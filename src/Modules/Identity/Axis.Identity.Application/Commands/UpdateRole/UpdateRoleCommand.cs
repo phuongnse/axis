@@ -1,0 +1,11 @@
+using Axis.Shared.Application.CQRS;
+
+namespace Axis.Identity.Application.Commands.UpdateRole;
+
+/// <summary>US-023: Update name, description, and permissions of a custom role.</summary>
+public sealed record UpdateRoleCommand(
+    Guid RoleId,
+    Guid OrganizationId,
+    string Name,
+    string? Description,
+    IReadOnlyList<string> Permissions) : ICommand;
