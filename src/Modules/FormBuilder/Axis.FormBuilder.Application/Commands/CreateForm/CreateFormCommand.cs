@@ -1,0 +1,9 @@
+using Axis.Shared.Application.CQRS;
+
+namespace Axis.FormBuilder.Application.Commands.CreateForm;
+
+/// <summary>US-075: Create a new form definition.</summary>
+public sealed record CreateFormCommand(
+    string Name,
+    string? Description,
+    Guid OrganizationId) : ICommand<Guid>;
