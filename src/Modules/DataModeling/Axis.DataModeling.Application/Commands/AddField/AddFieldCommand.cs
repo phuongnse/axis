@@ -1,0 +1,15 @@
+using Axis.DataModeling.Domain.Enums;
+using Axis.DataModeling.Domain.ValueObjects;
+using Axis.Shared.Application.CQRS;
+
+namespace Axis.DataModeling.Application.Commands.AddField;
+
+/// <summary>US-034: Add a field of any supported type to a model.</summary>
+public sealed record AddFieldCommand(
+    Guid ModelId,
+    Guid OrganizationId,
+    string Name,
+    string Label,
+    FieldType Type,
+    bool IsRequired,
+    FieldConfig Config) : ICommand<Guid>;

@@ -1,0 +1,47 @@
+using Axis.DataModeling.Application.Commands.CreateModel;
+using Axis.DataModeling.Application.Repositories;
+using Axis.DataModeling.Application.Services;
+using FluentAssertions;
+using FluentValidation;
+using NSubstitute;
+
+namespace Axis.DataModeling.Application.Tests.Commands;
+
+public class CreateModelHandlerTests
+{
+    private readonly IDataModelRepository _modelRepo = Substitute.For<IDataModelRepository>();
+    private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+
+    private static readonly Guid OrgId = Guid.NewGuid();
+
+    private CreateModelHandler CreateHandler() => new(_modelRepo, _uow);
+
+    [Fact]
+    public async Task Happy_path_creates_model_and_returns_id()
+    {
+        _modelRepo.NameExistsAsync("Invoice", OrgId).Returns(false);
+
+        var result = await CreateHandler().Handle(
+            new CreateModelCommand("Invoice", "Invoicing model", null, null, OrgId),
+            CancellationToken.None);
+
+        result.Should().NotBeEmpty();
+        await _modelRepo.Received(1).AddAsync(
+            Arg.Is<Domain.Aggregates.DataModel>(m =>
+                m.Name == "Invoice" && m.OrganizationId == OrgId),
+            Arg.Any<CancellationToken>());
+        await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Duplicate_name_throws_validation_exception()
+    {
+        _modelRepo.NameExistsAsync("Invoice", OrgId).Returns(true);
+
+        var act = async () => await CreateHandler().Handle(
+            new CreateModelCommand("Invoice", null, null, null, OrgId),
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<ValidationException>().WithMessage("*already exists*");
+    }
+}
