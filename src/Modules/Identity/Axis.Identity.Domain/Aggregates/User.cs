@@ -6,6 +6,9 @@ namespace Axis.Identity.Domain.Aggregates;
 
 public sealed class User : AggregateRoot<Guid>
 {
+    private const int MaxFailedAttempts = 5;
+    private const int LockoutMinutes = 15;
+
     private readonly List<Guid> _roleIds = [];
 
     public string FirstName { get; private set; }
@@ -14,7 +17,12 @@ public sealed class User : AggregateRoot<Guid>
     public Email Email { get; private set; }
     public Guid OrganizationId { get; private set; }
     public UserStatus Status { get; private set; }
+    public bool IsEmailVerified { get; private set; }
+    public int FailedLoginAttempts { get; private set; }
+    public DateTime? LockedUntil { get; private set; }
     public DateTime CreatedAt { get; private set; }
+
+    public bool IsLockedOut => LockedUntil.HasValue && DateTime.UtcNow < LockedUntil.Value;
 
     public IReadOnlyList<Guid> RoleIds => _roleIds.AsReadOnly();
 
@@ -32,6 +40,7 @@ public sealed class User : AggregateRoot<Guid>
         Email = email;
         OrganizationId = organizationId;
         Status = UserStatus.Active;
+        IsEmailVerified = false;
         CreatedAt = createdAt;
     }
 
@@ -42,12 +51,48 @@ public sealed class User : AggregateRoot<Guid>
         return user;
     }
 
+    public void VerifyEmail()
+    {
+        IsEmailVerified = true;
+    }
+
+    public void RecordFailedLogin()
+    {
+        FailedLoginAttempts++;
+        if (FailedLoginAttempts >= MaxFailedAttempts)
+            LockedUntil = DateTime.UtcNow.AddMinutes(LockoutMinutes);
+    }
+
+    public void ResetFailedLogins()
+    {
+        FailedLoginAttempts = 0;
+        LockedUntil = null;
+    }
+
+    /// <summary>Test helper — simulates lockout expiry by moving LockedUntil to the past.</summary>
+    internal void SimulateLockoutExpiry() =>
+        LockedUntil = DateTime.UtcNow.AddMinutes(-1);
+
     public void Deactivate()
     {
         if (Status == UserStatus.Inactive)
             throw new InvalidOperationException("User is already inactive.");
 
         Status = UserStatus.Inactive;
+    }
+
+    public void Reactivate()
+    {
+        if (Status == UserStatus.Active)
+            throw new InvalidOperationException("User is already active.");
+
+        Status = UserStatus.Active;
+    }
+
+    public void UpdateProfile(string firstName, string lastName)
+    {
+        FirstName = firstName;
+        LastName = lastName;
     }
 
     public void AssignRole(Guid roleId)

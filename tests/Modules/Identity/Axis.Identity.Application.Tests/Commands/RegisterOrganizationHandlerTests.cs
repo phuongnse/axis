@@ -1,0 +1,99 @@
+using Axis.Identity.Application.Commands.RegisterOrganization;
+using Axis.Identity.Application.Repositories;
+using Axis.Identity.Application.Services;
+using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Domain.ValueObjects;
+using FluentAssertions;
+using NSubstitute;
+using NSubstitute.ReturnsExtensions;
+
+namespace Axis.Identity.Application.Tests.Commands;
+
+public class RegisterOrganizationHandlerTests
+{
+    private readonly IOrganizationRepository _orgRepo = Substitute.For<IOrganizationRepository>();
+    private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
+    private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
+    private readonly IPasswordHasher _hasher = Substitute.For<IPasswordHasher>();
+    private readonly IEmailSender _emailSender = Substitute.For<IEmailSender>();
+    private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+
+    private RegisterOrganizationHandler CreateHandler() =>
+        new(_orgRepo, _userRepo, _roleRepo, _hasher, _emailSender, _uow);
+
+    private static RegisterOrganizationCommand ValidCommand() => new(
+        OrgName: "Acme Corp",
+        AdminFirstName: "Alice",
+        AdminLastName: "Smith",
+        AdminEmail: "alice@acme.com",
+        Password: "SecurePass1",
+        PasswordConfirmation: "SecurePass1");
+
+    [Fact]
+    public async Task Happy_path_creates_org_user_and_system_roles()
+    {
+        _orgRepo.SlugExistsAsync(Arg.Any<OrganizationSlug>()).Returns(false);
+        _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>()).Returns(false);
+        _hasher.Hash(Arg.Any<string>()).Returns("hashed");
+
+        await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
+
+        await _orgRepo.Received(1).AddAsync(Arg.Any<Organization>(), Arg.Any<CancellationToken>());
+        await _userRepo.Received(1).AddAsync(Arg.Any<User>(), Arg.Any<CancellationToken>());
+        await _roleRepo.Received(4).AddAsync(Arg.Any<Role>(), Arg.Any<CancellationToken>()); // 4 system roles
+        await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Happy_path_sends_verification_email()
+    {
+        _orgRepo.SlugExistsAsync(Arg.Any<OrganizationSlug>()).Returns(false);
+        _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>()).Returns(false);
+        _hasher.Hash(Arg.Any<string>()).Returns("hashed");
+
+        await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
+
+        await _emailSender.Received(1).SendVerificationEmailAsync(
+            "alice@acme.com", Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Duplicate_email_still_returns_success_without_creating_anything()
+    {
+        // Per US-001: no information leakage — same response whether email exists or not
+        _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>()).Returns(true);
+
+        var act = async () => await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
+
+        await act.Should().NotThrowAsync();
+        await _orgRepo.DidNotReceive().AddAsync(Arg.Any<Organization>(), Arg.Any<CancellationToken>());
+        await _emailSender.DidNotReceive().SendVerificationEmailAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Slug_collision_generates_unique_slug()
+    {
+        // First slug attempt collides, second should be unique
+        _orgRepo.SlugExistsAsync(Arg.Any<OrganizationSlug>())
+            .Returns(true, false); // first call: exists, second: free
+        _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>()).Returns(false);
+        _hasher.Hash(Arg.Any<string>()).Returns("hashed");
+
+        await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
+
+        await _orgRepo.Received(1).AddAsync(Arg.Any<Organization>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Password_is_hashed_before_storage()
+    {
+        _orgRepo.SlugExistsAsync(Arg.Any<OrganizationSlug>()).Returns(false);
+        _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>()).Returns(false);
+        _hasher.Hash("SecurePass1").Returns("hashed_password");
+
+        await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
+
+        _hasher.Received(1).Hash("SecurePass1");
+    }
+}
