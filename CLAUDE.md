@@ -44,7 +44,23 @@ Multi-tenancy: schema-per-tenant in PostgreSQL (`tenant_{org_slug}`). Tenant res
 - **TDD is mandatory**: write tests first, must pass before moving to next step, no exceptions.
 - **DDD**: apply fully to complex modules (WorkflowEngine, DataModeling). Be pragmatic on simpler CRUD modules (Identity).
 - **Diagrams**: add proactively to user stories or docs when a flow is complex enough that text alone doesn't convey it clearly.
+- **Docs first**: always read the relevant feature file(s) in `docs/epics/` before implementing. Every command/query must map to a specific US (User Story). Never invent requirements — if it's not in the docs, don't implement it.
+- **Layer order**: complete Domain → Application for ALL modules before touching Infrastructure. Infrastructure requires Docker (PostgreSQL + Redis via Testcontainers) and is done in one pass after all business logic is proven.
+- **CLAUDE.md maintenance**: update this file whenever architecture decisions change, new patterns are established, or layer-order rules are clarified.
 - Language: discuss in Vietnamese, write all code and docs in English.
+
+## Implementation Progress
+### Shared Kernel ✅
+- `Axis.Shared.Domain`: Entity, AggregateRoot, ValueObject, IDomainEvent, Result/Result<T>
+- `Axis.Shared.Application`: ICommand/IQuery/ICommandHandler/IQueryHandler, ValidationBehavior, TenantContext/ITenantContext
+
+### Identity Module (Domain ✅, Application 🔄, Infrastructure ⏳)
+**Domain**: Organization, User, Role, Invitation aggregates; Email, OrganizationSlug value objects; all domain events
+**Application done**: RegisterOrganization, InviteUser, DeactivateUser, CreateRole
+**Application remaining**: AcceptInvitation, AssignRoleToUser, GetRoles (query), UpdateRole, UpdateUserProfile, AcceptInvitation
+
+### Other Modules (⏳ not started)
+- DataModeling, WorkflowBuilder, FormBuilder, WorkflowEngine, PageBuilder
 
 ## Epics (MVP = E01–E06, Phase 2 = E07)
 All requirements, epics, features, and user stories are in `docs/`.
@@ -56,10 +72,10 @@ All requirements, epics, features, and user stories are in `docs/`.
 ## Diagram generation
 `docs/scripts/generate-diagrams.ps1` — regenerates PNGs from .puml via Kroki.io POST API.
 
-## Solution structure (when created)
+## Solution structure
 ```
 src/
-├── Axis.Api/                          # ASP.NET Core host
+├── Axis.Api/                          # ASP.NET Core host (sits directly under src/, not in a subfolder)
 ├── Shared/
 │   ├── Axis.Shared.Domain/
 │   ├── Axis.Shared.Application/
@@ -75,3 +91,11 @@ tests/
 ├── Shared/
 └── Modules/
 ```
+
+## Key patterns established
+- Command/Query files live in `Commands/{CommandName}/` or `Queries/{QueryName}/` subfolders
+- Repository interfaces defined in `Application/Repositories/`, service interfaces in `Application/Services/`
+- Domain guards throw `InvalidOperationException`; application-layer business rule violations throw `FluentValidation.ValidationException`
+- `InternalsVisibleTo` in `AssemblyInfo.cs` used for test helpers on domain aggregates
+- `Directory.Packages.props` manages all NuGet versions centrally — never add `Version=` to `<PackageReference>` in .csproj
+- `tests/Directory.Build.props` auto-adds FluentAssertions + NSubstitute to all test projects
