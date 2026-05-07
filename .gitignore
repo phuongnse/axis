@@ -26,6 +26,11 @@ dist/
 *.log
 logs/
 
+# NCrunch
+*.ncrunchsolution
+*.ncrunchproject
+.ncrunch*/
+
 # OS
 .DS_Store
 Thumbs.db
