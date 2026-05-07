@@ -1,0 +1,119 @@
+# F01 — Tenant Registration & Provisioning
+
+[← Back to E01](../README.md)
+
+---
+
+## Description
+
+Self-service registration flow where a new organization signs up and is automatically provisioned with an isolated database schema and a default admin account. No manual intervention from the Axis team is required.
+
+---
+
+## User Stories
+
+### US-001 — Register a new organization
+
+**As a** prospective customer, **I want to** register my organization on the Axis platform **so that** I can start building workflows for my team.
+
+**Acceptance Criteria:**
+
+*Happy path*
+- [ ] Registration form collects: organization name, admin full name, admin email, password, and password confirmation.
+- [ ] On successful submission, a verification email is sent and the user sees a confirmation screen.
+- [ ] The confirmation screen tells the user to check their email and does not reveal whether the email already exists.
+
+*Validation & errors*
+- [ ] Organization name: required, 2–100 characters.
+- [ ] Email: required, valid email format, unique across the platform.
+- [ ] Password: required, minimum 8 characters, must contain at least one letter and one number.
+- [ ] Password confirmation must match password exactly.
+- [ ] All field-level errors are shown inline, not as a global toast.
+- [ ] Submitting with an already-registered email shows the same confirmation screen (no information leakage about existing accounts).
+- [ ] If the API returns a server error (5xx), the form shows a generic "Something went wrong, please try again" message and the submit button re-enables.
+
+*Edge cases*
+- [ ] Multiple rapid submissions of the same form are deduplicated (idempotency key on the request).
+- [ ] Pasting a password with leading/trailing spaces is accepted as-is (no silent trimming).
+- [ ] Organization name with special characters (e.g., `O'Brien & Co.`) is accepted.
+
+*Out of scope*
+- Social/SSO sign-up (Google, GitHub) — not in MVP.
+- CAPTCHA — not in MVP.
+
+---
+
+### US-002 — Verify email and activate account
+
+**As a** new admin, **I want to** verify my email address **so that** my account is activated and I can access the platform.
+
+**Acceptance Criteria:**
+
+*Happy path*
+- [ ] Verification email arrives within 60 seconds of registration.
+- [ ] Clicking the verification link activates the account and automatically signs the user in.
+- [ ] User is redirected to the workspace after activation (or to the provisioning wait screen if schema is still being created).
+
+*Validation & errors*
+- [ ] Verification link is valid for 24 hours; clicking an expired link shows a clear message with a "Resend verification email" button.
+- [ ] Clicking an already-used verification link shows "This link has already been used. Please sign in."
+- [ ] Clicking a tampered/invalid token shows "Invalid verification link."
+
+*Edge cases*
+- [ ] Resend is rate-limited: max 3 resend requests per email per hour; subsequent attempts show "Please wait before requesting another email."
+- [ ] If the user tries to sign in before verifying, they see "Please verify your email first" with a resend option.
+- [ ] Verification link works regardless of which browser or device it is opened on.
+
+*Out of scope*
+- Automatic re-send after X minutes — not in MVP.
+
+---
+
+### US-003 — Automatic tenant provisioning
+
+**As a** new admin, **I want** my organization's environment to be ready immediately after email verification **so that** I can start using the platform without waiting.
+
+**Acceptance Criteria:**
+
+*Happy path*
+- [ ] A dedicated PostgreSQL schema is created within 10 seconds of email verification.
+- [ ] All base tables are migrated into the new schema automatically.
+- [ ] The registering user is assigned the Admin role within the org.
+- [ ] Once provisioning completes, the workspace dashboard is fully functional.
+
+*Validation & errors*
+- [ ] If provisioning fails (e.g., DB timeout), the error is logged with full context and a retry job is scheduled automatically (up to 3 retries, with exponential backoff).
+- [ ] If provisioning fails after all retries, a platform alert is triggered for the Axis team to investigate.
+- [ ] The user is not stuck: the UI shows a "Setting up your workspace…" state and retries polling every 5 seconds.
+
+*Edge cases*
+- [ ] Provisioning is idempotent: running it twice for the same org does not create duplicate schemas or tables.
+- [ ] If the org schema already exists (partial previous run), the migration runner detects this and continues from where it left off.
+
+*Out of scope*
+- Custom schema naming chosen by the user — schema names are auto-generated.
+
+---
+
+### US-004 — Select a subscription plan during registration
+
+**As a** new admin, **I want to** choose a subscription plan during registration **so that** I know what features and limits I have access to.
+
+**Acceptance Criteria:**
+
+*Happy path*
+- [ ] Available plans are shown in a comparison table before the registration form.
+- [ ] A free/trial plan is always available with no payment required.
+- [ ] Selected plan is saved to the organization record during provisioning.
+- [ ] After activation, the workspace header shows the current plan name.
+
+*Validation & errors*
+- [ ] If no plan is explicitly selected, the free/trial plan is applied by default.
+- [ ] Feature limits are enforced immediately after provisioning (e.g., creating a 4th workflow on a 3-workflow plan returns HTTP 402 with a clear upgrade message).
+
+*Edge cases*
+- [ ] If a paid plan is selected in MVP (before billing integration), it is treated as trial with a flag for the Axis team to follow up.
+
+*Out of scope*
+- Credit card collection and payment processing — Phase 2.
+- Plan upgrade/downgrade self-service — covered in F04.

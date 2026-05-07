@@ -1,0 +1,97 @@
+@startuml data-model
+skinparam backgroundColor #FAFAFA
+skinparam defaultFontName Segoe UI
+skinparam classAttributeIconSize 0
+
+skinparam class {
+    BorderColor #4A90D9
+    BackgroundColor #EBF4FF
+    FontColor #1A1A2E
+    ArrowColor #4A90D9
+}
+
+title Data Modeling — Core Entity Relationships
+
+class ModelDefinition {
+    +id: UUID
+    +name: string
+    +slug: string
+    +description: string
+    +icon: string
+    +color: string
+    +createdAt: DateTime
+    +updatedAt: DateTime
+}
+
+class FieldDefinition {
+    +id: UUID
+    +modelId: UUID
+    +name: string
+    +label: string
+    +type: FieldType
+    +required: boolean
+    +displayOrder: int
+    +config: JSONB
+    +createdAt: DateTime
+}
+
+enum FieldType {
+    Text
+    Number
+    Boolean
+    Date
+    Enum
+    Relation
+    DataClass
+    File
+    JSON
+}
+
+class DataClassDefinition {
+    +id: UUID
+    +name: string
+    +description: string
+    +createdAt: DateTime
+    +updatedAt: DateTime
+}
+
+class DataClassField {
+    +id: UUID
+    +dataClassId: UUID
+    +name: string
+    +label: string
+    +type: FieldType
+    +required: boolean
+    +displayOrder: int
+    +config: JSONB
+}
+
+class Record {
+    +id: UUID
+    +modelId: UUID
+    +data: JSONB
+    +createdAt: DateTime
+    +updatedAt: DateTime
+    +createdBy: UUID
+}
+
+ModelDefinition "1" *-- "many" FieldDefinition : has
+FieldDefinition --> FieldType : has type
+FieldDefinition ..> DataClassDefinition : (DataClass type)\nreferences
+FieldDefinition ..> ModelDefinition : (Relation type)\ntargets
+DataClassDefinition "1" *-- "many" DataClassField : has
+DataClassField --> FieldType : has type
+Record "many" --> "1" ModelDefinition : instance of
+
+note bottom of Record
+  data: JSONB stores all field values
+  Example:
+  {
+    "name": "ACME Corp",
+    "revenue": 500000,
+    "status": "active",
+    "address": { ... }
+  }
+end note
+
+@enduml

@@ -1,0 +1,55 @@
+@startuml auth-flow
+skinparam backgroundColor #FAFAFA
+skinparam defaultFontName Segoe UI
+skinparam sequenceMessageAlign center
+skinparam sequence {
+    ArrowColor #4A90D9
+    ActorBorderColor #4A90D9
+    LifeLineBorderColor #4A90D9
+    ParticipantBorderColor #4A90D9
+    ParticipantBackgroundColor #EBF4FF
+}
+
+title Authentication Flow — JWT + Refresh Token
+
+actor "User" as User
+participant "Web App\n(React SPA)" as Web
+participant "API Server\n(OpenIddict)" as API
+database "Redis\n(token blacklist)" as Redis
+database "PostgreSQL" as DB
+
+== Sign In ==
+
+User -> Web: Enter email + password
+Web -> API: POST /auth/token\n{email, password}
+API -> DB: Validate credentials\nLook up org_id, roles
+API --> Web: 200 OK\n{access_token (JWT, 15min),\nrefresh_token (opaque, 7d)}
+Web -> Web: Store access_token in memory\nStore refresh_token in httpOnly cookie
+
+== Authenticated Request ==
+
+User -> Web: Navigate / perform action
+Web -> API: GET /workflows\nAuthorization: Bearer {access_token}
+API -> API: Validate JWT signature\nExtract org_id, user_id, roles\nSet tenant context (search_path)
+API --> Web: 200 OK + data
+
+== Silent Token Refresh ==
+
+note over Web: At 80% of access_token TTL (~12 min)
+
+Web -> API: POST /auth/refresh\n(refresh_token via httpOnly cookie)
+API -> DB: Validate refresh token\n(not expired, not revoked)
+API -> DB: Rotate refresh token\n(old token invalidated)
+API --> Web: 200 OK\n{new access_token, new refresh_token}
+Web -> Web: Replace access_token in memory
+
+== Sign Out ==
+
+User -> Web: Click "Sign Out"
+Web -> API: POST /auth/signout\n(refresh_token via cookie)
+API -> Redis: Add access_token JTI to blacklist\n(until expiry)
+API -> DB: Revoke refresh token
+API --> Web: 200 OK
+Web -> Web: Clear access_token from memory\nRedirect to /sign-in
+
+@enduml

@@ -1,0 +1,38 @@
+@startuml container-diagram
+!include <C4/C4_Container>
+
+LAYOUT_WITH_LEGEND()
+
+title Container Diagram — Axis Platform
+
+Person(orgAdmin, "Org Admin / Member", "Uses the platform\nto build and run workflows.")
+Person(endUser, "End User", "Submits forms and\nviews published pages.")
+
+System_Boundary(axis, "Axis Platform") {
+    Container(webApp, "Web Application", "React 18 + TypeScript\nVite, shadcn/ui, React Flow, dnd-kit", "Single-page application for all user interactions:\nworkflow builder, form builder, data management.")
+
+    Container(api, "API Server", "ASP.NET Core 8\nModular Monolith + DDD + CQRS", "REST API and SignalR hub.\nHandles all business logic across 6 modules.")
+
+    ContainerDb(postgres, "PostgreSQL 16", "Database\nSchema-per-tenant", "Stores all tenant data:\nworkflow definitions, executions,\nmodels, records, forms.")
+
+    Container(redis, "Redis 7", "Cache & Distributed Lock", "Session and schema-name cache.\nDistributed locks for job deduplication.\nPub/sub for real-time events.")
+
+    Container(wolverine, "Wolverine\n(In-Process)", "Background Job Runner\n& Message Bus", "Executes scheduled workflows.\nProcesses async step handlers.\nDispatches domain events between modules.")
+}
+
+System_Ext(emailService, "Email Service", "SMTP / SendGrid")
+System_Ext(externalApis, "External APIs", "Third-party REST APIs")
+
+Rel(orgAdmin, webApp, "Uses", "HTTPS")
+Rel(endUser, webApp, "Submits forms,\nviews pages", "HTTPS")
+Rel(webApp, api, "REST API calls", "HTTPS / JSON")
+Rel(webApp, api, "Real-time status updates", "WebSocket / SignalR")
+Rel(api, postgres, "Reads / writes", "EF Core / SQL")
+Rel(api, redis, "Cache reads/writes,\ndistributed locks", "Redis Protocol")
+Rel(api, wolverine, "Schedules jobs,\npublishes domain events", "In-process")
+Rel(wolverine, postgres, "Reads / writes", "EF Core / SQL")
+Rel(wolverine, redis, "Job queue,\npub/sub", "Redis Protocol")
+Rel(wolverine, emailService, "Sends emails", "SMTP / API")
+Rel(wolverine, externalApis, "HTTP Request steps", "HTTPS")
+
+@enduml

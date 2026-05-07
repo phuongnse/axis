@@ -1,0 +1,95 @@
+@startuml module-overview
+skinparam backgroundColor #FAFAFA
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 12
+
+skinparam package {
+    BorderColor #4A90D9
+    BackgroundColor #EBF4FF
+    FontStyle bold
+    FontColor #1A1A2E
+}
+
+skinparam component {
+    BorderColor #4A90D9
+    BackgroundColor #FFFFFF
+    FontColor #1A1A2E
+}
+
+skinparam arrow {
+    Color #6B7280
+    FontColor #6B7280
+    FontSize 10
+}
+
+title Axis — Modular Monolith Module Overview
+
+package "Shared Kernel" as Shared {
+    [Domain Primitives\n(Entity, AggregateRoot,\nValueObject, DomainEvent)]
+    [Multi-Tenancy\n(ITenantContext,\nTenant Middleware)]
+    [CQRS Abstractions\n(ICommand, IQuery,\nICommandHandler)]
+    [Event Bus\n(Wolverine Integration)]
+}
+
+package "Identity Module" as Identity {
+    [Authentication\n(OpenIddict, JWT)]
+    [Users & Invitations]
+    [Roles & Permissions\n(RBAC)]
+}
+
+package "Data Modeling Module" as DataModeling {
+    [Model Definitions\n(Fields, Data Classes)]
+    [Record Storage\n(JSONB-backed)]
+    [Schema Registry]
+}
+
+package "Workflow Builder Module" as WorkflowBuilder {
+    [Workflow Definitions]
+    [Step Configurations]
+    [Trigger Configurations]
+    [Import / Export]
+}
+
+package "Form Builder Module" as FormBuilder {
+    [Form Definitions]
+    [Form Fields & Validation]
+    [Form Tasks]
+    [Submissions]
+}
+
+package "Workflow Engine Module" as WorkflowEngine {
+    [Execution Orchestrator]
+    [Step Handlers\n(Form, HTTP, Condition,\nScript, Notification)]
+    [Error Handler]
+    [Execution History]
+}
+
+package "Page Builder Module" as PageBuilder {
+    [Page Definitions]
+    [Widget Library]
+    [Layout Engine]
+    [Data Bindings]
+}
+
+Shared <-- Identity : uses
+Shared <-- DataModeling : uses
+Shared <-- WorkflowBuilder : uses
+Shared <-- FormBuilder : uses
+Shared <-- WorkflowEngine : uses
+Shared <-- PageBuilder : uses
+
+Identity <-- DataModeling : resolves tenant user
+Identity <-- WorkflowBuilder : checks permissions
+Identity <-- FormBuilder : resolves assignee
+Identity <-- WorkflowEngine : auth context
+Identity <-- PageBuilder : access control
+
+DataModeling <-- WorkflowEngine : reads model/record data
+DataModeling <-- FormBuilder : Relation Picker fields
+DataModeling <-- PageBuilder : data binding
+
+WorkflowBuilder <-- WorkflowEngine : loads definitions
+FormBuilder <-- WorkflowEngine : creates form tasks
+FormBuilder <-- WorkflowBuilder : Form step type
+
+@enduml
