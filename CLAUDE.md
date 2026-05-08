@@ -46,6 +46,8 @@ Multi-tenancy: schema-per-tenant in PostgreSQL (`tenant_{org_slug}`). Tenant res
 - **Diagrams**: add proactively to user stories or docs when a flow is complex enough that text alone doesn't convey it clearly.
 - **Docs-first, always — non-negotiable**: Before implementing any user story, feature, or fix, read the relevant feature file in `docs/epics/`. The doc defines the contract; code implements it. Never write code first and update docs after. If the spec needs clarification or refinement before coding starts, update the doc first. Every code change that affects observable behavior (bug fix, design decision, new constraint, deviation from spec) must also update the relevant doc in the same commit.
 - **Every command/query maps to a US**: Never invent requirements. If a new requirement is discovered during implementation, add it to the docs first, then implement.
+- **AC compliance is mandatory — no silent skips**: Every US must be implemented to ALL its acceptance criteria. Never defer or skip an AC without explicitly documenting it as a gap in the `> **Implementation status**` callout with the reason. If during implementation or discussion a requirement changes or a new constraint emerges, update the AC in the feature file first, then implement. A US is not done until every AC is either implemented or documented as a gap.
+- **A layer cannot be marked ✅ Done if any US in scope is missing its callout**: Before updating a layer status to ✅ in the epic README or CLAUDE.md, verify that every US in that feature set has an `> **Implementation status**` callout. A US with no callout = silently skipped = the layer is not done.
 - **Read files in full before making claims**: Never use a line `limit` when the goal is to assert something about a file's content (e.g. "this file has no X"). Read the whole file. Partial reads → wrong conclusions.
 - **Language**: discuss in Vietnamese, write all code and docs in English.
 - **Git workflow**: solo project — always commit directly to `main`. Only create a branch if explicitly asked. When Claude Code auto-creates a worktree with a random branch name, commit the work then fast-forward merge to `main` and delete the branch.
@@ -75,9 +77,10 @@ A US or layer is NOT done until all of the following are complete in the same co
 
 ### Completing a layer for a module (Domain, Application, Infrastructure, API)
 1. ✅ All tests for that layer passing
-2. ✅ All US callouts in the relevant feature files updated to reflect the new layer status
-3. ✅ Epic README `Implementation Status` table updated (e.g. `Infrastructure: ✅ Done`)
-4. ✅ `Implementation Progress` section in this file (CLAUDE.md) updated
+2. ✅ Every US in every feature file for that module has an `> **Implementation status**` callout — no US left without one
+3. ✅ All US callouts updated to reflect the new layer status
+4. ✅ Epic README `Implementation Status` table updated (e.g. `Infrastructure: ✅ Done`)
+5. ✅ `Implementation Progress` section in this file (CLAUDE.md) updated
 
 ### Completing a feature fix or refactor
 1. ✅ Tests updated/added and passing
