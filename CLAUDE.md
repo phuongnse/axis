@@ -35,7 +35,9 @@ Shared Kernel: `Axis.Shared.Domain`, `Axis.Shared.Application`, `Axis.Shared.Inf
 Multi-tenancy: schema-per-tenant in PostgreSQL (`tenant_{org_slug}`). Tenant resolved from JWT `org_id` claim; schema name cached in Redis.
 
 ## Module dependency rules
-- Modules communicate ONLY via domain events (Wolverine) or defined interfaces — never direct DB joins across modules.
+- Modules communicate ONLY via **asynchronous domain events** (Wolverine) or explicit Application-layer interfaces. 
+- **No shared database transactions** across module boundaries.
+- Cross-module data consistency is handled via Eventual Consistency.
 - Domain layer: zero external dependencies (pure C#, fully unit testable).
 - Application layer: depends on Domain only — no infrastructure references.
 - Infrastructure: implements interfaces defined in Application/Domain.
@@ -53,9 +55,18 @@ Multi-tenancy: schema-per-tenant in PostgreSQL (`tenant_{org_slug}`). Tenant res
 - **Git workflow**: solo project — always commit directly to `main`. Only create a branch if explicitly asked. When Claude Code auto-creates a worktree with a random branch name, commit the work then fast-forward merge to `main` and delete the branch.
 - **CLAUDE.md maintenance**: update this file whenever architecture decisions change, new patterns are established, or layer-order rules are clarified.
 - **API endpoint style — Minimal API (mandatory)**: All new endpoint work uses Minimal API (`MapGroup` + `IEndpointRouteBuilder` extension methods), not traditional controllers. Rationale: cleaner MediatR dispatch (no constructor injection overhead), per-handler DI, less ceremony, .NET 8 first-class support. Never default silently to traditional controllers — surface the choice explicitly if there is genuine ambiguity. Use `ConfigureHttpJsonOptions` for JSON configuration (not `AddControllers().AddJsonOptions(...)`).
+- **Explicit over Implicit**: Never use `var` if the type is not crystal clear from the assignment.
+- **Minimal API Structure**: Each module must implement an `IMapEndpoints` interface or use a consistent `Map{ModuleName}Endpoints` extension method. No logic in the mapping file—only MediatR dispatching.
+- **Idempotency**: All Command handlers and Migrations must be designed to be idempotent to ensure stability in a multi-tenant environment.
 - **Surface architectural decisions before implementing**: Before starting any new layer, module, or API surface, list the 2–3 key design choices (endpoint style, auth approach, error format, data access pattern, test strategy) and confirm with the user. Defaulting silently to familiar patterns wastes effort on later migration.
 - **No inline fully-qualified type names**: Always use `using` directives at the top of the file. Never write `typeof(Axis.Some.Long.Namespace.MyType)` inline — add `using Axis.Some.Long.Namespace;` and refer to `MyType` directly. Applies everywhere: `typeof(...)`, generic constraints, new expressions, casts. Keeps files readable and imports explicit.
+- **Mandatory Result Pattern**: All Application-layer logic and Command/Query handlers must return `Result` or `Result<T>` to signal business rule violations or expected failures. Throwing exceptions is strictly reserved for infrastructure failures (e.g., Database down, Network timeout) or true "exceptional" system states. Domain aggregates may use guards that throw `InvalidOperationException` for internal invariant violations.
+- **Centralized Global Usings**: Use a `GlobalUsings.cs` file in each project or define `<Using Include="..." />` in `Directory.Build.props` for ubiquitous namespaces (e.g., `MediatR`, `Axis.Shared.Domain`, `Axis.Shared.Application`). This eliminates boilerplate `using` directives in individual files and keeps the focus on implementation logic.
 - **Comment policy — WHY not WHAT**: Default to no comments; well-named identifiers speak for themselves. Add a comment only when the WHY is non-obvious: a hidden constraint, a multi-step flow with a non-obvious invariant, a framework quirk, or business logic that would surprise a reader (e.g. token rotation, JTI blacklisting TTL, admin-count guard). Never describe WHAT the code does — only why it must be done this way.
+
+## Multi-tenancy & Migrations
+- **Schema Management**: Every new migration must be tested against multiple schemas using `Testcontainers` before being marked as ✅ Done.
+- **Tenant Isolation**: Tenant resolution is a "hard-link" in `AxisDbContext`. Direct access to `public` schema from tenant-aware services is strictly forbidden.
 
 ## Priority order
 When deciding what to work on next, always follow this order — no exceptions, no asking:
