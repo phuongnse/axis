@@ -12,6 +12,12 @@ public interface IUserRepository
     /// <summary>Platform-wide email lookup (for registration uniqueness check).</summary>
     Task<bool> EmailExistsPlatformWideAsync(Email email, CancellationToken ct = default);
 
+    /// <summary>Platform-wide user lookup by email — used for sign-in (no org context yet).</summary>
+    Task<User?> FindByEmailGloballyAsync(Email email, CancellationToken ct = default);
+
+    /// <summary>Platform-wide user lookup by id — used for email verification (no org context yet).</summary>
+    Task<User?> GetByIdPlatformWideAsync(Guid id, CancellationToken ct = default);
+
     /// <summary>Returns count of users with Admin role in the org.</summary>
     Task<int> CountAdminsAsync(Guid organizationId, Guid adminRoleId, CancellationToken ct = default);
 }

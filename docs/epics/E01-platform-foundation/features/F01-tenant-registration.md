@@ -42,8 +42,8 @@ Self-service registration flow where a new organization signs up and is automati
 - CAPTCHA — not in MVP.
 
 > **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: email/password validation rules (min 8 chars, letter+number, confirmation match) implemented in `RegisterOrganizationCommandValidator`; idempotency key (rapid submission dedup) not yet implemented — pending API layer.
-> Decisions: duplicate email returns silently without creating anything (no error thrown) — matches "same confirmation screen" AC. Org slug auto-generated from org name with uniqueness retry loop; BCrypt work factor 12 for password hashing. 4 default system roles seeded atomically in the same transaction.
+> Gaps vs spec: idempotency key (rapid submission dedup) pending API layer.
+> Decisions: duplicate email returns silently without creating anything — matches "same confirmation screen" AC. `RegisterOrganizationCommandValidator` enforces: org name 2–100 chars, valid email, password min 8 chars + letter + number, confirmation match. Org slug auto-generated with uniqueness retry loop; BCrypt work factor 12. 4 default system roles seeded atomically in the same transaction.
 
 ---
 
@@ -70,6 +70,10 @@ Self-service registration flow where a new organization signs up and is automati
 
 *Out of scope*
 - Automatic re-send after X minutes — not in MVP.
+
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: rate limiting (max 3 resends/hour) pending API layer. Auto sign-in after verification click pending API layer.
+> Decisions: verification token is simplified as `user.Id` (Guid string) — `VerifyEmailCommand(token)` parses it as Guid, looks up user by ID platform-wide, calls `User.VerifyEmail()`. Production will use a dedicated token table; this is documented as a gap. `ResendVerificationEmailCommand` silently succeeds for unknown/already-verified emails (no info leakage).
 
 ---
 

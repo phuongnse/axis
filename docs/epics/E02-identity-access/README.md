@@ -64,8 +64,8 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 | Layer | Status | Notes |
 |---|---|---|
 | Domain | ✅ Done | `Organization`, `User`, `Role`, `Invitation` aggregates; `Email`, `OrganizationSlug` value objects; all domain events |
-| Application | ✅ Done | `RegisterOrganization`, `InviteUser`, `AcceptInvitation`, `DeactivateUser`, `AssignRoleToUser`, `CreateRole`, `UpdateRole`, `UpdateUserProfile`; `GetRoles` query |
-| Infrastructure | ✅ Done | `IdentityDbContext` (public schema), EF Core mappings, all repositories, `BCryptPasswordHasher` (work factor 12), `MailKitEmailSender`, `IdentityUnitOfWork` |
+| Application | ✅ Done | `RegisterOrganization`, `InviteUser`, `AcceptInvitation`, `DeactivateUser`, `AssignRoleToUser`, `CreateRole`, `UpdateRole`, `UpdateUserProfile`; `AuthenticateUser`, `VerifyEmail`, `ResendVerificationEmail`, `RequestPasswordReset`, `ResetPassword`, `ChangePassword`, `RevokeSession`; `GetRoles`, `GetUserSessions` queries |
+| Infrastructure | ✅ Done | `IdentityDbContext` (public schema), EF Core mappings, all repositories, `BCryptPasswordHasher` (work factor 12), `MailKitEmailSender`, `IdentityUnitOfWork`, `PasswordResetTokenStore` (`password_reset_tokens` table) |
 | API | ⏳ Pending | — |
 | Frontend | ⏳ Pending | — |
 

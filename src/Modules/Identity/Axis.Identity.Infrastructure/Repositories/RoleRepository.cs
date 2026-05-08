@@ -29,4 +29,13 @@ internal sealed class RoleRepository(IdentityDbContext context) : IRoleRepositor
               && r.OrganizationId == organizationId
               && (excludeRoleId == null || r.Id != excludeRoleId.Value),
             ct);
+
+    public async Task<IReadOnlyList<Role>> GetByIdsAsync(
+        IEnumerable<Guid> ids, Guid organizationId, CancellationToken ct = default)
+    {
+        var idList = ids.ToList();
+        return await context.Roles
+            .Where(r => idList.Contains(r.Id) && r.OrganizationId == organizationId)
+            .ToListAsync(ct);
+    }
 }

@@ -22,6 +22,12 @@ internal sealed class UserRepository(IdentityDbContext context) : IUserRepositor
     public async Task<bool> EmailExistsPlatformWideAsync(Email email, CancellationToken ct = default) =>
         await context.Users.AnyAsync(u => u.Email == email, ct);
 
+    public async Task<User?> FindByEmailGloballyAsync(Email email, CancellationToken ct = default) =>
+        await context.Users.FirstOrDefaultAsync(u => u.Email == email, ct);
+
+    public async Task<User?> GetByIdPlatformWideAsync(Guid id, CancellationToken ct = default) =>
+        await context.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
+
     public async Task<int> CountAdminsAsync(Guid organizationId, Guid adminRoleId, CancellationToken ct = default) =>
         await context.Users
             .Where(u => u.OrganizationId == organizationId

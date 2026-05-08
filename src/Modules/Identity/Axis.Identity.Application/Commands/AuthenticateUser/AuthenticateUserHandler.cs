@@ -1,0 +1,56 @@
+using Axis.Identity.Application.Repositories;
+using Axis.Identity.Application.Services;
+using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Domain.ValueObjects;
+using Axis.Shared.Application.CQRS;
+using FluentValidation;
+
+namespace Axis.Identity.Application.Commands.AuthenticateUser;
+
+public sealed class AuthenticateUserHandler(
+    IUserRepository userRepo,
+    IRoleRepository roleRepo,
+    IPasswordHasher hasher,
+    IUnitOfWork uow)
+    : ICommandHandler<AuthenticateUserCommand, AuthenticationResult>
+{
+    public async Task<AuthenticationResult> Handle(
+        AuthenticateUserCommand command, CancellationToken cancellationToken)
+    {
+        var email = Email.Create(command.Email);
+        if (email.IsFailure)
+            throw new ValidationException("Invalid email format.");
+
+        var user = await userRepo.FindByEmailGloballyAsync(email.Value, cancellationToken);
+        if (user is null)
+            return AuthenticationResult.Fail(AuthFailureReason.InvalidCredentials);
+
+        if (user.Status == UserStatus.Inactive)
+            return AuthenticationResult.Fail(AuthFailureReason.AccountDeactivated);
+
+        if (!user.IsEmailVerified)
+            return AuthenticationResult.Fail(AuthFailureReason.EmailNotVerified);
+
+        if (user.IsLockedOut)
+            return AuthenticationResult.Fail(AuthFailureReason.AccountLocked, user.LockedUntil);
+
+        if (!hasher.Verify(command.Password, user.PasswordHash ?? string.Empty))
+        {
+            user.RecordFailedLogin();
+            await uow.SaveChangesAsync(cancellationToken);
+            return AuthenticationResult.Fail(AuthFailureReason.InvalidCredentials);
+        }
+
+        user.ResetFailedLogins();
+        await uow.SaveChangesAsync(cancellationToken);
+
+        var roles = await roleRepo.GetByIdsAsync(user.RoleIds, user.OrganizationId, cancellationToken);
+        var permissions = roles
+            .SelectMany(r => r.Permissions)
+            .Distinct()
+            .ToList();
+
+        return AuthenticationResult.Ok(
+            user.Id, user.OrganizationId, user.Email.Value, user.FullName, permissions);
+    }
+}

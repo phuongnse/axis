@@ -27,6 +27,7 @@ public static class IdentityInfrastructureExtensions
         services.AddScoped<IUnitOfWork, IdentityUnitOfWork>();
         services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
         services.AddScoped<IEmailSender, MailKitEmailSender>();
+        services.AddScoped<IPasswordResetTokenStore, PasswordResetTokenStore>();
 
         services.AddAWSService<IAmazonS3>();
         services.AddScoped<IAvatarStorageService, S3AvatarStorageService>();

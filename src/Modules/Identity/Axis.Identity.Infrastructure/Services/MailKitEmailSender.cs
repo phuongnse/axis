@@ -21,6 +21,20 @@ internal sealed class MailKitEmailSender(IConfiguration configuration) : IEmailS
         await SendAsync(toEmail, subject, body, ct);
     }
 
+    public async Task SendPasswordResetEmailAsync(string toEmail, string resetToken, CancellationToken ct = default)
+    {
+        var subject = "Reset your Axis password";
+        var body = $"Click the link to reset your password (valid for 1 hour): {GetBaseUrl()}/auth/reset-password?token={resetToken}";
+        await SendAsync(toEmail, subject, body, ct);
+    }
+
+    public async Task SendPasswordChangedNotificationAsync(string toEmail, CancellationToken ct = default)
+    {
+        var subject = "Your Axis password was changed";
+        var body = "Your password was recently changed. If this wasn't you, contact support immediately.";
+        await SendAsync(toEmail, subject, body, ct);
+    }
+
     private async Task SendAsync(string toEmail, string subject, string body, CancellationToken ct)
     {
         var smtp = configuration.GetSection("Email:Smtp");

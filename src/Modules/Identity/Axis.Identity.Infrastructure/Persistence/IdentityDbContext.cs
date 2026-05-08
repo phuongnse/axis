@@ -1,5 +1,6 @@
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Infrastructure.Persistence.Configurations;
+using Axis.Identity.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Axis.Identity.Infrastructure.Persistence;
@@ -10,6 +11,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     public DbSet<User> Users => Set<User>();
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Invitation> Invitations => Set<Invitation>();
+    internal DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -17,5 +19,6 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
         modelBuilder.ApplyConfiguration(new UserConfiguration());
         modelBuilder.ApplyConfiguration(new RoleConfiguration());
         modelBuilder.ApplyConfiguration(new InvitationConfiguration());
+        modelBuilder.ApplyConfiguration(new PasswordResetTokenConfiguration());
     }
 }
