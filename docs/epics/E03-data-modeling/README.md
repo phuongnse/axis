@@ -83,8 +83,8 @@ A concrete instance of a Model. Records are stored in the tenant's schema using 
 |---|---|---|
 | Domain | ✅ Done | `DataModel`, `Field`, `DataRecord` aggregates; all field types and domain events |
 | Application | ✅ Done | All command/query handlers; repository interfaces |
-| Infrastructure | ✅ Done | EF Core mappings, repositories, JSONB field converters, Testcontainers integration tests (15 tests) |
-| API | ⏳ Pending | — |
+| Infrastructure | ✅ Done | EF Core mappings, repositories, JSONB field converters, pagination+search (GetPagedAsync), Testcontainers integration tests |
+| API | ✅ Done | Minimal API — `/api/models`, `/api/data-classes`, `/api/models/{id}/records`; integration tests |
 | Frontend | ⏳ Pending | — |
 
 ---

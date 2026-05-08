@@ -1,4 +1,4 @@
-using Axis.Shared.Application.Tenancy;
+﻿using Axis.Shared.Application.Tenancy;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Testcontainers.PostgreSql;
@@ -43,6 +43,5 @@ public sealed class WorkflowBuilderDatabaseFixture : IAsyncLifetime
 internal sealed class TestTenantContext(string schemaName) : ITenantContext
 {
     public Guid OrganizationId => Guid.Parse("00000000-0000-0000-0000-000000000001");
-    public string OrganizationSlug => "test-org";
     public string SchemaName => schemaName;
 }

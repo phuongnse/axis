@@ -33,7 +33,7 @@ public class RoleEndpointTests(ApiTestFixture fixture)
 
         // Admin, Editor, Viewer, End User seeded at registration
         body!.Should().HaveCount(4);
-        body.Select(r => r.GetProperty("name").GetString()!).Should()
+        body!.Select(r => r.GetProperty("name").GetString()!).Should()
             .Contain(["Admin", "Editor", "Viewer", "End User"]);
     }
 

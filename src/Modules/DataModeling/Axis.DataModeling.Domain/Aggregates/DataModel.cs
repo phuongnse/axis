@@ -84,6 +84,17 @@ public sealed class DataModel : AggregateRoot<Guid>
         return field;
     }
 
+    public void UpdateField(Guid fieldId, string label, string? helpText, bool isRequired, FieldConfig config)
+    {
+        EnsureNotDeleted();
+        var field = _fields.SingleOrDefault(f => f.Id == fieldId)
+            ?? throw new InvalidOperationException("Field not found.");
+        if (field.IsSystem)
+            throw new InvalidOperationException("Cannot modify a system field.");
+        field.Update(label, helpText, isRequired, config);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void RemoveField(Guid fieldId)
     {
         var field = _fields.SingleOrDefault(f => f.Id == fieldId)

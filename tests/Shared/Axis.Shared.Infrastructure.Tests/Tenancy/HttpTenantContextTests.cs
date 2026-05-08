@@ -8,13 +8,9 @@ namespace Axis.Shared.Infrastructure.Tests.Tenancy;
 
 public class HttpTenantContextTests
 {
-    private static IHttpContextAccessor BuildAccessor(Guid orgId, string orgSlug)
+    private static IHttpContextAccessor BuildAccessor(Guid orgId)
     {
-        var claims = new[]
-        {
-            new Claim("org_id", orgId.ToString()),
-            new Claim("org_slug", orgSlug)
-        };
+        var claims = new[] { new Claim("org_id", orgId.ToString()) };
         var identity = new ClaimsIdentity(claims, "Bearer");
         var principal = new ClaimsPrincipal(identity);
 
@@ -28,25 +24,18 @@ public class HttpTenantContextTests
     public void OrganizationId_reads_org_id_claim()
     {
         var orgId = Guid.NewGuid();
-        var sut = new HttpTenantContext(BuildAccessor(orgId, "acme"));
+        var sut = new HttpTenantContext(BuildAccessor(orgId));
 
         sut.OrganizationId.Should().Be(orgId);
     }
 
     [Fact]
-    public void OrganizationSlug_reads_org_slug_claim()
+    public void SchemaName_derives_tenant_prefix_from_org_id()
     {
-        var sut = new HttpTenantContext(BuildAccessor(Guid.NewGuid(), "my-company"));
+        var orgId = Guid.NewGuid();
+        var sut = new HttpTenantContext(BuildAccessor(orgId));
 
-        sut.OrganizationSlug.Should().Be("my-company");
-    }
-
-    [Fact]
-    public void SchemaName_derives_tenant_prefix()
-    {
-        var sut = new HttpTenantContext(BuildAccessor(Guid.NewGuid(), "acme"));
-
-        sut.SchemaName.Should().Be("tenant_acme");
+        sut.SchemaName.Should().Be($"tenant_{orgId:N}");
     }
 
     [Fact]
@@ -67,8 +56,7 @@ public class HttpTenantContextTests
     {
         var httpContext = new DefaultHttpContext
         {
-            User = new ClaimsPrincipal(new ClaimsIdentity(
-                [new Claim("org_slug", "acme")], "Bearer"))
+            User = new ClaimsPrincipal(new ClaimsIdentity([], "Bearer"))
         };
         var accessor = Substitute.For<IHttpContextAccessor>();
         accessor.HttpContext.Returns(httpContext);

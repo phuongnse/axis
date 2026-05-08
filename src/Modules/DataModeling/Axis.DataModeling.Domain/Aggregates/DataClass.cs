@@ -43,6 +43,24 @@ public sealed class DataClass : AggregateRoot<Guid>
         return dc;
     }
 
+    public void Update(string name, string? description)
+    {
+        if (IsDeleted)
+            throw new InvalidOperationException("Cannot modify a deleted data class.");
+        ValidateName(name);
+        Name = name.Trim();
+        Description = description?.Trim();
+    }
+
+    public void UpdateField(Guid fieldId, string label, string? helpText, bool isRequired, FieldConfig config)
+    {
+        if (IsDeleted)
+            throw new InvalidOperationException("Cannot modify a deleted data class.");
+        var field = _fields.SingleOrDefault(f => f.Id == fieldId)
+            ?? throw new InvalidOperationException("Field not found.");
+        field.Update(label, helpText, isRequired, config);
+    }
+
     public FieldDefinition AddField(string name, string label, FieldType type, bool required, FieldConfig config)
     {
         if (IsDeleted)

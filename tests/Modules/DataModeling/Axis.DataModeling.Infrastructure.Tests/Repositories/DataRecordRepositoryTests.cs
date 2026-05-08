@@ -82,4 +82,40 @@ public class DataRecordRepositoryTests(DataModelingDatabaseFixture db) : IAsyncL
         loaded.Data.Should().ContainKey("flag");
         loaded.Data.Should().ContainKey("nothing");
     }
+
+    [Fact]
+    public async Task GetPagedAsync_returns_correct_page_and_total()
+    {
+        var modelId = Guid.NewGuid();
+        var orgId = Guid.NewGuid();
+
+        for (var i = 1; i <= 5; i++)
+            await _sut.AddAsync(DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["i"] = i }));
+        await _ctx.SaveChangesAsync();
+
+        var (page1, total) = await _sut.GetPagedAsync(modelId, orgId, 1, 3, null);
+        var (page2, _) = await _sut.GetPagedAsync(modelId, orgId, 2, 3, null);
+
+        total.Should().Be(5);
+        page1.Should().HaveCount(3);
+        page2.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task GetPagedAsync_search_filters_by_jsonb_text()
+    {
+        var modelId = Guid.NewGuid();
+        var orgId = Guid.NewGuid();
+
+        await _sut.AddAsync(DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["company"] = "Acme Corp" }));
+        await _sut.AddAsync(DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["company"] = "Beta LLC" }));
+        await _sut.AddAsync(DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["company"] = "acme subsidiary" }));
+        await _ctx.SaveChangesAsync();
+
+        var (results, total) = await _sut.GetPagedAsync(modelId, orgId, 1, 25, "acme");
+
+        total.Should().Be(2);
+        results.Should().HaveCount(2);
+        results.Should().OnlyContain(r => r.Data["company"]!.ToString()!.Contains("acme", StringComparison.OrdinalIgnoreCase));
+    }
 }

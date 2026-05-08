@@ -3,6 +3,8 @@ using Axis.Api.Authorization;
 using Axis.Api.Endpoints;
 using Axis.Api.Infrastructure;
 using Axis.Api.Middleware;
+using Axis.Shared.Application.Tenancy;
+using Axis.Shared.Infrastructure.Tenancy;
 using Axis.DataModeling.Application.Commands.CreateModel;
 using Axis.DataModeling.Infrastructure.Extensions;
 using Axis.FormBuilder.Application.Commands.CreateForm;
@@ -116,7 +118,7 @@ try
     // Module infrastructure
     var cfg = builder.Configuration;
     builder.Services.AddIdentityInfrastructure(cfg);
-    builder.Services.AddDataModelingInfrastructure(cfg.GetConnectionString("DataModeling")!);
+    builder.Services.AddDataModelingInfrastructure(cfg);
     builder.Services.AddWorkflowBuilderInfrastructure(cfg.GetConnectionString("WorkflowBuilder")!);
     builder.Services.AddFormBuilderInfrastructure(cfg.GetConnectionString("FormBuilder")!);
     builder.Services.AddWorkflowEngineInfrastructure(cfg.GetConnectionString("WorkflowEngine")!);
@@ -132,6 +134,7 @@ try
     builder.Services.AddScoped<ITokenService, JwtTokenService>();
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddScoped<CurrentUser>();
+    builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
 
     // CORS
     var allowedOrigins = builder.Configuration
@@ -148,6 +151,7 @@ try
     {
         opts.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower;
         opts.SerializerOptions.PropertyNameCaseInsensitive = true;
+        opts.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
     });
 
     var app = builder.Build();
@@ -163,6 +167,9 @@ try
     app.MapInvitationEndpoints();
     app.MapUserEndpoints();
     app.MapRoleEndpoints();
+    app.MapModelEndpoints();
+    app.MapDataClassEndpoints();
+    app.MapRecordEndpoints();
 
     app.Run();
 }

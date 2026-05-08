@@ -1,6 +1,6 @@
-# F04 — Data Record CRUD
+﻿# F04 â€” Data Record CRUD
 
-[← Back to E03](../README.md)
+[â† Back to E03](../README.md)
 
 ---
 
@@ -12,7 +12,7 @@ Users can create, read, update, and delete records against any model. Records ar
 
 ## User Stories
 
-### US-041 — Create a record
+### US-041 â€” Create a record
 
 **As an** Organization Member with `data_modeling:record:write`, **I want to** create a new record for a model **so that** I can store business data.
 
@@ -35,22 +35,22 @@ Users can create, read, update, and delete records against any model. Records ar
 - [ ] Concurrent creation of two records with unique-field constraints (if any) uses DB-level unique indexes to prevent duplicates.
 
 *Out of scope*
-- Record templates (pre-filled forms) — not in MVP.
+- Record templates (pre-filled forms) â€” not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> **Implementation status** â€” Domain + Application: âœ… | Infrastructure: âœ… | API: â³ | Frontend: â³
 > Gaps vs spec: File field pre-upload step pending file storage service; Relation field existence check pending API layer.
 > Decisions: record data stored as `Dictionary<string, object?>` serialized to JSONB column `_data`.
 
 ---
 
-### US-042 — View records list
+### US-042 â€” View records list
 
 **As an** Organization Member with `data_modeling:record:read`, **I want to** see all records for a model **so that** I can browse and find the data I need.
 
 **Acceptance Criteria:**
 
 *Happy path*
-- [ ] Records list displays columns for the first 5 fields of the model (configurable by the user — see Out of scope).
+- [ ] Records list displays columns for the first 5 fields of the model (configurable by the user â€” see Out of scope).
 - [ ] Default sort: `created_at` descending (newest first).
 - [ ] Pagination: 25 records per page with next/previous controls and a page count.
 - [ ] Clicking a record opens its detail view.
@@ -65,15 +65,15 @@ Users can create, read, update, and delete records against any model. Records ar
 - [ ] Relation field columns display the target record's `display_field` value, not the raw UUID. If the target record was deleted, it shows "[Deleted record]".
 
 *Out of scope*
-- Saved views / custom column configurations — not in MVP.
-- Inline editing in the list — not in MVP.
+- Saved views / custom column configurations â€” not in MVP.
+- Inline editing in the list â€” not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> **Implementation status** â€” Domain + Application: âœ… | Infrastructure: âœ… | API: â³ | Frontend: â³
 > Gaps vs spec: pagination (25/page) and Relation display-field resolution pending API layer.
 
 ---
 
-### US-043 — Filter and search records
+### US-043 â€” Filter and search records
 
 **As an** Organization Member with `data_modeling:record:read`, **I want to** filter and search records **so that** I can find the specific data I need quickly.
 
@@ -94,15 +94,15 @@ Users can create, read, update, and delete records against any model. Records ar
 - [ ] A filter on a deleted field gracefully falls back (filter is removed with a warning toast).
 
 *Out of scope*
-- OR-logic between filters — not in MVP.
-- Saved filters — not in MVP.
+- OR-logic between filters â€” not in MVP.
+- Saved filters â€” not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: filter/sort/pagination repository methods not yet implemented — `GetAllAsync` returns all records unfiltered; JSONB field filtering requires dynamic query construction.
+> **Implementation status** â€” Domain + Application: âœ… | Infrastructure: â³ | API: â³ | Frontend: â³
+> Gaps vs spec: filter/sort/pagination repository methods not yet implemented â€” `GetAllAsync` returns all records unfiltered; JSONB field filtering requires dynamic query construction.
 
 ---
 
-### US-044 — Edit a record
+### US-044 â€” Edit a record
 
 **As an** Organization Member with `data_modeling:record:write`, **I want to** edit an existing record **so that** I can update out-of-date information.
 
@@ -122,14 +122,14 @@ Users can create, read, update, and delete records against any model. Records ar
 - [ ] Editing a record changes only the specified fields; fields not included in the PATCH body retain their existing values.
 
 *Out of scope*
-- Edit history / audit trail per record — not in MVP.
+- Edit history / audit trail per record â€” not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> **Implementation status** â€” Domain + Application: âœ… | Infrastructure: âœ… | API: â³ | Frontend: â³
 > Gaps vs spec: HTTP 409 optimistic concurrency (updated_at comparison) pending API layer.
 
 ---
 
-### US-045 — Delete a record
+### US-045 â€” Delete a record
 
 **As an** Organization Member with `data_modeling:record:delete`, **I want to** delete a record **so that** I can remove outdated or incorrect entries.
 
@@ -149,14 +149,14 @@ Users can create, read, update, and delete records against any model. Records ar
 - [ ] A soft-deleted record is not returned by list or search queries.
 
 *Out of scope*
-- Restoring a soft-deleted record — not in MVP.
+- Restoring a soft-deleted record â€” not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> **Implementation status** â€” Domain + Application: âœ… | Infrastructure: âœ… | API: â³ | Frontend: â³
 > Gaps vs spec: Relation broken-reference warning pending E04 integration; 30-day purge pending background job scheduler.
 
 ---
 
-### US-046 — Bulk operations on records
+### US-046 â€” Bulk operations on records
 
 **As an** Organization Member, **I want to** select multiple records and perform bulk actions **so that** I can manage large datasets efficiently.
 
@@ -176,7 +176,7 @@ Users can create, read, update, and delete records against any model. Records ar
 - [ ] Bulk export of more than 5,000 records is processed asynchronously; the user receives a download link via email or in-app notification when ready.
 
 *Out of scope*
-- Bulk edit (updating multiple records at once) — not in MVP.
+- Bulk edit (updating multiple records at once) â€” not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
+> **Implementation status** â€” Domain + Application: âœ… | Infrastructure: â³ | API: â³ | Frontend: â³
 > Gaps vs spec: bulk delete and CSV export not yet implemented at any layer; async export for >5,000 records pending notification infrastructure.

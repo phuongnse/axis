@@ -3,6 +3,7 @@ using Axis.DataModeling.Application.Services;
 using Axis.DataModeling.Infrastructure.Persistence;
 using Axis.DataModeling.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Axis.DataModeling.Infrastructure.Extensions;
@@ -10,10 +11,10 @@ namespace Axis.DataModeling.Infrastructure.Extensions;
 public static class DataModelingInfrastructureExtensions
 {
     public static IServiceCollection AddDataModelingInfrastructure(
-        this IServiceCollection services, string connectionString)
+        this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<DataModelingDbContext>((sp, options) =>
-            options.UseNpgsql(connectionString));
+            options.UseNpgsql(configuration.GetConnectionString("DataModeling")));
 
         services.AddScoped<IDataModelRepository, DataModelRepository>();
         services.AddScoped<IDataClassRepository, DataClassRepository>();

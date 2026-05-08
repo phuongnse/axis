@@ -5,8 +5,8 @@ namespace Axis.Shared.Infrastructure.Tenancy;
 
 /// <summary>
 /// Resolves tenant information from the current HTTP request's JWT claims.
-/// JWT must contain "org_id" (Guid) and "org_slug" (string) claims — both
-/// are written by OpenIddict during token issuance.
+/// Requires an "org_id" claim (Guid) — written by JwtTokenService at sign-in.
+/// Schema name is derived from org_id so it is stable across org renames.
 /// </summary>
 public sealed class HttpTenantContext(IHttpContextAccessor accessor) : ITenantContext
 {
@@ -24,17 +24,5 @@ public sealed class HttpTenantContext(IHttpContextAccessor accessor) : ITenantCo
         }
     }
 
-    public string OrganizationSlug
-    {
-        get
-        {
-            var ctx = accessor.HttpContext
-                ?? throw new InvalidOperationException("No HTTP context available for tenant resolution.");
-
-            return ctx.User.FindFirst("org_slug")?.Value
-                ?? throw new InvalidOperationException("JWT is missing required org_slug claim.");
-        }
-    }
-
-    public string SchemaName => $"tenant_{OrganizationSlug}";
+    public string SchemaName => $"tenant_{OrganizationId:N}";
 }
