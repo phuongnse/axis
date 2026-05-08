@@ -48,19 +48,22 @@ Multi-tenancy: schema-per-tenant in PostgreSQL (`tenant_{org_slug}`). Tenant res
 - **Layer order**: complete Domain → Application for ALL modules before touching Infrastructure. Infrastructure requires Docker (PostgreSQL + Redis via Testcontainers) and is done in one pass after all business logic is proven.
 - **CLAUDE.md maintenance**: update this file whenever architecture decisions change, new patterns are established, or layer-order rules are clarified.
 - Language: discuss in Vietnamese, write all code and docs in English.
+- **Git workflow**: solo project — always commit directly to `main`. Only create a branch if explicitly asked. When Claude Code auto-creates a worktree with a random branch name, commit the work then fast-forward merge to `main` and delete the branch.
 
 ## Implementation Progress
 ### Shared Kernel ✅
 - `Axis.Shared.Domain`: Entity, AggregateRoot, ValueObject, IDomainEvent, Result/Result<T>
 - `Axis.Shared.Application`: ICommand/IQuery/ICommandHandler/IQueryHandler, ValidationBehavior, TenantContext/ITenantContext
 
-### Identity Module (Domain ✅, Application 🔄, Infrastructure ⏳)
+### Identity Module (Domain ✅, Application ✅, Infrastructure ⏳)
 **Domain**: Organization, User, Role, Invitation aggregates; Email, OrganizationSlug value objects; all domain events
-**Application done**: RegisterOrganization, InviteUser, DeactivateUser, CreateRole
-**Application remaining**: AcceptInvitation, AssignRoleToUser, GetRoles (query), UpdateRole, UpdateUserProfile, AcceptInvitation
+**Application**: RegisterOrganization, InviteUser, AcceptInvitation, DeactivateUser, AssignRoleToUser, CreateRole, UpdateRole, UpdateUserProfile; GetRoles query
 
-### Other Modules (⏳ not started)
-- DataModeling, WorkflowBuilder, FormBuilder, WorkflowEngine, PageBuilder
+### DataModeling (Domain ✅, Application ✅, Infrastructure ⏳)
+### WorkflowBuilder (Domain ✅, Application ✅, Infrastructure ⏳)
+### FormBuilder (Domain ✅, Application ✅, Infrastructure ⏳)
+### WorkflowEngine (Domain ✅, Application ✅, Infrastructure ⏳)
+### PageBuilder (⏳ Phase 2 — not started)
 
 ## Epics (MVP = E01–E06, Phase 2 = E07)
 All requirements, epics, features, and user stories are in `docs/`.
