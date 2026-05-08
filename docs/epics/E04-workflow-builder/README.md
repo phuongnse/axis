@@ -76,7 +76,7 @@ The workflow builder is the heart of the platform. It is what differentiates Axi
 |---|---|---|
 | Domain | ✅ Done | `WorkflowDefinition`, `Step`, `Trigger` aggregates; all step types and domain events |
 | Application | ✅ Done | All command/query handlers; repository interfaces |
-| Infrastructure | ⏳ Pending | EF Core mappings, repositories, `AxisDbContext` wiring |
+| Infrastructure | ✅ Done | WorkflowBuilderDbContext, EF Core configuration (WorkflowDefinition with steps/transitions/triggers as JSONB), WorkflowRepository, 7 integration tests (Testcontainers) |
 | API | ⏳ Pending | — |
 | Frontend | ⏳ Pending | — |
 

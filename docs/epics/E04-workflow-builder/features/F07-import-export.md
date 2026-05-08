@@ -32,6 +32,9 @@ Workflow definitions can be exported as portable JSON files and imported into an
 - Exporting execution history — definitions only.
 - Exporting to formats other than JSON (YAML, BPMN) — not in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: REDACTED credential scrubbing and file download endpoint pending API layer.
+
 ---
 
 ## US-073 — Import a workflow from JSON
@@ -60,6 +63,9 @@ Workflow definitions can be exported as portable JSON files and imported into an
 *Out of scope*
 - Automatic periodic export/backup — not in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: import preview, form/model resolution, and transactional import endpoint pending API layer.
+
 ---
 
 ## US-074 — Bulk export all workflows
@@ -81,3 +87,6 @@ Workflow definitions can be exported as portable JSON files and imported into an
 
 *Out of scope*
 - Scheduled automatic backups — not in MVP.
+
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: async ZIP generation and in-app notification for large exports pending E06/notification infrastructure.

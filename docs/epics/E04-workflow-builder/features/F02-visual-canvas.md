@@ -35,6 +35,9 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 *Out of scope*
 - Copy-paste of steps — not in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: canvas drag-drop UI and 1-second debounce auto-save pending Frontend + API layers.
+
 ---
 
 ### US-053 — Connect steps with transitions
@@ -59,6 +62,9 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 
 *Out of scope*
 - Animated transitions showing flow direction — not in MVP (static arrows only).
+
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: canvas edge drawing and cycle-block toast pending Frontend; AddTransition cycle detection implemented in domain.
 
 ---
 
@@ -85,6 +91,9 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 *Out of scope*
 - Full-screen step config modal — the panel-based UI is the only config surface in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: slide-over panel, inline error indicators, and auto-save pending Frontend + API layers; step config stored as JSONB dict in `steps` column.
+
 ---
 
 ### US-055 — Navigate and zoom the canvas
@@ -108,6 +117,9 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 
 *Out of scope*
 - Touch/gesture controls for tablet use — not in MVP.
+
+> **Implementation status** — N/A (frontend-only) | API: N/A | Frontend: ⏳
+> No backend domain or infrastructure work; canvas navigation is a pure client-side concern.
 
 ---
 
@@ -133,3 +145,6 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 
 *Out of scope*
 - Server-side version history with named snapshots — not in MVP.
+
+> **Implementation status** — N/A (frontend-only) | API: N/A | Frontend: ⏳
+> Undo/redo is in-memory client state only; no server round-trip required.

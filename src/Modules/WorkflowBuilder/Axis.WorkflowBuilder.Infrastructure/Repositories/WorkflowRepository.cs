@@ -1,0 +1,28 @@
+using Axis.WorkflowBuilder.Application.Repositories;
+using Axis.WorkflowBuilder.Domain.Aggregates;
+using Axis.WorkflowBuilder.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace Axis.WorkflowBuilder.Infrastructure.Repositories;
+
+internal sealed class WorkflowRepository(WorkflowBuilderDbContext context) : IWorkflowRepository
+{
+    public async Task AddAsync(WorkflowDefinition workflow, CancellationToken ct = default)
+        => await context.WorkflowDefinitions.AddAsync(workflow, ct);
+
+    public async Task<WorkflowDefinition?> GetByIdAsync(Guid id, Guid organizationId, CancellationToken ct = default)
+        => await context.WorkflowDefinitions
+            .FirstOrDefaultAsync(w => w.Id == id && w.OrganizationId == organizationId, ct);
+
+    public async Task<IReadOnlyList<WorkflowDefinition>> GetAllAsync(Guid organizationId, CancellationToken ct = default)
+        => await context.WorkflowDefinitions
+            .Where(w => w.OrganizationId == organizationId)
+            .OrderBy(w => w.Name)
+            .ToListAsync(ct);
+
+    public async Task<bool> NameExistsAsync(string name, Guid organizationId, Guid? excludeId = null, CancellationToken ct = default)
+        => await context.WorkflowDefinitions
+            .AnyAsync(w => w.OrganizationId == organizationId
+                && w.Name.ToLower() == name.ToLower()
+                && (excludeId == null || w.Id != excludeId), ct);
+}

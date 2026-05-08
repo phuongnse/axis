@@ -10,6 +10,8 @@ public sealed class WorkflowStep : Entity<Guid>
     public StepType Type { get; private set; }
     public IReadOnlyDictionary<string, object?>? Config { get; private set; }
 
+    private WorkflowStep() : base(default) { Name = null!; } // EF Core materialisation
+
     private WorkflowStep(Guid id, string name, StepType type, IReadOnlyDictionary<string, object?>? config)
         : base(id)
     {
@@ -20,6 +22,9 @@ public sealed class WorkflowStep : Entity<Guid>
 
     internal static WorkflowStep Create(string name, StepType type, IReadOnlyDictionary<string, object?>? config)
         => new(Guid.NewGuid(), name, type, config);
+
+    internal static WorkflowStep Reconstitute(Guid id, string name, StepType type, IReadOnlyDictionary<string, object?>? config)
+        => new(id, name, type, config);
 
     public void UpdateConfig(string name, IReadOnlyDictionary<string, object?>? config)
     {

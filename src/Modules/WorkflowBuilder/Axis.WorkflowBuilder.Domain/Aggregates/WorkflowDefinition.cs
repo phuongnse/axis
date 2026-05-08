@@ -23,6 +23,8 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
     public IReadOnlyList<StepTransition> Transitions => _transitions.AsReadOnly();
     public IReadOnlyList<WorkflowTrigger> Triggers => _triggers.AsReadOnly();
 
+    private WorkflowDefinition() : base(default) { Name = null!; } // EF Core materialisation
+
     private WorkflowDefinition(Guid id, string name, string? description,
         Guid organizationId, DateTime createdAt)
         : base(id)
