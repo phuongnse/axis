@@ -1,5 +1,5 @@
 # Claude Code — local machine settings (do not commit)
-.claude/settings.local.json
+.claude/
 
 # Build outputs
 bin/
