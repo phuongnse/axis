@@ -10,25 +10,39 @@ using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
 using MediatR;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Axis.Api.Controllers;
+namespace Axis.Api.Endpoints;
 
-[ApiController]
-[Route("api/users")]
-[Authorize]
-public class UsersController(ISender mediator, IUserRepository userRepository) : ControllerBase
+public static class UserEndpoints
 {
-    // GET /api/users/me — current user profile
-    [HttpGet("me")]
-    public async Task<IActionResult> GetMe(
-        [FromServices] CurrentUser currentUser, CancellationToken ct)
+    public static IEndpointRouteBuilder MapUserEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/api/users").RequireAuthorization();
+
+        group.MapGet("/me", GetMe);
+        group.MapPatch("/me", UpdateProfile);
+        group.MapPost("/me/change-password", ChangePassword);
+        group.MapGet("/me/sessions", GetSessions);
+        group.MapDelete("/me/sessions/{sessionId}", RevokeSession);
+        group.MapDelete("/me/sessions", RevokeAllSessions);
+        group.MapPatch("/{userId:guid}/status", UpdateStatus)
+            .RequireAuthorization(Permissions.Users.Deactivate);
+        group.MapPut("/{userId:guid}/roles", AssignRole)
+            .RequireAuthorization(Permissions.Roles.Write);
+
+        return app;
+    }
+
+    private static async Task<IResult> GetMe(
+        CurrentUser currentUser,
+        IUserRepository userRepository,
+        CancellationToken ct)
     {
         var user = await userRepository.GetByIdPlatformWideAsync(currentUser.UserId, ct);
-        if (user is null) return NotFound();
+        if (user is null) return Results.NotFound();
 
-        return Ok(new
+        return Results.Ok(new
         {
             id = user.Id,
             email = user.Email.Value,
@@ -42,11 +56,10 @@ public class UsersController(ISender mediator, IUserRepository userRepository) :
         });
     }
 
-    // PATCH /api/users/me — update profile (US-020)
-    [HttpPatch("me")]
-    public async Task<IActionResult> UpdateProfile(
+    private static async Task<IResult> UpdateProfile(
         [FromBody] UpdateProfileRequest request,
-        [FromServices] CurrentUser currentUser,
+        CurrentUser currentUser,
+        ISender mediator,
         CancellationToken ct)
     {
         byte[]? avatarBytes = null;
@@ -66,14 +79,13 @@ public class UsersController(ISender mediator, IUserRepository userRepository) :
             avatarBytes,
             avatarContentType), ct);
 
-        return NoContent();
+        return Results.NoContent();
     }
 
-    // POST /api/users/me/change-password — US-028
-    [HttpPost("me/change-password")]
-    public async Task<IActionResult> ChangePassword(
+    private static async Task<IResult> ChangePassword(
         [FromBody] ChangePasswordRequest request,
-        [FromServices] CurrentUser currentUser,
+        CurrentUser currentUser,
+        ISender mediator,
         CancellationToken ct)
     {
         await mediator.Send(new ChangePasswordCommand(
@@ -83,18 +95,18 @@ public class UsersController(ISender mediator, IUserRepository userRepository) :
             request.NewPassword,
             request.ConfirmPassword), ct);
 
-        return NoContent();
+        return Results.NoContent();
     }
 
-    // GET /api/users/me/sessions — US-029
-    [HttpGet("me/sessions")]
-    public async Task<IActionResult> GetSessions(
-        [FromServices] CurrentUser currentUser, CancellationToken ct)
+    private static async Task<IResult> GetSessions(
+        CurrentUser currentUser,
+        ISender mediator,
+        CancellationToken ct)
     {
         var sessions = await mediator.Send(
             new GetUserSessionsQuery(currentUser.UserId, currentUser.RefreshTokenId ?? string.Empty), ct);
 
-        return Ok(sessions.Select(s => new
+        return Results.Ok(sessions.Select(s => new
         {
             session_id = s.SessionId,
             device_info = s.DeviceInfo,
@@ -104,41 +116,39 @@ public class UsersController(ISender mediator, IUserRepository userRepository) :
         }));
     }
 
-    // DELETE /api/users/me/sessions/{sessionId} — US-029 revoke specific
-    [HttpDelete("me/sessions/{sessionId}")]
-    public async Task<IActionResult> RevokeSession(
+    private static async Task<IResult> RevokeSession(
         string sessionId,
-        [FromServices] CurrentUser currentUser,
+        CurrentUser currentUser,
+        ISender mediator,
         CancellationToken ct)
     {
         await mediator.Send(new RevokeSessionCommand(sessionId, currentUser.UserId), ct);
-        return NoContent();
+        return Results.NoContent();
     }
 
-    // DELETE /api/users/me/sessions — US-029 sign out everywhere
-    [HttpDelete("me/sessions")]
-    public async Task<IActionResult> RevokeAllSessions(
-        [FromServices] CurrentUser currentUser,
+    private static async Task<IResult> RevokeAllSessions(
+        CurrentUser currentUser,
+        ISender mediator,
+        HttpContext httpContext,
         CancellationToken ct)
     {
         await mediator.Send(new RevokeSessionCommand(null, currentUser.UserId), ct);
-        Response.Cookies.Delete("refresh_token", new CookieOptions { Path = "/api/auth" });
-        return NoContent();
+        httpContext.Response.Cookies.Delete("refresh_token",
+            new CookieOptions { Path = "/api/auth" });
+        return Results.NoContent();
     }
 
-    // PATCH /api/users/{userId}/status — US-019 deactivate/reactivate
-    [Authorize(Policy = Permissions.Users.Deactivate)]
-    [HttpPatch("{userId:guid}/status")]
-    public async Task<IActionResult> UpdateStatus(
+    private static async Task<IResult> UpdateStatus(
         Guid userId,
         [FromBody] UpdateStatusRequest request,
-        [FromServices] CurrentUser currentUser,
-        [FromServices] IRoleRepository roleRepository,
-        [FromServices] IRefreshTokenStore refreshTokenStore,
+        CurrentUser currentUser,
+        ISender mediator,
+        IRoleRepository roleRepository,
+        IRefreshTokenStore refreshTokenStore,
         CancellationToken ct)
     {
         if (userId == currentUser.UserId)
-            return UnprocessableEntity(new
+            return Results.UnprocessableEntity(new
             {
                 error = "validation_failed",
                 errors = new { user_id = new[] { "You cannot deactivate yourself." } },
@@ -146,31 +156,30 @@ public class UsersController(ISender mediator, IUserRepository userRepository) :
 
         if (!request.IsActive)
         {
+            // DeactivateUserCommand enforces a last-admin guard: it rejects deactivation if
+            // the target user is the last remaining Admin in the org. Passing adminRoleId
+            // lets the handler check without querying the role table again.
             var adminRole = await roleRepository.GetByNameAsync("Admin", currentUser.OrgId, ct);
             var adminRoleId = adminRole?.Id ?? Guid.Empty;
 
             await mediator.Send(new DeactivateUserCommand(
                 userId, currentUser.OrgId, currentUser.UserId, adminRoleId), ct);
 
-            // Revoke all sessions for deactivated user (US-019 AC)
             await refreshTokenStore.RevokeAllForUserAsync(userId, ct);
         }
         else
         {
-            // Reactivate is documented as a gap — no ReactivateUserCommand exists yet
-            return StatusCode(501, new { error = "reactivation_not_implemented" });
+            return Results.Json(new { error = "reactivation_not_implemented" }, statusCode: 501);
         }
 
-        return NoContent();
+        return Results.NoContent();
     }
 
-    // PUT /api/users/{userId}/roles — US-024
-    [Authorize(Policy = Permissions.Roles.Write)]
-    [HttpPut("{userId:guid}/roles")]
-    public async Task<IActionResult> AssignRole(
+    private static async Task<IResult> AssignRole(
         Guid userId,
         [FromBody] AssignRoleRequest request,
-        [FromServices] CurrentUser currentUser,
+        CurrentUser currentUser,
+        ISender mediator,
         CancellationToken ct)
     {
         await mediator.Send(new AssignRoleToUserCommand(
@@ -179,7 +188,7 @@ public class UsersController(ISender mediator, IUserRepository userRepository) :
             request.RoleId,
             request.Action == "assign" ? RoleAction.Assign : RoleAction.Remove), ct);
 
-        return NoContent();
+        return Results.NoContent();
     }
 }
 

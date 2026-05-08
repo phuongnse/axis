@@ -1,12 +1,18 @@
 using System.Text;
 using Axis.Api.Authorization;
+using Axis.Api.Endpoints;
 using Axis.Api.Infrastructure;
 using Axis.Api.Middleware;
+using Axis.DataModeling.Application.Commands.CreateModel;
 using Axis.DataModeling.Infrastructure.Extensions;
+using Axis.FormBuilder.Application.Commands.CreateForm;
 using Axis.FormBuilder.Infrastructure.Extensions;
+using Axis.Identity.Application.Commands.RegisterOrganization;
 using Axis.Identity.Infrastructure.Extensions;
 using Axis.Shared.Application.Behaviors;
+using Axis.WorkflowBuilder.Application.Commands.CreateWorkflow;
 using Axis.WorkflowBuilder.Infrastructure.Extensions;
+using Axis.WorkflowEngine.Application.Commands.CancelExecution;
 using Axis.WorkflowEngine.Infrastructure.Extensions;
 using FluentValidation;
 using MediatR;
@@ -32,21 +38,21 @@ try
     builder.Services.AddMediatR(cfg =>
     {
         cfg.RegisterServicesFromAssemblies(
-            typeof(Axis.Identity.Application.Commands.RegisterOrganization.RegisterOrganizationCommand).Assembly,
-            typeof(Axis.DataModeling.Application.Commands.CreateModel.CreateModelCommand).Assembly,
-            typeof(Axis.WorkflowBuilder.Application.Commands.CreateWorkflow.CreateWorkflowCommand).Assembly,
-            typeof(Axis.FormBuilder.Application.Commands.CreateForm.CreateFormCommand).Assembly,
-            typeof(Axis.WorkflowEngine.Application.Commands.CancelExecution.CancelExecutionCommand).Assembly
+            typeof(RegisterOrganizationCommand).Assembly,
+            typeof(CreateModelCommand).Assembly,
+            typeof(CreateWorkflowCommand).Assembly,
+            typeof(CreateFormCommand).Assembly,
+            typeof(CancelExecutionCommand).Assembly
         );
         cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
     });
 
     builder.Services.AddValidatorsFromAssemblies([
-        typeof(Axis.Identity.Application.Commands.RegisterOrganization.RegisterOrganizationCommand).Assembly,
-        typeof(Axis.DataModeling.Application.Commands.CreateModel.CreateModelCommand).Assembly,
-        typeof(Axis.WorkflowBuilder.Application.Commands.CreateWorkflow.CreateWorkflowCommand).Assembly,
-        typeof(Axis.FormBuilder.Application.Commands.CreateForm.CreateFormCommand).Assembly,
-        typeof(Axis.WorkflowEngine.Application.Commands.CancelExecution.CancelExecutionCommand).Assembly,
+        typeof(RegisterOrganizationCommand).Assembly,
+        typeof(CreateModelCommand).Assembly,
+        typeof(CreateWorkflowCommand).Assembly,
+        typeof(CreateFormCommand).Assembly,
+        typeof(CancelExecutionCommand).Assembly,
     ]);
 
     // JWT Authentication
@@ -138,12 +144,11 @@ try
               .AllowAnyMethod()
               .AllowCredentials()));
 
-    builder.Services.AddControllers()
-        .AddJsonOptions(opts =>
-        {
-            opts.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower;
-            opts.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
-        });
+    builder.Services.ConfigureHttpJsonOptions(opts =>
+    {
+        opts.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower;
+        opts.SerializerOptions.PropertyNameCaseInsensitive = true;
+    });
 
     var app = builder.Build();
 
@@ -152,7 +157,12 @@ try
     app.UseCors();
     app.UseAuthentication();
     app.UseAuthorization();
-    app.MapControllers();
+
+    app.MapAuthEndpoints();
+    app.MapOrganizationEndpoints();
+    app.MapInvitationEndpoints();
+    app.MapUserEndpoints();
+    app.MapRoleEndpoints();
 
     app.Run();
 }

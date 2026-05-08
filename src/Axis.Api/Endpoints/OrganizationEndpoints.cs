@@ -3,19 +3,27 @@ using Axis.Api.Infrastructure;
 using Axis.Identity.Application.Commands.InviteUser;
 using Axis.Identity.Application.Commands.RegisterOrganization;
 using MediatR;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Axis.Api.Controllers;
+namespace Axis.Api.Endpoints;
 
-[ApiController]
-[Route("api/organizations")]
-public class OrganizationsController(ISender mediator) : ControllerBase
+public static class OrganizationEndpoints
 {
-    // POST /api/organizations — US-001
-    [HttpPost]
-    public async Task<IActionResult> Register(
-        [FromBody] RegisterOrganizationRequest request, CancellationToken ct)
+    public static IEndpointRouteBuilder MapOrganizationEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/api/organizations");
+
+        group.MapPost("/", Register);
+        group.MapPost("/me/invitations", InviteUser)
+            .RequireAuthorization(Permissions.Users.Invite);
+
+        return app;
+    }
+
+    private static async Task<IResult> Register(
+        [FromBody] RegisterOrganizationRequest request,
+        ISender mediator,
+        CancellationToken ct)
     {
         await mediator.Send(new RegisterOrganizationCommand(
             request.OrgName,
@@ -25,23 +33,20 @@ public class OrganizationsController(ISender mediator) : ControllerBase
             request.Password,
             request.PasswordConfirmation), ct);
 
-        return Ok(new
+        return Results.Ok(new
         {
             message = "Registration successful. Please check your email to verify your account.",
         });
     }
 
-    // POST /api/organizations/me/invitations — US-017
-    [Authorize(Policy = Permissions.Users.Invite)]
-    [HttpPost("me/invitations")]
-    public async Task<IActionResult> InviteUser(
+    private static async Task<IResult> InviteUser(
         [FromBody] InviteUserRequest request,
-        [FromServices] CurrentUser currentUser,
+        CurrentUser currentUser,
+        ISender mediator,
         CancellationToken ct)
     {
-        // Guard: admin cannot invite themselves (US-017 AC)
         if (string.Equals(request.Email, currentUser.Email, StringComparison.OrdinalIgnoreCase))
-            return UnprocessableEntity(new
+            return Results.UnprocessableEntity(new
             {
                 error = "validation_failed",
                 errors = new { email = new[] { "You cannot invite yourself." } },
@@ -53,7 +58,7 @@ public class OrganizationsController(ISender mediator) : ControllerBase
             request.RoleId,
             currentUser.UserId), ct);
 
-        return Ok(new { message = $"Invitation sent to {request.Email}." });
+        return Results.Ok(new { message = $"Invitation sent to {request.Email}." });
     }
 }
 
