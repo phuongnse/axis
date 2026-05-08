@@ -102,3 +102,15 @@ tests/
 - `InternalsVisibleTo` in `AssemblyInfo.cs` used for test helpers on domain aggregates
 - `Directory.Packages.props` manages all NuGet versions centrally — never add `Version=` to `<PackageReference>` in .csproj
 - `tests/Directory.Build.props` auto-adds FluentAssertions + NSubstitute to all test projects
+
+## NuGet / packaging rules
+- **Never use `dotnet add package`** on this repo — it corrupts `Directory.Packages.props` (CPM project). Always edit `Directory.Packages.props` directly.
+- **Search NuGet before assuming a package ID** — the NuGet ID often differs from the project name (e.g. `WolverineFx` not `Wolverine`). Run `dotnet package search "<name>"` when unsure.
+- **Check transitive dependency versions** after adding any new infrastructure package — do a trial `dotnet build` immediately to catch version conflicts (e.g. WolverineFx 5.x requires EF Core 9.x).
+- **`UseInMemoryDatabase` requires `Microsoft.EntityFrameworkCore.InMemory`** — separate package, must be added explicitly to test projects.
+- **Non-web test projects needing ASP.NET Core types** — use `<FrameworkReference Include="Microsoft.AspNetCore.App" />`, never `<PackageReference Include="Microsoft.AspNetCore.Http" />`.
+
+## Testing rules
+- Never run `dotnet test --no-build` after editing test code — always let it recompile.
+- **Never hardcode Docker endpoint in test code** (e.g. `.WithDockerEndpoint("tcp://localhost:2375")`). Docker host configuration belongs in `%USERPROFILE%\.testcontainers.properties` and `%USERPROFILE%\.wslconfig` — not in source code. Hardcoded values break portability across environments.
+- **Testcontainers on WSL2 without Docker Desktop**: configure via user-profile files only — `~/.testcontainers.properties` (set `docker.host`) and `~/.wslconfig` (set `networkingMode`). No code changes needed.

@@ -4,7 +4,7 @@ namespace Axis.Shared.Domain.Primitives;
 /// Base class for aggregate roots. Extends Entity with domain event collection.
 /// Modules raise domain events here; they are dispatched after persistence by the infrastructure layer.
 /// </summary>
-public abstract class AggregateRoot<TId>(TId id) : Entity<TId>(id)
+public abstract class AggregateRoot<TId>(TId id) : Entity<TId>(id), IHasDomainEvents
     where TId : notnull
 {
     private readonly List<IDomainEvent> _domainEvents = [];
