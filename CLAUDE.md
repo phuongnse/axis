@@ -101,7 +101,8 @@ Complete Domain → Application for ALL modules before touching Infrastructure. 
 **Infrastructure**: DataModelingDbContext, EF Core configurations (DataModel/DataClass/DataRecord), JSONB FieldDefinition converter (polymorphic FieldConfig), JSONB DataRecord._data, 3 repositories, DataModelingUnitOfWork, 15 integration tests (Testcontainers)
 ### WorkflowBuilder (Domain ✅, Application ✅, Infrastructure ✅, API ⏳, Frontend ⏳)
 **Infrastructure**: WorkflowBuilderDbContext, WorkflowDefinition config (steps/transitions/triggers as JSONB with custom WorkflowStepConverter), WorkflowRepository, 7 integration tests (Testcontainers)
-### FormBuilder (Domain ✅, Application ✅, Infrastructure ⏳, API ⏳, Frontend ⏳)
+### FormBuilder (Domain ✅, Application ✅, Infrastructure ✅, API ⏳, Frontend ⏳)
+**Infrastructure**: FormBuilderDbContext, EF Core config (FormDefinition with fields as JSONB via FormFieldConverter — 9 field types, polymorphic FormFieldConfig), FormRepository (IsReferencedByWorkflowAsync cross-module JSONB query), 8 integration tests (Testcontainers)
 ### WorkflowEngine (Domain ✅, Application ✅, Infrastructure ⏳, API ⏳, Frontend ⏳)
 ### PageBuilder (⏳ Phase 2 — not started)
 

@@ -34,6 +34,9 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 *Out of scope*
 - Creating a new form from within the workflow canvas (must go to Form Builder) — not in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: form picker dropdown and broken-step indicator pending Frontend + API; `IsReferencedByWorkflowAsync` query supports the reference check.
+
 ---
 
 ### US-084 — Pre-populate form fields from execution context
@@ -58,6 +61,9 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 *Out of scope*
 - Hiding fields from the assignee while keeping them pre-populated (hidden fields) — not in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: context expression input UI and expression evaluation at execution time pending Frontend + E06.
+
 ---
 
 ### US-085 — Map form submission data into workflow context
@@ -81,3 +87,6 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 
 *Out of scope*
 - Saving form submission data directly to a Data Model record automatically — not in MVP (a subsequent Script or HTTP step can do this).
+
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: context variable population after submission and context variable picker pending E06.

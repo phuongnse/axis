@@ -23,6 +23,8 @@ public sealed class FormDefinition : AggregateRoot<Guid>
 
     public IReadOnlyList<FormField> Fields => _fields.AsReadOnly();
 
+    private FormDefinition() : base(default) { Name = null!; } // EF Core materialisation
+
     private FormDefinition(Guid id, string name, string? description, Guid organizationId, DateTime createdAt)
         : base(id)
     {

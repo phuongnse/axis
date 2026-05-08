@@ -32,6 +32,10 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 *Out of scope*
 - Form templates / starter library — not in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: live preview panel and form editor pending Frontend.
+> Decisions: all form fields stored as JSONB via custom FormFieldConverter using FormFieldType as polymorphic discriminator.
+
 ---
 
 ### US-076 — View all forms
@@ -54,6 +58,9 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 
 *Out of scope*
 - Folders/categories for organizing forms — not in MVP.
+
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: "Used in N workflow(s)" count pending cross-module query (workflow step config query) or API aggregation.
 
 ---
 
@@ -78,6 +85,9 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 *Out of scope*
 - Form versioning (publishing a new "version" of a form) — not in MVP; edits are live immediately.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: live-workflow warning banner and definition snapshot for in-progress tasks pending API + E06.
+
 ---
 
 ### US-078 — Delete a form
@@ -100,3 +110,7 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 
 *Out of scope*
 - Recovering a soft-deleted form — not in MVP.
+
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: HTTP 409 on delete-while-referenced enforced via `IsReferencedByWorkflowAsync` JSONB query across `workflow_definitions.steps`; archived-workflow exception pending API layer.
+> Decisions: `IsReferencedByWorkflowAsync` uses raw SQL `workflow_definitions.steps @> [{...}]::jsonb` — cross-module table query within the same tenant schema.

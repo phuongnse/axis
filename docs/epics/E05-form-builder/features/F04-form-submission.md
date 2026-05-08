@@ -35,6 +35,9 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 - Push notifications (mobile) — not in MVP.
 - Escalation notifications if the form is not submitted after X hours — not in MVP (timeout causes failure, not escalation).
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: email notification dispatch and in-app notification pending E06 + notification infrastructure; role member resolution pending Identity integration.
+
 ---
 
 ### US-087 — Open and submit an assigned form
@@ -65,6 +68,9 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 - Saving a draft of the form and resuming later — not in MVP.
 - The assignee being able to add comments or annotations to the form submission — not in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: standalone form page (no login required), pre-signed URL file upload, and multi-tab deduplication pending Frontend + API.
+
 ---
 
 ### US-088 — View pending form tasks
@@ -91,6 +97,9 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 - Delegating a task to another user — not in MVP.
 - Bulk task completion — not in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: "My Tasks" page, role-assigned task aggregation, and SignalR push updates pending Frontend + API + E06.
+
 ---
 
 ### US-089 — Handle form step timeout
@@ -115,3 +124,6 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 
 *Out of scope*
 - Sending a reminder notification before timeout expires — not in MVP.
+
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: Wolverine scheduled expiry job, task expiry marking, and workflow failure flow pending E06.

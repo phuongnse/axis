@@ -80,7 +80,7 @@ Workflow reaches Form step
 |---|---|---|
 | Domain | ✅ Done | `FormDefinition`, `FormField`, `FormSubmission` aggregates; all field types and domain events |
 | Application | ✅ Done | All command/query handlers; repository interfaces |
-| Infrastructure | ⏳ Pending | EF Core mappings, repositories, `AxisDbContext` wiring |
+| Infrastructure | ✅ Done | FormBuilderDbContext, EF Core config (FormDefinition with fields as JSONB via FormFieldConverter), FormRepository (including cross-module IsReferencedByWorkflowAsync JSONB query), 8 integration tests (Testcontainers) |
 | API | ⏳ Pending | — |
 | Frontend | ⏳ Pending | — |
 

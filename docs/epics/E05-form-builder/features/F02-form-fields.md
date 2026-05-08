@@ -37,6 +37,10 @@ Form fields define what data the form collects. Each field has a type, label, he
 *Out of scope*
 - Conditional field visibility (show field only if another field has a certain value) — not in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: type picker UI, live preview update, and extension validation for File Upload pending Frontend + API layers.
+> Decisions: field config polymorphism handled by FormFieldConverter using FormFieldType enum as discriminator.
+
 ---
 
 ### US-080 — Configure validation rules on a field
@@ -63,6 +67,9 @@ Form fields define what data the form collects. Each field has a type, label, he
 *Out of scope*
 - Cross-field validation (e.g., "end date must be after start date") — not in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: client-side validation (React Hook Form + Zod) pending Frontend; HTTP 422 structured errors pending API layer.
+
 ---
 
 ### US-081 — Reorder fields via drag-and-drop
@@ -86,6 +93,9 @@ Form fields define what data the form collects. Each field has a type, label, he
 *Out of scope*
 - Multi-column form layouts — not in MVP (single-column only).
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: drag-handle UI and real-time preview reorder pending Frontend; `ReorderFields` domain method persists `displayOrder` in JSONB.
+
 ---
 
 ### US-082 — Add a section divider
@@ -108,3 +118,6 @@ Form fields define what data the form collects. Each field has a type, label, he
 
 *Out of scope*
 - Collapsible sections — not in MVP.
+
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: section grouping visual rendering pending Frontend; sections stored as `FormFieldType.Section` entries with `SectionFieldConfig` in the fields JSONB array.
