@@ -35,6 +35,10 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 *Out of scope*
 - Execution analytics dashboard (charts, trends) — not in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: paginated history table, status/date/trigger filters, and running-first sort pending API + Frontend.
+> Decisions: `GetByWorkflowAsync` and `GetAllAsync` return executions ordered by `CreatedAt DESC`; pagination deferred to API layer.
+
 ---
 
 ### US-098 — View execution detail and step timeline
@@ -60,6 +64,9 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 *Out of scope*
 - Replaying or simulating an execution from any point with a different context — not in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: step timeline UI, context snapshot display, and parallel group rendering pending Frontend + API.
+
 ---
 
 ### US-099 — View org-wide execution history
@@ -82,6 +89,9 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 
 *Out of scope*
 - Platform-wide execution monitoring across all tenants (Platform Admin view) — not in MVP.
+
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: CSV export, role-scoped visibility enforcement, and async export notification pending API + Frontend.
 
 ---
 

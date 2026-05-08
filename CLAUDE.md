@@ -46,6 +46,7 @@ Multi-tenancy: schema-per-tenant in PostgreSQL (`tenant_{org_slug}`). Tenant res
 - **Diagrams**: add proactively to user stories or docs when a flow is complex enough that text alone doesn't convey it clearly.
 - **Docs-first, always — non-negotiable**: Before implementing any user story, feature, or fix, read the relevant feature file in `docs/epics/`. The doc defines the contract; code implements it. Never write code first and update docs after. If the spec needs clarification or refinement before coding starts, update the doc first. Every code change that affects observable behavior (bug fix, design decision, new constraint, deviation from spec) must also update the relevant doc in the same commit.
 - **Every command/query maps to a US**: Never invent requirements. If a new requirement is discovered during implementation, add it to the docs first, then implement.
+- **Read files in full before making claims**: Never use a line `limit` when the goal is to assert something about a file's content (e.g. "this file has no X"). Read the whole file. Partial reads → wrong conclusions.
 - **Language**: discuss in Vietnamese, write all code and docs in English.
 - **Git workflow**: solo project — always commit directly to `main`. Only create a branch if explicitly asked. When Claude Code auto-creates a worktree with a random branch name, commit the work then fast-forward merge to `main` and delete the branch.
 - **CLAUDE.md maintenance**: update this file whenever architecture decisions change, new patterns are established, or layer-order rules are clarified.
@@ -103,7 +104,8 @@ Complete Domain → Application for ALL modules before touching Infrastructure. 
 **Infrastructure**: WorkflowBuilderDbContext, WorkflowDefinition config (steps/transitions/triggers as JSONB with custom WorkflowStepConverter), WorkflowRepository, 7 integration tests (Testcontainers)
 ### FormBuilder (Domain ✅, Application ✅, Infrastructure ✅, API ⏳, Frontend ⏳)
 **Infrastructure**: FormBuilderDbContext, EF Core config (FormDefinition with fields as JSONB via FormFieldConverter — 9 field types, polymorphic FormFieldConfig), FormRepository (IsReferencedByWorkflowAsync cross-module JSONB query), 8 integration tests (Testcontainers)
-### WorkflowEngine (Domain ✅, Application ✅, Infrastructure ⏳, API ⏳, Frontend ⏳)
+### WorkflowEngine (Domain ✅, Application ✅, Infrastructure ✅, API ⏳, Frontend ⏳)
+**Infrastructure**: WorkflowEngineDbContext, EF Core config (WorkflowExecution with `_context` as JSONB), ExecutionRepository (4 methods: AddAsync, GetByIdAsync, GetAllAsync, GetByWorkflowAsync), WorkflowDefinitionReader (cross-module raw SQL query on `workflow_definitions.status`), WorkflowEngineUnitOfWork, 8 integration tests (Testcontainers)
 ### PageBuilder (⏳ Phase 2 — not started)
 
 ## Epics (MVP = E01–E06, Phase 2 = E07)

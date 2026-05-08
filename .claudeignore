@@ -1,0 +1,28 @@
+# Build outputs
+bin/
+obj/
+out/
+
+# .NET
+*.user
+*.suo
+.vs/
+*.DotSettings.user
+
+# Node
+node_modules/
+dist/
+.next/
+
+# Logs
+*.log
+logs/
+
+# NCrunch
+*.ncrunchsolution
+*.ncrunchproject
+.ncrunch*/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -89,3 +89,6 @@ Each step type has a dedicated handler that executes it in isolation. Handlers r
 
 *Out of scope*
 - Custom step types defined by users — not in MVP.
+
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: Wolverine step handler message dispatch, engine-level 5-minute timeout, and idempotency check on re-delivery pending engine implementation layer.

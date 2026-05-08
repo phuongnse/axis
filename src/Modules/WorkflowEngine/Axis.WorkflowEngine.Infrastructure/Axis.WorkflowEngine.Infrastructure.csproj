@@ -1,9 +1,14 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\Axis.WorkflowEngine.Application\Axis.WorkflowEngine.Application.csproj" />
     <ProjectReference Include="..\Axis.WorkflowEngine.Domain\Axis.WorkflowEngine.Domain.csproj" />
     <ProjectReference Include="..\..\..\Shared\Axis.Shared.Infrastructure\Axis.Shared.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
   </ItemGroup>
 
   <PropertyGroup>

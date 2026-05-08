@@ -37,6 +37,10 @@ When a workflow execution fails at a step, users can manually retry from the fai
 *Out of scope*
 - Automatic retry (without user action) — not in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: Retry button UI, skip-completed-steps engine logic, and archived-definition warning pending API + Frontend.
+> Decisions: `CreateRetry()` produces a new `WorkflowExecution` with `RetryOfExecutionId` set; context is copied from original at time of retry.
+
 ---
 
 ### US-101 — View retry history
@@ -60,6 +64,9 @@ When a workflow execution fails at a step, users can manually retry from the fai
 
 *Out of scope*
 - Comparing two retry attempts side-by-side — not in MVP.
+
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: retry history section UI and interlinked execution chain navigation pending Frontend + API.
 
 ---
 
@@ -85,3 +92,6 @@ When a workflow execution fails at a step, users can manually retry from the fai
 
 *Out of scope*
 - Structured field-by-field editing of context (showing fields by step/variable name) — not in MVP; raw JSON editor only.
+
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: JSON context editor UI and modified-context flag pending Frontend + API.

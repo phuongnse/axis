@@ -34,6 +34,9 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 *Out of scope*
 - PagerDuty / OpsGenie / Slack integration for error notifications — not in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: email/in-app/webhook notification dispatch and rate-limiting pending API + notification infrastructure.
+
 ---
 
 ### US-095 — View detailed error information
@@ -59,6 +62,9 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 *Out of scope*
 - Sharing a link to a specific error detail view with another user — not in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: error detail UI (stack trace, redacted fields) pending Frontend + API.
+
 ---
 
 ### US-096 — Configure error notification channels per workflow
@@ -83,3 +89,6 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 
 *Out of scope*
 - Different notification channels for different failure scenarios (e.g., "only notify on HTTP step failures") — not in MVP; all failures use the same channels.
+
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: notification channel configuration UI and per-workflow channel storage pending API + Frontend.

@@ -36,6 +36,10 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 *Out of scope*
 - Triggering a specific version of a workflow (other than the current active version) — not in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: trigger HTTP endpoint, schedule/webhook/event trigger handlers, stale-PENDING recovery job pending API + E06 engine.
+> Decisions: `WorkflowExecution.Create` sets status `Pending`; `Start()` transitions to `Running` — engine calls both in sequence.
+
 ---
 
 ### US-091 — Track execution status in real time
@@ -61,6 +65,9 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 
 *Out of scope*
 - Real-time execution graph overlay on the workflow canvas — not in MVP (timeline list only).
+
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: SignalR push updates and execution detail page pending Frontend + API.
 
 ---
 
@@ -88,3 +95,7 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 
 *Out of scope*
 - Pausing an execution and resuming it — not in MVP (cancel only).
+
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: cancel button UI, Wolverine job abandonment, Form Task cancellation pending API + engine.
+> Decisions: `Cancel()` domain guard rejects terminal statuses (`Completed`, `Failed`, `Cancelled`) with `InvalidOperationException`.

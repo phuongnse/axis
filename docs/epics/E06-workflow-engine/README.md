@@ -86,7 +86,7 @@ Subsequent steps can reference context values using expressions like `{{context.
 |---|---|---|
 | Domain | ✅ Done | `WorkflowExecution`, `ExecutionStep` aggregates; all execution states and domain events |
 | Application | ✅ Done | All command/query handlers; repository interfaces |
-| Infrastructure | ⏳ Pending | EF Core mappings, repositories, Wolverine job handlers, `AxisDbContext` wiring |
+| Infrastructure | ✅ Done | `WorkflowEngineDbContext`, `ExecutionRepository`, `WorkflowDefinitionReader` (cross-module), `WorkflowEngineUnitOfWork`; `_context` as JSONB; 8 integration tests (Testcontainers) |
 | API | ⏳ Pending | — |
 | Frontend | ⏳ Pending | — |
 

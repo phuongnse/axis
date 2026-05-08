@@ -29,6 +29,8 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
 
     public IReadOnlyDictionary<string, object?> Context => _context;
 
+    private WorkflowExecution() : base(default) { _context = new Dictionary<string, object?>(); } // EF Core materialisation
+
     private WorkflowExecution(
         Guid id,
         Guid workflowDefinitionId,
