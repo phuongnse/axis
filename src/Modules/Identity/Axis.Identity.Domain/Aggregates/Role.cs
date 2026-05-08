@@ -15,6 +15,8 @@ public sealed class Role : AggregateRoot<Guid>
 
     public IReadOnlyList<string> Permissions => _permissions.AsReadOnly();
 
+    private Role() : base(default) { Name = null!; } // EF Core materialisation
+
     private Role(Guid id, string name, string? description, bool isSystem,
         Guid organizationId, IEnumerable<string> permissions, DateTime createdAt)
         : base(id)

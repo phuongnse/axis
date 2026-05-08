@@ -18,8 +18,10 @@
     <PackageVersion Include="WolverineFx.Http" Version="5.38.0" />
     <PackageVersion Include="WolverineFx.EntityFrameworkCore" Version="5.38.0" />
     <PackageVersion Include="WolverineFx.Postgresql" Version="5.38.0" />
-    <PackageVersion Include="MailKit" Version="4.11.0" />
-    <PackageVersion Include="AWSSDK.S3" Version="3.7.415.7" />
+    <PackageVersion Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageVersion Include="MailKit" Version="4.16.0" />
+    <PackageVersion Include="AWSSDK.S3" Version="4.0.23" />
+    <PackageVersion Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.3.37" />
     <PackageVersion Include="Serilog.AspNetCore" Version="9.0.0" />
     <PackageVersion Include="Serilog.Sinks.Console" Version="6.0.0" />
     <PackageVersion Include="Serilog.Sinks.Seq" Version="8.0.0" />
