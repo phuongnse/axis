@@ -74,6 +74,18 @@ Workflow reaches Form step
 
 ---
 
+## Implementation Status
+
+| Layer | Status | Notes |
+|---|---|---|
+| Domain | ✅ Done | `FormDefinition`, `FormField`, `FormSubmission` aggregates; all field types and domain events |
+| Application | ✅ Done | All command/query handlers; repository interfaces |
+| Infrastructure | ⏳ Pending | EF Core mappings, repositories, `AxisDbContext` wiring |
+| API | ⏳ Pending | — |
+| Frontend | ⏳ Pending | — |
+
+---
+
 ## Dependencies
 
 - [E01 — Platform Foundation](../E01-platform-foundation/README.md)

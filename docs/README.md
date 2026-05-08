@@ -19,13 +19,13 @@
 
 | ID | Epic | Phase | Status |
 |---|---|---|---|
-| [E01](./epics/E01-platform-foundation/README.md) | Platform Foundation | MVP | Planned |
-| [E02](./epics/E02-identity-access/README.md) | Identity & Access Management | MVP | Planned |
-| [E03](./epics/E03-data-modeling/README.md) | Data Modeling | MVP | Planned |
-| [E04](./epics/E04-workflow-builder/README.md) | Workflow Builder | MVP | Planned |
-| [E05](./epics/E05-form-builder/README.md) | Form Builder | MVP | Planned |
-| [E06](./epics/E06-workflow-engine/README.md) | Workflow Execution Engine | MVP | Planned |
-| [E07](./epics/E07-page-builder/README.md) | Page & UI Builder | Phase 2 | Planned |
+| [E01](./epics/E01-platform-foundation/README.md) | Platform Foundation | MVP | 🚧 In Progress |
+| [E02](./epics/E02-identity-access/README.md) | Identity & Access Management | MVP | 🚧 In Progress |
+| [E03](./epics/E03-data-modeling/README.md) | Data Modeling | MVP | 🚧 In Progress |
+| [E04](./epics/E04-workflow-builder/README.md) | Workflow Builder | MVP | 🚧 In Progress |
+| [E05](./epics/E05-form-builder/README.md) | Form Builder | MVP | 🚧 In Progress |
+| [E06](./epics/E06-workflow-engine/README.md) | Workflow Execution Engine | MVP | 🚧 In Progress |
+| [E07](./epics/E07-page-builder/README.md) | Page & UI Builder | Phase 2 | ⏳ Planned |
 
 ---
 

@@ -77,6 +77,18 @@ A concrete instance of a Model. Records are stored in the tenant's schema using 
 
 ---
 
+## Implementation Status
+
+| Layer | Status | Notes |
+|---|---|---|
+| Domain | ✅ Done | `DataModel`, `Field`, `DataRecord` aggregates; all field types and domain events |
+| Application | ✅ Done | All command/query handlers; repository interfaces |
+| Infrastructure | ⏳ Pending | EF Core mappings, repositories, `AxisDbContext` wiring |
+| API | ⏳ Pending | — |
+| Frontend | ⏳ Pending | — |
+
+---
+
 ## Dependencies
 
 - [E01 — Platform Foundation](../E01-platform-foundation/README.md)

@@ -59,6 +59,23 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 
 ---
 
+## Implementation Status
+
+| Layer | Status | Notes |
+|---|---|---|
+| Domain | ✅ Done | `Organization`, `User`, `Role`, `Invitation` aggregates; `Email`, `OrganizationSlug` value objects; all domain events |
+| Application | ✅ Done | `RegisterOrganization`, `InviteUser`, `AcceptInvitation`, `DeactivateUser`, `AssignRoleToUser`, `CreateRole`, `UpdateRole`, `UpdateUserProfile`; `GetRoles` query |
+| Infrastructure | ✅ Done | `IdentityDbContext` (public schema), EF Core mappings, all repositories, `BCryptPasswordHasher` (work factor 12), `MailKitEmailSender`, `IdentityUnitOfWork` |
+| API | ⏳ Pending | — |
+| Frontend | ⏳ Pending | — |
+
+**Key implementation decisions:**
+- Identity uses the global `public` PostgreSQL schema (not a tenant schema) — registration has no tenant context and email uniqueness is platform-wide.
+- Passwords are hashed with BCrypt (work factor 12) via `IPasswordHasher`. The hash is stored as a first-class property on `User` (`PasswordHash`), not a shadow property.
+- The 4 default system roles (Admin, Editor, Viewer, End User) and their full permission sets are seeded automatically by `RegisterOrganizationHandler` — see [F04](./features/F04-permissions.md) for the permission catalogue.
+
+---
+
 ## Dependencies
 
 - [E01 — Platform Foundation](../E01-platform-foundation/README.md)

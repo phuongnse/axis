@@ -41,6 +41,10 @@ Self-service registration flow where a new organization signs up and is automati
 - Social/SSO sign-up (Google, GitHub) — not in MVP.
 - CAPTCHA — not in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: email/password validation rules (min 8 chars, letter+number, confirmation match) implemented in `RegisterOrganizationCommandValidator`; idempotency key (rapid submission dedup) not yet implemented — pending API layer.
+> Decisions: duplicate email returns silently without creating anything (no error thrown) — matches "same confirmation screen" AC. Org slug auto-generated from org name with uniqueness retry loop; BCrypt work factor 12 for password hashing. 4 default system roles seeded atomically in the same transaction.
+
 ---
 
 ### US-002 — Verify email and activate account

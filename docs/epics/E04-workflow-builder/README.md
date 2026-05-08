@@ -70,6 +70,18 @@ The workflow builder is the heart of the platform. It is what differentiates Axi
 
 ---
 
+## Implementation Status
+
+| Layer | Status | Notes |
+|---|---|---|
+| Domain | ✅ Done | `WorkflowDefinition`, `Step`, `Trigger` aggregates; all step types and domain events |
+| Application | ✅ Done | All command/query handlers; repository interfaces |
+| Infrastructure | ⏳ Pending | EF Core mappings, repositories, `AxisDbContext` wiring |
+| API | ⏳ Pending | — |
+| Frontend | ⏳ Pending | — |
+
+---
+
 ## Dependencies
 
 - [E01 — Platform Foundation](../E01-platform-foundation/README.md)

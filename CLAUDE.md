@@ -44,25 +44,55 @@ Multi-tenancy: schema-per-tenant in PostgreSQL (`tenant_{org_slug}`). Tenant res
 - **TDD is mandatory**: write tests first, must pass before moving to next step, no exceptions.
 - **DDD**: apply fully to complex modules (WorkflowEngine, DataModeling). Be pragmatic on simpler CRUD modules (Identity).
 - **Diagrams**: add proactively to user stories or docs when a flow is complex enough that text alone doesn't convey it clearly.
-- **Docs first**: always read the relevant feature file(s) in `docs/epics/` before implementing. Every command/query must map to a specific US (User Story). Never invent requirements — if it's not in the docs, don't implement it.
-- **Layer order**: complete Domain → Application for ALL modules before touching Infrastructure. Infrastructure requires Docker (PostgreSQL + Redis via Testcontainers) and is done in one pass after all business logic is proven.
-- **CLAUDE.md maintenance**: update this file whenever architecture decisions change, new patterns are established, or layer-order rules are clarified.
-- Language: discuss in Vietnamese, write all code and docs in English.
+- **Docs-first, always — non-negotiable**: Before implementing any user story, feature, or fix, read the relevant feature file in `docs/epics/`. The doc defines the contract; code implements it. Never write code first and update docs after. If the spec needs clarification or refinement before coding starts, update the doc first. Every code change that affects observable behavior (bug fix, design decision, new constraint, deviation from spec) must also update the relevant doc in the same commit.
+- **Every command/query maps to a US**: Never invent requirements. If a new requirement is discovered during implementation, add it to the docs first, then implement.
+- **Language**: discuss in Vietnamese, write all code and docs in English.
 - **Git workflow**: solo project — always commit directly to `main`. Only create a branch if explicitly asked. When Claude Code auto-creates a worktree with a random branch name, commit the work then fast-forward merge to `main` and delete the branch.
+- **CLAUDE.md maintenance**: update this file whenever architecture decisions change, new patterns are established, or layer-order rules are clarified.
+
+## Definition of Done
+
+A US or layer is NOT done until all of the following are complete in the same commit:
+
+### Completing a User Story (any layer)
+1. ✅ Tests written first and passing
+2. ✅ Feature file updated — add/update the `> **Implementation status**` callout directly after the US's *Out of scope* block:
+   ```
+   > **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅/⏳ | API: ⏳ | Frontend: ⏳
+   > Gaps vs spec: [ACs not yet covered and why — e.g. "pending auth layer", "requires JWT identity"]
+   > Decisions: [design choices that affect how an AC is interpreted or implemented]
+   ```
+3. ✅ If a gap vs spec is found during implementation, document it in the callout — do not silently skip it
+
+### Completing a layer for a module (Domain, Application, Infrastructure, API)
+1. ✅ All tests for that layer passing
+2. ✅ All US callouts in the relevant feature files updated to reflect the new layer status
+3. ✅ Epic README `Implementation Status` table updated (e.g. `Infrastructure: ✅ Done`)
+4. ✅ `Implementation Progress` section in this file (CLAUDE.md) updated
+
+### Completing a feature fix or refactor
+1. ✅ Tests updated/added and passing
+2. ✅ If the fix changes observable behavior: update the affected US callout's Gaps or Decisions line
+3. ✅ If the fix closes a documented gap: remove that gap from the callout
+
+## Layer order
+Complete Domain → Application for ALL modules before touching Infrastructure. Infrastructure requires Docker (PostgreSQL + Redis via Testcontainers) and is done in one pass after all business logic is proven.
 
 ## Implementation Progress
 ### Shared Kernel ✅
 - `Axis.Shared.Domain`: Entity, AggregateRoot, ValueObject, IDomainEvent, Result/Result<T>
 - `Axis.Shared.Application`: ICommand/IQuery/ICommandHandler/IQueryHandler, ValidationBehavior, TenantContext/ITenantContext
+- `Axis.Shared.Infrastructure`: AxisDbContext, TenantSchemaInterceptor, UnitOfWork, MessageBus
 
-### Identity Module (Domain ✅, Application ✅, Infrastructure ⏳)
+### Identity Module (Domain ✅, Application ✅, Infrastructure ✅, API ⏳, Frontend ⏳)
 **Domain**: Organization, User, Role, Invitation aggregates; Email, OrganizationSlug value objects; all domain events
 **Application**: RegisterOrganization, InviteUser, AcceptInvitation, DeactivateUser, AssignRoleToUser, CreateRole, UpdateRole, UpdateUserProfile; GetRoles query
+**Infrastructure**: IdentityDbContext (public schema), all EF Core configurations, all repositories, BCryptPasswordHasher (work factor 12), MailKitEmailSender, IdentityUnitOfWork
 
-### DataModeling (Domain ✅, Application ✅, Infrastructure ⏳)
-### WorkflowBuilder (Domain ✅, Application ✅, Infrastructure ⏳)
-### FormBuilder (Domain ✅, Application ✅, Infrastructure ⏳)
-### WorkflowEngine (Domain ✅, Application ✅, Infrastructure ⏳)
+### DataModeling (Domain ✅, Application ✅, Infrastructure ⏳, API ⏳, Frontend ⏳)
+### WorkflowBuilder (Domain ✅, Application ✅, Infrastructure ⏳, API ⏳, Frontend ⏳)
+### FormBuilder (Domain ✅, Application ✅, Infrastructure ⏳, API ⏳, Frontend ⏳)
+### WorkflowEngine (Domain ✅, Application ✅, Infrastructure ⏳, API ⏳, Frontend ⏳)
 ### PageBuilder (⏳ Phase 2 — not started)
 
 ## Epics (MVP = E01–E06, Phase 2 = E07)

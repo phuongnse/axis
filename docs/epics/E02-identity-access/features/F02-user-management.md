@@ -39,6 +39,10 @@ Organization admins can invite new members, manage their accounts, and deactivat
 *Out of scope*
 - Bulk invitation via CSV upload — not in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: user limit check not implemented (no subscription/plan concept yet — pending E01 F04). Admin self-invite check not implemented — pending API layer (requires current user identity from JWT).
+> Decisions: existing-member and pending-invitation checks throw `ValidationException` with specific messages matching AC wording.
+
 ---
 
 ### US-018 — Accept an invitation
@@ -64,6 +68,10 @@ Organization admins can invite new members, manage their accounts, and deactivat
 
 *Out of scope*
 - Inviting users who already have accounts on other orgs to join a second org simultaneously — each user belongs to one org in MVP.
+
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: platform-wide email check before user creation not implemented — if the invited email already exists on another org, a second `User` record is created instead of prompting sign-in. Must be addressed before API layer ships. Session sign-in after accept is an API/auth concern, pending.
+> Decisions: expired/accepted/cancelled invitation states are enforced in `Invitation.Accept()` domain method and wrapped as `ValidationException` in the handler.
 
 ---
 
@@ -92,6 +100,10 @@ Organization admins can invite new members, manage their accounts, and deactivat
 *Out of scope*
 - Transferring ownership of content from a deactivated user — not in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: session revocation (refresh token revoke + access token blacklist) not implemented — pending auth infrastructure (OpenIddict + Redis). Self-deactivation guard and 403 check require current user identity from JWT — pending API layer. Deactivated-user sign-in message handled at auth layer (pending).
+> Decisions: "last admin" check queries `CountAdminsAsync` in the repository before deactivating — domain enforces via `ApplicationException` if violated.
+
 ---
 
 ### US-020 — Manage user profile
@@ -115,3 +127,7 @@ Organization admins can invite new members, manage their accounts, and deactivat
 
 *Out of scope*
 - Public profile visibility — all profiles are private within the org in MVP.
+
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: avatar upload (S3) not wired — `UpdateUserProfileHandler` updates name only; avatar URL stored as nullable string, upload flow pending API layer. Email change flow (F05) not started.
+> Decisions: name update is a direct property mutation on `User` aggregate with a `UserProfileUpdatedEvent`.

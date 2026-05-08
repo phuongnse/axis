@@ -44,6 +44,22 @@ Without this foundation, nothing else works. Every feature in every other epic r
 
 ---
 
+## Implementation Status
+
+| Layer | Status | Notes |
+|---|---|---|
+| Shared Domain | ✅ Done | `Entity`, `AggregateRoot`, `ValueObject`, `IDomainEvent`, `Result<T>` |
+| Shared Application | ✅ Done | `ICommand/IQuery`, `ICommandHandler/IQueryHandler`, `ValidationBehavior`, `ITenantContext` |
+| Shared Infrastructure | ✅ Done | `AxisDbContext`, `TenantSchemaInterceptor`, `UnitOfWork`, `MessageBus` |
+| Tenant Registration (US-001–002) | 🚧 In Progress | Domain + Application + Infrastructure done (in Identity module); API + email verification endpoint pending |
+| Tenant Provisioning (US-003) | ⏳ Pending | Schema auto-creation on registration not yet wired |
+| Organization Management (F02) | ⏳ Pending | — |
+| Subscription Plans (F04) | ⏳ Pending | — |
+| API | ⏳ Pending | — |
+| Frontend | ⏳ Pending | — |
+
+---
+
 ## Dependencies
 
 - None (this is the foundation)
