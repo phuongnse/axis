@@ -37,6 +37,10 @@ Users can create, read, update, and delete records against any model. Records ar
 *Out of scope*
 - Record templates (pre-filled forms) — not in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: File field pre-upload step pending file storage service; Relation field existence check pending API layer.
+> Decisions: record data stored as `Dictionary<string, object?>` serialized to JSONB column `_data`.
+
 ---
 
 ### US-042 — View records list
@@ -64,6 +68,9 @@ Users can create, read, update, and delete records against any model. Records ar
 - Saved views / custom column configurations — not in MVP.
 - Inline editing in the list — not in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: pagination (25/page) and Relation display-field resolution pending API layer.
+
 ---
 
 ### US-043 — Filter and search records
@@ -90,6 +97,9 @@ Users can create, read, update, and delete records against any model. Records ar
 - OR-logic between filters — not in MVP.
 - Saved filters — not in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: filter/sort/pagination repository methods not yet implemented — `GetAllAsync` returns all records unfiltered; JSONB field filtering requires dynamic query construction.
+
 ---
 
 ### US-044 — Edit a record
@@ -113,6 +123,9 @@ Users can create, read, update, and delete records against any model. Records ar
 
 *Out of scope*
 - Edit history / audit trail per record — not in MVP.
+
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: HTTP 409 optimistic concurrency (updated_at comparison) pending API layer.
 
 ---
 
@@ -138,6 +151,9 @@ Users can create, read, update, and delete records against any model. Records ar
 *Out of scope*
 - Restoring a soft-deleted record — not in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: Relation broken-reference warning pending E04 integration; 30-day purge pending background job scheduler.
+
 ---
 
 ### US-046 — Bulk operations on records
@@ -161,3 +177,6 @@ Users can create, read, update, and delete records against any model. Records ar
 
 *Out of scope*
 - Bulk edit (updating multiple records at once) — not in MVP.
+
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: bulk delete and CSV export not yet implemented at any layer; async export for >5,000 records pending notification infrastructure.

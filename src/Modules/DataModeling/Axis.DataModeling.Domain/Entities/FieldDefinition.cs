@@ -48,6 +48,11 @@ public sealed class FieldDefinition : Entity<Guid>
         bool isSystem = false)
         => new(Guid.NewGuid(), name, label, null, type, isRequired, isSystem, displayOrder, config);
 
+    internal static FieldDefinition Reconstitute(
+        Guid id, string name, string label, string? helpText,
+        FieldType type, bool isRequired, bool isSystem, int displayOrder, FieldConfig config)
+        => new(id, name, label, helpText, type, isRequired, isSystem, displayOrder, config);
+
     public void Update(string label, string? helpText, bool isRequired, FieldConfig config)
     {
         Label = label;

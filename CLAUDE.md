@@ -97,7 +97,8 @@ Complete Domain → Application for ALL modules before touching Infrastructure. 
 **Application**: RegisterOrganization, InviteUser, AcceptInvitation, DeactivateUser, AssignRoleToUser, CreateRole, UpdateRole, UpdateUserProfile; GetRoles query
 **Infrastructure**: IdentityDbContext (public schema), all EF Core configurations, all repositories, BCryptPasswordHasher (work factor 12), MailKitEmailSender, IdentityUnitOfWork
 
-### DataModeling (Domain ✅, Application ✅, Infrastructure ⏳, API ⏳, Frontend ⏳)
+### DataModeling (Domain ✅, Application ✅, Infrastructure ✅, API ⏳, Frontend ⏳)
+**Infrastructure**: DataModelingDbContext, EF Core configurations (DataModel/DataClass/DataRecord), JSONB FieldDefinition converter (polymorphic FieldConfig), JSONB DataRecord._data, 3 repositories, DataModelingUnitOfWork, 15 integration tests (Testcontainers)
 ### WorkflowBuilder (Domain ✅, Application ✅, Infrastructure ⏳, API ⏳, Frontend ⏳)
 ### FormBuilder (Domain ✅, Application ✅, Infrastructure ⏳, API ⏳, Frontend ⏳)
 ### WorkflowEngine (Domain ✅, Application ✅, Infrastructure ⏳, API ⏳, Frontend ⏳)

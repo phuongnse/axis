@@ -35,6 +35,10 @@ Users can create custom data models within their organization. A model defines t
 *Out of scope*
 - Importing a model from another org or from a JSON file directly — covered in [E04 F07 Import/Export](../../E04-workflow-builder/features/F07-import-export.md).
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: model plan-limit check (HTTP 402) pending billing layer (E01 F04); name format validation enforced in Application handler.
+> Decisions: system fields (id, created_at, updated_at) injected by domain factory; atomicity guaranteed by UnitOfWork.
+
 ---
 
 ### US-031 — View all models
@@ -58,6 +62,9 @@ Users can create custom data models within their organization. A model defines t
 
 *Out of scope*
 - Folders or categories for organizing models — not in MVP.
+
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: record count column pending denormalized counter or API-layer aggregation; field count is derived from Fields.Count at query time.
 
 ---
 
@@ -85,6 +92,9 @@ Users can create custom data models within their organization. A model defines t
 *Out of scope*
 - Undo history for field changes — not in MVP.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: HTTP 409 version-conflict check pending API layer (updated_at comparison); active-workflow warning pending E04 integration.
+
 ---
 
 ### US-033 — Delete a model
@@ -109,3 +119,6 @@ Users can create custom data models within their organization. A model defines t
 
 *Out of scope*
 - Recovering a soft-deleted model — not in MVP.
+
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: workflow/form reference check pending E04/E05 integration; 30-day purge background job pending infrastructure job scheduler.

@@ -1,0 +1,29 @@
+using Axis.DataModeling.Application.Repositories;
+using Axis.DataModeling.Domain.Aggregates;
+using Axis.DataModeling.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace Axis.DataModeling.Infrastructure.Repositories;
+
+internal sealed class DataModelRepository(DataModelingDbContext context) : IDataModelRepository
+{
+    public async Task AddAsync(DataModel model, CancellationToken ct = default)
+        => await context.DataModels.AddAsync(model, ct);
+
+    public async Task<DataModel?> GetByIdAsync(Guid id, Guid organizationId, CancellationToken ct = default)
+        => await context.DataModels
+            .FirstOrDefaultAsync(m => m.Id == id && m.OrganizationId == organizationId && !m.IsDeleted, ct);
+
+    public async Task<IReadOnlyList<DataModel>> GetAllAsync(Guid organizationId, CancellationToken ct = default)
+        => await context.DataModels
+            .Where(m => m.OrganizationId == organizationId && !m.IsDeleted)
+            .OrderBy(m => m.Name)
+            .ToListAsync(ct);
+
+    public async Task<bool> NameExistsAsync(string name, Guid organizationId, Guid? excludeId = null, CancellationToken ct = default)
+        => await context.DataModels
+            .AnyAsync(m => m.OrganizationId == organizationId
+                && !m.IsDeleted
+                && m.Name.ToLower() == name.ToLower()
+                && (excludeId == null || m.Id != excludeId), ct);
+}

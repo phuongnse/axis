@@ -1,6 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Axis.DataModeling.Application\Axis.DataModeling.Application.csproj" />
     <ProjectReference Include="..\Axis.DataModeling.Domain\Axis.DataModeling.Domain.csproj" />
     <ProjectReference Include="..\..\..\Shared\Axis.Shared.Infrastructure\Axis.Shared.Infrastructure.csproj" />

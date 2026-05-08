@@ -16,6 +16,8 @@ public sealed class DataRecord : AggregateRoot<Guid>
 
     public IReadOnlyDictionary<string, object?> Data => _data;
 
+    private DataRecord() : base(default) { _data = []; } // EF Core materialisation
+
     private DataRecord(Guid id, Guid modelId, Guid organizationId,
         Dictionary<string, object?> data, DateTime createdAt)
         : base(id)
