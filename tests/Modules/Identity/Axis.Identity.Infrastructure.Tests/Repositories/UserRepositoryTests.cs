@@ -104,6 +104,19 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task PasswordHash_is_persisted_and_reloaded()
+    {
+        var user = MakeUser("withhash@example.com");
+        user.SetPasswordHash("$2a$12$fakehashvalue");
+        await _sut.AddAsync(user);
+        await _ctx.SaveChangesAsync();
+
+        var loaded = await _sut.GetByIdAsync(user.Id, OrgId);
+
+        loaded!.PasswordHash.Should().Be("$2a$12$fakehashvalue");
+    }
+
+    [Fact]
     public async Task CountAdminsAsync_counts_users_with_admin_role()
     {
         var adminRoleId = Guid.NewGuid();

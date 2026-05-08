@@ -46,7 +46,8 @@ public class AcceptInvitationHandlerTests
                 u.FirstName == "Bob" &&
                 u.LastName == "Jones" &&
                 u.OrganizationId == OrgId &&
-                u.RoleIds.Contains(RoleId)),
+                u.RoleIds.Contains(RoleId) &&
+                u.PasswordHash == "hashed"),
             Arg.Any<CancellationToken>());
 
         invitation.Status.Should().Be(InvitationStatus.Accepted);

@@ -63,8 +63,7 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnName("created_at")
             .IsRequired();
 
-        // Shadow property for password hash — not part of domain
-        builder.Property<string?>("PasswordHash")
+        builder.Property(u => u.PasswordHash)
             .HasColumnName("password_hash");
 
         // Map private backing field _roleIds as a uuid[] column

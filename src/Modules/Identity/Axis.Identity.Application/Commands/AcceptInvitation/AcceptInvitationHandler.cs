@@ -34,6 +34,7 @@ public sealed class AcceptInvitationHandler(
         var passwordHash = hasher.Hash(command.Password);
 
         var user = User.Create(command.FirstName, command.LastName, invitation.Email, invitation.OrganizationId);
+        user.SetPasswordHash(passwordHash);
         user.AssignRole(invitation.RoleId);
 
         await userRepo.AddAsync(user, cancellationToken);

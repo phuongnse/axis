@@ -110,6 +110,15 @@ tests/
 - **`UseInMemoryDatabase` requires `Microsoft.EntityFrameworkCore.InMemory`** — separate package, must be added explicitly to test projects.
 - **Non-web test projects needing ASP.NET Core types** — use `<FrameworkReference Include="Microsoft.AspNetCore.App" />`, never `<PackageReference Include="Microsoft.AspNetCore.Http" />`.
 
+## Identity module schema strategy
+- **Identity uses the global `public` schema** — not a tenant schema. Registration has no tenant context and email uniqueness is platform-wide. `IdentityDbContext` is a plain `DbContext` with no `TenantSchemaInterceptor`.
+- All other modules use `AxisDbContext` (which wires in `TenantSchemaInterceptor` to switch schemas per request).
+
+## EF Core aggregate mapping patterns
+- **Private backing fields** (`_roleIds`, `_permissions`): use `PrimitiveCollection<List<T>>(fieldName).HasField(fieldName).UsePropertyAccessMode(PropertyAccessMode.Field)` — the type parameter must be the *collection* type, not the element type.
+- **No-args EF Core constructor**: when an aggregate's only constructor takes params EF Core can't bind (e.g. `IEnumerable<string>`), add a private no-args constructor: `private Role() : base(default) { Name = null!; }`. Initialize all non-nullable fields to silence CS8618.
+- **Migrations strategy**: Infrastructure tests use `context.Database.EnsureCreated()` (fast, no migration files). Production deployments will need EF Core migrations per module — one migration bundle per `DbContext`.
+
 ## Testing rules
 - Never run `dotnet test --no-build` after editing test code — always let it recompile.
 - **Never hardcode Docker endpoint in test code** (e.g. `.WithDockerEndpoint("tcp://localhost:2375")`). Docker host configuration belongs in `%USERPROFILE%\.testcontainers.properties` and `%USERPROFILE%\.wslconfig` — not in source code. Hardcoded values break portability across environments.

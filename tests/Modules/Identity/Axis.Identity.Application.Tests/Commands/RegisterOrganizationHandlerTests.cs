@@ -86,7 +86,7 @@ public class RegisterOrganizationHandlerTests
     }
 
     [Fact]
-    public async Task Password_is_hashed_before_storage()
+    public async Task Password_is_hashed_and_stored_on_user()
     {
         _orgRepo.SlugExistsAsync(Arg.Any<OrganizationSlug>()).Returns(false);
         _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>()).Returns(false);
@@ -95,5 +95,8 @@ public class RegisterOrganizationHandlerTests
         await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
         _hasher.Received(1).Hash("SecurePass1");
+        await _userRepo.Received(1).AddAsync(
+            Arg.Is<User>(u => u.PasswordHash == "hashed_password"),
+            Arg.Any<CancellationToken>());
     }
 }

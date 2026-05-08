@@ -17,6 +17,7 @@ public sealed class User : AggregateRoot<Guid>
     public string? AvatarUrl { get; private set; }
     public Email Email { get; private set; }
     public Guid OrganizationId { get; private set; }
+    public string? PasswordHash { get; private set; }
     public UserStatus Status { get; private set; }
     public bool IsEmailVerified { get; private set; }
     public int FailedLoginAttempts { get; private set; }
@@ -50,6 +51,13 @@ public sealed class User : AggregateRoot<Guid>
         var user = new User(Guid.NewGuid(), firstName, lastName, email, organizationId, DateTime.UtcNow);
         user.RaiseDomainEvent(new UserRegistered(user.Id, organizationId, email.Value));
         return user;
+    }
+
+    public void SetPasswordHash(string hash)
+    {
+        if (string.IsNullOrWhiteSpace(hash))
+            throw new ArgumentException("Password hash cannot be empty.", nameof(hash));
+        PasswordHash = hash;
     }
 
     public void VerifyEmail()

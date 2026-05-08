@@ -84,6 +84,7 @@ public sealed class RegisterOrganizationHandler(
         // Create admin user
         var passwordHash = hasher.Hash(command.Password);
         var user = User.Create(command.AdminFirstName, command.AdminLastName, email.Value, org.Id);
+        user.SetPasswordHash(passwordHash);
         user.AssignRole(adminRole.Id);
         await userRepo.AddAsync(user, cancellationToken);
 
