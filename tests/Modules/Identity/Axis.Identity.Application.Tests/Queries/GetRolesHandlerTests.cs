@@ -45,7 +45,7 @@ public class GetRolesHandlerTests
         dto.Name.Should().Be("Manager");
         dto.Description.Should().Be("Manages workflows");
         dto.IsSystem.Should().BeFalse();
-        dto.PermissionCount.Should().Be(2);
+        dto.Permissions.Should().HaveCount(2);
     }
 
     [Fact]

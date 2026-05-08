@@ -41,9 +41,9 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 - SSO / social login (Google, GitHub) — not in MVP.
 - 2FA / MFA — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: JWT issuance, httpOnly cookie for refresh token, rate-limit lockout message, and deactivated-user sign-in message pending API layer (OpenIddict + Redis).
-> Decisions: `AuthenticateUserCommand` in Application validates credentials, tracks failed logins via `User.RecordFailedLogin()`, resets on success via `User.ResetFailedLogins()`, returns `AuthenticationResult` with permissions for JWT claims. Actual JWT issuance is an API/Infrastructure concern.
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
+> Gaps vs spec: BroadcastChannel coordination for multi-tab refresh is Frontend-only.
+> Decisions: `AuthenticateUserCommand` validates credentials and returns permissions. `AuthController.SignIn` issues JWT (custom `JwtTokenService`, not OpenIddict) + stores refresh token in `refresh_tokens` table + sets httpOnly Secure SameSite=Strict cookie at `/api/auth`.
 
 ---
 
@@ -70,8 +70,9 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 *Out of scope*
 - Server-side session management (stateful sessions) — access is stateless JWT-based.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: refresh token rotation and BroadcastChannel coordination pending API + Frontend. Refresh token stored via OpenIddict in DB; rotation enforced at API layer.
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
+> Gaps vs spec: BroadcastChannel multi-tab coordination is Frontend-only.
+> Decisions: `POST /api/auth/refresh` validates the refresh token cookie, loads fresh user+permissions, rotates (revokes old, issues new) the refresh token, and returns a new access token. Replay detection: replayed refresh tokens return 401 since tokens are single-use.
 
 ---
 
@@ -98,6 +99,5 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 *Out of scope*
 - "Sign out of all devices" from this flow — covered in [F05 Password & Security](./F05-password-security.md).
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: refresh token revocation and JTI Redis blacklist pending API layer.
-> Decisions: sign-out is a pure API concern — Application layer has no handler; the API controller calls OpenIddict token revocation + Redis directly.
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
+> Decisions: `POST /api/auth/signout` [Authorize] revokes the refresh token from DB, blacklists the access token JTI in Redis with TTL = remaining token lifetime, and clears the cookie. Sign-out is a pure API/Infrastructure concern — no Application handler needed.

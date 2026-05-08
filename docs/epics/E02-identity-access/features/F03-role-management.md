@@ -1,4 +1,4 @@
-# F03 — Role Management
+﻿# F03 — Role Management
 
 [← Back to E02](../README.md)
 
@@ -32,7 +32,7 @@ Organization admins can create custom roles, assign permissions to each role, an
 *Out of scope*
 - Role hierarchy / role inheritance — not in MVP (flat role model only).
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: member count per role requires a JOIN query — not implemented yet (pending API query layer). UI badges and detail view are frontend concerns.
 
 ---
@@ -60,7 +60,7 @@ Organization admins can create custom roles, assign permissions to each role, an
 *Out of scope*
 - Copying permissions from an existing role as a starting point — not in MVP (user selects permissions manually).
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: 403 permission check requires JWT identity from API layer — pending. Case-insensitive name uniqueness check is done in handler against existing roles in org.
 > Decisions: `Role.CreateCustom(name, orgId, permissions[])` factory method; minimum 1 permission enforced in domain.
 
@@ -89,7 +89,7 @@ Organization admins can create custom roles, assign permissions to each role, an
 *Out of scope*
 - Permission change notifications to affected users — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: system role guard (cannot edit Admin/Editor/Viewer/End User) implemented in domain via `IsSystem` flag. 403 check pending API layer.
 
 ---
@@ -116,6 +116,6 @@ Organization admins can create custom roles, assign permissions to each role, an
 *Out of scope*
 - Time-limited role assignments (e.g., "grant admin for 24 hours") — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: 403 check pending API layer. "At least one role" guard and "last admin" guard both implemented in handler.
 > Decisions: roles stored as `List<Guid>` (`_roleIds`) on `User` aggregate — effective permissions are the union of all assigned roles' permission lists, computed at token issuance time (pending auth layer).

@@ -5,4 +5,4 @@ public sealed record RoleDto(
     string Name,
     string? Description,
     bool IsSystem,
-    int PermissionCount);
+    IReadOnlyList<string> Permissions);

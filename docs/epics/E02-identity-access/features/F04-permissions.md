@@ -1,4 +1,4 @@
-# F04 — Permission System
+﻿# F04 — Permission System
 
 [← Back to E02](../README.md)
 
@@ -81,7 +81,7 @@ A resource-based permission system where each permission grants the ability to p
 *Out of scope*
 - Row-level security (e.g., "user can only edit their own records") — not in MVP; all permission checks are type-level.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: policy-based authorization middleware, `[RequirePermission]` attribute, and automated permission tests pending API layer.
 > Decisions: permissions are included as a flat array in JWT claims at sign-in time (union of all role permissions); checked via ASP.NET Core custom policy at API layer.
 
@@ -109,5 +109,5 @@ A resource-based permission system where each permission grants the ability to p
 *Out of scope*
 - Per-record UI permissions (e.g., hiding individual table rows) — not in MVP.
 
-> **Implementation status** — Domain + Application: ⏳ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
+> **Implementation status** — Domain + Application: ⏳ | Infrastructure: ⏳ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: all ACs are frontend + API concerns — no Application-layer handler needed. Pending API layer for policy middleware and Frontend for UI hiding logic.

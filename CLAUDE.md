@@ -96,10 +96,11 @@ Complete Domain → Application for ALL modules before touching Infrastructure. 
 - `Axis.Shared.Application`: ICommand/IQuery/ICommandHandler/IQueryHandler, ValidationBehavior, TenantContext/ITenantContext
 - `Axis.Shared.Infrastructure`: AxisDbContext, TenantSchemaInterceptor, UnitOfWork, MessageBus
 
-### Identity Module (Domain ✅, Application ✅, Infrastructure ✅, API ⏳, Frontend ⏳)
+### Identity Module (Domain ✅, Application ✅, Infrastructure ✅, API ✅, Frontend ⏳)
 **Domain**: Organization, User, Role, Invitation aggregates; Email, OrganizationSlug value objects; all domain events
 **Application**: RegisterOrganization, InviteUser, AcceptInvitation, DeactivateUser, AssignRoleToUser, CreateRole, UpdateRole, UpdateUserProfile; AuthenticateUser, VerifyEmail, ResendVerificationEmail, RequestPasswordReset, ResetPassword, ChangePassword, RevokeSession; GetRoles, GetUserSessions queries
-**Infrastructure**: IdentityDbContext (public schema), all EF Core configurations, all repositories, BCryptPasswordHasher (work factor 12), MailKitEmailSender, IdentityUnitOfWork, PasswordResetTokenStore (password_reset_tokens table)
+**Infrastructure**: IdentityDbContext (public schema), all EF Core configurations, all repositories, BCryptPasswordHasher (work factor 12), MailKitEmailSender, IdentityUnitOfWork, PasswordResetTokenStore, RefreshTokenStore (refresh_tokens table), SessionStoreService
+**API**: AuthController (signin/refresh/signout/verify-email/forgot-password/reset-password), OrganizationsController (register + invite), InvitationsController (preview + accept), UsersController (profile/sessions/deactivate/assign-role), RolesController (list/create/update). Custom JWT via JwtTokenService (NOT OpenIddict); PermissionPolicyProvider for fine-grained RBAC; RedisJtiBlacklist; ValidationExceptionMiddleware (422). 27 integration tests (WebApplicationFactory + Testcontainers).
 
 ### DataModeling (Domain ✅, Application ✅, Infrastructure ✅, API ⏳, Frontend ⏳)
 **Infrastructure**: DataModelingDbContext, EF Core configurations (DataModel/DataClass/DataRecord), JSONB FieldDefinition converter (polymorphic FieldConfig), JSONB DataRecord._data, 3 repositories, DataModelingUnitOfWork, 15 integration tests (Testcontainers)

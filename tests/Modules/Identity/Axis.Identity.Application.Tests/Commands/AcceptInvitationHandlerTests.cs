@@ -14,6 +14,7 @@ public class AcceptInvitationHandlerTests
 {
     private readonly IInvitationRepository _invitationRepo = Substitute.For<IInvitationRepository>();
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
+    private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
     private readonly IPasswordHasher _hasher = Substitute.For<IPasswordHasher>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
@@ -23,7 +24,7 @@ public class AcceptInvitationHandlerTests
     private static readonly Email InvitedEmail = Email.Create("new@acme.com").Value;
 
     private AcceptInvitationHandler CreateHandler() =>
-        new(_invitationRepo, _userRepo, _hasher, _uow);
+        new(_invitationRepo, _userRepo, _roleRepo, _hasher, _uow);
 
     private AcceptInvitationCommand ValidCommand(string token = "valid-token") =>
         new(token, "Bob", "Jones", "NewPass1");
@@ -38,9 +39,13 @@ public class AcceptInvitationHandlerTests
         _invitationRepo.GetByTokenAsync("valid-token").Returns(invitation);
         _userRepo.EmailExistsPlatformWideAsync(InvitedEmail).Returns(false);
         _hasher.Hash("NewPass1").Returns("hashed");
+        _roleRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), OrgId).Returns([]);
 
-        await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
+        var result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
+        result.UserId.Should().NotBeEmpty();
+        result.OrganizationId.Should().Be(OrgId);
+        result.Email.Should().Be("new@acme.com");
         await _userRepo.Received(1).AddAsync(
             Arg.Is<User>(u =>
                 u.FirstName == "Bob" &&
@@ -81,7 +86,6 @@ public class AcceptInvitationHandlerTests
     [Fact]
     public async Task Expired_invitation_throws_with_expiry_message()
     {
-        // Use reflection/internal factory to create expired invitation
         var expired = InvitationTestHelper.CreateExpired(InvitedEmail, OrgId, RoleId, InvitedById);
         _invitationRepo.GetByTokenAsync("valid-token").Returns(expired);
 

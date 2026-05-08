@@ -12,7 +12,7 @@ public sealed class GetRolesHandler(IRoleRepository roleRepo)
         var roles = await roleRepo.GetAllAsync(query.OrganizationId, cancellationToken);
 
         return roles
-            .Select(r => new RoleDto(r.Id, r.Name, r.Description, r.IsSystem, r.Permissions.Count))
+            .Select(r => new RoleDto(r.Id, r.Name, r.Description, r.IsSystem, r.Permissions))
             .ToList()
             .AsReadOnly();
     }

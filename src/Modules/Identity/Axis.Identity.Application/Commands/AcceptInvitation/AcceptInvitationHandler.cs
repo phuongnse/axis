@@ -10,18 +10,18 @@ namespace Axis.Identity.Application.Commands.AcceptInvitation;
 public sealed class AcceptInvitationHandler(
     IInvitationRepository invitationRepo,
     IUserRepository userRepo,
+    IRoleRepository roleRepo,
     IPasswordHasher hasher,
     IUnitOfWork uow)
-    : ICommandHandler<AcceptInvitationCommand>
+    : ICommandHandler<AcceptInvitationCommand, AcceptInvitationResult>
 {
-    public async Task Handle(AcceptInvitationCommand command, CancellationToken cancellationToken)
+    public async Task<AcceptInvitationResult> Handle(
+        AcceptInvitationCommand command, CancellationToken cancellationToken)
     {
         var invitation = await invitationRepo.GetByTokenAsync(command.Token, cancellationToken);
         if (invitation is null)
             throw new ValidationException("Invalid or unknown invitation token.");
 
-        // Domain will throw InvalidOperationException for expired/accepted/cancelled —
-        // wrap in ValidationException so the API layer handles it consistently.
         try
         {
             invitation.Accept();
@@ -43,5 +43,15 @@ public sealed class AcceptInvitationHandler(
 
         await userRepo.AddAsync(user, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);
+
+        var roles = await roleRepo.GetByIdsAsync([invitation.RoleId], invitation.OrganizationId, cancellationToken);
+        var permissions = roles.SelectMany(r => r.Permissions).Distinct().ToList();
+
+        return new AcceptInvitationResult(
+            user.Id,
+            invitation.OrganizationId,
+            invitation.Email.Value,
+            $"{command.FirstName} {command.LastName}",
+            permissions);
     }
 }

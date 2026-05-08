@@ -65,14 +65,16 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 |---|---|---|
 | Domain | ✅ Done | `Organization`, `User`, `Role`, `Invitation` aggregates; `Email`, `OrganizationSlug` value objects; all domain events |
 | Application | ✅ Done | `RegisterOrganization`, `InviteUser`, `AcceptInvitation`, `DeactivateUser`, `AssignRoleToUser`, `CreateRole`, `UpdateRole`, `UpdateUserProfile`; `AuthenticateUser`, `VerifyEmail`, `ResendVerificationEmail`, `RequestPasswordReset`, `ResetPassword`, `ChangePassword`, `RevokeSession`; `GetRoles`, `GetUserSessions` queries |
-| Infrastructure | ✅ Done | `IdentityDbContext` (public schema), EF Core mappings, all repositories, `BCryptPasswordHasher` (work factor 12), `MailKitEmailSender`, `IdentityUnitOfWork`, `PasswordResetTokenStore` (`password_reset_tokens` table) |
-| API | ⏳ Pending | — |
+| Infrastructure | ✅ Done | `IdentityDbContext` (public schema), EF Core mappings, all repositories, `BCryptPasswordHasher` (work factor 12), `MailKitEmailSender`, `IdentityUnitOfWork`, `PasswordResetTokenStore`, `RefreshTokenStore` (`refresh_tokens` table), `SessionStoreService` |
+| API | ✅ Done | `AuthController` (signin/refresh/signout/verify-email/forgot-password/reset-password), `OrganizationsController` (register + invite), `InvitationsController` (preview + accept), `UsersController` (profile, sessions, deactivate, assign-role), `RolesController` (list, create, update). Custom JWT via `JwtTokenService`; permission-based authorization via `PermissionPolicyProvider`; JTI Redis blacklist; `ValidationExceptionMiddleware` (422). Integration-tested with WebApplicationFactory + Testcontainers (27 tests). |
 | Frontend | ⏳ Pending | — |
 
 **Key implementation decisions:**
 - Identity uses the global `public` PostgreSQL schema (not a tenant schema) — registration has no tenant context and email uniqueness is platform-wide.
 - Passwords are hashed with BCrypt (work factor 12) via `IPasswordHasher`. The hash is stored as a first-class property on `User` (`PasswordHash`), not a shadow property.
 - The 4 default system roles (Admin, Editor, Viewer, End User) and their full permission sets are seeded automatically by `RegisterOrganizationHandler` — see [F04](./features/F04-permissions.md) for the permission catalogue.
+- **JWT implementation**: Custom `JwtTokenService` using `Microsoft.AspNetCore.Authentication.JwtBearer` instead of the originally planned OpenIddict. OpenIddict adds significant complexity for a self-controlled SaaS where both client and server are owned by the same team. Refresh tokens are stored in a custom `refresh_tokens` table; access token JTIs are blacklisted in Redis on sign-out.
+- **Known gap (user deactivation)**: Revoking all refresh tokens is immediate, but existing access tokens remain valid up to 15 minutes. Full compliance would require a Redis user-level blacklist (not implemented in MVP).
 
 ---
 

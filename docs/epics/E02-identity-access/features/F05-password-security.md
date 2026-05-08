@@ -1,4 +1,4 @@
-# F05 — Password & Security Management
+﻿# F05 — Password & Security Management
 
 [← Back to E02](../README.md)
 
@@ -41,7 +41,7 @@ Allow users to reset forgotten passwords, change their current password, and man
 *Out of scope*
 - Security questions as a backup reset method — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: rate limiting (max 3 requests/hour) is an API/Infrastructure concern — pending API layer. Auto sign-in after reset pending API layer.
 > Decisions: reset token is a cryptographically random 32-byte value; stored as SHA-256 hash in `password_reset_tokens` table; raw token sent by email. New request invalidates all prior tokens for the user. Token lifetime: 1 hour.
 
@@ -71,7 +71,7 @@ Allow users to reset forgotten passwords, change their current password, and man
 *Out of scope*
 - Password history check (cannot reuse last N passwords) — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: failed-attempt lockout for change-password form (3 attempts / 15 min) pending API layer. Revoking other-device sessions after change pending API layer (OpenIddict token revocation).
 > Decisions: notification email failure is swallowed at handler level and logged separately at Infrastructure — password change still succeeds per US-028 AC.
 
@@ -101,6 +101,6 @@ Allow users to reset forgotten passwords, change their current password, and man
 *Out of scope*
 - Per-session device naming by the user — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: `ISessionStore` interface defined in Application; implementation pending Infrastructure (OpenIddict token manager wrapper). Session list UI, revoke button, and "sign out everywhere" pending Frontend + API.
 > Decisions: sessions are modelled as OpenIddict refresh tokens; `ISessionStore` wraps `IOpenIddictTokenManager` at Infrastructure layer. `RevokeSessionCommand(sessionId: null)` triggers "revoke all" via `RevokeAllAsync`.
