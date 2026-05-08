@@ -55,6 +55,19 @@ public class AcceptInvitationHandlerTests
     }
 
     [Fact]
+    public async Task Email_already_exists_platform_wide_throws_with_sign_in_message()
+    {
+        var invitation = MakePendingInvitation();
+        _invitationRepo.GetByTokenAsync("valid-token").Returns(invitation);
+        _userRepo.EmailExistsPlatformWideAsync(InvitedEmail).Returns(true);
+
+        var act = async () => await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
+
+        await act.Should().ThrowAsync<ValidationException>()
+            .WithMessage("*already exists*");
+    }
+
+    [Fact]
     public async Task Invalid_token_throws_validation_exception()
     {
         _invitationRepo.GetByTokenAsync(Arg.Any<string>()).ReturnsNull();

@@ -50,6 +50,14 @@ Multi-tenancy: schema-per-tenant in PostgreSQL (`tenant_{org_slug}`). Tenant res
 - **Git workflow**: solo project — always commit directly to `main`. Only create a branch if explicitly asked. When Claude Code auto-creates a worktree with a random branch name, commit the work then fast-forward merge to `main` and delete the branch.
 - **CLAUDE.md maintenance**: update this file whenever architecture decisions change, new patterns are established, or layer-order rules are clarified.
 
+## Priority order
+When deciding what to work on next, always follow this order — no exceptions, no asking:
+1. **Gaps / bugs / issues** — documented gaps in feature callouts, known correctness bugs, failing tests
+2. **Current layer completion** — finish the layer currently in progress across all modules before starting the next layer
+3. **Next planned layer** — follow the established layer order (Domain → Application → Infrastructure → API → Frontend)
+
+Never ask the user which direction to take if the priority order makes it unambiguous.
+
 ## Definition of Done
 
 A US or layer is NOT done until all of the following are complete in the same commit:

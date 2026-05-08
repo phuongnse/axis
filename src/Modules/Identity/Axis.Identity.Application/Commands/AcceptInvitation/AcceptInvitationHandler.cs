@@ -31,6 +31,10 @@ public sealed class AcceptInvitationHandler(
             throw new ValidationException(ex.Message);
         }
 
+        if (await userRepo.EmailExistsPlatformWideAsync(invitation.Email, cancellationToken))
+            throw new ValidationException(
+                "An account with this email already exists. Please sign in with your existing credentials.");
+
         var passwordHash = hasher.Hash(command.Password);
 
         var user = User.Create(command.FirstName, command.LastName, invitation.Email, invitation.OrganizationId);

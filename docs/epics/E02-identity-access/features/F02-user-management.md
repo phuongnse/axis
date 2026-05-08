@@ -70,8 +70,8 @@ Organization admins can invite new members, manage their accounts, and deactivat
 - Inviting users who already have accounts on other orgs to join a second org simultaneously — each user belongs to one org in MVP.
 
 > **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: platform-wide email check before user creation not implemented — if the invited email already exists on another org, a second `User` record is created instead of prompting sign-in. Must be addressed before API layer ships. Session sign-in after accept is an API/auth concern, pending.
-> Decisions: expired/accepted/cancelled invitation states are enforced in `Invitation.Accept()` domain method and wrapped as `ValidationException` in the handler.
+> Gaps vs spec: session sign-in after accept is an API/auth concern, pending.
+> Decisions: expired/accepted/cancelled invitation states enforced in `Invitation.Accept()` domain method, wrapped as `ValidationException` in handler. Platform-wide email check runs after invitation validation — throws `ValidationException` directing user to sign in with existing credentials.
 
 ---
 
