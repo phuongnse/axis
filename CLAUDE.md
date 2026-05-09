@@ -184,6 +184,5 @@ tests/
 
 ## Testing rules
 - Never run `dotnet test --no-build` after editing test code — always let it recompile.
-- **Never hardcode Docker endpoint in test code** (e.g. `.WithDockerEndpoint("tcp://localhost:2375")`). Docker host configuration belongs in `%USERPROFILE%\.testcontainers.properties` and `%USERPROFILE%\.wslconfig` — not in source code. Hardcoded values break portability across environments.
-- **Testcontainers on WSL2 without Docker Desktop**: configure via user-profile files only — `~/.testcontainers.properties` (set `docker.host`) and `~/.wslconfig` (set `networkingMode`). No code changes needed.
+- **Never hardcode environment configurations in code**: Any configuration values that vary across environments (e.g., connection strings, API URLs, Docker endpoints like `tcp://localhost:2375`, secret keys) must NOT be hardcoded in the source or test code. Use environment variables, `appsettings.json`, or `.testcontainers.properties` instead. Hardcoded values break portability and security.
 - **AI Agent Testing Scope**: AI agents are only required to run and verify **Unit Tests** locally. Integration tests or any tests depending on external services (like Docker, Testcontainers, PostgreSQL, Redis) can be skipped by the AI agent during development. Verification of these tests will be handled by external CI/CD tools (e.g., GitHub Actions) upon submitting the Pull Request.
