@@ -185,5 +185,5 @@ tests/
 ## Testing rules
 - Never run `dotnet test --no-build` after editing test code — always let it recompile.
 - **Never hardcode environment configurations in code**: Any configuration values that vary across environments (e.g., connection strings, API URLs, Docker endpoints like `tcp://localhost:2375`, secret keys) must NOT be hardcoded in the source or test code. Use environment variables, `appsettings.json`, or `.testcontainers.properties` instead. Hardcoded values break portability and security.
-- **AI Agent Testing Scope**: AI agents must run only unit tests locally using `dotnet test --filter "Category=Unit"`. Integration tests require Docker/Testcontainers and are verified by CI/CD on PR submission.
-- **Test category tagging — mandatory for every test project**: Every test project must have an `AssemblyInfo.cs` with `[assembly: Xunit.Trait("Category", "<category>")]`. Current categories: `Unit` (Domain + Application tests), `Integration` (Infrastructure + API tests). Add new categories if new test types emerge. This is what makes `--filter "Category=Unit"` reliable — if a project has no category, its tests are invisible to the agent.
+- **AI Agent Testing Scope**: AI agents must run only unit tests locally using `dotnet test unit-tests.slnf`. Integration tests require Docker/Testcontainers and are verified by CI/CD on PR submission.
+- **`unit-tests.slnf`**: Solution filter at the repo root that includes only Domain + Application test projects. When a new unit test project is added to the solution, it must also be added to this file.
