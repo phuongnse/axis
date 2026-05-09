@@ -187,3 +187,7 @@ tests/
 - **Never hardcode environment configurations in code**: Any configuration values that vary across environments (e.g., connection strings, API URLs, Docker endpoints like `tcp://localhost:2375`, secret keys) must NOT be hardcoded in the source or test code. Use environment variables, `appsettings.json`, or `.testcontainers.properties` instead. Hardcoded values break portability and security.
 - **AI Agent Testing Scope**: AI agents must run only unit tests locally using `dotnet test unit-tests.slnf`. Integration tests require Docker/Testcontainers and are verified by CI/CD on PR submission.
 - **`unit-tests.slnf`**: Solution filter at the repo root that includes only Domain + Application test projects. When a new unit test project is added to the solution, it must also be added to this file.
+
+- **Always write integration tests using WebApplicationFactory when implementing API endpoints** to cover the HTTP flow, authorization, and validation.
+- **Always update the project's documentation implementation statuses immediately** (e.g. in `docs/epics/` and `CLAUDE.md`) in the same PR when completing a feature or layer.
+- **Never work around established patterns**: Do not implement things like `NullUnitOfWork` just to avoid configuring `Wolverine.IMessageBus`. Mock dependencies properly rather than breaking architectural rules.

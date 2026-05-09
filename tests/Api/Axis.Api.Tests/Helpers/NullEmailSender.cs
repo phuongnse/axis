@@ -4,19 +4,6 @@ using Axis.Identity.Infrastructure.Persistence;
 
 namespace Axis.Api.Tests.Helpers;
 
-internal sealed class NullUnitOfWork(IdentityDbContext context) : IUnitOfWork
-{
-    public Task<int> SaveChangesAsync(CancellationToken ct = default) =>
-        context.SaveChangesAsync(ct);
-}
-
-internal sealed class NullDataModelingUnitOfWork(DataModelingDbContext context)
-    : Axis.DataModeling.Application.Services.IUnitOfWork
-{
-    public Task<int> SaveChangesAsync(CancellationToken ct = default) =>
-        context.SaveChangesAsync(ct);
-}
-
 internal sealed class NullEmailSender : IEmailSender
 {
     public Task SendVerificationEmailAsync(string toEmail, string verificationToken, CancellationToken ct = default) =>
@@ -39,11 +26,4 @@ internal sealed class NullAvatarStorageService : IAvatarStorageService
 
     public Task DeleteAvatarAsync(string avatarUrl, CancellationToken ct = default) =>
         Task.CompletedTask;
-}
-
-internal sealed class NullWorkflowBuilderUnitOfWork(Axis.WorkflowBuilder.Infrastructure.Persistence.WorkflowBuilderDbContext context)
-    : Axis.WorkflowBuilder.Application.Services.IUnitOfWork
-{
-    public Task<int> SaveChangesAsync(CancellationToken ct = default) =>
-        context.SaveChangesAsync(ct);
 }

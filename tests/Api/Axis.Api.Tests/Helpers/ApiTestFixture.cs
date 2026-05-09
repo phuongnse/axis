@@ -92,21 +92,8 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.RemoveAll<IAvatarStorageService>();
                 services.AddScoped<IAvatarStorageService, NullAvatarStorageService>();
 
-                // Replace IUnitOfWork — IdentityUnitOfWork requires Wolverine.IMessageBus
-                // which is not registered; domain events are irrelevant in tests
-                services.RemoveAll<IUnitOfWork>();
-                services.AddScoped<IUnitOfWork>(sp =>
-                    new NullUnitOfWork(sp.GetRequiredService<IdentityDbContext>()));
-
-                // Same for DataModeling IUnitOfWork (different interface, same Wolverine dependency)
-                services.RemoveAll<Axis.DataModeling.Application.Services.IUnitOfWork>();
-                services.AddScoped<Axis.DataModeling.Application.Services.IUnitOfWork>(sp =>
-                    new NullDataModelingUnitOfWork(sp.GetRequiredService<DataModelingDbContext>()));
-
-                // Same for WorkflowBuilder
-                services.RemoveAll<Axis.WorkflowBuilder.Application.Services.IUnitOfWork>();
-                services.AddScoped<Axis.WorkflowBuilder.Application.Services.IUnitOfWork>(sp =>
-                    new NullWorkflowBuilderUnitOfWork(sp.GetRequiredService<Axis.WorkflowBuilder.Infrastructure.Persistence.WorkflowBuilderDbContext>()));
+                // Register a mocked IMessageBus so that real UnitOfWork classes can be resolved
+                services.AddSingleton(NSubstitute.Substitute.For<Wolverine.IMessageBus>());
 
                 // Use a fixed "public" schema for all tenants so we don't need per-org
                 // schema creation. Integration tests are not validating tenant isolation.
