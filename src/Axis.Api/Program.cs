@@ -119,7 +119,7 @@ try
     var cfg = builder.Configuration;
     builder.Services.AddIdentityInfrastructure(cfg);
     builder.Services.AddDataModelingInfrastructure(cfg);
-    builder.Services.AddWorkflowBuilderInfrastructure(cfg.GetConnectionString("WorkflowBuilder")!);
+    builder.Services.AddWorkflowBuilderInfrastructure(cfg);
     builder.Services.AddFormBuilderInfrastructure(cfg.GetConnectionString("FormBuilder")!);
     builder.Services.AddWorkflowEngineInfrastructure(cfg.GetConnectionString("WorkflowEngine")!);
 
