@@ -120,7 +120,7 @@ Complete Domain → Application for ALL modules before touching Infrastructure. 
 ### DataModeling (Domain ✅, Application ✅, Infrastructure ✅, API ✅, Frontend ⏳)
 **Infrastructure**: DataModelingDbContext (public), EF Core configurations (DataModel/DataClass/DataRecord), JSONB FieldDefinition converter (polymorphic FieldConfig), JSONB DataRecord._data, 3 repositories (incl. GetPagedAsync with search via `data::text ILIKE`), DataModelingUnitOfWork, integration tests (Testcontainers)
 **API**: Minimal API — `/api/models` (9 endpoints: CRUD + field management + reorder), `/api/data-classes` (7 endpoints), `/api/models/{id}/records` (5 endpoints with pagination+search). FieldConfigHelper for discriminated deserialization. Integration tests (WebApplicationFactory).
-### WorkflowBuilder (Domain ✅, Application ✅, Infrastructure ✅, API ⏳, Frontend ⏳)
+### WorkflowBuilder (Domain ✅, Application ✅, Infrastructure ✅, API ⏳ (Partial), Frontend ⏳)
 **Infrastructure**: WorkflowBuilderDbContext, WorkflowDefinition config (steps/transitions/triggers as JSONB with custom WorkflowStepConverter), WorkflowRepository, 7 integration tests (Testcontainers)
 ### FormBuilder (Domain ✅, Application ✅, Infrastructure ✅, API ⏳, Frontend ⏳)
 **Infrastructure**: FormBuilderDbContext, EF Core config (FormDefinition with fields as JSONB via FormFieldConverter — 9 field types, polymorphic FormFieldConfig), FormRepository (IsReferencedByWorkflowAsync cross-module JSONB query), 8 integration tests (Testcontainers)

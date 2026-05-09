@@ -33,7 +33,7 @@ Users can create, view, edit, publish, archive, and duplicate workflow definitio
 *Out of scope*
 - Workflow templates / starter library — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: workflow plan-limit check (HTTP 402) pending billing layer (E01 F04).
 > Decisions: new workflow initialised with Start + End nodes by domain factory; all data stored in single `workflow_definitions` table.
 
@@ -60,7 +60,7 @@ Users can create, view, edit, publish, archive, and duplicate workflow definitio
 *Out of scope*
 - Workflow folders / tags — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: status-tab filter and last-execution-date column pending API layer; execution date requires WorkflowEngine integration.
 
 ---
@@ -86,7 +86,7 @@ Users can create, view, edit, publish, archive, and duplicate workflow definitio
 *Out of scope*
 - Approval workflow for publishing (e.g., requiring a second admin to approve) — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: cron job registration and webhook URL generation pending WorkflowEngine integration (E06); broken-step validation pending E03/E05 integration; draft versioning on re-edit pending API design.
 
 ---

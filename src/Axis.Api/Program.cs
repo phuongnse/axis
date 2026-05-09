@@ -170,6 +170,7 @@ try
     app.MapModelEndpoints();
     app.MapDataClassEndpoints();
     app.MapRecordEndpoints();
+    app.MapWorkflowEndpoints();
 
     app.Run();
 }
