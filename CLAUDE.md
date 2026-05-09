@@ -93,6 +93,9 @@ Do NOT read all docs upfront. The feature file defines the contract for the task
 - **Mandatory Result Pattern**: Command/Query handlers return `Result` or `Result<T>` for business rule violations. FluentValidation validators run via `ValidationBehavior` pipeline — never throw `ValidationException` manually in a handler. Exceptions are reserved for infrastructure failures. Domain aggregates guard with `throw InvalidOperationException` for internal invariants only.
 - **Centralized Global Usings**: Use `GlobalUsings.cs` per project or `<Using Include="..." />` in `Directory.Build.props` for ubiquitous namespaces.
 - **Comment policy — WHY not WHAT**: Default to no comments. Add one only when the WHY is non-obvious: a hidden constraint, a framework quirk, or business logic that would surprise a reader.
+- **Logging Policy**: Use Serilog for all logging. Always use **structured logging** (e.g., `_logger.LogInformation("Processing order {OrderId} for user {UserId}", orderId, userId)`). Log `Error` for exceptions/system failures, `Warning` for unexpected but handled edge cases, and `Information` for critical business milestones. Do not log sensitive PII/Credentials.
+- **Code Style & Linting**: All code must pass `dotnet format` without warnings before pushing. Follow standard C# naming conventions.
+- **Complexity Guardrails**: Keep methods small and focused. Minimal API endpoints MUST NOT contain any business logic — they only extract parameters, dispatch to MediatR, and map `Result` objects to `IResult` HTTP responses.
 
 ## Multi-tenancy & Migrations
 
