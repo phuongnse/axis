@@ -74,6 +74,7 @@ Do NOT read all docs upfront. The feature file defines the contract for the task
 ## Development Rules
 
 - **TDD is mandatory**: write tests first, must pass before moving to next step, no exceptions.
+- **Testing Database**: Integration and Infrastructure tests MUST use **Testcontainers** (PostgreSQL/Redis). The EF Core In-Memory database provider (`UseInMemoryDatabase`) is strictly forbidden.
 - **DDD**: apply fully to complex modules (WorkflowEngine, DataModeling). Be pragmatic on simpler CRUD modules (Identity).
 - **Diagrams**: add proactively when a flow is complex enough that text alone doesn't convey it clearly.
 - **Docs-first, always — non-negotiable**: Before implementing any user story, feature, or fix, read the relevant feature file in `docs/epics/`. The doc defines the contract; code implements it. Never write code first and update docs after. Every code change that affects observable behavior must also update the relevant doc in the same commit.
@@ -87,6 +88,7 @@ Do NOT read all docs upfront. The feature file defines the contract for the task
 - **Explicit over Implicit — no `var`**: Always write the explicit type. Never use `var`, even when the assignment makes the type obvious.
 - **Minimal API (mandatory)**: All new endpoint work uses Minimal API (`MapGroup` + `IEndpointRouteBuilder` extension methods), not traditional controllers. Use `ConfigureHttpJsonOptions` for JSON configuration. Never default silently to traditional controllers.
 - **Minimal API Structure**: Each module exposes a `Map{ModuleName}Endpoints(IEndpointRouteBuilder)` extension method. No logic in the mapping file — only MediatR dispatching.
+- **API Error Responses**: All endpoints MUST map `Result` failures to standard HTTP `ProblemDetails` (RFC 7807) responses. Do not return custom error JSON structures or raw strings.
 - **Idempotency**: All Command handlers and Migrations must be idempotent.
 - **Surface architectural decisions before implementing**: Before starting any new layer, module, or API surface, list the 2–3 key design choices and confirm with the user.
 - **No inline fully-qualified type names**: Always use `using` directives. Never write `typeof(Axis.Some.Long.Namespace.MyType)` inline.
@@ -96,6 +98,10 @@ Do NOT read all docs upfront. The feature file defines the contract for the task
 - **Logging Policy**: Use Serilog for all logging. Always use **structured logging** (e.g., `_logger.LogInformation("Processing order {OrderId} for user {UserId}", orderId, userId)`). Log `Error` for exceptions/system failures, `Warning` for unexpected but handled edge cases, and `Information` for critical business milestones. Do not log sensitive PII/Credentials.
 - **Code Style & Linting**: All code must pass `dotnet format` without warnings before pushing. Follow standard C# naming conventions.
 - **Complexity Guardrails**: Keep methods small and focused. Minimal API endpoints MUST NOT contain any business logic — they only extract parameters, dispatch to MediatR, and map `Result` objects to `IResult` HTTP responses.
+- **CQRS & Messaging Boundaries**: **MediatR** is strictly for internal module CQRS (Commands/Queries). **Wolverine** is strictly for inter-module asynchronous domain events and background jobs. Do not mix their purposes.
+- **EF Core Configuration**: Always use Fluent API (`IEntityTypeConfiguration<T>`) for EF Core mappings in the Infrastructure layer. **Data Annotations** (e.g., `[Required]`, `[Table]`) are strictly forbidden in Domain entities.
+- **NuGet Packages & Dependencies**: Always check `Directory.Packages.props` before adding any new libraries. Do not add libraries that are not explicitly approved or hallucinate versions. Do not upgrade packages unless explicitly requested.
+- **Safe Editing & Refactoring**: Only modify code directly related to the current task. **Never** delete, comment out, or massively restructure code outside the scope of your task unless explicitly requested. Preserve existing logic if you don't fully understand it.
 
 ## Multi-tenancy & Migrations
 
