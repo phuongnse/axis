@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Axis.WorkflowBuilder.Infrastructure.Persistence;
 
-internal sealed class WorkflowBuilderDbContext(
+public sealed class WorkflowBuilderDbContext(
     DbContextOptions<WorkflowBuilderDbContext> options,
     ITenantContext tenantContext)
     : AxisDbContext(options, tenantContext)

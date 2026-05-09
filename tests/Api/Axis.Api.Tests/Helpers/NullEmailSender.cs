@@ -40,3 +40,10 @@ internal sealed class NullAvatarStorageService : IAvatarStorageService
     public Task DeleteAvatarAsync(string avatarUrl, CancellationToken ct = default) =>
         Task.CompletedTask;
 }
+
+internal sealed class NullWorkflowBuilderUnitOfWork(Axis.WorkflowBuilder.Infrastructure.Persistence.WorkflowBuilderDbContext context)
+    : Axis.WorkflowBuilder.Application.Services.IUnitOfWork
+{
+    public Task<int> SaveChangesAsync(CancellationToken ct = default) =>
+        context.SaveChangesAsync(ct);
+}
