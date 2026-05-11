@@ -3,6 +3,7 @@ using Axis.FormBuilder.Domain.Aggregates;
 using Axis.FormBuilder.Domain.Entities;
 using Axis.FormBuilder.Infrastructure.Persistence.Converters;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
@@ -13,6 +14,11 @@ internal sealed class FormDefinitionConfiguration : IEntityTypeConfiguration<For
     private static readonly ValueConverter<List<FormField>, string> FieldsConverter = new(
         fields => JsonSerializer.Serialize(fields, FormJsonOptions.Options),
         json => JsonSerializer.Deserialize<List<FormField>>(json, FormJsonOptions.Options) ?? new List<FormField>());
+
+    private static readonly ValueComparer<List<FormField>> FieldsComparer = new(
+        (l1, l2) => l1 != null && l2 != null && l1.SequenceEqual(l2),
+        l => l.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+        l => l.ToList());
 
     public void Configure(EntityTypeBuilder<FormDefinition> builder)
     {
@@ -51,7 +57,7 @@ internal sealed class FormDefinitionConfiguration : IEntityTypeConfiguration<For
             .UsePropertyAccessMode(PropertyAccessMode.Field)
             .HasColumnName("fields")
             .HasColumnType("jsonb")
-            .HasConversion(FieldsConverter)
+            .HasConversion(FieldsConverter, FieldsComparer)
             .IsRequired();
 
         builder.Ignore(f => f.Fields);

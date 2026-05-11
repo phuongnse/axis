@@ -22,9 +22,7 @@
 
 ## DataModeling — E03-data-modeling
 
-**Domain ✅ | Application ✅ | Infrastructure ⚠️ | API ✅ | Frontend ⏳**
-
-> ⚠️ **Infrastructure gap — JSONB change tracking workaround**: `DataModelingDbContext.SaveChangesAsync` overrides to force-mark `_fields` as modified. This is incomplete — it only fires when the entity is already `Modified` (another scalar field changed). If only `_fields` is mutated, changes are silently lost. Fix: add `ValueComparer` to `DataModelConfiguration` and `DataClassConfiguration`, then remove `MarkJsonbFieldsModified`. See PATTERNS.md → "EF Core JSONB collection change tracking".
+**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳**
 
 - **Infrastructure**: DataModelingDbContext (public), EF Core configurations (DataModel/DataClass/DataRecord), JSONB FieldDefinition converter (polymorphic FieldConfig), JSONB DataRecord._data, 3 repositories (incl. GetPagedAsync with search via `data::text ILIKE`), DataModelingUnitOfWork, integration tests (Testcontainers)
 - **API**: Minimal API — `/api/models` (9 endpoints: CRUD + field management + reorder), `/api/data-classes` (7 endpoints), `/api/models/{id}/records` (5 endpoints with pagination+search). FieldConfigHelper for discriminated deserialization. Integration tests (WebApplicationFactory).
@@ -37,9 +35,7 @@
 
 ## FormBuilder — E05-form-builder
 
-**Domain ✅ | Application ✅ | Infrastructure ⚠️ | API ⏳ | Frontend ⏳**
-
-> ⚠️ **Infrastructure gap — JSONB change tracking missing**: `FormDefinitionConfiguration` maps `_fields` with `HasConversion` but no `ValueComparer`. Unlike DataModeling, FormBuilderDbContext has no workaround at all — any mutation to form fields that doesn't also change a scalar property will be silently lost. Fix: add `ValueComparer` to `FormDefinitionConfiguration`. See PATTERNS.md → "EF Core JSONB collection change tracking".
+**Domain ✅ | Application ✅ | Infrastructure ✅ | API ⏳ | Frontend ⏳**
 
 - **Infrastructure**: FormBuilderDbContext, EF Core config (FormDefinition with fields as JSONB via FormFieldConverter — 9 field types, polymorphic FormFieldConfig), FormRepository (IsReferencedByWorkflowAsync cross-module JSONB query), 8 integration tests (Testcontainers)
 
