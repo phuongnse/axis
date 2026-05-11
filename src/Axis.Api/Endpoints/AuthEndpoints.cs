@@ -17,13 +17,54 @@ public static class AuthEndpoints
     {
         var group = app.MapGroup("/api/auth");
 
-        group.MapPost("/signin", SignIn);
-        group.MapPost("/refresh", Refresh);
-        group.MapPost("/signout", SignOut).RequireAuthorization();
-        group.MapPost("/verify-email", VerifyEmail);
-        group.MapPost("/resend-verification", ResendVerification);
-        group.MapPost("/forgot-password", ForgotPassword);
-        group.MapPost("/reset-password", ResetPassword);
+        group.MapPost("/signin", SignIn)
+            .WithName("SignIn")
+            .WithSummary("Authenticate with email and password")
+            .WithTags("Identity")
+            .Produces<object>()
+            .ProducesProblem(401);
+
+        group.MapPost("/refresh", Refresh)
+            .WithName("RefreshToken")
+            .WithSummary("Refresh access token using HttpOnly refresh cookie")
+            .WithTags("Identity")
+            .Produces<object>()
+            .ProducesProblem(401);
+
+        group.MapPost("/signout", SignOut)
+            .RequireAuthorization()
+            .WithName("SignOut")
+            .WithSummary("Sign out and revoke the current refresh token")
+            .WithTags("Identity")
+            .Produces(204)
+            .ProducesProblem(401);
+
+        group.MapPost("/verify-email", VerifyEmail)
+            .WithName("VerifyEmail")
+            .WithSummary("Verify email address with a one-time token")
+            .WithTags("Identity")
+            .Produces(204)
+            .ProducesProblem(400);
+
+        group.MapPost("/resend-verification", ResendVerification)
+            .WithName("ResendEmailVerification")
+            .WithSummary("Resend email verification link")
+            .WithTags("Identity")
+            .Produces(204)
+            .ProducesProblem(400);
+
+        group.MapPost("/forgot-password", ForgotPassword)
+            .WithName("ForgotPassword")
+            .WithSummary("Request a password reset link")
+            .WithTags("Identity")
+            .Produces<object>();
+
+        group.MapPost("/reset-password", ResetPassword)
+            .WithName("ResetPassword")
+            .WithSummary("Reset password using a one-time token")
+            .WithTags("Identity")
+            .Produces(204)
+            .ProducesProblem(400);
 
         return app;
     }

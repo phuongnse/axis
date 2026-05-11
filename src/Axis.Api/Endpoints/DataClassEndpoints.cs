@@ -22,21 +22,77 @@ public static class DataClassEndpoints
             .RequireAuthorization();
 
         group.MapGet("/", GetDataClasses)
-            .RequireAuthorization(Permissions.DataModeling.ModelRead);
+            .RequireAuthorization(Permissions.DataModeling.ModelRead)
+            .WithName("GetDataClasses")
+            .WithSummary("List all data classes for the organization")
+            .WithTags("DataModeling")
+            .Produces<IReadOnlyList<DataClassSummaryDto>>()
+            .ProducesProblem(401)
+            .ProducesProblem(403);
+
         group.MapPost("/", CreateDataClass)
-            .RequireAuthorization(Permissions.DataModeling.ModelWrite);
+            .RequireAuthorization(Permissions.DataModeling.ModelWrite)
+            .WithName("CreateDataClass")
+            .WithSummary("Create a new data class")
+            .WithTags("DataModeling")
+            .Produces<object>(201)
+            .ProducesProblem(400)
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(409);
+
         group.MapGet("/{dataClassId:guid}", GetDataClass)
-            .RequireAuthorization(Permissions.DataModeling.ModelRead);
+            .RequireAuthorization(Permissions.DataModeling.ModelRead)
+            .WithName("GetDataClass")
+            .WithSummary("Get a data class by ID")
+            .WithTags("DataModeling")
+            .Produces<DataClassDetailDto>()
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(404);
+
         group.MapPut("/{dataClassId:guid}", UpdateDataClass)
-            .RequireAuthorization(Permissions.DataModeling.ModelWrite);
+            .RequireAuthorization(Permissions.DataModeling.ModelWrite)
+            .WithName("UpdateDataClass")
+            .WithSummary("Update a data class")
+            .WithTags("DataModeling")
+            .Produces(204)
+            .ProducesProblem(400)
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(404);
+
         group.MapDelete("/{dataClassId:guid}", DeleteDataClass)
-            .RequireAuthorization(Permissions.DataModeling.ModelDelete);
+            .RequireAuthorization(Permissions.DataModeling.ModelDelete)
+            .WithName("DeleteDataClass")
+            .WithSummary("Soft-delete a data class")
+            .WithTags("DataModeling")
+            .Produces(204)
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(404);
 
         // Field management
         group.MapPost("/{dataClassId:guid}/fields", AddField)
-            .RequireAuthorization(Permissions.DataModeling.ModelWrite);
+            .RequireAuthorization(Permissions.DataModeling.ModelWrite)
+            .WithName("AddFieldToDataClass")
+            .WithSummary("Add a field to a data class")
+            .WithTags("DataModeling")
+            .Produces<object>(201)
+            .ProducesProblem(400)
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(404);
+
         group.MapDelete("/{dataClassId:guid}/fields/{fieldId:guid}", RemoveField)
-            .RequireAuthorization(Permissions.DataModeling.ModelWrite);
+            .RequireAuthorization(Permissions.DataModeling.ModelWrite)
+            .WithName("RemoveFieldFromDataClass")
+            .WithSummary("Remove a field from a data class")
+            .WithTags("DataModeling")
+            .Produces(204)
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(404);
 
         return app;
     }
