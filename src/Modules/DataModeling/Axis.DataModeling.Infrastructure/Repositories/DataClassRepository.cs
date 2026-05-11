@@ -20,6 +20,22 @@ internal sealed class DataClassRepository(DataModelingDbContext context) : IData
             .OrderBy(c => c.Name)
             .ToListAsync(ct);
 
+    public async Task<(IReadOnlyList<DataClass> Items, int TotalCount)> GetPagedAsync(
+        Guid organizationId, int page, int pageSize, CancellationToken ct = default)
+    {
+        IQueryable<DataClass> query = context.DataClasses
+            .Where(c => c.OrganizationId == organizationId && !c.IsDeleted)
+            .OrderBy(c => c.Name);
+
+        int totalCount = await query.CountAsync(ct);
+        List<DataClass> items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        return (items, totalCount);
+    }
+
     public async Task<bool> NameExistsAsync(string name, Guid organizationId, Guid? excludeId = null, CancellationToken ct = default)
         => await context.DataClasses
             .AnyAsync(c => c.OrganizationId == organizationId

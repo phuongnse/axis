@@ -1,20 +1,26 @@
 using Axis.DataModeling.Application.Repositories;
+using Axis.DataModeling.Domain.Aggregates;
+using Axis.Shared.Application;
 using Axis.Shared.Application.CQRS;
 
 namespace Axis.DataModeling.Application.Queries.GetDataClasses;
 
-/// <summary>US-037: Lists all non-deleted data classes for the org, sorted by name.</summary>
+/// <summary>US-037: Lists non-deleted data classes for the org, paginated.</summary>
 public sealed class GetDataClassesHandler(IDataClassRepository dataClassRepo)
-    : IQueryHandler<GetDataClassesQuery, IReadOnlyList<DataClassSummaryDto>>
+    : IQueryHandler<GetDataClassesQuery, PagedResult<DataClassSummaryDto>>
 {
-    public async Task<IReadOnlyList<DataClassSummaryDto>> Handle(
+    public async Task<PagedResult<DataClassSummaryDto>> Handle(
         GetDataClassesQuery query, CancellationToken cancellationToken)
     {
-        var classes = await dataClassRepo.GetAllAsync(query.OrganizationId, cancellationToken);
+        int effectivePageSize = Math.Min(query.PageSize, 100);
 
-        return classes
+        (IReadOnlyList<DataClass> items, int totalCount) =
+            await dataClassRepo.GetPagedAsync(query.OrganizationId, query.Page, effectivePageSize, cancellationToken);
+
+        IReadOnlyList<DataClassSummaryDto> dtos = items
             .Select(c => new DataClassSummaryDto(c.Id, c.Name, c.Description, c.Fields.Count, c.CreatedAt))
-            .ToList()
-            .AsReadOnly();
+            .ToList();
+
+        return new PagedResult<DataClassSummaryDto>(dtos, totalCount, query.Page, effectivePageSize);
     }
 }

@@ -20,6 +20,22 @@ internal sealed class WorkflowRepository(WorkflowBuilderDbContext context) : IWo
             .OrderBy(w => w.Name)
             .ToListAsync(ct);
 
+    public async Task<(IReadOnlyList<WorkflowDefinition> Items, int TotalCount)> GetPagedAsync(
+        Guid organizationId, int page, int pageSize, CancellationToken ct = default)
+    {
+        IQueryable<WorkflowDefinition> query = context.WorkflowDefinitions
+            .Where(w => w.OrganizationId == organizationId)
+            .OrderByDescending(w => w.UpdatedAt);
+
+        int totalCount = await query.CountAsync(ct);
+        List<WorkflowDefinition> items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        return (items, totalCount);
+    }
+
     public async Task<bool> NameExistsAsync(string name, Guid organizationId, Guid? excludeId = null, CancellationToken ct = default)
         => await context.WorkflowDefinitions
             .AnyAsync(w => w.OrganizationId == organizationId

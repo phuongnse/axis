@@ -27,19 +27,12 @@ public static class RoleEndpoints
     private static async Task<IResult> GetRoles(
         CurrentUser currentUser,
         ISender mediator,
-        CancellationToken ct)
+        CancellationToken ct,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
-        var roles = await mediator.Send(new GetRolesQuery(currentUser.OrgId), ct);
-
-        return Results.Ok(roles.Select(r => new
-        {
-            id = r.Id,
-            name = r.Name,
-            description = r.Description,
-            is_system = r.IsSystem,
-            permissions = r.Permissions,
-            permission_count = r.Permissions.Count,
-        }));
+        var result = await mediator.Send(new GetRolesQuery(currentUser.OrgId, page, pageSize), ct);
+        return Results.Ok(result);
     }
 
     private static async Task<IResult> CreateRole(

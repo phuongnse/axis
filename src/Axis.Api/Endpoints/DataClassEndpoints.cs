@@ -44,9 +44,11 @@ public static class DataClassEndpoints
     private static async Task<IResult> GetDataClasses(
         CurrentUser currentUser,
         ISender mediator,
-        CancellationToken ct)
+        CancellationToken ct,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
-        var result = await mediator.Send(new GetDataClassesQuery(currentUser.OrgId), ct);
+        var result = await mediator.Send(new GetDataClassesQuery(currentUser.OrgId, page, pageSize), ct);
         return Results.Ok(result);
     }
 
