@@ -8,8 +8,8 @@ public sealed record ModelDetailDto(
     string? Description,
     string? Icon,
     string? Color,
-    DateTime CreatedAt,
-    DateTime UpdatedAt,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
     IReadOnlyList<FieldDefinitionDto> Fields);
 
 public sealed record FieldDefinitionDto(

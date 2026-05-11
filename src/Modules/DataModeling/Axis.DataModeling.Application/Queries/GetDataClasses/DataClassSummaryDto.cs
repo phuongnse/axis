@@ -5,4 +5,4 @@ public sealed record DataClassSummaryDto(
     string Name,
     string? Description,
     int FieldCount,
-    DateTime CreatedAt);
+    DateTimeOffset CreatedAt);
