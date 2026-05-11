@@ -15,26 +15,27 @@ public class DeleteFormHandlerTests
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
+    private const string UserId = "user-123";
 
     private DeleteFormHandler CreateHandler() => new(_formRepo, _uow);
 
     [Fact]
     public async Task Happy_path_soft_deletes_form()
     {
-        var form = FormDefinition.Create("Employee Intake", null, OrgId);
+        FormDefinition form = FormDefinition.Create("Employee Intake", null, OrgId, UserId);
         _formRepo.GetByIdAsync(form.Id, OrgId).Returns(form);
         _formRepo.IsReferencedByWorkflowAsync(form.Id).Returns(false);
 
         await CreateHandler().Handle(new DeleteFormCommand(form.Id, OrgId), CancellationToken.None);
 
-        form.IsDeleted.Should().BeTrue();
+        form.DeletedAt.Should().NotBeNull();
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task Form_referenced_by_active_workflow_throws_validation_exception()
     {
-        var form = FormDefinition.Create("Employee Intake", null, OrgId);
+        FormDefinition form = FormDefinition.Create("Employee Intake", null, OrgId, UserId);
         _formRepo.GetByIdAsync(form.Id, OrgId).Returns(form);
         _formRepo.IsReferencedByWorkflowAsync(form.Id).Returns(true);
 

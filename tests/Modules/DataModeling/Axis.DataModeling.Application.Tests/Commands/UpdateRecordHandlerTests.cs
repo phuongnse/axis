@@ -14,13 +14,14 @@ public class UpdateRecordHandlerTests
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private static readonly Guid OrgId = Guid.NewGuid();
     private static readonly Guid ModelId = Guid.NewGuid();
+    private const string UserId = "user-123";
 
     private UpdateRecordHandler CreateHandler() => new(_recordRepo, _uow);
 
     [Fact]
     public async Task Happy_path_updates_data_and_saves()
     {
-        var record = DataRecord.Create(ModelId, OrgId, new Dictionary<string, object?> { ["name"] = "Old" });
+        DataRecord record = DataRecord.Create(ModelId, OrgId, new Dictionary<string, object?> { ["name"] = "Old" }, UserId);
         _recordRepo.GetByIdAsync(record.Id, ModelId, OrgId).Returns(record);
 
         var newData = new Dictionary<string, object?> { ["name"] = "New" };

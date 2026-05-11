@@ -114,10 +114,11 @@ public static class DataClassEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        var id = await mediator.Send(new CreateDataClassCommand(
+        Guid id = await mediator.Send(new CreateDataClassCommand(
             request.Name,
             request.Description,
-            currentUser.OrgId), ct);
+            currentUser.OrgId,
+            currentUser.UserId.ToString()), ct);
 
         return Results.Created($"/api/data-classes/{id}", new { id });
     }

@@ -16,12 +16,13 @@ public class PublishWorkflowHandlerTests
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
+    private const string UserId = "user-123";
 
     private PublishWorkflowHandler CreateHandler() => new(_workflowRepo, _uow);
 
     private static WorkflowDefinition MakePublishableWorkflow()
     {
-        var wf = WorkflowDefinition.Create("Invoice Approval", null, OrgId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, OrgId, UserId);
         wf.AddTrigger(TriggerType.Manual, null);
         var formStep = wf.AddStep("Review", StepType.Form, null);
         var startStep = wf.Steps.Single(s => s.Type == StepType.Start);
@@ -58,7 +59,7 @@ public class PublishWorkflowHandlerTests
     [Fact]
     public async Task Workflow_without_triggers_throws_on_publish()
     {
-        var wf = WorkflowDefinition.Create("Invoice Approval", null, OrgId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, OrgId, UserId);
         // No trigger added — should fail domain validation
         var formStep = wf.AddStep("Review", StepType.Form, null);
         _workflowRepo.GetByIdAsync(wf.Id, OrgId).Returns(wf);

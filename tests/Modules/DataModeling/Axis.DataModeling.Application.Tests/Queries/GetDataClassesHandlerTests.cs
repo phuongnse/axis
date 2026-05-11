@@ -12,6 +12,7 @@ public class GetDataClassesHandlerTests
     private readonly IDataClassRepository _dataClassRepo = Substitute.For<IDataClassRepository>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
+    private const string UserId = "user-123";
 
     private GetDataClassesHandler CreateHandler() => new(_dataClassRepo);
 
@@ -20,8 +21,8 @@ public class GetDataClassesHandlerTests
     {
         List<DataClass> classes =
         [
-            DataClass.Create("Address", "Reusable address type", OrgId),
-            DataClass.Create("Contact", null, OrgId),
+            DataClass.Create("Address", "Reusable address type", OrgId, UserId),
+            DataClass.Create("Contact", null, OrgId, UserId),
         ];
         _dataClassRepo.GetPagedAsync(OrgId, 1, 20, Arg.Any<CancellationToken>())
             .Returns((classes, 2));

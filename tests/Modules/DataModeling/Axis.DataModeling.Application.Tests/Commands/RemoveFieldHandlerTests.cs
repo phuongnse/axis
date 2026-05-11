@@ -15,13 +15,14 @@ public class RemoveFieldHandlerTests
     private readonly IDataModelRepository _modelRepo = Substitute.For<IDataModelRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private static readonly Guid OrgId = Guid.NewGuid();
+    private const string UserId = "user-123";
 
     private RemoveFieldHandler CreateHandler() => new(_modelRepo, _uow);
 
     [Fact]
     public async Task Happy_path_removes_field_and_saves()
     {
-        var model = DataModel.Create("My Model", null, null, null, OrgId);
+        var model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
         var field = model.AddField("notes", "Notes", FieldType.Text, false, new TextFieldConfig());
         var fieldCountBefore = model.Fields.Count;
         _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
@@ -36,7 +37,7 @@ public class RemoveFieldHandlerTests
     [Fact]
     public async Task System_field_removal_throws()
     {
-        var model = DataModel.Create("My Model", null, null, null, OrgId);
+        var model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
         var sysField = model.Fields.First(f => f.IsSystem);
         _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
 

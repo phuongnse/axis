@@ -10,6 +10,6 @@ public sealed record RecordsPageDto(
 public sealed record RecordDto(
     Guid Id,
     Guid ModelId,
-    DateTime CreatedAt,
-    DateTime UpdatedAt,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
     IReadOnlyDictionary<string, object?> Data);

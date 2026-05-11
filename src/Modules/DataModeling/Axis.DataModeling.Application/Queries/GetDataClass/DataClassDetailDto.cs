@@ -6,5 +6,5 @@ public sealed record DataClassDetailDto(
     Guid Id,
     string Name,
     string? Description,
-    DateTime CreatedAt,
+    DateTimeOffset CreatedAt,
     IReadOnlyList<FieldDefinitionDto> Fields);

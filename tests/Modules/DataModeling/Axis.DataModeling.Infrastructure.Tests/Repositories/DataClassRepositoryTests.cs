@@ -13,6 +13,7 @@ public class DataClassRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     private DataModelRepository _modelRepo = null!;
 
     private static readonly Guid OrgId = Guid.NewGuid();
+    private const string UserId = "user-123";
 
     public Task InitializeAsync()
     {
@@ -27,11 +28,11 @@ public class DataClassRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     [Fact]
     public async Task AddAsync_and_GetByIdAsync_round_trip()
     {
-        var dc = DataClass.Create("Address", "Postal address", OrgId);
+        DataClass dc = DataClass.Create("Address", "Postal address", OrgId, UserId);
         await _sut.AddAsync(dc);
         await _ctx.SaveChangesAsync();
 
-        var loaded = await _sut.GetByIdAsync(dc.Id, OrgId);
+        DataClass? loaded = await _sut.GetByIdAsync(dc.Id, OrgId);
 
         loaded.Should().NotBeNull();
         loaded!.Name.Should().Be("Address");
@@ -41,7 +42,7 @@ public class DataClassRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     [Fact]
     public async Task Fields_are_persisted_and_reloaded()
     {
-        var dc = DataClass.Create("ContactInfo", null, OrgId);
+        DataClass dc = DataClass.Create("ContactInfo", null, OrgId, UserId);
         dc.AddField("email", "Email", FieldType.Text, true, new TextFieldConfig(MaxLength: 320));
         dc.AddField("phone", "Phone", FieldType.Text, false, new TextFieldConfig(MaxLength: 20));
         await _sut.AddAsync(dc);
@@ -57,16 +58,16 @@ public class DataClassRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     [Fact]
     public async Task IsReferencedByAnyModelAsync_returns_true_when_used_in_model()
     {
-        var orgId = Guid.NewGuid();
-        var dc = DataClass.Create("Billing", null, orgId);
+        Guid orgId = Guid.NewGuid();
+        DataClass dc = DataClass.Create("Billing", null, orgId, UserId);
         await _sut.AddAsync(dc);
 
-        var model = DataModel.Create("Order", null, null, null, orgId);
+        DataModel model = DataModel.Create("Order", null, null, null, orgId, UserId);
         model.AddField("billing", "Billing", FieldType.DataClass, false, new DataClassFieldConfig(dc.Id));
         await _modelRepo.AddAsync(model);
         await _ctx.SaveChangesAsync();
 
-        var referenced = await _sut.IsReferencedByAnyModelAsync(dc.Id);
+        bool referenced = await _sut.IsReferencedByAnyModelAsync(dc.Id);
 
         referenced.Should().BeTrue();
     }
@@ -74,11 +75,11 @@ public class DataClassRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     [Fact]
     public async Task IsReferencedByAnyModelAsync_returns_false_when_not_used()
     {
-        var dc = DataClass.Create("Unused", null, OrgId);
+        DataClass dc = DataClass.Create("Unused", null, OrgId, UserId);
         await _sut.AddAsync(dc);
         await _ctx.SaveChangesAsync();
 
-        var referenced = await _sut.IsReferencedByAnyModelAsync(dc.Id);
+        bool referenced = await _sut.IsReferencedByAnyModelAsync(dc.Id);
 
         referenced.Should().BeFalse();
     }
@@ -86,8 +87,8 @@ public class DataClassRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     [Fact]
     public async Task NameExistsAsync_is_case_insensitive()
     {
-        var orgId = Guid.NewGuid();
-        await _sut.AddAsync(DataClass.Create("Address", null, orgId));
+        Guid orgId = Guid.NewGuid();
+        await _sut.AddAsync(DataClass.Create("Address", null, orgId, UserId));
         await _ctx.SaveChangesAsync();
 
         (await _sut.NameExistsAsync("address", orgId)).Should().BeTrue();

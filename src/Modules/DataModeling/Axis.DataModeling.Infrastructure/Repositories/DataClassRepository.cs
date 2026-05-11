@@ -12,11 +12,11 @@ internal sealed class DataClassRepository(DataModelingDbContext context) : IData
 
     public async Task<DataClass?> GetByIdAsync(Guid id, Guid organizationId, CancellationToken ct = default)
         => await context.DataClasses
-            .FirstOrDefaultAsync(c => c.Id == id && c.OrganizationId == organizationId && !c.IsDeleted, ct);
+            .FirstOrDefaultAsync(c => c.Id == id && c.OrganizationId == organizationId, ct);
 
     public async Task<IReadOnlyList<DataClass>> GetAllAsync(Guid organizationId, CancellationToken ct = default)
         => await context.DataClasses
-            .Where(c => c.OrganizationId == organizationId && !c.IsDeleted)
+            .Where(c => c.OrganizationId == organizationId)
             .OrderBy(c => c.Name)
             .ToListAsync(ct);
 
@@ -24,7 +24,7 @@ internal sealed class DataClassRepository(DataModelingDbContext context) : IData
         Guid organizationId, int page, int pageSize, CancellationToken ct = default)
     {
         IQueryable<DataClass> query = context.DataClasses
-            .Where(c => c.OrganizationId == organizationId && !c.IsDeleted)
+            .Where(c => c.OrganizationId == organizationId)
             .OrderBy(c => c.Name);
 
         int totalCount = await query.CountAsync(ct);
@@ -39,16 +39,15 @@ internal sealed class DataClassRepository(DataModelingDbContext context) : IData
     public async Task<bool> NameExistsAsync(string name, Guid organizationId, Guid? excludeId = null, CancellationToken ct = default)
         => await context.DataClasses
             .AnyAsync(c => c.OrganizationId == organizationId
-                && !c.IsDeleted
                 && c.Name.ToLower() == name.ToLower()
                 && (excludeId == null || c.Id != excludeId), ct);
 
     public async Task<bool> IsReferencedByAnyModelAsync(Guid dataClassId, CancellationToken ct = default)
     {
-        var jsonContains = $"[{{\"type\":\"DataClass\",\"config\":{{\"dataClassId\":\"{dataClassId:D}\"}}}}]";
-        var count = await context.Database
+        string jsonContains = $"[{{\"type\":\"DataClass\",\"config\":{{\"dataClassId\":\"{dataClassId:D}\"}}}}]";
+        int count = await context.Database
             .SqlQueryRaw<int>(
-                "SELECT CAST(COUNT(*) AS int) AS \"Value\" FROM data_models WHERE NOT is_deleted AND fields @> {0}::jsonb",
+                "SELECT CAST(COUNT(*) AS int) AS \"Value\" FROM data_models WHERE deleted_at IS NULL AND fields @> {0}::jsonb",
                 jsonContains)
             .FirstAsync(ct);
         return count > 0;

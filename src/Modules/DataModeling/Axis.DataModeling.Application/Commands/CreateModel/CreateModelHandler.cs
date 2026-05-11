@@ -17,7 +17,7 @@ public sealed class CreateModelHandler(
         if (await modelRepo.NameExistsAsync(command.Name, command.OrganizationId, null, cancellationToken))
             throw new ValidationException($"A model named '{command.Name}' already exists.");
 
-        var model = DataModel.Create(command.Name, command.Description, command.Icon, command.Color, command.OrganizationId);
+        DataModel model = DataModel.Create(command.Name, command.Description, command.Icon, command.Color, command.OrganizationId, command.CreatedBy);
 
         await modelRepo.AddAsync(model, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);

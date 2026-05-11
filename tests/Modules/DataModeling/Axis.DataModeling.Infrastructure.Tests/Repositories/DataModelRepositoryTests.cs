@@ -12,6 +12,7 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     private DataModelRepository _sut = null!;
 
     private static readonly Guid OrgId = Guid.NewGuid();
+    private const string UserId = "user-123";
 
     public Task InitializeAsync()
     {
@@ -23,16 +24,16 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     public async Task DisposeAsync() => await _ctx.DisposeAsync();
 
     private static DataModel MakeModel(string name) =>
-        DataModel.Create(name, null, null, null, OrgId);
+        DataModel.Create(name, null, null, null, OrgId, UserId);
 
     [Fact]
     public async Task AddAsync_and_GetByIdAsync_round_trip()
     {
-        var model = MakeModel("Customer");
+        DataModel model = MakeModel("Customer");
         await _sut.AddAsync(model);
         await _ctx.SaveChangesAsync();
 
-        var loaded = await _sut.GetByIdAsync(model.Id, OrgId);
+        DataModel? loaded = await _sut.GetByIdAsync(model.Id, OrgId);
 
         loaded.Should().NotBeNull();
         loaded!.Name.Should().Be("Customer");
@@ -42,11 +43,11 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     [Fact]
     public async Task GetAllAsync_returns_only_org_models_excluding_deleted()
     {
-        var orgId = Guid.NewGuid();
-        var active = DataModel.Create("Active", null, null, null, orgId);
-        var deleted = DataModel.Create("Deleted", null, null, null, orgId);
+        Guid orgId = Guid.NewGuid();
+        DataModel active = DataModel.Create("Active", null, null, null, orgId, UserId);
+        DataModel deleted = DataModel.Create("Deleted", null, null, null, orgId, UserId);
         deleted.Delete();
-        var otherOrg = DataModel.Create("Other", null, null, null, Guid.NewGuid());
+        DataModel otherOrg = DataModel.Create("Other", null, null, null, Guid.NewGuid(), UserId);
 
         await _sut.AddAsync(active);
         await _sut.AddAsync(deleted);
@@ -61,11 +62,11 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     [Fact]
     public async Task NameExistsAsync_returns_true_for_existing_name()
     {
-        var orgId = Guid.NewGuid();
-        await _sut.AddAsync(DataModel.Create("Invoice", null, null, null, orgId));
+        Guid orgId = Guid.NewGuid();
+        await _sut.AddAsync(DataModel.Create("Invoice", null, null, null, orgId, UserId));
         await _ctx.SaveChangesAsync();
 
-        var exists = await _sut.NameExistsAsync("invoice", orgId); // case-insensitive
+        bool exists = await _sut.NameExistsAsync("invoice", orgId); // case-insensitive
 
         exists.Should().BeTrue();
     }
@@ -73,12 +74,12 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     [Fact]
     public async Task NameExistsAsync_excludes_self_on_update()
     {
-        var orgId = Guid.NewGuid();
-        var model = DataModel.Create("Project", null, null, null, orgId);
+        Guid orgId = Guid.NewGuid();
+        DataModel model = DataModel.Create("Project", null, null, null, orgId, UserId);
         await _sut.AddAsync(model);
         await _ctx.SaveChangesAsync();
 
-        var exists = await _sut.NameExistsAsync("Project", orgId, excludeId: model.Id);
+        bool exists = await _sut.NameExistsAsync("Project", orgId, excludeId: model.Id);
 
         exists.Should().BeFalse();
     }

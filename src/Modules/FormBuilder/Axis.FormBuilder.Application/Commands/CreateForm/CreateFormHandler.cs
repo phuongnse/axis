@@ -17,7 +17,7 @@ public sealed class CreateFormHandler(
         if (await formRepo.NameExistsAsync(command.Name, command.OrganizationId, null, cancellationToken))
             throw new ValidationException($"A form named '{command.Name}' already exists.");
 
-        var form = FormDefinition.Create(command.Name, command.Description, command.OrganizationId);
+        FormDefinition form = FormDefinition.Create(command.Name, command.Description, command.OrganizationId, command.CreatedBy);
 
         await formRepo.AddAsync(form, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);

@@ -17,30 +17,33 @@ public sealed class FormDefinition : AggregateRoot<Guid>
     public string Name { get; private set; }
     public string? Description { get; private set; }
     public Guid OrganizationId { get; private set; }
-    public bool IsDeleted { get; private set; }
-    public DateTime CreatedAt { get; private set; }
-    public DateTime UpdatedAt { get; private set; }
+    public DateTimeOffset? DeletedAt { get; private set; }
+    public DateTimeOffset CreatedAt { get; private set; }
+    public DateTimeOffset UpdatedAt { get; private set; }
+    public string CreatedBy { get; private set; }
 
     public IReadOnlyList<FormField> Fields => _fields.AsReadOnly();
 
-    private FormDefinition() : base(default) { Name = null!; } // EF Core materialisation
+    private FormDefinition() : base(default) { Name = null!; CreatedBy = string.Empty; } // EF Core materialisation
 
-    private FormDefinition(Guid id, string name, string? description, Guid organizationId, DateTime createdAt)
+    private FormDefinition(Guid id, string name, string? description, Guid organizationId,
+        string createdBy, DateTimeOffset createdAt)
         : base(id)
     {
         Name = name;
         Description = description;
         OrganizationId = organizationId;
+        CreatedBy = createdBy;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
     }
 
-    public static FormDefinition Create(string name, string? description, Guid organizationId)
+    public static FormDefinition Create(string name, string? description, Guid organizationId, string createdBy)
     {
         ValidateName(name);
 
-        var now = DateTime.UtcNow;
-        var form = new FormDefinition(Guid.NewGuid(), name.Trim(), description?.Trim(), organizationId, now);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        FormDefinition form = new(Guid.NewGuid(), name.Trim(), description?.Trim(), organizationId, createdBy, now);
         form.RaiseDomainEvent(new FormCreated(form.Id, organizationId, form.Name));
         return form;
     }
@@ -50,32 +53,32 @@ public sealed class FormDefinition : AggregateRoot<Guid>
         ValidateName(name);
         Name = name.Trim();
         Description = description?.Trim();
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     public FormField AddField(string key, string label, FormFieldType type, bool required, FormFieldConfig? config)
     {
-        if (IsDeleted)
+        if (DeletedAt.HasValue)
             throw new InvalidOperationException("Cannot modify a deleted form.");
 
         ValidateFieldKey(key);
         ValidateFieldConfig(type, config);
 
-        var order = _fields.Count;
-        var field = FormField.Create(key.ToLowerInvariant(), label, type, required, order, config);
+        int order = _fields.Count;
+        FormField field = FormField.Create(key.ToLowerInvariant(), label, type, required, order, config);
         _fields.Add(field);
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
         return field;
     }
 
     public void RemoveField(Guid fieldId)
     {
-        var field = _fields.SingleOrDefault(f => f.Id == fieldId)
+        FormField field = _fields.SingleOrDefault(f => f.Id == fieldId)
             ?? throw new InvalidOperationException("Field not found.");
 
         _fields.Remove(field);
         RecalculateOrder();
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     public void ReorderFields(IReadOnlyList<Guid> orderedFieldIds)
@@ -87,15 +90,15 @@ public sealed class FormDefinition : AggregateRoot<Guid>
         for (int i = 0; i < orderedFieldIds.Count; i++)
             _fields.Single(f => f.Id == orderedFieldIds[i]).DisplayOrder = i;
 
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     public void Delete()
     {
-        if (IsDeleted)
+        if (DeletedAt.HasValue)
             throw new InvalidOperationException("Form is already deleted.");
 
-        IsDeleted = true;
+        DeletedAt = DateTimeOffset.UtcNow;
         RaiseDomainEvent(new FormDeleted(Id, OrganizationId));
     }
 
@@ -103,7 +106,7 @@ public sealed class FormDefinition : AggregateRoot<Guid>
 
     private static void ValidateName(string name)
     {
-        var trimmed = name?.Trim() ?? "";
+        string trimmed = name?.Trim() ?? "";
         if (trimmed.Length < 2 || trimmed.Length > 200)
             throw new ArgumentException("Form name must be 2–200 characters.");
     }
@@ -134,7 +137,7 @@ public sealed class FormDefinition : AggregateRoot<Guid>
 
     private void RecalculateOrder()
     {
-        var sorted = _fields.OrderBy(f => f.DisplayOrder).ToList();
+        List<FormField> sorted = _fields.OrderBy(f => f.DisplayOrder).ToList();
         for (int i = 0; i < sorted.Count; i++)
             sorted[i].DisplayOrder = i;
     }

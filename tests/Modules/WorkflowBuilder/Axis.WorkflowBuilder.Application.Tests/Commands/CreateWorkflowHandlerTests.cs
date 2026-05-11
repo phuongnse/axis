@@ -14,6 +14,7 @@ public class CreateWorkflowHandlerTests
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
+    private const string UserId = "user-123";
 
     private CreateWorkflowHandler CreateHandler() => new(_workflowRepo, _uow);
 
@@ -23,14 +24,15 @@ public class CreateWorkflowHandlerTests
         _workflowRepo.NameExistsAsync("Invoice Approval", OrgId).Returns(false);
 
         var result = await CreateHandler().Handle(
-            new CreateWorkflowCommand("Invoice Approval", "Approves invoices", OrgId),
+            new CreateWorkflowCommand("Invoice Approval", "Approves invoices", OrgId, UserId),
             CancellationToken.None);
 
         result.Should().NotBeEmpty();
         await _workflowRepo.Received(1).AddAsync(
             Arg.Is<Domain.Aggregates.WorkflowDefinition>(w =>
                 w.Name == "Invoice Approval" &&
-                w.Status == WorkflowStatus.Draft),
+                w.Status == WorkflowStatus.Draft &&
+                w.CreatedBy == UserId),
             Arg.Any<CancellationToken>());
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
@@ -41,7 +43,7 @@ public class CreateWorkflowHandlerTests
         _workflowRepo.NameExistsAsync("Invoice Approval", OrgId).Returns(true);
 
         var act = async () => await CreateHandler().Handle(
-            new CreateWorkflowCommand("Invoice Approval", null, OrgId),
+            new CreateWorkflowCommand("Invoice Approval", null, OrgId, UserId),
             CancellationToken.None);
 
         await act.Should().ThrowAsync<ValidationException>().WithMessage("*already exists*");

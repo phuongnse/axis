@@ -47,10 +47,8 @@ internal sealed class DataModelConfiguration : IEntityTypeConfiguration<DataMode
             .HasColumnName("organization_id")
             .IsRequired();
 
-        builder.Property(m => m.IsDeleted)
-            .HasColumnName("is_deleted")
-            .HasDefaultValue(false)
-            .IsRequired();
+        builder.Property(m => m.DeletedAt)
+            .HasColumnName("deleted_at");
 
         builder.Property(m => m.CreatedAt)
             .HasColumnName("created_at")
@@ -59,6 +57,13 @@ internal sealed class DataModelConfiguration : IEntityTypeConfiguration<DataMode
         builder.Property(m => m.UpdatedAt)
             .HasColumnName("updated_at")
             .IsRequired();
+
+        builder.Property(m => m.CreatedBy)
+            .HasColumnName("created_by")
+            .HasMaxLength(100)
+            .IsRequired();
+
+        builder.HasQueryFilter(m => !m.DeletedAt.HasValue);
 
         builder.Property<List<FieldDefinition>>("_fields")
             .HasField("_fields")

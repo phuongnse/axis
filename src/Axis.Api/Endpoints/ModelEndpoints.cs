@@ -138,12 +138,13 @@ public static class ModelEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        var id = await mediator.Send(new CreateModelCommand(
+        Guid id = await mediator.Send(new CreateModelCommand(
             request.Name,
             request.Description,
             request.Icon,
             request.Color,
-            currentUser.OrgId), ct);
+            currentUser.OrgId,
+            currentUser.UserId.ToString()), ct);
 
         return Results.Created($"/api/models/{id}", new { id });
     }

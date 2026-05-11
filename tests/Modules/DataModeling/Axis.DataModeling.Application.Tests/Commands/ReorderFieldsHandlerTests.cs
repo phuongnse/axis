@@ -15,13 +15,14 @@ public class ReorderFieldsHandlerTests
     private readonly IDataModelRepository _modelRepo = Substitute.For<IDataModelRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private static readonly Guid OrgId = Guid.NewGuid();
+    private const string UserId = "user-123";
 
     private ReorderFieldsHandler CreateHandler() => new(_modelRepo, _uow);
 
     [Fact]
     public async Task Happy_path_reorders_custom_fields_and_saves()
     {
-        var model = DataModel.Create("My Model", null, null, null, OrgId);
+        var model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
         var f1 = model.AddField("alpha", "Alpha", FieldType.Text, false, new TextFieldConfig());
         var f2 = model.AddField("beta", "Beta", FieldType.Text, false, new TextFieldConfig());
         _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
@@ -40,7 +41,7 @@ public class ReorderFieldsHandlerTests
     [Fact]
     public async Task Mismatched_ids_throw()
     {
-        var model = DataModel.Create("My Model", null, null, null, OrgId);
+        var model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
         model.AddField("alpha", "Alpha", FieldType.Text, false, new TextFieldConfig());
         _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
 

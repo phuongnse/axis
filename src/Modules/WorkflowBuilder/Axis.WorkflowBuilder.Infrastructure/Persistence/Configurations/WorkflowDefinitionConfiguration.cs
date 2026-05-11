@@ -64,6 +64,9 @@ internal sealed class WorkflowDefinitionConfiguration : IEntityTypeConfiguration
             .HasColumnName("organization_id")
             .IsRequired();
 
+        builder.Property(w => w.DeletedAt)
+            .HasColumnName("deleted_at");
+
         builder.Property(w => w.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
@@ -71,6 +74,13 @@ internal sealed class WorkflowDefinitionConfiguration : IEntityTypeConfiguration
         builder.Property(w => w.UpdatedAt)
             .HasColumnName("updated_at")
             .IsRequired();
+
+        builder.Property(w => w.CreatedBy)
+            .HasColumnName("created_by")
+            .HasMaxLength(100)
+            .IsRequired();
+
+        builder.HasQueryFilter(w => !w.DeletedAt.HasValue);
 
         builder.Property<List<WorkflowStep>>("_steps")
             .HasField("_steps")

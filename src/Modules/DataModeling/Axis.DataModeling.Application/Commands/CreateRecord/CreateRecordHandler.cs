@@ -19,7 +19,7 @@ public sealed class CreateRecordHandler(
         if (model is null)
             throw new ValidationException("Model not found.");
 
-        var record = DataRecord.Create(command.ModelId, command.OrganizationId, command.Data);
+        DataRecord record = DataRecord.Create(command.ModelId, command.OrganizationId, command.Data, command.CreatedBy);
 
         await recordRepo.AddAsync(record, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);

@@ -12,13 +12,14 @@ public class GetModelHandlerTests
 {
     private readonly IDataModelRepository _modelRepo = Substitute.For<IDataModelRepository>();
     private static readonly Guid OrgId = Guid.NewGuid();
+    private const string UserId = "user-123";
 
     private GetModelHandler CreateHandler() => new(_modelRepo);
 
     [Fact]
     public async Task Returns_model_detail_with_all_fields()
     {
-        var model = DataModel.Create("Invoice", "desc", null, null, OrgId);
+        DataModel model = DataModel.Create("Invoice", "desc", null, null, OrgId, UserId);
         model.AddField("amount", "Amount", FieldType.Number, true, new NumberFieldConfig(Min: 0));
         _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
 

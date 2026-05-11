@@ -17,7 +17,7 @@ public sealed class CreateWorkflowHandler(
         if (await workflowRepo.NameExistsAsync(command.Name, command.OrganizationId, null, cancellationToken))
             throw new ValidationException($"A workflow named '{command.Name}' already exists.");
 
-        var workflow = WorkflowDefinition.Create(command.Name, command.Description, command.OrganizationId);
+        WorkflowDefinition workflow = WorkflowDefinition.Create(command.Name, command.Description, command.OrganizationId, command.CreatedBy);
 
         await workflowRepo.AddAsync(workflow, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);

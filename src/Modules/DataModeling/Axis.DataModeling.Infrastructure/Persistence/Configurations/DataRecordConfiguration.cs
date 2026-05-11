@@ -31,10 +31,8 @@ internal sealed class DataRecordConfiguration : IEntityTypeConfiguration<DataRec
             .HasColumnName("organization_id")
             .IsRequired();
 
-        builder.Property(r => r.IsDeleted)
-            .HasColumnName("is_deleted")
-            .HasDefaultValue(false)
-            .IsRequired();
+        builder.Property(r => r.DeletedAt)
+            .HasColumnName("deleted_at");
 
         builder.Property(r => r.CreatedAt)
             .HasColumnName("created_at")
@@ -43,6 +41,13 @@ internal sealed class DataRecordConfiguration : IEntityTypeConfiguration<DataRec
         builder.Property(r => r.UpdatedAt)
             .HasColumnName("updated_at")
             .IsRequired();
+
+        builder.Property(r => r.CreatedBy)
+            .HasColumnName("created_by")
+            .HasMaxLength(100)
+            .IsRequired();
+
+        builder.HasQueryFilter(r => !r.DeletedAt.HasValue);
 
         builder.Property<Dictionary<string, object?>>("_data")
             .HasField("_data")

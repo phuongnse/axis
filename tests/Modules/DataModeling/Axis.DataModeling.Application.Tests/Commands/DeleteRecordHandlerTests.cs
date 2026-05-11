@@ -14,20 +14,21 @@ public class DeleteRecordHandlerTests
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private static readonly Guid OrgId = Guid.NewGuid();
     private static readonly Guid ModelId = Guid.NewGuid();
+    private const string UserId = "user-123";
 
     private DeleteRecordHandler CreateHandler() => new(_recordRepo, _uow);
 
     [Fact]
     public async Task Happy_path_soft_deletes_and_saves()
     {
-        var record = DataRecord.Create(ModelId, OrgId, new Dictionary<string, object?> { ["x"] = 1 });
+        DataRecord record = DataRecord.Create(ModelId, OrgId, new Dictionary<string, object?> { ["x"] = 1 }, UserId);
         _recordRepo.GetByIdAsync(record.Id, ModelId, OrgId).Returns(record);
 
         await CreateHandler().Handle(
             new DeleteRecordCommand(record.Id, ModelId, OrgId),
             CancellationToken.None);
 
-        record.IsDeleted.Should().BeTrue();
+        record.DeletedAt.Should().NotBeNull();
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 

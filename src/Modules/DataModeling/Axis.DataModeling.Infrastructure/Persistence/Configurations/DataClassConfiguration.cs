@@ -39,14 +39,23 @@ internal sealed class DataClassConfiguration : IEntityTypeConfiguration<DataClas
             .HasColumnName("organization_id")
             .IsRequired();
 
-        builder.Property(c => c.IsDeleted)
-            .HasColumnName("is_deleted")
-            .HasDefaultValue(false)
-            .IsRequired();
+        builder.Property(c => c.DeletedAt)
+            .HasColumnName("deleted_at");
 
         builder.Property(c => c.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
+
+        builder.Property(c => c.UpdatedAt)
+            .HasColumnName("updated_at")
+            .IsRequired();
+
+        builder.Property(c => c.CreatedBy)
+            .HasColumnName("created_by")
+            .HasMaxLength(100)
+            .IsRequired();
+
+        builder.HasQueryFilter(c => !c.DeletedAt.HasValue);
 
         builder.Property<List<FieldDefinition>>("_fields")
             .HasField("_fields")

@@ -9,4 +9,4 @@ public sealed record WorkflowSummaryDto(
     WorkflowStatus Status,
     int StepCount,
     int TriggerCount,
-    DateTime UpdatedAt);
+    DateTimeOffset UpdatedAt);

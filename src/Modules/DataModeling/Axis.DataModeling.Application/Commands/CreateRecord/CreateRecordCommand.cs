@@ -6,4 +6,5 @@ namespace Axis.DataModeling.Application.Commands.CreateRecord;
 public sealed record CreateRecordCommand(
     Guid ModelId,
     Guid OrganizationId,
-    IReadOnlyDictionary<string, object?> Data) : ICommand<Guid>;
+    IReadOnlyDictionary<string, object?> Data,
+    string CreatedBy) : ICommand<Guid>;

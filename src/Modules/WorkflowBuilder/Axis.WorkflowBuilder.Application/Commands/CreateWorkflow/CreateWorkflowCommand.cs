@@ -6,4 +6,5 @@ namespace Axis.WorkflowBuilder.Application.Commands.CreateWorkflow;
 public sealed record CreateWorkflowCommand(
     string Name,
     string? Description,
-    Guid OrganizationId) : ICommand<Guid>;
+    Guid OrganizationId,
+    string CreatedBy) : ICommand<Guid>;

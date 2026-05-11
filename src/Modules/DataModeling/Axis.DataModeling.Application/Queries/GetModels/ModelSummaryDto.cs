@@ -7,4 +7,4 @@ public sealed record ModelSummaryDto(
     string? Icon,
     string? Color,
     int FieldCount,
-    DateTime UpdatedAt);
+    DateTimeOffset UpdatedAt);

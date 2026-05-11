@@ -12,11 +12,11 @@ internal sealed class DataRecordRepository(DataModelingDbContext context) : IDat
 
     public async Task<DataRecord?> GetByIdAsync(Guid id, Guid modelId, Guid organizationId, CancellationToken ct = default)
         => await context.DataRecords
-            .FirstOrDefaultAsync(r => r.Id == id && r.ModelId == modelId && r.OrganizationId == organizationId && !r.IsDeleted, ct);
+            .FirstOrDefaultAsync(r => r.Id == id && r.ModelId == modelId && r.OrganizationId == organizationId, ct);
 
     public async Task<IReadOnlyList<DataRecord>> GetAllAsync(Guid modelId, Guid organizationId, CancellationToken ct = default)
         => await context.DataRecords
-            .Where(r => r.ModelId == modelId && r.OrganizationId == organizationId && !r.IsDeleted)
+            .Where(r => r.ModelId == modelId && r.OrganizationId == organizationId)
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync(ct);
 
@@ -28,11 +28,11 @@ internal sealed class DataRecordRepository(DataModelingDbContext context) : IDat
     {
         if (string.IsNullOrWhiteSpace(search))
         {
-            var baseQuery = context.DataRecords
-                .Where(r => r.ModelId == modelId && r.OrganizationId == organizationId && !r.IsDeleted);
+            IQueryable<DataRecord> baseQuery = context.DataRecords
+                .Where(r => r.ModelId == modelId && r.OrganizationId == organizationId);
 
-            var total = await baseQuery.CountAsync(ct);
-            var records = await baseQuery
+            int total = await baseQuery.CountAsync(ct);
+            List<DataRecord> records = await baseQuery
                 .OrderByDescending(r => r.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
@@ -43,16 +43,16 @@ internal sealed class DataRecordRepository(DataModelingDbContext context) : IDat
         else
         {
             // data::text ILIKE is the only portable way to search across all JSONB field values
-            var pattern = $"%{search}%";
-            var ids = await context.Database
+            string pattern = $"%{search}%";
+            List<Guid> ids = await context.Database
                 .SqlQueryRaw<Guid>(
-                    "SELECT id AS \"Value\" FROM data_records WHERE model_id = {0} AND organization_id = {1} AND NOT is_deleted AND data::text ILIKE {2}",
+                    "SELECT id AS \"Value\" FROM data_records WHERE model_id = {0} AND organization_id = {1} AND deleted_at IS NULL AND data::text ILIKE {2}",
                     modelId, organizationId, pattern)
                 .ToListAsync(ct);
 
-            var total = ids.Count;
-            var pageIds = ids.Skip((page - 1) * pageSize).Take(pageSize).ToHashSet();
-            var records = await context.DataRecords
+            int total = ids.Count;
+            HashSet<Guid> pageIds = ids.Skip((page - 1) * pageSize).Take(pageSize).ToHashSet();
+            List<DataRecord> records = await context.DataRecords
                 .Where(r => pageIds.Contains(r.Id))
                 .OrderByDescending(r => r.CreatedAt)
                 .ToListAsync(ct);

@@ -24,14 +24,15 @@ public sealed class DataModel : AggregateRoot<Guid>
     public string? Icon { get; private set; }
     public string? Color { get; private set; }
     public Guid OrganizationId { get; private set; }
-    public bool IsDeleted { get; private set; }
-    public DateTime CreatedAt { get; private set; }
-    public DateTime UpdatedAt { get; private set; }
+    public DateTimeOffset? DeletedAt { get; private set; }
+    public DateTimeOffset CreatedAt { get; private set; }
+    public DateTimeOffset UpdatedAt { get; private set; }
+    public string CreatedBy { get; private set; }
 
     public IReadOnlyList<FieldDefinition> Fields => _fields.AsReadOnly();
 
     private DataModel(Guid id, string name, string? description, string? icon, string? color,
-        Guid organizationId, DateTime createdAt)
+        Guid organizationId, string createdBy, DateTimeOffset createdAt)
         : base(id)
     {
         Name = name;
@@ -39,16 +40,19 @@ public sealed class DataModel : AggregateRoot<Guid>
         Icon = icon;
         Color = color;
         OrganizationId = organizationId;
+        CreatedBy = createdBy;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
     }
 
-    public static DataModel Create(string name, string? description, string? icon, string? color, Guid organizationId)
+    public static DataModel Create(string name, string? description, string? icon, string? color,
+        Guid organizationId, string createdBy)
     {
         ValidateName(name);
 
-        var now = DateTime.UtcNow;
-        var model = new DataModel(Guid.NewGuid(), name.Trim(), description?.Trim(), icon, color, organizationId, now);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        DataModel model = new(Guid.NewGuid(), name.Trim(), description?.Trim(), icon, color,
+            organizationId, createdBy, now);
 
         // Auto-generate system fields (US-030)
         model._fields.Add(FieldDefinition.Create("id", "ID", FieldType.Text, true, 0, new TextFieldConfig(), isSystem: true));
@@ -68,7 +72,7 @@ public sealed class DataModel : AggregateRoot<Guid>
         Description = description?.Trim();
         Icon = icon;
         Color = color;
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     public FieldDefinition AddField(string name, string label, FieldType type, bool required, FieldConfig config)
@@ -77,59 +81,59 @@ public sealed class DataModel : AggregateRoot<Guid>
         ValidateFieldName(name);
         ValidateFieldConfig(type, config);
 
-        var order = _fields.Where(f => !f.IsSystem).Count();
-        var field = FieldDefinition.Create(name.ToLowerInvariant(), label, type, required, order, config);
+        int order = _fields.Where(f => !f.IsSystem).Count();
+        FieldDefinition field = FieldDefinition.Create(name.ToLowerInvariant(), label, type, required, order, config);
         _fields.Add(field);
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
         return field;
     }
 
     public void UpdateField(Guid fieldId, string label, string? helpText, bool isRequired, FieldConfig config)
     {
         EnsureNotDeleted();
-        var field = _fields.SingleOrDefault(f => f.Id == fieldId)
+        FieldDefinition field = _fields.SingleOrDefault(f => f.Id == fieldId)
             ?? throw new InvalidOperationException("Field not found.");
         if (field.IsSystem)
             throw new InvalidOperationException("Cannot modify a system field.");
         field.Update(label, helpText, isRequired, config);
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     public void RemoveField(Guid fieldId)
     {
-        var field = _fields.SingleOrDefault(f => f.Id == fieldId)
+        FieldDefinition field = _fields.SingleOrDefault(f => f.Id == fieldId)
             ?? throw new InvalidOperationException("Field not found.");
 
         if (field.IsSystem)
             throw new InvalidOperationException("Cannot remove a system field.");
 
         _fields.Remove(field);
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
         RecalculateOrder();
     }
 
     public void ReorderFields(IReadOnlyList<Guid> orderedFieldIds)
     {
-        var customFields = _fields.Where(f => !f.IsSystem).ToList();
+        List<FieldDefinition> customFields = _fields.Where(f => !f.IsSystem).ToList();
         if (orderedFieldIds.Count != customFields.Count ||
             !orderedFieldIds.All(id => customFields.Any(f => f.Id == id)))
             throw new ArgumentException("The provided field IDs must match all custom fields exactly.");
 
         for (int i = 0; i < orderedFieldIds.Count; i++)
         {
-            var field = customFields.Single(f => f.Id == orderedFieldIds[i]);
+            FieldDefinition field = customFields.Single(f => f.Id == orderedFieldIds[i]);
             field.DisplayOrder = i;
         }
 
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     public void Delete()
     {
-        if (IsDeleted)
+        if (DeletedAt.HasValue)
             throw new InvalidOperationException("Model is already deleted.");
 
-        IsDeleted = true;
+        DeletedAt = DateTimeOffset.UtcNow;
         RaiseDomainEvent(new ModelDeleted(Id, OrganizationId));
     }
 
@@ -137,7 +141,7 @@ public sealed class DataModel : AggregateRoot<Guid>
 
     private void EnsureNotDeleted()
     {
-        if (IsDeleted)
+        if (DeletedAt.HasValue)
             throw new InvalidOperationException("Cannot modify a deleted model.");
     }
 
@@ -172,7 +176,7 @@ public sealed class DataModel : AggregateRoot<Guid>
 
     private void RecalculateOrder()
     {
-        var customFields = _fields.Where(f => !f.IsSystem).OrderBy(f => f.DisplayOrder).ToList();
+        List<FieldDefinition> customFields = _fields.Where(f => !f.IsSystem).OrderBy(f => f.DisplayOrder).ToList();
         for (int i = 0; i < customFields.Count; i++)
             customFields[i].DisplayOrder = i;
     }

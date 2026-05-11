@@ -39,10 +39,8 @@ internal sealed class FormDefinitionConfiguration : IEntityTypeConfiguration<For
             .HasColumnName("organization_id")
             .IsRequired();
 
-        builder.Property(f => f.IsDeleted)
-            .HasColumnName("is_deleted")
-            .HasDefaultValue(false)
-            .IsRequired();
+        builder.Property(f => f.DeletedAt)
+            .HasColumnName("deleted_at");
 
         builder.Property(f => f.CreatedAt)
             .HasColumnName("created_at")
@@ -51,6 +49,13 @@ internal sealed class FormDefinitionConfiguration : IEntityTypeConfiguration<For
         builder.Property(f => f.UpdatedAt)
             .HasColumnName("updated_at")
             .IsRequired();
+
+        builder.Property(f => f.CreatedBy)
+            .HasColumnName("created_by")
+            .HasMaxLength(100)
+            .IsRequired();
+
+        builder.HasQueryFilter(f => !f.DeletedAt.HasValue);
 
         builder.Property<List<FormField>>("_fields")
             .HasField("_fields")
