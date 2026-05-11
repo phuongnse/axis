@@ -13,9 +13,24 @@ public static class OrganizationEndpoints
     {
         var group = app.MapGroup("/api/organizations");
 
-        group.MapPost("/", Register);
+        group.MapPost("/", Register)
+            .WithName("RegisterOrganization")
+            .WithSummary("Register a new organization and admin account")
+            .WithTags("Identity")
+            .Produces<object>()
+            .ProducesProblem(400)
+            .ProducesProblem(409);
+
         group.MapPost("/me/invitations", InviteUser)
-            .RequireAuthorization(Permissions.Users.Invite);
+            .RequireAuthorization(Permissions.Users.Invite)
+            .WithName("InviteUser")
+            .WithSummary("Invite a user to the organization by email")
+            .WithTags("Identity")
+            .Produces<object>()
+            .ProducesProblem(400)
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(422);
 
         return app;
     }
