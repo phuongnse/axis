@@ -121,7 +121,7 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     [Fact]
     public async Task Status_transition_is_persisted()
     {
-        var wf = MakeWorkflow("Published Flow");
+        WorkflowDefinition wf = MakeWorkflow("Published Flow");
         wf.AddStep("Notify", StepType.Notification, null);
         wf.AddTrigger(TriggerType.Manual, null);
         wf.Publish();
@@ -129,8 +129,51 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
         await _sut.AddAsync(wf);
         await _ctx.SaveChangesAsync();
 
-        var loaded = await _sut.GetByIdAsync(wf.Id, OrgId);
+        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, OrgId);
 
         loaded!.Status.Should().Be(WorkflowStatus.Active);
+    }
+
+    [Fact]
+    public async Task AddStep_AfterReload_IsPersisted()
+    {
+        Guid orgId = Guid.NewGuid();
+        WorkflowDefinition wf = MakeWorkflow("Mutation Test", orgId);
+        await _sut.AddAsync(wf);
+        await _ctx.SaveChangesAsync();
+
+        // Load then mutate in the same tracked context — without a ValueComparer EF Core
+        // uses reference equality on the list and silently skips the UPDATE.
+        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, orgId);
+        loaded!.AddStep("Extra Step", StepType.Notification, null);
+        await _ctx.SaveChangesAsync();
+
+        // Verify with a fresh context to bypass the first-level cache
+        await using WorkflowBuilderDbContext freshCtx = db.CreateContext();
+        WorkflowRepository freshRepo = new(freshCtx);
+        WorkflowDefinition? reloaded = await freshRepo.GetByIdAsync(wf.Id, orgId);
+
+        reloaded!.Steps.Should().HaveCount(3, "Start + End + Extra Step must all be persisted");
+        reloaded.Steps.Should().Contain(s => s.Name == "Extra Step");
+    }
+
+    [Fact]
+    public async Task AddTrigger_AfterReload_IsPersisted()
+    {
+        Guid orgId = Guid.NewGuid();
+        WorkflowDefinition wf = MakeWorkflow("Trigger Mutation Test", orgId);
+        await _sut.AddAsync(wf);
+        await _ctx.SaveChangesAsync();
+
+        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, orgId);
+        loaded!.AddTrigger(TriggerType.Manual, null);
+        await _ctx.SaveChangesAsync();
+
+        await using WorkflowBuilderDbContext freshCtx = db.CreateContext();
+        WorkflowRepository freshRepo = new(freshCtx);
+        WorkflowDefinition? reloaded = await freshRepo.GetByIdAsync(wf.Id, orgId);
+
+        reloaded!.Triggers.Should().HaveCount(1);
+        reloaded.Triggers.Should().Contain(t => t.Type == TriggerType.Manual);
     }
 }
