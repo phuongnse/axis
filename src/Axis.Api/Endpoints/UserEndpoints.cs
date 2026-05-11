@@ -20,16 +20,72 @@ public static class UserEndpoints
     {
         var group = app.MapGroup("/api/users").RequireAuthorization();
 
-        group.MapGet("/me", GetMe);
-        group.MapPatch("/me", UpdateProfile);
-        group.MapPost("/me/change-password", ChangePassword);
-        group.MapGet("/me/sessions", GetSessions);
-        group.MapDelete("/me/sessions/{sessionId}", RevokeSession);
-        group.MapDelete("/me/sessions", RevokeAllSessions);
+        group.MapGet("/me", GetMe)
+            .WithName("GetMe")
+            .WithSummary("Get the current user's profile")
+            .WithTags("Identity")
+            .Produces<object>()
+            .ProducesProblem(401)
+            .ProducesProblem(404);
+
+        group.MapPatch("/me", UpdateProfile)
+            .WithName("UpdateProfile")
+            .WithSummary("Update the current user's profile")
+            .WithTags("Identity")
+            .Produces(204)
+            .ProducesProblem(400)
+            .ProducesProblem(401);
+
+        group.MapPost("/me/change-password", ChangePassword)
+            .WithName("ChangePassword")
+            .WithSummary("Change the current user's password")
+            .WithTags("Identity")
+            .Produces(204)
+            .ProducesProblem(400)
+            .ProducesProblem(401);
+
+        group.MapGet("/me/sessions", GetSessions)
+            .WithName("GetUserSessions")
+            .WithSummary("List active sessions for the current user")
+            .WithTags("Identity")
+            .Produces<object>()
+            .ProducesProblem(401);
+
+        group.MapDelete("/me/sessions/{sessionId}", RevokeSession)
+            .WithName("RevokeSession")
+            .WithSummary("Revoke a specific session by ID")
+            .WithTags("Identity")
+            .Produces(204)
+            .ProducesProblem(401);
+
+        group.MapDelete("/me/sessions", RevokeAllSessions)
+            .WithName("RevokeAllSessions")
+            .WithSummary("Revoke all sessions for the current user")
+            .WithTags("Identity")
+            .Produces(204)
+            .ProducesProblem(401);
+
         group.MapPatch("/{userId:guid}/status", UpdateStatus)
-            .RequireAuthorization(Permissions.Users.Deactivate);
+            .RequireAuthorization(Permissions.Users.Deactivate)
+            .WithName("UpdateUserStatus")
+            .WithSummary("Activate or deactivate a user")
+            .WithTags("Identity")
+            .Produces(204)
+            .ProducesProblem(400)
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(422);
+
         group.MapPut("/{userId:guid}/roles", AssignRole)
-            .RequireAuthorization(Permissions.Roles.Write);
+            .RequireAuthorization(Permissions.Roles.Write)
+            .WithName("AssignRoleToUser")
+            .WithSummary("Assign or remove a role from a user")
+            .WithTags("Identity")
+            .Produces(204)
+            .ProducesProblem(400)
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(404);
 
         return app;
     }

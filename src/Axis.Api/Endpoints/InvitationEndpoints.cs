@@ -13,8 +13,20 @@ public static class InvitationEndpoints
     {
         var group = app.MapGroup("/api/invitations");
 
-        group.MapGet("/{token}", GetInvitation);
-        group.MapPost("/{token}/accept", AcceptInvitation);
+        group.MapGet("/{token}", GetInvitation)
+            .WithName("GetInvitation")
+            .WithSummary("Get invitation details by token")
+            .WithTags("Identity")
+            .Produces<object>()
+            .ProducesProblem(404);
+
+        group.MapPost("/{token}/accept", AcceptInvitation)
+            .WithName("AcceptInvitation")
+            .WithSummary("Accept an invitation and create a user account")
+            .WithTags("Identity")
+            .Produces<object>()
+            .ProducesProblem(400)
+            .ProducesProblem(404);
 
         return app;
     }

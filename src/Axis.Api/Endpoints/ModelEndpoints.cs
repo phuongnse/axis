@@ -24,25 +24,99 @@ public static class ModelEndpoints
             .RequireAuthorization();
 
         group.MapGet("/", GetModels)
-            .RequireAuthorization(Permissions.DataModeling.ModelRead);
+            .RequireAuthorization(Permissions.DataModeling.ModelRead)
+            .WithName("GetModels")
+            .WithSummary("List all data models for the organization")
+            .WithTags("DataModeling")
+            .Produces<IReadOnlyList<ModelSummaryDto>>()
+            .ProducesProblem(401)
+            .ProducesProblem(403);
+
         group.MapPost("/", CreateModel)
-            .RequireAuthorization(Permissions.DataModeling.ModelWrite);
+            .RequireAuthorization(Permissions.DataModeling.ModelWrite)
+            .WithName("CreateModel")
+            .WithSummary("Create a new data model")
+            .WithTags("DataModeling")
+            .Produces<object>(201)
+            .ProducesProblem(400)
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(409);
+
         group.MapGet("/{modelId:guid}", GetModel)
-            .RequireAuthorization(Permissions.DataModeling.ModelRead);
+            .RequireAuthorization(Permissions.DataModeling.ModelRead)
+            .WithName("GetModel")
+            .WithSummary("Get a data model by ID")
+            .WithTags("DataModeling")
+            .Produces<ModelDetailDto>()
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(404);
+
         group.MapPut("/{modelId:guid}", UpdateModel)
-            .RequireAuthorization(Permissions.DataModeling.ModelWrite);
+            .RequireAuthorization(Permissions.DataModeling.ModelWrite)
+            .WithName("UpdateModel")
+            .WithSummary("Update a data model")
+            .WithTags("DataModeling")
+            .Produces(204)
+            .ProducesProblem(400)
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(404);
+
         group.MapDelete("/{modelId:guid}", DeleteModel)
-            .RequireAuthorization(Permissions.DataModeling.ModelDelete);
+            .RequireAuthorization(Permissions.DataModeling.ModelDelete)
+            .WithName("DeleteModel")
+            .WithSummary("Soft-delete a data model")
+            .WithTags("DataModeling")
+            .Produces(204)
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(404);
 
         // Field management
         group.MapPost("/{modelId:guid}/fields", AddField)
-            .RequireAuthorization(Permissions.DataModeling.ModelWrite);
+            .RequireAuthorization(Permissions.DataModeling.ModelWrite)
+            .WithName("AddFieldToModel")
+            .WithSummary("Add a field to a data model")
+            .WithTags("DataModeling")
+            .Produces<object>(201)
+            .ProducesProblem(400)
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(404);
+
         group.MapPut("/{modelId:guid}/fields/{fieldId:guid}", UpdateField)
-            .RequireAuthorization(Permissions.DataModeling.ModelWrite);
+            .RequireAuthorization(Permissions.DataModeling.ModelWrite)
+            .WithName("UpdateFieldInModel")
+            .WithSummary("Update a field in a data model")
+            .WithTags("DataModeling")
+            .Produces(204)
+            .ProducesProblem(400)
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(404);
+
         group.MapDelete("/{modelId:guid}/fields/{fieldId:guid}", RemoveField)
-            .RequireAuthorization(Permissions.DataModeling.ModelWrite);
+            .RequireAuthorization(Permissions.DataModeling.ModelWrite)
+            .WithName("RemoveFieldFromModel")
+            .WithSummary("Remove a field from a data model")
+            .WithTags("DataModeling")
+            .Produces(204)
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(404);
+
         group.MapPut("/{modelId:guid}/fields/order", ReorderFields)
-            .RequireAuthorization(Permissions.DataModeling.ModelWrite);
+            .RequireAuthorization(Permissions.DataModeling.ModelWrite)
+            .WithName("ReorderModelFields")
+            .WithSummary("Reorder fields in a data model")
+            .WithTags("DataModeling")
+            .Produces(204)
+            .ProducesProblem(400)
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(404);
 
         return app;
     }

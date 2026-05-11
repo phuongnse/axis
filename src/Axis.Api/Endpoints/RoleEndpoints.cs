@@ -15,11 +15,35 @@ public static class RoleEndpoints
         var group = app.MapGroup("/api/roles").RequireAuthorization();
 
         group.MapGet("/", GetRoles)
-            .RequireAuthorization(Permissions.Roles.Read);
+            .RequireAuthorization(Permissions.Roles.Read)
+            .WithName("GetRoles")
+            .WithSummary("List all roles for the organization")
+            .WithTags("Identity")
+            .Produces<IReadOnlyList<RoleDto>>()
+            .ProducesProblem(401)
+            .ProducesProblem(403);
+
         group.MapPost("/", CreateRole)
-            .RequireAuthorization(Permissions.Roles.Write);
+            .RequireAuthorization(Permissions.Roles.Write)
+            .WithName("CreateRole")
+            .WithSummary("Create a new role")
+            .WithTags("Identity")
+            .Produces<object>()
+            .ProducesProblem(400)
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(409);
+
         group.MapPut("/{roleId:guid}", UpdateRole)
-            .RequireAuthorization(Permissions.Roles.Write);
+            .RequireAuthorization(Permissions.Roles.Write)
+            .WithName("UpdateRole")
+            .WithSummary("Update a role's name, description, and permissions")
+            .WithTags("Identity")
+            .Produces(204)
+            .ProducesProblem(400)
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(404);
 
         return app;
     }

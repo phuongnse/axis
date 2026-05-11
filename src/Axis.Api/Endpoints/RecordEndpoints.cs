@@ -18,15 +18,56 @@ public static class RecordEndpoints
             .RequireAuthorization();
 
         group.MapGet("/", GetRecords)
-            .RequireAuthorization(Permissions.DataModeling.RecordRead);
+            .RequireAuthorization(Permissions.DataModeling.RecordRead)
+            .WithName("GetRecords")
+            .WithSummary("List records for a data model (paginated)")
+            .WithTags("DataModeling")
+            .Produces<RecordsPageDto>()
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(404);
+
         group.MapPost("/", CreateRecord)
-            .RequireAuthorization(Permissions.DataModeling.RecordWrite);
+            .RequireAuthorization(Permissions.DataModeling.RecordWrite)
+            .WithName("CreateRecord")
+            .WithSummary("Create a new record")
+            .WithTags("DataModeling")
+            .Produces<object>(201)
+            .ProducesProblem(400)
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(404);
+
         group.MapGet("/{recordId:guid}", GetRecord)
-            .RequireAuthorization(Permissions.DataModeling.RecordRead);
+            .RequireAuthorization(Permissions.DataModeling.RecordRead)
+            .WithName("GetRecord")
+            .WithSummary("Get a record by ID")
+            .WithTags("DataModeling")
+            .Produces<RecordDto>()
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(404);
+
         group.MapPut("/{recordId:guid}", UpdateRecord)
-            .RequireAuthorization(Permissions.DataModeling.RecordWrite);
+            .RequireAuthorization(Permissions.DataModeling.RecordWrite)
+            .WithName("UpdateRecord")
+            .WithSummary("Update a record")
+            .WithTags("DataModeling")
+            .Produces(204)
+            .ProducesProblem(400)
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(404);
+
         group.MapDelete("/{recordId:guid}", DeleteRecord)
-            .RequireAuthorization(Permissions.DataModeling.RecordDelete);
+            .RequireAuthorization(Permissions.DataModeling.RecordDelete)
+            .WithName("DeleteRecord")
+            .WithSummary("Delete a record")
+            .WithTags("DataModeling")
+            .Produces(204)
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(404);
 
         return app;
     }
