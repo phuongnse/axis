@@ -15,7 +15,7 @@
 | **Entity Framework Core** | 8.x | ORM | Best-in-class ORM for .NET, great migration support |
 | **Npgsql** | 8.x | PostgreSQL driver | Official EF Core provider for PostgreSQL |
 | **Wolverine** | 2.x | Background jobs + messaging | Modern alternative to Hangfire; handles jobs, scheduling, and module-to-module messaging in one library |
-| **OpenIddict** | 5.x | Auth (JWT + OIDC) | Native .NET auth server, no external service dependency |
+| **OpenIddict** | 5.x | Auth (OAuth2/OIDC) | Standards-compliant OAuth2/OIDC server. Authorization Code + PKCE for the SPA; Client Credentials for external system integrations (e.g. triggering workflows via API). |
 | **SignalR** | (built-in) | Real-time updates | Workflow execution status pushed to client |
 | **FluentValidation** | 11.x | Input validation | Declarative, testable validation |
 | **Serilog** | 3.x | Structured logging | JSON logs, easy to ship to any log aggregator |
@@ -36,7 +36,8 @@
 | **Tailwind CSS** | 3.x | Styling | Utility-first, fast iteration |
 | **@xyflow/react** (React Flow) | 12.x | Workflow canvas | Best-in-class drag & drop node-based diagram editor |
 | **dnd-kit** | 6.x | Page builder drag & drop | Flexible, accessible DnD for UI builder |
-| **Zod** | 3.x | Schema validation | Runtime validation for API responses and forms |
+| **Zod** | 3.x | Schema validation | Runtime validation for API responses and forms; source of truth for form types |
+| **react-hook-form** | 7.x | Form state management | Performant form handling; always paired with Zod via `zodResolver` |
 
 ---
 
@@ -64,9 +65,10 @@
 **Decision:** Use Wolverine for background jobs and intra-module messaging.
 **Reason:** Wolverine unifies job processing and domain event dispatching. It integrates naturally with DDD patterns and eliminates the need for a separate message bus for internal communication.
 
-### ADR-004: OpenIddict over External Auth Service
-**Decision:** Implement auth server in-process using OpenIddict.
-**Reason:** Keeps the stack self-contained, reduces external dependencies and cost. OpenIddict is a well-maintained, standards-compliant OIDC server for .NET.
+### ADR-004: OpenIddict as OAuth2/OIDC Server
+**Decision:** Use OpenIddict 5.x as the in-process OAuth2/OIDC authorization server.
+**Reason:** Axis will support external systems triggering workflows via API — this requires a standards-compliant OAuth2 Client Credentials flow so third-party tools can authenticate without user interaction. OpenIddict also enables Authorization Code + PKCE for the SPA (more secure than custom JWT for browser clients) and positions Axis to support enterprise SSO in the future. Keeping the auth server in-process avoids external service dependencies.
+> ⚠️ **Implementation gap**: The current Identity API layer was built with a hand-rolled `JwtTokenService` (no OpenIddict). This is a known refactor target — the entire Identity API layer must be rewritten against OpenIddict before external integrations can be implemented.
 
 ### ADR-005: React over Vue/Svelte for Frontend
 **Decision:** Use React with TypeScript.

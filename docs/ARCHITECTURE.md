@@ -110,11 +110,21 @@ PostgreSQL
 
 ## Authentication Flow
 
-1. User signs in with email + password → `POST /auth/token`
-2. OpenIddict validates credentials, issues **Access Token** (JWT, 15 min) + **Refresh Token** (opaque, 7 days)
-3. Client sends `Authorization: Bearer <access_token>` on every request
-4. Middleware validates JWT, extracts `org_id` + `user_id` + `roles`, injects into request context
-5. Refresh via `POST /auth/refresh` before token expires
+> Auth is handled by **OpenIddict 5.x** — an in-process OAuth2/OIDC server. See ADR-004 in `docs/TECH_STACK.md`.
+> ⚠️ Current code uses a temporary custom `JwtTokenService` — planned for replacement. Do not build on top of it.
+
+### SPA flow (Authorization Code + PKCE)
+1. React SPA redirects user to `GET /connect/authorize` with PKCE challenge
+2. OpenIddict presents login, user authenticates with email + password
+3. OpenIddict issues **Authorization Code** → SPA exchanges it at `POST /connect/token` for **Access Token** (JWT, 15 min) + **Refresh Token**
+4. SPA sends `Authorization: Bearer <access_token>` on every API request
+5. JWT middleware validates token, extracts `org_id` + `user_id` + `permissions`, injects into `ITenantContext` / `ICurrentUser`
+6. SPA silently refreshes via `POST /connect/token` (refresh_token grant) before expiry
+
+### External integration flow (Client Credentials)
+1. External system (e.g. third-party tool triggering a workflow) authenticates with its own `client_id` + `client_secret` at `POST /connect/token`
+2. OpenIddict issues a scoped **Access Token** — no user context, only granted scopes
+3. Token is validated the same way; handler checks for the required scope instead of user permissions
 
 ---
 
