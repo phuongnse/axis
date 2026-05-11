@@ -3,6 +3,7 @@ using Axis.DataModeling.Domain.Aggregates;
 using Axis.DataModeling.Domain.Entities;
 using Axis.DataModeling.Infrastructure.Persistence.Converters;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
@@ -13,6 +14,11 @@ internal sealed class DataModelConfiguration : IEntityTypeConfiguration<DataMode
     private static readonly ValueConverter<List<FieldDefinition>, string> FieldsConverter = new(
         fields => JsonSerializer.Serialize(fields, FieldJsonOptions.Options),
         json => JsonSerializer.Deserialize<List<FieldDefinition>>(json, FieldJsonOptions.Options) ?? new List<FieldDefinition>());
+
+    private static readonly ValueComparer<List<FieldDefinition>> FieldsComparer = new(
+        (l1, l2) => l1 != null && l2 != null && l1.SequenceEqual(l2),
+        l => l.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+        l => l.ToList());
 
     public void Configure(EntityTypeBuilder<DataModel> builder)
     {
@@ -59,7 +65,7 @@ internal sealed class DataModelConfiguration : IEntityTypeConfiguration<DataMode
             .UsePropertyAccessMode(PropertyAccessMode.Field)
             .HasColumnName("fields")
             .HasColumnType("jsonb")
-            .HasConversion(FieldsConverter)
+            .HasConversion(FieldsConverter, FieldsComparer)
             .IsRequired();
 
         builder.Ignore(m => m.Fields);
