@@ -17,7 +17,7 @@ public sealed class CreateDataClassHandler(
         if (await dataClassRepo.NameExistsAsync(command.Name, command.OrganizationId, null, cancellationToken))
             throw new ValidationException($"A data class named '{command.Name}' already exists.");
 
-        var dataClass = DataClass.Create(command.Name, command.Description, command.OrganizationId);
+        DataClass dataClass = DataClass.Create(command.Name, command.Description, command.OrganizationId, command.CreatedBy);
 
         await dataClassRepo.AddAsync(dataClass, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);

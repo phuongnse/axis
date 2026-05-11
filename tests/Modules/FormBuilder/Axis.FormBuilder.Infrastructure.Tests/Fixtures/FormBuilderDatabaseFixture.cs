@@ -34,7 +34,8 @@ public sealed class FormBuilderDatabaseFixture : IAsyncLifetime
         wfCmd.CommandText = $"""
             CREATE TABLE IF NOT EXISTS "{TestSchema}".workflow_definitions (
                 id UUID PRIMARY KEY,
-                steps JSONB NOT NULL DEFAULT '[]'::jsonb
+                steps JSONB NOT NULL DEFAULT '[]'::jsonb,
+                deleted_at TIMESTAMPTZ NULL
             );
             """;
         await wfCmd.ExecuteNonQueryAsync();

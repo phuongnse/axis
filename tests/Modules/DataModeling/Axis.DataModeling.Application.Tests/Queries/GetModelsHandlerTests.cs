@@ -12,6 +12,7 @@ public class GetModelsHandlerTests
     private readonly IDataModelRepository _modelRepo = Substitute.For<IDataModelRepository>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
+    private const string UserId = "user-123";
 
     private GetModelsHandler CreateHandler() => new(_modelRepo);
 
@@ -20,8 +21,8 @@ public class GetModelsHandlerTests
     {
         List<DataModel> models =
         [
-            DataModel.Create("Invoice", "Billing", null, null, OrgId),
-            DataModel.Create("Contact", null, null, null, OrgId),
+            DataModel.Create("Invoice", "Billing", null, null, OrgId, UserId),
+            DataModel.Create("Contact", null, null, null, OrgId, UserId),
         ];
         _modelRepo.GetPagedAsync(OrgId, 1, 20, Arg.Any<CancellationToken>())
             .Returns((models, 2));
@@ -39,7 +40,7 @@ public class GetModelsHandlerTests
     [Fact]
     public async Task GetModels_WithModels_EachDtoContainsCorrectFieldCount()
     {
-        DataModel model = DataModel.Create("Invoice", null, null, null, OrgId);
+        DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         _modelRepo.GetPagedAsync(OrgId, 1, 20, Arg.Any<CancellationToken>())
             .Returns((new List<DataModel> { model }, 1));
 

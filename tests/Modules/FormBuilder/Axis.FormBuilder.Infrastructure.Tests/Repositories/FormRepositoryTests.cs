@@ -13,6 +13,7 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
     private FormRepository _sut = null!;
 
     private static readonly Guid OrgId = Guid.NewGuid();
+    private const string UserId = "user-123";
 
     public Task InitializeAsync()
     {
@@ -24,21 +25,21 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
     public async Task DisposeAsync() => await _ctx.DisposeAsync();
 
     private static FormDefinition MakeForm(string name, Guid? orgId = null)
-        => FormDefinition.Create(name, null, orgId ?? OrgId);
+        => FormDefinition.Create(name, null, orgId ?? OrgId, UserId);
 
     [Fact]
     public async Task AddAsync_and_GetByIdAsync_round_trip()
     {
-        var form = MakeForm("Contact Form");
+        FormDefinition form = MakeForm("Contact Form");
         await _sut.AddAsync(form);
         await _ctx.SaveChangesAsync();
 
-        var loaded = await _sut.GetByIdAsync(form.Id, OrgId);
+        FormDefinition? loaded = await _sut.GetByIdAsync(form.Id, OrgId);
 
         loaded.Should().NotBeNull();
         loaded!.Name.Should().Be("Contact Form");
         loaded.OrganizationId.Should().Be(OrgId);
-        loaded.IsDeleted.Should().BeFalse();
+        loaded.DeletedAt.Should().BeNull();
     }
 
     [Fact]

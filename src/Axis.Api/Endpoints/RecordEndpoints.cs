@@ -93,7 +93,7 @@ public static class RecordEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        var id = await mediator.Send(new CreateRecordCommand(modelId, currentUser.OrgId, data), ct);
+        Guid id = await mediator.Send(new CreateRecordCommand(modelId, currentUser.OrgId, data, currentUser.UserId.ToString()), ct);
         return Results.Created($"/api/models/{modelId}/records/{id}", new { id });
     }
 

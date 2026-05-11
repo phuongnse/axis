@@ -13,6 +13,7 @@ public class CreateModelHandlerTests
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
+    private const string UserId = "user-123";
 
     private CreateModelHandler CreateHandler() => new(_modelRepo, _uow);
 
@@ -22,13 +23,13 @@ public class CreateModelHandlerTests
         _modelRepo.NameExistsAsync("Invoice", OrgId).Returns(false);
 
         var result = await CreateHandler().Handle(
-            new CreateModelCommand("Invoice", "Invoicing model", null, null, OrgId),
+            new CreateModelCommand("Invoice", "Invoicing model", null, null, OrgId, UserId),
             CancellationToken.None);
 
         result.Should().NotBeEmpty();
         await _modelRepo.Received(1).AddAsync(
             Arg.Is<Domain.Aggregates.DataModel>(m =>
-                m.Name == "Invoice" && m.OrganizationId == OrgId),
+                m.Name == "Invoice" && m.OrganizationId == OrgId && m.CreatedBy == UserId),
             Arg.Any<CancellationToken>());
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
@@ -39,7 +40,7 @@ public class CreateModelHandlerTests
         _modelRepo.NameExistsAsync("Invoice", OrgId).Returns(true);
 
         var act = async () => await CreateHandler().Handle(
-            new CreateModelCommand("Invoice", null, null, null, OrgId),
+            new CreateModelCommand("Invoice", null, null, null, OrgId, UserId),
             CancellationToken.None);
 
         await act.Should().ThrowAsync<ValidationException>().WithMessage("*already exists*");

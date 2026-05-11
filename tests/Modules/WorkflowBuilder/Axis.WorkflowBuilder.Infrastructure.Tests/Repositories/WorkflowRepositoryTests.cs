@@ -11,6 +11,7 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     private WorkflowRepository _sut = null!;
 
     private static readonly Guid OrgId = Guid.NewGuid();
+    private const string UserId = "user-123";
 
     public Task InitializeAsync()
     {
@@ -22,7 +23,7 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     public async Task DisposeAsync() => await _ctx.DisposeAsync();
 
     private static WorkflowDefinition MakeWorkflow(string name, Guid? orgId = null)
-        => WorkflowDefinition.Create(name, null, orgId ?? OrgId);
+        => WorkflowDefinition.Create(name, null, orgId ?? OrgId, UserId);
 
     [Fact]
     public async Task AddAsync_and_GetByIdAsync_round_trip()

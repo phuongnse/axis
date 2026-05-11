@@ -14,11 +14,12 @@ public class UpdateModelHandlerTests
     private readonly IDataModelRepository _modelRepo = Substitute.For<IDataModelRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private static readonly Guid OrgId = Guid.NewGuid();
+    private const string UserId = "user-123";
 
     private UpdateModelHandler CreateHandler() => new(_modelRepo, _uow);
 
     private static DataModel BuildModel() =>
-        DataModel.Create("Invoice", null, null, null, OrgId);
+        DataModel.Create("Invoice", null, null, null, OrgId, UserId);
 
     [Fact]
     public async Task Happy_path_updates_model_and_saves()

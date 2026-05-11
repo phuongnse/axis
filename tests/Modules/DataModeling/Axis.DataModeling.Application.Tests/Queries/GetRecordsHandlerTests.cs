@@ -13,17 +13,18 @@ public class GetRecordsHandlerTests
     private readonly IDataRecordRepository _recordRepo = Substitute.For<IDataRecordRepository>();
     private static readonly Guid OrgId = Guid.NewGuid();
     private static readonly Guid ModelId = Guid.NewGuid();
+    private const string UserId = "user-123";
 
     private GetRecordsHandler CreateHandler() => new(_modelRepo, _recordRepo);
 
     [Fact]
     public async Task Happy_path_returns_paged_result()
     {
-        var model = DataModel.Create("My Model", null, null, null, OrgId);
-        var records = new List<DataRecord>
-        {
-            DataRecord.Create(ModelId, OrgId, new Dictionary<string, object?> { ["x"] = 1 }),
-        };
+        DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
+        List<DataRecord> records =
+        [
+            DataRecord.Create(ModelId, OrgId, new Dictionary<string, object?> { ["x"] = 1 }, UserId),
+        ];
         _modelRepo.GetByIdAsync(ModelId, OrgId).Returns(model);
         _recordRepo.GetPagedAsync(ModelId, OrgId, 1, 25, null)
             .Returns((records.AsReadOnly() as IReadOnlyList<DataRecord>, 1));

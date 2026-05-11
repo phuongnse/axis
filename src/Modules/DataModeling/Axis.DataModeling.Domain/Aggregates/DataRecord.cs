@@ -10,29 +10,32 @@ public sealed class DataRecord : AggregateRoot<Guid>
 
     public Guid ModelId { get; private set; }
     public Guid OrganizationId { get; private set; }
-    public bool IsDeleted { get; private set; }
-    public DateTime CreatedAt { get; private set; }
-    public DateTime UpdatedAt { get; private set; }
+    public DateTimeOffset? DeletedAt { get; private set; }
+    public DateTimeOffset CreatedAt { get; private set; }
+    public DateTimeOffset UpdatedAt { get; private set; }
+    public string CreatedBy { get; private set; }
 
     public IReadOnlyDictionary<string, object?> Data => _data;
 
-    private DataRecord() : base(default) { _data = []; } // EF Core materialisation
+    private DataRecord() : base(default) { _data = []; CreatedBy = string.Empty; } // EF Core materialisation
 
     private DataRecord(Guid id, Guid modelId, Guid organizationId,
-        Dictionary<string, object?> data, DateTime createdAt)
+        Dictionary<string, object?> data, string createdBy, DateTimeOffset createdAt)
         : base(id)
     {
         ModelId = modelId;
         OrganizationId = organizationId;
         _data = data;
+        CreatedBy = createdBy;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
     }
 
-    public static DataRecord Create(Guid modelId, Guid organizationId, IReadOnlyDictionary<string, object?> data)
+    public static DataRecord Create(Guid modelId, Guid organizationId,
+        IReadOnlyDictionary<string, object?> data, string createdBy)
     {
-        var record = new DataRecord(Guid.NewGuid(), modelId, organizationId,
-            new Dictionary<string, object?>(data), DateTime.UtcNow);
+        DataRecord record = new(Guid.NewGuid(), modelId, organizationId,
+            new Dictionary<string, object?>(data), createdBy, DateTimeOffset.UtcNow);
 
         record.RaiseDomainEvent(new DataRecordCreated(record.Id, modelId, organizationId));
         return record;
@@ -41,19 +44,19 @@ public sealed class DataRecord : AggregateRoot<Guid>
     /// <summary>Replaces the record data and bumps UpdatedAt.</summary>
     public void Update(IReadOnlyDictionary<string, object?> data)
     {
-        if (IsDeleted)
+        if (DeletedAt.HasValue)
             throw new InvalidOperationException("Cannot update a deleted record.");
 
         _data = new Dictionary<string, object?>(data);
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     public void Delete()
     {
-        if (IsDeleted)
+        if (DeletedAt.HasValue)
             throw new InvalidOperationException("Record is already deleted.");
 
-        IsDeleted = true;
+        DeletedAt = DateTimeOffset.UtcNow;
         RaiseDomainEvent(new DataRecordDeleted(Id, ModelId, OrganizationId));
     }
 }

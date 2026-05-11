@@ -13,6 +13,7 @@ public class GetWorkflowsHandlerTests
     private readonly IWorkflowRepository _workflowRepo = Substitute.For<IWorkflowRepository>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
+    private const string UserId = "user-123";
 
     private GetWorkflowsHandler CreateHandler() => new(_workflowRepo);
 
@@ -21,8 +22,8 @@ public class GetWorkflowsHandlerTests
     {
         List<WorkflowDefinition> workflows =
         [
-            WorkflowDefinition.Create("Invoice Approval", null, OrgId),
-            WorkflowDefinition.Create("Onboarding", "New hire flow", OrgId),
+            WorkflowDefinition.Create("Invoice Approval", null, OrgId, UserId),
+            WorkflowDefinition.Create("Onboarding", "New hire flow", OrgId, UserId),
         ];
         _workflowRepo.GetPagedAsync(OrgId, 1, 20, Arg.Any<CancellationToken>())
             .Returns((workflows, 2));

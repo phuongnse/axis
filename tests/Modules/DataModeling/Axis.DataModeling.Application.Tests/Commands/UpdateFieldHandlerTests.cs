@@ -15,13 +15,14 @@ public class UpdateFieldHandlerTests
     private readonly IDataModelRepository _modelRepo = Substitute.For<IDataModelRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private static readonly Guid OrgId = Guid.NewGuid();
+    private const string UserId = "user-123";
 
     private UpdateFieldHandler CreateHandler() => new(_modelRepo, _uow);
 
     [Fact]
     public async Task Happy_path_updates_field_label_and_saves()
     {
-        var model = DataModel.Create("My Model", null, null, null, OrgId);
+        var model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
         var field = model.AddField("price", "Price", FieldType.Number, false, new NumberFieldConfig());
         _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
 
@@ -50,7 +51,7 @@ public class UpdateFieldHandlerTests
     [Fact]
     public async Task System_field_update_throws()
     {
-        var model = DataModel.Create("My Model", null, null, null, OrgId);
+        var model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
         var systemField = model.Fields.First(f => f.IsSystem);
         _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
 

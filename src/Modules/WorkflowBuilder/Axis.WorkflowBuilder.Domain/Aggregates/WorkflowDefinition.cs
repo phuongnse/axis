@@ -16,33 +16,36 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
     public string? Description { get; private set; }
     public WorkflowStatus Status { get; private set; }
     public Guid OrganizationId { get; private set; }
-    public DateTime CreatedAt { get; private set; }
-    public DateTime UpdatedAt { get; private set; }
+    public DateTimeOffset? DeletedAt { get; private set; }
+    public DateTimeOffset CreatedAt { get; private set; }
+    public DateTimeOffset UpdatedAt { get; private set; }
+    public string CreatedBy { get; private set; }
 
     public IReadOnlyList<WorkflowStep> Steps => _steps.AsReadOnly();
     public IReadOnlyList<StepTransition> Transitions => _transitions.AsReadOnly();
     public IReadOnlyList<WorkflowTrigger> Triggers => _triggers.AsReadOnly();
 
-    private WorkflowDefinition() : base(default) { Name = null!; } // EF Core materialisation
+    private WorkflowDefinition() : base(default) { Name = null!; CreatedBy = string.Empty; } // EF Core materialisation
 
     private WorkflowDefinition(Guid id, string name, string? description,
-        Guid organizationId, DateTime createdAt)
+        Guid organizationId, string createdBy, DateTimeOffset createdAt)
         : base(id)
     {
         Name = name;
         Description = description;
         Status = WorkflowStatus.Draft;
         OrganizationId = organizationId;
+        CreatedBy = createdBy;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
     }
 
-    public static WorkflowDefinition Create(string name, string? description, Guid organizationId)
+    public static WorkflowDefinition Create(string name, string? description, Guid organizationId, string createdBy)
     {
         ValidateName(name);
 
-        var now = DateTime.UtcNow;
-        var wf = new WorkflowDefinition(Guid.NewGuid(), name.Trim(), description?.Trim(), organizationId, now);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        WorkflowDefinition wf = new(Guid.NewGuid(), name.Trim(), description?.Trim(), organizationId, createdBy, now);
 
         // US-047: new workflow starts with a Start and End node
         wf._steps.Add(WorkflowStep.Create("Start", StepType.Start, null));
@@ -57,7 +60,7 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
         ValidateName(name);
         Name = name.Trim();
         Description = description?.Trim();
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     public WorkflowStep AddStep(string name, StepType type, IReadOnlyDictionary<string, object?>? config)
@@ -66,15 +69,15 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
         if (type == StepType.Start || type == StepType.End)
             throw new InvalidOperationException("Start and End step types are reserved and cannot be added manually.");
 
-        var step = WorkflowStep.Create(name, type, config);
+        WorkflowStep step = WorkflowStep.Create(name, type, config);
         _steps.Add(step);
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
         return step;
     }
 
     public void RemoveStep(Guid stepId)
     {
-        var step = _steps.SingleOrDefault(s => s.Id == stepId)
+        WorkflowStep step = _steps.SingleOrDefault(s => s.Id == stepId)
             ?? throw new InvalidOperationException("Step not found.");
 
         if (step.Type == StepType.Start || step.Type == StepType.End)
@@ -83,7 +86,7 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
         _steps.Remove(step);
         // Remove any transitions involving this step
         _transitions.RemoveAll(t => t.FromStepId == stepId || t.ToStepId == stepId);
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     public void AddTransition(Guid fromStepId, Guid toStepId, string? label)
@@ -97,32 +100,32 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
                 "Adding this transition would create a cycle in the workflow, which is not allowed.");
 
         _transitions.Add(new StepTransition(fromStepId, toStepId, label));
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     public void RemoveTransition(Guid fromStepId, Guid toStepId)
     {
-        var transition = _transitions.FirstOrDefault(t => t.FromStepId == fromStepId && t.ToStepId == toStepId);
+        StepTransition? transition = _transitions.FirstOrDefault(t => t.FromStepId == fromStepId && t.ToStepId == toStepId);
         if (transition is not null)
         {
             _transitions.Remove(transition);
-            UpdatedAt = DateTime.UtcNow;
+            UpdatedAt = DateTimeOffset.UtcNow;
         }
     }
 
     public void AddTrigger(TriggerType type, IReadOnlyDictionary<string, object?>? config)
     {
         _triggers.Add(new WorkflowTrigger(type, config));
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     public void RemoveTrigger(TriggerType type)
     {
-        var trigger = _triggers.FirstOrDefault(t => t.Type == type);
+        WorkflowTrigger? trigger = _triggers.FirstOrDefault(t => t.Type == type);
         if (trigger is not null)
         {
             _triggers.Remove(trigger);
-            UpdatedAt = DateTime.UtcNow;
+            UpdatedAt = DateTimeOffset.UtcNow;
         }
     }
 
@@ -138,13 +141,13 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
                 "Workflow must have at least one trigger before it can be published.");
 
         // Must have at least one step beyond Start/End
-        var nonTerminalSteps = _steps.Where(s => s.Type != StepType.Start && s.Type != StepType.End).ToList();
+        List<WorkflowStep> nonTerminalSteps = _steps.Where(s => s.Type != StepType.Start && s.Type != StepType.End).ToList();
         if (nonTerminalSteps.Count == 0)
             throw new InvalidOperationException(
                 "Workflow must have at least one step beyond the Start and End nodes.");
 
         Status = WorkflowStatus.Active;
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
         RaiseDomainEvent(new WorkflowPublished(Id, OrganizationId));
     }
 
@@ -158,7 +161,7 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
             throw new InvalidOperationException("Workflow is already archived.");
 
         Status = WorkflowStatus.Archived;
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
         RaiseDomainEvent(new WorkflowArchived(Id, OrganizationId));
     }
 
@@ -169,29 +172,29 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
             throw new InvalidOperationException("Only archived workflows can be unarchived.");
 
         Status = WorkflowStatus.Active;
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     /// <summary>US-051: Creates a full copy as a new Draft. Webhook URLs are NOT copied.</summary>
     public WorkflowDefinition Duplicate()
     {
-        var copy = Create($"Copy of {Name}", Description, OrganizationId);
+        WorkflowDefinition copy = Create($"Copy of {Name}", Description, OrganizationId, CreatedBy);
         copy._triggers.AddRange(_triggers);
 
         // Map old step IDs to new step IDs
-        var idMap = new Dictionary<Guid, Guid>();
+        Dictionary<Guid, Guid> idMap = new();
 
         // Remove the default Start/End from the copy (we'll re-add mapped ones)
         copy._steps.Clear();
 
-        foreach (var step in _steps)
+        foreach (WorkflowStep step in _steps)
         {
-            var newStep = WorkflowStep.Create(step.Name, step.Type, step.Config);
+            WorkflowStep newStep = WorkflowStep.Create(step.Name, step.Type, step.Config);
             idMap[step.Id] = newStep.Id;
             copy._steps.Add(newStep);
         }
 
-        foreach (var transition in _transitions)
+        foreach (StepTransition transition in _transitions)
         {
             copy._transitions.Add(new StepTransition(
                 idMap[transition.FromStepId],
@@ -206,7 +209,7 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
 
     private static void ValidateName(string name)
     {
-        var trimmed = name?.Trim() ?? "";
+        string trimmed = name?.Trim() ?? "";
         if (trimmed.Length < 2 || trimmed.Length > 200)
             throw new ArgumentException("Workflow name must be 2–200 characters.");
     }
@@ -222,16 +225,16 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
     {
         if (start == target) return true;
 
-        var visited = new HashSet<Guid>();
-        var queue = new Queue<Guid>();
+        HashSet<Guid> visited = new();
+        Queue<Guid> queue = new();
         queue.Enqueue(start);
 
         while (queue.Count > 0)
         {
-            var current = queue.Dequeue();
+            Guid current = queue.Dequeue();
             if (!visited.Add(current)) continue;
 
-            foreach (var t in _transitions.Where(t => t.FromStepId == current))
+            foreach (StepTransition t in _transitions.Where(t => t.FromStepId == current))
             {
                 if (t.ToStepId == target) return true;
                 queue.Enqueue(t.ToStepId);

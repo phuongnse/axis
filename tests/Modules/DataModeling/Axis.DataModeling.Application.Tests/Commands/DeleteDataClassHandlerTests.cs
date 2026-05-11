@@ -13,26 +13,27 @@ public class DeleteDataClassHandlerTests
     private readonly IDataClassRepository _dcRepo = Substitute.For<IDataClassRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private static readonly Guid OrgId = Guid.NewGuid();
+    private const string UserId = "user-123";
 
     private DeleteDataClassHandler CreateHandler() => new(_dcRepo, _uow);
 
     [Fact]
     public async Task Happy_path_deletes_and_saves()
     {
-        var dc = DataClass.Create("Address", null, OrgId);
+        DataClass dc = DataClass.Create("Address", null, OrgId, UserId);
         _dcRepo.GetByIdAsync(dc.Id, OrgId).Returns(dc);
         _dcRepo.IsReferencedByAnyModelAsync(dc.Id).Returns(false);
 
         await CreateHandler().Handle(new DeleteDataClassCommand(dc.Id, OrgId), CancellationToken.None);
 
-        dc.IsDeleted.Should().BeTrue();
+        dc.DeletedAt.Should().NotBeNull();
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task Referenced_data_class_throws()
     {
-        var dc = DataClass.Create("Address", null, OrgId);
+        DataClass dc = DataClass.Create("Address", null, OrgId, UserId);
         _dcRepo.GetByIdAsync(dc.Id, OrgId).Returns(dc);
         _dcRepo.IsReferencedByAnyModelAsync(dc.Id).Returns(true);
 

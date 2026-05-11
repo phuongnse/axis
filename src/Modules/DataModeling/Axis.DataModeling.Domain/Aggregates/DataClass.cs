@@ -19,51 +19,58 @@ public sealed class DataClass : AggregateRoot<Guid>
     public string Name { get; private set; }
     public string? Description { get; private set; }
     public Guid OrganizationId { get; private set; }
-    public bool IsDeleted { get; private set; }
-    public DateTime CreatedAt { get; private set; }
+    public DateTimeOffset? DeletedAt { get; private set; }
+    public DateTimeOffset CreatedAt { get; private set; }
+    public DateTimeOffset UpdatedAt { get; private set; }
+    public string CreatedBy { get; private set; }
 
     public IReadOnlyList<FieldDefinition> Fields => _fields.AsReadOnly();
 
-    private DataClass(Guid id, string name, string? description, Guid organizationId, DateTime createdAt)
+    private DataClass(Guid id, string name, string? description, Guid organizationId,
+        string createdBy, DateTimeOffset createdAt)
         : base(id)
     {
         Name = name;
         Description = description;
         OrganizationId = organizationId;
+        CreatedBy = createdBy;
         CreatedAt = createdAt;
+        UpdatedAt = createdAt;
     }
 
-    public static DataClass Create(string name, string? description, Guid organizationId)
+    public static DataClass Create(string name, string? description, Guid organizationId, string createdBy)
     {
         ValidateName(name);
 
-        var now = DateTime.UtcNow;
-        var dc = new DataClass(Guid.NewGuid(), name.Trim(), description?.Trim(), organizationId, now);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        DataClass dc = new(Guid.NewGuid(), name.Trim(), description?.Trim(), organizationId, createdBy, now);
         dc.RaiseDomainEvent(new DataClassCreated(dc.Id, organizationId, dc.Name));
         return dc;
     }
 
     public void Update(string name, string? description)
     {
-        if (IsDeleted)
+        if (DeletedAt.HasValue)
             throw new InvalidOperationException("Cannot modify a deleted data class.");
         ValidateName(name);
         Name = name.Trim();
         Description = description?.Trim();
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     public void UpdateField(Guid fieldId, string label, string? helpText, bool isRequired, FieldConfig config)
     {
-        if (IsDeleted)
+        if (DeletedAt.HasValue)
             throw new InvalidOperationException("Cannot modify a deleted data class.");
-        var field = _fields.SingleOrDefault(f => f.Id == fieldId)
+        FieldDefinition field = _fields.SingleOrDefault(f => f.Id == fieldId)
             ?? throw new InvalidOperationException("Field not found.");
         field.Update(label, helpText, isRequired, config);
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     public FieldDefinition AddField(string name, string label, FieldType type, bool required, FieldConfig config)
     {
-        if (IsDeleted)
+        if (DeletedAt.HasValue)
             throw new InvalidOperationException("Cannot modify a deleted data class.");
 
         if (DisallowedTypes.Contains(type))
@@ -73,25 +80,27 @@ public sealed class DataClass : AggregateRoot<Guid>
         if (_fields.Any(f => f.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
             throw new InvalidOperationException($"A field named '{name}' already exists in this data class.");
 
-        var order = _fields.Count;
-        var field = FieldDefinition.Create(name.ToLowerInvariant(), label, type, required, order, config);
+        int order = _fields.Count;
+        FieldDefinition field = FieldDefinition.Create(name.ToLowerInvariant(), label, type, required, order, config);
         _fields.Add(field);
+        UpdatedAt = DateTimeOffset.UtcNow;
         return field;
     }
 
     public void RemoveField(Guid fieldId)
     {
-        var field = _fields.SingleOrDefault(f => f.Id == fieldId)
+        FieldDefinition field = _fields.SingleOrDefault(f => f.Id == fieldId)
             ?? throw new InvalidOperationException("Field not found.");
         _fields.Remove(field);
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     public void Delete()
     {
-        if (IsDeleted)
+        if (DeletedAt.HasValue)
             throw new InvalidOperationException("Data class is already deleted.");
 
-        IsDeleted = true;
+        DeletedAt = DateTimeOffset.UtcNow;
         RaiseDomainEvent(new DataClassDeleted(Id, OrganizationId));
     }
 

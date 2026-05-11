@@ -17,10 +17,11 @@ public class AddFieldHandlerTests
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
+    private const string UserId = "user-123";
 
     private AddFieldHandler CreateHandler() => new(_modelRepo, _uow);
 
-    private static DataModel MakeModel() => DataModel.Create("Invoice", null, null, null, OrgId);
+    private static DataModel MakeModel() => DataModel.Create("Invoice", null, null, null, OrgId, UserId);
 
     [Fact]
     public async Task Happy_path_adds_text_field()
