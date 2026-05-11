@@ -1,6 +1,7 @@
 using Axis.DataModeling.Application.Queries.GetModels;
 using Axis.DataModeling.Application.Repositories;
 using Axis.DataModeling.Domain.Aggregates;
+using Axis.Shared.Application;
 using FluentAssertions;
 using NSubstitute;
 
@@ -15,40 +16,62 @@ public class GetModelsHandlerTests
     private GetModelsHandler CreateHandler() => new(_modelRepo);
 
     [Fact]
-    public async Task Returns_model_dtos_for_org()
+    public async Task GetModels_WithExistingModels_ReturnsPagedDtos()
     {
-        var models = new List<DataModel>
-        {
+        List<DataModel> models =
+        [
             DataModel.Create("Invoice", "Billing", null, null, OrgId),
             DataModel.Create("Contact", null, null, null, OrgId),
-        };
-        _modelRepo.GetAllAsync(OrgId).Returns(models);
+        ];
+        _modelRepo.GetPagedAsync(OrgId, 1, 20, Arg.Any<CancellationToken>())
+            .Returns((models, 2));
 
-        var result = await CreateHandler().Handle(new GetModelsQuery(OrgId), CancellationToken.None);
+        PagedResult<ModelSummaryDto> result = await CreateHandler()
+            .Handle(new GetModelsQuery(OrgId, 1, 20), CancellationToken.None);
 
-        result.Should().HaveCount(2);
-        result.Should().Contain(m => m.Name == "Invoice" && m.Description == "Billing");
+        result.Items.Should().HaveCount(2);
+        result.TotalCount.Should().Be(2);
+        result.Page.Should().Be(1);
+        result.PageSize.Should().Be(20);
+        result.Items.Should().Contain(m => m.Name == "Invoice" && m.Description == "Billing");
     }
 
     [Fact]
-    public async Task Each_dto_contains_correct_field_count()
+    public async Task GetModels_WithModels_EachDtoContainsCorrectFieldCount()
     {
-        var model = DataModel.Create("Invoice", null, null, null, OrgId);
-        _modelRepo.GetAllAsync(OrgId).Returns(new List<DataModel> { model });
+        DataModel model = DataModel.Create("Invoice", null, null, null, OrgId);
+        _modelRepo.GetPagedAsync(OrgId, 1, 20, Arg.Any<CancellationToken>())
+            .Returns((new List<DataModel> { model }, 1));
 
-        var result = await CreateHandler().Handle(new GetModelsQuery(OrgId), CancellationToken.None);
+        PagedResult<ModelSummaryDto> result = await CreateHandler()
+            .Handle(new GetModelsQuery(OrgId, 1, 20), CancellationToken.None);
 
         // 3 system fields auto-created
-        result.Single().FieldCount.Should().Be(3);
+        result.Items.Single().FieldCount.Should().Be(3);
     }
 
     [Fact]
-    public async Task Empty_org_returns_empty_list()
+    public async Task GetModels_EmptyOrg_ReturnsEmptyPage()
     {
-        _modelRepo.GetAllAsync(OrgId).Returns(new List<DataModel>());
+        _modelRepo.GetPagedAsync(OrgId, 1, 20, Arg.Any<CancellationToken>())
+            .Returns((new List<DataModel>(), 0));
 
-        var result = await CreateHandler().Handle(new GetModelsQuery(OrgId), CancellationToken.None);
+        PagedResult<ModelSummaryDto> result = await CreateHandler()
+            .Handle(new GetModelsQuery(OrgId, 1, 20), CancellationToken.None);
 
-        result.Should().BeEmpty();
+        result.Items.Should().BeEmpty();
+        result.TotalCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task GetModels_PageSizeExceedsCap_ClampsTo100()
+    {
+        _modelRepo.GetPagedAsync(OrgId, 1, 100, Arg.Any<CancellationToken>())
+            .Returns((new List<DataModel>(), 0));
+
+        await CreateHandler().Handle(new GetModelsQuery(OrgId, 1, 999), CancellationToken.None);
+
+        await _modelRepo.Received(1)
+            .GetPagedAsync(OrgId, 1, 100, Arg.Any<CancellationToken>());
     }
 }

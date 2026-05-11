@@ -28,8 +28,9 @@ public class ModelEndpointTests(ApiTestFixture fixture)
         var resp = await client.GetAsync("/api/models");
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await resp.Content.ReadFromJsonAsync<JsonElement[]>(Json);
-        body.Should().NotBeNull().And.BeEmpty();
+        var body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
+        var items = body.GetProperty("items").EnumerateArray().ToList();
+        items.Should().BeEmpty();
     }
 
     // POST /api/models
@@ -61,7 +62,8 @@ public class ModelEndpointTests(ApiTestFixture fixture)
         id.Should().NotBeNullOrEmpty();
 
         var listResp = await client.GetAsync("/api/models");
-        var models = (await listResp.Content.ReadFromJsonAsync<JsonElement[]>(Json))!;
+        var listBody = await listResp.Content.ReadFromJsonAsync<JsonElement>(Json);
+        var models = listBody.GetProperty("items").EnumerateArray().ToList();
         models.Should().HaveCount(1);
         models[0].GetProperty("name").GetString().Should().Be("Contacts");
     }

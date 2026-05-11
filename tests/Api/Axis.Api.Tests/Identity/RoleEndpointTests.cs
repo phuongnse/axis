@@ -28,12 +28,12 @@ public class RoleEndpointTests(ApiTestFixture fixture)
         var resp = await client.GetAsync("/api/roles");
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await resp.Content.ReadFromJsonAsync<JsonElement[]>(Json);
-        body.Should().NotBeNull();
+        var body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
+        var items = body.GetProperty("items").EnumerateArray().ToList();
 
         // Admin, Editor, Viewer, End User seeded at registration
-        body!.Should().HaveCount(4);
-        body!.Select(r => r.GetProperty("name").GetString()!).Should()
+        items.Should().HaveCount(4);
+        items.Select(r => r.GetProperty("name").GetString()!).Should()
             .Contain(["Admin", "Editor", "Viewer", "End User"]);
     }
 
@@ -43,7 +43,8 @@ public class RoleEndpointTests(ApiTestFixture fixture)
         var client = await AuthHelper.CreateAdminClientAsync(fixture, "role2");
 
         var resp = await client.GetAsync("/api/roles");
-        var roles = (await resp.Content.ReadFromJsonAsync<JsonElement[]>(Json))!;
+        var body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
+        var roles = body.GetProperty("items").EnumerateArray().ToList();
 
         roles.All(r => r.GetProperty("is_system").GetBoolean()).Should().BeTrue();
     }
@@ -79,7 +80,8 @@ public class RoleEndpointTests(ApiTestFixture fixture)
 
         // Verify appears in list
         var listResp = await client.GetAsync("/api/roles");
-        var roles = (await listResp.Content.ReadFromJsonAsync<JsonElement[]>(Json))!;
+        var listBody = await listResp.Content.ReadFromJsonAsync<JsonElement>(Json);
+        var roles = listBody.GetProperty("items").EnumerateArray().ToList();
 
         roles.Should().HaveCount(5); // 4 system + 1 custom
         roles.Select(r => r.GetProperty("name").GetString()).Should().Contain("Analyst");

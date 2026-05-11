@@ -1,27 +1,24 @@
 using Axis.DataModeling.Application.Repositories;
+using Axis.Shared.Application;
 using Axis.Shared.Application.CQRS;
 
 namespace Axis.DataModeling.Application.Queries.GetModels;
 
-/// <summary>US-031: Lists all non-deleted models for the org.</summary>
+/// <summary>US-031: Lists non-deleted models for the org, paginated.</summary>
 public sealed class GetModelsHandler(IDataModelRepository modelRepo)
-    : IQueryHandler<GetModelsQuery, IReadOnlyList<ModelSummaryDto>>
+    : IQueryHandler<GetModelsQuery, PagedResult<ModelSummaryDto>>
 {
-    public async Task<IReadOnlyList<ModelSummaryDto>> Handle(GetModelsQuery query, CancellationToken cancellationToken)
+    public async Task<PagedResult<ModelSummaryDto>> Handle(GetModelsQuery query, CancellationToken cancellationToken)
     {
-        var models = await modelRepo.GetAllAsync(query.OrganizationId, cancellationToken);
+        int effectivePageSize = Math.Min(query.PageSize, 100);
 
-        return models
-            .OrderBy(m => m.Name)
-            .Select(m => new ModelSummaryDto(
-                m.Id,
-                m.Name,
-                m.Description,
-                m.Icon,
-                m.Color,
-                m.Fields.Count,
-                m.UpdatedAt))
-            .ToList()
-            .AsReadOnly();
+        (IReadOnlyList<DataModeling.Domain.Aggregates.DataModel> items, int totalCount) =
+            await modelRepo.GetPagedAsync(query.OrganizationId, query.Page, effectivePageSize, cancellationToken);
+
+        IReadOnlyList<ModelSummaryDto> dtos = items
+            .Select(m => new ModelSummaryDto(m.Id, m.Name, m.Description, m.Icon, m.Color, m.Fields.Count, m.UpdatedAt))
+            .ToList();
+
+        return new PagedResult<ModelSummaryDto>(dtos, totalCount, query.Page, effectivePageSize);
     }
 }

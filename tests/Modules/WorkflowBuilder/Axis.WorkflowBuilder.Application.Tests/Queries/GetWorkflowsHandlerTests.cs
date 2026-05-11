@@ -1,3 +1,4 @@
+using Axis.Shared.Application;
 using Axis.WorkflowBuilder.Application.Queries.GetWorkflows;
 using Axis.WorkflowBuilder.Application.Repositories;
 using Axis.WorkflowBuilder.Domain.Aggregates;
@@ -16,28 +17,46 @@ public class GetWorkflowsHandlerTests
     private GetWorkflowsHandler CreateHandler() => new(_workflowRepo);
 
     [Fact]
-    public async Task Returns_all_workflows_for_org()
+    public async Task GetWorkflows_WithExistingWorkflows_ReturnsPagedDtos()
     {
-        var workflows = new List<WorkflowDefinition>
-        {
+        List<WorkflowDefinition> workflows =
+        [
             WorkflowDefinition.Create("Invoice Approval", null, OrgId),
             WorkflowDefinition.Create("Onboarding", "New hire flow", OrgId),
-        };
-        _workflowRepo.GetAllAsync(OrgId).Returns(workflows);
+        ];
+        _workflowRepo.GetPagedAsync(OrgId, 1, 20, Arg.Any<CancellationToken>())
+            .Returns((workflows, 2));
 
-        var result = await CreateHandler().Handle(new GetWorkflowsQuery(OrgId), CancellationToken.None);
+        PagedResult<WorkflowSummaryDto> result = await CreateHandler()
+            .Handle(new GetWorkflowsQuery(OrgId, 1, 20), CancellationToken.None);
 
-        result.Should().HaveCount(2);
-        result.Should().Contain(w => w.Name == "Invoice Approval" && w.Status == WorkflowStatus.Draft);
+        result.Items.Should().HaveCount(2);
+        result.TotalCount.Should().Be(2);
+        result.Items.Should().Contain(w => w.Name == "Invoice Approval" && w.Status == WorkflowStatus.Draft);
     }
 
     [Fact]
-    public async Task Empty_org_returns_empty_list()
+    public async Task GetWorkflows_EmptyOrg_ReturnsEmptyPage()
     {
-        _workflowRepo.GetAllAsync(OrgId).Returns(new List<WorkflowDefinition>());
+        _workflowRepo.GetPagedAsync(OrgId, 1, 20, Arg.Any<CancellationToken>())
+            .Returns((new List<WorkflowDefinition>(), 0));
 
-        var result = await CreateHandler().Handle(new GetWorkflowsQuery(OrgId), CancellationToken.None);
+        PagedResult<WorkflowSummaryDto> result = await CreateHandler()
+            .Handle(new GetWorkflowsQuery(OrgId, 1, 20), CancellationToken.None);
 
-        result.Should().BeEmpty();
+        result.Items.Should().BeEmpty();
+        result.TotalCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task GetWorkflows_PageSizeExceedsCap_ClampsTo100()
+    {
+        _workflowRepo.GetPagedAsync(OrgId, 1, 100, Arg.Any<CancellationToken>())
+            .Returns((new List<WorkflowDefinition>(), 0));
+
+        await CreateHandler().Handle(new GetWorkflowsQuery(OrgId, 1, 999), CancellationToken.None);
+
+        await _workflowRepo.Received(1)
+            .GetPagedAsync(OrgId, 1, 100, Arg.Any<CancellationToken>());
     }
 }
