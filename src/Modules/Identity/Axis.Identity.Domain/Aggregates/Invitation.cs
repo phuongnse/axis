@@ -35,9 +35,9 @@ public sealed class Invitation : AggregateRoot<Guid>
 
     public static Invitation Create(Email email, Guid organizationId, Guid roleId, Guid invitedByUserId)
     {
-        var token = GenerateToken();
-        var now = DateTime.UtcNow;
-        var invitation = new Invitation(Guid.NewGuid(), email, organizationId, roleId,
+        string token = GenerateToken();
+        DateTime now = DateTime.UtcNow;
+        Invitation invitation = new Invitation(Guid.NewGuid(), email, organizationId, roleId,
             invitedByUserId, token, now.AddHours(ExpiryHours), now);
 
         invitation.RaiseDomainEvent(new InvitationCreated(invitation.Id, organizationId, email.Value, token));
@@ -47,8 +47,8 @@ public sealed class Invitation : AggregateRoot<Guid>
     /// <summary>Test helper — creates an already-expired invitation.</summary>
     internal static Invitation CreateExpired(Email email, Guid organizationId, Guid roleId, Guid invitedByUserId)
     {
-        var token = GenerateToken();
-        var past = DateTime.UtcNow.AddHours(-1);
+        string token = GenerateToken();
+        DateTime past = DateTime.UtcNow.AddHours(-1);
         return new Invitation(Guid.NewGuid(), email, organizationId, roleId,
             invitedByUserId, token, past, past.AddHours(-ExpiryHours));
     }

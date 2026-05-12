@@ -18,7 +18,7 @@ public sealed class Email : ValueObject
         if (string.IsNullOrWhiteSpace(value))
             return Result<Email>.Failure("Email is required.");
 
-        var normalized = value.Trim().ToLowerInvariant();
+        string normalized = value.Trim().ToLowerInvariant();
 
         if (!EmailRegex.IsMatch(normalized))
             return Result<Email>.Failure($"'{value}' is not a valid email address.");

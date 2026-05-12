@@ -32,7 +32,7 @@ public sealed class Organization : AggregateRoot<Guid>
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Organization name is required.", nameof(name));
 
-        var org = new Organization(Guid.NewGuid(), name.Trim(), slug, ownerEmail, DateTime.UtcNow);
+        Organization org = new Organization(Guid.NewGuid(), name.Trim(), slug, ownerEmail, DateTime.UtcNow);
         org.RaiseDomainEvent(new OrganizationCreated(org.Id, org.Name, slug.Value, ownerEmail.Value));
         return org;
     }

@@ -1,3 +1,4 @@
+using Axis.WorkflowEngine.Domain.Aggregates;
 using Axis.Shared.Application.CQRS;
 using Axis.WorkflowEngine.Application.Repositories;
 using Axis.WorkflowEngine.Application.Services;
@@ -13,7 +14,7 @@ public sealed class CancelExecutionHandler(
 {
     public async Task Handle(CancelExecutionCommand command, CancellationToken cancellationToken)
     {
-        var execution = await execRepo.GetByIdAsync(command.ExecutionId, command.OrganizationId, cancellationToken);
+        WorkflowExecution? execution = await execRepo.GetByIdAsync(command.ExecutionId, command.OrganizationId, cancellationToken);
         if (execution is null)
             throw new ValidationException("Execution not found.");
 

@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Axis.Shared.Domain.Primitives;
 using Microsoft.EntityFrameworkCore;
 using Wolverine;
@@ -15,17 +16,17 @@ public abstract class UnitOfWork(DbContext context, IMessageBus bus)
 {
     public async Task<int> SaveChangesAsync(CancellationToken ct = default)
     {
-        var events = context.ChangeTracker
+        List<IDomainEvent> events = context.ChangeTracker
             .Entries<IHasDomainEvents>()
             .SelectMany(e => e.Entity.DomainEvents)
             .ToList();
 
-        foreach (var entry in context.ChangeTracker.Entries<IHasDomainEvents>())
+        foreach (EntityEntry<IHasDomainEvents> entry in context.ChangeTracker.Entries<IHasDomainEvents>())
             entry.Entity.ClearDomainEvents();
 
-        var result = await context.SaveChangesAsync(ct);
+        int result = await context.SaveChangesAsync(ct);
 
-        foreach (var evt in events)
+        foreach (IDomainEvent evt in events)
             await bus.PublishAsync(evt);
 
         return result;

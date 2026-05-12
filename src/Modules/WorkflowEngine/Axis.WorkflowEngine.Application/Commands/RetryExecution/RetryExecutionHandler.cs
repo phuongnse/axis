@@ -1,3 +1,4 @@
+using Axis.WorkflowEngine.Domain.Aggregates;
 using Axis.Shared.Application.CQRS;
 using Axis.WorkflowEngine.Application.Repositories;
 using Axis.WorkflowEngine.Application.Services;
@@ -13,13 +14,13 @@ public sealed class RetryExecutionHandler(
 {
     public async Task<Guid> Handle(RetryExecutionCommand command, CancellationToken cancellationToken)
     {
-        var original = await execRepo.GetByIdAsync(command.ExecutionId, command.OrganizationId, cancellationToken);
+        WorkflowExecution? original = await execRepo.GetByIdAsync(command.ExecutionId, command.OrganizationId, cancellationToken);
         if (original is null)
             throw new ValidationException("Execution not found.");
 
         try
         {
-            var retry = original.CreateRetry(command.RetriedByUserId);
+            WorkflowExecution retry = original.CreateRetry(command.RetriedByUserId);
             await execRepo.AddAsync(retry, cancellationToken);
             await uow.SaveChangesAsync(cancellationToken);
             return retry.Id;
