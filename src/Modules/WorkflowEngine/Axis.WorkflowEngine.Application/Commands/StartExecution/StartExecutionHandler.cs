@@ -19,7 +19,7 @@ public sealed class StartExecutionHandler(
         if (!await workflowReader.IsActiveAsync(command.WorkflowDefinitionId, command.OrganizationId, cancellationToken))
             throw new ValidationException("This workflow cannot be triggered. Only active workflows can be executed.");
 
-        var execution = WorkflowExecution.Create(
+        WorkflowExecution execution = WorkflowExecution.Create(
             command.WorkflowDefinitionId,
             command.OrganizationId,
             command.TriggerType,

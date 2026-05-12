@@ -36,11 +36,11 @@ public sealed class Role : AggregateRoot<Guid>
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Role name is required.", nameof(name));
 
-        var permList = permissions.Distinct().ToList();
+        List<string> permList = permissions.Distinct().ToList();
         if (permList.Count == 0)
             throw new ArgumentException("A role must have at least one permission.", nameof(permissions));
 
-        var role = new Role(Guid.NewGuid(), name.Trim(), description?.Trim(), false,
+        Role role = new Role(Guid.NewGuid(), name.Trim(), description?.Trim(), false,
             organizationId, permList, DateTime.UtcNow);
 
         role.RaiseDomainEvent(new RoleCreated(role.Id, organizationId, role.Name, false));
@@ -50,7 +50,7 @@ public sealed class Role : AggregateRoot<Guid>
     /// <summary>Creates a system role (Admin, Editor, Viewer, EndUser). Cannot be updated.</summary>
     public static Role CreateSystem(string name, Guid organizationId, IEnumerable<string> permissions)
     {
-        var role = new Role(Guid.NewGuid(), name, null, true,
+        Role role = new Role(Guid.NewGuid(), name, null, true,
             organizationId, permissions, DateTime.UtcNow);
 
         role.RaiseDomainEvent(new RoleCreated(role.Id, organizationId, name, true));
@@ -65,7 +65,7 @@ public sealed class Role : AggregateRoot<Guid>
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Role name is required.", nameof(name));
 
-        var permList = permissions.Distinct().ToList();
+        List<string> permList = permissions.Distinct().ToList();
         if (permList.Count == 0)
             throw new ArgumentException("A role must have at least one permission.", nameof(permissions));
 

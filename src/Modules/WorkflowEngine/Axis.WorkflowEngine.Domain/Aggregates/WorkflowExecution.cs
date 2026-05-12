@@ -59,8 +59,8 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
         Guid? triggeredByUserId,
         IReadOnlyDictionary<string, object?> input)
     {
-        var now = DateTime.UtcNow;
-        var exec = new WorkflowExecution(
+        DateTime now = DateTime.UtcNow;
+        WorkflowExecution exec = new WorkflowExecution(
             Guid.NewGuid(), workflowDefinitionId, organizationId,
             triggerType, triggeredByUserId, null, input, now);
 
@@ -116,8 +116,8 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
     /// <summary>Merges step output into the running execution context.</summary>
     public void MergeContext(IReadOnlyDictionary<string, object?> stepOutput)
     {
-        foreach (var (key, value) in stepOutput)
-            _context[key] = value;
+        foreach (KeyValuePair<string, object?> kvp in stepOutput)
+            _context[kvp.Key] = kvp.Value;
     }
 
     /// <summary>US-100: Creates a retry execution linked to this failed execution.</summary>
@@ -126,8 +126,8 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
         if (Status != ExecutionStatus.Failed)
             throw new InvalidOperationException("Only failed executions can be retried.");
 
-        var now = DateTime.UtcNow;
-        var retry = new WorkflowExecution(
+        DateTime now = DateTime.UtcNow;
+        WorkflowExecution retry = new WorkflowExecution(
             Guid.NewGuid(), WorkflowDefinitionId, OrganizationId,
             TriggerType, retriedByUserId, Id, _context, now);
 

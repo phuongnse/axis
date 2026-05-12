@@ -48,7 +48,7 @@ public sealed class User : AggregateRoot<Guid>
 
     public static User Create(string firstName, string lastName, Email email, Guid organizationId)
     {
-        var user = new User(Guid.NewGuid(), firstName, lastName, email, organizationId, DateTime.UtcNow);
+        User user = new User(Guid.NewGuid(), firstName, lastName, email, organizationId, DateTime.UtcNow);
         user.RaiseDomainEvent(new UserRegistered(user.Id, organizationId, email.Value));
         return user;
     }

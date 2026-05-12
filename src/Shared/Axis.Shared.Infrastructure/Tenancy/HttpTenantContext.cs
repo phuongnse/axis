@@ -14,10 +14,10 @@ public sealed class HttpTenantContext(IHttpContextAccessor accessor) : ITenantCo
     {
         get
         {
-            var ctx = accessor.HttpContext
+            HttpContext ctx = accessor.HttpContext
                 ?? throw new InvalidOperationException("No HTTP context available for tenant resolution.");
 
-            var value = ctx.User.FindFirst("org_id")?.Value
+            string value = ctx.User.FindFirst("org_id")?.Value
                 ?? throw new InvalidOperationException("JWT is missing required org_id claim.");
 
             return Guid.Parse(value);

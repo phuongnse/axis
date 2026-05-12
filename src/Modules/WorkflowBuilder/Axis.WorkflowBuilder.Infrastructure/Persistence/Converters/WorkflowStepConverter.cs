@@ -12,12 +12,12 @@ internal sealed class WorkflowStepConverter : JsonConverter<WorkflowStep>
         using var doc = JsonDocument.ParseValue(ref reader);
         var root = doc.RootElement;
 
-        var id = root.GetProperty("id").GetGuid();
-        var name = root.GetProperty("name").GetString()!;
-        var type = Enum.Parse<StepType>(root.GetProperty("type").GetString()!, ignoreCase: true);
+        Guid id = root.GetProperty("id").GetGuid();
+        string name = root.GetProperty("name").GetString()!;
+        StepType type = Enum.Parse<StepType>(root.GetProperty("type").GetString()!, ignoreCase: true);
 
         IReadOnlyDictionary<string, object?>? config = null;
-        if (root.TryGetProperty("config", out var configEl) && configEl.ValueKind != JsonValueKind.Null)
+        if (root.TryGetProperty("config", out JsonElement configEl) && configEl.ValueKind != JsonValueKind.Null)
             config = JsonSerializer.Deserialize<Dictionary<string, object?>>(configEl.GetRawText(), options);
 
         return WorkflowStep.Reconstitute(id, name, type, config);
