@@ -1,8 +1,8 @@
-using Axis.WorkflowEngine.Domain.Aggregates;
 using Axis.Shared.Application.CQRS;
+using Axis.Shared.Domain.Primitives;
 using Axis.WorkflowEngine.Application.Repositories;
 using Axis.WorkflowEngine.Application.Services;
-using FluentValidation;
+using Axis.WorkflowEngine.Domain.Aggregates;
 
 namespace Axis.WorkflowEngine.Application.Commands.RetryExecution;
 
@@ -12,11 +12,12 @@ public sealed class RetryExecutionHandler(
     IUnitOfWork uow)
     : ICommandHandler<RetryExecutionCommand, Guid>
 {
-    public async Task<Guid> Handle(RetryExecutionCommand command, CancellationToken cancellationToken)
+    public async Task<Result<Guid>> Handle(RetryExecutionCommand command, CancellationToken cancellationToken)
     {
-        WorkflowExecution? original = await execRepo.GetByIdAsync(command.ExecutionId, command.OrganizationId, cancellationToken);
+        WorkflowExecution? original = await execRepo.GetByIdAsync(
+            command.ExecutionId, command.OrganizationId, cancellationToken);
         if (original is null)
-            throw new ValidationException("Execution not found.");
+            return Result.Failure<Guid>(ErrorCodes.NotFound, "Execution not found.");
 
         try
         {
@@ -27,7 +28,7 @@ public sealed class RetryExecutionHandler(
         }
         catch (InvalidOperationException ex)
         {
-            throw new ValidationException(ex.Message);
+            return Result.Failure<Guid>(ErrorCodes.BusinessRule, ex.Message);
         }
     }
 }

@@ -1,10 +1,12 @@
 using Axis.Api.Authorization;
+using Axis.Api.Extensions;
 using Axis.Api.Infrastructure;
 using Axis.DataModeling.Application.Commands.CreateRecord;
 using Axis.DataModeling.Application.Commands.DeleteRecord;
 using Axis.DataModeling.Application.Commands.UpdateRecord;
 using Axis.DataModeling.Application.Queries.GetRecord;
 using Axis.DataModeling.Application.Queries.GetRecords;
+using Axis.Shared.Domain.Primitives;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,7 +16,7 @@ public static class RecordEndpoints
 {
     public static IEndpointRouteBuilder MapRecordEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/models/{modelId:guid}/records")
+        RouteGroupBuilder group = app.MapGroup("/api/models/{modelId:guid}/records")
             .RequireAuthorization();
 
         group.MapGet("/", GetRecords)
@@ -81,9 +83,10 @@ public static class RecordEndpoints
         [FromQuery] int pageSize = 25,
         [FromQuery] string? search = null)
     {
-        var result = await mediator.Send(
+        Result<RecordsPageDto> result = await mediator.Send(
             new GetRecordsQuery(modelId, currentUser.OrgId, page, pageSize, search), ct);
-        return Results.Ok(result);
+        if (result.IsFailure) return result.ToProblemDetails();
+        return Results.Ok(result.Value);
     }
 
     private static async Task<IResult> CreateRecord(
@@ -93,8 +96,10 @@ public static class RecordEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        Guid id = await mediator.Send(new CreateRecordCommand(modelId, currentUser.OrgId, data, currentUser.UserId.ToString()), ct);
-        return Results.Created($"/api/models/{modelId}/records/{id}", new { id });
+        Result<Guid> result = await mediator.Send(
+            new CreateRecordCommand(modelId, currentUser.OrgId, data, currentUser.UserId.ToString()), ct);
+        if (result.IsFailure) return result.ToProblemDetails();
+        return Results.Created($"/api/models/{modelId}/records/{result.Value}", new { id = result.Value });
     }
 
     private static async Task<IResult> GetRecord(
@@ -104,8 +109,10 @@ public static class RecordEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        var result = await mediator.Send(new GetRecordQuery(recordId, modelId, currentUser.OrgId), ct);
-        return result is null ? Results.NotFound() : Results.Ok(result);
+        Result<RecordDto> result = await mediator.Send(
+            new GetRecordQuery(recordId, modelId, currentUser.OrgId), ct);
+        if (result.IsFailure) return result.ToProblemDetails();
+        return Results.Ok(result.Value);
     }
 
     private static async Task<IResult> UpdateRecord(
@@ -116,7 +123,9 @@ public static class RecordEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        await mediator.Send(new UpdateRecordCommand(recordId, modelId, currentUser.OrgId, data), ct);
+        Result result = await mediator.Send(
+            new UpdateRecordCommand(recordId, modelId, currentUser.OrgId, data), ct);
+        if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
 
@@ -127,7 +136,9 @@ public static class RecordEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        await mediator.Send(new DeleteRecordCommand(recordId, modelId, currentUser.OrgId), ct);
+        Result result = await mediator.Send(
+            new DeleteRecordCommand(recordId, modelId, currentUser.OrgId), ct);
+        if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
 }

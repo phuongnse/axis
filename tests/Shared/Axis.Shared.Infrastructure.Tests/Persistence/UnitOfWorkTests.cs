@@ -3,13 +3,15 @@ using Axis.Shared.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
+using Testcontainers.PostgreSql;
 using Wolverine;
 
 namespace Axis.Shared.Infrastructure.Tests.Persistence;
 
-public class UnitOfWorkTests
+public class UnitOfWorkTests : IAsyncLifetime
 {
-    // Minimal in-memory aggregate for testing
+    // ── Test fixtures ──────────────────────────────────────────────────────
+
     private sealed class OrderAggregate : AggregateRoot<Guid>
     {
         public string Name { get; private set; }
@@ -17,18 +19,16 @@ public class UnitOfWorkTests
 
         public static OrderAggregate Create(string name)
         {
-            var agg = new OrderAggregate { Name = name };
+            OrderAggregate agg = new() { Name = name };
             agg.RaiseDomainEvent(new OrderCreatedEvent(agg.Id, name));
             return agg;
         }
 
-        // Expose for tests
         public new void RaiseDomainEvent(IDomainEvent evt) => base.RaiseDomainEvent(evt);
     }
 
     private record OrderCreatedEvent(Guid OrderId, string Name) : IDomainEvent;
 
-    // Minimal in-memory DbContext
     private sealed class TestDbContext : DbContext
     {
         public TestDbContext(DbContextOptions<TestDbContext> options) : base(options) { }
@@ -44,23 +44,47 @@ public class UnitOfWorkTests
         }
     }
 
-    private static TestDbContext BuildInMemoryContext()
+    private sealed class TestUnitOfWork(DbContext ctx, IMessageBus bus) : UnitOfWork(ctx, bus);
+
+    // ── Lifecycle ──────────────────────────────────────────────────────────
+
+    private PostgreSqlContainer _postgres = null!;
+    private TestDbContext _context = null!;
+
+    public async Task InitializeAsync()
     {
-        var options = new DbContextOptionsBuilder<TestDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+        _postgres = new PostgreSqlBuilder().Build();
+        await _postgres.StartAsync();
+
+        DbContextOptions<TestDbContext> options = new DbContextOptionsBuilder<TestDbContext>()
+            .UseNpgsql(_postgres.GetConnectionString())
             .Options;
-        return new TestDbContext(options);
+
+        _context = new TestDbContext(options);
+        await _context.Database.EnsureCreatedAsync();
     }
+
+    public async Task DisposeAsync()
+    {
+        await _context.DisposeAsync();
+        await _postgres.DisposeAsync();
+    }
+
+    private async Task ResetAsync() =>
+        await _context.Database.ExecuteSqlRawAsync(
+            "TRUNCATE TABLE \"Orders\" RESTART IDENTITY CASCADE");
+
+    // ── Tests ──────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task SaveChangesAsync_dispatches_domain_events_raised_by_aggregates()
     {
-        await using var ctx = BuildInMemoryContext();
-        var bus = Substitute.For<IMessageBus>();
-        var uow = new TestUnitOfWork(ctx, bus);
+        await ResetAsync();
+        IMessageBus bus = Substitute.For<IMessageBus>();
+        TestUnitOfWork uow = new(_context, bus);
 
-        var order = OrderAggregate.Create("Widget");
-        await ctx.Orders.AddAsync(order);
+        OrderAggregate order = OrderAggregate.Create("Widget");
+        await _context.Orders.AddAsync(order);
 
         await uow.SaveChangesAsync();
 
@@ -72,12 +96,12 @@ public class UnitOfWorkTests
     [Fact]
     public async Task SaveChangesAsync_clears_domain_events_after_dispatch()
     {
-        await using var ctx = BuildInMemoryContext();
-        var bus = Substitute.For<IMessageBus>();
-        var uow = new TestUnitOfWork(ctx, bus);
+        await ResetAsync();
+        IMessageBus bus = Substitute.For<IMessageBus>();
+        TestUnitOfWork uow = new(_context, bus);
 
-        var order = OrderAggregate.Create("Widget");
-        await ctx.Orders.AddAsync(order);
+        OrderAggregate order = OrderAggregate.Create("Widget");
+        await _context.Orders.AddAsync(order);
 
         await uow.SaveChangesAsync();
 
@@ -87,20 +111,13 @@ public class UnitOfWorkTests
     [Fact]
     public async Task SaveChangesAsync_does_not_dispatch_when_no_events()
     {
-        await using var ctx = BuildInMemoryContext();
-        var bus = Substitute.For<IMessageBus>();
-        var uow = new TestUnitOfWork(ctx, bus);
-
-        // Add without raising events (direct set via EF shadow state isn't possible easily,
-        // so just don't attach any aggregates)
+        await ResetAsync();
+        IMessageBus bus = Substitute.For<IMessageBus>();
+        TestUnitOfWork uow = new(_context, bus);
 
         await uow.SaveChangesAsync();
 
         await bus.DidNotReceive().PublishAsync(
             Arg.Any<object>(), Arg.Any<DeliveryOptions?>());
     }
-
-    // Concrete subclass to test the abstract base
-    private sealed class TestUnitOfWork(DbContext ctx, IMessageBus bus)
-        : UnitOfWork(ctx, bus);
 }

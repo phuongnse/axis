@@ -1,7 +1,8 @@
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
+using Axis.Identity.Domain.Aggregates;
 using Axis.Shared.Application.CQRS;
-using FluentValidation;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Identity.Application.Commands.ChangePassword;
 
@@ -12,23 +13,23 @@ public sealed class ChangePasswordHandler(
     IUnitOfWork uow)
     : ICommandHandler<ChangePasswordCommand>
 {
-    public async Task Handle(ChangePasswordCommand command, CancellationToken cancellationToken)
+    public async Task<Result> Handle(ChangePasswordCommand command, CancellationToken cancellationToken)
     {
-        var user = await userRepo.GetByIdAsync(command.UserId, command.OrganizationId, cancellationToken);
+        User? user = await userRepo.GetByIdAsync(command.UserId, command.OrganizationId, cancellationToken);
         if (user is null)
-            throw new ValidationException("User not found.");
+            return Result.Failure(ErrorCodes.NotFound, "User not found.");
 
         if (!hasher.Verify(command.CurrentPassword, user.PasswordHash ?? string.Empty))
-            throw new ValidationException("Current password is incorrect.");
+            return Result.Failure(ErrorCodes.BusinessRule, "Current password is incorrect.");
 
         if (command.NewPassword != command.PasswordConfirmation)
-            throw new ValidationException("Passwords do not match.");
+            return Result.Failure(ErrorCodes.BusinessRule, "Passwords do not match.");
 
         if (hasher.Verify(command.NewPassword, user.PasswordHash ?? string.Empty))
-            throw new ValidationException("New password must be different from your current password.");
+            return Result.Failure(ErrorCodes.BusinessRule, "New password must be different from your current password.");
 
         if (!IsStrongPassword(command.NewPassword))
-            throw new ValidationException(
+            return Result.Failure(ErrorCodes.BusinessRule,
                 "Password must be at least 8 characters and contain at least one letter and one number.");
 
         user.SetPasswordHash(hasher.Hash(command.NewPassword));
@@ -44,6 +45,8 @@ public sealed class ChangePasswordHandler(
         {
             // Logged separately at infrastructure level — intentionally swallowed here
         }
+
+        return Result.Success();
     }
 
     private static bool IsStrongPassword(string password) =>

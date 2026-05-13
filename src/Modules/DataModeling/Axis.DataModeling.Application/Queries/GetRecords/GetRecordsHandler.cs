@@ -1,6 +1,7 @@
 using Axis.DataModeling.Application.Repositories;
+using Axis.DataModeling.Domain.Aggregates;
 using Axis.Shared.Application.CQRS;
-using FluentValidation;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Queries.GetRecords;
 
@@ -8,18 +9,18 @@ namespace Axis.DataModeling.Application.Queries.GetRecords;
 public sealed class GetRecordsHandler(
     IDataModelRepository modelRepo,
     IDataRecordRepository recordRepo)
-    : IQueryHandler<GetRecordsQuery, RecordsPageDto>
+    : IQueryHandler<GetRecordsQuery, Result<RecordsPageDto>>
 {
-    public async Task<RecordsPageDto> Handle(GetRecordsQuery query, CancellationToken cancellationToken)
+    public async Task<Result<RecordsPageDto>> Handle(GetRecordsQuery query, CancellationToken cancellationToken)
     {
-        var model = await modelRepo.GetByIdAsync(query.ModelId, query.OrganizationId, cancellationToken);
+        DataModel? model = await modelRepo.GetByIdAsync(query.ModelId, query.OrganizationId, cancellationToken);
         if (model is null)
-            throw new ValidationException("Model not found.");
+            return Result.Failure<RecordsPageDto>(ErrorCodes.NotFound, "Model not found.");
 
-        var page = Math.Max(1, query.Page);
-        var pageSize = Math.Clamp(query.PageSize, 1, 100);
+        int page = Math.Max(1, query.Page);
+        int pageSize = Math.Clamp(query.PageSize, 1, 100);
 
-        var (records, total) = await recordRepo.GetPagedAsync(
+        (IReadOnlyList<DataRecord> records, int total) = await recordRepo.GetPagedAsync(
             query.ModelId, query.OrganizationId,
             page, pageSize,
             query.Search,

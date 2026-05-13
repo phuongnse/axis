@@ -1,7 +1,8 @@
 using Axis.DataModeling.Application.Repositories;
 using Axis.DataModeling.Application.Services;
+using Axis.DataModeling.Domain.Aggregates;
 using Axis.Shared.Application.CQRS;
-using FluentValidation;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Commands.UpdateRecord;
 
@@ -11,15 +12,16 @@ public sealed class UpdateRecordHandler(
     IUnitOfWork uow)
     : ICommandHandler<UpdateRecordCommand>
 {
-    public async Task Handle(UpdateRecordCommand command, CancellationToken cancellationToken)
+    public async Task<Result> Handle(UpdateRecordCommand command, CancellationToken cancellationToken)
     {
-        var record = await recordRepo.GetByIdAsync(
+        DataRecord? record = await recordRepo.GetByIdAsync(
             command.RecordId, command.ModelId, command.OrganizationId, cancellationToken);
 
         if (record is null)
-            throw new ValidationException("Record not found.");
+            return Result.Failure(ErrorCodes.NotFound, "Record not found.");
 
         record.Update(command.Data);
         await uow.SaveChangesAsync(cancellationToken);
+        return Result.Success();
     }
 }

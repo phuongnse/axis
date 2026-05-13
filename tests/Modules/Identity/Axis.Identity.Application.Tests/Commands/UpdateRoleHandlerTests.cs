@@ -2,8 +2,8 @@ using Axis.Identity.Application.Commands.UpdateRole;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
-using FluentValidation;
 using NSubstitute;
 using NSubstitute.ReturnsExtensions;
 
@@ -28,51 +28,55 @@ public class UpdateRoleHandlerTests
     [Fact]
     public async Task Happy_path_updates_role()
     {
-        var role = Role.Create("Manager", null, OrgId, ["workflow:definition:read"]);
+        Role role = Role.Create("Manager", null, OrgId, ["workflow:definition:read"]);
         _roleRepo.GetByIdAsync(RoleId, OrgId).Returns(role);
         _roleRepo.NameExistsAsync("Senior Manager", OrgId, role.Id).Returns(false);
 
-        await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
+        Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
+        result.IsSuccess.Should().BeTrue();
         role.Name.Should().Be("Senior Manager");
         role.Description.Should().Be("Updated");
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task System_role_cannot_be_updated()
+    public async Task System_role_cannot_be_updated_returns_business_rule_failure()
     {
-        var systemRole = Role.CreateSystem("Admin", OrgId, ["users:read"]);
+        Role systemRole = Role.CreateSystem("Admin", OrgId, ["users:read"]);
         _roleRepo.GetByIdAsync(RoleId, OrgId).Returns(systemRole);
 
-        var act = async () => await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
+        Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
         // US-023: system roles cannot be edited
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*system role*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.Error.Should().Contain("system role");
     }
 
     [Fact]
-    public async Task Duplicate_name_throws_validation_exception()
+    public async Task Duplicate_name_returns_conflict()
     {
-        var role = Role.Create("Manager", null, OrgId, ["workflow:definition:read"]);
+        Role role = Role.Create("Manager", null, OrgId, ["workflow:definition:read"]);
         _roleRepo.GetByIdAsync(RoleId, OrgId).Returns(role);
         _roleRepo.NameExistsAsync("Senior Manager", OrgId, role.Id).Returns(true);
 
-        var act = async () => await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
+        Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*already exists*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.Conflict);
+        result.Error.Should().Contain("already exists");
     }
 
     [Fact]
-    public async Task Role_not_found_throws_validation_exception()
+    public async Task Role_not_found_returns_not_found()
     {
         _roleRepo.GetByIdAsync(RoleId, OrgId).ReturnsNull();
 
-        var act = async () => await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
+        Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*not found*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        result.Error.Should().Contain("not found");
     }
 }

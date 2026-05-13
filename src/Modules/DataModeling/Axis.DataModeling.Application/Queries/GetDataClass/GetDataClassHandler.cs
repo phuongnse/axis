@@ -1,17 +1,20 @@
 using Axis.DataModeling.Application.Queries.GetModel;
 using Axis.DataModeling.Application.Repositories;
+using Axis.DataModeling.Domain.Aggregates;
 using Axis.Shared.Application.CQRS;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Queries.GetDataClass;
 
 /// <summary>US-039: Loads a data class with its complete field list.</summary>
 public sealed class GetDataClassHandler(IDataClassRepository dataClassRepo)
-    : IQueryHandler<GetDataClassQuery, DataClassDetailDto?>
+    : IQueryHandler<GetDataClassQuery, Result<DataClassDetailDto>>
 {
-    public async Task<DataClassDetailDto?> Handle(GetDataClassQuery query, CancellationToken cancellationToken)
+    public async Task<Result<DataClassDetailDto>> Handle(GetDataClassQuery query, CancellationToken cancellationToken)
     {
-        var dc = await dataClassRepo.GetByIdAsync(query.DataClassId, query.OrganizationId, cancellationToken);
-        if (dc is null) return null;
+        DataClass? dc = await dataClassRepo.GetByIdAsync(query.DataClassId, query.OrganizationId, cancellationToken);
+        if (dc is null)
+            return Result.Failure<DataClassDetailDto>(ErrorCodes.NotFound, "Data class not found.");
 
         return new DataClassDetailDto(
             dc.Id,

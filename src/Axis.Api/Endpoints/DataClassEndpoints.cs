@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Axis.Api.Authorization;
+using Axis.Api.Extensions;
 using Axis.Api.Infrastructure;
 using Axis.DataModeling.Application.Commands.AddFieldToDataClass;
 using Axis.DataModeling.Application.Commands.CreateDataClass;
@@ -9,6 +10,9 @@ using Axis.DataModeling.Application.Commands.UpdateDataClass;
 using Axis.DataModeling.Application.Queries.GetDataClass;
 using Axis.DataModeling.Application.Queries.GetDataClasses;
 using Axis.DataModeling.Domain.Enums;
+using Axis.DataModeling.Domain.ValueObjects;
+using Axis.Shared.Application;
+using Axis.Shared.Domain.Primitives;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,7 +22,7 @@ public static class DataClassEndpoints
 {
     public static IEndpointRouteBuilder MapDataClassEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/data-classes")
+        RouteGroupBuilder group = app.MapGroup("/api/data-classes")
             .RequireAuthorization();
 
         group.MapGet("/", GetDataClasses)
@@ -104,7 +108,8 @@ public static class DataClassEndpoints
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        var result = await mediator.Send(new GetDataClassesQuery(currentUser.OrgId, page, pageSize), ct);
+        PagedResult<DataClassSummaryDto> result = await mediator.Send(
+            new GetDataClassesQuery(currentUser.OrgId, page, pageSize), ct);
         return Results.Ok(result);
     }
 
@@ -114,13 +119,14 @@ public static class DataClassEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        Guid id = await mediator.Send(new CreateDataClassCommand(
+        Result<Guid> result = await mediator.Send(new CreateDataClassCommand(
             request.Name,
             request.Description,
             currentUser.OrgId,
             currentUser.UserId.ToString()), ct);
 
-        return Results.Created($"/api/data-classes/{id}", new { id });
+        if (result.IsFailure) return result.ToProblemDetails();
+        return Results.Created($"/api/data-classes/{result.Value}", new { id = result.Value });
     }
 
     private static async Task<IResult> GetDataClass(
@@ -129,8 +135,10 @@ public static class DataClassEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        var result = await mediator.Send(new GetDataClassQuery(dataClassId, currentUser.OrgId), ct);
-        return result is null ? Results.NotFound() : Results.Ok(result);
+        Result<DataClassDetailDto> result = await mediator.Send(
+            new GetDataClassQuery(dataClassId, currentUser.OrgId), ct);
+        if (result.IsFailure) return result.ToProblemDetails();
+        return Results.Ok(result.Value);
     }
 
     private static async Task<IResult> UpdateDataClass(
@@ -140,12 +148,13 @@ public static class DataClassEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        await mediator.Send(new UpdateDataClassCommand(
+        Result result = await mediator.Send(new UpdateDataClassCommand(
             dataClassId,
             currentUser.OrgId,
             request.Name,
             request.Description), ct);
 
+        if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
 
@@ -155,7 +164,8 @@ public static class DataClassEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        await mediator.Send(new DeleteDataClassCommand(dataClassId, currentUser.OrgId), ct);
+        Result result = await mediator.Send(new DeleteDataClassCommand(dataClassId, currentUser.OrgId), ct);
+        if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
 
@@ -166,8 +176,8 @@ public static class DataClassEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        var config = FieldConfigHelper.Deserialize(request.Type, request.Config);
-        var fieldId = await mediator.Send(new AddFieldToDataClassCommand(
+        FieldConfig config = FieldConfigHelper.Deserialize(request.Type, request.Config);
+        Result<Guid> result = await mediator.Send(new AddFieldToDataClassCommand(
             dataClassId,
             currentUser.OrgId,
             request.Name,
@@ -176,7 +186,8 @@ public static class DataClassEndpoints
             request.IsRequired,
             config), ct);
 
-        return Results.Created($"/api/data-classes/{dataClassId}/fields/{fieldId}", new { id = fieldId });
+        if (result.IsFailure) return result.ToProblemDetails();
+        return Results.Created($"/api/data-classes/{dataClassId}/fields/{result.Value}", new { id = result.Value });
     }
 
     private static async Task<IResult> RemoveField(
@@ -186,7 +197,9 @@ public static class DataClassEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        await mediator.Send(new RemoveFieldFromDataClassCommand(dataClassId, fieldId, currentUser.OrgId), ct);
+        Result result = await mediator.Send(
+            new RemoveFieldFromDataClassCommand(dataClassId, fieldId, currentUser.OrgId), ct);
+        if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
 }

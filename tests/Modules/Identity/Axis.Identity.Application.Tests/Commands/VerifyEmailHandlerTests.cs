@@ -3,8 +3,8 @@ using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.ValueObjects;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
-using FluentValidation;
 using NSubstitute;
 using NSubstitute.ReturnsExtensions;
 
@@ -21,7 +21,7 @@ public class VerifyEmailHandlerTests
 
     private static User MakeUnverifiedUser()
     {
-        var user = User.Create("Alice", "Smith", Email.Create("alice@acme.com").Value, OrgId);
+        User user = User.Create("Alice", "Smith", Email.Create("alice@acme.com").Value, OrgId);
         user.SetPasswordHash("hashed");
         return user;
     }
@@ -29,54 +29,58 @@ public class VerifyEmailHandlerTests
     [Fact]
     public async Task Happy_path_verifies_email()
     {
-        var user = MakeUnverifiedUser();
+        User user = MakeUnverifiedUser();
         _userRepo.GetByIdPlatformWideAsync(user.Id).Returns(user);
 
-        await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new VerifyEmailCommand(user.Id.ToString()),
             CancellationToken.None);
 
+        result.IsSuccess.Should().BeTrue();
         user.IsEmailVerified.Should().BeTrue();
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Invalid_token_format_throws_validation_exception()
+    public async Task Invalid_token_format_returns_business_rule_failure()
     {
-        var act = async () => await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new VerifyEmailCommand("not-a-guid"),
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*Invalid verification link*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.Error.Should().Contain("Invalid verification link");
     }
 
     [Fact]
-    public async Task Token_not_found_throws_validation_exception()
+    public async Task Token_not_found_returns_business_rule_failure()
     {
         _userRepo.GetByIdPlatformWideAsync(Arg.Any<Guid>()).ReturnsNull();
 
-        var act = async () => await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new VerifyEmailCommand(Guid.NewGuid().ToString()),
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*Invalid verification link*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.Error.Should().Contain("Invalid verification link");
     }
 
     [Fact]
-    public async Task Already_verified_throws_validation_exception()
+    public async Task Already_verified_returns_business_rule_failure()
     {
-        var user = MakeUnverifiedUser();
+        User user = MakeUnverifiedUser();
         user.VerifyEmail();
         _userRepo.GetByIdPlatformWideAsync(user.Id).Returns(user);
 
-        var act = async () => await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new VerifyEmailCommand(user.Id.ToString()),
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*already been used*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.Error.Should().Contain("already been used");
     }
 }
 
@@ -92,7 +96,7 @@ public class ResendVerificationEmailHandlerTests
 
     private static User MakeUnverifiedUser(string email = "alice@acme.com")
     {
-        var user = User.Create("Alice", "Smith", Email.Create(email).Value, OrgId);
+        User user = User.Create("Alice", "Smith", Email.Create(email).Value, OrgId);
         user.SetPasswordHash("hashed");
         return user;
     }
@@ -100,7 +104,7 @@ public class ResendVerificationEmailHandlerTests
     [Fact]
     public async Task Happy_path_resends_verification_email()
     {
-        var user = MakeUnverifiedUser();
+        User user = MakeUnverifiedUser();
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).Returns(user);
 
         await CreateHandler().Handle(
@@ -117,7 +121,7 @@ public class ResendVerificationEmailHandlerTests
         // Per US-002: same behavior regardless of whether email exists
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).ReturnsNull();
 
-        var act = async () => await CreateHandler().Handle(
+        Func<Task> act = async () => await CreateHandler().Handle(
             new ResendVerificationEmailCommand("unknown@acme.com"),
             CancellationToken.None);
 
@@ -129,7 +133,7 @@ public class ResendVerificationEmailHandlerTests
     [Fact]
     public async Task Already_verified_does_nothing()
     {
-        var user = MakeUnverifiedUser();
+        User user = MakeUnverifiedUser();
         user.VerifyEmail();
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).Returns(user);
 

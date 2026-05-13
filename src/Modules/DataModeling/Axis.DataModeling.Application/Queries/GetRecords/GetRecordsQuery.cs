@@ -1,4 +1,5 @@
 using Axis.Shared.Application.CQRS;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Queries.GetRecords;
 
@@ -8,4 +9,4 @@ public sealed record GetRecordsQuery(
     Guid OrganizationId,
     int Page = 1,
     int PageSize = 25,
-    string? Search = null) : IQuery<RecordsPageDto>;
+    string? Search = null) : IQuery<Result<RecordsPageDto>>;

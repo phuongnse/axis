@@ -1,7 +1,8 @@
 using Axis.DataModeling.Application.Repositories;
 using Axis.DataModeling.Application.Services;
+using Axis.DataModeling.Domain.Aggregates;
 using Axis.Shared.Application.CQRS;
-using FluentValidation;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Commands.DeleteDataClass;
 
@@ -11,18 +12,19 @@ public sealed class DeleteDataClassHandler(
     IUnitOfWork uow)
     : ICommandHandler<DeleteDataClassCommand>
 {
-    public async Task Handle(DeleteDataClassCommand command, CancellationToken cancellationToken)
+    public async Task<Result> Handle(DeleteDataClassCommand command, CancellationToken cancellationToken)
     {
-        var dc = await dataClassRepo.GetByIdAsync(command.DataClassId, command.OrganizationId, cancellationToken);
+        DataClass? dc = await dataClassRepo.GetByIdAsync(command.DataClassId, command.OrganizationId, cancellationToken);
         if (dc is null)
-            throw new ValidationException("Data class not found.");
+            return Result.Failure(ErrorCodes.NotFound, "Data class not found.");
 
         // US-040: cannot delete while referenced by a model field
         if (await dataClassRepo.IsReferencedByAnyModelAsync(command.DataClassId, cancellationToken))
-            throw new ValidationException(
+            return Result.Failure(ErrorCodes.Conflict,
                 "This data class is still referenced by one or more model fields. Remove those fields first.");
 
         dc.Delete();
         await uow.SaveChangesAsync(cancellationToken);
+        return Result.Success();
     }
 }

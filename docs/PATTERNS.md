@@ -985,8 +985,8 @@ Add to `Directory.Packages.props`:
 
 ```xml
 <ItemGroup Label="API">
-  <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="9.0.5" />
-  <PackageVersion Include="Scalar.AspNetCore" Version="2.5.10" />
+  <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="8.0.11" />
+  <PackageVersion Include="Scalar.AspNetCore" Version="2.6.0" />
 </ItemGroup>
 ```
 

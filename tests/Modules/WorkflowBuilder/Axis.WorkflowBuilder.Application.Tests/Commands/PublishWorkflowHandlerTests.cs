@@ -1,10 +1,10 @@
+using Axis.Shared.Domain.Primitives;
 using Axis.WorkflowBuilder.Application.Commands.PublishWorkflow;
 using Axis.WorkflowBuilder.Application.Repositories;
 using Axis.WorkflowBuilder.Application.Services;
 using Axis.WorkflowBuilder.Domain.Aggregates;
 using Axis.WorkflowBuilder.Domain.Enums;
 using FluentAssertions;
-using FluentValidation;
 using NSubstitute;
 using NSubstitute.ReturnsExtensions;
 
@@ -24,9 +24,9 @@ public class PublishWorkflowHandlerTests
     {
         WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, OrgId, UserId);
         wf.AddTrigger(TriggerType.Manual, null);
-        var formStep = wf.AddStep("Review", StepType.Form, null);
-        var startStep = wf.Steps.Single(s => s.Type == StepType.Start);
-        var endStep = wf.Steps.Single(s => s.Type == StepType.End);
+        Domain.Entities.WorkflowStep formStep = wf.AddStep("Review", StepType.Form, null);
+        Domain.Entities.WorkflowStep startStep = wf.Steps.Single(s => s.Type == StepType.Start);
+        Domain.Entities.WorkflowStep endStep = wf.Steps.Single(s => s.Type == StepType.End);
         wf.AddTransition(startStep.Id, formStep.Id, null);
         wf.AddTransition(formStep.Id, endStep.Id, null);
         return wf;
@@ -35,39 +35,44 @@ public class PublishWorkflowHandlerTests
     [Fact]
     public async Task Happy_path_publishes_workflow()
     {
-        var wf = MakePublishableWorkflow();
+        WorkflowDefinition wf = MakePublishableWorkflow();
         _workflowRepo.GetByIdAsync(wf.Id, OrgId).Returns(wf);
 
-        await CreateHandler().Handle(new PublishWorkflowCommand(wf.Id, OrgId), CancellationToken.None);
+        Result result = await CreateHandler().Handle(new PublishWorkflowCommand(wf.Id, OrgId), CancellationToken.None);
 
+        result.IsSuccess.Should().BeTrue();
         wf.Status.Should().Be(WorkflowStatus.Active);
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Workflow_not_found_throws_validation_exception()
+    public async Task Workflow_not_found_returns_not_found()
     {
         _workflowRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).ReturnsNull();
 
-        var act = async () => await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new PublishWorkflowCommand(Guid.NewGuid(), OrgId),
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>().WithMessage("*not found*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        result.Error.Should().Contain("not found");
     }
 
     [Fact]
-    public async Task Workflow_without_triggers_throws_on_publish()
+    public async Task Workflow_without_triggers_returns_business_rule_failure_on_publish()
     {
         WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, OrgId, UserId);
         // No trigger added — should fail domain validation
-        var formStep = wf.AddStep("Review", StepType.Form, null);
+        wf.AddStep("Review", StepType.Form, null);
         _workflowRepo.GetByIdAsync(wf.Id, OrgId).Returns(wf);
 
-        var act = async () => await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new PublishWorkflowCommand(wf.Id, OrgId),
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>().WithMessage("*trigger*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.Error.Should().Contain("trigger");
     }
 }

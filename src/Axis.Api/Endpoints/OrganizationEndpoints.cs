@@ -1,7 +1,9 @@
 using Axis.Api.Authorization;
+using Axis.Api.Extensions;
 using Axis.Api.Infrastructure;
 using Axis.Identity.Application.Commands.InviteUser;
 using Axis.Identity.Application.Commands.RegisterOrganization;
+using Axis.Shared.Domain.Primitives;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,7 +13,7 @@ public static class OrganizationEndpoints
 {
     public static IEndpointRouteBuilder MapOrganizationEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/organizations");
+        RouteGroupBuilder group = app.MapGroup("/api/organizations");
 
         group.MapPost("/", Register)
             .WithName("RegisterOrganization")
@@ -30,6 +32,7 @@ public static class OrganizationEndpoints
             .ProducesProblem(400)
             .ProducesProblem(401)
             .ProducesProblem(403)
+            .ProducesProblem(409)
             .ProducesProblem(422);
 
         return app;
@@ -48,6 +51,7 @@ public static class OrganizationEndpoints
             request.Password,
             request.PasswordConfirmation), ct);
 
+        // Per US-001: always return the same success screen — no email-existence leakage
         return Results.Ok(new
         {
             message = "Registration successful. Please check your email to verify your account.",
@@ -61,18 +65,15 @@ public static class OrganizationEndpoints
         CancellationToken ct)
     {
         if (string.Equals(request.Email, currentUser.Email, StringComparison.OrdinalIgnoreCase))
-            return Results.UnprocessableEntity(new
-            {
-                error = "validation_failed",
-                errors = new { email = new[] { "You cannot invite yourself." } },
-            });
+            return Results.Problem("You cannot invite yourself.", statusCode: StatusCodes.Status422UnprocessableEntity);
 
-        await mediator.Send(new InviteUserCommand(
+        Result result = await mediator.Send(new InviteUserCommand(
             currentUser.OrgId,
             request.Email,
             request.RoleId,
             currentUser.UserId), ct);
 
+        if (result.IsFailure) return result.ToProblemDetails();
         return Results.Ok(new { message = $"Invitation sent to {request.Email}." });
     }
 }

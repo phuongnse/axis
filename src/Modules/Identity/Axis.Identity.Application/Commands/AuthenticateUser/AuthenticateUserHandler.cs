@@ -3,7 +3,7 @@ using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.ValueObjects;
 using Axis.Shared.Application.CQRS;
-using FluentValidation;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Identity.Application.Commands.AuthenticateUser;
 
@@ -14,14 +14,14 @@ public sealed class AuthenticateUserHandler(
     IUnitOfWork uow)
     : ICommandHandler<AuthenticateUserCommand, AuthenticationResult>
 {
-    public async Task<AuthenticationResult> Handle(
+    public async Task<Result<AuthenticationResult>> Handle(
         AuthenticateUserCommand command, CancellationToken cancellationToken)
     {
-        var email = Email.Create(command.Email);
-        if (email.IsFailure)
-            throw new ValidationException("Invalid email format.");
+        Result<Email> emailResult = Email.Create(command.Email);
+        if (emailResult.IsFailure)
+            return AuthenticationResult.Fail(AuthFailureReason.InvalidCredentials);
 
-        var user = await userRepo.FindByEmailGloballyAsync(email.Value, cancellationToken);
+        User? user = await userRepo.FindByEmailGloballyAsync(emailResult.Value, cancellationToken);
         if (user is null)
             return AuthenticationResult.Fail(AuthFailureReason.InvalidCredentials);
 
@@ -44,8 +44,8 @@ public sealed class AuthenticateUserHandler(
         user.ResetFailedLogins();
         await uow.SaveChangesAsync(cancellationToken);
 
-        var roles = await roleRepo.GetByIdsAsync(user.RoleIds, user.OrganizationId, cancellationToken);
-        var permissions = roles
+        IReadOnlyList<Role> roles = await roleRepo.GetByIdsAsync(user.RoleIds, user.OrganizationId, cancellationToken);
+        List<string> permissions = roles
             .SelectMany(r => r.Permissions)
             .Distinct()
             .ToList();

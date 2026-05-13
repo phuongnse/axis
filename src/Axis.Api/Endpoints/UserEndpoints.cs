@@ -1,4 +1,5 @@
 using Axis.Api.Authorization;
+using Axis.Api.Extensions;
 using Axis.Api.Infrastructure;
 using Axis.Identity.Application.Commands.AssignRoleToUser;
 using Axis.Identity.Application.Commands.ChangePassword;
@@ -9,6 +10,7 @@ using Axis.Identity.Application.Queries.GetUserSessions;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
+using Axis.Shared.Domain.Primitives;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,7 +20,7 @@ public static class UserEndpoints
 {
     public static IEndpointRouteBuilder MapUserEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/users").RequireAuthorization();
+        RouteGroupBuilder group = app.MapGroup("/api/users").RequireAuthorization();
 
         group.MapGet("/me", GetMe)
             .WithName("GetMe")
@@ -34,7 +36,8 @@ public static class UserEndpoints
             .WithTags("Identity")
             .Produces(204)
             .ProducesProblem(400)
-            .ProducesProblem(401);
+            .ProducesProblem(401)
+            .ProducesProblem(422);
 
         group.MapPost("/me/change-password", ChangePassword)
             .WithName("ChangePassword")
@@ -42,7 +45,8 @@ public static class UserEndpoints
             .WithTags("Identity")
             .Produces(204)
             .ProducesProblem(400)
-            .ProducesProblem(401);
+            .ProducesProblem(401)
+            .ProducesProblem(422);
 
         group.MapGet("/me/sessions", GetSessions)
             .WithName("GetUserSessions")
@@ -95,7 +99,7 @@ public static class UserEndpoints
         IUserRepository userRepository,
         CancellationToken ct)
     {
-        var user = await userRepository.GetByIdPlatformWideAsync(currentUser.UserId, ct);
+        User? user = await userRepository.GetByIdPlatformWideAsync(currentUser.UserId, ct);
         if (user is null) return Results.NotFound();
 
         return Results.Ok(new
@@ -127,7 +131,7 @@ public static class UserEndpoints
             avatarContentType = request.AvatarContentType ?? "image/jpeg";
         }
 
-        await mediator.Send(new UpdateUserProfileCommand(
+        Result result = await mediator.Send(new UpdateUserProfileCommand(
             currentUser.UserId,
             currentUser.OrgId,
             request.FirstName,
@@ -135,6 +139,7 @@ public static class UserEndpoints
             avatarBytes,
             avatarContentType), ct);
 
+        if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
 
@@ -144,13 +149,14 @@ public static class UserEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        await mediator.Send(new ChangePasswordCommand(
+        Result result = await mediator.Send(new ChangePasswordCommand(
             currentUser.UserId,
             currentUser.OrgId,
             request.CurrentPassword,
             request.NewPassword,
             request.ConfirmPassword), ct);
 
+        if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
 
@@ -159,7 +165,7 @@ public static class UserEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        var sessions = await mediator.Send(
+        IReadOnlyList<UserSession> sessions = await mediator.Send(
             new GetUserSessionsQuery(currentUser.UserId, currentUser.RefreshTokenId ?? string.Empty), ct);
 
         return Results.Ok(sessions.Select(s => new
@@ -178,7 +184,8 @@ public static class UserEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        await mediator.Send(new RevokeSessionCommand(sessionId, currentUser.UserId), ct);
+        Result result = await mediator.Send(new RevokeSessionCommand(sessionId, currentUser.UserId), ct);
+        if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
 
@@ -188,7 +195,8 @@ public static class UserEndpoints
         HttpContext httpContext,
         CancellationToken ct)
     {
-        await mediator.Send(new RevokeSessionCommand(null, currentUser.UserId), ct);
+        Result result = await mediator.Send(new RevokeSessionCommand(null, currentUser.UserId), ct);
+        if (result.IsFailure) return result.ToProblemDetails();
         httpContext.Response.Cookies.Delete("refresh_token",
             new CookieOptions { Path = "/api/auth" });
         return Results.NoContent();
@@ -204,28 +212,26 @@ public static class UserEndpoints
         CancellationToken ct)
     {
         if (userId == currentUser.UserId)
-            return Results.UnprocessableEntity(new
-            {
-                error = "validation_failed",
-                errors = new { user_id = new[] { "You cannot deactivate yourself." } },
-            });
+            return Results.Problem("You cannot deactivate yourself.", statusCode: StatusCodes.Status422UnprocessableEntity);
 
         if (!request.IsActive)
         {
             // DeactivateUserCommand enforces a last-admin guard: it rejects deactivation if
             // the target user is the last remaining Admin in the org. Passing adminRoleId
             // lets the handler check without querying the role table again.
-            var adminRole = await roleRepository.GetByNameAsync("Admin", currentUser.OrgId, ct);
-            var adminRoleId = adminRole?.Id ?? Guid.Empty;
+            Role? adminRole = await roleRepository.GetByNameAsync("Admin", currentUser.OrgId, ct);
+            Guid adminRoleId = adminRole?.Id ?? Guid.Empty;
 
-            await mediator.Send(new DeactivateUserCommand(
+            Result deactivateResult = await mediator.Send(new DeactivateUserCommand(
                 userId, currentUser.OrgId, currentUser.UserId, adminRoleId), ct);
+
+            if (deactivateResult.IsFailure) return deactivateResult.ToProblemDetails();
 
             await refreshTokenStore.RevokeAllForUserAsync(userId, ct);
         }
         else
         {
-            return Results.Json(new { error = "reactivation_not_implemented" }, statusCode: 501);
+            return Results.Problem("Reactivation is not yet implemented.", statusCode: StatusCodes.Status501NotImplemented);
         }
 
         return Results.NoContent();
@@ -238,12 +244,13 @@ public static class UserEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        await mediator.Send(new AssignRoleToUserCommand(
+        Result result = await mediator.Send(new AssignRoleToUserCommand(
             userId,
             currentUser.OrgId,
             request.RoleId,
             request.Action == "assign" ? RoleAction.Assign : RoleAction.Remove), ct);
 
+        if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
 }

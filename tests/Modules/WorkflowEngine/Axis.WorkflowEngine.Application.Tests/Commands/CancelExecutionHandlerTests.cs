@@ -1,10 +1,10 @@
+using Axis.Shared.Domain.Primitives;
 using Axis.WorkflowEngine.Application.Commands.CancelExecution;
 using Axis.WorkflowEngine.Application.Repositories;
 using Axis.WorkflowEngine.Application.Services;
 using Axis.WorkflowEngine.Domain.Aggregates;
 using Axis.WorkflowEngine.Domain.Enums;
 using FluentAssertions;
-using FluentValidation;
 using NSubstitute;
 using NSubstitute.ReturnsExtensions;
 
@@ -22,7 +22,7 @@ public class CancelExecutionHandlerTests
 
     private static WorkflowExecution MakeRunningExecution()
     {
-        var exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, null, new Dictionary<string, object?>());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, null, new Dictionary<string, object?>());
         exec.Start();
         return exec;
     }
@@ -30,36 +30,41 @@ public class CancelExecutionHandlerTests
     [Fact]
     public async Task Happy_path_cancels_a_running_execution()
     {
-        var exec = MakeRunningExecution();
+        WorkflowExecution exec = MakeRunningExecution();
         _execRepo.GetByIdAsync(exec.Id, OrgId).Returns(exec);
 
-        await CreateHandler().Handle(new CancelExecutionCommand(exec.Id, OrgId), CancellationToken.None);
+        Result result = await CreateHandler().Handle(new CancelExecutionCommand(exec.Id, OrgId), CancellationToken.None);
 
+        result.IsSuccess.Should().BeTrue();
         exec.Status.Should().Be(ExecutionStatus.Cancelled);
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Execution_not_found_throws_validation_exception()
+    public async Task Execution_not_found_returns_not_found()
     {
         _execRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).ReturnsNull();
 
-        var act = async () => await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new CancelExecutionCommand(Guid.NewGuid(), OrgId), CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>().WithMessage("*not found*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        result.Error.Should().Contain("not found");
     }
 
     [Fact]
-    public async Task Cancelling_a_completed_execution_throws_validation_exception()
+    public async Task Cancelling_a_completed_execution_returns_business_rule_failure()
     {
-        var exec = MakeRunningExecution();
+        WorkflowExecution exec = MakeRunningExecution();
         exec.Complete();
         _execRepo.GetByIdAsync(exec.Id, OrgId).Returns(exec);
 
-        var act = async () => await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new CancelExecutionCommand(exec.Id, OrgId), CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>().WithMessage("*cancel*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.Error.Should().Contain("cancel");
     }
 }

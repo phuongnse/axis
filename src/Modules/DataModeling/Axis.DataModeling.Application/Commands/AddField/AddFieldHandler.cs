@@ -1,7 +1,9 @@
 using Axis.DataModeling.Application.Repositories;
 using Axis.DataModeling.Application.Services;
+using Axis.DataModeling.Domain.Aggregates;
+using Axis.DataModeling.Domain.Entities;
 using Axis.Shared.Application.CQRS;
-using FluentValidation;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Commands.AddField;
 
@@ -11,25 +13,25 @@ public sealed class AddFieldHandler(
     IUnitOfWork uow)
     : ICommandHandler<AddFieldCommand, Guid>
 {
-    public async Task<Guid> Handle(AddFieldCommand command, CancellationToken cancellationToken)
+    public async Task<Result<Guid>> Handle(AddFieldCommand command, CancellationToken cancellationToken)
     {
-        var model = await modelRepo.GetByIdAsync(command.ModelId, command.OrganizationId, cancellationToken);
+        DataModel? model = await modelRepo.GetByIdAsync(command.ModelId, command.OrganizationId, cancellationToken);
         if (model is null)
-            throw new ValidationException("Model not found.");
+            return Result.Failure<Guid>(ErrorCodes.NotFound, "Model not found.");
 
         try
         {
-            var field = model.AddField(command.Name, command.Label, command.Type, command.IsRequired, command.Config);
+            FieldDefinition field = model.AddField(command.Name, command.Label, command.Type, command.IsRequired, command.Config);
             await uow.SaveChangesAsync(cancellationToken);
             return field.Id;
         }
         catch (InvalidOperationException ex)
         {
-            throw new ValidationException(ex.Message);
+            return Result.Failure<Guid>(ErrorCodes.BusinessRule, ex.Message);
         }
         catch (ArgumentException ex)
         {
-            throw new ValidationException(ex.Message);
+            return Result.Failure<Guid>(ErrorCodes.BusinessRule, ex.Message);
         }
     }
 }

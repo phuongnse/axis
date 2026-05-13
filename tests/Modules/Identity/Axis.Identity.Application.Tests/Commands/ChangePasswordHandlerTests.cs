@@ -3,8 +3,8 @@ using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.ValueObjects;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
-using FluentValidation;
 using NSubstitute;
 using NSubstitute.ReturnsExtensions;
 
@@ -24,7 +24,7 @@ public class ChangePasswordHandlerTests
 
     private static User MakeUser()
     {
-        var user = User.Create("Alice", "Smith", Email.Create("alice@acme.com").Value, OrgId);
+        User user = User.Create("Alice", "Smith", Email.Create("alice@acme.com").Value, OrgId);
         user.SetPasswordHash("old_hash");
         user.VerifyEmail();
         return user;
@@ -33,15 +33,16 @@ public class ChangePasswordHandlerTests
     [Fact]
     public async Task Happy_path_changes_password_and_sends_notification()
     {
-        var user = MakeUser();
+        User user = MakeUser();
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
         _hasher.Verify("OldPass1", "old_hash").Returns(true);
         _hasher.Hash("NewPass1").Returns("new_hash");
 
-        await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new ChangePasswordCommand(user.Id, OrgId, "OldPass1", "NewPass1", "NewPass1"),
             CancellationToken.None);
 
+        result.IsSuccess.Should().BeTrue();
         user.PasswordHash.Should().Be("new_hash");
         await _emailSender.Received(1).SendPasswordChangedNotificationAsync(
             "alice@acme.com", Arg.Any<CancellationToken>());
@@ -49,74 +50,79 @@ public class ChangePasswordHandlerTests
     }
 
     [Fact]
-    public async Task Wrong_current_password_throws_validation_exception()
+    public async Task Wrong_current_password_returns_business_rule_failure()
     {
-        var user = MakeUser();
+        User user = MakeUser();
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
         _hasher.Verify("WrongOld", "old_hash").Returns(false);
 
-        var act = async () => await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new ChangePasswordCommand(user.Id, OrgId, "WrongOld", "NewPass1", "NewPass1"),
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*Current password is incorrect*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.Error.Should().Contain("Current password is incorrect");
     }
 
     [Fact]
-    public async Task New_password_same_as_current_throws_validation_exception()
+    public async Task New_password_same_as_current_returns_business_rule_failure()
     {
-        var user = MakeUser();
+        User user = MakeUser();
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
         _hasher.Verify("OldPass1", "old_hash").Returns(true);
 
-        var act = async () => await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new ChangePasswordCommand(user.Id, OrgId, "OldPass1", "OldPass1", "OldPass1"),
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*different from your current*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.Error.Should().Contain("different from your current");
     }
 
     [Fact]
-    public async Task Password_confirmation_mismatch_throws_validation_exception()
+    public async Task Password_confirmation_mismatch_returns_business_rule_failure()
     {
-        var user = MakeUser();
+        User user = MakeUser();
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
         _hasher.Verify("OldPass1", "old_hash").Returns(true);
 
-        var act = async () => await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new ChangePasswordCommand(user.Id, OrgId, "OldPass1", "NewPass1", "Different1"),
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*match*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.Error.Should().Contain("match");
     }
 
     [Fact]
-    public async Task Weak_new_password_throws_validation_exception()
+    public async Task Weak_new_password_returns_business_rule_failure()
     {
-        var user = MakeUser();
+        User user = MakeUser();
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
         _hasher.Verify("OldPass1", "old_hash").Returns(true);
 
-        var act = async () => await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new ChangePasswordCommand(user.Id, OrgId, "OldPass1", "short", "short"),
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>();
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
     }
 
     [Fact]
-    public async Task User_not_found_throws_validation_exception()
+    public async Task User_not_found_returns_not_found()
     {
         _userRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).ReturnsNull();
 
-        var act = async () => await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new ChangePasswordCommand(Guid.NewGuid(), OrgId, "OldPass1", "NewPass1", "NewPass1"),
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*not found*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        result.Error.Should().Contain("not found");
     }
 }

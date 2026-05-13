@@ -1,10 +1,9 @@
-using Axis.DataModeling.Application.Commands.CreateModel;
 using Axis.DataModeling.Application.Commands.UpdateModel;
 using Axis.DataModeling.Application.Repositories;
 using Axis.DataModeling.Application.Services;
 using Axis.DataModeling.Domain.Aggregates;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
-using FluentValidation;
 using NSubstitute;
 
 namespace Axis.DataModeling.Application.Tests.Commands;
@@ -24,41 +23,46 @@ public class UpdateModelHandlerTests
     [Fact]
     public async Task Happy_path_updates_model_and_saves()
     {
-        var model = BuildModel();
+        DataModel model = BuildModel();
         _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
         _modelRepo.NameExistsAsync("Updated Invoice", OrgId, model.Id).Returns(false);
 
-        await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new UpdateModelCommand(model.Id, OrgId, "Updated Invoice", "desc", null, null),
             CancellationToken.None);
 
+        result.IsSuccess.Should().BeTrue();
         model.Name.Should().Be("Updated Invoice");
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Model_not_found_throws()
+    public async Task Model_not_found_returns_not_found()
     {
         _modelRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).Returns((DataModel?)null);
 
-        var act = async () => await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new UpdateModelCommand(Guid.NewGuid(), OrgId, "X", null, null, null),
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>().WithMessage("*not found*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        result.Error.Should().Contain("not found");
     }
 
     [Fact]
-    public async Task Duplicate_name_throws()
+    public async Task Duplicate_name_returns_conflict()
     {
-        var model = BuildModel();
+        DataModel model = BuildModel();
         _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
         _modelRepo.NameExistsAsync("Other", OrgId, model.Id).Returns(true);
 
-        var act = async () => await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new UpdateModelCommand(model.Id, OrgId, "Other", null, null, null),
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>().WithMessage("*already exists*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.Conflict);
+        result.Error.Should().Contain("already exists");
     }
 }

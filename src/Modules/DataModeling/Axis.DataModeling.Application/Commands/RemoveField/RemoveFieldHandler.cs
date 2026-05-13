@@ -1,7 +1,7 @@
 using Axis.DataModeling.Application.Repositories;
 using Axis.DataModeling.Application.Services;
 using Axis.Shared.Application.CQRS;
-using FluentValidation;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Commands.RemoveField;
 
@@ -11,11 +11,11 @@ public sealed class RemoveFieldHandler(
     IUnitOfWork uow)
     : ICommandHandler<RemoveFieldCommand>
 {
-    public async Task Handle(RemoveFieldCommand command, CancellationToken cancellationToken)
+    public async Task<Result> Handle(RemoveFieldCommand command, CancellationToken cancellationToken)
     {
-        var model = await modelRepo.GetByIdAsync(command.ModelId, command.OrganizationId, cancellationToken);
+        DataModeling.Domain.Aggregates.DataModel? model = await modelRepo.GetByIdAsync(command.ModelId, command.OrganizationId, cancellationToken);
         if (model is null)
-            throw new ValidationException("Model not found.");
+            return Result.Failure(ErrorCodes.NotFound, "Model not found.");
 
         try
         {
@@ -23,9 +23,10 @@ public sealed class RemoveFieldHandler(
         }
         catch (InvalidOperationException ex)
         {
-            throw new ValidationException(ex.Message);
+            return Result.Failure(ErrorCodes.BusinessRule, ex.Message);
         }
 
         await uow.SaveChangesAsync(cancellationToken);
+        return Result.Success();
     }
 }

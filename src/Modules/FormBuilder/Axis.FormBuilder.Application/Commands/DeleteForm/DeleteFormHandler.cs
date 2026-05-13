@@ -1,7 +1,8 @@
 using Axis.FormBuilder.Application.Repositories;
 using Axis.FormBuilder.Application.Services;
+using Axis.FormBuilder.Domain.Aggregates;
 using Axis.Shared.Application.CQRS;
-using FluentValidation;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.FormBuilder.Application.Commands.DeleteForm;
 
@@ -11,18 +12,20 @@ public sealed class DeleteFormHandler(
     IUnitOfWork uow)
     : ICommandHandler<DeleteFormCommand>
 {
-    public async Task Handle(DeleteFormCommand command, CancellationToken cancellationToken)
+    public async Task<Result> Handle(DeleteFormCommand command, CancellationToken cancellationToken)
     {
-        var form = await formRepo.GetByIdAsync(command.FormId, command.OrganizationId, cancellationToken);
+        FormDefinition? form = await formRepo.GetByIdAsync(command.FormId, command.OrganizationId, cancellationToken);
         if (form is null)
-            throw new ValidationException("Form not found.");
+            return Result.Failure(ErrorCodes.NotFound, "Form not found.");
 
         // US-078: cannot delete if referenced by non-Archived workflow steps
         if (await formRepo.IsReferencedByWorkflowAsync(command.FormId, cancellationToken))
-            throw new ValidationException(
+            return Result.Failure(ErrorCodes.BusinessRule,
                 "This form is referenced by one or more workflow steps. Remove those references before deleting.");
 
         form.Delete();
         await uow.SaveChangesAsync(cancellationToken);
+
+        return Result.Success();
     }
 }

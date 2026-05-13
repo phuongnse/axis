@@ -2,7 +2,7 @@ using Axis.DataModeling.Application.Repositories;
 using Axis.DataModeling.Application.Services;
 using Axis.DataModeling.Domain.Aggregates;
 using Axis.Shared.Application.CQRS;
-using FluentValidation;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Commands.CreateModel;
 
@@ -12,10 +12,10 @@ public sealed class CreateModelHandler(
     IUnitOfWork uow)
     : ICommandHandler<CreateModelCommand, Guid>
 {
-    public async Task<Guid> Handle(CreateModelCommand command, CancellationToken cancellationToken)
+    public async Task<Result<Guid>> Handle(CreateModelCommand command, CancellationToken cancellationToken)
     {
         if (await modelRepo.NameExistsAsync(command.Name, command.OrganizationId, null, cancellationToken))
-            throw new ValidationException($"A model named '{command.Name}' already exists.");
+            return Result.Failure<Guid>(ErrorCodes.Conflict, $"A model named '{command.Name}' already exists.");
 
         DataModel model = DataModel.Create(command.Name, command.Description, command.Icon, command.Color, command.OrganizationId, command.CreatedBy);
 

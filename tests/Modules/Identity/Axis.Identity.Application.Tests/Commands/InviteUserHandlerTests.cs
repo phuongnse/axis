@@ -3,8 +3,8 @@ using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.ValueObjects;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
-using FluentValidation;
 using NSubstitute;
 using NSubstitute.ReturnsExtensions;
 
@@ -32,17 +32,18 @@ public class InviteUserHandlerTests
     [Fact]
     public async Task Happy_path_creates_invitation_and_sends_email()
     {
-        var email = Email.Create("invited@example.com").Value;
+        Email email = Email.Create("invited@example.com").Value;
         _userRepo.GetByEmailAsync(Arg.Any<Email>(), OrgId).ReturnsNull();
         _invitationRepo.GetPendingByEmailAsync(Arg.Any<Email>(), OrgId).ReturnsNull();
-        var role = Role.Create("Editor", null, OrgId, ["workflow:definition:read"]);
+        Role role = Role.Create("Editor", null, OrgId, ["workflow:definition:read"]);
         _roleRepo.GetByIdAsync(RoleId, OrgId).Returns(role);
-        var org = Organization.Create("Acme", OrganizationSlug.Create("acme").Value,
+        Organization org = Organization.Create("Acme", OrganizationSlug.Create("acme").Value,
             Email.Create("admin@acme.com").Value);
         _orgRepo.GetByIdAsync(OrgId).Returns(org);
 
-        await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
+        Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
+        result.IsSuccess.Should().BeTrue();
         await _invitationRepo.Received(1).AddAsync(Arg.Any<Invitation>(), Arg.Any<CancellationToken>());
         await _emailSender.Received(1).SendInvitationEmailAsync(
             "invited@example.com", Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
@@ -50,57 +51,60 @@ public class InviteUserHandlerTests
     }
 
     [Fact]
-    public async Task Inviting_existing_member_throws_validation_exception()
+    public async Task Inviting_existing_member_returns_conflict()
     {
-        var existingUser = User.Create("Bob", "Jones", Email.Create("invited@example.com").Value, OrgId);
+        User existingUser = User.Create("Bob", "Jones", Email.Create("invited@example.com").Value, OrgId);
         _userRepo.GetByEmailAsync(Arg.Any<Email>(), OrgId).Returns(existingUser);
 
-        var act = async () => await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
+        Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*already a member*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.Conflict);
+        result.Error.Should().Contain("already a member");
     }
 
     [Fact]
-    public async Task Inviting_with_pending_invitation_throws_validation_exception()
+    public async Task Inviting_with_pending_invitation_returns_conflict()
     {
         _userRepo.GetByEmailAsync(Arg.Any<Email>(), OrgId).ReturnsNull();
-        var existing = Invitation.Create(
+        Invitation existing = Invitation.Create(
             Email.Create("invited@example.com").Value, OrgId, RoleId, InvitedById);
         _invitationRepo.GetPendingByEmailAsync(Arg.Any<Email>(), OrgId).Returns(existing);
 
-        var act = async () => await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
+        Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*already been sent*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.Conflict);
+        result.Error.Should().Contain("already been sent");
     }
 
     [Fact]
-    public async Task Inviting_self_throws_validation_exception()
+    public async Task Inviting_self_returns_conflict()
     {
-        var selfCommand = new InviteUserCommand(OrgId, "invited@example.com", RoleId,
+        InviteUserCommand selfCommand = new(OrgId, "invited@example.com", RoleId,
             InvitedById: InvitedById);
-        var inviter = User.Create("Alice", "Smith",
+        User inviter = User.Create("Alice", "Smith",
             Email.Create("invited@example.com").Value, OrgId);
         // Same user Id
         _userRepo.GetByEmailAsync(Arg.Any<Email>(), OrgId).Returns(inviter);
 
-        // The handler should detect self-invite via the existing member check or a dedicated check
-        var act = async () => await CreateHandler().Handle(selfCommand, CancellationToken.None);
+        // The handler detects self-invite via the existing member check
+        Result result = await CreateHandler().Handle(selfCommand, CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>();
+        result.IsFailure.Should().BeTrue();
     }
 
     [Fact]
-    public async Task Role_not_found_throws_validation_exception()
+    public async Task Role_not_found_returns_not_found()
     {
         _userRepo.GetByEmailAsync(Arg.Any<Email>(), OrgId).ReturnsNull();
         _invitationRepo.GetPendingByEmailAsync(Arg.Any<Email>(), OrgId).ReturnsNull();
         _roleRepo.GetByIdAsync(RoleId, OrgId).ReturnsNull();
 
-        var act = async () => await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
+        Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*role*not found*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        result.Error.Should().Contain("not found");
     }
 }

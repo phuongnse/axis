@@ -1,8 +1,8 @@
 using Axis.Shared.Application.CQRS;
+using Axis.Shared.Domain.Primitives;
 using Axis.WorkflowBuilder.Application.Repositories;
 using Axis.WorkflowBuilder.Application.Services;
 using Axis.WorkflowBuilder.Domain.Aggregates;
-using FluentValidation;
 
 namespace Axis.WorkflowBuilder.Application.Commands.CreateWorkflow;
 
@@ -12,12 +12,13 @@ public sealed class CreateWorkflowHandler(
     IUnitOfWork uow)
     : ICommandHandler<CreateWorkflowCommand, Guid>
 {
-    public async Task<Guid> Handle(CreateWorkflowCommand command, CancellationToken cancellationToken)
+    public async Task<Result<Guid>> Handle(CreateWorkflowCommand command, CancellationToken cancellationToken)
     {
         if (await workflowRepo.NameExistsAsync(command.Name, command.OrganizationId, null, cancellationToken))
-            throw new ValidationException($"A workflow named '{command.Name}' already exists.");
+            return Result.Failure<Guid>(ErrorCodes.Conflict, $"A workflow named '{command.Name}' already exists.");
 
-        WorkflowDefinition workflow = WorkflowDefinition.Create(command.Name, command.Description, command.OrganizationId, command.CreatedBy);
+        WorkflowDefinition workflow = WorkflowDefinition.Create(
+            command.Name, command.Description, command.OrganizationId, command.CreatedBy);
 
         await workflowRepo.AddAsync(workflow, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);

@@ -1,7 +1,7 @@
 using Axis.DataModeling.Application.Repositories;
 using Axis.DataModeling.Application.Services;
 using Axis.Shared.Application.CQRS;
-using FluentValidation;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Commands.DeleteModel;
 
@@ -11,13 +11,14 @@ public sealed class DeleteModelHandler(
     IUnitOfWork uow)
     : ICommandHandler<DeleteModelCommand>
 {
-    public async Task Handle(DeleteModelCommand command, CancellationToken cancellationToken)
+    public async Task<Result> Handle(DeleteModelCommand command, CancellationToken cancellationToken)
     {
-        var model = await modelRepo.GetByIdAsync(command.ModelId, command.OrganizationId, cancellationToken);
+        DataModeling.Domain.Aggregates.DataModel? model = await modelRepo.GetByIdAsync(command.ModelId, command.OrganizationId, cancellationToken);
         if (model is null)
-            throw new ValidationException("Model not found.");
+            return Result.Failure(ErrorCodes.NotFound, "Model not found.");
 
         model.Delete();
         await uow.SaveChangesAsync(cancellationToken);
+        return Result.Success();
     }
 }

@@ -73,7 +73,7 @@ public class RoleEndpointTests(ApiTestFixture fixture)
             permissions = new[] { "data_modeling:model:read", "data_modeling:record:read" },
         }, Json);
 
-        createResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        createResp.StatusCode.Should().Be(HttpStatusCode.Created);
         var createBody = await createResp.Content.ReadFromJsonAsync<JsonElement>(Json);
         var newId = createBody.GetProperty("id").GetString();
         newId.Should().NotBeNullOrEmpty();

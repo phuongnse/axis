@@ -4,8 +4,8 @@ using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.ValueObjects;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
-using FluentValidation;
 using NSubstitute;
 using NSubstitute.ReturnsExtensions;
 
@@ -24,7 +24,7 @@ public class RequestPasswordResetHandlerTests
 
     private static User MakeUser()
     {
-        var user = User.Create("Alice", "Smith", Email.Create("alice@acme.com").Value, OrgId);
+        User user = User.Create("Alice", "Smith", Email.Create("alice@acme.com").Value, OrgId);
         user.SetPasswordHash("hashed");
         user.VerifyEmail();
         return user;
@@ -33,7 +33,7 @@ public class RequestPasswordResetHandlerTests
     [Fact]
     public async Task Happy_path_creates_token_and_sends_email()
     {
-        var user = MakeUser();
+        User user = MakeUser();
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).Returns(user);
 
         await CreateHandler().Handle(
@@ -53,7 +53,7 @@ public class RequestPasswordResetHandlerTests
         // Per US-027: same message regardless of whether email exists
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).ReturnsNull();
 
-        var act = async () => await CreateHandler().Handle(
+        Func<Task> act = async () => await CreateHandler().Handle(
             new RequestPasswordResetCommand("unknown@acme.com"),
             CancellationToken.None);
 
@@ -65,7 +65,7 @@ public class RequestPasswordResetHandlerTests
     [Fact]
     public async Task New_request_invalidates_previous_token()
     {
-        var user = MakeUser();
+        User user = MakeUser();
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).Returns(user);
 
         await CreateHandler().Handle(
@@ -92,7 +92,7 @@ public class ResetPasswordHandlerTests
 
     private static User MakeUser()
     {
-        var user = User.Create("Alice", "Smith", Email.Create("alice@acme.com").Value, OrgId);
+        User user = User.Create("Alice", "Smith", Email.Create("alice@acme.com").Value, OrgId);
         user.SetPasswordHash("old_hash");
         user.VerifyEmail();
         return user;
@@ -101,55 +101,55 @@ public class ResetPasswordHandlerTests
     [Fact]
     public async Task Happy_path_resets_password_and_invalidates_token()
     {
-        var user = MakeUser();
+        User user = MakeUser();
         _tokenStore.FindUserIdByTokenHashAsync(Arg.Any<string>()).Returns(user.Id);
         _userRepo.GetByIdPlatformWideAsync(user.Id).Returns(user);
         _hasher.Hash("NewPass1").Returns("new_hash");
 
-        await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new ResetPasswordCommand("valid-token", "NewPass1", "NewPass1"),
             CancellationToken.None);
 
+        result.IsSuccess.Should().BeTrue();
         user.PasswordHash.Should().Be("new_hash");
         await _tokenStore.Received(1).InvalidateAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Expired_or_invalid_token_throws_validation_exception()
+    public async Task Expired_or_invalid_token_returns_business_rule_failure()
     {
         _tokenStore.FindUserIdByTokenHashAsync(Arg.Any<string>()).ReturnsNull();
 
-        var act = async () => await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new ResetPasswordCommand("bad-token", "NewPass1", "NewPass1"),
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*expired*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.Error.Should().Contain("expired");
     }
 
     [Fact]
-    public async Task Password_mismatch_throws_validation_exception()
+    public async Task Password_mismatch_returns_business_rule_failure()
     {
-        _tokenStore.FindUserIdByTokenHashAsync(Arg.Any<string>()).Returns(UserId);
-
-        var act = async () => await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new ResetPasswordCommand("valid-token", "NewPass1", "Different1"),
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*match*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.Error.Should().Contain("match");
     }
 
     [Fact]
-    public async Task Weak_password_throws_validation_exception()
+    public async Task Weak_password_returns_business_rule_failure()
     {
-        _tokenStore.FindUserIdByTokenHashAsync(Arg.Any<string>()).Returns(UserId);
-
-        var act = async () => await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new ResetPasswordCommand("valid-token", "short", "short"),
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>();
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
     }
 }

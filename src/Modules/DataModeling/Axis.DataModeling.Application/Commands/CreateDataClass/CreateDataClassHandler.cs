@@ -2,7 +2,7 @@ using Axis.DataModeling.Application.Repositories;
 using Axis.DataModeling.Application.Services;
 using Axis.DataModeling.Domain.Aggregates;
 using Axis.Shared.Application.CQRS;
-using FluentValidation;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Commands.CreateDataClass;
 
@@ -12,10 +12,10 @@ public sealed class CreateDataClassHandler(
     IUnitOfWork uow)
     : ICommandHandler<CreateDataClassCommand, Guid>
 {
-    public async Task<Guid> Handle(CreateDataClassCommand command, CancellationToken cancellationToken)
+    public async Task<Result<Guid>> Handle(CreateDataClassCommand command, CancellationToken cancellationToken)
     {
         if (await dataClassRepo.NameExistsAsync(command.Name, command.OrganizationId, null, cancellationToken))
-            throw new ValidationException($"A data class named '{command.Name}' already exists.");
+            return Result.Failure<Guid>(ErrorCodes.Conflict, $"A data class named '{command.Name}' already exists.");
 
         DataClass dataClass = DataClass.Create(command.Name, command.Description, command.OrganizationId, command.CreatedBy);
 

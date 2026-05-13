@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Axis.DataModeling.Domain.Aggregates;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
@@ -16,6 +17,12 @@ internal sealed class DataRecordConfiguration : IEntityTypeConfiguration<DataRec
     private static readonly ValueConverter<Dictionary<string, object?>, string> DataConverter = new(
         dict => JsonSerializer.Serialize(dict, DataJsonOptions),
         json => JsonSerializer.Deserialize<Dictionary<string, object?>>(json, DataJsonOptions) ?? new());
+
+    private static readonly ValueComparer<Dictionary<string, object?>> DataComparer = new(
+        (a, b) => JsonSerializer.Serialize(a, DataJsonOptions) == JsonSerializer.Serialize(b, DataJsonOptions),
+        v => JsonSerializer.Serialize(v, DataJsonOptions).GetHashCode(),
+        v => JsonSerializer.Deserialize<Dictionary<string, object?>>(
+            JsonSerializer.Serialize(v, DataJsonOptions), DataJsonOptions) ?? new());
 
     public void Configure(EntityTypeBuilder<DataRecord> builder)
     {
@@ -54,7 +61,7 @@ internal sealed class DataRecordConfiguration : IEntityTypeConfiguration<DataRec
             .UsePropertyAccessMode(PropertyAccessMode.Field)
             .HasColumnName("data")
             .HasColumnType("jsonb")
-            .HasConversion(DataConverter)
+            .HasConversion(DataConverter, DataComparer)
             .IsRequired();
 
         builder.Ignore(r => r.Data);

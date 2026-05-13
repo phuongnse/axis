@@ -1,7 +1,8 @@
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
+using Axis.Identity.Domain.Aggregates;
 using Axis.Shared.Application.CQRS;
-using FluentValidation;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Identity.Application.Commands.AssignRoleToUser;
 
@@ -15,15 +16,15 @@ public sealed class AssignRoleToUserHandler(
     IUnitOfWork uow)
     : ICommandHandler<AssignRoleToUserCommand>
 {
-    public async Task Handle(AssignRoleToUserCommand command, CancellationToken cancellationToken)
+    public async Task<Result> Handle(AssignRoleToUserCommand command, CancellationToken cancellationToken)
     {
-        var user = await userRepo.GetByIdAsync(command.UserId, command.OrganizationId, cancellationToken);
+        User? user = await userRepo.GetByIdAsync(command.UserId, command.OrganizationId, cancellationToken);
         if (user is null)
-            throw new ValidationException("User not found.");
+            return Result.Failure(ErrorCodes.NotFound, "User not found.");
 
-        var role = await roleRepo.GetByIdAsync(command.RoleId, command.OrganizationId, cancellationToken);
+        Role? role = await roleRepo.GetByIdAsync(command.RoleId, command.OrganizationId, cancellationToken);
         if (role is null)
-            throw new ValidationException("The role was not found in this organization.");
+            return Result.Failure(ErrorCodes.NotFound, "The role was not found in this organization.");
 
         if (command.Action == RoleAction.Assign)
         {
@@ -33,20 +34,21 @@ public sealed class AssignRoleToUserHandler(
         {
             // US-024: a user must always have at least one role
             if (user.RoleIds.Count <= 1 && user.RoleIds.Contains(command.RoleId))
-                throw new ValidationException("User must have at least one role.");
+                return Result.Failure(ErrorCodes.BusinessRule, "User must have at least one role.");
 
             // US-024: last admin guard — cannot remove admin role from the last admin
             if (role.IsSystem && role.Name == "Admin")
             {
-                var adminCount = await userRepo.CountAdminsAsync(
+                int adminCount = await userRepo.CountAdminsAsync(
                     command.OrganizationId, command.RoleId, cancellationToken);
                 if (adminCount <= 1)
-                    throw new ValidationException("Cannot remove the last admin role from this organization.");
+                    return Result.Failure(ErrorCodes.BusinessRule, "Cannot remove the last admin role from this organization.");
             }
 
             user.RemoveRole(command.RoleId);
         }
 
         await uow.SaveChangesAsync(cancellationToken);
+        return Result.Success();
     }
 }

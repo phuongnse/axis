@@ -2,6 +2,7 @@ using System.Text.Json;
 using Axis.WorkflowEngine.Domain.Aggregates;
 using Axis.WorkflowEngine.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
@@ -42,16 +43,22 @@ internal sealed class ExecutionConfiguration : IEntityTypeConfiguration<Workflow
         builder.Property(e => e.StartedAt);
         builder.Property(e => e.CompletedAt);
 
-        var contextConverter = new ValueConverter<Dictionary<string, object?>, string>(
+        ValueConverter<Dictionary<string, object?>, string> contextConverter = new(
             v => JsonSerializer.Serialize(v, JsonOptions),
             v => JsonSerializer.Deserialize<Dictionary<string, object?>>(v, JsonOptions) ?? new Dictionary<string, object?>());
+
+        ValueComparer<Dictionary<string, object?>> contextComparer = new(
+            (a, b) => JsonSerializer.Serialize(a, JsonOptions) == JsonSerializer.Serialize(b, JsonOptions),
+            v => JsonSerializer.Serialize(v, JsonOptions).GetHashCode(),
+            v => JsonSerializer.Deserialize<Dictionary<string, object?>>(
+                JsonSerializer.Serialize(v, JsonOptions), JsonOptions) ?? new Dictionary<string, object?>());
 
         builder.Property<Dictionary<string, object?>>("_context")
             .HasField("_context")
             .UsePropertyAccessMode(PropertyAccessMode.Field)
             .HasColumnName("context")
             .HasColumnType("jsonb")
-            .HasConversion(contextConverter)
+            .HasConversion(contextConverter, contextComparer)
             .IsRequired();
 
         builder.Ignore(e => e.Context);

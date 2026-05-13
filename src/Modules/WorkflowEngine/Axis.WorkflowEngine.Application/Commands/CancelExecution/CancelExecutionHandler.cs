@@ -1,8 +1,8 @@
-using Axis.WorkflowEngine.Domain.Aggregates;
 using Axis.Shared.Application.CQRS;
+using Axis.Shared.Domain.Primitives;
 using Axis.WorkflowEngine.Application.Repositories;
 using Axis.WorkflowEngine.Application.Services;
-using FluentValidation;
+using Axis.WorkflowEngine.Domain.Aggregates;
 
 namespace Axis.WorkflowEngine.Application.Commands.CancelExecution;
 
@@ -12,11 +12,12 @@ public sealed class CancelExecutionHandler(
     IUnitOfWork uow)
     : ICommandHandler<CancelExecutionCommand>
 {
-    public async Task Handle(CancelExecutionCommand command, CancellationToken cancellationToken)
+    public async Task<Result> Handle(CancelExecutionCommand command, CancellationToken cancellationToken)
     {
-        WorkflowExecution? execution = await execRepo.GetByIdAsync(command.ExecutionId, command.OrganizationId, cancellationToken);
+        WorkflowExecution? execution = await execRepo.GetByIdAsync(
+            command.ExecutionId, command.OrganizationId, cancellationToken);
         if (execution is null)
-            throw new ValidationException("Execution not found.");
+            return Result.Failure(ErrorCodes.NotFound, "Execution not found.");
 
         try
         {
@@ -24,9 +25,11 @@ public sealed class CancelExecutionHandler(
         }
         catch (InvalidOperationException ex)
         {
-            throw new ValidationException(ex.Message);
+            return Result.Failure(ErrorCodes.BusinessRule, ex.Message);
         }
 
         await uow.SaveChangesAsync(cancellationToken);
+
+        return Result.Success();
     }
 }

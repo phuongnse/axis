@@ -2,8 +2,8 @@ using Axis.DataModeling.Application.Commands.DeleteDataClass;
 using Axis.DataModeling.Application.Repositories;
 using Axis.DataModeling.Application.Services;
 using Axis.DataModeling.Domain.Aggregates;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
-using FluentValidation;
 using NSubstitute;
 
 namespace Axis.DataModeling.Application.Tests.Commands;
@@ -24,22 +24,25 @@ public class DeleteDataClassHandlerTests
         _dcRepo.GetByIdAsync(dc.Id, OrgId).Returns(dc);
         _dcRepo.IsReferencedByAnyModelAsync(dc.Id).Returns(false);
 
-        await CreateHandler().Handle(new DeleteDataClassCommand(dc.Id, OrgId), CancellationToken.None);
+        Result result = await CreateHandler().Handle(new DeleteDataClassCommand(dc.Id, OrgId), CancellationToken.None);
 
+        result.IsSuccess.Should().BeTrue();
         dc.DeletedAt.Should().NotBeNull();
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Referenced_data_class_throws()
+    public async Task Referenced_data_class_returns_conflict()
     {
         DataClass dc = DataClass.Create("Address", null, OrgId, UserId);
         _dcRepo.GetByIdAsync(dc.Id, OrgId).Returns(dc);
         _dcRepo.IsReferencedByAnyModelAsync(dc.Id).Returns(true);
 
-        var act = async () => await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new DeleteDataClassCommand(dc.Id, OrgId), CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>().WithMessage("*referenced*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.Conflict);
+        result.Error.Should().Contain("referenced");
     }
 }

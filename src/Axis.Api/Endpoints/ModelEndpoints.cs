@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Axis.Api.Authorization;
+using Axis.Api.Extensions;
 using Axis.Api.Infrastructure;
 using Axis.DataModeling.Application.Commands.AddField;
 using Axis.DataModeling.Application.Commands.CreateModel;
@@ -11,6 +12,9 @@ using Axis.DataModeling.Application.Commands.UpdateModel;
 using Axis.DataModeling.Application.Queries.GetModel;
 using Axis.DataModeling.Application.Queries.GetModels;
 using Axis.DataModeling.Domain.Enums;
+using Axis.DataModeling.Domain.ValueObjects;
+using Axis.Shared.Application;
+using Axis.Shared.Domain.Primitives;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -20,7 +24,7 @@ public static class ModelEndpoints
 {
     public static IEndpointRouteBuilder MapModelEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/models")
+        RouteGroupBuilder group = app.MapGroup("/api/models")
             .RequireAuthorization();
 
         group.MapGet("/", GetModels)
@@ -128,7 +132,7 @@ public static class ModelEndpoints
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        var result = await mediator.Send(new GetModelsQuery(currentUser.OrgId, page, pageSize), ct);
+        PagedResult<ModelSummaryDto> result = await mediator.Send(new GetModelsQuery(currentUser.OrgId, page, pageSize), ct);
         return Results.Ok(result);
     }
 
@@ -138,7 +142,7 @@ public static class ModelEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        Guid id = await mediator.Send(new CreateModelCommand(
+        Result<Guid> result = await mediator.Send(new CreateModelCommand(
             request.Name,
             request.Description,
             request.Icon,
@@ -146,7 +150,8 @@ public static class ModelEndpoints
             currentUser.OrgId,
             currentUser.UserId.ToString()), ct);
 
-        return Results.Created($"/api/models/{id}", new { id });
+        if (result.IsFailure) return result.ToProblemDetails();
+        return Results.Created($"/api/models/{result.Value}", new { id = result.Value });
     }
 
     private static async Task<IResult> GetModel(
@@ -155,8 +160,9 @@ public static class ModelEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        var result = await mediator.Send(new GetModelQuery(modelId, currentUser.OrgId), ct);
-        return result is null ? Results.NotFound() : Results.Ok(result);
+        Result<ModelDetailDto> result = await mediator.Send(new GetModelQuery(modelId, currentUser.OrgId), ct);
+        if (result.IsFailure) return result.ToProblemDetails();
+        return Results.Ok(result.Value);
     }
 
     private static async Task<IResult> UpdateModel(
@@ -166,7 +172,7 @@ public static class ModelEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        await mediator.Send(new UpdateModelCommand(
+        Result result = await mediator.Send(new UpdateModelCommand(
             modelId,
             currentUser.OrgId,
             request.Name,
@@ -174,6 +180,7 @@ public static class ModelEndpoints
             request.Icon,
             request.Color), ct);
 
+        if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
 
@@ -183,7 +190,8 @@ public static class ModelEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        await mediator.Send(new DeleteModelCommand(modelId, currentUser.OrgId), ct);
+        Result result = await mediator.Send(new DeleteModelCommand(modelId, currentUser.OrgId), ct);
+        if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
 
@@ -194,8 +202,8 @@ public static class ModelEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        var config = FieldConfigHelper.Deserialize(request.Type, request.Config);
-        var fieldId = await mediator.Send(new AddFieldCommand(
+        FieldConfig config = FieldConfigHelper.Deserialize(request.Type, request.Config);
+        Result<Guid> result = await mediator.Send(new AddFieldCommand(
             modelId,
             currentUser.OrgId,
             request.Name,
@@ -204,7 +212,8 @@ public static class ModelEndpoints
             request.IsRequired,
             config), ct);
 
-        return Results.Created($"/api/models/{modelId}/fields/{fieldId}", new { id = fieldId });
+        if (result.IsFailure) return result.ToProblemDetails();
+        return Results.Created($"/api/models/{modelId}/fields/{result.Value}", new { id = result.Value });
     }
 
     private static async Task<IResult> UpdateField(
@@ -215,8 +224,8 @@ public static class ModelEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        var config = FieldConfigHelper.Deserialize(request.Type, request.Config);
-        await mediator.Send(new UpdateFieldCommand(
+        FieldConfig config = FieldConfigHelper.Deserialize(request.Type, request.Config);
+        Result result = await mediator.Send(new UpdateFieldCommand(
             modelId,
             fieldId,
             currentUser.OrgId,
@@ -225,6 +234,7 @@ public static class ModelEndpoints
             request.IsRequired,
             config), ct);
 
+        if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
 
@@ -235,7 +245,8 @@ public static class ModelEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        await mediator.Send(new RemoveFieldCommand(modelId, fieldId, currentUser.OrgId), ct);
+        Result result = await mediator.Send(new RemoveFieldCommand(modelId, fieldId, currentUser.OrgId), ct);
+        if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
 
@@ -246,7 +257,8 @@ public static class ModelEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        await mediator.Send(new ReorderFieldsCommand(modelId, currentUser.OrgId, request.FieldIds), ct);
+        Result result = await mediator.Send(new ReorderFieldsCommand(modelId, currentUser.OrgId, request.FieldIds), ct);
+        if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
 }
