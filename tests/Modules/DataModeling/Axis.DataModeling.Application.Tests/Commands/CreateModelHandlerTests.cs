@@ -1,8 +1,8 @@
 using Axis.DataModeling.Application.Commands.CreateModel;
 using Axis.DataModeling.Application.Repositories;
 using Axis.DataModeling.Application.Services;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
-using FluentValidation;
 using NSubstitute;
 
 namespace Axis.DataModeling.Application.Tests.Commands;
@@ -22,11 +22,12 @@ public class CreateModelHandlerTests
     {
         _modelRepo.NameExistsAsync("Invoice", OrgId).Returns(false);
 
-        var result = await CreateHandler().Handle(
+        Result<Guid> result = await CreateHandler().Handle(
             new CreateModelCommand("Invoice", "Invoicing model", null, null, OrgId, UserId),
             CancellationToken.None);
 
-        result.Should().NotBeEmpty();
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotBeEmpty();
         await _modelRepo.Received(1).AddAsync(
             Arg.Is<Domain.Aggregates.DataModel>(m =>
                 m.Name == "Invoice" && m.OrganizationId == OrgId && m.CreatedBy == UserId),
@@ -35,14 +36,16 @@ public class CreateModelHandlerTests
     }
 
     [Fact]
-    public async Task Duplicate_name_throws_validation_exception()
+    public async Task Duplicate_name_returns_conflict()
     {
         _modelRepo.NameExistsAsync("Invoice", OrgId).Returns(true);
 
-        var act = async () => await CreateHandler().Handle(
+        Result<Guid> result = await CreateHandler().Handle(
             new CreateModelCommand("Invoice", null, null, null, OrgId, UserId),
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>().WithMessage("*already exists*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.Conflict);
+        result.Error.Should().Contain("already exists");
     }
 }

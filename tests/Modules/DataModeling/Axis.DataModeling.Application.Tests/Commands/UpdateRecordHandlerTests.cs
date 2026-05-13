@@ -2,8 +2,8 @@ using Axis.DataModeling.Application.Commands.UpdateRecord;
 using Axis.DataModeling.Application.Repositories;
 using Axis.DataModeling.Application.Services;
 using Axis.DataModeling.Domain.Aggregates;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
-using FluentValidation;
 using NSubstitute;
 
 namespace Axis.DataModeling.Application.Tests.Commands;
@@ -24,24 +24,27 @@ public class UpdateRecordHandlerTests
         DataRecord record = DataRecord.Create(ModelId, OrgId, new Dictionary<string, object?> { ["name"] = "Old" }, UserId);
         _recordRepo.GetByIdAsync(record.Id, ModelId, OrgId).Returns(record);
 
-        var newData = new Dictionary<string, object?> { ["name"] = "New" };
-        await CreateHandler().Handle(
+        Dictionary<string, object?> newData = new() { ["name"] = "New" };
+        Result result = await CreateHandler().Handle(
             new UpdateRecordCommand(record.Id, ModelId, OrgId, newData),
             CancellationToken.None);
 
+        result.IsSuccess.Should().BeTrue();
         record.Data["name"].Should().Be("New");
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Record_not_found_throws()
+    public async Task Record_not_found_returns_not_found()
     {
         _recordRepo.GetByIdAsync(Arg.Any<Guid>(), ModelId, OrgId).Returns((DataRecord?)null);
 
-        var act = async () => await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new UpdateRecordCommand(Guid.NewGuid(), ModelId, OrgId, new Dictionary<string, object?>()),
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>().WithMessage("*not found*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        result.Error.Should().Contain("not found");
     }
 }

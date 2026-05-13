@@ -3,8 +3,8 @@ using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.ValueObjects;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
-using FluentValidation;
 using NSubstitute;
 using NSubstitute.ReturnsExtensions;
 
@@ -24,7 +24,7 @@ public class AssignRoleToUserHandlerTests
 
     private static User MakeUser(string email = "user@acme.com")
     {
-        var u = User.Create("Test", "User", Email.Create(email).Value, OrgId);
+        User u = User.Create("Test", "User", Email.Create(email).Value, OrgId);
         u.AssignRole(EditorRoleId);
         return u;
     }
@@ -32,15 +32,16 @@ public class AssignRoleToUserHandlerTests
     [Fact]
     public async Task Assign_role_adds_to_user()
     {
-        var user = MakeUser();
-        var newRole = Role.Create("Manager", null, OrgId, ["workflow:definition:read"]);
+        User user = MakeUser();
+        Role newRole = Role.Create("Manager", null, OrgId, ["workflow:definition:read"]);
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
         _roleRepo.GetByIdAsync(newRole.Id, OrgId).Returns(newRole);
 
-        await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new AssignRoleToUserCommand(user.Id, OrgId, newRole.Id, Action: RoleAction.Assign),
             CancellationToken.None);
 
+        result.IsSuccess.Should().BeTrue();
         user.RoleIds.Should().Contain(newRole.Id);
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
@@ -48,68 +49,72 @@ public class AssignRoleToUserHandlerTests
     [Fact]
     public async Task Remove_role_removes_from_user()
     {
-        var user = MakeUser();
-        var editorRole = Role.Create("Editor", null, OrgId, ["workflow:definition:read"]);
+        User user = MakeUser();
+        Role editorRole = Role.Create("Editor", null, OrgId, ["workflow:definition:read"]);
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
         _roleRepo.GetByIdAsync(EditorRoleId, OrgId).Returns(editorRole);
         user.AssignRole(AdminRoleId); // give another role so we can remove editor
 
-        await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new AssignRoleToUserCommand(user.Id, OrgId, EditorRoleId, Action: RoleAction.Remove),
             CancellationToken.None);
 
+        result.IsSuccess.Should().BeTrue();
         user.RoleIds.Should().NotContain(EditorRoleId);
     }
 
     [Fact]
-    public async Task Removing_last_role_throws_validation_exception()
+    public async Task Removing_last_role_returns_business_rule_failure()
     {
         // User has only EditorRoleId
-        var user = MakeUser();
-        var editorRole = Role.Create("Editor", null, OrgId, ["workflow:definition:read"]);
+        User user = MakeUser();
+        Role editorRole = Role.Create("Editor", null, OrgId, ["workflow:definition:read"]);
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
         _roleRepo.GetByIdAsync(EditorRoleId, OrgId).Returns(editorRole);
 
-        var act = async () => await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new AssignRoleToUserCommand(user.Id, OrgId, EditorRoleId, Action: RoleAction.Remove),
             CancellationToken.None);
 
         // US-024: a user must always have at least one role
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*at least one role*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.Error.Should().Contain("at least one role");
     }
 
     [Fact]
-    public async Task Removing_admin_role_from_last_admin_throws()
+    public async Task Removing_admin_role_from_last_admin_returns_business_rule_failure()
     {
-        var user = MakeUser();
+        User user = MakeUser();
         user.AssignRole(AdminRoleId);
-        var adminRole = Role.CreateSystem("Admin", OrgId, ["users:read"]);
+        Role adminRole = Role.CreateSystem("Admin", OrgId, ["users:read"]);
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
         _roleRepo.GetByIdAsync(AdminRoleId, OrgId).Returns(adminRole);
         _userRepo.CountAdminsAsync(OrgId, AdminRoleId).Returns(1); // last admin
 
-        var act = async () => await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new AssignRoleToUserCommand(user.Id, OrgId, AdminRoleId, Action: RoleAction.Remove),
             CancellationToken.None);
 
         // US-024: last admin guard
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*last admin*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.Error.Should().Contain("last admin");
     }
 
     [Fact]
-    public async Task Role_not_found_in_org_throws_validation_exception()
+    public async Task Role_not_found_in_org_returns_not_found()
     {
-        var user = MakeUser();
+        User user = MakeUser();
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
         _roleRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).ReturnsNull();
 
-        var act = async () => await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new AssignRoleToUserCommand(user.Id, OrgId, Guid.NewGuid(), Action: RoleAction.Assign),
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*role*not found*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        result.Error.Should().Contain("not found");
     }
 }

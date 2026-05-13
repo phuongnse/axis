@@ -1,8 +1,8 @@
 using Axis.DataModeling.Application.Commands.CreateDataClass;
 using Axis.DataModeling.Application.Repositories;
 using Axis.DataModeling.Application.Services;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
-using FluentValidation;
 using NSubstitute;
 
 namespace Axis.DataModeling.Application.Tests.Commands;
@@ -22,11 +22,12 @@ public class CreateDataClassHandlerTests
     {
         _dataClassRepo.NameExistsAsync("Address", OrgId).Returns(false);
 
-        var result = await CreateHandler().Handle(
+        Result<Guid> result = await CreateHandler().Handle(
             new CreateDataClassCommand("Address", "Postal address", OrgId, UserId),
             CancellationToken.None);
 
-        result.Should().NotBeEmpty();
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotBeEmpty();
         await _dataClassRepo.Received(1).AddAsync(
             Arg.Is<Domain.Aggregates.DataClass>(dc =>
                 dc.Name == "Address" && dc.CreatedBy == UserId),
@@ -35,14 +36,16 @@ public class CreateDataClassHandlerTests
     }
 
     [Fact]
-    public async Task Duplicate_name_throws_validation_exception()
+    public async Task Duplicate_name_returns_conflict()
     {
         _dataClassRepo.NameExistsAsync("Address", OrgId).Returns(true);
 
-        var act = async () => await CreateHandler().Handle(
+        Result<Guid> result = await CreateHandler().Handle(
             new CreateDataClassCommand("Address", null, OrgId, UserId),
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>().WithMessage("*already exists*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.Conflict);
+        result.Error.Should().Contain("already exists");
     }
 }

@@ -1,8 +1,8 @@
 using Axis.FormBuilder.Application.Commands.CreateForm;
 using Axis.FormBuilder.Application.Repositories;
 using Axis.FormBuilder.Application.Services;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
-using FluentValidation;
 using NSubstitute;
 
 namespace Axis.FormBuilder.Application.Tests.Commands;
@@ -22,11 +22,12 @@ public class CreateFormHandlerTests
     {
         _formRepo.NameExistsAsync("Employee Intake", OrgId).Returns(false);
 
-        var result = await CreateHandler().Handle(
+        Result<Guid> result = await CreateHandler().Handle(
             new CreateFormCommand("Employee Intake", "New hire form", OrgId, UserId),
             CancellationToken.None);
 
-        result.Should().NotBeEmpty();
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotBeEmpty();
         await _formRepo.Received(1).AddAsync(
             Arg.Is<Domain.Aggregates.FormDefinition>(f =>
                 f.Name == "Employee Intake" && f.CreatedBy == UserId),
@@ -35,14 +36,16 @@ public class CreateFormHandlerTests
     }
 
     [Fact]
-    public async Task Duplicate_name_throws_validation_exception()
+    public async Task Duplicate_name_returns_conflict()
     {
         _formRepo.NameExistsAsync("Employee Intake", OrgId).Returns(true);
 
-        var act = async () => await CreateHandler().Handle(
+        Result<Guid> result = await CreateHandler().Handle(
             new CreateFormCommand("Employee Intake", null, OrgId, UserId),
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>().WithMessage("*already exists*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.Conflict);
+        result.Error.Should().Contain("already exists");
     }
 }

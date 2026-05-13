@@ -3,8 +3,8 @@ using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.ValueObjects;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
-using FluentValidation;
 using NSubstitute;
 using NSubstitute.ReturnsExtensions;
 
@@ -35,17 +35,18 @@ public class AcceptInvitationHandlerTests
     [Fact]
     public async Task Happy_path_creates_user_accepts_invitation_and_assigns_role()
     {
-        var invitation = MakePendingInvitation();
+        Invitation invitation = MakePendingInvitation();
         _invitationRepo.GetByTokenAsync("valid-token").Returns(invitation);
         _userRepo.EmailExistsPlatformWideAsync(InvitedEmail).Returns(false);
         _hasher.Hash("NewPass1").Returns("hashed");
         _roleRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), OrgId).Returns([]);
 
-        var result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
+        Result<AcceptInvitationResult> result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
-        result.UserId.Should().NotBeEmpty();
-        result.OrganizationId.Should().Be(OrgId);
-        result.Email.Should().Be("new@acme.com");
+        result.IsSuccess.Should().BeTrue();
+        result.Value.UserId.Should().NotBeEmpty();
+        result.Value.OrganizationId.Should().Be(OrgId);
+        result.Value.Email.Should().Be("new@acme.com");
         await _userRepo.Received(1).AddAsync(
             Arg.Is<User>(u =>
                 u.FirstName == "Bob" &&
@@ -60,64 +61,69 @@ public class AcceptInvitationHandlerTests
     }
 
     [Fact]
-    public async Task Email_already_exists_platform_wide_throws_with_sign_in_message()
+    public async Task Email_already_exists_platform_wide_returns_conflict()
     {
-        var invitation = MakePendingInvitation();
+        Invitation invitation = MakePendingInvitation();
         _invitationRepo.GetByTokenAsync("valid-token").Returns(invitation);
         _userRepo.EmailExistsPlatformWideAsync(InvitedEmail).Returns(true);
 
-        var act = async () => await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
+        Result<AcceptInvitationResult> result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*already exists*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.Conflict);
+        result.Error.Should().Contain("already exists");
     }
 
     [Fact]
-    public async Task Invalid_token_throws_validation_exception()
+    public async Task Invalid_token_returns_not_found()
     {
         _invitationRepo.GetByTokenAsync(Arg.Any<string>()).ReturnsNull();
 
-        var act = async () => await CreateHandler().Handle(ValidCommand("bad-token"), CancellationToken.None);
+        Result<AcceptInvitationResult> result = await CreateHandler().Handle(ValidCommand("bad-token"), CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*Invalid*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        result.Error.Should().Contain("Invalid");
     }
 
     [Fact]
-    public async Task Expired_invitation_throws_with_expiry_message()
+    public async Task Expired_invitation_returns_business_rule_failure()
     {
-        var expired = InvitationTestHelper.CreateExpired(InvitedEmail, OrgId, RoleId, InvitedById);
+        Invitation expired = InvitationTestHelper.CreateExpired(InvitedEmail, OrgId, RoleId, InvitedById);
         _invitationRepo.GetByTokenAsync("valid-token").Returns(expired);
 
-        var act = async () => await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
+        Result<AcceptInvitationResult> result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*expired*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.Error.Should().Contain("expired");
     }
 
     [Fact]
-    public async Task Already_accepted_invitation_throws()
+    public async Task Already_accepted_invitation_returns_business_rule_failure()
     {
-        var invitation = MakePendingInvitation();
+        Invitation invitation = MakePendingInvitation();
         invitation.Accept();
         _invitationRepo.GetByTokenAsync("valid-token").Returns(invitation);
 
-        var act = async () => await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
+        Result<AcceptInvitationResult> result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*already been used*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.Error.Should().Contain("already been used");
     }
 
     [Fact]
-    public async Task Cancelled_invitation_throws()
+    public async Task Cancelled_invitation_returns_business_rule_failure()
     {
-        var invitation = MakePendingInvitation();
+        Invitation invitation = MakePendingInvitation();
         invitation.Cancel();
         _invitationRepo.GetByTokenAsync("valid-token").Returns(invitation);
 
-        var act = async () => await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
+        Result<AcceptInvitationResult> result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*cancelled*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.Error.Should().Contain("cancelled");
     }
 }

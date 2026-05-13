@@ -2,8 +2,8 @@ using Axis.DataModeling.Application.Commands.DeleteModel;
 using Axis.DataModeling.Application.Repositories;
 using Axis.DataModeling.Application.Services;
 using Axis.DataModeling.Domain.Aggregates;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
-using FluentValidation;
 using NSubstitute;
 using NSubstitute.ReturnsExtensions;
 
@@ -25,20 +25,23 @@ public class DeleteModelHandlerTests
         DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
 
-        await CreateHandler().Handle(new DeleteModelCommand(model.Id, OrgId), CancellationToken.None);
+        Result result = await CreateHandler().Handle(new DeleteModelCommand(model.Id, OrgId), CancellationToken.None);
 
+        result.IsSuccess.Should().BeTrue();
         model.DeletedAt.Should().NotBeNull();
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Model_not_found_throws_validation_exception()
+    public async Task Model_not_found_returns_not_found()
     {
         _modelRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).ReturnsNull();
 
-        var act = async () => await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new DeleteModelCommand(Guid.NewGuid(), OrgId), CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>().WithMessage("*not found*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        result.Error.Should().Contain("not found");
     }
 }

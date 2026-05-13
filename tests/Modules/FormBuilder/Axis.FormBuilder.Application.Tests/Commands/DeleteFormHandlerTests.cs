@@ -2,8 +2,8 @@ using Axis.FormBuilder.Application.Commands.DeleteForm;
 using Axis.FormBuilder.Application.Repositories;
 using Axis.FormBuilder.Application.Services;
 using Axis.FormBuilder.Domain.Aggregates;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
-using FluentValidation;
 using NSubstitute;
 using NSubstitute.ReturnsExtensions;
 
@@ -26,32 +26,37 @@ public class DeleteFormHandlerTests
         _formRepo.GetByIdAsync(form.Id, OrgId).Returns(form);
         _formRepo.IsReferencedByWorkflowAsync(form.Id).Returns(false);
 
-        await CreateHandler().Handle(new DeleteFormCommand(form.Id, OrgId), CancellationToken.None);
+        Result result = await CreateHandler().Handle(new DeleteFormCommand(form.Id, OrgId), CancellationToken.None);
 
+        result.IsSuccess.Should().BeTrue();
         form.DeletedAt.Should().NotBeNull();
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Form_referenced_by_active_workflow_throws_validation_exception()
+    public async Task Form_referenced_by_active_workflow_returns_business_rule_failure()
     {
         FormDefinition form = FormDefinition.Create("Employee Intake", null, OrgId, UserId);
         _formRepo.GetByIdAsync(form.Id, OrgId).Returns(form);
         _formRepo.IsReferencedByWorkflowAsync(form.Id).Returns(true);
 
-        var act = async () => await CreateHandler().Handle(new DeleteFormCommand(form.Id, OrgId), CancellationToken.None);
+        Result result = await CreateHandler().Handle(new DeleteFormCommand(form.Id, OrgId), CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>().WithMessage("*workflow*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.Error.Should().Contain("workflow");
     }
 
     [Fact]
-    public async Task Form_not_found_throws_validation_exception()
+    public async Task Form_not_found_returns_not_found()
     {
         _formRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).ReturnsNull();
 
-        var act = async () => await CreateHandler().Handle(
+        Result result = await CreateHandler().Handle(
             new DeleteFormCommand(Guid.NewGuid(), OrgId), CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>().WithMessage("*not found*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        result.Error.Should().Contain("not found");
     }
 }

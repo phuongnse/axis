@@ -1,9 +1,9 @@
+using Axis.Shared.Domain.Primitives;
 using Axis.WorkflowBuilder.Application.Commands.CreateWorkflow;
 using Axis.WorkflowBuilder.Application.Repositories;
 using Axis.WorkflowBuilder.Application.Services;
 using Axis.WorkflowBuilder.Domain.Enums;
 using FluentAssertions;
-using FluentValidation;
 using NSubstitute;
 
 namespace Axis.WorkflowBuilder.Application.Tests.Commands;
@@ -23,11 +23,12 @@ public class CreateWorkflowHandlerTests
     {
         _workflowRepo.NameExistsAsync("Invoice Approval", OrgId).Returns(false);
 
-        var result = await CreateHandler().Handle(
+        Result<Guid> result = await CreateHandler().Handle(
             new CreateWorkflowCommand("Invoice Approval", "Approves invoices", OrgId, UserId),
             CancellationToken.None);
 
-        result.Should().NotBeEmpty();
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotBeEmpty();
         await _workflowRepo.Received(1).AddAsync(
             Arg.Is<Domain.Aggregates.WorkflowDefinition>(w =>
                 w.Name == "Invoice Approval" &&
@@ -38,14 +39,16 @@ public class CreateWorkflowHandlerTests
     }
 
     [Fact]
-    public async Task Duplicate_name_throws_validation_exception()
+    public async Task Duplicate_name_returns_conflict()
     {
         _workflowRepo.NameExistsAsync("Invoice Approval", OrgId).Returns(true);
 
-        var act = async () => await CreateHandler().Handle(
+        Result<Guid> result = await CreateHandler().Handle(
             new CreateWorkflowCommand("Invoice Approval", null, OrgId, UserId),
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>().WithMessage("*already exists*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.Conflict);
+        result.Error.Should().Contain("already exists");
     }
 }

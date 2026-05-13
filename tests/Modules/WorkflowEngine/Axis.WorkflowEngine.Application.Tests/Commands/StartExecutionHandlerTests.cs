@@ -1,9 +1,9 @@
+using Axis.Shared.Domain.Primitives;
 using Axis.WorkflowEngine.Application.Commands.StartExecution;
 using Axis.WorkflowEngine.Application.Repositories;
 using Axis.WorkflowEngine.Application.Services;
 using Axis.WorkflowEngine.Domain.Enums;
 using FluentAssertions;
-using FluentValidation;
 using NSubstitute;
 
 namespace Axis.WorkflowEngine.Application.Tests.Commands;
@@ -25,11 +25,12 @@ public class StartExecutionHandlerTests
     {
         _workflowReader.IsActiveAsync(WorkflowId, OrgId).Returns(true);
 
-        var result = await CreateHandler().Handle(
+        Result<Guid> result = await CreateHandler().Handle(
             new StartExecutionCommand(WorkflowId, OrgId, TriggerType.Manual, UserId, new Dictionary<string, object?>()),
             CancellationToken.None);
 
-        result.Should().NotBeEmpty();
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotBeEmpty();
         await _execRepo.Received(1).AddAsync(
             Arg.Is<Domain.Aggregates.WorkflowExecution>(e =>
                 e.WorkflowDefinitionId == WorkflowId &&
@@ -39,14 +40,16 @@ public class StartExecutionHandlerTests
     }
 
     [Fact]
-    public async Task Throws_when_workflow_is_not_active()
+    public async Task Workflow_not_active_returns_business_rule_failure()
     {
         _workflowReader.IsActiveAsync(WorkflowId, OrgId).Returns(false);
 
-        var act = async () => await CreateHandler().Handle(
+        Result<Guid> result = await CreateHandler().Handle(
             new StartExecutionCommand(WorkflowId, OrgId, TriggerType.Manual, UserId, new Dictionary<string, object?>()),
             CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>().WithMessage("*cannot be triggered*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.Error.Should().Contain("cannot be triggered");
     }
 }

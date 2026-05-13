@@ -2,8 +2,8 @@ using Axis.Identity.Application.Commands.CreateRole;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
-using FluentValidation;
 using NSubstitute;
 
 namespace Axis.Identity.Application.Tests.Commands;
@@ -28,9 +28,10 @@ public class CreateRoleHandlerTests
     {
         _roleRepo.NameExistsAsync("Manager", OrgId).Returns(false);
 
-        var roleId = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
+        Result<Guid> result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
-        roleId.Should().NotBeEmpty();
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotBeEmpty();
         await _roleRepo.Received(1).AddAsync(
             Arg.Is<Role>(r => r.Name == "Manager" && r.OrganizationId == OrgId),
             Arg.Any<CancellationToken>());
@@ -38,25 +39,27 @@ public class CreateRoleHandlerTests
     }
 
     [Fact]
-    public async Task Duplicate_name_throws_validation_exception()
+    public async Task Duplicate_name_returns_conflict()
     {
         _roleRepo.NameExistsAsync("Manager", OrgId).Returns(true);
 
-        var act = async () => await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
+        Result<Guid> result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*already exists*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.Conflict);
+        result.Error.Should().Contain("already exists");
     }
 
     [Fact]
-    public async Task Empty_permissions_throws_validation_exception()
+    public async Task Empty_permissions_returns_business_rule_failure()
     {
-        var command = ValidCommand() with { Permissions = [] };
+        CreateRoleCommand command = ValidCommand() with { Permissions = [] };
         _roleRepo.NameExistsAsync(Arg.Any<string>(), OrgId).Returns(false);
 
-        var act = async () => await CreateHandler().Handle(command, CancellationToken.None);
+        Result<Guid> result = await CreateHandler().Handle(command, CancellationToken.None);
 
-        await act.Should().ThrowAsync<ValidationException>()
-            .WithMessage("*at least one permission*");
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.Error.Should().Contain("at least one permission");
     }
 }
