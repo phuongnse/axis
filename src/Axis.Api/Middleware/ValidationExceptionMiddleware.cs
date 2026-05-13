@@ -1,8 +1,11 @@
 using FluentValidation;
-using System.Text.Json;
 
 namespace Axis.Api.Middleware;
 
+/// <summary>
+/// Catches FluentValidation.ValidationException bubbled up by ValidationBehavior
+/// and converts it to an RFC 7807 ProblemDetails response (HTTP 400).
+/// </summary>
 internal sealed class ValidationExceptionMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(HttpContext context)
@@ -13,10 +16,7 @@ internal sealed class ValidationExceptionMiddleware(RequestDelegate next)
         }
         catch (ValidationException ex)
         {
-            context.Response.StatusCode = StatusCodes.Status422UnprocessableEntity;
-            context.Response.ContentType = "application/json";
-
-            var errors = (ex.Errors ?? [])
+            Dictionary<string, string[]> errors = (ex.Errors ?? [])
                 .GroupBy(e => e.PropertyName)
                 .ToDictionary(
                     g => g.Key,
@@ -25,11 +25,11 @@ internal sealed class ValidationExceptionMiddleware(RequestDelegate next)
             if (errors.Count == 0 && !string.IsNullOrEmpty(ex.Message))
                 errors[""] = [ex.Message];
 
-            var body = JsonSerializer.Serialize(
-                new { error = "validation_failed", errors },
-                new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
-
-            await context.Response.WriteAsync(body);
+            await Results.ValidationProblem(
+                errors,
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "One or more validation errors occurred.")
+                .ExecuteAsync(context);
         }
     }
 }

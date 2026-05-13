@@ -1,7 +1,8 @@
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
+using Axis.Identity.Domain.Aggregates;
 using Axis.Shared.Application.CQRS;
-using FluentValidation;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Identity.Application.Commands.DeactivateUser;
 
@@ -10,23 +11,24 @@ public sealed class DeactivateUserHandler(
     IUnitOfWork uow)
     : ICommandHandler<DeactivateUserCommand>
 {
-    public async Task Handle(DeactivateUserCommand command, CancellationToken cancellationToken)
+    public async Task<Result> Handle(DeactivateUserCommand command, CancellationToken cancellationToken)
     {
         // US-019: cannot deactivate yourself
         if (command.UserId == command.RequesterId)
-            throw new ValidationException("You cannot deactivate yourself.");
+            return Result.Failure(ErrorCodes.BusinessRule, "You cannot deactivate yourself.");
 
-        var user = await userRepo.GetByIdAsync(command.UserId, command.OrganizationId, cancellationToken);
+        User? user = await userRepo.GetByIdAsync(command.UserId, command.OrganizationId, cancellationToken);
         if (user is null)
-            throw new ValidationException("User not found.");
+            return Result.Failure(ErrorCodes.NotFound, "User not found.");
 
         // US-019: cannot deactivate last admin
-        var adminCount = await userRepo.CountAdminsAsync(
+        int adminCount = await userRepo.CountAdminsAsync(
             command.OrganizationId, command.AdminRoleId, cancellationToken);
         if (adminCount <= 1 && user.RoleIds.Contains(command.AdminRoleId))
-            throw new ValidationException("You cannot deactivate the last admin of the organization.");
+            return Result.Failure(ErrorCodes.BusinessRule, "You cannot deactivate the last admin of the organization.");
 
         user.Deactivate();
         await uow.SaveChangesAsync(cancellationToken);
+        return Result.Success();
     }
 }

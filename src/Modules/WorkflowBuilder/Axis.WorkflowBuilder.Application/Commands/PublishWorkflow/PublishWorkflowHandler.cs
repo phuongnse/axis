@@ -1,7 +1,8 @@
 using Axis.Shared.Application.CQRS;
+using Axis.Shared.Domain.Primitives;
 using Axis.WorkflowBuilder.Application.Repositories;
 using Axis.WorkflowBuilder.Application.Services;
-using FluentValidation;
+using Axis.WorkflowBuilder.Domain.Aggregates;
 
 namespace Axis.WorkflowBuilder.Application.Commands.PublishWorkflow;
 
@@ -11,11 +12,12 @@ public sealed class PublishWorkflowHandler(
     IUnitOfWork uow)
     : ICommandHandler<PublishWorkflowCommand>
 {
-    public async Task Handle(PublishWorkflowCommand command, CancellationToken cancellationToken)
+    public async Task<Result> Handle(PublishWorkflowCommand command, CancellationToken cancellationToken)
     {
-        var workflow = await workflowRepo.GetByIdAsync(command.WorkflowId, command.OrganizationId, cancellationToken);
+        WorkflowDefinition? workflow = await workflowRepo.GetByIdAsync(
+            command.WorkflowId, command.OrganizationId, cancellationToken);
         if (workflow is null)
-            throw new ValidationException("Workflow not found.");
+            return Result.Failure(ErrorCodes.NotFound, "Workflow not found.");
 
         try
         {
@@ -23,9 +25,11 @@ public sealed class PublishWorkflowHandler(
         }
         catch (InvalidOperationException ex)
         {
-            throw new ValidationException(ex.Message);
+            return Result.Failure(ErrorCodes.BusinessRule, ex.Message);
         }
 
         await uow.SaveChangesAsync(cancellationToken);
+
+        return Result.Success();
     }
 }

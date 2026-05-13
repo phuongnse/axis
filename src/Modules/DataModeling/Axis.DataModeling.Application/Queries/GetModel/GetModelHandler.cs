@@ -1,16 +1,19 @@
 using Axis.DataModeling.Application.Repositories;
+using Axis.DataModeling.Domain.Aggregates;
 using Axis.Shared.Application.CQRS;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Queries.GetModel;
 
 /// <summary>US-031/032: Loads a model with its complete field list.</summary>
 public sealed class GetModelHandler(IDataModelRepository modelRepo)
-    : IQueryHandler<GetModelQuery, ModelDetailDto?>
+    : IQueryHandler<GetModelQuery, Result<ModelDetailDto>>
 {
-    public async Task<ModelDetailDto?> Handle(GetModelQuery query, CancellationToken cancellationToken)
+    public async Task<Result<ModelDetailDto>> Handle(GetModelQuery query, CancellationToken cancellationToken)
     {
-        var model = await modelRepo.GetByIdAsync(query.ModelId, query.OrganizationId, cancellationToken);
-        if (model is null) return null;
+        DataModel? model = await modelRepo.GetByIdAsync(query.ModelId, query.OrganizationId, cancellationToken);
+        if (model is null)
+            return Result.Failure<ModelDetailDto>(ErrorCodes.NotFound, "Model not found.");
 
         return new ModelDetailDto(
             model.Id,

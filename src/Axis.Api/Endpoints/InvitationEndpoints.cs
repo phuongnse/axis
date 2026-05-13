@@ -1,7 +1,10 @@
+using Axis.Api.Extensions;
 using Axis.Api.Infrastructure;
 using Axis.Identity.Application.Commands.AcceptInvitation;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
+using Axis.Identity.Domain.Aggregates;
+using Axis.Shared.Domain.Primitives;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,7 +14,7 @@ public static class InvitationEndpoints
 {
     public static IEndpointRouteBuilder MapInvitationEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/invitations");
+        RouteGroupBuilder group = app.MapGroup("/api/invitations");
 
         group.MapGet("/{token}", GetInvitation)
             .WithName("GetInvitation")
@@ -26,7 +29,9 @@ public static class InvitationEndpoints
             .WithTags("Identity")
             .Produces<object>()
             .ProducesProblem(400)
-            .ProducesProblem(404);
+            .ProducesProblem(404)
+            .ProducesProblem(409)
+            .ProducesProblem(422);
 
         return app;
     }
@@ -36,9 +41,9 @@ public static class InvitationEndpoints
         IInvitationRepository invitationRepository,
         CancellationToken ct)
     {
-        var invitation = await invitationRepository.GetByTokenAsync(token, ct);
+        Invitation? invitation = await invitationRepository.GetByTokenAsync(token, ct);
         if (invitation is null)
-            return Results.NotFound(new { error = "invitation_not_found" });
+            return Results.Problem("Invitation not found.", statusCode: StatusCodes.Status404NotFound);
 
         return Results.Ok(new
         {
@@ -59,13 +64,15 @@ public static class InvitationEndpoints
         HttpContext httpContext,
         CancellationToken ct)
     {
-        var result = await mediator.Send(
+        Result<AcceptInvitationResult> result = await mediator.Send(
             new AcceptInvitationCommand(token, request.FirstName, request.LastName, request.Password), ct);
 
+        if (result.IsFailure) return result.ToProblemDetails();
+
         return await TokenHelper.IssueTokensAsync(
-            result.UserId, result.OrganizationId,
-            result.Email, result.FullName,
-            result.Permissions,
+            result.Value.UserId, result.Value.OrganizationId,
+            result.Value.Email, result.Value.FullName,
+            result.Value.Permissions,
             tokenService, refreshTokenStore, configuration, httpContext, ct);
     }
 }

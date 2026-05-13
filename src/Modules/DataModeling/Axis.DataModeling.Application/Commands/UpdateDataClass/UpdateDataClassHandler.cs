@@ -1,7 +1,8 @@
 using Axis.DataModeling.Application.Repositories;
 using Axis.DataModeling.Application.Services;
+using Axis.DataModeling.Domain.Aggregates;
 using Axis.Shared.Application.CQRS;
-using FluentValidation;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Commands.UpdateDataClass;
 
@@ -11,14 +12,14 @@ public sealed class UpdateDataClassHandler(
     IUnitOfWork uow)
     : ICommandHandler<UpdateDataClassCommand>
 {
-    public async Task Handle(UpdateDataClassCommand command, CancellationToken cancellationToken)
+    public async Task<Result> Handle(UpdateDataClassCommand command, CancellationToken cancellationToken)
     {
-        var dc = await dataClassRepo.GetByIdAsync(command.DataClassId, command.OrganizationId, cancellationToken);
+        DataClass? dc = await dataClassRepo.GetByIdAsync(command.DataClassId, command.OrganizationId, cancellationToken);
         if (dc is null)
-            throw new ValidationException("Data class not found.");
+            return Result.Failure(ErrorCodes.NotFound, "Data class not found.");
 
         if (await dataClassRepo.NameExistsAsync(command.Name, command.OrganizationId, command.DataClassId, cancellationToken))
-            throw new ValidationException($"A data class named '{command.Name}' already exists.");
+            return Result.Failure(ErrorCodes.Conflict, $"A data class named '{command.Name}' already exists.");
 
         try
         {
@@ -26,9 +27,10 @@ public sealed class UpdateDataClassHandler(
         }
         catch (ArgumentException ex)
         {
-            throw new ValidationException(ex.Message);
+            return Result.Failure(ErrorCodes.BusinessRule, ex.Message);
         }
 
         await uow.SaveChangesAsync(cancellationToken);
+        return Result.Success();
     }
 }

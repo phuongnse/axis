@@ -1,7 +1,8 @@
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
+using Axis.Identity.Domain.Aggregates;
 using Axis.Shared.Application.CQRS;
-using FluentValidation;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Identity.Application.Commands.ResetPassword;
 
@@ -12,29 +13,31 @@ public sealed class ResetPasswordHandler(
     IUnitOfWork uow)
     : ICommandHandler<ResetPasswordCommand>
 {
-    public async Task Handle(ResetPasswordCommand command, CancellationToken cancellationToken)
+    public async Task<Result> Handle(ResetPasswordCommand command, CancellationToken cancellationToken)
     {
         if (command.NewPassword != command.PasswordConfirmation)
-            throw new ValidationException("Passwords do not match.");
+            return Result.Failure(ErrorCodes.BusinessRule, "Passwords do not match.");
 
         if (!IsStrongPassword(command.NewPassword))
-            throw new ValidationException(
+            return Result.Failure(ErrorCodes.BusinessRule,
                 "Password must be at least 8 characters and contain at least one letter and one number.");
 
-        var tokenHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+        string tokenHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
             System.Text.Encoding.UTF8.GetBytes(command.Token)));
 
-        var userId = await tokenStore.FindUserIdByTokenHashAsync(tokenHash, cancellationToken);
+        Guid? userId = await tokenStore.FindUserIdByTokenHashAsync(tokenHash, cancellationToken);
         if (userId is null)
-            throw new ValidationException("This reset link has expired. Please request a new one.");
+            return Result.Failure(ErrorCodes.BusinessRule, "This reset link has expired. Please request a new one.");
 
-        var user = await userRepo.GetByIdPlatformWideAsync(userId.Value, cancellationToken);
+        User? user = await userRepo.GetByIdPlatformWideAsync(userId.Value, cancellationToken);
         if (user is null)
-            throw new ValidationException("This reset link has expired. Please request a new one.");
+            return Result.Failure(ErrorCodes.BusinessRule, "This reset link has expired. Please request a new one.");
 
         user.SetPasswordHash(hasher.Hash(command.NewPassword));
         await tokenStore.InvalidateAsync(tokenHash, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);
+
+        return Result.Success();
     }
 
     private static bool IsStrongPassword(string password) =>

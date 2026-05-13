@@ -3,7 +3,7 @@ using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.ValueObjects;
 using Axis.Shared.Application.CQRS;
-using MediatR;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Identity.Application.Commands.RegisterOrganization;
 
@@ -54,27 +54,27 @@ public sealed class RegisterOrganizationHandler(
         "form:submit"
     ];
 
-    public async Task Handle(RegisterOrganizationCommand command, CancellationToken cancellationToken)
+    public async Task<Result> Handle(RegisterOrganizationCommand command, CancellationToken cancellationToken)
     {
         // Per US-001: always show the same screen — no leakage if email already exists
-        var email = Email.Create(command.AdminEmail);
-        if (email.IsFailure) return; // validation layer handles this before handler is reached
+        Result<Email> email = Email.Create(command.AdminEmail);
+        if (email.IsFailure) return Result.Success(); // validation layer handles this before handler is reached
 
         if (await userRepo.EmailExistsPlatformWideAsync(email.Value, cancellationToken))
-            return; // silently succeed — same confirmation screen shown
+            return Result.Success(); // silently succeed — same confirmation screen shown
 
         // Generate unique slug from org name
-        var slug = await GenerateUniqueSlugAsync(command.OrgName, cancellationToken);
+        OrganizationSlug slug = await GenerateUniqueSlugAsync(command.OrgName, cancellationToken);
 
         // Create Organization
-        var org = Organization.Create(command.OrgName, slug, email.Value);
+        Organization org = Organization.Create(command.OrgName, slug, email.Value);
         await orgRepo.AddAsync(org, cancellationToken);
 
         // Seed 4 system roles for this org
-        var adminRole = Role.CreateSystem("Admin", org.Id, AdminPermissions);
-        var editorRole = Role.CreateSystem("Editor", org.Id, EditorPermissions);
-        var viewerRole = Role.CreateSystem("Viewer", org.Id, ViewerPermissions);
-        var endUserRole = Role.CreateSystem("End User", org.Id, EndUserPermissions);
+        Role adminRole = Role.CreateSystem("Admin", org.Id, AdminPermissions);
+        Role editorRole = Role.CreateSystem("Editor", org.Id, EditorPermissions);
+        Role viewerRole = Role.CreateSystem("Viewer", org.Id, ViewerPermissions);
+        Role endUserRole = Role.CreateSystem("End User", org.Id, EndUserPermissions);
 
         await roleRepo.AddAsync(adminRole, cancellationToken);
         await roleRepo.AddAsync(editorRole, cancellationToken);
@@ -82,8 +82,8 @@ public sealed class RegisterOrganizationHandler(
         await roleRepo.AddAsync(endUserRole, cancellationToken);
 
         // Create admin user
-        var passwordHash = hasher.Hash(command.Password);
-        var user = User.Create(command.AdminFirstName, command.AdminLastName, email.Value, org.Id);
+        string passwordHash = hasher.Hash(command.Password);
+        User user = User.Create(command.AdminFirstName, command.AdminLastName, email.Value, org.Id);
         user.SetPasswordHash(passwordHash);
         user.AssignRole(adminRole.Id);
         await userRepo.AddAsync(user, cancellationToken);
@@ -95,12 +95,14 @@ public sealed class RegisterOrganizationHandler(
             email.Value.Value,
             verificationToken: user.Id.ToString(), // simplified; real impl uses a dedicated token
             cancellationToken);
+
+        return Result.Success();
     }
 
     private async Task<OrganizationSlug> GenerateUniqueSlugAsync(string orgName, CancellationToken ct)
     {
-        var baseSlug = GenerateSlugFromName(orgName);
-        var candidate = OrganizationSlug.Create(baseSlug);
+        string baseSlug = GenerateSlugFromName(orgName);
+        Result<OrganizationSlug> candidate = OrganizationSlug.Create(baseSlug);
 
         if (candidate.IsSuccess && !await orgRepo.SlugExistsAsync(candidate.Value, ct))
             return candidate.Value;
@@ -108,8 +110,8 @@ public sealed class RegisterOrganizationHandler(
         // Append random suffix until unique
         for (int i = 0; i < 10; i++)
         {
-            var suffix = Random.Shared.Next(1000, 9999).ToString();
-            var withSuffix = OrganizationSlug.Create($"{baseSlug}-{suffix}");
+            string suffix = Random.Shared.Next(1000, 9999).ToString();
+            Result<OrganizationSlug> withSuffix = OrganizationSlug.Create($"{baseSlug}-{suffix}");
             if (withSuffix.IsSuccess && !await orgRepo.SlugExistsAsync(withSuffix.Value, ct))
                 return withSuffix.Value;
         }

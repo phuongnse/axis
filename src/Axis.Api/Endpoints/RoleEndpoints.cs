@@ -1,8 +1,11 @@
 using Axis.Api.Authorization;
+using Axis.Api.Extensions;
 using Axis.Api.Infrastructure;
 using Axis.Identity.Application.Commands.CreateRole;
 using Axis.Identity.Application.Commands.UpdateRole;
 using Axis.Identity.Application.Queries.GetRoles;
+using Axis.Shared.Application;
+using Axis.Shared.Domain.Primitives;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,7 +15,7 @@ public static class RoleEndpoints
 {
     public static IEndpointRouteBuilder MapRoleEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/roles").RequireAuthorization();
+        RouteGroupBuilder group = app.MapGroup("/api/roles").RequireAuthorization();
 
         group.MapGet("/", GetRoles)
             .RequireAuthorization(Permissions.Roles.Read)
@@ -28,7 +31,7 @@ public static class RoleEndpoints
             .WithName("CreateRole")
             .WithSummary("Create a new role")
             .WithTags("Identity")
-            .Produces<object>()
+            .Produces<object>(201)
             .ProducesProblem(400)
             .ProducesProblem(401)
             .ProducesProblem(403)
@@ -55,7 +58,7 @@ public static class RoleEndpoints
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        var result = await mediator.Send(new GetRolesQuery(currentUser.OrgId, page, pageSize), ct);
+        PagedResult<RoleDto> result = await mediator.Send(new GetRolesQuery(currentUser.OrgId, page, pageSize), ct);
         return Results.Ok(result);
     }
 
@@ -65,13 +68,14 @@ public static class RoleEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        var roleId = await mediator.Send(new CreateRoleCommand(
+        Result<Guid> result = await mediator.Send(new CreateRoleCommand(
             currentUser.OrgId,
             request.Name,
             request.Description,
             request.Permissions), ct);
 
-        return Results.Ok(new { id = roleId, message = $"Role '{request.Name}' created." });
+        if (result.IsFailure) return result.ToProblemDetails();
+        return Results.Created($"/api/roles/{result.Value}", new { id = result.Value, message = $"Role '{request.Name}' created." });
     }
 
     private static async Task<IResult> UpdateRole(
@@ -81,13 +85,14 @@ public static class RoleEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        await mediator.Send(new UpdateRoleCommand(
+        Result result = await mediator.Send(new UpdateRoleCommand(
             roleId,
             currentUser.OrgId,
             request.Name,
             request.Description,
             request.Permissions), ct);
 
+        if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
 }

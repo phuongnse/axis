@@ -1,5 +1,6 @@
 using Axis.DataModeling.Application.Queries.GetRecords;
 using Axis.Shared.Application.CQRS;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Queries.GetRecord;
 
@@ -7,4 +8,4 @@ namespace Axis.DataModeling.Application.Queries.GetRecord;
 public sealed record GetRecordQuery(
     Guid RecordId,
     Guid ModelId,
-    Guid OrganizationId) : IQuery<RecordDto?>;
+    Guid OrganizationId) : IQuery<Result<RecordDto>>;

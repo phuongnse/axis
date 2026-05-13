@@ -1,3 +1,4 @@
+using Axis.Api.Extensions;
 using Axis.Api.Infrastructure;
 using Axis.Identity.Application.Commands.AuthenticateUser;
 using Axis.Identity.Application.Commands.RequestPasswordReset;
@@ -6,6 +7,7 @@ using Axis.Identity.Application.Commands.VerifyEmail;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
+using Axis.Shared.Domain.Primitives;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,7 +17,7 @@ public static class AuthEndpoints
 {
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/auth");
+        RouteGroupBuilder group = app.MapGroup("/api/auth");
 
         group.MapPost("/signin", SignIn)
             .WithName("SignIn")
@@ -44,14 +46,13 @@ public static class AuthEndpoints
             .WithSummary("Verify email address with a one-time token")
             .WithTags("Identity")
             .Produces(204)
-            .ProducesProblem(400);
+            .ProducesProblem(422);
 
         group.MapPost("/resend-verification", ResendVerification)
             .WithName("ResendEmailVerification")
             .WithSummary("Resend email verification link")
             .WithTags("Identity")
-            .Produces(204)
-            .ProducesProblem(400);
+            .Produces(204);
 
         group.MapPost("/forgot-password", ForgotPassword)
             .WithName("ForgotPassword")
@@ -64,7 +65,7 @@ public static class AuthEndpoints
             .WithSummary("Reset password using a one-time token")
             .WithTags("Identity")
             .Produces(204)
-            .ProducesProblem(400);
+            .ProducesProblem(422);
 
         return app;
     }
@@ -78,41 +79,35 @@ public static class AuthEndpoints
         HttpContext httpContext,
         CancellationToken ct)
     {
-        var result = await mediator.Send(
+        Result<AuthenticationResult> result = await mediator.Send(
             new AuthenticateUserCommand(request.Email, request.Password), ct);
 
-        if (!result.Success)
+        if (result.IsFailure)
+            return result.ToProblemDetails();
+
+        if (!result.Value.Success)
         {
-            return result.FailureReason switch
+            return result.Value.FailureReason switch
             {
-                AuthFailureReason.AccountLocked => Results.Json(new
-                {
-                    error = "account_locked",
-                    message = $"Too many failed attempts. Try again after {result.LockedUntil:HH:mm} UTC.",
-                    locked_until = result.LockedUntil,
-                }, statusCode: 401),
-                AuthFailureReason.AccountDeactivated => Results.Json(new
-                {
-                    error = "account_deactivated",
-                    message = "Your account has been deactivated. Contact your organization admin.",
-                }, statusCode: 401),
-                AuthFailureReason.EmailNotVerified => Results.Json(new
-                {
-                    error = "email_not_verified",
-                    message = "Please verify your email before signing in.",
-                }, statusCode: 401),
-                _ => Results.Json(new
-                {
-                    error = "invalid_credentials",
-                    message = "Incorrect email or password.",
-                }, statusCode: 401),
+                AuthFailureReason.AccountLocked => Results.Problem(
+                    detail: $"Too many failed attempts. Try again after {result.Value.LockedUntil:HH:mm} UTC.",
+                    statusCode: StatusCodes.Status401Unauthorized),
+                AuthFailureReason.AccountDeactivated => Results.Problem(
+                    detail: "Your account has been deactivated. Contact your organization admin.",
+                    statusCode: StatusCodes.Status401Unauthorized),
+                AuthFailureReason.EmailNotVerified => Results.Problem(
+                    detail: "Please verify your email before signing in.",
+                    statusCode: StatusCodes.Status401Unauthorized),
+                _ => Results.Problem(
+                    detail: "Incorrect email or password.",
+                    statusCode: StatusCodes.Status401Unauthorized),
             };
         }
 
         return await TokenHelper.IssueTokensAsync(
-            result.UserId, result.OrganizationId,
-            result.Email, result.FullName,
-            result.Permissions,
+            result.Value.UserId, result.Value.OrganizationId,
+            result.Value.Email, result.Value.FullName,
+            result.Value.Permissions,
             tokenService, refreshTokenStore, configuration, httpContext, ct);
     }
 
@@ -125,31 +120,31 @@ public static class AuthEndpoints
         HttpContext httpContext,
         CancellationToken ct)
     {
-        var rawToken = httpContext.Request.Cookies["refresh_token"];
+        string? rawToken = httpContext.Request.Cookies["refresh_token"];
         if (string.IsNullOrEmpty(rawToken))
-            return Results.Json(new { error = "missing_refresh_token" }, statusCode: 401);
+            return Results.Problem("Missing refresh token.", statusCode: StatusCodes.Status401Unauthorized);
 
-        var hash = tokenService.HashToken(rawToken);
-        var info = await refreshTokenStore.FindByHashAsync(hash, ct);
+        string hash = tokenService.HashToken(rawToken);
+        RefreshTokenInfo? info = await refreshTokenStore.FindByHashAsync(hash, ct);
 
         if (info is null)
         {
             httpContext.Response.Cookies.Delete("refresh_token",
                 new CookieOptions { Path = "/api/auth" });
-            return Results.Json(new { error = "invalid_refresh_token" }, statusCode: 401);
+            return Results.Problem("The refresh token is invalid or has been revoked.", statusCode: StatusCodes.Status401Unauthorized);
         }
 
-        var user = await userRepository.GetByIdPlatformWideAsync(info.UserId, ct);
+        User? user = await userRepository.GetByIdPlatformWideAsync(info.UserId, ct);
         if (user is null || user.Status != UserStatus.Active)
         {
             await refreshTokenStore.RevokeAsync(info.Id, ct);
             httpContext.Response.Cookies.Delete("refresh_token",
                 new CookieOptions { Path = "/api/auth" });
-            return Results.Json(new { error = "account_deactivated" }, statusCode: 401);
+            return Results.Problem("Account has been deactivated.", statusCode: StatusCodes.Status401Unauthorized);
         }
 
-        var roles = await roleRepository.GetByIdsAsync(user.RoleIds, info.OrganizationId!, ct);
-        var permissions = roles.SelectMany(r => r.Permissions).Distinct().ToList();
+        IReadOnlyList<Role> roles = await roleRepository.GetByIdsAsync(user.RoleIds, info.OrganizationId!, ct);
+        List<string> permissions = roles.SelectMany(r => r.Permissions).Distinct().ToList();
 
         // Revoke the used token before issuing a new one (refresh token rotation).
         // If the old token is replayed after this point it will be rejected, invalidating
@@ -174,11 +169,11 @@ public static class AuthEndpoints
         HttpContext httpContext,
         CancellationToken ct)
     {
-        var rawToken = httpContext.Request.Cookies["refresh_token"];
+        string? rawToken = httpContext.Request.Cookies["refresh_token"];
         if (!string.IsNullOrEmpty(rawToken))
         {
-            var hash = tokenService.HashToken(rawToken);
-            var info = await refreshTokenStore.FindByHashAsync(hash, ct);
+            string hash = tokenService.HashToken(rawToken);
+            RefreshTokenInfo? info = await refreshTokenStore.FindByHashAsync(hash, ct);
             if (info is not null)
                 await refreshTokenStore.RevokeAsync(info.Id, ct);
         }
@@ -186,7 +181,7 @@ public static class AuthEndpoints
         // Blacklist the access token's JTI for its remaining lifetime so it can't be
         // replayed after sign-out. TTL mirrors the token TTL — once the token would have
         // expired anyway the blacklist entry can safely be evicted.
-        var ttl = TimeSpan.FromMinutes(
+        TimeSpan ttl = TimeSpan.FromMinutes(
             int.Parse(configuration["Jwt:AccessTokenTtlMinutes"] ?? "15"));
         await jtiBlacklist.BlacklistAsync(currentUser.Jti, ttl, ct);
 
@@ -200,7 +195,8 @@ public static class AuthEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        await mediator.Send(new VerifyEmailCommand(request.Token), ct);
+        Result result = await mediator.Send(new VerifyEmailCommand(request.Token), ct);
+        if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
 
@@ -230,8 +226,9 @@ public static class AuthEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        await mediator.Send(
+        Result result = await mediator.Send(
             new ResetPasswordCommand(request.Token, request.NewPassword, request.ConfirmPassword), ct);
+        if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
 }

@@ -9,11 +9,8 @@
 - `Axis.Shared.Application`: ICommand/IQuery/ICommandHandler/IQueryHandler, ValidationBehavior, TenantContext/ITenantContext
 - `Axis.Shared.Infrastructure`: AxisDbContext, TenantSchemaInterceptor, UnitOfWork, MessageBus
 
-> ⚠️ **Known gaps requiring refactor:**
-> - **Wolverine not configured**: `builder.Host.UseWolverine(...)` is absent from `Program.cs`. The outbox-based domain event dispatch described in PATTERNS.md is not yet wired up. All Wolverine integration (outbox, durable queues, PostgreSQL transport) must be added as part of E01 Platform Foundation.
-> - **ProblemDetails not implemented**: `ValidationExceptionMiddleware` and JWT error events return custom JSON instead of RFC 7807 ProblemDetails. All error responses must be refactored to use `result.ToProblemDetails()` per CLAUDE.md.
-> - **InMemoryDatabase used in test**: `tests/Shared/Axis.Shared.Infrastructure.Tests/Persistence/UnitOfWorkTests.cs` uses `UseInMemoryDatabase`. Must be replaced with Testcontainers. `Microsoft.EntityFrameworkCore.InMemory` package should be removed from `Directory.Packages.props` after migration.
-> - **CORS uses `AddDefaultPolicy`**: `Program.cs` registers an unnamed default policy. Must be changed to a named policy per CLAUDE.md.
+> ⚠️ **Remaining gap (deferred):**
+> - **Wolverine durable outbox not configured**: Wolverine is wired (`UseWolverine` + `UseEntityFrameworkCoreTransactions`) and `IMessageBus` resolves correctly. Domain events are dispatched in-memory after `SaveChangesAsync`. The durable PostgreSQL outbox (survives process restart) is deferred until a decision is made on the Wolverine persistence schema strategy — tracked as E01 Platform Foundation gap.
 
 ## Identity — E02-identity-access
 

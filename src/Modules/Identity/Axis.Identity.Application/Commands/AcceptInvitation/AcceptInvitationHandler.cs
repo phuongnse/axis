@@ -2,7 +2,7 @@ using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Shared.Application.CQRS;
-using FluentValidation;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Identity.Application.Commands.AcceptInvitation;
 
@@ -15,12 +15,12 @@ public sealed class AcceptInvitationHandler(
     IUnitOfWork uow)
     : ICommandHandler<AcceptInvitationCommand, AcceptInvitationResult>
 {
-    public async Task<AcceptInvitationResult> Handle(
+    public async Task<Result<AcceptInvitationResult>> Handle(
         AcceptInvitationCommand command, CancellationToken cancellationToken)
     {
-        var invitation = await invitationRepo.GetByTokenAsync(command.Token, cancellationToken);
+        Invitation? invitation = await invitationRepo.GetByTokenAsync(command.Token, cancellationToken);
         if (invitation is null)
-            throw new ValidationException("Invalid or unknown invitation token.");
+            return Result.Failure<AcceptInvitationResult>(ErrorCodes.NotFound, "Invalid or unknown invitation token.");
 
         try
         {
@@ -28,24 +28,24 @@ public sealed class AcceptInvitationHandler(
         }
         catch (InvalidOperationException ex)
         {
-            throw new ValidationException(ex.Message);
+            return Result.Failure<AcceptInvitationResult>(ErrorCodes.BusinessRule, ex.Message);
         }
 
         if (await userRepo.EmailExistsPlatformWideAsync(invitation.Email, cancellationToken))
-            throw new ValidationException(
+            return Result.Failure<AcceptInvitationResult>(ErrorCodes.Conflict,
                 "An account with this email already exists. Please sign in with your existing credentials.");
 
-        var passwordHash = hasher.Hash(command.Password);
+        string passwordHash = hasher.Hash(command.Password);
 
-        var user = User.Create(command.FirstName, command.LastName, invitation.Email, invitation.OrganizationId);
+        User user = User.Create(command.FirstName, command.LastName, invitation.Email, invitation.OrganizationId);
         user.SetPasswordHash(passwordHash);
         user.AssignRole(invitation.RoleId);
 
         await userRepo.AddAsync(user, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);
 
-        var roles = await roleRepo.GetByIdsAsync([invitation.RoleId], invitation.OrganizationId, cancellationToken);
-        var permissions = roles.SelectMany(r => r.Permissions).Distinct().ToList();
+        IReadOnlyList<Role> roles = await roleRepo.GetByIdsAsync([invitation.RoleId], invitation.OrganizationId, cancellationToken);
+        List<string> permissions = roles.SelectMany(r => r.Permissions).Distinct().ToList();
 
         return new AcceptInvitationResult(
             user.Id,

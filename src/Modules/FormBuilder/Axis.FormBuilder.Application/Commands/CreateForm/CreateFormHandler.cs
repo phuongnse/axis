@@ -2,7 +2,7 @@ using Axis.FormBuilder.Application.Repositories;
 using Axis.FormBuilder.Application.Services;
 using Axis.FormBuilder.Domain.Aggregates;
 using Axis.Shared.Application.CQRS;
-using FluentValidation;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.FormBuilder.Application.Commands.CreateForm;
 
@@ -12,12 +12,13 @@ public sealed class CreateFormHandler(
     IUnitOfWork uow)
     : ICommandHandler<CreateFormCommand, Guid>
 {
-    public async Task<Guid> Handle(CreateFormCommand command, CancellationToken cancellationToken)
+    public async Task<Result<Guid>> Handle(CreateFormCommand command, CancellationToken cancellationToken)
     {
         if (await formRepo.NameExistsAsync(command.Name, command.OrganizationId, null, cancellationToken))
-            throw new ValidationException($"A form named '{command.Name}' already exists.");
+            return Result.Failure<Guid>(ErrorCodes.Conflict, $"A form named '{command.Name}' already exists.");
 
-        FormDefinition form = FormDefinition.Create(command.Name, command.Description, command.OrganizationId, command.CreatedBy);
+        FormDefinition form = FormDefinition.Create(
+            command.Name, command.Description, command.OrganizationId, command.CreatedBy);
 
         await formRepo.AddAsync(form, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);

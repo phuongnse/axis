@@ -1,7 +1,7 @@
 using Axis.DataModeling.Application.Repositories;
 using Axis.DataModeling.Application.Services;
 using Axis.Shared.Application.CQRS;
-using FluentValidation;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Commands.UpdateModel;
 
@@ -11,14 +11,14 @@ public sealed class UpdateModelHandler(
     IUnitOfWork uow)
     : ICommandHandler<UpdateModelCommand>
 {
-    public async Task Handle(UpdateModelCommand command, CancellationToken cancellationToken)
+    public async Task<Result> Handle(UpdateModelCommand command, CancellationToken cancellationToken)
     {
-        var model = await modelRepo.GetByIdAsync(command.ModelId, command.OrganizationId, cancellationToken);
+        DataModeling.Domain.Aggregates.DataModel? model = await modelRepo.GetByIdAsync(command.ModelId, command.OrganizationId, cancellationToken);
         if (model is null)
-            throw new ValidationException("Model not found.");
+            return Result.Failure(ErrorCodes.NotFound, "Model not found.");
 
         if (await modelRepo.NameExistsAsync(command.Name, command.OrganizationId, command.ModelId, cancellationToken))
-            throw new ValidationException($"A model named '{command.Name}' already exists.");
+            return Result.Failure(ErrorCodes.Conflict, $"A model named '{command.Name}' already exists.");
 
         try
         {
@@ -26,9 +26,10 @@ public sealed class UpdateModelHandler(
         }
         catch (ArgumentException ex)
         {
-            throw new ValidationException(ex.Message);
+            return Result.Failure(ErrorCodes.BusinessRule, ex.Message);
         }
 
         await uow.SaveChangesAsync(cancellationToken);
+        return Result.Success();
     }
 }

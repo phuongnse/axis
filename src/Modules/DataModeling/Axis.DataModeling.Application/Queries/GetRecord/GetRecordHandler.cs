@@ -1,17 +1,20 @@
 using Axis.DataModeling.Application.Queries.GetRecords;
 using Axis.DataModeling.Application.Repositories;
+using Axis.DataModeling.Domain.Aggregates;
 using Axis.Shared.Application.CQRS;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Queries.GetRecord;
 
-/// <summary>US-044: Returns a single record or null if not found.</summary>
+/// <summary>US-044: Returns a single record by ID; 404 if not found.</summary>
 public sealed class GetRecordHandler(IDataRecordRepository recordRepo)
-    : IQueryHandler<GetRecordQuery, RecordDto?>
+    : IQueryHandler<GetRecordQuery, Result<RecordDto>>
 {
-    public async Task<RecordDto?> Handle(GetRecordQuery query, CancellationToken cancellationToken)
+    public async Task<Result<RecordDto>> Handle(GetRecordQuery query, CancellationToken cancellationToken)
     {
-        var record = await recordRepo.GetByIdAsync(query.RecordId, query.ModelId, query.OrganizationId, cancellationToken);
-        if (record is null) return null;
+        DataRecord? record = await recordRepo.GetByIdAsync(query.RecordId, query.ModelId, query.OrganizationId, cancellationToken);
+        if (record is null)
+            return Result.Failure<RecordDto>(ErrorCodes.NotFound, "Record not found.");
 
         return new RecordDto(record.Id, record.ModelId, record.CreatedAt, record.UpdatedAt, record.Data);
     }
