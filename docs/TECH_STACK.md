@@ -12,9 +12,9 @@
 | **ASP.NET Core** | 8.x | Web API & SignalR | Industry standard for .NET APIs |
 | **Modular Monolith + DDD** | — | Architecture pattern | Team velocity + domain clarity, easier to extract microservices later |
 | **CQRS via MediatR** | 12.x | Command/Query separation | Clean separation of read/write paths, fits DDD |
-| **Entity Framework Core** | 8.x | ORM | Best-in-class ORM for .NET, great migration support |
-| **Npgsql** | 8.x | PostgreSQL driver | Official EF Core provider for PostgreSQL |
-| **Wolverine** | 2.x | Background jobs + messaging | Modern alternative to Hangfire; handles jobs, scheduling, and module-to-module messaging in one library |
+| **Entity Framework Core** | 9.x | ORM | Best-in-class ORM for .NET, great migration support |
+| **Npgsql** | 9.x | PostgreSQL driver | Official EF Core provider for PostgreSQL |
+| **Wolverine** | 5.x | Background jobs + messaging | Handles background jobs, scheduling, intra- and inter-module domain event dispatch via durable outbox. Not Hangfire. |
 | **OpenIddict** | 5.x | Auth (OAuth2/OIDC) | Standards-compliant OAuth2/OIDC server. Authorization Code + PKCE for the SPA; Client Credentials for external system integrations (e.g. triggering workflows via API). |
 | **SignalR** | (built-in) | Real-time updates | Workflow execution status pushed to client |
 | **FluentValidation** | 11.x | Input validation | Declarative, testable validation |
@@ -38,6 +38,8 @@
 | **dnd-kit** | 6.x | Page builder drag & drop | Flexible, accessible DnD for UI builder |
 | **Zod** | 3.x | Schema validation | Runtime validation for API responses and forms; source of truth for form types |
 | **react-hook-form** | 7.x | Form state management | Performant form handling; always paired with Zod via `zodResolver` |
+| **Microsoft.AspNetCore.OpenApi** | 9.x | OpenAPI metadata | Collects endpoint metadata for OpenAPI document generation |
+| **Scalar.AspNetCore** | 2.x | API reference UI | Modern OpenAPI UI; replaces Swagger UI. Enabled in Development and Staging. |
 
 ---
 
@@ -47,6 +49,7 @@
 |---|---|---|
 | **PostgreSQL 16** | Primary database | Schema-per-tenant isolation, JSONB for dynamic fields, strong .NET support |
 | **Redis 7** | Cache + distributed lock | Session cache, prevent duplicate job execution |
+| **AWS S3** | File storage | Stores uploaded files (attachments, exports). Accessed via AWSSDK.S3 + AWSSDK.Extensions.NETCore.Setup. |
 | **Docker / Docker Compose** | Local development | Reproducible dev environment |
 
 ---
