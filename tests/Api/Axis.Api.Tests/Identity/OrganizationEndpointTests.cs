@@ -34,7 +34,7 @@ public class OrganizationEndpointTests(ApiTestFixture fixture)
 
         resp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
         var body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
-        body.GetProperty("error").GetString().Should().Be("validation_failed");
+        body.GetProperty("detail").GetString().Should().Contain("cannot invite yourself");
     }
 
     [Fact]

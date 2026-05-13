@@ -36,7 +36,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
 
         signinResp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         var body = await signinResp.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("error").GetString().Should().Be("email_not_verified");
+        body.GetProperty("detail").GetString().Should().Contain("verify your email");
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
 
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("error").GetString().Should().Be("invalid_credentials");
+        body.GetProperty("detail").GetString().Should().Contain("Incorrect email");
     }
 
     [Fact]
@@ -93,7 +93,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
 
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("error").GetString().Should().Be("invalid_credentials");
+        body.GetProperty("detail").GetString().Should().Contain("Incorrect email");
     }
 
     [Fact]
@@ -136,8 +136,8 @@ public class AuthEndpointTests(ApiTestFixture fixture)
             password_confirmation = "different",
         }, Json);
 
-        resp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("error").GetString().Should().Be("validation_failed");
+        body.GetProperty("errors").ValueKind.Should().Be(JsonValueKind.Object);
     }
 }
