@@ -3,11 +3,17 @@
 > Updated each time a layer is completed. Source of truth for current implementation state.
 > When completing a layer, update this file — **not** CLAUDE.md.
 
-## Shared Kernel ✅
+## Shared Kernel ⚠️
 
 - `Axis.Shared.Domain`: Entity, AggregateRoot, ValueObject, IDomainEvent, Result/Result<T>
 - `Axis.Shared.Application`: ICommand/IQuery/ICommandHandler/IQueryHandler, ValidationBehavior, TenantContext/ITenantContext
 - `Axis.Shared.Infrastructure`: AxisDbContext, TenantSchemaInterceptor, UnitOfWork, MessageBus
+
+> ⚠️ **Known gaps requiring refactor:**
+> - **Wolverine not configured**: `builder.Host.UseWolverine(...)` is absent from `Program.cs`. The outbox-based domain event dispatch described in PATTERNS.md is not yet wired up. All Wolverine integration (outbox, durable queues, PostgreSQL transport) must be added as part of E01 Platform Foundation.
+> - **ProblemDetails not implemented**: `ValidationExceptionMiddleware` and JWT error events return custom JSON instead of RFC 7807 ProblemDetails. All error responses must be refactored to use `result.ToProblemDetails()` per CLAUDE.md.
+> - **InMemoryDatabase used in test**: `tests/Shared/Axis.Shared.Infrastructure.Tests/Persistence/UnitOfWorkTests.cs` uses `UseInMemoryDatabase`. Must be replaced with Testcontainers. `Microsoft.EntityFrameworkCore.InMemory` package should be removed from `Directory.Packages.props` after migration.
+> - **CORS uses `AddDefaultPolicy`**: `Program.cs` registers an unnamed default policy. Must be changed to a named policy per CLAUDE.md.
 
 ## Identity — E02-identity-access
 

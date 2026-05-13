@@ -1,6 +1,34 @@
 # Technical Patterns
 
-> Read this file when the task involves any of: adding/updating NuGet packages, EF Core aggregate or JSONB mapping, Minimal API endpoint wiring, writing tests, implementing a list/query endpoint, adding async methods, defining response DTOs, writing repository methods, adding domain methods to an aggregate, working with multi-tenant raw SQL, implementing a new step or field type, adding a cross-cutting concern, or any design decision about where logic should live. Skip otherwise.
+> Read this file when the task involves any of: adding/updating NuGet packages, EF Core aggregate or JSONB mapping, Minimal API endpoint wiring, writing tests, implementing a list/query endpoint, adding async methods, defining response DTOs, writing repository methods, adding domain methods to an aggregate, working with multi-tenant raw SQL, Wolverine handlers or jobs, implementing a new step or field type, adding a cross-cutting concern, or any design decision about where logic should live. Skip otherwise.
+
+## Contents
+
+- [Key patterns](#key-patterns)
+- [Result Pattern vs. exceptions](#result-pattern-vs-exceptions----when-to-use-what)
+- [NuGet / packaging rules](#nuget--packaging-rules)
+- [EF Core JSONB collection change tracking](#ef-core-jsonb-collection-change-tracking)
+- [EF Core common pitfalls](#ef-core-common-pitfalls)
+- [DDD / Aggregate design pitfalls](#ddd--aggregate-design-pitfalls)
+- [Dependency Injection pitfalls](#dependency-injection-pitfalls)
+- [Multi-tenancy pitfalls](#multi-tenancy-pitfalls)
+- [Async fire-and-forget pitfalls](#async-fire-and-forget-pitfalls)
+- [EF Core aggregate mapping patterns](#ef-core-aggregate-mapping-patterns)
+- [Testing rules](#testing-rules)
+- [Async patterns](#async-patterns)
+- [Query & N+1 patterns](#query--n1-patterns)
+- [Response DTO convention](#response-dto-convention)
+- [Pagination pattern](#pagination-pattern)
+- [Minimal API endpoint wiring](#minimal-api-endpoint-wiring)
+- [Result → HTTP status code mapping](#result--http-status-code-mapping) ★
+- [OpenAPI / Scalar setup](#openapi--scalar-setup) ★
+- [Wolverine patterns](#wolverine-patterns) ★
+- [Cross-module read pattern](#cross-module-read-pattern) ★
+- [Command idempotency pattern](#command-idempotency-pattern) ★
+- [Clean Code Principles](#clean-code-principles)
+- [Design Patterns in Practice](#design-patterns-in-practice)
+
+---
 
 ## Key patterns
 
@@ -898,4 +926,257 @@ group.MapPost("/", async (...) => { ... })
     .ProducesProblem(StatusCodes.Status401Unauthorized)
     .ProducesProblem(StatusCodes.Status409Conflict)
     .RequireAuthorization();
+```
+
+---
+
+## Result → HTTP status code mapping
+
+All `Result` failures from Command/Query handlers map to `ProblemDetails` (RFC 7807). Use this table consistently across all modules:
+
+| Failure reason | HTTP status | Typical error code |
+|---|---|---|
+| Entity not found | 404 Not Found | `"not_found"` |
+| Duplicate / unique constraint | 409 Conflict | `"conflict"` |
+| Business rule violation | 422 Unprocessable Entity | `"business_rule"` |
+| Plan / subscription limit | 402 Payment Required | `"plan_limit"` |
+| Input validation (FluentValidation) | 400 Bad Request | Handled automatically by `ValidationBehavior` → middleware |
+| Unauthenticated | 401 Unauthorized | Handled by JWT middleware |
+| RBAC denied | 403 Forbidden | Handled by `PermissionAuthorizationHandler` |
+
+**Endpoint pattern — always use `result.ToProblemDetails()`:**
+
+```csharp
+private static async Task<IResult> CreateWorkflow(
+    [FromBody] CreateWorkflowRequest request,
+    CurrentUser currentUser,
+    ISender mediator,
+    CancellationToken ct)
+{
+    Result<Guid> result = await mediator.Send(
+        new CreateWorkflowCommand(request.Name, request.Description, currentUser.OrgId, currentUser.UserId.ToString()), ct);
+
+    return result.Match(
+        id  => Results.Created($"/api/workflows/{id}", new { id }),
+        err => err.ToProblemDetails());
+}
+```
+
+`ToProblemDetails()` is a shared extension in `Axis.Shared.Application` that maps a well-known error code to the correct HTTP status:
+
+```csharp
+// Axis.Shared.Application/Extensions/ResultExtensions.cs
+public static IResult ToProblemDetails(this Error error) => error.Code switch
+{
+    "not_found"     => Results.Problem(error.Message, statusCode: 404),
+    "conflict"      => Results.Problem(error.Message, statusCode: 409),
+    "plan_limit"    => Results.Problem(error.Message, statusCode: 402),
+    _               => Results.Problem(error.Message, statusCode: 422),
+};
+```
+
+**Rule:** Never hardcode a status code in an endpoint handler. Always call `result.ToProblemDetails()`. Never return custom JSON error shapes.
+
+---
+
+## OpenAPI / Scalar setup
+
+Add to `Directory.Packages.props`:
+
+```xml
+<ItemGroup Label="API">
+  <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="9.0.5" />
+  <PackageVersion Include="Scalar.AspNetCore" Version="2.5.10" />
+</ItemGroup>
+```
+
+Wire up in `Program.cs`:
+
+```csharp
+builder.Services.AddOpenApi();
+
+// After app.Build():
+if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
+{
+    app.MapOpenApi();
+    app.MapScalarApiReference(options =>
+    {
+        options.Title = "Axis API";
+        options.Theme = ScalarTheme.Moon;
+    });
+}
+```
+
+Every endpoint must be fully annotated — see CLAUDE.md API Layer section for required metadata.
+
+---
+
+## Wolverine patterns
+
+### Host setup
+
+```csharp
+// Program.cs
+builder.Host.UseWolverine(opts =>
+{
+    // Durable outbox + transport via PostgreSQL (same DB, no extra broker)
+    opts.UsePostgresqlPersistenceAndTransport(
+        builder.Configuration.GetConnectionString("Default")!);
+
+    // Auto-wrap handlers that use EF Core DbContext in a transaction
+    opts.Policies.AutoApplyTransactions();
+
+    // Local queues are durable by default (survive process restart)
+    opts.Policies.UseDurableLocalQueues();
+});
+```
+
+### Intra-module domain event handler
+
+Domain events raised by aggregates (`AddDomainEvent`) are stored in the Wolverine outbox by `UnitOfWork.SaveChangesAsync`, then dispatched asynchronously after the transaction commits. Define the handler in the Application layer:
+
+```csharp
+// WorkflowBuilder.Application/EventHandlers/WorkflowPublishedEventHandler.cs
+public sealed class WorkflowPublishedEventHandler
+{
+    // Wolverine resolves by convention — no registration needed.
+    // Method name: Handle or HandleAsync.
+    public async Task HandleAsync(WorkflowPublishedEvent @event, CancellationToken ct)
+    {
+        // Runs after the transaction that raised the event commits.
+        // Safe to read the fully-persisted aggregate here.
+    }
+}
+```
+
+### Inter-module domain event handler
+
+Same pattern — the handler lives in the Application layer of the **consuming** module. Wolverine routes the event by message type, regardless of which module raised it:
+
+```csharp
+// WorkflowEngine.Application/EventHandlers/WorkflowPublishedEventHandler.cs
+// Consumes WorkflowPublishedEvent raised by WorkflowBuilder — no direct module reference needed.
+public sealed class WorkflowPublishedEventHandler
+{
+    public async Task HandleAsync(WorkflowPublishedEvent @event, CancellationToken ct)
+    {
+        // Validate the published workflow is executable, pre-warm caches, etc.
+    }
+}
+```
+
+### Reliable background job
+
+```csharp
+// Schedule fire-and-forget work that must not be lost if the process crashes
+await _messageBus.SendAsync(new SendWelcomeEmailCommand(userId));
+
+// Handler (Wolverine resolves by convention):
+public sealed class SendWelcomeEmailHandler(IEmailSender emailSender)
+{
+    public async Task HandleAsync(SendWelcomeEmailCommand cmd, CancellationToken ct)
+    {
+        await emailSender.SendAsync(cmd.UserId, ct);
+    }
+}
+```
+
+### Scheduled / recurring job
+
+```csharp
+// One-time delayed job:
+await _messageBus.ScheduleAsync(new CleanUpExpiredSessionsCommand(), TimeSpan.FromMinutes(30));
+
+// Recurring cron job — registered in UseWolverine opts:
+opts.ScheduleJob<ArchiveOldExecutionsCommand>(cron: "0 2 * * *"); // daily at 02:00
+```
+
+**Rules:**
+- Never use `Task.Run` for background work that must be reliable — use Wolverine `SendAsync`.
+- Domain event handlers live in the **Application** layer of the consuming module; never in Domain or Infrastructure.
+- Never call `_messageBus.PublishAsync` for a domain event inside a Command handler — the `UnitOfWork` dispatches events automatically via the outbox.
+- Integration events to external systems (webhooks, third-party APIs) are Wolverine jobs scheduled from within a domain event handler, not from the command handler directly.
+
+---
+
+## Cross-module read pattern
+
+Modules never share DbContexts and never reference each other's repositories or Application assemblies.
+
+**Option A — Wolverine request/response (preferred for non-critical paths):**
+
+Publish a query message via `_messageBus.InvokeAsync<TResponse>`. The responding module handles it in its own Application layer. Clean separation, but adds a small round-trip.
+
+**Option B — Raw SQL reader (for critical hot paths):**
+
+A thin reader class in the consuming module's Infrastructure layer executes a targeted SQL query directly on the source module's table. Acceptable when Wolverine round-trip latency is unacceptable (e.g., execution hot path). Must be documented with a comment.
+
+```csharp
+// WorkflowEngine.Application/CrossModule/IWorkflowDefinitionReader.cs
+// Interface defined in Application — Infrastructure implements it.
+public interface IWorkflowDefinitionReader
+{
+    Task<WorkflowSnapshot?> GetPublishedAsync(Guid workflowId, CancellationToken ct);
+}
+
+// WorkflowEngine.Infrastructure/CrossModule/WorkflowDefinitionReader.cs
+internal sealed class WorkflowDefinitionReader(NpgsqlDataSource dataSource, ITenantContext tenant)
+    : IWorkflowDefinitionReader
+{
+    // Cross-module raw SQL read — justified because WorkflowEngine reads the workflow definition
+    // on every step execution; Wolverine request/response would add unacceptable latency here.
+    public async Task<WorkflowSnapshot?> GetPublishedAsync(Guid workflowId, CancellationToken ct)
+    {
+        string schema = tenant.Schema;
+        await using NpgsqlConnection conn = await dataSource.OpenConnectionAsync(ct);
+        // SELECT only the columns needed — never SELECT *
+        // Always filter by schema and status to avoid cross-tenant reads
+    }
+}
+```
+
+**Rules:**
+- `IWorkflowDefinitionReader` is defined in the Application layer of the consuming module — never imported from the source module's assembly.
+- Always prefix the table name with `ITenantContext.Schema`.
+- Always add a comment explaining why raw SQL cross-module was used over Wolverine request/response.
+- Select only the columns needed — never `SELECT *`.
+
+---
+
+## Command idempotency pattern
+
+All Command handlers must be safe to retry without producing duplicate side effects.
+
+**Pattern 1 — check-before-create (most commands):**
+
+```csharp
+public async Task<Result<Guid>> Handle(CreateWorkflowCommand cmd, CancellationToken ct)
+{
+    bool exists = await _repo.ExistsByNameAsync(cmd.Name, cmd.OrganizationId, ct);
+    if (exists)
+        return Result.Failure<Guid>(Error.Conflict($"A workflow named '{cmd.Name}' already exists."));
+
+    WorkflowDefinition wf = WorkflowDefinition.Create(cmd.Name, cmd.OrganizationId, cmd.CreatedByUserId);
+    await _repo.AddAsync(wf, ct);
+    await _uow.SaveChangesAsync(ct);
+    return Result.Success(wf.Id);
+}
+```
+
+**Pattern 2 — caller-supplied idempotency key (for external triggers):**
+
+Commands triggered by external systems (webhooks, scheduled jobs) accept a caller-supplied `IdempotencyKey` (UUID). The handler checks if a record with that key already exists and returns the existing result without re-executing.
+
+**Migrations — idempotent raw SQL:**
+
+EF-scaffolded migrations are idempotent by default. When using `migrationBuilder.Sql(...)` for custom DDL or data migrations, always add an existence check:
+
+```csharp
+migrationBuilder.Sql(@"
+    DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'workflow_status') THEN
+            CREATE TYPE workflow_status AS ENUM ('Draft', 'Published', 'Archived');
+        END IF;
+    END $$;
+");
 ```

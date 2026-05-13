@@ -5,12 +5,13 @@ Multi-tenant low-code SaaS platform for building data-driven workflow applicatio
 
 ## Tech Stack
 - **Backend**: .NET 8 / ASP.NET Core — Modular Monolith + DDD + CQRS (MediatR)
-- **ORM**: Entity Framework Core + Npgsql (PostgreSQL)
-- **Background jobs + messaging**: Wolverine (NOT Hangfire)
+- **ORM**: Entity Framework Core 9.x + Npgsql (PostgreSQL)
+- **Background jobs + messaging**: Wolverine — handles background jobs AND all domain event dispatch (intra- and inter-module). Not Hangfire.
 - **Auth**: OpenIddict 5.x — OAuth2/OIDC server (Authorization Code + PKCE for SPA; Client Credentials for external integrations)
 - **Real-time**: ASP.NET Core SignalR
 - **Validation**: FluentValidation
 - **Logging**: Serilog
+- **File storage**: AWS S3 (AWSSDK.S3)
 - **Frontend**: React 18 + TypeScript + Vite
 - **UI components**: shadcn/ui + Tailwind CSS
 - **Workflow canvas**: @xyflow/react (React Flow)
@@ -19,10 +20,11 @@ Multi-tenant low-code SaaS platform for building data-driven workflow applicatio
 - **State**: Zustand
 - **Database**: PostgreSQL 16 — schema-per-tenant
 - **Cache**: Redis 7
-- **Tests**: xUnit + FluentAssertions + NSubstitute + Testcontainers
+- **OpenAPI**: Microsoft.AspNetCore.OpenApi (metadata) + Scalar.AspNetCore (UI)
+- **Tests**: xUnit + FluentAssertions + NSubstitute + Testcontainers + Bogus
 
 ## Architecture
-Modular Monolith. 6 modules, each with Domain / Application / Infrastructure layers:
+Modular Monolith. 6 modules, each with Domain / Application / Infrastructure / Api layers:
 - **Identity** — auth, users, roles, RBAC
 - **DataModeling** — custom models, field types, data classes, record CRUD
 - **WorkflowBuilder** — workflow definitions, step config, triggers, branching, parallel
@@ -34,13 +36,10 @@ Shared Kernel: `Axis.Shared.Domain`, `Axis.Shared.Application`, `Axis.Shared.Inf
 
 Multi-tenancy: schema-per-tenant in PostgreSQL (`tenant_{org_slug}`). Tenant resolved from JWT `org_id` claim; schema name cached in Redis.
 
-## Module dependency rules
-- Modules communicate ONLY via **asynchronous domain events** (Wolverine) or explicit Application-layer interfaces.
-- **No shared database transactions** across module boundaries.
-- Cross-module data consistency via Eventual Consistency.
-- Domain layer: zero external dependencies (pure C#, fully unit testable).
-- Application layer: depends on Domain only — no infrastructure references.
-- Infrastructure: implements interfaces defined in Application/Domain.
+### Module dependency rules
+- Modules communicate **only via asynchronous domain events** (Wolverine) or explicit Application-layer interfaces. No shared DB transactions across module boundaries.
+- Cross-module consistency via Eventual Consistency.
+- **Domain**: zero external dependencies (pure C#). **Application**: depends on Domain only. **Infrastructure**: implements Application/Domain interfaces.
 
 ---
 
@@ -65,155 +64,175 @@ Before starting any task, read only what is relevant — not everything.
 
 **Step 4 — Check implementation status** in [`docs/PROGRESS.md`](docs/PROGRESS.md)
 
-**Step 5 — Read [`docs/PATTERNS.md`](docs/PATTERNS.md)** only if the task involves: adding NuGet packages, EF Core aggregate mapping or JSONB mapping, Minimal API endpoint wiring, writing tests, implementing a list/query endpoint (pagination, N+1, projection), adding async methods (CancellationToken, sync-over-async, fire-and-forget), defining response DTOs, writing repository methods, adding domain methods to an aggregate, working with multi-tenant raw SQL, implementing a new step type or field type, adding a cross-cutting concern, or any design decision about where logic should live.
+**Step 5 — Read [`docs/PATTERNS.md`](docs/PATTERNS.md)** when the task involves any of: NuGet packages, EF Core mapping or JSONB, Minimal API wiring, writing tests, list/query endpoints, async patterns, response DTOs, repository methods, domain aggregate methods, multi-tenant raw SQL, Wolverine handlers or jobs, new step/field types, cross-cutting concerns, or any design decision about where logic lives.
 
-Do NOT read all docs upfront. The feature file defines the contract for the task at hand.
+**Step 6 — Read [`docs/TECH_STACK.md`](docs/TECH_STACK.md)** when making any architectural decision, adding a library, or referencing an ADR.
 
 ---
 
 ## Development Rules
 
-- **TDD is mandatory**: write tests first, must pass before moving to next step, no exceptions.
-- **Test naming convention**: `{Subject}_{Condition}_{ExpectedOutcome}` — e.g. `CreateWorkflow_WhenNameIsDuplicate_ReturnsConflictError`. No generic names like `Test1` or `ShouldWork`.
-- **Test isolation**: Each integration test class must implement `IAsyncLifetime` for per-class Testcontainers setup/teardown. Tests within a class must never share mutable database state — each test method must call a `ResetAsync()` cleanup helper at its start to truncate relevant tables. Never assume a test runs first. Flaky tests caused by ordering dependencies are bugs. See PATTERNS.md for the full pattern.
-- **Testing Database**: Integration and Infrastructure tests MUST use **Testcontainers** (PostgreSQL/Redis). The EF Core In-Memory database provider (`UseInMemoryDatabase`) is strictly forbidden.
-- **Unit tests must pass locally before every commit**: Run `dotnet test unit-tests.slnf` (at repo root) before committing. This filter includes only Domain + Application tests — no Docker required. Never commit code that fails these tests. Infrastructure and API integration tests require Docker and are delegated to CI (GitHub Actions), but they still must be maintained — see the rule below.
-- **Integration test maintenance is mandatory**: "Cannot run integration tests" means the agent cannot execute them locally (no Docker) — it does NOT mean ignoring them. Any change that affects API response shape, status codes, or request contract MUST include reading and updating all relevant files under `tests/Api/Axis.Api.Tests/` in the same commit. Never let CI be the first to catch a broken integration test.
-- **DDD**: Apply fully to complex modules (WorkflowEngine, DataModeling) — rich aggregates, domain events, value objects, all invariants enforced in the domain. For simpler CRUD modules (Identity), pragmatic means: aggregates may have minimal behavior, but still apply the Result pattern, repository interfaces, value objects for typed IDs and Email, and no Data Annotations on domain types.
-- **Diagrams**: add proactively when a flow is complex enough that text alone doesn't convey it clearly.
-- **Docs-first, always — non-negotiable**: Before implementing any user story, feature, or fix, read the relevant feature file in `docs/epics/`. The doc defines the contract; code implements it. Never write code first and update docs after. Every code change that affects observable behavior must also update the relevant doc in the same commit.
-- **Every command/query maps to a US**: Never invent requirements. If a new requirement is discovered during implementation, add it to the docs first, then implement.
-- **AC compliance is mandatory — no silent skips**: Every US must be implemented to ALL its acceptance criteria. Never defer or skip an AC without explicitly documenting it as a gap in the `> **Implementation status**` callout. A US is not done until every AC is either implemented or documented as a gap.
-- **A layer cannot be marked ✅ Done if any US in scope is missing its callout**: Verify every US in every feature file for that module has an `> **Implementation status**` callout before updating layer status. A US with no callout = silently skipped = the layer is not done.
-- **Read files in full before making claims**: Never use a line `limit` when the goal is to assert something about a file's content. Partial reads → wrong conclusions.
+### Process & Workflow
 - **Language**: discuss in Vietnamese, write all code and docs in English.
-- **Git workflow**: Never push directly to `main` — always create a branch and open a PR. Branch naming: `{type}/{short-description}` in kebab-case, where `type` ∈ `feat | fix | docs | refactor | test | chore`. When Claude Code auto-creates a worktree with a random branch name, rename the branch before pushing. Commit messages follow Conventional Commits: `feat: add workflow step handler`, `fix: resolve tenant schema collision`, `docs: update FormBuilder US callout`. Subject line ≤ 72 chars, imperative mood, no period.
-- **CLAUDE.md maintenance**: update this file whenever architecture decisions change, new patterns are established, or layer-order rules are clarified.
-- **Explicit over Implicit — no `var`**: Always write the explicit type. Never use `var`, even when the assignment makes the type obvious.
-- **Minimal API (mandatory)**: All new endpoint work uses Minimal API (`MapGroup` + `IEndpointRouteBuilder` extension methods), not traditional controllers. Use `ConfigureHttpJsonOptions` for JSON configuration. Never default silently to traditional controllers.
-- **Minimal API Structure**: Each module exposes a `Map{ModuleName}Endpoints(IEndpointRouteBuilder)` extension method. No logic in the mapping file — only MediatR dispatching.
-- **API Error Responses**: All endpoints MUST map `Result` failures to standard HTTP `ProblemDetails` (RFC 7807) responses. Do not return custom error JSON structures or raw strings.
-- **Idempotency**: All Command handlers and Migrations must be idempotent.
-- **Surface architectural decisions before implementing**: Before starting any new layer, module, or API surface, list the 2–3 key design choices and confirm with the user.
-- **No inline fully-qualified type names**: Always use `using` directives. Never write `typeof(Axis.Some.Long.Namespace.MyType)` inline.
-- **Mandatory Result Pattern**: Command/Query handlers return `Result` or `Result<T>` for business rule violations. FluentValidation validators run via `ValidationBehavior` pipeline — never throw `ValidationException` manually in a handler. Exceptions are reserved for infrastructure failures. Domain aggregates guard with `throw InvalidOperationException` for internal invariants only.
-- **Centralized Global Usings**: Use `GlobalUsings.cs` per project or `<Using Include="..." />` in `Directory.Build.props` for ubiquitous namespaces.
-- **Comment policy — WHY not WHAT**: Default to no comments. Add one only when the WHY is non-obvious: a hidden constraint, a framework quirk, or business logic that would surprise a reader.
-- **Logging Policy**: Use Serilog for all logging. Always use **structured logging** (e.g., `_logger.LogInformation("Processing order {OrderId} for user {UserId}", orderId, userId)`). Log `Error` for exceptions/system failures, `Warning` for unexpected but handled edge cases, and `Information` for critical business milestones. Do not log sensitive PII/Credentials.
-- **Correlation ID**: Every request must carry a `X-Correlation-Id` header. Middleware generates a new GUID if the header is absent and echoes it on the response. All Serilog log entries must be enriched with `CorrelationId` via `LogContext.PushProperty`. This is the primary key for tracing a request across all log lines in production — never omit it.
-- **Code Style & Linting**: All code must pass `dotnet format` without warnings before pushing. Follow standard C# naming conventions.
-- **Complexity Guardrails**: Keep methods small and focused. Minimal API endpoints MUST NOT contain any business logic — they only extract parameters, dispatch to MediatR, and map `Result` objects to `IResult` HTTP responses.
-- **Endpoint Authorization**: Every endpoint MUST call `.RequireAuthorization()` unless it is explicitly an anonymous/public endpoint (e.g. login, register, health check). RBAC policy enforcement goes in the Command/Query handler via the current user's claims — not in the endpoint mapping.
-- **OpenAPI documentation**: Every Minimal API endpoint must declare `.WithName()` (unique operation ID), `.WithSummary()` (one-line description), `.WithTags()` (module name), `.Produces<TResponse>()`, and `.ProducesProblem()` for each error status it can return (400, 401, 403, 404 as applicable). Swagger UI must be enabled in Development and Staging environments.
-- **CancellationToken propagation**: All `async` methods in Application and Infrastructure layers must accept and forward `CancellationToken`. Pass it to every EF Core query, repository call, and HTTP client call. Never substitute `CancellationToken.None` inside a handler.
-- **No sync-over-async**: Never call `.Result`, `.Wait()`, or `.GetAwaiter().GetResult()` on a `Task` in an async context. Always `await` directly. This causes thread-pool starvation and deadlocks in ASP.NET Core under load — it is a production incident waiting to happen.
-- **No N+1 queries**: Lazy loading is disabled globally. Always use explicit `.Include()` / `.ThenInclude()` for navigation properties needed in a query. List queries must project to DTOs via `.Select()` — never load full aggregates then map in memory for collections. Accessing an un-`Include`d navigation property in a handler is a bug.
-- **Pagination mandatory**: No endpoint may return an unbounded collection. All list endpoints must accept `int page = 1` and `int pageSize = 20` query parameters with a hard cap of `pageSize ≤ 100`. Return a `PagedResult<T>` (defined in `Axis.Shared.Application`) containing `Items`, `TotalCount`, `Page`, and `PageSize`.
-- **CQRS & Messaging Boundaries**: **MediatR** is strictly for internal module CQRS (Commands/Queries). **Wolverine** is strictly for inter-module asynchronous domain events and background jobs. Do not mix their purposes.
-- **EF Core Configuration**: Always use Fluent API (`IEntityTypeConfiguration<T>`) for EF Core mappings in the Infrastructure layer. **Data Annotations** (e.g., `[Required]`, `[Table]`) are strictly forbidden in Domain entities.
-- **EF Core JSONB collections — always pair converter with comparer**: Any `List<T>` or collection stored as JSONB via `HasConversion` MUST also declare a `ValueComparer` in the same configuration call (`HasConversion(converter, comparer)`). A converter without a comparer means EF Core uses reference equality — mutations to the list are silently not persisted. See PATTERNS.md for the correct pattern. Never work around this by overriding `SaveChangesAsync` to force-mark properties as modified.
-- **NuGet Packages & Dependencies**: Always check `Directory.Packages.props` before adding any new libraries. Do not add libraries that are not explicitly approved or hallucinate versions. Do not upgrade packages unless explicitly requested.
-- **Safe Editing & Refactoring**: Only modify code directly related to the current task. **Never** delete, comment out, or massively restructure code outside the scope of your task unless explicitly requested. Preserve existing logic if you don't fully understand it.
-- **No hardcoded secrets**: Connection strings, JWT signing keys, Redis passwords, SMTP credentials, and API keys must never appear in source code or committed config files. Use `appsettings.Development.json` (gitignored) or environment variables for local dev. Testcontainers generates its own ephemeral credentials — never reference external service credentials in test code.
-- **Response DTOs — never leak domain models**: Query handlers must return dedicated response record types (`*Response` or `*Dto`) defined in the Application layer. Domain entities, aggregates, EF Core–tracked objects, and value objects must never appear in HTTP responses. All mapping happens inside the query handler, not in the endpoint.
-- **Audit fields**: Every tenant-owned aggregate must declare `DateTimeOffset CreatedAt`, `DateTimeOffset UpdatedAt`, and `string CreatedBy` (user ID). These are set by the Application layer via `ICurrentUser` / `ITenantContext` before calling the repository — never set inside the domain aggregate itself.
-- **Soft delete policy**: Tenant-owned aggregates use **soft delete** — add `DateTimeOffset? DeletedAt` and register a global EF Core query filter (`HasQueryFilter(e => e.DeletedAt == null)`) in `IEntityTypeConfiguration`. Platform-level data in the `public` schema (organizations, subscriptions) uses **hard delete**. Never mix strategies within the same module.
-- **Optimistic concurrency**: Aggregates subject to concurrent writes must include a `uint RowVersion` concurrency token mapped via `.IsRowVersion()` in EF Core configuration. Handlers must catch `DbUpdateConcurrencyException` and return `Result.Failure` — never let it surface as an unhandled 500.
-- **Rate limiting**: Auth endpoints (`/connect/token`, `/connect/authorize`, password reset) must be protected by a rate limiter (`AddRateLimiter` with a fixed-window policy). Unauthenticated endpoints that accept user input must also be rate-limited. Authenticated API endpoints do not require rate limiting by default.
-- **CORS**: Configure a named CORS policy in `Program.cs` that explicitly allowlists the SPA origin(s). Never use `AllowAnyOrigin()` in production. The policy must be applied via `app.UseCors()` before `app.UseAuthentication()`.
-- **Health checks**: The host must expose `GET /health` (liveness) and `GET /health/ready` (readiness) via `AddHealthChecks()`. Readiness must include checks for PostgreSQL connectivity and Redis connectivity. Both endpoints are anonymous (no auth required) and excluded from rate limiting.
+- **Git**: never push to `main` — always branch (`{type}/{short-description}` kebab-case, `type` ∈ `feat|fix|docs|refactor|test|chore`) and open a PR. When Claude Code auto-creates a worktree with a random branch name, rename before pushing.
+- **Conventional Commits**: `feat: add workflow step handler` — subject ≤ 72 chars, imperative mood, no period.
+- **Docs-first for new features**: before implementing any user story or new feature, read the relevant feature file. The doc defines the contract; code implements it. Never write code first and update docs after. For bug fixes, a doc update is only required if the fix reveals a spec deviation.
+- **Every command/query maps to a US**: never invent requirements. New requirement discovered → add to docs first, then implement.
+- **AC compliance is mandatory**: implement ALL acceptance criteria. Never skip an AC without documenting it as a gap in the `> **Implementation status**` callout.
+- **Surface architectural decisions first**: list the 2–3 key design choices and confirm with the user before starting any new layer, module, or API surface.
+- **Diagrams**: add proactively when a flow is complex enough that text alone doesn't convey it clearly.
+- **CLAUDE.md maintenance**: update whenever architecture decisions change, new patterns are established, or layer-order rules are clarified.
+
+### Testing
+- **TDD is mandatory**: write tests first, must pass before moving to next step, no exceptions.
+- **Test naming**: `{Subject}_{Condition}_{ExpectedOutcome}` — e.g. `CreateWorkflow_WhenNameIsDuplicate_ReturnsConflictError`.
+- **Test isolation**: each integration test class implements `IAsyncLifetime` (container per class). Each test method calls `ResetAsync()` at its start to truncate relevant tables. See PATTERNS.md for the full pattern.
+- **No InMemoryDatabase**: `UseInMemoryDatabase` is strictly forbidden for all new tests. All database tests use Testcontainers (PostgreSQL/Redis).
+- **Unit tests before every commit**: run `dotnet test unit-tests.slnf` (Domain + Application only, no Docker required). When adding a new unit test project, add it to this file too.
+- **Integration test maintenance**: any change affecting API response shape, status codes, or request contract must include updating all relevant files under `tests/Api/Axis.Api.Tests/` in the same PR. "Cannot run locally" is not an excuse.
+
+### Code Style
+- **No `var`**: always write the explicit type, even when the assignment makes it obvious.
+- **Comments — WHY only**: default to no comments. Add one only when the WHY is non-obvious — a hidden constraint, a framework quirk, or surprising business logic. No WHAT comments.
+- **No inline fully-qualified type names**: always use `using` directives.
+- **Centralized global usings**: `GlobalUsings.cs` per project or `<Using Include="..." />` in `Directory.Build.props`.
+- **`dotnet format`** must pass without warnings before pushing.
+- **Scope discipline**: only modify code directly related to the current task. Never restructure code outside task scope unless explicitly requested.
+- **Read in full before asserting**: Grep to locate, then Read without a `limit` to assert content. Partial reads lead to wrong conclusions. Grep-first and read-in-full are complementary, not conflicting.
+
+### Architecture & DDD
+- **DDD depth by module**: rich aggregates for complex modules (WorkflowEngine, DataModeling) — full invariants, factory methods, domain events. Pragmatic for simpler CRUD modules (Identity) — still apply Result pattern, repository interfaces, value objects for typed IDs and Email, no Data Annotations on domain types.
+- **Result Pattern**: Command/Query handlers return `Result` or `Result<T>` for business rule violations. `ValidationBehavior` pipeline handles FluentValidation — never throw `ValidationException` manually in a handler. Exceptions are for infrastructure failures only. Aggregates guard with `throw InvalidOperationException` for internal invariants.
+- **CQRS & messaging**: MediatR = Commands and Queries only (intra-module). Domain events = Wolverine outbox, regardless of whether the consumer is in the same module or another. Never use MediatR to dispatch domain events.
+- **Domain events**: raised inside aggregates via `AddDomainEvent`. Dispatched by `UnitOfWork` via Wolverine outbox after `SaveChangesAsync`. Never call `_messageBus.PublishAsync` for a domain event inside a handler.
+- **Response DTOs**: query handlers return dedicated `*Response` / `*Dto` record types defined in the Application layer. Domain entities must never appear in HTTP responses. Mapping happens inside the query handler.
+- **Commands that create resources**: return `Result<Guid>` — not the full aggregate.
+- **Idempotency**: all Command handlers and Migrations must be idempotent. See PATTERNS.md.
+
+### API Layer
+- **Minimal API (mandatory)**: all new endpoints use Minimal API (`MapGroup` + `IEndpointRouteBuilder` extension methods), not controllers. No logic in mapping files — only `mediator.Send(...)` and `Result` → `IResult` mapping. Use `ConfigureHttpJsonOptions` for JSON config.
+- **Authorization**: every endpoint must call `.RequireAuthorization()` unless explicitly public (login, register, health check). RBAC enforcement goes in the Command/Query handler via the user's claims — not in the endpoint mapping.
+- **OpenAPI**: every endpoint must declare `.WithName()`, `.WithSummary()`, `.WithTags()`, `.Produces<T>()`, `.ProducesProblem()` for each applicable status (400, 401, 403, 404, 409 as relevant). Scalar UI enabled in Development and Staging. See PATTERNS.md for setup.
+- **Error responses**: all failures map to `ProblemDetails` (RFC 7807) via `result.ToProblemDetails()`. No custom error JSON shapes or raw strings. See PATTERNS.md for the Result → HTTP status code mapping table.
+- **Pagination**: no endpoint returns an unbounded collection. All list endpoints accept `int page = 1`, `int pageSize = 20`, hard cap `pageSize ≤ 100`. Return `PagedResult<T>` from `Axis.Shared.Application`. See PATTERNS.md.
+
+### Infrastructure & EF Core
+- **Fluent API only**: use `IEntityTypeConfiguration<T>` for all EF Core mappings. Data Annotations (`[Required]`, `[Table]`, etc.) are forbidden on domain entities.
+- **JSONB collections**: every `HasConversion` on a `List<T>` stored as JSONB must be paired with `HasValueComparer` in the same call. Converter without comparer = silent data loss. See PATTERNS.md.
+- **Read vs write**: `AsNoTracking()` on read-only paths only. Write paths must use tracked queries.
+- **Unit of Work**: `SaveChangesAsync` called only via `IUnitOfWork` in the handler, never inside a repository. Repositories only add/query `DbSet<T>`.
+- **No `IQueryable` from repositories**: repository methods return materialized types (`T?`, `List<T>`, `PagedResult<T>`).
+- **No N+1**: lazy loading disabled globally. Always explicit `Include`/`ThenInclude`. List queries project to DTOs via `.Select()`. See PATTERNS.md.
+- **NuGet**: check `Directory.Packages.props` before adding any library. Never `dotnet add package` — it corrupts CPM. See PATTERNS.md for the correct procedure.
+
+### Multi-tenancy & Migrations
+- **Identity uses `public` schema** — `IdentityDbContext` has no `TenantSchemaInterceptor`. All other modules use `AxisDbContext` with `TenantSchemaInterceptor`.
+- **No direct `public` schema access** from tenant-aware services.
+- **Raw SQL in tenant-aware contexts** must prefix the table with `ITenantContext.Schema` and apply the soft-delete filter manually. Prefer LINQ so global filters apply automatically. See PATTERNS.md.
+- **Migration workflow**: `dotnet ef migrations add {PascalCaseName} --project src/Modules/{Module}/{Module}.Infrastructure --startup-project src/Axis.Api`. Applied automatically at startup via `MigrateAsync()`. Never apply manually in production. All migrations must be idempotent and tested against multiple schemas via Testcontainers before marking ✅.
+
+### Cross-cutting Concerns
+- **CancellationToken**: all `async` methods in Application and Infrastructure accept and forward `CancellationToken` to every EF Core, repository, and HttpClient call.
+- **No sync-over-async**: never `.Result`, `.Wait()`, or `.GetAwaiter().GetResult()` on a `Task`. Always `await`. Causes thread-pool starvation under ASP.NET Core.
+- **Audit fields**: every tenant-owned aggregate declares `DateTimeOffset CreatedAt`, `DateTimeOffset UpdatedAt`, `string CreatedBy`. Set in the Application layer via `ICurrentUser` / `ITenantContext` — never inside the domain.
+- **Soft delete**: tenant-owned aggregates use `DateTimeOffset? DeletedAt` + global EF Core query filter (`HasQueryFilter(e => e.DeletedAt == null)`). Platform-level `public` schema data uses hard delete.
+- **Optimistic concurrency**: aggregates subject to concurrent writes include `uint RowVersion` mapped via `.IsRowVersion()`. Handlers catch `DbUpdateConcurrencyException` and return `Result.Failure`.
+- **Logging**: Serilog structured logging only — `Error` for system failures, `Warning` for unexpected handled edge cases, `Information` for critical business milestones. No PII or credentials in logs.
+- **Correlation ID**: every request carries `X-Correlation-Id`. Middleware generates a GUID if absent and echoes it on the response. All log entries enriched with `CorrelationId` via `LogContext.PushProperty`.
+- **No hardcoded secrets**: use `appsettings.Development.json` (gitignored) or environment variables. Testcontainers generates ephemeral credentials — never reference external credentials in test code.
+- **Rate limiting**: required on auth endpoints (`/connect/token`, `/connect/authorize`, password reset) and any unauthenticated input endpoints.
+- **CORS**: named policy with explicit origin allowlist. Never `AllowAnyOrigin()` in production. Apply `app.UseCors()` before `app.UseAuthentication()`.
+- **Health checks**: `GET /health` (liveness) and `GET /health/ready` (readiness, includes PostgreSQL + Redis checks). Both anonymous, excluded from rate limiting.
+
+### Frontend
+- **Folder structure**: feature-based — `src/features/{feature-name}/` with components, hooks, and types co-located. Shared UI in `src/components/ui/`.
+- **State**: TanStack Query owns all server state. Zustand owns global client-only state. Never store server data in Zustand; never cache client UI state in TanStack Query.
+- **Forms**: `react-hook-form` + Zod. Define the Zod schema first (source of truth), infer TypeScript type via `z.infer<typeof schema>`.
+- **No `any`**: TypeScript strict mode on. Use `unknown` + type guards when shape is genuinely unknown.
+- **API errors**: all TanStack Query mutations handle errors explicitly — surface via toast or inline message. Use a shared `ApiError` type for typed error responses.
+- **Error Boundaries**: wrap every top-level route. Render a user-actionable fallback, never a blank screen.
+- **Three async states**: every data-fetching component handles loading (skeleton/spinner), empty (descriptive message), and error (message + retry). Silent empty render is a bug.
+- **Component size**: small and single-purpose. Extract hooks for non-trivial logic.
+
+---
 
 ## Agent Integrity Rules
 
 These rules exist to prevent a specific failure mode: an agent hitting a blocker, silently working around it, updating docs to justify the deviation, then marking work as done. This has happened before on this project (OpenIddict replaced with custom JWT without user approval). These rules are non-negotiable.
 
-- **Tech stack is immutable without explicit user approval**: The Tech Stack section above is the authoritative list. Never substitute, add, or remove a library — even temporarily or "just to unblock". If a specified library cannot be used (version conflict, missing feature, etc.), STOP immediately, describe the exact blocker, and wait for the user to decide. Do not implement an alternative.
+- **Tech stack is immutable without explicit user approval**: the Tech Stack section above is the authoritative list. Never substitute, add, or remove a library — even temporarily or "just to unblock". If a specified library cannot be used, STOP, describe the exact blocker, and wait for the user to decide.
+- **Spec → code. Never code → spec**: deviations from a feature file AC, Tech Stack entry, or ADR are gaps to document — never a reason to retroactively update the spec to match what you did.
+- **Never work around a failing test**: fix the production code. Never weaken assertions, add `.Skip()`, introduce excessive mocks that bypass the behavior under test, or change what a test verifies to make it green.
+- **Tech stack compliance before marking ✅**: verify every library used in that layer appears in the approved Tech Stack. Any deviation → mark ⚠️ and document the gap. Never mark ✅ to avoid a difficult conversation.
+- **Architectural decisions require user confirmation**: any decision affecting which library is used, the structure of a cross-cutting concern, or module communication patterns must be confirmed before implementation.
+- **"No exceptions, no asking" does not apply to blockers**: the Priority Order governs direction of work only. Technical blockers or architectural ambiguity → always stop and ask.
 
-- **Spec → code. Never code → spec**: The relationship is always one direction. If your implementation deviates from a feature file AC, a Tech Stack entry, or an ADR, that deviation is a GAP to be documented — never a reason to update the spec to match what you did. Updating CLAUDE.md's Tech Stack, an ADR in TECH_STACK.md, or an AC list to retroactively approve something you already implemented is forbidden.
+---
 
-- **Never work around a failing test**: Tests exist to verify production code. If a test is failing, fix the production code. Never: weaken assertions to make them pass, add `.Skip()` / `[Fact(Skip=...)]`, introduce excessive mocking that bypasses the behavior under test, or change what a test verifies in order to make it green. A failing test that correctly describes the expected behavior is more valuable than a passing test that hides a bug.
-
-- **Tech stack compliance check is mandatory before marking ✅**: Before marking any layer ✅ in PROGRESS.md or a feature callout, explicitly verify: every library used in that layer appears in the approved Tech Stack in CLAUDE.md. If any deviation exists — even a small one — mark the layer ⚠️ and document the gap. Never mark ✅ to avoid a difficult conversation.
-
-- **Architectural decisions always require user confirmation**: Any decision affecting which library or framework is used, the structure of a cross-cutting concern (auth tokens, tenant isolation, event dispatch), or module communication patterns must be surfaced and confirmed with the user before implementation — even when the choice seems obvious. "It seemed like the right thing to do" is not sufficient justification.
-
-- **"No exceptions, no asking" does not apply to architectural blockers**: The Priority Order rule ("no exceptions, no asking") governs the *direction of work* — which module or layer to tackle next. It does not apply when you hit a technical blocker or an architectural ambiguity. In those cases, always stop and ask. Proceeding silently is worse than asking.
-
-## Multi-tenancy & Migrations
-
-- **Schema Management**: Every new migration must be tested against multiple schemas using Testcontainers before being marked ✅ Done.
-- **Tenant Isolation**: Direct access to `public` schema from tenant-aware services is strictly forbidden.
-- **Identity uses the global `public` schema** — `IdentityDbContext` has no `TenantSchemaInterceptor`. All other modules use `AxisDbContext` with `TenantSchemaInterceptor`.
-- **Migration workflow**: Run `dotnet ef migrations add {MigrationName} --project src/Modules/{Module}/{Module}.Infrastructure --startup-project src/Axis.Api`. Migration names use PascalCase describing the schema change — e.g. `AddWorkflowStepTable`, `AddTenantIdToFormSubmission`. Migrations are applied automatically at startup via `MigrateAsync()` in the host; never apply manually in production. Every migration must be idempotent (use `migrationBuilder.Sql` with existence checks when EF scaffolding is insufficient).
-
-## Priority order
+## Priority Order
 
 When deciding what to work on next, always follow this order — no exceptions, no asking:
 1. **Gaps / bugs / issues** — documented gaps in feature callouts, known correctness bugs, failing tests
-2. **Current layer completion** — finish the layer currently in progress across all modules before starting the next layer
-3. **Next planned layer** — follow the established layer order (Domain → Application → Infrastructure → API → Frontend)
+2. **Current layer completion** — finish the layer in progress across all modules before starting the next
+3. **Next planned layer** — Domain → Application → Infrastructure → API → Frontend
 
-Never ask the user which direction to take if the priority order makes it unambiguous.
-
-**Exception — always stop and ask when:**
-- A specified library in the Tech Stack cannot be used for a concrete technical reason
-- An AC or feature file requirement is ambiguous enough that two reasonable interpretations lead to different implementations
-- Completing a task requires making an architectural decision not already documented
+**Always stop and ask when:**
+- A Tech Stack library cannot be used for a concrete technical reason
+- An AC is ambiguous enough that two reasonable interpretations lead to different implementations
+- Completing a task requires an architectural decision not already documented
 - A test is failing and fixing it would require deviating from a rule in this file
+
+---
 
 ## Definition of Done
 
-A US or layer is NOT done until all of the following are complete in the same commit:
+A US or layer is NOT done until all of the following are complete in the **same PR**:
 
 ### Completing a User Story (any layer)
 1. ✅ Tests written first and passing
 2. ✅ Feature file updated — add/update the `> **Implementation status**` callout directly after the US's *Out of scope* block:
    ```
    > **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅/⏳ | API: ⏳ | Frontend: ⏳
-   > Gaps vs spec: [ACs not yet covered and why — omit this line if none]
-   > Decisions: [design choices that affect how an AC is interpreted — omit this line if none]
+   > Gaps vs spec: [ACs not yet covered and why — omit if none]
+   > Decisions: [design choices affecting how an AC is interpreted — omit if none]
    ```
-   Each layer is tracked independently. Use ✅ when complete, ⏳ when in progress or not yet started.
-3. ✅ If a gap vs spec is found during implementation, document it in the callout — do not silently skip it
+   AC checkboxes (`- [ ]`) in feature files are **spec structure only** — do not check them off. Completion is tracked exclusively via the callout above.
+3. ✅ If a gap vs spec exists, document it in the callout — never silently skip.
 
-### Completing a layer for a module (Domain, Application, Infrastructure, API)
+### Completing a layer for a module
 1. ✅ All tests for that layer passing
-2. ✅ Every US in every feature file for that module has an `> **Implementation status**` callout
-3. ✅ All US callouts updated to reflect the new layer status
-4. ✅ Epic README `Implementation Status` table updated (e.g. `Infrastructure: ✅ Done`)
+2. ✅ Every US in every feature file for that module has a `> **Implementation status**` callout — a US with no callout = the layer is not done
+3. ✅ All callouts updated to reflect the new layer status
+4. ✅ Epic README `Implementation Status` table updated
 5. ✅ [`docs/PROGRESS.md`](docs/PROGRESS.md) updated — **not** CLAUDE.md
 
-### Completing a feature fix or refactor
+### Completing a fix or refactor
 1. ✅ Tests updated/added and passing
 2. ✅ If the fix changes observable behavior: update the affected US callout's Gaps or Decisions line
 3. ✅ If the fix closes a documented gap: remove that gap from the callout
 
-## Layer order
+---
 
-For any **new** module: complete Domain → Application before touching Infrastructure. Infrastructure requires Docker (PostgreSQL + Redis via Testcontainers) and is done in one pass after all business logic is proven.
+## Layer Order
 
-> Existing modules (Identity, DataModeling, WorkflowBuilder, FormBuilder, WorkflowEngine) have already completed Domain → Application → Infrastructure. The current focus is the API layer for WorkflowBuilder, FormBuilder, and WorkflowEngine. See [`docs/PROGRESS.md`](docs/PROGRESS.md) for current state.
+For any **new** module: Domain → Application (no Docker needed) → Infrastructure (requires Testcontainers) → API → Frontend. Complete each layer fully before starting the next.
 
-## Frontend Rules
+---
 
-- **Folder structure**: Feature-based, not type-based. Each feature lives in `src/features/{feature-name}/` with its own components, hooks, and types co-located. Shared UI goes in `src/components/ui/`.
-- **State boundaries**: TanStack Query owns all server state (fetching, caching, mutations). Zustand owns global client-only state (e.g. sidebar open, active tenant). Never store server data in Zustand; never cache client UI state in TanStack Query.
-- **Forms**: Use `react-hook-form` + Zod schema for all forms. Define the Zod schema first (it is the source of truth for validation), then infer the TypeScript type from it.
-- **API error handling**: All TanStack Query mutations must handle error state explicitly — surface errors via toast or inline message, never silently swallow them. Use a shared `ApiError` type for typed error responses from the backend.
-- **No `any`**: TypeScript strict mode is on. Never use `any`. Use `unknown` + type guards when the shape is genuinely unknown.
-- **Component size**: Keep components small and single-purpose. Extract hooks for any non-trivial logic — components should be mostly JSX.
-- **Error Boundaries**: Wrap every top-level route in a React Error Boundary. Never allow an unhandled render error to crash the entire app. Each boundary must render a user-actionable fallback — not a blank screen.
-- **Loading and empty states**: Every component that fetches async data must explicitly handle three states: loading (skeleton or spinner), empty (descriptive zero-state message), and error (user-actionable message with retry). Rendering nothing silently while data loads is a bug.
-
-## Epics & docs navigation
+## Epics & Docs Navigation
 
 - `docs/README.md` — master navigation
+- `docs/TECH_STACK.md` — approved libraries, versions, and ADRs
+- `docs/PROGRESS.md` — current implementation status per module and layer
+- `docs/PATTERNS.md` — implementation patterns and pitfalls; read before any non-trivial implementation
 - `docs/epics/E0{N}-*/README.md` — epic overview + implementation status table
 - `docs/epics/E0{N}-*/features/F0{N}-*.md` — feature + user stories with ACs
 - `docs/diagrams/` — system-level diagrams (.puml + .png)
 - `docs/scripts/generate-diagrams.ps1` — regenerates PNGs from .puml via Kroki.io POST API
 
-## Solution structure
+---
+
+## Solution Structure
 
 ```
 src/
