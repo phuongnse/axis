@@ -1,5 +1,8 @@
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Axis.Api.Authorization;
 using Axis.Api.Endpoints;
 using Axis.Api.HealthChecks;
@@ -187,9 +190,9 @@ try
     // ── JSON ───────────────────────────────────────────────────────────────
     builder.Services.ConfigureHttpJsonOptions(opts =>
     {
-        opts.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower;
+        opts.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
         opts.SerializerOptions.PropertyNameCaseInsensitive = true;
-        opts.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+        opts.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
 
     // ── OpenAPI ────────────────────────────────────────────────────────────
@@ -245,7 +248,7 @@ try
 
     // ── Health endpoints (anonymous, no rate limiting) ─────────────────────
     app.MapHealthChecks("/health");
-    app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+    app.MapHealthChecks("/health/ready", new HealthCheckOptions
     {
         Predicate = check => check.Tags.Contains("ready"),
     });

@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
@@ -121,7 +122,6 @@ public sealed class RegisterOrganizationHandler(
     }
 
     private static string GenerateSlugFromName(string name) =>
-        System.Text.RegularExpressions.Regex
-            .Replace(name.ToLowerInvariant().Trim(), @"[^a-z0-9]+", "-")
+        Regex.Replace(name.ToLowerInvariant().Trim(), @"[^a-z0-9]+", "-")
             .Trim('-');
 }
