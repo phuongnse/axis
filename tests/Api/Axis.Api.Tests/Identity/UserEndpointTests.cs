@@ -14,14 +14,14 @@ public class UserEndpointTests(ApiTestFixture fixture)
     // GET /api/users/me
 
     [Fact]
-    public async Task GetMe_without_token_returns_401()
+    public async Task GetMe_WhenNoToken_Returns401()
     {
         var resp = await fixture.Client.GetAsync("/api/users/me");
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
-    public async Task GetMe_returns_current_user_profile()
+    public async Task GetMe_WhenAuthenticated_ReturnsCurrentUserProfile()
     {
         var client = await AuthHelper.CreateAdminClientAsync(fixture, "user1");
 
@@ -39,7 +39,7 @@ public class UserEndpointTests(ApiTestFixture fixture)
     // PATCH /api/users/me
 
     [Fact]
-    public async Task UpdateProfile_without_token_returns_401()
+    public async Task UpdateProfile_WhenNoToken_Returns401()
     {
         var resp = await fixture.Client.PatchAsync("/api/users/me",
             JsonContent.Create(new { first_name = "X", last_name = "Y" }, options: Json));
@@ -48,7 +48,7 @@ public class UserEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task UpdateProfile_returns_no_content()
+    public async Task UpdateProfile_WhenAuthenticated_ReturnsNoContent()
     {
         var client = await AuthHelper.CreateAdminClientAsync(fixture, "user2");
 
@@ -61,7 +61,7 @@ public class UserEndpointTests(ApiTestFixture fixture)
     // POST /api/users/me/change-password
 
     [Fact]
-    public async Task ChangePassword_without_token_returns_401()
+    public async Task ChangePassword_WhenNoToken_Returns401()
     {
         var resp = await fixture.Client.PostAsJsonAsync("/api/users/me/change-password",
             new { current_password = "TestPass1", new_password = "NewPass2!", confirm_password = "NewPass2!" }, Json);
@@ -70,7 +70,7 @@ public class UserEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task ChangePassword_wrong_current_returns_unprocessable()
+    public async Task ChangePassword_WhenCurrentPasswordIsWrong_ReturnsUnprocessable()
     {
         var client = await AuthHelper.CreateAdminClientAsync(fixture, "user3");
 
@@ -89,14 +89,14 @@ public class UserEndpointTests(ApiTestFixture fixture)
     // GET /api/users/me/sessions
 
     [Fact]
-    public async Task GetSessions_without_token_returns_401()
+    public async Task GetSessions_WhenNoToken_Returns401()
     {
         var resp = await fixture.Client.GetAsync("/api/users/me/sessions");
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
-    public async Task GetSessions_returns_current_session()
+    public async Task GetSessions_WhenAuthenticated_ReturnsCurrentSession()
     {
         var client = await AuthHelper.CreateAdminClientAsync(fixture, "user4");
 
@@ -115,7 +115,7 @@ public class UserEndpointTests(ApiTestFixture fixture)
     // PATCH /api/users/{userId}/status
 
     [Fact]
-    public async Task DeactivateUser_self_deactivation_returns_422()
+    public async Task DeactivateUser_WhenSelfDeactivation_Returns422()
     {
         var client = await AuthHelper.CreateAdminClientAsync(fixture, "user5");
 

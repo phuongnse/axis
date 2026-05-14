@@ -10,7 +10,7 @@ public class UserEmailVerificationTests
     private static readonly Guid OrgId = Guid.NewGuid();
 
     [Fact]
-    public void New_user_is_not_email_verified()
+    public void User_WhenCreated_IsNotEmailVerified()
     {
         var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
 
@@ -18,7 +18,7 @@ public class UserEmailVerificationTests
     }
 
     [Fact]
-    public void VerifyEmail_marks_user_as_verified()
+    public void VerifyEmail_WhenCalled_MarksUserAsVerified()
     {
         var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
 
@@ -28,7 +28,7 @@ public class UserEmailVerificationTests
     }
 
     [Fact]
-    public void VerifyEmail_already_verified_is_idempotent()
+    public void VerifyEmail_WhenAlreadyVerified_IsIdempotent()
     {
         var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
         user.VerifyEmail();
@@ -40,7 +40,7 @@ public class UserEmailVerificationTests
     }
 
     [Fact]
-    public void RecordFailedLogin_increments_counter()
+    public void RecordFailedLogin_WhenCalled_IncrementsCounter()
     {
         var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
         user.VerifyEmail();
@@ -52,7 +52,7 @@ public class UserEmailVerificationTests
     }
 
     [Fact]
-    public void RecordFailedLogin_locks_account_after_5_attempts()
+    public void RecordFailedLogin_WhenFiveAttempts_LocksAccount()
     {
         var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
         user.VerifyEmail();
@@ -66,7 +66,7 @@ public class UserEmailVerificationTests
     }
 
     [Fact]
-    public void ResetFailedLogins_clears_counter_and_lockout()
+    public void ResetFailedLogins_WhenCalled_ClearsCounterAndLockout()
     {
         var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
         user.VerifyEmail();
@@ -79,7 +79,7 @@ public class UserEmailVerificationTests
     }
 
     [Fact]
-    public void IsLockedOut_is_false_when_lockout_has_expired()
+    public void IsLockedOut_WhenLockoutHasExpired_ReturnsFalse()
     {
         var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
         user.VerifyEmail();

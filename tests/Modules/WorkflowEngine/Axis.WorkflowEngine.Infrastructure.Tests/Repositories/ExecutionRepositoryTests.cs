@@ -24,7 +24,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
             new Dictionary<string, object?> { ["key"] = "value" });
 
     [Fact]
-    public async Task AddAsync_and_GetByIdAsync_round_trip()
+    public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
     {
         await using var ctx = fixture.CreateContext();
         var repo = new ExecutionRepository(ctx);
@@ -44,7 +44,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     }
 
     [Fact]
-    public async Task GetByIdAsync_returns_null_for_wrong_org()
+    public async Task GetByIdAsync_WhenOrgDoesNotMatch_ReturnsNull()
     {
         await using var ctx = fixture.CreateContext();
         var repo = new ExecutionRepository(ctx);
@@ -61,7 +61,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     }
 
     [Fact]
-    public async Task GetAllAsync_returns_only_org_executions_ordered_newest_first()
+    public async Task GetAllAsync_WhenMultipleExecutionsExist_ReturnsOnlyOrgExecutionsOrderedNewestFirst()
     {
         await using var ctx = fixture.CreateContext();
         var repo = new ExecutionRepository(ctx);
@@ -87,7 +87,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     }
 
     [Fact]
-    public async Task GetByWorkflowAsync_filters_by_workflow_and_org()
+    public async Task GetByWorkflowAsync_WhenFilteredByWorkflowAndOrg_ReturnsMatchingExecutions()
     {
         await using var ctx = fixture.CreateContext();
         var repo = new ExecutionRepository(ctx);
@@ -112,7 +112,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     }
 
     [Fact]
-    public async Task Context_dictionary_is_persisted_and_loaded()
+    public async Task AddAsync_WhenExecutionHasContextDictionary_PersistsAndLoadsContext()
     {
         await using var ctx = fixture.CreateContext();
         var repo = new ExecutionRepository(ctx);
@@ -133,7 +133,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     }
 
     [Fact]
-    public async Task Status_transitions_are_persisted()
+    public async Task SaveChangesAsync_WhenStatusTransitionsOccur_PersistsStatusTransitions()
     {
         await using var ctx = fixture.CreateContext();
         var repo = new ExecutionRepository(ctx);
@@ -156,7 +156,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     }
 
     [Fact]
-    public async Task WorkflowDefinitionReader_returns_true_for_active_workflow()
+    public async Task WorkflowDefinitionReader_WhenWorkflowIsActive_ReturnsTrue()
     {
         var wfId = Guid.NewGuid();
 
@@ -176,7 +176,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     }
 
     [Fact]
-    public async Task WorkflowDefinitionReader_returns_false_for_draft_workflow()
+    public async Task WorkflowDefinitionReader_WhenWorkflowIsDraft_ReturnsFalse()
     {
         var wfId = Guid.NewGuid();
 

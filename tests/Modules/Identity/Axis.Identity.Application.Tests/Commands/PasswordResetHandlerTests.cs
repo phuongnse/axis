@@ -31,7 +31,7 @@ public class RequestPasswordResetHandlerTests
     }
 
     [Fact]
-    public async Task Happy_path_creates_token_and_sends_email()
+    public async Task RequestPasswordReset_WhenEmailExists_CreatesTokenAndSendsEmail()
     {
         User user = MakeUser();
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).Returns(user);
@@ -48,7 +48,7 @@ public class RequestPasswordResetHandlerTests
     }
 
     [Fact]
-    public async Task Unknown_email_does_nothing_no_error_leakage()
+    public async Task RequestPasswordReset_WhenEmailIsUnknown_DoesNothingWithoutErrorLeakage()
     {
         // Per US-027: same message regardless of whether email exists
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).ReturnsNull();
@@ -63,7 +63,7 @@ public class RequestPasswordResetHandlerTests
     }
 
     [Fact]
-    public async Task New_request_invalidates_previous_token()
+    public async Task RequestPasswordReset_WhenNewRequest_InvalidatesPreviousToken()
     {
         User user = MakeUser();
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).Returns(user);

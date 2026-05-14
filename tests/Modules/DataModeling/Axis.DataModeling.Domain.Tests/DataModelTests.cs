@@ -14,7 +14,7 @@ public class DataModelTests
     // ─── Create ───────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Create_sets_name_description_icon_color_and_orgId()
+    public void DataModel_WhenCreated_SetsNameDescriptionIconColorAndOrgId()
     {
         var model = DataModel.Create("Invoice", "Invoicing model", "file-text", "#3B82F6", OrgId, UserId);
 
@@ -27,7 +27,7 @@ public class DataModelTests
     }
 
     [Fact]
-    public void Create_sets_CreatedBy_and_DateTimeOffset_timestamps()
+    public void DataModel_WhenCreated_SetsCreatedByAndTimestamps()
     {
         var before = DateTimeOffset.UtcNow;
         var model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
@@ -38,7 +38,7 @@ public class DataModelTests
     }
 
     [Fact]
-    public void Create_generates_three_system_fields()
+    public void DataModel_WhenCreated_GeneratesThreeSystemFields()
     {
         var model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
 
@@ -50,7 +50,7 @@ public class DataModelTests
     [InlineData("")]
     [InlineData("A")]                                 // too short (< 2)
     [InlineData("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")] // > 100
-    public void Create_throws_when_name_invalid_length(string name)
+    public void DataModel_WhenNameLengthIsInvalid_ThrowsArgumentException(string name)
     {
         var act = () => DataModel.Create(name, null, null, null, OrgId, UserId);
         act.Should().Throw<ArgumentException>();
@@ -62,14 +62,14 @@ public class DataModelTests
     [InlineData("Invoice<v2>")]
     [InlineData("Invoice\"v2")]
     [InlineData("Invoice;v2")]
-    public void Create_throws_when_name_contains_special_chars(string name)
+    public void DataModel_WhenNameContainsSpecialChars_ThrowsArgumentException(string name)
     {
         var act = () => DataModel.Create(name, null, null, null, OrgId, UserId);
         act.Should().Throw<ArgumentException>();
     }
 
     [Fact]
-    public void Create_raises_ModelCreated_event()
+    public void DataModel_WhenCreated_RaisesModelCreatedEvent()
     {
         var model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         model.DomainEvents.Should().ContainSingle(e => e is ModelCreated);
@@ -78,7 +78,7 @@ public class DataModelTests
     // ─── Update ───────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Update_changes_metadata()
+    public void DataModel_WhenUpdated_ChangesMetadata()
     {
         var model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         model.Update("Tax Invoice", "Updated", "file", "#EF4444");
@@ -90,7 +90,7 @@ public class DataModelTests
     }
 
     [Fact]
-    public void Update_throws_when_model_is_deleted()
+    public void Update_WhenModelIsDeleted_Throws()
     {
         var model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         model.Delete();
@@ -102,7 +102,7 @@ public class DataModelTests
     // ─── AddField ─────────────────────────────────────────────────────────────
 
     [Fact]
-    public void AddField_adds_text_field_with_correct_properties()
+    public void AddField_WhenFieldIsTextField_AddsWithCorrectProperties()
     {
         var model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         model.AddField("amount", "Amount", FieldType.Text, required: true, new TextFieldConfig());
@@ -118,7 +118,7 @@ public class DataModelTests
     [InlineData("id")]
     [InlineData("created_at")]
     [InlineData("updated_at")]
-    public void AddField_throws_when_name_is_reserved(string name)
+    public void AddField_WhenNameIsReserved_Throws(string name)
     {
         var model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         var act = () => model.AddField(name, "Label", FieldType.Text, false, new TextFieldConfig());
@@ -126,7 +126,7 @@ public class DataModelTests
     }
 
     [Fact]
-    public void AddField_throws_when_name_is_duplicate_case_insensitive()
+    public void AddField_WhenNameIsDuplicateCaseInsensitive_Throws()
     {
         var model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         model.AddField("amount", "Amount", FieldType.Text, false, new TextFieldConfig());
@@ -141,7 +141,7 @@ public class DataModelTests
     [InlineData("has-hyphen")]
     [InlineData("has space")]
     [InlineData("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")] // 65 chars
-    public void AddField_throws_when_name_is_invalid_format(string name)
+    public void AddField_WhenNameFormatIsInvalid_Throws(string name)
     {
         var model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         var act = () => model.AddField(name, "Label", FieldType.Text, false, new TextFieldConfig());
@@ -149,7 +149,7 @@ public class DataModelTests
     }
 
     [Fact]
-    public void AddField_enum_requires_at_least_two_options()
+    public void AddField_WhenEnumHasFewerThanTwoOptions_Throws()
     {
         var model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         var config = new EnumFieldConfig([new EnumOption("a", "A")], false);
@@ -159,7 +159,7 @@ public class DataModelTests
     }
 
     [Fact]
-    public void AddField_enum_with_two_options_succeeds()
+    public void AddField_WhenEnumHasTwoOptions_AddsFieldSuccessfully()
     {
         var model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         var config = new EnumFieldConfig(
@@ -170,7 +170,7 @@ public class DataModelTests
     }
 
     [Fact]
-    public void AddField_throws_when_model_is_deleted()
+    public void AddField_WhenModelIsDeleted_Throws()
     {
         var model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         model.Delete();
@@ -182,7 +182,7 @@ public class DataModelTests
     // ─── RemoveField ──────────────────────────────────────────────────────────
 
     [Fact]
-    public void RemoveField_removes_custom_field()
+    public void RemoveField_WhenFieldIsCustom_RemovesField()
     {
         var model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         var field = model.AddField("amount", "Amount", FieldType.Text, false, new TextFieldConfig());
@@ -193,7 +193,7 @@ public class DataModelTests
     }
 
     [Fact]
-    public void RemoveField_throws_when_field_is_system()
+    public void RemoveField_WhenFieldIsSystem_Throws()
     {
         var model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         var idField = model.Fields.Single(f => f.Name == "id");
@@ -203,7 +203,7 @@ public class DataModelTests
     }
 
     [Fact]
-    public void RemoveField_throws_when_field_not_found()
+    public void RemoveField_WhenFieldNotFound_Throws()
     {
         var model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         var act = () => model.RemoveField(Guid.NewGuid());
@@ -213,7 +213,7 @@ public class DataModelTests
     // ─── ReorderFields ────────────────────────────────────────────────────────
 
     [Fact]
-    public void ReorderFields_changes_display_order_of_custom_fields()
+    public void ReorderFields_WhenValidOrderProvided_ChangesDisplayOrderOfCustomFields()
     {
         var model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         var f1 = model.AddField("amount", "Amount", FieldType.Number, false, new NumberFieldConfig());
@@ -230,7 +230,7 @@ public class DataModelTests
     }
 
     [Fact]
-    public void ReorderFields_throws_when_list_does_not_match_all_custom_fields()
+    public void ReorderFields_WhenListDoesNotMatchAllCustomFields_Throws()
     {
         var model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         model.AddField("amount", "Amount", FieldType.Number, false, new NumberFieldConfig());
@@ -243,7 +243,7 @@ public class DataModelTests
     // ─── Delete ───────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Delete_sets_DeletedAt_and_raises_event()
+    public void Delete_WhenCalled_SetsDeletedAtAndRaisesEvent()
     {
         var model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         var before = DateTimeOffset.UtcNow;
@@ -255,7 +255,7 @@ public class DataModelTests
     }
 
     [Fact]
-    public void Delete_throws_when_already_deleted()
+    public void Delete_WhenAlreadyDeleted_Throws()
     {
         var model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         model.Delete();

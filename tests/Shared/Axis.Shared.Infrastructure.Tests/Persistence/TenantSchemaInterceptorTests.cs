@@ -32,7 +32,7 @@ public class TenantSchemaInterceptorTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Connection_uses_tenant_schema_after_open()
+    public async Task TenantSchemaInterceptor_WhenConnectionOpened_UsesTenantSchema()
     {
         const string schema = "tenant_acme";
         await using var ctx = BuildContext(schema);
@@ -48,7 +48,7 @@ public class TenantSchemaInterceptorTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Different_contexts_use_different_schemas()
+    public async Task TenantSchemaInterceptor_WhenMultipleContexts_EachUsesDifferentSchema()
     {
         const string schemaA = "tenant_alpha";
         const string schemaB = "tenant_beta";

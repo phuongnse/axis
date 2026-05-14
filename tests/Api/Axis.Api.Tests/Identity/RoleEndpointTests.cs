@@ -14,14 +14,14 @@ public class RoleEndpointTests(ApiTestFixture fixture)
     // GET /api/roles
 
     [Fact]
-    public async Task GetRoles_without_token_returns_401()
+    public async Task GetRoles_WhenNoToken_Returns401()
     {
         var resp = await fixture.Client.GetAsync("/api/roles");
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
-    public async Task GetRoles_returns_four_seeded_system_roles()
+    public async Task GetRoles_WhenAuthenticated_ReturnsFourSeededSystemRoles()
     {
         var client = await AuthHelper.CreateAdminClientAsync(fixture, "role1");
 
@@ -38,7 +38,7 @@ public class RoleEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task GetRoles_system_roles_are_flagged()
+    public async Task GetRoles_WhenAuthenticated_SystemRolesAreFlagged()
     {
         var client = await AuthHelper.CreateAdminClientAsync(fixture, "role2");
 
@@ -52,7 +52,7 @@ public class RoleEndpointTests(ApiTestFixture fixture)
     // POST /api/roles
 
     [Fact]
-    public async Task CreateRole_without_token_returns_401()
+    public async Task CreateRole_WhenNoToken_Returns401()
     {
         var resp = await fixture.Client.PostAsJsonAsync("/api/roles",
             new { name = "Analyst", permissions = new[] { "data_modeling:model:read" } }, Json);
@@ -61,7 +61,7 @@ public class RoleEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task CreateRole_returns_id_and_appears_in_list()
+    public async Task CreateRole_WhenRequestIsValid_ReturnsIdAndAppearsInList()
     {
         var client = await AuthHelper.CreateAdminClientAsync(fixture, "role3");
 
@@ -90,7 +90,7 @@ public class RoleEndpointTests(ApiTestFixture fixture)
     // PUT /api/roles/{roleId}
 
     [Fact]
-    public async Task UpdateRole_without_token_returns_401()
+    public async Task UpdateRole_WhenNoToken_Returns401()
     {
         var resp = await fixture.Client.PutAsJsonAsync($"/api/roles/{Guid.NewGuid()}",
             new { name = "X", permissions = Array.Empty<string>() }, Json);
@@ -99,7 +99,7 @@ public class RoleEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task UpdateRole_custom_role_returns_no_content()
+    public async Task UpdateRole_WhenRoleIsCustom_ReturnsNoContent()
     {
         var client = await AuthHelper.CreateAdminClientAsync(fixture, "role4");
 

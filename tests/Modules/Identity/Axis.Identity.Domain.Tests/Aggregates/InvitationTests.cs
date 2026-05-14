@@ -13,7 +13,7 @@ public class InvitationTests
     private static Email ValidEmail => Email.Create("invited@example.com").Value;
 
     [Fact]
-    public void Create_produces_valid_invitation()
+    public void Invitation_WhenCreated_ProducesValidInvitation()
     {
         var invitation = Invitation.Create(ValidEmail, OrgId, RoleId, InvitedBy);
 
@@ -26,7 +26,7 @@ public class InvitationTests
     }
 
     [Fact]
-    public void Create_generates_non_empty_token()
+    public void Invitation_WhenCreated_GeneratesNonEmptyToken()
     {
         var invitation = Invitation.Create(ValidEmail, OrgId, RoleId, InvitedBy);
 
@@ -34,7 +34,7 @@ public class InvitationTests
     }
 
     [Fact]
-    public void Two_invitations_have_different_tokens()
+    public void Invitation_WhenTwoCreated_HaveDifferentTokens()
     {
         var a = Invitation.Create(ValidEmail, OrgId, RoleId, InvitedBy);
         var b = Invitation.Create(ValidEmail, OrgId, RoleId, InvitedBy);
@@ -43,7 +43,7 @@ public class InvitationTests
     }
 
     [Fact]
-    public void Create_raises_InvitationCreated_event()
+    public void Invitation_WhenCreated_RaisesInvitationCreatedEvent()
     {
         var invitation = Invitation.Create(ValidEmail, OrgId, RoleId, InvitedBy);
 
@@ -52,7 +52,7 @@ public class InvitationTests
     }
 
     [Fact]
-    public void Accept_changes_status_to_accepted()
+    public void Invitation_WhenAccepted_ChangesStatusToAccepted()
     {
         var invitation = Invitation.Create(ValidEmail, OrgId, RoleId, InvitedBy);
         invitation.ClearDomainEvents();
@@ -65,7 +65,7 @@ public class InvitationTests
     }
 
     [Fact]
-    public void Accept_expired_invitation_throws()
+    public void Invitation_WhenExpired_AcceptThrows()
     {
         var invitation = Invitation.CreateExpired(ValidEmail, OrgId, RoleId, InvitedBy);
 
@@ -76,7 +76,7 @@ public class InvitationTests
     }
 
     [Fact]
-    public void Accept_already_accepted_invitation_throws()
+    public void Invitation_WhenAlreadyAccepted_AcceptThrows()
     {
         var invitation = Invitation.Create(ValidEmail, OrgId, RoleId, InvitedBy);
         invitation.Accept();
@@ -88,7 +88,7 @@ public class InvitationTests
     }
 
     [Fact]
-    public void Cancel_changes_status_to_cancelled()
+    public void Invitation_WhenCancelled_ChangesStatusToCancelled()
     {
         var invitation = Invitation.Create(ValidEmail, OrgId, RoleId, InvitedBy);
 
@@ -98,7 +98,7 @@ public class InvitationTests
     }
 
     [Fact]
-    public void Cancel_accepted_invitation_throws()
+    public void Invitation_WhenAlreadyAccepted_CancelThrows()
     {
         var invitation = Invitation.Create(ValidEmail, OrgId, RoleId, InvitedBy);
         invitation.Accept();
@@ -110,7 +110,7 @@ public class InvitationTests
     }
 
     [Fact]
-    public void IsExpired_returns_true_when_past_expiry()
+    public void IsExpired_WhenPastExpiry_ReturnsTrue()
     {
         var invitation = Invitation.CreateExpired(ValidEmail, OrgId, RoleId, InvitedBy);
 
@@ -118,7 +118,7 @@ public class InvitationTests
     }
 
     [Fact]
-    public void IsExpired_returns_false_for_fresh_invitation()
+    public void IsExpired_WhenFreshInvitation_ReturnsFalse()
     {
         var invitation = Invitation.Create(ValidEmail, OrgId, RoleId, InvitedBy);
 

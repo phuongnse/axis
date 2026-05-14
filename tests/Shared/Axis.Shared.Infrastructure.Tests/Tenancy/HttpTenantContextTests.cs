@@ -21,7 +21,7 @@ public class HttpTenantContextTests
     }
 
     [Fact]
-    public void OrganizationId_reads_org_id_claim()
+    public void HttpTenantContext_WhenOrgIdClaimPresent_ReadsOrganizationId()
     {
         var orgId = Guid.NewGuid();
         var sut = new HttpTenantContext(BuildAccessor(orgId));
@@ -30,7 +30,7 @@ public class HttpTenantContextTests
     }
 
     [Fact]
-    public void SchemaName_derives_tenant_prefix_from_org_id()
+    public void HttpTenantContext_WhenOrgIdClaimPresent_DerivesSchemaName()
     {
         var orgId = Guid.NewGuid();
         var sut = new HttpTenantContext(BuildAccessor(orgId));
@@ -39,7 +39,7 @@ public class HttpTenantContextTests
     }
 
     [Fact]
-    public void Throws_when_http_context_is_null()
+    public void HttpTenantContext_WhenHttpContextIsNull_Throws()
     {
         var accessor = Substitute.For<IHttpContextAccessor>();
         accessor.HttpContext.Returns((HttpContext?)null);
@@ -52,7 +52,7 @@ public class HttpTenantContextTests
     }
 
     [Fact]
-    public void Throws_when_org_id_claim_is_missing()
+    public void HttpTenantContext_WhenOrgIdClaimIsMissing_Throws()
     {
         var httpContext = new DefaultHttpContext
         {

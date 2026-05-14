@@ -17,7 +17,7 @@ public class WorkflowExecutionTests
     // ─── Create ───────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Create_sets_workflow_org_trigger_and_Pending_status()
+    public void WorkflowExecution_WhenCreated_SetsWorkflowOrgTriggerAndPendingStatus()
     {
         var exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
 
@@ -30,7 +30,7 @@ public class WorkflowExecutionTests
     }
 
     [Fact]
-    public void Create_raises_ExecutionStarted_event()
+    public void WorkflowExecution_WhenCreated_RaisesExecutionStartedEvent()
     {
         var exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.DomainEvents.Should().ContainSingle(e => e is ExecutionStarted);
@@ -39,7 +39,7 @@ public class WorkflowExecutionTests
     // ─── Start ────────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Start_transitions_from_Pending_to_Running()
+    public void Start_WhenExecutionIsPending_TransitionsToRunning()
     {
         var exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.Start();
@@ -49,7 +49,7 @@ public class WorkflowExecutionTests
     }
 
     [Fact]
-    public void Start_throws_when_not_in_Pending_status()
+    public void Start_WhenNotInPendingStatus_Throws()
     {
         var exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.Start();
@@ -61,7 +61,7 @@ public class WorkflowExecutionTests
     // ─── Complete ─────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Complete_transitions_Running_to_Completed()
+    public void Complete_WhenExecutionIsRunning_TransitionsToCompleted()
     {
         var exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.Start();
@@ -73,7 +73,7 @@ public class WorkflowExecutionTests
     }
 
     [Fact]
-    public void Complete_throws_when_not_Running()
+    public void Complete_WhenNotRunning_Throws()
     {
         var exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
         var act = () => exec.Complete();
@@ -83,7 +83,7 @@ public class WorkflowExecutionTests
     // ─── Fail ─────────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Fail_transitions_Running_to_Failed_with_error_message()
+    public void Fail_WhenExecutionIsRunning_TransitionsToFailedWithErrorMessage()
     {
         var exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.Start();
@@ -97,7 +97,7 @@ public class WorkflowExecutionTests
     // ─── Cancel ───────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Cancel_transitions_Running_to_Cancelled()
+    public void Cancel_WhenRunning_TransitionsToCancelled()
     {
         var exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.Start();
@@ -108,7 +108,7 @@ public class WorkflowExecutionTests
     }
 
     [Fact]
-    public void Cancel_transitions_Pending_to_Cancelled()
+    public void Cancel_WhenPending_TransitionsToCancelled()
     {
         var exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.Cancel();
@@ -119,7 +119,7 @@ public class WorkflowExecutionTests
     [InlineData(ExecutionStatus.Completed)]
     [InlineData(ExecutionStatus.Failed)]
     [InlineData(ExecutionStatus.Cancelled)]
-    public void Cancel_throws_when_execution_is_terminal(ExecutionStatus terminal)
+    public void Cancel_WhenExecutionIsInTerminalState_Throws(ExecutionStatus terminal)
     {
         var exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.Start();
@@ -136,7 +136,7 @@ public class WorkflowExecutionTests
     // ─── Retry ────────────────────────────────────────────────────────────────
 
     [Fact]
-    public void CreateRetry_creates_new_execution_linked_to_original()
+    public void CreateRetry_WhenExecutionHasFailed_CreatesNewExecutionLinkedToOriginal()
     {
         var original = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
         original.Start();
@@ -150,7 +150,7 @@ public class WorkflowExecutionTests
     }
 
     [Fact]
-    public void CreateRetry_throws_when_execution_is_not_Failed()
+    public void CreateRetry_WhenExecutionIsNotFailed_Throws()
     {
         var exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.Start();

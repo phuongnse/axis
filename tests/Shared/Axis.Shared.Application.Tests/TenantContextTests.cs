@@ -6,7 +6,7 @@ namespace Axis.Shared.Application.Tests;
 public class TenantContextTests
 {
     [Fact]
-    public void SchemaName_is_derived_from_org_id()
+    public void TenantContext_WhenCreatedWithOrgId_DerivesSchemaNameFromOrgId()
     {
         var orgId = Guid.NewGuid();
         var context = new TenantContext(orgId);
@@ -15,7 +15,7 @@ public class TenantContextTests
     }
 
     [Fact]
-    public void TenantContext_exposes_org_id()
+    public void TenantContext_WhenCreatedWithOrgId_ExposesOrganizationId()
     {
         var orgId = Guid.NewGuid();
         var context = new TenantContext(orgId);

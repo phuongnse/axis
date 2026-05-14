@@ -77,7 +77,7 @@ public class UnitOfWorkTests : IAsyncLifetime
     // ── Tests ──────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task SaveChangesAsync_dispatches_domain_events_raised_by_aggregates()
+    public async Task SaveChangesAsync_WhenAggregateHasDomainEvents_DispatchesEvents()
     {
         await ResetAsync();
         IMessageBus bus = Substitute.For<IMessageBus>();
@@ -94,7 +94,7 @@ public class UnitOfWorkTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task SaveChangesAsync_clears_domain_events_after_dispatch()
+    public async Task SaveChangesAsync_WhenEventsDispatched_ClearsDomainEvents()
     {
         await ResetAsync();
         IMessageBus bus = Substitute.For<IMessageBus>();
@@ -109,7 +109,7 @@ public class UnitOfWorkTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task SaveChangesAsync_does_not_dispatch_when_no_events()
+    public async Task SaveChangesAsync_WhenNoEvents_DoesNotDispatch()
     {
         await ResetAsync();
         IMessageBus bus = Substitute.For<IMessageBus>();

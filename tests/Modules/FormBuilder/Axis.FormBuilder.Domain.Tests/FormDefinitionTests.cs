@@ -14,7 +14,7 @@ public class FormDefinitionTests
     // ─── Create ───────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Create_sets_name_description_and_orgId()
+    public void FormDefinition_WhenCreated_SetsNameDescriptionAndOrgId()
     {
         var form = FormDefinition.Create("Employee Intake", "New hire form", OrgId, UserId);
 
@@ -26,7 +26,7 @@ public class FormDefinitionTests
     }
 
     [Fact]
-    public void Create_sets_CreatedBy_and_DateTimeOffset_timestamps()
+    public void FormDefinition_WhenCreated_SetsCreatedByAndTimestamps()
     {
         var before = DateTimeOffset.UtcNow;
         var form = FormDefinition.Create("Employee Intake", null, OrgId, UserId);
@@ -37,7 +37,7 @@ public class FormDefinitionTests
     }
 
     [Fact]
-    public void Create_raises_FormCreated_event()
+    public void FormDefinition_WhenCreated_RaisesFormCreatedEvent()
     {
         var form = FormDefinition.Create("Employee Intake", null, OrgId, UserId);
         form.DomainEvents.Should().ContainSingle(e => e is FormCreated);
@@ -47,7 +47,7 @@ public class FormDefinitionTests
     [InlineData("")]
     [InlineData("A")]  // too short
     [InlineData("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")] // > 200
-    public void Create_throws_when_name_is_invalid_length(string name)
+    public void FormDefinition_WhenNameLengthIsInvalid_ThrowsArgumentException(string name)
     {
         var act = () => FormDefinition.Create(name, null, OrgId, UserId);
         act.Should().Throw<ArgumentException>();
@@ -56,7 +56,7 @@ public class FormDefinitionTests
     // ─── AddField ─────────────────────────────────────────────────────────────
 
     [Fact]
-    public void AddField_adds_text_field()
+    public void AddField_WhenFieldIsTextField_AddsFieldSuccessfully()
     {
         var form = FormDefinition.Create("Employee Intake", null, OrgId, UserId);
         var field = form.AddField("first_name", "First Name", FormFieldType.Text, required: true, null);
@@ -68,7 +68,7 @@ public class FormDefinitionTests
     }
 
     [Fact]
-    public void AddField_throws_when_key_is_duplicate()
+    public void AddField_WhenKeyIsDuplicate_Throws()
     {
         var form = FormDefinition.Create("Employee Intake", null, OrgId, UserId);
         form.AddField("first_name", "First Name", FormFieldType.Text, false, null);
@@ -82,7 +82,7 @@ public class FormDefinitionTests
     [InlineData("1starts_with_number")]
     [InlineData("has-hyphen")]
     [InlineData("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")] // 65 chars
-    public void AddField_throws_when_key_is_invalid_format(string key)
+    public void AddField_WhenKeyFormatIsInvalid_Throws(string key)
     {
         var form = FormDefinition.Create("Employee Intake", null, OrgId, UserId);
         var act = () => form.AddField(key, "Label", FormFieldType.Text, false, null);
@@ -90,7 +90,7 @@ public class FormDefinitionTests
     }
 
     [Fact]
-    public void AddField_dropdown_requires_at_least_two_options()
+    public void AddField_WhenDropdownHasFewerThanTwoOptions_Throws()
     {
         var form = FormDefinition.Create("Employee Intake", null, OrgId, UserId);
         var config = new DropdownFieldConfig([new DropdownOption("a", "A")]);
@@ -100,7 +100,7 @@ public class FormDefinitionTests
     }
 
     [Fact]
-    public void AddField_dropdown_with_two_options_succeeds()
+    public void AddField_WhenDropdownHasTwoOptions_AddsFieldSuccessfully()
     {
         var form = FormDefinition.Create("Employee Intake", null, OrgId, UserId);
         var config = new DropdownFieldConfig(
@@ -113,7 +113,7 @@ public class FormDefinitionTests
     // ─── RemoveField ──────────────────────────────────────────────────────────
 
     [Fact]
-    public void RemoveField_removes_an_existing_field()
+    public void RemoveField_WhenFieldExists_RemovesField()
     {
         var form = FormDefinition.Create("Employee Intake", null, OrgId, UserId);
         var field = form.AddField("first_name", "First Name", FormFieldType.Text, false, null);
@@ -124,7 +124,7 @@ public class FormDefinitionTests
     }
 
     [Fact]
-    public void RemoveField_throws_when_field_not_found()
+    public void RemoveField_WhenFieldNotFound_Throws()
     {
         var form = FormDefinition.Create("Employee Intake", null, OrgId, UserId);
         var act = () => form.RemoveField(Guid.NewGuid());
@@ -134,7 +134,7 @@ public class FormDefinitionTests
     // ─── ReorderFields ────────────────────────────────────────────────────────
 
     [Fact]
-    public void ReorderFields_updates_display_order()
+    public void ReorderFields_WhenValidOrderProvided_UpdatesDisplayOrder()
     {
         var form = FormDefinition.Create("Employee Intake", null, OrgId, UserId);
         var f1 = form.AddField("first_name", "First Name", FormFieldType.Text, false, null);
@@ -152,7 +152,7 @@ public class FormDefinitionTests
     // ─── Delete ───────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Delete_sets_DeletedAt_and_raises_event()
+    public void Delete_WhenCalled_SetsDeletedAtAndRaisesEvent()
     {
         var form = FormDefinition.Create("Employee Intake", null, OrgId, UserId);
         var before = DateTimeOffset.UtcNow;
@@ -164,7 +164,7 @@ public class FormDefinitionTests
     }
 
     [Fact]
-    public void Delete_throws_when_already_deleted()
+    public void Delete_WhenAlreadyDeleted_Throws()
     {
         var form = FormDefinition.Create("Employee Intake", null, OrgId, UserId);
         form.Delete();

@@ -6,7 +6,7 @@ namespace Axis.Shared.Domain.Tests;
 public class ResultTests
 {
     [Fact]
-    public void Success_result_is_successful()
+    public void Result_WhenSuccess_IsSuccessful()
     {
         var result = Result.Success();
 
@@ -15,7 +15,7 @@ public class ResultTests
     }
 
     [Fact]
-    public void Failure_result_is_not_successful()
+    public void Result_WhenFailure_IsNotSuccessful()
     {
         var result = Result.Failure("Something went wrong");
 
@@ -25,7 +25,7 @@ public class ResultTests
     }
 
     [Fact]
-    public void Success_result_with_value_holds_value()
+    public void ResultT_WhenSuccess_HoldsValue()
     {
         var result = Result<int>.Success(42);
 
@@ -34,7 +34,7 @@ public class ResultTests
     }
 
     [Fact]
-    public void Failure_result_with_value_has_error()
+    public void ResultT_WhenFailure_HasError()
     {
         var result = Result<int>.Failure("Not found");
 
@@ -43,7 +43,7 @@ public class ResultTests
     }
 
     [Fact]
-    public void Accessing_value_on_failure_throws()
+    public void ResultT_WhenAccessingValueOnFailure_Throws()
     {
         var result = Result<int>.Failure("error");
 
@@ -53,7 +53,7 @@ public class ResultTests
     }
 
     [Fact]
-    public void Accessing_error_on_success_throws()
+    public void Result_WhenAccessingErrorOnSuccess_Throws()
     {
         var result = Result.Success();
 
@@ -63,7 +63,7 @@ public class ResultTests
     }
 
     [Fact]
-    public void Result_can_be_implicitly_created_from_value()
+    public void ResultT_WhenImplicitlyCreatedFromValue_IsSuccess()
     {
         Result<string> result = "hello";
 

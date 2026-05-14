@@ -9,7 +9,7 @@ public class RoleTests
     private static readonly Guid OrgId = Guid.NewGuid();
 
     [Fact]
-    public void Create_custom_role_with_permissions()
+    public void Role_WhenCreated_ProducesCustomRoleWithPermissions()
     {
         var permissions = new[] { "workflow:definition:read", "workflow:definition:write" };
 
@@ -23,7 +23,7 @@ public class RoleTests
     }
 
     [Fact]
-    public void Create_raises_RoleCreated_event()
+    public void Role_WhenCreated_RaisesRoleCreatedEvent()
     {
         var role = Role.Create("Manager", null, OrgId, ["workflow:definition:read"]);
 
@@ -32,7 +32,7 @@ public class RoleTests
     }
 
     [Fact]
-    public void Create_requires_at_least_one_permission()
+    public void Role_WhenCreatedWithNoPermissions_Throws()
     {
         var act = () => Role.Create("Empty", null, OrgId, []);
 
@@ -43,7 +43,7 @@ public class RoleTests
     [Theory]
     [InlineData("")]
     [InlineData("  ")]
-    public void Create_requires_non_empty_name(string name)
+    public void Role_WhenCreatedWithEmptyName_Throws(string name)
     {
         var act = () => Role.Create(name, null, OrgId, ["workflow:definition:read"]);
 
@@ -51,7 +51,7 @@ public class RoleTests
     }
 
     [Fact]
-    public void Update_changes_name_description_and_permissions()
+    public void Role_WhenUpdated_ChangesNameDescriptionAndPermissions()
     {
         var role = Role.Create("Manager", null, OrgId, ["workflow:definition:read"]);
         role.ClearDomainEvents();
@@ -66,7 +66,7 @@ public class RoleTests
     }
 
     [Fact]
-    public void System_role_cannot_be_updated()
+    public void Role_WhenSystemRoleUpdated_Throws()
     {
         var role = Role.CreateSystem("Admin", OrgId, ["users:read", "users:invite"]);
 
@@ -77,7 +77,7 @@ public class RoleTests
     }
 
     [Fact]
-    public void System_role_is_marked_correctly()
+    public void Role_WhenCreatedAsSystem_IsMarkedAsSystemRole()
     {
         var role = Role.CreateSystem("Viewer", OrgId, ["workflow:definition:read"]);
 
@@ -85,7 +85,7 @@ public class RoleTests
     }
 
     [Fact]
-    public void Duplicate_permissions_are_deduplicated()
+    public void Role_WhenDuplicatePermissionsProvided_DeduplicatesPermissions()
     {
         var role = Role.Create("Manager", null, OrgId,
             ["workflow:definition:read", "workflow:definition:read"]);

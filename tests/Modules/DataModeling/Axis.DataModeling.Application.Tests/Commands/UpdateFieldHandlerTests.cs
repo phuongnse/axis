@@ -21,7 +21,7 @@ public class UpdateFieldHandlerTests
     private UpdateFieldHandler CreateHandler() => new(_modelRepo, _uow);
 
     [Fact]
-    public async Task Happy_path_updates_field_label_and_saves()
+    public async Task UpdateField_WhenFieldExists_UpdatesLabelAndSaves()
     {
         DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
         FieldDefinition field = model.AddField("price", "Price", FieldType.Number, false, new NumberFieldConfig());
@@ -39,7 +39,7 @@ public class UpdateFieldHandlerTests
     }
 
     [Fact]
-    public async Task Model_not_found_returns_not_found()
+    public async Task UpdateField_WhenModelNotFound_ReturnsNotFound()
     {
         _modelRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).Returns((DataModel?)null);
 
@@ -53,7 +53,7 @@ public class UpdateFieldHandlerTests
     }
 
     [Fact]
-    public async Task System_field_update_returns_business_rule_failure()
+    public async Task UpdateField_WhenFieldIsSystem_ReturnsBusinessRuleFailure()
     {
         DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
         FieldDefinition systemField = model.Fields.First(f => f.IsSystem);

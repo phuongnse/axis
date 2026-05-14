@@ -28,7 +28,7 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
         => FormDefinition.Create(name, null, orgId ?? OrgId, UserId);
 
     [Fact]
-    public async Task AddAsync_and_GetByIdAsync_round_trip()
+    public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
     {
         FormDefinition form = MakeForm("Contact Form");
         await _sut.AddAsync(form);
@@ -43,7 +43,7 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetAllAsync_excludes_deleted_and_other_orgs()
+    public async Task GetAllAsync_WhenMultipleFormsExist_ExcludesDeletedAndOtherOrgs()
     {
         var orgId = Guid.NewGuid();
         var active = MakeForm("Active Form", orgId);
@@ -62,7 +62,7 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetByIdAsync_returns_null_for_deleted_form()
+    public async Task GetByIdAsync_WhenFormIsDeleted_ReturnsNull()
     {
         var orgId = Guid.NewGuid();
         var form = MakeForm("To Delete", orgId);
@@ -76,7 +76,7 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task NameExistsAsync_is_case_insensitive()
+    public async Task NameExistsAsync_WhenNameExists_IsCaseInsensitive()
     {
         var orgId = Guid.NewGuid();
         await _sut.AddAsync(MakeForm("Feedback Form", orgId));
@@ -87,7 +87,7 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task NameExistsAsync_excludes_self_on_update()
+    public async Task NameExistsAsync_WhenExcludeIdProvided_ExcludesThatFormFromCheck()
     {
         var orgId = Guid.NewGuid();
         var form = MakeForm("Survey Form", orgId);
@@ -100,7 +100,7 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Fields_with_various_config_types_round_trip()
+    public async Task AddAsync_WhenFormHasFieldsWithVariousConfigTypes_PersistsAndReloadsAllFields()
     {
         var form = MakeForm("Multi-type Form");
         form.AddField("title", "Title", FormFieldType.Text, true,
@@ -130,7 +130,7 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task IsReferencedByWorkflowAsync_returns_false_when_not_referenced()
+    public async Task IsReferencedByWorkflowAsync_WhenFormNotReferenced_ReturnsFalse()
     {
         var form = MakeForm("Unreferenced Form");
         await _sut.AddAsync(form);
@@ -142,7 +142,7 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task IsReferencedByWorkflowAsync_returns_true_when_form_used_in_workflow_step()
+    public async Task IsReferencedByWorkflowAsync_WhenFormUsedInWorkflowStep_ReturnsTrue()
     {
         var form = MakeForm("Referenced Form");
         await _sut.AddAsync(form);

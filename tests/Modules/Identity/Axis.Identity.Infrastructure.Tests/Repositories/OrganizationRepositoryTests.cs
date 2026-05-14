@@ -28,7 +28,7 @@ public class OrganizationRepositoryTests(IdentityDatabaseFixture db) : IAsyncLif
             Email.Create("owner@example.com").Value);
 
     [Fact]
-    public async Task AddAsync_and_GetByIdAsync_round_trip()
+    public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
     {
         var org = MakeOrg("org-add-get");
         await _sut.AddAsync(org);
@@ -44,7 +44,7 @@ public class OrganizationRepositoryTests(IdentityDatabaseFixture db) : IAsyncLif
     }
 
     [Fact]
-    public async Task GetBySlugAsync_returns_org_with_matching_slug()
+    public async Task GetBySlugAsync_WhenSlugExists_ReturnsMatchingOrg()
     {
         var org = MakeOrg("org-by-slug");
         await _sut.AddAsync(org);
@@ -58,7 +58,7 @@ public class OrganizationRepositoryTests(IdentityDatabaseFixture db) : IAsyncLif
     }
 
     [Fact]
-    public async Task GetBySlugAsync_returns_null_for_unknown_slug()
+    public async Task GetBySlugAsync_WhenSlugDoesNotExist_ReturnsNull()
     {
         var slug = OrganizationSlug.Create("does-not-exist").Value;
         var result = await _sut.GetBySlugAsync(slug);
@@ -66,7 +66,7 @@ public class OrganizationRepositoryTests(IdentityDatabaseFixture db) : IAsyncLif
     }
 
     [Fact]
-    public async Task SlugExistsAsync_returns_true_when_slug_taken()
+    public async Task SlugExistsAsync_WhenSlugIsTaken_ReturnsTrue()
     {
         var org = MakeOrg("slug-exists-check");
         await _sut.AddAsync(org);
@@ -77,7 +77,7 @@ public class OrganizationRepositoryTests(IdentityDatabaseFixture db) : IAsyncLif
     }
 
     [Fact]
-    public async Task SlugExistsAsync_returns_false_for_unused_slug()
+    public async Task SlugExistsAsync_WhenSlugIsUnused_ReturnsFalse()
     {
         var exists = await _sut.SlugExistsAsync(OrganizationSlug.Create("never-used-slug").Value);
         exists.Should().BeFalse();

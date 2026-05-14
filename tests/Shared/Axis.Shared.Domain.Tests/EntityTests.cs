@@ -8,7 +8,7 @@ public class EntityTests
     private class TestEntity(Guid id) : Entity<Guid>(id);
 
     [Fact]
-    public void Entities_with_same_id_are_equal()
+    public void Entity_WhenIdsAreIdentical_AreEqual()
     {
         var id = Guid.NewGuid();
         var a = new TestEntity(id);
@@ -19,7 +19,7 @@ public class EntityTests
     }
 
     [Fact]
-    public void Entities_with_different_ids_are_not_equal()
+    public void Entity_WhenIdsDiffer_AreNotEqual()
     {
         var a = new TestEntity(Guid.NewGuid());
         var b = new TestEntity(Guid.NewGuid());
@@ -29,7 +29,7 @@ public class EntityTests
     }
 
     [Fact]
-    public void Entity_is_not_equal_to_null()
+    public void Entity_WhenComparedToNull_IsNotEqual()
     {
         var entity = new TestEntity(Guid.NewGuid());
 
@@ -38,7 +38,7 @@ public class EntityTests
     }
 
     [Fact]
-    public void Entity_has_consistent_hash_code()
+    public void Entity_WhenSameId_HasConsistentHashCode()
     {
         var id = Guid.NewGuid();
         var a = new TestEntity(id);
@@ -48,7 +48,7 @@ public class EntityTests
     }
 
     [Fact]
-    public void Entity_is_not_equal_to_different_type()
+    public void Entity_WhenComparedToDifferentType_IsNotEqual()
     {
         var id = Guid.NewGuid();
         var entity = new TestEntity(id);

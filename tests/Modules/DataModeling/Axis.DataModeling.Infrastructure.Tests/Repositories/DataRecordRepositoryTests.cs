@@ -23,7 +23,7 @@ public class DataRecordRepositoryTests(DataModelingDatabaseFixture db) : IAsyncL
     public async Task DisposeAsync() => await _ctx.DisposeAsync();
 
     [Fact]
-    public async Task AddAsync_and_GetByIdAsync_round_trip()
+    public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
     {
         Dictionary<string, object?> data = new() { ["name"] = "Acme Corp", ["revenue"] = 1000000 };
         DataRecord record = DataRecord.Create(ModelId, OrgId, data, UserId);
@@ -39,7 +39,7 @@ public class DataRecordRepositoryTests(DataModelingDatabaseFixture db) : IAsyncL
     }
 
     [Fact]
-    public async Task GetAllAsync_returns_records_for_model_excluding_deleted()
+    public async Task GetAllAsync_WhenMultipleRecordsExist_ReturnsRecordsForModelExcludingDeleted()
     {
         Guid modelId = Guid.NewGuid();
         Guid orgId = Guid.NewGuid();
@@ -63,7 +63,7 @@ public class DataRecordRepositoryTests(DataModelingDatabaseFixture db) : IAsyncL
     }
 
     [Fact]
-    public async Task Data_dictionary_persists_various_value_types()
+    public async Task AddAsync_WhenDataContainsVariousValueTypes_PersistsAllTypes()
     {
         Dictionary<string, object?> data = new()
         {
@@ -85,7 +85,7 @@ public class DataRecordRepositoryTests(DataModelingDatabaseFixture db) : IAsyncL
     }
 
     [Fact]
-    public async Task GetPagedAsync_returns_correct_page_and_total()
+    public async Task GetPagedAsync_WhenMultipleRecordsExist_ReturnsCorrectPageAndTotal()
     {
         Guid modelId = Guid.NewGuid();
         Guid orgId = Guid.NewGuid();
@@ -103,7 +103,7 @@ public class DataRecordRepositoryTests(DataModelingDatabaseFixture db) : IAsyncL
     }
 
     [Fact]
-    public async Task GetPagedAsync_search_filters_by_jsonb_text()
+    public async Task GetPagedAsync_WhenSearchProvided_FiltersByJsonbText()
     {
         Guid modelId = Guid.NewGuid();
         Guid orgId = Guid.NewGuid();

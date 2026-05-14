@@ -26,7 +26,7 @@ public class DataClassRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     public async Task DisposeAsync() => await _ctx.DisposeAsync();
 
     [Fact]
-    public async Task AddAsync_and_GetByIdAsync_round_trip()
+    public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
     {
         DataClass dc = DataClass.Create("Address", "Postal address", OrgId, UserId);
         await _sut.AddAsync(dc);
@@ -40,7 +40,7 @@ public class DataClassRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     }
 
     [Fact]
-    public async Task Fields_are_persisted_and_reloaded()
+    public async Task AddAsync_WhenDataClassHasFields_PersistsAndReloadsFields()
     {
         DataClass dc = DataClass.Create("ContactInfo", null, OrgId, UserId);
         dc.AddField("email", "Email", FieldType.Text, true, new TextFieldConfig(MaxLength: 320));
@@ -56,7 +56,7 @@ public class DataClassRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     }
 
     [Fact]
-    public async Task IsReferencedByAnyModelAsync_returns_true_when_used_in_model()
+    public async Task IsReferencedByAnyModelAsync_WhenUsedInModel_ReturnsTrue()
     {
         Guid orgId = Guid.NewGuid();
         DataClass dc = DataClass.Create("Billing", null, orgId, UserId);
@@ -73,7 +73,7 @@ public class DataClassRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     }
 
     [Fact]
-    public async Task IsReferencedByAnyModelAsync_returns_false_when_not_used()
+    public async Task IsReferencedByAnyModelAsync_WhenNotUsed_ReturnsFalse()
     {
         DataClass dc = DataClass.Create("Unused", null, OrgId, UserId);
         await _sut.AddAsync(dc);
@@ -85,7 +85,7 @@ public class DataClassRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     }
 
     [Fact]
-    public async Task NameExistsAsync_is_case_insensitive()
+    public async Task NameExistsAsync_WhenNameExists_IsCaseInsensitive()
     {
         Guid orgId = Guid.NewGuid();
         await _sut.AddAsync(DataClass.Create("Address", null, orgId, UserId));

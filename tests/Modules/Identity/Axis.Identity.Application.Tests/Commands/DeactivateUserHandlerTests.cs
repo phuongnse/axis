@@ -27,7 +27,7 @@ public class DeactivateUserHandlerTests
         User.Create("Test", "User", Email.Create(email).Value, OrgId);
 
     [Fact]
-    public async Task Happy_path_deactivates_user()
+    public async Task DeactivateUser_WhenRequestIsValid_DeactivatesUser()
     {
         User target = MakeUser();
         User requester = MakeUser("admin@acme.com");
@@ -47,7 +47,7 @@ public class DeactivateUserHandlerTests
     }
 
     [Fact]
-    public async Task Admin_cannot_deactivate_themselves_returns_business_rule_failure()
+    public async Task DeactivateUser_WhenSelfDeactivation_ReturnsBusinessRuleFailure()
     {
         User user = MakeUser();
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
@@ -62,7 +62,7 @@ public class DeactivateUserHandlerTests
     }
 
     [Fact]
-    public async Task Cannot_deactivate_last_admin_returns_business_rule_failure()
+    public async Task DeactivateUser_WhenLastAdmin_ReturnsBusinessRuleFailure()
     {
         User target = MakeUser();
         target.AssignRole(AdminRoleId);
@@ -81,7 +81,7 @@ public class DeactivateUserHandlerTests
     }
 
     [Fact]
-    public async Task User_not_found_returns_not_found()
+    public async Task DeactivateUser_WhenUserNotFound_ReturnsNotFound()
     {
         _userRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).ReturnsNull();
 

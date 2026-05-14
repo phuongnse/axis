@@ -11,7 +11,7 @@ public class UserTests
     private static readonly Guid OrgId = Guid.NewGuid();
 
     [Fact]
-    public void Create_produces_valid_user()
+    public void User_WhenCreated_ProducesValidUser()
     {
         var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
 
@@ -23,7 +23,7 @@ public class UserTests
     }
 
     [Fact]
-    public void Create_raises_UserRegistered_event()
+    public void User_WhenCreated_RaisesUserRegisteredEvent()
     {
         var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
 
@@ -32,7 +32,7 @@ public class UserTests
     }
 
     [Fact]
-    public void UserRegistered_event_contains_correct_data()
+    public void User_WhenCreated_UserRegisteredEventContainsCorrectData()
     {
         var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
 
@@ -43,7 +43,7 @@ public class UserTests
     }
 
     [Fact]
-    public void Deactivate_changes_status_to_inactive()
+    public void User_WhenDeactivated_ChangesStatusToInactive()
     {
         var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
         user.ClearDomainEvents();
@@ -54,7 +54,7 @@ public class UserTests
     }
 
     [Fact]
-    public void Deactivating_already_inactive_user_throws()
+    public void User_WhenAlreadyInactive_DeactivateThrows()
     {
         var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
         user.Deactivate();
@@ -66,7 +66,7 @@ public class UserTests
     }
 
     [Fact]
-    public void Assign_role_adds_to_roles_collection()
+    public void User_WhenRoleAssigned_AddsToRolesCollection()
     {
         var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
         var roleId = Guid.NewGuid();
@@ -77,7 +77,7 @@ public class UserTests
     }
 
     [Fact]
-    public void Assign_same_role_twice_is_idempotent()
+    public void User_WhenSameRoleAssignedTwice_IsIdempotent()
     {
         var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
         var roleId = Guid.NewGuid();
@@ -89,7 +89,7 @@ public class UserTests
     }
 
     [Fact]
-    public void Remove_role_removes_from_roles_collection()
+    public void User_WhenRoleRemoved_RemovesFromRolesCollection()
     {
         var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
         var roleId = Guid.NewGuid();
@@ -101,7 +101,7 @@ public class UserTests
     }
 
     [Fact]
-    public void FullName_combines_first_and_last_name()
+    public void User_WhenAccessed_FullNameCombinesFirstAndLastName()
     {
         var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
 

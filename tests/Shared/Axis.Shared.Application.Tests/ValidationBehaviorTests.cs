@@ -24,7 +24,7 @@ public class ValidationBehaviorTests
         Substitute.For<RequestHandlerDelegate<string>>();
 
     [Fact]
-    public async Task Valid_command_passes_through_to_next()
+    public async Task ValidationBehavior_WhenNoValidationErrors_PassesThroughToNext()
     {
         var validators = new[] { new TestCommandValidator() };
         var behavior = new ValidationBehavior<TestCommand, string>(validators);
@@ -36,7 +36,7 @@ public class ValidationBehaviorTests
     }
 
     [Fact]
-    public async Task Invalid_command_throws_validation_exception()
+    public async Task ValidationBehavior_WhenCommandIsInvalid_ThrowsValidationException()
     {
         var validators = new[] { new TestCommandValidator() };
         var behavior = new ValidationBehavior<TestCommand, string>(validators);
@@ -49,7 +49,7 @@ public class ValidationBehaviorTests
     }
 
     [Fact]
-    public async Task Multiple_violations_are_all_reported()
+    public async Task ValidationBehavior_WhenMultipleViolations_ReportsAllErrors()
     {
         var validators = new[] { new TestCommandValidator() };
         var behavior = new ValidationBehavior<TestCommand, string>(validators);
@@ -63,7 +63,7 @@ public class ValidationBehaviorTests
     }
 
     [Fact]
-    public async Task No_validators_passes_through()
+    public async Task ValidationBehavior_WhenNoValidators_PassesThroughToNext()
     {
         var behavior = new ValidationBehavior<TestCommand, string>([]);
         _next.Invoke().Returns("ok");

@@ -28,7 +28,7 @@ public class ValueObjectTests
     }
 
     [Fact]
-    public void Value_objects_with_same_components_are_equal()
+    public void ValueObject_WhenComponentsAreIdentical_AreEqual()
     {
         var a = new Money(100, "USD");
         var b = new Money(100, "USD");
@@ -38,7 +38,7 @@ public class ValueObjectTests
     }
 
     [Fact]
-    public void Value_objects_with_different_components_are_not_equal()
+    public void ValueObject_WhenComponentsDiffer_AreNotEqual()
     {
         var a = new Money(100, "USD");
         var b = new Money(200, "USD");
@@ -48,7 +48,7 @@ public class ValueObjectTests
     }
 
     [Fact]
-    public void Value_objects_with_different_currency_are_not_equal()
+    public void ValueObject_WhenCurrencyDiffers_AreNotEqual()
     {
         var a = new Money(100, "USD");
         var b = new Money(100, "EUR");
@@ -57,7 +57,7 @@ public class ValueObjectTests
     }
 
     [Fact]
-    public void Value_object_is_not_equal_to_null()
+    public void ValueObject_WhenComparedToNull_IsNotEqual()
     {
         var a = new Money(100, "USD");
 
@@ -66,7 +66,7 @@ public class ValueObjectTests
     }
 
     [Fact]
-    public void Value_objects_with_same_components_have_same_hash_code()
+    public void ValueObject_WhenComponentsAreIdentical_HaveSameHashCode()
     {
         var a = new Money(100, "USD");
         var b = new Money(100, "USD");
@@ -75,7 +75,7 @@ public class ValueObjectTests
     }
 
     [Fact]
-    public void Value_objects_of_different_types_are_not_equal()
+    public void ValueObject_WhenTypesAreDifferent_AreNotEqual()
     {
         var money = new Money(100, "USD");
         var single = new SingleValue("100");

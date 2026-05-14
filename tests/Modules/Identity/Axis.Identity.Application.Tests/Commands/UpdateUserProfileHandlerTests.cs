@@ -31,7 +31,7 @@ public class UpdateUserProfileHandlerTests
     }
 
     [Fact]
-    public async Task Happy_path_updates_name_without_avatar()
+    public async Task UpdateUserProfile_WhenNoAvatarProvided_UpdatesNameOnly()
     {
         User user = MakeUser();
         _userRepo.GetByIdAsync(UserId, OrgId).Returns(user);
@@ -48,7 +48,7 @@ public class UpdateUserProfileHandlerTests
     }
 
     [Fact]
-    public async Task Happy_path_uploads_new_avatar_when_no_previous()
+    public async Task UpdateUserProfile_WhenNoPreviousAvatar_UploadsNewAvatar()
     {
         User user = MakeUser(avatarUrl: null);
         _userRepo.GetByIdAsync(UserId, OrgId).Returns(user);
@@ -66,7 +66,7 @@ public class UpdateUserProfileHandlerTests
     }
 
     [Fact]
-    public async Task Happy_path_replaces_old_avatar_and_deletes_it()
+    public async Task UpdateUserProfile_WhenAvatarExists_ReplacesOldAndDeletesIt()
     {
         User user = MakeUser(avatarUrl: "https://storage/old-avatar.png");
         _userRepo.GetByIdAsync(UserId, OrgId).Returns(user);
@@ -85,7 +85,7 @@ public class UpdateUserProfileHandlerTests
     }
 
     [Fact]
-    public async Task User_not_found_returns_not_found()
+    public async Task UpdateUserProfile_WhenUserNotFound_ReturnsNotFound()
     {
         _userRepo.GetByIdAsync(UserId, OrgId).ReturnsNull();
 
@@ -98,7 +98,7 @@ public class UpdateUserProfileHandlerTests
     }
 
     [Fact]
-    public async Task Full_name_too_short_returns_business_rule_failure()
+    public async Task UpdateUserProfile_WhenFullNameTooShort_ReturnsBusinessRuleFailure()
     {
         User user = MakeUser();
         _userRepo.GetByIdAsync(UserId, OrgId).Returns(user);
@@ -112,7 +112,7 @@ public class UpdateUserProfileHandlerTests
     }
 
     [Fact]
-    public async Task Full_name_too_long_returns_business_rule_failure()
+    public async Task UpdateUserProfile_WhenFullNameTooLong_ReturnsBusinessRuleFailure()
     {
         User user = MakeUser();
         _userRepo.GetByIdAsync(UserId, OrgId).Returns(user);
@@ -127,7 +127,7 @@ public class UpdateUserProfileHandlerTests
     }
 
     [Fact]
-    public async Task Invalid_avatar_content_type_returns_business_rule_failure()
+    public async Task UpdateUserProfile_WhenAvatarContentTypeIsInvalid_ReturnsBusinessRuleFailure()
     {
         User user = MakeUser();
         _userRepo.GetByIdAsync(UserId, OrgId).Returns(user);
@@ -142,7 +142,7 @@ public class UpdateUserProfileHandlerTests
     }
 
     [Fact]
-    public async Task Avatar_exceeds_max_size_returns_business_rule_failure()
+    public async Task UpdateUserProfile_WhenAvatarExceedsMaxSize_ReturnsBusinessRuleFailure()
     {
         User user = MakeUser();
         _userRepo.GetByIdAsync(UserId, OrgId).Returns(user);

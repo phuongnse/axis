@@ -21,7 +21,7 @@ public class StartExecutionHandlerTests
     private StartExecutionHandler CreateHandler() => new(_execRepo, _workflowReader, _uow);
 
     [Fact]
-    public async Task Happy_path_creates_pending_execution_and_returns_id()
+    public async Task StartExecution_WhenWorkflowIsActive_CreatesPendingExecutionAndReturnsId()
     {
         _workflowReader.IsActiveAsync(WorkflowId, OrgId).Returns(true);
 
@@ -40,7 +40,7 @@ public class StartExecutionHandlerTests
     }
 
     [Fact]
-    public async Task Workflow_not_active_returns_business_rule_failure()
+    public async Task StartExecution_WhenWorkflowIsNotActive_ReturnsBusinessRuleFailure()
     {
         _workflowReader.IsActiveAsync(WorkflowId, OrgId).Returns(false);
 

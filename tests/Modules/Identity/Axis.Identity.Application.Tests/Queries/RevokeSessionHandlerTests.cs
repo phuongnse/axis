@@ -14,7 +14,7 @@ public class RevokeSessionHandlerTests
     private RevokeSessionHandler CreateHandler() => new(_sessionStore);
 
     [Fact]
-    public async Task Revokes_session_via_store()
+    public async Task RevokeSession_WhenSessionIdProvided_RevokesSessionViaStore()
     {
         await CreateHandler().Handle(
             new RevokeSessionCommand("session-1", UserId),
@@ -24,7 +24,7 @@ public class RevokeSessionHandlerTests
     }
 
     [Fact]
-    public async Task Revoke_all_delegates_to_store()
+    public async Task RevokeSession_WhenNoSessionIdProvided_RevokesAllSessionsViaStore()
     {
         await CreateHandler().Handle(
             new RevokeSessionCommand(null, UserId),

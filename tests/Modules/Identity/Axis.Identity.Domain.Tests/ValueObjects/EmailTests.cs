@@ -9,7 +9,7 @@ public class EmailTests
     [InlineData("user@example.com")]
     [InlineData("USER@EXAMPLE.COM")]
     [InlineData("first.last+tag@sub.domain.io")]
-    public void Valid_email_is_created_successfully(string value)
+    public void Email_WhenValueIsValid_IsCreatedSuccessfully(string value)
     {
         var result = Email.Create(value);
 
@@ -17,7 +17,7 @@ public class EmailTests
     }
 
     [Fact]
-    public void Email_is_normalized_to_lowercase()
+    public void Email_WhenCreated_IsNormalizedToLowercase()
     {
         var result = Email.Create("User@Example.COM");
 
@@ -30,7 +30,7 @@ public class EmailTests
     [InlineData("notanemail")]
     [InlineData("@nodomain.com")]
     [InlineData("noatsign.com")]
-    public void Invalid_email_returns_failure(string value)
+    public void Email_WhenValueIsInvalid_ReturnsFailure(string value)
     {
         var result = Email.Create(value);
 
@@ -39,7 +39,7 @@ public class EmailTests
     }
 
     [Fact]
-    public void Same_emails_are_equal()
+    public void Email_WhenValuesAreIdentical_AreEqual()
     {
         var a = Email.Create("user@example.com").Value;
         var b = Email.Create("user@example.com").Value;
@@ -48,7 +48,7 @@ public class EmailTests
     }
 
     [Fact]
-    public void Different_emails_are_not_equal()
+    public void Email_WhenValuesDiffer_AreNotEqual()
     {
         var a = Email.Create("alice@example.com").Value;
         var b = Email.Create("bob@example.com").Value;

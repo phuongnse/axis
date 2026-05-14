@@ -26,7 +26,7 @@ public class UpdateRoleHandlerTests
         Permissions: ["workflow:definition:read", "workflow:definition:write"]);
 
     [Fact]
-    public async Task Happy_path_updates_role()
+    public async Task UpdateRole_WhenRequestIsValid_UpdatesRole()
     {
         Role role = Role.Create("Manager", null, OrgId, ["workflow:definition:read"]);
         _roleRepo.GetByIdAsync(RoleId, OrgId).Returns(role);
@@ -41,7 +41,7 @@ public class UpdateRoleHandlerTests
     }
 
     [Fact]
-    public async Task System_role_cannot_be_updated_returns_business_rule_failure()
+    public async Task UpdateRole_WhenSystemRole_ReturnsBusinessRuleFailure()
     {
         Role systemRole = Role.CreateSystem("Admin", OrgId, ["users:read"]);
         _roleRepo.GetByIdAsync(RoleId, OrgId).Returns(systemRole);
@@ -55,7 +55,7 @@ public class UpdateRoleHandlerTests
     }
 
     [Fact]
-    public async Task Duplicate_name_returns_conflict()
+    public async Task UpdateRole_WhenNameIsDuplicate_ReturnsConflict()
     {
         Role role = Role.Create("Manager", null, OrgId, ["workflow:definition:read"]);
         _roleRepo.GetByIdAsync(RoleId, OrgId).Returns(role);
@@ -69,7 +69,7 @@ public class UpdateRoleHandlerTests
     }
 
     [Fact]
-    public async Task Role_not_found_returns_not_found()
+    public async Task UpdateRole_WhenRoleNotFound_ReturnsNotFound()
     {
         _roleRepo.GetByIdAsync(RoleId, OrgId).ReturnsNull();
 

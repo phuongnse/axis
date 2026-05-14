@@ -21,7 +21,7 @@ public class CreateRecordHandlerTests
     private CreateRecordHandler CreateHandler() => new(_modelRepo, _recordRepo, _uow);
 
     [Fact]
-    public async Task Happy_path_creates_record_and_returns_id()
+    public async Task CreateRecord_WhenModelExists_CreatesRecordAndReturnsId()
     {
         DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
@@ -39,7 +39,7 @@ public class CreateRecordHandlerTests
     }
 
     [Fact]
-    public async Task Model_not_found_returns_not_found()
+    public async Task CreateRecord_WhenModelNotFound_ReturnsNotFound()
     {
         _modelRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).ReturnsNull();
 

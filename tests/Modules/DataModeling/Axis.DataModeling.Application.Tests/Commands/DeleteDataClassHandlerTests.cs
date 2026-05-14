@@ -18,7 +18,7 @@ public class DeleteDataClassHandlerTests
     private DeleteDataClassHandler CreateHandler() => new(_dcRepo, _uow);
 
     [Fact]
-    public async Task Happy_path_deletes_and_saves()
+    public async Task DeleteDataClass_WhenNotReferenced_DeletesAndSaves()
     {
         DataClass dc = DataClass.Create("Address", null, OrgId, UserId);
         _dcRepo.GetByIdAsync(dc.Id, OrgId).Returns(dc);
@@ -32,7 +32,7 @@ public class DeleteDataClassHandlerTests
     }
 
     [Fact]
-    public async Task Referenced_data_class_returns_conflict()
+    public async Task DeleteDataClass_WhenReferencedByModel_ReturnsConflict()
     {
         DataClass dc = DataClass.Create("Address", null, OrgId, UserId);
         _dcRepo.GetByIdAsync(dc.Id, OrgId).Returns(dc);

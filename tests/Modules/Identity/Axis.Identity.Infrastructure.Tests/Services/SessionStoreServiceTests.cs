@@ -21,7 +21,7 @@ public class SessionStoreServiceTests
     }
 
     [Fact]
-    public async Task GetByUserAsync_returns_only_valid_refresh_tokens()
+    public async Task GetByUserAsync_WhenTokensExist_ReturnsOnlyValidRefreshTokens()
     {
         Guid userId = Guid.NewGuid();
         object validToken = new();
@@ -63,7 +63,7 @@ public class SessionStoreServiceTests
     }
 
     [Fact]
-    public async Task RevokeAsync_calls_token_manager_revoke()
+    public async Task RevokeAsync_WhenSessionExists_CallsTokenManagerRevoke()
     {
         Guid userId = Guid.NewGuid();
         object token = new();
@@ -77,7 +77,7 @@ public class SessionStoreServiceTests
     }
 
     [Fact]
-    public async Task RevokeAsync_does_nothing_when_session_not_found()
+    public async Task RevokeAsync_WhenSessionNotFound_DoesNothing()
     {
         _tokenManager.FindByIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns((object?)null);
@@ -88,7 +88,7 @@ public class SessionStoreServiceTests
     }
 
     [Fact]
-    public async Task RevokeAllAsync_revokes_each_token_for_user()
+    public async Task RevokeAllAsync_WhenCalled_RevokesEachTokenForUser()
     {
         Guid userId = Guid.NewGuid();
         object t1 = new();

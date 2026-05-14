@@ -12,7 +12,7 @@ public class DataClassTests
     private const string UserId = "user-123";
 
     [Fact]
-    public void Create_sets_name_description_and_orgId()
+    public void DataClass_WhenCreated_SetsNameDescriptionAndOrgId()
     {
         var dc = DataClass.Create("Address", "Postal address structure", OrgId, UserId);
 
@@ -23,7 +23,7 @@ public class DataClassTests
     }
 
     [Fact]
-    public void Create_sets_CreatedBy_and_DateTimeOffset_timestamps()
+    public void DataClass_WhenCreated_SetsCreatedByAndTimestamps()
     {
         var before = DateTimeOffset.UtcNow;
         var dc = DataClass.Create("Address", null, OrgId, UserId);
@@ -34,7 +34,7 @@ public class DataClassTests
     }
 
     [Fact]
-    public void Create_raises_DataClassCreated_event()
+    public void DataClass_WhenCreated_RaisesDataClassCreatedEvent()
     {
         var dc = DataClass.Create("Address", null, OrgId, UserId);
         dc.DomainEvents.Should().ContainSingle(e => e is DataClassCreated);
@@ -44,7 +44,7 @@ public class DataClassTests
     [InlineData("")]
     [InlineData("A")]                   // too short
     [InlineData("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")] // > 100
-    public void Create_throws_when_name_invalid_length(string name)
+    public void DataClass_WhenNameLengthIsInvalid_ThrowsArgumentException(string name)
     {
         var act = () => DataClass.Create(name, null, OrgId, UserId);
         act.Should().Throw<ArgumentException>();
@@ -53,7 +53,7 @@ public class DataClassTests
     // ─── Update ───────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Update_changes_name_and_bumps_UpdatedAt()
+    public void DataClass_WhenUpdated_ChangesNameAndBumpsUpdatedAt()
     {
         var dc = DataClass.Create("Address", null, OrgId, UserId);
         var before = dc.UpdatedAt;
@@ -68,7 +68,7 @@ public class DataClassTests
     // ─── AddField ─────────────────────────────────────────────────────────────
 
     [Fact]
-    public void AddField_accepts_allowed_field_types()
+    public void AddField_WhenFieldTypeIsAllowed_AddsFieldSuccessfully()
     {
         var dc = DataClass.Create("Address", null, OrgId, UserId);
 
@@ -84,7 +84,7 @@ public class DataClassTests
     [InlineData(FieldType.Relation)]
     [InlineData(FieldType.DataClass)]
     [InlineData(FieldType.File)]
-    public void AddField_throws_for_disallowed_field_types(FieldType type)
+    public void AddField_WhenFieldTypeIsDisallowed_Throws(FieldType type)
     {
         var dc = DataClass.Create("Address", null, OrgId, UserId);
         var act = () => dc.AddField("field1", "Field", type, false, new TextFieldConfig());
@@ -92,7 +92,7 @@ public class DataClassTests
     }
 
     [Fact]
-    public void AddField_throws_when_name_is_duplicate()
+    public void AddField_WhenNameIsDuplicate_Throws()
     {
         var dc = DataClass.Create("Address", null, OrgId, UserId);
         dc.AddField("street", "Street", FieldType.Text, false, new TextFieldConfig());
@@ -104,7 +104,7 @@ public class DataClassTests
     // ─── RemoveField ──────────────────────────────────────────────────────────
 
     [Fact]
-    public void RemoveField_removes_a_field()
+    public void RemoveField_WhenFieldExists_RemovesField()
     {
         var dc = DataClass.Create("Address", null, OrgId, UserId);
         var field = dc.AddField("street", "Street", FieldType.Text, false, new TextFieldConfig());
@@ -116,7 +116,7 @@ public class DataClassTests
     // ─── Delete ───────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Delete_sets_DeletedAt_and_raises_event()
+    public void Delete_WhenCalled_SetsDeletedAtAndRaisesEvent()
     {
         var dc = DataClass.Create("Address", null, OrgId, UserId);
         var before = DateTimeOffset.UtcNow;
@@ -128,7 +128,7 @@ public class DataClassTests
     }
 
     [Fact]
-    public void Delete_throws_when_already_deleted()
+    public void Delete_WhenAlreadyDeleted_Throws()
     {
         var dc = DataClass.Create("Address", null, OrgId, UserId);
         dc.Delete();

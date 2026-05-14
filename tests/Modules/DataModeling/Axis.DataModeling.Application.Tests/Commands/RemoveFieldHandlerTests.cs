@@ -21,7 +21,7 @@ public class RemoveFieldHandlerTests
     private RemoveFieldHandler CreateHandler() => new(_modelRepo, _uow);
 
     [Fact]
-    public async Task Happy_path_removes_field_and_saves()
+    public async Task RemoveField_WhenFieldExists_RemovesFieldAndSaves()
     {
         DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
         FieldDefinition field = model.AddField("notes", "Notes", FieldType.Text, false, new TextFieldConfig());
@@ -37,7 +37,7 @@ public class RemoveFieldHandlerTests
     }
 
     [Fact]
-    public async Task System_field_removal_returns_business_rule_failure()
+    public async Task RemoveField_WhenFieldIsSystem_ReturnsBusinessRuleFailure()
     {
         DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
         FieldDefinition sysField = model.Fields.First(f => f.IsSystem);

@@ -14,7 +14,7 @@ public class DataRecordTests
         new Dictionary<string, object?> { ["amount"] = 100, ["notes"] = "test" };
 
     [Fact]
-    public void Create_sets_modelId_orgId_and_data()
+    public void DataRecord_WhenCreated_SetsModelIdOrgIdAndData()
     {
         var data = SampleData();
         var record = DataRecord.Create(ModelId, OrgId, data, UserId);
@@ -26,7 +26,7 @@ public class DataRecordTests
     }
 
     [Fact]
-    public void Create_sets_CreatedBy_and_DateTimeOffset_timestamps()
+    public void DataRecord_WhenCreated_SetsCreatedByAndTimestamps()
     {
         var before = DateTimeOffset.UtcNow;
         var record = DataRecord.Create(ModelId, OrgId, SampleData(), UserId);
@@ -37,7 +37,7 @@ public class DataRecordTests
     }
 
     [Fact]
-    public void Update_replaces_data_and_bumps_UpdatedAt()
+    public void DataRecord_WhenUpdated_ReplacesDataAndBumpsUpdatedAt()
     {
         var record = DataRecord.Create(ModelId, OrgId, SampleData(), UserId);
         var before = record.UpdatedAt;
@@ -50,7 +50,7 @@ public class DataRecordTests
     }
 
     [Fact]
-    public void Delete_sets_DeletedAt_and_raises_event()
+    public void Delete_WhenCalled_SetsDeletedAtAndRaisesEvent()
     {
         var record = DataRecord.Create(ModelId, OrgId, SampleData(), UserId);
         var before = DateTimeOffset.UtcNow;
@@ -62,7 +62,7 @@ public class DataRecordTests
     }
 
     [Fact]
-    public void Delete_throws_when_already_deleted()
+    public void Delete_WhenAlreadyDeleted_Throws()
     {
         var record = DataRecord.Create(ModelId, OrgId, SampleData(), UserId);
         record.Delete();

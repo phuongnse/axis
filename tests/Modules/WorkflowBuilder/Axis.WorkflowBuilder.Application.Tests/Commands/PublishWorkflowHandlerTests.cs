@@ -33,7 +33,7 @@ public class PublishWorkflowHandlerTests
     }
 
     [Fact]
-    public async Task Happy_path_publishes_workflow()
+    public async Task PublishWorkflow_WhenWorkflowIsValid_PublishesWorkflow()
     {
         WorkflowDefinition wf = MakePublishableWorkflow();
         _workflowRepo.GetByIdAsync(wf.Id, OrgId).Returns(wf);
@@ -46,7 +46,7 @@ public class PublishWorkflowHandlerTests
     }
 
     [Fact]
-    public async Task Workflow_not_found_returns_not_found()
+    public async Task PublishWorkflow_WhenWorkflowNotFound_ReturnsNotFound()
     {
         _workflowRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).ReturnsNull();
 
@@ -60,7 +60,7 @@ public class PublishWorkflowHandlerTests
     }
 
     [Fact]
-    public async Task Workflow_without_triggers_returns_business_rule_failure_on_publish()
+    public async Task PublishWorkflow_WhenNoTriggersConfigured_ReturnsBusinessRuleFailure()
     {
         WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, OrgId, UserId);
         // No trigger added — should fail domain validation

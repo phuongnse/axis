@@ -27,7 +27,7 @@ public class VerifyEmailHandlerTests
     }
 
     [Fact]
-    public async Task Happy_path_verifies_email()
+    public async Task VerifyEmail_WhenTokenIsValid_VerifiesEmail()
     {
         User user = MakeUnverifiedUser();
         _userRepo.GetByIdPlatformWideAsync(user.Id).Returns(user);
@@ -42,7 +42,7 @@ public class VerifyEmailHandlerTests
     }
 
     [Fact]
-    public async Task Invalid_token_format_returns_business_rule_failure()
+    public async Task VerifyEmail_WhenTokenFormatIsInvalid_ReturnsBusinessRuleFailure()
     {
         Result result = await CreateHandler().Handle(
             new VerifyEmailCommand("not-a-guid"),
@@ -54,7 +54,7 @@ public class VerifyEmailHandlerTests
     }
 
     [Fact]
-    public async Task Token_not_found_returns_business_rule_failure()
+    public async Task VerifyEmail_WhenTokenNotFound_ReturnsBusinessRuleFailure()
     {
         _userRepo.GetByIdPlatformWideAsync(Arg.Any<Guid>()).ReturnsNull();
 
@@ -68,7 +68,7 @@ public class VerifyEmailHandlerTests
     }
 
     [Fact]
-    public async Task Already_verified_returns_business_rule_failure()
+    public async Task VerifyEmail_WhenAlreadyVerified_ReturnsBusinessRuleFailure()
     {
         User user = MakeUnverifiedUser();
         user.VerifyEmail();

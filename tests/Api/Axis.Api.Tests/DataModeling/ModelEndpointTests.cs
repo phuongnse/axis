@@ -14,14 +14,14 @@ public class ModelEndpointTests(ApiTestFixture fixture)
     // GET /api/models
 
     [Fact]
-    public async Task GetModels_without_token_returns_401()
+    public async Task GetModels_WhenNoToken_Returns401()
     {
         var resp = await fixture.Client.GetAsync("/api/models");
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
-    public async Task GetModels_returns_empty_list_for_new_org()
+    public async Task GetModels_WhenOrgHasNoModels_ReturnsEmptyList()
     {
         var client = await AuthHelper.CreateAdminClientAsync(fixture, "mdl1");
 
@@ -36,7 +36,7 @@ public class ModelEndpointTests(ApiTestFixture fixture)
     // POST /api/models
 
     [Fact]
-    public async Task CreateModel_without_token_returns_401()
+    public async Task CreateModel_WhenNoToken_Returns401()
     {
         var resp = await fixture.Client.PostAsJsonAsync("/api/models",
             new { name = "Contacts" }, Json);
@@ -44,7 +44,7 @@ public class ModelEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task CreateModel_returns_201_and_appears_in_list()
+    public async Task CreateModel_WhenRequestIsValid_Returns201AndAppearsInList()
     {
         var client = await AuthHelper.CreateAdminClientAsync(fixture, "mdl2");
 
@@ -71,7 +71,7 @@ public class ModelEndpointTests(ApiTestFixture fixture)
     // GET /api/models/{id}
 
     [Fact]
-    public async Task GetModel_returns_404_for_unknown_id()
+    public async Task GetModel_WhenIdIsUnknown_Returns404()
     {
         var client = await AuthHelper.CreateAdminClientAsync(fixture, "mdl3");
 
@@ -81,7 +81,7 @@ public class ModelEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task GetModel_returns_model_with_system_fields()
+    public async Task GetModel_WhenModelExists_ReturnsModelWithSystemFields()
     {
         var client = await AuthHelper.CreateAdminClientAsync(fixture, "mdl4");
 
@@ -105,7 +105,7 @@ public class ModelEndpointTests(ApiTestFixture fixture)
     // PUT /api/models/{id}
 
     [Fact]
-    public async Task UpdateModel_returns_no_content()
+    public async Task UpdateModel_WhenRequestIsValid_ReturnsNoContent()
     {
         var client = await AuthHelper.CreateAdminClientAsync(fixture, "mdl5");
 
@@ -130,7 +130,7 @@ public class ModelEndpointTests(ApiTestFixture fixture)
     // DELETE /api/models/{id}
 
     [Fact]
-    public async Task DeleteModel_returns_no_content_and_model_disappears()
+    public async Task DeleteModel_WhenModelExists_ReturnsNoContentAndModelDisappears()
     {
         var client = await AuthHelper.CreateAdminClientAsync(fixture, "mdl6");
 
@@ -148,7 +148,7 @@ public class ModelEndpointTests(ApiTestFixture fixture)
     // POST /api/models/{id}/fields
 
     [Fact]
-    public async Task AddField_returns_201_and_field_appears_in_model()
+    public async Task AddField_WhenRequestIsValid_Returns201AndFieldAppearsInModel()
     {
         var client = await AuthHelper.CreateAdminClientAsync(fixture, "mdl7");
 
@@ -177,7 +177,7 @@ public class ModelEndpointTests(ApiTestFixture fixture)
     // PUT /api/models/{id}/fields/order
 
     [Fact]
-    public async Task ReorderFields_returns_no_content()
+    public async Task ReorderFields_WhenRequestIsValid_ReturnsNoContent()
     {
         var client = await AuthHelper.CreateAdminClientAsync(fixture, "mdl8");
 

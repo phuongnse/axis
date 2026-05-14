@@ -33,7 +33,7 @@ public class AcceptInvitationHandlerTests
         Invitation.Create(InvitedEmail, OrgId, RoleId, InvitedById);
 
     [Fact]
-    public async Task Happy_path_creates_user_accepts_invitation_and_assigns_role()
+    public async Task AcceptInvitation_WhenTokenIsValid_CreatesUserAndAssignsRole()
     {
         Invitation invitation = MakePendingInvitation();
         _invitationRepo.GetByTokenAsync("valid-token").Returns(invitation);
@@ -61,7 +61,7 @@ public class AcceptInvitationHandlerTests
     }
 
     [Fact]
-    public async Task Email_already_exists_platform_wide_returns_conflict()
+    public async Task AcceptInvitation_WhenEmailAlreadyExists_ReturnsConflict()
     {
         Invitation invitation = MakePendingInvitation();
         _invitationRepo.GetByTokenAsync("valid-token").Returns(invitation);
@@ -75,7 +75,7 @@ public class AcceptInvitationHandlerTests
     }
 
     [Fact]
-    public async Task Invalid_token_returns_not_found()
+    public async Task AcceptInvitation_WhenTokenIsInvalid_ReturnsNotFound()
     {
         _invitationRepo.GetByTokenAsync(Arg.Any<string>()).ReturnsNull();
 
@@ -87,7 +87,7 @@ public class AcceptInvitationHandlerTests
     }
 
     [Fact]
-    public async Task Expired_invitation_returns_business_rule_failure()
+    public async Task AcceptInvitation_WhenInvitationIsExpired_ReturnsBusinessRuleFailure()
     {
         Invitation expired = InvitationTestHelper.CreateExpired(InvitedEmail, OrgId, RoleId, InvitedById);
         _invitationRepo.GetByTokenAsync("valid-token").Returns(expired);
@@ -100,7 +100,7 @@ public class AcceptInvitationHandlerTests
     }
 
     [Fact]
-    public async Task Already_accepted_invitation_returns_business_rule_failure()
+    public async Task AcceptInvitation_WhenAlreadyAccepted_ReturnsBusinessRuleFailure()
     {
         Invitation invitation = MakePendingInvitation();
         invitation.Accept();
@@ -114,7 +114,7 @@ public class AcceptInvitationHandlerTests
     }
 
     [Fact]
-    public async Task Cancelled_invitation_returns_business_rule_failure()
+    public async Task AcceptInvitation_WhenCancelled_ReturnsBusinessRuleFailure()
     {
         Invitation invitation = MakePendingInvitation();
         invitation.Cancel();

@@ -21,7 +21,7 @@ public class ReorderFieldsHandlerTests
     private ReorderFieldsHandler CreateHandler() => new(_modelRepo, _uow);
 
     [Fact]
-    public async Task Happy_path_reorders_custom_fields_and_saves()
+    public async Task ReorderFields_WhenValidOrderProvided_ReordersCustomFieldsAndSaves()
     {
         DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
         FieldDefinition f1 = model.AddField("alpha", "Alpha", FieldType.Text, false, new TextFieldConfig());
@@ -41,7 +41,7 @@ public class ReorderFieldsHandlerTests
     }
 
     [Fact]
-    public async Task Mismatched_ids_return_business_rule_failure()
+    public async Task ReorderFields_WhenIdsMismatch_ReturnsBusinessRuleFailure()
     {
         DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
         model.AddField("alpha", "Alpha", FieldType.Text, false, new TextFieldConfig());

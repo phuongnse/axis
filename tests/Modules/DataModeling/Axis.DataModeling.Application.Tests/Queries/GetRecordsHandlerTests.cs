@@ -18,7 +18,7 @@ public class GetRecordsHandlerTests
     private GetRecordsHandler CreateHandler() => new(_modelRepo, _recordRepo);
 
     [Fact]
-    public async Task Happy_path_returns_paged_result()
+    public async Task GetRecords_WhenModelExists_ReturnsPagedResult()
     {
         DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
         List<DataRecord> records =
@@ -39,7 +39,7 @@ public class GetRecordsHandlerTests
     }
 
     [Fact]
-    public async Task Model_not_found_returns_not_found()
+    public async Task GetRecords_WhenModelNotFound_ReturnsNotFound()
     {
         _modelRepo.GetByIdAsync(ModelId, OrgId).Returns((DataModel?)null);
 
