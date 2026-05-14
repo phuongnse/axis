@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Axis.Identity.Domain.Events;
 using Axis.Identity.Domain.ValueObjects;
 using Axis.Shared.Domain.Primitives;
@@ -77,6 +78,6 @@ public sealed class Invitation : AggregateRoot<Guid>
     }
 
     private static string GenerateToken() =>
-        Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))
+        Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
             .Replace("+", "-").Replace("/", "_").Replace("=", "");
 }

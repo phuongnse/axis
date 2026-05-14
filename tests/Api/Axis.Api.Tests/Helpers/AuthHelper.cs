@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -38,7 +39,7 @@ public static class AuthHelper
         var token = user.Id.ToString();
 
         var verifyResp = await fixture.Client.PostAsJsonAsync("/api/auth/verify-email", new { token }, Json);
-        if (verifyResp.StatusCode != System.Net.HttpStatusCode.NoContent)
+        if (verifyResp.StatusCode != HttpStatusCode.NoContent)
             throw new InvalidOperationException($"Email verification failed: {verifyResp.StatusCode}");
 
         // 3. Sign in on a fresh client (so cookie jar is independent)
