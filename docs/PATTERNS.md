@@ -1180,3 +1180,82 @@ migrationBuilder.Sql(@"
     END $$;
 ");
 ```
+
+## Code hygiene checklist
+
+Run this checklist before every commit. Items are ordered from most to least likely to be missed.
+
+### 1. No inline fully-qualified type names
+
+CLAUDE.md rule: **always use `using` directives — never write the namespace inline**.
+
+**Wrong:**
+```csharp
+string hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+    System.Text.Encoding.UTF8.GetBytes(token)));
+
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions { … });
+
+opts.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower;
+```
+
+**Right:**
+```csharp
+using System.Security.Cryptography;
+using System.Text;
+// …
+string hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+```
+
+**Detection command** — run this before committing; output must be empty:
+```bash
+grep -rn --include="*.cs" \
+  -E "(System\.(Collections\.Generic|Linq|Threading|IO|Text|Net|Security)\.|Microsoft\.(AspNetCore|Extensions|EntityFrameworkCore)\.[A-Z])" \
+  src/ tests/ \
+  | grep -v "obj/" \
+  | grep -v "\.cs:.*using " \
+  | grep -v "^\s*//"
+```
+
+Common namespaces that agents forget to add as `using` directives:
+
+| Inline form seen in code | `using` to add |
+|---|---|
+| `System.Text.Encoding.UTF8` | `using System.Text;` |
+| `System.Text.RegularExpressions.Regex` | `using System.Text.RegularExpressions;` |
+| `System.Text.Json.JsonNamingPolicy` | `using System.Text.Json;` |
+| `System.Text.Json.Serialization.JsonStringEnumConverter` | `using System.Text.Json.Serialization;` |
+| `System.Security.Cryptography.SHA256` / `RandomNumberGenerator` | `using System.Security.Cryptography;` |
+| `System.Net.HttpStatusCode` | `using System.Net;` |
+| `Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions` | `using Microsoft.AspNetCore.Diagnostics.HealthChecks;` |
+
+### 2. No scaffold placeholder files
+
+Visual Studio scaffolds `Class1.cs` when creating a new project. These files must be deleted immediately — never committed. A `Class1.cs` anywhere in `src/` or `tests/` is always wrong.
+
+**Detection command:**
+```bash
+find src/ tests/ -name "Class1.cs" -not -path "*/obj/*"
+```
+
+### 3. No direct commits to `main`
+
+Every change — including one-line fixes — goes through a branch + PR. Steps:
+
+```bash
+git checkout -b chore/my-fix   # branch off current HEAD
+# make changes
+git add <files>
+git commit -m "chore: ..."
+git push -u origin chore/my-fix
+gh pr create …
+```
+
+If a commit lands on `main` by mistake, move it before pushing:
+```bash
+git checkout -b chore/rescue-branch   # create branch at current (wrong) HEAD
+git checkout main
+git reset --hard origin/main          # reset main to remote — commit stays on rescue-branch
+git push                              # push clean main
+# then open a PR from rescue-branch
+```

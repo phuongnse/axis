@@ -94,7 +94,8 @@ Before starting any task, read only what is relevant — not everything.
 ### Code Style
 - **No `var`**: always write the explicit type, even when the assignment makes it obvious.
 - **Comments — WHY only**: default to no comments. Add one only when the WHY is non-obvious — a hidden constraint, a framework quirk, or surprising business logic. No WHAT comments.
-- **No inline fully-qualified type names**: always use `using` directives.
+- **No inline fully-qualified type names**: always use `using` directives. Never write `System.Text.Encoding.UTF8`, `System.Security.Cryptography.SHA256`, `Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions`, etc. inline. Run the detection grep in PATTERNS.md § "Code hygiene checklist" before every commit.
+- **No scaffold placeholder files**: delete `Class1.cs` immediately when Visual Studio creates it. A `Class1.cs` anywhere in `src/` or `tests/` must never be committed.
 - **Centralized global usings**: `GlobalUsings.cs` per project or `<Using Include="..." />` in `Directory.Build.props`.
 - **`dotnet format`** must pass without warnings before pushing.
 - **Scope discipline**: only modify code directly related to the current task. Never restructure code outside task scope unless explicitly requested.
