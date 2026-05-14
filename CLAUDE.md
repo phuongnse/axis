@@ -88,10 +88,11 @@ Before starting any task, read only what is relevant — not everything.
 - **Test naming**: `{Subject}_{Condition}_{ExpectedOutcome}` — e.g. `CreateWorkflow_WhenNameIsDuplicate_ReturnsConflictError`.
 - **Test isolation**: each integration test class implements `IAsyncLifetime` (container per class). Each test method calls `ResetAsync()` at its start to truncate relevant tables. See PATTERNS.md for the full pattern.
 - **No InMemoryDatabase**: `UseInMemoryDatabase` is strictly forbidden for all new tests. All database tests use Testcontainers (PostgreSQL/Redis).
-- **Unit tests before every commit**: run `dotnet test unit-tests.slnf` (Domain + Application only, no Docker required). When adding a new unit test project, add it to this file too.
+- **Unit tests before every commit**: run `dotnet test unit-tests.slnf`. When adding a new unit test project, add it to this file too. Note: The agent is only required to verify that unit tests pass. Integration tests and other tests requiring third-party dependencies can be skipped unless explicitly instructed otherwise.
 - **Integration test maintenance**: any change affecting API response shape, status codes, or request contract must include updating all relevant files under `tests/Api/Axis.Api.Tests/` in the same PR. "Cannot run locally" is not an excuse.
 
 ### Code Style
+- **Rules apply everywhere**: all rules, conventions, and patterns defined in the project instruction documents apply repository-wide unless explicitly overridden. Do not lower the code quality standard when writing tests.
 - **No `var`**: always write the explicit type, even when the assignment makes it obvious.
 - **Comments — WHY only**: default to no comments. Add one only when the WHY is non-obvious — a hidden constraint, a framework quirk, or surprising business logic. No WHAT comments.
 - **No inline fully-qualified type names**: always use `using` directives. Never write `System.Text.Encoding.UTF8`, `System.Security.Cryptography.SHA256`, `Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions`, etc. inline. Run the detection grep in PATTERNS.md § "Code hygiene checklist" before every commit.
