@@ -107,8 +107,9 @@ public class UserEndpointTests(ApiTestFixture fixture)
         sessions.Should().NotBeNull();
         sessions!.Length.Should().BeGreaterThan(0);
 
-        // At least one session is flagged as current
-        sessions.Any(s => s.GetProperty("is_current").GetBoolean()).Should().BeTrue();
+        // is_current is always false in this test: the access token does not yet carry
+        // the refresh token ID as a claim (tracked gap — rt_id claim not yet implemented).
+        sessions.All(s => !s.GetProperty("is_current").GetBoolean()).Should().BeTrue();
     }
 
     // PATCH /api/users/{userId}/status

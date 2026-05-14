@@ -1,21 +1,23 @@
-using System.Text;
 using System.Text.Json;
 using Axis.DataModeling.Infrastructure.Persistence;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Infrastructure.Persistence;
+using Axis.Identity.Infrastructure.Services;
+using IDataModelingUnitOfWork = Axis.DataModeling.Application.Services.IUnitOfWork;
 using Axis.Shared.Application.Tenancy;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using OpenIddict.Server.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.IdentityModel.Tokens;
 using Npgsql;
+using OpenIddict.Abstractions;
 using StackExchange.Redis;
 using Testcontainers.PostgreSql;
 using Testcontainers.Redis;
+using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace Axis.Api.Tests.Helpers;
 
@@ -45,8 +47,6 @@ public sealed class ApiTestFixture : IAsyncLifetime
         await Task.WhenAll(_postgres.StartAsync(), _redis.StartAsync());
 
         // Each module needs its own database so EnsureCreatedAsync creates tables correctly.
-        // EnsureCreatedAsync only runs DDL when the database is freshly created; sharing a
-        // single database means only the first context creates tables.
         _dmConnectionString = await CreateModuleDatabaseAsync("axis_dm_test");
 
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
@@ -63,21 +63,17 @@ public sealed class ApiTestFixture : IAsyncLifetime
                     ["ConnectionStrings:FormBuilder"] = _postgres.GetConnectionString(),
                     ["ConnectionStrings:WorkflowEngine"] = _postgres.GetConnectionString(),
                     ["Redis:ConnectionString"] = _redis.GetConnectionString(),
-                    ["Jwt:SecretKey"] = "test-secret-key-that-is-long-enough-32chars!!",
-                    ["Jwt:Issuer"] = "axis-test",
-                    ["Jwt:Audience"] = "axis-test",
-                    ["Jwt:AccessTokenTtlMinutes"] = "15",
-                    ["RefreshToken:TtlDays"] = "7",
                 });
             });
 
             builder.ConfigureTestServices(services =>
             {
-                // Replace IdentityDbContext with test container
+                // Replace IdentityDbContext with test container connection
                 services.RemoveAll<DbContextOptions<IdentityDbContext>>();
                 services.RemoveAll<IdentityDbContext>();
                 services.AddDbContext<IdentityDbContext>(opts =>
-                    opts.UseNpgsql(_postgres.GetConnectionString()));
+                    opts.UseNpgsql(_postgres.GetConnectionString())
+                        .UseOpenIddict());
 
                 // Replace Redis
                 services.RemoveAll<IConnectionMultiplexer>();
@@ -91,46 +87,46 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.AddScoped<IAvatarStorageService, NullAvatarStorageService>();
 
                 // Replace IUnitOfWork — IdentityUnitOfWork requires Wolverine.IMessageBus
-                // which is not registered; domain events are irrelevant in tests
+                // which is not registered in integration tests; domain events are irrelevant
                 services.RemoveAll<IUnitOfWork>();
                 services.AddScoped<IUnitOfWork>(sp =>
                     new NullUnitOfWork(sp.GetRequiredService<IdentityDbContext>()));
 
-                // Same for DataModeling IUnitOfWork (different interface, same Wolverine dependency)
-                services.RemoveAll<Axis.DataModeling.Application.Services.IUnitOfWork>();
-                services.AddScoped<Axis.DataModeling.Application.Services.IUnitOfWork>(sp =>
+                services.RemoveAll<IDataModelingUnitOfWork>();
+                services.AddScoped<IDataModelingUnitOfWork>(sp =>
                     new NullDataModelingUnitOfWork(sp.GetRequiredService<DataModelingDbContext>()));
 
-                // Use a fixed "public" schema for all tenants so we don't need per-org
-                // schema creation. Integration tests are not validating tenant isolation.
+                // Use a fixed "public" schema for all tenants
                 services.RemoveAll<ITenantContext>();
                 services.AddScoped<ITenantContext>(_ => new PublicSchemaTenantContext());
 
-                // Re-configure JWT bearer to use test signing key.
-                // Program.cs captures builder.Configuration["Jwt:SecretKey"] at startup time
-                // (resolves to appsettings.json value). JwtTokenService reads IConfiguration at
-                // runtime (resolves to in-memory override). PostConfigure aligns them.
-                const string TestJwtKey = "test-secret-key-that-is-long-enough-32chars!!";
-                services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, opts =>
-                {
-                    opts.TokenValidationParameters.IssuerSigningKey =
-                        new SymmetricSecurityKey(Encoding.UTF8.GetBytes(TestJwtKey));
-                    opts.TokenValidationParameters.ValidIssuer = "axis-test";
-                    opts.TokenValidationParameters.ValidAudience = "axis-test";
-                });
+                // WebApplicationFactory uses HTTP, not HTTPS. Disable OpenIddict's transport
+                // security check so the authorization endpoint is reachable in tests.
+                services.PostConfigure<OpenIddictServerAspNetCoreOptions>(opts =>
+                    opts.DisableTransportSecurityRequirement = true);
+
+                // Remove OpenIddictSeeder: it is a hosted service that runs on app startup,
+                // before EnsureCreatedAsync is called here, causing "relation does not exist".
+                // The fixture seeds OpenIddict clients manually in SeedTestOpenIddictClientsAsync.
+                ServiceDescriptor? seederDescriptor = services.FirstOrDefault(
+                    d => d.ImplementationType == typeof(OpenIddictSeeder));
+                if (seederDescriptor is not null)
+                    services.Remove(seederDescriptor);
             });
         });
 
-        using var scope = _factory.Services.CreateScope();
-        var ctx = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        using IServiceScope scope = _factory.Services.CreateScope();
+
+        IdentityDbContext ctx = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         await ctx.Database.EnsureCreatedAsync();
 
-        // DataModeling uses a separate database so EnsureCreatedAsync creates tables there.
-        // Constructed directly to avoid resolving ITenantContext (no HTTP context at init time).
+        // Seed the SPA client used by integration tests
+        await SeedTestOpenIddictClientsAsync(scope.ServiceProvider);
+
         var dmOptions = new DbContextOptionsBuilder<DataModelingDbContext>()
             .UseNpgsql(_dmConnectionString)
             .Options;
-        await using var dmCtx = new DataModelingDbContext(dmOptions, new PublicSchemaTenantContext());
+        await using DataModelingDbContext dmCtx = new(dmOptions, new PublicSchemaTenantContext());
         await dmCtx.Database.EnsureCreatedAsync();
 
         Client = _factory.CreateClient(new WebApplicationFactoryClientOptions
@@ -152,23 +148,73 @@ public sealed class ApiTestFixture : IAsyncLifetime
         AllowAutoRedirect = false,
     });
 
+    private static async Task SeedTestOpenIddictClientsAsync(IServiceProvider services)
+    {
+        IOpenIddictApplicationManager appManager =
+            services.GetRequiredService<IOpenIddictApplicationManager>();
+
+        IOpenIddictScopeManager scopeManager =
+            services.GetRequiredService<IOpenIddictScopeManager>();
+
+        if (await scopeManager.FindByNameAsync("permissions") is null)
+        {
+            await scopeManager.CreateAsync(new OpenIddictScopeDescriptor
+            {
+                Name = "permissions",
+                Resources = { "axis_api" },
+            });
+        }
+
+        if (await appManager.FindByClientIdAsync("axis_spa") is null)
+        {
+            await appManager.CreateAsync(new OpenIddictApplicationDescriptor
+            {
+                ClientId = "axis_spa",
+                ClientType = ClientTypes.Public,
+                DisplayName = "Axis SPA (Test)",
+                Permissions =
+                {
+                    Permissions.Endpoints.Authorization,
+                    Permissions.Endpoints.Token,
+                    Permissions.GrantTypes.AuthorizationCode,
+                    Permissions.GrantTypes.RefreshToken,
+                    Permissions.ResponseTypes.Code,
+                    Permissions.Prefixes.Scope + Scopes.OpenId,
+                    Permissions.Prefixes.Scope + Scopes.Email,
+                    Permissions.Prefixes.Scope + Scopes.Profile,
+                    Permissions.Prefixes.Scope + Scopes.OfflineAccess,
+                    Permissions.Prefixes.Scope + "permissions",
+                },
+                RedirectUris =
+                {
+                    new Uri("http://localhost:3000/callback"),
+                    // Test redirect — we instruct the HTTP client not to follow redirects
+                    new Uri("http://localhost/callback"),
+                },
+                Requirements =
+                {
+                    Requirements.Features.ProofKeyForCodeExchange,
+                },
+            });
+        }
+    }
+
     private async Task<string> CreateModuleDatabaseAsync(string dbName)
     {
-        await using var conn = new NpgsqlConnection(_postgres.GetConnectionString());
+        await using NpgsqlConnection conn = new(_postgres.GetConnectionString());
         await conn.OpenAsync();
-        await using var cmd = conn.CreateCommand();
+        await using NpgsqlCommand cmd = conn.CreateCommand();
         cmd.CommandText = $"CREATE DATABASE \"{dbName}\"";
         await cmd.ExecuteNonQueryAsync();
 
-        var builder = new NpgsqlConnectionStringBuilder(_postgres.GetConnectionString())
+        NpgsqlConnectionStringBuilder csb = new(_postgres.GetConnectionString())
             { Database = dbName };
-        return builder.ToString();
+        return csb.ToString();
     }
 }
 
 /// <summary>
-/// Stub tenant context used in integration tests. All requests share the "public" schema
-/// so tables created by EnsureCreatedAsync are immediately accessible.
+/// Stub tenant context — all tests share the "public" schema.
 /// </summary>
 internal sealed class PublicSchemaTenantContext : ITenantContext
 {

@@ -2,6 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Axis.Api.Tests.Helpers;
+using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Domain.ValueObjects;
+using Axis.Identity.Infrastructure.Persistence;
 using FluentAssertions;
 
 namespace Axis.Api.Tests.Identity;
@@ -12,7 +15,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     private readonly HttpClient _client = fixture.Client;
     private static readonly JsonSerializerOptions Json = ApiTestFixture.JsonOptions;
 
-    private static object RegisterPayload(string suffix = "") => new
+    private static object RegisterPayload(string suffix) => new
     {
         org_name = $"TestOrg{suffix}",
         admin_first_name = "Test",
@@ -22,122 +25,203 @@ public class AuthEndpointTests(ApiTestFixture fixture)
         password_confirmation = "TestPass1",
     };
 
-    // POST /api/organizations (register, then sign in)
+    // ── Registration ──────────────────────────────────────────────────────────
+
     [Fact]
-    public async Task Register_then_signin_returns_access_token()
+    public async Task Register_returns_200()
+    {
+        HttpResponseMessage resp = await _client.PostAsJsonAsync(
+            "/api/organizations", RegisterPayload("auth_reg1"), Json);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task ValidationError_on_register_returns_400_with_errors()
+    {
+        HttpResponseMessage resp = await _client.PostAsJsonAsync("/api/organizations", new
+        {
+            org_name = "A",          // too short
+            admin_first_name = "",
+            admin_last_name = "",
+            admin_email = "not-an-email",
+            password = "weak",       // too short
+            password_confirmation = "different",
+        }, Json);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("errors").ValueKind.Should().Be(JsonValueKind.Object);
+    }
+
+    // ── PKCE Flow ─────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task FullPkceFlow_after_email_verification_returns_access_token()
     {
         // Register
-        var regResp = await _client.PostAsJsonAsync("/api/organizations", RegisterPayload("auth1"), Json);
-        regResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        await _client.PostAsJsonAsync("/api/organizations", RegisterPayload("auth_pkce1"), Json);
 
-        // SignIn before email verification → email_not_verified
-        var signinResp = await _client.PostAsJsonAsync("/api/auth/signin",
-            new { email = "adminauth1@test.com", password = "TestPass1" });
+        // Verify email
+        using IServiceScope scope = fixture.CreateScope();
+        IdentityDbContext ctx =
+            scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        User user = ctx.Users
+            .First(u => u.Email == Email.Create("adminauth_pkce1@test.com").Value);
 
-        signinResp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        var body = await signinResp.Content.ReadFromJsonAsync<JsonElement>();
+        HttpResponseMessage verifyResp = await _client.PostAsJsonAsync(
+            "/api/auth/verify-email", new { token = user.Id.ToString() }, Json);
+        verifyResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // Full PKCE flow on independent client (isolated cookie jar)
+        HttpClient pkceClient = fixture.CreateNewClient();
+        string accessToken = await AuthHelper.CompletePkceFlowAsync(
+            pkceClient, "adminauth_pkce1@test.com", "TestPass1");
+
+        accessToken.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task Authorize_before_email_verification_returns_401()
+    {
+        // Register but do NOT verify email
+        await _client.PostAsJsonAsync("/api/organizations", RegisterPayload("auth_noverify1"), Json);
+
+        // POST /connect/login directly — should fail because email is not verified
+        HttpClient pkceClient = fixture.CreateNewClient();
+        HttpResponseMessage loginResp = await pkceClient.PostAsync("/connect/login",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["email"] = "adminauth_noverify1@test.com",
+                ["password"] = "TestPass1",
+                ["return_url"] = "/connect/authorize",
+            }));
+
+        loginResp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        JsonElement body = await loginResp.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("detail").GetString().Should().Contain("verify your email");
     }
 
     [Fact]
-    public async Task Register_then_verify_then_signin_returns_access_token()
+    public async Task Login_with_wrong_password_returns_401()
     {
-        // Register
-        var regResp = await _client.PostAsJsonAsync("/api/organizations", RegisterPayload("auth2"), Json);
-        regResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        // Register + verify
+        await _client.PostAsJsonAsync("/api/organizations", RegisterPayload("auth_badpwd1"), Json);
 
-        // Get verification token from DB (simulate clicking email link)
-        using var scope = fixture.CreateScope();
-        var ctx = scope.ServiceProvider.GetRequiredService<Axis.Identity.Infrastructure.Persistence.IdentityDbContext>();
-        var user = ctx.Users.First(u => u.Email == Axis.Identity.Domain.ValueObjects.Email.Create("adminauth2@test.com").Value);
-        var token = user.Id.ToString();
+        using IServiceScope scope = fixture.CreateScope();
+        IdentityDbContext ctx =
+            scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        User user = ctx.Users
+            .First(u => u.Email == Email.Create("adminauth_badpwd1@test.com").Value);
+        await _client.PostAsJsonAsync("/api/auth/verify-email", new { token = user.Id.ToString() }, Json);
 
-        // Verify email
-        var verifyResp = await _client.PostAsJsonAsync("/api/auth/verify-email", new { token });
-        verifyResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        // Attempt login with wrong password
+        HttpClient pkceClient = fixture.CreateNewClient();
+        HttpResponseMessage loginResp = await pkceClient.PostAsync("/connect/login",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["email"] = "adminauth_badpwd1@test.com",
+                ["password"] = "WrongPassword1",
+                ["return_url"] = "/connect/authorize",
+            }));
 
-        // Sign in
-        var signinResp = await _client.PostAsJsonAsync("/api/auth/signin",
-            new { email = "adminauth2@test.com", password = "TestPass1" });
-
-        signinResp.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await signinResp.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("access_token").GetString().Should().NotBeNullOrEmpty();
-        body.GetProperty("token_type").GetString().Should().Be("Bearer");
-    }
-
-    [Fact]
-    public async Task Signin_with_wrong_password_returns_401_invalid_credentials()
-    {
-        await _client.PostAsJsonAsync("/api/organizations", RegisterPayload("auth3"), Json);
-
-        // Verify email so the handler reaches password check
-        using var scope = fixture.CreateScope();
-        var ctx = scope.ServiceProvider.GetRequiredService<Axis.Identity.Infrastructure.Persistence.IdentityDbContext>();
-        var u = ctx.Users.First(x => x.Email == Axis.Identity.Domain.ValueObjects.Email.Create("adminauth3@test.com").Value);
-        await _client.PostAsJsonAsync("/api/auth/verify-email", new { token = u.Id.ToString() });
-
-        var resp = await _client.PostAsJsonAsync("/api/auth/signin",
-            new { email = "adminauth3@test.com", password = "WrongPass1" });
-
-        resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        loginResp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        JsonElement body = await loginResp.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("detail").GetString().Should().Contain("Incorrect email");
     }
 
     [Fact]
-    public async Task Signin_with_unknown_email_returns_401_invalid_credentials()
+    public async Task Login_with_unknown_email_returns_401()
     {
-        var resp = await _client.PostAsJsonAsync("/api/auth/signin",
-            new { email = "nobody@test.com", password = "TestPass1" });
+        HttpClient pkceClient = fixture.CreateNewClient();
+        HttpResponseMessage loginResp = await pkceClient.PostAsync("/connect/login",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["email"] = "nobody@test.com",
+                ["password"] = "TestPass1",
+                ["return_url"] = "/connect/authorize",
+            }));
 
-        resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        loginResp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        JsonElement body = await loginResp.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("detail").GetString().Should().Contain("Incorrect email");
     }
+
+    // ── Sign Out ──────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Signout_without_token_returns_401()
     {
-        var resp = await _client.PostAsync("/api/auth/signout", null);
+        HttpResponseMessage resp = await _client.PostAsync("/api/auth/signout", null);
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
+    public async Task Signout_with_valid_token_returns_204()
+    {
+        HttpClient authedClient = await AuthHelper.CreateAdminClientAsync(fixture, "auth_signout1");
+        HttpResponseMessage resp = await authedClient.PostAsync("/api/auth/signout", null);
+        resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    // ── Password Reset ────────────────────────────────────────────────────────
+
+    [Fact]
     public async Task ForgotPassword_always_returns_ok_regardless_of_email()
     {
-        var resp = await _client.PostAsJsonAsync("/api/auth/forgot-password",
+        HttpResponseMessage resp = await _client.PostAsJsonAsync("/api/auth/forgot-password",
             new { email = "notexist@test.com" });
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("message").GetString().Should().Contain("reset link");
     }
 
     [Fact]
     public async Task ResendVerification_always_returns_no_content()
     {
-        var resp = await _client.PostAsJsonAsync("/api/auth/resend-verification",
+        HttpResponseMessage resp = await _client.PostAsJsonAsync("/api/auth/resend-verification",
             new { email = "nobody@test.com" });
 
         resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
-    [Fact]
-    public async Task ValidationError_on_register_returns_422_with_errors()
-    {
-        var resp = await _client.PostAsJsonAsync("/api/organizations", new
-        {
-            org_name = "A",     // too short
-            admin_first_name = "",
-            admin_last_name = "",
-            admin_email = "not-an-email",
-            password = "weak",  // too short
-            password_confirmation = "different",
-        }, Json);
+    // ── Token Refresh ─────────────────────────────────────────────────────────
 
-        resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("errors").ValueKind.Should().Be(JsonValueKind.Object);
+    [Fact]
+    public async Task RefreshToken_cookie_returns_new_access_token()
+    {
+        // Complete PKCE flow — refresh token is set as httpOnly cookie on the client
+        HttpClient pkceClient = fixture.CreateNewClient();
+
+        await _client.PostAsJsonAsync("/api/organizations", RegisterPayload("auth_refresh1"), Json);
+
+        using IServiceScope scope = fixture.CreateScope();
+        IdentityDbContext ctx =
+            scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        User user = ctx.Users
+            .First(u => u.Email == Email.Create("adminauth_refresh1@test.com").Value);
+        await _client.PostAsJsonAsync("/api/auth/verify-email", new { token = user.Id.ToString() }, Json);
+
+        // PKCE flow sets refresh_token cookie on pkceClient
+        string firstAccessToken = await AuthHelper.CompletePkceFlowAsync(
+            pkceClient, "adminauth_refresh1@test.com", "TestPass1");
+        firstAccessToken.Should().NotBeNullOrEmpty();
+
+        // Refresh — the cookie is automatically sent by pkceClient
+        HttpResponseMessage refreshResp = await pkceClient.PostAsync("/connect/token",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["grant_type"] = "refresh_token",
+                ["client_id"] = "axis_spa",
+                // refresh_token is in the httpOnly cookie — not in the body
+            }));
+
+        refreshResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement tokenBody = await refreshResp.Content.ReadFromJsonAsync<JsonElement>();
+        string? newAccessToken = tokenBody.GetProperty("access_token").GetString();
+        newAccessToken.Should().NotBeNullOrEmpty();
+        // Tokens are different (rotation)
+        newAccessToken.Should().NotBe(firstAccessToken);
     }
 }

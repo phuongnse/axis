@@ -1,6 +1,7 @@
 using Axis.DataModeling.Infrastructure.Persistence;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Infrastructure.Persistence;
+using IDataModelingUnitOfWork = Axis.DataModeling.Application.Services.IUnitOfWork;
 
 namespace Axis.Api.Tests.Helpers;
 
@@ -11,7 +12,7 @@ internal sealed class NullUnitOfWork(IdentityDbContext context) : IUnitOfWork
 }
 
 internal sealed class NullDataModelingUnitOfWork(DataModelingDbContext context)
-    : Axis.DataModeling.Application.Services.IUnitOfWork
+    : IDataModelingUnitOfWork
 {
     public Task<int> SaveChangesAsync(CancellationToken ct = default) =>
         context.SaveChangesAsync(ct);

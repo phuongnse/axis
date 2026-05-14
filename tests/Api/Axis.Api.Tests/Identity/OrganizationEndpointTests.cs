@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Axis.Api.Tests.Helpers;
+using Axis.Identity.Infrastructure.Persistence;
 using FluentAssertions;
 
 namespace Axis.Api.Tests.Identity;
@@ -48,7 +49,7 @@ public class OrganizationEndpointTests(ApiTestFixture fixture)
         var orgId = Guid.Parse(me.GetProperty("org_id").GetString()!);
 
         using var scope = fixture.CreateScope();
-        var ctx = scope.ServiceProvider.GetRequiredService<Axis.Identity.Infrastructure.Persistence.IdentityDbContext>();
+        IdentityDbContext ctx = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         var viewerRole = ctx.Roles.First(r => r.Name == "Viewer" && r.OrganizationId == orgId);
 
         var resp = await client.PostAsJsonAsync(

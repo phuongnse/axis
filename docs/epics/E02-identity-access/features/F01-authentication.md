@@ -42,8 +42,8 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 - 2FA / MFA — not in MVP.
 
 > **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: BroadcastChannel coordination for multi-tab refresh is Frontend-only.
-> Decisions: `AuthenticateUserCommand` validates credentials and returns permissions. `AuthController.SignIn` issues JWT (custom `JwtTokenService`, not OpenIddict) + stores refresh token in `refresh_tokens` table + sets httpOnly Secure SameSite=Strict cookie at `/api/auth`.
+> Gaps vs spec: BroadcastChannel coordination for multi-tab refresh is Frontend-only. Sign-in is an OIDC Authorization Code + PKCE flow, not a simple POST `/api/auth/signin` — the SPA must initiate `/connect/authorize` with PKCE; the `/connect/login` endpoint handles credentials.
+> Decisions: OpenIddict 5.x serves as the in-process OAuth2/OIDC server. `AuthenticateUserCommand` validates credentials; `/connect/login` sets a 5-min httpOnly session cookie; `/connect/authorize` issues the authorization code; `/connect/token` exchanges it for access + refresh tokens. Refresh token stored as an opaque reference in DB (OpenIddict `OpenIddictTokens` table) and delivered as an httpOnly `Secure SameSite=Strict` cookie at `/connect` path via `ApplyRefreshTokenCookieHandler`.
 
 ---
 
@@ -71,8 +71,8 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 - Server-side session management (stateful sessions) — access is stateless JWT-based.
 
 > **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: BroadcastChannel multi-tab coordination is Frontend-only.
-> Decisions: `POST /api/auth/refresh` validates the refresh token cookie, loads fresh user+permissions, rotates (revokes old, issues new) the refresh token, and returns a new access token. Replay detection: replayed refresh tokens return 401 since tokens are single-use.
+> Gaps vs spec: BroadcastChannel multi-tab coordination is Frontend-only. Endpoint is `POST /connect/token` (grant_type=refresh_token) instead of `/api/auth/refresh`.
+> Decisions: OpenIddict handles token rotation natively. `ExtractRefreshTokenFromCookieHandler` reads the refresh token from the httpOnly cookie into the OpenIddict request. `POST /connect/token` with grant_type=refresh_token validates the opaque reference token, loads fresh user+permissions, rotates the refresh token, returns a new access token in the JSON body and a new refresh token cookie. Replay detection: reference tokens are single-use; replaying revoked token returns `invalid_grant`.
 
 ---
 
@@ -100,4 +100,4 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 - "Sign out of all devices" from this flow — covered in [F05 Password & Security](./F05-password-security.md).
 
 > **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Decisions: `POST /api/auth/signout` [Authorize] revokes the refresh token from DB, blacklists the access token JTI in Redis with TTL = remaining token lifetime, and clears the cookie. Sign-out is a pure API/Infrastructure concern — no Application handler needed.
+> Decisions: `POST /api/auth/signout` [Authorize] reads the opaque refresh token from the httpOnly cookie, calls `IOpenIddictTokenManager.FindByReferenceIdAsync` + `TryRevokeAsync` to revoke it in DB, blacklists the access token JTI in Redis via `IJtiBlacklist` (TTL = remaining access token lifetime), clears the refresh token cookie and the PKCE session cookie. No Application handler — pure API/Infrastructure concern.

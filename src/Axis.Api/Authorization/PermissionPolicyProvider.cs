@@ -1,6 +1,6 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
+using OpenIddict.Validation.AspNetCore;
 
 namespace Axis.Api.Authorization;
 
@@ -19,7 +19,7 @@ internal sealed class PermissionPolicyProvider(IOptions<AuthorizationOptions> op
     {
         if (policyName.Contains(':'))
         {
-            var policy = new AuthorizationPolicyBuilder(JwtBearerDefaults.AuthenticationScheme)
+            var policy = new AuthorizationPolicyBuilder(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)
                 .RequireAuthenticatedUser()
                 .AddRequirements(new PermissionRequirement(policyName))
                 .Build();

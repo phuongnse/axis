@@ -17,7 +17,17 @@ public static class IdentityInfrastructureExtensions
         IConfiguration configuration)
     {
         services.AddDbContext<IdentityDbContext>(opts =>
-            opts.UseNpgsql(configuration.GetConnectionString("Identity")));
+            opts.UseNpgsql(configuration.GetConnectionString("Identity"))
+                // Required by OpenIddict EF Core — stores must be able to resolve
+                // the context from the internal service provider
+                .UseOpenIddict());
+
+        services.AddOpenIddict()
+            .AddCore(opts =>
+            {
+                opts.UseEntityFrameworkCore()
+                    .UseDbContext<IdentityDbContext>();
+            });
 
         services.AddScoped<IOrganizationRepository, OrganizationRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
@@ -28,8 +38,9 @@ public static class IdentityInfrastructureExtensions
         services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
         services.AddScoped<IEmailSender, MailKitEmailSender>();
         services.AddScoped<IPasswordResetTokenStore, PasswordResetTokenStore>();
-        services.AddScoped<IRefreshTokenStore, RefreshTokenStore>();
         services.AddScoped<ISessionStore, SessionStoreService>();
+
+        services.AddHostedService<OpenIddictSeeder>();
 
         services.AddAWSService<IAmazonS3>();
         services.AddScoped<IAvatarStorageService, S3AvatarStorageService>();
