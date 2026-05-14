@@ -20,7 +20,7 @@ public class DeleteModelHandlerTests
     private DeleteModelHandler CreateHandler() => new(_modelRepo, _uow);
 
     [Fact]
-    public async Task Happy_path_soft_deletes_model()
+    public async Task DeleteModel_WhenModelExists_SoftDeletesModel()
     {
         DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
@@ -33,7 +33,7 @@ public class DeleteModelHandlerTests
     }
 
     [Fact]
-    public async Task Model_not_found_returns_not_found()
+    public async Task DeleteModel_WhenModelNotFound_ReturnsNotFound()
     {
         _modelRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).ReturnsNull();
 

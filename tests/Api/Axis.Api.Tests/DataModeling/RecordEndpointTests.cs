@@ -23,14 +23,14 @@ public class RecordEndpointTests(ApiTestFixture fixture)
     // GET /api/models/{id}/records
 
     [Fact]
-    public async Task GetRecords_without_token_returns_401()
+    public async Task GetRecords_WhenNoToken_Returns401()
     {
         var resp = await fixture.Client.GetAsync($"/api/models/{Guid.NewGuid()}/records");
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
-    public async Task GetRecords_returns_empty_page_for_new_model()
+    public async Task GetRecords_WhenModelHasNoRecords_ReturnsEmptyPage()
     {
         var (client, modelId) = await SetupModelAsync("rec1");
 
@@ -45,7 +45,7 @@ public class RecordEndpointTests(ApiTestFixture fixture)
     // POST /api/models/{id}/records
 
     [Fact]
-    public async Task CreateRecord_returns_201_and_appears_in_list()
+    public async Task CreateRecord_WhenRequestIsValid_Returns201AndAppearsInList()
     {
         var (client, modelId) = await SetupModelAsync("rec2");
 
@@ -66,7 +66,7 @@ public class RecordEndpointTests(ApiTestFixture fixture)
     // GET /api/models/{id}/records/{recordId}
 
     [Fact]
-    public async Task GetRecord_returns_404_for_unknown_id()
+    public async Task GetRecord_WhenIdIsUnknown_Returns404()
     {
         var (client, modelId) = await SetupModelAsync("rec3");
 
@@ -76,7 +76,7 @@ public class RecordEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task GetRecord_returns_record_data()
+    public async Task GetRecord_WhenRecordExists_ReturnsRecordData()
     {
         var (client, modelId) = await SetupModelAsync("rec4");
 
@@ -97,7 +97,7 @@ public class RecordEndpointTests(ApiTestFixture fixture)
     // PUT /api/models/{id}/records/{recordId}
 
     [Fact]
-    public async Task UpdateRecord_returns_no_content()
+    public async Task UpdateRecord_WhenRequestIsValid_ReturnsNoContent()
     {
         var (client, modelId) = await SetupModelAsync("rec5");
 
@@ -118,7 +118,7 @@ public class RecordEndpointTests(ApiTestFixture fixture)
     // DELETE /api/models/{id}/records/{recordId}
 
     [Fact]
-    public async Task DeleteRecord_returns_no_content_and_record_disappears()
+    public async Task DeleteRecord_WhenRecordExists_ReturnsNoContentAndRecordDisappears()
     {
         var (client, modelId) = await SetupModelAsync("rec6");
 
@@ -138,7 +138,7 @@ public class RecordEndpointTests(ApiTestFixture fixture)
     // Search (US-043)
 
     [Fact]
-    public async Task GetRecords_search_filters_results()
+    public async Task GetRecords_WhenSearchTermProvided_FiltersResults()
     {
         var (client, modelId) = await SetupModelAsync("rec7");
 

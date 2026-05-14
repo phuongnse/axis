@@ -10,7 +10,7 @@ public class OrganizationSlugTests
     [InlineData("acme-corp")]
     [InlineData("my-org-123")]
     [InlineData("a")]
-    public void Valid_slug_is_created_successfully(string value)
+    public void OrganizationSlug_WhenValueIsValid_IsCreatedSuccessfully(string value)
     {
         var result = OrganizationSlug.Create(value);
 
@@ -27,7 +27,7 @@ public class OrganizationSlugTests
     [InlineData("has.dot")]
     [InlineData("-starts-with-dash")]
     [InlineData("ends-with-dash-")]
-    public void Invalid_slug_returns_failure(string value)
+    public void OrganizationSlug_WhenValueIsInvalid_ReturnsFailure(string value)
     {
         var result = OrganizationSlug.Create(value);
 
@@ -35,7 +35,7 @@ public class OrganizationSlugTests
     }
 
     [Fact]
-    public void Slug_exceeding_max_length_returns_failure()
+    public void OrganizationSlug_WhenExceedsMaxLength_ReturnsFailure()
     {
         var tooLong = new string('a', 64);
 
@@ -46,7 +46,7 @@ public class OrganizationSlugTests
     }
 
     [Fact]
-    public void Same_slugs_are_equal()
+    public void OrganizationSlug_WhenValuesAreIdentical_AreEqual()
     {
         var a = OrganizationSlug.Create("acme-corp").Value;
         var b = OrganizationSlug.Create("acme-corp").Value;

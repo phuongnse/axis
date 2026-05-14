@@ -18,7 +18,7 @@ public class CreateModelHandlerTests
     private CreateModelHandler CreateHandler() => new(_modelRepo, _uow);
 
     [Fact]
-    public async Task Happy_path_creates_model_and_returns_id()
+    public async Task CreateModel_WhenNameIsUnique_CreatesModelAndReturnsId()
     {
         _modelRepo.NameExistsAsync("Invoice", OrgId).Returns(false);
 
@@ -36,7 +36,7 @@ public class CreateModelHandlerTests
     }
 
     [Fact]
-    public async Task Duplicate_name_returns_conflict()
+    public async Task CreateModel_WhenNameIsDuplicate_ReturnsConflict()
     {
         _modelRepo.NameExistsAsync("Invoice", OrgId).Returns(true);
 

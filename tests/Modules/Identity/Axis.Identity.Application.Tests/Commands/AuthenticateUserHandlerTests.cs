@@ -36,7 +36,7 @@ public class AuthenticateUserHandlerTests
         Role.CreateSystem("Admin", OrgId, permissions);
 
     [Fact]
-    public async Task Happy_path_returns_success_with_user_info_and_permissions()
+    public async Task AuthenticateUser_WhenCredentialsAreValid_ReturnsSuccessWithUserInfoAndPermissions()
     {
         User user = MakeActiveUser();
         Role role = MakeRole(["workflow:definition:read", "users:read"]);
@@ -57,7 +57,7 @@ public class AuthenticateUserHandlerTests
     }
 
     [Fact]
-    public async Task Wrong_password_returns_failure_and_increments_failed_logins()
+    public async Task AuthenticateUser_WhenPasswordIsWrong_ReturnsFailureAndIncrementsFailedLogins()
     {
         User user = MakeActiveUser();
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).Returns(user);
@@ -75,7 +75,7 @@ public class AuthenticateUserHandlerTests
     }
 
     [Fact]
-    public async Task Unknown_email_returns_generic_invalid_credentials()
+    public async Task AuthenticateUser_WhenEmailIsUnknown_ReturnsInvalidCredentials()
     {
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).ReturnsNull();
 
@@ -89,7 +89,7 @@ public class AuthenticateUserHandlerTests
     }
 
     [Fact]
-    public async Task Locked_out_account_returns_account_locked()
+    public async Task AuthenticateUser_WhenAccountIsLockedOut_ReturnsAccountLocked()
     {
         User user = MakeActiveUser();
         // Exhaust all attempts to trigger lockout
@@ -107,7 +107,7 @@ public class AuthenticateUserHandlerTests
     }
 
     [Fact]
-    public async Task Deactivated_account_returns_account_deactivated()
+    public async Task AuthenticateUser_WhenAccountIsDeactivated_ReturnsAccountDeactivated()
     {
         User user = MakeActiveUser();
         user.Deactivate();
@@ -123,7 +123,7 @@ public class AuthenticateUserHandlerTests
     }
 
     [Fact]
-    public async Task Unverified_email_returns_email_not_verified()
+    public async Task AuthenticateUser_WhenEmailNotVerified_ReturnsEmailNotVerified()
     {
         User user = User.Create("Alice", "Smith", Email.Create("alice@acme.com").Value, OrgId);
         user.SetPasswordHash("hashed");
@@ -140,7 +140,7 @@ public class AuthenticateUserHandlerTests
     }
 
     [Fact]
-    public async Task Invalid_email_format_returns_invalid_credentials()
+    public async Task AuthenticateUser_WhenEmailFormatIsInvalid_ReturnsInvalidCredentials()
     {
         Result<AuthenticationResult> result = await CreateHandler().Handle(
             new AuthenticateUserCommand("not-an-email", "password"),
@@ -152,7 +152,7 @@ public class AuthenticateUserHandlerTests
     }
 
     [Fact]
-    public async Task Fifth_failed_attempt_triggers_lockout()
+    public async Task AuthenticateUser_WhenFifthFailedAttempt_TriggersLockout()
     {
         User user = MakeActiveUser();
         for (int i = 0; i < 4; i++) user.RecordFailedLogin(); // 4 prior failures

@@ -19,7 +19,7 @@ public class CreateWorkflowHandlerTests
     private CreateWorkflowHandler CreateHandler() => new(_workflowRepo, _uow);
 
     [Fact]
-    public async Task Happy_path_creates_draft_workflow_and_returns_id()
+    public async Task CreateWorkflow_WhenNameIsUnique_CreatesDraftWorkflowAndReturnsId()
     {
         _workflowRepo.NameExistsAsync("Invoice Approval", OrgId).Returns(false);
 
@@ -39,7 +39,7 @@ public class CreateWorkflowHandlerTests
     }
 
     [Fact]
-    public async Task Duplicate_name_returns_conflict()
+    public async Task CreateWorkflow_WhenNameIsDuplicate_ReturnsConflict()
     {
         _workflowRepo.NameExistsAsync("Invoice Approval", OrgId).Returns(true);
 

@@ -18,7 +18,7 @@ public class CreateDataClassHandlerTests
     private CreateDataClassHandler CreateHandler() => new(_dataClassRepo, _uow);
 
     [Fact]
-    public async Task Happy_path_creates_data_class_and_returns_id()
+    public async Task CreateDataClass_WhenNameIsUnique_CreatesDataClassAndReturnsId()
     {
         _dataClassRepo.NameExistsAsync("Address", OrgId).Returns(false);
 
@@ -36,7 +36,7 @@ public class CreateDataClassHandlerTests
     }
 
     [Fact]
-    public async Task Duplicate_name_returns_conflict()
+    public async Task CreateDataClass_WhenNameIsDuplicate_ReturnsConflict()
     {
         _dataClassRepo.NameExistsAsync("Address", OrgId).Returns(true);
 

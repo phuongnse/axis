@@ -30,7 +30,7 @@ public class InviteUserHandlerTests
         new(OrgId, "invited@example.com", RoleId, InvitedById);
 
     [Fact]
-    public async Task Happy_path_creates_invitation_and_sends_email()
+    public async Task InviteUser_WhenRequestIsValid_CreatesInvitationAndSendsEmail()
     {
         Email email = Email.Create("invited@example.com").Value;
         _userRepo.GetByEmailAsync(Arg.Any<Email>(), OrgId).ReturnsNull();
@@ -51,7 +51,7 @@ public class InviteUserHandlerTests
     }
 
     [Fact]
-    public async Task Inviting_existing_member_returns_conflict()
+    public async Task InviteUser_WhenEmailIsExistingMember_ReturnsConflict()
     {
         User existingUser = User.Create("Bob", "Jones", Email.Create("invited@example.com").Value, OrgId);
         _userRepo.GetByEmailAsync(Arg.Any<Email>(), OrgId).Returns(existingUser);
@@ -64,7 +64,7 @@ public class InviteUserHandlerTests
     }
 
     [Fact]
-    public async Task Inviting_with_pending_invitation_returns_conflict()
+    public async Task InviteUser_WhenPendingInvitationExists_ReturnsConflict()
     {
         _userRepo.GetByEmailAsync(Arg.Any<Email>(), OrgId).ReturnsNull();
         Invitation existing = Invitation.Create(
@@ -79,7 +79,7 @@ public class InviteUserHandlerTests
     }
 
     [Fact]
-    public async Task Inviting_self_returns_conflict()
+    public async Task InviteUser_WhenInvitingSelf_ReturnsConflict()
     {
         InviteUserCommand selfCommand = new(OrgId, "invited@example.com", RoleId,
             InvitedById: InvitedById);
@@ -95,7 +95,7 @@ public class InviteUserHandlerTests
     }
 
     [Fact]
-    public async Task Role_not_found_returns_not_found()
+    public async Task InviteUser_WhenRoleNotFound_ReturnsNotFound()
     {
         _userRepo.GetByEmailAsync(Arg.Any<Email>(), OrgId).ReturnsNull();
         _invitationRepo.GetPendingByEmailAsync(Arg.Any<Email>(), OrgId).ReturnsNull();

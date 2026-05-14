@@ -24,7 +24,7 @@ public class AddFieldHandlerTests
     private static DataModel MakeModel() => DataModel.Create("Invoice", null, null, null, OrgId, UserId);
 
     [Fact]
-    public async Task Happy_path_adds_text_field()
+    public async Task AddField_WhenModelExists_AddsTextField()
     {
         DataModel model = MakeModel();
         _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
@@ -39,7 +39,7 @@ public class AddFieldHandlerTests
     }
 
     [Fact]
-    public async Task Model_not_found_returns_not_found()
+    public async Task AddField_WhenModelNotFound_ReturnsNotFound()
     {
         _modelRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).ReturnsNull();
 

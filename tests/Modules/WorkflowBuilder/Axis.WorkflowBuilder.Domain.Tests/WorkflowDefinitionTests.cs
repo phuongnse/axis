@@ -14,7 +14,7 @@ public class WorkflowDefinitionTests
     // ─── Create ───────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Create_sets_name_description_orgId_and_Draft_status()
+    public void WorkflowDefinition_WhenCreated_SetsNameDescriptionOrgIdAndDraftStatus()
     {
         var wf = WorkflowDefinition.Create("Invoice Approval", "Approves invoices", OrgId, UserId);
 
@@ -26,7 +26,7 @@ public class WorkflowDefinitionTests
     }
 
     [Fact]
-    public void Create_sets_CreatedBy_and_DateTimeOffset_timestamps()
+    public void WorkflowDefinition_WhenCreated_SetsCreatedByAndTimestamps()
     {
         var before = DateTimeOffset.UtcNow;
         var wf = WorkflowDefinition.Create("Invoice Approval", null, OrgId, UserId);
@@ -37,7 +37,7 @@ public class WorkflowDefinitionTests
     }
 
     [Fact]
-    public void Create_adds_Start_and_End_nodes_by_default()
+    public void WorkflowDefinition_WhenCreated_AddsStartAndEndNodesByDefault()
     {
         var wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
 
@@ -47,7 +47,7 @@ public class WorkflowDefinitionTests
     }
 
     [Fact]
-    public void Create_raises_WorkflowCreated_event()
+    public void WorkflowDefinition_WhenCreated_RaisesWorkflowCreatedEvent()
     {
         var wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
         wf.DomainEvents.Should().ContainSingle(e => e is WorkflowCreated);
@@ -56,14 +56,14 @@ public class WorkflowDefinitionTests
     [Theory]
     [InlineData("")]
     [InlineData("A")]   // too short (< 2)
-    public void Create_throws_when_name_too_short(string name)
+    public void WorkflowDefinition_WhenNameTooShort_ThrowsArgumentException(string name)
     {
         var act = () => WorkflowDefinition.Create(name, null, OrgId, UserId);
         act.Should().Throw<ArgumentException>();
     }
 
     [Fact]
-    public void Create_throws_when_name_exceeds_200_chars()
+    public void WorkflowDefinition_WhenNameExceeds200Chars_ThrowsArgumentException()
     {
         var longName = new string('A', 201);
         var act = () => WorkflowDefinition.Create(longName, null, OrgId, UserId);
@@ -73,7 +73,7 @@ public class WorkflowDefinitionTests
     // ─── Publish ──────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Publish_transitions_to_Active_when_valid()
+    public void Publish_WhenWorkflowIsValid_TransitionsToActive()
     {
         var wf = WorkflowDefinition.Create("Invoice Approval", null, OrgId, UserId);
         wf.AddTrigger(TriggerType.Manual, null);
@@ -90,7 +90,7 @@ public class WorkflowDefinitionTests
     }
 
     [Fact]
-    public void Publish_throws_when_no_triggers_configured()
+    public void Publish_WhenNoTriggersConfigured_Throws()
     {
         var wf = WorkflowDefinition.Create("Invoice Approval", null, OrgId, UserId);
 
@@ -99,7 +99,7 @@ public class WorkflowDefinitionTests
     }
 
     [Fact]
-    public void Publish_throws_when_no_steps_beyond_start_and_end()
+    public void Publish_WhenNoStepsBeyondStartAndEnd_Throws()
     {
         var wf = WorkflowDefinition.Create("Invoice Approval", null, OrgId, UserId);
         wf.AddTrigger(TriggerType.Manual, null);
@@ -109,7 +109,7 @@ public class WorkflowDefinitionTests
     }
 
     [Fact]
-    public void Publish_throws_when_already_active()
+    public void Publish_WhenAlreadyActive_Throws()
     {
         var wf = CreatePublishableWorkflow();
         wf.Publish();
@@ -121,7 +121,7 @@ public class WorkflowDefinitionTests
     // ─── Archive ──────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Archive_transitions_to_Archived()
+    public void Archive_WhenWorkflowIsActive_TransitionsToArchived()
     {
         var wf = CreatePublishableWorkflow();
         wf.Publish();
@@ -132,7 +132,7 @@ public class WorkflowDefinitionTests
     }
 
     [Fact]
-    public void Archive_throws_when_in_Draft_status()
+    public void Archive_WhenInDraftStatus_Throws()
     {
         var wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
         var act = () => wf.Archive();
@@ -142,7 +142,7 @@ public class WorkflowDefinitionTests
     // ─── Unarchive ────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Unarchive_transitions_archived_back_to_Active()
+    public void Unarchive_WhenWorkflowIsArchived_TransitionsBackToActive()
     {
         var wf = CreatePublishableWorkflow();
         wf.Publish();
@@ -155,7 +155,7 @@ public class WorkflowDefinitionTests
     // ─── Update ───────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Update_changes_name_and_description()
+    public void Update_WhenCalled_ChangesNameAndDescription()
     {
         var wf = WorkflowDefinition.Create("Old Name", null, OrgId, UserId);
         wf.Update("New Name", "Some description");
@@ -167,7 +167,7 @@ public class WorkflowDefinitionTests
     // ─── AddStep ──────────────────────────────────────────────────────────────
 
     [Fact]
-    public void AddStep_adds_a_step_with_given_type()
+    public void AddStep_WhenCalled_AddsStepWithGivenType()
     {
         var wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
         var step = wf.AddStep("Send Email", StepType.Notification, null);
@@ -178,7 +178,7 @@ public class WorkflowDefinitionTests
     [Theory]
     [InlineData(StepType.Start)]
     [InlineData(StepType.End)]
-    public void AddStep_throws_when_adding_Start_or_End_step(StepType type)
+    public void AddStep_WhenAddingStartOrEndStep_Throws(StepType type)
     {
         var wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
         var act = () => wf.AddStep("Node", type, null);
@@ -188,7 +188,7 @@ public class WorkflowDefinitionTests
     // ─── AddTransition ────────────────────────────────────────────────────────
 
     [Fact]
-    public void AddTransition_connects_two_steps()
+    public void AddTransition_WhenStepsExist_ConnectsTwoSteps()
     {
         var wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
         var startStep = wf.Steps.Single(s => s.Type == StepType.Start);
@@ -201,7 +201,7 @@ public class WorkflowDefinitionTests
     }
 
     [Fact]
-    public void AddTransition_throws_when_creating_a_cycle()
+    public void AddTransition_WhenCreatingACycle_Throws()
     {
         var wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
         var s1 = wf.AddStep("Step 1", StepType.Form, null);
@@ -215,7 +215,7 @@ public class WorkflowDefinitionTests
     // ─── Duplicate ────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Duplicate_creates_new_draft_with_copy_name()
+    public void Duplicate_WhenCalled_CreatesNewDraftWithCopyName()
     {
         var wf = CreatePublishableWorkflow();
         wf.Publish();
@@ -229,7 +229,7 @@ public class WorkflowDefinitionTests
     }
 
     [Fact]
-    public void Duplicate_does_not_copy_execution_history()
+    public void Duplicate_WhenCalled_DoesNotCopyExecutionHistory()
     {
         var wf = CreatePublishableWorkflow();
         var copy = wf.Duplicate();
@@ -239,7 +239,7 @@ public class WorkflowDefinitionTests
     // ─── AddTrigger ───────────────────────────────────────────────────────────
 
     [Fact]
-    public void AddTrigger_adds_trigger_to_workflow()
+    public void AddTrigger_WhenCalled_AddsTriggerToWorkflow()
     {
         var wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
         wf.AddTrigger(TriggerType.Manual, null);

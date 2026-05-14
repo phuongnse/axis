@@ -18,7 +18,7 @@ public class GetModelHandlerTests
     private GetModelHandler CreateHandler() => new(_modelRepo);
 
     [Fact]
-    public async Task Returns_model_detail_with_all_fields()
+    public async Task GetModel_WhenModelExists_ReturnsModelDetailWithAllFields()
     {
         DataModel model = DataModel.Create("Invoice", "desc", null, null, OrgId, UserId);
         model.AddField("amount", "Amount", FieldType.Number, true, new NumberFieldConfig(Min: 0));
@@ -34,7 +34,7 @@ public class GetModelHandlerTests
     }
 
     [Fact]
-    public async Task Returns_not_found_when_model_does_not_exist()
+    public async Task GetModel_WhenModelDoesNotExist_ReturnsNotFound()
     {
         _modelRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).Returns((DataModel?)null);
 

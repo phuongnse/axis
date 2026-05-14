@@ -28,7 +28,7 @@ public class CancelExecutionHandlerTests
     }
 
     [Fact]
-    public async Task Happy_path_cancels_a_running_execution()
+    public async Task CancelExecution_WhenExecutionIsRunning_CancelsExecution()
     {
         WorkflowExecution exec = MakeRunningExecution();
         _execRepo.GetByIdAsync(exec.Id, OrgId).Returns(exec);
@@ -41,7 +41,7 @@ public class CancelExecutionHandlerTests
     }
 
     [Fact]
-    public async Task Execution_not_found_returns_not_found()
+    public async Task CancelExecution_WhenExecutionNotFound_ReturnsNotFound()
     {
         _execRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).ReturnsNull();
 
@@ -54,7 +54,7 @@ public class CancelExecutionHandlerTests
     }
 
     [Fact]
-    public async Task Cancelling_a_completed_execution_returns_business_rule_failure()
+    public async Task CancelExecution_WhenExecutionIsCompleted_ReturnsBusinessRuleFailure()
     {
         WorkflowExecution exec = MakeRunningExecution();
         exec.Complete();

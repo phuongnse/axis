@@ -26,7 +26,7 @@ public class RoleRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
         Role.Create(name, null, OrgId, ["data_modeling:model:read"]);
 
     [Fact]
-    public async Task AddAsync_and_GetByIdAsync_round_trip()
+    public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
     {
         var role = MakeRole("CustomRole-GetById");
         await _sut.AddAsync(role);
@@ -41,7 +41,7 @@ public class RoleRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetByNameAsync_returns_matching_role()
+    public async Task GetByNameAsync_WhenNameExists_ReturnsMatchingRole()
     {
         var role = MakeRole("NamedRole-FindMe");
         await _sut.AddAsync(role);
@@ -54,7 +54,7 @@ public class RoleRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetAllAsync_returns_all_roles_for_org()
+    public async Task GetAllAsync_WhenMultipleRolesExist_ReturnsAllRolesForOrg()
     {
         var r1 = MakeRole($"BulkRole-A-{Guid.NewGuid():N}");
         var r2 = MakeRole($"BulkRole-B-{Guid.NewGuid():N}");
@@ -69,7 +69,7 @@ public class RoleRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task NameExistsAsync_returns_true_for_existing_name()
+    public async Task NameExistsAsync_WhenNameExistsInOrg_ReturnsTrue()
     {
         var role = MakeRole($"DupeName-{Guid.NewGuid():N}");
         await _sut.AddAsync(role);
@@ -80,7 +80,7 @@ public class RoleRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task NameExistsAsync_excludes_specified_role_id()
+    public async Task NameExistsAsync_WhenExcludeRoleIdSpecified_ExcludesThatRoleFromCheck()
     {
         var role = MakeRole($"ExcludeSelf-{Guid.NewGuid():N}");
         await _sut.AddAsync(role);

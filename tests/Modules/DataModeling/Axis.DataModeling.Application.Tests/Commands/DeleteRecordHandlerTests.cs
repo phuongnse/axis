@@ -19,7 +19,7 @@ public class DeleteRecordHandlerTests
     private DeleteRecordHandler CreateHandler() => new(_recordRepo, _uow);
 
     [Fact]
-    public async Task Happy_path_soft_deletes_and_saves()
+    public async Task DeleteRecord_WhenRecordExists_SoftDeletesAndSaves()
     {
         DataRecord record = DataRecord.Create(ModelId, OrgId, new Dictionary<string, object?> { ["x"] = 1 }, UserId);
         _recordRepo.GetByIdAsync(record.Id, ModelId, OrgId).Returns(record);
@@ -34,7 +34,7 @@ public class DeleteRecordHandlerTests
     }
 
     [Fact]
-    public async Task Record_not_found_returns_not_found()
+    public async Task DeleteRecord_WhenRecordNotFound_ReturnsNotFound()
     {
         _recordRepo.GetByIdAsync(Arg.Any<Guid>(), ModelId, OrgId).Returns((DataRecord?)null);
 

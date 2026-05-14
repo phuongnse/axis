@@ -30,7 +30,7 @@ public class RegisterOrganizationHandlerTests
         PasswordConfirmation: "SecurePass1");
 
     [Fact]
-    public async Task Happy_path_creates_org_user_and_system_roles()
+    public async Task RegisterOrganization_WhenCommandIsValid_CreatesOrgUserAndSystemRoles()
     {
         _orgRepo.SlugExistsAsync(Arg.Any<OrganizationSlug>()).Returns(false);
         _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>()).Returns(false);
@@ -45,7 +45,7 @@ public class RegisterOrganizationHandlerTests
     }
 
     [Fact]
-    public async Task Happy_path_sends_verification_email()
+    public async Task RegisterOrganization_WhenCommandIsValid_SendsVerificationEmail()
     {
         _orgRepo.SlugExistsAsync(Arg.Any<OrganizationSlug>()).Returns(false);
         _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>()).Returns(false);
@@ -58,7 +58,7 @@ public class RegisterOrganizationHandlerTests
     }
 
     [Fact]
-    public async Task Duplicate_email_still_returns_success_without_creating_anything()
+    public async Task RegisterOrganization_WhenEmailAlreadyExists_ReturnsSuccessWithoutCreatingAnything()
     {
         // Per US-001: no information leakage — same response whether email exists or not
         _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>()).Returns(true);
@@ -72,7 +72,7 @@ public class RegisterOrganizationHandlerTests
     }
 
     [Fact]
-    public async Task Slug_collision_generates_unique_slug()
+    public async Task RegisterOrganization_WhenSlugCollides_GeneratesUniqueSlug()
     {
         // First slug attempt collides, second should be unique
         _orgRepo.SlugExistsAsync(Arg.Any<OrganizationSlug>())
@@ -86,7 +86,7 @@ public class RegisterOrganizationHandlerTests
     }
 
     [Fact]
-    public async Task Password_is_hashed_and_stored_on_user()
+    public async Task RegisterOrganization_WhenCommandIsValid_HashesAndStoresPassword()
     {
         _orgRepo.SlugExistsAsync(Arg.Any<OrganizationSlug>()).Returns(false);
         _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>()).Returns(false);

@@ -11,7 +11,7 @@ public class OrganizationTests
     private static Email ValidEmail => Email.Create("admin@acme.com").Value;
 
     [Fact]
-    public void Create_produces_valid_organization()
+    public void Organization_WhenCreated_ProducesValidOrganization()
     {
         var org = Organization.Create("Acme Corp", ValidSlug, ValidEmail);
 
@@ -22,7 +22,7 @@ public class OrganizationTests
     }
 
     [Fact]
-    public void Create_raises_OrganizationCreated_event()
+    public void Organization_WhenCreated_RaisesOrganizationCreatedEvent()
     {
         var org = Organization.Create("Acme Corp", ValidSlug, ValidEmail);
 
@@ -31,7 +31,7 @@ public class OrganizationTests
     }
 
     [Fact]
-    public void OrganizationCreated_event_contains_correct_data()
+    public void Organization_WhenCreated_OrganizationCreatedEventContainsCorrectData()
     {
         var org = Organization.Create("Acme Corp", ValidSlug, ValidEmail);
 
@@ -43,7 +43,7 @@ public class OrganizationTests
     }
 
     [Fact]
-    public void Archive_changes_status_to_archived()
+    public void Organization_WhenArchived_ChangesStatusToArchived()
     {
         var org = Organization.Create("Acme Corp", ValidSlug, ValidEmail);
         org.ClearDomainEvents();
@@ -54,7 +54,7 @@ public class OrganizationTests
     }
 
     [Fact]
-    public void Archiving_already_archived_org_throws()
+    public void Organization_WhenAlreadyArchived_ArchiveThrows()
     {
         var org = Organization.Create("Acme Corp", ValidSlug, ValidEmail);
         org.Archive();
@@ -68,7 +68,7 @@ public class OrganizationTests
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
-    public void Create_with_empty_name_throws(string name)
+    public void Organization_WhenCreatedWithEmptyName_Throws(string name)
     {
         var act = () => Organization.Create(name, ValidSlug, ValidEmail);
 

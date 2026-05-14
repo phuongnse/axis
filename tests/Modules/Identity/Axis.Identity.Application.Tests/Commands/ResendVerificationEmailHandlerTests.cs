@@ -27,7 +27,7 @@ public class ResendVerificationEmailHandlerTests
     }
 
     [Fact]
-    public async Task Happy_path_resends_verification_email()
+    public async Task ResendVerificationEmail_WhenUserExists_ResendsVerificationEmail()
     {
         User user = MakeUnverifiedUser();
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).Returns(user);
@@ -41,7 +41,7 @@ public class ResendVerificationEmailHandlerTests
     }
 
     [Fact]
-    public async Task Email_not_found_does_nothing_no_error_leakage()
+    public async Task ResendVerificationEmail_WhenEmailNotFound_DoesNothingWithoutErrorLeakage()
     {
         // Per US-002: same behavior regardless of whether email exists
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).ReturnsNull();
@@ -56,7 +56,7 @@ public class ResendVerificationEmailHandlerTests
     }
 
     [Fact]
-    public async Task Already_verified_does_nothing()
+    public async Task ResendVerificationEmail_WhenAlreadyVerified_DoesNothing()
     {
         User user = MakeUnverifiedUser();
         user.VerifyEmail();

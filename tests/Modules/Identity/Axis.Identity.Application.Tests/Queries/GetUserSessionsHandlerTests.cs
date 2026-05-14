@@ -14,7 +14,7 @@ public class GetUserSessionsHandlerTests
     private GetUserSessionsHandler CreateHandler() => new(_sessionStore);
 
     [Fact]
-    public async Task Returns_sessions_from_store()
+    public async Task GetUserSessions_WhenCalled_ReturnsSessionsFromStore()
     {
         var sessions = new List<UserSession>
         {

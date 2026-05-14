@@ -30,7 +30,7 @@ public class RetryExecutionHandlerTests
     }
 
     [Fact]
-    public async Task Happy_path_creates_retry_execution_and_returns_id()
+    public async Task RetryExecution_WhenExecutionHasFailed_CreatesRetryExecutionAndReturnsId()
     {
         WorkflowExecution failed = MakeFailedExecution();
         _execRepo.GetByIdAsync(failed.Id, OrgId).Returns(failed);
@@ -50,7 +50,7 @@ public class RetryExecutionHandlerTests
     }
 
     [Fact]
-    public async Task Execution_not_found_returns_not_found()
+    public async Task RetryExecution_WhenExecutionNotFound_ReturnsNotFound()
     {
         _execRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).ReturnsNull();
 
@@ -63,7 +63,7 @@ public class RetryExecutionHandlerTests
     }
 
     [Fact]
-    public async Task Retrying_non_failed_execution_returns_business_rule_failure()
+    public async Task RetryExecution_WhenExecutionIsNotFailed_ReturnsBusinessRuleFailure()
     {
         WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, null, new Dictionary<string, object?>());
         exec.Start();

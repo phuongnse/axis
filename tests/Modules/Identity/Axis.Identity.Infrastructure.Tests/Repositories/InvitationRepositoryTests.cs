@@ -29,7 +29,7 @@ public class InvitationRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifet
         Invitation.Create(Email.Create(email).Value, OrgId, RoleId, InvitedById);
 
     [Fact]
-    public async Task AddAsync_and_GetByTokenAsync_round_trip()
+    public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedByToken()
     {
         var invitation = MakeInvitation("invite-token@example.com");
         await _sut.AddAsync(invitation);
@@ -44,14 +44,14 @@ public class InvitationRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifet
     }
 
     [Fact]
-    public async Task GetByTokenAsync_returns_null_for_unknown_token()
+    public async Task GetByTokenAsync_WhenTokenDoesNotExist_ReturnsNull()
     {
         var result = await _sut.GetByTokenAsync("nonexistent-token");
         result.Should().BeNull();
     }
 
     [Fact]
-    public async Task GetPendingByEmailAsync_returns_pending_invitation()
+    public async Task GetPendingByEmailAsync_WhenPendingInvitationExists_ReturnsInvitation()
     {
         var invitation = MakeInvitation("pending@example.com");
         await _sut.AddAsync(invitation);
@@ -65,7 +65,7 @@ public class InvitationRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifet
     }
 
     [Fact]
-    public async Task GetPendingByEmailAsync_returns_null_after_accepted()
+    public async Task GetPendingByEmailAsync_WhenInvitationHasBeenAccepted_ReturnsNull()
     {
         var invitation = MakeInvitation("accepted@example.com");
         await _sut.AddAsync(invitation);

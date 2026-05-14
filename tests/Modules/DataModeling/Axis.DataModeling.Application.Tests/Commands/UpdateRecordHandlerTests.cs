@@ -19,7 +19,7 @@ public class UpdateRecordHandlerTests
     private UpdateRecordHandler CreateHandler() => new(_recordRepo, _uow);
 
     [Fact]
-    public async Task Happy_path_updates_data_and_saves()
+    public async Task UpdateRecord_WhenRecordExists_UpdatesDataAndSaves()
     {
         DataRecord record = DataRecord.Create(ModelId, OrgId, new Dictionary<string, object?> { ["name"] = "Old" }, UserId);
         _recordRepo.GetByIdAsync(record.Id, ModelId, OrgId).Returns(record);
@@ -35,7 +35,7 @@ public class UpdateRecordHandlerTests
     }
 
     [Fact]
-    public async Task Record_not_found_returns_not_found()
+    public async Task UpdateRecord_WhenRecordNotFound_ReturnsNotFound()
     {
         _recordRepo.GetByIdAsync(Arg.Any<Guid>(), ModelId, OrgId).Returns((DataRecord?)null);
 

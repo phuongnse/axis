@@ -31,7 +31,7 @@ public class ChangePasswordHandlerTests
     }
 
     [Fact]
-    public async Task Happy_path_changes_password_and_sends_notification()
+    public async Task ChangePassword_WhenCurrentPasswordIsCorrect_ChangesPasswordAndSendsNotification()
     {
         User user = MakeUser();
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
@@ -50,7 +50,7 @@ public class ChangePasswordHandlerTests
     }
 
     [Fact]
-    public async Task Wrong_current_password_returns_business_rule_failure()
+    public async Task ChangePassword_WhenCurrentPasswordIsWrong_ReturnsBusinessRuleFailure()
     {
         User user = MakeUser();
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
@@ -66,7 +66,7 @@ public class ChangePasswordHandlerTests
     }
 
     [Fact]
-    public async Task New_password_same_as_current_returns_business_rule_failure()
+    public async Task ChangePassword_WhenNewPasswordSameAsCurrent_ReturnsBusinessRuleFailure()
     {
         User user = MakeUser();
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
@@ -82,7 +82,7 @@ public class ChangePasswordHandlerTests
     }
 
     [Fact]
-    public async Task Password_confirmation_mismatch_returns_business_rule_failure()
+    public async Task ChangePassword_WhenConfirmationDoesNotMatch_ReturnsBusinessRuleFailure()
     {
         User user = MakeUser();
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
@@ -98,7 +98,7 @@ public class ChangePasswordHandlerTests
     }
 
     [Fact]
-    public async Task Weak_new_password_returns_business_rule_failure()
+    public async Task ChangePassword_WhenNewPasswordIsWeak_ReturnsBusinessRuleFailure()
     {
         User user = MakeUser();
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
@@ -113,7 +113,7 @@ public class ChangePasswordHandlerTests
     }
 
     [Fact]
-    public async Task User_not_found_returns_not_found()
+    public async Task ChangePassword_WhenUserNotFound_ReturnsNotFound()
     {
         _userRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).ReturnsNull();
 

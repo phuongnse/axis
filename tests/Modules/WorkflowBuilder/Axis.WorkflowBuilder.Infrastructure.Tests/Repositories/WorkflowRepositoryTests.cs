@@ -26,7 +26,7 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
         => WorkflowDefinition.Create(name, null, orgId ?? OrgId, UserId);
 
     [Fact]
-    public async Task AddAsync_and_GetByIdAsync_round_trip()
+    public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
     {
         var wf = MakeWorkflow("Order Approval");
         await _sut.AddAsync(wf);
@@ -41,7 +41,7 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     }
 
     [Fact]
-    public async Task GetAllAsync_returns_only_org_workflows()
+    public async Task GetAllAsync_WhenMultipleWorkflowsExist_ReturnsOnlyOrgWorkflows()
     {
         var orgId = Guid.NewGuid();
         var w1 = MakeWorkflow("WF-A", orgId);
@@ -60,7 +60,7 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     }
 
     [Fact]
-    public async Task NameExistsAsync_is_case_insensitive()
+    public async Task NameExistsAsync_WhenNameExists_IsCaseInsensitive()
     {
         var orgId = Guid.NewGuid();
         await _sut.AddAsync(MakeWorkflow("Employee Onboarding", orgId));
@@ -71,7 +71,7 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     }
 
     [Fact]
-    public async Task NameExistsAsync_excludes_self_on_update()
+    public async Task NameExistsAsync_WhenExcludeIdProvided_ExcludesThatWorkflowFromCheck()
     {
         var orgId = Guid.NewGuid();
         var wf = MakeWorkflow("Invoice Review", orgId);
@@ -84,7 +84,7 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     }
 
     [Fact]
-    public async Task Steps_and_transitions_are_persisted_and_reloaded()
+    public async Task AddAsync_WhenWorkflowHasStepsAndTransitions_PersistsAndReloadsThem()
     {
         var wf = MakeWorkflow("Approval Flow");
         var step = wf.AddStep("Review", StepType.Form, new Dictionary<string, object?> { ["formId"] = "form-123" });
@@ -103,7 +103,7 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     }
 
     [Fact]
-    public async Task Triggers_are_persisted_and_reloaded()
+    public async Task AddAsync_WhenWorkflowHasTriggers_PersistsAndReloadsTriggers()
     {
         var wf = MakeWorkflow("Scheduled Report");
         wf.AddTrigger(TriggerType.Schedule, new Dictionary<string, object?> { ["cron"] = "0 9 * * 1" });
@@ -120,7 +120,7 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     }
 
     [Fact]
-    public async Task Status_transition_is_persisted()
+    public async Task AddAsync_WhenWorkflowIsPublished_PersistsStatusTransition()
     {
         WorkflowDefinition wf = MakeWorkflow("Published Flow");
         wf.AddStep("Notify", StepType.Notification, null);
@@ -136,7 +136,7 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     }
 
     [Fact]
-    public async Task AddStep_AfterReload_IsPersisted()
+    public async Task AddStep_WhenMutatedAfterReload_IsPersisted()
     {
         Guid orgId = Guid.NewGuid();
         WorkflowDefinition wf = MakeWorkflow("Mutation Test", orgId);
@@ -159,7 +159,7 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     }
 
     [Fact]
-    public async Task AddTrigger_AfterReload_IsPersisted()
+    public async Task AddTrigger_WhenMutatedAfterReload_IsPersisted()
     {
         Guid orgId = Guid.NewGuid();
         WorkflowDefinition wf = MakeWorkflow("Trigger Mutation Test", orgId);

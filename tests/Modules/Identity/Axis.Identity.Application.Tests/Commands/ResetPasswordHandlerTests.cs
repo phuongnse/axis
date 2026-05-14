@@ -32,7 +32,7 @@ public class ResetPasswordHandlerTests
     }
 
     [Fact]
-    public async Task Happy_path_resets_password_and_invalidates_token()
+    public async Task ResetPassword_WhenTokenIsValid_ResetsPasswordAndInvalidatesToken()
     {
         User user = MakeUser();
         _tokenStore.FindUserIdByTokenHashAsync(Arg.Any<string>()).Returns(user.Id);
@@ -50,7 +50,7 @@ public class ResetPasswordHandlerTests
     }
 
     [Fact]
-    public async Task Expired_or_invalid_token_returns_business_rule_failure()
+    public async Task ResetPassword_WhenTokenIsExpiredOrInvalid_ReturnsBusinessRuleFailure()
     {
         _tokenStore.FindUserIdByTokenHashAsync(Arg.Any<string>()).ReturnsNull();
 
@@ -64,7 +64,7 @@ public class ResetPasswordHandlerTests
     }
 
     [Fact]
-    public async Task Password_mismatch_returns_business_rule_failure()
+    public async Task ResetPassword_WhenPasswordsDoNotMatch_ReturnsBusinessRuleFailure()
     {
         Result result = await CreateHandler().Handle(
             new ResetPasswordCommand("valid-token", "NewPass1", "Different1"),
@@ -76,7 +76,7 @@ public class ResetPasswordHandlerTests
     }
 
     [Fact]
-    public async Task Weak_password_returns_business_rule_failure()
+    public async Task ResetPassword_WhenPasswordIsWeak_ReturnsBusinessRuleFailure()
     {
         Result result = await CreateHandler().Handle(
             new ResetPasswordCommand("valid-token", "short", "short"),

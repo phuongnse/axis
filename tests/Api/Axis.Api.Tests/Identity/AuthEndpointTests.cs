@@ -28,7 +28,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     // ── Registration ──────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Register_returns_200()
+    public async Task Register_WhenPayloadIsValid_Returns200()
     {
         HttpResponseMessage resp = await _client.PostAsJsonAsync(
             "/api/organizations", RegisterPayload("auth_reg1"), Json);
@@ -37,7 +37,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task ValidationError_on_register_returns_400_with_errors()
+    public async Task Register_WhenPayloadIsInvalid_Returns400WithErrors()
     {
         HttpResponseMessage resp = await _client.PostAsJsonAsync("/api/organizations", new
         {
@@ -57,7 +57,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     // ── PKCE Flow ─────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task FullPkceFlow_after_email_verification_returns_access_token()
+    public async Task Authorize_WhenEmailIsVerified_ReturnsAccessToken()
     {
         // Register
         await _client.PostAsJsonAsync("/api/organizations", RegisterPayload("auth_pkce1"), Json);
@@ -82,7 +82,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task Authorize_before_email_verification_returns_401()
+    public async Task Authorize_WhenEmailIsNotVerified_Returns401()
     {
         // Register but do NOT verify email
         await _client.PostAsJsonAsync("/api/organizations", RegisterPayload("auth_noverify1"), Json);
@@ -103,7 +103,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task Login_with_wrong_password_returns_401()
+    public async Task Login_WhenPasswordIsWrong_Returns401()
     {
         // Register + verify
         await _client.PostAsJsonAsync("/api/organizations", RegisterPayload("auth_badpwd1"), Json);
@@ -131,7 +131,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task Login_with_unknown_email_returns_401()
+    public async Task Login_WhenEmailIsUnknown_Returns401()
     {
         HttpClient pkceClient = fixture.CreateNewClient();
         HttpResponseMessage loginResp = await pkceClient.PostAsync("/connect/login",
@@ -150,14 +150,14 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     // ── Sign Out ──────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Signout_without_token_returns_401()
+    public async Task Signout_WhenNoToken_Returns401()
     {
         HttpResponseMessage resp = await _client.PostAsync("/api/auth/signout", null);
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
-    public async Task Signout_with_valid_token_returns_204()
+    public async Task Signout_WhenTokenIsValid_Returns204()
     {
         HttpClient authedClient = await AuthHelper.CreateAdminClientAsync(fixture, "auth_signout1");
         HttpResponseMessage resp = await authedClient.PostAsync("/api/auth/signout", null);
@@ -167,7 +167,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     // ── Password Reset ────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task ForgotPassword_always_returns_ok_regardless_of_email()
+    public async Task ForgotPassword_WhenEmailIsAny_AlwaysReturnsOk()
     {
         HttpResponseMessage resp = await _client.PostAsJsonAsync("/api/auth/forgot-password",
             new { email = "notexist@test.com" });
@@ -178,7 +178,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task ResendVerification_always_returns_no_content()
+    public async Task ResendVerification_WhenEmailIsAny_AlwaysReturnsNoContent()
     {
         HttpResponseMessage resp = await _client.PostAsJsonAsync("/api/auth/resend-verification",
             new { email = "nobody@test.com" });
@@ -189,7 +189,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     // ── Token Refresh ─────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task RefreshToken_cookie_returns_new_access_token()
+    public async Task RefreshToken_WhenCookieIsPresent_ReturnsNewAccessToken()
     {
         // Complete PKCE flow — refresh token is set as httpOnly cookie on the client
         HttpClient pkceClient = fixture.CreateNewClient();

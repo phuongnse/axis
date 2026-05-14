@@ -24,7 +24,7 @@ public class CreateRoleHandlerTests
         Permissions: ["workflow:definition:read", "workflow:definition:write"]);
 
     [Fact]
-    public async Task Happy_path_creates_and_persists_role()
+    public async Task CreateRole_WhenNameIsUnique_CreatesAndPersistsRole()
     {
         _roleRepo.NameExistsAsync("Manager", OrgId).Returns(false);
 
@@ -39,7 +39,7 @@ public class CreateRoleHandlerTests
     }
 
     [Fact]
-    public async Task Duplicate_name_returns_conflict()
+    public async Task CreateRole_WhenNameIsDuplicate_ReturnsConflict()
     {
         _roleRepo.NameExistsAsync("Manager", OrgId).Returns(true);
 
@@ -51,7 +51,7 @@ public class CreateRoleHandlerTests
     }
 
     [Fact]
-    public async Task Empty_permissions_returns_business_rule_failure()
+    public async Task CreateRole_WhenPermissionsAreEmpty_ReturnsBusinessRuleFailure()
     {
         CreateRoleCommand command = ValidCommand() with { Permissions = [] };
         _roleRepo.NameExistsAsync(Arg.Any<string>(), OrgId).Returns(false);

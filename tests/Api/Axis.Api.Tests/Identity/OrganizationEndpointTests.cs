@@ -15,7 +15,7 @@ public class OrganizationEndpointTests(ApiTestFixture fixture)
     // POST /api/organizations/me/invitations
 
     [Fact]
-    public async Task InviteUser_without_token_returns_401()
+    public async Task InviteUser_WhenNoToken_Returns401()
     {
         var resp = await fixture.Client.PostAsJsonAsync(
             "/api/organizations/me/invitations",
@@ -25,7 +25,7 @@ public class OrganizationEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task InviteUser_self_invite_returns_422()
+    public async Task InviteUser_WhenSelfInvite_Returns422()
     {
         var client = await AuthHelper.CreateAdminClientAsync(fixture, "orginv1");
 
@@ -39,7 +39,7 @@ public class OrganizationEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task InviteUser_with_valid_request_returns_ok()
+    public async Task InviteUser_WhenRequestIsValid_ReturnsOk()
     {
         var client = await AuthHelper.CreateAdminClientAsync(fixture, "orginv2");
 

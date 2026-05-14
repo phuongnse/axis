@@ -27,7 +27,7 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
         User.Create("Jane", "Doe", Email.Create(email).Value, OrgId);
 
     [Fact]
-    public async Task AddAsync_and_GetByIdAsync_round_trip()
+    public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
     {
         var user = MakeUser("getbyid@example.com");
         await _sut.AddAsync(user);
@@ -42,7 +42,7 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetByEmailAsync_returns_user_for_org()
+    public async Task GetByEmailAsync_WhenEmailExistsInOrg_ReturnsUser()
     {
         var user = MakeUser("byemail@example.com");
         await _sut.AddAsync(user);
@@ -56,7 +56,7 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetByEmailAsync_returns_null_for_different_org()
+    public async Task GetByEmailAsync_WhenEmailBelongsToDifferentOrg_ReturnsNull()
     {
         var user = MakeUser("difforg@example.com");
         await _sut.AddAsync(user);
@@ -69,7 +69,7 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task EmailExistsPlatformWideAsync_returns_true_across_orgs()
+    public async Task EmailExistsPlatformWideAsync_WhenEmailExistsInAnyOrg_ReturnsTrue()
     {
         var user = MakeUser("platform@example.com");
         await _sut.AddAsync(user);
@@ -82,7 +82,7 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task EmailExistsPlatformWideAsync_returns_false_for_unknown_email()
+    public async Task EmailExistsPlatformWideAsync_WhenEmailDoesNotExist_ReturnsFalse()
     {
         var email = Email.Create("nobody@example.com").Value;
         var exists = await _sut.EmailExistsPlatformWideAsync(email);
@@ -90,7 +90,7 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task RoleIds_are_persisted_and_reloaded()
+    public async Task AddAsync_WhenUserHasRoles_PersistsAndReloadsRoleIds()
     {
         var roleId = Guid.NewGuid();
         var user = MakeUser("withrole@example.com");
@@ -104,7 +104,7 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task PasswordHash_is_persisted_and_reloaded()
+    public async Task AddAsync_WhenUserHasPasswordHash_PersistsAndReloadsPasswordHash()
     {
         var user = MakeUser("withhash@example.com");
         user.SetPasswordHash("$2a$12$fakehashvalue");
@@ -117,7 +117,7 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task CountAdminsAsync_counts_users_with_admin_role()
+    public async Task CountAdminsAsync_WhenMultipleUsersExist_CountsOnlyUsersWithAdminRole()
     {
         var adminRoleId = Guid.NewGuid();
         var adminOrgId = Guid.NewGuid();

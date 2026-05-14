@@ -18,7 +18,7 @@ public class CreateFormHandlerTests
     private CreateFormHandler CreateHandler() => new(_formRepo, _uow);
 
     [Fact]
-    public async Task Happy_path_creates_form_and_returns_id()
+    public async Task CreateForm_WhenNameIsUnique_CreatesFormAndReturnsId()
     {
         _formRepo.NameExistsAsync("Employee Intake", OrgId).Returns(false);
 
@@ -36,7 +36,7 @@ public class CreateFormHandlerTests
     }
 
     [Fact]
-    public async Task Duplicate_name_returns_conflict()
+    public async Task CreateForm_WhenNameIsDuplicate_ReturnsConflict()
     {
         _formRepo.NameExistsAsync("Employee Intake", OrgId).Returns(true);
 

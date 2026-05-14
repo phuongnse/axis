@@ -27,7 +27,7 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
         DataModel.Create(name, null, null, null, OrgId, UserId);
 
     [Fact]
-    public async Task AddAsync_and_GetByIdAsync_round_trip()
+    public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
     {
         DataModel model = MakeModel("Customer");
         await _sut.AddAsync(model);
@@ -41,7 +41,7 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     }
 
     [Fact]
-    public async Task GetAllAsync_returns_only_org_models_excluding_deleted()
+    public async Task GetAllAsync_WhenMultipleModelsExist_ReturnsOnlyOrgModelsExcludingDeleted()
     {
         Guid orgId = Guid.NewGuid();
         DataModel active = DataModel.Create("Active", null, null, null, orgId, UserId);
@@ -60,7 +60,7 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     }
 
     [Fact]
-    public async Task NameExistsAsync_returns_true_for_existing_name()
+    public async Task NameExistsAsync_WhenNameExistsInOrg_ReturnsTrueCaseInsensitive()
     {
         Guid orgId = Guid.NewGuid();
         await _sut.AddAsync(DataModel.Create("Invoice", null, null, null, orgId, UserId));
@@ -72,7 +72,7 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     }
 
     [Fact]
-    public async Task NameExistsAsync_excludes_self_on_update()
+    public async Task NameExistsAsync_WhenExcludeIdProvided_ExcludesThatModelFromCheck()
     {
         Guid orgId = Guid.NewGuid();
         DataModel model = DataModel.Create("Project", null, null, null, orgId, UserId);
@@ -85,7 +85,7 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     }
 
     [Fact]
-    public async Task System_fields_are_persisted_and_reloaded()
+    public async Task AddAsync_WhenModelCreated_PersistsAndReloadsSystemFields()
     {
         var model = MakeModel("Order");
         await _sut.AddAsync(model);
@@ -100,7 +100,7 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     }
 
     [Fact]
-    public async Task Custom_fields_with_various_types_round_trip()
+    public async Task AddAsync_WhenModelHasCustomFields_PersistsAndReloadsAllFieldTypes()
     {
         var model = MakeModel("Product");
         model.AddField("title", "Title", FieldType.Text, true,
@@ -129,7 +129,7 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     }
 
     [Fact]
-    public async Task GetByIdAsync_returns_null_for_deleted_model()
+    public async Task GetByIdAsync_WhenModelIsDeleted_ReturnsNull()
     {
         var model = MakeModel("ToDelete");
         model.Delete();

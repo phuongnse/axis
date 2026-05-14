@@ -20,7 +20,7 @@ public class DeleteFormHandlerTests
     private DeleteFormHandler CreateHandler() => new(_formRepo, _uow);
 
     [Fact]
-    public async Task Happy_path_soft_deletes_form()
+    public async Task DeleteForm_WhenFormNotReferenced_SoftDeletesForm()
     {
         FormDefinition form = FormDefinition.Create("Employee Intake", null, OrgId, UserId);
         _formRepo.GetByIdAsync(form.Id, OrgId).Returns(form);
@@ -34,7 +34,7 @@ public class DeleteFormHandlerTests
     }
 
     [Fact]
-    public async Task Form_referenced_by_active_workflow_returns_business_rule_failure()
+    public async Task DeleteForm_WhenReferencedByActiveWorkflow_ReturnsBusinessRuleFailure()
     {
         FormDefinition form = FormDefinition.Create("Employee Intake", null, OrgId, UserId);
         _formRepo.GetByIdAsync(form.Id, OrgId).Returns(form);
@@ -48,7 +48,7 @@ public class DeleteFormHandlerTests
     }
 
     [Fact]
-    public async Task Form_not_found_returns_not_found()
+    public async Task DeleteForm_WhenFormNotFound_ReturnsNotFound()
     {
         _formRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).ReturnsNull();
 

@@ -21,7 +21,7 @@ public class UpdateModelHandlerTests
         DataModel.Create("Invoice", null, null, null, OrgId, UserId);
 
     [Fact]
-    public async Task Happy_path_updates_model_and_saves()
+    public async Task UpdateModel_WhenRequestIsValid_UpdatesModelAndSaves()
     {
         DataModel model = BuildModel();
         _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
@@ -37,7 +37,7 @@ public class UpdateModelHandlerTests
     }
 
     [Fact]
-    public async Task Model_not_found_returns_not_found()
+    public async Task UpdateModel_WhenModelNotFound_ReturnsNotFound()
     {
         _modelRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).Returns((DataModel?)null);
 
@@ -51,7 +51,7 @@ public class UpdateModelHandlerTests
     }
 
     [Fact]
-    public async Task Duplicate_name_returns_conflict()
+    public async Task UpdateModel_WhenNameIsDuplicate_ReturnsConflict()
     {
         DataModel model = BuildModel();
         _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);

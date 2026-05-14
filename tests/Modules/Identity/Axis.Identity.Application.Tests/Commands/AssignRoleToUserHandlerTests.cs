@@ -30,7 +30,7 @@ public class AssignRoleToUserHandlerTests
     }
 
     [Fact]
-    public async Task Assign_role_adds_to_user()
+    public async Task AssignRoleToUser_WhenRoleIsValid_AddsRoleToUser()
     {
         User user = MakeUser();
         Role newRole = Role.Create("Manager", null, OrgId, ["workflow:definition:read"]);
@@ -47,7 +47,7 @@ public class AssignRoleToUserHandlerTests
     }
 
     [Fact]
-    public async Task Remove_role_removes_from_user()
+    public async Task AssignRoleToUser_WhenActionIsRemove_RemovesRoleFromUser()
     {
         User user = MakeUser();
         Role editorRole = Role.Create("Editor", null, OrgId, ["workflow:definition:read"]);
@@ -64,7 +64,7 @@ public class AssignRoleToUserHandlerTests
     }
 
     [Fact]
-    public async Task Removing_last_role_returns_business_rule_failure()
+    public async Task AssignRoleToUser_WhenRemovingLastRole_ReturnsBusinessRuleFailure()
     {
         // User has only EditorRoleId
         User user = MakeUser();
@@ -83,7 +83,7 @@ public class AssignRoleToUserHandlerTests
     }
 
     [Fact]
-    public async Task Removing_admin_role_from_last_admin_returns_business_rule_failure()
+    public async Task AssignRoleToUser_WhenRemovingAdminRoleFromLastAdmin_ReturnsBusinessRuleFailure()
     {
         User user = MakeUser();
         user.AssignRole(AdminRoleId);
@@ -103,7 +103,7 @@ public class AssignRoleToUserHandlerTests
     }
 
     [Fact]
-    public async Task Role_not_found_in_org_returns_not_found()
+    public async Task AssignRoleToUser_WhenRoleNotFoundInOrg_ReturnsNotFound()
     {
         User user = MakeUser();
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
