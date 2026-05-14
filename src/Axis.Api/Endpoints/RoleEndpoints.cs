@@ -96,6 +96,3 @@ public static class RoleEndpoints
         return Results.NoContent();
     }
 }
-
-public record CreateRoleRequest(string Name, string? Description, IReadOnlyList<string> Permissions);
-public record UpdateRoleRequest(string Name, string? Description, IReadOnlyList<string> Permissions);

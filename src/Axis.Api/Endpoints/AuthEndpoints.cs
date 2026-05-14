@@ -136,8 +136,3 @@ public static class AuthEndpoints
         return Results.NoContent();
     }
 }
-
-public record VerifyEmailRequest(string Token);
-public record ResendVerificationRequest(string Email);
-public record ForgotPasswordRequest(string Email);
-public record ResetPasswordRequest(string Token, string NewPassword, string ConfirmPassword);

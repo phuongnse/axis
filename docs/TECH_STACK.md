@@ -71,7 +71,6 @@
 ### ADR-004: OpenIddict as OAuth2/OIDC Server
 **Decision:** Use OpenIddict 5.x as the in-process OAuth2/OIDC authorization server.
 **Reason:** Axis will support external systems triggering workflows via API — this requires a standards-compliant OAuth2 Client Credentials flow so third-party tools can authenticate without user interaction. OpenIddict also enables Authorization Code + PKCE for the SPA (more secure than custom JWT for browser clients) and positions Axis to support enterprise SSO in the future. Keeping the auth server in-process avoids external service dependencies.
-> ⚠️ **Implementation gap**: The current Identity API layer was built with a hand-rolled `JwtTokenService` (no OpenIddict). This is a known refactor target — the entire Identity API layer must be rewritten against OpenIddict before external integrations can be implemented.
 
 ### ADR-005: React over Vue/Svelte for Frontend
 **Decision:** Use React with TypeScript.

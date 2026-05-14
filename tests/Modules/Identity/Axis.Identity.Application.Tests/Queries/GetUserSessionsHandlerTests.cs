@@ -1,8 +1,6 @@
-using Axis.Identity.Application.Commands.RevokeSession;
 using Axis.Identity.Application.Queries.GetUserSessions;
 using Axis.Identity.Application.Services;
 using FluentAssertions;
-using FluentValidation;
 using NSubstitute;
 
 namespace Axis.Identity.Application.Tests.Queries;
@@ -32,35 +30,5 @@ public class GetUserSessionsHandlerTests
 
         result.Should().HaveCount(2);
         result[0].IsCurrentSession.Should().BeTrue();
-    }
-}
-
-public class RevokeSessionHandlerTests
-{
-    private readonly ISessionStore _sessionStore = Substitute.For<ISessionStore>();
-
-    private static readonly Guid UserId = Guid.NewGuid();
-    private static readonly Guid OrgId = Guid.NewGuid();
-
-    private RevokeSessionHandler CreateHandler() => new(_sessionStore);
-
-    [Fact]
-    public async Task Revokes_session_via_store()
-    {
-        await CreateHandler().Handle(
-            new RevokeSessionCommand("session-1", UserId),
-            CancellationToken.None);
-
-        await _sessionStore.Received(1).RevokeAsync("session-1", UserId, Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task Revoke_all_delegates_to_store()
-    {
-        await CreateHandler().Handle(
-            new RevokeSessionCommand(null, UserId),
-            CancellationToken.None);
-
-        await _sessionStore.Received(1).RevokeAllAsync(UserId, Arg.Any<CancellationToken>());
     }
 }

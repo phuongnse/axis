@@ -265,18 +265,3 @@ public static class UserEndpoints
         return Results.NoContent();
     }
 }
-
-public record UpdateProfileRequest(
-    string FirstName,
-    string LastName,
-    string? AvatarBase64,
-    string? AvatarContentType);
-
-public record ChangePasswordRequest(
-    string CurrentPassword,
-    string NewPassword,
-    string ConfirmPassword);
-
-public record UpdateStatusRequest(bool IsActive);
-
-public record AssignRoleRequest(Guid RoleId, string Action);

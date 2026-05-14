@@ -96,6 +96,11 @@ Before starting any task, read only what is relevant — not everything.
 - **No `var`**: always write the explicit type, even when the assignment makes it obvious.
 - **Comments — WHY only**: default to no comments. Add one only when the WHY is non-obvious — a hidden constraint, a framework quirk, or surprising business logic. No WHAT comments.
 - **No inline fully-qualified type names**: always use `using` directives. Never write `System.Text.Encoding.UTF8`, `System.Security.Cryptography.SHA256`, `Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions`, etc. inline. Run the detection grep in PATTERNS.md § "Code hygiene checklist" before every commit.
+- **One type per file**: every class, record, interface, or enum lives in its own file named after the type. Never group multiple types in one file, including test helpers. This applies equally to `src/` and `tests/`. Allowed exceptions:
+  - Generic overloads of the same concept may share a file (e.g. `Result` + `Result<T>` in `Result.cs`, `ICommand` + `ICommand<T>` in `ICommand.cs`).
+  - An xUnit `[CollectionDefinition]` class may be co-located with its fixture class (xUnit convention requires them to be in the same assembly scope).
+  - A large sealed polymorphic hierarchy (5+ subtypes, all `sealed`, all deriving from the same base) may be kept in one file named after the base type (e.g. `FieldConfig.cs`).
+  - A simple DTO that exists solely as the return type of a single interface method may be co-located with that interface (e.g. `UserSession` alongside `ISessionStore`).
 - **No scaffold placeholder files**: delete `Class1.cs` immediately when Visual Studio creates it. A `Class1.cs` anywhere in `src/` or `tests/` must never be committed.
 - **Centralized global usings**: `GlobalUsings.cs` per project or `<Using Include="..." />` in `Directory.Build.props`.
 - **`dotnet format`** must pass without warnings before pushing.
@@ -212,6 +217,7 @@ A US or layer is NOT done until all of the following are complete in the **same 
 1. ✅ Tests updated/added and passing
 2. ✅ If the fix changes observable behavior: update the affected US callout's Gaps or Decisions line
 3. ✅ If the fix closes a documented gap: remove that gap from the callout
+4. ✅ If the fix resolves any gap documented anywhere in `docs/`, remove that ⚠️ note in the same PR.
 
 ---
 
