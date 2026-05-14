@@ -12,6 +12,8 @@ using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Shared.Domain.Primitives;
 using MediatR;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Axis.Api.Endpoints;
@@ -165,8 +167,11 @@ public static class UserEndpoints
         ISender mediator,
         CancellationToken ct)
     {
+        // currentTokenId identifies the current session so the UI can mark it as "current device".
+        // With OpenIddict the access token doesn't carry the refresh token ID — pass empty string
+        // until we add a custom "rt_id" claim at issuance time (tracked gap).
         IReadOnlyList<UserSession> sessions = await mediator.Send(
-            new GetUserSessionsQuery(currentUser.UserId, currentUser.RefreshTokenId ?? string.Empty), ct);
+            new GetUserSessionsQuery(currentUser.UserId, CurrentTokenId: string.Empty), ct);
 
         return Results.Ok(sessions.Select(s => new
         {
@@ -197,8 +202,12 @@ public static class UserEndpoints
     {
         Result result = await mediator.Send(new RevokeSessionCommand(null, currentUser.UserId), ct);
         if (result.IsFailure) return result.ToProblemDetails();
+
+        // Clear the refresh token cookie from this device
         httpContext.Response.Cookies.Delete("refresh_token",
-            new CookieOptions { Path = "/api/auth" });
+            new CookieOptions { Path = "/connect" });
+
+        await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         return Results.NoContent();
     }
 
@@ -208,17 +217,16 @@ public static class UserEndpoints
         CurrentUser currentUser,
         ISender mediator,
         IRoleRepository roleRepository,
-        IRefreshTokenStore refreshTokenStore,
+        ISessionStore sessionStore,
         CancellationToken ct)
     {
         if (userId == currentUser.UserId)
-            return Results.Problem("You cannot deactivate yourself.", statusCode: StatusCodes.Status422UnprocessableEntity);
+            return Results.Problem(
+                "You cannot deactivate yourself.",
+                statusCode: StatusCodes.Status422UnprocessableEntity);
 
         if (!request.IsActive)
         {
-            // DeactivateUserCommand enforces a last-admin guard: it rejects deactivation if
-            // the target user is the last remaining Admin in the org. Passing adminRoleId
-            // lets the handler check without querying the role table again.
             Role? adminRole = await roleRepository.GetByNameAsync("Admin", currentUser.OrgId, ct);
             Guid adminRoleId = adminRole?.Id ?? Guid.Empty;
 
@@ -227,11 +235,14 @@ public static class UserEndpoints
 
             if (deactivateResult.IsFailure) return deactivateResult.ToProblemDetails();
 
-            await refreshTokenStore.RevokeAllForUserAsync(userId, ct);
+            // Revoke all active refresh tokens so the deactivated user can't silently renew
+            await sessionStore.RevokeAllAsync(userId, ct);
         }
         else
         {
-            return Results.Problem("Reactivation is not yet implemented.", statusCode: StatusCodes.Status501NotImplemented);
+            return Results.Problem(
+                "Reactivation is not yet implemented.",
+                statusCode: StatusCodes.Status501NotImplemented);
         }
 
         return Results.NoContent();

@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
@@ -15,6 +14,7 @@ using Axis.FormBuilder.Application.Commands.CreateForm;
 using Axis.FormBuilder.Infrastructure.Extensions;
 using Axis.Identity.Application.Commands.RegisterOrganization;
 using Axis.Identity.Infrastructure.Extensions;
+using Axis.Identity.Infrastructure.Persistence;
 using Axis.Shared.Application.Behaviors;
 using Axis.Shared.Application.Tenancy;
 using Axis.Shared.Infrastructure.Tenancy;
@@ -24,17 +24,19 @@ using Axis.WorkflowEngine.Application.Commands.CancelExecution;
 using Axis.WorkflowEngine.Infrastructure.Extensions;
 using FluentValidation;
 using MediatR;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using OpenIddict.Server.AspNetCore;
+using OpenIddict.Validation.AspNetCore;
 using Scalar.AspNetCore;
 using Serilog;
-using Serilog.Context;
 using StackExchange.Redis;
 using Wolverine;
 using Wolverine.EntityFrameworkCore;
+using static OpenIddict.Abstractions.OpenIddictConstants;
+using static OpenIddict.Server.OpenIddictServerEvents;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -51,10 +53,6 @@ try
         .Enrich.FromLogContext());
 
     // ── Wolverine (messaging + domain event outbox) ────────────────────────
-    // Registers IMessageBus in DI. Domain events raised by aggregates are
-    // dispatched here after SaveChangesAsync via UnitOfWork.
-    // Durable PostgreSQL outbox will be added once the Wolverine persistence
-    // schema strategy is decided (tracked in PROGRESS.md).
     builder.Host.UseWolverine(opts =>
     {
         opts.UseEntityFrameworkCoreTransactions();
@@ -81,60 +79,72 @@ try
         typeof(CancelExecutionCommand).Assembly,
     ]);
 
-    // ── JWT Authentication ─────────────────────────────────────────────────
-    // NOTE: This will be replaced by OpenIddict (Authorization Code + PKCE)
-    // once the Identity API layer is refactored. See ADR-004 in TECH_STACK.md.
-    string jwtKey = builder.Configuration["Jwt:SecretKey"]
-        ?? throw new InvalidOperationException("Jwt:SecretKey is required");
-
-    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-        .AddJwtBearer(options =>
+    // ── Authentication & OpenIddict ────────────────────────────────────────
+    // Cookie scheme: short-lived session used only during the PKCE authorize flow
+    // (POST /connect/login → GET /connect/authorize). Not used for API calls.
+    // OpenIddict validation scheme: validates JWT access tokens on every API request.
+    builder.Services.AddAuthentication(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)
+        .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, opts =>
         {
-            options.TokenValidationParameters = new TokenValidationParameters
-            {
-                ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-                ValidateIssuer = true,
-                ValidIssuer = builder.Configuration["Jwt:Issuer"],
-                ValidateAudience = true,
-                ValidAudience = builder.Configuration["Jwt:Audience"],
-                ValidateLifetime = true,
-                ClockSkew = TimeSpan.Zero,
-            };
-            options.Events = new JwtBearerEvents
-            {
-                OnTokenValidated = async context =>
-                {
-                    string? jti = context.Principal?.FindFirst("jti")?.Value;
-                    if (jti is not null)
-                    {
-                        IJtiBlacklist blacklist = context.HttpContext.RequestServices
-                            .GetRequiredService<IJtiBlacklist>();
-                        if (await blacklist.IsBlacklistedAsync(jti))
-                            context.Fail("Token has been revoked.");
-                    }
-                },
-                OnChallenge = async context =>
-                {
-                    if (!context.Handled)
-                    {
-                        context.HandleResponse();
-                        await Results.Problem(
-                            title: "Unauthorized",
-                            detail: "Authentication is required to access this resource.",
-                            statusCode: StatusCodes.Status401Unauthorized)
-                            .ExecuteAsync(context.HttpContext);
-                    }
-                },
-                OnForbidden = async context =>
-                {
-                    await Results.Problem(
-                        title: "Forbidden",
-                        detail: "You do not have permission to perform this action.",
-                        statusCode: StatusCodes.Status403Forbidden)
-                        .ExecuteAsync(context.HttpContext);
-                },
-            };
+            opts.ExpireTimeSpan = TimeSpan.FromMinutes(5);
+            opts.SlidingExpiration = false;
+            // Challenge returns 302 to /connect/login — only hit by the authorize endpoint.
+            // API endpoints use OpenIddict validation which challenges with 401 Bearer.
+            opts.LoginPath = "/connect/login";
+        });
+
+    builder.Services.AddOpenIddict()
+        // Core: EF Core token/application/scope stores (registered in IdentityInfrastructureExtensions)
+        // NOTE: AddCore is called in AddIdentityInfrastructure; we only add Server and Validation here.
+
+        // Server: the in-process OAuth2/OIDC authorization server
+        .AddServer(opts =>
+        {
+            opts.SetAuthorizationEndpointUris("/connect/authorize")
+                .SetTokenEndpointUris("/connect/token");
+
+            // Register supported scopes so OpenIddict validates them during authorize requests.
+            // Custom scopes (e.g. "permissions") are also seeded as OpenIddictScope entities by
+            // OpenIddictSeeder so resource servers can discover them via introspection.
+            opts.RegisterScopes(Scopes.OpenId, Scopes.Email, Scopes.Profile, Scopes.OfflineAccess, "permissions");
+
+            // Authorization Code + PKCE — SPA flow
+            opts.AllowAuthorizationCodeFlow()
+                .RequireProofKeyForCodeExchange();
+
+            // Client Credentials — M2M / external system integrations
+            opts.AllowClientCredentialsFlow();
+
+            // Refresh Token — silent session renewal
+            opts.AllowRefreshTokenFlow();
+
+            // Refresh tokens stored as opaque references in the DB → easy revocation
+            opts.UseReferenceRefreshTokens();
+
+            // Ephemeral keys for development. Production should use
+            // .AddEncryptionCertificate() / .AddSigningCertificate() from Azure Key Vault.
+            opts.AddEphemeralEncryptionKey()
+                .AddEphemeralSigningKey();
+
+            opts.UseAspNetCore()
+                // Passthrough: our endpoint handlers call Results.SignIn to complete the flow
+                .EnableAuthorizationEndpointPassthrough()
+                .EnableTokenEndpointPassthrough();
+
+            // Move refresh token out of response body and into an httpOnly cookie
+            opts.AddEventHandler<ApplyTokenResponseContext>(b =>
+                b.UseSingletonHandler<ApplyRefreshTokenCookieHandler>());
+
+            // Read refresh token from cookie instead of request body on refresh
+            opts.AddEventHandler<ExtractTokenRequestContext>(b =>
+                b.UseSingletonHandler<ExtractRefreshTokenFromCookieHandler>());
+        })
+
+        // Validation: validates JWT access tokens on incoming API requests (same process — no network call)
+        .AddValidation(opts =>
+        {
+            opts.UseLocalServer();
+            opts.UseAspNetCore();
         });
 
     // ── Authorization ──────────────────────────────────────────────────────
@@ -143,7 +153,6 @@ try
     builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
     // ── Rate limiting ──────────────────────────────────────────────────────
-    // Applied to auth endpoints only. Authenticated API endpoints are not rate-limited by default.
     builder.Services.AddRateLimiter(opts =>
     {
         opts.AddFixedWindowLimiter("auth", cfg =>
@@ -171,7 +180,6 @@ try
     builder.Services.AddSingleton<IJtiBlacklist, RedisJtiBlacklist>();
 
     // ── API services ───────────────────────────────────────────────────────
-    builder.Services.AddScoped<ITokenService, JwtTokenService>();
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddScoped<CurrentUser>();
     builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
@@ -252,6 +260,9 @@ try
     {
         Predicate = check => check.Tags.Contains("ready"),
     });
+
+    // ── OpenIddict connect endpoints ───────────────────────────────────────
+    app.MapConnectEndpoints();
 
     // ── Module endpoints ───────────────────────────────────────────────────
     app.MapAuthEndpoints();

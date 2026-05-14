@@ -14,14 +14,12 @@
 
 ## Identity — E02-identity-access
 
-**Domain ✅ | Application ✅ | Infrastructure ✅ | API ⚠️ | Frontend ⏳**
-
-> ⚠️ **API layer has a known architectural gap**: implemented with a hand-rolled `JwtTokenService` instead of OpenIddict. The entire Identity API layer must be refactored to OpenIddict (Authorization Code + PKCE for SPA; Client Credentials for external integrations) before the module can be marked ✅. See ADR-004 in `docs/TECH_STACK.md`.
+**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳**
 
 - **Domain**: Organization, User, Role, Invitation aggregates; Email, OrganizationSlug value objects; all domain events
 - **Application**: RegisterOrganization, InviteUser, AcceptInvitation, DeactivateUser, AssignRoleToUser, CreateRole, UpdateRole, UpdateUserProfile; AuthenticateUser, VerifyEmail, ResendVerificationEmail, RequestPasswordReset, ResetPassword, ChangePassword, RevokeSession; GetRoles, GetUserSessions queries
-- **Infrastructure**: IdentityDbContext (public schema), all EF Core configurations, all repositories, BCryptPasswordHasher (work factor 12), MailKitEmailSender, IdentityUnitOfWork, PasswordResetTokenStore, RefreshTokenStore (refresh_tokens table), SessionStoreService
-- **API (current — to be replaced)**: Custom JWT via `JwtTokenService`; endpoints for signin/refresh/signout/verify-email/forgot-password/reset-password, org registration, invitations, user management, roles. PermissionPolicyProvider for RBAC; RedisJtiBlacklist; ValidationExceptionMiddleware (422). 27 integration tests passing — but these tests will need to be rewritten against the OpenIddict flow.
+- **Infrastructure**: IdentityDbContext (public schema), all EF Core configurations, all repositories, BCryptPasswordHasher (work factor 12), MailKitEmailSender, IdentityUnitOfWork, PasswordResetTokenStore, SessionStoreService (wraps `IOpenIddictTokenManager`), OpenIddictSeeder (`axis_spa` PKCE + `axis_m2m` client credentials clients)
+- **API**: OpenIddict 5.x — `GET /connect/authorize` (Authorization Code + PKCE), `POST /connect/login` (credential validation + 5-min session cookie), `POST /connect/token` (code exchange / refresh / client credentials). Refresh token in httpOnly `Secure SameSite=Strict` cookie via `ApplyRefreshTokenCookieHandler`/`ExtractRefreshTokenFromCookieHandler`. `POST /api/auth/signout` (revoke via `IOpenIddictTokenManager` + JTI Redis blacklist). PermissionPolicyProvider (OpenIddict validation scheme). Full PKCE integration test helper (`AuthHelper.CompletePkceFlowAsync`). 11 auth integration tests.
 
 ## DataModeling — E03-data-modeling
 

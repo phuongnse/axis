@@ -12,7 +12,6 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Invitation> Invitations => Set<Invitation>();
     internal DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
-    internal DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -21,6 +20,8 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
         modelBuilder.ApplyConfiguration(new RoleConfiguration());
         modelBuilder.ApplyConfiguration(new InvitationConfiguration());
         modelBuilder.ApplyConfiguration(new PasswordResetTokenConfiguration());
-        modelBuilder.ApplyConfiguration(new RefreshTokenConfiguration());
+
+        // Register OpenIddict entity model (Applications, Authorizations, Scopes, Tokens)
+        modelBuilder.UseOpenIddict();
     }
 }

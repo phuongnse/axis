@@ -1,8 +1,6 @@
 using Axis.Api.Extensions;
-using Axis.Api.Infrastructure;
 using Axis.Identity.Application.Commands.AcceptInvitation;
 using Axis.Identity.Application.Repositories;
-using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Shared.Domain.Primitives;
 using MediatR;
@@ -27,7 +25,7 @@ public static class InvitationEndpoints
             .WithName("AcceptInvitation")
             .WithSummary("Accept an invitation and create a user account")
             .WithTags("Identity")
-            .Produces<object>()
+            .Produces(204)
             .ProducesProblem(400)
             .ProducesProblem(404)
             .ProducesProblem(409)
@@ -58,10 +56,6 @@ public static class InvitationEndpoints
         string token,
         [FromBody] AcceptInvitationRequest request,
         ISender mediator,
-        ITokenService tokenService,
-        IRefreshTokenStore refreshTokenStore,
-        IConfiguration configuration,
-        HttpContext httpContext,
         CancellationToken ct)
     {
         Result<AcceptInvitationResult> result = await mediator.Send(
@@ -69,11 +63,9 @@ public static class InvitationEndpoints
 
         if (result.IsFailure) return result.ToProblemDetails();
 
-        return await TokenHelper.IssueTokensAsync(
-            result.Value.UserId, result.Value.OrganizationId,
-            result.Value.Email, result.Value.FullName,
-            result.Value.Permissions,
-            tokenService, refreshTokenStore, configuration, httpContext, ct);
+        // Invitation accepted — client initiates the Authorization Code + PKCE flow
+        // at POST /connect/login to sign in. Auto-sign-in is incompatible with PKCE.
+        return Results.NoContent();
     }
 }
 

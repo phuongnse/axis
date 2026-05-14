@@ -19,6 +19,8 @@
     <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="OpenIddict.AspNetCore" />
+    <PackageReference Include="OpenIddict.EntityFrameworkCore" />
   </ItemGroup>
 
 </Project>
