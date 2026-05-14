@@ -77,13 +77,3 @@ public static class OrganizationEndpoints
         return Results.Ok(new { message = $"Invitation sent to {request.Email}." });
     }
 }
-
-public record RegisterOrganizationRequest(
-    string OrgName,
-    string AdminFirstName,
-    string AdminLastName,
-    string AdminEmail,
-    string Password,
-    string PasswordConfirmation);
-
-public record InviteUserRequest(string Email, Guid RoleId);

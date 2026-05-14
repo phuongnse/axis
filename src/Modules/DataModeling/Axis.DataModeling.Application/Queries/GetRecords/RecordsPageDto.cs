@@ -6,10 +6,3 @@ public sealed record RecordsPageDto(
     int Page,
     int PageSize,
     int TotalPages);
-
-public sealed record RecordDto(
-    Guid Id,
-    Guid ModelId,
-    DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt,
-    IReadOnlyDictionary<string, object?> Data);

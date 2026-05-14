@@ -1,4 +1,4 @@
-using Axis.Identity.Application.Commands.VerifyEmail;
+using Axis.Identity.Application.Commands.ResetPassword;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
@@ -10,76 +10,79 @@ using NSubstitute.ReturnsExtensions;
 
 namespace Axis.Identity.Application.Tests.Commands;
 
-public class VerifyEmailHandlerTests
+public class ResetPasswordHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
+    private readonly IPasswordResetTokenStore _tokenStore = Substitute.For<IPasswordResetTokenStore>();
+    private readonly IPasswordHasher _hasher = Substitute.For<IPasswordHasher>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid UserId = Guid.NewGuid();
 
-    private VerifyEmailHandler CreateHandler() => new(_userRepo, _uow);
+    private ResetPasswordHandler CreateHandler() =>
+        new(_userRepo, _tokenStore, _hasher, _uow);
 
-    private static User MakeUnverifiedUser()
+    private static User MakeUser()
     {
         User user = User.Create("Alice", "Smith", Email.Create("alice@acme.com").Value, OrgId);
-        user.SetPasswordHash("hashed");
+        user.SetPasswordHash("old_hash");
+        user.VerifyEmail();
         return user;
     }
 
     [Fact]
-    public async Task Happy_path_verifies_email()
+    public async Task Happy_path_resets_password_and_invalidates_token()
     {
-        User user = MakeUnverifiedUser();
+        User user = MakeUser();
+        _tokenStore.FindUserIdByTokenHashAsync(Arg.Any<string>()).Returns(user.Id);
         _userRepo.GetByIdPlatformWideAsync(user.Id).Returns(user);
+        _hasher.Hash("NewPass1").Returns("new_hash");
 
         Result result = await CreateHandler().Handle(
-            new VerifyEmailCommand(user.Id.ToString()),
+            new ResetPasswordCommand("valid-token", "NewPass1", "NewPass1"),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        user.IsEmailVerified.Should().BeTrue();
+        user.PasswordHash.Should().Be("new_hash");
+        await _tokenStore.Received(1).InvalidateAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Invalid_token_format_returns_business_rule_failure()
+    public async Task Expired_or_invalid_token_returns_business_rule_failure()
     {
+        _tokenStore.FindUserIdByTokenHashAsync(Arg.Any<string>()).ReturnsNull();
+
         Result result = await CreateHandler().Handle(
-            new VerifyEmailCommand("not-a-guid"),
+            new ResetPasswordCommand("bad-token", "NewPass1", "NewPass1"),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
-        result.Error.Should().Contain("Invalid verification link");
+        result.Error.Should().Contain("expired");
     }
 
     [Fact]
-    public async Task Token_not_found_returns_business_rule_failure()
+    public async Task Password_mismatch_returns_business_rule_failure()
     {
-        _userRepo.GetByIdPlatformWideAsync(Arg.Any<Guid>()).ReturnsNull();
-
         Result result = await CreateHandler().Handle(
-            new VerifyEmailCommand(Guid.NewGuid().ToString()),
+            new ResetPasswordCommand("valid-token", "NewPass1", "Different1"),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
-        result.Error.Should().Contain("Invalid verification link");
+        result.Error.Should().Contain("match");
     }
 
     [Fact]
-    public async Task Already_verified_returns_business_rule_failure()
+    public async Task Weak_password_returns_business_rule_failure()
     {
-        User user = MakeUnverifiedUser();
-        user.VerifyEmail();
-        _userRepo.GetByIdPlatformWideAsync(user.Id).Returns(user);
-
         Result result = await CreateHandler().Handle(
-            new VerifyEmailCommand(user.Id.ToString()),
+            new ResetPasswordCommand("valid-token", "short", "short"),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
-        result.Error.Should().Contain("already been used");
     }
 }

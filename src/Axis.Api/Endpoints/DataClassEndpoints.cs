@@ -203,14 +203,3 @@ public static class DataClassEndpoints
         return Results.NoContent();
     }
 }
-
-public record CreateDataClassRequest(string Name, string? Description);
-
-public record UpdateDataClassRequest(string Name, string? Description);
-
-public record AddDataClassFieldRequest(
-    string Name,
-    string Label,
-    FieldType Type,
-    bool IsRequired,
-    JsonElement Config);

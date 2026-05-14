@@ -262,31 +262,3 @@ public static class ModelEndpoints
         return Results.NoContent();
     }
 }
-
-public record CreateModelRequest(
-    string Name,
-    string? Description,
-    string? Icon,
-    string? Color);
-
-public record UpdateModelRequest(
-    string Name,
-    string? Description,
-    string? Icon,
-    string? Color);
-
-public record AddFieldRequest(
-    string Name,
-    string Label,
-    FieldType Type,
-    bool IsRequired,
-    JsonElement Config);
-
-public record UpdateFieldRequest(
-    FieldType Type,
-    string Label,
-    string? HelpText,
-    bool IsRequired,
-    JsonElement Config);
-
-public record ReorderFieldsRequest(IReadOnlyList<Guid> FieldIds);

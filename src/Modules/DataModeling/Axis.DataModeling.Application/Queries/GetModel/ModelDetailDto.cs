@@ -11,14 +11,3 @@ public sealed record ModelDetailDto(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     IReadOnlyList<FieldDefinitionDto> Fields);
-
-public sealed record FieldDefinitionDto(
-    Guid Id,
-    string Name,
-    string Label,
-    string? HelpText,
-    string Type,
-    bool IsRequired,
-    bool IsSystem,
-    int DisplayOrder,
-    FieldConfig Config);
