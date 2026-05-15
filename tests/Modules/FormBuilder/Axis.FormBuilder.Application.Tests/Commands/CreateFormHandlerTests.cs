@@ -1,6 +1,7 @@
 using Axis.FormBuilder.Application.Commands.CreateForm;
 using Axis.FormBuilder.Application.Repositories;
 using Axis.FormBuilder.Application.Services;
+using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
@@ -47,5 +48,20 @@ public class CreateFormHandlerTests
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.Conflict);
         result.Error.Should().Contain("already exists");
+    }
+
+    [Fact]
+    public async Task CreateForm_WhenSaveThrowsUniqueConstraint_ReturnsConflict()
+    {
+        _formRepo.NameExistsAsync("Concurrent Form", OrgId).Returns(false);
+        _uow.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns<int>(_ => throw new UniqueConstraintException("unique violation"));
+
+        Result<Guid> result = await CreateHandler().Handle(
+            new CreateFormCommand("Concurrent Form", null, OrgId, UserId),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.Conflict);
     }
 }

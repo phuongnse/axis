@@ -67,6 +67,7 @@ internal sealed class FormDefinitionConfiguration : IEntityTypeConfiguration<For
 
         builder.Ignore(f => f.Fields);
 
-        builder.HasIndex(f => new { f.OrganizationId, f.Name });
+        builder.HasIndex(f => new { f.OrganizationId, f.Name }).IsUnique()
+            .HasFilter("deleted_at IS NULL");
     }
 }
