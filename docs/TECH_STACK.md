@@ -33,7 +33,8 @@
 | **Vite** | 5.x | Build tool | Fast dev server and build |
 | **TanStack Query** | 5.x | Server state / data fetching | Caching, background refetch, request deduplication |
 | **Zustand** | 4.x | Client state management | Lightweight, minimal boilerplate |
-| **React Router** | 6.x | Routing | Standard SPA routing |
+| **TanStack Router** | 1.x | Routing | Type-safe routing with search param management and built-in prefetching |
+| **Axios** | 1.x | HTTP client | API requests, interceptors for auth & error handling |
 | **shadcn/ui** | latest | UI components | Unstyled base components, full control over design |
 | **Tailwind CSS** | 3.x | Styling | Utility-first, fast iteration |
 | **@xyflow/react** (React Flow) | 12.x | Workflow canvas | Best-in-class drag & drop node-based diagram editor |
