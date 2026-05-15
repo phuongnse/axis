@@ -64,8 +64,8 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 *Out of scope*
 - Replaying or simulating an execution from any point with a different context — not in MVP.
 
-> **Implementation status** — Domain: ⚠️ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: `ExecutionStep` aggregate not yet implemented (required for per-step timeline data); `GetExecutionQuery` (by ID, with step detail) not yet implemented; step timeline UI, context snapshot display, and parallel group rendering pending Frontend + API.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `GetExecutionQuery` (by ID, with step detail) not yet implemented; step timeline UI, context snapshot display, and parallel group rendering pending Frontend + API.
 
 ---
 

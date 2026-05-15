@@ -37,17 +37,17 @@
 
 ## FormBuilder — E05-form-builder
 
-**Domain ⚠️ | Application ⚠️ | Infrastructure ✅ | API ⏳ | Frontend ⏳**
+**Domain ✅ | Application ⚠️ | Infrastructure ✅ | API ⏳ | Frontend ⏳**
 
-- **Domain (partial)**: FormDefinition, FormField aggregates; all field types and domain events implemented. Missing: FormSubmission aggregate (required for F04 form task lifecycle).
+- **Domain**: FormDefinition, FormField aggregates; all field types and domain events. FormSubmission aggregate (Pending/Submitted/Expired/Cancelled state machine; AccessToken Guid; FormTaskCreated/Submitted/Expired/Cancelled events).
 - **Application (partial)**: CreateForm, DeleteForm commands. Missing: UpdateForm command; GetForms, GetFormById queries; field management commands (AddField, RemoveField, ReorderFields).
 - **Infrastructure**: FormBuilderDbContext, EF Core config (FormDefinition with fields as JSONB via FormFieldConverter — 9 field types, polymorphic FormFieldConfig), FormRepository (IsReferencedByWorkflowAsync cross-module JSONB query), 8 integration tests (Testcontainers)
 
 ## WorkflowEngine — E06-workflow-engine
 
-**Domain ⚠️ | Application ⚠️ | Infrastructure ✅ | API ⏳ | Frontend ⏳**
+**Domain ✅ | Application ⚠️ | Infrastructure ✅ | API ⏳ | Frontend ⏳**
 
-- **Domain (partial)**: WorkflowExecution aggregate with execution state machine and domain events. Missing: ExecutionStep aggregate (required for per-step status, timing, and output tracking as specified in US-093/098).
+- **Domain**: WorkflowExecution aggregate with execution state machine and domain events. ExecutionStep aggregate (Pending/Running/Waiting/Completed/Failed/Skipped/Cancelled state machine; InputSnapshot/OutputSnapshot; ExecutionStepCompleted/Failed events; IsTerminal for idempotency; StepType enum).
 - **Application (partial)**: StartExecution, CancelExecution, RetryExecution commands. Missing: GetExecution, GetExecutionsByWorkflow, GetAllExecutions queries; RetryExecutionWithContext command.
 - **Infrastructure**: WorkflowEngineDbContext, EF Core config (WorkflowExecution with `_context` as JSONB), ExecutionRepository (4 methods: AddAsync, GetByIdAsync, GetAllAsync, GetByWorkflowAsync), WorkflowDefinitionReader (cross-module raw SQL query on `workflow_definitions.status`), WorkflowEngineUnitOfWork, 8 integration tests (Testcontainers)
 

@@ -90,5 +90,6 @@ Each step type has a dedicated handler that executes it in isolation. Handlers r
 *Out of scope*
 - Custom step types defined by users — not in MVP.
 
-> **Implementation status** — Domain: ⚠️ | Application: ⚠️ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: `ExecutionStep` aggregate not yet implemented in domain (required for per-step status, start/end times, and output tracking); no Wolverine step handler message handlers; engine-level 5-minute timeout and idempotency check on re-delivery pending engine implementation layer.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: No Wolverine step handler message handlers; engine-level 5-minute timeout and idempotency check on re-delivery pending Application + Infrastructure layer.
+> Decisions: `ExecutionStep.IsTerminal` covers Completed/Failed/Cancelled (idempotency check per spec). `Skipped` is a separate non-running terminal state set via `Skip(reason)` before the step starts. `StepType` is an enum (Form, HttpRequest, Condition, Script, Notification).
