@@ -30,9 +30,10 @@
 
 ## WorkflowBuilder — E04-workflow-builder
 
-**Domain ✅ | Application ⚠️ | Infrastructure ✅ | API ⏳ | Frontend ⏳**
+**Domain ✅ | Application ✅ | Infrastructure ✅ | API ⏳ | Frontend ⏳**
 
-- **Application (partial)**: CreateWorkflow, PublishWorkflow commands; GetWorkflows query. Missing: ArchiveWorkflow, UnarchiveWorkflow, DuplicateWorkflow, UpdateWorkflow commands; GetWorkflow (by ID) query; canvas operation commands (AddStep, RemoveStep, ConfigureStep, AddTransition, RemoveTransition); trigger management commands (AddTrigger, RemoveTrigger); ExportWorkflow query; ImportWorkflow, BulkExportWorkflows commands.
+- **Domain**: WorkflowDefinition aggregate with Start/End nodes, step/transition/trigger management, cycle detection (DFS), ConfigureStep method, AddTrigger duplicate-type guard, Duplicate() deep-copy. All domain events.
+- **Application**: All 15 command/query handlers — CreateWorkflow, PublishWorkflow, ArchiveWorkflow, UnarchiveWorkflow, UpdateWorkflow, DuplicateWorkflow, AddStep, RemoveStep, ConfigureStep, AddTransition, RemoveTransition, AddTrigger, RemoveTrigger, ImportWorkflow, BulkExportWorkflows; GetWorkflows (paged), GetWorkflow (by ID), ExportWorkflow (with credential scrubbing) queries.
 - **Infrastructure**: WorkflowBuilderDbContext, WorkflowDefinition config (steps/transitions/triggers as JSONB with custom WorkflowStepConverter), WorkflowRepository, 7 integration tests (Testcontainers)
 
 ## FormBuilder — E05-form-builder

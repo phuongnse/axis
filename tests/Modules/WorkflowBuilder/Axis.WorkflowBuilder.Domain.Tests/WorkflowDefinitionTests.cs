@@ -247,6 +247,76 @@ public class WorkflowDefinitionTests
         wf.Triggers.Should().ContainSingle(t => t.Type == TriggerType.Manual);
     }
 
+    // ─── ConfigureStep ────────────────────────────────────────────────────────
+
+    [Fact]
+    public void ConfigureStep_WhenStepExists_UpdatesNameAndConfig()
+    {
+        var wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
+        var step = wf.AddStep("Old Name", StepType.Form, null);
+        var config = new Dictionary<string, object?> { ["form_id"] = Guid.NewGuid() };
+
+        wf.ConfigureStep(step.Id, "New Name", config);
+
+        var updated = wf.Steps.Single(s => s.Id == step.Id);
+        updated.Name.Should().Be("New Name");
+        updated.Config.Should().BeEquivalentTo(config);
+    }
+
+    [Fact]
+    public void ConfigureStep_WhenStepNotFound_Throws()
+    {
+        var wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
+        var act = () => wf.ConfigureStep(Guid.NewGuid(), "Name", null);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*not found*");
+    }
+
+    [Theory]
+    [InlineData(StepType.Start)]
+    [InlineData(StepType.End)]
+    public void ConfigureStep_WhenReservedStep_Throws(StepType reservedType)
+    {
+        var wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
+        var reserved = wf.Steps.Single(s => s.Type == reservedType);
+
+        var act = () => wf.ConfigureStep(reserved.Id, "New Name", null);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*reserved*");
+    }
+
+    [Fact]
+    public void ConfigureStep_WhenCalled_UpdatesUpdatedAt()
+    {
+        var wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
+        var step = wf.AddStep("Step", StepType.HttpRequest, null);
+        var before = DateTimeOffset.UtcNow;
+
+        wf.ConfigureStep(step.Id, "Updated Step", null);
+
+        wf.UpdatedAt.Should().BeOnOrAfter(before);
+    }
+
+    // ─── AddTrigger (duplicate check) ─────────────────────────────────────────
+
+    [Fact]
+    public void AddTrigger_WhenSameTypeAlreadyExists_Throws()
+    {
+        var wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
+        wf.AddTrigger(TriggerType.Manual, null);
+
+        var act = () => wf.AddTrigger(TriggerType.Manual, null);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*already configured*");
+    }
+
+    [Fact]
+    public void AddTrigger_WhenDifferentTypes_AddsBoth()
+    {
+        var wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
+        wf.AddTrigger(TriggerType.Manual, null);
+        wf.AddTrigger(TriggerType.Webhook, null);
+
+        wf.Triggers.Should().HaveCount(2);
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
     private static WorkflowDefinition CreatePublishableWorkflow()

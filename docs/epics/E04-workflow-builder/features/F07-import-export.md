@@ -32,8 +32,9 @@ Workflow definitions can be exported as portable JSON files and imported into an
 - Exporting execution history — definitions only.
 - Exporting to formats other than JSON (YAML, BPMN) — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: `ExportWorkflowQuery` handler not yet implemented; REDACTED credential scrubbing and file download endpoint pending API layer.
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: file download endpoint and export notice pending API layer; broken-reference `"broken": true` flag pending E03/E05 integration.
+> Decisions: credential scrubbing in `ExportWorkflowHandler` — keys matching token/api_key/apikey/secret/password/authorization/auth_token/hmac_secret/client_secret/private_key/bearer/access_token/refresh_token replaced with `[REDACTED]` (OrdinalIgnoreCase).
 
 ---
 
@@ -63,8 +64,8 @@ Workflow definitions can be exported as portable JSON files and imported into an
 *Out of scope*
 - Automatic periodic export/backup — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: `ImportWorkflowCommand` handler not yet implemented; import preview, form/model resolution, and transactional import endpoint pending API layer.
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: import preview dialog, form/model resolution (auto-create or prompt), and file-picker UI pending API + Frontend; handler skips invalid transitions/triggers rather than stopping, which is a deviation from "import is transactional" — full transactional rollback pending API layer wrapper.
 
 ---
 
@@ -88,5 +89,5 @@ Workflow definitions can be exported as portable JSON files and imported into an
 *Out of scope*
 - Scheduled automatic backups — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: `BulkExportWorkflowsCommand` handler not yet implemented; async ZIP generation and in-app notification for large exports pending E06/notification infrastructure.
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: ZIP packaging, file download, and async notification for large exports (> 20 workflows) pending API layer; `BulkExportWorkflowsHandler` returns the list of export DTOs — ZIP assembly is an API concern.

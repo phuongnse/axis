@@ -17,6 +17,45 @@ public class ExecutionStepTests
     private static IReadOnlyDictionary<string, object?> SomeContext() =>
         new Dictionary<string, object?> { ["key"] = "value" };
 
+    // ─── Create guards ────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Create_WhenExecutionIdIsEmpty_Throws()
+    {
+        Action act = () => ExecutionStep.Create(Guid.Empty, OrgId, StepDefinitionId, "Name", StepType.Form, 0);
+        act.Should().Throw<ArgumentException>().WithParameterName("executionId");
+    }
+
+    [Fact]
+    public void Create_WhenOrganizationIdIsEmpty_Throws()
+    {
+        Action act = () => ExecutionStep.Create(ExecutionId, Guid.Empty, StepDefinitionId, "Name", StepType.Form, 0);
+        act.Should().Throw<ArgumentException>().WithParameterName("organizationId");
+    }
+
+    [Fact]
+    public void Create_WhenStepDefinitionIdIsEmpty_Throws()
+    {
+        Action act = () => ExecutionStep.Create(ExecutionId, OrgId, Guid.Empty, "Name", StepType.Form, 0);
+        act.Should().Throw<ArgumentException>().WithParameterName("stepDefinitionId");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Create_WhenNameIsBlank_Throws(string name)
+    {
+        Action act = () => ExecutionStep.Create(ExecutionId, OrgId, StepDefinitionId, name, StepType.Form, 0);
+        act.Should().Throw<ArgumentException>().WithParameterName("name");
+    }
+
+    [Fact]
+    public void Create_WhenDisplayOrderIsNegative_Throws()
+    {
+        Action act = () => ExecutionStep.Create(ExecutionId, OrgId, StepDefinitionId, "Name", StepType.Form, -1);
+        act.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("displayOrder");
+    }
+
     // ─── Create ───────────────────────────────────────────────────────────────
 
     [Fact]
@@ -218,6 +257,7 @@ public class ExecutionStepTests
         step.Cancel();
 
         step.Status.Should().Be(StepExecutionStatus.Cancelled);
+        step.CompletedAt.Should().NotBeNull();
     }
 
     [Theory]
