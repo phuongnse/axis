@@ -36,7 +36,7 @@ logs/
 
 # IDE
 .idea/
-.vscode/
+.vscode/*
 !.vscode/extensions.json
 
 # OS

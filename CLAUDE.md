@@ -134,6 +134,7 @@ Every time code changes, the relevant docs change too — in the **same PR, not 
 - **Test runner**: Vitest + `@testing-library/react`. Run with `npm run test` (or `npx vitest`) inside `frontend/`.
 - **Test structure**: `describe('ComponentOrHookName', () => { it('should ...', ...) })`. Use `describe` to group by subject, `it` sentences describe the expected behavior.
 - **Test location**: test files live in `frontend/tests/` for integration-style tests and alongside source files (`*.test.ts(x)`) for unit tests.
+- **Test file naming**: use `kebab-case.test.ts(x)` mirroring the source file name (e.g. `api.test.ts`, `button.test.tsx`, `vite-config.test.ts`). Never use camelCase or PascalCase for test files. Avoid names that match vitest's built-in exclude glob (`**/vite.config.*`, `**/vitest.config.*`, etc.) — use hyphens instead of dots to bypass (e.g. `vite-config.test.ts`, not `vite.config.test.ts`).
 - **Before every push**: run `npm run ci` (type check + Biome) AND `npm run test`. Both must pass.
 - **Test behavior, not implementation**: assert what users see and can interact with — not internal state, not component structure. If a refactor breaks a test without changing visible behavior, the test was wrong.
 - **Use `@testing-library/user-event` for interactions** — not `fireEvent`. `userEvent` simulates real browser event sequences (focus, input, click) more accurately.
@@ -214,7 +215,7 @@ Every time code changes, the relevant docs change too — in the **same PR, not 
 
 #### Feature folder anatomy
 Every feature lives under `frontend/src/features/{feature-name}/` with a fixed internal structure:
-```
+```text
 features/{feature-name}/
 ├── components/     # React components belonging to this feature
 ├── hooks/          # custom hooks (useXxx.ts)
@@ -382,7 +383,7 @@ For any **new** module: Domain → Application (no Docker needed) → Infrastruc
 
 ## Solution Structure
 
-```
+```text
 frontend/                              # React 18 + TypeScript + Vite SPA
 ├── src/
 │   ├── features/{feature-name}/       # feature-based: components, hooks, types co-located

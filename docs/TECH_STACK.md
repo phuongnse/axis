@@ -30,7 +30,8 @@
 |---|---|---|---|
 | **React** | 18.x | UI framework | Richest ecosystem for complex builder UIs |
 | **TypeScript** | 6.x | Type safety | Catches errors early, essential for a large codebase. `strict: true` + `noUnusedLocals/Parameters` enforced. |
-| **Vite** | 5.x | Build tool | Fast dev server and build |
+| **Vite** | 6.x | Build tool | Fast dev server and build |
+| **@vitejs/plugin-react** | 5.x | React Vite plugin | Babel-based React transform; v5 supports vite 4–7 |
 | **TanStack Query** | 5.x | Server state / data fetching | Caching, background refetch, request deduplication |
 | **TanStack Router** | 1.x | Routing | Type-safe routing with search param management and built-in prefetching |
 | **Zustand** | 5.x | Client state management | Lightweight, minimal boilerplate |
@@ -42,7 +43,7 @@
 | **Zod** | 3.x | Schema validation | Runtime validation; source of truth for form types via `z.infer`. ⏳ Not yet installed — add when forms are first implemented. |
 | **react-hook-form** | 7.x | Form state management | Performant form handling; always paired with Zod via `zodResolver`. ⏳ Not yet installed — add alongside Zod. |
 | **Biome** | 2.x | Linter + formatter | Replaces ESLint + Prettier. Single tool for linting, formatting, and import sorting. See ADR-008. |
-| **Vitest** | 4.x | Frontend test runner | Fast Vite-native test runner; replaces Jest for browser-environment tests |
+| **Vitest** | 3.x | Frontend test runner | Fast Vite-native test runner; v3 deduplicates cleanly with vite 6 (v4 installs a nested vite 8, breaking `npm ci`). |
 | **@testing-library/react** | 16.x | Component testing | Behaviour-driven component tests; always paired with Vitest |
 
 ---

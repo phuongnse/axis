@@ -1288,7 +1288,7 @@ git push                              # push clean main
 
 Every feature lives under `frontend/src/features/{feature-name}/`:
 
-```
+```text
 features/workflows/
 ├── components/        # React components owned by this feature
 │   ├── WorkflowList.tsx
