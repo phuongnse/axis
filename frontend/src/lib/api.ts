@@ -1,33 +1,62 @@
-import axios from 'axios';
+export class ApiError extends Error {
+  status: number;
+  data: any;
 
-// Create a configured axios instance
-export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
-  withCredentials: true, // Necessary for HttpOnly cookies (refresh token)
-  headers: {
+  constructor(
+    status: number,
+    data: any,
+    message?: string
+  ) {
+    super(message || `API Error: ${status}`);
+    this.status = status;
+    this.data = data;
+    this.name = 'ApiError';
+  }
+}
+
+const BASE_URL = import.meta.env.VITE_API_URL || '/api';
+
+export async function fetchApi<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const url = `${BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+
+  const defaultHeaders: HeadersInit = {
     'Content-Type': 'application/json',
-  },
-});
+    'Accept': 'application/json',
+  };
 
-// Add a request interceptor to attach correlation IDs or other headers if needed
-api.interceptors.request.use((config) => {
-  // If we had a Zustand store for the access token, we could inject it here.
-  // E.g., const token = useAuthStore.getState().accessToken;
-  // if (token) config.headers.Authorization = `Bearer ${token}`;
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      ...defaultHeaders,
+      ...options.headers,
+    },
+    // Ensure credentials (cookies) are always sent
+    credentials: options.credentials || 'include',
+  });
 
-  return config;
-});
-
-// Add a response interceptor for global error handling
-api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    // Check if error is 401 Unauthorized
-    if (error.response?.status === 401) {
-      // Logic to refresh token or redirect to login could go here
-      // For now, we rely on TanStack Router loader to redirect on 401
+  if (!response.ok) {
+    let errorData;
+    try {
+      errorData = await response.json();
+    } catch {
+      errorData = { message: response.statusText };
     }
 
-    return Promise.reject(error);
+    if (response.status === 401) {
+      // Handled globally (e.g. redirect to login)
+      // Usually intercepted at the Router loader level
+    }
+
+    throw new ApiError(response.status, errorData);
   }
-);
+
+  // Handle empty responses (like 204 No Content)
+  if (response.status === 204) {
+    return null as any;
+  }
+
+  return response.json();
+}
