@@ -57,6 +57,49 @@ public class ExportWorkflowHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WhenConfigHasVariantSensitiveKey_RedactsPatternMatch()
+    {
+        WorkflowDefinition wf = WorkflowDefinition.Create("API Workflow", null, OrgId, "user");
+        wf.AddStep("HTTP Call", StepType.HttpRequest,
+            new Dictionary<string, object?>
+            {
+                ["bearer_token"] = "abc",
+                ["my_api_key"] = "sk-xyz",
+                ["webhook_secret"] = "hmac",
+                ["url"] = "https://example.com"
+            });
+        _repo.GetByIdAsync(wf.Id, OrgId, Arg.Any<CancellationToken>()).Returns(wf);
+
+        WorkflowExportDto? dto = await _handler.Handle(new ExportWorkflowQuery(wf.Id, OrgId), CancellationToken.None);
+
+        StepExportDto step = dto!.Steps.Single(s => s.Name == "HTTP Call");
+        step.Config!["bearer_token"].Should().Be("[REDACTED]");
+        step.Config["my_api_key"].Should().Be("[REDACTED]");
+        step.Config["webhook_secret"].Should().Be("[REDACTED]");
+        step.Config["url"].Should().Be("https://example.com");
+    }
+
+    [Fact]
+    public async Task Handle_WhenConfigHasNestedDictionary_RecursivelyScrubs()
+    {
+        WorkflowDefinition wf = WorkflowDefinition.Create("API Workflow", null, OrgId, "user");
+        wf.AddStep("HTTP Call", StepType.HttpRequest,
+            new Dictionary<string, object?>
+            {
+                ["headers"] = new Dictionary<string, object?> { ["Authorization"] = "Bearer abc", ["Content-Type"] = "application/json" },
+                ["url"] = "https://example.com"
+            });
+        _repo.GetByIdAsync(wf.Id, OrgId, Arg.Any<CancellationToken>()).Returns(wf);
+
+        WorkflowExportDto? dto = await _handler.Handle(new ExportWorkflowQuery(wf.Id, OrgId), CancellationToken.None);
+
+        StepExportDto step = dto!.Steps.Single(s => s.Name == "HTTP Call");
+        IReadOnlyDictionary<string, object?> headers = (IReadOnlyDictionary<string, object?>)step.Config!["headers"]!;
+        headers["Authorization"].Should().Be("[REDACTED]");
+        headers["Content-Type"].Should().Be("application/json");
+    }
+
+    [Fact]
     public async Task Handle_WhenWorkflowNotFound_ReturnsNull()
     {
         _repo.GetByIdAsync(Arg.Any<Guid>(), OrgId, Arg.Any<CancellationToken>()).Returns((WorkflowDefinition?)null);

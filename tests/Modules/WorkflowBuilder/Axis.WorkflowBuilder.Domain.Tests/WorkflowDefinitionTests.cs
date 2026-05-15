@@ -271,6 +271,18 @@ public class WorkflowDefinitionTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*not found*");
     }
 
+    [Theory]
+    [InlineData(StepType.Start)]
+    [InlineData(StepType.End)]
+    public void ConfigureStep_WhenReservedStep_Throws(StepType reservedType)
+    {
+        var wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
+        var reserved = wf.Steps.Single(s => s.Type == reservedType);
+
+        var act = () => wf.ConfigureStep(reserved.Id, "New Name", null);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*reserved*");
+    }
+
     [Fact]
     public void ConfigureStep_WhenCalled_UpdatesUpdatedAt()
     {

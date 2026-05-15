@@ -118,6 +118,9 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
         WorkflowStep step = _steps.SingleOrDefault(s => s.Id == stepId)
             ?? throw new InvalidOperationException("Step not found.");
 
+        if (step.Type is StepType.Start or StepType.End)
+            throw new InvalidOperationException($"Cannot configure a reserved {step.Type} step.");
+
         step.UpdateConfig(name, config);
         UpdatedAt = DateTimeOffset.UtcNow;
     }

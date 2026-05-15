@@ -54,6 +54,12 @@ public sealed class ExecutionStep : AggregateRoot<Guid>
         StepType stepType,
         int displayOrder)
     {
+        if (executionId == Guid.Empty) throw new ArgumentException("ExecutionId must not be empty.", nameof(executionId));
+        if (organizationId == Guid.Empty) throw new ArgumentException("OrganizationId must not be empty.", nameof(organizationId));
+        if (stepDefinitionId == Guid.Empty) throw new ArgumentException("StepDefinitionId must not be empty.", nameof(stepDefinitionId));
+        if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Name must not be blank.", nameof(name));
+        if (displayOrder < 0) throw new ArgumentOutOfRangeException(nameof(displayOrder), "DisplayOrder must be non-negative.");
+
         return new ExecutionStep(
             Guid.NewGuid(),
             executionId,
@@ -120,5 +126,6 @@ public sealed class ExecutionStep : AggregateRoot<Guid>
             throw new InvalidOperationException($"Cannot cancel a step that is already in a terminal state. Current status: {Status}.");
 
         Status = StepExecutionStatus.Cancelled;
+        CompletedAt = DateTimeOffset.UtcNow;
     }
 }
