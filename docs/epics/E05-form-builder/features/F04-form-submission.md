@@ -35,8 +35,9 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 - Push notifications (mobile) — not in MVP.
 - Escalation notifications if the form is not submitted after X hours — not in MVP (timeout causes failure, not escalation).
 
-> **Implementation status** — Domain: ⚠️ | Application: ⚠️ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: `FormSubmission` aggregate not yet implemented in domain; no Application handlers for form task management; email notification dispatch and in-app notification pending E06 + notification infrastructure; role member resolution pending Identity integration.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: No Application handlers for form task management; email notification dispatch and in-app notification pending E06 + notification infrastructure; role member resolution pending Identity integration.
+> Decisions: `FormSubmission.AccessToken` is a `Guid` (unique URL lookup key, not JWT); expiry is enforced via `ExpiresAt` field + `Expire()` domain method. Non-idempotent domain transition — `Expire()` throws if status is not Pending; idempotency is handled at the job/application level (caller checks status before invoking).
 
 ---
 
@@ -68,8 +69,8 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 - Saving a draft of the form and resuming later — not in MVP.
 - The assignee being able to add comments or annotations to the form submission — not in MVP.
 
-> **Implementation status** — Domain: ⚠️ | Application: ⚠️ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: `FormSubmission` aggregate not yet implemented; no `SubmitFormCommand` handler; standalone form page (no login required), pre-signed URL file upload, and multi-tab deduplication pending Frontend + API.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: No `SubmitFormCommand` handler; standalone form page (no login required), pre-signed URL file upload, and multi-tab deduplication pending Frontend + API.
 
 ---
 
@@ -97,8 +98,8 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 - Delegating a task to another user — not in MVP.
 - Bulk task completion — not in MVP.
 
-> **Implementation status** — Domain: ⚠️ | Application: ⚠️ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: `FormSubmission` aggregate not yet implemented; no `GetMyFormTasksQuery` handler; "My Tasks" page, role-assigned task aggregation, and SignalR push updates pending Frontend + API + E06.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: No `GetMyFormTasksQuery` handler; "My Tasks" page, role-assigned task aggregation, and SignalR push updates pending Frontend + API + E06.
 
 ---
 
@@ -125,5 +126,5 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 *Out of scope*
 - Sending a reminder notification before timeout expires — not in MVP.
 
-> **Implementation status** — Domain: ⚠️ | Application: ⚠️ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: `FormSubmission` aggregate (with expiry state) not yet implemented; Wolverine scheduled expiry job, task expiry marking, and workflow failure flow pending E06.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: Wolverine scheduled expiry job, task expiry marking, and workflow failure flow pending Application + Infrastructure.
