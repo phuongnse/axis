@@ -7,5 +7,6 @@ public enum StepExecutionStatus
     Completed,
     Failed,
     Skipped,
-    Waiting   // For Form steps waiting for submission
+    Waiting,
+    Cancelled
 }
