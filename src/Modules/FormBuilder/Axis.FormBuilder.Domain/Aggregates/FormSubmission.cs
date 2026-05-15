@@ -58,6 +58,12 @@ public sealed class FormSubmission : AggregateRoot<Guid>
         DateTimeOffset? expiresAt,
         string createdBy)
     {
+        if (formDefinitionId == Guid.Empty) throw new ArgumentException("FormDefinitionId must not be empty.", nameof(formDefinitionId));
+        if (organizationId == Guid.Empty) throw new ArgumentException("OrganizationId must not be empty.", nameof(organizationId));
+        if (executionId == Guid.Empty) throw new ArgumentException("ExecutionId must not be empty.", nameof(executionId));
+        if (executionStepId == Guid.Empty) throw new ArgumentException("ExecutionStepId must not be empty.", nameof(executionStepId));
+        if (string.IsNullOrWhiteSpace(createdBy)) throw new ArgumentException("CreatedBy must not be blank.", nameof(createdBy));
+
         FormSubmission submission = new(
             Guid.NewGuid(),
             formDefinitionId,
@@ -87,9 +93,11 @@ public sealed class FormSubmission : AggregateRoot<Guid>
         if (Status != FormSubmissionStatus.Pending)
             throw new InvalidOperationException($"Cannot submit a form task that is already {Status}.");
 
+        Dictionary<string, object?> snapshot = new(data);
+
         Status = FormSubmissionStatus.Submitted;
         SubmittedByUserId = submittedByUserId;
-        SubmittedData = data;
+        SubmittedData = snapshot;
         SubmittedAt = DateTimeOffset.UtcNow;
 
         RaiseDomainEvent(new FormTaskSubmitted(
@@ -98,7 +106,7 @@ public sealed class FormSubmission : AggregateRoot<Guid>
             OrganizationId,
             ExecutionId,
             ExecutionStepId,
-            data));
+            snapshot));
     }
 
     public void Expire()

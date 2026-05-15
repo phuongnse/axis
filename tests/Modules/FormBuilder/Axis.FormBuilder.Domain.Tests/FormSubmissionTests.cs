@@ -240,7 +240,62 @@ public class FormSubmissionTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*Pending*");
     }
 
-    // ─── Idempotency — Expire job fires twice (US-089 edge case) ─────────────
+    // ─── Create guards ────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Create_WhenFormDefinitionIdIsEmpty_Throws()
+    {
+        Action act = () => FormSubmission.Create(Guid.Empty, OrgId, ExecutionId, ExecutionStepId, null, null, null, CreatedBy);
+        act.Should().Throw<ArgumentException>().WithParameterName("formDefinitionId");
+    }
+
+    [Fact]
+    public void Create_WhenOrganizationIdIsEmpty_Throws()
+    {
+        Action act = () => FormSubmission.Create(FormDefinitionId, Guid.Empty, ExecutionId, ExecutionStepId, null, null, null, CreatedBy);
+        act.Should().Throw<ArgumentException>().WithParameterName("organizationId");
+    }
+
+    [Fact]
+    public void Create_WhenExecutionIdIsEmpty_Throws()
+    {
+        Action act = () => FormSubmission.Create(FormDefinitionId, OrgId, Guid.Empty, ExecutionStepId, null, null, null, CreatedBy);
+        act.Should().Throw<ArgumentException>().WithParameterName("executionId");
+    }
+
+    [Fact]
+    public void Create_WhenExecutionStepIdIsEmpty_Throws()
+    {
+        Action act = () => FormSubmission.Create(FormDefinitionId, OrgId, ExecutionId, Guid.Empty, null, null, null, CreatedBy);
+        act.Should().Throw<ArgumentException>().WithParameterName("executionStepId");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Create_WhenCreatedByIsBlank_Throws(string createdBy)
+    {
+        Action act = () => FormSubmission.Create(FormDefinitionId, OrgId, ExecutionId, ExecutionStepId, null, null, null, createdBy);
+        act.Should().Throw<ArgumentException>().WithParameterName("createdBy");
+    }
+
+    // ─── Submit — defensive copy ──────────────────────────────────────────────
+
+    [Fact]
+    public void Submit_WhenCallerMutatesSourceDictionary_SubmittedDataIsUnaffected()
+    {
+        var submission = CreatePending();
+        Dictionary<string, object?> mutableData = new() { ["field"] = "original" };
+        submission.Submit(Guid.NewGuid(), mutableData);
+
+        mutableData["field"] = "mutated";
+
+        submission.SubmittedData["field"].Should().Be("original");
+        FormTaskSubmitted evt = submission.DomainEvents.OfType<FormTaskSubmitted>().Single();
+        evt.SubmittedData["field"].Should().Be("original");
+    }
+
+    // ─── Expire — non-idempotent domain guard (idempotency at job level) ──────
 
     [Fact]
     public void Expire_WhenAlreadyExpired_Throws()
