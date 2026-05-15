@@ -129,5 +129,5 @@ Organization admins can invite new members, manage their accounts, and deactivat
 - Public profile visibility — all profiles are private within the org in MVP.
 
 > **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: avatar upload (S3) not wired — `UpdateUserProfileHandler` updates name only; avatar URL stored as nullable string, upload flow pending API layer. Email change flow (F05) not started.
-> Decisions: name update is a direct property mutation on `User` aggregate with a `UserProfileUpdatedEvent`.
+> Gaps vs spec: email change flow (F05) not started.
+> Decisions: name update is a direct property mutation on `User` aggregate with a `UserProfileUpdatedEvent`. Avatar upload fully wired in `UpdateUserProfileHandler` — validates type (PNG/JPG only) and size (max 1 MB), uploads to S3, deletes old file on replacement.

@@ -35,8 +35,8 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 *Out of scope*
 - Copy-paste of steps — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: canvas drag-drop UI and 1-second debounce auto-save pending Frontend + API layers.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `AddStepCommand` and `RemoveStepCommand` handlers not yet implemented (domain `AddStep()`/`RemoveStep()` methods exist); canvas drag-drop UI and 1-second debounce auto-save pending Frontend + API layers.
 
 ---
 
@@ -63,8 +63,8 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 *Out of scope*
 - Animated transitions showing flow direction — not in MVP (static arrows only).
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: canvas edge drawing and cycle-block toast pending Frontend; AddTransition cycle detection implemented in domain.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `AddTransitionCommand` and `RemoveTransitionCommand` handlers not yet implemented (domain `AddTransition()`/`RemoveTransition()` methods exist); canvas edge drawing and cycle-block toast pending Frontend; AddTransition cycle detection implemented in domain.
 
 ---
 
@@ -91,8 +91,8 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 *Out of scope*
 - Full-screen step config modal — the panel-based UI is the only config surface in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: slide-over panel, inline error indicators, and auto-save pending Frontend + API layers; step config stored as JSONB dict in `steps` column.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `ConfigureStepCommand` handler not yet implemented (step config update via domain `WorkflowStep` entity exists); slide-over panel, inline error indicators, and auto-save pending Frontend + API layers; step config stored as JSONB dict in `steps` column.
 
 ---
 

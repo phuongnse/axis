@@ -78,8 +78,8 @@ Workflow reaches Form step
 
 | Layer | Status | Notes |
 |---|---|---|
-| Domain | ✅ Done | `FormDefinition`, `FormField`, `FormSubmission` aggregates; all field types and domain events |
-| Application | ✅ Done | All command/query handlers; repository interfaces |
+| Domain | ⚠️ Partial | `FormDefinition`, `FormField` aggregates; all field types and domain events. Missing: `FormSubmission` aggregate (required for F04 form task lifecycle — submission, expiry, deduplication) |
+| Application | ⚠️ Partial | `CreateFormCommand`, `DeleteFormCommand`. Missing: `UpdateFormCommand`; `GetFormsQuery`, `GetFormByIdQuery`; field management commands (`AddFieldToFormCommand`, `UpdateFieldValidationCommand`, `ReorderFormFieldsCommand`) |
 | Infrastructure | ✅ Done | FormBuilderDbContext, EF Core config (FormDefinition with fields as JSONB via FormFieldConverter), FormRepository (including cross-module IsReferencedByWorkflowAsync JSONB query), 8 integration tests (Testcontainers) |
 | API | ⏳ Pending | — |
 | Frontend | ⏳ Pending | — |

@@ -981,26 +981,46 @@ public static IResult ToProblemDetails(this Error error) => error.Code switch
 
 ## OpenAPI / Scalar setup
 
-Add to `Directory.Packages.props`:
+Packages already in `Directory.Packages.props`:
 
 ```xml
-<ItemGroup Label="API">
-  <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="8.0.11" />
-  <PackageVersion Include="Scalar.AspNetCore" Version="2.6.0" />
-</ItemGroup>
+<PackageVersion Include="Swashbuckle.AspNetCore" Version="6.9.0" />
+<PackageVersion Include="Scalar.AspNetCore" Version="2.6.0" />
 ```
 
 Wire up in `Program.cs`:
 
 ```csharp
-builder.Services.AddOpenApi();
+// Registration
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(opts =>
+{
+    opts.SwaggerDoc("v1", new OpenApiInfo { Title = "Axis API", Version = "v1" });
+    opts.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+    });
+    opts.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" },
+            },
+            []
+        },
+    });
+});
 
 // After app.Build():
 if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
 {
-    app.MapOpenApi();
+    app.UseSwagger();
     app.MapScalarApiReference(options =>
     {
+        options.WithOpenApiRoutePattern("/swagger/v1/swagger.json");
         options.Title = "Axis API";
         options.Theme = ScalarTheme.Moon;
     });

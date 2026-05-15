@@ -19,6 +19,8 @@
 | **SignalR** | (built-in) | Real-time updates | Workflow execution status pushed to client |
 | **FluentValidation** | 11.x | Input validation | Declarative, testable validation |
 | **Serilog** | 3.x | Structured logging | JSON logs, easy to ship to any log aggregator |
+| **Swashbuckle.AspNetCore** | 6.9.0 | OpenAPI metadata | `AddSwaggerGen` + `UseSwagger` generates the Swagger JSON document; wired with Bearer auth definition |
+| **Scalar.AspNetCore** | 2.x | API reference UI | Modern OpenAPI UI; reads `/swagger/v1/swagger.json`. Enabled in Development and Staging only. |
 
 ---
 
@@ -38,8 +40,6 @@
 | **dnd-kit** | 6.x | Page builder drag & drop | Flexible, accessible DnD for UI builder |
 | **Zod** | 3.x | Schema validation | Runtime validation for API responses and forms; source of truth for form types |
 | **react-hook-form** | 7.x | Form state management | Performant form handling; always paired with Zod via `zodResolver` |
-| **Microsoft.AspNetCore.OpenApi** | 9.x | OpenAPI metadata | Collects endpoint metadata for OpenAPI document generation |
-| **Scalar.AspNetCore** | 2.x | API reference UI | Modern OpenAPI UI; replaces Swagger UI. Enabled in Development and Staging. |
 
 ---
 

@@ -71,8 +71,8 @@ Self-service registration flow where a new organization signs up and is automati
 *Out of scope*
 - Automatic re-send after X minutes — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: rate limiting (max 3 resends/hour) pending API layer. Auto sign-in after verification click pending API layer.
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⚠️ | Frontend: ⏳
+> Gaps vs spec: rate limiting (max 3 resends/hour) on resend endpoint not implemented. Auto sign-in after verification click pending Frontend layer.
 > Decisions: verification token is simplified as `user.Id` (Guid string) — `VerifyEmailCommand(token)` parses it as Guid, looks up user by ID platform-wide, calls `User.VerifyEmail()`. Production will use a dedicated token table; this is documented as a gap. `ResendVerificationEmailCommand` silently succeeds for unknown/already-verified emails (no info leakage).
 
 ---

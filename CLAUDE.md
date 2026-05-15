@@ -20,7 +20,7 @@ Multi-tenant low-code SaaS platform for building data-driven workflow applicatio
 - **State**: Zustand
 - **Database**: PostgreSQL 16 — schema-per-tenant
 - **Cache**: Redis 7
-- **OpenAPI**: Microsoft.AspNetCore.OpenApi (metadata) + Scalar.AspNetCore (UI)
+- **OpenAPI**: Swashbuckle.AspNetCore 6.9.0 (metadata + Swagger JSON) + Scalar.AspNetCore (UI)
 - **Tests**: xUnit + FluentAssertions + NSubstitute + Testcontainers + Bogus
 
 ## Architecture
@@ -204,6 +204,11 @@ A US or layer is NOT done until all of the following are complete in the **same 
    > Decisions: [design choices affecting how an AC is interpreted — omit if none]
    ```
    AC checkboxes (`- [ ]`) in feature files are **spec structure only** — do not check them off. Completion is tracked exclusively via the callout above.
+   **Layer status rules:**
+   - A layer is marked ✅ only when **every AC** in this US that belongs to that layer is fully implemented — no exceptions.
+   - Partial implementation (even one AC unimplemented) must be marked ⚠️, not ✅.
+   - Use `⏳` for a layer not yet started, `⚠️` for a layer started but incomplete, `✅` for fully complete.
+   - When `Domain + Application` shorthand is used, it means both are ✅; if either is partial, split them: `Domain: ✅ | Application: ⚠️`.
 3. ✅ If a gap vs spec exists, document it in the callout — never silently skip.
 
 ### Completing a layer for a module
@@ -218,6 +223,26 @@ A US or layer is NOT done until all of the following are complete in the **same 
 2. ✅ If the fix changes observable behavior: update the affected US callout's Gaps or Decisions line
 3. ✅ If the fix closes a documented gap: remove that gap from the callout
 4. ✅ If the fix resolves any gap documented anywhere in `docs/`, remove that ⚠️ note in the same PR.
+
+### Keeping high-level docs current (applies to every PR)
+
+**Diagrams** (`docs/diagrams/*.puml` + `.png`) — update in the same PR when:
+- A new module is introduced or a module's public boundary changes (domain events emitted, API surface added)
+- A cross-module flow changes (e.g., how modules communicate via Wolverine events)
+- After editing any `.puml` file, run `docs/scripts/generate-diagrams.ps1` to regenerate the `.png`
+
+**`CLAUDE.md`** — update in the same PR when:
+- A library is added, removed, or version-pinned differently (update Tech Stack section)
+- A new architectural rule or layer-order decision is established
+- A cross-cutting pattern is standardized (new multi-tenancy behavior, new error-handling convention, etc.)
+
+**`docs/TECH_STACK.md`** — update in the same PR when:
+- A library is approved for use or explicitly rejected (add an ADR entry explaining why)
+- A library version changes intentionally
+
+**`docs/PATTERNS.md`** — update in the same PR when:
+- A new implementation pattern is established that future PRs should follow
+- A new pitfall or "gotcha" is discovered and solved (so others don't repeat it)
 
 ---
 

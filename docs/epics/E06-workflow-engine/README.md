@@ -84,8 +84,8 @@ Subsequent steps can reference context values using expressions like `{{context.
 
 | Layer | Status | Notes |
 |---|---|---|
-| Domain | ✅ Done | `WorkflowExecution`, `ExecutionStep` aggregates; all execution states and domain events |
-| Application | ✅ Done | All command/query handlers; repository interfaces |
+| Domain | ⚠️ Partial | `WorkflowExecution` aggregate with execution state machine and domain events. Missing: `ExecutionStep` aggregate (required for per-step status tracking, start/end times, step-level output — see US-093/098) |
+| Application | ⚠️ Partial | StartExecution, CancelExecution, RetryExecution commands. Missing: GetExecution, GetExecutionsByWorkflow, GetAllExecutions queries; RetryExecutionWithContext command |
 | Infrastructure | ✅ Done | `WorkflowEngineDbContext`, `ExecutionRepository`, `WorkflowDefinitionReader` (cross-module), `WorkflowEngineUnitOfWork`; `_context` as JSONB; 8 integration tests (Testcontainers) |
 | API | ⏳ Pending | — |
 | Frontend | ⏳ Pending | — |

@@ -75,7 +75,7 @@ The workflow builder is the heart of the platform. It is what differentiates Axi
 | Layer | Status | Notes |
 |---|---|---|
 | Domain | ✅ Done | `WorkflowDefinition`, `Step`, `Trigger` aggregates; all step types and domain events |
-| Application | ✅ Done | All command/query handlers; repository interfaces |
+| Application | ⚠️ Partial | CreateWorkflow, PublishWorkflow commands; GetWorkflows query. Missing: ArchiveWorkflow, UnarchiveWorkflow, DuplicateWorkflow, UpdateWorkflow; GetWorkflow (by ID); canvas operation commands (AddStep, RemoveStep, ConfigureStep, AddTransition, RemoveTransition); trigger commands (AddTrigger, RemoveTrigger); ExportWorkflow, ImportWorkflow, BulkExportWorkflows |
 | Infrastructure | ✅ Done | WorkflowBuilderDbContext, EF Core configuration (WorkflowDefinition with steps/transitions/triggers as JSONB), WorkflowRepository, 7 integration tests (Testcontainers) |
 | API | ⏳ Pending | — |
 | Frontend | ⏳ Pending | — |
