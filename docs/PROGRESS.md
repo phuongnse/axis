@@ -55,3 +55,19 @@
 ## PageBuilder — E07-page-builder
 
 **⏳ Phase 2 — not started**
+
+---
+
+## Frontend Foundation
+
+**Status: ✅ Tooling complete — feature implementation ⏳**
+
+- **Project**: `frontend/` at repo root (React 18 + TypeScript 6 + Vite 5)
+- **Routing**: TanStack Router with file-based routes in `frontend/src/routes/`
+- **HTTP client**: `fetchApi` wrapper (`frontend/src/lib/api.ts`) — timeout, `credentials: include`, `ApiError` typed with `unknown` data
+- **Build gate**: `npm run ci` = `tsc -b --noEmit && biome ci .` — zero TypeScript errors + zero Biome errors/warnings required before every push
+- **Linting + formatting**: Biome 2.x (replaces ESLint + Prettier) — `frontend/biome.json`; Tailwind directives handled via `css.parser.tailwindDirectives: true` + `overrides` suppressing `noUnknownAtRules` for CSS only
+- **TypeScript**: `strict: true` enforced in both `tsconfig.app.json` and `tsconfig.node.json`
+- **Tests**: Vitest 4.x + `@testing-library/react` — `npm run test`; 11 tests passing
+
+All module frontend layers remain **⏳** — no feature UI implemented yet.

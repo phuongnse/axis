@@ -1284,19 +1284,152 @@ git push                              # push clean main
 
 ## Frontend Patterns
 
-**Folder Structure (Feature-Sliced Design):**
-Features should be placed in `frontend/src/features/{feature-name}` with everything they need (components, hooks, types, api definitions). Shared UI goes in `frontend/src/components/ui`.
+### Feature folder anatomy
 
-**State Management:**
-1. **Server State (TanStack Query):** Always use `useQuery` and `useMutation` for any data fetched from or sent to the backend.
-2. **Client State (Zustand):** Only use Zustand for global client-side state (e.g., UI theme, sidebar toggles, drag-and-drop state, etc).
+Every feature lives under `frontend/src/features/{feature-name}/`:
 
-**Routing & Prefetching:**
-- We use **TanStack Router** for 100% type-safe routing.
-- Define routes in `frontend/src/routes`. Run `npx @tanstack/router-cli generate` to generate the route tree.
-- Use the `loader` property in your routes for **Prefetching**: Call `queryClient.ensureQueryData(...)` before rendering the component to eliminate waterfall data loading.
+```text
+features/workflows/
+├── components/        # React components owned by this feature
+│   ├── WorkflowList.tsx
+│   └── WorkflowCard.tsx
+├── hooks/             # Custom hooks — mandatory use prefix
+│   └── useWorkflows.ts
+├── api.ts             # All queryFn / mutationFn for this feature
+├── types.ts           # Shared types for this feature
+└── index.ts           # Barrel export — public API of the feature
+```
 
-**Error Handling:**
-- Wrap components in Error Boundaries for catastrophic failures.
-- For API endpoints: TanStack Query handles HTTP errors via `onError`. Catch and display user-friendly Toast notifications.
-- Forms: Use Zod to define schemas, and `react-hook-form` to handle UI validation.
+- Component files: `PascalCase.tsx`. Hook files: `camelCase.ts` with mandatory `use` prefix.
+- Cross-feature imports must go through `index.ts`, never directly into `components/` or `hooks/`.
+- Shared UI primitives: `frontend/src/components/ui/`. Utilities: `frontend/src/lib/`.
+
+### TanStack Query patterns
+
+**Query key factory** — one per feature, avoids magic strings:
+
+```ts
+// features/workflows/api.ts
+export const workflowKeys = {
+  all: ['workflows'] as const,
+  list: (filters: WorkflowFilters) => [...workflowKeys.all, 'list', filters] as const,
+  detail: (id: string) => [...workflowKeys.all, 'detail', id] as const,
+};
+```
+
+**All `queryFn` / `mutationFn` live in `api.ts`** — never inline in a component:
+
+```ts
+// features/workflows/api.ts
+export async function fetchWorkflows(filters: WorkflowFilters): Promise<PagedResult<WorkflowDto>> {
+  return fetchApi(`/api/workflows?page=${filters.page}&pageSize=${filters.pageSize}`);
+}
+
+// features/workflows/hooks/useWorkflows.ts
+export function useWorkflows(filters: WorkflowFilters) {
+  return useQuery({
+    queryKey: workflowKeys.list(filters),
+    queryFn: () => fetchWorkflows(filters),
+  });
+}
+```
+
+**Components call custom hooks only** — never call `useQuery` directly with a `queryFn` inside a component file.
+
+### TypeScript discipline
+
+- **No `as any`** — use `as unknown as T` only when a double-assertion is genuinely necessary, with a comment explaining why.
+- **Entity IDs are `string`** — backend serialises `Guid` as string. Never type an ID field as `number`.
+- **`unknown` at API boundaries** — catch blocks and raw response data use `unknown`, then narrow with `instanceof` / type guards:
+
+```ts
+// ✅
+} catch (error: unknown) {
+  if (error instanceof ApiError) { ... }
+}
+
+// ❌
+} catch (error: any) {
+  if (error.status === 401) { ... }
+}
+```
+
+- **Mock objects in tests** use `as unknown as Response`, not `as any`:
+
+```ts
+vi.mocked(fetch).mockResolvedValueOnce({
+  ok: true,
+  status: 200,
+  text: () => Promise.resolve('{"id":"abc"}'),
+} as unknown as Response);
+```
+
+### Routing patterns
+
+- All routes beyond the root are **lazy-loaded** — use TanStack Router's `lazy()`:
+
+```ts
+// routes/workflows/index.lazy.tsx — filename convention triggers lazy loading
+export const Route = createLazyFileRoute('/workflows/')({ component: WorkflowsPage });
+```
+
+- **Auth guard** lives in a root layout route `beforeLoad`, not inside individual pages:
+
+```ts
+// routes/__authenticated.tsx
+export const Route = createFileRoute('/_authenticated')({
+  beforeLoad: ({ context }) => {
+    if (!context.auth.isAuthenticated) throw redirect({ to: '/login' });
+  },
+});
+```
+
+- TanStack Router auto-generates `routeTree.gen.ts` — never edit it manually, always exclude from linting.
+
+### Frontend testing patterns
+
+**Test behaviour, not implementation:**
+
+```ts
+// ✅ Tests what the user sees
+it('should show error message when submission fails', async () => {
+  render(<CreateWorkflowForm />);
+  await userEvent.click(screen.getByRole('button', { name: /create/i }));
+  expect(await screen.findByText(/name is required/i)).toBeInTheDocument();
+});
+
+// ❌ Tests implementation detail
+it('should set isSubmitting to true', () => { ... });
+```
+
+**Use `userEvent` over `fireEvent`** — simulates real browser event sequences:
+
+```ts
+import userEvent from '@testing-library/user-event';
+const user = userEvent.setup();
+await user.type(screen.getByLabelText('Name'), 'My Workflow');
+await user.click(screen.getByRole('button', { name: /save/i }));
+```
+
+**Thrown errors in tests** — use `unknown` + `instanceof`, not `any`:
+
+```ts
+let thrownError: unknown;
+try { await fetchApi('/fail'); } catch (e) { thrownError = e; }
+
+expect(thrownError).toBeInstanceOf(ApiError);
+if (thrownError instanceof ApiError) {
+  expect(thrownError.status).toBe(400);
+}
+```
+
+### Build gate
+
+Before every push involving `frontend/` changes:
+
+```bash
+npm run ci      # tsc -b --noEmit && biome ci . — must be zero errors/warnings
+npm run test    # vitest run — all tests must pass
+```
+
+`npm run lint:fix` auto-fixes safe Biome issues. `npm run format` reformats all files.

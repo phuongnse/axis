@@ -1,9 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fetchApi, ApiError } from '../src/lib/api';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError, fetchApi } from '../src/lib/api';
 
 describe('fetchApi', () => {
-  const mockBaseUrl = 'http://localhost/api';
-
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
   });
@@ -20,7 +18,7 @@ describe('fetchApi', () => {
       status: 200,
       json: () => Promise.resolve(mockData),
       text: () => Promise.resolve(JSON.stringify(mockData)),
-    } as any);
+    } as unknown as Response);
 
     const result = await fetchApi('/test');
     expect(result).toEqual(mockData);
@@ -35,7 +33,7 @@ describe('fetchApi', () => {
       ok: true,
       status: 204,
       json: () => Promise.reject(new Error('Should not be called')),
-    } as any);
+    } as unknown as Response);
 
     const result = await fetchApi('/test-204');
     expect(result).toBeNull();
@@ -46,7 +44,7 @@ describe('fetchApi', () => {
       ok: true,
       status: 205,
       json: () => Promise.reject(new Error('Should not be called')),
-    } as any);
+    } as unknown as Response);
 
     const result = await fetchApi('/test-205');
     expect(result).toBeNull();
@@ -57,7 +55,7 @@ describe('fetchApi', () => {
       ok: true,
       status: 200,
       text: () => Promise.resolve('{"success": true}'),
-    } as any);
+    } as unknown as Response);
 
     const formData = new FormData();
     formData.append('file', 'test');
@@ -67,7 +65,7 @@ describe('fetchApi', () => {
     const fetchCallArgs = vi.mocked(fetch).mock.calls[0][1];
     expect(fetchCallArgs?.headers).toBeDefined();
     const headers = fetchCallArgs?.headers as Record<string, string>;
-    expect(headers['Content-Type']).toBeUndefined(); // It should be removed so browser can set multipart boundary
+    expect(headers['Content-Type']).toBeUndefined();
   });
 
   it('should throw ApiError on non-2xx responses', async () => {
@@ -76,24 +74,26 @@ describe('fetchApi', () => {
       status: 400,
       statusText: 'Bad Request',
       json: () => Promise.resolve({ error: 'Validation failed' }),
-    } as any);
+    } as unknown as Response);
 
-    let error: any;
+    let thrownError: unknown;
     try {
       await fetchApi('/fail');
     } catch (e) {
-      error = e;
+      thrownError = e;
     }
 
-    expect(error).toBeInstanceOf(ApiError);
-    expect(error.status).toBe(400);
-    expect(error.data).toEqual({ error: 'Validation failed' });
+    expect(thrownError).toBeInstanceOf(ApiError);
+    if (thrownError instanceof ApiError) {
+      expect(thrownError.status).toBe(400);
+      expect(thrownError.data).toEqual({ error: 'Validation failed' });
+    }
   });
 
   it('should timeout after configured time', async () => {
-    // We cannot reliably use fake timers with fetch inside Vitest
-    // Instead we can simulate the AbortError throw directly if signal is aborted
-    vi.mocked(fetch).mockImplementationOnce(async (url, init) => {
+    // Cannot reliably use fake timers with fetch inside Vitest.
+    // Simulate AbortError by listening to signal.abort event.
+    vi.mocked(fetch).mockImplementationOnce(async (_url, init) => {
       return new Promise((_, reject) => {
         if (init?.signal) {
           init.signal.addEventListener('abort', () => {
@@ -105,14 +105,16 @@ describe('fetchApi', () => {
       });
     });
 
-    let error: any;
+    let thrownError: unknown;
     try {
       await fetchApi('/timeout', { timeout: 10 });
     } catch (e) {
-      error = e;
+      thrownError = e;
     }
 
-    expect(error).toBeDefined();
-    expect(error.message).toBe('The operation was aborted');
+    expect(thrownError).toBeInstanceOf(Error);
+    if (thrownError instanceof Error) {
+      expect(thrownError.message).toBe('The operation was aborted');
+    }
   });
 });

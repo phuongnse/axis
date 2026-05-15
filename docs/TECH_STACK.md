@@ -29,18 +29,22 @@
 | Technology | Version | Role | Rationale |
 |---|---|---|---|
 | **React** | 18.x | UI framework | Richest ecosystem for complex builder UIs |
-| **TypeScript** | 5.x | Type safety | Catches errors early, essential for a large codebase |
-| **Vite** | 5.x | Build tool | Fast dev server and build |
+| **TypeScript** | 6.x | Type safety | Catches errors early, essential for a large codebase. `strict: true` + `noUnusedLocals/Parameters` enforced. |
+| **Vite** | 6.x | Build tool | Fast dev server and build |
+| **@vitejs/plugin-react** | 5.x | React Vite plugin | Babel-based React transform; v5 supports vite 4–7 |
 | **TanStack Query** | 5.x | Server state / data fetching | Caching, background refetch, request deduplication |
-| **Zustand** | 4.x | Client state management | Lightweight, minimal boilerplate |
 | **TanStack Router** | 1.x | Routing | Type-safe routing with search param management and built-in prefetching |
-| **Fetch API** | (native) | HTTP client | Native browser API for network requests; custom wrapper for error handling |
-| **shadcn/ui** | latest | UI components | Unstyled base components, full control over design |
+| **Zustand** | 5.x | Client state management | Lightweight, minimal boilerplate |
+| **Fetch API** | (native) | HTTP client | Native browser API for network requests; custom wrapper (`fetchApi`) for auth, timeout, and error normalisation |
+| **shadcn/ui + @base-ui/react** | latest | UI components | shadcn/ui for pre-built patterns; @base-ui/react for lower-level unstyled primitives |
 | **Tailwind CSS** | 3.x | Styling | Utility-first, fast iteration |
 | **@xyflow/react** (React Flow) | 12.x | Workflow canvas | Best-in-class drag & drop node-based diagram editor |
 | **dnd-kit** | 6.x | Page builder drag & drop | Flexible, accessible DnD for UI builder |
-| **Zod** | 3.x | Schema validation | Runtime validation for API responses and forms; source of truth for form types |
-| **react-hook-form** | 7.x | Form state management | Performant form handling; always paired with Zod via `zodResolver` |
+| **Zod** | 3.x | Schema validation | Runtime validation; source of truth for form types via `z.infer`. ⏳ Not yet installed — add when forms are first implemented. |
+| **react-hook-form** | 7.x | Form state management | Performant form handling; always paired with Zod via `zodResolver`. ⏳ Not yet installed — add alongside Zod. |
+| **Biome** | 2.x | Linter + formatter | Replaces ESLint + Prettier. Single tool for linting, formatting, and import sorting. See ADR-008. |
+| **Vitest** | 3.x | Frontend test runner | Fast Vite-native test runner; v3 deduplicates cleanly with vite 6 (v4 installs a nested vite 8, breaking `npm ci`). |
+| **@testing-library/react** | 16.x | Component testing | Behaviour-driven component tests; always paired with Vitest |
 
 ---
 
@@ -84,3 +88,7 @@
 ### ADR-007: Native Fetch API over Axios
 **Decision:** Use a lightweight wrapper around the native `fetch` API instead of Axios.
 **Reason:** Reduces external dependencies since `fetch` is built-in. Modern TanStack Query handles the heavy lifting (caching, deduplication, retry) making a heavy HTTP client like Axios unnecessary. The wrapper ensures proper JSON parsing, cookie inclusion, and error throwing for non-2xx responses.
+
+### ADR-008: Biome over ESLint + Prettier
+**Decision:** Use Biome as the single tool for linting, formatting, and import sorting in `frontend/`.
+**Reason:** Biome replaces ESLint + Prettier with one Rust-based tool that is significantly faster and has zero configuration conflicts between formatter and linter. The only meaningful trade-off is losing `eslint-plugin-react-refresh` (Vite HMR dev hint, not a correctness check). Tailwind `@tailwind` at-rules are handled via `css.parser.tailwindDirectives: true` and a targeted `overrides` rule suppression — not by disabling CSS checking entirely.

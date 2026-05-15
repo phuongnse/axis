@@ -11,6 +11,9 @@ out/
 *.suo
 .vs/
 *.DotSettings.user
+appsettings.Development.json
+appsettings.*.Local.json
+TestResults/
 
 # Node
 node_modules/
@@ -30,6 +33,11 @@ logs/
 *.ncrunchsolution
 *.ncrunchproject
 .ncrunch*/
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
 
 # OS
 .DS_Store

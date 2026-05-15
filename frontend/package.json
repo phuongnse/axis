@@ -1,12 +1,16 @@
 {
-  "name": "frontend",
+  "name": "axis",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    "typecheck": "tsc -b --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "ci": "tsc -b --noEmit && biome ci .",
     "preview": "vite preview",
     "test": "vitest run"
   },
@@ -22,7 +26,7 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
+    "@biomejs/biome": "^2.4.15",
     "@tanstack/react-query-devtools": "^5.100.10",
     "@tanstack/router-devtools": "^1.166.13",
     "@tanstack/router-plugin": "^1.167.35",
@@ -32,14 +36,10 @@
     "@types/node": "^24.12.4",
     "@types/react": "^18.3.28",
     "@types/react-dom": "^18.3.7",
-    "@vitejs/plugin-react": "^4.3.3",
+    "@vitejs/plugin-react": "^5.1.4",
     "autoprefixer": "^10.5.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "eslint": "^10.3.0",
-    "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.2",
-    "globals": "^17.6.0",
     "jsdom": "^29.1.1",
     "lucide-react": "^1.16.0",
     "postcss": "^8.5.14",
@@ -48,8 +48,7 @@
     "tailwindcss": "^3.4.15",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "~6.0.2",
-    "typescript-eslint": "^8.59.2",
-    "vite": "^5.4.11",
-    "vitest": "^4.1.6"
+    "vite": "^6.0.0",
+    "vitest": "^3.0.0"
   }
 }

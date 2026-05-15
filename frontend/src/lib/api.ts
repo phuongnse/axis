@@ -1,12 +1,8 @@
 export class ApiError extends Error {
   status: number;
-  data: any;
+  data: unknown;
 
-  constructor(
-    status: number,
-    data: any,
-    message?: string
-  ) {
+  constructor(status: number, data: unknown, message?: string) {
     super(message || `API Error: ${status}`);
     this.status = status;
     this.data = data;
@@ -20,14 +16,11 @@ interface FetchApiOptions extends RequestInit {
   timeout?: number;
 }
 
-export async function fetchApi<T>(
-  endpoint: string,
-  options: FetchApiOptions = {}
-): Promise<T> {
+export async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {}): Promise<T> {
   const url = `${BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
   const headers: Record<string, string> = {
-    'Accept': 'application/json',
+    Accept: 'application/json',
     ...((options.headers as Record<string, string>) || {}),
   };
 
@@ -42,8 +35,7 @@ export async function fetchApi<T>(
     delete headers['Content-Type'];
   }
 
-  // Setup timeout
-  const timeoutMs = options.timeout || 30000; // Default 30s timeout
+  const timeoutMs = options.timeout || 30000;
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -58,7 +50,7 @@ export async function fetchApi<T>(
     clearTimeout(id);
 
     if (!response.ok) {
-      let errorData;
+      let errorData: unknown;
       try {
         errorData = await response.json();
       } catch {
@@ -72,7 +64,6 @@ export async function fetchApi<T>(
       throw new ApiError(response.status, errorData);
     }
 
-    // Handle empty responses
     if (response.status === 204 || response.status === 205) {
       return null as T;
     }
@@ -84,9 +75,9 @@ export async function fetchApi<T>(
     }
 
     return JSON.parse(text);
-  } catch (error: any) {
+  } catch (error: unknown) {
     clearTimeout(id);
-    if (error.name === 'AbortError') {
+    if (error instanceof Error && error.name === 'AbortError') {
       throw new Error('The operation was aborted');
     }
     throw error;
