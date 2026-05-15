@@ -59,8 +59,9 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 *Out of scope*
 - Folders/categories for organizing forms — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: `GetFormsQuery` handler not yet implemented; "Used in N workflow(s)" count pending cross-module query (workflow step config query) or API aggregation.
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: "Used in N workflow(s)" count pending cross-module query — not supported at Application layer without inter-module dependency; deferred to API/Frontend aggregation. Pagination is in-memory (GetAllAsync + LINQ Skip/Take); DB-level pagination deferred to Infrastructure.
+> Decisions: `GetFormsHandler` loads all org forms and paginates in-memory to avoid adding a new `GetPagedAsync` repository method before Infrastructure is complete.
 
 ---
 
@@ -85,8 +86,9 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 *Out of scope*
 - Form versioning (publishing a new "version" of a form) — not in MVP; edits are live immediately.
 
-> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: `UpdateFormCommand` handler not yet implemented (domain `Update()` method exists); live-workflow warning banner and definition snapshot for in-progress tasks pending API + E06.
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: live-workflow warning banner (informational) and definition snapshot for in-progress tasks pending API + E06.
+> Decisions: `UpdateFormHandler` checks name uniqueness via `NameExistsAsync(name, orgId, excludeId)` before calling `form.Update()`; TOCTOU race requires a unique DB index on `(name, org_id)` at Infrastructure layer.
 
 ---
 

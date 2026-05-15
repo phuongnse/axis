@@ -38,10 +38,10 @@
 
 ## FormBuilder — E05-form-builder
 
-**Domain ✅ | Application ⚠️ | Infrastructure ✅ | API ⏳ | Frontend ⏳**
+**Domain ✅ | Application ✅ | Infrastructure ✅ | API ⏳ | Frontend ⏳**
 
 - **Domain**: FormDefinition, FormField aggregates; all field types and domain events. FormSubmission aggregate (Pending/Submitted/Expired/Cancelled state machine; AccessToken Guid; FormTaskCreated/Submitted/Expired/Cancelled events).
-- **Application (partial)**: CreateForm, DeleteForm commands. Missing: UpdateForm command; GetForms, GetFormById queries; field management commands (AddField, RemoveField, ReorderFields).
+- **Application**: CreateForm, DeleteForm, UpdateForm commands; GetForms, GetFormById queries; AddFieldToForm, RemoveFieldFromForm, ReorderFormFields commands. Gap: GetFormsHandler uses in-memory pagination (DB-level pagination deferred to Infrastructure).
 - **Infrastructure**: FormBuilderDbContext, EF Core config (FormDefinition with fields as JSONB via FormFieldConverter — 9 field types, polymorphic FormFieldConfig), FormRepository (IsReferencedByWorkflowAsync cross-module JSONB query), 8 integration tests (Testcontainers)
 
 ## WorkflowEngine — E06-workflow-engine
