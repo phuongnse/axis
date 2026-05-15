@@ -113,8 +113,20 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
         }
     }
 
+    public void ConfigureStep(Guid stepId, string name, IReadOnlyDictionary<string, object?>? config)
+    {
+        WorkflowStep step = _steps.SingleOrDefault(s => s.Id == stepId)
+            ?? throw new InvalidOperationException("Step not found.");
+
+        step.UpdateConfig(name, config);
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
     public void AddTrigger(TriggerType type, IReadOnlyDictionary<string, object?>? config)
     {
+        if (_triggers.Any(t => t.Type == type))
+            throw new InvalidOperationException($"A {type} trigger is already configured on this workflow.");
+
         _triggers.Add(new WorkflowTrigger(type, config));
         UpdatedAt = DateTimeOffset.UtcNow;
     }
