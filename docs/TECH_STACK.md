@@ -40,7 +40,6 @@
 | **dnd-kit** | 6.x | Page builder drag & drop | Flexible, accessible DnD for UI builder |
 | **Zod** | 3.x | Schema validation | Runtime validation for API responses and forms; source of truth for form types |
 | **react-hook-form** | 7.x | Form state management | Performant form handling; always paired with Zod via `zodResolver` |
-## Backend
 
 ---
 
