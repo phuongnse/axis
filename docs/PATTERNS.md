@@ -4,6 +4,7 @@
 
 ## Contents
 
+- [Frontend Patterns](#frontend-patterns)
 - [Key patterns](#key-patterns)
 - [Result Pattern vs. exceptions](#result-pattern-vs-exceptions----when-to-use-what)
 - [NuGet / packaging rules](#nuget--packaging-rules)
@@ -1279,3 +1280,23 @@ git reset --hard origin/main          # reset main to remote — commit stays on
 git push                              # push clean main
 # then open a PR from rescue-branch
 ```
+
+
+## Frontend Patterns
+
+**Folder Structure (Feature-Sliced Design):**
+Features should be placed in `frontend/src/features/{feature-name}` with everything they need (components, hooks, types, api definitions). Shared UI goes in `frontend/src/components/ui`.
+
+**State Management:**
+1. **Server State (TanStack Query):** Always use `useQuery` and `useMutation` for any data fetched from or sent to the backend.
+2. **Client State (Zustand):** Only use Zustand for global client-side state (e.g., UI theme, sidebar toggles, drag-and-drop state, etc).
+
+**Routing & Prefetching:**
+- We use **TanStack Router** for 100% type-safe routing.
+- Define routes in `frontend/src/routes`. Run `npx @tanstack/router-cli generate` to generate the route tree.
+- Use the `loader` property in your routes for **Prefetching**: Call `queryClient.ensureQueryData(...)` before rendering the component to eliminate waterfall data loading.
+
+**Error Handling:**
+- Wrap components in Error Boundaries for catastrophic failures.
+- For API endpoints: TanStack Query handles HTTP errors via `onError`. Catch and display user-friendly Toast notifications.
+- Forms: Use Zod to define schemas, and `react-hook-form` to handle UI validation.
