@@ -1,6 +1,5 @@
-import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import React from 'react';
+import { describe, expect, it } from 'vitest';
 import { Button } from '../src/components/ui/button';
 
 describe('Button', () => {
@@ -24,7 +23,11 @@ describe('Button', () => {
   });
 
   it('should apply outline variant correctly', () => {
-    render(<Button data-testid="btn" variant="outline">Outline</Button>);
+    render(
+      <Button data-testid="btn" variant="outline">
+        Outline
+      </Button>,
+    );
     const button = screen.getByTestId('btn');
     expect(button).toHaveClass('border-border', 'bg-background');
   });
@@ -33,7 +36,7 @@ describe('Button', () => {
     render(
       <Button data-testid="btn" disabled aria-label="test-label">
         Disabled
-      </Button>
+      </Button>,
     );
     const button = screen.getByTestId('btn');
     expect(button).toBeDisabled();

@@ -70,6 +70,38 @@ Before starting any task, read only what is relevant — not everything.
 
 ---
 
+## Non-Negotiable Gates
+
+These two rules apply to **every task, every commit, no exceptions**. They are not part of a checklist to skim — skipping either is a hard failure regardless of how complete the implementation looks.
+
+### Gate 1 — Build & tests must be green before committing
+
+Run only what the change touches, but run **all** of it:
+
+| What changed | Command(s) required | Must pass |
+|---|---|---|
+| `src/` or `tests/` only | `dotnet test unit-tests.slnf` | Zero errors, zero warnings |
+| `frontend/` only | `npm run ci` then `npm run test` | Zero errors, zero warnings |
+| Both | All of the above | Both gates, no skipping |
+
+A commit that breaks the build or leaves a failing test is **never acceptable**, even as "temporary" or "just to save progress".
+
+### Gate 2 — Docs must be updated in the same task
+
+Every time code changes, the relevant docs change too — in the **same PR, not a follow-up**:
+
+| What you did | What you must update |
+|---|---|
+| Added, removed, or changed a library | `docs/TECH_STACK.md` — version table + ADR if applicable |
+| Established a new implementation pattern | `docs/PATTERNS.md` — add the pattern with an example |
+| Completed a US layer | Feature file `> **Implementation status**` callout |
+| Completed a full layer for a module | Epic README status table + `docs/PROGRESS.md` |
+| Changed architecture, added a cross-cutting rule | `CLAUDE.md` — the relevant section |
+
+"I'll update docs later" = the docs are already out of date. Later never comes.
+
+---
+
 ## Development Rules
 
 ### Process & Workflow
@@ -83,18 +115,39 @@ Before starting any task, read only what is relevant — not everything.
 - **Diagrams**: add proactively when a flow is complex enough that text alone doesn't convey it clearly.
 - **CLAUDE.md maintenance**: update whenever architecture decisions change, new patterns are established, or layer-order rules are clarified.
 
-### Testing
-- **TDD is mandatory**: write tests first, must pass before moving to next step, no exceptions.
+### Testing (shared)
+- **TDD is mandatory**: write tests first, must pass before moving to next step, no exceptions. Applies to both .NET and frontend.
+- **Comments — WHY only in tests too**: same rule applies — no `// Arrange / Act / Assert` headers, no WHAT comments.
+- **Pre-commit verification is scope-based** — run only what the change touches, but run all of it:
+  - Changes only in `src/` or `tests/` → run `dotnet test unit-tests.slnf`. Build must succeed with zero errors and zero warnings.
+  - Changes only in `frontend/` → run `npm run ci` (tsc + Biome) AND `npm run test`. Both must pass with zero errors and zero warnings.
+  - Changes in both → run both of the above. Neither gate may be skipped.
+
+#### Testing — .NET only
 - **Test naming**: `{Subject}_{Condition}_{ExpectedOutcome}` — e.g. `CreateWorkflow_WhenNameIsDuplicate_ReturnsConflictError`.
 - **Test isolation**: each integration test class implements `IAsyncLifetime` (container per class). Each test method calls `ResetAsync()` at its start to truncate relevant tables. See PATTERNS.md for the full pattern.
 - **No InMemoryDatabase**: `UseInMemoryDatabase` is strictly forbidden for all new tests. All database tests use Testcontainers (PostgreSQL/Redis).
 - **Unit tests before every commit**: run `dotnet test unit-tests.slnf`. When adding a new unit test project, add it to this file too. Note: The agent is only required to verify that unit tests pass. Integration tests and other tests requiring third-party dependencies can be skipped unless explicitly instructed otherwise.
 - **Integration test maintenance**: any change affecting API response shape, status codes, or request contract must include updating all relevant files under `tests/Api/Axis.Api.Tests/` in the same PR. "Cannot run locally" is not an excuse.
 
-### Code Style
-- **Rules apply everywhere**: all rules, conventions, and patterns defined in the project instruction documents apply repository-wide unless explicitly overridden. Do not lower the code quality standard when writing tests.
-- **No `var`**: always write the explicit type, even when the assignment makes it obvious.
+#### Testing — Frontend only
+- **Test runner**: Vitest + `@testing-library/react`. Run with `npm run test` (or `npx vitest`) inside `frontend/`.
+- **Test structure**: `describe('ComponentOrHookName', () => { it('should ...', ...) })`. Use `describe` to group by subject, `it` sentences describe the expected behavior.
+- **Test location**: test files live in `frontend/tests/` for integration-style tests and alongside source files (`*.test.ts(x)`) for unit tests.
+- **Before every push**: run `npm run ci` (type check + Biome) AND `npm run test`. Both must pass.
+- **Test behavior, not implementation**: assert what users see and can interact with — not internal state, not component structure. If a refactor breaks a test without changing visible behavior, the test was wrong.
+- **Use `@testing-library/user-event` for interactions** — not `fireEvent`. `userEvent` simulates real browser event sequences (focus, input, click) more accurately.
+- **Never mock child components** unless the child has external dependencies that make the test impractical. Testing with real children catches integration bugs; mocking them hides them.
+
+### Code Style (shared)
 - **Comments — WHY only**: default to no comments. Add one only when the WHY is non-obvious — a hidden constraint, a framework quirk, or surprising business logic. No WHAT comments.
+- **Scope discipline**: only modify code directly related to the current task. Never restructure code outside task scope unless explicitly requested.
+- **Read in full before asserting**: Grep to locate, then Read without a `limit` to assert content. Partial reads lead to wrong conclusions. Grep-first and read-in-full are complementary, not conflicting.
+- **No hardcoded secrets**: use environment-specific config files (gitignored) or environment variables. Never commit credentials or API keys.
+
+#### Code Style — .NET only
+- **Rules apply everywhere in .NET**: all rules below apply to both `src/` and `tests/` unless noted.
+- **No `var`**: always write the explicit type, even when the assignment makes it obvious.
 - **No inline fully-qualified type names**: always use `using` directives. Never write `System.Text.Encoding.UTF8`, `System.Security.Cryptography.SHA256`, `Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions`, etc. inline. Run the detection grep in PATTERNS.md § "Code hygiene checklist" before every commit.
 - **One type per file**: every class, record, interface, or enum lives in its own file named after the type. Never group multiple types in one file, including test helpers. This applies equally to `src/` and `tests/`. Allowed exceptions:
   - Generic overloads of the same concept may share a file (e.g. `Result` + `Result<T>` in `Result.cs`, `ICommand` + `ICommand<T>` in `ICommand.cs`).
@@ -104,10 +157,16 @@ Before starting any task, read only what is relevant — not everything.
 - **No scaffold placeholder files**: delete `Class1.cs` immediately when Visual Studio creates it. A `Class1.cs` anywhere in `src/` or `tests/` must never be committed.
 - **Centralized global usings**: `GlobalUsings.cs` per project or `<Using Include="..." />` in `Directory.Build.props`.
 - **`dotnet format`** must pass without warnings before pushing.
-- **Scope discipline**: only modify code directly related to the current task. Never restructure code outside task scope unless explicitly requested.
-- **Read in full before asserting**: Grep to locate, then Read without a `limit` to assert content. Partial reads lead to wrong conclusions. Grep-first and read-in-full are complementary, not conflicting.
 
-### Architecture & DDD
+#### Code Style — Frontend only
+- **Never use `var`**: use `const` by default; use `let` only when reassignment is needed. Never use `var`.
+- **TypeScript strict mode**: `strict: true` in tsconfig — enabled. No `any` — use `unknown` + type guards when shape is genuinely unknown. `any` only at external data boundaries and must be typed away immediately.
+- **No type assertions without justification**: `as T` requires a comment explaining why the compiler cannot infer it. Never use `as any` — use `as unknown as T` if a double assertion is truly necessary.
+- **Type co-location**: small prop interfaces and local type aliases may be co-located with the component that owns them. Shared types belong in a `types.ts` file within the feature folder.
+- **Biome is the single tool for linting and formatting** — replaces ESLint + Prettier. Config lives in `frontend/biome.json`. Run `npm run lint:fix` to auto-fix, `npm run format` to format only.
+- **`npm run ci` must pass before pushing**: runs `tsc -b --noEmit && biome ci .` — zero TypeScript errors AND zero Biome errors/warnings. This is the frontend equivalent of the .NET build gate.
+
+### Architecture & DDD (.NET only)
 - **DDD depth by module**: rich aggregates for complex modules (WorkflowEngine, DataModeling) — full invariants, factory methods, domain events. Pragmatic for simpler CRUD modules (Identity) — still apply Result pattern, repository interfaces, value objects for typed IDs and Email, no Data Annotations on domain types.
 - **Result Pattern**: Command/Query handlers return `Result` or `Result<T>` for business rule violations. `ValidationBehavior` pipeline handles FluentValidation — never throw `ValidationException` manually in a handler. Exceptions are for infrastructure failures only. Aggregates guard with `throw InvalidOperationException` for internal invariants.
 - **CQRS & messaging**: MediatR = Commands and Queries only (intra-module). Domain events = Wolverine outbox, regardless of whether the consumer is in the same module or another. Never use MediatR to dispatch domain events.
@@ -116,14 +175,14 @@ Before starting any task, read only what is relevant — not everything.
 - **Commands that create resources**: return `Result<Guid>` — not the full aggregate.
 - **Idempotency**: all Command handlers and Migrations must be idempotent. See PATTERNS.md.
 
-### API Layer
+### API Layer (.NET only)
 - **Minimal API (mandatory)**: all new endpoints use Minimal API (`MapGroup` + `IEndpointRouteBuilder` extension methods), not controllers. No logic in mapping files — only `mediator.Send(...)` and `Result` → `IResult` mapping. Use `ConfigureHttpJsonOptions` for JSON config.
 - **Authorization**: every endpoint must call `.RequireAuthorization()` unless explicitly public (login, register, health check). RBAC enforcement goes in the Command/Query handler via the user's claims — not in the endpoint mapping.
 - **OpenAPI**: every endpoint must declare `.WithName()`, `.WithSummary()`, `.WithTags()`, `.Produces<T>()`, `.ProducesProblem()` for each applicable status (400, 401, 403, 404, 409 as relevant). Scalar UI enabled in Development and Staging. See PATTERNS.md for setup.
 - **Error responses**: all failures map to `ProblemDetails` (RFC 7807) via `result.ToProblemDetails()`. No custom error JSON shapes or raw strings. See PATTERNS.md for the Result → HTTP status code mapping table.
 - **Pagination**: no endpoint returns an unbounded collection. All list endpoints accept `int page = 1`, `int pageSize = 20`, hard cap `pageSize ≤ 100`. Return `PagedResult<T>` from `Axis.Shared.Application`. See PATTERNS.md.
 
-### Infrastructure & EF Core
+### Infrastructure & EF Core (.NET only)
 - **Fluent API only**: use `IEntityTypeConfiguration<T>` for all EF Core mappings. Data Annotations (`[Required]`, `[Table]`, etc.) are forbidden on domain entities.
 - **JSONB collections**: every `HasConversion` on a `List<T>` stored as JSONB must be paired with `HasValueComparer` in the same call. Converter without comparer = silent data loss. See PATTERNS.md.
 - **Read vs write**: `AsNoTracking()` on read-only paths only. Write paths must use tracked queries.
@@ -132,13 +191,13 @@ Before starting any task, read only what is relevant — not everything.
 - **No N+1**: lazy loading disabled globally. Always explicit `Include`/`ThenInclude`. List queries project to DTOs via `.Select()`. See PATTERNS.md.
 - **NuGet**: check `Directory.Packages.props` before adding any library. Never `dotnet add package` — it corrupts CPM. See PATTERNS.md for the correct procedure.
 
-### Multi-tenancy & Migrations
+### Multi-tenancy & Migrations (.NET only)
 - **Identity uses `public` schema** — `IdentityDbContext` has no `TenantSchemaInterceptor`. All other modules use `AxisDbContext` with `TenantSchemaInterceptor`.
 - **No direct `public` schema access** from tenant-aware services.
 - **Raw SQL in tenant-aware contexts** must prefix the table with `ITenantContext.Schema` and apply the soft-delete filter manually. Prefer LINQ so global filters apply automatically. See PATTERNS.md.
 - **Migration workflow**: `dotnet ef migrations add {PascalCaseName} --project src/Modules/{Module}/{Module}.Infrastructure --startup-project src/Axis.Api`. Applied automatically at startup via `MigrateAsync()`. Never apply manually in production. All migrations must be idempotent and tested against multiple schemas via Testcontainers before marking ✅.
 
-### Cross-cutting Concerns
+### Cross-cutting Concerns (.NET only)
 - **CancellationToken**: all `async` methods in Application and Infrastructure accept and forward `CancellationToken` to every EF Core, repository, and HttpClient call.
 - **No sync-over-async**: never `.Result`, `.Wait()`, or `.GetAwaiter().GetResult()` on a `Task`. Always `await`. Causes thread-pool starvation under ASP.NET Core.
 - **Audit fields**: every tenant-owned aggregate declares `DateTimeOffset CreatedAt`, `DateTimeOffset UpdatedAt`, `string CreatedBy`. Set in the Application layer via `ICurrentUser` / `ITenantContext` — never inside the domain.
@@ -152,14 +211,70 @@ Before starting any task, read only what is relevant — not everything.
 - **Health checks**: `GET /health` (liveness) and `GET /health/ready` (readiness, includes PostgreSQL + Redis checks). Both anonymous, excluded from rate limiting.
 
 ### Frontend
-- **Folder structure**: feature-based — `src/features/{feature-name}/` with components, hooks, and types co-located. Shared UI in `src/components/ui/`.
-- **State**: TanStack Query owns all server state. Zustand owns global client-only state. Never store server data in Zustand; never cache client UI state in TanStack Query.
+
+#### Feature folder anatomy
+Every feature lives under `frontend/src/features/{feature-name}/` with a fixed internal structure:
+```
+features/{feature-name}/
+├── components/     # React components belonging to this feature
+├── hooks/          # custom hooks (useXxx.ts)
+├── api.ts          # all query/mutation functions for this feature
+├── types.ts        # shared types for this feature
+└── index.ts        # barrel export — public API of the feature
+```
+- Component files: `PascalCase.tsx`. Hook files: `camelCase.ts` with mandatory `use` prefix (`useWorkflows.ts`).
+- Never import directly from another feature's `components/` or `hooks/` — only through its `index.ts`.
+- Shared UI primitives (shadcn/ui, base-ui): `src/components/ui/`. Shared utilities: `src/lib/`.
+
+#### State management
+- **TanStack Query owns all server state**. Zustand owns global client-only state (UI flags, user preferences). Never store server data in Zustand; never cache client UI state in TanStack Query.
 - **Forms**: `react-hook-form` + Zod. Define the Zod schema first (source of truth), infer TypeScript type via `z.infer<typeof schema>`.
-- **No `any`**: TypeScript strict mode on. Use `unknown` + type guards when shape is genuinely unknown.
-- **API errors**: all TanStack Query mutations handle errors explicitly — surface via toast or inline message. Use a shared `ApiError` type for typed error responses.
-- **Error Boundaries**: wrap every top-level route. Render a user-actionable fallback, never a blank screen.
 - **Three async states**: every data-fetching component handles loading (skeleton/spinner), empty (descriptive message), and error (message + retry). Silent empty render is a bug.
-- **Component size**: small and single-purpose. Extract hooks for non-trivial logic.
+
+#### TanStack Query patterns
+- All `queryFn` and `mutationFn` definitions live in `features/{feature}/api.ts`. Never write them inline inside a component.
+- Components call custom hooks — never call `useQuery`/`useMutation` directly with a `queryFn` in a component file.
+- Each feature defines a **query key factory** to avoid magic strings:
+  ```ts
+  export const workflowKeys = {
+    all: ['workflows'] as const,
+    list: (filters: WorkflowFilters) => [...workflowKeys.all, 'list', filters] as const,
+    detail: (id: string) => [...workflowKeys.all, 'detail', id] as const,
+  }
+  ```
+- All TanStack Query mutations handle errors explicitly — surface via toast or inline message using the shared `ApiError` type.
+
+#### TypeScript discipline
+- **No `any`**: TypeScript strict mode on. Use `unknown` + type guards when shape is genuinely unknown. `any` is only acceptable at external/unknown data boundaries (raw API responses before parsing), and must be typed away immediately.
+- **No type assertions without justification**: `as T` requires an inline comment explaining why the compiler cannot infer it — not just `as unknown as T` to silence an error.
+- **Entity IDs are `string`**: backend uses Guid serialized as string. Never type an entity ID as `number`.
+- **API response types are not transformed in components**: if a different shape is needed, derive it in the hook or a selector — not inline in JSX.
+
+#### Routing
+- All routes beyond the root are **lazy-loaded** by default — use TanStack Router's `lazy()` for code splitting.
+- **Route protection**: auth guard logic lives in a root layout route (loader or `beforeLoad`), not inside individual page components.
+- Global 401 handling (redirect to login) is wired once in `api.ts` / a root query error handler — never duplicated per feature.
+- **Error Boundaries**: wrap every top-level route. Render a user-actionable fallback, never a blank screen.
+
+#### Component design
+- **Small and single-purpose**: extract hooks for non-trivial logic. If a component does data fetching AND complex rendering, split it.
+- **Composition over prop drilling**: use compound components or context for UI that shares state across more than two levels. Avoid prop chains longer than 2 hops.
+- No more than ~5 props before reconsidering the component's responsibility.
+
+#### Styling
+- **No inline `style` prop** — use Tailwind classes exclusively.
+- **`cn()` for conditional classes** — never string concatenation.
+- Do not mix Tailwind utility classes and custom CSS on the same element.
+
+#### Security
+- **No `dangerouslySetInnerHTML`** unless content is sanitized first (DOMPurify). Requires an explicit comment explaining the source.
+- **Environment variables**: public vars use `VITE_` prefix. Never expose secrets via `VITE_` — anything in `VITE_*` is bundled into the client.
+- **Do not store auth tokens in `localStorage`** — the backend uses `httpOnly` cookies via `credentials: 'include'` (already set in `fetchApi`).
+
+#### Accessibility baseline
+- Every form input must have a `<label>` or `aria-label`.
+- Every icon-only button must have `aria-label`.
+- Never use color as the sole indicator — error/warning states require text or icon alongside color.
 
 ---
 
@@ -268,6 +383,13 @@ For any **new** module: Domain → Application (no Docker needed) → Infrastruc
 ## Solution Structure
 
 ```
+frontend/                              # React 18 + TypeScript + Vite SPA
+├── src/
+│   ├── features/{feature-name}/       # feature-based: components, hooks, types co-located
+│   ├── components/ui/                 # shared shadcn/ui components
+│   ├── lib/                           # shared utilities (api.ts, utils.ts)
+│   └── routes/                        # TanStack Router file-based routes
+└── tests/                             # Vitest integration-style tests
 src/
 ├── Axis.Api/                          # ASP.NET Core host
 ├── Shared/
