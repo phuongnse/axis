@@ -16,5 +16,8 @@ public interface IDataRecordRepository
         Guid modelId, Guid organizationId,
         int page, int pageSize,
         string? search,
+        string[]? filters = null,
+        string? sortBy = null,
+        bool? sortDesc = null,
         CancellationToken ct = default);
 }

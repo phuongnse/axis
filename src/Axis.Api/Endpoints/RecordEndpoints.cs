@@ -2,6 +2,8 @@ using Axis.Api.Authorization;
 using Axis.Api.Extensions;
 using Axis.Api.Infrastructure;
 using Axis.DataModeling.Application.Commands.CreateRecord;
+using Axis.DataModeling.Application.Commands.BulkDeleteRecords;
+using Axis.DataModeling.Application.Queries.BulkExportRecords;
 using Axis.DataModeling.Application.Commands.DeleteRecord;
 using Axis.DataModeling.Application.Commands.UpdateRecord;
 using Axis.DataModeling.Application.Queries.GetRecord;
@@ -9,6 +11,7 @@ using Axis.DataModeling.Application.Queries.GetRecords;
 using Axis.Shared.Domain.Primitives;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using System.Text;
 
 namespace Axis.Api.Endpoints;
 
@@ -71,6 +74,22 @@ public static class RecordEndpoints
             .ProducesProblem(403)
             .ProducesProblem(404);
 
+        group.MapPost("/bulk-delete", BulkDeleteRecords)
+            .RequireAuthorization(Permissions.DataModeling.RecordDelete)
+            .WithName("BulkDeleteRecords")
+            .WithSummary("Bulk delete records")
+            .WithTags("DataModeling")
+            .Produces(204)
+            .ProducesProblem(400);
+
+        group.MapPost("/bulk-export", BulkExportRecords)
+            .RequireAuthorization(Permissions.DataModeling.RecordRead)
+            .WithName("BulkExportRecords")
+            .WithSummary("Bulk export records as CSV")
+            .WithTags("DataModeling")
+            .Produces<FileContentResult>(200, "text/csv")
+            .ProducesProblem(400);
+
         return app;
     }
 
@@ -81,10 +100,13 @@ public static class RecordEndpoints
         CancellationToken ct,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 25,
-        [FromQuery] string? search = null)
+        [FromQuery] string? search = null,
+        [FromQuery] string[]? filter = null,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] bool? sortDesc = null)
     {
         Result<RecordsPageDto> result = await mediator.Send(
-            new GetRecordsQuery(modelId, currentUser.OrgId, page, pageSize, search), ct);
+            new GetRecordsQuery(modelId, currentUser.OrgId, page, pageSize, search, filter, sortBy, sortDesc), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.Ok(result.Value);
     }
@@ -140,5 +162,30 @@ public static class RecordEndpoints
             new DeleteRecordCommand(recordId, modelId, currentUser.OrgId), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
+    }
+
+    private static async Task<IResult> BulkDeleteRecords(
+        Guid modelId,
+        [FromBody] Guid[] recordIds,
+        CurrentUser currentUser,
+        ISender mediator,
+        CancellationToken ct)
+    {
+        Result result = await mediator.Send(
+            new BulkDeleteRecordsCommand(modelId, currentUser.OrgId, recordIds), ct);
+        if (result.IsFailure) return result.ToProblemDetails();
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> BulkExportRecords(
+        Guid modelId,
+        [FromBody] Guid[] recordIds,
+        CurrentUser currentUser,
+        ISender mediator,
+        CancellationToken ct)
+    {
+        Result<string> result = await mediator.Send(new BulkExportRecordsQuery(modelId, currentUser.OrgId, recordIds), ct);
+        if (result.IsFailure) return result.ToProblemDetails();
+        return Results.File(Encoding.UTF8.GetBytes(result.Value), "text/csv", $"records-export-{DateTime.UtcNow:yyyyMMddHHmmss}.csv");
     }
 }

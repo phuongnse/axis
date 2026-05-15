@@ -9,4 +9,7 @@ public sealed record GetRecordsQuery(
     Guid OrganizationId,
     int Page = 1,
     int PageSize = 25,
-    string? Search = null) : IQuery<Result<RecordsPageDto>>;
+    string? Search = null,
+    string[]? Filters = null,
+    string? SortBy = null,
+    bool? SortDesc = null) : IQuery<Result<RecordsPageDto>>;

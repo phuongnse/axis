@@ -14,11 +14,17 @@ public class CreateRecordHandlerTests
     private readonly IDataModelRepository _modelRepo = Substitute.For<IDataModelRepository>();
     private readonly IDataRecordRepository _recordRepo = Substitute.For<IDataRecordRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly IRecordValidator _validator = Substitute.For<IRecordValidator>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
     private const string UserId = "user-123";
 
-    private CreateRecordHandler CreateHandler() => new(_modelRepo, _recordRepo, _uow);
+    private CreateRecordHandler CreateHandler()
+    {
+        _validator.ValidateAsync(Arg.Any<DataModel>(), Arg.Any<IReadOnlyDictionary<string, object?>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<FluentValidation.Results.ValidationFailure>()));
+        return new(_modelRepo, _recordRepo, _uow, _validator);
+    }
 
     [Fact]
     public async Task CreateRecord_WhenModelExists_CreatesRecordAndReturnsId()

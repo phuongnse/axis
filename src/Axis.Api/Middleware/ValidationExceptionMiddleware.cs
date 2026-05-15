@@ -4,7 +4,7 @@ namespace Axis.Api.Middleware;
 
 /// <summary>
 /// Catches FluentValidation.ValidationException bubbled up by ValidationBehavior
-/// and converts it to an RFC 7807 ProblemDetails response (HTTP 400).
+/// and converts it to an RFC 7807 ProblemDetails response (HTTP 422).
 /// </summary>
 internal sealed class ValidationExceptionMiddleware(RequestDelegate next)
 {
@@ -27,7 +27,7 @@ internal sealed class ValidationExceptionMiddleware(RequestDelegate next)
 
             await Results.ValidationProblem(
                 errors,
-                statusCode: StatusCodes.Status400BadRequest,
+                statusCode: StatusCodes.Status422UnprocessableEntity,
                 title: "One or more validation errors occurred.")
                 .ExecuteAsync(context);
         }

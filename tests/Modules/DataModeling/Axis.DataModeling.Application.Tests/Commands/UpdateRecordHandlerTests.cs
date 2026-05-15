@@ -10,19 +10,28 @@ namespace Axis.DataModeling.Application.Tests.Commands;
 
 public class UpdateRecordHandlerTests
 {
+    private readonly IDataModelRepository _modelRepo = Substitute.For<IDataModelRepository>();
     private readonly IDataRecordRepository _recordRepo = Substitute.For<IDataRecordRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly IRecordValidator _validator = Substitute.For<IRecordValidator>();
     private static readonly Guid OrgId = Guid.NewGuid();
     private static readonly Guid ModelId = Guid.NewGuid();
     private const string UserId = "user-123";
 
-    private UpdateRecordHandler CreateHandler() => new(_recordRepo, _uow);
+    private UpdateRecordHandler CreateHandler()
+    {
+        _validator.ValidateAsync(Arg.Any<DataModel>(), Arg.Any<IReadOnlyDictionary<string, object?>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<FluentValidation.Results.ValidationFailure>()));
+        return new(_modelRepo, _recordRepo, _uow, _validator);
+    }
 
     [Fact]
     public async Task UpdateRecord_WhenRecordExists_UpdatesDataAndSaves()
     {
         DataRecord record = DataRecord.Create(ModelId, OrgId, new Dictionary<string, object?> { ["name"] = "Old" }, UserId);
         _recordRepo.GetByIdAsync(record.Id, ModelId, OrgId).Returns(record);
+        DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
+        _modelRepo.GetByIdAsync(ModelId, OrgId).Returns(model);
 
         Dictionary<string, object?> newData = new() { ["name"] = "New" };
         Result result = await CreateHandler().Handle(

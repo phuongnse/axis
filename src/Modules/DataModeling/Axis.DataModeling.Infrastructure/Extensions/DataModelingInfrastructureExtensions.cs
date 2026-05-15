@@ -20,6 +20,7 @@ public static class DataModelingInfrastructureExtensions
         services.AddScoped<IDataClassRepository, DataClassRepository>();
         services.AddScoped<IDataRecordRepository, DataRecordRepository>();
         services.AddScoped<IUnitOfWork, DataModelingUnitOfWork>();
+        services.AddScoped<IRecordValidator, RecordValidator>();
 
         return services;
     }
