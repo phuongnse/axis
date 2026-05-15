@@ -2,6 +2,7 @@ using Axis.FormBuilder.Application.Commands.UpdateForm;
 using Axis.FormBuilder.Application.Repositories;
 using Axis.FormBuilder.Application.Services;
 using Axis.FormBuilder.Domain.Aggregates;
+using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
@@ -55,6 +56,22 @@ public class UpdateFormHandlerTests
 
         Result result = await _handler.Handle(
             new UpdateFormCommand(form.Id, OrgId, "Taken Name", null), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorCode.Should().Be(ErrorCodes.Conflict);
+    }
+
+    [Fact]
+    public async Task Handle_WhenSaveThrowsUniqueConstraint_ReturnsConflict()
+    {
+        FormDefinition form = FormDefinition.Create("Old Name", null, OrgId, "user");
+        _repo.GetByIdAsync(form.Id, OrgId, Arg.Any<CancellationToken>()).Returns(form);
+        _repo.NameExistsAsync("Concurrent Name", OrgId, form.Id, Arg.Any<CancellationToken>()).Returns(false);
+        _uow.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns<int>(_ => throw new UniqueConstraintException("unique violation"));
+
+        Result result = await _handler.Handle(
+            new UpdateFormCommand(form.Id, OrgId, "Concurrent Name", null), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.Conflict);

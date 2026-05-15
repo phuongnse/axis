@@ -10,18 +10,19 @@ public sealed class GetFormsHandler(IFormRepository formRepo)
 {
     public async Task<PagedResult<FormSummaryDto>> Handle(GetFormsQuery query, CancellationToken cancellationToken)
     {
-        int effectivePageSize = Math.Min(query.PageSize, 100);
+        int effectivePage = Math.Max(1, query.Page);
+        int effectivePageSize = Math.Min(Math.Max(1, query.PageSize), 100);
 
         IReadOnlyList<FormDefinition> all = await formRepo.GetAllAsync(query.OrganizationId, cancellationToken);
 
         int totalCount = all.Count;
         IReadOnlyList<FormSummaryDto> page = all
             .OrderByDescending(f => f.UpdatedAt)
-            .Skip((query.Page - 1) * effectivePageSize)
+            .Skip((effectivePage - 1) * effectivePageSize)
             .Take(effectivePageSize)
             .Select(f => new FormSummaryDto(f.Id, f.Name, f.Description, f.Fields.Count, f.UpdatedAt))
             .ToList();
 
-        return new PagedResult<FormSummaryDto>(page, totalCount, query.Page, effectivePageSize);
+        return new PagedResult<FormSummaryDto>(page, totalCount, effectivePage, effectivePageSize);
     }
 }

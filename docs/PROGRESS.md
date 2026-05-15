@@ -41,7 +41,7 @@
 **Domain ✅ | Application ✅ | Infrastructure ✅ | API ⏳ | Frontend ⏳**
 
 - **Domain**: FormDefinition, FormField aggregates; all field types and domain events. FormSubmission aggregate (Pending/Submitted/Expired/Cancelled state machine; AccessToken Guid; FormTaskCreated/Submitted/Expired/Cancelled events).
-- **Application**: CreateForm, DeleteForm, UpdateForm commands; GetForms, GetFormById queries; AddFieldToForm, RemoveFieldFromForm, ReorderFormFields commands. Gap: GetFormsHandler uses in-memory pagination (DB-level pagination deferred to Infrastructure).
+- **Application**: CreateForm, DeleteForm, UpdateForm commands; GetForms, GetFormById queries; AddFieldToForm, RemoveFieldFromForm, ReorderFormFields commands. Decision: GetFormsHandler uses in-memory pagination (accepted MVP trade-off; Page/PageSize inputs clamped to valid range).
 - **Infrastructure**: FormBuilderDbContext, EF Core config (FormDefinition with fields as JSONB via FormFieldConverter — 9 field types, polymorphic FormFieldConfig), FormRepository (IsReferencedByWorkflowAsync cross-module JSONB query), 8 integration tests (Testcontainers)
 
 ## WorkflowEngine — E06-workflow-engine

@@ -71,4 +71,32 @@ public class GetFormsHandlerTests
         result.Items.Should().HaveCount(1);
         result.TotalCount.Should().Be(3);
     }
+
+    [Fact]
+    public async Task Handle_WhenPageIsZeroOrNegative_ClampsToPageOne()
+    {
+        FormDefinition form = FormDefinition.Create("Form", null, OrgId, "user");
+        _repo.GetAllAsync(OrgId, Arg.Any<CancellationToken>()).Returns([form]);
+
+        PagedResult<FormSummaryDto> result = await _handler.Handle(
+            new GetFormsQuery(OrgId, Page: -5, PageSize: 10), CancellationToken.None);
+
+        result.Page.Should().Be(1);
+        result.Items.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task Handle_WhenPageSizeIsZeroOrNegative_ClampsToOne()
+    {
+        FormDefinition[] forms = Enumerable.Range(1, 3)
+            .Select(i => FormDefinition.Create($"Form {i}", null, OrgId, "user"))
+            .ToArray();
+        _repo.GetAllAsync(OrgId, Arg.Any<CancellationToken>()).Returns(forms);
+
+        PagedResult<FormSummaryDto> result = await _handler.Handle(
+            new GetFormsQuery(OrgId, Page: 1, PageSize: -1), CancellationToken.None);
+
+        result.PageSize.Should().Be(1);
+        result.Items.Should().HaveCount(1);
+    }
 }

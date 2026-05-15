@@ -79,7 +79,7 @@ Workflow reaches Form step
 | Layer | Status | Notes |
 |---|---|---|
 | Domain | ⚠️ Partial | `FormDefinition`, `FormField` aggregates; all field types and domain events. Missing: `FormSubmission` aggregate (required for F04 form task lifecycle — submission, expiry, deduplication) |
-| Application | ✅ Done | `CreateFormCommand`, `DeleteFormCommand`, `UpdateFormCommand`, `GetFormsQuery`, `GetFormByIdQuery`, `AddFieldToFormCommand`, `RemoveFieldFromFormCommand`, `ReorderFormFieldsCommand`. Gap: in-memory pagination in `GetFormsHandler` (DB-level pagination deferred to Infrastructure). |
+| Application | ✅ Done | `CreateFormCommand`, `DeleteFormCommand`, `UpdateFormCommand`, `GetFormsQuery`, `GetFormByIdQuery`, `AddFieldToFormCommand`, `RemoveFieldFromFormCommand`, `ReorderFormFieldsCommand`. Decision: `GetFormsHandler` uses in-memory pagination (accepted MVP trade-off; `Page`/`PageSize` clamped to valid range). |
 | Infrastructure | ✅ Done | FormBuilderDbContext, EF Core config (FormDefinition with fields as JSONB via FormFieldConverter), FormRepository (including cross-module IsReferencedByWorkflowAsync JSONB query), 8 integration tests (Testcontainers) |
 | API | ⏳ Pending | — |
 | Frontend | ⏳ Pending | — |

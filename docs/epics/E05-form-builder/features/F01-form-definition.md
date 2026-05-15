@@ -60,8 +60,8 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 - Folders/categories for organizing forms — not in MVP.
 
 > **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: "Used in N workflow(s)" count pending cross-module query — not supported at Application layer without inter-module dependency; deferred to API/Frontend aggregation. Pagination is in-memory (GetAllAsync + LINQ Skip/Take); DB-level pagination deferred to Infrastructure.
-> Decisions: `GetFormsHandler` loads all org forms and paginates in-memory to avoid adding a new `GetPagedAsync` repository method before Infrastructure is complete.
+> Gaps vs spec: "Used in N workflow(s)" count pending cross-module query — not supported at Application layer without inter-module dependency; deferred to API/Frontend aggregation.
+> Decisions: `GetFormsHandler` paginates in-memory (GetAllAsync + LINQ Skip/Take). This is an accepted trade-off for MVP: adding a `GetPagedAsync` repository method would push sorting/paging logic into Infrastructure without additional correctness benefit at this scale. `Page` and `PageSize` are clamped to ≥ 1 and ≤ 100 in the handler.
 
 ---
 
