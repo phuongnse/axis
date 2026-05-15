@@ -76,3 +76,11 @@
 ### ADR-005: React over Vue/Svelte for Frontend
 **Decision:** Use React with TypeScript.
 **Reason:** The workflow canvas (React Flow) and page builder (dnd-kit) have the best React integrations. React's ecosystem for complex editor-style UIs is unmatched.
+
+### ADR-006: TanStack Router for SPA Routing
+**Decision:** Use TanStack Router instead of React Router.
+**Reason:** Provides 100% type-safety for paths and search parameters (query string). Its built-in loader mechanism integrates perfectly with TanStack Query for prefetching data, preventing waterfall rendering issues typical in complex dashboards.
+
+### ADR-007: Native Fetch API over Axios
+**Decision:** Use a lightweight wrapper around the native `fetch` API instead of Axios.
+**Reason:** Reduces external dependencies since `fetch` is built-in. Modern TanStack Query handles the heavy lifting (caching, deduplication, retry) making a heavy HTTP client like Axios unnecessary. The wrapper ensures proper JSON parsing, cookie inclusion, and error throwing for non-2xx responses.

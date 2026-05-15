@@ -16,47 +16,79 @@ export class ApiError extends Error {
 
 const BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
+interface FetchApiOptions extends RequestInit {
+  timeout?: number;
+}
+
 export async function fetchApi<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: FetchApiOptions = {}
 ): Promise<T> {
   const url = `${BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
-  const defaultHeaders: HeadersInit = {
-    'Content-Type': 'application/json',
+  const headers: Record<string, string> = {
     'Accept': 'application/json',
+    ...((options.headers as Record<string, string>) || {}),
   };
 
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      ...defaultHeaders,
-      ...options.headers,
-    },
-    // Ensure credentials (cookies) are always sent
-    credentials: options.credentials || 'include',
-  });
-
-  if (!response.ok) {
-    let errorData;
-    try {
-      errorData = await response.json();
-    } catch {
-      errorData = { message: response.statusText };
+  // Only set Content-Type to JSON if it's not FormData
+  if (!(options.body instanceof FormData)) {
+    if (!headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json';
     }
-
-    if (response.status === 401) {
-      // Handled globally (e.g. redirect to login)
-      // Usually intercepted at the Router loader level
-    }
-
-    throw new ApiError(response.status, errorData);
+  } else {
+    // If body is FormData, ensure Content-Type is NOT set so the browser
+    // automatically sets it with the correct multipart boundary.
+    delete headers['Content-Type'];
   }
 
-  // Handle empty responses (like 204 No Content)
-  if (response.status === 204) {
-    return null as any;
-  }
+  // Setup timeout
+  const timeoutMs = options.timeout || 30000; // Default 30s timeout
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
 
-  return response.json();
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers,
+      signal: options.signal || controller.signal,
+      credentials: options.credentials || 'include',
+    });
+
+    clearTimeout(id);
+
+    if (!response.ok) {
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch {
+        errorData = { message: response.statusText };
+      }
+
+      if (response.status === 401) {
+        // Handled globally (e.g. redirect to login)
+      }
+
+      throw new ApiError(response.status, errorData);
+    }
+
+    // Handle empty responses
+    if (response.status === 204 || response.status === 205) {
+      return null as T;
+    }
+
+    // Handle 200/201 that might surprisingly have no body
+    const text = await response.text();
+    if (!text) {
+      return null as T;
+    }
+
+    return JSON.parse(text);
+  } catch (error: any) {
+    clearTimeout(id);
+    if (error.name === 'AbortError') {
+      throw new Error('The operation was aborted');
+    }
+    throw error;
+  }
 }
