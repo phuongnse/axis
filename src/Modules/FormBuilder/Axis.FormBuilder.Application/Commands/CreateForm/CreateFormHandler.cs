@@ -1,6 +1,7 @@
 using Axis.FormBuilder.Application.Repositories;
 using Axis.FormBuilder.Application.Services;
 using Axis.FormBuilder.Domain.Aggregates;
+using Axis.Shared.Application;
 using Axis.Shared.Application.CQRS;
 using Axis.Shared.Domain.Primitives;
 
@@ -21,7 +22,15 @@ public sealed class CreateFormHandler(
             command.Name, command.Description, command.OrganizationId, command.CreatedBy);
 
         await formRepo.AddAsync(form, cancellationToken);
-        await uow.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await uow.SaveChangesAsync(cancellationToken);
+        }
+        catch (UniqueConstraintException)
+        {
+            return Result.Failure<Guid>(ErrorCodes.Conflict, $"A form named '{command.Name}' already exists.");
+        }
 
         return form.Id;
     }
