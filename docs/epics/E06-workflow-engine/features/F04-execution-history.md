@@ -37,7 +37,7 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 
 > **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
 > Gaps vs spec: `GetExecutionsByWorkflowQuery` handler not yet implemented (repository `GetByWorkflowAsync` exists); paginated history table, status/date/trigger filters, and running-first sort pending API + Frontend.
-> Decisions: `GetByWorkflowAsync` and `GetAllAsync` return executions ordered by `CreatedAt DESC`; pagination deferred to API layer.
+> Decisions: `GetByWorkflowAsync` and `GetAllAsync` return executions ordered by `CreatedAt DESC`. `CreatedAt` is set when the execution record is created (status `PENDING`, before any step runs) and serves as the proxy for "started at" in sort order — the difference is at most ~5 seconds per spec (US-090), which is negligible for display purposes. Pagination deferred to API layer.
 
 ---
 

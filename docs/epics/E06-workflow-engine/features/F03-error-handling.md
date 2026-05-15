@@ -35,7 +35,7 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 - PagerDuty / OpsGenie / Slack integration for error notifications — not in MVP.
 
 > **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: no Application-layer notification dispatch handler; `ExecutionFailed` domain event raised but notification channels not wired; email/in-app/webhook dispatch and rate-limiting pending API + notification infrastructure.
+> Gaps vs spec: no Application-layer notification dispatch handler; `ExecutionFailed` domain event raised but notification channels not wired; email/in-app/webhook dispatch and rate-limiting pending Application layer + a future cross-cutting notification service (outside WorkflowEngine Infrastructure, which is complete).
 
 ---
 
