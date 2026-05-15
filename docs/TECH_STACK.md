@@ -38,6 +38,11 @@
 | **dnd-kit** | 6.x | Page builder drag & drop | Flexible, accessible DnD for UI builder |
 | **Zod** | 3.x | Schema validation | Runtime validation for API responses and forms; source of truth for form types |
 | **react-hook-form** | 7.x | Form state management | Performant form handling; always paired with Zod via `zodResolver` |
+## Backend
+
+| Technology | Version | Role | Rationale |
+|---|---|---|---|
+...
 | **Swashbuckle.AspNetCore** | 6.9.0 | OpenAPI metadata | `AddSwaggerGen` + `UseSwagger` generates the Swagger JSON document; wired with Bearer auth definition |
 | **Scalar.AspNetCore** | 2.x | API reference UI | Modern OpenAPI UI; reads `/swagger/v1/swagger.json`. Enabled in Development and Staging only. |
 
