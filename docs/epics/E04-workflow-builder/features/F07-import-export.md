@@ -32,8 +32,8 @@ Workflow definitions can be exported as portable JSON files and imported into an
 - Exporting execution history — definitions only.
 - Exporting to formats other than JSON (YAML, BPMN) — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: REDACTED credential scrubbing and file download endpoint pending API layer.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `ExportWorkflowQuery` handler not yet implemented; REDACTED credential scrubbing and file download endpoint pending API layer.
 
 ---
 
@@ -63,8 +63,8 @@ Workflow definitions can be exported as portable JSON files and imported into an
 *Out of scope*
 - Automatic periodic export/backup — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: import preview, form/model resolution, and transactional import endpoint pending API layer.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `ImportWorkflowCommand` handler not yet implemented; import preview, form/model resolution, and transactional import endpoint pending API layer.
 
 ---
 
@@ -88,5 +88,5 @@ Workflow definitions can be exported as portable JSON files and imported into an
 *Out of scope*
 - Scheduled automatic backups — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: async ZIP generation and in-app notification for large exports pending E06/notification infrastructure.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `BulkExportWorkflowsCommand` handler not yet implemented; async ZIP generation and in-app notification for large exports pending E06/notification infrastructure.

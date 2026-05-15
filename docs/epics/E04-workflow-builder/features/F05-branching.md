@@ -32,8 +32,8 @@ Workflows can take different execution paths based on data values using Conditio
 *Out of scope*
 - Loop-back branching (sending execution back to an earlier step) — cycles are blocked in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: canvas branch label rendering pending Frontend; branch evaluation at execution time pending E06.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `AddTransitionCommand` (with branch label) not yet implemented; canvas branch label rendering pending Frontend; branch evaluation at execution time pending E06.
 > Decisions: cycle detection implemented in domain (DFS reachability check in AddTransition).
 
 ---
@@ -62,8 +62,8 @@ Workflows can take different execution paths based on data values using Conditio
 *Out of scope*
 - Regex-based branch matching — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: branch drag-to-reorder UI and default-branch validation at publish pending Frontend + API.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `ConfigureStepCommand` (multi-branch config) not yet implemented; branch drag-to-reorder UI and default-branch validation at publish pending Frontend + API.
 
 ---
 
@@ -88,5 +88,5 @@ Workflows can take different execution paths based on data values using Conditio
 *Out of scope*
 - Explicit merge/join nodes on the canvas — merging is implicit (any step with multiple incoming edges acts as a merge point). An explicit Join node is used only in Parallel Groups (F06).
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: OR-merge deduplication (execute-once on first arrival) is an execution engine concern — pending E06.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: canvas operations (AddTransition with multiple incoming edges) pending Application command handlers; OR-merge deduplication (execute-once on first arrival) is an execution engine concern — pending E06.

@@ -33,8 +33,8 @@ A workflow must have at least one trigger before it can be published. Triggers d
 *Out of scope*
 - Triggering with pre-filled input from a page button (Page Builder) — not in MVP for this epic; covered in E07.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: input variable prompt dialog and `POST /workflows/{id}/executions` endpoint pending API + E06.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `AddTriggerCommand` and `RemoveTriggerCommand` handlers not yet implemented (domain `AddTrigger()`/`RemoveTrigger()` methods exist); input variable prompt dialog and `POST /workflows/{id}/executions` endpoint pending API + E06.
 > Decisions: trigger config (input variable definitions) stored as JSONB in `triggers` column.
 
 ---
@@ -64,8 +64,8 @@ A workflow must have at least one trigger before it can be published. Triggers d
 *Out of scope*
 - Date-specific one-time scheduling (e.g., "run once on 2026-12-25") — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: Wolverine cron job registration on publish and deregistration on archive pending E06.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `AddTriggerCommand` handler not yet implemented; Wolverine cron job registration on publish and deregistration on archive pending E06.
 
 ---
 
@@ -94,8 +94,8 @@ A workflow must have at least one trigger before it can be published. Triggers d
 - GET webhook triggers — POST only in MVP.
 - Event-type filtering on a single webhook URL (multiple workflows sharing one URL) — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: unique webhook URL generation, HMAC verification, and payload mapping pending E06 + API layer.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `AddTriggerCommand` handler not yet implemented; unique webhook URL generation, HMAC verification, and payload mapping pending E06 + API layer.
 
 ---
 
@@ -125,5 +125,5 @@ A workflow must have at least one trigger before it can be published. Triggers d
 - Custom platform events defined by users — not in MVP.
 - Listening to events from external systems (without going through a Webhook trigger) — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: Wolverine event subscription wiring and filter expression evaluation pending E06; event type registry and model-picker UI pending API + Frontend.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `AddTriggerCommand` handler not yet implemented; Wolverine event subscription wiring and filter expression evaluation pending E06; event type registry and model-picker UI pending API + Frontend.

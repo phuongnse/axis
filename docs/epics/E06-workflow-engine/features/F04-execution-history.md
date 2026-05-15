@@ -35,8 +35,8 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 *Out of scope*
 - Execution analytics dashboard (charts, trends) — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: paginated history table, status/date/trigger filters, and running-first sort pending API + Frontend.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `GetExecutionsByWorkflowQuery` handler not yet implemented (repository `GetByWorkflowAsync` exists); paginated history table, status/date/trigger filters, and running-first sort pending API + Frontend.
 > Decisions: `GetByWorkflowAsync` and `GetAllAsync` return executions ordered by `CreatedAt DESC`; pagination deferred to API layer.
 
 ---
@@ -64,8 +64,8 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 *Out of scope*
 - Replaying or simulating an execution from any point with a different context — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: step timeline UI, context snapshot display, and parallel group rendering pending Frontend + API.
+> **Implementation status** — Domain: ⚠️ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `ExecutionStep` aggregate not yet implemented (required for per-step timeline data); `GetExecutionQuery` (by ID, with step detail) not yet implemented; step timeline UI, context snapshot display, and parallel group rendering pending Frontend + API.
 
 ---
 
@@ -90,8 +90,8 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 *Out of scope*
 - Platform-wide execution monitoring across all tenants (Platform Admin view) — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: CSV export, role-scoped visibility enforcement, and async export notification pending API + Frontend.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `GetAllExecutionsQuery` handler not yet implemented (repository `GetAllAsync` exists); CSV export, role-scoped visibility enforcement, and async export notification pending API + Frontend.
 
 ---
 

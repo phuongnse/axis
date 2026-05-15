@@ -1,6 +1,6 @@
-﻿# F01 â€” Model Definition
+﻿# F01 — Model Definition
 
-[â† Back to E03](../README.md)
+[← Back to E03](../README.md)
 
 ---
 
@@ -12,7 +12,7 @@ Users can create custom data models within their organization. A model defines t
 
 ## User Stories
 
-### US-030 â€” Create a model
+### US-030 — Create a model
 
 **As an** Organization Member with `data_modeling:model:write`, **I want to** create a new model **so that** I can start defining the data structure for my business objects.
 
@@ -24,7 +24,7 @@ Users can create custom data models within their organization. A model defines t
 - [ ] After creation, the model opens in the field editor.
 
 *Validation & errors*
-- [ ] Name: required, 2â€“100 characters. Allows letters, numbers, spaces, and hyphens. Blocks special characters like `/ \ < > " ;`.
+- [ ] Name: required, 2–100 characters. Allows letters, numbers, spaces, and hyphens. Blocks special characters like `/ \ < > " ;`.
 - [ ] Name must be unique within the org (case-insensitive). Duplicate name shows: "A model named '{name}' already exists."
 - [ ] If the plan's model limit is reached, creation returns HTTP 402 with an upgrade prompt instead of a form error.
 
@@ -33,15 +33,15 @@ Users can create custom data models within their organization. A model defines t
 - [ ] Model creation is atomic: if any part of the creation fails (e.g., inserting system fields), the entire model is rolled back and nothing is left in a partial state.
 
 *Out of scope*
-- Importing a model from another org or from a JSON file directly â€” covered in [E04 F07 Import/Export](../../E04-workflow-builder/features/F07-import-export.md).
+- Importing a model from another org or from a JSON file directly — covered in [E04 F07 Import/Export](../../E04-workflow-builder/features/F07-import-export.md).
 
-> **Implementation status** â€” Domain + Application: âœ… | Infrastructure: âœ… | API: â³ | Frontend: â³
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: model plan-limit check (HTTP 402) pending billing layer (E01 F04); name format validation enforced in Application handler.
 > Decisions: system fields (id, created_at, updated_at) injected by domain factory; atomicity guaranteed by UnitOfWork.
 
 ---
 
-### US-031 â€” View all models
+### US-031 — View all models
 
 **As an** Organization Member with `data_modeling:model:read`, **I want to** see all models in my organization **so that** I can understand the data available to me.
 
@@ -61,14 +61,14 @@ Users can create custom data models within their organization. A model defines t
 - [ ] Record count may be slightly behind real-time (cached with 1-minute TTL) to avoid expensive COUNT queries on every list load.
 
 *Out of scope*
-- Folders or categories for organizing models â€” not in MVP.
+- Folders or categories for organizing models — not in MVP.
 
-> **Implementation status** â€” Domain + Application: âœ… | Infrastructure: âœ… | API: â³ | Frontend: â³
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: record count column pending denormalized counter or API-layer aggregation; field count is derived from Fields.Count at query time.
 
 ---
 
-### US-032 â€” Edit a model
+### US-032 — Edit a model
 
 **As an** Organization Member with `data_modeling:model:write`, **I want to** edit an existing model **so that** I can add, remove, or rename fields as requirements evolve.
 
@@ -86,18 +86,18 @@ Users can create custom data models within their organization. A model defines t
 - [ ] If the model is referenced by an active workflow step, editing it shows an informational warning (not a blocker): "This model is used in N workflow(s). Changes may affect their behavior."
 
 *Edge cases*
-- [ ] Two admins editing the same model simultaneously: last save wins. The first admin's changes are not silently overwritten without notice â€” on save, if the server detects a version conflict (via `updated_at` comparison), it returns HTTP 409 with: "This model was modified by someone else. Please refresh and reapply your changes."
+- [ ] Two admins editing the same model simultaneously: last save wins. The first admin's changes are not silently overwritten without notice — on save, if the server detects a version conflict (via `updated_at` comparison), it returns HTTP 409 with: "This model was modified by someone else. Please refresh and reapply your changes."
 - [ ] Renaming a field does not lose existing data; the underlying storage key is the field's immutable `id`, not its name.
 
 *Out of scope*
-- Undo history for field changes â€” not in MVP.
+- Undo history for field changes — not in MVP.
 
-> **Implementation status** â€” Domain + Application: âœ… | Infrastructure: âœ… | API: â³ | Frontend: â³
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: HTTP 409 version-conflict check pending API layer (updated_at comparison); active-workflow warning pending E04 integration.
 
 ---
 
-### US-033 â€” Delete a model
+### US-033 — Delete a model
 
 **As an** Organization Member with `data_modeling:model:delete`, **I want to** delete a model **so that** I can clean up unused data structures.
 
@@ -118,7 +118,7 @@ Users can create custom data models within their organization. A model defines t
 - [ ] Relation fields in other models that point to the deleted model are also flagged as broken.
 
 *Out of scope*
-- Recovering a soft-deleted model â€” not in MVP.
+- Recovering a soft-deleted model — not in MVP.
 
-> **Implementation status** â€” Domain + Application: âœ… | Infrastructure: âœ… | API: â³ | Frontend: â³
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: workflow/form reference check pending E04/E05 integration; 30-day purge background job pending infrastructure job scheduler.

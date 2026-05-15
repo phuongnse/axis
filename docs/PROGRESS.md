@@ -23,27 +23,32 @@
 
 ## DataModeling — E03-data-modeling
 
-**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳**
+**Domain ✅ | Application ✅ | Infrastructure ⚠️ | API ⚠️ | Frontend ⏳**
 
-- **Infrastructure**: DataModelingDbContext (public), EF Core configurations (DataModel/DataClass/DataRecord), JSONB FieldDefinition converter (polymorphic FieldConfig), JSONB DataRecord._data, 3 repositories (incl. GetPagedAsync with search via `data::text ILIKE`), DataModelingUnitOfWork, integration tests (Testcontainers)
-- **API**: Minimal API — `/api/models` (9 endpoints: CRUD + field management + reorder), `/api/data-classes` (7 endpoints), `/api/models/{id}/records` (5 endpoints with pagination+search). FieldConfigHelper for discriminated deserialization. Integration tests (WebApplicationFactory).
+- **Infrastructure (partial)**: DataModelingDbContext (public), EF Core configurations (DataModel/DataClass/DataRecord), JSONB FieldDefinition converter (polymorphic FieldConfig), JSONB DataRecord._data, 3 repositories (incl. GetPagedAsync with basic search via `data::text ILIKE`), DataModelingUnitOfWork, integration tests (Testcontainers). Missing: per-field filter/sort queries (US-043); bulk delete/export (US-046).
+- **API (partial)**: Minimal API — `/api/models` (9 endpoints: CRUD + field management + reorder), `/api/data-classes` (7 endpoints), `/api/models/{id}/records` (5 endpoints with pagination+search). FieldConfigHelper for discriminated deserialization. Integration tests (WebApplicationFactory). Missing: HTTP 422 structured field errors on record endpoints (US-035); per-field filter conditions and sort-by-column (US-043); bulk delete and CSV export (US-046).
 
 ## WorkflowBuilder — E04-workflow-builder
 
-**Domain ✅ | Application ✅ | Infrastructure ✅ | API ⏳ | Frontend ⏳**
+**Domain ✅ | Application ⚠️ | Infrastructure ✅ | API ⏳ | Frontend ⏳**
 
+- **Application (partial)**: CreateWorkflow, PublishWorkflow commands; GetWorkflows query. Missing: ArchiveWorkflow, UnarchiveWorkflow, DuplicateWorkflow, UpdateWorkflow commands; GetWorkflow (by ID) query; canvas operation commands (AddStep, RemoveStep, ConfigureStep, AddTransition, RemoveTransition); trigger management commands (AddTrigger, RemoveTrigger); ExportWorkflow query; ImportWorkflow, BulkExportWorkflows commands.
 - **Infrastructure**: WorkflowBuilderDbContext, WorkflowDefinition config (steps/transitions/triggers as JSONB with custom WorkflowStepConverter), WorkflowRepository, 7 integration tests (Testcontainers)
 
 ## FormBuilder — E05-form-builder
 
-**Domain ✅ | Application ✅ | Infrastructure ✅ | API ⏳ | Frontend ⏳**
+**Domain ⚠️ | Application ⚠️ | Infrastructure ✅ | API ⏳ | Frontend ⏳**
 
+- **Domain (partial)**: FormDefinition, FormField aggregates; all field types and domain events implemented. Missing: FormSubmission aggregate (required for F04 form task lifecycle).
+- **Application (partial)**: CreateForm, DeleteForm commands. Missing: UpdateForm command; GetForms, GetFormById queries; field management commands (AddField, RemoveField, ReorderFields).
 - **Infrastructure**: FormBuilderDbContext, EF Core config (FormDefinition with fields as JSONB via FormFieldConverter — 9 field types, polymorphic FormFieldConfig), FormRepository (IsReferencedByWorkflowAsync cross-module JSONB query), 8 integration tests (Testcontainers)
 
 ## WorkflowEngine — E06-workflow-engine
 
-**Domain ✅ | Application ✅ | Infrastructure ✅ | API ⏳ | Frontend ⏳**
+**Domain ⚠️ | Application ⚠️ | Infrastructure ✅ | API ⏳ | Frontend ⏳**
 
+- **Domain (partial)**: WorkflowExecution aggregate with execution state machine and domain events. Missing: ExecutionStep aggregate (required for per-step status, timing, and output tracking as specified in US-093/098).
+- **Application (partial)**: StartExecution, CancelExecution, RetryExecution commands. Missing: GetExecution, GetExecutionsByWorkflow, GetAllExecutions queries; RetryExecutionWithContext command.
 - **Infrastructure**: WorkflowEngineDbContext, EF Core config (WorkflowExecution with `_context` as JSONB), ExecutionRepository (4 methods: AddAsync, GetByIdAsync, GetAllAsync, GetByWorkflowAsync), WorkflowDefinitionReader (cross-module raw SQL query on `workflow_definitions.status`), WorkflowEngineUnitOfWork, 8 integration tests (Testcontainers)
 
 ## PageBuilder — E07-page-builder

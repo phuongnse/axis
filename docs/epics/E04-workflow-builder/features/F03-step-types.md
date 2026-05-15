@@ -35,8 +35,8 @@ Each step has a type that determines what it does when executed. Users configure
 *Out of scope*
 - Multiple assignees on a single Form step (assign to all and wait for the first response) — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: form picker UI, assignee expression evaluation, and timeout enforcement pending Frontend + E06.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: step config command handlers (`ConfigureStepCommand` covering Form-step-specific config) not yet implemented; form picker UI, assignee expression evaluation, and timeout enforcement pending Frontend + E06.
 > Decisions: step config (formId, assignee, timeout) stored as JSONB dict in `steps` column.
 
 ---
@@ -67,8 +67,8 @@ Each step has a type that determines what it does when executed. Users configure
 - GraphQL or gRPC step types — not in MVP.
 - Response streaming — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: HTTP execution, REDACTED credential storage, and Test button pending E06 + API layers.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: step config command handler not yet implemented; HTTP execution, REDACTED credential storage, and Test button pending E06 + API layers.
 
 ---
 
@@ -96,8 +96,8 @@ Each step has a type that determines what it does when executed. Users configure
 *Out of scope*
 - Raw expression editing (writing code directly) — the visual builder is the only interface in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: expression builder UI and branch evaluation pending Frontend + E06; condition branches stored in step config JSONB.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: step config command handler not yet implemented; expression builder UI and branch evaluation pending Frontend + E06; condition branches stored in step config JSONB.
 
 ---
 
@@ -127,8 +127,8 @@ Each step has a type that determines what it does when executed. Users configure
 - Importing external npm packages — not in MVP.
 - Python or other language scripts — JavaScript only in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: JS sandbox execution, timeout enforcement, and "Run test" button pending E06 + Frontend.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: step config command handler not yet implemented; JS sandbox execution, timeout enforcement, and "Run test" button pending E06 + Frontend.
 
 ---
 
@@ -158,5 +158,5 @@ Each step has a type that determines what it does when executed. Users configure
 - SMS, Slack, or Teams notification channels — not in MVP.
 - Notification templates shared across workflows — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: email/webhook dispatch pending E06; configurable fail-on-error toggle pending API layer.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: step config command handler not yet implemented; email/webhook dispatch pending E06; configurable fail-on-error toggle pending API layer.

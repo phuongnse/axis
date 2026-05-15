@@ -111,8 +111,8 @@ Users can create, view, edit, publish, archive, and duplicate workflow definitio
 *Out of scope*
 - Automatic archiving after N days of inactivity — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: trigger deactivation on archive pending E06 integration; HTTP 422 on archived-workflow trigger pending API layer.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `ArchiveWorkflowCommand` and `UnarchiveWorkflowCommand` handlers not yet implemented (domain `Archive()`/`Unarchive()` methods exist); trigger deactivation on archive pending E06 integration; HTTP 422 on archived-workflow trigger pending API layer.
 
 ---
 
@@ -138,6 +138,6 @@ Users can create, view, edit, publish, archive, and duplicate workflow definitio
 *Out of scope*
 - Cross-org workflow duplication (copy to another org) — handled by Import/Export in F07.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: "Copy of {name}" suffix deduplication and plan-limit check pending API layer; webhook URL generation for duplicate pending E06.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `DuplicateWorkflowCommand` handler not yet implemented (domain `Duplicate()` method exists); "Copy of {name}" suffix deduplication and plan-limit check pending API layer; webhook URL generation for duplicate pending E06.
 > Decisions: Duplicate() deep-copies all steps with new IDs and remaps transitions atomically in domain logic.
