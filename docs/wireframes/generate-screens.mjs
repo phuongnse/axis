@@ -2,7 +2,8 @@
  * Axis Screen Wireframes Generator
  * Run: node docs/wireframes/generate-screens.mjs
  *
- * Generates 15 .excalidraw files across modules E02–E06 + _shared.
+ * All component helper dimensions match generate-template.mjs exactly.
+ * See docs/playbooks/wireframes.md §"Component dimensions" for the canonical table.
  *
  * Files produced:
  *   _shared/app-shell.excalidraw
@@ -25,7 +26,7 @@
 import { writeFileSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 
-// ─── Primitive builders ───────────────────────────────────────────────────────
+// ─── Primitive builders (identical signatures to generate-template.mjs) ───────
 
 let _seed = 2001;
 const nextSeed = () => (_seed += 3);
@@ -80,151 +81,193 @@ function vline(id, x, y, h, stroke = '#D9D7D1', sw = 1) {
   };
 }
 
-// ─── Colors ───────────────────────────────────────────────────────────────────
+function ellipse(id, x, y, w, h, stroke, bg, sw = 1) {
+  const s = nextSeed();
+  return {
+    ...BASE, id, type: 'ellipse', x, y, width: w, height: h,
+    strokeColor: stroke, backgroundColor: bg, fillStyle: 'solid',
+    strokeWidth: sw, strokeStyle: 'solid', roughness: 1,
+    roundness: { type: 3 }, seed: s, versionNonce: s + 1,
+  };
+}
+
+// ─── Colors (identical to generate-template.mjs) ─────────────────────────────
 
 const C = {
-  primary:      '#667A6E',
-  primaryDark:  '#4F5F57',
-  accent:       '#C58B55',
-  accentDark:   '#A8743E',
-  danger:       '#9E4A44',
-  success:      '#4D6B44',
-  warning:      '#B5763D',
-  gray900:      '#2B2F33',
-  gray700:      '#4A5058',
-  gray500:      '#8A9099',
-  gray300:      '#D9D7D1',
-  gray100:      '#F4F3EF',
-  gray50:       '#F9F8F5',
-  white:        '#FFFFFF',
-  successBg:    '#EBF0E9',
-  warningBg:    '#F6EEE4',
-  dangerBg:     '#F3ECEA',
-  infoBg:       '#EDF0EE',
+  primary:       '#667A6E',
+  primaryDark:   '#4F5F57',
+  accent:        '#C58B55',
+  accentDark:    '#A8743E',
+  danger:        '#9E4A44',
+  dangerDark:    '#7D3A35',
+  success:       '#4D6B44',
+  warning:       '#B5763D',
+  gray900:       '#2B2F33',
+  gray700:       '#4A5058',
+  gray500:       '#8A9099',
+  gray300:       '#D9D7D1',
+  gray100:       '#F4F3EF',
+  gray50:        '#F9F8F5',
+  white:         '#FFFFFF',
+  infoBg:        '#EDF0EE',
+  infoBorder:    '#A8BAB1',
+  successBg:     '#EBF0E9',
+  successBorder: '#7FA676',
+  warningBg:     '#F6EEE4',
+  warningBorder: '#C9975E',
+  dangerBg:      '#F3ECEA',
+  dangerBorder:  '#C08078',
 };
 
-// ─── Layout constants ─────────────────────────────────────────────────────────
+// ─── Layout constants (from S18 App Shell in generate-template.mjs) ───────────
 
-const SB = 220;       // sidebar width
-const HDR = 52;       // header height
-const OX = 20;        // canvas origin x
-const OY = 20;        // canvas origin y
-const CX = OX + SB;  // content x = 240
-const CY = OY + HDR; // content y = 72
+const SB  = 230;      // sidebar width  — matches shell_sidebar w=230 in S18
+const HDR = 60;       // header height  — matches shell_header h=60 in S18
+const OX  = 20;       // canvas left margin
+const OY  = 20;       // canvas top margin
+const CX  = OX + SB; // content area x = 250
+const CY  = OY + HDR; // content area y = 80
 
-// ─── Shared component helpers ─────────────────────────────────────────────────
+// ─── Component helpers — dimensions must match generate-template.mjs ──────────
 
-function btn(id, x, y, label, variant = 'primary', w = 100) {
-  const bg = variant === 'primary' ? C.accent : variant === 'danger' ? C.danger : C.white;
-  const stroke = variant === 'primary' ? C.accentDark : variant === 'danger' ? C.danger : C.gray300;
-  const color = variant === 'ghost' ? C.gray700 : C.white;
+// Button — h=36 (or 40 for primary full-width), sw=2 for primary/danger, sw=1 for ghost
+// Text at y+10, 13px, centered. Source: S03 Buttons.
+function btn(id, x, y, label, variant = 'primary', w = 120) {
+  const configs = {
+    primary: { bg: C.accent,   stroke: C.accentDark, color: C.white, sw: 2 },
+    danger:  { bg: C.danger,   stroke: C.dangerDark, color: C.white, sw: 2 },
+    ghost:   { bg: C.white,    stroke: C.gray300,    color: C.gray700, sw: 1 },
+    secondary:{ bg: C.infoBg,  stroke: C.primary,    color: C.primary, sw: 1 },
+  };
+  const { bg, stroke, color, sw } = configs[variant] || configs.ghost;
   return [
-    rect(id + '_bg', x, y, w, 30, stroke, bg, 1, true),
-    txt(id + '_lbl', x, y + 8, w, 16, label, 12, color, 'center'),
+    rect(`${id}_bg`, x, y, w, 36, stroke, bg, sw, true),
+    txt(`${id}_lbl`, x, y + 10, w, 16, label, 13, color, 'center'),
   ];
 }
 
-function inputField(id, x, y, placeholder, w = 200) {
+// Input field — h=40, placeholder at y+11, 13px. Source: S04 Form Controls.
+function inputField(id, x, y, placeholder, w = 280) {
   return [
-    rect(id + '_box', x, y, w, 32, C.gray300, C.white, 1, true),
-    txt(id + '_ph', x + 8, y + 9, w - 16, 16, placeholder, 12, C.gray500),
+    rect(`${id}_box`, x, y, w, 40, C.gray300, C.white, 1, true),
+    txt(`${id}_ph`, x + 12, y + 11, w - 24, 18, placeholder, 13, C.gray500),
   ];
 }
 
-function selectField(id, x, y, placeholder, w = 200) {
+// Select — same h=40 as input, arrow at x+w-22. Source: S04 Form Controls.
+function selectField(id, x, y, placeholder, w = 280) {
   return [
-    rect(id + '_box', x, y, w, 32, C.gray300, C.white, 1, true),
-    txt(id + '_ph', x + 8, y + 9, w - 16, 16, placeholder, 12, C.gray500),
-    txt(id + '_arr', x + w - 20, y + 9, 16, 16, '▾', 11, C.gray500),
+    rect(`${id}_box`, x, y, w, 40, C.gray300, C.white, 1, true),
+    txt(`${id}_ph`, x + 12, y + 11, w - 36, 18, placeholder, 13, C.gray500),
+    txt(`${id}_arr`, x + w - 22, y + 11, 16, 18, '▾', 13, C.gray700),
   ];
 }
 
+// Badge — h=28, width=label.length×8+24, text at y+6, 12px. Source: S09 Badges.
 function badge(id, x, y, label, color, bg) {
+  const w = label.length * 8 + 24;
   return [
-    rect(id + '_bg', x, y, label.length * 7 + 12, 20, color, bg, 1, true),
-    txt(id + '_lbl', x + 6, y + 4, label.length * 7, 14, label, 10, color),
+    rect(`${id}_bg`, x, y, w, 28, color, bg, 1, true),
+    txt(`${id}_lbl`, x, y + 6, w, 16, label, 12, color, 'center'),
   ];
 }
 
+// Search bar — h=40, icon at y+11. Source: S04 Form Controls (search variant).
+function searchBar(id, x, y, w = 280) {
+  return [
+    rect(`${id}_box`, x, y, w, 40, C.gray300, C.white, 1, true),
+    txt(`${id}_icon`, x + 10, y + 11, 18, 18, '⌕', 14, C.gray500),
+    txt(`${id}_ph`, x + 34, y + 11, w - 46, 18, 'Search…', 13, C.gray500),
+  ];
+}
+
+// Page header — title 18px + optional subtitle 12px.
 function pageHeader(id, x, y, title, subtitle = '') {
-  const els = [txt(id + '_title', x, y, 500, 28, title, 20, C.gray900)];
-  if (subtitle) els.push(txt(id + '_sub', x, y + 30, 500, 16, subtitle, 12, C.gray500));
+  const els = [txt(`${id}_title`, x, y, 500, 26, title, 18, C.gray900)];
+  if (subtitle) els.push(txt(`${id}_sub`, x, y + 30, 500, 18, subtitle, 12, C.gray500));
   return els;
 }
 
-function searchBar(id, x, y, w = 260) {
-  return [
-    rect(id + '_box', x, y, w, 32, C.gray300, C.white, 1, true),
-    txt(id + '_icon', x + 8, y + 9, 16, 16, '⌕', 13, C.gray500),
-    txt(id + '_ph', x + 26, y + 9, w - 34, 16, 'Search…', 12, C.gray500),
-  ];
-}
-
+// Table header — h=44, text at yH+12, 13px. Source: S10 Table.
 function tableHeader(id, x, y, w, cols) {
-  const els = [rect(id + '_bg', x, y, w, 36, C.gray300, C.gray100, 1)];
+  const els = [
+    rect(`${id}_bg`, x, y, w, 44, C.gray300, C.gray100, 1),
+    hline(`${id}_div`, x, y + 44, w, C.gray300),
+  ];
   let cx = x + 12;
   cols.forEach(([label, cw], i) => {
-    els.push(txt(id + `_h${i}`, cx, y + 10, cw - 8, 16, label, 11, C.gray700));
+    els.push(txt(`${id}_h${i}`, cx, y + 12, cw - 16, 20, label, 13, C.gray900));
     cx += cw;
   });
   return els;
 }
 
-function tableRow(id, x, y, w, cells, highlight = false) {
-  const bg = highlight ? C.infoBg : C.white;
+// Table row — h=50, text at yR+15, 13px. Source: S10 Table.
+function tableRow(id, x, y, w, cells, shade = false) {
+  const bg = shade ? C.gray50 : C.white;
   const els = [
-    rect(id + '_bg', x, y, w, 40, C.gray300, bg, 1),
-    hline(id + '_div', x, y + 40, w, C.gray100),
+    rect(`${id}_bg`, x, y, w, 50, 'transparent', bg, 0),
+    hline(`${id}_div`, x, y + 50, w, C.gray300),
   ];
   let cx = x + 12;
   cells.forEach(([label, cw, color], i) => {
-    els.push(txt(id + `_c${i}`, cx, y + 13, cw - 8, 16, label, 12, color || C.gray900));
+    els.push(txt(`${id}_c${i}`, cx, y + 15, cw - 16, 20, label, 13, color || C.gray900));
     cx += cw;
   });
   return els;
 }
 
-// ─── App shell components ─────────────────────────────────────────────────────
+// Table outer border — wraps header + rows.
+function tableOuter(id, x, y, w, h) {
+  return rect(id, x, y, w, h, C.gray300, 'transparent', 1);
+}
 
+// ─── App shell — matches S18 App Shell in generate-template.mjs exactly ──────
+
+// navItems: array of [label, active]
 function appShell(prefix, W, H, activeNav) {
   const els = [];
   const totalH = H - OY;
   const totalW = W - OX;
 
-  // outer container
-  els.push(rect(`${prefix}_outer`, OX, OY, totalW, totalH, C.gray300, C.gray100, 1));
+  // Page background (warm off-white)
+  els.push(rect(`${prefix}_bg`, OX, OY, totalW, totalH, C.gray300, C.gray100, 1));
 
-  // sidebar
-  els.push(rect(`${prefix}_sb`, OX, OY, SB, totalH, C.gray300, C.primaryDark, 1));
+  // Sidebar (white surface, sage accents) — matches shell_sidebar w=230
+  els.push(rect(`${prefix}_sb`, OX, OY, SB, totalH, C.gray300, C.white, 1));
 
-  // logo area
-  els.push(rect(`${prefix}_logo`, OX + 12, OY + 12, SB - 24, 28, C.primary, C.primary, 1, true));
-  els.push(txt(`${prefix}_logoTxt`, OX + 20, OY + 18, 100, 18, 'AXIS', 14, C.white));
+  // Logo area — h=60, gray50 bg, matches shell_logo in S18
+  els.push(rect(`${prefix}_logo_area`, OX, OY, SB, 60, C.gray300, C.gray50, 1));
+  els.push(txt(`${prefix}_logo_t`, OX + 28, OY + 18, 160, 26, '⬡  Axis', 18, C.primary));
 
-  // nav items
-  const navItems = [
-    'Dashboard', 'Data Models', 'Workflows', 'Forms', 'Executions', 'Pages',
-  ];
+  // Nav items — 214×36px, matches shell_ni pattern in S18
+  const navItems = ['Data Models', 'Workflows', 'Forms', 'Executions', 'Settings'];
   navItems.forEach((item, i) => {
-    const ny = OY + 60 + i * 36;
-    const isActive = item === activeNav;
-    if (isActive) {
-      els.push(rect(`${prefix}_nav_act_${i}`, OX + 8, ny, SB - 16, 28, 'transparent', C.primary, 0, true));
-    }
-    els.push(txt(`${prefix}_nav_${i}`, OX + 20, ny + 6, SB - 40, 18, item, 12, isActive ? C.white : C.gray300));
+    const ny = OY + 72 + i * 44;
+    const active = item === activeNav;
+    const bg = active ? C.infoBg : 'transparent';
+    const stroke = active ? C.infoBorder : 'transparent';
+    const tc = active ? C.primary : C.gray700;
+    els.push(rect(`${prefix}_ni_${i}`, OX + 8, ny, 214, 36, stroke, bg, 1));
+    // Active left accent bar — 3px, matches shell_acc in S18
+    if (active) els.push(rect(`${prefix}_nacc_${i}`, OX + 8, ny, 3, 36, C.primary, C.primary, 1));
+    els.push(txt(`${prefix}_nl_${i}`, OX + 28, ny + 9, 170, 18, item, 13, tc));
   });
 
-  // settings link at bottom of sidebar
-  els.push(hline(`${prefix}_sb_sep`, OX, OY + totalH - 44, SB, C.primary));
-  els.push(txt(`${prefix}_sb_settings`, OX + 20, OY + totalH - 32, SB - 40, 18, 'Settings', 12, C.gray300));
+  // User area at sidebar bottom — ellipse avatar matches shell_uav in S18
+  els.push(hline(`${prefix}_user_div`, OX + 8, OY + totalH - 52, 214, C.gray300));
+  els.push(ellipse(`${prefix}_uav`, OX + 16, OY + totalH - 44, 32, 32, C.infoBorder, C.infoBg, 1));
+  els.push(txt(`${prefix}_un`, OX + 56, OY + totalH - 36, 140, 18, 'Alex Brown', 12, C.gray900));
 
-  // header bar
+  // Header bar — h=60, white surface, matches shell_header in S18
   els.push(rect(`${prefix}_hdr`, CX, OY, totalW - SB, HDR, C.gray300, C.white, 1));
   els.push(hline(`${prefix}_hdr_div`, CX, OY + HDR, totalW - SB, C.gray300));
 
-  // user avatar placeholder
-  els.push(rect(`${prefix}_avatar`, OX + totalW - 44, OY + 10, 32, 32, C.gray300, C.gray100, 1, true));
-  els.push(txt(`${prefix}_avatarTxt`, OX + totalW - 38, OY + 18, 20, 16, 'JD', 11, C.gray700, 'center'));
+  // Header: notification + avatar ellipses — matches S18
+  els.push(ellipse(`${prefix}_notif`, OX + totalW - 76, OY + 12, 36, 36, C.gray300, C.gray100, 1));
+  els.push(txt(`${prefix}_notif_t`, OX + totalW - 76, OY + 21, 36, 18, '🔔', 12, C.gray700, 'center'));
+  els.push(ellipse(`${prefix}_av`, OX + totalW - 32, OY + 12, 36, 36, C.infoBorder, C.infoBg, 1));
+  els.push(txt(`${prefix}_av_t`, OX + totalW - 32, OY + 21, 36, 18, 'AB', 12, C.primary, 'center'));
 
   return els;
 }
@@ -237,10 +280,7 @@ function writeExcalidraw(filePath, elements) {
     version: 2,
     source: 'generate-screens.mjs',
     elements,
-    appState: {
-      gridSize: null,
-      viewBackgroundColor: C.gray100,
-    },
+    appState: { gridSize: null, viewBackgroundColor: C.gray100 },
     files: {},
   };
   mkdirSync(dirname(filePath), { recursive: true });
@@ -251,55 +291,54 @@ function writeExcalidraw(filePath, elements) {
 const BASE_DIR = 'docs/wireframes';
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// _shared/app-shell
+// _shared / app-shell
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function genAppShell() {
-  const W = 1100, H = 700;
+  const W = 1100, H = 640;
   const els = [];
 
-  // Section 1: App Shell with sidebar + header
-  els.push(txt('as_title', 40, 20, 600, 28, 'App Shell — Authenticated Layout', 18, C.gray500));
-  els.push(hline('as_div', 40, 52, 1020));
+  // ── Section 1: Full app shell layout reference ─────────────────────────────
+  els.push(txt('as_title', OX, OY - 16, 700, 20, 'App Shell — Authenticated Layout (SB=230px  HDR=60px  CX=250  CY=80)', 12, C.gray500));
 
-  const shell = appShell('as', W, H, 'Dashboard');
-  els.push(...shell);
+  els.push(...appShell('as', W, H, 'Data Models'));
 
-  // breadcrumb area in header
-  els.push(txt('as_breadcrumb', CX + 16, OY + 16, 400, 20, 'Dashboard / Overview', 12, C.gray700));
+  // Breadcrumb in header (matches shell_breadcrumb in S18)
+  els.push(txt('as_bc', CX + 16, OY + 18, 300, 22, 'Data Models', 18, C.gray900));
 
-  // content area label
-  els.push(rect('as_content', CX, CY, W - OX - SB, H - OY - HDR, C.gray200, C.gray100, 1));
-  els.push(txt('as_content_lbl', CX + 40, CY + 60, 400, 24, 'Content Area', 16, C.gray500, 'center'));
-  els.push(txt('as_content_sub', CX + 40, CY + 88, 400, 16, `x=${CX}  y=${CY}  w=${W - OX - SB}`, 11, C.gray500, 'center'));
+  // Content area annotation
+  els.push(txt('as_ann_cx', CX + 20, CY + 20, 300, 18, `Content starts at x=${CX}  y=${CY}`, 11, C.gray500));
+  els.push(txt('as_ann_w', CX + 20, CY + 40, 400, 18, `Content width = W − OX − SB − 40 (20px pad each side)`, 11, C.gray500));
 
-  // Annotation callouts
-  els.push(txt('as_ann_sb', OX + 50, OY + 340, 130, 50, `Sidebar\n${SB}px wide\nSage Dark bg`, 11, C.gray300, 'center'));
-  els.push(txt('as_ann_hdr', CX + 20, OY + 4, 200, 14, `Header  h=${HDR}px`, 10, C.gray500));
+  // ── Section 2: Settings sub-navigation pattern ─────────────────────────────
+  const s2Y = H + 20;
+  els.push(txt('as2_title', OX, s2Y, 600, 18, 'Settings area — sub-navigation pattern (used by E02 settings screens)', 12, C.gray500));
+  els.push(hline('as2_div', OX, s2Y + 22, W - OX * 2, C.gray300));
 
-  // Section 2: Annotation — settings sub-pages
-  const y2 = H + 40;
-  els.push(txt('as2_title', 40, y2, 700, 28, 'Settings Area — sub-navigation pattern', 18, C.gray500));
-  els.push(hline('as2_div', 40, y2 + 32, 1020));
+  const s2C = s2Y + 36;
+  const s2H = 280;
 
-  const y2c = y2 + 50;
-  // settings sidebar (within content area)
-  els.push(rect('as2_outer', OX, y2c, W - OX * 2, 300, C.gray300, C.gray100));
-  els.push(rect('as2_mainsb', OX, y2c, SB, 300, C.gray300, C.primaryDark));
-  els.push(txt('as2_mainsb_lbl', OX + 20, y2c + 10, 120, 16, 'Main Nav', 11, C.gray300));
-  // settings sub-sidebar
-  els.push(rect('as2_subnav', OX + SB, y2c, 160, 300, C.gray300, C.white));
-  els.push(txt('as2_subnav_lbl', OX + SB + 12, y2c + 10, 140, 14, 'Settings', 13, C.gray900));
-  const settingsItems = ['Users & Invites', 'Roles & Permissions', 'Security'];
-  settingsItems.forEach((item, i) => {
-    const sy = y2c + 36 + i * 32;
-    const isFirst = i === 0;
-    if (isFirst) els.push(rect(`as2_sub_act_${i}`, OX + SB + 4, sy - 4, 152, 26, 'transparent', C.infoBg, 0, true));
-    els.push(txt(`as2_sub_${i}`, OX + SB + 16, sy, 130, 18, item, 12, isFirst ? C.primary : C.gray700));
+  els.push(rect('as2_bg', OX, s2C, W - OX * 2, s2H, C.gray300, C.gray100));
+  // main sidebar
+  els.push(rect('as2_sb', OX, s2C, SB, s2H, C.gray300, C.white));
+  els.push(txt('as2_sb_nav', OX + 28, s2C + 18, 160, 18, '⬡  Axis', 18, C.primary));
+  // settings sub-nav panel
+  const subW = 180;
+  els.push(rect('as2_sub', OX + SB, s2C, subW, s2H, C.gray300, C.white));
+  els.push(txt('as2_sub_hdr', OX + SB + 16, s2C + 16, 150, 20, 'Settings', 14, C.gray900));
+  els.push(hline('as2_sub_sep', OX + SB, s2C + 44, subW, C.gray300));
+  const subItems = [['Users & Invites', true], ['Roles & Permissions', false], ['Security', false]];
+  subItems.forEach(([label, active], i) => {
+    const iy = s2C + 52 + i * 40;
+    if (active) {
+      els.push(rect(`as2_sub_act_${i}`, OX + SB + 4, iy - 2, subW - 8, 32, C.infoBorder, C.infoBg, 1, true));
+      els.push(rect(`as2_sub_bar_${i}`, OX + SB + 4, iy - 2, 3, 32, C.primary, C.primary, 1));
+    }
+    els.push(txt(`as2_sub_lbl_${i}`, OX + SB + 20, iy + 6, 150, 18, label, 12, active ? C.primary : C.gray700));
   });
-  // content
-  els.push(rect('as2_content', OX + SB + 160, y2c, W - OX * 2 - SB - 160, 300, C.gray300, C.gray50));
-  els.push(txt('as2_content_lbl', OX + SB + 180, y2c + 40, 300, 20, 'Settings Content', 14, C.gray500));
+  // content area
+  els.push(rect('as2_content', OX + SB + subW, s2C, W - OX * 2 - SB - subW, s2H, C.gray300, C.gray50));
+  els.push(txt('as2_content_lbl', OX + SB + subW + 20, s2C + 40, 300, 20, 'Settings Content Area', 13, C.gray500));
 
   writeExcalidraw(`${BASE_DIR}/_shared/app-shell.excalidraw`, els);
 }
@@ -309,224 +348,224 @@ function genAppShell() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function genSettingsUsers() {
-  const W = 1100, H = 760;
-  const tableW = W - OX - SB - 40;
+  const W = 1100, H = 800;
+  const PAD = 20;                          // content padding left/right
+  const tW = W - OX - SB - PAD * 2;       // table width = 810
+  const tX = CX + PAD;                     // table x = 270
   const els = [...appShell('su', W, H, 'Settings')];
 
-  // header in content area
-  els.push(txt('su_hdr_bc', CX + 16, OY + 16, 300, 20, 'Settings / Users & Invites', 12, C.gray700));
+  // Header breadcrumb
+  els.push(txt('su_bc', CX + 16, OY + 20, 340, 22, 'Settings / Users & Invites', 14, C.gray700));
 
-  // page header
-  els.push(...pageHeader('su_ph', CX + 20, CY + 20, 'Users & Invites'));
-  els.push(...btn('su_invite', CX + tableW - 60, CY + 20, '+ Invite', 'primary', 100));
+  // Page header + primary action
+  els.push(...pageHeader('su_ph', tX, CY + PAD, 'Users & Invites'));
+  els.push(...btn('su_invite', tX + tW - 120, CY + PAD, '+ Invite User', 'primary', 120));
 
-  // search + filter row
-  els.push(...searchBar('su_search', CX + 20, CY + 72, 260));
-  els.push(...selectField('su_filter_status', CX + 292, CY + 72, 'Status: All', 150));
-  els.push(...selectField('su_filter_role', CX + 452, CY + 72, 'Role: All', 140));
+  // Search + filters row
+  const filterY = CY + 78;
+  els.push(...searchBar('su_search', tX, filterY, 260));
+  els.push(...selectField('su_status', tX + 276, filterY, 'Status: All', 160));
+  els.push(...selectField('su_role', tX + 452, filterY, 'Role: All', 150));
 
-  // tabs: Users | Pending Invitations
-  const tabY = CY + 118;
-  els.push(rect('su_tab1_bg', CX + 20, tabY, 120, 32, C.primary, C.white, 2));
-  els.push(txt('su_tab1', CX + 20, tabY + 8, 120, 18, 'Users', 13, C.primary, 'center'));
-  els.push(rect('su_tab2_bg', CX + 144, tabY, 160, 32, C.gray300, C.white, 1));
-  els.push(txt('su_tab2', CX + 144, tabY + 8, 160, 18, 'Pending Invitations', 13, C.gray500, 'center'));
-  els.push(hline('su_tab_div', CX + 20, tabY + 32, tableW));
+  // Tabs
+  const tabY = filterY + 56;
+  els.push(rect('su_tab1_bg', tX, tabY, 110, 36, C.primary, C.white, 2, true));
+  els.push(txt('su_tab1', tX, tabY + 9, 110, 18, 'Users', 13, C.primary, 'center'));
+  els.push(rect('su_tab2_bg', tX + 118, tabY, 180, 36, C.gray300, C.white, 1, true));
+  els.push(txt('su_tab2', tX + 118, tabY + 9, 180, 18, 'Pending Invitations', 13, C.gray500, 'center'));
+  els.push(hline('su_tab_line', tX, tabY + 36, tW, C.gray300));
 
-  // Users table
-  const tY = tabY + 44;
-  const cols = [['Name / Email', 260], ['Role', 140], ['Status', 100], ['Last Active', 140], ['Actions', 100]];
-  els.push(...tableHeader('su_th', CX + 20, tY, tableW, cols));
+  // Table
+  const tY = tabY + 52;
+  const cols = [['Name / Email', 260], ['Role', 140], ['Status', 100], ['Last Active', 160], ['Actions', 150]];
+  els.push(tableOuter('su_outer', tX, tY, tW, 44 + 4 * 50));
+  els.push(...tableHeader('su_th', tX, tY, tW, cols));
 
   const users = [
-    ['John Doe  john@acme.com', 'Admin', 'Active', '2 hours ago', ''],
-    ['Jane Smith  jane@acme.com', 'Editor', 'Active', 'Yesterday', ''],
-    ['Bob Wilson  bob@acme.com', 'Viewer', 'Inactive', '3 weeks ago', ''],
-    ['Alice Chen  alice@acme.com', 'Editor', 'Active', '1 hour ago', ''],
+    ['John Doe  ·  john@acme.com', 'Admin', 'Active', '2 hours ago', false],
+    ['Jane Smith  ·  jane@acme.com', 'Editor', 'Active', 'Yesterday', true],
+    ['Bob Wilson  ·  bob@acme.com', 'Viewer', 'Inactive', '3 weeks ago', false],
+    ['Alice Chen  ·  alice@acme.com', 'Editor', 'Active', '1 hour ago', true],
   ];
-  users.forEach(([name, role, status, lastActive], i) => {
-    const rowY = tY + 36 + i * 40;
-    const statusColor = status === 'Active' ? C.success : C.gray500;
-    els.push(...tableRow(`su_row_${i}`, CX + 20, rowY, tableW, [
-      [name, 260], [role, 140], [status, 100, statusColor], [lastActive, 140], ['Edit  Remove', 100, C.primary],
-    ]));
+  users.forEach(([name, role, status, lastActive, shade], i) => {
+    const rY = tY + 44 + i * 50;
+    const sColor = status === 'Active' ? C.success : C.gray500;
+    els.push(...tableRow(`su_r${i}`, tX, rY, tW, [
+      [name, 260], [role, 140], [status, 100, sColor], [lastActive, 160, C.gray500], ['Edit  ·  Remove', 150, C.primary],
+    ], shade));
   });
 
-  // pagination
-  const pgY = tY + 36 + users.length * 40 + 12;
-  els.push(txt('su_pg', CX + 20, pgY, 300, 16, 'Showing 1–4 of 4 users', 11, C.gray500));
-  els.push(...btn('su_pg_prev', CX + tableW - 180, pgY - 4, '← Prev', 'ghost', 80));
-  els.push(...btn('su_pg_next', CX + tableW - 90, pgY - 4, 'Next →', 'ghost', 80));
+  // Pagination
+  const pgY = tY + 44 + users.length * 50 + 16;
+  els.push(txt('su_pg_info', tX, pgY + 8, 280, 20, 'Showing 1–4 of 4 users', 12, C.gray500));
+  els.push(...btn('su_pg_prev', tX + tW - 188, pgY, '← Prev', 'ghost', 88));
+  els.push(...btn('su_pg_next', tX + tW - 92, pgY, 'Next →', 'ghost', 88));
 
-  // ── Invite User modal (overlay)
-  const mX = CX + 80, mY = CY + 60, mW = 440, mH = 320;
-  els.push(rect('su_modal_overlay', OX, OY, W - OX, H - OY, 'transparent', C.gray900, 0, false, { opacity: 30 }));
+  // ── Invite User modal ──────────────────────────────────────────────────────
+  const mW = 460, mH = 340;
+  const mX = CX + Math.round((W - OX - SB - mW) / 2);
+  const mY = CY + 60;
+  els.push(rect('su_ov', OX, OY, W - OX, H - OY, 'transparent', C.gray900, 0, false, { opacity: 30 }));
   els.push(rect('su_modal', mX, mY, mW, mH, C.gray300, C.white, 1, true));
   els.push(txt('su_modal_title', mX + 20, mY + 20, mW - 40, 24, 'Invite User', 16, C.gray900));
-  els.push(hline('su_modal_div', mX + 20, mY + 50, mW - 40));
-  els.push(txt('su_modal_email_lbl', mX + 20, mY + 68, 120, 16, 'Email address', 12, C.gray700));
-  els.push(...inputField('su_modal_email', mX + 20, mY + 86, 'colleague@company.com', mW - 40));
-  els.push(txt('su_modal_role_lbl', mX + 20, mY + 132, 60, 16, 'Role', 12, C.gray700));
-  els.push(...selectField('su_modal_role', mX + 20, mY + 150, 'Select role…', mW - 40));
-  els.push(txt('su_modal_roles_note', mX + 20, mY + 196, mW - 40, 16, 'Viewer · Editor · Admin', 11, C.gray500));
-  els.push(...btn('su_modal_cancel', mX + mW - 220, mY + mH - 48, 'Cancel', 'ghost', 90));
-  els.push(...btn('su_modal_send', mX + mW - 120, mY + mH - 48, 'Send Invite', 'primary', 110));
+  els.push(hline('su_modal_sep', mX + 20, mY + 52, mW - 40));
+
+  els.push(txt('su_email_lbl', mX + 20, mY + 68, 140, 18, 'Email address', 12, C.gray700));
+  els.push(...inputField('su_email', mX + 20, mY + 88, 'colleague@company.com', mW - 40));
+
+  els.push(txt('su_role_lbl', mX + 20, mY + 144, 60, 18, 'Role', 12, C.gray700));
+  els.push(...selectField('su_role_sel', mX + 20, mY + 164, 'Select role…', mW - 40));
+  els.push(txt('su_role_hint', mX + 20, mY + 212, mW - 40, 18, 'Viewer · Editor · Admin', 11, C.gray500));
+
+  els.push(...btn('su_cancel', mX + mW - 240, mY + mH - 52, 'Cancel', 'ghost', 100));
+  els.push(...btn('su_send', mX + mW - 132, mY + mH - 52, 'Send Invite', 'primary', 120));
 
   writeExcalidraw(`${BASE_DIR}/E02-identity-access/settings-users.excalidraw`, els);
 }
 
 function genSettingsRoles() {
-  const W = 1100, H = 780;
+  const W = 1100, H = 820;
+  const PAD = 20;
   const els = [...appShell('sr', W, H, 'Settings')];
 
-  els.push(txt('sr_hdr_bc', CX + 16, OY + 16, 300, 20, 'Settings / Roles & Permissions', 12, C.gray700));
-  els.push(...pageHeader('sr_ph', CX + 20, CY + 20, 'Roles & Permissions'));
-  els.push(...btn('sr_add', CX + W - OX - SB - 80, CY + 20, '+ New Role', 'primary', 110));
+  els.push(txt('sr_bc', CX + 16, OY + 20, 360, 22, 'Settings / Roles & Permissions', 14, C.gray700));
+  els.push(...pageHeader('sr_ph', CX + PAD, CY + PAD, 'Roles & Permissions'));
+  els.push(...btn('sr_add', W - OX - PAD - 120, CY + PAD, '+ New Role', 'primary', 120));
 
-  // Two-panel layout: role list (left) + permission matrix (right)
-  const listW = 220, matrixX = CX + listW + 20;
-  const panelY = CY + 70;
-  const panelH = H - OY - HDR - 80;
+  // Two-panel layout
+  const panelY = CY + 76;
+  const panelH = H - OY - HDR - 96;
+  const listW = 220;
+  const matX = CX + PAD + listW + 12;
+  const matW = W - OX - PAD - matX;
 
   // Role list panel
-  els.push(rect('sr_list', CX + 20, panelY, listW, panelH, C.gray300, C.white));
-  els.push(txt('sr_list_hdr', CX + 32, panelY + 12, listW - 20, 16, 'Roles', 13, C.gray900));
-  els.push(hline('sr_list_sep', CX + 20, panelY + 36, listW));
+  els.push(rect('sr_list', CX + PAD, panelY, listW, panelH, C.gray300, C.white));
+  els.push(txt('sr_list_hdr', CX + PAD + 16, panelY + 14, 150, 20, 'Roles', 14, C.gray900));
+  els.push(hline('sr_list_sep', CX + PAD, panelY + 44, listW));
 
-  const roles = [
-    ['Admin', '3 users', true],
-    ['Editor', '5 users', false],
-    ['Viewer', '8 users', false],
-    ['Custom Role', '1 user', false],
-  ];
+  const roles = [['Admin', '3 users', true], ['Editor', '5 users', false], ['Viewer', '8 users', false], ['Custom Role', '1 user', false]];
   roles.forEach(([name, count, active], i) => {
-    const ry = panelY + 44 + i * 44;
-    const bg = active ? C.infoBg : C.white;
-    const nameColor = active ? C.primary : C.gray900;
-    els.push(rect(`sr_role_bg_${i}`, CX + 20, ry, listW, 40, active ? C.primary : C.gray100, bg));
-    els.push(txt(`sr_role_name_${i}`, CX + 32, ry + 8, 120, 16, name, 13, nameColor));
-    els.push(txt(`sr_role_count_${i}`, CX + 32, ry + 24, 120, 12, count, 10, C.gray500));
+    const ry = panelY + 52 + i * 52;
+    els.push(rect(`sr_ri_${i}`, CX + PAD, ry, listW, 44,
+      active ? C.infoBorder : C.gray100, active ? C.infoBg : C.white));
+    if (active) els.push(rect(`sr_rb_${i}`, CX + PAD, ry, 3, 44, C.primary, C.primary, 1));
+    els.push(txt(`sr_rn_${i}`, CX + PAD + 16, ry + 8, 150, 18, name, 13, active ? C.primary : C.gray900));
+    els.push(txt(`sr_rc_${i}`, CX + PAD + 16, ry + 26, 150, 16, count, 11, C.gray500));
   });
 
   // Permission matrix panel
-  const matrixW = W - OX - SB - listW - 40;
-  els.push(rect('sr_matrix', matrixX, panelY, matrixW, panelH, C.gray300, C.white));
-  els.push(txt('sr_matrix_hdr', matrixX + 12, panelY + 12, 300, 16, 'Admin — Permissions', 13, C.gray900));
-  els.push(hline('sr_matrix_sep', matrixX, panelY + 36, matrixW));
+  els.push(rect('sr_mat', matX, panelY, matW, panelH, C.gray300, C.white));
+  els.push(txt('sr_mat_hdr', matX + 16, panelY + 14, 300, 20, 'Admin — Permissions', 14, C.gray900));
+  els.push(hline('sr_mat_sep', matX, panelY + 44, matW));
 
-  // Permission rows: resource + CRUD checkboxes
   const resources = ['Data Models', 'Records', 'Workflows', 'Forms', 'Executions', 'Users', 'Roles'];
   const actions = ['View', 'Create', 'Edit', 'Delete'];
+  const col0W = 180;
+  const actionW = 80;
 
-  // column headers
-  const col0W = 160;
-  els.push(txt('sr_mx_res_hdr', matrixX + 12, panelY + 48, col0W, 14, 'Resource', 11, C.gray700));
+  els.push(txt('sr_mx_res_h', matX + 16, panelY + 56, col0W, 18, 'Resource', 12, C.gray700));
   actions.forEach((a, i) => {
-    els.push(txt(`sr_mx_act_hdr_${i}`, matrixX + col0W + i * 70, panelY + 48, 60, 14, a, 11, C.gray700, 'center'));
+    els.push(txt(`sr_mx_act_h${i}`, matX + col0W + i * actionW, panelY + 56, actionW, 18, a, 12, C.gray700, 'center'));
   });
-  els.push(hline('sr_mx_hdr_div', matrixX + 12, panelY + 64, matrixW - 24));
+  els.push(hline('sr_mx_col_sep', matX + 16, panelY + 76, matW - 32));
 
   resources.forEach((res, ri) => {
-    const ry = panelY + 74 + ri * 32;
-    els.push(txt(`sr_mx_res_${ri}`, matrixX + 12, ry + 8, col0W, 16, res, 12, C.gray900));
+    const ry = panelY + 84 + ri * 36;
+    els.push(txt(`sr_res_${ri}`, matX + 16, ry + 9, col0W - 8, 18, res, 13, C.gray900));
     actions.forEach((_, ai) => {
-      const cx2 = matrixX + col0W + ai * 70 + 20;
-      // checkbox: Admin has all checked
-      els.push(rect(`sr_mx_chk_${ri}_${ai}`, cx2, ry + 6, 18, 18, C.primary, C.successBg, 1, true));
-      els.push(txt(`sr_mx_chk_mark_${ri}_${ai}`, cx2 + 3, ry + 7, 14, 14, '✓', 11, C.success, 'center'));
+      const cx = matX + col0W + ai * actionW + 28;
+      els.push(rect(`sr_chk_${ri}_${ai}`, cx, ry + 8, 20, 20, C.successBorder, C.successBg, 1, true));
+      els.push(txt(`sr_chkm_${ri}_${ai}`, cx, ry + 10, 20, 16, '✓', 11, C.success, 'center'));
     });
-    if (ri < resources.length - 1) els.push(hline(`sr_mx_div_${ri}`, matrixX + 12, ry + 32, matrixW - 24, C.gray100));
+    if (ri < resources.length - 1) els.push(hline(`sr_rdiv_${ri}`, matX + 16, ry + 36, matW - 32, C.gray100));
   });
 
-  // Save button
-  els.push(...btn('sr_save', matrixX + matrixW - 110, panelY + panelH - 44, 'Save Changes', 'primary', 120));
+  els.push(...btn('sr_save', matX + matW - 140, panelY + panelH - 52, 'Save Changes', 'primary', 130));
 
   writeExcalidraw(`${BASE_DIR}/E02-identity-access/settings-roles.excalidraw`, els);
 }
 
 function genSettingsSecurity() {
-  const W = 1100, H = 700;
+  const W = 1100, H = 780;
+  const PAD = 20;
+  const cardX = CX + PAD;
+  const cardW = W - OX - SB - PAD * 2;
   const els = [...appShell('ss', W, H, 'Settings')];
 
-  els.push(txt('ss_hdr_bc', CX + 16, OY + 16, 300, 20, 'Settings / Security', 12, C.gray700));
-  els.push(...pageHeader('ss_ph', CX + 20, CY + 20, 'Security'));
-
-  const cardX = CX + 20, cardW = W - OX - SB - 40;
+  els.push(txt('ss_bc', CX + 16, OY + 20, 280, 22, 'Settings / Security', 14, C.gray700));
+  els.push(...pageHeader('ss_ph', cardX, CY + PAD, 'Security'));
 
   // Change Password card
-  let cardY = CY + 72;
-  els.push(rect('ss_pwd_card', cardX, cardY, cardW, 220, C.gray300, C.white, 1, true));
-  els.push(txt('ss_pwd_title', cardX + 20, cardY + 16, 300, 20, 'Change Password', 14, C.gray900));
-  els.push(hline('ss_pwd_sep', cardX + 20, cardY + 44, cardW - 40));
+  let cY = CY + 72;
+  els.push(rect('ss_pwd_card', cardX, cY, cardW, 236, C.gray300, C.white, 1, true));
+  els.push(txt('ss_pwd_title', cardX + 20, cY + 16, 300, 22, 'Change Password', 15, C.gray900));
+  els.push(hline('ss_pwd_sep', cardX + 20, cY + 48, cardW - 40));
 
-  els.push(txt('ss_pwd_cur_lbl', cardX + 20, cardY + 60, 160, 14, 'Current password', 12, C.gray700));
-  els.push(...inputField('ss_pwd_cur', cardX + 200, cardY + 56, '••••••••', 260));
-  els.push(txt('ss_pwd_new_lbl', cardX + 20, cardY + 104, 160, 14, 'New password', 12, C.gray700));
-  els.push(...inputField('ss_pwd_new', cardX + 200, cardY + 100, '••••••••', 260));
-  els.push(txt('ss_pwd_conf_lbl', cardX + 20, cardY + 148, 160, 14, 'Confirm password', 12, C.gray700));
-  els.push(...inputField('ss_pwd_conf', cardX + 200, cardY + 144, '••••••••', 260));
-  els.push(...btn('ss_pwd_save', cardX + cardW - 160, cardY + 184, 'Update Password', 'primary', 140));
+  const fields = [['Current password', 'ss_cur'], ['New password', 'ss_new'], ['Confirm password', 'ss_conf']];
+  fields.forEach(([label, fid], i) => {
+    const fy = cY + 64 + i * 52;
+    els.push(txt(`${fid}_lbl`, cardX + 20, fy, 160, 18, label, 12, C.gray700));
+    els.push(...inputField(fid, cardX + 200, fy - 2, '••••••••', cardW - 220));
+  });
+  els.push(...btn('ss_pwd_save', cardX + cardW - 160, cY + 196, 'Update Password', 'primary', 150));
 
   // Active Sessions card
-  cardY += 236;
-  els.push(rect('ss_sess_card', cardX, cardY, cardW, 240, C.gray300, C.white, 1, true));
-  els.push(txt('ss_sess_title', cardX + 20, cardY + 16, 300, 20, 'Active Sessions', 14, C.gray900));
-  els.push(hline('ss_sess_sep', cardX + 20, cardY + 44, cardW - 40));
+  cY += 256;
+  els.push(rect('ss_sess_card', cardX, cY, cardW, 260, C.gray300, C.white, 1, true));
+  els.push(txt('ss_sess_title', cardX + 20, cY + 16, 300, 22, 'Active Sessions', 15, C.gray900));
+  els.push(hline('ss_sess_sep', cardX + 20, cY + 48, cardW - 40));
 
   const sessions = [
     ['Chrome · macOS · 192.168.1.1', 'Current session', true],
     ['Firefox · Windows · 10.0.0.5', 'Last seen 2 hours ago', false],
-    ['Mobile · iOS · 172.16.0.8', 'Last seen yesterday', false],
+    ['Mobile Safari · iOS · 172.16.0.8', 'Last seen yesterday', false],
   ];
   sessions.forEach(([device, meta, isCurrent], i) => {
-    const sy = cardY + 56 + i * 52;
-    els.push(txt(`ss_sess_dev_${i}`, cardX + 20, sy, 380, 16, device, 13, C.gray900));
-    els.push(txt(`ss_sess_meta_${i}`, cardX + 20, sy + 18, 380, 14, meta, 11, C.gray500));
-    if (!isCurrent) {
-      els.push(...btn(`ss_sess_revoke_${i}`, cardX + cardW - 110, sy + 8, 'Revoke', 'danger', 90));
+    const sy = cY + 60 + i * 60;
+    els.push(txt(`ss_dev_${i}`, cardX + 20, sy, 400, 20, device, 13, C.gray900));
+    els.push(txt(`ss_meta_${i}`, cardX + 20, sy + 22, 400, 18, meta, 12, C.gray500));
+    if (isCurrent) {
+      els.push(...badge(`ss_cur_badge_${i}`, cardX + cardW - 100, sy + 8, 'Current', C.success, C.successBg));
     } else {
-      els.push(...badge(`ss_sess_cur_badge_${i}`, cardX + cardW - 110, sy + 10, 'Current', C.success, C.successBg));
+      els.push(...btn(`ss_revoke_${i}`, cardX + cardW - 110, sy + 4, 'Revoke', 'danger', 100));
     }
-    if (i < sessions.length - 1) els.push(hline(`ss_sess_div_${i}`, cardX + 20, sy + 48, cardW - 40, C.gray100));
+    if (i < sessions.length - 1) els.push(hline(`ss_sdiv_${i}`, cardX + 20, sy + 56, cardW - 40, C.gray100));
   });
-  els.push(...btn('ss_sess_revoke_all', cardX + cardW - 160, cardY + 200, 'Revoke All Others', 'danger', 150));
+  els.push(...btn('ss_revoke_all', cardX + cardW - 180, cY + 220, 'Revoke All Others', 'danger', 168));
 
   writeExcalidraw(`${BASE_DIR}/E02-identity-access/settings-security.excalidraw`, els);
 }
 
 function genAcceptInvitation() {
   // Public page — no app shell
-  const W = 800, H = 500;
-  const els = [];
-
-  // centered card
-  const cW = 420, cH = 380;
+  const W = 760, H = 520;
+  const cW = 440, cH = 400;
   const cX = (W - cW) / 2, cY = (H - cH) / 2;
+  const els = [];
 
   els.push(rect('ai_bg', 0, 0, W, H, C.gray300, C.gray100));
   els.push(rect('ai_card', cX, cY, cW, cH, C.gray300, C.white, 1, true));
 
-  // logo
-  els.push(rect('ai_logo', cX + cW / 2 - 30, cY + 24, 60, 24, C.primary, C.primary, 1, true));
-  els.push(txt('ai_logo_txt', cX + cW / 2 - 22, cY + 30, 44, 14, 'AXIS', 12, C.white, 'center'));
+  // Logo — matches S18 style: gray50 area + primary text
+  els.push(rect('ai_logo_area', cX + cW / 2 - 52, cY + 24, 104, 36, C.gray300, C.gray50, 1, true));
+  els.push(txt('ai_logo_t', cX + cW / 2 - 52, cY + 32, 104, 22, '⬡  Axis', 15, C.primary, 'center'));
 
-  els.push(txt('ai_title', cX + 20, cY + 64, cW - 40, 28, 'Accept Invitation', 20, C.gray900, 'center'));
-  els.push(txt('ai_sub', cX + 20, cY + 96, cW - 40, 16, "You've been invited to join Acme Corp.", 12, C.gray500, 'center'));
+  els.push(txt('ai_title', cX + 24, cY + 76, cW - 48, 28, 'Accept Invitation', 20, C.gray900, 'center'));
+  els.push(txt('ai_sub', cX + 24, cY + 108, cW - 48, 20, "You've been invited to join Acme Corp.", 12, C.gray500, 'center'));
+  els.push(hline('ai_sep', cX + 24, cY + 136, cW - 48));
 
-  els.push(hline('ai_div', cX + 20, cY + 120, cW - 40));
+  els.push(txt('ai_name_lbl', cX + 24, cY + 152, 120, 18, 'Full name', 12, C.gray700));
+  els.push(...inputField('ai_name', cX + 24, cY + 172, 'Your full name', cW - 48));
 
-  // form
-  els.push(txt('ai_name_lbl', cX + 20, cY + 136, 120, 14, 'Full name', 12, C.gray700));
-  els.push(...inputField('ai_name', cX + 20, cY + 152, 'Your name', cW - 40));
+  els.push(txt('ai_email_lbl', cX + 24, cY + 228, 60, 18, 'Email', 12, C.gray700));
+  els.push(rect('ai_email_box', cX + 24, cY + 248, cW - 48, 40, C.gray300, C.gray100, 1, true));
+  els.push(txt('ai_email_val', cX + 36, cY + 259, cW - 72, 18, 'invited@company.com', 13, C.gray700));
 
-  els.push(txt('ai_email_lbl', cX + 20, cY + 200, 120, 14, 'Email', 12, C.gray700));
-  els.push(rect('ai_email_box', cX + 20, cY + 216, cW - 40, 32, C.gray300, C.gray100, 1, true));
-  els.push(txt('ai_email_val', cX + 28, cY + 225, cW - 56, 16, 'invited@company.com', 12, C.gray700));
+  els.push(txt('ai_pwd_lbl', cX + 24, cY + 304, 140, 18, 'Create password', 12, C.gray700));
+  els.push(...inputField('ai_pwd', cX + 24, cY + 324, '••••••••', cW - 48));
 
-  els.push(txt('ai_pwd_lbl', cX + 20, cY + 264, 120, 14, 'Create password', 12, C.gray700));
-  els.push(...inputField('ai_pwd', cX + 20, cY + 280, '••••••••', cW - 40));
-
-  els.push(...btn('ai_accept', cX + 20, cY + cH - 52, 'Accept & Create Account', 'primary', cW - 40));
+  els.push(...btn('ai_accept', cX + 24, cY + cH - 56, 'Accept & Create Account', 'primary', cW - 48));
 
   writeExcalidraw(`${BASE_DIR}/E02-identity-access/accept-invitation.excalidraw`, els);
 }
@@ -536,180 +575,172 @@ function genAcceptInvitation() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function genDataModels() {
-  const W = 1100, H = 780;
-  const tableW = W - OX - SB - 40;
+  const W = 1100, H = 820;
+  const PAD = 20;
+  const tW = W - OX - SB - PAD * 2;
+  const tX = CX + PAD;
   const els = [...appShell('dm', W, H, 'Data Models')];
 
-  els.push(txt('dm_hdr_bc', CX + 16, OY + 16, 300, 20, 'Data Models', 12, C.gray700));
-  els.push(...pageHeader('dm_ph', CX + 20, CY + 20, 'Data Models', 'Define custom data structures for your workspace'));
-  els.push(...btn('dm_create', CX + tableW - 60, CY + 20, '+ New Model', 'primary', 110));
+  els.push(txt('dm_bc', CX + 16, OY + 20, 240, 22, 'Data Models', 14, C.gray700));
+  els.push(...pageHeader('dm_ph', tX, CY + PAD, 'Data Models', 'Define custom data structures for your workspace'));
+  els.push(...btn('dm_create', tX + tW - 120, CY + PAD, '+ New Model', 'primary', 120));
 
-  els.push(...searchBar('dm_search', CX + 20, CY + 76, 260));
+  els.push(...searchBar('dm_search', tX, CY + 82, 260));
 
-  // table
-  const tY = CY + 124;
-  const cols = [['Name', 220], ['Display Name', 200], ['Fields', 80], ['Records', 90], ['Updated', 140], ['Actions', 110]];
-  els.push(...tableHeader('dm_th', CX + 20, tY, tableW, cols));
+  const tY = CY + 138;
+  const cols = [['Name (slug)', 200], ['Display Name', 180], ['Fields', 80], ['Records', 90], ['Updated', 140], ['Actions', 120]];
+  els.push(tableOuter('dm_outer', tX, tY, tW, 44 + 4 * 50));
+  els.push(...tableHeader('dm_th', tX, tY, tW, cols));
 
   const models = [
-    ['customer', 'Customer', '12 fields', '1,240', '2 hours ago'],
-    ['order', 'Order', '8 fields', '4,891', 'Yesterday'],
-    ['product', 'Product', '15 fields', '342', '3 days ago'],
-    ['invoice', 'Invoice', '10 fields', '2,104', 'Last week'],
+    ['customer', 'Customer', '12', '1,240', '2 hours ago'],
+    ['order', 'Order', '8', '4,891', 'Yesterday'],
+    ['product', 'Product', '15', '342', '3 days ago'],
+    ['invoice', 'Invoice', '10', '2,104', 'Last week'],
   ];
-  models.forEach(([name, display, fields, records, updated], i) => {
-    const rowY = tY + 36 + i * 40;
-    els.push(...tableRow(`dm_row_${i}`, CX + 20, rowY, tableW, [
-      [name, 220, C.primary], [display, 200], [fields, 80, C.gray700], [records, 90, C.gray700],
-      [updated, 140, C.gray500], ['Edit  Fields  ···', 110, C.primary],
-    ]));
+  models.forEach(([slug, display, fields, records, updated], i) => {
+    els.push(...tableRow(`dm_r${i}`, tX, tY + 44 + i * 50, tW, [
+      [slug, 200, C.primary], [display, 180], [fields, 80, C.gray700],
+      [records, 90, C.gray700], [updated, 140, C.gray500], ['Fields  Edit  ···', 120, C.primary],
+    ], i % 2 === 1));
   });
 
-  // ── Field editor side sheet
-  const shW = 380, shX = W - OX - shW;
-  const shY = OY;
+  // Field editor side sheet
+  const shW = 380;
+  const shX = W - OX - shW;
   const shH = H - OY;
-  els.push(rect('dm_sh_overlay', CX, CY, shX - CX, shH - CY, 'transparent', C.gray900, 0, false, { opacity: 15 }));
-  els.push(rect('dm_sh', shX, shY, shW, shH, C.gray300, C.white, 2));
-  els.push(txt('dm_sh_title', shX + 16, shY + 16, shW - 60, 22, 'customer — Fields', 15, C.gray900));
-  els.push(txt('dm_sh_close', shX + shW - 36, shY + 14, 24, 24, '✕', 14, C.gray500));
-  els.push(hline('dm_sh_sep', shX, shY + 48, shW));
+  els.push(rect('dm_sh_ov', CX, CY, shX - CX, shH - CY, 'transparent', C.gray900, 0, false, { opacity: 20 }));
+  els.push(rect('dm_sh', shX, OY, shW, shH, C.gray300, C.white, 2));
+  els.push(txt('dm_sh_title', shX + 16, OY + 16, shW - 60, 22, 'customer — Fields', 15, C.gray900));
+  els.push(txt('dm_sh_close', shX + shW - 36, OY + 14, 24, 24, '✕', 14, C.gray500));
+  els.push(hline('dm_sh_sep', shX, OY + 48, shW));
+  els.push(...btn('dm_sh_add', shX + shW - 128, OY + 60, '+ Add Field', 'primary', 116));
 
-  // field list in side sheet
-  const fields = [
-    ['id', 'UUID', 'System'],
-    ['name', 'Text', ''],
-    ['email', 'Email', ''],
-    ['phone', 'Text', 'Optional'],
-    ['created_at', 'DateTime', 'System'],
-  ];
-  els.push(...btn('dm_sh_add', shX + shW - 120, shY + 56, '+ Add Field', 'primary', 110));
-  fields.forEach(([fname, ftype, note], i) => {
-    const fy = shY + 56 + i * 44;
-    els.push(rect(`dm_sh_f_bg_${i}`, shX + 12, fy, shW - 24, 36, C.gray100, C.gray50));
-    els.push(txt(`dm_sh_f_name_${i}`, shX + 22, fy + 10, 120, 16, fname, 12, C.gray900));
-    els.push(txt(`dm_sh_f_type_${i}`, shX + 160, fy + 10, 80, 16, ftype, 12, C.gray500));
-    if (note) els.push(txt(`dm_sh_f_note_${i}`, shX + 260, fy + 10, 80, 16, note, 10, C.gray300));
+  const shFields = [['id', 'UUID', 'System'], ['name', 'Text', ''], ['email', 'Email', ''], ['phone', 'Text', 'Optional'], ['created_at', 'DateTime', 'System']];
+  shFields.forEach(([fname, ftype, note], i) => {
+    const fy = OY + 108 + i * 48;
+    els.push(rect(`dm_sf_${i}`, shX + 12, fy, shW - 24, 40, C.gray100, C.gray50, 1));
+    els.push(txt(`dm_sfn_${i}`, shX + 24, fy + 11, 120, 18, fname, 13, C.gray900));
+    els.push(txt(`dm_sft_${i}`, shX + 168, fy + 11, 80, 18, ftype, 12, C.gray500));
+    if (note) els.push(txt(`dm_sfnote_${i}`, shX + 272, fy + 11, 80, 18, note, 10, C.gray300));
+    els.push(txt(`dm_sfact_${i}`, shX + shW - 36, fy + 11, 20, 18, '···', 12, C.gray300));
   });
 
   writeExcalidraw(`${BASE_DIR}/E03-data-modeling/data-models.excalidraw`, els);
 }
 
 function genDataClasses() {
-  const W = 1100, H = 780;
-  const tableW = W - OX - SB - 40;
+  const W = 1100, H = 820;
+  const PAD = 20;
+  const tW = W - OX - SB - PAD * 2;
+  const tX = CX + PAD;
   const els = [...appShell('dc', W, H, 'Data Models')];
 
-  els.push(txt('dc_hdr_bc', CX + 16, OY + 16, 300, 20, 'Data Models / Data Classes', 12, C.gray700));
-  els.push(...pageHeader('dc_ph', CX + 20, CY + 20, 'Data Classes', 'Reusable field groups shared across models'));
-  els.push(...btn('dc_create', CX + tableW - 60, CY + 20, '+ New Class', 'primary', 110));
+  els.push(txt('dc_bc', CX + 16, OY + 20, 300, 22, 'Data Models / Data Classes', 14, C.gray700));
+  els.push(...pageHeader('dc_ph', tX, CY + PAD, 'Data Classes', 'Reusable field groups shared across models'));
+  els.push(...btn('dc_create', tX + tW - 120, CY + PAD, '+ New Class', 'primary', 120));
+  els.push(...searchBar('dc_search', tX, CY + 82, 260));
 
-  els.push(...searchBar('dc_search', CX + 20, CY + 76, 260));
+  const tY = CY + 138;
+  const cols = [['Name (slug)', 190], ['Display Name', 190], ['Fields', 80], ['Used In', 130], ['Updated', 130], ['Actions', 90]];
+  els.push(tableOuter('dc_outer', tX, tY, tW, 44 + 3 * 50));
+  els.push(...tableHeader('dc_th', tX, tY, tW, cols));
 
-  const tY = CY + 124;
-  const cols = [['Name', 200], ['Display Name', 200], ['Fields', 80], ['Used In', 140], ['Updated', 140], ['Actions', 80]];
-  els.push(...tableHeader('dc_th', CX + 20, tY, tableW, cols));
-
-  const classes = [
-    ['address', 'Address', '5 fields', '3 models'],
-    ['contact_info', 'Contact Info', '4 fields', '2 models'],
-    ['audit_fields', 'Audit Fields', '3 fields', '8 models'],
-  ];
-  classes.forEach(([name, display, fields, usedIn], i) => {
-    const rowY = tY + 36 + i * 40;
-    els.push(...tableRow(`dc_row_${i}`, CX + 20, rowY, tableW, [
-      [name, 200, C.primary], [display, 200], [fields, 80, C.gray700], [usedIn, 140, C.gray700],
-      ['3 days ago', 140, C.gray500], ['Edit  ···', 80, C.primary],
-    ]));
+  [['address', 'Address', '5 fields', '3 models'], ['contact_info', 'Contact Info', '4 fields', '2 models'], ['audit_fields', 'Audit Fields', '3 fields', '8 models']].forEach(([slug, display, fields, used], i) => {
+    els.push(...tableRow(`dc_r${i}`, tX, tY + 44 + i * 50, tW, [
+      [slug, 190, C.primary], [display, 190], [fields, 80, C.gray700],
+      [used, 130, C.gray700], ['3 days ago', 130, C.gray500], ['Edit  ···', 90, C.primary],
+    ], i % 2 === 1));
   });
 
-  // Create/Edit side sheet
-  const shW = 400, shX = W - OX - shW;
-  els.push(rect('dc_sh_overlay', CX, CY, shX - CX, H - CY - OY, 'transparent', C.gray900, 0, false, { opacity: 15 }));
-  els.push(rect('dc_sh', shX, OY, shW, H - OY, C.gray300, C.white, 2));
+  // Create side sheet
+  const shW = 400, shX = W - OX - shW, shH = H - OY;
+  els.push(rect('dc_sh_ov', CX, CY, shX - CX, shH - CY, 'transparent', C.gray900, 0, false, { opacity: 20 }));
+  els.push(rect('dc_sh', shX, OY, shW, shH, C.gray300, C.white, 2));
   els.push(txt('dc_sh_title', shX + 16, OY + 16, shW - 60, 22, 'New Data Class', 15, C.gray900));
   els.push(txt('dc_sh_close', shX + shW - 36, OY + 14, 24, 24, '✕', 14, C.gray500));
   els.push(hline('dc_sh_sep', shX, OY + 48, shW));
 
-  const fY = OY + 64;
-  els.push(txt('dc_sh_name_lbl', shX + 16, fY, 100, 14, 'Name (slug)', 12, C.gray700));
-  els.push(...inputField('dc_sh_name', shX + 16, fY + 18, 'e.g. address', shW - 32));
-  els.push(txt('dc_sh_disp_lbl', shX + 16, fY + 66, 100, 14, 'Display name', 12, C.gray700));
-  els.push(...inputField('dc_sh_disp', shX + 16, fY + 84, 'e.g. Address', shW - 32));
-  els.push(txt('dc_sh_desc_lbl', shX + 16, fY + 132, 100, 14, 'Description', 12, C.gray700));
-  els.push(...inputField('dc_sh_desc', shX + 16, fY + 150, 'Optional description', shW - 32));
-
-  els.push(txt('dc_sh_fields_lbl', shX + 16, fY + 200, 200, 14, 'Fields', 13, C.gray900));
-  els.push(...btn('dc_sh_add_field', shX + shW - 120, fY + 196, '+ Add Field', 'ghost', 110));
-  els.push(hline('dc_sh_f_sep', shX + 16, fY + 218, shW - 32));
-
-  // sample fields
-  [['street', 'Text'], ['city', 'Text'], ['postcode', 'Text']].forEach(([n, t], i) => {
-    const fy2 = fY + 228 + i * 40;
-    els.push(rect(`dc_sh_f_${i}`, shX + 16, fy2, shW - 32, 32, C.gray100, C.gray50));
-    els.push(txt(`dc_sh_fn_${i}`, shX + 26, fy2 + 9, 120, 14, n, 12, C.gray900));
-    els.push(txt(`dc_sh_ft_${i}`, shX + 180, fy2 + 9, 80, 14, t, 12, C.gray500));
-    els.push(txt(`dc_sh_fdel_${i}`, shX + shW - 40, fy2 + 9, 20, 14, '✕', 12, C.gray300));
+  let fy = OY + 64;
+  [['Name (slug)', 'dc_slug', 'e.g. address'], ['Display name', 'dc_disp', 'e.g. Address'], ['Description', 'dc_desc', 'Optional']].forEach(([label, fid, ph]) => {
+    els.push(txt(`${fid}_lbl`, shX + 16, fy, 200, 18, label, 12, C.gray700));
+    els.push(...inputField(fid, shX + 16, fy + 20, ph, shW - 32));
+    fy += 76;
   });
 
-  els.push(...btn('dc_sh_cancel', shX + 16, H - OY - 52, 'Cancel', 'ghost', 100));
-  els.push(...btn('dc_sh_save', shX + shW - 130, H - OY - 52, 'Save Class', 'primary', 120));
+  els.push(txt('dc_fields_hdr', shX + 16, fy, 160, 20, 'Fields', 14, C.gray900));
+  els.push(...btn('dc_add_field', shX + shW - 128, fy - 4, '+ Add Field', 'ghost', 116));
+  els.push(hline('dc_fields_sep', shX + 16, fy + 28, shW - 32));
+
+  [['street', 'Text'], ['city', 'Text'], ['postcode', 'Text']].forEach(([n, t], i) => {
+    const ffy = fy + 40 + i * 48;
+    els.push(rect(`dc_f_${i}`, shX + 16, ffy, shW - 32, 40, C.gray100, C.gray50, 1));
+    els.push(txt(`dc_fn_${i}`, shX + 28, ffy + 11, 130, 18, n, 13, C.gray900));
+    els.push(txt(`dc_ft_${i}`, shX + 200, ffy + 11, 80, 18, t, 12, C.gray500));
+    els.push(txt(`dc_fdel_${i}`, shX + shW - 40, ffy + 11, 20, 18, '✕', 12, C.gray300));
+  });
+
+  els.push(...btn('dc_cancel', shX + 16, shH + OY - 56, 'Cancel', 'ghost', 100));
+  els.push(...btn('dc_save', shX + shW - 140, shH + OY - 56, 'Save Class', 'primary', 128));
 
   writeExcalidraw(`${BASE_DIR}/E03-data-modeling/data-classes.excalidraw`, els);
 }
 
 function genRecords() {
-  const W = 1100, H = 780;
-  const tableW = W - OX - SB - 40;
+  const W = 1100, H = 820;
+  const PAD = 20;
+  const tW = W - OX - SB - PAD * 2;
+  const tX = CX + PAD;
   const els = [...appShell('rec', W, H, 'Data Models')];
 
-  els.push(txt('rec_hdr_bc', CX + 16, OY + 16, 400, 20, 'Data Models / Customer / Records', 12, C.gray700));
-  els.push(...pageHeader('rec_ph', CX + 20, CY + 20, 'Customer Records'));
-  els.push(...btn('rec_create', CX + tableW - 60, CY + 20, '+ New Record', 'primary', 110));
+  els.push(txt('rec_bc', CX + 16, OY + 20, 400, 22, 'Data Models / customer / Records', 14, C.gray700));
+  els.push(...pageHeader('rec_ph', tX, CY + PAD, 'Customer Records'));
+  els.push(...btn('rec_create', tX + tW - 128, CY + PAD, '+ New Record', 'primary', 128));
 
-  els.push(...searchBar('rec_search', CX + 20, CY + 76, 260));
-  els.push(...selectField('rec_filter', CX + 292, CY + 76, 'Filter by field', 180));
-  els.push(...btn('rec_export', CX + tableW - 100, CY + 76, 'Export CSV', 'ghost', 100));
+  els.push(...searchBar('rec_search', tX, CY + 82, 260));
+  els.push(...selectField('rec_filter', tX + 276, CY + 82, 'Filter by field…', 180));
+  els.push(...btn('rec_export', tX + tW - 116, CY + 82, 'Export CSV', 'ghost', 108));
 
-  const tY = CY + 124;
-  const cols = [['ID', 100], ['name', 180], ['email', 220], ['phone', 140], ['created_at', 140], ['Actions', 60]];
-  els.push(...tableHeader('rec_th', CX + 20, tY, tableW, cols));
+  const tY = CY + 138;
+  const cols = [['ID', 110], ['name', 180], ['email', 220], ['phone', 140], ['created_at', 120], ['Actions', 40]];
+  els.push(tableOuter('rec_outer', tX, tY, tW, 44 + 5 * 50));
+  els.push(...tableHeader('rec_th', tX, tY, tW, cols));
 
-  const records = [
+  [
     ['uuid-0001', 'Alice Johnson', 'alice@acme.com', '+1 555-0101', '2026-01-15'],
     ['uuid-0002', 'Bob Martinez', 'bob@globex.com', '+1 555-0202', '2026-01-16'],
     ['uuid-0003', 'Carol White', 'carol@initech.com', '+1 555-0303', '2026-02-01'],
     ['uuid-0004', 'Dan Brown', 'dan@umbrella.com', '+1 555-0404', '2026-02-10'],
     ['uuid-0005', 'Eve Davis', 'eve@cyberdyne.com', '+1 555-0505', '2026-03-01'],
-  ];
-  records.forEach(([id, name, email, phone, created], i) => {
-    const rowY = tY + 36 + i * 40;
-    els.push(...tableRow(`rec_row_${i}`, CX + 20, rowY, tableW, [
-      [id.slice(0, 8) + '…', 100, C.gray500], [name, 180], [email, 220, C.primary], [phone, 140, C.gray700],
-      [created, 140, C.gray500], ['···', 60, C.gray700],
-    ]));
+  ].forEach(([id, name, email, phone, created], i) => {
+    els.push(...tableRow(`rec_r${i}`, tX, tY + 44 + i * 50, tW, [
+      [id.slice(0, 9) + '…', 110, C.gray500], [name, 180], [email, 220, C.primary],
+      [phone, 140, C.gray700], [created, 120, C.gray500], ['···', 40, C.gray700],
+    ], i % 2 === 1));
   });
 
-  const pgY = tY + 36 + records.length * 40 + 12;
-  els.push(txt('rec_pg_info', CX + 20, pgY, 300, 16, 'Showing 1–5 of 1,240 records', 11, C.gray500));
-  els.push(...btn('rec_pg_prev', CX + tableW - 180, pgY - 4, '← Prev', 'ghost', 80));
-  els.push(...btn('rec_pg_next', CX + tableW - 90, pgY - 4, 'Next →', 'ghost', 80));
+  const pgY = tY + 44 + 5 * 50 + 16;
+  els.push(txt('rec_pg', tX, pgY + 8, 300, 20, 'Showing 1–5 of 1,240 records', 12, C.gray500));
+  els.push(...btn('rec_prev', tX + tW - 188, pgY, '← Prev', 'ghost', 88));
+  els.push(...btn('rec_next', tX + tW - 92, pgY, 'Next →', 'ghost', 88));
 
-  // Create Record modal
-  const mX = CX + 100, mY = CY + 40, mW = 480, mH = 380;
-  els.push(rect('rec_modal_ov', OX, OY, W - OX, H - OY, 'transparent', C.gray900, 0, false, { opacity: 30 }));
+  // Create record modal
+  const mW = 480, mH = 380;
+  const mX = CX + Math.round((W - OX - SB - mW) / 2);
+  const mY = CY + 52;
+  els.push(rect('rec_ov', OX, OY, W - OX, H - OY, 'transparent', C.gray900, 0, false, { opacity: 30 }));
   els.push(rect('rec_modal', mX, mY, mW, mH, C.gray300, C.white, 1, true));
-  els.push(txt('rec_modal_title', mX + 20, mY + 20, mW - 40, 22, 'New Customer Record', 15, C.gray900));
-  els.push(hline('rec_modal_sep', mX + 20, mY + 50, mW - 40));
+  els.push(txt('rec_modal_title', mX + 20, mY + 20, mW - 40, 24, 'New Customer Record', 16, C.gray900));
+  els.push(hline('rec_modal_sep', mX + 20, mY + 52, mW - 40));
 
-  [['name', 'Full name'], ['email', 'Email address'], ['phone', 'Phone number (optional)']].forEach(([f, ph], i) => {
-    const fy = mY + 68 + i * 62;
-    els.push(txt(`rec_modal_lbl_${i}`, mX + 20, fy, 120, 14, f, 12, C.gray700));
-    els.push(...inputField(`rec_modal_f_${i}`, mX + 20, fy + 18, ph, mW - 40));
+  [['name', 'Full name', 'rec_mf0'], ['email', 'Email address', 'rec_mf1'], ['phone', 'Phone (optional)', 'rec_mf2']].forEach(([label, ph, fid], i) => {
+    const fy = mY + 68 + i * 72;
+    els.push(txt(`${fid}_lbl`, mX + 20, fy, 160, 18, label, 12, C.gray700));
+    els.push(...inputField(fid, mX + 20, fy + 22, ph, mW - 40));
   });
 
-  els.push(...btn('rec_modal_cancel', mX + mW - 230, mY + mH - 48, 'Cancel', 'ghost', 90));
-  els.push(...btn('rec_modal_save', mX + mW - 130, mY + mH - 48, 'Save Record', 'primary', 120));
+  els.push(...btn('rec_cancel', mX + mW - 244, mY + mH - 52, 'Cancel', 'ghost', 100));
+  els.push(...btn('rec_save', mX + mW - 136, mY + mH - 52, 'Save Record', 'primary', 124));
 
   writeExcalidraw(`${BASE_DIR}/E03-data-modeling/records.excalidraw`, els);
 }
@@ -719,162 +750,154 @@ function genRecords() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function genWorkflows() {
-  const W = 1100, H = 760;
-  const tableW = W - OX - SB - 40;
+  const W = 1100, H = 820;
+  const PAD = 20;
+  const tW = W - OX - SB - PAD * 2;
+  const tX = CX + PAD;
   const els = [...appShell('wf', W, H, 'Workflows')];
 
-  els.push(txt('wf_hdr_bc', CX + 16, OY + 16, 200, 20, 'Workflows', 12, C.gray700));
-  els.push(...pageHeader('wf_ph', CX + 20, CY + 20, 'Workflows', 'Automate processes with visual workflows'));
-  els.push(...btn('wf_create', CX + tableW - 60, CY + 20, '+ New Workflow', 'primary', 120));
+  els.push(txt('wf_bc', CX + 16, OY + 20, 180, 22, 'Workflows', 14, C.gray700));
+  els.push(...pageHeader('wf_ph', tX, CY + PAD, 'Workflows', 'Automate processes with visual workflows'));
+  els.push(...btn('wf_create', tX + tW - 136, CY + PAD, '+ New Workflow', 'primary', 136));
 
-  els.push(...searchBar('wf_search', CX + 20, CY + 76, 260));
-  els.push(...selectField('wf_filter_status', CX + 292, CY + 76, 'Status: All', 150));
+  els.push(...searchBar('wf_search', tX, CY + 82, 260));
+  els.push(...selectField('wf_status', tX + 276, CY + 82, 'Status: All', 160));
 
-  const tY = CY + 124;
-  const cols = [['Name', 220], ['Trigger', 160], ['Steps', 70], ['Status', 110], ['Last Run', 140], ['Actions', 100]];
-  els.push(...tableHeader('wf_th', CX + 20, tY, tableW, cols));
+  const tY = CY + 138;
+  const cols = [['Name', 220], ['Trigger', 160], ['Steps', 70], ['Status', 120], ['Last Run', 130], ['Actions', 110]];
+  els.push(tableOuter('wf_outer', tX, tY, tW, 44 + 5 * 50));
+  els.push(...tableHeader('wf_th', tX, tY, tW, cols));
 
-  const workflows = [
+  const sMap = { Active: [C.success, C.successBg], Draft: [C.gray500, C.gray100], Paused: [C.warning, C.warningBg] };
+  [
     ['Customer Onboarding', 'Record Created', '5', 'Active'],
     ['Invoice Approval', 'Form Submission', '3', 'Active'],
     ['Weekly Report', 'Schedule', '4', 'Active'],
     ['Data Sync', 'Webhook', '2', 'Draft'],
     ['Archive Old Orders', 'Schedule', '3', 'Paused'],
-  ];
-  const statusColors = { Active: C.success, Draft: C.gray500, Paused: C.warning };
-  const statusBgs = { Active: C.successBg, Draft: C.gray100, Paused: C.warningBg };
-
-  workflows.forEach(([name, trigger, steps, status], i) => {
-    const rowY = tY + 36 + i * 40;
-    els.push(...tableRow(`wf_row_${i}`, CX + 20, rowY, tableW, [
+  ].forEach(([name, trigger, steps, status], i) => {
+    const [sc] = sMap[status];
+    els.push(...tableRow(`wf_r${i}`, tX, tY + 44 + i * 50, tW, [
       [name, 220, C.primary], [trigger, 160, C.gray700], [steps, 70, C.gray700],
-      [status, 110, statusColors[status]], ['2 hours ago', 140, C.gray500], ['Edit  ···', 100, C.primary],
-    ]));
+      [status, 120, sc], ['2 hours ago', 130, C.gray500], ['Edit  ···', 110, C.primary],
+    ], i % 2 === 1));
   });
 
-  const pgY = tY + 36 + workflows.length * 40 + 12;
-  els.push(txt('wf_pg', CX + 20, pgY, 300, 16, 'Showing 1–5 of 5 workflows', 11, C.gray500));
+  const pgY = tY + 44 + 5 * 50 + 16;
+  els.push(txt('wf_pg', tX, pgY + 8, 260, 20, 'Showing 1–5 of 5 workflows', 12, C.gray500));
 
   // Create workflow dialog
-  const mX = CX + 100, mY = CY + 60, mW = 480, mH = 320;
-  els.push(rect('wf_dlg_ov', OX, OY, W - OX, H - OY, 'transparent', C.gray900, 0, false, { opacity: 30 }));
+  const mW = 480, mH = 340;
+  const mX = CX + Math.round((W - OX - SB - mW) / 2);
+  const mY = CY + 60;
+  els.push(rect('wf_ov', OX, OY, W - OX, H - OY, 'transparent', C.gray900, 0, false, { opacity: 30 }));
   els.push(rect('wf_dlg', mX, mY, mW, mH, C.gray300, C.white, 1, true));
-  els.push(txt('wf_dlg_title', mX + 20, mY + 20, mW - 40, 22, 'New Workflow', 15, C.gray900));
-  els.push(hline('wf_dlg_sep', mX + 20, mY + 50, mW - 40));
+  els.push(txt('wf_dlg_title', mX + 20, mY + 20, mW - 40, 24, 'New Workflow', 16, C.gray900));
+  els.push(hline('wf_dlg_sep', mX + 20, mY + 52, mW - 40));
 
-  els.push(txt('wf_dlg_name_lbl', mX + 20, mY + 66, 100, 14, 'Name', 12, C.gray700));
-  els.push(...inputField('wf_dlg_name', mX + 20, mY + 82, 'Workflow name', mW - 40));
+  [['Name', 'wf_dn', 'Workflow name'], ['Description', 'wf_dd', 'Optional description']].forEach(([label, fid, ph], i) => {
+    const fy = mY + 68 + i * 72;
+    els.push(txt(`${fid}_lbl`, mX + 20, fy, 140, 18, label, 12, C.gray700));
+    els.push(...inputField(fid, mX + 20, fy + 22, ph, mW - 40));
+  });
+  els.push(txt('wf_dt_lbl', mX + 20, mY + 212, 120, 18, 'Trigger type', 12, C.gray700));
+  els.push(...selectField('wf_dt', mX + 20, mY + 232, 'Select trigger…', mW - 40));
 
-  els.push(txt('wf_dlg_desc_lbl', mX + 20, mY + 128, 100, 14, 'Description', 12, C.gray700));
-  els.push(...inputField('wf_dlg_desc', mX + 20, mY + 144, 'Optional description', mW - 40));
-
-  els.push(txt('wf_dlg_trigger_lbl', mX + 20, mY + 190, 100, 14, 'Trigger type', 12, C.gray700));
-  els.push(...selectField('wf_dlg_trigger', mX + 20, mY + 206, 'Select trigger…', mW - 40));
-
-  els.push(...btn('wf_dlg_cancel', mX + mW - 230, mY + mH - 48, 'Cancel', 'ghost', 90));
-  els.push(...btn('wf_dlg_create', mX + mW - 130, mY + mH - 48, 'Create', 'primary', 110));
+  els.push(...btn('wf_cancel', mX + mW - 244, mY + mH - 52, 'Cancel', 'ghost', 100));
+  els.push(...btn('wf_dlg_create', mX + mW - 136, mY + mH - 52, 'Create', 'primary', 124));
 
   writeExcalidraw(`${BASE_DIR}/E04-workflow-builder/workflows.excalidraw`, els);
 }
 
 function genWorkflowEditor() {
-  const W = 1200, H = 800;
-  // No standard sidebar — full-screen editor with its own chrome
-  const TOOLBAR_H = 48;
-  const STEP_PANEL_W = 280;
-  const PROP_PANEL_W = 320;
-  const CANVAS_W = W - STEP_PANEL_W - PROP_PANEL_W;
+  const W = 1240, H = 820;
+  const TB = 52;       // toolbar height (editor-specific, not app shell)
+  const PAL_W = 260;  // step palette
+  const PROP_W = 300; // properties panel
+  const CVS_W = W - PAL_W - PROP_W;
   const els = [];
 
-  // Top toolbar
-  els.push(rect('we_toolbar', 0, 0, W, TOOLBAR_H, C.gray300, C.white, 1));
-  els.push(txt('we_back', 12, TOOLBAR_H / 2 - 8, 80, 18, '← Workflows', 12, C.primary));
-  els.push(vline('we_tb_sep1', 100, 8, TOOLBAR_H - 16, C.gray300));
-  els.push(txt('we_wf_name', 112, TOOLBAR_H / 2 - 9, 200, 20, 'Customer Onboarding', 14, C.gray900));
-  els.push(...badge('we_status', 324, TOOLBAR_H / 2 - 10, 'Active', C.success, C.successBg));
-  els.push(...btn('we_save', W - 220, 9, 'Save', 'ghost', 70));
-  els.push(...btn('we_activate', W - 140, 9, 'Activate', 'primary', 100));
-  els.push(hline('we_tb_div', 0, TOOLBAR_H, W, C.gray300));
+  // Toolbar
+  els.push(rect('we_tb', 0, 0, W, TB, C.gray300, C.white, 1));
+  els.push(hline('we_tb_div', 0, TB, W, C.gray300));
+  els.push(txt('we_back', 16, TB / 2 - 9, 100, 18, '← Workflows', 13, C.primary));
+  els.push(vline('we_tb_sep', 120, 10, TB - 20, C.gray300));
+  els.push(txt('we_name', 132, TB / 2 - 9, 220, 18, 'Customer Onboarding', 14, C.gray900));
+  els.push(...badge('we_badge', 364, TB / 2 - 14, 'Active', C.success, C.successBg));
+  els.push(...btn('we_save', W - 240, 8, 'Save', 'ghost', 80));
+  els.push(...btn('we_activate', W - 152, 8, 'Activate', 'primary', 136));
 
-  // Step palette panel (left)
-  els.push(rect('we_palette', 0, TOOLBAR_H, STEP_PANEL_W, H - TOOLBAR_H, C.gray300, C.white));
-  els.push(txt('we_palette_title', 12, TOOLBAR_H + 12, STEP_PANEL_W - 24, 18, 'Steps', 13, C.gray900));
-  els.push(hline('we_palette_sep', 0, TOOLBAR_H + 36, STEP_PANEL_W));
-  els.push(txt('we_palette_sub', 12, TOOLBAR_H + 44, STEP_PANEL_W - 24, 14, 'Drag to canvas', 10, C.gray500));
+  // Step palette (left)
+  els.push(rect('we_pal', 0, TB, PAL_W, H - TB, C.gray300, C.white));
+  els.push(txt('we_pal_title', 16, TB + 14, PAL_W - 32, 20, 'Step Types', 14, C.gray900));
+  els.push(hline('we_pal_sep', 0, TB + 44, PAL_W));
+  els.push(txt('we_pal_hint', 16, TB + 52, PAL_W - 32, 18, 'Drag onto canvas', 11, C.gray500));
 
   const stepTypes = [
-    ['Trigger', 'Start the workflow', C.primary, C.infoBg],
-    ['Condition', 'Branch on logic', C.warning, C.warningBg],
-    ['Action', 'Perform an action', C.accent, C.warningBg],
-    ['Wait', 'Delay / await event', C.gray700, C.gray100],
-    ['Send Email', 'Notify via email', C.primary, C.infoBg],
-    ['Webhook', 'Call external URL', C.primary, C.infoBg],
-    ['End', 'Terminate path', C.danger, C.dangerBg],
+    ['Trigger', 'Start condition', C.primary, C.infoBg, C.infoBorder],
+    ['Condition', 'Branch on logic', C.warning, C.warningBg, C.warningBorder],
+    ['Action', 'Perform action', C.accent, C.warningBg, C.warningBorder],
+    ['Send Email', 'Notify via email', C.primary, C.infoBg, C.infoBorder],
+    ['Webhook', 'Call external URL', C.primary, C.infoBg, C.infoBorder],
+    ['Wait', 'Delay or await', C.gray700, C.gray100, C.gray300],
+    ['End', 'Terminate path', C.danger, C.dangerBg, C.dangerBorder],
   ];
-  stepTypes.forEach(([name, desc, color, bg], i) => {
-    const sy = TOOLBAR_H + 64 + i * 48;
-    els.push(rect(`we_st_${i}`, 10, sy, STEP_PANEL_W - 20, 40, color, bg, 1, true));
-    els.push(txt(`we_st_name_${i}`, 22, sy + 8, 140, 16, name, 12, color));
-    els.push(txt(`we_st_desc_${i}`, 22, sy + 24, 200, 12, desc, 10, C.gray500));
+  stepTypes.forEach(([name, desc, tc, bg, stroke], i) => {
+    const sy = TB + 72 + i * 52;
+    els.push(rect(`we_st_${i}`, 10, sy, PAL_W - 20, 44, stroke, bg, 1, true));
+    els.push(txt(`we_stn_${i}`, 24, sy + 8, PAL_W - 48, 18, name, 13, tc));
+    els.push(txt(`we_std_${i}`, 24, sy + 26, PAL_W - 48, 14, desc, 10, C.gray500));
+    els.push(txt(`we_stdg_${i}`, PAL_W - 28, sy + 13, 18, 18, '⠿', 12, C.gray300));
   });
 
-  // Canvas area
-  els.push(rect('we_canvas', STEP_PANEL_W, TOOLBAR_H, CANVAS_W, H - TOOLBAR_H, C.gray300, C.gray100));
-  // grid dots (represented as faint pattern description)
-  els.push(txt('we_canvas_hint', STEP_PANEL_W + 10, TOOLBAR_H + 10, 200, 14, '· · · canvas area · · ·', 10, C.gray300, 'center'));
+  // Canvas
+  els.push(rect('we_cvs', PAL_W, TB, CVS_W, H - TB, C.gray300, C.gray100));
+  els.push(txt('we_cvs_hint', PAL_W + CVS_W / 2 - 60, TB + 20, 120, 18, '· · · canvas · · ·', 11, C.gray300, 'center'));
 
-  // Workflow nodes on canvas
-  const nx = STEP_PANEL_W + 60;
-  const nodeW = 180, nodeH = 60;
-
+  // Workflow nodes
+  const nW = 180, nH = 60;
+  const nX = PAL_W + (CVS_W - nW) / 2;
   const nodes = [
-    [nx, TOOLBAR_H + 60, 'Record Created', 'Trigger', C.primary, C.infoBg],
-    [nx, TOOLBAR_H + 180, 'Validate Data', 'Condition', C.warning, C.warningBg],
-    [nx - 100, TOOLBAR_H + 300, 'Send Welcome Email', 'Action', C.accent, C.warningBg],
-    [nx + 100, TOOLBAR_H + 300, 'Flag for Review', 'Action', C.accent, C.warningBg],
-    [nx, TOOLBAR_H + 420, 'End', 'End', C.danger, C.dangerBg],
+    [nX, TB + 60, 'Record Created', 'Trigger', C.primary, C.infoBg, C.infoBorder, false],
+    [nX, TB + 184, 'Validate Data', 'Condition', C.warning, C.warningBg, C.warningBorder, true],
+    [nX - 110, TB + 308, 'Send Welcome Email', 'Action', C.accent, C.warningBg, C.warningBorder, false],
+    [nX + 110, TB + 308, 'Flag for Review', 'Action', C.accent, C.warningBg, C.warningBorder, false],
+    [nX, TB + 432, 'End', 'End', C.danger, C.dangerBg, C.dangerBorder, false],
   ];
-  nodes.forEach(([nx2, ny, label, type, color, bg], i) => {
-    const isSelected = i === 1;
-    els.push(rect(`we_node_${i}`, nx2, ny, nodeW, nodeH, isSelected ? C.accent : color, bg, isSelected ? 2 : 1, true));
-    els.push(txt(`we_node_type_${i}`, nx2 + 10, ny + 8, nodeW - 20, 14, type, 10, color));
-    els.push(txt(`we_node_label_${i}`, nx2 + 10, ny + 26, nodeW - 20, 18, label, 12, C.gray900));
+  nodes.forEach(([nx, ny, label, type, tc, bg, stroke, selected], i) => {
+    els.push(rect(`we_n_${i}`, nx, ny, nW, nH, selected ? C.accent : stroke, bg, selected ? 2 : 1, true));
+    els.push(txt(`we_nt_${i}`, nx + 10, ny + 8, nW - 20, 16, type, 10, tc));
+    els.push(txt(`we_nl_${i}`, nx + 10, ny + 28, nW - 20, 20, label, 13, C.gray900));
   });
+  // connectors
+  const midX = nX + nW / 2;
+  els.push(vline('we_c01', midX, nodes[0][1] + nH, nodes[1][1] - nodes[0][1] - nH, C.gray500));
+  els.push(vline('we_c14', midX, nodes[1][1] + nH, nodes[4][1] - nodes[1][1] - nH, C.gray500));
+  els.push(hline('we_c12h', nodes[2][0] + nW / 2, nodes[2][1] + nH / 2, midX - nodes[2][0] - nW / 2, C.gray500));
+  els.push(hline('we_c13h', midX, nodes[3][1] + nH / 2, nodes[3][0] - midX, C.gray500));
 
-  // connector lines between nodes (simple vertical lines)
-  [0, 1, 3, 4].forEach((i) => {
-    const [nx2, ny] = nodes[i];
-    const [nx3, ny3] = nodes[i + 1] || nodes[4];
-    const startY = ny + nodeH;
-    const endY = ny3;
-    if (Math.abs(nx2 - nx3) < 10) {
-      els.push(vline(`we_conn_${i}`, nx2 + nodeW / 2, startY, endY - startY, C.gray500));
-    }
-  });
-  // branch lines from condition node
-  els.push(hline('we_branch_h1', nodes[1][0] + nodeW / 2, nodes[2][1] + nodeH / 2, -(100 + nodeW / 2), C.gray500));
-  els.push(hline('we_branch_h2', nodes[1][0] + nodeW / 2, nodes[3][1] + nodeH / 2, 100 + nodeW / 2, C.gray500));
+  // Properties panel (right)
+  els.push(rect('we_props', PAL_W + CVS_W, TB, PROP_W, H - TB, C.gray300, C.white));
+  els.push(txt('we_props_title', PAL_W + CVS_W + 16, TB + 14, PROP_W - 32, 20, 'Step Properties', 14, C.gray900));
+  els.push(hline('we_props_sep', PAL_W + CVS_W, TB + 44, PROP_W));
 
-  // Properties panel (right) — showing selected step
-  els.push(rect('we_props', STEP_PANEL_W + CANVAS_W, TOOLBAR_H, PROP_PANEL_W, H - TOOLBAR_H, C.gray300, C.white));
-  els.push(txt('we_props_title', STEP_PANEL_W + CANVAS_W + 12, TOOLBAR_H + 12, PROP_PANEL_W - 24, 18, 'Step Properties', 13, C.gray900));
-  els.push(hline('we_props_sep', STEP_PANEL_W + CANVAS_W, TOOLBAR_H + 36, PROP_PANEL_W));
-
-  const px = STEP_PANEL_W + CANVAS_W + 12;
-  const py = TOOLBAR_H + 48;
-  els.push(txt('we_props_type', px, py, PROP_PANEL_W - 24, 14, 'Condition', 11, C.warning));
-  els.push(txt('we_props_name_lbl', px, py + 20, 100, 14, 'Step name', 12, C.gray700));
-  els.push(...inputField('we_props_name', px, py + 36, 'Validate Data', PROP_PANEL_W - 24));
-
-  els.push(txt('we_props_cond_lbl', px, py + 86, 100, 14, 'Condition', 12, C.gray700));
-  els.push(...selectField('we_props_field', px, py + 102, 'Select field…', PROP_PANEL_W - 24));
-  els.push(...selectField('we_props_op', px, py + 144, 'Operator…', (PROP_PANEL_W - 24) / 2 - 4));
-  els.push(...inputField('we_props_val', px + (PROP_PANEL_W - 24) / 2 + 4, py + 144, 'Value', (PROP_PANEL_W - 24) / 2 - 4));
-
-  els.push(txt('we_props_branches', px, py + 192, PROP_PANEL_W - 24, 14, 'Branches', 12, C.gray700));
-  ['True → Send Welcome Email', 'False → Flag for Review'].forEach((branch, i) => {
-    els.push(rect(`we_props_br_${i}`, px, py + 210 + i * 36, PROP_PANEL_W - 24, 28, C.gray300, C.gray50, 1, true));
-    els.push(txt(`we_props_br_lbl_${i}`, px + 8, py + 218 + i * 36, PROP_PANEL_W - 36, 16, branch, 11, C.gray700));
+  const px = PAL_W + CVS_W + 16;
+  const pW = PROP_W - 32;
+  let py = TB + 56;
+  els.push(txt('we_pt', px, py, pW, 18, 'Type: Condition', 11, C.warning));
+  py += 20;
+  els.push(txt('we_pn_lbl', px, py, 100, 18, 'Step name', 12, C.gray700));
+  els.push(...inputField('we_pn', px, py + 20, 'Validate Data', pW));
+  py += 72;
+  els.push(txt('we_pc_lbl', px, py, 100, 18, 'Condition', 12, C.gray700));
+  els.push(...selectField('we_pc_field', px, py + 20, 'Select field…', pW));
+  els.push(...selectField('we_pc_op', px, py + 68, 'Operator…', Math.floor(pW / 2) - 4));
+  els.push(...inputField('we_pc_val', px + Math.floor(pW / 2) + 4, py + 68, 'Value', Math.ceil(pW / 2) - 4));
+  py += 124;
+  els.push(txt('we_pb_lbl', px, py, 100, 18, 'Branches', 12, C.gray700));
+  ['True → Send Welcome Email', 'False → Flag for Review'].forEach((b, i) => {
+    els.push(rect(`we_pb_${i}`, px, py + 20 + i * 44, pW, 36, C.gray300, C.gray50, 1, true));
+    els.push(txt(`we_pbl_${i}`, px + 10, py + 29 + i * 44, pW - 20, 18, b, 11, C.gray700));
   });
 
   writeExcalidraw(`${BASE_DIR}/E04-workflow-builder/workflow-editor.excalidraw`, els);
@@ -885,196 +908,206 @@ function genWorkflowEditor() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function genForms() {
-  const W = 1100, H = 760;
-  const tableW = W - OX - SB - 40;
+  const W = 1100, H = 820;
+  const PAD = 20;
+  const tW = W - OX - SB - PAD * 2;
+  const tX = CX + PAD;
   const els = [...appShell('fb', W, H, 'Forms')];
 
-  els.push(txt('fb_hdr_bc', CX + 16, OY + 16, 200, 20, 'Forms', 12, C.gray700));
-  els.push(...pageHeader('fb_ph', CX + 20, CY + 20, 'Forms', 'Collect data and trigger workflows'));
-  els.push(...btn('fb_create', CX + tableW - 60, CY + 20, '+ New Form', 'primary', 100));
+  els.push(txt('fb_bc', CX + 16, OY + 20, 140, 22, 'Forms', 14, C.gray700));
+  els.push(...pageHeader('fb_ph', tX, CY + PAD, 'Forms', 'Collect data and trigger workflows'));
+  els.push(...btn('fb_create', tX + tW - 116, CY + PAD, '+ New Form', 'primary', 116));
+  els.push(...searchBar('fb_search', tX, CY + 82, 260));
 
-  els.push(...searchBar('fb_search', CX + 20, CY + 76, 260));
+  const tY = CY + 138;
+  const cols = [['Name', 220], ['Linked Model', 170], ['Submissions', 110], ['Status', 120], ['Updated', 120], ['Actions', 70]];
+  els.push(tableOuter('fb_outer', tX, tY, tW, 44 + 5 * 50));
+  els.push(...tableHeader('fb_th', tX, tY, tW, cols));
 
-  const tY = CY + 124;
-  const cols = [['Name', 220], ['Linked Model', 180], ['Submissions', 110], ['Status', 110], ['Updated', 120], ['Actions', 100]];
-  els.push(...tableHeader('fb_th', CX + 20, tY, tableW, cols));
-
-  const forms = [
+  [
     ['Customer Intake', 'customer', '142', 'Published'],
     ['Support Request', 'ticket', '89', 'Published'],
     ['Order Form', 'order', '34', 'Draft'],
     ['Feedback Survey', 'feedback', '210', 'Published'],
     ['Invoice Approval', 'invoice', '12', 'Draft'],
-  ];
-  forms.forEach(([name, model, submissions, status], i) => {
-    const rowY = tY + 36 + i * 40;
-    const statusColor = status === 'Published' ? C.success : C.gray500;
-    els.push(...tableRow(`fb_row_${i}`, CX + 20, rowY, tableW, [
-      [name, 220, C.primary], [model, 180, C.gray700], [submissions, 110, C.gray700],
-      [status, 110, statusColor], ['2 days ago', 120, C.gray500], ['Edit  View  ···', 100, C.primary],
-    ]));
+  ].forEach(([name, model, subs, status], i) => {
+    const sc = status === 'Published' ? C.success : C.gray500;
+    els.push(...tableRow(`fb_r${i}`, tX, tY + 44 + i * 50, tW, [
+      [name, 220, C.primary], [model, 170, C.gray700], [subs, 110, C.gray700],
+      [status, 120, sc], ['2 days ago', 120, C.gray500], ['Edit  ···', 70, C.primary],
+    ], i % 2 === 1));
   });
 
-  // Create Form dialog
-  const mX = CX + 100, mY = CY + 60, mW = 480, mH = 320;
-  els.push(rect('fb_dlg_ov', OX, OY, W - OX, H - OY, 'transparent', C.gray900, 0, false, { opacity: 30 }));
+  // Create form dialog
+  const mW = 480, mH = 360;
+  const mX = CX + Math.round((W - OX - SB - mW) / 2);
+  const mY = CY + 60;
+  els.push(rect('fb_ov', OX, OY, W - OX, H - OY, 'transparent', C.gray900, 0, false, { opacity: 30 }));
   els.push(rect('fb_dlg', mX, mY, mW, mH, C.gray300, C.white, 1, true));
-  els.push(txt('fb_dlg_title', mX + 20, mY + 20, mW - 40, 22, 'New Form', 15, C.gray900));
-  els.push(hline('fb_dlg_sep', mX + 20, mY + 50, mW - 40));
+  els.push(txt('fb_dlg_title', mX + 20, mY + 20, mW - 40, 24, 'New Form', 16, C.gray900));
+  els.push(hline('fb_dlg_sep', mX + 20, mY + 52, mW - 40));
 
-  els.push(txt('fb_dlg_name_lbl', mX + 20, mY + 66, 100, 14, 'Form name', 12, C.gray700));
-  els.push(...inputField('fb_dlg_name', mX + 20, mY + 82, 'e.g. Customer Intake', mW - 40));
+  [['Form name', 'fb_dn', 'e.g. Customer Intake'], ['Linked data model', 'fb_dm', null], ['On submit: trigger workflow', 'fb_dw', null]].forEach(([label, fid, ph], i) => {
+    const fy = mY + 68 + i * 76;
+    els.push(txt(`${fid}_lbl`, mX + 20, fy, 240, 18, label, 12, C.gray700));
+    if (ph) {
+      els.push(...inputField(fid, mX + 20, fy + 22, ph, mW - 40));
+    } else {
+      els.push(...selectField(fid, mX + 20, fy + 22, i === 1 ? 'Select model…' : 'Select workflow (optional)…', mW - 40));
+    }
+  });
 
-  els.push(txt('fb_dlg_model_lbl', mX + 20, mY + 128, 140, 14, 'Linked data model', 12, C.gray700));
-  els.push(...selectField('fb_dlg_model', mX + 20, mY + 144, 'Select model…', mW - 40));
-
-  els.push(txt('fb_dlg_wf_lbl', mX + 20, mY + 190, 160, 14, 'On submit: trigger workflow', 12, C.gray700));
-  els.push(...selectField('fb_dlg_wf', mX + 20, mY + 206, 'Select workflow (optional)…', mW - 40));
-
-  els.push(...btn('fb_dlg_cancel', mX + mW - 230, mY + mH - 48, 'Cancel', 'ghost', 90));
-  els.push(...btn('fb_dlg_create', mX + mW - 130, mY + mH - 48, 'Create', 'primary', 110));
+  els.push(...btn('fb_cancel', mX + mW - 244, mY + mH - 52, 'Cancel', 'ghost', 100));
+  els.push(...btn('fb_dlg_create', mX + mW - 136, mY + mH - 52, 'Create', 'primary', 124));
 
   writeExcalidraw(`${BASE_DIR}/E05-form-builder/forms.excalidraw`, els);
 }
 
 function genFormEditor() {
-  const W = 1200, H = 800;
-  const TOOLBAR_H = 48;
-  const PALETTE_W = 240;
-  const PROPS_W = 280;
-  const CANVAS_W = W - PALETTE_W - PROPS_W;
+  const W = 1240, H = 820;
+  const TB = 52;
+  const PAL_W = 220;
+  const PROP_W = 280;
+  const CVS_W = W - PAL_W - PROP_W;
   const els = [];
 
   // Toolbar
-  els.push(rect('fe_toolbar', 0, 0, W, TOOLBAR_H, C.gray300, C.white, 1));
-  els.push(txt('fe_back', 12, TOOLBAR_H / 2 - 8, 60, 18, '← Forms', 12, C.primary));
-  els.push(vline('fe_tb_sep', 82, 8, TOOLBAR_H - 16, C.gray300));
-  els.push(txt('fe_form_name', 94, TOOLBAR_H / 2 - 9, 220, 20, 'Customer Intake', 14, C.gray900));
-  els.push(...badge('fe_status', 328, TOOLBAR_H / 2 - 10, 'Draft', C.gray500, C.gray100));
-  els.push(...btn('fe_preview', W - 320, 9, 'Preview', 'ghost', 80));
-  els.push(...btn('fe_save', W - 230, 9, 'Save', 'ghost', 70));
-  els.push(...btn('fe_publish', W - 150, 9, 'Publish', 'primary', 100));
-  els.push(hline('fe_tb_div', 0, TOOLBAR_H, W, C.gray300));
+  els.push(rect('fe_tb', 0, 0, W, TB, C.gray300, C.white, 1));
+  els.push(hline('fe_tb_div', 0, TB, W, C.gray300));
+  els.push(txt('fe_back', 16, TB / 2 - 9, 70, 18, '← Forms', 13, C.primary));
+  els.push(vline('fe_tb_sep', 96, 10, TB - 20, C.gray300));
+  els.push(txt('fe_name', 108, TB / 2 - 9, 220, 18, 'Customer Intake', 14, C.gray900));
+  els.push(...badge('fe_badge', 340, TB / 2 - 14, 'Draft', C.gray500, C.gray100));
+  els.push(...btn('fe_preview', W - 332, 8, 'Preview', 'ghost', 88));
+  els.push(...btn('fe_save', W - 236, 8, 'Save', 'ghost', 80));
+  els.push(...btn('fe_publish', W - 148, 8, 'Publish', 'primary', 136));
 
-  // Field palette (left)
-  els.push(rect('fe_palette', 0, TOOLBAR_H, PALETTE_W, H - TOOLBAR_H, C.gray300, C.white));
-  els.push(txt('fe_pal_title', 12, TOOLBAR_H + 12, PALETTE_W - 24, 18, 'Field Types', 13, C.gray900));
-  els.push(hline('fe_pal_sep', 0, TOOLBAR_H + 36, PALETTE_W));
+  // Field type palette (left)
+  els.push(rect('fe_pal', 0, TB, PAL_W, H - TB, C.gray300, C.white));
+  els.push(txt('fe_pal_title', 16, TB + 14, PAL_W - 32, 20, 'Field Types', 14, C.gray900));
+  els.push(hline('fe_pal_sep', 0, TB + 44, PAL_W));
 
-  const fieldTypes = ['Text', 'Number', 'Email', 'Date', 'Dropdown', 'Checkbox', 'File Upload', 'Rich Text', 'Relation'];
-  fieldTypes.forEach((ft, i) => {
-    const fy = TOOLBAR_H + 44 + i * 36;
-    els.push(rect(`fe_ft_${i}`, 10, fy, PALETTE_W - 20, 28, C.gray300, C.gray50, 1, true));
-    els.push(txt(`fe_ft_lbl_${i}`, 22, fy + 7, PALETTE_W - 40, 16, ft, 12, C.gray700));
-    els.push(txt(`fe_ft_drag_${i}`, PALETTE_W - 30, fy + 7, 18, 16, '⠿', 12, C.gray300));
+  ['Text', 'Number', 'Email', 'Date', 'Dropdown', 'Checkbox', 'File Upload', 'Rich Text', 'Relation'].forEach((ft, i) => {
+    const fy = TB + 52 + i * 40;
+    els.push(rect(`fe_ft_${i}`, 10, fy, PAL_W - 20, 32, C.gray300, C.gray50, 1, true));
+    els.push(txt(`fe_ftn_${i}`, 24, fy + 7, PAL_W - 52, 18, ft, 13, C.gray700));
+    els.push(txt(`fe_ftd_${i}`, PAL_W - 28, fy + 7, 18, 18, '⠿', 12, C.gray300));
   });
 
-  // Form canvas (center)
-  els.push(rect('fe_canvas', PALETTE_W, TOOLBAR_H, CANVAS_W, H - TOOLBAR_H, C.gray300, C.gray100));
-  // Form preview in canvas
-  const fX = PALETTE_W + 60, fW = CANVAS_W - 120, fYS = TOOLBAR_H + 40;
-  els.push(rect('fe_form_bg', fX, fYS, fW, H - TOOLBAR_H - 80, C.gray300, C.white, 1, true));
-  els.push(txt('fe_form_title', fX + 24, fYS + 20, fW - 48, 28, 'Customer Intake', 18, C.gray900));
-  els.push(txt('fe_form_sub', fX + 24, fYS + 52, fW - 48, 16, 'Fill out the form below', 12, C.gray500));
-  els.push(hline('fe_form_sep', fX + 24, fYS + 76, fW - 48));
+  // Canvas
+  els.push(rect('fe_cvs', PAL_W, TB, CVS_W, H - TB, C.gray300, C.gray100));
 
-  // form fields
-  const formFields = [
-    ['Full Name *', 'Enter full name'],
-    ['Email Address *', 'Enter email'],
-    ['Phone Number', 'Enter phone (optional)'],
-  ];
-  formFields.forEach(([label, ph], i) => {
-    const ffy = fYS + 96 + i * 72;
-    els.push(txt(`fe_form_f_lbl_${i}`, fX + 24, ffy, 200, 14, label, 12, C.gray700));
-    // selected field has highlight border
-    const isSelected = i === 0;
-    els.push(rect(`fe_form_f_box_${i}`, fX + 24, ffy + 18, fW - 48, 36, isSelected ? C.accent : C.gray300, C.white, isSelected ? 2 : 1, true));
-    els.push(txt(`fe_form_f_ph_${i}`, fX + 34, ffy + 28, fW - 68, 16, ph, 12, C.gray500));
+  // Form preview card in canvas
+  const fX = PAL_W + 60, fW = CVS_W - 120, fY = TB + 36;
+  els.push(rect('fe_form', fX, fY, fW, H - TB - 72, C.gray300, C.white, 1, true));
+  els.push(txt('fe_form_title', fX + 24, fY + 20, fW - 48, 26, 'Customer Intake', 18, C.gray900));
+  els.push(txt('fe_form_sub', fX + 24, fY + 50, fW - 48, 18, 'Fill out the form below', 12, C.gray500));
+  els.push(hline('fe_form_sep', fX + 24, fY + 76, fW - 48));
+
+  [['Full Name *', 'Enter full name', true], ['Email Address *', 'Enter email', false], ['Phone Number', 'Enter phone (optional)', false]].forEach(([label, ph, selected], i) => {
+    const ffy = fY + 96 + i * 80;
+    els.push(txt(`fe_ff_lbl_${i}`, fX + 24, ffy, 220, 18, label, 12, C.gray700));
+    els.push(rect(`fe_ff_box_${i}`, fX + 24, ffy + 22, fW - 48, 40,
+      selected ? C.accent : C.gray300, C.white, selected ? 2 : 1, true));
+    els.push(txt(`fe_ff_ph_${i}`, fX + 36, ffy + 33, fW - 72, 18, ph, 13, C.gray500));
   });
-
-  // submit button in form
-  els.push(...btn('fe_form_submit', fX + 24, fYS + 340, 'Submit', 'primary', 120));
+  els.push(...btn('fe_form_submit', fX + 24, fY + 340, 'Submit', 'primary', 120));
 
   // Properties panel (right)
-  els.push(rect('fe_props', PALETTE_W + CANVAS_W, TOOLBAR_H, PROPS_W, H - TOOLBAR_H, C.gray300, C.white));
-  els.push(txt('fe_props_title', PALETTE_W + CANVAS_W + 12, TOOLBAR_H + 12, PROPS_W - 24, 18, 'Field Properties', 13, C.gray900));
-  els.push(hline('fe_props_sep', PALETTE_W + CANVAS_W, TOOLBAR_H + 36, PROPS_W));
+  els.push(rect('fe_props', PAL_W + CVS_W, TB, PROP_W, H - TB, C.gray300, C.white));
+  els.push(txt('fe_props_title', PAL_W + CVS_W + 16, TB + 14, PROP_W - 32, 20, 'Field Properties', 14, C.gray900));
+  els.push(hline('fe_props_sep', PAL_W + CVS_W, TB + 44, PROP_W));
 
-  const ppX = PALETTE_W + CANVAS_W + 12;
-  const ppY = TOOLBAR_H + 48;
-  els.push(txt('fe_pp_type', ppX, ppY, PROPS_W - 24, 14, 'Field type: Text', 11, C.gray500));
-  els.push(txt('fe_pp_label_lbl', ppX, ppY + 20, 80, 14, 'Label', 12, C.gray700));
-  els.push(...inputField('fe_pp_label', ppX, ppY + 36, 'Full Name', PROPS_W - 24));
-  els.push(txt('fe_pp_ph_lbl', ppX, ppY + 82, 80, 14, 'Placeholder', 12, C.gray700));
-  els.push(...inputField('fe_pp_ph', ppX, ppY + 98, 'Enter full name', PROPS_W - 24));
-  els.push(txt('fe_pp_req_lbl', ppX, ppY + 144, 80, 14, 'Required', 12, C.gray700));
-  els.push(rect('fe_pp_req_toggle', ppX + 180, ppY + 140, 40, 22, C.primary, C.primary, 1, true));
-  els.push(rect('fe_pp_req_knob', ppX + 200, ppY + 143, 16, 16, C.white, C.white, 1, true));
-  els.push(txt('fe_pp_val_lbl', ppX, ppY + 180, 100, 14, 'Validation', 12, C.gray700));
-  els.push(...selectField('fe_pp_val_type', ppX, ppY + 196, 'None', PROPS_W - 24));
+  const px = PAL_W + CVS_W + 16;
+  const pW = PROP_W - 32;
+  let py = TB + 56;
+  els.push(txt('fe_pt', px, py, pW, 18, 'Field type: Text', 11, C.gray500));
+  py += 22;
+  els.push(txt('fe_plbl_lbl', px, py, 80, 18, 'Label', 12, C.gray700));
+  els.push(...inputField('fe_plbl', px, py + 20, 'Full Name', pW));
+  py += 72;
+  els.push(txt('fe_pph_lbl', px, py, 100, 18, 'Placeholder', 12, C.gray700));
+  els.push(...inputField('fe_pph', px, py + 20, 'Enter full name', pW));
+  py += 72;
+  els.push(txt('fe_preq_lbl', px, py, 80, 18, 'Required', 12, C.gray700));
+  // Toggle — matches S04 Toggle in template
+  els.push(rect('fe_tog', px + pW - 48, py - 2, 44, 24, C.primaryDark, C.primary, 1, true));
+  els.push(ellipse('fe_tog_k', px + pW - 28, py, 20, 20, C.white, C.white, 1));
+  py += 40;
+  els.push(txt('fe_pval_lbl', px, py, 100, 18, 'Validation', 12, C.gray700));
+  els.push(...selectField('fe_pval', px, py + 20, 'None', pW));
 
   writeExcalidraw(`${BASE_DIR}/E05-form-builder/form-editor.excalidraw`, els);
 }
 
 function genFormSubmission() {
-  const W = 1100, H = 900;
+  const W = 1100, H = 960;
   const els = [];
 
-  // Section 1: Public form submission page
-  els.push(txt('fs_s1_title', 40, 20, 600, 22, 'Public Form — Submission view (unauthenticated)', 16, C.gray500));
-  els.push(hline('fs_s1_div', 40, 48, 1020));
+  // ── Section 1: Public form page ────────────────────────────────────────────
+  els.push(txt('fs_s1_hdr', OX, OY, 700, 18, 'Public Form — Submission view (unauthenticated)', 13, C.gray500));
+  els.push(hline('fs_s1_div', OX, OY + 22, W - OX * 2));
 
-  const pgW = 580, pgX = (W - pgW) / 2;
-  els.push(rect('fs_bg', 0, 60, W, 420, C.gray300, C.gray100));
-  els.push(rect('fs_card', pgX, 80, pgW, 380, C.gray300, C.white, 1, true));
-  els.push(txt('fs_logo', pgX + pgW / 2 - 24, 96, 48, 18, 'AXIS', 13, C.primary, 'center'));
-  els.push(txt('fs_title', pgX + 24, 122, pgW - 48, 28, 'Customer Intake', 18, C.gray900, 'center'));
-  els.push(txt('fs_sub', pgX + 24, 154, pgW - 48, 16, 'Acme Corp · Fill out the form below', 12, C.gray500, 'center'));
-  els.push(hline('fs_sep', pgX + 24, 178, pgW - 48));
+  const pgW = 520;
+  const pgX = (W - pgW) / 2;
+  const pgY = OY + 36;
+  els.push(rect('fs_bg', 0, pgY, W, 440, C.gray300, C.gray100));
 
-  [['Full Name *', 'Alice Johnson'], ['Email Address *', 'alice@example.com'], ['Phone', '+1 555-0101']].forEach(([lbl, val], i) => {
-    const fy = 192 + i * 62;
-    els.push(txt(`fs_f_lbl_${i}`, pgX + 24, fy, 200, 14, lbl, 12, C.gray700));
-    els.push(rect(`fs_f_box_${i}`, pgX + 24, fy + 18, pgW - 48, 34, C.gray300, C.white, 1, true));
-    els.push(txt(`fs_f_val_${i}`, pgX + 34, fy + 27, pgW - 68, 16, val, 12, C.gray900));
+  els.push(rect('fs_card', pgX, pgY + 16, pgW, 400, C.gray300, C.white, 1, true));
+
+  // Logo — matches S18 style
+  els.push(rect('fs_logo_area', pgX + pgW / 2 - 48, pgY + 28, 96, 32, C.gray300, C.gray50, 1, true));
+  els.push(txt('fs_logo_t', pgX + pgW / 2 - 48, pgY + 36, 96, 20, '⬡  Axis', 13, C.primary, 'center'));
+
+  els.push(txt('fs_title', pgX + 24, pgY + 72, pgW - 48, 28, 'Customer Intake', 20, C.gray900, 'center'));
+  els.push(txt('fs_org', pgX + 24, pgY + 104, pgW - 48, 18, 'Acme Corp', 12, C.gray500, 'center'));
+  els.push(hline('fs_sep', pgX + 24, pgY + 130, pgW - 48));
+
+  [['Full Name *', 'Alice Johnson'], ['Email Address *', 'alice@example.com'], ['Phone', '+1 555-0101']].forEach(([label, val], i) => {
+    const fy = pgY + 148 + i * 68;
+    els.push(txt(`fs_lbl_${i}`, pgX + 24, fy, 220, 18, label, 12, C.gray700));
+    els.push(rect(`fs_box_${i}`, pgX + 24, fy + 22, pgW - 48, 40, C.gray300, C.white, 1, true));
+    els.push(txt(`fs_val_${i}`, pgX + 36, fy + 33, pgW - 72, 18, val, 13, C.gray900));
   });
-
-  els.push(...btn('fs_submit', pgX + 24, 376 + 12, 'Submit Form', 'primary', pgW - 48));
+  els.push(...btn('fs_submit', pgX + 24, pgY + 360, 'Submit Form', 'primary', pgW - 48));
 
   // Success state annotation
-  els.push(txt('fs_success_note', pgX + pgW + 20, 200, 180, 60, '→ Success state\nshows confirmation\nmessage', 11, C.gray500));
+  els.push(txt('fs_note', pgX + pgW + 16, pgY + 170, 160, 60, '→ On success:\nshows confirmation\nmessage + checkmark', 11, C.gray500));
 
-  // Section 2: My Tasks (authenticated — task assignment view)
-  const s2Y = 520;
-  els.push(txt('fs_s2_title', 40, s2Y, 700, 22, 'My Tasks — Form submission task assignment (authenticated)', 16, C.gray500));
-  els.push(hline('fs_s2_div', 40, s2Y + 28, 1020));
+  // ── Section 2: My Tasks ────────────────────────────────────────────────────
+  const s2Y = pgY + 460;
+  els.push(txt('fs_s2_hdr', OX, s2Y, 700, 18, 'My Tasks — Form submission task assignment (authenticated)', 13, C.gray500));
+  els.push(hline('fs_s2_div', OX, s2Y + 22, W - OX * 2));
 
-  const shell2 = appShell('fs_shell', W, H - s2Y + OY, 'Forms');
-  const shellYOffset = s2Y + 28;
-  // We need to draw the shell relative to s2Y
-  els.push(rect('fs_shell2_outer', OX, shellYOffset, W - OX * 2, 320, C.gray300, C.gray100));
-  els.push(rect('fs_shell2_sb', OX, shellYOffset, SB, 320, C.gray300, C.primaryDark));
-  els.push(txt('fs_shell2_nav', OX + 20, shellYOffset + 20, SB - 40, 18, 'My Tasks ←', 12, C.white));
+  // Mini app shell
+  const shellY = s2Y + 36;
+  const shellH = 340;
+  els.push(rect('fs_shell_bg', OX, shellY, W - OX * 2, shellH, C.gray300, C.gray100));
+  els.push(rect('fs_shell_sb', OX, shellY, SB, shellH, C.gray300, C.white));
+  els.push(rect('fs_shell_logo', OX, shellY, SB, 60, C.gray300, C.gray50));
+  els.push(txt('fs_shell_logo_t', OX + 28, shellY + 18, 160, 26, '⬡  Axis', 18, C.primary));
+  els.push(txt('fs_shell_nav', OX + 28, shellY + 82, 160, 18, 'My Tasks', 13, C.primary));
+  els.push(rect('fs_shell_ni', OX + 8, shellY + 72, 214, 36, C.infoBorder, C.infoBg, 1));
+  els.push(rect('fs_shell_nb', OX + 8, shellY + 72, 3, 36, C.primary, C.primary, 1));
 
-  const taskTableW = W - OX * 2 - SB - 20;
-  const tX2 = OX + SB + 10;
-  const tY2 = shellYOffset + 10;
-  els.push(...pageHeader('fs_tasks_hdr', tX2, tY2, 'My Tasks'));
-  els.push(...selectField('fs_tasks_filter', tX2, tY2 + 44, 'Status: Pending', 160));
-  const taskCols = [['Form', 180], ['Record', 180], ['Assigned', 120], ['Status', 100], ['Due', 100], ['Action', 80]];
-  els.push(...tableHeader('fs_tasks_th', tX2, tY2 + 86, taskTableW, taskCols));
-  const tasks = [
+  const tX2 = OX + SB + 20;
+  const tW2 = W - OX * 2 - SB - 40;
+  els.push(txt('fs_tasks_title', tX2, shellY + 20, 300, 26, 'My Tasks', 18, C.gray900));
+  els.push(...selectField('fs_tasks_filter', tX2, shellY + 58, 'Status: Pending', 180));
+
+  const tY2 = shellY + 112;
+  const taskCols = [['Form', 180], ['Record', 180], ['Assigned to', 130], ['Status', 110], ['Due', 100], ['Action', 60]];
+  els.push(tableOuter('fs_task_outer', tX2, tY2, tW2, 44 + 2 * 50));
+  els.push(...tableHeader('fs_task_th', tX2, tY2, tW2, taskCols));
+  [
     ['Customer Intake', 'Alice Johnson', 'John Doe', 'Pending'],
     ['Invoice Approval', 'INV-2026-042', 'Jane Smith', 'In Review'],
-  ];
-  tasks.forEach(([form, rec, assignee, status], i) => {
-    const rowY2 = tY2 + 86 + 36 + i * 40;
-    const sColor = status === 'Pending' ? C.warning : C.primary;
-    els.push(...tableRow(`fs_task_row_${i}`, tX2, rowY2, taskTableW, [
-      [form, 180, C.primary], [rec, 180], [assignee, 120, C.gray700], [status, 100, sColor],
-      ['Tomorrow', 100, C.gray500], ['Open', 80, C.primary],
-    ]));
+  ].forEach(([form, rec, assignee, status], i) => {
+    const sc = status === 'Pending' ? C.warning : C.primary;
+    els.push(...tableRow(`fs_tr_${i}`, tX2, tY2 + 44 + i * 50, tW2, [
+      [form, 180, C.primary], [rec, 180], [assignee, 130, C.gray700],
+      [status, 110, sc], ['Tomorrow', 100, C.gray500], ['Open', 60, C.primary],
+    ], i % 2 === 1));
   });
 
   writeExcalidraw(`${BASE_DIR}/E05-form-builder/form-submission.excalidraw`, els);
@@ -1085,145 +1118,149 @@ function genFormSubmission() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function genExecutions() {
-  const W = 1100, H = 780;
-  const tableW = W - OX - SB - 40;
+  const W = 1100, H = 880;
+  const PAD = 20;
+  const tW = W - OX - SB - PAD * 2;
+  const tX = CX + PAD;
   const els = [...appShell('ex', W, H, 'Executions')];
 
-  els.push(txt('ex_hdr_bc', CX + 16, OY + 16, 200, 20, 'Executions', 12, C.gray700));
-  els.push(...pageHeader('ex_ph', CX + 20, CY + 20, 'Executions', 'Monitor workflow execution history'));
+  els.push(txt('ex_bc', CX + 16, OY + 20, 180, 22, 'Executions', 14, C.gray700));
+  els.push(...pageHeader('ex_ph', tX, CY + PAD, 'Executions', 'Monitor workflow execution history'));
 
-  // filter bar
-  els.push(...searchBar('ex_search', CX + 20, CY + 76, 220));
-  els.push(...selectField('ex_filter_wf', CX + 252, CY + 76, 'Workflow: All', 180));
-  els.push(...selectField('ex_filter_status', CX + 444, CY + 76, 'Status: All', 140));
-  els.push(...selectField('ex_filter_date', CX + 596, CY + 76, 'Date range', 140));
+  // Filters
+  els.push(...searchBar('ex_search', tX, CY + 82, 220));
+  els.push(...selectField('ex_wf', tX + 236, CY + 82, 'Workflow: All', 180));
+  els.push(...selectField('ex_status', tX + 432, CY + 82, 'Status: All', 150));
+  els.push(...selectField('ex_date', tX + 598, CY + 82, 'Date range', 140));
 
-  // stats row
-  const statsY = CY + 122;
-  const stats = [
-    ['Total', '1,482', C.gray900],
-    ['Completed', '1,341', C.success],
-    ['Failed', '87', C.danger],
-    ['Running', '54', C.primary],
-  ];
-  stats.forEach(([label, value, color], i) => {
-    const sx = CX + 20 + i * 180;
-    els.push(rect(`ex_stat_${i}`, sx, statsY, 160, 56, C.gray300, C.white, 1, true));
-    els.push(txt(`ex_stat_val_${i}`, sx + 16, statsY + 10, 130, 24, value, 20, color));
-    els.push(txt(`ex_stat_lbl_${i}`, sx + 16, statsY + 36, 130, 14, label, 11, C.gray500));
+  // Stats row — matches S12 Stat Card pattern
+  const stY = CY + 142;
+  const stW = 168;
+  [['Total', '1,482', C.gray900], ['Completed', '1,341', C.success], ['Failed', '87', C.danger], ['Running', '54', C.primary]].forEach(([label, val, vc], i) => {
+    const sx = tX + i * (stW + 12);
+    els.push(rect(`ex_stat_${i}`, sx, stY, stW, 60, C.gray300, C.white, 1, true));
+    els.push(txt(`ex_sv_${i}`, sx + 16, stY + 8, stW - 32, 28, val, 22, vc));
+    els.push(txt(`ex_sl_${i}`, sx + 16, stY + 38, stW - 32, 18, label, 12, C.gray500));
   });
 
-  // table
-  const tY = statsY + 72;
-  const cols = [['Execution ID', 160], ['Workflow', 180], ['Trigger', 130], ['Status', 110], ['Duration', 90], ['Started', 130], ['Actions', 60]];
-  els.push(...tableHeader('ex_th', CX + 20, tY, tableW, cols));
+  const tY = stY + 76;
+  const cols = [['Execution ID', 150], ['Workflow', 190], ['Trigger', 130], ['Status', 120], ['Duration', 90], ['Started', 130]];
+  els.push(tableOuter('ex_outer', tX, tY, tW, 44 + 5 * 50));
+  els.push(...tableHeader('ex_th', tX, tY, tW, cols));
 
-  const statusMap = { Completed: C.success, Failed: C.danger, Running: C.primary, Cancelled: C.gray500 };
-  const executions = [
+  const sMap2 = { Completed: C.success, Failed: C.danger, Running: C.primary, Cancelled: C.gray500 };
+  [
     ['exec-0001', 'Customer Onboarding', 'Record Created', 'Completed', '1.2s', '10:42 AM'],
     ['exec-0002', 'Invoice Approval', 'Form Submission', 'Failed', '0.8s', '10:38 AM'],
     ['exec-0003', 'Weekly Report', 'Schedule', 'Running', '—', '10:35 AM'],
     ['exec-0004', 'Customer Onboarding', 'Record Created', 'Completed', '2.1s', '10:20 AM'],
     ['exec-0005', 'Data Sync', 'Webhook', 'Cancelled', '0.2s', '09:55 AM'],
-  ];
-  executions.forEach(([id, wf, trigger, status, duration, started], i) => {
-    const rowY = tY + 36 + i * 40;
-    els.push(...tableRow(`ex_row_${i}`, CX + 20, rowY, tableW, [
-      [id, 160, C.primary], [wf, 180], [trigger, 130, C.gray700],
-      [status, 110, statusMap[status] || C.gray700], [duration, 90, C.gray700],
-      [started, 130, C.gray500], ['View', 60, C.primary],
-    ]));
+  ].forEach(([id, wf, trigger, status, dur, started], i) => {
+    const sc = sMap2[status] || C.gray700;
+    els.push(...tableRow(`ex_r${i}`, tX, tY + 44 + i * 50, tW, [
+      [id, 150, C.primary], [wf, 190], [trigger, 130, C.gray700],
+      [status, 120, sc], [dur, 90, C.gray700], [started, 130, C.gray500],
+    ], i % 2 === 1));
   });
 
-  const pgY = tY + 36 + executions.length * 40 + 12;
-  els.push(txt('ex_pg', CX + 20, pgY, 300, 16, 'Showing 1–5 of 1,482 executions', 11, C.gray500));
-  els.push(...btn('ex_pg_prev', CX + tableW - 180, pgY - 4, '← Prev', 'ghost', 80));
-  els.push(...btn('ex_pg_next', CX + tableW - 90, pgY - 4, 'Next →', 'ghost', 80));
+  const pgY = tY + 44 + 5 * 50 + 16;
+  els.push(txt('ex_pg', tX, pgY + 8, 320, 20, 'Showing 1–5 of 1,482 executions', 12, C.gray500));
+  els.push(...btn('ex_prev', tX + tW - 188, pgY, '← Prev', 'ghost', 88));
+  els.push(...btn('ex_next', tX + tW - 92, pgY, 'Next →', 'ghost', 88));
 
   writeExcalidraw(`${BASE_DIR}/E06-workflow-engine/executions.excalidraw`, els);
 }
 
 function genExecutionDetail() {
-  const W = 1100, H = 860;
-  const contentW = W - OX - SB - 40;
+  const W = 1100, H = 960;
+  const PAD = 20;
+  const contentW = W - OX - SB - PAD * 2;
+  const tX = CX + PAD;
   const els = [...appShell('ed', W, H, 'Executions')];
 
-  els.push(txt('ed_hdr_bc', CX + 16, OY + 16, 400, 20, 'Executions / exec-0002', 12, C.gray700));
+  els.push(txt('ed_bc', CX + 16, OY + 20, 340, 22, 'Executions / exec-0002', 14, C.gray700));
 
-  // Page header with status
-  els.push(txt('ed_title', CX + 20, CY + 20, 400, 28, 'exec-0002', 20, C.gray900));
-  els.push(...badge('ed_status', CX + 160, CY + 26, 'Failed', C.danger, C.dangerBg));
-  els.push(...btn('ed_retry', CX + contentW - 100, CY + 20, 'Retry', 'primary', 90));
+  // Page header
+  els.push(txt('ed_title', tX, CY + PAD, 400, 26, 'exec-0002', 18, C.gray900));
+  els.push(...badge('ed_badge', tX + 148, CY + PAD + 4, 'Failed', C.danger, C.dangerBg));
+  els.push(...btn('ed_retry', tX + contentW - 100, CY + PAD, 'Retry', 'primary', 100));
 
-  // Meta row
-  els.push(txt('ed_meta', CX + 20, CY + 58, 600, 16, 'Workflow: Invoice Approval  ·  Trigger: Form Submission  ·  Started: 10:38 AM  ·  Duration: 0.8s', 11, C.gray500));
+  els.push(txt('ed_meta', tX, CY + 58, contentW, 18,
+    'Workflow: Invoice Approval  ·  Trigger: Form Submission  ·  Started: 10:38 AM  ·  Duration: 0.8s', 11, C.gray500));
 
   // Error banner
   const errY = CY + 86;
-  els.push(rect('ed_err_banner', CX + 20, errY, contentW, 44, C.danger, C.dangerBg, 1, true));
-  els.push(txt('ed_err_icon', CX + 32, errY + 14, 20, 18, '⚠', 13, C.danger));
-  els.push(txt('ed_err_msg', CX + 56, errY + 14, contentW - 80, 16, 'Step "Validate Invoice" failed: required field "amount" is missing', 12, C.danger));
+  els.push(rect('ed_err_banner', tX, errY, contentW, 48, C.dangerBorder, C.dangerBg, 1, true));
+  els.push(txt('ed_err_icon', tX + 14, errY + 14, 20, 20, '⚠', 14, C.danger));
+  els.push(txt('ed_err_msg', tX + 40, errY + 14, contentW - 60, 20,
+    'Step "Validate Invoice" failed: required field "amount" is missing', 12, C.danger));
 
   // Two-column layout
-  const leftW = 480, rightW = contentW - leftW - 20;
-  const rightX = CX + leftW + 40;
+  const leftW = 460;
+  const rightX = tX + leftW + 20;
+  const rightW = contentW - leftW - 20;
 
-  // Left: Execution Timeline
-  const tlY = errY + 60;
-  els.push(txt('ed_tl_title', CX + 20, tlY, 200, 18, 'Execution Timeline', 14, C.gray900));
-  els.push(hline('ed_tl_sep', CX + 20, tlY + 24, leftW));
+  // ── Timeline (left) ────────────────────────────────────────────────────────
+  const tlY = errY + 64;
+  els.push(txt('ed_tl_title', tX, tlY, 300, 22, 'Execution Timeline', 15, C.gray900));
+  els.push(hline('ed_tl_sep', tX, tlY + 28, leftW));
 
-  const steps = [
+  const stepDefs = [
     ['Form Submission Received', 'completed', '10:38:00.000', '0ms'],
     ['Load Invoice Data', 'completed', '10:38:00.120', '120ms'],
     ['Validate Invoice', 'failed', '10:38:00.640', '520ms'],
     ['Send Approval Email', 'skipped', '—', '—'],
     ['Update Record Status', 'skipped', '—', '—'],
   ];
+  const stepC = { completed: C.success, failed: C.danger, skipped: C.gray300 };
+  const stepBg = { completed: C.successBg, failed: C.dangerBg, skipped: C.gray50 };
+  const stepBorder = { completed: C.successBorder, failed: C.dangerBorder, skipped: C.gray300 };
 
-  const stepColors = { completed: C.success, failed: C.danger, skipped: C.gray300 };
-  const stepBgs = { completed: C.successBg, failed: C.dangerBg, skipped: C.gray50 };
-
-  steps.forEach(([name, status, time, dur], i) => {
-    const sy = tlY + 36 + i * 52;
-    // timeline dot
-    els.push(rect(`ed_tl_dot_${i}`, CX + 20, sy + 8, 12, 12, stepColors[status], stepColors[status], 1, true));
-    // connector line
-    if (i < steps.length - 1) {
-      els.push(vline(`ed_tl_line_${i}`, CX + 25, sy + 20, 40, stepColors[status]));
-    }
+  stepDefs.forEach(([name, status, time, dur], i) => {
+    const sy = tlY + 40 + i * 60;
+    // dot + connector
+    els.push(rect(`ed_dot_${i}`, tX, sy + 10, 12, 12, stepC[status], stepC[status], 1, true));
+    if (i < stepDefs.length - 1) els.push(vline(`ed_conn_${i}`, tX + 5, sy + 22, 48, stepC[status]));
     // step card
-    els.push(rect(`ed_tl_card_${i}`, CX + 44, sy, leftW - 44, 44, stepColors[status], stepBgs[status], 1, true));
-    els.push(txt(`ed_tl_name_${i}`, CX + 56, sy + 8, 200, 16, name, 12, C.gray900));
-    els.push(txt(`ed_tl_meta_${i}`, CX + 56, sy + 26, 200, 12, `${time}  ·  ${dur}`, 10, C.gray500));
-    els.push(txt(`ed_tl_status_${i}`, CX + 44 + leftW - 100, sy + 14, 88, 16, status, 11, stepColors[status], 'right'));
+    els.push(rect(`ed_card_${i}`, tX + 24, sy, leftW - 24, 48, stepBorder[status], stepBg[status], 1, true));
+    els.push(txt(`ed_cname_${i}`, tX + 36, sy + 8, 260, 18, name, 13, C.gray900));
+    els.push(txt(`ed_cmeta_${i}`, tX + 36, sy + 28, 200, 16, `${time}  ·  ${dur}`, 11, C.gray500));
+    els.push(txt(`ed_cstatus_${i}`, tX + leftW - 80, sy + 15, 68, 18, status, 11, stepC[status], 'right'));
   });
 
-  // Right: Step error detail
+  // ── Step detail (right) ────────────────────────────────────────────────────
   const detY = tlY;
-  els.push(txt('ed_det_title', rightX, detY, rightW, 18, 'Step Detail: Validate Invoice', 14, C.gray900));
-  els.push(hline('ed_det_sep', rightX, detY + 24, rightW));
+  els.push(txt('ed_det_title', rightX, detY, rightW, 22, 'Step Detail: Validate Invoice', 15, C.gray900));
+  els.push(hline('ed_det_sep', rightX, detY + 28, rightW));
 
   // Error detail card
-  els.push(rect('ed_det_err', rightX, detY + 36, rightW, 120, C.danger, C.dangerBg, 1, true));
-  els.push(txt('ed_det_err_title', rightX + 12, detY + 50, rightW - 24, 16, 'Error Details', 12, C.danger));
-  els.push(txt('ed_det_err_code', rightX + 12, detY + 70, rightW - 24, 14, 'Code: VALIDATION_FAILED', 11, C.gray700));
-  els.push(txt('ed_det_err_msg', rightX + 12, detY + 88, rightW - 24, 14, 'Message: required field "amount" is missing', 11, C.gray700));
-  els.push(txt('ed_det_err_step', rightX + 12, detY + 106, rightW - 24, 14, 'Step: Validate Invoice (step 3 of 5)', 11, C.gray700));
-  els.push(txt('ed_det_err_ts', rightX + 12, detY + 124, rightW - 24, 14, 'Timestamp: 2026-05-16T10:38:00.640Z', 11, C.gray500));
+  const edY = detY + 40;
+  els.push(rect('ed_det_err', rightX, edY, rightW, 120, C.dangerBorder, C.dangerBg, 1, true));
+  els.push(txt('ed_det_err_t', rightX + 14, edY + 12, rightW - 28, 20, 'Error Details', 13, C.danger));
+  [
+    ['Code:', 'VALIDATION_FAILED'],
+    ['Message:', 'required field "amount" is missing'],
+    ['Timestamp:', '2026-05-16T10:38:00.640Z'],
+  ].forEach(([k, v], i) => {
+    els.push(txt(`ed_ek_${i}`, rightX + 14, edY + 36 + i * 24, 90, 18, k, 11, C.gray700));
+    els.push(txt(`ed_ev_${i}`, rightX + 108, edY + 36 + i * 24, rightW - 122, 18, v, 11, C.gray900));
+  });
 
-  // Input/Output data
-  els.push(txt('ed_det_in_title', rightX, detY + 172, rightW, 16, 'Step Input', 13, C.gray900));
-  els.push(rect('ed_det_in', rightX, detY + 192, rightW, 80, C.gray300, C.gray50, 1, true));
-  els.push(txt('ed_det_in_json', rightX + 12, detY + 204, rightW - 24, 60,
+  // Step input
+  const inY = edY + 136;
+  els.push(txt('ed_in_title', rightX, inY, rightW, 20, 'Step Input', 13, C.gray900));
+  els.push(rect('ed_in_box', rightX, inY + 24, rightW, 88, C.gray300, C.gray50, 1, true));
+  els.push(txt('ed_in_json', rightX + 12, inY + 36, rightW - 24, 64,
     '{\n  "invoice_id": "INV-2026-042",\n  "submitted_by": "jane@acme.com"\n}', 10, C.gray700));
 
   // Retry section
-  els.push(txt('ed_retry_title', rightX, detY + 288, rightW, 16, 'Retry Options', 13, C.gray900));
-  els.push(hline('ed_retry_sep', rightX, detY + 308, rightW));
-  els.push(txt('ed_retry_note', rightX, detY + 320, rightW, 32, 'Retry will re-run from the failed step\nwith current record data.', 11, C.gray500));
-  els.push(...btn('ed_retry_btn', rightX, detY + 364, 'Retry from Failed Step', 'primary', 200));
-  els.push(...btn('ed_retry_full', rightX + 210, detY + 364, 'Retry from Start', 'ghost', 160));
+  const rtY = inY + 140;
+  els.push(txt('ed_rt_title', rightX, rtY, rightW, 20, 'Retry Options', 13, C.gray900));
+  els.push(hline('ed_rt_sep', rightX, rtY + 24, rightW));
+  els.push(txt('ed_rt_note', rightX, rtY + 36, rightW, 36,
+    'Retry will re-run from the failed step with current record data.', 11, C.gray500));
+  els.push(...btn('ed_rt_step', rightX, rtY + 80, 'Retry from Failed Step', 'primary', 196));
+  els.push(...btn('ed_rt_full', rightX + 204, rtY + 80, 'Retry from Start', 'ghost', 156));
 
   writeExcalidraw(`${BASE_DIR}/E06-workflow-engine/execution-detail.excalidraw`, els);
 }
