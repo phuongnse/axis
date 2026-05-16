@@ -1,5 +1,7 @@
 # F01 — Execution Management
 
+> **Wireframe**: [docs/wireframes/E06-workflow-engine/executions.excalidraw](../../../wireframes/E06-workflow-engine/executions.excalidraw) · [preview](../../../wireframes/E06-workflow-engine/executions.svg)
+
 [← Back to E06](../README.md)
 
 ---

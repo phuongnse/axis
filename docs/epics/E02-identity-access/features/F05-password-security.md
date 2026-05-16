@@ -1,5 +1,7 @@
 ﻿# F05 — Password & Security Management
 
+> **Wireframe**: [docs/wireframes/E02-identity-access/settings-security.excalidraw](../../../wireframes/E02-identity-access/settings-security.excalidraw) · [preview](../../../wireframes/E02-identity-access/settings-security.svg)
+
 [← Back to E02](../README.md)
 
 ---

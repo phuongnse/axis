@@ -1,5 +1,7 @@
 ﻿# F02 — User Management
 
+> **Wireframe**: [docs/wireframes/E02-identity-access/settings-users.excalidraw](../../../wireframes/E02-identity-access/settings-users.excalidraw) · [preview](../../../wireframes/E02-identity-access/settings-users.svg)
+
 [← Back to E02](../README.md)
 
 ---

@@ -1,5 +1,7 @@
 ﻿# F04 — Permission System
 
+> **Wireframe**: [docs/wireframes/E02-identity-access/settings-roles.excalidraw](../../../wireframes/E02-identity-access/settings-roles.excalidraw) · [preview](../../../wireframes/E02-identity-access/settings-roles.svg)
+
 [← Back to E02](../README.md)
 
 ---
