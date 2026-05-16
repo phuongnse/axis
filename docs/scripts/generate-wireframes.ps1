@@ -30,7 +30,7 @@ function Export-ExcalidrawToSvg {
 
 $wireframesRoot = Split-Path $PSScriptRoot -Parent | Join-Path -ChildPath "wireframes"
 
-$wireframes = Get-ChildItem -Path $wireframesRoot -Filter "*.excalidraw" |
+$wireframes = Get-ChildItem -Path $wireframesRoot -Filter "*.excalidraw" -Recurse |
     ForEach-Object {
         @{
             src = $_.FullName

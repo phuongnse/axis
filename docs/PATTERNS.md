@@ -1442,18 +1442,24 @@ Wireframes use Excalidraw (`.excalidraw` JSON). Both files — source and SVG pr
 **File location:**
 ```
 docs/wireframes/
-├── {screen-slug}.excalidraw   ← source (JSON, diffable on GitHub)
-└── {screen-slug}.svg          ← rendered preview (vector, renders inline on GitHub)
+├── E02-identity-access/
+│   ├── login.excalidraw        ← source (JSON, diffable on GitHub)
+│   └── login.svg               ← rendered preview (vector, renders inline on GitHub)
+├── E03-data-modeling/
+│   └── ...
+└── _shared/                    ← screens not belonging to a single module
 ```
 
-**Naming:** kebab-case matching the primary route segment — `login`, `data-models`, `workflow-detail`.
+One subfolder per epic, mirroring `docs/epics/`. Shared screens (error pages, global settings) go in `_shared/`.
+
+**Naming:** screen slug in kebab-case matching the primary route segment — `login`, `data-models`, `workflow-detail`.
 
 **One wireframe per screen.** Multiple user stories on the same screen share one wireframe file.
 
 **Linking from a feature file** — add directly after the feature title, before the first user story:
 
 ```markdown
-> **Wireframe**: [docs/wireframes/login.excalidraw](../../wireframes/login.excalidraw) · [preview](../../wireframes/login.svg)
+> **Wireframe**: [docs/wireframes/E02-identity-access/login.excalidraw](../../../wireframes/E02-identity-access/login.excalidraw) · [preview](../../../wireframes/E02-identity-access/login.svg)
 ```
 
 **Excalidraw settings** for consistent sketch aesthetic:

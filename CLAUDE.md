@@ -287,15 +287,16 @@ See [`docs/PROCESS.md`](docs/PROCESS.md) for the full step-by-step checklists �
 
 #### Wireframe convention
 
-- **Location**: `docs/wireframes/{screen-slug}.excalidraw` (source) + `{screen-slug}.svg` (rendered preview)
-- **Naming**: kebab-case matching the primary route segment — `login`, `data-models`, `workflow-detail`
+- **Location**: `docs/wireframes/{E0N-module-name}/{screen-slug}.excalidraw` (source) + `.svg` (rendered preview) — one subfolder per epic, mirroring `docs/epics/`
+- **Naming**: screen slug in kebab-case matching the primary route segment — `login`, `data-models`, `workflow-detail`
+- **Shared screens** (error pages, global settings) that don't belong to a single module go in `docs/wireframes/_shared/`
 - **Format**: Excalidraw JSON (`roughness: 1`, sketch aesthetic) — both files committed; `.excalidraw` is diffable, `.svg` is for quick preview
 - **One wireframe per screen** — multiple user stories on the same screen share one wireframe file
-- **Generate SVG** after every edit: run `docs/scripts/generate-wireframes.ps1` — regenerates all `.svg` files from `.excalidraw` source via Kroki.io
+- **Generate SVG** after every edit: run `docs/scripts/generate-wireframes.ps1` — recurses all subfolders and regenerates `.svg` files via Kroki.io
 - **Link from feature file** — add a `> **Wireframe**` callout directly after the feature title, before the first user story:
 
   ```markdown
-  > **Wireframe**: [docs/wireframes/login.excalidraw](../../wireframes/login.excalidraw) · [preview](../../wireframes/login.svg)
+  > **Wireframe**: [docs/wireframes/E02-identity-access/login.excalidraw](../../../wireframes/E02-identity-access/login.excalidraw) · [preview](../../../wireframes/E02-identity-access/login.svg)
   ```
 
 ---

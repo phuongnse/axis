@@ -2,7 +2,7 @@
 
 [← Back to E02](../README.md)
 
-> **Wireframe**: [docs/wireframes/login.excalidraw](../../../wireframes/login.excalidraw) · [preview](../../../wireframes/login.svg)
+> **Wireframe**: [docs/wireframes/E02-identity-access/login.excalidraw](../../../wireframes/E02-identity-access/login.excalidraw) · [preview](../../../wireframes/E02-identity-access/login.svg)
 
 ---
 

@@ -45,7 +45,7 @@ Excalidraw wireframes live in `docs/wireframes/`. Each feature file links to its
 
 | Screen | Source | Preview |
 |---|---|---|
-| Login | [login.excalidraw](./wireframes/login.excalidraw) | [login.svg](./wireframes/login.svg) |
+| Login | [login.excalidraw](./wireframes/E02-identity-access/login.excalidraw) | [login.svg](./wireframes/E02-identity-access/login.svg) |
 
 ---
 
