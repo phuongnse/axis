@@ -204,10 +204,10 @@ function buildFormControls(y0) {
 
   // ── Col 1: Text input states (x=50) ──
   const inputStates = [
-    ['Default',  C.gray500,   C.gray100,  1, 'email@company.com',  C.gray300],
+    ['Default',  C.gray300,   C.white,    1, 'email@company.com',  C.gray500],
     ['Focus',    C.primary,   C.white,    2, 'email@company.com',  C.gray500],
     ['Error',    C.danger,    C.dangerBg, 2, 'invalid-email',      C.danger],
-    ['Disabled', C.gray300,   C.gray50,   1, 'Disabled',           C.gray300],
+    ['Disabled', C.gray300,   C.gray100,  1, 'Disabled',           C.gray300],
   ];
   inputStates.forEach(([state, stroke, bg, sw, placeholder, phColor], i) => {
     const y = yC + i * 78;
@@ -224,24 +224,24 @@ function buildFormControls(y0) {
 
   // Password
   els.push(text('pw_lbl', x2, yC, 100, 16, 'Password', 11, C.gray500));
-  els.push(rect('pw_inp', x2, yC + 18, 280, 40, C.gray500, C.gray100, 1, true));
+  els.push(rect('pw_inp', x2, yC + 18, 280, 40, C.gray300, C.white, 1, true));
   els.push(text('pw_dots', x2 + 12, yC + 29, 150, 18, '••••••••', 13, C.gray700));
   els.push(text('pw_eye', x2 + 248, yC + 29, 20, 18, '👁', 13, C.gray500));
 
   // Search
   els.push(text('srch_lbl', x2, yC + 78, 100, 16, 'Search', 11, C.gray500));
-  els.push(rect('srch_inp', x2, yC + 96, 280, 40, C.gray500, C.gray100, 1, true));
+  els.push(rect('srch_inp', x2, yC + 96, 280, 40, C.gray300, C.white, 1, true));
   els.push(text('srch_icon', x2 + 10, yC + 107, 20, 18, '⌕', 14, C.gray500));
   els.push(text('srch_ph', x2 + 34, yC + 107, 230, 18, 'Search records…', 13, C.gray300));
 
   // Textarea
   els.push(text('ta_lbl', x2, yC + 156, 100, 16, 'Textarea', 11, C.gray500));
-  els.push(rect('ta_inp', x2, yC + 174, 280, 80, C.gray500, C.gray100, 1, true));
+  els.push(rect('ta_inp', x2, yC + 174, 280, 80, C.gray300, C.white, 1, true));
   els.push(text('ta_ph', x2 + 12, yC + 185, 250, 18, 'Enter description…', 13, C.gray300));
 
   // Select
   els.push(text('sel_lbl', x2, yC + 274, 120, 16, 'Select / Dropdown', 11, C.gray500));
-  els.push(rect('sel_inp', x2, yC + 292, 280, 40, C.gray500, C.gray100, 1, true));
+  els.push(rect('sel_inp', x2, yC + 292, 280, 40, C.gray300, C.white, 1, true));
   els.push(text('sel_ph', x2 + 12, yC + 303, 230, 18, 'Choose an option…', 13, C.gray300));
   els.push(text('sel_arr', x2 + 250, yC + 303, 20, 18, '▾', 13, C.gray700));
 
@@ -278,7 +278,7 @@ function buildBadges(y0) {
   const yC = y0 + 68;
   const badges = [
     ['Default',  C.gray300,     C.gray50,      C.gray700,  'Default',  50],
-    ['Primary',  C.infoBorder,  C.infoBg,      C.primary,  'Active',   155],
+    ['Primary',  C.primaryDark, C.primary,     C.white,    'Active',   155],
     ['Success',  C.successBorder,C.successBg,  C.success,  'Complete', 250],
     ['Warning',  C.warningBorder,C.warningBg,  C.warning,  'Pending',  375],
     ['Danger',   C.dangerBorder, C.dangerBg,   C.danger,   'Error',    480],
@@ -1482,12 +1482,12 @@ function buildSkeletonLoaders(y0) {
 
   // ── Card skeleton ──
   els.push(rect('sk_card', 390, yC, 200, 200, C.gray300, C.white, 1, true));
-  els.push(rect('sk_card_img', 391, yC + 1, 198, 78, 'transparent', C.gray100, 0, false, { roundness: null }));
+  els.push(rect('sk_card_img', 391, yC + 1, 198, 78, 'transparent', C.gray300, 0, false, { roundness: null }));
   els.push(rect('sk_card_t1', 402, yC + 94,  140, 10, 'transparent', C.gray300, 0, true));
   els.push(rect('sk_card_t2', 402, yC + 112, 100, 9,  'transparent', C.gray300, 0, true));
-  els.push(rect('sk_card_t3', 402, yC + 136, 176, 9,  'transparent', C.gray100, 0, true));
-  els.push(rect('sk_card_t4', 402, yC + 152, 140, 9,  'transparent', C.gray100, 0, true));
-  els.push(rect('sk_card_btn',402, yC + 174, 76,  18, C.gray300, C.gray100, 1, true));
+  els.push(rect('sk_card_t3', 402, yC + 136, 176, 9,  'transparent', C.gray300, 0, true));
+  els.push(rect('sk_card_t4', 402, yC + 152, 140, 9,  'transparent', C.gray300, 0, true));
+  els.push(rect('sk_card_btn',402, yC + 174, 76,  18, C.gray300, C.gray300, 1, true));
 
   // ── Form panel skeleton ──
   els.push(rect('sk_form', 630, yC, 240, 200, C.gray300, C.white, 1, true));
@@ -1500,8 +1500,7 @@ function buildSkeletonLoaders(y0) {
     [12, 140, 216, 28],
   ];
   formBars.forEach(([dx, dy, w, h], i) => {
-    const isLabel = i % 2 === 0;
-    els.push(rect(`sk_form_bar_${i}`, 630 + dx, yC + dy, w, h, 'transparent', isLabel ? C.gray300 : C.gray100, 0, true));
+    els.push(rect(`sk_form_bar_${i}`, 630 + dx, yC + dy, w, h, 'transparent', C.gray300, 0, true));
   });
 
   return els;
