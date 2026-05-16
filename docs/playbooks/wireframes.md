@@ -1,0 +1,72 @@
+# Wireframe Playbook — Component Kit Template
+
+> **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
+
+This playbook covers the operational details for working with `docs/wireframes/_template.excalidraw` and `docs/wireframes/generate-template.mjs`. High-level wireframe conventions (location, naming, format, SVG generation, feature file linking) are in [CLAUDE.md](../../CLAUDE.md).
+
+---
+
+## Anatomy of a section builder
+
+```js
+function buildXxx(y0) {
+  const els = [...sectionHeader(N, 'Section Label', y0)];
+  const yC = y0 + 48;  // content start — use +68 if section has sub-labels at y0+46
+
+  // sub-labels (only when section has distinct columns/sub-sections):
+  els.push(text('xxx_col1_lbl', 50,  y0 + 46, 120, 14, 'Col 1', 11, C.gray500));
+  els.push(text('xxx_col2_lbl', 400, y0 + 46, 120, 14, 'Col 2', 11, C.gray500));
+
+  // elements...
+  return els;
+}
+```
+
+---
+
+## Rules for adding or modifying sections
+
+### `yC` offset
+- Use `y0 + 48` for sections with **no sub-labels**.
+- Use `y0 + 68` when the section has per-column sub-labels placed at `y0 + 46`.
+- Never use `y0 + 48` when sub-labels are present — the first content rect will overlap and hide them.
+
+### Element ID prefixes
+Every section must use a **unique 3–6 character snake_case prefix** for all element IDs (e.g. `rte_`, `sk_`, `ttp_`, `rel_`). Never reuse a prefix from another section — Excalidraw silently deduplicates IDs, causing elements to vanish without an error.
+
+### Section numbers
+`sectionHeader(N, label, y0)` — N must match the section's position in the compose array. When inserting a new section in the middle of a group, renumber all subsequent sections so numbers stay contiguous and match visual order.
+
+### Compose array
+Always keep entries in grouped order with `// ── Group name` block comments and `// SXX` inline comments. New sections go into the appropriate group.
+
+### TOC
+Update the section count and the TOC comment at the top of `generate-template.mjs` every time sections are added, removed, or renumbered. The TOC is the quick reference for anyone reading the source file.
+
+---
+
+## Current section inventory (34 sections)
+
+| Group | Sections |
+|---|---|
+| Foundations | S01–S03 |
+| Input & Forms | S04–S08 |
+| Data Display | S09–S14 |
+| Navigation & Layout | S15–S18 |
+| Feedback & Overlays | S19–S24 |
+| Interaction Patterns | S25–S29 |
+| Axis App Patterns | S30–S34 |
+
+---
+
+## Regenerating the template
+
+```powershell
+# 1. Regenerate the .excalidraw source
+node docs/wireframes/generate-template.mjs
+
+# 2. Regenerate the .svg preview
+docs/scripts/generate-wireframes.ps1 -Filter _template
+```
+
+Both files must be committed together. The `.excalidraw` is the diffable source; the `.svg` is for quick visual preview.
