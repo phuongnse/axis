@@ -299,6 +299,35 @@ See [`docs/PROCESS.md`](docs/PROCESS.md) for the full step-by-step checklists �
   > **Wireframe**: [docs/wireframes/E02-identity-access/login.excalidraw](../../../wireframes/E02-identity-access/login.excalidraw) · [preview](../../../wireframes/E02-identity-access/login.svg)
   ```
 
+#### Component kit template (`docs/wireframes/_template.excalidraw`)
+
+The template is the single source of truth for all reusable UI patterns. Source lives in `docs/wireframes/generate-template.mjs`. Run `node docs/wireframes/generate-template.mjs` to regenerate `_template.excalidraw`, then run `docs/scripts/generate-wireframes.ps1 -Filter _template` to regenerate `_template.svg`.
+
+**Anatomy of a section builder:**
+
+```js
+function buildXxx(y0) {
+  const els = [...sectionHeader(N, 'Section Label', y0)];
+  const yC = y0 + 48;  // content start — use +68 if section has sub-labels at y0+46
+
+  // sub-labels (only when section has distinct columns/sub-sections):
+  els.push(text('xxx_col1_lbl', 50,  y0 + 46, 120, 14, 'Col 1', 11, C.gray500));
+  els.push(text('xxx_col2_lbl', 400, y0 + 46, 120, 14, 'Col 2', 11, C.gray500));
+
+  // elements...
+  return els;
+}
+```
+
+**Rules for adding or modifying sections:**
+
+- **`yC` offset**: use `y0 + 48` for sections with no sub-labels. Use `y0 + 68` when the section has per-column sub-labels placed at `y0 + 46`. Never use `y0 + 48` when sub-labels are present — they will be hidden by the first content rect.
+- **Element ID prefixes**: every section must use a unique 3-6 character snake_case prefix for all IDs (e.g. `rte_`, `sk_`, `ttp_`, `rel_`). Never reuse a prefix from another section — Excalidraw silently deduplicates IDs, causing elements to vanish.
+- **Section numbers**: `sectionHeader(N, label, y0)` — N must match the section's position in the compose array. When inserting a new section in the middle of a group, **renumber all subsequent sections** so numbers stay contiguous and match the visual order.
+- **Compose array**: always keep entries in grouped order with `// ── Group name` block comments and `// SXX` inline comments. New sections go into the appropriate group.
+- **TOC**: update the section count and the TOC comment at the top of the file every time sections are added, removed, or renumbered. The TOC is the quick reference for anyone reading the file.
+- **Current structure (34 sections)**: Foundations S01-S03 · Input & Forms S04-S08 · Data Display S09-S14 · Navigation & Layout S15-S18 · Feedback & Overlays S19-S24 · Interaction Patterns S25-S29 · Axis App Patterns S30-S34.
+
 ---
 
 ## Agent Integrity Rules
