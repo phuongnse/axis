@@ -23,8 +23,10 @@ function Export-ExcalidrawToSvg {
             -OutFile $svgPath
         $size = [math]::Round((Get-Item $svgPath).Length / 1024, 1)
         Write-Host "  OK  ($size KB) $([System.IO.Path]::GetFileName($svgPath))" -ForegroundColor Green
+        return $true
     } catch {
         Write-Host "  FAIL $([System.IO.Path]::GetFileName($excalidrawPath)): $_" -ForegroundColor Red
+        return $false
     }
 }
 
@@ -44,10 +46,16 @@ Write-Host ""
 Write-Host "Generating $($filtered.Count) wireframe(s) via Kroki.io..." -ForegroundColor Cyan
 Write-Host ""
 
+$failed = 0
 foreach ($w in $filtered) {
-    Export-ExcalidrawToSvg -excalidrawPath $w.src -svgPath $w.svg
+    $ok = Export-ExcalidrawToSvg -excalidrawPath $w.src -svgPath $w.svg
+    if (-not $ok) { $failed++ }
     Start-Sleep -Milliseconds 300
 }
 
 Write-Host ""
+if ($failed -gt 0) {
+    Write-Host "Done with $failed failure(s)." -ForegroundColor Red
+    exit 1
+}
 Write-Host "Done." -ForegroundColor Cyan

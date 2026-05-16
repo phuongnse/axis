@@ -13,7 +13,7 @@
 | [Architecture](./ARCHITECTURE.md) | System design, modules, data strategy |
 | [Epics](./epics/README.md) | All epics, features, and user stories |
 | [Process](./PROCESS.md) | Step-by-step implementation workflow — backend and frontend |
-| [Wireframes](./wireframes/) | Screen wireframes — Excalidraw source + PNG preview |
+| [Wireframes](./wireframes/) | Screen wireframes — Excalidraw source + SVG preview |
 
 ---
 
