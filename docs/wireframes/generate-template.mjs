@@ -547,7 +547,7 @@ function buildAppShell(y0) {
 
 function buildDateTimePicker(y0) {
   const els = [...sectionHeader(19, 'Date & Time Picker', y0)];
-  const yC = y0 + 48;
+  const yC = y0 + 68;
 
   // ── Date Picker — calendar popup (x=50) ──
   els.push(text('dp_lbl', 50, y0 + 46, 100, 14, 'Date Picker', 11, C.gray500));
@@ -706,7 +706,7 @@ function buildEditableTable(y0) {
 
 function buildCommandPalette(y0) {
   const els = [...sectionHeader(21, 'Command Palette', y0)];
-  const yC = y0 + 48;
+  const yC = y0 + 68;
 
   els.push(text('cp_hint', 50, y0 + 46, 220, 14, 'Global Command Palette  ⌘K to open', 11, C.gray500));
 
@@ -763,7 +763,7 @@ function buildCommandPalette(y0) {
 
 function buildFileUpload(y0) {
   const els = [...sectionHeader(22, 'File Upload', y0)];
-  const yC = y0 + 48;
+  const yC = y0 + 68;
 
   // ── Default drop zone (x=50) ──
   els.push(text('fu_lbl', 50, y0 + 46, 100, 14, 'Default State', 11, C.gray500));
@@ -815,7 +815,7 @@ function buildFileUpload(y0) {
 
 function buildNotifications(y0) {
   const els = [...sectionHeader(23, 'Notifications & Activity Feed', y0)];
-  const yC = y0 + 48;
+  const yC = y0 + 68;
 
   // ── Notification panel (x=50) ──
   els.push(text('no_lbl', 50, y0 + 46, 140, 14, 'Notification Panel', 11, C.gray500));
@@ -947,7 +947,7 @@ function buildPermissionMatrix(y0) {
 
 function buildDropdownContextMenu(y0) {
   const els = [...sectionHeader(13, 'Dropdown & Context Menu', y0)];
-  const yC = y0 + 48;
+  const yC = y0 + 68;
 
   // ── Dropdown open state (x=50) ──
   els.push(text('dd_lbl', 50, y0 + 46, 150, 14, 'Select Dropdown (open)', 11, C.gray500));
@@ -988,7 +988,7 @@ function buildDropdownContextMenu(y0) {
 
 function buildDragDrop(y0) {
   const els = [...sectionHeader(14, 'Drag & Drop / Sortable', y0)];
-  const yC = y0 + 48;
+  const yC = y0 + 68;
 
   // ── Sortable list (x=50) ──
   els.push(text('dnd_lbl', 50, y0 + 46, 120, 14, 'Sortable List', 11, C.gray500));
@@ -1173,7 +1173,7 @@ function buildExecutionTimeline(y0) {
 
 function buildUtilities(y0) {
   const els = [...sectionHeader(18, 'Utilities', y0)];
-  const yC = y0 + 48;
+  const yC = y0 + 68;
 
   // ── Tooltip (x=50) ──
   els.push(text('tt_lbl', 50, y0 + 46, 80, 14, 'Tooltip', 11, C.gray500));
