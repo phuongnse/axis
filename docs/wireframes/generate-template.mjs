@@ -2,7 +2,7 @@
  * Axis UI Component Kit — _template.excalidraw
  * Run: node docs/wireframes/generate-template.mjs
  *
- * TOC — 27 sections
+ * TOC — 33 sections
  * ─── Foundations ─────────────────── S01 Color Palette
  *                                     S02 Typography
  *                                     S03 Buttons
@@ -15,21 +15,27 @@
  *                                     S10 Table
  *                                     S11 Editable Table / Data Grid
  *                                     S12 Cards & Display
- * ─── Navigation & Layout ─────────── S13 Navigation
- *                                     S14 Sidebar Navigation
- *                                     S15 App Shell
- * ─── Feedback & Overlays ─────────── S16 Feedback & Overlays
- *                                     S17 Modal / Dialog
- *                                     S18 Command Palette
- *                                     S19 Notifications & Activity Feed
- * ─── Interaction Patterns ────────── S20 Dropdown & Context Menu
- *                                     S21 Drag & Drop / Sortable
- *                                     S22 Utilities
- *                                     S23 Permission Matrix
- *                                     S24 Color & Icon Picker
- * ─── Axis App Patterns ───────────── S25 Workflow Canvas
- *                                     S26 Builder Layout
- *                                     S27 Execution Timeline
+ *                                     S13 Empty States
+ *                                     S14 Skeleton Loaders
+ * ─── Navigation & Layout ─────────── S15 Navigation
+ *                                     S16 Sidebar Navigation
+ *                                     S17 Tabs
+ *                                     S18 App Shell
+ * ─── Feedback & Overlays ─────────── S19 Feedback & Overlays
+ *                                     S20 Modal / Dialog
+ *                                     S21 Command Palette
+ *                                     S22 Notifications & Activity Feed
+ *                                     S23 Tooltip & Popover
+ * ─── Interaction Patterns ────────── S24 Dropdown & Context Menu
+ *                                     S25 Drag & Drop / Sortable
+ *                                     S26 Utilities
+ *                                     S27 Permission Matrix
+ *                                     S28 Color & Icon Picker
+ * ─── Axis App Patterns ───────────── S29 Workflow Canvas
+ *                                     S30 Builder Layout
+ *                                     S31 Execution Timeline
+ *                                     S32 Field Type Picker
+ *                                     S33 Relation / Lookup Field
  */
 
 import { writeFileSync } from 'fs';
@@ -287,7 +293,7 @@ function buildBadges(y0) {
 }
 
 function buildNavigation(y0) {
-  const els = [...sectionHeader(13, 'Navigation', y0)];
+  const els = [...sectionHeader(15, 'Navigation', y0)];
   const yC = y0 + 62;
 
   // Breadcrumb
@@ -325,7 +331,7 @@ function buildNavigation(y0) {
 }
 
 function buildSidebarNav(y0) {
-  const els = [...sectionHeader(14, 'Sidebar Navigation', y0)];
+  const els = [...sectionHeader(16, 'Sidebar Navigation', y0)];
   const yC = y0 + 48;
 
   // Sidebar container
@@ -453,7 +459,7 @@ function buildCards(y0) {
 }
 
 function buildFeedback(y0) {
-  const els = [...sectionHeader(16, 'Feedback & Overlays', y0)];
+  const els = [...sectionHeader(19, 'Feedback & Overlays', y0)];
   const yC = y0 + 68;
 
   // Toasts
@@ -502,7 +508,7 @@ function buildFeedback(y0) {
 }
 
 function buildModal(y0) {
-  const els = [...sectionHeader(17, 'Modal / Dialog', y0)];
+  const els = [...sectionHeader(20, 'Modal / Dialog', y0)];
   const yC = y0 + 48;
 
   // Overlay
@@ -525,7 +531,7 @@ function buildModal(y0) {
 }
 
 function buildAppShell(y0) {
-  const els = [...sectionHeader(15, 'App Shell', y0)];
+  const els = [...sectionHeader(18, 'App Shell', y0)];
   const yC = y0 + 48;
   const W = 900, H = 520;
 
@@ -734,7 +740,7 @@ function buildEditableTable(y0) {
 }
 
 function buildCommandPalette(y0) {
-  const els = [...sectionHeader(18, 'Command Palette', y0)];
+  const els = [...sectionHeader(21, 'Command Palette', y0)];
   const yC = y0 + 68;
 
   els.push(text('cp_hint', 50, y0 + 46, 220, 14, 'Global Command Palette  ⌘K to open', 11, C.gray500));
@@ -843,7 +849,7 @@ function buildFileUpload(y0) {
 }
 
 function buildNotifications(y0) {
-  const els = [...sectionHeader(19, 'Notifications & Activity Feed', y0)];
+  const els = [...sectionHeader(22, 'Notifications & Activity Feed', y0)];
   const yC = y0 + 68;
 
   // ── Notification panel (x=50) ──
@@ -910,7 +916,7 @@ function buildNotifications(y0) {
 }
 
 function buildPermissionMatrix(y0) {
-  const els = [...sectionHeader(23, 'Permission Matrix', y0)];
+  const els = [...sectionHeader(27, 'Permission Matrix', y0)];
   const yC = y0 + 48;
 
   const roles = ['Admin', 'Editor', 'Viewer', 'Guest'];
@@ -975,7 +981,7 @@ function buildPermissionMatrix(y0) {
 }
 
 function buildDropdownContextMenu(y0) {
-  const els = [...sectionHeader(20, 'Dropdown & Context Menu', y0)];
+  const els = [...sectionHeader(24, 'Dropdown & Context Menu', y0)];
   const yC = y0 + 68;
 
   // ── Dropdown open state (x=50) ──
@@ -1016,7 +1022,7 @@ function buildDropdownContextMenu(y0) {
 }
 
 function buildDragDrop(y0) {
-  const els = [...sectionHeader(21, 'Drag & Drop / Sortable', y0)];
+  const els = [...sectionHeader(25, 'Drag & Drop / Sortable', y0)];
   const yC = y0 + 68;
 
   // ── Sortable list (x=50) ──
@@ -1062,7 +1068,7 @@ function buildDragDrop(y0) {
 }
 
 function buildWorkflowCanvas(y0) {
-  const els = [...sectionHeader(25, 'Workflow Canvas', y0)];
+  const els = [...sectionHeader(29, 'Workflow Canvas', y0)];
   const yC = y0 + 48;
 
   // Canvas bg
@@ -1106,7 +1112,7 @@ function buildWorkflowCanvas(y0) {
 }
 
 function buildBuilderLayout(y0) {
-  const els = [...sectionHeader(26, 'Builder Layout', y0)];
+  const els = [...sectionHeader(30, 'Builder Layout', y0)];
   const yC = y0 + 48;
   const H = 300;
 
@@ -1161,7 +1167,7 @@ function buildBuilderLayout(y0) {
 }
 
 function buildExecutionTimeline(y0) {
-  const els = [...sectionHeader(27, 'Execution Timeline', y0)];
+  const els = [...sectionHeader(31, 'Execution Timeline', y0)];
   const yC = y0 + 48;
 
   // Panel
@@ -1201,7 +1207,7 @@ function buildExecutionTimeline(y0) {
 }
 
 function buildUtilities(y0) {
-  const els = [...sectionHeader(22, 'Utilities', y0)];
+  const els = [...sectionHeader(26, 'Utilities', y0)];
   const yC = y0 + 68;
 
   // ── Tooltip (x=50) ──
@@ -1374,8 +1380,271 @@ function buildCodeEditor(y0) {
   return els;
 }
 
+function buildEmptyStates(y0) {
+  const els = [...sectionHeader(13, 'Empty States', y0)];
+  const yC = y0 + 48;
+
+  const states = [
+    { id: 'es_list', x: 50,  label: 'List / Table',  icon: '□',  title: 'No records yet',       msg: 'Create your first record.',   cta: '+ New Record' },
+    { id: 'es_srch', x: 265, label: 'No Results',     icon: '◎',  title: 'No results found',     msg: 'Try different search terms.', cta: null },
+    { id: 'es_feed', x: 480, label: 'Feed / Inbox',   icon: '⬡',  title: 'All caught up',        msg: 'No new notifications.',       cta: null },
+    { id: 'es_err',  x: 695, label: 'Error',          icon: '⚠',  title: 'Something went wrong', msg: 'Failed to load. Try again.',  cta: 'Retry' },
+  ];
+
+  states.forEach(({ id, x, label, icon, title, msg, cta }) => {
+    els.push(text(`${id}_sub`,   x, yC,      190, 14, label, 11, C.gray500));
+    const yCard = yC + 18;
+    els.push(rect(`${id}_card`,  x, yCard, 190, 156, C.gray300, C.gray50, 1, true));
+    els.push(ellipse(`${id}_ico_bg`, x + 70, yCard + 20, 50, 50, C.gray300, C.gray100, 1));
+    els.push(text(`${id}_ico`,   x + 70, yCard + 32, 50, 26, icon, 18, C.gray500, 'center'));
+    els.push(text(`${id}_title`, x + 10, yCard + 82, 170, 18, title, 13, C.gray900, 'center'));
+    els.push(text(`${id}_msg`,   x + 10, yCard + 103, 170, 28, msg,  11, C.gray500, 'center'));
+    if (cta) {
+      els.push(rect(`${id}_btn`,   x + 35, yCard + 130, 120, 22, C.accentDark, C.accent, 2, true));
+      els.push(text(`${id}_btn_t`, x + 35, yCard + 134, 120, 14, cta, 11, C.white, 'center'));
+    }
+  });
+
+  return els;
+}
+
+function buildSkeletonLoaders(y0) {
+  const els = [...sectionHeader(14, 'Skeleton Loaders', y0)];
+  const yC = y0 + 68;
+  els.push(text('sk_tbl_lbl',  50,  y0 + 46, 100, 14, 'Table Rows', 11, C.gray500));
+  els.push(text('sk_card_lbl', 390, y0 + 46, 60,  14, 'Card',       11, C.gray500));
+  els.push(text('sk_form_lbl', 630, y0 + 46, 80,  14, 'Form Panel', 11, C.gray500));
+
+  // ── Table skeleton (header + 3 rows) ──
+  const colDefs = [32, 170, 94, 72, 48];
+  for (let row = 0; row < 4; row++) {
+    const y = yC + row * 42;
+    const isHeader = row === 0;
+    els.push(rect(`sk_tbl_row_${row}`, 50, y, 300, 38, C.gray300, isHeader ? C.gray50 : C.white, 1, false));
+    let cx = 58;
+    colDefs.forEach((w, ci) => {
+      const bh = 8;
+      els.push(rect(`sk_tbl_bar_${row}_${ci}`, cx, y + 15, isHeader ? Math.round(w * 0.65) : w, bh, 'transparent', C.gray300, 0, true));
+      cx += w + 8;
+    });
+    els.push(hline(`sk_tbl_div_${row}`, 50, y + 38, 300, C.gray300));
+  }
+
+  // ── Card skeleton ──
+  els.push(rect('sk_card', 390, yC, 200, 200, C.gray300, C.white, 1, true));
+  els.push(rect('sk_card_img', 391, yC + 1, 198, 78, 'transparent', C.gray100, 0, false, { roundness: null }));
+  els.push(rect('sk_card_t1', 402, yC + 94,  140, 10, 'transparent', C.gray300, 0, true));
+  els.push(rect('sk_card_t2', 402, yC + 112, 100, 9,  'transparent', C.gray300, 0, true));
+  els.push(rect('sk_card_t3', 402, yC + 136, 176, 9,  'transparent', C.gray100, 0, true));
+  els.push(rect('sk_card_t4', 402, yC + 152, 140, 9,  'transparent', C.gray100, 0, true));
+  els.push(rect('sk_card_btn',402, yC + 174, 76,  18, C.gray300, C.gray100, 1, true));
+
+  // ── Form panel skeleton ──
+  els.push(rect('sk_form', 630, yC, 240, 200, C.gray300, C.white, 1, true));
+  const formBars = [
+    [12, 14,  80,  8 ],
+    [12, 28,  216, 28],
+    [12, 70,  60,  8 ],
+    [12, 84,  216, 28],
+    [12, 126, 70,  8 ],
+    [12, 140, 216, 28],
+  ];
+  formBars.forEach(([dx, dy, w, h], i) => {
+    const isLabel = i % 2 === 0;
+    els.push(rect(`sk_form_bar_${i}`, 630 + dx, yC + dy, w, h, 'transparent', isLabel ? C.gray300 : C.gray100, 0, true));
+  });
+
+  return els;
+}
+
+function buildTabs(y0) {
+  const els = [...sectionHeader(17, 'Tabs', y0)];
+  const yC = y0 + 68;
+  els.push(text('tab_ul_lbl',   50,  y0 + 46, 160, 14, 'Underline (default)', 11, C.gray500));
+  els.push(text('tab_pill_lbl', 510, y0 + 46, 120, 14, 'Pill / Segment',      11, C.gray500));
+
+  // ── Underline tabs ──
+  const ulLabels = ['Overview', 'Fields', 'Relations', 'History'];
+  els.push(hline('tab_ul_base', 50, yC + 36, 430, C.gray300));
+  ulLabels.forEach((label, i) => {
+    const active = i === 0;
+    const x = 50 + i * 108;
+    els.push(text(`tab_ul_t_${i}`, x, yC + 12, 100, 20, label, 13, active ? C.primary : C.gray500, 'center'));
+    if (active) els.push(hline(`tab_ul_ind_${i}`, x + 4, yC + 36, 92, C.primary, 2));
+  });
+  els.push(rect('tab_ul_panel', 50, yC + 44, 430, 52, C.gray300, C.gray50, 1, false));
+  els.push(text('tab_ul_panel_t', 62, yC + 58, 300, 16, 'Tab panel content renders here', 12, C.gray300));
+
+  // ── Pill tabs ──
+  const pillLabels = ['All', 'Active', 'Draft', 'Archived'];
+  els.push(rect('tab_pill_wrap', 510, yC, 300, 36, C.gray300, C.gray100, 1, true));
+  pillLabels.forEach((label, i) => {
+    const active = i === 0;
+    const x = 514 + i * 72;
+    if (active) els.push(rect(`tab_pill_bg_${i}`, x, yC + 4, 68, 28, C.gray300, C.white, 1, true));
+    els.push(text(`tab_pill_t_${i}`, x, yC + 10, 68, 16, label, 12, active ? C.gray900 : C.gray500, 'center'));
+  });
+
+  // ── Tabs with badge counts ──
+  const yBadge = yC + 56;
+  const badgeTabs = [['Inbox', '3'], ['Sent', ''], ['Archived', '12']];
+  els.push(hline('tab_badge_base', 510, yBadge + 36, 300, C.gray300));
+  badgeTabs.forEach(([label, count], i) => {
+    const active = i === 0;
+    const x = 510 + i * 100;
+    els.push(text(`tab_badge_t_${i}`, x, yBadge + 12, 88, 18, label, 13, active ? C.primary : C.gray500, 'center'));
+    if (count) {
+      els.push(rect(`tab_badge_bg_${i}`, x + 58, yBadge + 15, 22, 14, active ? C.primary : C.gray300, active ? C.infoBg : C.gray100, 1, true));
+      els.push(text(`tab_badge_n_${i}`, x + 58, yBadge + 17, 22, 12, count, 10, active ? C.primary : C.gray500, 'center'));
+    }
+    if (active) els.push(hline(`tab_badge_ind_${i}`, x + 4, yBadge + 36, 80, C.primary, 2));
+  });
+
+  return els;
+}
+
+function buildTooltipPopover(y0) {
+  const els = [...sectionHeader(23, 'Tooltip & Popover', y0)];
+  const yC = y0 + 68;
+  els.push(text('ttp_tt_lbl',  50,  y0 + 46, 80,  14, 'Tooltip',           11, C.gray500));
+  els.push(text('ttp_pop_lbl', 310, y0 + 46, 80,  14, 'Popover',           11, C.gray500));
+  els.push(text('ttp_cnf_lbl', 610, y0 + 46, 160, 14, 'Confirm / Destruct', 11, C.gray500));
+
+  // ── Tooltip (dark + light) ──
+  els.push(rect('ttp_dark_box', 50, yC, 180, 28, C.gray900, C.gray900, 1, true));
+  els.push(text('ttp_dark_t',   50, yC + 7, 180, 14, 'Publish to all tenants', 11, C.white, 'center'));
+  els.push(rect('ttp_dark_arr', 127, yC + 26, 8, 8, C.gray900, C.gray900, 0, false));
+  els.push(rect('ttp_dark_btn', 80, yC + 44, 100, 30, C.gray300, C.gray50, 1, true));
+  els.push(text('ttp_dark_btn_t', 80, yC + 52, 100, 14, '? Help', 12, C.gray700, 'center'));
+
+  els.push(rect('ttp_light_btn', 80, yC + 100, 100, 18, C.gray300, C.gray50, 1, true));
+  els.push(rect('ttp_light_arr', 127, yC + 116, 8, 8, C.gray300, C.white, 1, false));
+  els.push(rect('ttp_light_box', 50, yC + 122, 180, 26, C.gray300, C.white, 1, true));
+  els.push(text('ttp_light_t',   50, yC + 129, 180, 14, 'Last updated 3 min ago', 11, C.gray700, 'center'));
+
+  // ── Popover (config panel) ──
+  els.push(rect('ttp_pop_card', 310, yC, 260, 186, C.gray300, C.white, 2, true));
+  els.push(text('ttp_pop_title', 326, yC + 16, 200, 18, 'Configure step', 14, C.gray900));
+  els.push(hline('ttp_pop_div', 310, yC + 42, 260, C.gray300));
+  els.push(text('ttp_pop_lbl1', 326, yC + 54, 80, 13, 'Timeout (s)', 11, C.gray500));
+  els.push(rect('ttp_pop_inp1', 326, yC + 70, 228, 32, C.gray300, C.gray50, 1, true));
+  els.push(text('ttp_pop_ph1',  334, yC + 80, 150, 14, '30', 12, C.gray300));
+  els.push(text('ttp_pop_lbl2', 326, yC + 116, 100, 13, 'Retry on fail', 11, C.gray500));
+  els.push(rect('ttp_pop_chk',  326, yC + 132, 16, 16, C.primary, C.infoBg, 2, true));
+  els.push(text('ttp_pop_chk_t',348, yC + 133, 180, 13, 'Enable automatic retry', 12, C.gray700));
+  els.push(rect('ttp_pop_save',  390, yC + 160, 76, 20, C.accentDark, C.accent, 2, true));
+  els.push(text('ttp_pop_save_t',390, yC + 164, 76, 12, 'Save', 11, C.white, 'center'));
+  els.push(rect('ttp_pop_cancel',472, yC + 160, 60, 20, C.gray300, 'transparent', 1, true));
+  els.push(text('ttp_pop_cancel_t', 472, yC + 164, 60, 12, 'Cancel', 11, C.gray500, 'center'));
+
+  // ── Destructive confirm popover ──
+  els.push(rect('ttp_cnf_card',  610, yC, 240, 128, C.gray300, C.white, 2, true));
+  els.push(text('ttp_cnf_title', 626, yC + 16, 200, 18, 'Delete record?', 14, C.gray900));
+  els.push(text('ttp_cnf_msg',   626, yC + 38, 200, 32, 'This action cannot be undone. All data will be removed.', 11, C.gray500));
+  els.push(rect('ttp_cnf_del',   626, yC + 96, 88, 22, C.dangerDark, C.danger, 2, true));
+  els.push(text('ttp_cnf_del_t', 626, yC + 101, 88, 12, 'Delete', 12, C.white, 'center'));
+  els.push(rect('ttp_cnf_no',    724, yC + 96, 66, 22, C.gray300, 'transparent', 1, true));
+  els.push(text('ttp_cnf_no_t',  724, yC + 101, 66, 12, 'Cancel', 12, C.gray500, 'center'));
+
+  return els;
+}
+
+function buildFieldTypePicker(y0) {
+  const els = [...sectionHeader(32, 'Field Type Picker', y0)];
+  const yC = y0 + 48;
+
+  const types = [
+    ['Text',        '𝐓',  false],
+    ['Long Text',   '¶',  false],
+    ['Number',      '#',  false],
+    ['Currency',    '$',  true ],
+    ['Date',        '📅', false],
+    ['DateTime',    '⏱',  false],
+    ['Boolean',     '◎',  false],
+    ['Select',      '▾',  false],
+    ['Multi-select','▾▾', false],
+    ['Relation',    '⇄',  false],
+    ['File',        '📎', false],
+    ['Formula',     'ƒ',  false],
+    ['User',        '👤', false],
+    ['Email',       '@',  false],
+    ['URL',         '🔗', false],
+  ];
+
+  const cellW = 140, cellH = 54, cols = 5;
+  types.forEach(([label, icon, active], i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const x = 50 + col * (cellW + 8);
+    const y = yC + row * (cellH + 8);
+    const stroke = active ? C.primary : C.gray300;
+    const bg     = active ? C.infoBg  : C.white;
+    els.push(rect(`ftp_cell_${i}`, x, y, cellW, cellH, stroke, bg, active ? 2 : 1, true));
+    els.push(text(`ftp_ico_${i}`,  x + 12, y + 14, 22, 22, icon,  15, active ? C.primary : C.gray500));
+    els.push(text(`ftp_lbl_${i}`,  x + 38, y + 17, cellW - 48, 20, label, 13, active ? C.primary : C.gray700));
+  });
+
+  return els;
+}
+
+function buildRelationLookup(y0) {
+  const els = [...sectionHeader(33, 'Relation / Lookup Field', y0)];
+  const yC = y0 + 68;
+  els.push(text('rel_view_lbl', 50,  y0 + 46, 140, 14, 'Field (view mode)',   11, C.gray500));
+  els.push(text('rel_pop_lbl',  370, y0 + 46, 120, 14, 'Lookup Popup',        11, C.gray500));
+  els.push(text('rel_cell_lbl', 720, y0 + 46, 180, 14, 'Table Cell (multi)',  11, C.gray500));
+
+  // ── Relation field in view mode ──
+  els.push(text('rel_field_lbl', 50, yC - 18, 120, 14, 'Account', 11, C.gray500));
+  els.push(rect('rel_inp', 50, yC, 290, 40, C.gray300, C.white, 1, true));
+  let cx = 58;
+  ['Acme Corp', 'TechFlow Ltd'].forEach((rec, i) => {
+    const w = rec.length * 7 + 26;
+    els.push(rect(`rel_chip_${i}`,   cx, yC + 10, w, 22, C.primary, C.infoBg, 1, true));
+    els.push(text(`rel_chip_t_${i}`, cx + 6, yC + 13, w - 20, 14, rec, 11, C.primary));
+    els.push(text(`rel_chip_x_${i}`, cx + w - 14, yC + 14, 10, 12, '×', 10, C.primary));
+    cx += w + 6;
+  });
+  els.push(text('rel_add', cx + 2, yC + 13, 50, 14, '+ Add', 11, C.gray300));
+
+  // ── Lookup popup ──
+  els.push(rect('rel_pop', 370, yC, 310, 244, C.gray300, C.white, 2, true));
+  els.push(rect('rel_pop_srch', 380, yC + 10, 290, 32, C.gray300, C.gray50, 1, true));
+  els.push(text('rel_pop_srch_t', 390, yC + 18, 200, 16, '🔍  Search records…', 12, C.gray300));
+  const popRows = [
+    ['Acme Corp',      true ],
+    ['TechFlow Ltd',   true ],
+    ['Bright Systems', false],
+    ['Nova Partners',  false],
+    ['Vertex Inc.',    false],
+  ];
+  popRows.forEach(([name, checked], i) => {
+    const y = yC + 52 + i * 36;
+    const hover = i === 2;
+    if (hover) els.push(rect(`rel_pop_hover_${i}`, 374, y, 302, 32, 'transparent', C.gray50, 0, false));
+    els.push(rect(`rel_pop_chk_${i}`,   380, y + 8, 16, 16, checked ? C.primary : C.gray300, checked ? C.infoBg : C.white, checked ? 2 : 1, true));
+    if (checked) els.push(text(`rel_pop_chk_t_${i}`, 380, y + 8, 16, 16, '✓', 10, C.primary, 'center'));
+    els.push(text(`rel_pop_name_${i}`, 404, y + 9, 260, 16, name, 12, C.gray900));
+  });
+
+  // ── Table cell with multi-relation chips ──
+  els.push(rect('rel_cell', 720, yC, 240, 100, C.gray300, C.white, 1, false));
+  els.push(rect('rel_cell_hdr', 720, yC, 240, 32, C.gray300, C.gray50, 1, false, { roundness: null }));
+  els.push(text('rel_cell_hdr_t', 732, yC + 9, 180, 16, 'Related Accounts', 12, C.gray700));
+  let tcx = 730;
+  ['Acme Corp', 'TechFlow'].forEach((chip, i) => {
+    const w = chip.length * 7 + 20;
+    els.push(rect(`rel_cell_chip_${i}`,   tcx, yC + 40, w, 22, C.primary, C.infoBg, 1, true));
+    els.push(text(`rel_cell_chip_t_${i}`, tcx + 6, yC + 43, w - 8, 14, chip, 11, C.primary));
+    tcx += w + 6;
+  });
+  els.push(text('rel_cell_more', tcx + 2, yC + 43, 30, 14, '+2', 11, C.gray500));
+
+  return els;
+}
+
 function buildColorIconPicker(y0) {
-  const els = [...sectionHeader(24, 'Color & Icon Picker', y0)];
+  const els = [...sectionHeader(28, 'Color & Icon Picker', y0)];
   const yC = y0 + 68;
   els.push(text('clr_lbl', 50,  y0 + 46, 120, 14, 'Color Picker', 11, C.gray500));
   els.push(text('icp_lbl', 360, y0 + 46, 120, 14, 'Icon Picker',  11, C.gray500));
@@ -1460,25 +1729,31 @@ for (const builder of [
   buildTable,                  // S10
   buildEditableTable,          // S11
   buildCards,                  // S12
+  buildEmptyStates,            // S13
+  buildSkeletonLoaders,        // S14
   // ── Navigation & Layout ───────────────────────────────────────────────────
-  buildNavigation,             // S13
-  buildSidebarNav,             // S14
-  buildAppShell,               // S15
+  buildNavigation,             // S15
+  buildSidebarNav,             // S16
+  buildTabs,                   // S17
+  buildAppShell,               // S18
   // ── Feedback & Overlays ───────────────────────────────────────────────────
-  buildFeedback,               // S16
-  buildModal,                  // S17
-  buildCommandPalette,         // S18
-  buildNotifications,          // S19
+  buildFeedback,               // S19
+  buildModal,                  // S20
+  buildCommandPalette,         // S21
+  buildNotifications,          // S22
+  buildTooltipPopover,         // S23
   // ── Interaction Patterns ──────────────────────────────────────────────────
-  buildDropdownContextMenu,    // S20
-  buildDragDrop,               // S21
-  buildUtilities,              // S22
-  buildPermissionMatrix,       // S23
-  buildColorIconPicker,        // S24
+  buildDropdownContextMenu,    // S24
+  buildDragDrop,               // S25
+  buildUtilities,              // S26
+  buildPermissionMatrix,       // S27
+  buildColorIconPicker,        // S28
   // ── Axis App Patterns ─────────────────────────────────────────────────────
-  buildWorkflowCanvas,         // S25
-  buildBuilderLayout,          // S26
-  buildExecutionTimeline,      // S27
+  buildWorkflowCanvas,         // S29
+  buildBuilderLayout,          // S30
+  buildExecutionTimeline,      // S31
+  buildFieldTypePicker,        // S32
+  buildRelationLookup,         // S33
 ]) {
   const els = builder(currentY);
   allElements.push(...els);
@@ -1487,7 +1762,7 @@ for (const builder of [
 
 const elements = allElements;
 
-const output = JSON.stringify({ type: 'excalidraw', version: 2, source: 'https://excalidraw.com', elements, appState: { gridSize: 8, viewBackgroundColor: '#ffffff' }, files: {} }, null, 2);
+const output = JSON.stringify({ type: 'excalidraw', version: 2, source: 'https://excalidraw.com', elements, appState: { gridSize: 8, viewBackgroundColor: '#ffffff' }, files: {} });
 
 writeFileSync(new URL('./_template.excalidraw', import.meta.url), output, 'utf-8');
 console.log(`✓ Generated _template.excalidraw — ${elements.length} elements`);
