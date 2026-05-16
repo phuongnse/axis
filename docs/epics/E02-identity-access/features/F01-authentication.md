@@ -2,6 +2,8 @@
 
 [← Back to E02](../README.md)
 
+> **Wireframe**: [docs/wireframes/login.excalidraw](../../../wireframes/login.excalidraw) · [preview](../../../wireframes/login.svg)
+
 ---
 
 ## Description
