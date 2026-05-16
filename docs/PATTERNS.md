@@ -5,6 +5,7 @@
 ## Contents
 
 - [Frontend Patterns](#frontend-patterns)
+- [Wireframe convention](#wireframe-convention)
 - [Key patterns](#key-patterns)
 - [Result Pattern vs. exceptions](#result-pattern-vs-exceptions----when-to-use-what)
 - [NuGet / packaging rules](#nuget--packaging-rules)
@@ -1433,3 +1434,40 @@ npm run test    # vitest run — all tests must pass
 ```
 
 `npm run lint:fix` auto-fixes safe Biome issues. `npm run format` reformats all files.
+
+### Wireframe convention
+
+Wireframes use Excalidraw (`.excalidraw` JSON). Both files — source and SVG preview — are committed.
+
+**File location:**
+```
+docs/wireframes/
+├── E02-identity-access/
+│   ├── login.excalidraw        ← source (JSON, diffable on GitHub)
+│   └── login.svg               ← rendered preview (vector, renders inline on GitHub)
+├── E03-data-modeling/
+│   └── ...
+└── _shared/                    ← screens not belonging to a single module
+```
+
+One subfolder per epic, mirroring `docs/epics/`. Shared screens (error pages, global settings) go in `_shared/`.
+
+**Naming:** screen slug in kebab-case matching the primary route segment — `login`, `data-models`, `workflow-detail`.
+
+**One wireframe per screen.** Multiple user stories on the same screen share one wireframe file.
+
+**Linking from a feature file** — add directly after the feature title, before the first user story:
+
+```markdown
+> **Wireframe**: [docs/wireframes/E02-identity-access/login.excalidraw](../../../wireframes/E02-identity-access/login.excalidraw) · [preview](../../../wireframes/E02-identity-access/login.svg)
+```
+
+**Excalidraw settings** for consistent sketch aesthetic:
+- `roughness: 1` on all shapes
+- `fillStyle: "solid"` for filled shapes
+- `fontFamily: 1` (Virgil — hand-drawn feel)
+- `strokeWidth: 2` for card/container outlines, `1` for inputs
+
+**Generate SVG** after every edit: run `docs/scripts/generate-wireframes.ps1` — regenerates all `.svg` files from `.excalidraw` source via Kroki.io. Commit both `.excalidraw` and `.svg` together.
+
+**Pitfall:** committing only `.excalidraw` without `.svg` means the wireframe is invisible on GitHub without the VS Code extension. Always run the script and commit both.

@@ -64,9 +64,11 @@ Before starting any task, read only what is relevant — not everything.
 
 **Step 4 — Check implementation status** in [`docs/PROGRESS.md`](docs/PROGRESS.md)
 
-**Step 5 — Read [`docs/PATTERNS.md`](docs/PATTERNS.md)** when the task involves any of: NuGet packages, EF Core mapping or JSONB, Minimal API wiring, writing tests, list/query endpoints, async patterns, response DTOs, repository methods, domain aggregate methods, multi-tenant raw SQL, Wolverine handlers or jobs, new step/field types, cross-cutting concerns, or any design decision about where logic lives.
+**Step 5 — Read [`docs/PROCESS.md`](docs/PROCESS.md)** when starting a new module or implementing a new US — it has the step-by-step checklist (layer order, TDD gates, doc update triggers) for both backend and frontend.
 
-**Step 6 — Read [`docs/TECH_STACK.md`](docs/TECH_STACK.md)** when making any architectural decision, adding a library, or referencing an ADR.
+**Step 7 — Read [`docs/PATTERNS.md`](docs/PATTERNS.md)** when the task involves any of: NuGet packages, EF Core mapping or JSONB, Minimal API wiring, writing tests, list/query endpoints, async patterns, response DTOs, repository methods, domain aggregate methods, multi-tenant raw SQL, Wolverine handlers or jobs, new step/field types, cross-cutting concerns, or any design decision about where logic lives.
+
+**Step 8 — Read [`docs/TECH_STACK.md`](docs/TECH_STACK.md)** when making any architectural decision, adding a library, or referencing an ADR.
 
 ---
 
@@ -97,6 +99,7 @@ Every time code changes, the relevant docs change too — in the **same PR, not 
 | Completed a US layer | Feature file `> **Implementation status**` callout |
 | Completed a full layer for a module | Epic README status table + `docs/PROGRESS.md` |
 | Changed architecture, added a cross-cutting rule | `CLAUDE.md` — the relevant section |
+| Changed the implementation workflow or layer order | `docs/PROCESS.md` — update the affected checklist |
 
 "I'll update docs later" = the docs are already out of date. Later never comes.
 
@@ -105,6 +108,7 @@ Every time code changes, the relevant docs change too — in the **same PR, not 
 ## Development Rules
 
 ### Process & Workflow
+- **Step-by-step workflow**: follow [`docs/PROCESS.md`](docs/PROCESS.md) at the start of every new US or module. Rules in this file govern HOW; PROCESS.md governs WHAT order.
 - **Language**: discuss in Vietnamese, write all code and docs in English.
 - **Git**: never push to `main` — always branch (`{type}/{short-description}` kebab-case, `type` ∈ `feat|fix|docs|refactor|test|chore`) and open a PR. When Claude Code auto-creates a worktree with a random branch name, rename before pushing.
 - **Conventional Commits**: `feat: add workflow step handler` — subject ≤ 72 chars, imperative mood, no period.
@@ -277,6 +281,24 @@ features/{feature-name}/
 - Every icon-only button must have `aria-label`.
 - Never use color as the sole indicator — error/warning states require text or icon alongside color.
 
+### Frontend Development Process
+
+See [`docs/PROCESS.md`](docs/PROCESS.md) for the full step-by-step checklists — Phase 1 (Foundation, one-time) and Phase 2 (per-feature, repeatable).
+
+#### Wireframe convention
+
+- **Location**: `docs/wireframes/{E0N-module-name}/{screen-slug}.excalidraw` (source) + `.svg` (rendered preview) — one subfolder per epic, mirroring `docs/epics/`
+- **Naming**: screen slug in kebab-case matching the primary route segment — `login`, `data-models`, `workflow-detail`
+- **Shared screens** (error pages, global settings) that don't belong to a single module go in `docs/wireframes/_shared/`
+- **Format**: Excalidraw JSON (`roughness: 1`, sketch aesthetic) — both files committed; `.excalidraw` is diffable, `.svg` is for quick preview
+- **One wireframe per screen** — multiple user stories on the same screen share one wireframe file
+- **Generate SVG** after every edit: run `docs/scripts/generate-wireframes.ps1` — recurses all subfolders and regenerates `.svg` files via Kroki.io
+- **Link from feature file** — add a `> **Wireframe**` callout directly after the feature title, before the first user story:
+
+  ```markdown
+  > **Wireframe**: [docs/wireframes/E02-identity-access/login.excalidraw](../../../wireframes/E02-identity-access/login.excalidraw) · [preview](../../../wireframes/E02-identity-access/login.svg)
+  ```
+
 ---
 
 ## Agent Integrity Rules
@@ -326,6 +348,7 @@ A US or layer is NOT done until all of the following are complete in the **same 
    - Use `⏳` for a layer not yet started, `⚠️` for a layer started but incomplete, `✅` for fully complete.
    - When `Domain + Application` shorthand is used, it means both are ✅; if either is partial, split them: `Domain: ✅ | Application: ⚠️`.
 3. ✅ If a gap vs spec exists, document it in the callout — never silently skip.
+4. ✅ If this US introduces a new screen (Frontend layer): wireframe exists at `docs/wireframes/{screen-slug}.excalidraw`, SVG generated via `docs/scripts/generate-wireframes.ps1` alongside it, and `> **Wireframe**` callout added to the feature file before the first US. Creating the wireframe is part of the US — not a pre-task or follow-up.
 
 ### Completing a layer for a module
 1. ✅ All tests for that layer passing
@@ -346,6 +369,10 @@ A US or layer is NOT done until all of the following are complete in the **same 
 - A new module is introduced or a module's public boundary changes (domain events emitted, API surface added)
 - A cross-module flow changes (e.g., how modules communicate via Wolverine events)
 - After editing any `.puml` file, run `docs/scripts/generate-diagrams.ps1` to regenerate the `.png`
+
+**Wireframes** (`docs/wireframes/*.excalidraw` + `.svg`) — update in the same PR when:
+- A new screen is introduced or an existing screen's layout changes
+- After editing any `.excalidraw` file, run `docs/scripts/generate-wireframes.ps1` to regenerate the `.svg`
 
 **`CLAUDE.md`** — update in the same PR when:
 - A library is added, removed, or version-pinned differently (update Tech Stack section)
@@ -378,6 +405,8 @@ For any **new** module: Domain → Application (no Docker needed) → Infrastruc
 - `docs/epics/E0{N}-*/features/F0{N}-*.md` — feature + user stories with ACs
 - `docs/diagrams/` — system-level diagrams (.puml + .png)
 - `docs/scripts/generate-diagrams.ps1` — regenerates PNGs from .puml via Kroki.io POST API
+- `docs/wireframes/` — screen wireframes (.excalidraw source + .svg preview)
+- `docs/scripts/generate-wireframes.ps1` — regenerates SVGs from .excalidraw via Kroki.io POST API
 
 ---
 

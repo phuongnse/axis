@@ -12,6 +12,8 @@
 | [Tech Stack](./TECH_STACK.md) | Technology decisions and rationale |
 | [Architecture](./ARCHITECTURE.md) | System design, modules, data strategy |
 | [Epics](./epics/README.md) | All epics, features, and user stories |
+| [Process](./PROCESS.md) | Step-by-step implementation workflow — backend and frontend |
+| [Wireframes](./wireframes/) | Screen wireframes — Excalidraw source + SVG preview |
 
 ---
 
@@ -36,6 +38,14 @@
 | [System Context](./diagrams/system-context.puml) | C4 Level 1 — actors and external systems |
 | [Container Diagram](./diagrams/container-diagram.puml) | C4 Level 2 — main containers |
 | [Module Overview](./diagrams/module-overview.puml) | Modular monolith modules and dependencies |
+
+## Wireframes
+
+Excalidraw wireframes live in `docs/wireframes/`. Each feature file links to its wireframe via a `> **Wireframe**` callout directly after the feature title.
+
+| Screen | Source | Preview |
+|---|---|---|
+| Login | [login.excalidraw](./wireframes/E02-identity-access/login.excalidraw) | [login.svg](./wireframes/E02-identity-access/login.svg) |
 
 ---
 

@@ -1,0 +1,122 @@
+# Development Process
+
+> Step-by-step checklists for backend and frontend. Read this at the start of any new module or user story — before writing any code.
+
+## Contents
+
+- [Backend Process](#backend-process)
+  - [New module setup](#new-module-setup-one-time-per-module)
+  - [Per-US workflow](#per-us-workflow)
+- [Frontend Process](#frontend-process)
+  - [Phase 1 — Foundation](#phase-1--foundation-one-time)
+  - [Phase 2 — Per-feature workflow](#phase-2--per-feature-workflow)
+
+---
+
+## Backend Process
+
+### New module setup (one-time per module)
+
+Complete in order when scaffolding a brand-new module:
+
+| Step | Action |
+|---|---|
+| 1 | Create four projects: `{Module}.Domain`, `{Module}.Application`, `{Module}.Infrastructure`, `{Module}.Api` under `src/Modules/{Module}/` |
+| 2 | Add all four to `Axis.sln`; add Domain and Application test projects to `unit-tests.slnf` |
+| 3 | Wire project references: `Domain` ← `Application` ← `Infrastructure` ← `Api`; `Api` also references `Axis.Shared.*` |
+| 4 | Add `GlobalUsings.cs` to each project; add common usings to `Directory.Build.props` if not already present |
+| 5 | Create `AxisDbContext` subclass in Infrastructure with `TenantSchemaInterceptor`; register in DI |
+| 6 | Create `IEndpointRouteBuilder` extension in `{Module}.Api`; wire it in `Axis.Api/Program.cs` |
+| 7 | Create test projects: `{Module}.Domain.Tests` (unit), `{Module}.Application.Tests` (unit), `{Module}.Infrastructure.Tests` (integration with Testcontainers) |
+| 8 | Add test projects to `Axis.sln`; add unit test projects to `unit-tests.slnf` |
+| 9 | Run `dotnet build` — zero errors before writing any domain code |
+
+### Per-US workflow
+
+Repeat for every user story, in layer order: Domain → Application → Infrastructure → API.
+**Never start the next layer until the current layer's tests are green.**
+
+#### Step 1 — Read and align
+
+- Read the feature file ACs in full
+- Check `docs/PROGRESS.md` for current layer status
+- Identify 2–3 key design decisions (aggregate boundaries, value objects, event names, query shape)
+- **Surface decisions to the user and confirm before writing any code** — see "Surface architectural decisions first" rule in `CLAUDE.md`
+
+#### Step 2 — Domain layer (TDD)
+
+1. Write failing unit tests for aggregate behaviour, value object invariants, and domain events
+2. Implement: aggregate factory methods, domain methods, value objects, domain events, repository interface
+3. Run `dotnet test unit-tests.slnf` — must be **zero errors, zero warnings** before proceeding
+4. No EF Core, no MediatR, no external dependencies — pure C# only
+
+#### Step 3 — Application layer (TDD)
+
+1. Write failing unit tests for the command/query handler (NSubstitute for repository)
+2. Implement: `ICommand` / `IQuery`, handler, `AbstractValidator<T>`, `*Response` / `*Dto` record
+3. Run `dotnet test unit-tests.slnf` — must be **zero errors, zero warnings** before proceeding
+4. Handlers return `Result` / `Result<T>` for business rule violations — never throw
+
+#### Step 4 — Infrastructure layer (Testcontainers)
+
+1. Implement `IEntityTypeConfiguration<T>` — Fluent API only, no Data Annotations
+2. Implement repository — `AsNoTracking()` on reads, tracked queries on writes
+3. Run `dotnet ef migrations add {PascalCaseName} --project ... --startup-project ...`
+4. Verify migration is idempotent; run integration tests against Testcontainers PostgreSQL
+5. Run `dotnet test unit-tests.slnf` — still green
+
+#### Step 5 — API layer
+
+1. Add Minimal API endpoint in `{Module}.Api` with full OpenAPI annotations (`.WithName`, `.WithSummary`, `.WithTags`, `.Produces<T>`, `.ProducesProblem`)
+2. Every endpoint calls `.RequireAuthorization()` unless explicitly public
+3. Mapping: `mediator.Send(...)` → `Result` → `result.ToProblemDetails()` — no logic in endpoint
+4. Add / update integration tests under `tests/Api/Axis.Api.Tests/`
+5. Run `dotnet test unit-tests.slnf` — must be **zero errors, zero warnings**
+
+#### Step 6 — Update docs (same PR)
+
+- Update feature file `> **Implementation status**` callout for this US
+- If all USes in the feature are complete for a layer: update Epic README status table
+- If the full layer is done for the module: update `docs/PROGRESS.md`
+- If a new pattern was established: add to `docs/PATTERNS.md`
+- If a library was added or changed: update `docs/TECH_STACK.md`
+
+---
+
+## Frontend Process
+
+### Phase 1 — Foundation (one-time)
+
+Complete in order before building any feature screen. Do not skip or reorder.
+
+| Step | What | Done when |
+|---|---|---|
+| 1 | **Auth flow** — React `/login` page collects email + password, POSTs to `/connect/token`; backend (OpenIddict) validates and sets `httpOnly` cookie; SPA navigates to dashboard on success | Login form renders, successful POST redirects to dashboard |
+| 2 | **Route guard** — `_authenticated` layout route with `beforeLoad`; redirects to `/login` when session is absent | Unauthenticated navigation to any protected route → redirected |
+| 3 | **Global 401 handling** — `fetchApi` 401 branch navigates to `/login` and calls `queryClient.clear()` | Any expired-session API call redirects without per-feature handling |
+| 4 | **App shell** — root authenticated layout with sidebar + header; all protected routes render as `<Outlet />` inside it | Every protected page inherits sidebar + header automatically |
+
+### Phase 2 — Per-feature workflow
+
+Repeat for every screen / feature area. **Never skip the wireframe step** — it is part of the US, not a pre-task.
+
+| Step | Action | Output |
+|---|---|---|
+| 1 | Read feature file ACs in full | Understand spec contract |
+| 2 | Create Excalidraw wireframe + run `generate-wireframes.ps1` | `docs/wireframes/{screen-slug}.excalidraw` + `.svg` |
+| 3 | Add `> **Wireframe**` callout to feature file | Wireframe linked from spec |
+| 4 | Define types from backend contract | `features/{name}/types.ts` |
+| 5 | Define API functions + query key factory | `features/{name}/api.ts` |
+| 6 | Write tests first (TDD) — Vitest + Testing Library | Failing tests that define expected behaviour |
+| 7 | Implement components + hooks | Feature folder anatomy (see `CLAUDE.md`) |
+| 8 | Wire route — lazy-loaded, nested inside `_authenticated` | New file under `routes/` |
+| 9 | Run gates: `npm run ci` + `npm run test` | Both green |
+| 10 | Update docs (same PR — see breakdown below) | No stale docs |
+
+**Step 10 — Update docs breakdown:**
+
+- Update feature file `> **Implementation status**` callout for this US
+- If all USes in the feature are complete for Frontend: update Epic README status table
+- If the full Frontend layer is done for the module: update `docs/PROGRESS.md`
+- If a new frontend pattern was established: add to `docs/PATTERNS.md`
+- If a library was added or changed: update `docs/TECH_STACK.md`
