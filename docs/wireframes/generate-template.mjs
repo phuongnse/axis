@@ -545,6 +545,406 @@ function buildAppShell(y0) {
   return els;
 }
 
+function buildDateTimePicker(y0) {
+  const els = [...sectionHeader(19, 'Date & Time Picker', y0)];
+  const yC = y0 + 48;
+
+  // ── Date Picker — calendar popup (x=50) ──
+  els.push(text('dp_lbl', 50, y0 + 46, 100, 14, 'Date Picker', 11, C.gray500));
+  els.push(rect('dp_inp', 50, yC, 224, 40, C.primary, C.infoBg, 2, true));
+  els.push(text('dp_val', 62, yC + 11, 180, 18, '📅  Mar 15, 2026', 13, C.gray700));
+
+  const cx = 50, cy = yC + 48, cw = 252;
+  els.push(rect('dp_cal', cx, cy, cw, 244, C.gray300, C.white, 1, false));
+  els.push(rect('dp_hdr', cx, cy, cw, 44, 'transparent', C.gray50, 0, false));
+  els.push(text('dp_prev', cx + 10, cy + 13, 18, 18, '‹', 15, C.gray700));
+  els.push(text('dp_mo', cx, cy + 13, cw, 18, 'March  2026', 14, C.gray900, 'center'));
+  els.push(text('dp_nxt', cx + 224, cy + 13, 18, 18, '›', 15, C.gray700));
+  els.push(hline('dp_hdiv', cx, cy + 44, cw, C.gray300));
+
+  ['S','M','T','W','T','F','S'].forEach((d, i) =>
+    els.push(text(`dp_wd_${i}`, cx + 8 + i * 34, cy + 52, 26, 16, d, 11, C.gray500, 'center')));
+
+  const calRows = [
+    [1,2,3,4,5,6,7], [8,9,10,11,12,13,14],
+    [15,16,17,18,19,20,21], [22,23,24,25,26,27,28],
+    [29,30,31,null,null,null,null],
+  ];
+  calRows.forEach((row, ri) => {
+    row.forEach((d, ci) => {
+      if (!d) return;
+      const dx = cx + 8 + ci * 34, dy = cy + 76 + ri * 32;
+      if (d === 15) {
+        els.push(ellipse(`dp_sel`, dx + 3, dy, 24, 24, C.accentDark, C.accent, 1));
+        els.push(text(`dp_d_${ri}_${ci}`, dx, dy + 4, 30, 16, `${d}`, 12, C.white, 'center'));
+      } else if (d === 8) {
+        els.push(ellipse(`dp_tod`, dx + 3, dy, 24, 24, C.primary, 'transparent', 1));
+        els.push(text(`dp_d_${ri}_${ci}`, dx, dy + 4, 30, 16, `${d}`, 12, C.primary, 'center'));
+      } else {
+        els.push(text(`dp_d_${ri}_${ci}`, dx, dy + 4, 30, 16, `${d}`, 12, (ci === 0 || ci === 6) ? C.gray300 : C.gray700, 'center'));
+      }
+    });
+  });
+
+  // ── Time Picker (x=346) ──
+  els.push(text('tp_lbl', 346, y0 + 46, 100, 14, 'Time Picker', 11, C.gray500));
+  els.push(rect('tp_inp', 346, yC, 180, 40, C.gray300, C.gray100, 1, true));
+  els.push(text('tp_val', 358, yC + 11, 140, 18, '🕐  14:30', 13, C.gray700));
+  els.push(rect('tp_popup', 346, yC + 48, 180, 162, C.gray300, C.white, 1, false));
+  // Hour
+  els.push(text('tp_h_lbl', 352, yC + 58, 56, 14, 'Hour', 10, C.gray500, 'center'));
+  els.push(text('tp_h_up',  352, yC + 76, 56, 16, '▴', 13, C.gray700, 'center'));
+  els.push(rect('tp_h_box', 347, yC + 96, 66, 34, C.primary, C.infoBg, 2, true));
+  els.push(text('tp_h_v',   347, yC + 106, 66, 16, '14', 16, C.primary, 'center'));
+  els.push(text('tp_h_dn',  352, yC + 134, 56, 16, '▾', 13, C.gray700, 'center'));
+  // Colon
+  els.push(text('tp_col', 415, yC + 108, 14, 16, ':', 18, C.gray900));
+  // Minute
+  els.push(text('tp_m_lbl', 432, yC + 58, 56, 14, 'Min', 10, C.gray500, 'center'));
+  els.push(text('tp_m_up',  432, yC + 76, 56, 16, '▴', 13, C.gray700, 'center'));
+  els.push(rect('tp_m_box', 427, yC + 96, 66, 34, C.primary, C.infoBg, 2, true));
+  els.push(text('tp_m_v',   427, yC + 106, 66, 16, '30', 16, C.primary, 'center'));
+  els.push(text('tp_m_dn',  432, yC + 134, 56, 16, '▾', 13, C.gray700, 'center'));
+  els.push(rect('tp_ok', 363, yC + 162, 96, 28, C.accentDark, C.accent, 2, true));
+  els.push(text('tp_ok_t', 363, yC + 170, 96, 16, 'Apply', 12, C.white, 'center'));
+
+  // ── Date Range (x=576) ──
+  els.push(text('dr_lbl', 576, y0 + 46, 100, 14, 'Date Range', 11, C.gray500));
+  els.push(rect('dr_inp', 576, yC, 266, 40, C.gray300, C.gray100, 1, true));
+  els.push(text('dr_val', 588, yC + 11, 236, 18, 'Mar 10 → Mar 20, 2026', 13, C.gray700));
+  els.push(rect('dr_cal', 576, yC + 48, 266, 200, C.gray300, C.white, 1, false));
+  els.push(rect('dr_hdr', 576, yC + 48, 266, 44, 'transparent', C.gray50, 0, false));
+  els.push(text('dr_mo', 576, yC + 61, 266, 18, '< March 2026 >', 13, C.gray900, 'center'));
+  els.push(hline('dr_hdiv', 576, yC + 92, 266, C.gray300));
+  ['S','M','T','W','T','F','S'].forEach((d, i) =>
+    els.push(text(`dr_wd_${i}`, 584 + i * 36, yC + 100, 28, 14, d, 11, C.gray500, 'center')));
+  // Range: days 10-20. Row 1 col 2–6 = days 10-14; Row 2 col 0–5 = days 15-20.
+  for (let ri = 0; ri < 4; ri++) {
+    for (let ci = 0; ci < 7; ci++) {
+      const inRange = (ri === 1 && ci >= 2) || (ri === 2 && ci <= 5);
+      const isStart = ri === 1 && ci === 2;
+      const isEnd   = ri === 2 && ci === 5;
+      const ex = 584 + ci * 36, ey = yC + 120 + ri * 34;
+      if (isStart || isEnd) {
+        els.push(ellipse(`dr_ep_${ri}_${ci}`, ex + 2, ey, 24, 24, C.accentDark, C.accent, 1));
+        els.push(text(`dr_en_${ri}_${ci}`, ex, ey + 5, 28, 14, isStart ? '10' : '20', 11, C.white, 'center'));
+      } else if (inRange) {
+        els.push(rect(`dr_rng_${ri}_${ci}`, ex, ey + 2, 32, 22, 'transparent', C.infoBg, 0, false));
+      }
+    }
+  }
+
+  return els;
+}
+
+function buildEditableTable(y0) {
+  const els = [...sectionHeader(20, 'Editable Table / Data Grid', y0)];
+  const yC = y0 + 48;
+
+  // Bulk action bar (visible when rows selected)
+  els.push(rect('edt_bar', 50, yC, 850, 44, C.infoBorder, C.infoBg, 1, false));
+  els.push(text('edt_bar_t', 66, yC + 13, 200, 18, '2 items selected', 13, C.primary));
+  els.push(rect('edt_bar_del', 600, yC + 8, 88, 28, C.dangerDark, C.danger, 2, true));
+  els.push(text('edt_bar_del_t', 600, yC + 14, 88, 16, '✕  Delete', 12, C.white, 'center'));
+  els.push(rect('edt_bar_exp', 698, yC + 8, 96, 28, C.gray300, C.gray100, 1, true));
+  els.push(text('edt_bar_exp_t', 698, yC + 14, 96, 16, '⤓  Export', 12, C.gray700, 'center'));
+  els.push(text('edt_bar_clr', 806, yC + 14, 80, 16, '× Clear', 12, C.gray700));
+
+  // Table
+  const tY = yC + 52;
+  const cols = [44, 210, 130, 150, 160, 156];
+  const xC = cols.reduce((a, w, i) => [...a, i === 0 ? 50 : a[a.length - 1] + cols[i - 1]], []);
+  const W = 850;
+
+  els.push(rect('edt_outer', 50, tY, W, 212, C.gray300, 'transparent', 1, false));
+  els.push(rect('edt_hdr', 50, tY, W, 44, 'transparent', C.gray100, 0, false));
+  els.push(hline('edt_hdiv', 50, tY + 44, W, C.gray300));
+  // Select-all checkbox (indeterminate)
+  els.push(rect('edt_chk_all', xC[0] + 13, tY + 13, 18, 18, C.primary, C.primary, 1, false));
+  els.push(text('edt_chk_all_m', xC[0] + 13, tY + 14, 18, 16, '—', 10, C.white, 'center'));
+  ['Name', 'Type', 'Status', 'Created', 'Actions'].forEach((h, i) =>
+    els.push(text(`edt_h_${i}`, xC[i + 1] + 12, tY + 12, cols[i + 1] - 16, 20, h, 13, C.gray900)));
+  xC.slice(1).forEach((x, i) => els.push(vline(`edt_vl_${i}`, x, tY, 212, C.gray300)));
+
+  const rows = [
+    { name: 'User Profile',    type: 'Data Model', status: 'Active', date: 'Jan 12, 2026', sel: true,  edit: false },
+    { name: 'Order Workflow',  type: 'Workflow',   status: 'Draft',  date: 'Jan 10, 2026', sel: true,  edit: false },
+    { name: 'Contact Form',    type: 'Form',       status: 'Active', date: 'Jan 8, 2026',  sel: false, edit: true  },
+    { name: 'Invoice Page',    type: 'Page',       status: 'Draft',  date: 'Jan 5, 2026',  sel: false, edit: false },
+  ];
+  const sc = { Active: [C.successBorder, C.successBg, C.success], Draft: [C.gray300, C.gray50, C.gray700] };
+
+  rows.forEach(({ name, type, status, date, sel, edit }, i) => {
+    const y = tY + 44 + i * 42;
+    els.push(rect(`edt_row_${i}`, 50, y, W, 42, 'transparent', sel ? C.infoBg : i % 2 === 0 ? C.white : C.gray50, 0, false));
+    if (i < rows.length - 1) els.push(hline(`edt_hl_${i}`, 50, y + 42, W, C.gray300));
+    // Checkbox
+    els.push(rect(`edt_chk_${i}`, xC[0] + 13, y + 12, 18, 18, sel ? C.primary : C.gray500, sel ? C.primary : C.white, 1, false));
+    if (sel) els.push(text(`edt_chk_t_${i}`, xC[0] + 13, y + 13, 18, 16, '✓', 11, C.white, 'center'));
+    // Name — editing on row 2
+    if (edit) {
+      els.push(rect(`edt_ni_${i}`, xC[1] + 10, y + 6, cols[1] - 22, 30, C.primary, C.infoBg, 2, true));
+      els.push(text(`edt_nv_${i}`, xC[1] + 16, y + 14, cols[1] - 34, 16, name, 12, C.gray900));
+      els.push(rect(`edt_cur_${i}`, xC[1] + 16 + name.length * 6.8, y + 10, 2, 18, C.primary, C.primary, 0, false));
+    } else {
+      els.push(text(`edt_nm_${i}`, xC[1] + 12, y + 13, cols[1] - 16, 18, name, 13, C.gray900));
+    }
+    els.push(text(`edt_ty_${i}`, xC[2] + 12, y + 13, cols[2] - 16, 18, type, 12, C.gray700));
+    const [bs, bb, bt] = sc[status];
+    els.push(rect(`edt_bdg_${i}`, xC[3] + 12, y + 10, 70, 22, bs, bb, 1, true));
+    els.push(text(`edt_bdt_${i}`, xC[3] + 12, y + 14, 70, 14, status, 11, bt, 'center'));
+    els.push(text(`edt_dt_${i}`, xC[4] + 12, y + 13, cols[4] - 16, 18, date, 12, C.gray700));
+    els.push(rect(`edt_eb_${i}`, xC[5] + 10, y + 9, 44, 24, C.gray300, C.gray100, 1, true));
+    els.push(text(`edt_et_${i}`, xC[5] + 10, y + 14, 44, 14, '✎  Edit', 10, C.gray700, 'center'));
+    els.push(rect(`edt_db_${i}`, xC[5] + 62, y + 9, 44, 24, C.dangerBorder, C.dangerBg, 1, true));
+    els.push(text(`edt_dt2_${i}`, xC[5] + 62, y + 14, 44, 14, '✕', 11, C.danger, 'center'));
+  });
+  els.push(text('edt_foot', 62, tY + 224, 300, 18, 'Showing 1–4 of 143 records', 12, C.gray500));
+
+  return els;
+}
+
+function buildCommandPalette(y0) {
+  const els = [...sectionHeader(21, 'Command Palette', y0)];
+  const yC = y0 + 48;
+
+  els.push(text('cp_hint', 50, y0 + 46, 220, 14, 'Global Command Palette  ⌘K to open', 11, C.gray500));
+
+  // Scrim
+  els.push(rect('cp_scrim', 50, yC, 900, 330, C.gray900, C.gray900, 1, false, { opacity: 25, roughness: 0 }));
+
+  // Dialog
+  const dx = 210, dy = yC + 28, dw = 480, dh = 274;
+  els.push(rect('cp_dlg', dx, dy, dw, dh, C.gray300, C.white, 2, true));
+
+  // Search row
+  els.push(text('cp_icon', dx + 16, dy + 18, 20, 20, '⌕', 16, C.gray500));
+  els.push(text('cp_inp', dx + 42, dy + 19, 360, 18, 'Search commands, pages, records…', 14, C.gray300));
+  els.push(rect('cp_esc', dx + 430, dy + 15, 32, 22, C.gray300, C.gray100, 1, true));
+  els.push(text('cp_esc_t', dx + 430, dy + 19, 32, 14, 'esc', 9, C.gray500, 'center'));
+  els.push(hline('cp_sdiv', dx, dy + 52, dw, C.gray300));
+
+  // Result groups
+  const groups = [
+    { label: 'Recent', items: [
+      { icon: '▶', label: 'Order Workflow',       sub: 'Workflow' },
+      { icon: '⬡', label: 'User Profile Schema',  sub: 'Data Model' },
+    ]},
+    { label: 'Actions', items: [
+      { icon: '+', label: 'Create new workflow',   sub: '⌘ Action' },
+      { icon: '+', label: 'Add data model field',  sub: '⌘ Action' },
+    ]},
+    { label: 'Navigation', items: [
+      { icon: '→', label: 'Go to Data Models',     sub: '⌘ Navigate' },
+    ]},
+  ];
+
+  let ry = dy + 62;
+  groups.forEach(({ label, items }, gi) => {
+    els.push(text(`cp_gl_${gi}`, dx + 14, ry, dw - 28, 14, label, 10, C.gray500));
+    ry += 22;
+    items.forEach(({ icon, label: iLabel, sub }, ii) => {
+      const active = gi === 0 && ii === 0;
+      if (active) els.push(rect(`cp_hi_${gi}_${ii}`, dx + 6, ry - 2, dw - 12, 34, C.infoBorder, C.infoBg, 1, true));
+      els.push(text(`cp_ic_${gi}_${ii}`, dx + 16, ry + 5, 20, 20, icon, 13, active ? C.primary : C.gray700));
+      els.push(text(`cp_lb_${gi}_${ii}`, dx + 40, ry + 7, 310, 16, iLabel, 13, active ? C.primary : C.gray700));
+      els.push(text(`cp_sb_${gi}_${ii}`, dx + 366, ry + 7, 94, 16, sub, 10, C.gray500, 'right'));
+      ry += 32;
+    });
+    ry += 6;
+  });
+
+  // Footer
+  els.push(hline('cp_fdiv', dx, dy + dh - 32, dw, C.gray300));
+  els.push(text('cp_fhint', dx + 14, dy + dh - 22, dw - 28, 16, '↑↓  navigate    ↵  select    esc  dismiss', 10, C.gray500));
+
+  return els;
+}
+
+function buildFileUpload(y0) {
+  const els = [...sectionHeader(22, 'File Upload', y0)];
+  const yC = y0 + 48;
+
+  // ── Default drop zone (x=50) ──
+  els.push(text('fu_lbl', 50, y0 + 46, 100, 14, 'Default State', 11, C.gray500));
+  els.push(rect('fu_zone', 50, yC, 380, 140, C.gray300, C.gray50, 1, false, { strokeStyle: 'dashed', roughness: 0 }));
+  els.push(ellipse('fu_ic_bg', 215, yC + 28, 44, 44, C.gray300, C.gray100, 1));
+  els.push(text('fu_ic', 215, yC + 40, 44, 22, '⤒', 16, C.gray500, 'center'));
+  els.push(text('fu_title', 50, yC + 82, 380, 18, 'Drag & drop files here', 13, C.gray700, 'center'));
+  els.push(rect('fu_browse', 145, yC + 108, 120, 28, C.primary, C.infoBg, 1, true));
+  els.push(text('fu_browse_t', 145, yC + 116, 120, 16, 'Browse files', 12, C.primary, 'center'));
+  els.push(text('fu_hint', 50, yC + 146, 380, 14, 'PDF · DOCX · PNG  up to 20 MB', 10, C.gray500, 'center'));
+
+  // ── Drag-over state (x=464) ──
+  els.push(text('fu_act_lbl', 464, y0 + 46, 120, 14, 'Drag-over State', 11, C.gray500));
+  els.push(rect('fu_act', 464, yC, 380, 140, C.infoBorder, C.infoBg, 2, false, { strokeStyle: 'dashed', roughness: 0 }));
+  els.push(ellipse('fu_act_ic', 629, yC + 28, 44, 44, C.infoBorder, C.infoBg, 2));
+  els.push(text('fu_act_ic_t', 629, yC + 40, 44, 22, '⤒', 16, C.primary, 'center'));
+  els.push(text('fu_act_title', 464, yC + 82, 380, 18, 'Drop to upload', 14, C.primary, 'center'));
+  els.push(text('fu_act_sub', 464, yC + 106, 380, 16, 'Release to start uploading', 12, C.primary, 'center', { opacity: 75 }));
+
+  // ── File list ──
+  els.push(text('fl_lbl', 50, yC + 158, 120, 14, 'Uploaded Files', 11, C.gray500));
+  const files = [
+    { name: 'report-2026.pdf',    size: '2.4 MB', state: 'done' },
+    { name: 'schema-export.json', size: '145 KB', state: 'uploading', pct: 65 },
+    { name: 'cover-image.png',    size: '1.1 MB', state: 'error' },
+  ];
+  files.forEach(({ name, size, state, pct }, i) => {
+    const y = yC + 178 + i * 56;
+    els.push(rect(`fl_item_${i}`, 50, y, 794, 48, C.gray300, C.white, 1, false));
+    els.push(rect(`fl_ic_${i}`, 62, y + 10, 28, 28, C.gray300, C.gray100, 1, false));
+    els.push(text(`fl_ic_t_${i}`, 62, y + 18, 28, 14, '📄', 10, C.gray500, 'center'));
+    els.push(text(`fl_nm_${i}`, 100, y + 8, 290, 16, name, 12, C.gray900));
+    els.push(text(`fl_sz_${i}`, 100, y + 26, 100, 14, size, 10, C.gray500));
+    if (state === 'done') {
+      els.push(text(`fl_st_${i}`, 660, y + 17, 60, 16, '✓  Done', 11, C.success, 'center'));
+    } else if (state === 'uploading') {
+      els.push(rect(`fl_tr_${i}`, 400, y + 20, 240, 8, C.gray300, C.gray100, 1, true));
+      els.push(rect(`fl_fl_${i}`, 400, y + 20, Math.round(240 * pct / 100), 8, C.primaryDark, C.primary, 1, true));
+      els.push(text(`fl_pc_${i}`, 650, y + 15, 36, 14, `${pct}%`, 10, C.primary, 'right'));
+    } else {
+      els.push(text(`fl_er_${i}`, 648, y + 17, 80, 16, '✕  Failed', 11, C.danger, 'center'));
+    }
+    els.push(text(`fl_rm_${i}`, 778, y + 16, 16, 16, '×', 14, C.gray500));
+    if (i < files.length - 1) els.push(hline(`fl_div_${i}`, 50, y + 48, 794, C.gray300));
+  });
+
+  return els;
+}
+
+function buildNotifications(y0) {
+  const els = [...sectionHeader(23, 'Notifications & Activity Feed', y0)];
+  const yC = y0 + 48;
+
+  // ── Notification panel (x=50) ──
+  els.push(text('no_lbl', 50, y0 + 46, 140, 14, 'Notification Panel', 11, C.gray500));
+  // Bell trigger with badge
+  els.push(ellipse('no_bell', 50, yC, 40, 40, C.gray300, C.gray100, 1));
+  els.push(text('no_bell_t', 50, yC + 10, 40, 20, '🔔', 14, C.gray700, 'center'));
+  els.push(ellipse('no_badge', 72, yC, 18, 18, C.dangerDark, C.danger, 1));
+  els.push(text('no_badge_t', 72, yC + 4, 18, 12, '3', 9, C.white, 'center'));
+
+  // Panel dropdown
+  els.push(rect('no_panel', 50, yC + 48, 344, 306, C.gray300, C.white, 1, false));
+  els.push(rect('no_phdr', 50, yC + 48, 344, 48, 'transparent', C.gray50, 0, false));
+  els.push(text('no_ptitle', 66, yC + 62, 160, 20, 'Notifications', 14, C.gray900));
+  els.push(text('no_mark', 292, yC + 62, 88, 20, 'Mark all read', 11, C.primary, 'right'));
+  els.push(hline('no_hdiv', 50, yC + 96, 344, C.gray300));
+
+  const notifs = [
+    { icon: '✓', sc: [C.successBorder, C.successBg, C.success], title: 'Workflow completed',       sub: 'Run #1042 finished in 14 ms', time: '2m ago',    unread: true  },
+    { icon: '⚠', sc: [C.warningBorder, C.warningBg, C.warning], title: 'Retry limit reached',      sub: 'Send Email failed 3 times',   time: '1h ago',    unread: true  },
+    { icon: 'ℹ', sc: [C.infoBorder,   C.infoBg,    C.primary], title: 'New form submission',      sub: 'Contact Form — Jane Smith',   time: '3h ago',    unread: false },
+    { icon: '✓', sc: [C.successBorder, C.successBg, C.success], title: 'Schema migration applied', sub: 'User Profile updated',        time: 'Yesterday', unread: false },
+  ];
+  notifs.forEach(({ icon, sc: [stroke, bg, tc], title, sub, time, unread }, i) => {
+    const y = yC + 96 + i * 54;
+    if (unread) els.push(rect(`no_unrd_${i}`, 50, y, 344, 54, 'transparent', C.infoBg, 0, false));
+    els.push(ellipse(`no_ic_${i}`, 64, y + 14, 26, 26, stroke, bg, 1));
+    els.push(text(`no_ic_t_${i}`, 64, y + 21, 26, 14, icon, 11, tc, 'center'));
+    els.push(text(`no_ti_${i}`, 100, y + 10, 196, 16, title, 12, C.gray900));
+    els.push(text(`no_su_${i}`, 100, y + 28, 196, 14, sub, 10, C.gray500));
+    els.push(text(`no_tm_${i}`, 308, y + 10, 72, 16, time, 10, C.gray500, 'right'));
+    if (unread) els.push(ellipse(`no_dot_${i}`, 372, y + 20, 8, 8, C.primary, C.primary, 1));
+    if (i < notifs.length - 1) els.push(hline(`no_div_${i}`, 58, y + 54, 328, C.gray300));
+  });
+  els.push(text('no_all', 50, yC + 312, 344, 18, 'View all notifications →', 12, C.primary, 'center'));
+
+  // ── Activity Feed (x=446) ──
+  els.push(text('af_lbl', 446, y0 + 46, 120, 14, 'Activity Feed', 11, C.gray500));
+  els.push(rect('af_panel', 446, yC, 408, 354, C.gray300, C.white, 1, false));
+  els.push(rect('af_hdr', 446, yC, 408, 48, 'transparent', C.gray50, 0, false));
+  els.push(text('af_title', 462, yC + 14, 200, 20, 'Recent Activity', 14, C.gray900));
+  els.push(hline('af_hdiv', 446, yC + 48, 408, C.gray300));
+
+  const acts = [
+    { av: 'AB', name: 'Alex Brown', action: 'ran workflow',    target: 'Order Processing', time: '2 min ago',  type: 'success' },
+    { av: 'JS', name: 'Jane Smith',  action: 'created form',   target: 'Contact Form v2',  time: '1 hr ago',   type: 'info'    },
+    { av: 'MJ', name: 'Mark J.',     action: 'updated schema', target: 'User Profile',     time: '2 hr ago',   type: 'info'    },
+    { av: 'SL', name: 'Sarah Lee',   action: 'deleted item',   target: 'Test Workflow',    time: 'Yesterday',  type: 'danger'  },
+    { av: 'AB', name: 'Alex Brown',  action: 'published page', target: 'Dashboard v1',     time: '2 days ago', type: 'success' },
+  ];
+  const atc = { success: C.success, info: C.primary, danger: C.danger };
+  acts.forEach(({ av, name, action, target, time, type }, i) => {
+    const y = yC + 56 + i * 56;
+    if (i < acts.length - 1) els.push(vline(`af_vl_${i}`, 469, y + 34, 22, C.gray300));
+    els.push(ellipse(`af_av_${i}`, 456, y + 4, 30, 30, C.infoBorder, C.infoBg, 1));
+    els.push(text(`af_av_t_${i}`, 456, y + 12, 30, 14, av, 10, C.primary, 'center'));
+    els.push(text(`af_nm_${i}`, 496, y + 4, 120, 16, name, 12, C.gray900));
+    els.push(text(`af_ac_${i}`, 496, y + 22, 130, 14, `${action}:`, 10, C.gray500));
+    els.push(text(`af_tg_${i}`, 496 + action.length * 6 + 6, y + 22, 180, 14, target, 10, atc[type]));
+    els.push(text(`af_tm_${i}`, 732, y + 4, 100, 16, time, 10, C.gray500, 'right'));
+  });
+
+  return els;
+}
+
+function buildPermissionMatrix(y0) {
+  const els = [...sectionHeader(24, 'Permission Matrix', y0)];
+  const yC = y0 + 48;
+
+  const roles = ['Admin', 'Editor', 'Viewer', 'Guest'];
+  const lw = 190, rw = 120, hH = 48, rH = 38;
+  const tW = lw + roles.length * rw;
+
+  // Header
+  els.push(rect('pm_hdr', 50, yC, tW, hH, C.gray300, C.gray100, 1, false));
+  roles.forEach((role, ri) => {
+    const x = 50 + lw + ri * rw;
+    els.push(vline(`pm_hvl_${ri}`, x, yC, hH, C.gray300));
+    els.push(text(`pm_rl_${ri}`, x, yC + hH / 2 - 9, rw, 18, role, 13, C.gray900, 'center'));
+  });
+  els.push(hline('pm_hdiv', 50, yC + hH, tW, C.gray300, 2));
+
+  const groups = [
+    { label: 'Data Models', rows: [
+      { name: 'View records',   checks: [true, true,  true,  false] },
+      { name: 'Create records', checks: [true, true,  false, false] },
+      { name: 'Delete records', checks: [true, false, false, false] },
+    ]},
+    { label: 'Workflows', rows: [
+      { name: 'View workflows', checks: [true, true,  true,  false] },
+      { name: 'Run workflows',  checks: [true, true,  false, false] },
+      { name: 'Edit workflows', checks: [true, false, false, false] },
+    ]},
+    { label: 'Settings', rows: [
+      { name: 'View settings',  checks: [true, false, false, false] },
+      { name: 'Edit settings',  checks: [true, false, false, false] },
+    ]},
+  ];
+
+  let gy = yC + hH;
+  groups.forEach(({ label, rows }, gi) => {
+    // Group header
+    els.push(rect(`pm_gh_${gi}`, 50, gy, tW, 34, C.gray300, C.gray50, 1, false));
+    els.push(text(`pm_ghl_${gi}`, 62, gy + 10, lw - 12, 16, label, 12, C.gray700));
+    roles.forEach((_, ri) => els.push(vline(`pm_gvl_${gi}_${ri}`, 50 + lw + ri * rw, gy, 34, C.gray300)));
+    els.push(hline(`pm_gh_div_${gi}`, 50, gy + 34, tW, C.gray300));
+    gy += 34;
+
+    rows.forEach(({ name, checks }, pi) => {
+      els.push(rect(`pm_row_${gi}_${pi}`, 50, gy, tW, rH, 'transparent', pi % 2 === 0 ? C.white : C.gray50, 0, false));
+      els.push(text(`pm_pn_${gi}_${pi}`, 62, gy + 11, lw - 12, 16, name, 12, C.gray700));
+      roles.forEach((_, ri) => {
+        els.push(vline(`pm_pvl_${gi}_${pi}_${ri}`, 50 + lw + ri * rw, gy, rH, C.gray300));
+        const bx = 50 + lw + ri * rw + rw / 2 - 9, by = gy + rH / 2 - 9;
+        els.push(rect(`pm_chk_${gi}_${pi}_${ri}`, bx, by, 18, 18, checks[ri] ? C.primary : C.gray300, checks[ri] ? C.primary : C.white, 1, false));
+        if (checks[ri]) els.push(text(`pm_chkt_${gi}_${pi}_${ri}`, bx, by + 1, 18, 16, '✓', 11, C.white, 'center'));
+      });
+      els.push(hline(`pm_pdiv_${gi}_${pi}`, 50, gy + rH, tW, C.gray300));
+      gy += rH;
+    });
+    gy += 4;
+  });
+
+  // Save button
+  els.push(rect('pm_save', 50 + tW - 130, gy + 10, 130, 36, C.accentDark, C.accent, 2, true));
+  els.push(text('pm_save_t', 50 + tW - 130, gy + 18, 130, 18, 'Save Permissions', 12, C.white, 'center'));
+
+  return els;
+}
+
 function buildDropdownContextMenu(y0) {
   const els = [...sectionHeader(13, 'Dropdown & Context Menu', y0)];
   const yC = y0 + 48;
@@ -873,6 +1273,12 @@ for (const builder of [
   buildBuilderLayout,
   buildExecutionTimeline,
   buildUtilities,
+  buildDateTimePicker,
+  buildEditableTable,
+  buildCommandPalette,
+  buildFileUpload,
+  buildNotifications,
+  buildPermissionMatrix,
 ]) {
   const els = builder(currentY);
   allElements.push(...els);
