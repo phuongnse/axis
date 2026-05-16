@@ -2,7 +2,7 @@
  * Axis UI Component Kit — _template.excalidraw
  * Run: node docs/wireframes/generate-template.mjs
  *
- * TOC — 33 sections
+ * TOC — 34 sections
  * ─── Foundations ─────────────────── S01 Color Palette
  *                                     S02 Typography
  *                                     S03 Buttons
@@ -23,19 +23,20 @@
  *                                     S18 App Shell
  * ─── Feedback & Overlays ─────────── S19 Feedback & Overlays
  *                                     S20 Modal / Dialog
- *                                     S21 Command Palette
- *                                     S22 Notifications & Activity Feed
- *                                     S23 Tooltip & Popover
- * ─── Interaction Patterns ────────── S24 Dropdown & Context Menu
- *                                     S25 Drag & Drop / Sortable
- *                                     S26 Utilities
- *                                     S27 Permission Matrix
- *                                     S28 Color & Icon Picker
- * ─── Axis App Patterns ───────────── S29 Workflow Canvas
- *                                     S30 Builder Layout
- *                                     S31 Execution Timeline
- *                                     S32 Field Type Picker
- *                                     S33 Relation / Lookup Field
+ *                                     S21 Side Sheet / Drawer
+ *                                     S22 Command Palette
+ *                                     S23 Notifications & Activity Feed
+ *                                     S24 Tooltip & Popover
+ * ─── Interaction Patterns ────────── S25 Dropdown & Context Menu
+ *                                     S26 Drag & Drop / Sortable
+ *                                     S27 Utilities
+ *                                     S28 Permission Matrix
+ *                                     S29 Color & Icon Picker
+ * ─── Axis App Patterns ───────────── S30 Workflow Canvas
+ *                                     S31 Builder Layout
+ *                                     S32 Execution Timeline
+ *                                     S33 Field Type Picker
+ *                                     S34 Relation / Lookup Field
  */
 
 import { writeFileSync } from 'fs';
@@ -740,7 +741,7 @@ function buildEditableTable(y0) {
 }
 
 function buildCommandPalette(y0) {
-  const els = [...sectionHeader(21, 'Command Palette', y0)];
+  const els = [...sectionHeader(22, 'Command Palette', y0)];
   const yC = y0 + 68;
 
   els.push(text('cp_hint', 50, y0 + 46, 220, 14, 'Global Command Palette  ⌘K to open', 11, C.gray500));
@@ -849,7 +850,7 @@ function buildFileUpload(y0) {
 }
 
 function buildNotifications(y0) {
-  const els = [...sectionHeader(22, 'Notifications & Activity Feed', y0)];
+  const els = [...sectionHeader(23, 'Notifications & Activity Feed', y0)];
   const yC = y0 + 68;
 
   // ── Notification panel (x=50) ──
@@ -916,7 +917,7 @@ function buildNotifications(y0) {
 }
 
 function buildPermissionMatrix(y0) {
-  const els = [...sectionHeader(27, 'Permission Matrix', y0)];
+  const els = [...sectionHeader(28, 'Permission Matrix', y0)];
   const yC = y0 + 48;
 
   const roles = ['Admin', 'Editor', 'Viewer', 'Guest'];
@@ -981,7 +982,7 @@ function buildPermissionMatrix(y0) {
 }
 
 function buildDropdownContextMenu(y0) {
-  const els = [...sectionHeader(24, 'Dropdown & Context Menu', y0)];
+  const els = [...sectionHeader(25, 'Dropdown & Context Menu', y0)];
   const yC = y0 + 68;
 
   // ── Dropdown open state (x=50) ──
@@ -1022,7 +1023,7 @@ function buildDropdownContextMenu(y0) {
 }
 
 function buildDragDrop(y0) {
-  const els = [...sectionHeader(25, 'Drag & Drop / Sortable', y0)];
+  const els = [...sectionHeader(26, 'Drag & Drop / Sortable', y0)];
   const yC = y0 + 68;
 
   // ── Sortable list (x=50) ──
@@ -1068,7 +1069,7 @@ function buildDragDrop(y0) {
 }
 
 function buildWorkflowCanvas(y0) {
-  const els = [...sectionHeader(29, 'Workflow Canvas', y0)];
+  const els = [...sectionHeader(30, 'Workflow Canvas', y0)];
   const yC = y0 + 48;
 
   // Canvas bg
@@ -1112,7 +1113,7 @@ function buildWorkflowCanvas(y0) {
 }
 
 function buildBuilderLayout(y0) {
-  const els = [...sectionHeader(30, 'Builder Layout', y0)];
+  const els = [...sectionHeader(31, 'Builder Layout', y0)];
   const yC = y0 + 48;
   const H = 300;
 
@@ -1167,7 +1168,7 @@ function buildBuilderLayout(y0) {
 }
 
 function buildExecutionTimeline(y0) {
-  const els = [...sectionHeader(31, 'Execution Timeline', y0)];
+  const els = [...sectionHeader(32, 'Execution Timeline', y0)];
   const yC = y0 + 48;
 
   // Panel
@@ -1207,7 +1208,7 @@ function buildExecutionTimeline(y0) {
 }
 
 function buildUtilities(y0) {
-  const els = [...sectionHeader(26, 'Utilities', y0)];
+  const els = [...sectionHeader(27, 'Utilities', y0)];
   const yC = y0 + 68;
 
   // ── Tooltip (x=50) ──
@@ -1240,7 +1241,7 @@ function buildUtilities(y0) {
   });
 
   // ── Stepper (x=50, row 2) ──
-  const yS = yC + 186;
+  const yS = yC + 220;
   els.push(text('stp_lbl', 50, yS - 18, 80, 14, 'Stepper', 11, C.gray500));
   const stepItems = ['Details', 'Fields', 'Relations', 'Publish'];
   stepItems.forEach((label, i) => {
@@ -1380,6 +1381,55 @@ function buildCodeEditor(y0) {
   return els;
 }
 
+function buildSideSheet(y0) {
+  const els = [...sectionHeader(21, 'Side Sheet / Drawer', y0)];
+  const yC = y0 + 48;
+
+  // ── Dimmed app context (left) ──
+  els.push(rect('ss_app', 50, yC, 310, 360, C.gray300, C.gray100, 1, false));
+  [[62,14,200,12],[62,44,260,8],[62,62,220,8],[62,80,240,8],[62,108,260,8],[62,126,200,8]].forEach(([x,dy,w,h], i) =>
+    els.push(rect(`ss_bg_${i}`, x, yC + dy, w, h, 'transparent', C.gray300, 0, true)));
+
+  // ── Sheet panel ──
+  const sx = 360, sw = 300;
+  els.push(rect('ss_panel', sx, yC, sw, 360, C.gray300, C.white, 2, false));
+
+  // Header
+  els.push(rect('ss_hdr', sx, yC, sw, 50, C.gray300, C.gray50, 1, false, { roundness: null }));
+  els.push(text('ss_title', sx + 16, yC + 15, sw - 50, 20, 'Record Detail', 14, C.gray900));
+  els.push(text('ss_close', sx + sw - 26, yC + 13, 20, 24, '×', 18, C.gray500));
+  els.push(hline('ss_hdr_line', sx, yC + 50, sw, C.gray300));
+
+  // Body fields
+  const fields = [
+    ['Name',    'Acme Corporation'],
+    ['Status',  'Active'],
+    ['Owner',   'Jane Smith'],
+    ['Created', '2026-01-15'],
+  ];
+  fields.forEach(([label, value], i) => {
+    const y = yC + 60 + i * 58;
+    els.push(text(`ss_lbl_${i}`, sx + 16, y, 100, 13, label, 11, C.gray500));
+    els.push(rect(`ss_inp_${i}`, sx + 16, y + 16, sw - 32, 32, C.gray300, C.gray50, 1, true));
+    els.push(text(`ss_val_${i}`, sx + 26, y + 24, sw - 52, 16, value, 12, C.gray700));
+  });
+
+  // Sticky footer
+  const yFt = yC + 308;
+  els.push(hline('ss_foot_line', sx, yFt, sw, C.gray300));
+  els.push(rect('ss_save',     sx + 16,       yFt + 14, 110, 32, C.accentDark, C.accent,      2, true));
+  els.push(text('ss_save_t',   sx + 16,       yFt + 22, 110, 16, 'Save changes', 12, C.white,  'center'));
+  els.push(rect('ss_cancel',   sx + 134,      yFt + 14,  80, 32, C.gray300, 'transparent',    1, true));
+  els.push(text('ss_cancel_t', sx + 134,      yFt + 22,  80, 16, 'Cancel',       12, C.gray500, 'center'));
+  els.push(rect('ss_del',      sx + sw - 74,  yFt + 14,  58, 32, C.dangerDark, C.dangerBg,    1, true));
+  els.push(text('ss_del_t',    sx + sw - 74,  yFt + 22,  58, 16, 'Delete',       12, C.danger,  'center'));
+
+  // Resize handle on left edge
+  els.push(rect('ss_handle', sx - 5, yC + 155, 10, 50, C.gray300, C.gray300, 1, true));
+
+  return els;
+}
+
 function buildEmptyStates(y0) {
   const els = [...sectionHeader(13, 'Empty States', y0)];
   const yC = y0 + 48;
@@ -1416,7 +1466,7 @@ function buildSkeletonLoaders(y0) {
   els.push(text('sk_form_lbl', 630, y0 + 46, 80,  14, 'Form Panel', 11, C.gray500));
 
   // ── Table skeleton (header + 3 rows) ──
-  const colDefs = [32, 170, 94, 72, 48];
+  const colDefs = [24, 100, 62, 46, 20];
   for (let row = 0; row < 4; row++) {
     const y = yC + row * 42;
     const isHeader = row === 0;
@@ -1504,7 +1554,7 @@ function buildTabs(y0) {
 }
 
 function buildTooltipPopover(y0) {
-  const els = [...sectionHeader(23, 'Tooltip & Popover', y0)];
+  const els = [...sectionHeader(24, 'Tooltip & Popover', y0)];
   const yC = y0 + 68;
   els.push(text('ttp_tt_lbl',  50,  y0 + 46, 80,  14, 'Tooltip',           11, C.gray500));
   els.push(text('ttp_pop_lbl', 310, y0 + 46, 80,  14, 'Popover',           11, C.gray500));
@@ -1550,7 +1600,7 @@ function buildTooltipPopover(y0) {
 }
 
 function buildFieldTypePicker(y0) {
-  const els = [...sectionHeader(32, 'Field Type Picker', y0)];
+  const els = [...sectionHeader(33, 'Field Type Picker', y0)];
   const yC = y0 + 48;
 
   const types = [
@@ -1588,14 +1638,13 @@ function buildFieldTypePicker(y0) {
 }
 
 function buildRelationLookup(y0) {
-  const els = [...sectionHeader(33, 'Relation / Lookup Field', y0)];
+  const els = [...sectionHeader(34, 'Relation / Lookup Field', y0)];
   const yC = y0 + 68;
   els.push(text('rel_view_lbl', 50,  y0 + 46, 140, 14, 'Field (view mode)',   11, C.gray500));
   els.push(text('rel_pop_lbl',  370, y0 + 46, 120, 14, 'Lookup Popup',        11, C.gray500));
   els.push(text('rel_cell_lbl', 720, y0 + 46, 180, 14, 'Table Cell (multi)',  11, C.gray500));
 
   // ── Relation field in view mode ──
-  els.push(text('rel_field_lbl', 50, yC - 18, 120, 14, 'Account', 11, C.gray500));
   els.push(rect('rel_inp', 50, yC, 290, 40, C.gray300, C.white, 1, true));
   let cx = 58;
   ['Acme Corp', 'TechFlow Ltd'].forEach((rec, i) => {
@@ -1644,7 +1693,7 @@ function buildRelationLookup(y0) {
 }
 
 function buildColorIconPicker(y0) {
-  const els = [...sectionHeader(28, 'Color & Icon Picker', y0)];
+  const els = [...sectionHeader(29, 'Color & Icon Picker', y0)];
   const yC = y0 + 68;
   els.push(text('clr_lbl', 50,  y0 + 46, 120, 14, 'Color Picker', 11, C.gray500));
   els.push(text('icp_lbl', 360, y0 + 46, 120, 14, 'Icon Picker',  11, C.gray500));
@@ -1739,21 +1788,22 @@ for (const builder of [
   // ── Feedback & Overlays ───────────────────────────────────────────────────
   buildFeedback,               // S19
   buildModal,                  // S20
-  buildCommandPalette,         // S21
-  buildNotifications,          // S22
-  buildTooltipPopover,         // S23
+  buildSideSheet,              // S21
+  buildCommandPalette,         // S22
+  buildNotifications,          // S23
+  buildTooltipPopover,         // S24
   // ── Interaction Patterns ──────────────────────────────────────────────────
-  buildDropdownContextMenu,    // S24
-  buildDragDrop,               // S25
-  buildUtilities,              // S26
-  buildPermissionMatrix,       // S27
-  buildColorIconPicker,        // S28
+  buildDropdownContextMenu,    // S25
+  buildDragDrop,               // S26
+  buildUtilities,              // S27
+  buildPermissionMatrix,       // S28
+  buildColorIconPicker,        // S29
   // ── Axis App Patterns ─────────────────────────────────────────────────────
-  buildWorkflowCanvas,         // S29
-  buildBuilderLayout,          // S30
-  buildExecutionTimeline,      // S31
-  buildFieldTypePicker,        // S32
-  buildRelationLookup,         // S33
+  buildWorkflowCanvas,         // S30
+  buildBuilderLayout,          // S31
+  buildExecutionTimeline,      // S32
+  buildFieldTypePicker,        // S33
+  buildRelationLookup,         // S34
 ]) {
   const els = builder(currentY);
   allElements.push(...els);

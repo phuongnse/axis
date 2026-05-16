@@ -326,7 +326,7 @@ function buildXxx(y0) {
 - **Section numbers**: `sectionHeader(N, label, y0)` — N must match the section's position in the compose array. When inserting a new section in the middle of a group, **renumber all subsequent sections** so numbers stay contiguous and match the visual order.
 - **Compose array**: always keep entries in grouped order with `// ── Group name` block comments and `// SXX` inline comments. New sections go into the appropriate group.
 - **TOC**: update the section count and the TOC comment at the top of the file every time sections are added, removed, or renumbered. The TOC is the quick reference for anyone reading the file.
-- **Current structure (33 sections)**: Foundations S01-S03 · Input & Forms S04-S08 · Data Display S09-S14 · Navigation & Layout S15-S18 · Feedback & Overlays S19-S23 · Interaction Patterns S24-S28 · Axis App Patterns S29-S33.
+- **Current structure (34 sections)**: Foundations S01-S03 · Input & Forms S04-S08 · Data Display S09-S14 · Navigation & Layout S15-S18 · Feedback & Overlays S19-S24 · Interaction Patterns S25-S29 · Axis App Patterns S30-S34.
 
 ---
 
