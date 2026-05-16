@@ -1,5 +1,7 @@
 # Axis Platform — Documentation
 
+> **Navigation**: [← CLAUDE.md](../CLAUDE.md)
+
 > A low-code SaaS platform for building data-driven workflow applications.
 
 ---
@@ -12,8 +14,17 @@
 | [Tech Stack](./TECH_STACK.md) | Technology decisions and rationale |
 | [Architecture](./ARCHITECTURE.md) | System design, modules, data strategy |
 | [Epics](./epics/README.md) | All epics, features, and user stories |
-| [Process](./PROCESS.md) | Step-by-step implementation workflow — backend and frontend |
 | [Wireframes](./wireframes/) | Screen wireframes — Excalidraw source + SVG preview |
+
+### Playbooks (how-to guides)
+
+| Playbook | Description |
+|---|---|
+| [Process](./playbooks/process.md) | Step-by-step implementation workflow — backend and frontend |
+| [Patterns](./playbooks/patterns.md) | Technical patterns, pitfalls, and code examples |
+| [Testing](./playbooks/testing.md) | Test isolation, naming, file layout, mocking rules — .NET and frontend |
+| [Frontend](./playbooks/frontend.md) | TanStack Query patterns, TypeScript discipline, routing, component design |
+| [Wireframe kit](./playbooks/wireframes.md) | Component kit template rules — section builder anatomy, ID prefixes, offsets |
 
 ---
 

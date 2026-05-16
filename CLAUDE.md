@@ -40,6 +40,66 @@ Multi-tenancy: schema-per-tenant in PostgreSQL (`tenant_{org_slug}`). Tenant res
 - Modules communicate **only via asynchronous domain events** (Wolverine) or explicit Application-layer interfaces. No shared DB transactions across module boundaries.
 - Cross-module consistency via Eventual Consistency.
 - **Domain**: zero external dependencies (pure C#). **Application**: depends on Domain only. **Infrastructure**: implements Application/Domain interfaces.
+- **Hard stops — never do any of the following:**
+  - Reference another module's `Infrastructure` project from any layer
+  - Query another module's database tables directly (no cross-module `DbSet<T>` access)
+  - Share a `DbContext` instance across module boundaries
+  - Use `IMediator` to dispatch a domain event (use Wolverine outbox only)
+
+---
+
+## Machine Rules — Quick Reference
+
+Scan this before acting. Full explanations are in the sections below.
+
+**P0 — Hard stops (violating any of these is always wrong):**
+- Tech stack is immutable — no substitutions, additions, or removals without explicit user approval
+- Never weaken tests, skip assertions, add `.Skip()`, or mock around the behavior under test
+- Spec → code only — never retroactively update docs or feature files to justify what the code does
+- Never bypass auth, silently skip an AC, or mark ✅ to avoid a difficult conversation
+- Domain layer: zero external dependencies (pure C#)
+- Modules communicate only via Wolverine events or Application-layer interfaces — no shared DB transactions
+
+**P1 — Architectural (require user confirmation before deviating):**
+- Layer order: Domain → Application → Infrastructure → API → Frontend — no skipping
+- Result pattern for all business rule violations; exceptions only for infrastructure failures
+- CQRS: MediatR for commands/queries only; Wolverine outbox for all domain events
+- All Minimal API endpoints must call `.RequireAuthorization()` unless explicitly public
+
+**P2 — Quality gates (verify before every commit):**
+- Zero test failures and zero build warnings
+- Docs updated in the same PR as code changes
+- No TODO/FIXME, placeholder code, or commented-out code introduced
+
+**When blocked:** state exact blocker → list relevant constraints → propose 2–3 options with tradeoffs → wait for user decision. Never self-unblock on a P0 path.
+
+---
+
+## Source of Truth Priority
+
+When sources conflict, resolve in this order — higher wins:
+
+1. **Feature file ACs** — the contract for what to build; never override with code reality
+2. **CLAUDE.md** — architectural and process rules; always current
+3. **Playbooks** (`docs/playbooks/`) — implementation patterns and how-to detail
+4. **Existing implementation** — reference for local conventions, not authority on correctness
+5. **Agent preference** — last resort; never invent when a source above answers the question
+
+Existing code is not authoritative if it conflicts with any doc above. Document the conflict and surface it to the user rather than silently following the code.
+
+---
+
+## Required task response structure
+
+For any task that spans multiple files, requires an architectural decision, or implements a new feature layer — begin your response with this structure before writing any code:
+
+1. **Affected module(s)** — which module(s) and layer(s) this touches
+2. **Docs to read** — which feature file, playbook, or pattern is authoritative
+3. **Key decisions** — the 2–3 architectural choices that will shape the implementation
+4. **Plan** — ordered implementation steps
+5. **Risks / ambiguities** — anything that could block progress or needs user confirmation first
+
+Skip this structure for single-file edits, simple bug fixes, and doc-only changes.
 
 ---
 
@@ -64,11 +124,24 @@ Before starting any task, read only what is relevant — not everything.
 
 **Step 4 — Check implementation status** in [`docs/PROGRESS.md`](docs/PROGRESS.md)
 
-**Step 5 — Read [`docs/PROCESS.md`](docs/PROCESS.md)** when starting a new module or implementing a new US — it has the step-by-step checklist (layer order, TDD gates, doc update triggers) for both backend and frontend.
+**Step 5 — Read [`docs/playbooks/process.md`](docs/playbooks/process.md)** when starting a new module or implementing a new US — it has the step-by-step checklist (layer order, TDD gates, doc update triggers) for both backend and frontend.
 
-**Step 7 — Read [`docs/PATTERNS.md`](docs/PATTERNS.md)** when the task involves any of: NuGet packages, EF Core mapping or JSONB, Minimal API wiring, writing tests, list/query endpoints, async patterns, response DTOs, repository methods, domain aggregate methods, multi-tenant raw SQL, Wolverine handlers or jobs, new step/field types, cross-cutting concerns, or any design decision about where logic lives.
+**Step 6 — Read [`docs/playbooks/patterns.md`](docs/playbooks/patterns.md)** when the task involves any of: NuGet packages, EF Core mapping or JSONB, Minimal API wiring, writing tests, list/query endpoints, async patterns, response DTOs, repository methods, domain aggregate methods, multi-tenant raw SQL, Wolverine handlers or jobs, new step/field types, cross-cutting concerns, or any design decision about where logic lives.
 
-**Step 8 — Read [`docs/TECH_STACK.md`](docs/TECH_STACK.md)** when making any architectural decision, adding a library, or referencing an ADR.
+**Step 7 — Read [`docs/TECH_STACK.md`](docs/TECH_STACK.md)** when making any architectural decision, adding a library, or referencing an ADR.
+
+### Reading priority
+
+When multiple sources are available, prefer in this order:
+1. Current feature file — authoritative for what to build
+2. Existing implementation in the **same module** — for patterns already established there
+3. `docs/playbooks/patterns.md` — canonical patterns and pitfalls
+4. Shared abstractions in `Axis.Shared.*` — reuse before creating
+5. Other modules — reference only; never copy-paste cross-module logic
+
+Do not read files preemptively. Read the minimum required to complete the task safely. If existing code in the codebase conflicts with CLAUDE.md or a feature spec, treat the docs as source of truth — do not imitate inconsistent legacy patterns.
+
+Avoid re-reading a file you have already processed in the same task — reference your prior findings instead. Re-read only when an inconsistency or ambiguity requires clarification. When you have enough information to act safely, act.
 
 ---
 
@@ -95,24 +168,36 @@ Every time code changes, the relevant docs change too — in the **same PR, not 
 | What you did | What you must update |
 |---|---|
 | Added, removed, or changed a library | `docs/TECH_STACK.md` — version table + ADR if applicable |
-| Established a new implementation pattern | `docs/PATTERNS.md` — add the pattern with an example |
+| Established a new implementation pattern | `docs/playbooks/patterns.md` — add the pattern with an example |
 | Completed a US layer | Feature file `> **Implementation status**` callout |
 | Completed a full layer for a module | Epic README status table + `docs/PROGRESS.md` |
 | Changed architecture, added a cross-cutting rule | `CLAUDE.md` — the relevant section |
-| Changed the implementation workflow or layer order | `docs/PROCESS.md` — update the affected checklist |
+| Changed the implementation workflow or layer order | `docs/playbooks/process.md` — update the affected checklist |
 
 "I'll update docs later" = the docs are already out of date. Later never comes.
+
+### Docs navigation structure
+
+Every doc file must support bidirectional navigation — a reader arriving from any link must be able to navigate back without using the browser's back button:
+
+- **`docs/README.md`** — links to CLAUDE.md (already present). It is the navigation hub for everything under `docs/`.
+- **`docs/playbooks/*.md`** — every playbook must have a `> **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)` line directly after the `# Title`.
+- **`docs/epics/{module}/README.md`** — must link back to `docs/epics/README.md`.
+- **`docs/epics/{module}/features/*.md`** — must link back to the module's epic README.
+- **Any new `docs/` subfolder** — its files must link back to `docs/README.md` at minimum.
+
+When creating any new doc file, add the appropriate back-link as the first thing after the `# Title`.
 
 ---
 
 ## Development Rules
 
 ### Process & Workflow
-- **Step-by-step workflow**: follow [`docs/PROCESS.md`](docs/PROCESS.md) at the start of every new US or module. Rules in this file govern HOW; PROCESS.md governs WHAT order.
-- **Language**: discuss in Vietnamese, write all code and docs in English.
+- **Step-by-step workflow**: follow [`docs/playbooks/process.md`](docs/playbooks/process.md) at the start of every new US or module. Rules in this file govern HOW; PROCESS.md governs WHAT order.
+- **Language**: all code, docs, commit messages, PR descriptions, and comments must be in English.
 - **Git**: never push to `main` — always branch (`{type}/{short-description}` kebab-case, `type` ∈ `feat|fix|docs|refactor|test|chore`) and open a PR. When Claude Code auto-creates a worktree with a random branch name, rename before pushing.
 - **Conventional Commits**: `feat: add workflow step handler` — subject ≤ 72 chars, imperative mood, no period.
-- **Docs-first for new features**: before implementing any user story or new feature, read the relevant feature file. The doc defines the contract; code implements it. Never write code first and update docs after. For bug fixes, a doc update is only required if the fix reveals a spec deviation.
+- **Docs-first for new features**: before implementing any user story or new feature, read the relevant feature file. The doc defines the contract; code implements it. Never write code first and update docs after. For bug fixes, a doc update is only required if the fix reveals a spec deviation. Exception: production hotfixes under active incident — fix first, document the deviation immediately after.
 - **Every command/query maps to a US**: never invent requirements. New requirement discovered → add to docs first, then implement.
 - **AC compliance is mandatory**: implement ALL acceptance criteria. Never skip an AC without documenting it as a gap in the `> **Implementation status**` callout.
 - **Surface architectural decisions first**: list the 2–3 key design choices and confirm with the user before starting any new layer, module, or API surface.
@@ -120,39 +205,34 @@ Every time code changes, the relevant docs change too — in the **same PR, not 
 - **CLAUDE.md maintenance**: update whenever architecture decisions change, new patterns are established, or layer-order rules are clarified.
 
 ### Testing (shared)
+
 - **TDD is mandatory**: write tests first, must pass before moving to next step, no exceptions. Applies to both .NET and frontend.
-- **Comments — WHY only in tests too**: same rule applies — no `// Arrange / Act / Assert` headers, no WHAT comments.
 - **Pre-commit verification is scope-based** — run only what the change touches, but run all of it:
-  - Changes only in `src/` or `tests/` → run `dotnet test unit-tests.slnf`. Build must succeed with zero errors and zero warnings.
-  - Changes only in `frontend/` → run `npm run ci` (tsc + Biome) AND `npm run test`. Both must pass with zero errors and zero warnings.
-  - Changes in both → run both of the above. Neither gate may be skipped.
 
-#### Testing — .NET only
-- **Test naming**: `{Subject}_{Condition}_{ExpectedOutcome}` — e.g. `CreateWorkflow_WhenNameIsDuplicate_ReturnsConflictError`.
-- **Test isolation**: each integration test class implements `IAsyncLifetime` (container per class). Each test method calls `ResetAsync()` at its start to truncate relevant tables. See PATTERNS.md for the full pattern.
-- **No InMemoryDatabase**: `UseInMemoryDatabase` is strictly forbidden for all new tests. All database tests use Testcontainers (PostgreSQL/Redis).
-- **Unit tests before every commit**: run `dotnet test unit-tests.slnf`. When adding a new unit test project, add it to this file too. Note: The agent is only required to verify that unit tests pass. Integration tests and other tests requiring third-party dependencies can be skipped unless explicitly instructed otherwise.
-- **Integration test maintenance**: any change affecting API response shape, status codes, or request contract must include updating all relevant files under `tests/Api/Axis.Api.Tests/` in the same PR. "Cannot run locally" is not an excuse.
+| What changed | Command(s) required | Must pass |
+|---|---|---|
+| `src/` or `tests/` only | `dotnet test unit-tests.slnf` | Zero errors, zero warnings |
+| `frontend/` only | `npm run ci` then `npm run test` | Zero errors, zero warnings |
+| Both | All of the above | Both gates, no skipping |
 
-#### Testing — Frontend only
-- **Test runner**: Vitest + `@testing-library/react`. Run with `npm run test` (or `npx vitest`) inside `frontend/`.
-- **Test structure**: `describe('ComponentOrHookName', () => { it('should ...', ...) })`. Use `describe` to group by subject, `it` sentences describe the expected behavior.
-- **Test location**: test files live in `frontend/tests/` for integration-style tests and alongside source files (`*.test.ts(x)`) for unit tests.
-- **Test file naming**: use `kebab-case.test.ts(x)` mirroring the source file name (e.g. `api.test.ts`, `button.test.tsx`, `vite-config.test.ts`). Never use camelCase or PascalCase for test files. Avoid names that match vitest's built-in exclude glob (`**/vite.config.*`, `**/vitest.config.*`, etc.) — use hyphens instead of dots to bypass (e.g. `vite-config.test.ts`, not `vite.config.test.ts`).
-- **Before every push**: run `npm run ci` (type check + Biome) AND `npm run test`. Both must pass.
-- **Test behavior, not implementation**: assert what users see and can interact with — not internal state, not component structure. If a refactor breaks a test without changing visible behavior, the test was wrong.
-- **Use `@testing-library/user-event` for interactions** — not `fireEvent`. `userEvent` simulates real browser event sequences (focus, input, click) more accurately.
-- **Never mock child components** unless the child has external dependencies that make the test impractical. Testing with real children catches integration bugs; mocking them hides them.
+**Key .NET rules:** naming `{Subject}_{Condition}_{ExpectedOutcome}`; no `UseInMemoryDatabase`; Testcontainers for all DB tests; run unit tests before every commit; update `tests/Api/Axis.Api.Tests/` when API contracts change.
+
+**Key frontend rules:** Vitest + `@testing-library/react`; test behaviour not implementation; `userEvent` not `fireEvent`; never mock child components unless they have external dependencies.
+
+See [`docs/playbooks/testing.md`](docs/playbooks/testing.md) for full patterns — test isolation, `IAsyncLifetime`, file naming, mocking rules, integration test maintenance.
 
 ### Code Style (shared)
 - **Comments — WHY only**: default to no comments. Add one only when the WHY is non-obvious — a hidden constraint, a framework quirk, or surprising business logic. No WHAT comments.
-- **Scope discipline**: only modify code directly related to the current task. Never restructure code outside task scope unless explicitly requested.
-- **Read in full before asserting**: Grep to locate, then Read without a `limit` to assert content. Partial reads lead to wrong conclusions. Grep-first and read-in-full are complementary, not conflicting.
+- **Scope discipline**: only modify code directly related to the current task. Do not perform opportunistic refactors, cleanups, or "while I'm here" improvements unless explicitly requested. If you notice something worth fixing outside the current scope, flag it to the user — do not silently fix it in the same PR.
+- **Simplest implementation first**: prefer concrete implementations first. Introduce abstractions only when variation, reuse, or lifecycle complexity is proven in the code — not anticipated. Speculative abstractions add maintenance cost without current benefit.
+- **No generic abstractions without 2 existing use cases**: do not introduce `BaseRepository`, `GenericService`, `AbstractHandlerFactory`, or similar generalised scaffolding unless at least 2 concrete implementations already exist in the codebase that would benefit from it. One use case is a concrete implementation, not an abstraction.
+- **Match existing local conventions**: within a module or file, prefer consistency with the patterns already present unless they directly conflict with CLAUDE.md or an official playbook. Docs override legacy code for correctness; local style overrides AI preference for consistency.
+- **Read enough to reason safely**: Grep to locate, then read the minimum complete scope needed to reason about the code — a full function, a full class, or a relevant section. Expand to adjacent sections only if ambiguity remains. Blind truncation mid-logic leads to wrong conclusions; reading the entire repo when a section suffices wastes context.
 - **No hardcoded secrets**: use environment-specific config files (gitignored) or environment variables. Never commit credentials or API keys.
 
 #### Code Style — .NET only
 - **Rules apply everywhere in .NET**: all rules below apply to both `src/` and `tests/` unless noted.
-- **No `var`**: always write the explicit type, even when the assignment makes it obvious.
+- **No `var`**: always write the explicit type. For constructor calls, use target-typed new to avoid repeating the type name: `WorkflowDefinition workflow = new(id, name)` not `var workflow = new WorkflowDefinition(id, name)`.
 - **No inline fully-qualified type names**: always use `using` directives. Never write `System.Text.Encoding.UTF8`, `System.Security.Cryptography.SHA256`, `Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions`, etc. inline. Run the detection grep in PATTERNS.md § "Code hygiene checklist" before every commit.
 - **One type per file**: every class, record, interface, or enum lives in its own file named after the type. Never group multiple types in one file, including test helpers. This applies equally to `src/` and `tests/`. Allowed exceptions:
   - Generic overloads of the same concept may share a file (e.g. `Result` + `Result<T>` in `Result.cs`, `ICommand` + `ICommand<T>` in `ICommand.cs`).
@@ -194,6 +274,7 @@ Every time code changes, the relevant docs change too — in the **same PR, not 
 - **Unit of Work**: `SaveChangesAsync` called only via `IUnitOfWork` in the handler, never inside a repository. Repositories only add/query `DbSet<T>`.
 - **No `IQueryable` from repositories**: repository methods return materialized types (`T?`, `List<T>`, `PagedResult<T>`).
 - **No N+1**: lazy loading disabled globally. Always explicit `Include`/`ThenInclude`. List queries project to DTOs via `.Select()`. See PATTERNS.md.
+- **Projection-first for lists**: never materialise entities before projecting for list endpoints — call `.Select(...)` before `.ToListAsync()`, not after. Avoid `Include` chains on list queries; project directly to DTOs instead. Loading full aggregates to map them in memory is forbidden on list paths.
 - **NuGet**: check `Directory.Packages.props` before adding any library. Never `dotnet add package` — it corrupts CPM. See PATTERNS.md for the correct procedure.
 
 ### Multi-tenancy & Migrations (.NET only)
@@ -201,6 +282,7 @@ Every time code changes, the relevant docs change too — in the **same PR, not 
 - **No direct `public` schema access** from tenant-aware services.
 - **Raw SQL in tenant-aware contexts** must prefix the table with `ITenantContext.Schema` and apply the soft-delete filter manually. Prefer LINQ so global filters apply automatically. See PATTERNS.md.
 - **Migration workflow**: `dotnet ef migrations add {PascalCaseName} --project src/Modules/{Module}/{Module}.Infrastructure --startup-project src/Axis.Api`. Applied automatically at startup via `MigrateAsync()`. Never apply manually in production. All migrations must be idempotent and tested against multiple schemas via Testcontainers before marking ✅.
+- **Migration complexity escalation**: any migration that touches tenant schema resolution, cross-module contracts, Wolverine outbox or event persistence schema, or optimistic concurrency columns requires an explicit architectural review with the user before implementation. Do not proceed autonomously — the multi-tenant schema-per-tenant setup makes these changes high-blast-radius.
 
 ### Cross-cutting Concerns (.NET only)
 - **CancellationToken**: all `async` methods in Application and Infrastructure accept and forward `CancellationToken` to every EF Core, repository, and HttpClient call.
@@ -214,76 +296,28 @@ Every time code changes, the relevant docs change too — in the **same PR, not 
 - **Rate limiting**: required on auth endpoints (`/connect/token`, `/connect/authorize`, password reset) and any unauthenticated input endpoints.
 - **CORS**: named policy with explicit origin allowlist. Never `AllowAnyOrigin()` in production. Apply `app.UseCors()` before `app.UseAuthentication()`.
 - **Health checks**: `GET /health` (liveness) and `GET /health/ready` (readiness, includes PostgreSQL + Redis checks). Both anonymous, excluded from rate limiting.
+- **Execution-critical path discipline**: workflow execution paths must favour predictable allocation and query behaviour. Avoid reflection-heavy runtime dispatch (`Activator.CreateInstance`, dynamic type resolution), unbounded metadata queries, or per-step DB round-trips on hot paths unless explicitly benchmarked. Prefer pre-resolved handler registrations and compiled expression trees over runtime reflection.
 
 ### Frontend
 
-#### Feature folder anatomy
-Every feature lives under `frontend/src/features/{feature-name}/` with a fixed internal structure:
-```text
-features/{feature-name}/
-├── components/     # React components belonging to this feature
-├── hooks/          # custom hooks (useXxx.ts)
-├── api.ts          # all query/mutation functions for this feature
-├── types.ts        # shared types for this feature
-└── index.ts        # barrel export — public API of the feature
-```
-- Component files: `PascalCase.tsx`. Hook files: `camelCase.ts` with mandatory `use` prefix (`useWorkflows.ts`).
-- Never import directly from another feature's `components/` or `hooks/` — only through its `index.ts`.
-- Shared UI primitives (shadcn/ui, base-ui): `src/components/ui/`. Shared utilities: `src/lib/`.
+**Structure:** every feature in `frontend/src/features/{name}/{components/,hooks/,api.ts,types.ts,index.ts}`. Never import cross-feature except via `index.ts`. Shared UI: `src/components/ui/`. Utilities: `src/lib/`.
 
-#### State management
-- **TanStack Query owns all server state**. Zustand owns global client-only state (UI flags, user preferences). Never store server data in Zustand; never cache client UI state in TanStack Query.
-- **Forms**: `react-hook-form` + Zod. Define the Zod schema first (source of truth), infer TypeScript type via `z.infer<typeof schema>`.
-- **Three async states**: every data-fetching component handles loading (skeleton/spinner), empty (descriptive message), and error (message + retry). Silent empty render is a bug.
+**Non-negotiable rules:**
+- TanStack Query owns all server state; Zustand owns client-only state — never mix
+- Three async states required on every data-fetching component: loading (skeleton), empty (message), error (message + retry)
+- `react-hook-form` + Zod — Zod schema first, type inferred via `z.infer<typeof schema>`
+- TypeScript strict: no `any`, no ungrounded `as T`, entity IDs typed as `string`
+- All routes beyond root lazy-loaded; Error Boundaries on every top-level route
+- `queryFn`/`mutationFn` in `api.ts` only — never inline in components; components call custom hooks
+- Tailwind only — no inline `style` prop, no mixed Tailwind + custom CSS on the same element
+- No `dangerouslySetInnerHTML` without DOMPurify; no auth tokens in `localStorage`
+- If a component both fetches server data AND has complex conditional rendering, extract the fetch into a custom hook
 
-#### TanStack Query patterns
-- All `queryFn` and `mutationFn` definitions live in `features/{feature}/api.ts`. Never write them inline inside a component.
-- Components call custom hooks — never call `useQuery`/`useMutation` directly with a `queryFn` in a component file.
-- Each feature defines a **query key factory** to avoid magic strings:
-  ```ts
-  export const workflowKeys = {
-    all: ['workflows'] as const,
-    list: (filters: WorkflowFilters) => [...workflowKeys.all, 'list', filters] as const,
-    detail: (id: string) => [...workflowKeys.all, 'detail', id] as const,
-  }
-  ```
-- All TanStack Query mutations handle errors explicitly — surface via toast or inline message using the shared `ApiError` type.
-
-#### TypeScript discipline
-- **No `any`**: TypeScript strict mode on. Use `unknown` + type guards when shape is genuinely unknown. `any` is only acceptable at external/unknown data boundaries (raw API responses before parsing), and must be typed away immediately.
-- **No type assertions without justification**: `as T` requires an inline comment explaining why the compiler cannot infer it — not just `as unknown as T` to silence an error.
-- **Entity IDs are `string`**: backend uses Guid serialized as string. Never type an entity ID as `number`.
-- **API response types are not transformed in components**: if a different shape is needed, derive it in the hook or a selector — not inline in JSX.
-
-#### Routing
-- All routes beyond the root are **lazy-loaded** by default — use TanStack Router's `lazy()` for code splitting.
-- **Route protection**: auth guard logic lives in a root layout route (loader or `beforeLoad`), not inside individual page components.
-- Global 401 handling (redirect to login) is wired once in `api.ts` / a root query error handler — never duplicated per feature.
-- **Error Boundaries**: wrap every top-level route. Render a user-actionable fallback, never a blank screen.
-
-#### Component design
-- **Small and single-purpose**: extract hooks for non-trivial logic. If a component does data fetching AND complex rendering, split it.
-- **Composition over prop drilling**: use compound components or context for UI that shares state across more than two levels. Avoid prop chains longer than 2 hops.
-- No more than ~5 props before reconsidering the component's responsibility.
-
-#### Styling
-- **No inline `style` prop** — use Tailwind classes exclusively.
-- **`cn()` for conditional classes** — never string concatenation.
-- Do not mix Tailwind utility classes and custom CSS on the same element.
-
-#### Security
-- **No `dangerouslySetInnerHTML`** unless content is sanitized first (DOMPurify). Requires an explicit comment explaining the source.
-- **Environment variables**: public vars use `VITE_` prefix. Never expose secrets via `VITE_` — anything in `VITE_*` is bundled into the client.
-- **Do not store auth tokens in `localStorage`** — the backend uses `httpOnly` cookies via `credentials: 'include'` (already set in `fetchApi`).
-
-#### Accessibility baseline
-- Every form input must have a `<label>` or `aria-label`.
-- Every icon-only button must have `aria-label`.
-- Never use color as the sole indicator — error/warning states require text or icon alongside color.
+See [`docs/playbooks/frontend.md`](docs/playbooks/frontend.md) for full rules — TanStack Query patterns, TypeScript discipline, routing, component design, styling, security, accessibility.
 
 ### Frontend Development Process
 
-See [`docs/PROCESS.md`](docs/PROCESS.md) for the full step-by-step checklists — Phase 1 (Foundation, one-time) and Phase 2 (per-feature, repeatable).
+See [`docs/playbooks/process.md`](docs/playbooks/process.md) for the full step-by-step checklists — Phase 1 (Foundation, one-time) and Phase 2 (per-feature, repeatable).
 
 #### Wireframe convention
 
@@ -303,30 +337,7 @@ See [`docs/PROCESS.md`](docs/PROCESS.md) for the full step-by-step checklists �
 
 The template is the single source of truth for all reusable UI patterns. Source lives in `docs/wireframes/generate-template.mjs`. Run `node docs/wireframes/generate-template.mjs` to regenerate `_template.excalidraw`, then run `docs/scripts/generate-wireframes.ps1 -Filter _template` to regenerate `_template.svg`.
 
-**Anatomy of a section builder:**
-
-```js
-function buildXxx(y0) {
-  const els = [...sectionHeader(N, 'Section Label', y0)];
-  const yC = y0 + 48;  // content start — use +68 if section has sub-labels at y0+46
-
-  // sub-labels (only when section has distinct columns/sub-sections):
-  els.push(text('xxx_col1_lbl', 50,  y0 + 46, 120, 14, 'Col 1', 11, C.gray500));
-  els.push(text('xxx_col2_lbl', 400, y0 + 46, 120, 14, 'Col 2', 11, C.gray500));
-
-  // elements...
-  return els;
-}
-```
-
-**Rules for adding or modifying sections:**
-
-- **`yC` offset**: use `y0 + 48` for sections with no sub-labels. Use `y0 + 68` when the section has per-column sub-labels placed at `y0 + 46`. Never use `y0 + 48` when sub-labels are present — they will be hidden by the first content rect.
-- **Element ID prefixes**: every section must use a unique 3-6 character snake_case prefix for all IDs (e.g. `rte_`, `sk_`, `ttp_`, `rel_`). Never reuse a prefix from another section — Excalidraw silently deduplicates IDs, causing elements to vanish.
-- **Section numbers**: `sectionHeader(N, label, y0)` — N must match the section's position in the compose array. When inserting a new section in the middle of a group, **renumber all subsequent sections** so numbers stay contiguous and match the visual order.
-- **Compose array**: always keep entries in grouped order with `// ── Group name` block comments and `// SXX` inline comments. New sections go into the appropriate group.
-- **TOC**: update the section count and the TOC comment at the top of the file every time sections are added, removed, or renumbered. The TOC is the quick reference for anyone reading the file.
-- **Current structure (34 sections)**: Foundations S01-S03 · Input & Forms S04-S08 · Data Display S09-S14 · Navigation & Layout S15-S18 · Feedback & Overlays S19-S24 · Interaction Patterns S25-S29 · Axis App Patterns S30-S34.
+For section builder anatomy, `yC` offset rules, element ID prefix conventions, section numbering, compose array structure, and the current section inventory — see [`docs/playbooks/wireframes.md`](docs/playbooks/wireframes.md).
 
 ---
 
@@ -340,6 +351,8 @@ These rules exist to prevent a specific failure mode: an agent hitting a blocker
 - **Tech stack compliance before marking ✅**: verify every library used in that layer appears in the approved Tech Stack. Any deviation → mark ⚠️ and document the gap. Never mark ✅ to avoid a difficult conversation.
 - **Architectural decisions require user confirmation**: any decision affecting which library is used, the structure of a cross-cutting concern, or module communication patterns must be confirmed before implementation.
 - **"No exceptions, no asking" does not apply to blockers**: the Priority Order governs direction of work only. Technical blockers or architectural ambiguity → always stop and ask.
+- **Legacy code is not authoritative**: if existing code conflicts with CLAUDE.md, PATTERNS.md, or a feature spec, the docs win. Do not imitate inconsistent or outdated patterns found in the codebase. If the conflict affects correctness, document it and surface it to the user.
+- **Uncertainty protocol**: if you are not confident about a business rule, an architectural constraint, or an existing project pattern — stop and ask rather than guess. Never invent: API endpoint paths, domain event names, DTO field names, database table or column names, or workflow step semantics. Fabricated identifiers silently corrupt the codebase and are hard to detect in review.
 
 ---
 
@@ -355,6 +368,12 @@ When deciding what to work on next, always follow this order — no exceptions, 
 - An AC is ambiguous enough that two reasonable interpretations lead to different implementations
 - Completing a task requires an architectural decision not already documented
 - A test is failing and fixing it would require deviating from a rule in this file
+
+**Blocked? Follow this protocol — never self-unblock on a P0 path:**
+1. State the exact blocker and what you cannot proceed without
+2. List the relevant constraints from CLAUDE.md or the feature spec
+3. Propose 2–3 valid options (if any exist) with concrete tradeoffs
+4. Wait for the user to decide
 
 ---
 
@@ -412,9 +431,22 @@ A US or layer is NOT done until all of the following are complete in the **same 
 - A library is approved for use or explicitly rejected (add an ADR entry explaining why)
 - A library version changes intentionally
 
-**`docs/PATTERNS.md`** — update in the same PR when:
+**`docs/playbooks/patterns.md`** — update in the same PR when:
 - A new implementation pattern is established that future PRs should follow
 - A new pitfall or "gotcha" is discovered and solved (so others don't repeat it)
+
+### Pre-mark-done verification
+
+Run through this before marking any task ✅ or raising a PR:
+
+- Tests pass — `dotnet test unit-tests.slnf` / `npm run test`
+- Zero build warnings — `dotnet build` / `npm run ci`
+- No TODO or FIXME introduced in this PR
+- No placeholder, stub, or dead code committed
+- No commented-out code left in
+- Every affected US has an updated `> **Implementation status**` callout
+- All Gate 2 doc updates are in the same PR (not a follow-up)
+- Every library used in this layer appears in the approved Tech Stack
 
 ---
 
@@ -426,10 +458,14 @@ For any **new** module: Domain → Application (no Docker needed) → Infrastruc
 
 ## Epics & Docs Navigation
 
-- `docs/README.md` — master navigation
+- `docs/README.md` — master navigation hub
 - `docs/TECH_STACK.md` — approved libraries, versions, and ADRs
 - `docs/PROGRESS.md` — current implementation status per module and layer
-- `docs/PATTERNS.md` — implementation patterns and pitfalls; read before any non-trivial implementation
+- `docs/playbooks/process.md` — step-by-step implementation workflow; read at the start of every new US or module
+- `docs/playbooks/patterns.md` — implementation patterns and pitfalls; read before any non-trivial implementation
+- `docs/playbooks/testing.md` — test isolation, naming, file layout, mocking rules (.NET and frontend)
+- `docs/playbooks/frontend.md` — TanStack Query patterns, TypeScript discipline, routing, component design
+- `docs/playbooks/wireframes.md` — component kit template rules (section builder anatomy, ID prefixes, offsets)
 - `docs/epics/E0{N}-*/README.md` — epic overview + implementation status table
 - `docs/epics/E0{N}-*/features/F0{N}-*.md` — feature + user stories with ACs
 - `docs/diagrams/` — system-level diagrams (.puml + .png)
