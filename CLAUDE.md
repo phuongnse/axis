@@ -194,7 +194,7 @@ When creating any new doc file, add the appropriate back-link as the first thing
 
 ### Process & Workflow
 - **Step-by-step workflow**: follow [`docs/playbooks/process.md`](docs/playbooks/process.md) at the start of every new US or module. Rules in this file govern HOW; PROCESS.md governs WHAT order.
-- **Language**: discuss in Vietnamese, write all code and docs in English.
+- **Language**: all code, docs, commit messages, PR descriptions, and comments must be in English.
 - **Git**: never push to `main` — always branch (`{type}/{short-description}` kebab-case, `type` ∈ `feat|fix|docs|refactor|test|chore`) and open a PR. When Claude Code auto-creates a worktree with a random branch name, rename before pushing.
 - **Conventional Commits**: `feat: add workflow step handler` — subject ≤ 72 chars, imperative mood, no period.
 - **Docs-first for new features**: before implementing any user story or new feature, read the relevant feature file. The doc defines the contract; code implements it. Never write code first and update docs after. For bug fixes, a doc update is only required if the fix reveals a spec deviation. Exception: production hotfixes under active incident — fix first, document the deviation immediately after.
