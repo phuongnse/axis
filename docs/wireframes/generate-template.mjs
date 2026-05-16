@@ -394,7 +394,7 @@ function buildTable(y0) {
     ['Order Workflow',    'Workflow',   'Jan 10, 2026', 'Draft',   C.gray50],
     ['Contact Form',      'Form',       'Jan 8, 2026',  'Pending', C.white],
   ];
-  const statusColors = { Active: [C.successBorder, C.successBg, C.success], Draft: [C.gray300, C.gray50, C.gray700], Pending: [C.warningBorder, C.warningBg, C.warning] };
+  const statusColors = { Active: [C.primaryDark, C.primary, C.white], Draft: [C.gray300, C.gray50, C.gray700], Pending: [C.warningBorder, C.warningBg, C.warning] };
 
   rows.forEach(([name, type, date, status, rowBg], i) => {
     const y = yC + 44 + i * 50;
@@ -708,7 +708,7 @@ function buildEditableTable(y0) {
     { name: 'Contact Form',    type: 'Form',       status: 'Active', date: 'Jan 8, 2026',  sel: false, edit: true  },
     { name: 'Invoice Page',    type: 'Page',       status: 'Draft',  date: 'Jan 5, 2026',  sel: false, edit: false },
   ];
-  const sc = { Active: [C.successBorder, C.successBg, C.success], Draft: [C.gray300, C.gray50, C.gray700] };
+  const sc = { Active: [C.primaryDark, C.primary, C.white], Draft: [C.gray300, C.gray50, C.gray700] };
 
   rows.forEach(({ name, type, status, date, sel, edit }, i) => {
     const y = tY + 44 + i * 42;
