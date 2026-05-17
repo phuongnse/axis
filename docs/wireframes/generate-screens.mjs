@@ -610,9 +610,7 @@ function genFormSubmission() {
   const els = [
     ...appShell('fs', W, H, NAV, 2, 'Form Submission — Contact Form'),
     ...sideEls,
-    // Label the two regions for clarity
-    text('fs_list_lbl',  cx + 20,       cy + 14, 200, 16, 'Submission list', 11, C.gray500),
-    text('fs_panel_lbl', cx + 310 + 20, cy + 14, 200, 16, 'Submission detail', 11, C.gray500),
+    // ss_title inside the panel header already reads 'Record Detail' — no extra labels needed
   ];
   write('E05-form-builder/form-submission.excalidraw', els);
 }
