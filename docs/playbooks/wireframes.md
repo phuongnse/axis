@@ -13,7 +13,7 @@ This playbook covers everything needed to work with the wireframe generation sys
 |---|---|
 | `docs/wireframes/components.mjs` | **Single source of truth** — primitives, colors, layout constants, helpers |
 | `docs/wireframes/generate-template.mjs` | 34-section component kit — imports from `components.mjs`, exports all builders |
-| `docs/wireframes/generate-screens.mjs` | 19 screen wireframes — imports builders from the template, places them via `component()` |
+| `docs/wireframes/generate-screens.mjs` | 27 screen wireframes — imports builders from the template, places them via `component()` |
 | `docs/wireframes/_template.excalidraw` | Generated output of `generate-template.mjs` |
 | `docs/wireframes/{E0N-*}/*.excalidraw` | Generated outputs of `generate-screens.mjs` |
 
@@ -394,6 +394,7 @@ This is what makes `import { buildWorkflowCanvas } from './generate-template.mjs
 | Module | Files |
 |---|---|
 | `_shared/` | `app-shell` |
+| `E01-platform-foundation/` | `register-org`, `email-confirmation`, `verify-email`, `workspace-provisioning`, `pricing`, `settings-org`, `settings-org-delete-modal` |
 | `E02-identity-access/` | `login`, `register`, `forgot-password`, `change-password`, `accept-invitation`, `settings-users`, `settings-roles`, `settings-security` |
 | `E03-data-modeling/` | `data-models`, `data-classes`, `records` |
 | `E04-workflow-builder/` | `workflows`, `workflow-editor` |
