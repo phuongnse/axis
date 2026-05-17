@@ -195,12 +195,12 @@ public sealed class ExecutionRepositoryQueryTests(WorkflowEngineDatabaseFixture 
         await repo.AddAsync(original);
         await ctx.SaveChangesAsync();
 
-        await Task.Delay(5);
+        await Task.Delay(50);
         WorkflowExecution retry1 = original.CreateRetry(null);
         await repo.AddAsync(retry1);
         await ctx.SaveChangesAsync();
 
-        await Task.Delay(5);
+        await Task.Delay(50);
         WorkflowExecution retry2 = original.CreateRetryWithModifiedContext(
             null, new Dictionary<string, object?> { ["key"] = "fixed" });
         await repo.AddAsync(retry2);

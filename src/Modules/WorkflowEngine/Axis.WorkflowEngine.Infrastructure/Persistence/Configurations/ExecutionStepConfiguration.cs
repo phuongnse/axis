@@ -30,6 +30,7 @@ internal sealed class ExecutionStepConfiguration : IEntityTypeConfiguration<Exec
         builder.Property(s => s.StartedAt);
         builder.Property(s => s.CompletedAt);
         builder.Property(s => s.ErrorDetails);
+        builder.Property(s => s.DeletedAt);
 
         builder.Property(s => s.StepType)
             .HasConversion<string>()
@@ -58,5 +59,12 @@ internal sealed class ExecutionStepConfiguration : IEntityTypeConfiguration<Exec
             .HasConversion(snapshotConverter, snapshotComparer);
 
         builder.HasIndex(s => new { s.ExecutionId, s.OrganizationId });
+
+        builder.HasOne<WorkflowExecution>()
+            .WithMany()
+            .HasForeignKey(s => s.ExecutionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasQueryFilter(s => !s.DeletedAt.HasValue);
     }
 }

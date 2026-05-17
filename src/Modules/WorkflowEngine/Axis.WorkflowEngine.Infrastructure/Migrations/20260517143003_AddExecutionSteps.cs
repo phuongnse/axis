@@ -12,6 +12,29 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
+                name: "workflow_executions",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    WorkflowDefinitionId = table.Column<Guid>(type: "uuid", nullable: false),
+                    OrganizationId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Status = table.Column<string>(type: "text", nullable: false),
+                    TriggerType = table.Column<string>(type: "text", nullable: false),
+                    TriggeredByUserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    RetryOfExecutionId = table.Column<Guid>(type: "uuid", nullable: true),
+                    ErrorMessage = table.Column<string>(type: "text", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    StartedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CompletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    DeletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    context = table.Column<string>(type: "jsonb", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_workflow_executions", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "execution_steps",
                 columns: table => new
                 {
@@ -28,33 +51,18 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                     ErrorDetails = table.Column<string>(type: "text", nullable: true),
                     StartedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     CompletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    DeletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_execution_steps", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "workflow_executions",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    WorkflowDefinitionId = table.Column<Guid>(type: "uuid", nullable: false),
-                    OrganizationId = table.Column<Guid>(type: "uuid", nullable: false),
-                    Status = table.Column<string>(type: "text", nullable: false),
-                    TriggerType = table.Column<string>(type: "text", nullable: false),
-                    TriggeredByUserId = table.Column<Guid>(type: "uuid", nullable: true),
-                    RetryOfExecutionId = table.Column<Guid>(type: "uuid", nullable: true),
-                    ErrorMessage = table.Column<string>(type: "text", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    StartedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    CompletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    context = table.Column<string>(type: "jsonb", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_workflow_executions", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_execution_steps_workflow_executions_ExecutionId",
+                        column: x => x.ExecutionId,
+                        principalTable: "workflow_executions",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateIndex(

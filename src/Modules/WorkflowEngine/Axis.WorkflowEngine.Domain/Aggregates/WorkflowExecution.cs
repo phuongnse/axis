@@ -26,6 +26,7 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
     public DateTime CreatedAt { get; private set; }
     public DateTime? StartedAt { get; private set; }
     public DateTime? CompletedAt { get; private set; }
+    public DateTimeOffset? DeletedAt { get; private set; }
 
     public IReadOnlyDictionary<string, object?> Context => _context;
 

@@ -19,6 +19,7 @@ public sealed class ExecutionStep : AggregateRoot<Guid>
     public DateTimeOffset? StartedAt { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
+    public DateTimeOffset? DeletedAt { get; private set; }
 
     public bool IsTerminal => Status is
         StepExecutionStatus.Completed or

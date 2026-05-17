@@ -34,6 +34,9 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("DisplayOrder")
                         .HasColumnType("integer");
 
@@ -90,6 +93,9 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("ErrorMessage")
                         .HasColumnType("text");
 
@@ -124,6 +130,15 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("workflow_executions", (string)null);
+                });
+
+            modelBuilder.Entity("Axis.WorkflowEngine.Domain.Aggregates.ExecutionStep", b =>
+                {
+                    b.HasOne("Axis.WorkflowEngine.Domain.Aggregates.WorkflowExecution", null)
+                        .WithMany()
+                        .HasForeignKey("ExecutionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

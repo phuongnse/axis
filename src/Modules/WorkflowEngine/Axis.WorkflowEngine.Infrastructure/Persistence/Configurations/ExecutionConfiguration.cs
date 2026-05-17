@@ -42,6 +42,9 @@ internal sealed class ExecutionConfiguration : IEntityTypeConfiguration<Workflow
         builder.Property(e => e.CreatedAt).IsRequired();
         builder.Property(e => e.StartedAt);
         builder.Property(e => e.CompletedAt);
+        builder.Property(e => e.DeletedAt);
+
+        builder.HasQueryFilter(e => !e.DeletedAt.HasValue);
 
         ValueConverter<Dictionary<string, object?>, string> contextConverter = new(
             v => JsonSerializer.Serialize(v, JsonOptions),
