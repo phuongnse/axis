@@ -4,16 +4,13 @@ using Axis.WorkflowEngine.Domain.Events;
 
 namespace Axis.WorkflowEngine.Domain.Aggregates;
 
-/// <summary>
-/// A single runtime instance of a WorkflowDefinition.
-/// Tracks execution status, context, and timing.
-/// </summary>
 public sealed class WorkflowExecution : AggregateRoot<Guid>
 {
     private static readonly ExecutionStatus[] TerminalStatuses =
         [ExecutionStatus.Completed, ExecutionStatus.Failed, ExecutionStatus.Cancelled];
 
     private Dictionary<string, object?> _context;
+    private List<ExecutionStep> _steps = [];
 
     public Guid WorkflowDefinitionId { get; private set; }
     public Guid OrganizationId { get; private set; }
@@ -29,8 +26,9 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
     public DateTimeOffset? DeletedAt { get; private set; }
 
     public IReadOnlyDictionary<string, object?> Context => _context;
+    public IReadOnlyList<ExecutionStep> Steps => _steps.AsReadOnly();
 
-    private WorkflowExecution() : base(default) { _context = new Dictionary<string, object?>(); } // EF Core materialisation
+    private WorkflowExecution() : base(default) { _context = new Dictionary<string, object?>(); }
 
     private WorkflowExecution(
         Guid id,
@@ -119,6 +117,46 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
     {
         foreach (KeyValuePair<string, object?> kvp in stepOutput)
             _context[kvp.Key] = kvp.Value;
+    }
+
+    public ExecutionStep AddStep(
+        Guid stepDefinitionId, string name, StepType stepType, int displayOrder)
+    {
+        ExecutionStep step = ExecutionStep.Create(Id, OrganizationId, stepDefinitionId, name, stepType, displayOrder);
+        _steps.Add(step);
+        return step;
+    }
+
+    public void StartStep(Guid stepId, IReadOnlyDictionary<string, object?> inputSnapshot)
+        => GetStep(stepId).Start(inputSnapshot);
+
+    public void CompleteStep(Guid stepId, IReadOnlyDictionary<string, object?> output)
+    {
+        GetStep(stepId).Complete(output);
+        RaiseDomainEvent(new ExecutionStepCompleted(Id, stepId, OrganizationId, output));
+    }
+
+    public void FailStep(Guid stepId, string errorDetails)
+    {
+        GetStep(stepId).Fail(errorDetails);
+        RaiseDomainEvent(new ExecutionStepFailed(Id, stepId, OrganizationId, errorDetails));
+    }
+
+    public void WaitStep(Guid stepId)
+        => GetStep(stepId).Wait();
+
+    public void SkipStep(Guid stepId, string reason)
+        => GetStep(stepId).Skip(reason);
+
+    public void CancelStep(Guid stepId)
+        => GetStep(stepId).Cancel();
+
+    private ExecutionStep GetStep(Guid stepId)
+    {
+        ExecutionStep? step = _steps.FirstOrDefault(s => s.Id == stepId);
+        if (step is null)
+            throw new InvalidOperationException($"Step '{stepId}' not found in execution '{Id}'.");
+        return step;
     }
 
     /// <summary>US-100: Creates a retry execution linked to this failed execution.</summary>

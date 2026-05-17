@@ -51,8 +51,7 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                     ErrorDetails = table.Column<string>(type: "text", nullable: true),
                     StartedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     CompletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    DeletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {

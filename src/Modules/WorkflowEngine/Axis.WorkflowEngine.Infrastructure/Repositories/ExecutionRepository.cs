@@ -34,14 +34,13 @@ internal sealed class ExecutionRepository(WorkflowEngineDbContext context) : IEx
     {
         WorkflowExecution? execution = await context.WorkflowExecutions
             .AsNoTracking()
+            .Include(e => e.Steps)
             .FirstOrDefaultAsync(e => e.Id == executionId && e.OrganizationId == organizationId, ct);
 
         if (execution is null)
             return null;
 
-        List<ExecutionStepResponse> steps = await context.ExecutionSteps
-            .AsNoTracking()
-            .Where(s => s.ExecutionId == executionId && s.OrganizationId == organizationId)
+        IReadOnlyList<ExecutionStepResponse> steps = execution.Steps
             .OrderBy(s => s.DisplayOrder)
             .Select(s => new ExecutionStepResponse(
                 s.Id,
@@ -56,7 +55,7 @@ internal sealed class ExecutionRepository(WorkflowEngineDbContext context) : IEx
                 s.StartedAt,
                 s.CompletedAt,
                 s.CreatedAt))
-            .ToListAsync(ct);
+            .ToList();
 
         return new ExecutionResponse(
             execution.Id,

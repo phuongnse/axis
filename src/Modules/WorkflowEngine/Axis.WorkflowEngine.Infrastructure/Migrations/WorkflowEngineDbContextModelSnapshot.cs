@@ -22,65 +22,6 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Axis.WorkflowEngine.Domain.Aggregates.ExecutionStep", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset?>("CompletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTimeOffset?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ErrorDetails")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("ExecutionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("InputSnapshot")
-                        .HasColumnType("jsonb");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<Guid>("OrganizationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("OutputSnapshot")
-                        .HasColumnType("jsonb");
-
-                    b.Property<DateTimeOffset?>("StartedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("StepDefinitionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("StepType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ExecutionId", "OrganizationId");
-
-                    b.ToTable("execution_steps", (string)null);
-                });
-
             modelBuilder.Entity("Axis.WorkflowEngine.Domain.Aggregates.WorkflowExecution", b =>
                 {
                     b.Property<Guid>("Id")
@@ -132,13 +73,68 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                     b.ToTable("workflow_executions", (string)null);
                 });
 
-            modelBuilder.Entity("Axis.WorkflowEngine.Domain.Aggregates.ExecutionStep", b =>
+            modelBuilder.Entity("Axis.WorkflowEngine.Domain.Aggregates.WorkflowExecution", b =>
                 {
-                    b.HasOne("Axis.WorkflowEngine.Domain.Aggregates.WorkflowExecution", null)
-                        .WithMany()
-                        .HasForeignKey("ExecutionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                    b.OwnsMany("Axis.WorkflowEngine.Domain.Aggregates.ExecutionStep", "Steps", b1 =>
+                        {
+                            b1.Property<Guid>("Id")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("uuid");
+
+                            b1.Property<DateTimeOffset?>("CompletedAt")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.Property<DateTimeOffset>("CreatedAt")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.Property<int>("DisplayOrder")
+                                .HasColumnType("integer");
+
+                            b1.Property<string>("ErrorDetails")
+                                .HasColumnType("text");
+
+                            b1.Property<Guid>("ExecutionId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<string>("InputSnapshot")
+                                .HasColumnType("jsonb");
+
+                            b1.Property<string>("Name")
+                                .IsRequired()
+                                .HasMaxLength(500)
+                                .HasColumnType("character varying(500)");
+
+                            b1.Property<Guid>("OrganizationId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<string>("OutputSnapshot")
+                                .HasColumnType("jsonb");
+
+                            b1.Property<DateTimeOffset?>("StartedAt")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.Property<string>("Status")
+                                .IsRequired()
+                                .HasColumnType("text");
+
+                            b1.Property<Guid>("StepDefinitionId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<string>("StepType")
+                                .IsRequired()
+                                .HasColumnType("text");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("ExecutionId", "OrganizationId");
+
+                            b1.ToTable("execution_steps", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("ExecutionId");
+                        });
+
+                    b.Navigation("Steps");
                 });
 #pragma warning restore 612, 618
         }

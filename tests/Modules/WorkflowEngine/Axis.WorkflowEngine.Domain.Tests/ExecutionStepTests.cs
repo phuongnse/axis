@@ -1,6 +1,5 @@
 using Axis.WorkflowEngine.Domain.Aggregates;
 using Axis.WorkflowEngine.Domain.Enums;
-using Axis.WorkflowEngine.Domain.Events;
 using FluentAssertions;
 
 namespace Axis.WorkflowEngine.Domain.Tests;
@@ -128,7 +127,6 @@ public class ExecutionStepTests
         step.Status.Should().Be(StepExecutionStatus.Completed);
         step.CompletedAt.Should().NotBeNull();
         step.OutputSnapshot.Should().BeEquivalentTo(output);
-        step.DomainEvents.Should().ContainSingle(e => e is ExecutionStepCompleted);
     }
 
     [Fact]
@@ -141,7 +139,6 @@ public class ExecutionStepTests
         step.Complete(output);
 
         step.Status.Should().Be(StepExecutionStatus.Completed);
-        step.DomainEvents.Should().ContainSingle(e => e is ExecutionStepCompleted);
     }
 
     [Theory]
@@ -171,7 +168,6 @@ public class ExecutionStepTests
         step.Status.Should().Be(StepExecutionStatus.Failed);
         step.CompletedAt.Should().NotBeNull();
         step.ErrorDetails.Should().Be("Connection timeout after 5s");
-        step.DomainEvents.Should().ContainSingle(e => e is ExecutionStepFailed);
     }
 
     [Theory]
@@ -299,37 +295,6 @@ public class ExecutionStepTests
         BringToStatus(step, status);
 
         step.IsTerminal.Should().BeFalse();
-    }
-
-    // ─── Domain event payloads ────────────────────────────────────────────────
-
-    [Fact]
-    public void Complete_RaisesEventWithCorrectPayload()
-    {
-        var step = CreatePending();
-        step.Start(SomeContext());
-        var output = new Dictionary<string, object?> { ["x"] = 1 };
-        step.Complete(output);
-
-        var evt = step.DomainEvents.OfType<ExecutionStepCompleted>().Single();
-        evt.ExecutionId.Should().Be(ExecutionId);
-        evt.StepId.Should().Be(step.Id);
-        evt.OrganizationId.Should().Be(OrgId);
-        evt.Output.Should().BeEquivalentTo(output);
-    }
-
-    [Fact]
-    public void Fail_RaisesEventWithCorrectPayload()
-    {
-        var step = CreatePending();
-        step.Start(SomeContext());
-        step.Fail("timeout");
-
-        var evt = step.DomainEvents.OfType<ExecutionStepFailed>().Single();
-        evt.ExecutionId.Should().Be(ExecutionId);
-        evt.StepId.Should().Be(step.Id);
-        evt.OrganizationId.Should().Be(OrgId);
-        evt.ErrorDetails.Should().Be("timeout");
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────

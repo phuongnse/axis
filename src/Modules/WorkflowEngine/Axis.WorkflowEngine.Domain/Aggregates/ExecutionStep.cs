@@ -1,10 +1,9 @@
 using Axis.Shared.Domain.Primitives;
 using Axis.WorkflowEngine.Domain.Enums;
-using Axis.WorkflowEngine.Domain.Events;
 
 namespace Axis.WorkflowEngine.Domain.Aggregates;
 
-public sealed class ExecutionStep : AggregateRoot<Guid>
+public sealed class ExecutionStep : Entity<Guid>
 {
     public Guid ExecutionId { get; private set; }
     public Guid OrganizationId { get; private set; }
@@ -19,7 +18,6 @@ public sealed class ExecutionStep : AggregateRoot<Guid>
     public DateTimeOffset? StartedAt { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
-    public DateTimeOffset? DeletedAt { get; private set; }
 
     public bool IsTerminal => Status is
         StepExecutionStatus.Completed or
@@ -89,7 +87,6 @@ public sealed class ExecutionStep : AggregateRoot<Guid>
         Status = StepExecutionStatus.Completed;
         OutputSnapshot = output;
         CompletedAt = DateTimeOffset.UtcNow;
-        RaiseDomainEvent(new ExecutionStepCompleted(ExecutionId, Id, OrganizationId, output));
     }
 
     public void Fail(string errorDetails)
@@ -100,7 +97,6 @@ public sealed class ExecutionStep : AggregateRoot<Guid>
         Status = StepExecutionStatus.Failed;
         ErrorDetails = errorDetails;
         CompletedAt = DateTimeOffset.UtcNow;
-        RaiseDomainEvent(new ExecutionStepFailed(ExecutionId, Id, OrganizationId, errorDetails));
     }
 
     public void Wait()

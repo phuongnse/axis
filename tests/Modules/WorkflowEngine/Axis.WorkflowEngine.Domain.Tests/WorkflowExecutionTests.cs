@@ -10,9 +10,13 @@ public class WorkflowExecutionTests
     private static readonly Guid OrgId = Guid.NewGuid();
     private static readonly Guid WorkflowId = Guid.NewGuid();
     private static readonly Guid TriggeredBy = Guid.NewGuid();
+    private static readonly Guid StepDefId = Guid.NewGuid();
 
     private static IReadOnlyDictionary<string, object?> EmptyInput() =>
         new Dictionary<string, object?>();
+
+    private static IReadOnlyDictionary<string, object?> SomeData() =>
+        new Dictionary<string, object?> { ["key"] = "val" };
 
     // ─── Create ───────────────────────────────────────────────────────────────
 
@@ -131,6 +135,111 @@ public class WorkflowExecutionTests
 
         var act = () => exec.Cancel();
         act.Should().Throw<InvalidOperationException>().WithMessage("*cancel*");
+    }
+
+    // ─── Steps ────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void AddStep_AddsStepToCollection()
+    {
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        exec.AddStep(StepDefId, "Send Email", StepType.Notification, 0);
+
+        exec.Steps.Should().HaveCount(1);
+        exec.Steps[0].Name.Should().Be("Send Email");
+        exec.Steps[0].DisplayOrder.Should().Be(0);
+        exec.Steps[0].Status.Should().Be(StepExecutionStatus.Pending);
+    }
+
+    [Fact]
+    public void StartStep_WhenStepIsPending_TransitionsStepToRunning()
+    {
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        ExecutionStep step = exec.AddStep(StepDefId, "Send Email", StepType.Notification, 0);
+        exec.StartStep(step.Id, SomeData());
+
+        exec.Steps[0].Status.Should().Be(StepExecutionStatus.Running);
+    }
+
+    [Fact]
+    public void CompleteStep_WhenStepIsRunning_TransitionsStepToCompletedAndRaisesEvent()
+    {
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        ExecutionStep step = exec.AddStep(StepDefId, "Send Email", StepType.Notification, 0);
+        exec.StartStep(step.Id, SomeData());
+        exec.ClearDomainEvents();
+
+        IReadOnlyDictionary<string, object?> output = new Dictionary<string, object?> { ["result"] = "ok" };
+        exec.CompleteStep(step.Id, output);
+
+        exec.Steps[0].Status.Should().Be(StepExecutionStatus.Completed);
+        ExecutionStepCompleted evt = exec.DomainEvents.OfType<ExecutionStepCompleted>().Single();
+        evt.ExecutionId.Should().Be(exec.Id);
+        evt.StepId.Should().Be(step.Id);
+        evt.OrganizationId.Should().Be(OrgId);
+        evt.Output.Should().BeEquivalentTo(output);
+    }
+
+    [Fact]
+    public void FailStep_WhenStepIsRunning_TransitionsStepToFailedAndRaisesEvent()
+    {
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        ExecutionStep step = exec.AddStep(StepDefId, "Send Email", StepType.Notification, 0);
+        exec.StartStep(step.Id, SomeData());
+        exec.ClearDomainEvents();
+
+        exec.FailStep(step.Id, "Connection timeout");
+
+        exec.Steps[0].Status.Should().Be(StepExecutionStatus.Failed);
+        ExecutionStepFailed evt = exec.DomainEvents.OfType<ExecutionStepFailed>().Single();
+        evt.ExecutionId.Should().Be(exec.Id);
+        evt.StepId.Should().Be(step.Id);
+        evt.OrganizationId.Should().Be(OrgId);
+        evt.ErrorDetails.Should().Be("Connection timeout");
+    }
+
+    [Fact]
+    public void WaitStep_WhenStepIsRunning_TransitionsStepToWaiting()
+    {
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        ExecutionStep step = exec.AddStep(StepDefId, "Approval", StepType.Form, 0);
+        exec.StartStep(step.Id, SomeData());
+        exec.WaitStep(step.Id);
+
+        exec.Steps[0].Status.Should().Be(StepExecutionStatus.Waiting);
+    }
+
+    [Fact]
+    public void SkipStep_WhenStepIsPending_TransitionsStepToSkipped()
+    {
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        ExecutionStep step = exec.AddStep(StepDefId, "Condition Branch", StepType.Condition, 0);
+        exec.SkipStep(step.Id, "Branch not taken");
+
+        exec.Steps[0].Status.Should().Be(StepExecutionStatus.Skipped);
+        exec.Steps[0].ErrorDetails.Should().Be("Branch not taken");
+    }
+
+    [Fact]
+    public void CancelStep_WhenStepIsRunning_TransitionsStepToCancelled()
+    {
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        ExecutionStep step = exec.AddStep(StepDefId, "Send Email", StepType.Notification, 0);
+        exec.StartStep(step.Id, SomeData());
+        exec.CancelStep(step.Id);
+
+        exec.Steps[0].Status.Should().Be(StepExecutionStatus.Cancelled);
+    }
+
+    [Fact]
+    public void StepOperation_WhenStepIdNotFound_Throws()
+    {
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        Guid missing = Guid.NewGuid();
+
+        Action act = () => exec.StartStep(missing, SomeData());
+
+        act.Should().Throw<InvalidOperationException>().WithMessage($"*{missing}*");
     }
 
     // ─── Retry ────────────────────────────────────────────────────────────────

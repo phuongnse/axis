@@ -145,12 +145,9 @@ public sealed class ExecutionRepositoryQueryTests(WorkflowEngineDatabaseFixture 
         ExecutionRepository repo = new(ctx);
 
         WorkflowExecution exec = CreateExecution();
+        exec.AddStep(Guid.NewGuid(), "Step B", StepType.HttpRequest, 1);
+        exec.AddStep(Guid.NewGuid(), "Step A", StepType.Form, 0);
         await repo.AddAsync(exec);
-
-        ExecutionStep stepB = ExecutionStep.Create(exec.Id, OrgId, Guid.NewGuid(), "Step B", StepType.HttpRequest, 1);
-        ExecutionStep stepA = ExecutionStep.Create(exec.Id, OrgId, Guid.NewGuid(), "Step A", StepType.Form, 0);
-        ctx.ExecutionSteps.Add(stepA);
-        ctx.ExecutionSteps.Add(stepB);
         await ctx.SaveChangesAsync();
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
