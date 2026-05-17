@@ -88,8 +88,8 @@ export const OX  = 0;     // screen origin x (sidebar starts here)
 export const OY  = 0;     // screen origin y
 
 // Content area starts at (SB, HDR) inside the screen
-export const CX  = 240;    // content origin x (after sidebar)
-export const CY  = 56;   // content origin y (after header)
+export const CX  = 296;    // content origin x (after sidebar)
+export const CY  = 60;   // content origin y (after header)
 
 // ─── Placement helpers ────────────────────────────────────────────────────────
 
@@ -138,64 +138,78 @@ export function writeExcalidraw(filePath, elements) {
 
 
 
+
 export function appShell(prefix, W, H, navItems, activeIdx, pageTitle) {
   const els = [];
 
-  // Main Page Background
+  // Main Page Background (Canvas area)
   els.push(rect(`${prefix}_bg`, 0, 0, W, H, C.gray300, C.gray50, 1, false));
 
-  // --- TOPBAR (Full Width) ---
-  const hdrH = 56;
-  els.push(rect(`${prefix}_hdr`, 0, 0, W, hdrH, C.gray300, C.white, 1, false));
+  // --- ACTIVITY BAR (Far Left, Dark Theme) ---
+  const actW = 56;
+  els.push(rect(`${prefix}_actbar`, 0, 0, actW, H, C.gray900, C.gray900, 1, false));
 
-  // App Switcher (Left side of header)
-  els.push(rect(`${prefix}_app_sw`, 16, 8, 180, 40, 'transparent', C.infoBg, 0, true));
-  els.push(text(`${prefix}_app_logo`, 24, 18, 20, 20, '⬡', 16, C.primary));
-  els.push(text(`${prefix}_app_name`, 48, 19, 100, 18, 'Workflow', 14, C.primary));
-  els.push(text(`${prefix}_app_arr`, 168, 19, 16, 16, '▾', 14, C.primary));
+  // App Logo
+  els.push(text(`${prefix}_logo`, 14, 16, 28, 28, '⬡', 24, C.white, 'center'));
 
-  // Global Search (Centered)
-  const cmdW = 400;
-  const cmdX = (W / 2) - (cmdW / 2);
-  els.push(rect(`${prefix}_srch`, cmdX, 8, cmdW, 40, C.gray300, C.gray100, 1, true));
-  els.push(text(`${prefix}_srch_t`, cmdX + 16, 19, 140, 16, '⌕  Search anything...', 13, C.gray500));
+  // Activity Icons
+  const icons = ['⌘', '👥', '🗃', '⚡', '📝', '⚙'];
+  icons.forEach((icon, i) => {
+    const y = 80 + i * 56;
+    const active = i === activeIdx;
+    if (active) {
+       els.push(rect(`${prefix}_act_bg_${i}`, 8, y - 8, 40, 40, 'transparent', '#4A5058', 0, true, { roundness: { type: 3 } }));
+       // left indicator strip
+       els.push(rect(`${prefix}_act_ind_${i}`, 0, y - 8, 3, 40, C.accent, C.accent, 1, false));
+    }
+    els.push(text(`${prefix}_act_ic_${i}`, 14, y, 28, 28, icon, 18, active ? C.white : C.gray500, 'center'));
+  });
 
-  // Right Side (Workspace, Notifications, Profile)
-  els.push(rect(`${prefix}_ws_sw`, W - 260, 12, 120, 32, C.gray300, C.white, 1, true));
-  els.push(text(`${prefix}_ws_name`, W - 250, 20, 80, 16, 'Acme Corp', 12, C.gray700));
-  els.push(text(`${prefix}_ws_arr`, W - 160, 20, 14, 14, '▾', 12, C.gray500));
-
-  els.push(ellipse(`${prefix}_notif`, W - 110, 10, 36, 36, C.gray300, C.white, 1));
-  els.push(text(`${prefix}_notif_t`, W - 110, 19, 36, 18, '🔔', 14, C.gray700, 'center'));
-
-  els.push(ellipse(`${prefix}_av`, W - 56, 10, 36, 36, C.infoBorder, C.infoBg, 1));
-  els.push(text(`${prefix}_av_t`, W - 56, 19, 36, 18, 'AB', 12, C.primary, 'center'));
-  els.push(hline(`${prefix}_hdr_div`, 0, hdrH, W, C.gray300));
+  // User Avatar (Bottom)
+  els.push(ellipse(`${prefix}_act_av`, 12, H - 48, 32, 32, C.gray500, 'transparent', 1));
+  els.push(text(`${prefix}_act_avt`, 12, H - 39, 32, 16, 'AB', 12, C.gray300, 'center'));
 
 
-  // --- CONTEXTUAL SIDEBAR ---
-  const sbW = 240;
-  const sbH = H - hdrH;
-  els.push(rect(`${prefix}_sidebar`, 0, hdrH, sbW, sbH, C.gray300, C.white, 1, false));
+  // --- CONTEXT PANEL (Secondary Sidebar) ---
+  const ctxW = 240;
+  els.push(rect(`${prefix}_ctxpanel`, actW, 0, ctxW, H, C.gray300, C.white, 1, false));
 
-  // Context Title
-  els.push(text(`${prefix}_ctx_title`, 20, hdrH + 20, 200, 20, 'Context Menu', 12, C.gray500));
+  // Context Header
+  els.push(text(`${prefix}_ctx_title`, actW + 20, 20, 180, 24, 'Workflow Engine', 16, C.gray900));
+  els.push(hline(`${prefix}_ctx_div1`, actW, 60, ctxW, C.gray300));
 
-  // Nav items
-  const navStartY = hdrH + 48;
+  // Context Nav Items
+  const navStartY = 80;
   navItems.forEach((label, i) => {
-    const y = navStartY + i * 40;
+    const y = navStartY + i * 36;
     const active = i === activeIdx;
     const bg     = active ? C.infoBg      : 'transparent';
-    const stroke = active ? C.infoBorder  : 'transparent';
     const tc     = active ? C.primary     : C.gray700;
-    els.push(rect(`${prefix}_ni_${i}`, 12, y, sbW - 24, 32, stroke, bg, 1, true));
-    if (active) els.push(rect(`${prefix}_nacc_${i}`, 12, y, 3, 32, C.primary, C.primary, 1, false));
-    els.push(text(`${prefix}_nl_${i}`, 32, y + 8, 170, 16, label, 13, tc));
+
+    if (active) {
+       els.push(rect(`${prefix}_ni_${i}`, actW + 8, y, ctxW - 16, 32, 'transparent', bg, 0, true, { roundness: { type: 3 } }));
+    }
+    els.push(text(`${prefix}_nl_${i}`, actW + 24, y + 8, 170, 16, label, 13, tc));
   });
+
+
+  // --- WORKSPACE HEADER (Top area over the canvas) ---
+  const hdrX = actW + ctxW;
+  const hdrH = 60;
+  els.push(rect(`${prefix}_hdr`, hdrX, 0, W - hdrX, hdrH, C.gray300, C.white, 1, false));
+
+  // Breadcrumb / Page Title
+  els.push(text(`${prefix}_page_title`, hdrX + 24, 20, 300, 20, pageTitle, 16, C.gray900));
+
+  // Global Actions (Search & Notif)
+  const rightX = W - 200;
+  els.push(rect(`${prefix}_srch`, rightX, 12, 140, 36, C.gray300, C.gray50, 1, true));
+  els.push(text(`${prefix}_srch_t`, rightX + 12, 22, 100, 16, '⌕ Search...', 12, C.gray500));
+  els.push(text(`${prefix}_notif`, rightX + 156, 20, 24, 24, '🔔', 16, C.gray700));
 
   return els;
 }
+
 
 
 
