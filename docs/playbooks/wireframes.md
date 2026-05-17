@@ -13,7 +13,7 @@ This playbook covers everything needed to work with the wireframe generation sys
 |---|---|
 | `docs/wireframes/components.mjs` | **Single source of truth** — primitives, colors, layout constants, helpers |
 | `docs/wireframes/generate-template.mjs` | 34-section component kit — imports from `components.mjs`, exports all builders |
-| `docs/wireframes/generate-screens.mjs` | 15 screen wireframes — imports builders from the template, places them via `component()` |
+| `docs/wireframes/generate-screens.mjs` | 19 screen wireframes — imports builders from the template, places them via `component()` |
 | `docs/wireframes/_template.excalidraw` | Generated output of `generate-template.mjs` |
 | `docs/wireframes/{E0N-*}/*.excalidraw` | Generated outputs of `generate-screens.mjs` |
 
@@ -125,7 +125,7 @@ const sideEls = component(buildSideSheet, cx + 520, cy);
 | Parameter | Type | Description |
 |---|---|---|
 | `prefix` | string | ID prefix (e.g. `'dm'`) — must be unique per screen |
-| `W` | number | Total screen width (use `1100`) |
+| `W` | number | Total screen width (use `1200`) |
 | `H` | number | Total screen height (use `700`) |
 | `navItems` | string[] | Nav label strings |
 | `activeIdx` | number | 0-based index of the active nav item |
@@ -133,7 +133,7 @@ const sideEls = component(buildSideSheet, cx + 520, cy);
 
 **Standard values:**
 ```js
-const W   = 1100;
+const W   = 1200;
 const H   = 700;
 const NAV = ['Data Models', 'Workflows', 'Forms', 'Executions', 'Settings'];
 ```
@@ -215,7 +215,7 @@ These formulas are the source of truth for all layout math in `generate-screens.
 
 ### Table layout
 
-```
+```text
 tblY = cy + 56    // standard: toolbar(40px) + gap(16px)
 tblY = cy + 82    // with breadcrumb: breadcrumb(18) + gap(8) + toolbar(40) + gap(16)
 tblH = H - tblY - PAD
@@ -239,7 +239,7 @@ Table internals (from S10, canonical):
 
 A "settings row" places a text label on the left and a control (input, checkbox, toggle) on the right. The label must be **vertically centered** with the control:
 
-```
+```text
 labelY = controlY + (controlH - 16) / 2
 ```
 
@@ -251,7 +251,7 @@ labelY = controlY + (controlH - 16) / 2
 
 ### Section header spacing (settings screens)
 
-```
+```text
 title   at  ySection          (h=22, fontSize=16)
 divider at  ySection + 26     (title h=22 + gap 4)
 first row at ySection + 44    (divider + gap 18)
@@ -281,7 +281,7 @@ authCard(prefix, { title, subtitle?, items, extraLink? }, submitLabel, footerTex
 
 **Card geometry (auto-calculated — do not override):**
 
-```
+```text
 cardW   = 440
 headerH = subtitle ? 136 : 112    // space from card top to first field
 fieldH  = items.length × 72       // 72px per field: label(16) + gap(2) + input(40) + gap(14)
