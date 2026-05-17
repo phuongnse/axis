@@ -364,7 +364,7 @@ function genSettingsOrgDeleteModal() {
   els.push(text('sdm_bg_dt', cx + 16, cy + 296,     300, 18, 'Delete organization',  14, C.danger));
 
   // Semi-transparent overlay
-  els.push(rect('sdm_overlay', 0, 0, W, H, 'transparent', C.gray900, 0, false, { opacity: 40, roughness: 0 }));
+  els.push(rect('sdm_overlay', 0, 0, W, H, 'transparent', C.gray900, 0, false, { opacity: 40, roughness: 1 }));
 
   // ── Modal card ────────────────────────────────────────────────────────────────
   const mW = 480;
@@ -372,7 +372,7 @@ function genSettingsOrgDeleteModal() {
   const mX = Math.round((W - mW) / 2);  // 360
   const mY = Math.round((H - mH) / 2);  // 210
 
-  els.push(rect('sdm_card', mX, mY, mW, mH, C.gray700, C.white, 2, true, { roughness: 0 }));
+  els.push(rect('sdm_card', mX, mY, mW, mH, C.gray700, C.white, 2, true, { roughness: 1 }));
 
   // Header
   els.push(text('sdm_title', mX + 20,      mY + 18, 380, 24, 'Delete organization', 16, C.danger));
@@ -398,7 +398,7 @@ function genSettingsOrgDeleteModal() {
   els.push(...btn('sdm_cancel', cancelBtnX, mY + mH - 44, 'Cancel', 'ghost'));
 
   // Delete button — disabled state until input matches exactly
-  els.push(rect('sdm_del',   delBtnX, mY + mH - 44, delW, 36, C.gray300, C.gray100, 1, true, { roughness: 0 }));
+  els.push(rect('sdm_del',   delBtnX, mY + mH - 44, delW, 36, C.gray300, C.gray100, 1, true, { roughness: 1 }));
   els.push(text('sdm_del_t', delBtnX, mY + mH - 34, delW, 16, 'Delete organization', 13, C.gray300, 'center'));
   els.push(text('sdm_hint',  mX + 20, mY + mH - 36, 240,  14, 'Enabled when name matches exactly', 10, C.gray300));
 

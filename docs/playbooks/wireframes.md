@@ -13,7 +13,7 @@ This playbook covers everything needed to work with the wireframe generation sys
 |---|---|
 | `docs/wireframes/components.mjs` | **Single source of truth** — primitives, colors, layout constants, helpers |
 | `docs/wireframes/generate-template.mjs` | 34-section component kit — imports from `components.mjs`, exports all builders |
-| `docs/wireframes/generate-screens.mjs` | 27 screen wireframes — imports builders from the template, places them via `component()` |
+| `docs/wireframes/generate-screens.mjs` | 26 screen wireframes — imports builders from the template, places them via `component()` |
 | `docs/wireframes/_template.excalidraw` | Generated output of `generate-template.mjs` |
 | `docs/wireframes/{E0N-*}/*.excalidraw` | Generated outputs of `generate-screens.mjs` |
 
