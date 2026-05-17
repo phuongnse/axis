@@ -66,50 +66,62 @@ function write(relativePath, elements) {
 }
 
 // ─── Auth card helper — shared by all standalone auth screens ─────────────────
-// Consistent centered card layout: logo → divider → title → fields → submit → footer.
+// Centered card: logo → divider → title → [subtitle] → fields → [extraLink] → submit → footer.
+//
+// headerH breakdown (no subtitle): logo-gap(16) + logo(28) + gap(16) + divider(0) + gap(16) + title(24) + gap(12) = 112
+// headerH breakdown (with subtitle): +subtitle(18) + gap(6) = 136
+// Each field: label(16) + gap(2) + input(40) + gap(14) = 72px
+// extraLink: 'Forgot password?' shown right-aligned between fields and submit btn (adds 22px)
+// Footer zone: gap(12) + divider(0) + gap(10) + footer-text(16) + gap(6) = 32px from card bottom
 
-function authCard(prefix, fields, submitLabel, footerText) {
-  const cardW = 440;
-  const fieldH = fields.length * 72;  // ~72px per field (label 18 + input 40 + gap 14)
-  const cardH = 72 + fieldH + 56 + 32; // logo+divider + fields + button + footer
-  const cardX = Math.round((W - cardW) / 2);
-  const cardY = Math.round((H - cardH) / 2);
-  const els = [];
+function authCard(prefix, { title, subtitle = null, items = [], extraLink = null }, submitLabel, footerText) {
+  const cardW   = 440;
+  const headerH = subtitle ? 136 : 112;  // vertical space from card top to first field
+  const fieldH  = items.length * 72;     // 72px per field: label(16) + gap(2) + input(40) + gap(14)
+  const cardH   = headerH + fieldH + (extraLink ? 22 : 4) + 36 + 12 + 32;
+  const cardX   = Math.round((W - cardW) / 2);
+  const cardY   = Math.round((H - cardH) / 2);
+  const els     = [];
 
-  // Background
-  els.push(rect(`${prefix}_bg`, 0, 0, W, H, C.gray300, C.gray100, 1, false));
+  // Page background
+  els.push(rect(`${prefix}_bg`,   0,     0,     W,     H,     C.gray300, C.gray100, 1, false));
+  // Card surface
+  els.push(rect(`${prefix}_card`, cardX, cardY, cardW, cardH, C.gray300, C.white,   2, true));
 
-  // Card
-  els.push(rect(`${prefix}_card`, cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
-
-  // Logo area
-  els.push(text(`${prefix}_logo`, cardX + cardW / 2 - 44, cardY + 20, 88, 28, '⬡  Axis', 18, C.primary, 'center'));
+  // Logo — full-width bounding box so 'center' alignment is correct
+  els.push(text(`${prefix}_logo`, cardX, cardY + 16, cardW, 28, '⬡  Axis', 18, C.primary, 'center'));
   els.push(hline(`${prefix}_hdiv`, cardX, cardY + 60, cardW, C.gray300));
 
-  // Title & subtitle
-  if (fields.title) {
-    els.push(text(`${prefix}_title`, cardX + 24, cardY + 76, cardW - 48, 24, fields.title, 17, C.gray900));
-  }
-  if (fields.subtitle) {
-    els.push(text(`${prefix}_sub`, cardX + 24, cardY + 104, cardW - 48, 18, fields.subtitle, 13, C.gray700));
+  // Title (always present)
+  els.push(text(`${prefix}_title`, cardX + 24, cardY + 76, cardW - 48, 24, title, 17, C.gray900));
+
+  // Optional subtitle
+  if (subtitle) {
+    els.push(text(`${prefix}_sub`, cardX + 24, cardY + 104, cardW - 48, 18, subtitle, 13, C.gray700));
   }
 
-  // Fields
-  const fieldStartY = cardY + (fields.subtitle ? 136 : 112);
-  fields.items.forEach(({ label, placeholder }, i) => {
+  // Fields — start at headerH from card top
+  const fieldStartY = cardY + headerH;
+  items.forEach(({ label, placeholder }, i) => {
     const y = fieldStartY + i * 72;
-    els.push(text(`${prefix}_fl_${i}`, cardX + 24, y, cardW - 48, 16, label, 11, C.gray500));
+    els.push(text(`${prefix}_fl_${i}`, cardX + 24, y,      cardW - 48, 16, label,       11, C.gray500));
     els.push(...inputField(`${prefix}_fi_${i}`, cardX + 24, y + 18, cardW - 48, placeholder));
   });
 
-  // Submit button (full width)
-  const btnY = fieldStartY + fields.items.length * 72 + 4;
-  const btnW = cardW - 48;
-  els.push(rect(`${prefix}_sbtn`, cardX + 24, btnY, btnW, 36, C.accentDark, C.accent, 2, true));
-  els.push(text(`${prefix}_sbtn_t`, cardX + 24, btnY + 10, btnW, 16, submitLabel, 13, C.white, 'center'));
+  // Optional secondary link (e.g. 'Forgot password?') — right-aligned, 6px below last field
+  const afterFieldsY = fieldStartY + fieldH;
+  if (extraLink) {
+    els.push(text(`${prefix}_xl`, cardX + 24, afterFieldsY + 6, cardW - 48, 16, extraLink, 12, C.primary, 'right'));
+  }
 
-  // Footer link
-  els.push(hline(`${prefix}_fdiv`, cardX, cardY + cardH - 32, cardW, C.gray300));
+  // Submit button — full card width minus 24px padding each side
+  const btnY = afterFieldsY + (extraLink ? 22 : 4);
+  const btnW = cardW - 48;
+  els.push(rect(`${prefix}_sbtn`,   cardX + 24, btnY,      btnW, 36, C.accentDark, C.accent, 2, true));
+  els.push(text(`${prefix}_sbtn_t`, cardX + 24, btnY + 10, btnW, 16, submitLabel,  13, C.white, 'center'));
+
+  // Footer divider + link
+  els.push(hline(`${prefix}_fdiv`,  cardX,      cardY + cardH - 32,      cardW,     C.gray300));
   els.push(text(`${prefix}_footer`, cardX + 24, cardY + cardH - 22, cardW - 48, 16, footerText, 12, C.primary, 'center'));
 
   return els;
@@ -131,15 +143,12 @@ function genAppShell() {
 function genLogin() {
   const els = authCard('li', {
     title: 'Sign in to Axis',
-    subtitle: null,
     items: [
       { label: 'Email address', placeholder: 'you@company.com' },
       { label: 'Password',      placeholder: '••••••••' },
     ],
+    extraLink: 'Forgot password?',
   }, 'Sign in', "Don't have an account? Sign up");
-  // Forgot password link above submit button
-  const cardW = 440, cardX = Math.round((W - cardW) / 2), cardY = Math.round((H - (72 + 144 + 56 + 32)) / 2);
-  els.push(text('li_forgot', cardX + 24, cardY + 112 + 144 - 4, cardW - 48, 16, 'Forgot password?', 12, C.primary, 'right'));
   write('E02-identity-access/login.excalidraw', els);
 }
 
