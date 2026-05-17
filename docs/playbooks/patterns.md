@@ -1043,15 +1043,16 @@ Every endpoint must be fully annotated — see CLAUDE.md API Layer section for r
 // Program.cs
 builder.Host.UseWolverine(opts =>
 {
-    // Durable outbox + transport via PostgreSQL (same DB, no extra broker)
-    opts.UsePostgresqlPersistenceAndTransport(
-        builder.Configuration.GetConnectionString("Default")!);
-
     // Auto-wrap handlers that use EF Core DbContext in a transaction
     opts.Policies.AutoApplyTransactions();
 
-    // Local queues are durable by default (survive process restart)
-    opts.Policies.UseDurableLocalQueues();
+    // Integrates Wolverine's outbox with EF Core SaveChangesAsync
+    opts.UseEntityFrameworkCoreTransactions();
+
+    // NOTE: Durable PostgreSQL outbox (UsePostgresqlPersistenceAndTransport +
+    // UseDurableLocalQueues) is NOT yet configured. Domain events are dispatched
+    // in-memory after SaveChangesAsync. The durable outbox is deferred until the
+    // Wolverine persistence schema strategy is decided — tracked as E01 gap.
 });
 ```
 

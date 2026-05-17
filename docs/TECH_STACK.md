@@ -38,8 +38,8 @@
 | **Fetch API** | (native) | HTTP client | Native browser API for network requests; custom wrapper (`fetchApi`) for auth, timeout, and error normalisation |
 | **shadcn/ui + @base-ui/react** | latest | UI components | shadcn/ui for pre-built patterns; @base-ui/react for lower-level unstyled primitives |
 | **Tailwind CSS** | 3.x | Styling | Utility-first, fast iteration |
-| **@xyflow/react** (React Flow) | 12.x | Workflow canvas | Best-in-class drag & drop node-based diagram editor |
-| **dnd-kit** | 6.x | Page builder drag & drop | Flexible, accessible DnD for UI builder |
+| **@xyflow/react** (React Flow) | 12.x | Workflow canvas | Best-in-class drag & drop node-based diagram editor. ⏳ Not yet installed — add when workflow canvas is first implemented. |
+| **dnd-kit** | 6.x | Page builder drag & drop | Flexible, accessible DnD for UI builder. ⏳ Not yet installed — add when page builder is first implemented. |
 | **Zod** | 3.x | Schema validation | Runtime validation; source of truth for form types via `z.infer`. ⏳ Not yet installed — add when forms are first implemented. |
 | **react-hook-form** | 7.x | Form state management | Performant form handling; always paired with Zod via `zodResolver`. ⏳ Not yet installed — add alongside Zod. |
 | **Biome** | 2.x | Linter + formatter | Replaces ESLint + Prettier. Single tool for linting, formatting, and import sorting. See ADR-008. |

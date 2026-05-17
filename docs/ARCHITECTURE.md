@@ -34,43 +34,40 @@ The Axis platform serves four actor types: **Platform Admins** (Axis team), **Or
 
 ```
 src/
-├── Axis.Api/                    # ASP.NET Core host, middleware, DI wiring
+├── Axis.Api/                    # ASP.NET Core host — all Minimal API endpoints, middleware, DI wiring
+│   └── Endpoints/               # One IEndpointRouteBuilder extension per module (e.g. ModelEndpoints.cs)
 ├── Modules/
 │   ├── Identity/
 │   │   ├── Axis.Identity.Domain/
 │   │   ├── Axis.Identity.Application/
-│   │   ├── Axis.Identity.Infrastructure/
-│   │   └── Axis.Identity.Api/
+│   │   └── Axis.Identity.Infrastructure/
 │   ├── DataModeling/
 │   │   ├── Axis.DataModeling.Domain/
 │   │   ├── Axis.DataModeling.Application/
-│   │   ├── Axis.DataModeling.Infrastructure/
-│   │   └── Axis.DataModeling.Api/
+│   │   └── Axis.DataModeling.Infrastructure/
 │   ├── WorkflowBuilder/
 │   │   ├── Axis.WorkflowBuilder.Domain/
 │   │   ├── Axis.WorkflowBuilder.Application/
-│   │   ├── Axis.WorkflowBuilder.Infrastructure/
-│   │   └── Axis.WorkflowBuilder.Api/
+│   │   └── Axis.WorkflowBuilder.Infrastructure/
 │   ├── FormBuilder/
 │   │   ├── Axis.FormBuilder.Domain/
 │   │   ├── Axis.FormBuilder.Application/
-│   │   ├── Axis.FormBuilder.Infrastructure/
-│   │   └── Axis.FormBuilder.Api/
+│   │   └── Axis.FormBuilder.Infrastructure/
 │   ├── WorkflowEngine/
 │   │   ├── Axis.WorkflowEngine.Domain/
 │   │   ├── Axis.WorkflowEngine.Application/
-│   │   ├── Axis.WorkflowEngine.Infrastructure/
-│   │   └── Axis.WorkflowEngine.Api/
+│   │   └── Axis.WorkflowEngine.Infrastructure/
 │   └── PageBuilder/
 │       ├── Axis.PageBuilder.Domain/
 │       ├── Axis.PageBuilder.Application/
-│       ├── Axis.PageBuilder.Infrastructure/
-│       └── Axis.PageBuilder.Api/
+│       └── Axis.PageBuilder.Infrastructure/
 └── Shared/
     ├── Axis.Shared.Domain/      # Base entities, value objects, domain events
     ├── Axis.Shared.Application/ # Base handlers, pagination, CQRS abstractions
     └── Axis.Shared.Infrastructure/ # Multi-tenancy, EF Core base, Redis, email
 ```
+
+> **Note:** There are no per-module `.Api` projects. All HTTP endpoints are Minimal API methods defined in `src/Axis.Api/Endpoints/` and registered in `Program.cs`. Each module contributes one `IEndpointRouteBuilder` extension class.
 
 ### Module Layer Convention (per module)
 
@@ -79,7 +76,7 @@ src/
 | **Domain** | Entities, value objects, domain events, repository interfaces | Shared.Domain only |
 | **Application** | Commands, queries, handlers, DTOs, service interfaces | Domain, Shared.Application |
 | **Infrastructure** | EF Core DbContext, repository implementations, external clients | Application, Shared.Infrastructure |
-| **Api** | Controllers, SignalR hubs, endpoint mapping | Application |
+| **Api** | Minimal API endpoint methods (in `Axis.Api/Endpoints/`), OpenAPI annotations | Application |
 
 ---
 
@@ -104,14 +101,13 @@ PostgreSQL
     └── ...
 ```
 
-**Tenant resolution:** Every API request carries a JWT with an `org_id` claim. Middleware resolves the tenant and switches the EF Core schema context before the request hits any handler.
+**Tenant resolution:** Every API request carries a JWT with an `org_id` claim. `HttpTenantContext` (an `ITenantContext` implementation) resolves the tenant lazily from the claim on first access. `TenantSchemaInterceptor` (an EF Core `DbConnectionInterceptor`) sets `search_path` to the tenant schema when a DB connection opens — no middleware switches the schema context in the pipeline.
 
 ---
 
 ## Authentication Flow
 
 > Auth is handled by **OpenIddict 5.x** — an in-process OAuth2/OIDC server. See ADR-004 in `docs/TECH_STACK.md`.
-> ⚠️ Current code uses a temporary custom `JwtTokenService` — planned for replacement. Do not build on top of it.
 
 ### SPA flow (Authorization Code + PKCE)
 1. React SPA redirects user to `GET /connect/authorize` with PKCE challenge
@@ -130,7 +126,9 @@ PostgreSQL
 
 ## Real-Time Updates (SignalR)
 
-When a workflow execution changes state (started, step completed, failed, finished), the **WorkflowEngine** publishes a domain event. Wolverine dispatches it to the SignalR hub, which pushes the update to the connected client.
+> ⏳ **Not yet implemented.** SignalR is listed in the approved tech stack but no `*Hub.cs` exists in `src/` yet. The architecture below describes the planned design for when this is built.
+
+When a workflow execution changes state (started, step completed, failed, finished), the **WorkflowEngine** will publish a domain event. Wolverine will dispatch it to the SignalR hub, which will push the update to the connected client.
 
 ```
 WorkflowEngine → domain event → Wolverine → SignalR Hub → Browser
