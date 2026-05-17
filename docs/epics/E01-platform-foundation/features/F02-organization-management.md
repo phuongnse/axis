@@ -2,6 +2,9 @@
 
 [← Back to E01](../README.md)
 
+> **Wireframe**: [docs/wireframes/E01-platform-foundation/settings-org.excalidraw](../../../wireframes/E01-platform-foundation/settings-org.excalidraw) · [preview](../../../wireframes/E01-platform-foundation/settings-org.svg)
+> **Wireframe**: [docs/wireframes/E01-platform-foundation/settings-org-delete-modal.excalidraw](../../../wireframes/E01-platform-foundation/settings-org-delete-modal.excalidraw) · [preview](../../../wireframes/E01-platform-foundation/settings-org-delete-modal.svg)
+
 ---
 
 ## Description

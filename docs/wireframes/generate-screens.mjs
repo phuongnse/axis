@@ -10,6 +10,9 @@
  *
  * Screens generated:
  *   _shared/app-shell
+ *   E01: register-org, email-confirmation, verify-email,
+ *        workspace-provisioning, pricing, settings-org,
+ *        settings-org-delete-modal
  *   E02: login, register, forgot-password, change-password,
  *        settings-users, settings-roles, settings-security, accept-invitation
  *   E03: data-models, data-classes, records
@@ -136,6 +139,450 @@ function genAppShell() {
     text('as_ph', cx + 20, cy + 20, 200, 24, 'Content area', 14, C.gray500),
   ];
   write('_shared/app-shell.excalidraw', els);
+}
+
+// ─── E01 Platform Foundation ─────────────────────────────────────────────────
+
+/**
+ * Register-Org — US-001, US-004
+ * Standard auth card: 5 fields, plan selection shown in subtitle.
+ * cardH = 136 (subtitle) + 5×72 (fields) + 4 + 36 + 12 + 32 = 580 → centered vertically.
+ */
+function genRegisterOrg() {
+  const els = authCard('ro', {
+    title:    'Create your organization',
+    subtitle: 'Plan: Free trial  ·  Change plan →',
+    items: [
+      { label: 'Organization name', placeholder: 'Acme Corp' },
+      { label: 'Admin full name',   placeholder: 'Alex Brown' },
+      { label: 'Email address',     placeholder: 'you@company.com' },
+      { label: 'Password',          placeholder: '••••••••' },
+      { label: 'Confirm password',  placeholder: '••••••••' },
+    ],
+  }, 'Create organization', 'Already have an account? Sign in');
+  write('E01-platform-foundation/register-org.excalidraw', els);
+}
+
+/**
+ * Email-Confirmation — US-001 success state, US-002 resend
+ * Informational card (no form): envelope icon, check-email message, resend link.
+ */
+function genEmailConfirmation() {
+  const cardW = 440;
+  const cardH = 300;
+  const cardX = Math.round((W - cardW) / 2);
+  const cardY = Math.round((H - cardH) / 2);
+  const els   = [];
+
+  els.push(rect('ec_bg',   0,     0,     W,     H,     C.gray300, C.gray100, 1, false));
+  els.push(rect('ec_card', cardX, cardY, cardW, cardH, C.gray300, C.white,   2, true));
+
+  // Logo row
+  els.push(text('ec_logo',  cardX,      cardY + 16,  cardW,      28, '⬡  Axis',            18, C.primary, 'center'));
+  els.push(hline('ec_hdiv', cardX,      cardY + 60,  cardW,          C.gray300));
+
+  // Envelope icon (US-001 success state)
+  els.push(text('ec_icon',  cardX,      cardY + 76,  cardW,      36, '✉',                  28, C.primary, 'center'));
+
+  // Title + body
+  els.push(text('ec_title', cardX + 24, cardY + 128, cardW - 48, 24, 'Check your email',   17, C.gray900));
+  els.push(text('ec_body1', cardX + 24, cardY + 160, cardW - 48, 18, 'We sent a verification link to:', 13, C.gray700));
+  els.push(text('ec_body2', cardX + 24, cardY + 182, cardW - 48, 18, 'alex@company.com',   13, C.gray900));
+
+  // Resend link (US-002)
+  els.push(text('ec_resend', cardX + 24, cardY + 220, cardW - 48, 16, "Didn't receive it?  Resend email →", 12, C.primary, 'center'));
+
+  // Footer
+  els.push(hline('ec_fdiv',   cardX,      cardY + cardH - 32, cardW,      C.gray300));
+  els.push(text('ec_footer',  cardX + 24, cardY + cardH - 22, cardW - 48, 16, 'Back to sign in', 12, C.primary, 'center'));
+
+  write('E01-platform-foundation/email-confirmation.excalidraw', els);
+}
+
+/**
+ * Verify-Email — US-002 (all 4 outcome states)
+ * 2×2 grid of state cards: success, expired, already-used, invalid.
+ * Each card: 440×200. Grid centred at W=1200.
+ */
+function genVerifyEmail() {
+  const els   = [];
+  const cardW = 440;
+  const cardH = 200;
+  const gapX  = 60;
+  const gapY  = 44;   // row gap; first 20px reserved for state label above card
+  const col1X = Math.round((W - (cardW * 2 + gapX)) / 2);  // 130
+  const col2X = col1X + cardW + gapX;
+  const row1Y = 100;
+  const row2Y = row1Y + cardH + gapY;
+
+  els.push(rect('ve_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
+  els.push(text('ve_pg', 0, 48, W, 20, 'Email Verification — States', 13, C.gray500, 'center'));
+
+  const states = [
+    {
+      id: 've_ok',   x: col1X, y: row1Y,
+      stateLbl: '✓  Success',       lblColor: C.success,
+      icon: '✓', iconColor: C.success,
+      title: 'Email verified!',
+      body:  'Your account is ready. Signing you in…',
+      btnLabel: null, btnVariant: null,
+    },
+    {
+      id: 've_exp',  x: col2X, y: row1Y,
+      stateLbl: 'Expired link',     lblColor: C.warning,
+      icon: '⏱', iconColor: C.warning,
+      title: 'Verification link expired',
+      body:  'This link was valid for 24 hours.',
+      btnLabel: 'Resend verification email', btnVariant: 'secondary',
+    },
+    {
+      id: 've_used', x: col1X, y: row2Y,
+      stateLbl: 'Already verified', lblColor: C.gray500,
+      icon: '✓', iconColor: C.gray500,
+      title: 'Already verified',
+      body:  'This link has already been used. Please sign in.',
+      btnLabel: 'Sign in', btnVariant: 'ghost',
+    },
+    {
+      id: 've_inv',  x: col2X, y: row2Y,
+      stateLbl: 'Invalid token',    lblColor: C.danger,
+      icon: '✕', iconColor: C.danger,
+      title: 'Invalid verification link',
+      body:  'This link is invalid or has been tampered with.',
+      btnLabel: null, btnVariant: null,
+    },
+  ];
+
+  states.forEach(({ id, x, y, stateLbl, lblColor, icon, iconColor, title, body, btnLabel, btnVariant }) => {
+    els.push(text(`${id}_lbl`,   x,      y - 20,  cardW,      16, stateLbl, 12, lblColor));
+    els.push(rect(`${id}_card`,  x,      y,       cardW,      cardH, C.gray300, C.white, 2, true));
+    // Mini logo
+    els.push(text(`${id}_logo`,  x,      y + 12,  cardW,      18, '⬡  Axis', 12, C.primary, 'center'));
+    els.push(hline(`${id}_hdiv`, x,      y + 36,  cardW,      C.gray300));
+    // Status icon
+    els.push(text(`${id}_icon`,  x,      y + 46,  cardW,      26, icon, 20, iconColor, 'center'));
+    // Title + body
+    els.push(text(`${id}_title`, x + 20, y + 84,  cardW - 40, 20, title, 14, C.gray900));
+    els.push(text(`${id}_body`,  x + 20, y + 108, cardW - 40, 32, body,  12, C.gray700));
+    // Optional CTA
+    if (btnLabel) {
+      els.push(...btn(`${id}_cta`, x + 20, y + cardH - 44, btnLabel, btnVariant));
+    }
+  });
+
+  write('E01-platform-foundation/verify-email.excalidraw', els);
+}
+
+/**
+ * Workspace-Provisioning — US-003 (2 states side by side)
+ * Left:  In-progress — spinner + step 2 active.
+ * Right: Failed (after 3 retries) — error icon + failed step + contact link.
+ *
+ * W=1200 split at x=600. Each panel: 520px usable, centred at x=300/900.
+ * Steps y baseline: 278. 4 × 40px → bottom 438.
+ */
+function genWorkspaceProvisioning() {
+  const els = [];
+
+  els.push(rect('wp_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
+
+  // Shared header row
+  els.push(text('wp_logo',    0, 24, W, 28, '⬡  Axis',                  18, C.primary, 'center'));
+  els.push(text('wp_heading', 0, 60, W, 18, 'Workspace Setup — States', 12, C.gray500, 'center'));
+  els.push(vline('wp_div', W / 2, 86, H - 86, C.gray300));
+
+  // ── Left: In-progress ────────────────────────────────────────────────────────
+  const lX    = 40;
+  const lW    = W / 2 - 80;  // 520
+  const lMidX = W / 4;        // 300
+
+  els.push(text('wp_l_lbl', lX, 90, lW, 16, '↻  In progress', 12, C.primary));
+  els.push(ellipse('wp_l_spin',   lMidX - 28, 116, 56, 56, C.infoBorder, C.infoBg, 2));
+  els.push(text('wp_l_spin_t',    lMidX - 28, 131, 56, 26, '↻', 18, C.primary, 'center'));
+  els.push(text('wp_l_title', lX, 190, lW, 26, 'Setting up your workspace…', 18, C.gray900, 'center'));
+  els.push(text('wp_l_org',   lX, 222, lW, 18, 'For Acme Corp',              13, C.accent,  'center'));
+  els.push(text('wp_l_sub',   lX, 246, lW, 14, "Don't close this tab.",      11, C.gray500, 'center'));
+
+  const stepsY  = 278;
+  const lStepsX = lMidX - 160;  // 140
+  [
+    { icon: '✓', label: 'Email verified',          c: C.success },
+    { icon: '↻', label: 'Creating your workspace', c: C.primary },
+    { icon: '○', label: 'Configuring defaults',    c: C.gray300 },
+    { icon: '○', label: 'Assigning admin role',    c: C.gray300 },
+  ].forEach(({ icon, label, c }, i) => {
+    const y = stepsY + i * 40;
+    els.push(text(`wp_l_si_${i}`, lStepsX,      y, 20,  20, icon,  14, c));
+    els.push(text(`wp_l_sl_${i}`, lStepsX + 28, y, 280, 20, label, 13, c === C.gray300 ? C.gray300 : C.gray700));
+  });
+  els.push(text('wp_l_note', lX, stepsY + 4 * 40 + 8, lW, 14,
+    'Retrying automatically if this takes longer.', 10, C.gray300, 'center'));
+
+  // ── Right: Failed (after 3 retries) ─────────────────────────────────────────
+  const rX    = W / 2 + 40;    // 640
+  const rW    = W / 2 - 80;    // 520
+  const rMidX = (W * 3) / 4;   // 900
+
+  els.push(text('wp_r_lbl', rX, 90, rW, 16, '✕  Failed (after 3 retries)', 12, C.danger));
+  els.push(ellipse('wp_r_err',   rMidX - 28, 116, 56, 56, C.dangerBorder, C.dangerBg, 2));
+  els.push(text('wp_r_err_t',    rMidX - 28, 131, 56, 26, '✕', 18, C.danger, 'center'));
+  els.push(text('wp_r_title', rX, 190, rW, 26, 'Setup failed',                                        18, C.gray900, 'center'));
+  els.push(text('wp_r_body',  rX, 222, rW, 36, 'Provisioning failed after 3 attempts.\nOur team has been notified.', 12, C.gray700, 'center'));
+
+  const rStepsX = rMidX - 160;  // 740
+  [
+    { icon: '✓', label: 'Email verified',          c: C.success },
+    { icon: '✕', label: 'Creating your workspace', c: C.danger  },
+    { icon: '○', label: 'Configuring defaults',    c: C.gray300 },
+    { icon: '○', label: 'Assigning admin role',    c: C.gray300 },
+  ].forEach(({ icon, label, c }, i) => {
+    const y = stepsY + i * 40;
+    els.push(text(`wp_r_si_${i}`, rStepsX,      y, 20,  20, icon,  14, c));
+    els.push(text(`wp_r_sl_${i}`, rStepsX + 28, y, 280, 20, label, 13, c === C.gray300 ? C.gray300 : C.gray700));
+  });
+  els.push(text('wp_r_supp', rX, stepsY + 4 * 40 + 8, rW, 14,
+    'Contact support if the issue persists →', 11, C.primary, 'center'));
+
+  write('E01-platform-foundation/workspace-provisioning.excalidraw', els);
+}
+
+/**
+ * Settings-Org Delete Modal — US-007
+ * Settings-org page (dimmed) + confirmation modal centred.
+ *
+ * Modal: 480×280. Input to type org name. Delete button disabled (gray) until match.
+ * mX=360, mY=210. Right edge=840, bottom=490.
+ */
+function genSettingsOrgDeleteModal() {
+  const navIdx = 4;
+  const els    = [];
+
+  // ── Background: abbreviated settings-org (for context behind modal) ──────────
+  els.push(...appShell('sdm', W, H, NAV, navIdx, 'Settings — Organization'));
+  els.push(text('sdm_bg_h',  cx,      cy,           300, 28, 'Organization Profile', 20, C.gray900));
+  els.push(rect('sdm_bg_dz', cx,      cy + 280, cw, 72, C.dangerBorder, C.dangerBg, 1, true));
+  els.push(text('sdm_bg_dt', cx + 16, cy + 296,     300, 18, 'Delete organization',  14, C.danger));
+
+  // Semi-transparent overlay
+  els.push(rect('sdm_overlay', 0, 0, W, H, 'transparent', C.gray900, 0, false, { opacity: 40, roughness: 0 }));
+
+  // ── Modal card ────────────────────────────────────────────────────────────────
+  const mW = 480;
+  const mH = 280;
+  const mX = Math.round((W - mW) / 2);  // 360
+  const mY = Math.round((H - mH) / 2);  // 210
+
+  els.push(rect('sdm_card', mX, mY, mW, mH, C.gray700, C.white, 2, true, { roughness: 0 }));
+
+  // Header
+  els.push(text('sdm_title', mX + 20,      mY + 18, 380, 24, 'Delete organization', 16, C.danger));
+  els.push(text('sdm_close', mX + mW - 40, mY + 16, 20,  20, '×',                   18, C.gray500));
+  els.push(hline('sdm_hdiv', mX, mY + 52, mW, C.gray300));
+
+  // Warning body
+  els.push(text('sdm_body', mX + 20, mY + 68, mW - 40, 52,
+    'This action is permanent and cannot be undone.\nAll data will be deleted after a 30-day grace period.', 13, C.gray700));
+
+  // Confirm input
+  els.push(text('sdm_inp_l', mX + 20, mY + 130, mW - 40, 16, "Type 'Acme Corp' to confirm:", 12, C.gray500));
+  els.push(...inputField('sdm_inp', mX + 20, mY + 150, mW - 40, 'Acme Corp'));
+
+  // Footer
+  els.push(hline('sdm_fdiv', mX, mY + mH - 56, mW, C.gray300));
+
+  const cancelW = 'Cancel'.length * 8 + 32;             // 80
+  const delW    = 'Delete organization'.length * 8 + 32; // 184
+  const delBtnX    = mX + mW - 20 - delW;               // 636
+  const cancelBtnX = delBtnX - 8 - cancelW;             // 548
+
+  els.push(...btn('sdm_cancel', cancelBtnX, mY + mH - 44, 'Cancel', 'ghost'));
+
+  // Delete button — disabled state until input matches exactly
+  els.push(rect('sdm_del',   delBtnX, mY + mH - 44, delW, 36, C.gray300, C.gray100, 1, true, { roughness: 0 }));
+  els.push(text('sdm_del_t', delBtnX, mY + mH - 34, delW, 16, 'Delete organization', 13, C.gray300, 'center'));
+  els.push(text('sdm_hint',  mX + 20, mY + mH - 36, 240,  14, 'Enabled when name matches exactly', 10, C.gray300));
+
+  write('E01-platform-foundation/settings-org-delete-modal.excalidraw', els);
+}
+
+/**
+ * Pricing — US-004 (plan selection before registration), US-010 (public pricing page)
+ * Public marketing page (no app shell). 3-column plan cards.
+ * Signed-in users see "Current plan" badge on their active plan.
+ */
+function genPricing() {
+  const els = [];
+  els.push(rect('pr_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
+
+  // Slim marketing header
+  els.push(rect('pr_mhdr', 0, 0, W, 60, C.gray300, C.white, 1, false));
+  els.push(text('pr_logo', 30, 18, 150, 26, '⬡  Axis', 18, C.primary));
+  const siW = 'Sign in'.length * 8 + 32;     // 88
+  const gsW = 'Get started'.length * 8 + 32; // 120
+  els.push(...btn('pr_gst', W - 16 - gsW,              12, 'Get started', 'primary'));
+  els.push(...btn('pr_si',  W - 16 - gsW - 8 - siW,    12, 'Sign in',     'ghost'));
+
+  // Hero text
+  els.push(text('pr_h1', 0, 80,  W, 30, 'Simple, transparent pricing',                               22, C.gray900, 'center'));
+  els.push(text('pr_h2', 0, 118, W, 18, 'Start free. Upgrade as you grow. No credit card required.', 13, C.gray500, 'center'));
+
+  // Plan cards — 3 × 300px wide, 25px gaps, centred at W=1200
+  const planCardW = 300;
+  const planCardH = 360;
+  const planGap   = 25;
+  const planY     = 150;
+  const planX0    = Math.round((W - (3 * planCardW + 2 * planGap)) / 2);  // 125
+
+  const plans = [
+    {
+      id: 'free', name: 'Free',       price: '$0',     priceSub: 'forever free',
+      features: ['3 workflows', '1,000 executions / mo', '3 users', '1 GB storage', 'Community support'],
+      cta: 'Get started free', ctaVariant: 'ghost',    highlight: false, currentPlan: false,
+    },
+    {
+      id: 'pro',  name: 'Pro',        price: '$49',    priceSub: 'per month',
+      features: ['20 workflows', '10,000 executions / mo', '10 users', '10 GB storage', 'Email support'],
+      cta: 'Start free trial',  ctaVariant: 'primary', highlight: true,  currentPlan: true,
+    },
+    {
+      id: 'ent',  name: 'Enterprise', price: 'Custom', priceSub: 'contact us',
+      features: ['Unlimited workflows', 'Unlimited executions', 'Unlimited users', 'Unlimited storage', 'Dedicated support'],
+      cta: 'Contact sales',     ctaVariant: 'secondary', highlight: false, currentPlan: false,
+    },
+  ];
+
+  plans.forEach(({ id, name, price, priceSub, features, cta, ctaVariant, highlight, currentPlan }, planIdx) => {
+    const px     = planX0 + planIdx * (planCardW + planGap);
+    const stroke = highlight ? C.primary : C.gray300;
+    const sw     = highlight ? 2 : 1;
+
+    els.push(rect(`pr_${id}_c`, px, planY, planCardW, planCardH, stroke, C.white, sw, true));
+
+    // "Current plan" badge (shown for signed-in users on their active plan)
+    if (currentPlan) {
+      const bdgW = 'Current plan'.length * 8 + 24;  // 120
+      els.push(rect(`pr_${id}_bdg`,   px + planCardW - bdgW - 12, planY + 12, bdgW, 22, C.infoBorder, C.infoBg,  1, true));
+      els.push(text(`pr_${id}_bdg_t`, px + planCardW - bdgW - 12, planY + 17, bdgW, 14, 'Current plan', 10, C.primary, 'center'));
+    }
+
+    // Plan name + price
+    els.push(text(`pr_${id}_nm`, px + 20, planY + 20, planCardW - 40, 22, name,     16, C.gray900));
+    els.push(text(`pr_${id}_pr`, px + 20, planY + 50, planCardW - 40, 34, price,    26, C.gray900));
+    els.push(text(`pr_${id}_ps`, px + 20, planY + 90, planCardW - 40, 16, priceSub, 12, C.gray500));
+    els.push(hline(`pr_${id}_div`, px, planY + 114, planCardW, C.gray300));
+
+    // Feature list
+    features.forEach((f, j) => {
+      els.push(text(`pr_${id}_f${j}`, px + 20, planY + 126 + j * 30, planCardW - 40, 18, `✓  ${f}`, 12, C.gray700));
+    });
+
+    // Full-width CTA button (raw elements so it spans the card)
+    const ctaDivY = planY + planCardH - 52;
+    els.push(hline(`pr_${id}_cdiv`, px, ctaDivY, planCardW, C.gray300));
+    const [stroke2, bg2, tc2, sw2] =
+      ctaVariant === 'primary'   ? [C.accentDark, C.accent, C.white,   2] :
+      ctaVariant === 'ghost'     ? [C.gray300,    C.white,  C.gray700, 1] :
+                                   [C.primary,    C.infoBg, C.primary, 1];  // secondary
+    const ctaBtnY = ctaDivY + 8;
+    const ctaBtnW = planCardW - 40;
+    els.push(rect(`pr_${id}_cb`,   px + 20, ctaBtnY,      ctaBtnW, 36, stroke2, bg2, sw2, true));
+    els.push(text(`pr_${id}_cb_t`, px + 20, ctaBtnY + 10, ctaBtnW, 16, cta,     13,  tc2, 'center'));
+  });
+
+  write('E01-platform-foundation/pricing.excalidraw', els);
+}
+
+/**
+ * Settings-Org — US-005, US-006, US-007
+ * App shell (Settings nav active). Three sections:
+ *   1. Organization Profile — name, logo, timezone, language, creation date
+ *   2. Usage — 3 metric cards (workflows, executions, users) + plan badge
+ *   3. Danger Zone — delete organization with confirmation description
+ *
+ * Layout math (all y values from screen top):
+ *   cy=80 → profY=124 → row2Y=212 → div1Y=302 → mY=354 → div2Y=442 → dboxY=494
+ */
+function genSettingsOrg() {
+  const navIdx = 4;
+  const els    = [];
+
+  els.push(...appShell('so', W, H, NAV, navIdx, 'Settings — Organization'));
+
+  // ── 1. Organization Profile ───────────────────────────────────────────────────
+  els.push(...pageHeader('so_ph', cx, cy, cw, 'Organization Profile', [
+    { label: 'Save changes', variant: 'primary' },
+  ]));
+
+  const profY = cy + 44;  // 124 — first content row starts 16px below the page-header title
+
+  // Logo upload square
+  els.push(rect('so_lgbx',  cx,      profY,      80,  80, C.gray300, C.gray50, 1, false));
+  els.push(text('so_lgic',  cx,      profY + 24, 80,  32, '⬡',           20, C.primary, 'center'));
+  els.push(text('so_lglnk', cx + 4,  profY + 62, 72,  14, 'Change logo', 10, C.primary, 'center'));
+
+  // Organization name
+  els.push(text('so_nm_l', cx + 96, profY + 12, 300, 16, 'Organization name', 11, C.gray500));
+  els.push(...inputField('so_nm', cx + 96, profY + 30, 500, 'Acme Corp'));
+
+  // Timezone + Language (row 2 — starts at profY+88 = 212)
+  const row2Y = profY + 88;
+  els.push(text('so_tz_l',   cx + 96,       row2Y,      240, 16, 'Timezone',    11, C.gray500));
+  els.push(...selectField('so_tz',   cx + 96,       row2Y + 18, 280, 'UTC+0 · London'));
+  els.push(text('so_ln_l',   cx + 96 + 296, row2Y,      180, 16, 'Language',    11, C.gray500));
+  els.push(...selectField('so_lang', cx + 96 + 296, row2Y + 18, 200, 'English (US)'));
+
+  // Created date meta (row2 bottom = row2Y+58 = 270; meta 8px below)
+  const row2Bottom = row2Y + 58;   // label(16) + gap(2) + input(40)
+  els.push(text('so_meta', cx + 96, row2Bottom + 8, 300, 14, 'Created  January 1, 2024', 11, C.gray300));
+
+  // ── 2. Usage ─────────────────────────────────────────────────────────────────
+  const div1Y  = row2Bottom + 32;  // 302
+  els.push(hline('so_div1', cx, div1Y, cw, C.gray300));
+
+  const usageY = div1Y + 20;       // 322
+  els.push(text('so_use_h', cx, usageY, 120, 22, 'Usage', 15, C.gray900));
+
+  // Inline plan badge + upgrade link
+  const planBdgW = 'Pro'.length * 8 + 24;  // 48
+  els.push(rect('so_pl_b',   cx + 128,                 usageY,     planBdgW, 22, C.infoBorder, C.infoBg, 1, true));
+  els.push(text('so_pl_b_t', cx + 128,                 usageY + 4, planBdgW, 14, 'Pro',        11, C.primary, 'center'));
+  els.push(text('so_pl_lnk', cx + 128 + planBdgW + 8,  usageY + 4, 80,       14, 'Upgrade →',  11, C.primary));
+
+  const mY = usageY + 32;          // 354
+  const mW = Math.floor((cw - 40) / 3);  // 296
+  const metrics = [
+    { id: 'wf',  label: 'Workflows',             val: '7',     sub: 'of 20 limit' },
+    { id: 'ex',  label: 'Executions this month', val: '1,234', sub: 'of 10,000 limit' },
+    { id: 'usr', label: 'Team members',           val: '4',     sub: 'of 10 limit' },
+  ];
+  metrics.forEach(({ id, label, val, sub }, i) => {
+    const mx = cx + i * (mW + 20);
+    els.push(rect(`so_m_${id}`,     mx,      mY,      mW, 72, C.gray300, C.white, 1, true));
+    els.push(text(`so_m_${id}_l`,   mx + 12, mY + 10, mW - 24, 16, label, 11, C.gray500));
+    els.push(text(`so_m_${id}_v`,   mx + 12, mY + 28, mW - 24, 24, val,   20, C.gray900));
+    els.push(text(`so_m_${id}_sub`, mx + 12, mY + 54, mW - 24, 14, sub,   11, C.gray300));
+  });
+
+  // ── 3. Danger Zone ───────────────────────────────────────────────────────────
+  const div2Y   = mY + 72 + 16;    // 442
+  els.push(hline('so_div2', cx, div2Y, cw, C.gray300));
+
+  const dangerY = div2Y + 20;      // 462
+  els.push(text('so_dng_h', cx, dangerY, 300, 22, 'Danger Zone', 15, C.danger));
+
+  const dboxY = dangerY + 32;      // 494
+  const dboxH = H - dboxY - PAD;   // 186
+  els.push(rect('so_dbox', cx, dboxY, cw, dboxH, C.dangerBorder, C.dangerBg, 1, true));
+  els.push(text('so_dbox_t', cx + 16, dboxY + 16, 400, 18, 'Delete organization', 14, C.danger));
+  els.push(text('so_dbox_d', cx + 16, dboxY + 38, 620, 14,
+    'Permanently delete this organization and all its data. A 30-day grace period applies.', 12, C.gray700));
+
+  // Delete button right-aligned inside the danger box (danger variant)
+  const delLabel = 'Delete organization';
+  const delBtnX  = cx + cw - (delLabel.length * 8 + 32);  // 996
+  els.push(...btn('so_del', delBtnX, dboxY + 12, delLabel, 'danger'));
+
+  write('E01-platform-foundation/settings-org.excalidraw', els);
 }
 
 // ─── E02 Identity & Access — Auth screens (no sidebar) ───────────────────────
@@ -708,6 +1155,15 @@ function genExecutionDetail() {
 
 // Shared
 genAppShell();
+
+// E01 — Platform Foundation
+genRegisterOrg();
+genEmailConfirmation();
+genVerifyEmail();
+genWorkspaceProvisioning();
+genPricing();
+genSettingsOrg();
+genSettingsOrgDeleteModal();
 
 // E02 — auth screens (no sidebar)
 genLogin();
