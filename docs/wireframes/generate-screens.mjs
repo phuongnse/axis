@@ -204,8 +204,8 @@ function genAcceptInvitation() {
 
 function genSettingsUsers() {
   const navIdx = 4;
-  // Breadcrumb + search bar = 18 + PAD(8) + 40 = 66px; add 16px gap = 82
-  const tblY = cy + 82;
+  // Toolbar (search + btn): 40px height. Table starts 16px below → cy+56
+  const tblY = cy + 56;
   const tblH = H - tblY - PAD;
   const cols  = [280, 120, 140, 120, 130, 60];
   const xC    = cols.reduce((a, w, i) => [...a, i === 0 ? cx : a[a.length - 1] + cols[i - 1]], []);
@@ -226,10 +226,7 @@ function genSettingsUsers() {
     ...searchBar('su_s', cx, cy, 280),
     ...btn('su_inv', cx + cw - 152, cy + 2, '+ Invite User'),
 
-    // 16px gap after toolbar (toolbar ends cy+40)
-    hline('su_sep', cx, cy + 56, cw, C.gray300),
-
-    // Table
+    // Table — 16px gap below toolbar (table border serves as separator)
     rect('su_tbl', cx, tblY, tblW, tblH, C.gray300, 'transparent', 1, false),
     rect('su_hdr', cx, tblY, tblW, 44, 'transparent', C.gray100, 0, false),
     hline('su_hdiv', cx, tblY + 44, tblW, C.gray300),
@@ -259,7 +256,8 @@ function genSettingsRoles() {
   const navIdx = 4;
   // Use permission matrix from template (S28) — exact same visual as component kit
   // buildPermissionMatrix uses contentDy=48; table w = 190 + 4×120 = 670px
-  const matrixEls = component(buildPermissionMatrix, cx, cy + 50);
+  // Hint text (h=16) ends at cy+52. Matrix placed 10px below → cy+62
+  const matrixEls = component(buildPermissionMatrix, cx, cy + 62);
   const els = [
     ...appShell('sr', W, H, NAV, navIdx, 'Settings — Roles & Permissions'),
     text('sr_title', cx, cy, 300, 22, 'Roles & Permissions', 16, C.gray900),
@@ -279,23 +277,25 @@ function genSettingsSecurity() {
 
     text('ss_s1', cx, cy, 300, 22, 'Password Policy', 16, C.gray900),
     hline('ss_s1div', cx, cy + 26, cw, C.gray300),
-    text('ss_min_lbl',  cx, cy + 50,  280, 16, 'Minimum password length', 13, C.gray700),
+    // Row layout rule: label(h=16) center-aligned with input(h=40) → labelY = inputY + 12
+    //                  label(h=16) center-aligned with toggle(h=24) → labelY = inputY + 4
+    text('ss_min_lbl',  cx, cy + 56,  280, 16, 'Minimum password length', 13, C.gray700),
     ...inputField('ss_min',  cx + 320, cy + 44, 100, '12'),
     text('ss_up_lbl',   cx, cy + 106, 280, 16, 'Require uppercase letters', 13, C.gray700),
     rect('ss_up_chk',   cx + 320, cy + 104, 20, 20, C.primary, C.primary, 1, false),
     text('ss_up_chkt',  cx + 320, cy + 105, 20, 16, '✓', 11, C.white, 'center'),
-    text('ss_exp_lbl',  cx, cy + 142, 280, 16, 'Password expiry (days)', 13, C.gray700),
+    text('ss_exp_lbl',  cx, cy + 148, 280, 16, 'Password expiry (days)', 13, C.gray700),
     ...inputField('ss_exp',  cx + 320, cy + 136, 100, '90'),
 
     text('ss_s2', cx, cy + 200, 300, 22, 'Multi-Factor Authentication', 16, C.gray900),
     hline('ss_s2div', cx, cy + 226, cw, C.gray300),
-    text('ss_mfa_lbl', cx, cy + 250, 280, 16, 'Require MFA for all users', 13, C.gray700),
+    text('ss_mfa_lbl', cx, cy + 252, 280, 16, 'Require MFA for all users', 13, C.gray700),
     rect('ss_mfa_tog',  cx + 320, cy + 248, 44, 24, C.primary,     C.primary, 2, true),
     rect('ss_mfa_knob', cx + 342, cy + 250, 20, 20, C.primaryDark, C.white,   1, true),
 
     text('ss_s3', cx, cy + 304, 300, 22, 'Session Management', 16, C.gray900),
     hline('ss_s3div', cx, cy + 330, cw, C.gray300),
-    text('ss_sess_lbl', cx, cy + 354, 280, 16, 'Session timeout (minutes)', 13, C.gray700),
+    text('ss_sess_lbl', cx, cy + 360, 280, 16, 'Session timeout (minutes)', 13, C.gray700),
     ...inputField('ss_sess', cx + 320, cy + 348, 100, '60'),
 
     ...btn('ss_save', cx + cw - 140, cy + 430, 'Save Changes'),
@@ -621,7 +621,8 @@ function genFormSubmission() {
 
 function genExecutions() {
   const navIdx = 3;
-  const tblY = cy + 64;
+  // Toolbar (search + 2× select + btn): 40px. Table starts 16px below → cy+56
+  const tblY = cy + 56;
   const tblH = H - tblY - PAD;
   const cols = [120, 100, 150, 120, 120, 100, 100, 60];
   const xC   = cols.reduce((a, w, i) => [...a, i === 0 ? cx : a[a.length - 1] + cols[i - 1]], []);
