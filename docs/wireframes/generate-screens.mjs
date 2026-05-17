@@ -134,32 +134,36 @@ function authCard(prefix, { title, subtitle = null, items = [], extraLink = null
 // ─── _shared ─────────────────────────────────────────────────────────────────
 
 function genAppShell() {
+  // Using contextual sidebar, we have standard cx, cy
   const dashStats = component(buildStatsCards, cx, cy, 48);
+
+  // Note: pageTitle is no longer rendered in the new appShell header,
+  // so we render a page header inside the content area.
   const els = [
-    ...appShell('as', W, H, NAV, 0, 'Overview'),
+    ...appShell('as', W, H, NAV, 0, 'Dashboard'),
 
-    // Page Actions (top right, inside content area)
-    ...btn('as_new_btn', cx + cw - 140, cy, '+ New Workflow', 'primary'),
+    // Page Header in content area
+    ...pageHeader('as_ph', cx, cy, cw, 'Dashboard Overview', [{ label: '+ New Workflow', variant: 'primary' }]),
 
-    // Dashboard Stats Panel
-    ...dashStats,
+    // Dashboard Stats Panel (offset by 60px below page header)
+    ...translate(dashStats, 0, 60),
 
     // Secondary panel for empty state / activity feed
-    rect('as_panel2', cx, cy + 140, cw, 280, C.gray300, C.white, 1, true, { roundness: { type: 3 } }),
-    rect('as_panel2_hdr', cx, cy + 140, cw, 48, 'transparent', C.gray50, 0, false, { roundness: { type: 3 } }),
-    hline('as_panel2_div', cx, cy + 188, cw, C.gray300),
-    text('as_panel2_title', cx + 20, cy + 154, 200, 18, 'Recent Activity', 14, C.gray900),
+    rect('as_panel2', cx, cy + 220, cw, 280, C.gray300, C.white, 1, true, { roundness: { type: 3 } }),
+    rect('as_panel2_hdr', cx, cy + 220, cw, 48, 'transparent', C.gray50, 0, false, { roundness: { type: 3 } }),
+    hline('as_panel2_div', cx, cy + 268, cw, C.gray300),
+    text('as_panel2_title', cx + 20, cy + 234, 200, 18, 'Recent Activity', 14, C.gray900),
 
-    // Some placeholder activity rows
-    text('as_act1_t', cx + 20, cy + 210, 400, 16, 'Alex Brown created workflow "Order Processing"', 13, C.gray700),
-    text('as_act1_d', cx + cw - 120, cy + 210, 100, 16, '2 hours ago', 12, C.gray500, 'right'),
-    hline('as_act1_div', cx + 20, cy + 242, cw - 40, C.gray100),
+    // Placeholder activity rows
+    text('as_act1_t', cx + 20, cy + 290, 400, 16, 'Alex Brown created workflow "Order Processing"', 13, C.gray700),
+    text('as_act1_d', cx + cw - 120, cy + 290, 100, 16, '2 hours ago', 12, C.gray500, 'right'),
+    hline('as_act1_div', cx + 20, cy + 322, cw - 40, C.gray100),
 
-    text('as_act2_t', cx + 20, cy + 260, 400, 16, 'Jane Smith updated data model "Customer"', 13, C.gray700),
-    text('as_act2_d', cx + cw - 120, cy + 260, 100, 16, 'Yesterday', 12, C.gray500, 'right'),
-    hline('as_act2_div', cx + 20, cy + 292, cw - 40, C.gray100),
+    text('as_act2_t', cx + 20, cy + 340, 400, 16, 'Jane Smith updated data model "Customer"', 13, C.gray700),
+    text('as_act2_d', cx + cw - 120, cy + 340, 100, 16, 'Yesterday', 12, C.gray500, 'right'),
+    hline('as_act2_div', cx + 20, cy + 372, cw - 40, C.gray100),
 
-    text('as_act_view_all', cx + 20, cy + 320, 100, 16, 'View all activity →', 13, C.primary),
+    text('as_act_view_all', cx + 20, cy + 400, 100, 16, 'View all activity →', 13, C.primary),
   ];
   write('_shared/app-shell.excalidraw', els);
 }
