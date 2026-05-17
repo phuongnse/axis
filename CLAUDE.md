@@ -173,8 +173,13 @@ Every time code changes, the relevant docs change too — in the **same PR, not 
 | Completed a full layer for a module | Epic README status table + `docs/PROGRESS.md` |
 | Changed architecture, added a cross-cutting rule | `CLAUDE.md` — the relevant section |
 | Changed the implementation workflow or layer order | `docs/playbooks/process.md` — update the affected checklist |
+| Changed project structure (added/removed projects) | `ARCHITECTURE.md` source tree + `docs/playbooks/process.md` new module setup table |
+| Changed `Program.cs` host/middleware wiring | `docs/playbooks/patterns.md` host setup section — verify the code example still matches |
+| Changed or removed a class/method/service referenced in a doc comment | Update the comment in the same file — stale comments are docs debt |
+| Replaced a framework or library with another | Every doc that names the old library — search for the old name across `docs/` and `src/` comments |
+| Decided a feature is out of scope or deferred | Document the decision explicitly in the affected feature file callout — never silently omit |
 
-"I'll update docs later" = the docs are already out of date. Later never comes.
+**Gate 2 walk-through is mandatory.** Before every commit, go through the table above row by row. For each row, answer explicitly: did any change in this PR trigger this row? If yes, confirm the target doc is already updated in this PR. "I'll update docs later" = the docs are already out of date. Later never comes.
 
 ### Docs navigation structure
 
@@ -198,6 +203,7 @@ When creating any new doc file, add the appropriate back-link as the first thing
 - **Git**: never push to `main` — always branch (`{type}/{short-description}` kebab-case, `type` ∈ `feat|fix|docs|refactor|test|chore`) and open a PR. When Claude Code auto-creates a worktree with a random branch name, rename before pushing.
 - **Conventional Commits**: `feat: add workflow step handler` — subject ≤ 72 chars, imperative mood, no period.
 - **Docs-first for new features**: before implementing any user story or new feature, read the relevant feature file. The doc defines the contract; code implements it. Never write code first and update docs after. For bug fixes, a doc update is only required if the fix reveals a spec deviation. Exception: production hotfixes under active incident — fix first, document the deviation immediately after.
+- **Deviation = immediate doc update**: whenever implementation diverges from what is currently documented — different project structure, different library, different startup wiring, different API path convention, removed class or method — the doc update is the very next action, before continuing to the next implementation step. Accumulating "code reality vs doc reality" debt is the primary source of staleness. Close it immediately, never defer.
 - **Every command/query maps to a US**: never invent requirements. New requirement discovered → add to docs first, then implement.
 - **AC compliance is mandatory**: implement ALL acceptance criteria. Never skip an AC without documenting it as a gap in the `> **Implementation status**` callout.
 - **Surface architectural decisions first**: list the 2–3 key design choices and confirm with the user before starting any new layer, module, or API surface.
@@ -370,6 +376,7 @@ These rules exist to prevent a specific failure mode: an agent hitting a blocker
 - **"No exceptions, no asking" does not apply to blockers**: the Priority Order governs direction of work only. Technical blockers or architectural ambiguity → always stop and ask.
 - **Legacy code is not authoritative**: if existing code conflicts with CLAUDE.md, PATTERNS.md, or a feature spec, the docs win. Do not imitate inconsistent or outdated patterns found in the codebase. If the conflict affects correctness, document it and surface it to the user.
 - **Uncertainty protocol**: if you are not confident about a business rule, an architectural constraint, or an existing project pattern — stop and ask rather than guess. Never invent: API endpoint paths, domain event names, DTO field names, database table or column names, or workflow step semantics. Fabricated identifiers silently corrupt the codebase and are hard to detect in review.
+- **Document what is, not what was planned**: docs must reflect the code that actually exists — not the design intent before implementation. If a planned pattern (e.g., durable outbox, MigrateAsync at startup) was deferred or replaced, update the doc to describe the current reality and note the deferral explicitly. A doc that describes a future state as if it were current is as harmful as a missing doc.
 
 ---
 
@@ -456,14 +463,21 @@ A US or layer is NOT done until all of the following are complete in the **same 
 
 Run through this before marking any task ✅ or raising a PR:
 
+**Code quality**
 - Tests pass — `dotnet test unit-tests.slnf` / `npm run test`
 - Zero build warnings — `dotnet build` / `npm run ci`
 - No TODO or FIXME introduced in this PR
 - No placeholder, stub, or dead code committed
 - No commented-out code left in
-- Every affected US has an updated `> **Implementation status**` callout
-- All Gate 2 doc updates are in the same PR (not a follow-up)
-- Every library used in this layer appears in the approved Tech Stack
+
+**Gate 2 — Doc correctness (run each check explicitly, not as a batch)**
+- Walk the Gate 2 table row by row. For every row whose trigger fired in this PR, confirm the target doc is updated.
+- If any library was used: verify it appears in `docs/TECH_STACK.md` AND in the actual package file (`Directory.Packages.props` for .NET, `package.json` for frontend). If the doc says a library is installed but it isn't (or vice versa), fix the discrepancy now.
+- If `Program.cs` was touched: open `docs/playbooks/patterns.md` § "Host setup" and verify the code example still matches what's actually in `Program.cs`.
+- If any project was added or removed: open `ARCHITECTURE.md` source tree and `docs/playbooks/process.md` new module setup table and verify both still match reality.
+- If a class, method, or service was renamed or removed: `grep` for the old name across `docs/` and `src/**/*.cs` comments — update every occurrence.
+- Every affected US has an updated `> **Implementation status**` callout.
+- Every library used in this layer appears in the approved Tech Stack.
 
 ---
 
