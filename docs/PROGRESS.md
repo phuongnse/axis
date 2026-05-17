@@ -7,7 +7,7 @@
 
 - `Axis.Shared.Domain`: Entity, AggregateRoot, ValueObject, IDomainEvent, Result/Result<T>
 - `Axis.Shared.Application`: ICommand/IQuery/ICommandHandler/IQueryHandler, ValidationBehavior, TenantContext/ITenantContext
-- `Axis.Shared.Infrastructure`: AxisDbContext, TenantSchemaInterceptor, UnitOfWork, MessageBus
+- `Axis.Shared.Infrastructure`: AxisDbContext, TenantSchemaInterceptor, UnitOfWork (uses Wolverine's `IMessageBus` framework interface — no custom `MessageBus` class)
 
 > ⚠️ **Remaining gap (deferred):**
 > - **Wolverine durable outbox not configured**: Wolverine is wired (`UseWolverine` + `UseEntityFrameworkCoreTransactions`) and `IMessageBus` resolves correctly. Domain events are dispatched in-memory after `SaveChangesAsync`. The durable PostgreSQL outbox (survives process restart) is deferred until a decision is made on the Wolverine persistence schema strategy — tracked as E01 Platform Foundation gap.
@@ -49,7 +49,7 @@
 **Domain ✅ | Application ⚠️ | Infrastructure ✅ | API ⏳ | Frontend ⏳**
 
 - **Domain**: WorkflowExecution aggregate with execution state machine and domain events. ExecutionStep aggregate (Pending/Running/Waiting/Completed/Failed/Skipped/Cancelled state machine; InputSnapshot/OutputSnapshot; ExecutionStepCompleted/Failed events; IsTerminal for idempotency; StepType enum).
-- **Application (partial)**: StartExecution, CancelExecution, RetryExecution commands. Missing: GetExecution, GetExecutionsByWorkflow, GetAllExecutions queries; RetryExecutionWithContext command.
+- **Application (partial)**: StartExecution, CancelExecution, RetryExecution commands. Missing: GetExecution, GetExecutionsByWorkflow, GetAllExecutions queries; RetryExecutionWithContext command (variant of RetryExecution that allows overriding the execution context — `RetryExecutionCommand` without context override already exists).
 - **Infrastructure**: WorkflowEngineDbContext, EF Core config (WorkflowExecution with `_context` as JSONB), ExecutionRepository (4 methods: AddAsync, GetByIdAsync, GetAllAsync, GetByWorkflowAsync), WorkflowDefinitionReader (cross-module raw SQL query on `workflow_definitions.status`), WorkflowEngineUnitOfWork, 8 integration tests (Testcontainers)
 
 ## PageBuilder — E07-page-builder
@@ -68,6 +68,6 @@
 - **Build gate**: `npm run ci` = `tsc -b --noEmit && biome ci .` — zero TypeScript errors + zero Biome errors/warnings required before every push
 - **Linting + formatting**: Biome 2.x (replaces ESLint + Prettier) — `frontend/biome.json`; Tailwind directives handled via `css.parser.tailwindDirectives: true` + `overrides` suppressing `noUnknownAtRules` for CSS only
 - **TypeScript**: `strict: true` enforced in both `tsconfig.app.json` and `tsconfig.node.json`
-- **Tests**: Vitest 4.x + `@testing-library/react` — `npm run test`; 11 tests passing
+- **Tests**: Vitest 3.x + `@testing-library/react` — `npm run test`; 11 tests passing
 
 All module frontend layers remain **⏳** — no feature UI implemented yet.

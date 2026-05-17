@@ -23,12 +23,12 @@ Complete in order when scaffolding a brand-new module:
 
 | Step | Action |
 |---|---|
-| 1 | Create four projects: `{Module}.Domain`, `{Module}.Application`, `{Module}.Infrastructure`, `{Module}.Api` under `src/Modules/{Module}/` |
-| 2 | Add all four to `Axis.sln`; add Domain and Application test projects to `unit-tests.slnf` |
-| 3 | Wire project references: `Domain` ← `Application` ← `Infrastructure` ← `Api`; `Api` also references `Axis.Shared.*` |
+| 1 | Create three projects: `{Module}.Domain`, `{Module}.Application`, `{Module}.Infrastructure` under `src/Modules/{Module}/` (no per-module `.Api` project — all endpoints live in `src/Axis.Api/Endpoints/`) |
+| 2 | Add all three to `Axis.sln`; add Domain and Application test projects to `unit-tests.slnf` |
+| 3 | Wire project references: `Domain` ← `Application` ← `Infrastructure`; `Axis.Api` references `Infrastructure` (and transitively `Application`) |
 | 4 | Add `GlobalUsings.cs` to each project; add common usings to `Directory.Build.props` if not already present |
 | 5 | Create `AxisDbContext` subclass in Infrastructure with `TenantSchemaInterceptor`; register in DI |
-| 6 | Create `IEndpointRouteBuilder` extension in `{Module}.Api`; wire it in `Axis.Api/Program.cs` |
+| 6 | Create `IEndpointRouteBuilder` extension class in `src/Axis.Api/Endpoints/{Module}Endpoints.cs`; wire it in `Axis.Api/Program.cs` |
 | 7 | Create test projects: `{Module}.Domain.Tests` (unit), `{Module}.Application.Tests` (unit), `{Module}.Infrastructure.Tests` (integration with Testcontainers) |
 | 8 | Add test projects to `Axis.sln`; add unit test projects to `unit-tests.slnf` |
 | 9 | Run `dotnet build` — zero errors before writing any domain code |
@@ -69,7 +69,7 @@ Repeat for every user story, in layer order: Domain → Application → Infrastr
 
 #### Step 5 — API layer
 
-1. Add Minimal API endpoint in `{Module}.Api` with full OpenAPI annotations (`.WithName`, `.WithSummary`, `.WithTags`, `.Produces<T>`, `.ProducesProblem`)
+1. Add Minimal API endpoint in `src/Axis.Api/Endpoints/{Module}Endpoints.cs` with full OpenAPI annotations (`.WithName`, `.WithSummary`, `.WithTags`, `.Produces<T>`, `.ProducesProblem`)
 2. Every endpoint calls `.RequireAuthorization()` unless explicitly public
 3. Mapping: `mediator.Send(...)` → `Result` → `result.ToProblemDetails()` — no logic in endpoint
 4. Add / update integration tests under `tests/Api/Axis.Api.Tests/`
@@ -80,7 +80,7 @@ Repeat for every user story, in layer order: Domain → Application → Infrastr
 - Update feature file `> **Implementation status**` callout for this US
 - If all USes in the feature are complete for a layer: update Epic README status table
 - If the full layer is done for the module: update `docs/PROGRESS.md`
-- If a new pattern was established: add to `docs/PATTERNS.md`
+- If a new pattern was established: add to `docs/playbooks/patterns.md`
 - If a library was added or changed: update `docs/TECH_STACK.md`
 
 ---
@@ -120,5 +120,5 @@ Repeat for every screen / feature area. **Never skip the wireframe step** — it
 - Update feature file `> **Implementation status**` callout for this US
 - If all USes in the feature are complete for Frontend: update Epic README status table
 - If the full Frontend layer is done for the module: update `docs/PROGRESS.md`
-- If a new frontend pattern was established: add to `docs/PATTERNS.md`
+- If a new frontend pattern was established: add to `docs/playbooks/patterns.md`
 - If a library was added or changed: update `docs/TECH_STACK.md`

@@ -899,22 +899,26 @@ WorkflowDefinition wf = new WorkflowDefinitionBuilder()
 
 ---
 
-### Outbox via Wolverine — reliable domain event dispatch
+### Domain event dispatch via Wolverine
 
-Domain events must survive infrastructure failures. Wolverine's outbox pattern stores events in the same transaction as the aggregate write, then dispatches them asynchronously. This guarantees at-least-once delivery even if the process crashes between `SaveChanges` and the dispatch.
+> ⚠️ **Current state — in-memory dispatch:** The durable PostgreSQL outbox (`UsePostgresqlPersistenceAndTransport` + `UseDurableLocalQueues`) is **not yet configured**. Domain events are dispatched in-memory by the `UnitOfWork` after `SaveChangesAsync`. Events do not survive a process crash between `SaveChanges` and dispatch. This is an accepted MVP trade-off tracked as an E01 gap.
+>
+> **Target state (when durable outbox is configured):** Wolverine will write events to a PostgreSQL outbox table in the same transaction as the aggregate write, then dispatch them asynchronously via a background process — guaranteeing at-least-once delivery even across process restarts.
+
+The dispatch pattern is identical in both states — code written today requires no changes when the durable outbox is enabled:
 
 ```csharp
 // This happens automatically when you use UnitOfWork correctly:
 // 1. wf.Publish() → AddDomainEvent(new WorkflowPublishedEvent(...))
 // 2. await _uow.SaveChangesAsync(ct)
-//    └─ UnitOfWork: saves aggregate to DB + writes event to Wolverine outbox (same transaction)
-//    └─ Wolverine: reads outbox, dispatches WorkflowPublishedEvent to handler (async, after commit)
+//    └─ UnitOfWork: saves aggregate to DB, then dispatches events via Wolverine (in-memory today;
+//       durable outbox when UsePostgresqlPersistenceAndTransport is configured)
 
 // You never need to manually publish a domain event.
 // If you find yourself calling _bus.PublishAsync() for a domain event inside a handler → stop.
 ```
 
-**Rule:** Domain events are dispatched by the UnitOfWork via Wolverine's outbox — never manually in a handler. Integration events to external systems (webhooks, third-party APIs) use Wolverine jobs scheduled from within the domain event handler.
+**Rule:** Domain events are dispatched by the UnitOfWork via Wolverine — never manually in a handler. Integration events to external systems (webhooks, third-party APIs) use Wolverine jobs scheduled from within the domain event handler.
 
 ---
 
@@ -1043,21 +1047,22 @@ Every endpoint must be fully annotated — see CLAUDE.md API Layer section for r
 // Program.cs
 builder.Host.UseWolverine(opts =>
 {
-    // Durable outbox + transport via PostgreSQL (same DB, no extra broker)
-    opts.UsePostgresqlPersistenceAndTransport(
-        builder.Configuration.GetConnectionString("Default")!);
-
     // Auto-wrap handlers that use EF Core DbContext in a transaction
     opts.Policies.AutoApplyTransactions();
 
-    // Local queues are durable by default (survive process restart)
-    opts.Policies.UseDurableLocalQueues();
+    // Integrates Wolverine's outbox with EF Core SaveChangesAsync
+    opts.UseEntityFrameworkCoreTransactions();
+
+    // NOTE: Durable PostgreSQL outbox (UsePostgresqlPersistenceAndTransport +
+    // UseDurableLocalQueues) is NOT yet configured. Domain events are dispatched
+    // in-memory after SaveChangesAsync. The durable outbox is deferred until the
+    // Wolverine persistence schema strategy is decided — tracked as E01 gap.
 });
 ```
 
 ### Intra-module domain event handler
 
-Domain events raised by aggregates (`AddDomainEvent`) are stored in the Wolverine outbox by `UnitOfWork.SaveChangesAsync`, then dispatched asynchronously after the transaction commits. Define the handler in the Application layer:
+Domain events raised by aggregates (`AddDomainEvent`) are dispatched by `UnitOfWork.SaveChangesAsync` via Wolverine after the transaction commits (in-memory today; durable when outbox is configured — see section above). Define the handler in the Application layer:
 
 ```csharp
 // WorkflowBuilder.Application/EventHandlers/WorkflowPublishedEventHandler.cs
@@ -1118,7 +1123,7 @@ opts.ScheduleJob<ArchiveOldExecutionsCommand>(cron: "0 2 * * *"); // daily at 02
 **Rules:**
 - Never use `Task.Run` for background work that must be reliable — use Wolverine `SendAsync`.
 - Domain event handlers live in the **Application** layer of the consuming module; never in Domain or Infrastructure.
-- Never call `_messageBus.PublishAsync` for a domain event inside a Command handler — the `UnitOfWork` dispatches events automatically via the outbox.
+- Never call `_messageBus.PublishAsync` for a domain event inside a Command handler — the `UnitOfWork` dispatches events automatically via Wolverine after commit.
 - Integration events to external systems (webhooks, third-party APIs) are Wolverine jobs scheduled from within a domain event handler, not from the command handler directly.
 
 ---

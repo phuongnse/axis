@@ -50,12 +50,11 @@ Without this foundation, nothing else works. Every feature in every other epic r
 |---|---|---|
 | Shared Domain | ✅ Done | `Entity`, `AggregateRoot`, `ValueObject`, `IDomainEvent`, `Result<T>` |
 | Shared Application | ✅ Done | `ICommand/IQuery`, `ICommandHandler/IQueryHandler`, `ValidationBehavior`, `ITenantContext` |
-| Shared Infrastructure | ✅ Done | `AxisDbContext`, `TenantSchemaInterceptor`, `UnitOfWork`, `MessageBus` |
-| Tenant Registration (US-001–002) | 🚧 In Progress | Domain + Application + Infrastructure done (in Identity module); API + email verification endpoint pending |
+| Shared Infrastructure | ✅ Done | `AxisDbContext`, `TenantSchemaInterceptor`, `UnitOfWork` (Wolverine `IMessageBus`) |
+| Tenant Registration (US-001–002) | ⚠️ Partial | Domain + Application + Infrastructure + API done (`POST /api/organizations/`, `/api/auth/verify-email`, `/api/auth/resend-verification`); Frontend ⏳. Gap: rate-limiting on resend (max 3/hr) pending |
 | Tenant Provisioning (US-003) | ⏳ Pending | Schema auto-creation on registration not yet wired |
 | Organization Management (F02) | ⏳ Pending | — |
 | Subscription Plans (F04) | ⏳ Pending | — |
-| API | ⏳ Pending | — |
 | Frontend | ⏳ Pending | — |
 
 ---
