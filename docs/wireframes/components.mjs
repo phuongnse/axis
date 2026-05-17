@@ -169,12 +169,13 @@ export function appShell(prefix, W, H, navItems, activeIdx, pageTitle) {
   // Header strip
   els.push(rect(`${prefix}_hdr`, SB, 0, W - SB, HDR, C.gray300, C.white, 1, false));
   els.push(text(`${prefix}_page_title`, SB + 20, 18, 300, 24, pageTitle, 18, C.gray900));
-  els.push(rect(`${prefix}_srch`, W - 240, 12, 160, 36, C.gray300, C.gray100, 1, true));
-  els.push(text(`${prefix}_srch_t`, W - 226, 22, 140, 16, '⌕  Search…', 12, C.gray500));
-  els.push(ellipse(`${prefix}_notif`, W - 72, 12, 36, 36, C.gray300, C.gray100, 1));
-  els.push(text(`${prefix}_notif_t`, W - 72, 21, 36, 18, '🔔', 12, C.gray700, 'center'));
-  els.push(ellipse(`${prefix}_av`, W - 28, 12, 36, 36, C.infoBorder, C.infoBg, 1));
-  els.push(text(`${prefix}_av_t`, W - 28, 21, 36, 18, 'AB', 12, C.primary, 'center'));
+  // Right-to-left: margin(8) + avatar(36) + gap(8) + bell(36) + gap(8) + search(160)
+  els.push(rect(`${prefix}_srch`, W - 256, 12, 160, 36, C.gray300, C.gray100, 1, true));
+  els.push(text(`${prefix}_srch_t`, W - 242, 22, 140, 16, '⌕  Search…', 12, C.gray500));
+  els.push(ellipse(`${prefix}_notif`, W - 88, 12, 36, 36, C.gray300, C.gray100, 1));
+  els.push(text(`${prefix}_notif_t`, W - 88, 21, 36, 18, '🔔', 12, C.gray700, 'center'));
+  els.push(ellipse(`${prefix}_av`, W - 44, 12, 36, 36, C.infoBorder, C.infoBg, 1));
+  els.push(text(`${prefix}_av_t`, W - 44, 21, 36, 18, 'AB', 12, C.primary, 'center'));
 
   return els;
 }
