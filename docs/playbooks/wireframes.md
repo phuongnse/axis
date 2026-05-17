@@ -193,6 +193,107 @@ Height: **40px**. Renders input + `⌕` icon + `'Search…'` placeholder.
 
 ---
 
+## Screen constants
+
+All authenticated screens use these values. **Never change W or H without re-verifying every screen.**
+
+```js
+const W   = 1200;  // total screen width — must be ≥ 1150 (cx=250 + template content=900)
+const H   = 700;   // total screen height
+const PAD = 20;    // content area padding
+
+const cx  = CX + PAD;          // 250 — first content element x (after sidebar + padding)
+const cy  = CY + PAD;          // 80  — first content element y (after header + padding)
+const cw  = W - CX - PAD * 2;  // 930 — usable content width
+```
+
+---
+
+## Spacing formulas — pixel-exact rules
+
+These formulas are the source of truth for all layout math in `generate-screens.mjs`. Always derive positions from them — never guess.
+
+### Table layout
+
+```
+tblY = cy + 56    // standard: toolbar(40px) + gap(16px)
+tblY = cy + 82    // with breadcrumb: breadcrumb(18) + gap(8) + toolbar(40) + gap(16)
+tblH = H - tblY - PAD
+```
+
+| Variant | When to use |
+|---|---|
+| `cy + 56` | Toolbar only (search bar, filters, action buttons in one row) |
+| `cy + 82` | Toolbar preceded by a breadcrumb row |
+
+Table internals (from S10, canonical):
+
+| Element | Height | Content y-offset |
+|---|---|---|
+| Header row | **44px** `C.gray100` bg | `tblY + 12` |
+| Data row | **50px** | `tblY + 44 + i × 50 + 15` |
+| Badge in row | — | row `y + 11` (centers 28px badge in 50px row) |
+| Button in row | — | row `y + 7` (centers 36px btn in 50px row) |
+
+### Inline form row (label left, control right)
+
+A "settings row" places a text label on the left and a control (input, checkbox, toggle) on the right. The label must be **vertically centered** with the control:
+
+```
+labelY = controlY + (controlH - 16) / 2
+```
+
+| Control type | controlH | labelY formula | Example |
+|---|---|---|---|
+| `inputField` | 40px | `controlY + 12` | `text('lbl', cx, y+12, ...); inputField('inp', cx+320, y, ...)` |
+| Toggle (`rect` h=24) | 24px | `controlY + 4` | `text('lbl', cx, y+4, ...);  rect('tog', cx+320, y, 44, 24, ...)` |
+| Checkbox (`rect` h=20) | 20px | `controlY + 2` | `text('lbl', cx, y+2, ...);  rect('chk', cx+320, y, 20, 20, ...)` |
+
+### Section header spacing (settings screens)
+
+```
+title   at  ySection          (h=22, fontSize=16)
+divider at  ySection + 26     (title h=22 + gap 4)
+first row at ySection + 44    (divider + gap 18)
+```
+
+Subsequent sections start after the last control of the previous section, plus a **32px** inter-section gap.
+
+---
+
+## Auth screen pattern (`authCard`)
+
+All standalone auth screens (no sidebar) use `authCard()` in `generate-screens.mjs`. **Never build auth cards by hand.**
+
+```js
+authCard(prefix, { title, subtitle?, items, extraLink? }, submitLabel, footerText)
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `prefix` | string | ID prefix — must be unique per screen |
+| `title` | string | Heading inside the card |
+| `subtitle` | string \| null | Secondary line below the title (optional) |
+| `items` | `{ label, placeholder }[]` | Form fields — each is 72px tall |
+| `extraLink` | string \| null | Right-aligned link above the submit button (e.g. `'Forgot password?'`) |
+| `submitLabel` | string | Text on the full-width primary button |
+| `footerText` | string | Centered link in the card footer |
+
+**Card geometry (auto-calculated — do not override):**
+
+```
+cardW   = 440
+headerH = subtitle ? 136 : 112    // space from card top to first field
+fieldH  = items.length × 72       // 72px per field: label(16) + gap(2) + input(40) + gap(14)
+cardH   = headerH + fieldH + (extraLink ? 22 : 4) + 36 + 12 + 32
+cardX   = Math.round((W - cardW) / 2)
+cardY   = Math.round((H - cardH) / 2)
+```
+
+**Logo rule**: always `text(id, cardX, cardY+16, cardW, 28, '⬡  Axis', 18, C.primary, 'center')` — bounding box must span full `cardW` so `'center'` alignment works correctly. Never use a narrower bounding box.
+
+---
+
 ## Component dimensions — canonical reference
 
 When writing or editing any wireframe generator, verify against these values (from S03, S04, S09, S10, S18).
@@ -227,14 +328,24 @@ When writing or editing any wireframe generator, verify against these values (fr
 ## Adding a new screen
 
 1. Add a `genXxx()` function in `generate-screens.mjs`:
-   - Start with `appShell(prefix, W, H, NAV, activeIdx, pageTitle)`
+   - **Authenticated screen**: start with `appShell(prefix, W, H, NAV, activeIdx, pageTitle)`
+   - **Auth screen** (login, register, etc.): use `authCard()` — never build the card by hand
    - Use `component(buildXxx, cx, cy)` for any element that matches a template section
    - Use `btn`, `inputField`, `badge`, etc. from `components.mjs` for individual controls
-   - Use raw `rect`, `text`, etc. only for screen-specific layout that has no template equivalent
+   - Use raw `rect`, `text`, etc. only for layout with no template equivalent
+   - **All y-positions must use the spacing formulas** in the "Spacing formulas" section above — never guess offsets
 2. Call `genXxx()` in the main section at the bottom of the file
 3. Add the output path to the screen inventory table in this playbook
-4. Run `node docs/wireframes/generate-screens.mjs` and `docs/scripts/generate-wireframes.ps1`
-5. Add a `> **Wireframe**` callout to the relevant feature file
+4. Run `node docs/wireframes/generate-screens.mjs` — **verify output has no `NaN` positions** (element count must be > 0)
+5. Run `docs/scripts/generate-wireframes.ps1` to regenerate SVGs
+6. Add a `> **Wireframe**` callout to the relevant feature file
+
+**Pre-commit checks for screen wireframes:**
+- [ ] Element count > 0 for every generated file (NaN positions = 0 renderable elements)
+- [ ] All table `tblY` values use the formula (`cy+56` or `cy+82`) — not ad-hoc numbers
+- [ ] All inline label y-positions use `labelY = controlY + (controlH - 16) / 2`
+- [ ] No custom duplicates of template builders — use `component()` instead
+- [ ] Widest element: `cx + maxElementWidth ≤ W` (no overflow past right edge)
 
 ---
 
