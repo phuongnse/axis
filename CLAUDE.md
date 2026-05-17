@@ -339,6 +339,23 @@ The template is the single source of truth for all reusable UI patterns. Source 
 
 For section builder anatomy, `yC` offset rules, element ID prefix conventions, section numbering, compose array structure, and the current section inventory — see [`docs/playbooks/wireframes.md`](docs/playbooks/wireframes.md).
 
+#### Shared component library (`docs/wireframes/components.mjs`)
+
+`components.mjs` is the single source of truth for all primitives, colors, and layout constants. **Both `generate-template.mjs` and `generate-screens.mjs` must import from it — never redefine primitives locally.**
+
+- All primitive builders (`rect`, `ellipse`, `text`, `hline`, `vline`, `arrow`, `sectionHeader`) live here
+- `C` color object and layout constants (`SB=230`, `HDR=60`, `CX`, `CY`) live here
+- `component(builderFn, targetX, targetY)` — places a template section into a screen coordinate by stripping the section header (2 elements) and translating content to the target position
+- `appShell(prefix, W, H, navItems, activeIdx, pageTitle)` — parameterized app shell matching S18 exactly; use this on every authenticated screen
+- Convenience builders: `btn`, `inputField`, `selectField`, `badge`, `searchBar`, `pageHeader` — all with canonical dimensions from the template
+
+**Hard rules for `generate-screens.mjs`:**
+- Import primitives and helpers from `./components.mjs` — never re-declare `rect`, `text`, `C`, etc.
+- Import template builders (`buildWorkflowCanvas`, `buildBuilderLayout`, `buildExecutionTimeline`, `buildModal`, `buildSideSheet`) from `./generate-template.mjs`
+- Use `component(buildXxx, x, y)` to place any template section — never recreate it from scratch
+- Use `appShell(...)` for the nav/header on every authenticated screen
+- `generate-template.mjs` has an `isMain` guard so importing it never triggers side effects
+
 ---
 
 ## Agent Integrity Rules
