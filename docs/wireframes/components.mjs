@@ -88,8 +88,8 @@ export const OX  = 0;     // screen origin x (sidebar starts here)
 export const OY  = 0;     // screen origin y
 
 // Content area starts at (SB, HDR) inside the screen
-export const CX  = SB;    // content origin x (after sidebar)
-export const CY  = HDR;   // content origin y (after header)
+export const CX  = 246;    // content origin x (after sidebar)
+export const CY  = 96;   // content origin y (after header)
 
 // ─── Placement helpers ────────────────────────────────────────────────────────
 
@@ -136,49 +136,80 @@ export function writeExcalidraw(filePath, elements) {
 // Active item: C.infoBg bg + C.infoBorder stroke + 3px left accent bar + C.primary text.
 // Logo: gray50 area 230×60, text '⬡  Axis' 18px C.primary at (30, 18).
 
+
 export function appShell(prefix, W, H, navItems, activeIdx, pageTitle) {
   const els = [];
 
-  // Page background
-  els.push(rect(`${prefix}_bg`, 0, 0, W, H, C.gray300, C.gray100, 1, false));
+  // Main Page Background (subtle gray)
+  els.push(rect(`${prefix}_bg`, 0, 0, W, H, C.gray100, C.gray50, 1, false));
 
-  // Sidebar surface
-  els.push(rect(`${prefix}_sidebar`, 0, 0, SB, H, C.gray300, C.white, 1, false));
+  // --- FLOATING SIDEBAR ---
+  const sbX = 16;
+  const sbY = 16;
+  const sbW = 214;
+  const sbH = H - 32;
+  // Floating Island for Sidebar (rounded, white, slightly darker border to simulate shadow/depth)
+  els.push(rect(`${prefix}_sidebar`, sbX, sbY, sbW, sbH, C.gray300, C.white, 1, true, { roundness: { type: 3 } }));
 
-  // Logo area (gray50, 60px tall)
-  els.push(rect(`${prefix}_logo_bg`, 0, 0, SB, HDR, C.gray300, C.gray50, 1, false));
-  els.push(text(`${prefix}_logo_t`, 30, 18, 150, 26, '⬡  Axis', 18, C.primary));
+  // Tenant / Environment Switcher (Top of Sidebar)
+  els.push(rect(`${prefix}_tenant_bg`, sbX + 12, sbY + 16, sbW - 24, 40, C.gray300, C.gray50, 1, true));
+  els.push(text(`${prefix}_tenant_logo`, sbX + 24, sbY + 26, 20, 20, '⬡', 16, C.primary));
+  els.push(text(`${prefix}_tenant_name`, sbX + 48, sbY + 27, 100, 16, 'Acme Corp', 13, C.gray900));
+  els.push(text(`${prefix}_tenant_arr`, sbX + sbW - 36, sbY + 26, 16, 16, '▾', 14, C.gray500));
 
-  // Nav items
+  // Nav items (shifted down)
+  const navStartY = sbY + 80;
   navItems.forEach((label, i) => {
-    const y = HDR + 12 + i * 44;
+    const y = navStartY + i * 44;
     const active = i === activeIdx;
     const bg     = active ? C.infoBg      : 'transparent';
     const stroke = active ? C.infoBorder  : 'transparent';
     const tc     = active ? C.primary     : C.gray700;
-    els.push(rect(`${prefix}_ni_${i}`, 8, y, 214, 36, stroke, bg, 1, false));
-    if (active) els.push(rect(`${prefix}_nacc_${i}`, 8, y, 3, 36, C.primary, C.primary, 1, false));
-    els.push(text(`${prefix}_nl_${i}`, 30, y + 9, 170, 18, label, 13, tc));
+    // Nav items are slightly narrower to fit inside the floating sidebar
+    els.push(rect(`${prefix}_ni_${i}`, sbX + 12, y, sbW - 24, 36, stroke, bg, 1, true));
+    if (active) {
+      // Modern active state: small dot instead of full bar
+      els.push(ellipse(`${prefix}_nacc_${i}`, sbX + 24, y + 14, 8, 8, C.primary, C.primary, 1));
+    }
+    els.push(text(`${prefix}_nl_${i}`, sbX + (active ? 40 : 24), y + 9, 140, 18, label, 13, tc));
   });
 
-  // User area
-  els.push(hline(`${prefix}_user_div`, 8, H - 52, 214, C.gray300));
-  els.push(ellipse(`${prefix}_uav`, 16, H - 46, 32, 32, C.infoBorder, C.infoBg, 1));
-  els.push(text(`${prefix}_un`, 56, H - 38, 140, 16, 'Alex Brown', 12, C.gray900));
+  // User area (Bottom of Sidebar)
+  els.push(hline(`${prefix}_user_div`, sbX + 16, sbY + sbH - 60, sbW - 32, C.gray300));
+  els.push(ellipse(`${prefix}_uav`, sbX + 16, sbY + sbH - 46, 32, 32, C.infoBorder, C.infoBg, 1));
+  els.push(text(`${prefix}_un`, sbX + 56, sbY + sbH - 38, 120, 16, 'Alex Brown', 12, C.gray900));
 
-  // Header strip
-  els.push(rect(`${prefix}_hdr`, SB, 0, W - SB, HDR, C.gray300, C.white, 1, false));
-  els.push(text(`${prefix}_page_title`, SB + 20, 18, 300, 24, pageTitle, 18, C.gray900));
-  // Right-to-left: margin(8) + avatar(36) + gap(8) + bell(36) + gap(8) + search(160)
-  els.push(rect(`${prefix}_srch`, W - 256, 12, 160, 36, C.gray300, C.gray100, 1, true));
-  els.push(text(`${prefix}_srch_t`, W - 242, 22, 140, 16, '⌕  Search…', 12, C.gray500));
-  els.push(ellipse(`${prefix}_notif`, W - 88, 12, 36, 36, C.gray300, C.gray100, 1));
-  els.push(text(`${prefix}_notif_t`, W - 88, 21, 36, 18, '🔔', 12, C.gray700, 'center'));
-  els.push(ellipse(`${prefix}_av`, W - 44, 12, 36, 36, C.infoBorder, C.infoBg, 1));
-  els.push(text(`${prefix}_av_t`, W - 44, 21, 36, 18, 'AB', 12, C.primary, 'center'));
+
+  // --- FLOATING HEADER ---
+  const hdrX = sbX + sbW + 16;
+  const hdrY = 16;
+  const hdrW = W - hdrX - 16;
+  const hdrH = 64;
+
+  els.push(rect(`${prefix}_hdr`, hdrX, hdrY, hdrW, hdrH, C.gray300, C.white, 1, true, { roundness: { type: 3 } }));
+
+  // Page Title (Left of header)
+  els.push(text(`${prefix}_page_title`, hdrX + 24, hdrY + 22, 300, 24, pageTitle, 16, C.gray900));
+
+  // Prominent Command Palette / Search (Centered in Header)
+  const cmdW = 320;
+  const cmdX = hdrX + (hdrW / 2) - (cmdW / 2);
+  els.push(rect(`${prefix}_srch`, cmdX, hdrY + 12, cmdW, 40, C.gray300, C.gray50, 1, true));
+  els.push(text(`${prefix}_srch_t`, cmdX + 16, hdrY + 23, 140, 16, '⌕  Search or jump to...', 13, C.gray500));
+  // Hotkey hint (Cmd+K)
+  els.push(rect(`${prefix}_srch_key`, cmdX + cmdW - 48, hdrY + 18, 36, 24, C.gray300, C.white, 1, true));
+  els.push(text(`${prefix}_srch_key_t`, cmdX + cmdW - 42, hdrY + 22, 24, 16, '⌘K', 11, C.gray500));
+
+  // Right Side (Notifications & Help)
+  els.push(ellipse(`${prefix}_help`, hdrX + hdrW - 88, hdrY + 14, 36, 36, C.gray300, 'transparent', 1));
+  els.push(text(`${prefix}_help_t`, hdrX + hdrW - 88, hdrY + 23, 36, 18, '?', 14, C.gray700, 'center'));
+
+  els.push(ellipse(`${prefix}_notif`, hdrX + hdrW - 44, hdrY + 14, 36, 36, C.gray300, C.gray50, 1));
+  els.push(text(`${prefix}_notif_t`, hdrX + hdrW - 44, hdrY + 23, 36, 18, '🔔', 14, C.gray700, 'center'));
 
   return els;
 }
+
 
 // ─── Convenience UI builders ──────────────────────────────────────────────────
 // Dimensions match template canonical values exactly (from wireframes.md table).
