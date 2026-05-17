@@ -1,5 +1,7 @@
 # F05 — Branching & Conditional Logic
 
+> **Wireframe**: [docs/wireframes/E04-workflow-builder/workflow-editor.excalidraw](../../../wireframes/E04-workflow-builder/workflow-editor.excalidraw) · [preview](../../../wireframes/E04-workflow-builder/workflow-editor.svg)
+
 [← Back to E04](../README.md)
 
 ---

@@ -39,88 +39,17 @@
  *                                     S34 Relation / Lookup Field
  */
 
-import { writeFileSync } from 'fs';
-
-// ─── Primitive builders ───────────────────────────────────────────────────────
-
-let _seed = 1001;
-const nextSeed = () => (_seed += 2);
-const BASE = { angle: 0, opacity: 100, groupIds: [], isDeleted: false, boundElements: null, updated: 1700000000000, link: null, locked: false, version: 1 };
-
-function rect(id, x, y, w, h, stroke, bg, sw = 1, rounded = false, extra = {}) {
-  const s = nextSeed();
-  return { ...BASE, id, type: 'rectangle', x, y, width: w, height: h, strokeColor: stroke, backgroundColor: bg, fillStyle: 'solid', strokeWidth: sw, strokeStyle: 'solid', roughness: 1, roundness: rounded ? { type: 3 } : null, seed: s, versionNonce: s + 1, ...extra };
-}
-
-function ellipse(id, x, y, w, h, stroke, bg, sw = 1, extra = {}) {
-  const s = nextSeed();
-  return { ...BASE, id, type: 'ellipse', x, y, width: w, height: h, strokeColor: stroke, backgroundColor: bg, fillStyle: 'solid', strokeWidth: sw, strokeStyle: 'solid', roughness: 1, roundness: { type: 3 }, seed: s, versionNonce: s + 1, ...extra };
-}
-
-function text(id, x, y, w, h, str, fontSize, color, align = 'left', extra = {}) {
-  const s = nextSeed();
-  return { ...BASE, id, type: 'text', x, y, width: w, height: h, strokeColor: color, backgroundColor: 'transparent', fillStyle: 'solid', strokeWidth: 1, strokeStyle: 'solid', roughness: 1, roundness: null, seed: s, versionNonce: s + 1, text: str, fontSize, fontFamily: 1, textAlign: align, verticalAlign: 'top', containerId: null, originalText: str, lineHeight: 1.25, ...extra };
-}
-
-function hline(id, x, y, w, stroke = '#dee2e6', sw = 1) {
-  const s = nextSeed();
-  return { ...BASE, id, type: 'line', x, y, width: w, height: 0, strokeColor: stroke, backgroundColor: 'transparent', fillStyle: 'solid', strokeWidth: sw, strokeStyle: 'solid', roughness: 0, roundness: null, seed: s, versionNonce: s + 1, points: [[0, 0], [w, 0]], lastCommittedPoint: null, startBinding: null, endBinding: null, startArrowhead: null, endArrowhead: null };
-}
-
-function vline(id, x, y, h, stroke = '#dee2e6', sw = 1) {
-  const s = nextSeed();
-  return { ...BASE, id, type: 'line', x, y, width: 0, height: h, strokeColor: stroke, backgroundColor: 'transparent', fillStyle: 'solid', strokeWidth: sw, strokeStyle: 'solid', roughness: 0, roundness: null, seed: s, versionNonce: s + 1, points: [[0, 0], [0, h]], lastCommittedPoint: null, startBinding: null, endBinding: null, startArrowhead: null, endArrowhead: null };
-}
-
-function arrow(id, x, y, dx, dy, stroke, sw = 2) {
-  const s = nextSeed();
-  return { ...BASE, id, type: 'arrow', x, y, width: Math.abs(dx) || 1, height: Math.abs(dy) || 1, strokeColor: stroke || C.gray500, backgroundColor: 'transparent', fillStyle: 'solid', strokeWidth: sw, strokeStyle: 'solid', roughness: 1, roundness: { type: 2 }, seed: s, versionNonce: s + 1, points: [[0, 0], [dx, dy]], lastCommittedPoint: null, startBinding: null, endBinding: null, startArrowhead: null, endArrowhead: 'arrow' };
-}
-
-function sectionHeader(n, label, y) {
-  return [
-    text(`s${n}_lbl`, 50, y, 600, 26, `${n.toString().padStart(2, '0')} — ${label}`, 18, '#6c757d'),
-    hline(`s${n}_div`, 50, y + 32, 1000),
-  ];
-}
-
-// ─── Colors ───────────────────────────────────────────────────────────────────
-
-const C = {
-  // — Industrial Calm —
-  // Primary: sage green (nav, icons, subtle highlights)
-  // Accent:  amber clay (CTA buttons, key actions)
-  primary:     '#667A6E',  // sage green
-  primaryDark: '#4F5F57',  // sage dark
-  accent:      '#C58B55',  // amber clay
-  accentDark:  '#A8743E',  // amber clay dark
-  danger:      '#9E4A44',  // muted brick
-  dangerDark:  '#7D3A35',
-  success:     '#4D6B44',  // moss green
-  warning:     '#B5763D',  // amber clay (earthy)
-  // Neutrals — warm, not blue-cast
-  gray900:     '#2B2F33',  // near-black warm charcoal
-  gray700:     '#4A5058',
-  gray500:     '#8A9099',
-  gray300:     '#D9D7D1',  // warm border
-  gray100:     '#F4F3EF',  // warm off-white (page bg)
-  gray50:      '#F9F8F5',
-  white:       '#FFFFFF',  // surface (cards, panels)
-  // Semantic backgrounds — earthy tones, low saturation
-  infoBg:      '#EDF0EE',  // sage tint
-  successBg:   '#EBF0E9',  // moss tint
-  warningBg:   '#F6EEE4',  // clay tint
-  dangerBg:    '#F3ECEA',  // brick tint
-  // Borders
-  infoBorder:  '#A8BAB1',  // sage muted
-  successBorder:'#7FA676',  // moss muted
-  warningBorder:'#C9975E',  // clay muted
-  dangerBorder: '#C08078',  // brick muted
-};
+import { fileURLToPath } from 'url';
+import {
+  nextSeed, BASE,
+  rect, ellipse, text, hline, vline, arrow, sectionHeader,
+  C,
+  writeExcalidraw,
+} from './components.mjs';
 
 // ─── Section builders ─────────────────────────────────────────────────────────
 
-function buildColorPalette(y0) {
+export function buildColorPalette(y0) {
   const swatches = [
     ['Sage',        C.primaryDark, C.primary],
     ['Sage Dark',   '#374840',     C.primaryDark],
@@ -144,7 +73,7 @@ function buildColorPalette(y0) {
   return els;
 }
 
-function buildTypography(y0) {
+export function buildTypography(y0) {
   const els = [...sectionHeader(2, 'Typography', y0)];
   const yC = y0 + 48;
   const samples = [
@@ -165,7 +94,7 @@ function buildTypography(y0) {
   return els;
 }
 
-function buildButtons(y0) {
+export function buildButtons(y0) {
   const els = [...sectionHeader(3, 'Buttons', y0)];
   const yR1 = y0 + 66, yR2 = y0 + 140;
 
@@ -198,7 +127,7 @@ function buildButtons(y0) {
   return els;
 }
 
-function buildFormControls(y0) {
+export function buildFormControls(y0) {
   const els = [...sectionHeader(4, 'Form Controls', y0)];
   const yC = y0 + 48;
 
@@ -273,7 +202,7 @@ function buildFormControls(y0) {
   return els;
 }
 
-function buildBadges(y0) {
+export function buildBadges(y0) {
   const els = [...sectionHeader(9, 'Badges & Tags', y0)];
   const yC = y0 + 68;
   const badges = [
@@ -293,7 +222,7 @@ function buildBadges(y0) {
   return els;
 }
 
-function buildNavigation(y0) {
+export function buildNavigation(y0) {
   const els = [...sectionHeader(15, 'Navigation', y0)];
   const yC = y0 + 62;
 
@@ -331,7 +260,7 @@ function buildNavigation(y0) {
   return els;
 }
 
-function buildSidebarNav(y0) {
+export function buildSidebarNav(y0) {
   const els = [...sectionHeader(16, 'Sidebar Navigation', y0)];
   const yC = y0 + 48;
 
@@ -370,7 +299,7 @@ function buildSidebarNav(y0) {
   return els;
 }
 
-function buildTable(y0) {
+export function buildTable(y0) {
   const els = [...sectionHeader(10, 'Table', y0)];
   const yC = y0 + 48;
   const W = 850, cols = [220, 160, 180, 160, 130];
@@ -416,7 +345,7 @@ function buildTable(y0) {
   return els;
 }
 
-function buildCards(y0) {
+export function buildCards(y0) {
   const els = [...sectionHeader(12, 'Cards & Display', y0)];
   const yC = y0 + 72;
 
@@ -459,7 +388,7 @@ function buildCards(y0) {
   return els;
 }
 
-function buildFeedback(y0) {
+export function buildFeedback(y0) {
   const els = [...sectionHeader(19, 'Feedback & Overlays', y0)];
   const yC = y0 + 68;
 
@@ -508,7 +437,7 @@ function buildFeedback(y0) {
   return els;
 }
 
-function buildModal(y0) {
+export function buildModal(y0) {
   const els = [...sectionHeader(20, 'Modal / Dialog', y0)];
   const yC = y0 + 48;
 
@@ -531,7 +460,7 @@ function buildModal(y0) {
   return els;
 }
 
-function buildAppShell(y0) {
+export function buildAppShell(y0) {
   const els = [...sectionHeader(18, 'App Shell', y0)];
   const yC = y0 + 48;
   const W = 900, H = 520;
@@ -581,7 +510,7 @@ function buildAppShell(y0) {
   return els;
 }
 
-function buildDateTimePicker(y0) {
+export function buildDateTimePicker(y0) {
   const els = [...sectionHeader(5, 'Date & Time Picker', y0)];
   const yC = y0 + 68;
 
@@ -673,7 +602,7 @@ function buildDateTimePicker(y0) {
   return els;
 }
 
-function buildEditableTable(y0) {
+export function buildEditableTable(y0) {
   const els = [...sectionHeader(11, 'Editable Table / Data Grid', y0)];
   const yC = y0 + 48;
 
@@ -740,7 +669,7 @@ function buildEditableTable(y0) {
   return els;
 }
 
-function buildCommandPalette(y0) {
+export function buildCommandPalette(y0) {
   const els = [...sectionHeader(22, 'Command Palette', y0)];
   const yC = y0 + 68;
 
@@ -797,7 +726,7 @@ function buildCommandPalette(y0) {
   return els;
 }
 
-function buildFileUpload(y0) {
+export function buildFileUpload(y0) {
   const els = [...sectionHeader(6, 'File Upload', y0)];
   const yC = y0 + 68;
 
@@ -849,7 +778,7 @@ function buildFileUpload(y0) {
   return els;
 }
 
-function buildNotifications(y0) {
+export function buildNotifications(y0) {
   const els = [...sectionHeader(23, 'Notifications & Activity Feed', y0)];
   const yC = y0 + 68;
 
@@ -916,7 +845,7 @@ function buildNotifications(y0) {
   return els;
 }
 
-function buildPermissionMatrix(y0) {
+export function buildPermissionMatrix(y0) {
   const els = [...sectionHeader(28, 'Permission Matrix', y0)];
   const yC = y0 + 48;
 
@@ -981,7 +910,7 @@ function buildPermissionMatrix(y0) {
   return els;
 }
 
-function buildDropdownContextMenu(y0) {
+export function buildDropdownContextMenu(y0) {
   const els = [...sectionHeader(25, 'Dropdown & Context Menu', y0)];
   const yC = y0 + 68;
 
@@ -1022,7 +951,7 @@ function buildDropdownContextMenu(y0) {
   return els;
 }
 
-function buildDragDrop(y0) {
+export function buildDragDrop(y0) {
   const els = [...sectionHeader(26, 'Drag & Drop / Sortable', y0)];
   const yC = y0 + 68;
 
@@ -1068,7 +997,7 @@ function buildDragDrop(y0) {
   return els;
 }
 
-function buildWorkflowCanvas(y0) {
+export function buildWorkflowCanvas(y0) {
   const els = [...sectionHeader(30, 'Workflow Canvas', y0)];
   const yC = y0 + 48;
 
@@ -1112,7 +1041,7 @@ function buildWorkflowCanvas(y0) {
   return els;
 }
 
-function buildBuilderLayout(y0) {
+export function buildBuilderLayout(y0) {
   const els = [...sectionHeader(31, 'Builder Layout', y0)];
   const yC = y0 + 48;
   const H = 300;
@@ -1167,7 +1096,7 @@ function buildBuilderLayout(y0) {
   return els;
 }
 
-function buildExecutionTimeline(y0) {
+export function buildExecutionTimeline(y0) {
   const els = [...sectionHeader(32, 'Execution Timeline', y0)];
   const yC = y0 + 48;
 
@@ -1207,7 +1136,7 @@ function buildExecutionTimeline(y0) {
   return els;
 }
 
-function buildUtilities(y0) {
+export function buildUtilities(y0) {
   const els = [...sectionHeader(27, 'Utilities', y0)];
   const yC = y0 + 68;
 
@@ -1274,7 +1203,7 @@ function buildUtilities(y0) {
   return els;
 }
 
-function buildRichTextEditor(y0) {
+export function buildRichTextEditor(y0) {
   const els = [...sectionHeader(7, 'Rich Text Editor', y0)];
   const yC = y0 + 48;
 
@@ -1328,7 +1257,7 @@ function buildRichTextEditor(y0) {
   return els;
 }
 
-function buildCodeEditor(y0) {
+export function buildCodeEditor(y0) {
   const els = [...sectionHeader(8, 'Code / JSON Editor', y0)];
   const yC = y0 + 68;
   els.push(text('ce_json_lbl', 50,  y0 + 46, 120, 14, 'JSON Editor',   11, C.gray500));
@@ -1381,7 +1310,7 @@ function buildCodeEditor(y0) {
   return els;
 }
 
-function buildSideSheet(y0) {
+export function buildSideSheet(y0) {
   const els = [...sectionHeader(21, 'Side Sheet / Drawer', y0)];
   const yC = y0 + 48;
 
@@ -1430,7 +1359,7 @@ function buildSideSheet(y0) {
   return els;
 }
 
-function buildEmptyStates(y0) {
+export function buildEmptyStates(y0) {
   const els = [...sectionHeader(13, 'Empty States', y0)];
   const yC = y0 + 48;
 
@@ -1458,7 +1387,7 @@ function buildEmptyStates(y0) {
   return els;
 }
 
-function buildSkeletonLoaders(y0) {
+export function buildSkeletonLoaders(y0) {
   const els = [...sectionHeader(14, 'Skeleton Loaders', y0)];
   const yC = y0 + 68;
   els.push(text('sk_tbl_lbl',  50,  y0 + 46, 100, 14, 'Table Rows', 11, C.gray500));
@@ -1506,7 +1435,7 @@ function buildSkeletonLoaders(y0) {
   return els;
 }
 
-function buildTabs(y0) {
+export function buildTabs(y0) {
   const els = [...sectionHeader(17, 'Tabs', y0)];
   const yC = y0 + 68;
   els.push(text('tab_ul_lbl',   50,  y0 + 46, 160, 14, 'Underline (default)', 11, C.gray500));
@@ -1552,7 +1481,7 @@ function buildTabs(y0) {
   return els;
 }
 
-function buildTooltipPopover(y0) {
+export function buildTooltipPopover(y0) {
   const els = [...sectionHeader(24, 'Tooltip & Popover', y0)];
   const yC = y0 + 68;
   els.push(text('ttp_tt_lbl',  50,  y0 + 46, 80,  14, 'Tooltip',           11, C.gray500));
@@ -1598,7 +1527,7 @@ function buildTooltipPopover(y0) {
   return els;
 }
 
-function buildFieldTypePicker(y0) {
+export function buildFieldTypePicker(y0) {
   const els = [...sectionHeader(33, 'Field Type Picker', y0)];
   const yC = y0 + 48;
 
@@ -1636,7 +1565,7 @@ function buildFieldTypePicker(y0) {
   return els;
 }
 
-function buildRelationLookup(y0) {
+export function buildRelationLookup(y0) {
   const els = [...sectionHeader(34, 'Relation / Lookup Field', y0)];
   const yC = y0 + 68;
   els.push(text('rel_view_lbl', 50,  y0 + 46, 140, 14, 'Field (view mode)',   11, C.gray500));
@@ -1691,7 +1620,7 @@ function buildRelationLookup(y0) {
   return els;
 }
 
-function buildColorIconPicker(y0) {
+export function buildColorIconPicker(y0) {
   const els = [...sectionHeader(29, 'Color & Icon Picker', y0)];
   const yC = y0 + 68;
   els.push(text('clr_lbl', 50,  y0 + 46, 120, 14, 'Color Picker', 11, C.gray500));
@@ -1757,61 +1686,61 @@ function sectionBottom(els) {
   }));
 }
 
-const GAP = 60;
-const allElements = [];
-let currentY = 30;
+// ─── Run if executed directly ─────────────────────────────────────────────────
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const GAP = 60;
+  const allElements = [];
+  let currentY = 30;
 
-for (const builder of [
-  // ── Foundations ───────────────────────────────────────────────────────────
-  buildColorPalette,           // S01
-  buildTypography,             // S02
-  buildButtons,                // S03
-  // ── Input & Forms ─────────────────────────────────────────────────────────
-  buildFormControls,           // S04
-  buildDateTimePicker,         // S05
-  buildFileUpload,             // S06
-  buildRichTextEditor,         // S07
-  buildCodeEditor,             // S08
-  // ── Data Display ──────────────────────────────────────────────────────────
-  buildBadges,                 // S09
-  buildTable,                  // S10
-  buildEditableTable,          // S11
-  buildCards,                  // S12
-  buildEmptyStates,            // S13
-  buildSkeletonLoaders,        // S14
-  // ── Navigation & Layout ───────────────────────────────────────────────────
-  buildNavigation,             // S15
-  buildSidebarNav,             // S16
-  buildTabs,                   // S17
-  buildAppShell,               // S18
-  // ── Feedback & Overlays ───────────────────────────────────────────────────
-  buildFeedback,               // S19
-  buildModal,                  // S20
-  buildSideSheet,              // S21
-  buildCommandPalette,         // S22
-  buildNotifications,          // S23
-  buildTooltipPopover,         // S24
-  // ── Interaction Patterns ──────────────────────────────────────────────────
-  buildDropdownContextMenu,    // S25
-  buildDragDrop,               // S26
-  buildUtilities,              // S27
-  buildPermissionMatrix,       // S28
-  buildColorIconPicker,        // S29
-  // ── Axis App Patterns ─────────────────────────────────────────────────────
-  buildWorkflowCanvas,         // S30
-  buildBuilderLayout,          // S31
-  buildExecutionTimeline,      // S32
-  buildFieldTypePicker,        // S33
-  buildRelationLookup,         // S34
-]) {
-  const els = builder(currentY);
-  allElements.push(...els);
-  currentY = sectionBottom(els) + GAP;
+  for (const builder of [
+    // ── Foundations ───────────────────────────────────────────────────────────
+    buildColorPalette,           // S01
+    buildTypography,             // S02
+    buildButtons,                // S03
+    // ── Input & Forms ─────────────────────────────────────────────────────────
+    buildFormControls,           // S04
+    buildDateTimePicker,         // S05
+    buildFileUpload,             // S06
+    buildRichTextEditor,         // S07
+    buildCodeEditor,             // S08
+    // ── Data Display ──────────────────────────────────────────────────────────
+    buildBadges,                 // S09
+    buildTable,                  // S10
+    buildEditableTable,          // S11
+    buildCards,                  // S12
+    buildEmptyStates,            // S13
+    buildSkeletonLoaders,        // S14
+    // ── Navigation & Layout ───────────────────────────────────────────────────
+    buildNavigation,             // S15
+    buildSidebarNav,             // S16
+    buildTabs,                   // S17
+    buildAppShell,               // S18
+    // ── Feedback & Overlays ───────────────────────────────────────────────────
+    buildFeedback,               // S19
+    buildModal,                  // S20
+    buildSideSheet,              // S21
+    buildCommandPalette,         // S22
+    buildNotifications,          // S23
+    buildTooltipPopover,         // S24
+    // ── Interaction Patterns ──────────────────────────────────────────────────
+    buildDropdownContextMenu,    // S25
+    buildDragDrop,               // S26
+    buildUtilities,              // S27
+    buildPermissionMatrix,       // S28
+    buildColorIconPicker,        // S29
+    // ── Axis App Patterns ─────────────────────────────────────────────────────
+    buildWorkflowCanvas,         // S30
+    buildBuilderLayout,          // S31
+    buildExecutionTimeline,      // S32
+    buildFieldTypePicker,        // S33
+    buildRelationLookup,         // S34
+  ]) {
+    const els = builder(currentY);
+    allElements.push(...els);
+    currentY = sectionBottom(els) + GAP;
+  }
+
+  const elements = allElements;
+  writeExcalidraw(fileURLToPath(new URL('./_template.excalidraw', import.meta.url)), elements);
+  console.log(`✓ Generated _template.excalidraw — ${elements.length} elements`);
 }
-
-const elements = allElements;
-
-const output = JSON.stringify({ type: 'excalidraw', version: 2, source: 'https://excalidraw.com', elements, appState: { gridSize: 8, viewBackgroundColor: '#ffffff' }, files: {} });
-
-writeFileSync(new URL('./_template.excalidraw', import.meta.url), output, 'utf-8');
-console.log(`✓ Generated _template.excalidraw — ${elements.length} elements`);

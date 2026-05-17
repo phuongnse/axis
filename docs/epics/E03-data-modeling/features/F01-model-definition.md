@@ -1,5 +1,7 @@
 ﻿# F01 — Model Definition
 
+> **Wireframe**: [docs/wireframes/E03-data-modeling/data-models.excalidraw](../../../wireframes/E03-data-modeling/data-models.excalidraw) · [preview](../../../wireframes/E03-data-modeling/data-models.svg)
+
 [← Back to E03](../README.md)
 
 ---

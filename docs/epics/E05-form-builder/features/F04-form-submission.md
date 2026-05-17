@@ -1,5 +1,7 @@
 # F04 — Form Submission Handling
 
+> **Wireframe**: [docs/wireframes/E05-form-builder/form-submission.excalidraw](../../../wireframes/E05-form-builder/form-submission.excalidraw) · [preview](../../../wireframes/E05-form-builder/form-submission.svg)
+
 [← Back to E05](../README.md)
 
 ---

@@ -1,5 +1,7 @@
 ﻿# F02 — Field Type System
 
+> **Wireframe**: [docs/wireframes/E03-data-modeling/data-models.excalidraw](../../../wireframes/E03-data-modeling/data-models.excalidraw) · [preview](../../../wireframes/E03-data-modeling/data-models.svg)
+
 [← Back to E03](../README.md)
 
 ---
