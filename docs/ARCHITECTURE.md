@@ -19,7 +19,7 @@ The Axis platform serves four actor types: **Platform Admins** (Axis team), **Or
 | Container | Technology | Responsibility |
 |---|---|---|
 | **Web Application** | React + TypeScript (Vite) | SPA for all user interactions: workflow builder, form builder, page builder, data management |
-| **API Server** | ASP.NET Core 8 | Modular monolith exposing REST API and SignalR hub |
+| **API Server** | ASP.NET Core 8 | Modular monolith exposing REST API; SignalR hub ⏳ planned (see Real-Time Updates section) |
 | **Background Job Runner** | Wolverine (in-process) | Executes scheduled workflows, processes async steps, dispatches domain events |
 | **PostgreSQL** | PostgreSQL 16 | Primary data store — schema-per-tenant |
 | **Redis** | Redis 7 | Session cache, distributed locks, pub/sub for real-time events |
