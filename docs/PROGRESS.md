@@ -46,11 +46,11 @@
 
 ## WorkflowEngine — E06-workflow-engine
 
-**Domain ✅ | Application ⚠️ | Infrastructure ✅ | API ⏳ | Frontend ⏳**
+**Domain ✅ | Application ✅ | Infrastructure ✅ | API ⏳ | Frontend ⏳**
 
-- **Domain**: WorkflowExecution aggregate with execution state machine and domain events. ExecutionStep aggregate (Pending/Running/Waiting/Completed/Failed/Skipped/Cancelled state machine; InputSnapshot/OutputSnapshot; ExecutionStepCompleted/Failed events; IsTerminal for idempotency; StepType enum).
-- **Application (partial)**: StartExecution, CancelExecution, RetryExecution commands. Missing: GetExecution, GetExecutionsByWorkflow, GetAllExecutions queries; RetryExecutionWithContext command (variant of RetryExecution that allows overriding the execution context — `RetryExecutionCommand` without context override already exists).
-- **Infrastructure**: WorkflowEngineDbContext, EF Core config (WorkflowExecution with `_context` as JSONB), ExecutionRepository (4 methods: AddAsync, GetByIdAsync, GetAllAsync, GetByWorkflowAsync), WorkflowDefinitionReader (cross-module raw SQL query on `workflow_definitions.status`), WorkflowEngineUnitOfWork, 8 integration tests (Testcontainers)
+- **Domain**: WorkflowExecution aggregate with execution state machine and domain events. ExecutionStep aggregate (Pending/Running/Waiting/Completed/Failed/Skipped/Cancelled state machine; InputSnapshot/OutputSnapshot; ExecutionStepCompleted/Failed events; IsTerminal for idempotency; StepType enum). `CreateRetryWithModifiedContext` added for US-102.
+- **Application**: StartExecution, CancelExecution, RetryExecution, RetryExecutionWithContext commands. GetExecution (with step timeline), GetExecutionsByWorkflow (paged + status filter), GetAllExecutions (paged + status filter), GetRetryHistory queries. DTOs: ExecutionSummaryResponse, ExecutionStepResponse, ExecutionResponse.
+- **Infrastructure**: WorkflowEngineDbContext (WorkflowExecution + ExecutionStep DbSets), EF Core config (WorkflowExecution `_context` as JSONB; ExecutionStep InputSnapshot/OutputSnapshot as JSONB), ExecutionRepository (8 methods including paginated projection queries + GetWithStepsAsync + GetRetriesAsync), WorkflowDefinitionReader, WorkflowEngineUnitOfWork. EF migration `AddExecutionSteps` (creates `workflow_executions` + `execution_steps` tables). 8 existing + 10 new integration tests (Testcontainers — require Docker).
 
 ## PageBuilder — E07-page-builder
 

@@ -122,6 +122,15 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
 
     /// <summary>US-100: Creates a retry execution linked to this failed execution.</summary>
     public WorkflowExecution CreateRetry(Guid? retriedByUserId)
+        => CreateRetryCore(retriedByUserId, _context);
+
+    /// <summary>US-102: Creates a retry execution using a user-supplied modified context.</summary>
+    public WorkflowExecution CreateRetryWithModifiedContext(
+        Guid? retriedByUserId, IReadOnlyDictionary<string, object?> modifiedContext)
+        => CreateRetryCore(retriedByUserId, modifiedContext);
+
+    private WorkflowExecution CreateRetryCore(
+        Guid? retriedByUserId, IReadOnlyDictionary<string, object?> context)
     {
         if (Status != ExecutionStatus.Failed)
             throw new InvalidOperationException("Only failed executions can be retried.");
@@ -129,7 +138,7 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
         DateTime now = DateTime.UtcNow;
         WorkflowExecution retry = new WorkflowExecution(
             Guid.NewGuid(), WorkflowDefinitionId, OrganizationId,
-            TriggerType, retriedByUserId, Id, _context, now);
+            TriggerType, retriedByUserId, Id, context, now);
 
         retry.RaiseDomainEvent(new ExecutionStarted(retry.Id, WorkflowDefinitionId, OrganizationId));
         return retry;

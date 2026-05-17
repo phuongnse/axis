@@ -12,10 +12,12 @@ internal sealed class WorkflowEngineDbContext(
     : AxisDbContext(options, tenantContext)
 {
     public DbSet<WorkflowExecution> WorkflowExecutions => Set<WorkflowExecution>();
+    public DbSet<ExecutionStep> ExecutionSteps => Set<ExecutionStep>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfiguration(new ExecutionConfiguration());
+        modelBuilder.ApplyConfiguration(new ExecutionStepConfiguration());
     }
 }
