@@ -187,6 +187,7 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
             throw new InvalidOperationException("Only draft workflows can be deleted.");
 
         DeletedAt = DateTimeOffset.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     /// <summary>US-050: Restores an archived workflow to Active.</summary>

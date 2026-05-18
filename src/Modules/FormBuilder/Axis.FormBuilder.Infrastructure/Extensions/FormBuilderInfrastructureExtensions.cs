@@ -14,7 +14,8 @@ public static class FormBuilderInfrastructureExtensions
         this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<FormBuilderDbContext>(opts =>
-            opts.UseNpgsql(configuration.GetConnectionString("FormBuilder")));
+            opts.UseNpgsql(configuration.GetConnectionString("FormBuilder")
+                ?? throw new InvalidOperationException("Missing connection string 'FormBuilder'.")));
 
         services.AddScoped<IFormRepository, FormRepository>();
         services.AddScoped<IUnitOfWork, FormBuilderUnitOfWork>();

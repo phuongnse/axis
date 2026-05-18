@@ -385,7 +385,7 @@ public static class WorkflowEndpoints
             PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
             WriteIndented = true,
         });
-        string slug = dto.Name.ToLowerInvariant().Replace(' ', '-');
+        string slug = ToSafeSlug(dto.Name);
         string date = DateTimeOffset.UtcNow.ToString("yyyyMMdd");
         string fileName = $"{slug}-{date}.json";
 
@@ -421,10 +421,18 @@ public static class WorkflowEndpoints
         using MemoryStream zipStream = new();
         using (ZipArchive zip = new(zipStream, ZipArchiveMode.Create, leaveOpen: true))
         {
+            Dictionary<string, int> seen = new(StringComparer.Ordinal);
+            int idx = 0;
             foreach (WorkflowExportDto dto in workflows)
             {
-                string slug = dto.Name.ToLowerInvariant().Replace(' ', '-');
-                ZipArchiveEntry entry = zip.CreateEntry($"{slug}.json");
+                string baseSlug = ToSafeSlug(dto.Name);
+                if (string.IsNullOrEmpty(baseSlug)) baseSlug = $"workflow-{idx}";
+                idx++;
+                seen.TryGetValue(baseSlug, out int count);
+                string entrySlug = count == 0 ? baseSlug : $"{baseSlug}_{count + 1}";
+                seen[baseSlug] = count + 1;
+
+                ZipArchiveEntry entry = zip.CreateEntry($"{entrySlug}.json");
                 await using Stream entryStream = entry.Open();
                 await JsonSerializer.SerializeAsync(entryStream, dto, jsonOpts, ct);
             }
@@ -530,5 +538,13 @@ public static class WorkflowEndpoints
             new RemoveTriggerCommand(workflowId, currentUser.OrgId, parsedType), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
+    }
+
+    // Produces a filename-safe slug: lowercase, spaces → hyphens, non-alphanumeric/hyphen chars stripped.
+    private static string ToSafeSlug(string name)
+    {
+        string slug = name.ToLowerInvariant().Replace(' ', '-');
+        slug = new string(slug.Where(c => char.IsAsciiLetterOrDigit(c) || c == '-' || c == '_').ToArray());
+        return slug.Trim('-', '_');
     }
 }

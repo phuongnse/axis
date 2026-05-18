@@ -14,7 +14,8 @@ public static class WorkflowBuilderInfrastructureExtensions
         this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<WorkflowBuilderDbContext>(opts =>
-            opts.UseNpgsql(configuration.GetConnectionString("WorkflowBuilder")));
+            opts.UseNpgsql(configuration.GetConnectionString("WorkflowBuilder")
+                ?? throw new InvalidOperationException("Missing connection string 'WorkflowBuilder'.")));
 
         services.AddScoped<IWorkflowRepository, WorkflowRepository>();
         services.AddScoped<IUnitOfWork, WorkflowBuilderUnitOfWork>();

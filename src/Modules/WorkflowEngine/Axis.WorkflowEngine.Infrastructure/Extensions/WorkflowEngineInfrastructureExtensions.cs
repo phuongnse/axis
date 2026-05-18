@@ -15,7 +15,8 @@ public static class WorkflowEngineInfrastructureExtensions
         this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<WorkflowEngineDbContext>(opts =>
-            opts.UseNpgsql(configuration.GetConnectionString("WorkflowEngine")));
+            opts.UseNpgsql(configuration.GetConnectionString("WorkflowEngine")
+                ?? throw new InvalidOperationException("Missing connection string 'WorkflowEngine'.")));
 
         services.AddScoped<IExecutionRepository, ExecutionRepository>();
         services.AddScoped<IWorkflowDefinitionReader, WorkflowDefinitionReader>();

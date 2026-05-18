@@ -160,5 +160,5 @@ Each step has a type that determines what it does when executed. Users configure
 - SMS, Slack, or Teams notification channels — not in MVP.
 - Notification templates shared across workflows — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: email/webhook dispatch pending E06; configurable fail-on-error toggle pending API layer.
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⚠️ | Frontend: ⏳
+> Gaps vs spec: email/webhook dispatch pending E06; configurable fail-on-error toggle not yet implemented in API layer.
