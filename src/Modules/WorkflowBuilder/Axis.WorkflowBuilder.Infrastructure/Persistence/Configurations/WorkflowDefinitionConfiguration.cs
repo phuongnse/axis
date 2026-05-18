@@ -110,6 +110,8 @@ internal sealed class WorkflowDefinitionConfiguration : IEntityTypeConfiguration
         builder.Ignore(w => w.Transitions);
         builder.Ignore(w => w.Triggers);
 
-        builder.HasIndex(w => new { w.OrganizationId, w.Name });
+        builder.HasIndex(w => new { w.OrganizationId, w.Name })
+            .IsUnique()
+            .HasFilter("deleted_at IS NULL");
     }
 }

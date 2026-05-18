@@ -1,3 +1,4 @@
+using Axis.Shared.Application;
 using Axis.Shared.Application.CQRS;
 using Axis.Shared.Domain.Primitives;
 using Axis.WorkflowBuilder.Application.Repositories;
@@ -21,7 +22,15 @@ public sealed class CreateWorkflowHandler(
             command.Name, command.Description, command.OrganizationId, command.CreatedBy);
 
         await workflowRepo.AddAsync(workflow, cancellationToken);
-        await uow.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await uow.SaveChangesAsync(cancellationToken);
+        }
+        catch (UniqueConstraintException)
+        {
+            return Result.Failure<Guid>(ErrorCodes.Conflict, $"A workflow named '{command.Name}' already exists.");
+        }
 
         return workflow.Id;
     }

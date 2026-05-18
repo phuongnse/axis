@@ -389,6 +389,12 @@ When deciding what to work on next, always follow this order — no exceptions, 
 2. **Current layer completion** — finish the layer in progress across all modules before starting the next
 3. **Next planned layer** — Domain → Application → Infrastructure → API → Frontend
 
+**Mandatory gap sweep before starting API layer** — before writing any API endpoint, run:
+```
+grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/epics/
+```
+Every `⚠️` must be resolved (fixed or explicitly documented as deferred with reason) before any API work begins. This is not optional. See `docs/playbooks/process.md` § "Step 4.5 — Gap sweep".
+
 **Always stop and ask when:**
 - A Tech Stack library cannot be used for a concrete technical reason
 - An AC is ambiguous enough that two reasonable interpretations lead to different implementations

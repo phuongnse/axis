@@ -36,7 +36,7 @@ Users can create, view, edit, publish, archive, and duplicate workflow definitio
 - Workflow templates / starter library — not in MVP.
 
 > **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: workflow plan-limit check (HTTP 402) pending billing layer (E01 F04); name-uniqueness TOCTOU race in UpdateWorkflow requires a DB unique index on `(name, org_id)` — pending Infrastructure migration.
+> Gaps vs spec: workflow plan-limit check (HTTP 402) pending billing layer (E01 F04).
 > Decisions: new workflow initialised with Start + End nodes by domain factory; all data stored in single `workflow_definitions` table.
 
 ---
@@ -141,5 +141,5 @@ Users can create, view, edit, publish, archive, and duplicate workflow definitio
 - Cross-org workflow duplication (copy to another org) — handled by Import/Export in F07.
 
 > **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: plan-limit check (HTTP 402) pending billing layer; webhook URL generation for duplicate pending E06; name-collision TOCTOU race requires a DB unique index on `(name, org_id)` and mapping the constraint violation to Conflict at Infrastructure layer — pending Infrastructure migration.
+> Gaps vs spec: plan-limit check (HTTP 402) pending billing layer; webhook URL generation for duplicate pending E06.
 > Decisions: Duplicate() deep-copies all steps with new IDs and remaps transitions atomically in domain logic; handler resolves name collisions via "(2)", "(3)"… suffix loop up to 50, then Guid suffix.
