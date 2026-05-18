@@ -119,21 +119,74 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     [Fact]
     public async Task CountAdminsAsync_WhenMultipleUsersExist_CountsOnlyUsersWithAdminRole()
     {
-        var adminRoleId = Guid.NewGuid();
-        var adminOrgId = Guid.NewGuid();
+        Guid adminRoleId = Guid.NewGuid();
+        Guid adminOrgId = Guid.NewGuid();
 
-        var admin1 = User.Create("A", "One", Email.Create($"admin1-{adminOrgId:N}@example.com").Value, adminOrgId);
+        User admin1 = User.Create("A", "One", Email.Create($"admin1-{adminOrgId:N}@example.com").Value, adminOrgId);
         admin1.AssignRole(adminRoleId);
-        var admin2 = User.Create("A", "Two", Email.Create($"admin2-{adminOrgId:N}@example.com").Value, adminOrgId);
+        User admin2 = User.Create("A", "Two", Email.Create($"admin2-{adminOrgId:N}@example.com").Value, adminOrgId);
         admin2.AssignRole(adminRoleId);
-        var nonAdmin = User.Create("B", "One", Email.Create($"nonadmin-{adminOrgId:N}@example.com").Value, adminOrgId);
+        User nonAdmin = User.Create("B", "One", Email.Create($"nonadmin-{adminOrgId:N}@example.com").Value, adminOrgId);
 
         await _sut.AddAsync(admin1);
         await _sut.AddAsync(admin2);
         await _sut.AddAsync(nonAdmin);
         await _ctx.SaveChangesAsync();
 
-        var count = await _sut.CountAdminsAsync(adminOrgId, adminRoleId);
+        int count = await _sut.CountAdminsAsync(adminOrgId, adminRoleId);
         count.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WhenUserBelongsToDifferentOrg_ReturnsNull()
+    {
+        User user = MakeUser($"crossorg-{Guid.NewGuid():N}@example.com");
+        await _sut.AddAsync(user);
+        await _ctx.SaveChangesAsync();
+
+        User? result = await _sut.GetByIdAsync(user.Id, Guid.NewGuid());
+
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task FindByEmailGloballyAsync_WhenEmailExistsInAnyOrg_ReturnsUser()
+    {
+        User user = MakeUser($"global-{Guid.NewGuid():N}@example.com");
+        await _sut.AddAsync(user);
+        await _ctx.SaveChangesAsync();
+
+        User? result = await _sut.FindByEmailGloballyAsync(user.Email);
+
+        result.Should().NotBeNull();
+        result!.Id.Should().Be(user.Id);
+    }
+
+    [Fact]
+    public async Task FindByEmailGloballyAsync_WhenEmailDoesNotExist_ReturnsNull()
+    {
+        Email email = Email.Create($"notfound-{Guid.NewGuid():N}@example.com").Value;
+        User? result = await _sut.FindByEmailGloballyAsync(email);
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetByIdPlatformWideAsync_WhenUserExists_ReturnsUser()
+    {
+        User user = MakeUser($"platformwide-{Guid.NewGuid():N}@example.com");
+        await _sut.AddAsync(user);
+        await _ctx.SaveChangesAsync();
+
+        User? result = await _sut.GetByIdPlatformWideAsync(user.Id);
+
+        result.Should().NotBeNull();
+        result!.Id.Should().Be(user.Id);
+    }
+
+    [Fact]
+    public async Task GetByIdPlatformWideAsync_WhenUserDoesNotExist_ReturnsNull()
+    {
+        User? result = await _sut.GetByIdPlatformWideAsync(Guid.NewGuid());
+        result.Should().BeNull();
     }
 }
