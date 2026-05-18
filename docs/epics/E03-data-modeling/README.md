@@ -82,9 +82,9 @@ A concrete instance of a Model. Records are stored in the tenant's schema using 
 | Layer | Status | Notes |
 |---|---|---|
 | Domain | ✅ Done | `DataModel`, `Field`, `DataRecord` aggregates; all field types and domain events |
-| Application | ✅ Done | All command/query handlers; repository interfaces |
-| Infrastructure | ⚠️ Partial | EF Core mappings, repositories, JSONB field converters, pagination+search (`GetPagedAsync`). Missing: per-field filter/sort queries (US-043); bulk delete/export (US-046) |
-| API | ⚠️ Partial | Minimal API — `/api/models`, `/api/data-classes`, `/api/models/{id}/records`. Missing: HTTP 422 structured field errors on record endpoints (US-035); per-field filter conditions and sort-by-column (US-043); bulk delete and CSV export (US-046) |
+| Application | ✅ Done | All command/query handlers; `RecordFieldValidator`; `BulkDeleteRecordsHandler`; `ExportRecordsCsvHandler` |
+| Infrastructure | ✅ Done | EF Core mappings, repositories, JSONB field converters; `GetPagedAsync` with filter/sort; `BulkDeleteAsync`; `GetAllForExportAsync` (chunked streaming) |
+| API | ✅ Done | 7 record endpoints (CRUD + bulk-delete + CSV export); filter/sort params; HTTP 422 `ValidationProblemDetails` on create/update |
 | Frontend | ⏳ Pending | — |
 
 ---

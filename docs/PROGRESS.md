@@ -23,10 +23,11 @@
 
 ## DataModeling — E03-data-modeling
 
-**Domain ✅ | Application ✅ | Infrastructure ⚠️ | API ⚠️ | Frontend ⏳**
+**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳**
 
-- **Infrastructure (partial)**: DataModelingDbContext (public), EF Core configurations (DataModel/DataClass/DataRecord), JSONB FieldDefinition converter (polymorphic FieldConfig), JSONB DataRecord._data, 3 repositories (incl. GetPagedAsync with basic search via `data::text ILIKE`), DataModelingUnitOfWork, integration tests (Testcontainers). Missing: per-field filter/sort queries (US-043); bulk delete/export (US-046).
-- **API (partial)**: Minimal API — `/api/models` (9 endpoints: CRUD + field management + reorder), `/api/data-classes` (7 endpoints), `/api/models/{id}/records` (5 endpoints with pagination+search). FieldConfigHelper for discriminated deserialization. Integration tests (WebApplicationFactory). Missing: HTTP 422 structured field errors on record endpoints (US-035); per-field filter conditions and sort-by-column (US-043); bulk delete and CSV export (US-046).
+- **Infrastructure**: DataModelingDbContext (public schema), EF Core configurations (DataModel/DataClass/DataRecord), JSONB FieldDefinition converter (polymorphic FieldConfig), JSONB DataRecord._data, 3 repositories. `GetPagedAsync` supports full-text search (`data::text ILIKE`), per-field JSONB filters (eq/contains/gt/lt/isEmpty/isNotEmpty combined with AND), and custom sort-by-column. `BulkDeleteAsync` (single UPDATE statement). `GetAllForExportAsync` (streamed in 500-record chunks). DataModelingUnitOfWork. Integration tests (Testcontainers).
+- **Application**: All command/query handlers including `BulkDeleteRecordsHandler` and `ExportRecordsCsvHandler` (US-046). `RecordFieldValidator` service (US-035). `Result.FieldValidation` factory + `ErrorCodes.FieldValidation` (US-035).
+- **API**: Minimal API — `/api/models` (9 endpoints), `/api/data-classes` (7 endpoints), `/api/models/{id}/records` (7 endpoints: CRUD + bulk-delete `POST /bulk-delete` + CSV export `GET /export`, with pagination/search/`?filter=field:op:value`/sort). HTTP 422 `ValidationProblemDetails` on record create/update (US-035). Integration tests (WebApplicationFactory).
 
 ## WorkflowBuilder — E04-workflow-builder
 
@@ -48,9 +49,9 @@
 
 **Domain ✅ | Application ✅ | Infrastructure ✅ | API ⏳ | Frontend ⏳**
 
-- **Domain**: WorkflowExecution aggregate with execution state machine and domain events. ExecutionStep aggregate (Pending/Running/Waiting/Completed/Failed/Skipped/Cancelled state machine; InputSnapshot/OutputSnapshot; ExecutionStepCompleted/Failed events; IsTerminal for idempotency; StepType enum). `CreateRetryWithModifiedContext` added for US-102.
+- **Domain**: WorkflowExecution aggregate with execution state machine, domain events, and step management methods (AddStep/StartStep/CompleteStep/FailStep/WaitStep/SkipStep/CancelStep). ExecutionStep as owned Entity<Guid> (Pending/Running/Waiting/Completed/Failed/Skipped/Cancelled state machine; InputSnapshot/OutputSnapshot; IsTerminal for idempotency; StepType enum — events raised by WorkflowExecution, not ExecutionStep). `CreateRetryWithModifiedContext` added for US-102.
 - **Application**: StartExecution, CancelExecution, RetryExecution, RetryExecutionWithContext commands. GetExecution (with step timeline), GetExecutionsByWorkflow (paged + status filter), GetAllExecutions (paged + status filter), GetRetryHistory queries. DTOs: ExecutionSummaryResponse, ExecutionStepResponse, ExecutionResponse.
-- **Infrastructure**: WorkflowEngineDbContext (WorkflowExecution + ExecutionStep DbSets), EF Core config (WorkflowExecution `_context` as JSONB; ExecutionStep InputSnapshot/OutputSnapshot as JSONB), ExecutionRepository (8 methods including paginated projection queries + GetWithStepsAsync + GetRetriesAsync), WorkflowDefinitionReader, WorkflowEngineUnitOfWork. EF migration `AddExecutionSteps` (creates `workflow_executions` + `execution_steps` tables). 8 existing + 10 new integration tests (Testcontainers — require Docker).
+- **Infrastructure**: WorkflowEngineDbContext (WorkflowExecution only — ExecutionStep is an owned entity, no standalone DbSet), EF Core config (WorkflowExecution `_context` as JSONB; ExecutionStep InputSnapshot/OutputSnapshot as JSONB, mapped via `OwnsMany` with `WithOwner().HasForeignKey(s => s.ExecutionId)`), ExecutionRepository (8 methods including paginated projection queries + GetWithStepsAsync via `Include(e => e.Steps)` + GetRetriesAsync), WorkflowDefinitionReader, WorkflowEngineUnitOfWork. EF migration `AddExecutionSteps` (creates `workflow_executions` + `execution_steps` tables with FK `ExecutionId → workflow_executions.Id`). 8 existing + 10 new integration tests (Testcontainers — require Docker).
 
 ## PageBuilder — E07-page-builder
 
