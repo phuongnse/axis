@@ -85,15 +85,15 @@ internal sealed class DataRecordRepository(
 
         Guid[] idArray = ids.ToArray();
         string table = SchemaTable();
-        return await context.Database.ExecuteSqlAsync(
-            $"""
-            UPDATE {table}
+        string sql = $$"""
+            UPDATE {{table}}
                SET deleted_at = NOW()
-             WHERE id = ANY({idArray})
-               AND model_id = {modelId}
-               AND organization_id = {organizationId}
+             WHERE id = ANY({0})
+               AND model_id = {1}
+               AND organization_id = {2}
                AND deleted_at IS NULL
-            """, ct);
+            """;
+        return await context.Database.ExecuteSqlRawAsync(sql, [idArray, modelId, organizationId], ct);
     }
 
     public async IAsyncEnumerable<DataRecord> GetAllForExportAsync(
