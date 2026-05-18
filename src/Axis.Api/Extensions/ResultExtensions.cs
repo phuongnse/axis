@@ -13,6 +13,13 @@ public static class ResultExtensions
         if (result.IsSuccess)
             throw new InvalidOperationException("Cannot convert a successful result to ProblemDetails.");
 
+        if (result.ErrorCode == ErrorCodes.FieldValidation && result.FieldErrors is not null)
+        {
+            Dictionary<string, string[]> errors = result.FieldErrors
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+            return Results.ValidationProblem(errors);
+        }
+
         return result.ErrorCode switch
         {
             ErrorCodes.NotFound    => Results.Problem(result.Error, statusCode: StatusCodes.Status404NotFound),

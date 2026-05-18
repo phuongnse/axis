@@ -10,6 +10,7 @@ public static class ErrorCodes
     public const string Conflict = "conflict";
     public const string BusinessRule = "business_rule";
     public const string PlanLimit = "plan_limit";
+    public const string FieldValidation = "field_validation";
 }
 
 /// <summary>
@@ -18,7 +19,8 @@ public static class ErrorCodes
 /// </summary>
 public class Result
 {
-    protected Result(bool isSuccess, string? errorCode, string? error)
+    protected Result(bool isSuccess, string? errorCode, string? error,
+        IReadOnlyDictionary<string, string[]>? fieldErrors = null)
     {
         if (isSuccess && error is not null)
             throw new InvalidOperationException("A success result cannot have an error.");
@@ -28,6 +30,7 @@ public class Result
         IsSuccess = isSuccess;
         _errorCode = errorCode;
         _error = error;
+        _fieldErrors = fieldErrors;
     }
 
     public bool IsSuccess { get; }
@@ -35,6 +38,7 @@ public class Result
 
     private readonly string? _errorCode;
     private readonly string? _error;
+    private readonly IReadOnlyDictionary<string, string[]>? _fieldErrors;
 
     /// <summary>Well-known code from ErrorCodes — used by ToProblemDetails() to pick HTTP status.</summary>
     public string? ErrorCode => IsFailure
@@ -44,6 +48,9 @@ public class Result
     public string Error => IsFailure
         ? _error!
         : throw new InvalidOperationException("A success result has no error.");
+
+    /// <summary>Per-field validation errors. Only populated when ErrorCode == ErrorCodes.FieldValidation.</summary>
+    public IReadOnlyDictionary<string, string[]>? FieldErrors => _fieldErrors;
 
     // ── Factory methods ─────────────────────────────────────────────────────
 
@@ -55,9 +62,17 @@ public class Result
     /// <summary>Failure with a well-known code from <see cref="ErrorCodes"/> — maps to the correct HTTP status.</summary>
     public static Result Failure(string code, string error) => new(false, code, error);
 
+    /// <summary>Field-level validation failure — maps to HTTP 422 ValidationProblemDetails with per-field errors.</summary>
+    public static Result FieldValidation(IReadOnlyDictionary<string, string[]> fieldErrors)
+        => new(false, ErrorCodes.FieldValidation, "One or more validation errors occurred.", fieldErrors);
+
     public static Result<TValue> Success<TValue>(TValue value) => Result<TValue>.Success(value);
     public static Result<TValue> Failure<TValue>(string error) => Result<TValue>.Failure(error);
     public static Result<TValue> Failure<TValue>(string code, string error) => Result<TValue>.Failure(code, error);
+
+    /// <summary>Field-level validation failure returning a typed result.</summary>
+    public static Result<TValue> FieldValidation<TValue>(IReadOnlyDictionary<string, string[]> fieldErrors)
+        => Result<TValue>.FieldValidation(fieldErrors);
 }
 
 /// <summary>
@@ -67,8 +82,9 @@ public sealed class Result<TValue> : Result
 {
     private readonly TValue? _value;
 
-    private Result(bool isSuccess, TValue? value, string? errorCode, string? error)
-        : base(isSuccess, errorCode, error)
+    private Result(bool isSuccess, TValue? value, string? errorCode, string? error,
+        IReadOnlyDictionary<string, string[]>? fieldErrors = null)
+        : base(isSuccess, errorCode, error, fieldErrors)
     {
         _value = value;
     }
@@ -80,6 +96,8 @@ public sealed class Result<TValue> : Result
     public static Result<TValue> Success(TValue value) => new(true, value, null, null);
     public new static Result<TValue> Failure(string error) => new(false, default, null, error);
     public new static Result<TValue> Failure(string code, string error) => new(false, default, code, error);
+    public new static Result<TValue> FieldValidation(IReadOnlyDictionary<string, string[]> fieldErrors)
+        => new(false, default, ErrorCodes.FieldValidation, "One or more validation errors occurred.", fieldErrors);
 
     public static implicit operator Result<TValue>(TValue value) => Success(value);
 }
