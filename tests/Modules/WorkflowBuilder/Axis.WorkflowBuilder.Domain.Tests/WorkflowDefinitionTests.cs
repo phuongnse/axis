@@ -132,11 +132,11 @@ public class WorkflowDefinitionTests
     }
 
     [Fact]
-    public void Archive_WhenInDraftStatus_Throws()
+    public void Archive_WhenInDraftStatus_TransitionsToArchived()
     {
-        var wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
-        var act = () => wf.Archive();
-        act.Should().Throw<InvalidOperationException>().WithMessage("*draft*");
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
+        wf.Archive();
+        wf.Status.Should().Be(WorkflowStatus.Archived);
     }
 
     // ─── Unarchive ────────────────────────────────────────────────────────────

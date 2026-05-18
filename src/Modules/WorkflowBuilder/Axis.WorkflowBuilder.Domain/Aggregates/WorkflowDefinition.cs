@@ -169,9 +169,6 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
     /// <summary>US-050: Deactivates the workflow; running executions complete but no new ones start.</summary>
     public void Archive()
     {
-        if (Status == WorkflowStatus.Draft)
-            throw new InvalidOperationException("Cannot archive a draft workflow. Publish it first.");
-
         if (Status == WorkflowStatus.Archived)
             throw new InvalidOperationException("Workflow is already archived.");
 

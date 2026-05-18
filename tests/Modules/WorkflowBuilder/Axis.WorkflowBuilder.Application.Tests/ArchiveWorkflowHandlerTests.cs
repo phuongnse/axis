@@ -62,16 +62,16 @@ public class ArchiveWorkflowHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenWorkflowIsDraft_ReturnsBusinessRuleError()
+    public async Task Handle_WhenWorkflowIsDraft_ArchivesAndSaves()
     {
         WorkflowDefinition wf = WorkflowDefinition.Create("Draft", null, OrgId, "user");
         _repo.GetByIdAsync(wf.Id, OrgId, Arg.Any<CancellationToken>()).Returns(wf);
 
         Result result = await _handler.Handle(new ArchiveWorkflowCommand(wf.Id, OrgId), CancellationToken.None);
 
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
-        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        result.IsSuccess.Should().BeTrue();
+        wf.Status.Should().Be(WorkflowStatus.Archived);
+        await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     private static WorkflowDefinition CreatePublishableWorkflow()
