@@ -48,6 +48,20 @@ public class UpdateFormHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WhenFormBelongsToAnotherOrg_ReturnsNotFound()
+    {
+        FormDefinition form = FormDefinition.Create("Old Name", null, OrgId, "user");
+        _repo.GetByIdAsync(form.Id, OrgId, Arg.Any<CancellationToken>()).Returns(form);
+
+        Guid otherOrgId = Guid.NewGuid();
+        Result result = await _handler.Handle(
+            new UpdateFormCommand(form.Id, otherOrgId, "New Name", null), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+    }
+
+    [Fact]
     public async Task Handle_WhenNameAlreadyExists_ReturnsConflict()
     {
         FormDefinition form = FormDefinition.Create("Old Name", null, OrgId, "user");

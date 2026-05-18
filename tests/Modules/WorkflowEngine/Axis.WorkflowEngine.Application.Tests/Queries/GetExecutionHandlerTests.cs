@@ -47,4 +47,17 @@ public class GetExecutionHandlerTests
 
         result.Should().BeNull();
     }
+
+    [Fact]
+    public async Task GetExecution_WhenExecutionBelongsToAnotherOrg_ReturnsNull()
+    {
+        ExecutionResponse expected = BuildResponse();
+        _execRepo.GetWithStepsAsync(ExecId, OrgId).Returns(expected);
+
+        Guid otherOrgId = Guid.NewGuid();
+        ExecutionResponse? result = await CreateHandler().Handle(
+            new GetExecutionQuery(ExecId, otherOrgId), CancellationToken.None);
+
+        result.Should().BeNull();
+    }
 }

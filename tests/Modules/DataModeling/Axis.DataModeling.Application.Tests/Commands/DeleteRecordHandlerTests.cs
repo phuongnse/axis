@@ -46,4 +46,19 @@ public class DeleteRecordHandlerTests
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
         result.Error.Should().Contain("not found");
     }
+
+    [Fact]
+    public async Task DeleteRecord_WhenRecordBelongsToAnotherOrg_ReturnsNotFound()
+    {
+        DataRecord record = DataRecord.Create(ModelId, OrgId, new Dictionary<string, object?> { ["x"] = 1 }, UserId);
+        _recordRepo.GetByIdAsync(record.Id, ModelId, OrgId).Returns(record);
+
+        Guid otherOrgId = Guid.NewGuid();
+        Result result = await CreateHandler().Handle(
+            new DeleteRecordCommand(record.Id, ModelId, otherOrgId),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+    }
 }

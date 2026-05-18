@@ -79,7 +79,14 @@ public class OrganizationRepositoryTests(IdentityDatabaseFixture db) : IAsyncLif
     [Fact]
     public async Task SlugExistsAsync_WhenSlugIsUnused_ReturnsFalse()
     {
-        var exists = await _sut.SlugExistsAsync(OrganizationSlug.Create("never-used-slug").Value);
+        bool exists = await _sut.SlugExistsAsync(OrganizationSlug.Create("never-used-slug").Value);
         exists.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WhenIdDoesNotExist_ReturnsNull()
+    {
+        Organization? result = await _sut.GetByIdAsync(Guid.NewGuid());
+        result.Should().BeNull();
     }
 }

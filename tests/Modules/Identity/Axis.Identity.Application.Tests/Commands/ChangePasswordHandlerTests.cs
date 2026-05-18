@@ -125,4 +125,19 @@ public class ChangePasswordHandlerTests
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
         result.Error.Should().Contain("not found");
     }
+
+    [Fact]
+    public async Task ChangePassword_WhenUserBelongsToAnotherOrg_ReturnsNotFound()
+    {
+        User user = MakeUser();
+        _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
+
+        Guid otherOrgId = Guid.NewGuid();
+        Result result = await CreateHandler().Handle(
+            new ChangePasswordCommand(user.Id, otherOrgId, "OldPass1", "NewPass1", "NewPass1"),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+    }
 }

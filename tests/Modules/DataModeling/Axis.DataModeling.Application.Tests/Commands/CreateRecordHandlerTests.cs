@@ -84,4 +84,19 @@ public class CreateRecordHandlerTests
 
         result.IsSuccess.Should().BeTrue();
     }
+
+    [Fact]
+    public async Task CreateRecord_WhenModelBelongsToAnotherOrg_ReturnsNotFound()
+    {
+        DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
+        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
+
+        Guid otherOrgId = Guid.NewGuid();
+        Result<Guid> result = await CreateHandler().Handle(
+            new CreateRecordCommand(model.Id, otherOrgId, new Dictionary<string, object?>(), UserId),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+    }
 }

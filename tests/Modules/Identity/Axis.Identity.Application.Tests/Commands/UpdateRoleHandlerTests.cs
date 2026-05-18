@@ -79,4 +79,18 @@ public class UpdateRoleHandlerTests
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
         result.Error.Should().Contain("not found");
     }
+
+    [Fact]
+    public async Task UpdateRole_WhenRoleBelongsToAnotherOrg_ReturnsNotFound()
+    {
+        Role role = Role.Create("Manager", null, OrgId, ["workflow:definition:read"]);
+        _roleRepo.GetByIdAsync(RoleId, OrgId).Returns(role);
+
+        Guid otherOrgId = Guid.NewGuid();
+        UpdateRoleCommand command = ValidCommand() with { OrganizationId = otherOrgId };
+        Result result = await CreateHandler().Handle(command, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+    }
 }
