@@ -117,4 +117,19 @@ public class AssignRoleToUserHandlerTests
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
         result.Error.Should().Contain("not found");
     }
+
+    [Fact]
+    public async Task AssignRoleToUser_WhenUserBelongsToAnotherOrg_ReturnsNotFound()
+    {
+        User user = MakeUser();
+        _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
+
+        Guid otherOrgId = Guid.NewGuid();
+        Result result = await CreateHandler().Handle(
+            new AssignRoleToUserCommand(user.Id, otherOrgId, EditorRoleId, Action: RoleAction.Assign),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+    }
 }

@@ -67,4 +67,32 @@ public class CancelExecutionHandlerTests
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
         result.Error.Should().Contain("cancel");
     }
+
+    [Fact]
+    public async Task CancelExecution_WhenExecutionIsFailed_ReturnsBusinessRuleFailure()
+    {
+        WorkflowExecution exec = MakeRunningExecution();
+        exec.Fail("error");
+        _execRepo.GetByIdAsync(exec.Id, OrgId).Returns(exec);
+
+        Result result = await CreateHandler().Handle(
+            new CancelExecutionCommand(exec.Id, OrgId), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+    }
+
+    [Fact]
+    public async Task CancelExecution_WhenExecutionBelongsToAnotherOrg_ReturnsNotFound()
+    {
+        WorkflowExecution exec = MakeRunningExecution();
+        _execRepo.GetByIdAsync(exec.Id, OrgId).Returns(exec);
+
+        Guid otherOrgId = Guid.NewGuid();
+        Result result = await CreateHandler().Handle(
+            new CancelExecutionCommand(exec.Id, otherOrgId), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+    }
 }

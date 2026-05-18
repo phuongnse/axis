@@ -53,6 +53,24 @@ public class UpdateFieldHandlerTests
     }
 
     [Fact]
+    public async Task UpdateField_WhenModelBelongsToAnotherOrg_ReturnsNotFound()
+    {
+        DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
+        FieldDefinition field = model.AddField("price", "Price", FieldType.Number, false, new NumberFieldConfig());
+        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
+
+        Guid otherOrgId = Guid.NewGuid();
+        Result result = await CreateHandler().Handle(
+            new UpdateFieldCommand(model.Id, field.Id, otherOrgId, "New Label", null, false, new NumberFieldConfig()),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        await _modelRepo.Received(1).GetByIdAsync(model.Id, otherOrgId);
+        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task UpdateField_WhenFieldIsSystem_ReturnsBusinessRuleFailure()
     {
         DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);

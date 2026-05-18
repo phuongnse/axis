@@ -99,8 +99,9 @@ Users can create, read, update, and delete records against any model. Records ar
 - OR-logic between filters — not in MVP.
 - Saved filters — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ⚠️ | API: ⚠️ | Frontend: ⏳
-> Gaps vs spec: basic search (`GetPagedAsync` with JSONB `ILIKE` full-text search) implemented; per-field filter conditions, sort-by-column, and filter-state URL persistence not yet implemented — `GetAllAsync` returns all records unfiltered for non-search queries; JSONB field filtering requires dynamic query construction.
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
+> Gaps vs spec: filter-state URL persistence is a frontend concern (query params round-tripped via `?filter=field:op:value`); filter on a deleted field falls back gracefully (RecordFilter.TryParse validates field name format, unknown fields simply match no JSONB data). A filter on a deleted field currently returns 0 results rather than showing a warning toast — that warning is a frontend concern.
+> Decisions: per-field filters encoded as repeated `?filter=field:op:value` query params (URL-shareable); ops supported: eq, contains, gt, lt, isEmpty, isNotEmpty; multiple filters combined with AND; sort via `?sortBy=field&sortDir=asc|desc`; unknown/unsafe field names in sort fall back to `created_at DESC`.
 
 ---
 
@@ -180,5 +181,6 @@ Users can create, read, update, and delete records against any model. Records ar
 *Out of scope*
 - Bulk edit (updating multiple records at once) — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: bulk delete and CSV export not yet implemented at any layer; async export for >5,000 records pending notification infrastructure.
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
+> Gaps vs spec: async export for >5,000 records deferred — pending Wolverine background job + in-app notification infrastructure; current sync CSV export has no size limit (streams in 500-record chunks). "Select all N records across all pages" for bulk delete is a frontend concern.
+> Decisions: bulk delete via `POST /api/models/{id}/records/bulk-delete` with `{ "ids": [...] }` body; CSV export via `GET /api/models/{id}/records/export` (same filter/sort params as list); field names for export header taken from model's FieldDefinition labels; CSV uses RFC 4180 escaping.
