@@ -88,8 +88,8 @@ export const OX  = 0;     // screen origin x (sidebar starts here)
 export const OY  = 0;     // screen origin y
 
 // Content area starts at (SB, HDR) inside the screen
-export const CX  = 40;    // content origin x (after sidebar)
-export const CY  = 120;   // content origin y (after header)
+export const CX  = 240;    // content origin x (after sidebar)
+export const CY  = 56;   // content origin y (after header)
 
 // ─── Placement helpers ────────────────────────────────────────────────────────
 
@@ -139,54 +139,65 @@ export function writeExcalidraw(filePath, elements) {
 export function appShell(prefix, W, H, navItems, activeIdx, pageTitle) {
   const els = [];
 
-  // Main Canvas Background (Edge to Edge)
-  els.push(rect(`${prefix}_bg`, 0, 0, W, H, C.gray100, C.gray50, 1, false));
+  // Main Page Background
+  els.push(rect(`${prefix}_bg`, 0, 0, W, H, C.gray300, C.gray50, 1, false));
 
-  // --- FLOATING ISLAND: TOP LEFT (Context & Title) ---
-  els.push(rect(`${prefix}_top_left`, 40, 32, 340, 56, C.gray300, C.white, 1, true, { roundness: { type: 3 } }));
-  els.push(text(`${prefix}_logo`, 56, 47, 24, 24, '⬡', 20, C.primary));
-  els.push(vline(`${prefix}_tl_div`, 92, 44, 32, C.gray300));
-  els.push(text(`${prefix}_ws_name`, 108, 50, 80, 16, 'Acme Corp', 13, C.gray500));
-  els.push(text(`${prefix}_tl_slash`, 196, 50, 12, 16, '/', 13, C.gray300));
-  els.push(text(`${prefix}_page_title`, 216, 48, 140, 20, pageTitle, 15, C.gray900));
+  // --- HYBRID COLLAPSIBLE SIDEBAR ---
+  const sbW = 240;
+  els.push(rect(`${prefix}_sidebar`, 0, 0, sbW, H, C.gray300, C.white, 1, false));
 
-  // --- FLOATING ISLAND: TOP RIGHT (Profile & Actions) ---
-  const trW = 280;
-  const trX = W - trW - 40;
-  els.push(rect(`${prefix}_top_right`, trX, 32, trW, 56, C.gray300, C.white, 1, true, { roundness: { type: 3 } }));
+  // Workspace / Tenant Header
+  els.push(text(`${prefix}_logo`, 20, 20, 24, 24, '⬡', 20, C.primary));
+  els.push(text(`${prefix}_ws_name`, 54, 23, 100, 18, 'Acme Corp', 14, C.gray900));
+  els.push(text(`${prefix}_ws_arr`, 158, 23, 16, 16, '▾', 14, C.gray500));
 
-  // Search / Cmd+K Pill inside Top Right
-  els.push(rect(`${prefix}_cmd_pill`, trX + 16, 42, 120, 36, C.gray300, C.gray50, 1, true, { roundness: { type: 3 } }));
-  els.push(text(`${prefix}_cmd_t`, trX + 32, 50, 80, 16, '⌕  Cmd+K', 12, C.gray500));
+  // Collapse Sidebar Action
+  els.push(rect(`${prefix}_sb_coll_bg`, sbW - 36, 16, 24, 24, 'transparent', C.gray100, 0, true, { roundness: { type: 3 } }));
+  els.push(text(`${prefix}_sb_coll_t`, sbW - 36, 19, 24, 16, '◂', 14, C.gray500, 'center'));
+  els.push(text(`${prefix}_sb_hint`, sbW - 38, 40, 28, 12, 'Cmd+\\', 9, C.gray300, 'center'));
 
-  els.push(ellipse(`${prefix}_notif`, trX + 160, 42, 36, 36, 'transparent', C.gray50, 0));
-  els.push(text(`${prefix}_notif_t`, trX + 160, 50, 36, 18, '🔔', 14, C.gray700, 'center'));
-
-  els.push(ellipse(`${prefix}_av`, trX + 220, 42, 36, 36, C.infoBorder, C.infoBg, 1));
-  els.push(text(`${prefix}_av_t`, trX + 220, 51, 36, 18, 'AB', 12, C.primary, 'center'));
-
-  // --- FLOATING DOCK: BOTTOM CENTER (Main Navigation) ---
-  // A pill-shaped dock holding icons for main sections
-  const dockItemW = 64;
-  const dockW = (navItems.length * dockItemW) + 32;
-  const dockX = (W / 2) - (dockW / 2);
-  const dockY = H - 88;
-
-  els.push(rect(`${prefix}_dock`, dockX, dockY, dockW, 64, C.gray300, C.white, 1, true, { roundness: { type: 3 } }));
-
+  // Nav items (Expanded state with icons and labels)
+  const navStartY = 80;
   const icons = ['🗂', '👥', '🗃', '⚡', '📝', '⚙'];
   navItems.forEach((label, i) => {
+    const y = navStartY + i * 40;
     const active = i === activeIdx;
-    const x = dockX + 16 + (i * dockItemW);
-    const icon = icons[i] || '•';
+    const bg     = active ? C.infoBg      : 'transparent';
+    const tc     = active ? C.primary     : C.gray700;
+    const icon   = icons[i] || '•';
 
-    if (active) {
-       els.push(rect(`${prefix}_dock_bg_${i}`, x + 4, dockY + 8, 56, 48, 'transparent', C.infoBg, 0, true, { roundness: { type: 3 } }));
-       // Active dot indicator below icon
-       els.push(ellipse(`${prefix}_dock_dot_${i}`, x + 30, dockY + 46, 4, 4, C.primary, C.primary, 1));
-    }
-    els.push(text(`${prefix}_dock_ic_${i}`, x, dockY + 22, dockItemW, 20, icon, 18, active ? C.primary : C.gray500, 'center'));
+    els.push(rect(`${prefix}_ni_${i}`, 12, y, sbW - 24, 32, 'transparent', bg, 0, true, { roundness: { type: 3 } }));
+    els.push(text(`${prefix}_nic_${i}`, 20, y + 6, 20, 20, icon, 14, tc, 'center'));
+    els.push(text(`${prefix}_nl_${i}`, 48, y + 8, 140, 16, label, 13, tc));
   });
+
+  // User Profile at bottom left
+  els.push(hline(`${prefix}_u_div`, 12, H - 60, sbW - 24, C.gray300));
+  els.push(ellipse(`${prefix}_uav`, 16, H - 46, 32, 32, C.infoBorder, C.infoBg, 1));
+  els.push(text(`${prefix}_un`, 56, H - 38, 120, 16, 'Alex Brown', 12, C.gray900));
+
+
+  // --- TOP HEADER (Breadcrumb + CmdK) ---
+  const hdrH = 56;
+  els.push(rect(`${prefix}_hdr`, sbW, 0, W - sbW, hdrH, C.gray300, C.white, 1, false));
+
+  // Breadcrumb
+  els.push(text(`${prefix}_bc`, sbW + 24, 20, 200, 16, `Axis  /  ${pageTitle}`, 13, C.gray700));
+
+  // Command Palette (Centered in the remaining workspace width)
+  const cmdW = 320;
+  const cmdX = sbW + ((W - sbW) / 2) - (cmdW / 2);
+  els.push(rect(`${prefix}_cmd_bg`, cmdX, 12, cmdW, 32, C.gray300, C.gray50, 1, true, { roundness: { type: 3 } }));
+  els.push(text(`${prefix}_cmd_t`, cmdX + 12, 19, 140, 16, '⌕  Search anything...', 12, C.gray500));
+  els.push(rect(`${prefix}_cmd_key`, cmdX + cmdW - 40, 16, 32, 20, C.gray300, C.white, 1, true, { roundness: { type: 3 } }));
+  els.push(text(`${prefix}_cmd_key_t`, cmdX + cmdW - 35, 19, 24, 14, '⌘K', 10, C.gray500));
+
+  // Right Actions
+  els.push(text(`${prefix}_notif`, W - 44, 18, 24, 24, '🔔', 16, C.gray700));
+
+  // --- FLOATING HELP/FOOTER (Bottom Right) ---
+  els.push(ellipse(`${prefix}_help`, W - 56, H - 56, 40, 40, C.gray300, C.white, 1));
+  els.push(text(`${prefix}_help_ic`, W - 56, H - 46, 40, 20, '?', 16, C.gray700, 'center'));
 
   return els;
 }

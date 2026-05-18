@@ -21,6 +21,7 @@
  *   E06: executions, execution-detail
  */
 
+import { buildStatsCards } from './generate-template.mjs';
 import { mkdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -133,28 +134,35 @@ function authCard(prefix, { title, subtitle = null, items = [], extraLink = null
 // ─── _shared ─────────────────────────────────────────────────────────────────
 
 function genAppShell() {
+  const dashStats = component(buildStatsCards, cx, cy, 48);
+
   const els = [
+    // Standard app shell layout
     ...appShell('as', W, H, NAV, 0, 'Dashboard Overview'),
 
-    // Page Actions (top right, inside canvas area)
-    ...btn('as_new_btn', cx + cw - 140, cy, '+ New Workflow', 'primary'),
+    // Page Header / Action Bar
+    text('as_pg_title', cx, cy + 24, 300, 28, 'Dashboard Overview', 20, C.gray900),
+    ...btn('as_new_btn', cx + cw - 140, cy + 20, '+ New Workflow', 'primary'),
+
+    // Dashboard Stats Panel
+    ...translate(dashStats, 0, 80),
 
     // Secondary panel for empty state / activity feed
-    rect('as_panel2', cx, cy + 60, cw, 280, C.gray300, C.white, 1, true, { roundness: { type: 3 } }),
-    rect('as_panel2_hdr', cx, cy + 60, cw, 48, 'transparent', C.gray50, 0, false, { roundness: { type: 3 } }),
-    hline('as_panel2_div', cx, cy + 108, cw, C.gray300),
-    text('as_panel2_title', cx + 20, cy + 74, 200, 18, 'Recent Activity', 14, C.gray900),
+    rect('as_panel2', cx, cy + 240, cw, 280, C.gray300, C.white, 1, true, { roundness: { type: 3 } }),
+    rect('as_panel2_hdr', cx, cy + 240, cw, 48, 'transparent', C.gray50, 0, false, { roundness: { type: 3 } }),
+    hline('as_panel2_div', cx, cy + 288, cw, C.gray300),
+    text('as_panel2_title', cx + 20, cy + 254, 200, 18, 'Recent Activity', 14, C.gray900),
 
     // Placeholder activity rows
-    text('as_act1_t', cx + 20, cy + 130, 400, 16, 'Alex Brown created workflow "Order Processing"', 13, C.gray700),
-    text('as_act1_d', cx + cw - 120, cy + 130, 100, 16, '2 hours ago', 12, C.gray500, 'right'),
-    hline('as_act1_div', cx + 20, cy + 162, cw - 40, C.gray100),
+    text('as_act1_t', cx + 20, cy + 310, 400, 16, 'Alex Brown created workflow "Order Processing"', 13, C.gray700),
+    text('as_act1_d', cx + cw - 120, cy + 310, 100, 16, '2 hours ago', 12, C.gray500, 'right'),
+    hline('as_act1_div', cx + 20, cy + 342, cw - 40, C.gray100),
 
-    text('as_act2_t', cx + 20, cy + 180, 400, 16, 'Jane Smith updated data model "Customer"', 13, C.gray700),
-    text('as_act2_d', cx + cw - 120, cy + 180, 100, 16, 'Yesterday', 12, C.gray500, 'right'),
-    hline('as_act2_div', cx + 20, cy + 212, cw - 40, C.gray100),
+    text('as_act2_t', cx + 20, cy + 360, 400, 16, 'Jane Smith updated data model "Customer"', 13, C.gray700),
+    text('as_act2_d', cx + cw - 120, cy + 360, 100, 16, 'Yesterday', 12, C.gray500, 'right'),
+    hline('as_act2_div', cx + 20, cy + 392, cw - 40, C.gray100),
 
-    text('as_act_view_all', cx + 20, cy + 240, 100, 16, 'View all activity →', 13, C.primary),
+    text('as_act_view_all', cx + 20, cy + 420, 100, 16, 'View all activity →', 13, C.primary),
   ];
   write('_shared/app-shell.excalidraw', els);
 }
