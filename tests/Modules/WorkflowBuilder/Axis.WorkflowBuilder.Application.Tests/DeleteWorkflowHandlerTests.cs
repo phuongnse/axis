@@ -1,5 +1,5 @@
 using Axis.Shared.Domain.Primitives;
-using Axis.WorkflowBuilder.Application.Commands.ArchiveWorkflow;
+using Axis.WorkflowBuilder.Application.Commands.DeleteWorkflow;
 using Axis.WorkflowBuilder.Application.Repositories;
 using Axis.WorkflowBuilder.Application.Services;
 using Axis.WorkflowBuilder.Domain.Aggregates;
@@ -10,26 +10,25 @@ using NSubstitute;
 
 namespace Axis.WorkflowBuilder.Application.Tests;
 
-public class ArchiveWorkflowHandlerTests
+public class DeleteWorkflowHandlerTests
 {
     private static readonly Guid OrgId = Guid.NewGuid();
     private readonly IWorkflowRepository _repo = Substitute.For<IWorkflowRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
-    private readonly ArchiveWorkflowHandler _handler;
+    private readonly DeleteWorkflowHandler _handler;
 
-    public ArchiveWorkflowHandlerTests() => _handler = new ArchiveWorkflowHandler(_repo, _uow);
+    public DeleteWorkflowHandlerTests() => _handler = new DeleteWorkflowHandler(_repo, _uow);
 
     [Fact]
-    public async Task Handle_WhenWorkflowIsActive_ArchivesAndSaves()
+    public async Task Handle_WhenWorkflowIsDraft_DeletesAndSaves()
     {
-        WorkflowDefinition wf = CreatePublishableWorkflow();
-        wf.Publish();
+        WorkflowDefinition wf = WorkflowDefinition.Create("Draft Flow", null, OrgId, "user");
         _repo.GetByIdAsync(wf.Id, OrgId, Arg.Any<CancellationToken>()).Returns(wf);
 
-        Result result = await _handler.Handle(new ArchiveWorkflowCommand(wf.Id, OrgId), CancellationToken.None);
+        Result result = await _handler.Handle(new DeleteWorkflowCommand(wf.Id, OrgId), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        wf.Status.Should().Be(WorkflowStatus.Archived);
+        wf.DeletedAt.Should().NotBeNull();
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
@@ -38,36 +37,20 @@ public class ArchiveWorkflowHandlerTests
     {
         _repo.GetByIdAsync(Arg.Any<Guid>(), OrgId, Arg.Any<CancellationToken>()).Returns((WorkflowDefinition?)null);
 
-        Result result = await _handler.Handle(new ArchiveWorkflowCommand(Guid.NewGuid(), OrgId), CancellationToken.None);
+        Result result = await _handler.Handle(new DeleteWorkflowCommand(Guid.NewGuid(), OrgId), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
     }
 
     [Fact]
-    public async Task Handle_WhenWorkflowBelongsToAnotherOrg_ReturnsNotFound()
+    public async Task Handle_WhenWorkflowIsActive_ReturnsBusinessRuleError()
     {
         WorkflowDefinition wf = CreatePublishableWorkflow();
         wf.Publish();
-
-        Guid otherOrgId = Guid.NewGuid();
-        _repo.GetByIdAsync(wf.Id, otherOrgId, Arg.Any<CancellationToken>())
-            .Returns((WorkflowDefinition?)null);
-        Result result = await _handler.Handle(new ArchiveWorkflowCommand(wf.Id, otherOrgId), CancellationToken.None);
-
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-        await _repo.Received(1).GetByIdAsync(wf.Id, otherOrgId, Arg.Any<CancellationToken>());
-        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task Handle_WhenWorkflowIsDraft_ReturnsBusinessRuleError()
-    {
-        WorkflowDefinition wf = WorkflowDefinition.Create("Draft", null, OrgId, "user");
         _repo.GetByIdAsync(wf.Id, OrgId, Arg.Any<CancellationToken>()).Returns(wf);
 
-        Result result = await _handler.Handle(new ArchiveWorkflowCommand(wf.Id, OrgId), CancellationToken.None);
+        Result result = await _handler.Handle(new DeleteWorkflowCommand(wf.Id, OrgId), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);

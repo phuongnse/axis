@@ -13,6 +13,7 @@ using Axis.WorkflowBuilder.Application.Commands.ArchiveWorkflow;
 using Axis.WorkflowBuilder.Application.Commands.BulkExportWorkflows;
 using Axis.WorkflowBuilder.Application.Commands.ConfigureStep;
 using Axis.WorkflowBuilder.Application.Commands.CreateWorkflow;
+using Axis.WorkflowBuilder.Application.Commands.DeleteWorkflow;
 using Axis.WorkflowBuilder.Application.Commands.DuplicateWorkflow;
 using Axis.WorkflowBuilder.Application.Commands.ImportWorkflow;
 using Axis.WorkflowBuilder.Application.Commands.PublishWorkflow;
@@ -79,6 +80,17 @@ public static class WorkflowEndpoints
             .ProducesProblem(401)
             .ProducesProblem(403)
             .ProducesProblem(404);
+
+        group.MapDelete("/{workflowId:guid}", DeleteWorkflow)
+            .RequireAuthorization(Permissions.Workflow.DefinitionWrite)
+            .WithName("DeleteWorkflow")
+            .WithSummary("Permanently delete a Draft workflow")
+            .WithTags("WorkflowBuilder")
+            .Produces(204)
+            .ProducesProblem(401)
+            .ProducesProblem(403)
+            .ProducesProblem(404)
+            .ProducesProblem(422);
 
         // ── Lifecycle ──────────────────────────────────────────────────────────
 
@@ -329,6 +341,18 @@ public static class WorkflowEndpoints
     {
         Result result = await mediator.Send(
             new UnarchiveWorkflowCommand(workflowId, currentUser.OrgId), ct);
+        if (result.IsFailure) return result.ToProblemDetails();
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> DeleteWorkflow(
+        Guid workflowId,
+        CurrentUser currentUser,
+        ISender mediator,
+        CancellationToken ct)
+    {
+        Result result = await mediator.Send(
+            new DeleteWorkflowCommand(workflowId, currentUser.OrgId), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }

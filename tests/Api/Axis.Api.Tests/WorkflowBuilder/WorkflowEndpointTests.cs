@@ -130,11 +130,11 @@ public class WorkflowEndpointTests(ApiTestFixture fixture)
     // ── POST /api/workflows/{id}/archive + unarchive ──────────────────────────
 
     [Fact]
-    public async Task ArchiveWorkflow_WhenWorkflowExists_Returns204()
+    public async Task ArchiveWorkflow_WhenWorkflowIsActive_Returns204()
     {
         var client = await AuthHelper.CreateAdminClientAsync(fixture, "wf7");
 
-        var id = await CreateWorkflowAsync(client, "To Archive");
+        var id = await CreateAndPublishWorkflowAsync(client, "To Archive");
 
         var resp = await client.PostAsync($"/api/workflows/{id}/archive", null);
         resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -144,11 +144,22 @@ public class WorkflowEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
+    public async Task ArchiveWorkflow_WhenWorkflowIsDraft_Returns422()
+    {
+        var client = await AuthHelper.CreateAdminClientAsync(fixture, "wf7b");
+
+        var id = await CreateWorkflowAsync(client, "Draft Flow");
+
+        var resp = await client.PostAsync($"/api/workflows/{id}/archive", null);
+        resp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+    }
+
+    [Fact]
     public async Task UnarchiveWorkflow_WhenWorkflowIsArchived_Returns204()
     {
         var client = await AuthHelper.CreateAdminClientAsync(fixture, "wf8");
 
-        var id = await CreateWorkflowAsync(client, "To Unarchive");
+        var id = await CreateAndPublishWorkflowAsync(client, "To Unarchive");
         await client.PostAsync($"/api/workflows/{id}/archive", null);
 
         var resp = await client.PostAsync($"/api/workflows/{id}/unarchive", null);
@@ -156,6 +167,33 @@ public class WorkflowEndpointTests(ApiTestFixture fixture)
 
         var detail = await (await client.GetAsync($"/api/workflows/{id}")).Content.ReadFromJsonAsync<JsonElement>(Json);
         detail.GetProperty("status").GetString().Should().Be("Active");
+    }
+
+    // ── DELETE /api/workflows/{id} ────────────────────────────────────────────
+
+    [Fact]
+    public async Task DeleteWorkflow_WhenWorkflowIsDraft_Returns204()
+    {
+        var client = await AuthHelper.CreateAdminClientAsync(fixture, "wf7c");
+
+        var id = await CreateWorkflowAsync(client, "Draft to Delete");
+
+        var resp = await client.DeleteAsync($"/api/workflows/{id}");
+        resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var getResp = await client.GetAsync($"/api/workflows/{id}");
+        getResp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task DeleteWorkflow_WhenWorkflowIsActive_Returns422()
+    {
+        var client = await AuthHelper.CreateAdminClientAsync(fixture, "wf7d");
+
+        var id = await CreateAndPublishWorkflowAsync(client, "Active Flow");
+
+        var resp = await client.DeleteAsync($"/api/workflows/{id}");
+        resp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
     // ── POST /api/workflows/{id}/duplicate ───────────────────────────────────
@@ -329,5 +367,31 @@ public class WorkflowEndpointTests(ApiTestFixture fixture)
             new { name, description = (string?)null }, Json);
         var body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
         return body.GetProperty("id").GetString()!;
+    }
+
+    private async Task<string> CreateAndPublishWorkflowAsync(HttpClient client, string name)
+    {
+        string id = await CreateWorkflowAsync(client, name);
+
+        await client.PostAsJsonAsync($"/api/workflows/{id}/triggers",
+            new { trigger_type = "Manual", config = (object?)null }, Json);
+
+        var detail = await (await client.GetAsync($"/api/workflows/{id}")).Content.ReadFromJsonAsync<JsonElement>(Json);
+        var steps = detail.GetProperty("steps").EnumerateArray().ToList();
+        var startId = steps.First(s => s.GetProperty("type").GetString() == "Start").GetProperty("id").GetString()!;
+        var endId = steps.First(s => s.GetProperty("type").GetString() == "End").GetProperty("id").GetString()!;
+
+        var stepResp = await client.PostAsJsonAsync($"/api/workflows/{id}/steps",
+            new { name = "Task", step_type = "Form", config = (object?)null }, Json);
+        var stepId = (await stepResp.Content.ReadFromJsonAsync<JsonElement>(Json)).GetProperty("id").GetString()!;
+
+        await client.PostAsJsonAsync($"/api/workflows/{id}/transitions",
+            new { from_step_id = startId, to_step_id = stepId, label = (string?)null }, Json);
+        await client.PostAsJsonAsync($"/api/workflows/{id}/transitions",
+            new { from_step_id = stepId, to_step_id = endId, label = (string?)null }, Json);
+
+        await client.PostAsync($"/api/workflows/{id}/publish", null);
+
+        return id;
     }
 }
