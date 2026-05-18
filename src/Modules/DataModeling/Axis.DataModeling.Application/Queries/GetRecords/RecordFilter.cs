@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace Axis.DataModeling.Application.Queries.GetRecords;
 
 /// <summary>
@@ -38,7 +40,7 @@ public sealed record RecordFilter(string Field, string Op, string Value)
             return null;
 
         // Field name must match DataModel's FieldNameRegex: letter then alphanumeric/underscore
-        if (!System.Text.RegularExpressions.Regex.IsMatch(field, @"^[A-Za-z][A-Za-z0-9_]{0,63}$"))
+        if (!Regex.IsMatch(field, @"^[A-Za-z][A-Za-z0-9_]{0,63}$"))
             return null;
 
         return new RecordFilter(field, op.ToLowerInvariant(), value);

@@ -52,7 +52,8 @@ public class BulkDeleteRecordsHandlerTests
         IReadOnlyList<Guid> ids = [Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()];
 
         _modelRepo.GetByIdAsync(ModelId, OrgId).Returns(model);
-        _recordRepo.BulkDeleteAsync(ids, ModelId, OrgId).Returns(3);
+        _recordRepo.BulkDeleteAsync(
+            Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(3);
 
         Result<BulkDeleteResult> result = await CreateHandler().Handle(
             new BulkDeleteRecordsCommand(ids, ModelId, OrgId),
@@ -64,13 +65,38 @@ public class BulkDeleteRecordsHandlerTests
     }
 
     [Fact]
+    public async Task BulkDelete_WhenDuplicateIdsProvided_DeduplicatesBeforeRepositoryCall()
+    {
+        DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
+        Guid id = Guid.NewGuid();
+        IReadOnlyList<Guid> idsWithDuplicates = [id, id, id]; // same ID 3 times
+
+        _modelRepo.GetByIdAsync(ModelId, OrgId).Returns(model);
+        _recordRepo.BulkDeleteAsync(
+            Arg.Is<IReadOnlyList<Guid>>(l => l.Count == 1),
+            Arg.Is(ModelId), Arg.Is(OrgId), Arg.Any<CancellationToken>()).Returns(1);
+
+        Result<BulkDeleteResult> result = await CreateHandler().Handle(
+            new BulkDeleteRecordsCommand(idsWithDuplicates, ModelId, OrgId),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Deleted.Should().Be(1);
+        result.Value.NotFound.Should().Be(0); // not inflated by duplicates
+        await _recordRepo.Received(1).BulkDeleteAsync(
+            Arg.Is<IReadOnlyList<Guid>>(l => l.Count == 1),
+            Arg.Is(ModelId), Arg.Is(OrgId));
+    }
+
+    [Fact]
     public async Task BulkDelete_WhenSomeRecordsNotFound_ReturnsPartialDeletedCount()
     {
         DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         IReadOnlyList<Guid> ids = [Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()];
 
         _modelRepo.GetByIdAsync(ModelId, OrgId).Returns(model);
-        _recordRepo.BulkDeleteAsync(ids, ModelId, OrgId).Returns(2); // one not found or already deleted
+        _recordRepo.BulkDeleteAsync(
+            Arg.Any<IReadOnlyList<Guid>>(), Arg.Is(ModelId), Arg.Is(OrgId), Arg.Any<CancellationToken>()).Returns(2); // one not found or already deleted
 
         Result<BulkDeleteResult> result = await CreateHandler().Handle(
             new BulkDeleteRecordsCommand(ids, ModelId, OrgId),

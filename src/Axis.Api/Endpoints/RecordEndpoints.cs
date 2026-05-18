@@ -1,3 +1,4 @@
+using System.Text;
 using Axis.Api.Authorization;
 using Axis.Api.Extensions;
 using Axis.Api.Infrastructure;
@@ -27,6 +28,7 @@ public static class RecordEndpoints
             .WithSummary("List records for a data model (paginated, filterable, sortable)")
             .WithTags("DataModeling")
             .Produces<RecordsPageDto>()
+            .ProducesProblem(400)
             .ProducesProblem(401)
             .ProducesProblem(403)
             .ProducesProblem(404);
@@ -48,6 +50,7 @@ public static class RecordEndpoints
             .WithSummary("Export records as a CSV file")
             .WithTags("DataModeling")
             .Produces(200)
+            .ProducesProblem(400)
             .ProducesProblem(401)
             .ProducesProblem(403)
             .ProducesProblem(404);
@@ -111,21 +114,11 @@ public static class RecordEndpoints
         [FromQuery] string? sortBy = null,
         [FromQuery] string? sortDir = null)
     {
-        List<RecordFilter> parsedFilters = [];
-        if (filter is { Length: > 0 })
-        {
-            foreach (string raw in filter)
-            {
-                RecordFilter? parsed = RecordFilter.TryParse(raw);
-                if (parsed is not null)
-                    parsedFilters.Add(parsed);
-            }
-        }
+        IResult? filterError = ParseFilters(filter, out IReadOnlyList<RecordFilter>? parsedFilters);
+        if (filterError is not null) return filterError;
 
         Result<RecordsPageDto> result = await mediator.Send(
-            new GetRecordsQuery(modelId, currentUser.OrgId, page, pageSize, search,
-                parsedFilters.Count > 0 ? parsedFilters.AsReadOnly() : null,
-                sortBy, sortDir),
+            new GetRecordsQuery(modelId, currentUser.OrgId, page, pageSize, search, parsedFilters, sortBy, sortDir),
             ct);
 
         if (result.IsFailure) return result.ToProblemDetails();
@@ -139,8 +132,11 @@ public static class RecordEndpoints
         ISender mediator,
         CancellationToken ct)
     {
+        // Coerce null (JSON null / missing property) to empty list so the handler's validation fires correctly.
+        IReadOnlyList<Guid> ids = request.Ids ?? [];
+
         Result<BulkDeleteResult> result = await mediator.Send(
-            new BulkDeleteRecordsCommand(request.Ids, modelId, currentUser.OrgId), ct);
+            new BulkDeleteRecordsCommand(ids, modelId, currentUser.OrgId), ct);
 
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.Ok(result.Value);
@@ -156,28 +152,18 @@ public static class RecordEndpoints
         [FromQuery] string? sortBy = null,
         [FromQuery] string? sortDir = null)
     {
-        List<RecordFilter> parsedFilters = [];
-        if (filter is { Length: > 0 })
-        {
-            foreach (string raw in filter)
-            {
-                RecordFilter? parsed = RecordFilter.TryParse(raw);
-                if (parsed is not null)
-                    parsedFilters.Add(parsed);
-            }
-        }
+        IResult? filterError = ParseFilters(filter, out IReadOnlyList<RecordFilter>? parsedFilters);
+        if (filterError is not null) return filterError;
 
         Result<CsvExportDto> result = await mediator.Send(
-            new ExportRecordsCsvQuery(modelId, currentUser.OrgId, search,
-                parsedFilters.Count > 0 ? parsedFilters.AsReadOnly() : null,
-                sortBy, sortDir),
+            new ExportRecordsCsvQuery(modelId, currentUser.OrgId, search, parsedFilters, sortBy, sortDir),
             ct);
 
         if (result.IsFailure) return result.ToProblemDetails();
 
         CsvExportDto csv = result.Value;
         return Results.File(
-            System.Text.Encoding.UTF8.GetBytes(csv.Content),
+            Encoding.UTF8.GetBytes(csv.Content),
             contentType: "text/csv",
             fileDownloadName: csv.FileName);
     }
@@ -234,5 +220,40 @@ public static class RecordEndpoints
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
-}
 
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Parses repeated ?filter=field:op:value params.
+    /// Returns a non-null IResult (HTTP 400) if any item fails TryParse; otherwise null.
+    /// </summary>
+    private static IResult? ParseFilters(string[]? filter, out IReadOnlyList<RecordFilter>? parsed)
+    {
+        parsed = null;
+        if (filter is not { Length: > 0 })
+            return null;
+
+        List<RecordFilter> valid = [];
+        List<string> invalid = [];
+
+        foreach (string raw in filter)
+        {
+            RecordFilter? f = RecordFilter.TryParse(raw);
+            if (f is not null)
+                valid.Add(f);
+            else
+                invalid.Add(raw);
+        }
+
+        if (invalid.Count > 0)
+        {
+            return Result.Failure<object>(
+                ErrorCodes.InvalidInput,
+                $"Invalid filter syntax: {string.Join(", ", invalid)}. Expected format: field:op:value.")
+                .ToProblemDetails();
+        }
+
+        parsed = valid.AsReadOnly();
+        return null;
+    }
+}

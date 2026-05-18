@@ -21,12 +21,15 @@ public sealed class BulkDeleteRecordsHandler(
         if (model is null)
             return Result<BulkDeleteResult>.Failure(ErrorCodes.NotFound, "Model not found.");
 
+        // Deduplicate so duplicate IDs don't inflate NotFound counts or produce redundant DB work.
+        IReadOnlyList<Guid> uniqueIds = command.RecordIds.Distinct().ToList().AsReadOnly();
+
         // BulkDeleteAsync executes immediately via a single UPDATE statement (not through EF change tracking),
         // so SaveChangesAsync is intentionally omitted here.
         int deleted = await recordRepo.BulkDeleteAsync(
-            command.RecordIds, command.ModelId, command.OrganizationId, cancellationToken);
+            uniqueIds, command.ModelId, command.OrganizationId, cancellationToken);
 
-        int notFound = command.RecordIds.Count - deleted;
+        int notFound = uniqueIds.Count - deleted;
         return Result.Success(new BulkDeleteResult(deleted, notFound));
     }
 }

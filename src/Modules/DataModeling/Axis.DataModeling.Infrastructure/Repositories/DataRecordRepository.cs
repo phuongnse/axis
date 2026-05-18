@@ -5,11 +5,14 @@ using Axis.DataModeling.Application.Queries.GetRecords;
 using Axis.DataModeling.Application.Repositories;
 using Axis.DataModeling.Domain.Aggregates;
 using Axis.DataModeling.Infrastructure.Persistence;
+using Axis.Shared.Application.Tenancy;
 using Microsoft.EntityFrameworkCore;
 
 namespace Axis.DataModeling.Infrastructure.Repositories;
 
-internal sealed class DataRecordRepository(DataModelingDbContext context) : IDataRecordRepository
+internal sealed class DataRecordRepository(
+    DataModelingDbContext context,
+    ITenantContext tenantContext) : IDataRecordRepository
 {
     // Field names must match the same regex enforced by RecordFilter.TryParse and DataModel.
     private static readonly Regex SafeFieldName = new(@"^[A-Za-z][A-Za-z0-9_]{0,63}$", RegexOptions.Compiled);
@@ -38,11 +41,12 @@ internal sealed class DataRecordRepository(DataModelingDbContext context) : IDat
         (string where, object[] parameters) = BuildWhere(modelId, organizationId, search, filters);
         string orderBy = BuildOrderBy(sortBy, sortDir);
         int offset = (page - 1) * pageSize;
+        string table = SchemaTable();
 
         // Use string concatenation (not $"" interpolation) to avoid EF1002 on SqlQueryRaw.
         // The positional {n} placeholders in the where clause become parameterized SQL parameters.
         List<int> counts = await context.Database
-            .SqlQueryRaw<int>("SELECT COUNT(*)::int AS \"Value\" FROM data_records WHERE " + where, parameters)
+            .SqlQueryRaw<int>("SELECT COUNT(*)::int AS \"Value\" FROM " + table + " WHERE " + where, parameters)
             .ToListAsync(ct);
 
         int total = counts.FirstOrDefault();
@@ -50,7 +54,7 @@ internal sealed class DataRecordRepository(DataModelingDbContext context) : IDat
             return (Array.Empty<DataRecord>(), 0);
 
         // Fetch only the IDs in the correct page/order, then materialise full aggregates.
-        string idSql = "SELECT id AS \"Value\" FROM data_records WHERE " + where
+        string idSql = "SELECT id AS \"Value\" FROM " + table + " WHERE " + where
             + " ORDER BY " + orderBy
             + " LIMIT " + pageSize + " OFFSET " + offset;
 
@@ -80,9 +84,10 @@ internal sealed class DataRecordRepository(DataModelingDbContext context) : IDat
         if (ids.Count == 0) return 0;
 
         Guid[] idArray = ids.ToArray();
+        string table = SchemaTable();
         return await context.Database.ExecuteSqlAsync(
             $"""
-            UPDATE data_records
+            UPDATE {table}
                SET deleted_at = NOW()
              WHERE id = ANY({idArray})
                AND model_id = {modelId}
@@ -100,9 +105,10 @@ internal sealed class DataRecordRepository(DataModelingDbContext context) : IDat
     {
         (string where, object[] parameters) = BuildWhere(modelId, organizationId, search, filters);
         string orderBy = BuildOrderBy(sortBy, sortDir);
+        string table = SchemaTable();
 
         // Load all matching IDs once (sorted), then stream records in chunks.
-        string idSql = "SELECT id AS \"Value\" FROM data_records WHERE " + where + " ORDER BY " + orderBy;
+        string idSql = "SELECT id AS \"Value\" FROM " + table + " WHERE " + where + " ORDER BY " + orderBy;
         List<Guid> allIds = await context.Database
             .SqlQueryRaw<Guid>(idSql, parameters)
             .ToListAsync(ct);
@@ -130,8 +136,16 @@ internal sealed class DataRecordRepository(DataModelingDbContext context) : IDat
     // ── Query helpers ─────────────────────────────────────────────────────────
 
     /// <summary>
+    /// Returns the fully schema-qualified table name, e.g. <c>"tenant_acme"."data_records"</c>.
+    /// Raw SQL must use this to respect the tenant schema rather than relying solely on search_path.
+    /// </summary>
+    private string SchemaTable()
+        => $"\"{tenantContext.SchemaName}\".\"data_records\"";
+
+    /// <summary>
     /// Builds a positional-parameter WHERE clause for data_records raw SQL queries.
-    /// Field names in filters are pre-validated by RecordFilter.TryParse before reaching here.
+    /// Validates all filter field names and operators defensively — throws if invalid input
+    /// reaches here despite the upstream RecordFilter.TryParse guard.
     /// </summary>
     private static (string Sql, object[] Parameters) BuildWhere(
         Guid modelId, Guid organizationId,
@@ -151,7 +165,10 @@ internal sealed class DataRecordRepository(DataModelingDbContext context) : IDat
         {
             foreach (RecordFilter f in filters)
             {
-                // Field name validated by RecordFilter.TryParse regex — safe to embed in SQL.
+                // Fail closed: validate field name even if the caller skipped RecordFilter.TryParse.
+                if (!SafeFieldName.IsMatch(f.Field))
+                    throw new ArgumentException($"Invalid filter field name: '{f.Field}'.", nameof(filters));
+
                 string col = "data->>'" + f.Field + "'";
 
                 switch (f.Op)
@@ -183,6 +200,9 @@ internal sealed class DataRecordRepository(DataModelingDbContext context) : IDat
                     case "isnotempty":
                         sb.Append(" AND (" + col + " IS NOT NULL AND " + col + " != '')");
                         break;
+
+                    default:
+                        throw new ArgumentException($"Unsupported filter operator: '{f.Op}'.", nameof(filters));
                 }
             }
         }

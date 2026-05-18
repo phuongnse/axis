@@ -80,6 +80,31 @@ public class ExportRecordsCsvHandlerTests
         result.Value.Content.Should().Contain("\"He said \"\"hello\"\"\"");
     }
 
+    [Theory]
+    [InlineData("=SUM(A1:A10)")]
+    [InlineData("+cmd|' /C calc'!A0")]
+    [InlineData("-2+3")]
+    [InlineData("@SUM(1+1)")]
+    public async Task Export_WhenValueStartsWithFormulaChar_PrefixesSingleQuote(string formulaValue)
+    {
+        DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
+        model.AddField("notes", "Notes", FieldType.Text, required: false, new TextFieldConfig());
+
+        DataRecord record = DataRecord.Create(ModelId, OrgId,
+            new Dictionary<string, object?> { ["notes"] = formulaValue }, UserId);
+
+        _modelRepo.GetByIdAsync(ModelId, OrgId).Returns(model);
+        _recordRepo.GetAllForExportAsync(ModelId, OrgId, null, null, null, null)
+            .Returns(AsyncEnumerableOf(record));
+
+        Result<CsvExportDto> result = await CreateHandler().Handle(
+            new ExportRecordsCsvQuery(ModelId, OrgId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        // Value is prefixed with ' to neutralise spreadsheet formula execution
+        result.Value.Content.Should().Contain($"\"'{formulaValue}\"");
+    }
+
     [Fact]
     public async Task Export_WhenNoRecords_ReturnsCsvWithHeaderOnly()
     {

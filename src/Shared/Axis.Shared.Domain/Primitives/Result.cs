@@ -11,6 +11,7 @@ public static class ErrorCodes
     public const string BusinessRule = "business_rule";
     public const string PlanLimit = "plan_limit";
     public const string FieldValidation = "field_validation";
+    public const string InvalidInput = "invalid_input";
 }
 
 /// <summary>
@@ -30,7 +31,8 @@ public class Result
         IsSuccess = isSuccess;
         _errorCode = errorCode;
         _error = error;
-        _fieldErrors = fieldErrors;
+        // Defensive copy: prevents callers from mutating error payloads after result creation.
+        _fieldErrors = fieldErrors?.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray());
     }
 
     public bool IsSuccess { get; }

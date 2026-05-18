@@ -17,15 +17,16 @@ public static class ResultExtensions
         {
             Dictionary<string, string[]> errors = result.FieldErrors
                 .ToDictionary(kv => kv.Key, kv => kv.Value);
-            return Results.ValidationProblem(errors);
+            return Results.ValidationProblem(errors, statusCode: StatusCodes.Status422UnprocessableEntity);
         }
 
         return result.ErrorCode switch
         {
-            ErrorCodes.NotFound    => Results.Problem(result.Error, statusCode: StatusCodes.Status404NotFound),
-            ErrorCodes.Conflict    => Results.Problem(result.Error, statusCode: StatusCodes.Status409Conflict),
-            ErrorCodes.PlanLimit   => Results.Problem(result.Error, statusCode: StatusCodes.Status402PaymentRequired),
-            _                      => Results.Problem(result.Error, statusCode: StatusCodes.Status422UnprocessableEntity),
+            ErrorCodes.NotFound     => Results.Problem(result.Error, statusCode: StatusCodes.Status404NotFound),
+            ErrorCodes.Conflict     => Results.Problem(result.Error, statusCode: StatusCodes.Status409Conflict),
+            ErrorCodes.PlanLimit    => Results.Problem(result.Error, statusCode: StatusCodes.Status402PaymentRequired),
+            ErrorCodes.InvalidInput => Results.Problem(result.Error, statusCode: StatusCodes.Status400BadRequest),
+            _                       => Results.Problem(result.Error, statusCode: StatusCodes.Status422UnprocessableEntity),
         };
     }
 }

@@ -135,6 +135,16 @@ public class RecordFieldValidatorTests
         errors.Should().NotContainKey("status");
     }
 
+    [Fact]
+    public void Validate_WhenNumberFieldReceivesNonNumericString_ReturnsError()
+    {
+        DataModel model = ModelWith(m => m.AddField("qty", "Qty", FieldType.Number, required: false, new NumberFieldConfig()));
+        Dictionary<string, string[]> errors = RecordFieldValidator.Validate(
+            new Dictionary<string, object?> { ["qty"] = "abc" }, model.Fields);
+        errors.Should().ContainKey("qty");
+        errors["qty"].Should().Contain(e => e.Contains("valid number"));
+    }
+
     // ─── Optional field absent — no error ──────────────────────────────────
 
     [Fact]

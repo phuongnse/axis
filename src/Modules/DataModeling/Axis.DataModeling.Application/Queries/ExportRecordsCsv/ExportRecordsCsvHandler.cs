@@ -59,11 +59,20 @@ public sealed class ExportRecordsCsvHandler(
                                 : string.Empty
         };
 
-    /// <summary>RFC 4180 CSV escaping: wrap in double-quotes and double any internal double-quotes.</summary>
+    /// <summary>
+    /// RFC 4180 CSV escaping: wrap in double-quotes and double any internal double-quotes.
+    /// Prefixes values that start with =, +, -, or @ with a single-quote to neutralise
+    /// spreadsheet formula injection (Excel / Google Sheets DDE attacks).
+    /// </summary>
     private static string Escape(string? value)
     {
         if (string.IsNullOrEmpty(value))
             return "\"\"";
+
+        // Neutralise formula injection: spreadsheet clients execute cells starting with these characters.
+        if (value[0] is '=' or '+' or '-' or '@')
+            value = "'" + value;
+
         return $"\"{value.Replace("\"", "\"\"")}\"";
     }
 }

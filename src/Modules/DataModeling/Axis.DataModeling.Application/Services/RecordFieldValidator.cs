@@ -46,7 +46,11 @@ public static class RecordFieldValidator
                     break;
 
                 case NumberFieldConfig number:
-                    if (decimal.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal num))
+                    if (!decimal.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal num))
+                    {
+                        Add(errors, field.Name, $"'{field.Label}' must be a valid number.");
+                    }
+                    else
                     {
                         if (number.Min.HasValue && num < number.Min.Value)
                             Add(errors, field.Name, $"'{field.Label}' must be at least {number.Min}.");

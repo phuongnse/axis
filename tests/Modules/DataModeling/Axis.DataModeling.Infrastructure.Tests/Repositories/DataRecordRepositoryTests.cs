@@ -17,7 +17,7 @@ public class DataRecordRepositoryTests(DataModelingDatabaseFixture db) : IAsyncL
     public Task InitializeAsync()
     {
         _ctx = db.CreateContext();
-        _sut = new DataRecordRepository(_ctx);
+        _sut = new DataRecordRepository(_ctx, db.TenantContext);
         return Task.CompletedTask;
     }
 
