@@ -403,7 +403,7 @@ This is what makes `import { buildWorkflowCanvas } from './generate-template.mjs
 
 ---
 
-## Current section inventory (34 sections)
+## Current section inventory (37 sections)
 
 | Group | Sections |
 |---|---|
@@ -413,4 +413,4 @@ This is what makes `import { buildWorkflowCanvas } from './generate-template.mjs
 | Navigation & Layout | S15–S18 |
 | Feedback & Overlays | S19–S24 |
 | Interaction Patterns | S25–S29 |
-| Axis App Patterns | S30–S34 |
+| Axis App Patterns | S30–S37 |

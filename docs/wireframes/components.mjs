@@ -88,8 +88,8 @@ export const OX  = 0;     // screen origin x (sidebar starts here)
 export const OY  = 0;     // screen origin y
 
 // Content area starts at (SB, HDR) inside the screen
-export const CX  = SB;    // content origin x (after sidebar)
-export const CY  = HDR;   // content origin y (after header)
+export const CX  = 240;    // content origin x (after sidebar)
+export const CY  = 56;   // content origin y (after header)
 
 // ─── Placement helpers ────────────────────────────────────────────────────────
 
@@ -139,43 +139,65 @@ export function writeExcalidraw(filePath, elements) {
 export function appShell(prefix, W, H, navItems, activeIdx, pageTitle) {
   const els = [];
 
-  // Page background
-  els.push(rect(`${prefix}_bg`, 0, 0, W, H, C.gray300, C.gray100, 1, false));
+  // Main Page Background
+  els.push(rect(`${prefix}_bg`, 0, 0, W, H, C.gray300, C.gray50, 1, false));
 
-  // Sidebar surface
-  els.push(rect(`${prefix}_sidebar`, 0, 0, SB, H, C.gray300, C.white, 1, false));
+  // --- HYBRID COLLAPSIBLE SIDEBAR ---
+  const sbW = 240;
+  els.push(rect(`${prefix}_sidebar`, 0, 0, sbW, H, C.gray300, C.white, 1, false));
 
-  // Logo area (gray50, 60px tall)
-  els.push(rect(`${prefix}_logo_bg`, 0, 0, SB, HDR, C.gray300, C.gray50, 1, false));
-  els.push(text(`${prefix}_logo_t`, 30, 18, 150, 26, '⬡  Axis', 18, C.primary));
+  // Workspace / Tenant Header
+  els.push(text(`${prefix}_logo`, 20, 20, 24, 24, '⬡', 20, C.primary));
+  els.push(text(`${prefix}_ws_name`, 54, 23, 100, 18, 'Acme Corp', 14, C.gray900));
+  els.push(text(`${prefix}_ws_arr`, 158, 23, 16, 16, '▾', 14, C.gray500));
 
-  // Nav items
+  // Collapse Sidebar Action
+  els.push(rect(`${prefix}_sb_coll_bg`, sbW - 36, 16, 24, 24, 'transparent', C.gray100, 0, true, { roundness: { type: 3 } }));
+  els.push(text(`${prefix}_sb_coll_t`, sbW - 36, 19, 24, 16, '◂', 14, C.gray500, 'center'));
+  els.push(text(`${prefix}_sb_hint`, sbW - 38, 40, 28, 12, 'Cmd+\\', 9, C.gray300, 'center'));
+
+  // Nav items (Expanded state with icons and labels)
+  const navStartY = 80;
+  const icons = ['🗂', '👥', '🗃', '⚡', '📝', '⚙'];
   navItems.forEach((label, i) => {
-    const y = HDR + 12 + i * 44;
+    const y = navStartY + i * 40;
     const active = i === activeIdx;
     const bg     = active ? C.infoBg      : 'transparent';
-    const stroke = active ? C.infoBorder  : 'transparent';
     const tc     = active ? C.primary     : C.gray700;
-    els.push(rect(`${prefix}_ni_${i}`, 8, y, 214, 36, stroke, bg, 1, false));
-    if (active) els.push(rect(`${prefix}_nacc_${i}`, 8, y, 3, 36, C.primary, C.primary, 1, false));
-    els.push(text(`${prefix}_nl_${i}`, 30, y + 9, 170, 18, label, 13, tc));
+    const icon   = icons[i] || '•';
+
+    els.push(rect(`${prefix}_ni_${i}`, 12, y, sbW - 24, 32, 'transparent', bg, 0, true, { roundness: { type: 3 } }));
+    els.push(text(`${prefix}_nic_${i}`, 20, y + 6, 20, 20, icon, 14, tc, 'center'));
+    els.push(text(`${prefix}_nl_${i}`, 48, y + 8, 140, 16, label, 13, tc));
   });
 
-  // User area
-  els.push(hline(`${prefix}_user_div`, 8, H - 52, 214, C.gray300));
+  // User Profile at bottom left
+  els.push(hline(`${prefix}_u_div`, 12, H - 60, sbW - 24, C.gray300));
   els.push(ellipse(`${prefix}_uav`, 16, H - 46, 32, 32, C.infoBorder, C.infoBg, 1));
-  els.push(text(`${prefix}_un`, 56, H - 38, 140, 16, 'Alex Brown', 12, C.gray900));
+  els.push(text(`${prefix}_un`, 56, H - 38, 120, 16, 'Alex Brown', 12, C.gray900));
 
-  // Header strip
-  els.push(rect(`${prefix}_hdr`, SB, 0, W - SB, HDR, C.gray300, C.white, 1, false));
-  els.push(text(`${prefix}_page_title`, SB + 20, 18, 300, 24, pageTitle, 18, C.gray900));
-  // Right-to-left: margin(8) + avatar(36) + gap(8) + bell(36) + gap(8) + search(160)
-  els.push(rect(`${prefix}_srch`, W - 256, 12, 160, 36, C.gray300, C.gray100, 1, true));
-  els.push(text(`${prefix}_srch_t`, W - 242, 22, 140, 16, '⌕  Search…', 12, C.gray500));
-  els.push(ellipse(`${prefix}_notif`, W - 88, 12, 36, 36, C.gray300, C.gray100, 1));
-  els.push(text(`${prefix}_notif_t`, W - 88, 21, 36, 18, '🔔', 12, C.gray700, 'center'));
-  els.push(ellipse(`${prefix}_av`, W - 44, 12, 36, 36, C.infoBorder, C.infoBg, 1));
-  els.push(text(`${prefix}_av_t`, W - 44, 21, 36, 18, 'AB', 12, C.primary, 'center'));
+
+  // --- TOP HEADER (Breadcrumb + CmdK) ---
+  const hdrH = 56;
+  els.push(rect(`${prefix}_hdr`, sbW, 0, W - sbW, hdrH, C.gray300, C.white, 1, false));
+
+  // Breadcrumb
+  els.push(text(`${prefix}_bc`, sbW + 24, 20, 200, 16, `Axis  /  ${pageTitle}`, 13, C.gray700));
+
+  // Command Palette (Centered in the remaining workspace width)
+  const cmdW = 320;
+  const cmdX = sbW + ((W - sbW) / 2) - (cmdW / 2);
+  els.push(rect(`${prefix}_cmd_bg`, cmdX, 12, cmdW, 32, C.gray300, C.gray50, 1, true, { roundness: { type: 3 } }));
+  els.push(text(`${prefix}_cmd_t`, cmdX + 12, 19, 140, 16, '⌕  Search anything...', 12, C.gray500));
+  els.push(rect(`${prefix}_cmd_key`, cmdX + cmdW - 40, 16, 32, 20, C.gray300, C.white, 1, true, { roundness: { type: 3 } }));
+  els.push(text(`${prefix}_cmd_key_t`, cmdX + cmdW - 35, 19, 24, 14, '⌘K', 10, C.gray500));
+
+  // Right Actions
+  els.push(text(`${prefix}_notif`, W - 44, 18, 24, 24, '🔔', 16, C.gray700));
+
+  // --- FLOATING HELP/FOOTER (Bottom Right) ---
+  els.push(ellipse(`${prefix}_help`, W - 56, H - 56, 40, 40, C.gray300, C.white, 1));
+  els.push(text(`${prefix}_help_ic`, W - 56, H - 46, 40, 20, '?', 16, C.gray700, 'center'));
 
   return els;
 }

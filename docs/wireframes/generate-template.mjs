@@ -2,7 +2,7 @@
  * Axis UI Component Kit — _template.excalidraw
  * Run: node docs/wireframes/generate-template.mjs
  *
- * TOC — 34 sections
+ * TOC — 37 sections
  * ─── Foundations ─────────────────── S01 Color Palette
  *                                     S02 Typography
  *                                     S03 Buttons
@@ -37,6 +37,9 @@
  *                                     S32 Execution Timeline
  *                                     S33 Field Type Picker
  *                                     S34 Relation / Lookup Field
+ *                                     S35 Dashboard & Analytics Stats
+ *                                     S36 Advanced Filters / Query Builder
+ *                                     S37 Dual Listbox / Transfer List
  */
 
 import { fileURLToPath } from 'url';
@@ -1620,6 +1623,182 @@ export function buildRelationLookup(y0) {
   return els;
 }
 
+
+export function buildStatsCards(y0) {
+  const els = [...sectionHeader(35, 'Dashboard & Analytics Stats', y0)];
+  const yC = y0 + 48;
+
+  // Basic Stat Card
+  els.push(rect('stat_basic', 50, yC, 240, 110, C.gray300, C.white, 1, true));
+  els.push(text('stat_basic_lbl', 66, yC + 16, 200, 14, 'Total Workflows', 12, C.gray500));
+  els.push(text('stat_basic_val', 66, yC + 40, 200, 36, '1,248', 28, C.gray900));
+  els.push(text('stat_basic_sub', 66, yC + 80, 200, 14, '+12% from last month', 11, C.success));
+
+  // Stat Card with Mini Chart/Trend
+  els.push(rect('stat_trend', 310, yC, 280, 110, C.gray300, C.white, 1, true));
+  els.push(text('stat_trend_lbl', 326, yC + 16, 200, 14, 'Active Executions', 12, C.gray500));
+  els.push(text('stat_trend_val', 326, yC + 40, 100, 36, '42', 28, C.gray900));
+
+  // Mini line chart (trend)
+  els.push(hline('stat_trend_chart_base', 460, yC + 76, 100, C.gray100, 1));
+  const s = Date.now();
+  els.push({
+    ...({ type: 'line', strokeColor: C.primary, backgroundColor: 'transparent', fillStyle: 'solid', strokeWidth: 2, strokeStyle: 'solid', roughness: 1, roundness: { type: 2 }, seed: s, versionNonce: s + 1, lastCommittedPoint: null, startBinding: null, endBinding: null, startArrowhead: null, endArrowhead: null }),
+    id: 'stat_trend_line',
+    x: 460,
+    y: yC + 60,
+    width: 100,
+    height: 30,
+    points: [[0, 10], [20, 20], [40, 5], [60, 15], [80, -5], [100, -10]]
+  });
+
+  els.push(text('stat_trend_sub', 326, yC + 80, 100, 14, 'Live view', 11, C.gray500));
+
+  // Stat Card with Progress
+  els.push(rect('stat_prog', 610, yC, 240, 110, C.gray300, C.white, 1, true));
+  els.push(text('stat_prog_lbl', 626, yC + 16, 200, 14, 'Storage Used', 12, C.gray500));
+  els.push(text('stat_prog_val', 626, yC + 36, 200, 24, '45.2 GB', 18, C.gray900));
+  els.push(text('stat_prog_max', 770, yC + 44, 60, 14, '/ 100 GB', 11, C.gray500));
+
+  els.push(rect('stat_prog_track', 626, yC + 76, 208, 8, 'transparent', C.gray100, 0, true, { roundness: { type: 3 } }));
+  els.push(rect('stat_prog_fill',  626, yC + 76, 94,  8, 'transparent', C.warning, 0, true, { roundness: { type: 3 } }));
+
+  return els;
+}
+
+
+export function buildAdvancedFilters(y0) {
+  const els = [...sectionHeader(36, 'Advanced Filters / Query Builder', y0)];
+  const yC = y0 + 48;
+
+  els.push(rect('adv_filt_panel', 50, yC, 600, 200, C.gray300, C.white, 1, false));
+
+  // Header
+  els.push(rect('adv_filt_hdr', 50, yC, 600, 40, 'transparent', C.gray50, 0, false));
+  els.push(hline('adv_filt_div_top', 50, yC + 40, 600, C.gray300));
+  els.push(text('adv_filt_title', 66, yC + 10, 200, 18, 'Filters', 14, C.gray900));
+  els.push(text('adv_filt_match', 350, yC + 12, 200, 14, 'Match', 12, C.gray700));
+  els.push(rect('adv_filt_op_sel', 396, yC + 6, 80, 28, C.gray300, C.white, 1, true));
+  els.push(text('adv_filt_op_val', 404, yC + 12, 50, 14, 'All', 12, C.gray900));
+  els.push(text('adv_filt_op_arr', 456, yC + 11, 14, 14, '▾', 12, C.gray700));
+  els.push(text('adv_filt_rules', 484, yC + 12, 100, 14, 'of the following rules:', 12, C.gray700));
+
+  // Rule 1
+  const r1y = yC + 56;
+  els.push(rect('adv_filt_r1_fld', 66, r1y, 140, 32, C.gray300, C.white, 1, true));
+  els.push(text('adv_filt_r1_fld_t', 74, r1y + 8, 100, 14, 'Status', 12, C.gray900));
+  els.push(text('adv_filt_r1_fld_a', 186, r1y + 8, 14, 14, '▾', 12, C.gray700));
+
+  els.push(rect('adv_filt_r1_op', 214, r1y, 120, 32, C.gray300, C.white, 1, true));
+  els.push(text('adv_filt_r1_op_t', 222, r1y + 8, 80, 14, 'is equal to', 12, C.gray900));
+  els.push(text('adv_filt_r1_op_a', 314, r1y + 8, 14, 14, '▾', 12, C.gray700));
+
+  els.push(rect('adv_filt_r1_val', 342, r1y, 160, 32, C.gray300, C.white, 1, true));
+  els.push(text('adv_filt_r1_val_t', 350, r1y + 8, 120, 14, 'Active', 12, C.gray900));
+  els.push(text('adv_filt_r1_val_a', 482, r1y + 8, 14, 14, '▾', 12, C.gray700));
+
+  els.push(text('adv_filt_r1_del', 510, r1y + 8, 20, 14, '×', 16, C.gray500));
+
+  // Rule 2
+  const r2y = yC + 96;
+  els.push(rect('adv_filt_r2_fld', 66, r2y, 140, 32, C.gray300, C.white, 1, true));
+  els.push(text('adv_filt_r2_fld_t', 74, r2y + 8, 100, 14, 'Created Date', 12, C.gray900));
+  els.push(text('adv_filt_r2_fld_a', 186, r2y + 8, 14, 14, '▾', 12, C.gray700));
+
+  els.push(rect('adv_filt_r2_op', 214, r2y, 120, 32, C.gray300, C.white, 1, true));
+  els.push(text('adv_filt_r2_op_t', 222, r2y + 8, 80, 14, 'is after', 12, C.gray900));
+  els.push(text('adv_filt_r2_op_a', 314, r2y + 8, 14, 14, '▾', 12, C.gray700));
+
+  els.push(rect('adv_filt_r2_val', 342, r2y, 160, 32, C.gray300, C.white, 1, true));
+  els.push(text('adv_filt_r2_val_t', 350, r2y + 8, 120, 14, '2023-01-01', 12, C.gray900));
+  els.push(text('adv_filt_r2_val_i', 480, r2y + 8, 14, 14, '📅', 10, C.gray700));
+
+  els.push(text('adv_filt_r2_del', 510, r2y + 8, 20, 14, '×', 16, C.gray500));
+
+  // Footer / Add Rule
+  els.push(hline('adv_filt_div_bot', 50, yC + 144, 600, C.gray300));
+  els.push(text('adv_filt_add_rule', 66, yC + 160, 100, 14, '+ Add Rule', 12, C.primary));
+  els.push(text('adv_filt_add_grp', 170, yC + 160, 100, 14, '+ Add Group', 12, C.primary));
+
+  // Apply button
+  els.push(rect('adv_filt_apply', 540, yC + 154, 80, 28, C.accentDark, C.accent, 2, true));
+  els.push(text('adv_filt_apply_t', 540, yC + 161, 80, 14, 'Apply', 11, C.white, 'center'));
+
+  return els;
+}
+
+
+export function buildDualListbox(y0) {
+  const els = [...sectionHeader(37, 'Dual Listbox / Transfer List', y0)];
+  const yC = y0 + 48;
+
+  // Left List (Available)
+  els.push(rect('dual_left_panel', 50, yC, 240, 260, C.gray300, C.white, 1, false));
+  els.push(rect('dual_left_hdr', 50, yC, 240, 40, 'transparent', C.gray50, 0, false));
+  els.push(hline('dual_left_div1', 50, yC + 40, 240, C.gray300));
+  els.push(text('dual_left_title', 62, yC + 10, 160, 18, 'Available Permissions', 12, C.gray900));
+  els.push(text('dual_left_count', 240, yC + 12, 40, 14, '12', 11, C.gray500, 'right'));
+
+  // Search
+  els.push(rect('dual_left_search', 58, yC + 48, 224, 32, C.gray300, C.white, 1, true));
+  els.push(text('dual_left_search_t', 66, yC + 56, 160, 16, '⌕ Search...', 12, C.gray500));
+  els.push(hline('dual_left_div2', 50, yC + 88, 240, C.gray300));
+
+  // Left Items
+  const leftItems = ['users:read', 'users:write', 'users:delete', 'roles:read', 'roles:write'];
+  leftItems.forEach((item, i) => {
+    const iy = yC + 88 + i * 32;
+    if (i === 1 || i === 3) {
+      // Selected state
+      els.push(rect(`dual_left_sel_${i}`, 50, iy, 240, 32, 'transparent', C.infoBg, 0, false));
+      els.push(rect(`dual_left_chk_${i}`, 62, iy + 8, 16, 16, C.primary, C.primary, 1, true));
+      els.push(text(`dual_left_chkt_${i}`, 62, iy + 8, 16, 16, '✓', 11, C.white, 'center'));
+    } else {
+      els.push(rect(`dual_left_chk_${i}`, 62, iy + 8, 16, 16, C.gray300, C.white, 1, true));
+    }
+    els.push(text(`dual_left_itmt_${i}`, 86, iy + 9, 180, 16, item, 12, C.gray900));
+  });
+
+  // Transfer Buttons (Middle)
+  const mx = 302;
+  const my = yC + 110;
+  els.push(rect('dual_btn_all_right', mx, my, 36, 32, C.gray300, C.white, 1, true));
+  els.push(text('dual_btn_all_right_t', mx, my + 8, 36, 16, '⟫', 14, C.gray700, 'center'));
+
+  els.push(rect('dual_btn_right', mx, my + 40, 36, 32, C.primary, C.infoBg, 1, true));
+  els.push(text('dual_btn_right_t', mx, my + 48, 36, 16, '⟩', 14, C.primary, 'center'));
+
+  els.push(rect('dual_btn_left', mx, my + 80, 36, 32, C.gray300, C.white, 1, true));
+  els.push(text('dual_btn_left_t', mx, my + 88, 36, 16, '⟨', 14, C.gray300, 'center'));
+
+  els.push(rect('dual_btn_all_left', mx, my + 120, 36, 32, C.gray300, C.white, 1, true));
+  els.push(text('dual_btn_all_left_t', mx, my + 128, 36, 16, '⟪', 14, C.gray300, 'center'));
+
+  // Right List (Assigned)
+  const rx = 350;
+  els.push(rect('dual_right_panel', rx, yC, 240, 260, C.gray300, C.white, 1, false));
+  els.push(rect('dual_right_hdr', rx, yC, 240, 40, 'transparent', C.gray50, 0, false));
+  els.push(hline('dual_right_div1', rx, yC + 40, 240, C.gray300));
+  els.push(text('dual_right_title', rx + 12, yC + 10, 160, 18, 'Assigned Permissions', 12, C.gray900));
+  els.push(text('dual_right_count', rx + 190, yC + 12, 40, 14, '3', 11, C.gray500, 'right'));
+
+  // Search
+  els.push(rect('dual_right_search', rx + 8, yC + 48, 224, 32, C.gray300, C.white, 1, true));
+  els.push(text('dual_right_search_t', rx + 16, yC + 56, 160, 16, '⌕ Search...', 12, C.gray500));
+  els.push(hline('dual_right_div2', rx, yC + 88, 240, C.gray300));
+
+  // Right Items
+  const rightItems = ['models:read', 'models:write', 'workflows:read'];
+  rightItems.forEach((item, i) => {
+    const iy = yC + 88 + i * 32;
+    els.push(rect(`dual_right_chk_${i}`, rx + 12, iy + 8, 16, 16, C.gray300, C.white, 1, true));
+    els.push(text(`dual_right_itmt_${i}`, rx + 36, iy + 9, 180, 16, item, 12, C.gray900));
+    els.push(text(`dual_right_del_${i}`, rx + 210, iy + 8, 20, 16, '×', 16, C.gray500));
+  });
+
+  return els;
+}
+
 export function buildColorIconPicker(y0) {
   const els = [...sectionHeader(29, 'Color & Icon Picker', y0)];
   const yC = y0 + 68;
@@ -1734,6 +1913,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     buildExecutionTimeline,      // S32
     buildFieldTypePicker,        // S33
     buildRelationLookup,         // S34
+    buildStatsCards,             // S35
+    buildAdvancedFilters,        // S36
+    buildDualListbox,            // S37
   ]) {
     const els = builder(currentY);
     allElements.push(...els);
