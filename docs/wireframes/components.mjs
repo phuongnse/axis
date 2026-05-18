@@ -88,8 +88,8 @@ export const OX  = 0;     // screen origin x (sidebar starts here)
 export const OY  = 0;     // screen origin y
 
 // Content area starts at (SB, HDR) inside the screen
-export const CX  = 296;    // content origin x (after sidebar)
-export const CY  = 60;   // content origin y (after header)
+export const CX  = 40;    // content origin x (after sidebar)
+export const CY  = 120;   // content origin y (after header)
 
 // ─── Placement helpers ────────────────────────────────────────────────────────
 
@@ -136,82 +136,60 @@ export function writeExcalidraw(filePath, elements) {
 // Active item: C.infoBg bg + C.infoBorder stroke + 3px left accent bar + C.primary text.
 // Logo: gray50 area 230×60, text '⬡  Axis' 18px C.primary at (30, 18).
 
-
-
-
 export function appShell(prefix, W, H, navItems, activeIdx, pageTitle) {
   const els = [];
 
-  // Main Page Background (Canvas area)
-  els.push(rect(`${prefix}_bg`, 0, 0, W, H, C.gray300, C.gray50, 1, false));
+  // Main Canvas Background (Edge to Edge)
+  els.push(rect(`${prefix}_bg`, 0, 0, W, H, C.gray100, C.gray50, 1, false));
 
-  // --- ACTIVITY BAR (Far Left, Dark Theme) ---
-  const actW = 56;
-  els.push(rect(`${prefix}_actbar`, 0, 0, actW, H, C.gray900, C.gray900, 1, false));
+  // --- FLOATING ISLAND: TOP LEFT (Context & Title) ---
+  els.push(rect(`${prefix}_top_left`, 40, 32, 340, 56, C.gray300, C.white, 1, true, { roundness: { type: 3 } }));
+  els.push(text(`${prefix}_logo`, 56, 47, 24, 24, '⬡', 20, C.primary));
+  els.push(vline(`${prefix}_tl_div`, 92, 44, 32, C.gray300));
+  els.push(text(`${prefix}_ws_name`, 108, 50, 80, 16, 'Acme Corp', 13, C.gray500));
+  els.push(text(`${prefix}_tl_slash`, 196, 50, 12, 16, '/', 13, C.gray300));
+  els.push(text(`${prefix}_page_title`, 216, 48, 140, 20, pageTitle, 15, C.gray900));
 
-  // App Logo
-  els.push(text(`${prefix}_logo`, 14, 16, 28, 28, '⬡', 24, C.white, 'center'));
+  // --- FLOATING ISLAND: TOP RIGHT (Profile & Actions) ---
+  const trW = 280;
+  const trX = W - trW - 40;
+  els.push(rect(`${prefix}_top_right`, trX, 32, trW, 56, C.gray300, C.white, 1, true, { roundness: { type: 3 } }));
 
-  // Activity Icons
-  const icons = ['⌘', '👥', '🗃', '⚡', '📝', '⚙'];
-  icons.forEach((icon, i) => {
-    const y = 80 + i * 56;
-    const active = i === activeIdx;
-    if (active) {
-       els.push(rect(`${prefix}_act_bg_${i}`, 8, y - 8, 40, 40, 'transparent', '#4A5058', 0, true, { roundness: { type: 3 } }));
-       // left indicator strip
-       els.push(rect(`${prefix}_act_ind_${i}`, 0, y - 8, 3, 40, C.accent, C.accent, 1, false));
-    }
-    els.push(text(`${prefix}_act_ic_${i}`, 14, y, 28, 28, icon, 18, active ? C.white : C.gray500, 'center'));
-  });
+  // Search / Cmd+K Pill inside Top Right
+  els.push(rect(`${prefix}_cmd_pill`, trX + 16, 42, 120, 36, C.gray300, C.gray50, 1, true, { roundness: { type: 3 } }));
+  els.push(text(`${prefix}_cmd_t`, trX + 32, 50, 80, 16, '⌕  Cmd+K', 12, C.gray500));
 
-  // User Avatar (Bottom)
-  els.push(ellipse(`${prefix}_act_av`, 12, H - 48, 32, 32, C.gray500, 'transparent', 1));
-  els.push(text(`${prefix}_act_avt`, 12, H - 39, 32, 16, 'AB', 12, C.gray300, 'center'));
+  els.push(ellipse(`${prefix}_notif`, trX + 160, 42, 36, 36, 'transparent', C.gray50, 0));
+  els.push(text(`${prefix}_notif_t`, trX + 160, 50, 36, 18, '🔔', 14, C.gray700, 'center'));
 
+  els.push(ellipse(`${prefix}_av`, trX + 220, 42, 36, 36, C.infoBorder, C.infoBg, 1));
+  els.push(text(`${prefix}_av_t`, trX + 220, 51, 36, 18, 'AB', 12, C.primary, 'center'));
 
-  // --- CONTEXT PANEL (Secondary Sidebar) ---
-  const ctxW = 240;
-  els.push(rect(`${prefix}_ctxpanel`, actW, 0, ctxW, H, C.gray300, C.white, 1, false));
+  // --- FLOATING DOCK: BOTTOM CENTER (Main Navigation) ---
+  // A pill-shaped dock holding icons for main sections
+  const dockItemW = 64;
+  const dockW = (navItems.length * dockItemW) + 32;
+  const dockX = (W / 2) - (dockW / 2);
+  const dockY = H - 88;
 
-  // Context Header
-  els.push(text(`${prefix}_ctx_title`, actW + 20, 20, 180, 24, 'Workflow Engine', 16, C.gray900));
-  els.push(hline(`${prefix}_ctx_div1`, actW, 60, ctxW, C.gray300));
+  els.push(rect(`${prefix}_dock`, dockX, dockY, dockW, 64, C.gray300, C.white, 1, true, { roundness: { type: 3 } }));
 
-  // Context Nav Items
-  const navStartY = 80;
+  const icons = ['🗂', '👥', '🗃', '⚡', '📝', '⚙'];
   navItems.forEach((label, i) => {
-    const y = navStartY + i * 36;
     const active = i === activeIdx;
-    const bg     = active ? C.infoBg      : 'transparent';
-    const tc     = active ? C.primary     : C.gray700;
+    const x = dockX + 16 + (i * dockItemW);
+    const icon = icons[i] || '•';
 
     if (active) {
-       els.push(rect(`${prefix}_ni_${i}`, actW + 8, y, ctxW - 16, 32, 'transparent', bg, 0, true, { roundness: { type: 3 } }));
+       els.push(rect(`${prefix}_dock_bg_${i}`, x + 4, dockY + 8, 56, 48, 'transparent', C.infoBg, 0, true, { roundness: { type: 3 } }));
+       // Active dot indicator below icon
+       els.push(ellipse(`${prefix}_dock_dot_${i}`, x + 30, dockY + 46, 4, 4, C.primary, C.primary, 1));
     }
-    els.push(text(`${prefix}_nl_${i}`, actW + 24, y + 8, 170, 16, label, 13, tc));
+    els.push(text(`${prefix}_dock_ic_${i}`, x, dockY + 22, dockItemW, 20, icon, 18, active ? C.primary : C.gray500, 'center'));
   });
-
-
-  // --- WORKSPACE HEADER (Top area over the canvas) ---
-  const hdrX = actW + ctxW;
-  const hdrH = 60;
-  els.push(rect(`${prefix}_hdr`, hdrX, 0, W - hdrX, hdrH, C.gray300, C.white, 1, false));
-
-  // Breadcrumb / Page Title
-  els.push(text(`${prefix}_page_title`, hdrX + 24, 20, 300, 20, pageTitle, 16, C.gray900));
-
-  // Global Actions (Search & Notif)
-  const rightX = W - 200;
-  els.push(rect(`${prefix}_srch`, rightX, 12, 140, 36, C.gray300, C.gray50, 1, true));
-  els.push(text(`${prefix}_srch_t`, rightX + 12, 22, 100, 16, '⌕ Search...', 12, C.gray500));
-  els.push(text(`${prefix}_notif`, rightX + 156, 20, 24, 24, '🔔', 16, C.gray700));
 
   return els;
 }
-
-
-
 
 // ─── Convenience UI builders ──────────────────────────────────────────────────
 // Dimensions match template canonical values exactly (from wireframes.md table).
