@@ -264,6 +264,7 @@ See [`docs/playbooks/testing.md`](docs/playbooks/testing.md) for full patterns �
 - **DDD depth by module**: rich aggregates for complex modules (WorkflowEngine, DataModeling) — full invariants, factory methods, domain events. Pragmatic for simpler CRUD modules (Identity) — still apply Result pattern, repository interfaces, value objects for typed IDs and Email, no Data Annotations on domain types.
 - **Aggregate boundary rule**: a class is an `Entity<TId>` within a parent aggregate — NOT a separate `AggregateRoot<TId>` — when all three hold: (1) it cannot exist without the parent, (2) it has no lifecycle independent of the parent, (3) it is only ever accessed via the parent. A FK field back to the owner is a red flag that aggregate boundaries may be wrong. When in doubt, consult patterns.md § "Mismodeled aggregate boundary". Consequences: child entities do NOT raise domain events themselves (the aggregate root raises them); child entities do NOT have `DeletedAt` (cascade covers them); EF Core maps them via `OwnsMany`, NOT a standalone `DbSet<T>`. See patterns.md § "EF Core OwnsMany pattern".
 - **Result Pattern**: Command/Query handlers return `Result` or `Result<T>` for business rule violations. `ValidationBehavior` pipeline handles FluentValidation — never throw `ValidationException` manually in a handler. Exceptions are for infrastructure failures only. Aggregates guard with `throw InvalidOperationException` for internal invariants.
+- **Domain invariants require spec backing**: every `throw InvalidOperationException` in a domain method must correspond to an explicit AC in the feature file. If no AC exists, do not add the throw — add the AC to the spec first. An invented guard with no spec backing is a hidden spec gap that will silently contradict integration tests. See patterns.md § "Guard Clauses".
 - **CQRS & messaging**: MediatR = Commands and Queries only (intra-module). Domain events = Wolverine outbox, regardless of whether the consumer is in the same module or another. Never use MediatR to dispatch domain events.
 - **Domain events**: raised inside aggregates via `AddDomainEvent`. Dispatched by `UnitOfWork` via Wolverine outbox after `SaveChangesAsync`. Never call `_messageBus.PublishAsync` for a domain event inside a handler.
 - **Response DTOs**: query handlers return dedicated `*Response` / `*Dto` record types defined in the Application layer. Domain entities must never appear in HTTP responses. Mapping happens inside the query handler.
@@ -490,6 +491,30 @@ Run through this before marking any task ✅ or raising a PR:
 - If a class, method, or service was renamed or removed: `grep` for the old name across `docs/` and `src/**/*.cs` comments — update every occurrence.
 - Every affected US has an updated `> **Implementation status**` callout.
 - Every library used in this layer appears in the approved Tech Stack.
+
+**Gate 3 — Retrospective (mandatory, runs in every PR before the final commit)**
+
+Answer each question explicitly. If the answer is "yes", update the relevant doc in this PR — not later.
+
+1. **Did any test fail for a reason not covered by an existing rule in `CLAUDE.md` or `patterns.md`?**
+   If yes → add the rule or pitfall now.
+
+2. **Did I invent a domain invariant (a `throw` in a domain method) that has no AC in the feature file?**
+   If yes → either add the AC to the spec first, or remove the throw. Never leave an unbacked guard.
+
+3. **Did I encounter a footgun in the infrastructure setup (connection strings, DI wiring, EF Core config) that surprised me?**
+   If yes → add it to `patterns.md` under the relevant pitfall section.
+
+4. **Did the test setup (fixture, containers, seed data) require a non-obvious workaround?**
+   If yes → document the pattern or constraint in `testing.md`.
+
+5. **Did I change direction mid-task — switch libraries, revert a commit, or undo an architectural choice?**
+   If yes → document the decision and the reason it was wrong in `patterns.md` or an ADR in `TECH_STACK.md`.
+
+6. **Was there a spec gap (missing AC, ambiguous lifecycle, unstated constraint) that only became visible during implementation or CI?**
+   If yes → add the missing AC to the feature file now.
+
+This gate exists because process gaps that surface during implementation are the highest-value moment to close them — the problem is fresh, the context is loaded, and the fix takes minutes. The same gap discovered six months later takes hours to reconstruct.
 
 ---
 

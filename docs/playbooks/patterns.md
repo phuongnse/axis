@@ -623,6 +623,35 @@ app.MapGet("/api/workflows", async (
 .RequireAuthorization();
 ```
 
+## Module infrastructure extension signature
+
+Each module exposes an `Add{Module}Infrastructure(IServiceCollection, IConfiguration)` extension. The `IConfiguration` object must be passed through and read **lazily inside** the `AddDbContext` lambda — never pre-evaluated before passing.
+
+```csharp
+// ✅ correct — connection string read lazily at DbContext resolution time.
+// WebApplicationFactory.ConfigureAppConfiguration overrides apply before
+// the first DbContext is resolved, so test overrides always take effect.
+public static IServiceCollection AddWorkflowBuilderInfrastructure(
+    this IServiceCollection services, IConfiguration configuration)
+{
+    services.AddDbContext<WorkflowBuilderDbContext>(opts =>
+        opts.UseNpgsql(configuration.GetConnectionString("WorkflowBuilder")));
+    ...
+}
+
+// ❌ wrong — connection string evaluated at Program.cs startup, before
+// test overrides are applied. Test containers never receive the request.
+public static IServiceCollection AddWorkflowBuilderInfrastructure(
+    this IServiceCollection services, string connectionString)
+{
+    services.AddDbContext<WorkflowBuilderDbContext>(opts =>
+        opts.UseNpgsql(connectionString));
+    ...
+}
+```
+
+**Why this matters in tests:** `WebApplicationFactory.ConfigureAppConfiguration` applies overrides before `Program.cs` runs, but the DI container resolves services lazily (on first request). A lambda that captures `IConfiguration` and reads at resolution time picks up the test override. A pre-evaluated `string` captures the value at startup and ignores the override.
+
 ## Minimal API endpoint wiring
 
 - Each module exposes a `Map{ModuleName}Endpoints(IEndpointRouteBuilder)` extension method.
@@ -839,6 +868,8 @@ public static WorkflowDefinition Create(string name, Guid organizationId, Guid c
 ### Guard Clauses — flat, readable invariant enforcement
 
 Use early-return guards in domain methods. The happy path stays at the bottom, readable at a glance.
+
+**Every guard must trace to a spec AC.** Before adding `throw InvalidOperationException(...)` in a domain method, identify the feature file AC that mandates this constraint. If no AC exists, add it to the spec first (see CLAUDE.md § "Domain invariants require spec backing"). A guard without a spec backing is an assumption that will silently contradict integration tests — as happened when `Archive()` threw for `Draft` status with no corresponding AC in US-050.
 
 ```csharp
 // ❌ wrong — nested if pyramid, hard to read
