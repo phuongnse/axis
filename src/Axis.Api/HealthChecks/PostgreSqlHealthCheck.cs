@@ -1,13 +1,9 @@
-using Axis.DataModeling.Infrastructure.Persistence;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Npgsql;
 
 namespace Axis.Api.HealthChecks;
 
-/// <summary>
-/// Verifies PostgreSQL connectivity by attempting to open a connection via the
-/// DataModeling DbContext. No extra packages needed — uses EF Core's built-in CanConnectAsync.
-/// </summary>
-internal sealed class PostgreSqlHealthCheck(DataModelingDbContext db) : IHealthCheck
+internal sealed class PostgreSqlHealthCheck(NpgsqlDataSource dataSource) : IHealthCheck
 {
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
@@ -15,10 +11,9 @@ internal sealed class PostgreSqlHealthCheck(DataModelingDbContext db) : IHealthC
     {
         try
         {
-            bool canConnect = await db.Database.CanConnectAsync(cancellationToken);
-            return canConnect
-                ? HealthCheckResult.Healthy()
-                : HealthCheckResult.Unhealthy("Cannot connect to PostgreSQL.");
+            await using NpgsqlConnection conn = dataSource.CreateConnection();
+            await conn.OpenAsync(cancellationToken);
+            return HealthCheckResult.Healthy();
         }
         catch (Exception ex)
         {

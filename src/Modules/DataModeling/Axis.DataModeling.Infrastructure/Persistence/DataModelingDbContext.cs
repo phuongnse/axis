@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Axis.DataModeling.Infrastructure.Persistence;
 
-public sealed class DataModelingDbContext(
+internal sealed class DataModelingDbContext(
     DbContextOptions<DataModelingDbContext> options,
     ITenantContext tenantContext)
     : AxisDbContext(options, tenantContext)
