@@ -80,6 +80,7 @@ public class GetRecordsHandlerTests
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        await _modelRepo.Received(1).GetByIdAsync(ModelId, otherOrgId);
         await _recordRepo.DidNotReceive().GetPagedAsync(
             Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<int>(), Arg.Any<int>(),
             Arg.Any<string?>(), Arg.Any<IReadOnlyList<RecordFilter>?>(), Arg.Any<string?>(), Arg.Any<string?>());

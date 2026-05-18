@@ -63,14 +63,16 @@ public class PublishWorkflowHandlerTests
     public async Task PublishWorkflow_WhenWorkflowBelongsToAnotherOrg_ReturnsNotFound()
     {
         WorkflowDefinition wf = MakePublishableWorkflow();
-        _workflowRepo.GetByIdAsync(wf.Id, OrgId).Returns(wf);
 
         Guid otherOrgId = Guid.NewGuid();
+        _workflowRepo.GetByIdAsync(wf.Id, otherOrgId).Returns((WorkflowDefinition?)null);
         Result result = await CreateHandler().Handle(
             new PublishWorkflowCommand(wf.Id, otherOrgId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        await _workflowRepo.Received(1).GetByIdAsync(wf.Id, otherOrgId);
+        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]

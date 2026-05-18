@@ -49,14 +49,17 @@ public class AddStepHandlerTests
     public async Task Handle_WhenWorkflowBelongsToAnotherOrg_ReturnsNotFound()
     {
         WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, "user");
-        _repo.GetByIdAsync(wf.Id, OrgId, Arg.Any<CancellationToken>()).Returns(wf);
 
         Guid otherOrgId = Guid.NewGuid();
+        _repo.GetByIdAsync(wf.Id, otherOrgId, Arg.Any<CancellationToken>())
+            .Returns((WorkflowDefinition?)null);
         Result<Guid> result = await _handler.Handle(
             new AddStepCommand(wf.Id, otherOrgId, "Step", StepType.Form, null), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        await _repo.Received(1).GetByIdAsync(wf.Id, otherOrgId, Arg.Any<CancellationToken>());
+        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Theory]

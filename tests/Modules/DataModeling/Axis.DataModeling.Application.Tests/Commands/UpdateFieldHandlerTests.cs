@@ -66,6 +66,8 @@ public class UpdateFieldHandlerTests
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        await _modelRepo.Received(1).GetByIdAsync(model.Id, otherOrgId);
+        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]

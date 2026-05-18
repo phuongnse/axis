@@ -54,14 +54,17 @@ public class AddTransitionHandlerTests
         WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, "user");
         WorkflowStep start = wf.Steps.Single(s => s.Type == StepType.Start);
         WorkflowStep end = wf.Steps.Single(s => s.Type == StepType.End);
-        _repo.GetByIdAsync(wf.Id, OrgId, Arg.Any<CancellationToken>()).Returns(wf);
 
         Guid otherOrgId = Guid.NewGuid();
+        _repo.GetByIdAsync(wf.Id, otherOrgId, Arg.Any<CancellationToken>())
+            .Returns((WorkflowDefinition?)null);
         Result result = await _handler.Handle(
             new AddTransitionCommand(wf.Id, otherOrgId, start.Id, end.Id, null), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        await _repo.Received(1).GetByIdAsync(wf.Id, otherOrgId, Arg.Any<CancellationToken>());
+        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]

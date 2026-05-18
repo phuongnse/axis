@@ -76,6 +76,8 @@ public class AddFieldToFormHandlerTests
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        await _repo.Received(1).GetByIdAsync(form.Id, otherOrgId, Arg.Any<CancellationToken>());
+        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]

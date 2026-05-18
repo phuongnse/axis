@@ -50,14 +50,17 @@ public class RemoveStepHandlerTests
     {
         WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, "user");
         WorkflowStep step = wf.AddStep("Review", StepType.Form, null);
-        _repo.GetByIdAsync(wf.Id, OrgId, Arg.Any<CancellationToken>()).Returns(wf);
 
         Guid otherOrgId = Guid.NewGuid();
+        _repo.GetByIdAsync(wf.Id, otherOrgId, Arg.Any<CancellationToken>())
+            .Returns((WorkflowDefinition?)null);
         Result result = await _handler.Handle(
             new RemoveStepCommand(wf.Id, otherOrgId, step.Id), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        await _repo.Received(1).GetByIdAsync(wf.Id, otherOrgId, Arg.Any<CancellationToken>());
+        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]

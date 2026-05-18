@@ -50,13 +50,16 @@ public class RemoveTriggerHandlerTests
     {
         WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, "user");
         wf.AddTrigger(TriggerType.Manual, null);
-        _repo.GetByIdAsync(wf.Id, OrgId, Arg.Any<CancellationToken>()).Returns(wf);
 
         Guid otherOrgId = Guid.NewGuid();
+        _repo.GetByIdAsync(wf.Id, otherOrgId, Arg.Any<CancellationToken>())
+            .Returns((WorkflowDefinition?)null);
         Result result = await _handler.Handle(
             new RemoveTriggerCommand(wf.Id, otherOrgId, TriggerType.Manual), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        await _repo.Received(1).GetByIdAsync(wf.Id, otherOrgId, Arg.Any<CancellationToken>());
+        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 }

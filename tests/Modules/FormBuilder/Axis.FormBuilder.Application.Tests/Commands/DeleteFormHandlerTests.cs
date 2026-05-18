@@ -72,5 +72,7 @@ public class DeleteFormHandlerTests
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        await _formRepo.Received(1).GetByIdAsync(form.Id, otherOrgId);
+        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 }

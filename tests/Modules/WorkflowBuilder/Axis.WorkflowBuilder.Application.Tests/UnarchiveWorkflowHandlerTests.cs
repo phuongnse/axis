@@ -47,13 +47,16 @@ public class UnarchiveWorkflowHandlerTests
     public async Task Handle_WhenWorkflowBelongsToAnotherOrg_ReturnsNotFound()
     {
         WorkflowDefinition wf = CreateArchivedWorkflow();
-        _repo.GetByIdAsync(wf.Id, OrgId, Arg.Any<CancellationToken>()).Returns(wf);
 
         Guid otherOrgId = Guid.NewGuid();
+        _repo.GetByIdAsync(wf.Id, otherOrgId, Arg.Any<CancellationToken>())
+            .Returns((WorkflowDefinition?)null);
         Result result = await _handler.Handle(new UnarchiveWorkflowCommand(wf.Id, otherOrgId), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        await _repo.Received(1).GetByIdAsync(wf.Id, otherOrgId, Arg.Any<CancellationToken>());
+        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
