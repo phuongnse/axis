@@ -47,4 +47,17 @@ public class GetRetryHistoryHandlerTests
 
         result.Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task GetRetryHistory_WhenQueriedWithWrongOrg_ReturnsEmptyList()
+    {
+        List<ExecutionSummaryResponse> retries = [BuildSummary(OriginalExecId)];
+        _execRepo.GetRetriesAsync(OriginalExecId, OrgId).Returns(retries);
+
+        Guid otherOrgId = Guid.NewGuid();
+        IReadOnlyList<ExecutionSummaryResponse> result = await CreateHandler().Handle(
+            new GetRetryHistoryQuery(OriginalExecId, otherOrgId), CancellationToken.None);
+
+        result.Should().BeEmpty();
+    }
 }

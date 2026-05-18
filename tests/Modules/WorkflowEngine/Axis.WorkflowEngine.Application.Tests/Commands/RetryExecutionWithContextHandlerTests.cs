@@ -82,4 +82,19 @@ public class RetryExecutionWithContextHandlerTests
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
         result.Error.Should().Contain("failed");
     }
+
+    [Fact]
+    public async Task RetryWithContext_WhenExecutionBelongsToAnotherOrg_ReturnsNotFound()
+    {
+        WorkflowExecution failed = MakeFailedExecution();
+        _execRepo.GetByIdAsync(failed.Id, OrgId).Returns(failed);
+
+        Guid otherOrgId = Guid.NewGuid();
+        Result<Guid> result = await CreateHandler().Handle(
+            new RetryExecutionWithContextCommand(failed.Id, otherOrgId, UserId, ModifiedContext),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+    }
 }

@@ -72,6 +72,21 @@ public class UpdateRecordHandlerTests
     }
 
     [Fact]
+    public async Task UpdateRecord_WhenModelBelongsToAnotherOrg_ReturnsNotFound()
+    {
+        DataModel model = SimpleModel();
+        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
+
+        Guid otherOrgId = Guid.NewGuid();
+        Result result = await CreateHandler().Handle(
+            new UpdateRecordCommand(Guid.NewGuid(), model.Id, otherOrgId, new Dictionary<string, object?>()),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+    }
+
+    [Fact]
     public async Task UpdateRecord_WhenRequiredFieldMissing_ReturnsFieldValidationError()
     {
         DataModel model = SimpleModel();

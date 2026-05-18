@@ -60,6 +60,20 @@ public class PublishWorkflowHandlerTests
     }
 
     [Fact]
+    public async Task PublishWorkflow_WhenWorkflowBelongsToAnotherOrg_ReturnsNotFound()
+    {
+        WorkflowDefinition wf = MakePublishableWorkflow();
+        _workflowRepo.GetByIdAsync(wf.Id, OrgId).Returns(wf);
+
+        Guid otherOrgId = Guid.NewGuid();
+        Result result = await CreateHandler().Handle(
+            new PublishWorkflowCommand(wf.Id, otherOrgId), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+    }
+
+    [Fact]
     public async Task PublishWorkflow_WhenNoTriggersConfigured_ReturnsBusinessRuleFailure()
     {
         WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, OrgId, UserId);

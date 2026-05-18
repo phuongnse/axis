@@ -49,6 +49,21 @@ public class ConfigureStepHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WhenWorkflowBelongsToAnotherOrg_ReturnsNotFound()
+    {
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, "user");
+        WorkflowStep step = wf.AddStep("Form Step", StepType.Form, null);
+        _repo.GetByIdAsync(wf.Id, OrgId, Arg.Any<CancellationToken>()).Returns(wf);
+
+        Guid otherOrgId = Guid.NewGuid();
+        Result result = await _handler.Handle(
+            new ConfigureStepCommand(wf.Id, otherOrgId, step.Id, "Name", null), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+    }
+
+    [Fact]
     public async Task Handle_WhenStepNotFound_ReturnsBusinessRuleError()
     {
         WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, "user");

@@ -44,4 +44,18 @@ public class DeleteModelHandlerTests
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
         result.Error.Should().Contain("not found");
     }
+
+    [Fact]
+    public async Task DeleteModel_WhenModelBelongsToAnotherOrg_ReturnsNotFound()
+    {
+        DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
+        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
+
+        Guid otherOrgId = Guid.NewGuid();
+        Result result = await CreateHandler().Handle(
+            new DeleteModelCommand(model.Id, otherOrgId), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+    }
 }

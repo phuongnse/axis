@@ -62,4 +62,18 @@ public class DuplicateWorkflowHandlerTests
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
     }
+
+    [Fact]
+    public async Task Handle_WhenWorkflowBelongsToAnotherOrg_ReturnsNotFound()
+    {
+        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, OrgId, "user");
+        _repo.GetByIdAsync(wf.Id, OrgId, Arg.Any<CancellationToken>()).Returns(wf);
+
+        Guid otherOrgId = Guid.NewGuid();
+        Result<Guid> result = await _handler.Handle(
+            new DuplicateWorkflowCommand(wf.Id, otherOrgId, "user"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+    }
 }

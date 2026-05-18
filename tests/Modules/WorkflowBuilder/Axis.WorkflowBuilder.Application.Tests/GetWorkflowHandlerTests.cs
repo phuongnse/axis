@@ -47,4 +47,17 @@ public class GetWorkflowHandlerTests
 
         dto.Should().BeNull();
     }
+
+    [Fact]
+    public async Task Handle_WhenWorkflowBelongsToAnotherOrg_ReturnsNull()
+    {
+        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, OrgId, "user");
+        _repo.GetByIdAsync(wf.Id, OrgId, Arg.Any<CancellationToken>()).Returns(wf);
+
+        Guid otherOrgId = Guid.NewGuid();
+        WorkflowDetailDto? dto = await _handler.Handle(
+            new GetWorkflowQuery(wf.Id, otherOrgId), CancellationToken.None);
+
+        dto.Should().BeNull();
+    }
 }

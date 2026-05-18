@@ -64,6 +64,21 @@ public class AddFieldToFormHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WhenFormBelongsToAnotherOrg_ReturnsNotFound()
+    {
+        FormDefinition form = FormDefinition.Create("My Form", null, OrgId, "user");
+        _repo.GetByIdAsync(form.Id, OrgId, Arg.Any<CancellationToken>()).Returns(form);
+
+        Guid otherOrgId = Guid.NewGuid();
+        Result<Guid> result = await _handler.Handle(
+            new AddFieldToFormCommand(form.Id, otherOrgId, "key", "Label", FormFieldType.Text, false, null),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+    }
+
+    [Fact]
     public async Task Handle_WhenInvalidFieldKey_ReturnsBusinessRule()
     {
         FormDefinition form = FormDefinition.Create("My Form", null, OrgId, "user");

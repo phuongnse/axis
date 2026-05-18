@@ -46,6 +46,21 @@ public class RemoveStepHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WhenWorkflowBelongsToAnotherOrg_ReturnsNotFound()
+    {
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, "user");
+        WorkflowStep step = wf.AddStep("Review", StepType.Form, null);
+        _repo.GetByIdAsync(wf.Id, OrgId, Arg.Any<CancellationToken>()).Returns(wf);
+
+        Guid otherOrgId = Guid.NewGuid();
+        Result result = await _handler.Handle(
+            new RemoveStepCommand(wf.Id, otherOrgId, step.Id), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+    }
+
+    [Fact]
     public async Task Handle_WhenRemovingStartOrEnd_ReturnsBusinessRuleError()
     {
         WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, "user");

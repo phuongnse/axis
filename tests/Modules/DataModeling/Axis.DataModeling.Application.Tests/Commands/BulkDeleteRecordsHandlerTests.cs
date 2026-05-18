@@ -89,6 +89,22 @@ public class BulkDeleteRecordsHandlerTests
     }
 
     [Fact]
+    public async Task BulkDelete_WhenModelBelongsToAnotherOrg_ReturnsNotFound()
+    {
+        DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
+        _modelRepo.GetByIdAsync(ModelId, OrgId).Returns(model);
+
+        Guid otherOrgId = Guid.NewGuid();
+        Result<BulkDeleteResult> result = await CreateHandler().Handle(
+            new BulkDeleteRecordsCommand([Guid.NewGuid()], ModelId, otherOrgId),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        await _recordRepo.DidNotReceive().BulkDeleteAsync(Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<Guid>(), Arg.Any<Guid>());
+    }
+
+    [Fact]
     public async Task BulkDelete_WhenSomeRecordsNotFound_ReturnsPartialDeletedCount()
     {
         DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);

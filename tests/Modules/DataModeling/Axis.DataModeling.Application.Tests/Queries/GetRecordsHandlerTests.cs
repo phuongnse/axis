@@ -69,6 +69,23 @@ public class GetRecordsHandlerTests
     }
 
     [Fact]
+    public async Task GetRecords_WhenModelBelongsToAnotherOrg_ReturnsNotFound()
+    {
+        DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
+        _modelRepo.GetByIdAsync(ModelId, OrgId).Returns(model);
+
+        Guid otherOrgId = Guid.NewGuid();
+        Result<RecordsPageDto> result = await CreateHandler().Handle(
+            new GetRecordsQuery(ModelId, otherOrgId), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        await _recordRepo.DidNotReceive().GetPagedAsync(
+            Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<int>(), Arg.Any<int>(),
+            Arg.Any<string?>(), Arg.Any<IReadOnlyList<RecordFilter>?>(), Arg.Any<string?>(), Arg.Any<string?>());
+    }
+
+    [Fact]
     public async Task GetRecords_WhenSortProvided_PassesSortToRepository()
     {
         DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);

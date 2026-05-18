@@ -49,6 +49,22 @@ public class AddTransitionHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WhenWorkflowBelongsToAnotherOrg_ReturnsNotFound()
+    {
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, "user");
+        WorkflowStep start = wf.Steps.Single(s => s.Type == StepType.Start);
+        WorkflowStep end = wf.Steps.Single(s => s.Type == StepType.End);
+        _repo.GetByIdAsync(wf.Id, OrgId, Arg.Any<CancellationToken>()).Returns(wf);
+
+        Guid otherOrgId = Guid.NewGuid();
+        Result result = await _handler.Handle(
+            new AddTransitionCommand(wf.Id, otherOrgId, start.Id, end.Id, null), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+    }
+
+    [Fact]
     public async Task Handle_WhenTransitionCreatesCycle_ReturnsBusinessRuleError()
     {
         WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, "user");

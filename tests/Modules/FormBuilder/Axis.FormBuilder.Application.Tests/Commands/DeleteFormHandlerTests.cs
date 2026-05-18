@@ -59,4 +59,18 @@ public class DeleteFormHandlerTests
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
         result.Error.Should().Contain("not found");
     }
+
+    [Fact]
+    public async Task DeleteForm_WhenFormBelongsToAnotherOrg_ReturnsNotFound()
+    {
+        FormDefinition form = FormDefinition.Create("Employee Intake", null, OrgId, UserId);
+        _formRepo.GetByIdAsync(form.Id, OrgId).Returns(form);
+
+        Guid otherOrgId = Guid.NewGuid();
+        Result result = await CreateHandler().Handle(
+            new DeleteFormCommand(form.Id, otherOrgId), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+    }
 }
