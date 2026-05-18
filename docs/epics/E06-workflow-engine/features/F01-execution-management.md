@@ -68,9 +68,8 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 *Out of scope*
 - Real-time execution graph overlay on the workflow canvas — not in MVP (timeline list only).
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: SignalR push updates and execution detail page pending Frontend + API.
-> Decisions: `GetExecutionHandler` delegates to `IExecutionRepository.GetWithStepsAsync`, which loads execution + steps in two queries (no EF navigation property — `ExecutionStep` is a separate aggregate).
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `GetExecutionQuery` handler not yet implemented; SignalR push updates and execution detail page pending Frontend + API.
 
 ---
 

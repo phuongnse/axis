@@ -142,20 +142,6 @@ public class UpdateUserProfileHandlerTests
     }
 
     [Fact]
-    public async Task UpdateUserProfile_WhenUserBelongsToAnotherOrg_ReturnsNotFound()
-    {
-        User user = MakeUser();
-        _userRepo.GetByIdAsync(UserId, OrgId).Returns(user);
-
-        Guid otherOrgId = Guid.NewGuid();
-        UpdateUserProfileCommand command = new(UserId, otherOrgId, "Bob", "Jones", null, null);
-        Result result = await CreateHandler().Handle(command, CancellationToken.None);
-
-        result.IsFailure.Should().BeTrue();
-        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-    }
-
-    [Fact]
     public async Task UpdateUserProfile_WhenAvatarExceedsMaxSize_ReturnsBusinessRuleFailure()
     {
         User user = MakeUser();

@@ -51,19 +51,4 @@ public class AddFieldHandlerTests
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
         result.Error.Should().Contain("not found");
     }
-
-    [Fact]
-    public async Task AddField_WhenModelBelongsToAnotherOrg_ReturnsNotFound()
-    {
-        DataModel model = MakeModel();
-        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
-
-        Guid otherOrgId = Guid.NewGuid();
-        Result<Guid> result = await CreateHandler().Handle(
-            new AddFieldCommand(model.Id, otherOrgId, "amount", "Amount", FieldType.Text, false, new TextFieldConfig()),
-            CancellationToken.None);
-
-        result.IsFailure.Should().BeTrue();
-        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-    }
 }

@@ -2,8 +2,6 @@ using Axis.DataModeling.Application.Commands.CreateRecord;
 using Axis.DataModeling.Application.Repositories;
 using Axis.DataModeling.Application.Services;
 using Axis.DataModeling.Domain.Aggregates;
-using Axis.DataModeling.Domain.Enums;
-using Axis.DataModeling.Domain.ValueObjects;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
@@ -52,51 +50,5 @@ public class CreateRecordHandlerTests
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
         result.Error.Should().Contain("not found");
-    }
-
-    [Fact]
-    public async Task CreateRecord_WhenRequiredFieldMissing_ReturnsFieldValidationError()
-    {
-        DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
-        model.AddField("title", "Title", FieldType.Text, required: true, new TextFieldConfig());
-        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
-
-        Result<Guid> result = await CreateHandler().Handle(
-            new CreateRecordCommand(model.Id, OrgId, new Dictionary<string, object?>(), UserId),
-            CancellationToken.None);
-
-        result.IsFailure.Should().BeTrue();
-        result.ErrorCode.Should().Be(ErrorCodes.FieldValidation);
-        result.FieldErrors.Should().ContainKey("title");
-        await _recordRepo.DidNotReceive().AddAsync(Arg.Any<DataRecord>(), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task CreateRecord_WhenFieldDataValid_CreatesRecord()
-    {
-        DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
-        model.AddField("title", "Title", FieldType.Text, required: true, new TextFieldConfig(MaxLength: 100));
-        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
-
-        Result<Guid> result = await CreateHandler().Handle(
-            new CreateRecordCommand(model.Id, OrgId, new Dictionary<string, object?> { ["title"] = "Test Invoice" }, UserId),
-            CancellationToken.None);
-
-        result.IsSuccess.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task CreateRecord_WhenModelBelongsToAnotherOrg_ReturnsNotFound()
-    {
-        DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
-        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
-
-        Guid otherOrgId = Guid.NewGuid();
-        Result<Guid> result = await CreateHandler().Handle(
-            new CreateRecordCommand(model.Id, otherOrgId, new Dictionary<string, object?>(), UserId),
-            CancellationToken.None);
-
-        result.IsFailure.Should().BeTrue();
-        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
     }
 }

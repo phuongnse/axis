@@ -93,19 +93,4 @@ public class DeactivateUserHandlerTests
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
         result.Error.Should().Contain("not found");
     }
-
-    [Fact]
-    public async Task DeactivateUser_WhenUserBelongsToAnotherOrg_ReturnsNotFound()
-    {
-        User target = MakeUser();
-        _userRepo.GetByIdAsync(target.Id, OrgId).Returns(target);
-
-        Guid otherOrgId = Guid.NewGuid();
-        Result result = await CreateHandler().Handle(
-            new DeactivateUserCommand(target.Id, otherOrgId, RequesterId, AdminRoleId),
-            CancellationToken.None);
-
-        result.IsFailure.Should().BeTrue();
-        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-    }
 }

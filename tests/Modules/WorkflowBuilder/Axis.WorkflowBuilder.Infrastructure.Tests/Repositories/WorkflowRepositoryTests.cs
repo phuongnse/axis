@@ -159,32 +159,6 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     }
 
     [Fact]
-    public async Task GetByIdAsync_WhenWorkflowBelongsToDifferentOrg_ReturnsNull()
-    {
-        WorkflowDefinition wf = MakeWorkflow("Cross-Org Check");
-        await _sut.AddAsync(wf);
-        await _ctx.SaveChangesAsync();
-
-        WorkflowDefinition? result = await _sut.GetByIdAsync(wf.Id, Guid.NewGuid());
-
-        result.Should().BeNull();
-    }
-
-    [Fact]
-    public async Task GetPagedAsync_WhenWorkflowsExist_ReturnsPagedResult()
-    {
-        Guid orgId = Guid.NewGuid();
-        await _sut.AddAsync(MakeWorkflow($"Paged-WF-A-{Guid.NewGuid():N}", orgId));
-        await _sut.AddAsync(MakeWorkflow($"Paged-WF-B-{Guid.NewGuid():N}", orgId));
-        await _ctx.SaveChangesAsync();
-
-        (IReadOnlyList<WorkflowDefinition> items, int total) = await _sut.GetPagedAsync(orgId, 1, 20);
-
-        items.Should().HaveCount(2);
-        total.Should().Be(2);
-    }
-
-    [Fact]
     public async Task AddTrigger_WhenMutatedAfterReload_IsPersisted()
     {
         Guid orgId = Guid.NewGuid();

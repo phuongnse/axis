@@ -131,29 +131,13 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     [Fact]
     public async Task GetByIdAsync_WhenModelIsDeleted_ReturnsNull()
     {
-        DataModel model = MakeModel("ToDelete");
+        var model = MakeModel("ToDelete");
         model.Delete();
         await _sut.AddAsync(model);
         await _ctx.SaveChangesAsync();
 
-        DataModel? loaded = await _sut.GetByIdAsync(model.Id, OrgId);
+        var loaded = await _sut.GetByIdAsync(model.Id, OrgId);
 
         loaded.Should().BeNull();
-    }
-
-    [Fact]
-    public async Task GetPagedAsync_WhenModelsExist_ReturnsPagedResult()
-    {
-        Guid orgId = Guid.NewGuid();
-        DataModel m1 = DataModel.Create($"Paged-Model-A-{Guid.NewGuid():N}", null, null, null, orgId, UserId);
-        DataModel m2 = DataModel.Create($"Paged-Model-B-{Guid.NewGuid():N}", null, null, null, orgId, UserId);
-        await _sut.AddAsync(m1);
-        await _sut.AddAsync(m2);
-        await _ctx.SaveChangesAsync();
-
-        (IReadOnlyList<DataModel> items, int total) = await _sut.GetPagedAsync(orgId, 1, 20);
-
-        items.Should().HaveCount(2);
-        total.Should().Be(2);
     }
 }

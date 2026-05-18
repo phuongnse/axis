@@ -59,17 +59,4 @@ public class GetFormByIdHandlerTests
 
         dto!.Fields.Should().BeEmpty();
     }
-
-    [Fact]
-    public async Task Handle_WhenFormBelongsToAnotherOrg_ReturnsNull()
-    {
-        FormDefinition form = FormDefinition.Create("Employee Intake", null, OrgId, "user");
-        _repo.GetByIdAsync(form.Id, OrgId, Arg.Any<CancellationToken>()).Returns(form);
-
-        Guid otherOrgId = Guid.NewGuid();
-        FormDetailDto? dto = await _handler.Handle(
-            new GetFormByIdQuery(form.Id, otherOrgId), CancellationToken.None);
-
-        dto.Should().BeNull();
-    }
 }

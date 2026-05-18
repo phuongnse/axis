@@ -1,12 +1,9 @@
-using System.Text;
 using Axis.Api.Authorization;
 using Axis.Api.Extensions;
 using Axis.Api.Infrastructure;
-using Axis.DataModeling.Application.Commands.BulkDeleteRecords;
 using Axis.DataModeling.Application.Commands.CreateRecord;
 using Axis.DataModeling.Application.Commands.DeleteRecord;
 using Axis.DataModeling.Application.Commands.UpdateRecord;
-using Axis.DataModeling.Application.Queries.ExportRecordsCsv;
 using Axis.DataModeling.Application.Queries.GetRecord;
 using Axis.DataModeling.Application.Queries.GetRecords;
 using Axis.Shared.Domain.Primitives;
@@ -25,32 +22,9 @@ public static class RecordEndpoints
         group.MapGet("/", GetRecords)
             .RequireAuthorization(Permissions.DataModeling.RecordRead)
             .WithName("GetRecords")
-            .WithSummary("List records for a data model (paginated, filterable, sortable)")
+            .WithSummary("List records for a data model (paginated)")
             .WithTags("DataModeling")
             .Produces<RecordsPageDto>()
-            .ProducesProblem(400)
-            .ProducesProblem(401)
-            .ProducesProblem(403)
-            .ProducesProblem(404);
-
-        group.MapPost("/bulk-delete", BulkDeleteRecords)
-            .RequireAuthorization(Permissions.DataModeling.RecordDelete)
-            .WithName("BulkDeleteRecords")
-            .WithSummary("Soft-delete multiple records in a single operation")
-            .WithTags("DataModeling")
-            .Produces<BulkDeleteResult>(200)
-            .ProducesProblem(400)
-            .ProducesProblem(401)
-            .ProducesProblem(403)
-            .ProducesProblem(404);
-
-        group.MapGet("/export", ExportRecordsCsv)
-            .RequireAuthorization(Permissions.DataModeling.RecordRead)
-            .WithName("ExportRecordsCsv")
-            .WithSummary("Export records as a CSV file")
-            .WithTags("DataModeling")
-            .Produces(200)
-            .ProducesProblem(400)
             .ProducesProblem(401)
             .ProducesProblem(403)
             .ProducesProblem(404);
@@ -64,8 +38,7 @@ public static class RecordEndpoints
             .ProducesProblem(400)
             .ProducesProblem(401)
             .ProducesProblem(403)
-            .ProducesProblem(404)
-            .ProducesValidationProblem();
+            .ProducesProblem(404);
 
         group.MapGet("/{recordId:guid}", GetRecord)
             .RequireAuthorization(Permissions.DataModeling.RecordRead)
@@ -86,8 +59,7 @@ public static class RecordEndpoints
             .ProducesProblem(400)
             .ProducesProblem(401)
             .ProducesProblem(403)
-            .ProducesProblem(404)
-            .ProducesValidationProblem();
+            .ProducesProblem(404);
 
         group.MapDelete("/{recordId:guid}", DeleteRecord)
             .RequireAuthorization(Permissions.DataModeling.RecordDelete)
@@ -109,63 +81,12 @@ public static class RecordEndpoints
         CancellationToken ct,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 25,
-        [FromQuery] string? search = null,
-        [FromQuery(Name = "filter")] string[]? filter = null,
-        [FromQuery] string? sortBy = null,
-        [FromQuery] string? sortDir = null)
+        [FromQuery] string? search = null)
     {
-        IResult? filterError = ParseFilters(filter, out IReadOnlyList<RecordFilter>? parsedFilters);
-        if (filterError is not null) return filterError;
-
         Result<RecordsPageDto> result = await mediator.Send(
-            new GetRecordsQuery(modelId, currentUser.OrgId, page, pageSize, search, parsedFilters, sortBy, sortDir),
-            ct);
-
+            new GetRecordsQuery(modelId, currentUser.OrgId, page, pageSize, search), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.Ok(result.Value);
-    }
-
-    private static async Task<IResult> BulkDeleteRecords(
-        Guid modelId,
-        [FromBody] BulkDeleteRequest request,
-        CurrentUser currentUser,
-        ISender mediator,
-        CancellationToken ct)
-    {
-        // Coerce null (JSON null / missing property) to empty list so the handler's validation fires correctly.
-        IReadOnlyList<Guid> ids = request.Ids ?? [];
-
-        Result<BulkDeleteResult> result = await mediator.Send(
-            new BulkDeleteRecordsCommand(ids, modelId, currentUser.OrgId), ct);
-
-        if (result.IsFailure) return result.ToProblemDetails();
-        return Results.Ok(result.Value);
-    }
-
-    private static async Task<IResult> ExportRecordsCsv(
-        Guid modelId,
-        CurrentUser currentUser,
-        ISender mediator,
-        CancellationToken ct,
-        [FromQuery] string? search = null,
-        [FromQuery(Name = "filter")] string[]? filter = null,
-        [FromQuery] string? sortBy = null,
-        [FromQuery] string? sortDir = null)
-    {
-        IResult? filterError = ParseFilters(filter, out IReadOnlyList<RecordFilter>? parsedFilters);
-        if (filterError is not null) return filterError;
-
-        Result<CsvExportDto> result = await mediator.Send(
-            new ExportRecordsCsvQuery(modelId, currentUser.OrgId, search, parsedFilters, sortBy, sortDir),
-            ct);
-
-        if (result.IsFailure) return result.ToProblemDetails();
-
-        CsvExportDto csv = result.Value;
-        return Results.File(
-            Encoding.UTF8.GetBytes(csv.Content),
-            contentType: "text/csv",
-            fileDownloadName: csv.FileName);
     }
 
     private static async Task<IResult> CreateRecord(
@@ -219,41 +140,5 @@ public static class RecordEndpoints
             new DeleteRecordCommand(recordId, modelId, currentUser.OrgId), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
-    }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Parses repeated ?filter=field:op:value params.
-    /// Returns a non-null IResult (HTTP 400) if any item fails TryParse; otherwise null.
-    /// </summary>
-    private static IResult? ParseFilters(string[]? filter, out IReadOnlyList<RecordFilter>? parsed)
-    {
-        parsed = null;
-        if (filter is not { Length: > 0 })
-            return null;
-
-        List<RecordFilter> valid = [];
-        List<string> invalid = [];
-
-        foreach (string raw in filter)
-        {
-            RecordFilter? f = RecordFilter.TryParse(raw);
-            if (f is not null)
-                valid.Add(f);
-            else
-                invalid.Add(raw);
-        }
-
-        if (invalid.Count > 0)
-        {
-            return Result.Failure<object>(
-                ErrorCodes.InvalidInput,
-                $"Invalid filter syntax: {string.Join(", ", invalid)}. Expected format: field:op:value.")
-                .ToProblemDetails();
-        }
-
-        parsed = valid.AsReadOnly();
-        return null;
     }
 }

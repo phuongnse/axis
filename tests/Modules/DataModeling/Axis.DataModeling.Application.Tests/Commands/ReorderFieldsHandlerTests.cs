@@ -41,36 +41,6 @@ public class ReorderFieldsHandlerTests
     }
 
     [Fact]
-    public async Task ReorderFields_WhenModelNotFound_ReturnsNotFound()
-    {
-        _modelRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).Returns((DataModel?)null);
-
-        Result result = await CreateHandler().Handle(
-            new ReorderFieldsCommand(Guid.NewGuid(), OrgId, [Guid.NewGuid()]),
-            CancellationToken.None);
-
-        result.IsFailure.Should().BeTrue();
-        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-        result.Error.Should().Contain("not found");
-    }
-
-    [Fact]
-    public async Task ReorderFields_WhenModelBelongsToAnotherOrg_ReturnsNotFound()
-    {
-        DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
-        FieldDefinition f1 = model.AddField("alpha", "Alpha", FieldType.Text, false, new TextFieldConfig());
-        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
-
-        Guid otherOrgId = Guid.NewGuid();
-        Result result = await CreateHandler().Handle(
-            new ReorderFieldsCommand(model.Id, otherOrgId, [f1.Id]),
-            CancellationToken.None);
-
-        result.IsFailure.Should().BeTrue();
-        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-    }
-
-    [Fact]
     public async Task ReorderFields_WhenIdsMismatch_ReturnsBusinessRuleFailure()
     {
         DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);

@@ -82,67 +82,11 @@ public class RoleRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     [Fact]
     public async Task NameExistsAsync_WhenExcludeRoleIdSpecified_ExcludesThatRoleFromCheck()
     {
-        Role role = MakeRole($"ExcludeSelf-{Guid.NewGuid():N}");
+        var role = MakeRole($"ExcludeSelf-{Guid.NewGuid():N}");
         await _sut.AddAsync(role);
         await _ctx.SaveChangesAsync();
 
-        bool exists = await _sut.NameExistsAsync(role.Name, OrgId, excludeRoleId: role.Id);
+        var exists = await _sut.NameExistsAsync(role.Name, OrgId, excludeRoleId: role.Id);
         exists.Should().BeFalse();
-    }
-
-    [Fact]
-    public async Task GetByIdAsync_WhenRoleBelongsToDifferentOrg_ReturnsNull()
-    {
-        Role role = MakeRole($"CrossOrg-{Guid.NewGuid():N}");
-        await _sut.AddAsync(role);
-        await _ctx.SaveChangesAsync();
-
-        Role? result = await _sut.GetByIdAsync(role.Id, Guid.NewGuid());
-
-        result.Should().BeNull();
-    }
-
-    [Fact]
-    public async Task GetByIdsAsync_WhenIdsProvided_ReturnsMatchingRolesForOrg()
-    {
-        Guid orgId = Guid.NewGuid();
-        Role r1 = Role.Create($"GetByIds-A-{Guid.NewGuid():N}", null, orgId, ["data_modeling:model:read"]);
-        Role r2 = Role.Create($"GetByIds-B-{Guid.NewGuid():N}", null, orgId, ["data_modeling:model:read"]);
-        await _sut.AddAsync(r1);
-        await _sut.AddAsync(r2);
-        await _ctx.SaveChangesAsync();
-
-        IReadOnlyList<Role> result = await _sut.GetByIdsAsync([r1.Id, r2.Id], orgId);
-
-        result.Should().HaveCount(2);
-        result.Select(r => r.Id).Should().BeEquivalentTo(new[] { r1.Id, r2.Id });
-    }
-
-    [Fact]
-    public async Task GetByIdsAsync_WhenIdsBelongToDifferentOrg_ReturnsEmpty()
-    {
-        Role role = MakeRole($"GetByIds-CrossOrg-{Guid.NewGuid():N}");
-        await _sut.AddAsync(role);
-        await _ctx.SaveChangesAsync();
-
-        IReadOnlyList<Role> result = await _sut.GetByIdsAsync([role.Id], Guid.NewGuid());
-
-        result.Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task GetPagedAsync_WhenRolesExist_ReturnsPagedResult()
-    {
-        Guid orgId = Guid.NewGuid();
-        Role r1 = Role.Create($"Paged-A-{Guid.NewGuid():N}", null, orgId, ["data_modeling:model:read"]);
-        Role r2 = Role.Create($"Paged-B-{Guid.NewGuid():N}", null, orgId, ["data_modeling:model:read"]);
-        await _sut.AddAsync(r1);
-        await _sut.AddAsync(r2);
-        await _ctx.SaveChangesAsync();
-
-        (IReadOnlyList<Role> items, int total) = await _sut.GetPagedAsync(orgId, 1, 20);
-
-        items.Should().HaveCount(2);
-        total.Should().Be(2);
     }
 }

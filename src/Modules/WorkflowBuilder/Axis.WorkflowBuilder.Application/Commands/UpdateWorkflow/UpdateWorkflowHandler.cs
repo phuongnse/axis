@@ -1,4 +1,3 @@
-using Axis.Shared.Application;
 using Axis.Shared.Application.CQRS;
 using Axis.Shared.Domain.Primitives;
 using Axis.WorkflowBuilder.Application.Repositories;
@@ -22,16 +21,7 @@ public sealed class UpdateWorkflowHandler(IWorkflowRepository workflowRepo, IUni
             return Result.Failure(ErrorCodes.Conflict, $"A workflow named '{command.Name}' already exists.");
 
         workflow.Update(command.Name, command.Description);
-
-        try
-        {
-            await uow.SaveChangesAsync(cancellationToken);
-        }
-        catch (UniqueConstraintException)
-        {
-            return Result.Failure(ErrorCodes.Conflict, $"A workflow named '{command.Name}' already exists.");
-        }
-
+        await uow.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 }

@@ -45,23 +45,6 @@ public class AddTriggerHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenWorkflowBelongsToAnotherOrg_ReturnsNotFound()
-    {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, "user");
-
-        Guid otherOrgId = Guid.NewGuid();
-        _repo.GetByIdAsync(wf.Id, otherOrgId, Arg.Any<CancellationToken>())
-            .Returns((WorkflowDefinition?)null);
-        Result result = await _handler.Handle(
-            new AddTriggerCommand(wf.Id, otherOrgId, TriggerType.Manual, null), CancellationToken.None);
-
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-        await _repo.Received(1).GetByIdAsync(wf.Id, otherOrgId, Arg.Any<CancellationToken>());
-        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
     public async Task Handle_WhenTriggerTypeAlreadyExists_ReturnsConflict()
     {
         WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, "user");

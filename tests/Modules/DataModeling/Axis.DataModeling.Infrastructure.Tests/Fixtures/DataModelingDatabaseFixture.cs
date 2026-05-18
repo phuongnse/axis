@@ -13,7 +13,6 @@ public sealed class DataModelingDatabaseFixture : IAsyncLifetime
 
     private const string TestSchema = "test_data_modeling";
     public string ConnectionString { get; private set; } = null!;
-    public ITenantContext TenantContext { get; } = new TestTenantContext(TestSchema);
 
     public async Task InitializeAsync()
     {
@@ -34,10 +33,10 @@ public sealed class DataModelingDatabaseFixture : IAsyncLifetime
 
     internal DataModelingDbContext CreateContext()
     {
-        DbContextOptions<DataModelingDbContext> options = new DbContextOptionsBuilder<DataModelingDbContext>()
+        var options = new DbContextOptionsBuilder<DataModelingDbContext>()
             .UseNpgsql(ConnectionString)
             .Options;
-        return new DataModelingDbContext(options, TenantContext);
+        return new DataModelingDbContext(options, new TestTenantContext(TestSchema));
     }
 }
 

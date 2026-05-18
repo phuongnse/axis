@@ -26,7 +26,7 @@ public class GetRecordsHandlerTests
             DataRecord.Create(ModelId, OrgId, new Dictionary<string, object?> { ["x"] = 1 }, UserId),
         ];
         _modelRepo.GetByIdAsync(ModelId, OrgId).Returns(model);
-        _recordRepo.GetPagedAsync(ModelId, OrgId, 1, 25, null, null, null, null)
+        _recordRepo.GetPagedAsync(ModelId, OrgId, 1, 25, null)
             .Returns((records.AsReadOnly() as IReadOnlyList<DataRecord>, 1));
 
         Result<RecordsPageDto> result = await CreateHandler().Handle(
@@ -49,56 +49,5 @@ public class GetRecordsHandlerTests
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
         result.Error.Should().Contain("not found");
-    }
-
-    [Fact]
-    public async Task GetRecords_WhenFiltersProvided_PassesFiltersToRepository()
-    {
-        DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
-        IReadOnlyList<RecordFilter> filters = new List<RecordFilter> { new("status", "eq", "active") }.AsReadOnly();
-
-        _modelRepo.GetByIdAsync(ModelId, OrgId).Returns(model);
-        _recordRepo.GetPagedAsync(ModelId, OrgId, 1, 25, null, filters, null, null)
-            .Returns((new List<DataRecord>().AsReadOnly() as IReadOnlyList<DataRecord>, 0));
-
-        Result<RecordsPageDto> result = await CreateHandler().Handle(
-            new GetRecordsQuery(ModelId, OrgId, Filters: filters), CancellationToken.None);
-
-        result.IsSuccess.Should().BeTrue();
-        await _recordRepo.Received(1).GetPagedAsync(ModelId, OrgId, 1, 25, null, filters, null, null);
-    }
-
-    [Fact]
-    public async Task GetRecords_WhenModelBelongsToAnotherOrg_ReturnsNotFound()
-    {
-        DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
-        _modelRepo.GetByIdAsync(ModelId, OrgId).Returns(model);
-
-        Guid otherOrgId = Guid.NewGuid();
-        Result<RecordsPageDto> result = await CreateHandler().Handle(
-            new GetRecordsQuery(ModelId, otherOrgId), CancellationToken.None);
-
-        result.IsFailure.Should().BeTrue();
-        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-        await _modelRepo.Received(1).GetByIdAsync(ModelId, otherOrgId);
-        await _recordRepo.DidNotReceive().GetPagedAsync(
-            Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<int>(), Arg.Any<int>(),
-            Arg.Any<string?>(), Arg.Any<IReadOnlyList<RecordFilter>?>(), Arg.Any<string?>(), Arg.Any<string?>());
-    }
-
-    [Fact]
-    public async Task GetRecords_WhenSortProvided_PassesSortToRepository()
-    {
-        DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
-
-        _modelRepo.GetByIdAsync(ModelId, OrgId).Returns(model);
-        _recordRepo.GetPagedAsync(ModelId, OrgId, 1, 25, null, null, "name", "asc")
-            .Returns((new List<DataRecord>().AsReadOnly() as IReadOnlyList<DataRecord>, 0));
-
-        Result<RecordsPageDto> result = await CreateHandler().Handle(
-            new GetRecordsQuery(ModelId, OrgId, SortBy: "name", SortDir: "asc"), CancellationToken.None);
-
-        result.IsSuccess.Should().BeTrue();
-        await _recordRepo.Received(1).GetPagedAsync(ModelId, OrgId, 1, 25, null, null, "name", "asc");
     }
 }

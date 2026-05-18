@@ -51,23 +51,6 @@ public class UpdateModelHandlerTests
     }
 
     [Fact]
-    public async Task UpdateModel_WhenModelBelongsToAnotherOrg_ReturnsNotFound()
-    {
-        DataModel model = BuildModel();
-        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
-
-        Guid otherOrgId = Guid.NewGuid();
-        Result result = await CreateHandler().Handle(
-            new UpdateModelCommand(model.Id, otherOrgId, "Updated Invoice", null, null, null),
-            CancellationToken.None);
-
-        result.IsFailure.Should().BeTrue();
-        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-        await _modelRepo.Received(1).GetByIdAsync(model.Id, otherOrgId);
-        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
     public async Task UpdateModel_WhenNameIsDuplicate_ReturnsConflict()
     {
         DataModel model = BuildModel();

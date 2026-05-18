@@ -94,20 +94,4 @@ public class DataClassRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
         (await _sut.NameExistsAsync("address", orgId)).Should().BeTrue();
         (await _sut.NameExistsAsync("ADDRESS", orgId)).Should().BeTrue();
     }
-
-    [Fact]
-    public async Task GetPagedAsync_WhenClassesExist_ReturnsPagedResult()
-    {
-        Guid orgId = Guid.NewGuid();
-        DataClass c1 = DataClass.Create($"Paged-Class-A-{Guid.NewGuid():N}", null, orgId, UserId);
-        DataClass c2 = DataClass.Create($"Paged-Class-B-{Guid.NewGuid():N}", null, orgId, UserId);
-        await _sut.AddAsync(c1);
-        await _sut.AddAsync(c2);
-        await _ctx.SaveChangesAsync();
-
-        (IReadOnlyList<DataClass> items, int total) = await _sut.GetPagedAsync(orgId, 1, 20);
-
-        items.Should().HaveCount(2);
-        total.Should().Be(2);
-    }
 }

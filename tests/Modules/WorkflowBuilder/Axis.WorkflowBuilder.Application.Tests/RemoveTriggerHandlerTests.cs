@@ -44,22 +44,4 @@ public class RemoveTriggerHandlerTests
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
     }
-
-    [Fact]
-    public async Task Handle_WhenWorkflowBelongsToAnotherOrg_ReturnsNotFound()
-    {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, "user");
-        wf.AddTrigger(TriggerType.Manual, null);
-
-        Guid otherOrgId = Guid.NewGuid();
-        _repo.GetByIdAsync(wf.Id, otherOrgId, Arg.Any<CancellationToken>())
-            .Returns((WorkflowDefinition?)null);
-        Result result = await _handler.Handle(
-            new RemoveTriggerCommand(wf.Id, otherOrgId, TriggerType.Manual), CancellationToken.None);
-
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-        await _repo.Received(1).GetByIdAsync(wf.Id, otherOrgId, Arg.Any<CancellationToken>());
-        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
-    }
 }

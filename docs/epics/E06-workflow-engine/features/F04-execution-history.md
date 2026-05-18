@@ -37,9 +37,9 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 *Out of scope*
 - Execution analytics dashboard (charts, trends) — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: Paginated history table, status/date/trigger filters, and running-first sort pending API + Frontend.
-> Decisions: `GetExecutionsByWorkflowHandler` and `GetAllExecutionsHandler` use `IExecutionRepository.GetPagedByWorkflowAsync`/`GetPagedAsync` — server-side pagination with `pageSize` clamped to 100. Status filter forwarded to repository. Date range filter and trigger type filter deferred to API layer query parameters.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `GetExecutionsByWorkflowQuery` handler not yet implemented (repository `GetByWorkflowAsync` exists); paginated history table, status/date/trigger filters, and running-first sort pending API + Frontend.
+> Decisions: `GetByWorkflowAsync` and `GetAllAsync` return executions ordered by `CreatedAt DESC`. `CreatedAt` is set when the execution record is created (status `PENDING`, before any step runs) and serves as the proxy for "started at" in sort order — the difference is at most ~5 seconds per spec (US-090), which is negligible for display purposes. Pagination deferred to API layer.
 
 ---
 
@@ -66,8 +66,8 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 *Out of scope*
 - Replaying or simulating an execution from any point with a different context — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: Step timeline UI, context snapshot display, and parallel group rendering pending Frontend + API.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `GetExecutionQuery` (by ID, with step detail) not yet implemented; step timeline UI, context snapshot display, and parallel group rendering pending Frontend + API.
 
 ---
 
@@ -92,8 +92,8 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 *Out of scope*
 - Platform-wide execution monitoring across all tenants (Platform Admin view) — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: CSV export, role-scoped visibility enforcement, and async export notification pending API + Frontend.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `GetAllExecutionsQuery` handler not yet implemented (repository `GetAllAsync` exists); CSV export, role-scoped visibility enforcement, and async export notification pending API + Frontend.
 
 ---
 

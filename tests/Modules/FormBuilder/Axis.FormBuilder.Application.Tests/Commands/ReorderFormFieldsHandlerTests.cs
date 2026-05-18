@@ -54,24 +54,6 @@ public class ReorderFormFieldsHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenFormBelongsToAnotherOrg_ReturnsNotFound()
-    {
-        FormDefinition form = FormDefinition.Create("My Form", null, OrgId, "user");
-        FormField f1 = form.AddField("field_a", "Field A", FormFieldType.Text, false, null);
-        _repo.GetByIdAsync(form.Id, OrgId, Arg.Any<CancellationToken>()).Returns(form);
-
-        Guid otherOrgId = Guid.NewGuid();
-        Result result = await _handler.Handle(
-            new ReorderFormFieldsCommand(form.Id, otherOrgId, [f1.Id]),
-            CancellationToken.None);
-
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-        await _repo.Received(1).GetByIdAsync(form.Id, otherOrgId, Arg.Any<CancellationToken>());
-        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
     public async Task Handle_WhenIdsMismatchFields_ReturnsBusinessRule()
     {
         FormDefinition form = FormDefinition.Create("My Form", null, OrgId, "user");

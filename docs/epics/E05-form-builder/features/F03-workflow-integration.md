@@ -36,9 +36,8 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 *Out of scope*
 - Creating a new form from within the workflow canvas (must go to Form Builder) — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: broken-step indicator pending Frontend + API.
-> Decisions: `GetFormPickerQuery` returns all forms for the org as a flat list (Id, Name, FieldCount) ordered by name — used by the API form-step picker dropdown. `IsReferencedByWorkflowAsync` query supports the reference check.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `GetFormsQuery` handler (required for form picker dropdown) not yet implemented; broken-step indicator pending Frontend + API; `IsReferencedByWorkflowAsync` query supports the reference check.
 
 ---
 

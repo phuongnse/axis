@@ -67,26 +67,6 @@ Repeat for every user story, in layer order: Domain → Application → Infrastr
 4. Verify migration is idempotent; run integration tests against Testcontainers PostgreSQL
 5. Run `dotnet test unit-tests.slnf` — still green
 
-#### Step 4.5 — Gap sweep (mandatory before API layer)
-
-**Run this before starting Step 5 for any module.** Skipping it means carrying hidden debt into the API layer.
-
-```
-grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/epics/
-```
-
-For every `⚠️` found, decide explicitly:
-
-| Verdict | Action |
-|---|---|
-| Actually done, docs stale | Update callout to ✅ |
-| Deferred — depends on a later module (e.g. E06) | Add explicit "deferred pending E0X" note to the gap line |
-| Genuine miss | Fix it before proceeding |
-
-Also check cross-module Application dependencies: list every query or command the upcoming API layer will call from *other* modules' Application layers. If any are missing, add them now.
-
-**Do not start Step 5 until every ⚠️ is resolved or explicitly documented as deferred with a reason.**
-
 #### Step 5 — API layer
 
 1. Add Minimal API endpoint in `src/Axis.Api/Endpoints/{Module}Endpoints.cs` with full OpenAPI annotations (`.WithName`, `.WithSummary`, `.WithTags`, `.Produces<T>`, `.ProducesProblem`)

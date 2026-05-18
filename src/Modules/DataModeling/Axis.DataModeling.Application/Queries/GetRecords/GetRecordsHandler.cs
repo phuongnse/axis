@@ -24,9 +24,6 @@ public sealed class GetRecordsHandler(
             query.ModelId, query.OrganizationId,
             page, pageSize,
             query.Search,
-            query.Filters,
-            query.SortBy,
-            query.SortDir,
             cancellationToken);
 
         return new RecordsPageDto(

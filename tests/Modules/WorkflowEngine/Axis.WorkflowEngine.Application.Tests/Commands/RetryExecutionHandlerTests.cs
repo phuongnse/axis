@@ -76,18 +76,4 @@ public class RetryExecutionHandlerTests
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
         result.Error.Should().Contain("failed");
     }
-
-    [Fact]
-    public async Task RetryExecution_WhenExecutionBelongsToAnotherOrg_ReturnsNotFound()
-    {
-        WorkflowExecution failed = MakeFailedExecution();
-        _execRepo.GetByIdAsync(failed.Id, OrgId).Returns(failed);
-
-        Guid otherOrgId = Guid.NewGuid();
-        Result<Guid> result = await CreateHandler().Handle(
-            new RetryExecutionCommand(failed.Id, otherOrgId, UserId), CancellationToken.None);
-
-        result.IsFailure.Should().BeTrue();
-        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-    }
 }

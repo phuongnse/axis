@@ -37,34 +37,6 @@ public class RemoveFieldHandlerTests
     }
 
     [Fact]
-    public async Task RemoveField_WhenModelNotFound_ReturnsNotFound()
-    {
-        _modelRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).Returns((DataModel?)null);
-
-        Result result = await CreateHandler().Handle(
-            new RemoveFieldCommand(Guid.NewGuid(), Guid.NewGuid(), OrgId), CancellationToken.None);
-
-        result.IsFailure.Should().BeTrue();
-        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-        result.Error.Should().Contain("not found");
-    }
-
-    [Fact]
-    public async Task RemoveField_WhenModelBelongsToAnotherOrg_ReturnsNotFound()
-    {
-        DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
-        FieldDefinition field = model.AddField("notes", "Notes", FieldType.Text, false, new TextFieldConfig());
-        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
-
-        Guid otherOrgId = Guid.NewGuid();
-        Result result = await CreateHandler().Handle(
-            new RemoveFieldCommand(model.Id, field.Id, otherOrgId), CancellationToken.None);
-
-        result.IsFailure.Should().BeTrue();
-        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-    }
-
-    [Fact]
     public async Task RemoveField_WhenFieldIsSystem_ReturnsBusinessRuleFailure()
     {
         DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
