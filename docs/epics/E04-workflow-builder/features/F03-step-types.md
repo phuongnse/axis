@@ -1,4 +1,4 @@
-# F03 — Step Type Configuration
+﻿# F03 — Step Type Configuration
 
 > **Wireframe**: [docs/wireframes/E04-workflow-builder/workflow-editor.excalidraw](../../../wireframes/E04-workflow-builder/workflow-editor.excalidraw) · [preview](../../../wireframes/E04-workflow-builder/workflow-editor.svg)
 
@@ -37,7 +37,7 @@ Each step has a type that determines what it does when executed. Users configure
 *Out of scope*
 - Multiple assignees on a single Form step (assign to all and wait for the first response) — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: form picker UI, assignee expression evaluation, and timeout enforcement pending Frontend + E06.
 > Decisions: step config (formId, assignee, timeout) stored as JSONB dict in `steps` column.
 
@@ -69,7 +69,7 @@ Each step has a type that determines what it does when executed. Users configure
 - GraphQL or gRPC step types — not in MVP.
 - Response streaming — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: HTTP execution and Test request button pending E06 + Frontend; credential storage redaction is enforced at export (keys matching token/api_key/secret/password/authorization/etc. replaced with `[REDACTED]` in `ExportWorkflowHandler`).
 
 ---
@@ -98,7 +98,7 @@ Each step has a type that determines what it does when executed. Users configure
 *Out of scope*
 - Raw expression editing (writing code directly) — the visual builder is the only interface in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: expression builder UI and branch evaluation pending Frontend + E06; condition branches stored in step config JSONB.
 
 ---
@@ -129,7 +129,7 @@ Each step has a type that determines what it does when executed. Users configure
 - Importing external npm packages — not in MVP.
 - Python or other language scripts — JavaScript only in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: JS sandbox execution, timeout enforcement, and "Run test" button pending E06 + Frontend.
 
 ---
@@ -160,5 +160,5 @@ Each step has a type that determines what it does when executed. Users configure
 - SMS, Slack, or Teams notification channels — not in MVP.
 - Notification templates shared across workflows — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: email/webhook dispatch pending E06; configurable fail-on-error toggle pending API layer.

@@ -122,13 +122,15 @@ Before starting any task, read only what is relevant — not everything.
 
 **Step 3 — Read only the feature file(s)** for the task: `docs/epics/{folder}/features/F0{N}-*.md`
 
-**Step 4 — Check implementation status** in [`docs/PROGRESS.md`](docs/PROGRESS.md)
+**Step 4 — Map every AC to a concrete implementation step** before writing any code. For each AC in the US being implemented: identify which layer it belongs to, which file/method will implement it, and what the expected behavior is. Any AC that cannot be mapped to a specific implementation → stop and clarify first. This is the step most likely to surface missed requirements before they become bugs.
 
-**Step 5 — Read [`docs/playbooks/process.md`](docs/playbooks/process.md)** when starting a new module or implementing a new US — it has the step-by-step checklist (layer order, TDD gates, doc update triggers) for both backend and frontend.
+**Step 5 — Check implementation status** in [`docs/PROGRESS.md`](docs/PROGRESS.md)
 
-**Step 6 — Read [`docs/playbooks/patterns.md`](docs/playbooks/patterns.md)** when the task involves any of: NuGet packages, EF Core mapping or JSONB, Minimal API wiring, writing tests, list/query endpoints, async patterns, response DTOs, repository methods, domain aggregate methods, multi-tenant raw SQL, Wolverine handlers or jobs, new step/field types, cross-cutting concerns, or any design decision about where logic lives.
+**Step 6 — Read [`docs/playbooks/process.md`](docs/playbooks/process.md)** when starting a new module or implementing a new US — it has the step-by-step checklist (layer order, TDD gates, doc update triggers) for both backend and frontend.
 
-**Step 7 — Read [`docs/TECH_STACK.md`](docs/TECH_STACK.md)** when making any architectural decision, adding a library, or referencing an ADR.
+**Step 7 — Read [`docs/playbooks/patterns.md`](docs/playbooks/patterns.md)** when the task involves any of: NuGet packages, EF Core mapping or JSONB, Minimal API wiring, writing tests, list/query endpoints, async patterns, response DTOs, repository methods, domain aggregate methods, multi-tenant raw SQL, Wolverine handlers or jobs, new step/field types, cross-cutting concerns, or any design decision about where logic lives.
+
+**Step 8 — Read [`docs/TECH_STACK.md`](docs/TECH_STACK.md)** when making any architectural decision, adding a library, or referencing an ADR.
 
 ### Reading priority
 
