@@ -13,7 +13,6 @@ using Axis.FormBuilder.Application.Commands.CreateForm;
 using Axis.FormBuilder.Infrastructure.Extensions;
 using Axis.Identity.Application.Commands.RegisterOrganization;
 using Axis.Identity.Infrastructure.Extensions;
-using Npgsql;
 using Axis.Shared.Application.Behaviors;
 using Axis.Shared.Application.Tenancy;
 using Axis.Shared.Infrastructure.Tenancy;
@@ -226,9 +225,6 @@ try
     });
 
     // ── Health checks ──────────────────────────────────────────────────────
-    builder.Services.AddSingleton(_ =>
-        NpgsqlDataSource.Create(cfg.GetConnectionString("Identity")!));
-
     builder.Services.AddHealthChecks()
         .AddCheck<PostgreSqlHealthCheck>("postgresql", tags: ["ready"])
         .AddCheck<RedisHealthCheck>("redis", tags: ["ready"]);

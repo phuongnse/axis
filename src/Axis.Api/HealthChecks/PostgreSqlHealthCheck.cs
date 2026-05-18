@@ -1,9 +1,9 @@
+using Axis.Identity.Infrastructure.Persistence;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Npgsql;
 
 namespace Axis.Api.HealthChecks;
 
-internal sealed class PostgreSqlHealthCheck(NpgsqlDataSource dataSource) : IHealthCheck
+internal sealed class PostgreSqlHealthCheck(IdentityDbContext db) : IHealthCheck
 {
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
@@ -11,9 +11,10 @@ internal sealed class PostgreSqlHealthCheck(NpgsqlDataSource dataSource) : IHeal
     {
         try
         {
-            await using NpgsqlConnection conn = dataSource.CreateConnection();
-            await conn.OpenAsync(cancellationToken);
-            return HealthCheckResult.Healthy();
+            bool canConnect = await db.Database.CanConnectAsync(cancellationToken);
+            return canConnect
+                ? HealthCheckResult.Healthy()
+                : HealthCheckResult.Unhealthy("Cannot connect to PostgreSQL.");
         }
         catch (Exception ex)
         {
