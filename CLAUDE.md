@@ -171,7 +171,7 @@ Every time code changes, the relevant docs change too — in the **same PR, not 
 |---|---|
 | Added, removed, or changed a library | `docs/TECH_STACK.md` — version table + ADR if applicable |
 | Established a new implementation pattern | `docs/playbooks/patterns.md` — add the pattern with an example |
-| Completed a US layer | Feature file `> **Implementation status**` callout |
+| Completed a US layer | Feature file `> **Implementation status**` callout — and remove any mention of that layer from the gap text (✅ and "pending X layer" in the same callout is always a contradiction) |
 | Completed a full layer for a module | Epic README status table + `docs/PROGRESS.md` |
 | Changed architecture, added a cross-cutting rule | `CLAUDE.md` — the relevant section |
 | Changed the implementation workflow or layer order | `docs/playbooks/process.md` — update the affected checklist |
@@ -515,6 +515,8 @@ Answer each question explicitly. If the answer is "yes", update the relevant doc
    If yes → add the missing AC to the feature file now.
 
 This gate exists because process gaps that surface during implementation are the highest-value moment to close them — the problem is fresh, the context is loaded, and the fix takes minutes. The same gap discovered six months later takes hours to reconstruct.
+
+**When any answer above requires updating docs:** write at the principle level, not the incident level. Ask: "Will a reader who has never seen this specific situation understand and apply this rule to analogous future cases?" If not, rewrite it at a higher level of abstraction. Before adding a new section, check whether an existing section can absorb the lesson — extend rather than accumulate.
 
 ---
 
