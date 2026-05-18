@@ -35,6 +35,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
     private WebApplicationFactory<Program> _factory = null!;
     private string _dmConnectionString = null!;
+    private string _wbConnectionString = null!;
 
     public HttpClient Client { get; private set; } = null!;
 
@@ -50,6 +51,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
         // Each module needs its own database so EnsureCreatedAsync creates tables correctly.
         _dmConnectionString = await CreateModuleDatabaseAsync("axis_dm_test");
+        _wbConnectionString = await CreateModuleDatabaseAsync("axis_wb_test");
 
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -61,7 +63,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 {
                     ["ConnectionStrings:Identity"] = _postgres.GetConnectionString(),
                     ["ConnectionStrings:DataModeling"] = _dmConnectionString,
-                    ["ConnectionStrings:WorkflowBuilder"] = _postgres.GetConnectionString(),
+                    ["ConnectionStrings:WorkflowBuilder"] = _wbConnectionString,
                     ["ConnectionStrings:FormBuilder"] = _postgres.GetConnectionString(),
                     ["ConnectionStrings:WorkflowEngine"] = _postgres.GetConnectionString(),
                     ["Redis:ConnectionString"] = _redis.GetConnectionString(),
@@ -136,7 +138,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
         await dmCtx.Database.EnsureCreatedAsync();
 
         var wbOptions = new DbContextOptionsBuilder<WorkflowBuilderDbContext>()
-            .UseNpgsql(_postgres.GetConnectionString())
+            .UseNpgsql(_wbConnectionString)
             .Options;
         await using WorkflowBuilderDbContext wbCtx = new(wbOptions, new PublicSchemaTenantContext());
         await wbCtx.Database.EnsureCreatedAsync();
