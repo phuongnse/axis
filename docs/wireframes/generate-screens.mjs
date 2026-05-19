@@ -195,7 +195,7 @@ function genRegisterOrg() {
  */
 function genEmailConfirmation() {
   const cardW = 440;
-  const cardH = 300;
+  const cardH = 264;
   const cardX = Math.round((W - cardW) / 2);
   const cardY = Math.round((H - cardH) / 2);
   const els   = [];
@@ -207,20 +207,17 @@ function genEmailConfirmation() {
   els.push(text('ec_logo',  cardX,      cardY + 16,  cardW,      28, '⬡  Axis',            18, C.primary, 'center'));
   els.push(hline('ec_hdiv', cardX,      cardY + 60,  cardW,          C.gray300));
 
-  // Envelope icon (US-001 success state)
-  els.push(text('ec_icon',  cardX,      cardY + 76,  cardW,      36, '✉',                  28, C.primary, 'center'));
-
-  // Title + body
-  els.push(text('ec_title', cardX + 24, cardY + 128, cardW - 48, 24, 'Check your email',   17, C.gray900));
-  els.push(text('ec_body1', cardX + 24, cardY + 160, cardW - 48, 18, 'We sent a verification link to:', 13, C.gray700));
-  els.push(text('ec_body2', cardX + 24, cardY + 182, cardW - 48, 18, 'alex@company.com',   13, C.gray900));
+  // Title + body (shifted up)
+  els.push(text('ec_title', cardX + 24, cardY + 92,  cardW - 48, 24, 'Check your email',   17, C.gray900));
+  els.push(text('ec_body1', cardX + 24, cardY + 124, cardW - 48, 18, 'We sent a verification link to:', 13, C.gray700));
+  els.push(text('ec_body2', cardX + 24, cardY + 146, cardW - 48, 18, 'alex@company.com',   13, C.gray900));
 
   // Resend link (US-002)
-  els.push(text('ec_resend', cardX + 24, cardY + 220, cardW - 48, 16, "Didn't receive it?  Resend email →", 12, C.primary, 'center'));
+  els.push(text('ec_resend', cardX + 24, cardY + 184, cardW - 48, 16, "Didn't receive it?  Resend email →", 12, C.primary, 'center'));
 
   // Footer
-  els.push(hline('ec_fdiv',   cardX,      cardY + cardH - 32, cardW,      C.gray300));
-  els.push(text('ec_footer',  cardX + 24, cardY + cardH - 22, cardW - 48, 16, 'Back to sign in', 12, C.primary, 'center'));
+  els.push(hline('ec_fdiv',  cardX,      cardY + 232, cardW,          C.gray300));
+  els.push(text('ec_footer', cardX + 24, cardY + 242, cardW - 48, 16, 'Back to sign in',   12, C.primary, 'center'));
 
   write('E01-platform-foundation/email-confirmation.excalidraw', els);
 }
