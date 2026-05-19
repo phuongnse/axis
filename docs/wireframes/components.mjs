@@ -10,6 +10,7 @@ import { writeFileSync } from 'fs';
 // ─── Seed management ─────────────────────────────────────────────────────────
 let _seed = 1001;
 export const nextSeed = () => (_seed += 2);
+export const resetSeed = () => (_seed = 1001);
 export const BASE = { angle: 0, opacity: 100, groupIds: [], isDeleted: false, boundElements: null, updated: 1700000000000, link: null, locked: false, version: 1 };
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
@@ -118,6 +119,7 @@ export function component(builderFn, targetX, targetY, contentDy = 48) {
 // ─── File writer ──────────────────────────────────────────────────────────────
 
 export function writeExcalidraw(filePath, elements) {
+  resetSeed(); // Ensure stable deterministic seed for every generated file
   const output = JSON.stringify({
     type: 'excalidraw',
     version: 2,
