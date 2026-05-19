@@ -1347,6 +1347,10 @@ public async Task<bool> IsReferencedByWorkflowAsync(Guid formId, CancellationTok
 - The source module (B) owns the event — define it in B's Domain layer.
 - The consuming module (A) owns the handler and the local copy table — both in A's Infrastructure layer.
 - The Wolverine handler in A is idempotent: use upsert or check-before-insert to handle duplicate events.
+- **Cross-module event handlers must always filter by `OrganizationId`** in addition to the entity ID. A handler that queries only by `WorkflowId` (or similar) without `OrganizationId` can silently affect rows belonging to other tenants if the same ID happens to collide — or, more practically, it makes the tenant isolation assumption implicit and fragile. Always include both:
+  ```csharp
+  .Where(r => r.WorkflowId == @event.WorkflowId && r.OrganizationId == @event.OrganizationId)
+  ```
 - If the consuming module needs derived state computed (e.g., "is the form referenced at all?"), compute it from the local copy at query time — do not try to sync aggregated state.
 
 ### Pre-commit violation sweep
@@ -1384,6 +1388,35 @@ public async Task<Result<Guid>> Handle(CreateWorkflowCommand cmd, CancellationTo
 **Pattern 2 — caller-supplied idempotency key (for external triggers):**
 
 Commands triggered by external systems (webhooks, scheduled jobs) accept a caller-supplied `IdempotencyKey` (UUID). The handler checks if a record with that key already exists and returns the existing result without re-executing.
+
+**Pattern 3 — try-catch `DbUpdateException` for Wolverine at-least-once concurrent INSERT race:**
+
+Check-before-insert (Pattern 1) handles the *sequential* duplicate case but not the *concurrent* race: two handler invocations can both read `existing = null`, both attempt INSERT, and one will throw a unique constraint violation. For Wolverine event handlers where at-least-once delivery can cause parallel execution, wrap `SaveChangesAsync` in a try-catch:
+
+```csharp
+public async Task Handle(WorkflowPublished @event, CancellationToken ct)
+{
+    WorkflowActiveStatus? existing = await context.WorkflowActiveStatuses
+        .FirstOrDefaultAsync(w => w.WorkflowId == @event.WorkflowId, ct);
+
+    if (existing is null)
+        context.WorkflowActiveStatuses.Add(
+            WorkflowActiveStatus.Activated(@event.WorkflowId, @event.OrganizationId));
+    else
+        existing.Reactivate();
+
+    try
+    {
+        await context.SaveChangesAsync(ct);
+    }
+    catch (DbUpdateException)
+    {
+        // Concurrent duplicate event delivery — row already inserted by a parallel invocation.
+    }
+}
+```
+
+Apply this pattern when: (a) the handler is a Wolverine consumer (at-least-once), (b) the operation involves an INSERT guarded by a unique constraint, and (c) concurrent handler execution is plausible (e.g., high-volume event bus, test environments with parallel test runs).
 
 **Migrations — idempotent raw SQL:**
 
@@ -1467,7 +1500,26 @@ Role viewerRole = ctx.Roles.First(r => r.Name == "Viewer" && r.OrganizationId ==
 
 The restructured version hides what type is being worked with, discards future flexibility (e.g. if a second property is later needed), and violates the intent of "no `var`" — which is to make types explicit, not to obscure them by different means.
 
-### 3. No scaffold placeholder files
+### 3. `JsonElement` from `ReadFromJsonAsync` — no `!` needed in tests
+
+`HttpContent.ReadFromJsonAsync<JsonElement>()` can be assigned directly to `JsonElement` without the null-forgiving operator `!`. The `!` is a workaround, not a fix.
+
+**Wrong** — unnecessary null-forgiving operator:
+```csharp
+JsonElement body = (await resp.Content.ReadFromJsonAsync<JsonElement>(Json))!;
+```
+
+**Right** — direct assignment, consistent with existing `AuthHelper.cs` pattern:
+```csharp
+JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
+```
+
+For array responses (`JsonElement[]`), use the nullable reference type since arrays are reference types:
+```csharp
+JsonElement[]? sessions = await resp.Content.ReadFromJsonAsync<JsonElement[]>(Json);
+```
+
+### 4. No scaffold placeholder files
 
 Visual Studio scaffolds `Class1.cs` when creating a new project. These files must be deleted immediately — never committed. A `Class1.cs` anywhere in `src/` or `tests/` is always wrong.
 
@@ -1476,7 +1528,7 @@ Visual Studio scaffolds `Class1.cs` when creating a new project. These files mus
 find src/ tests/ -name "Class1.cs" -not -path "*/obj/*"
 ```
 
-### 3. User input flowing into external identifiers
+### 5. User input flowing into external identifiers
 
 Any string derived from user input that becomes an external identifier — filename, ZIP entry name, URL slug, S3 key, Redis key — needs two checks:
 
