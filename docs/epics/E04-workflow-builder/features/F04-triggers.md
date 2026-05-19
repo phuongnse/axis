@@ -38,6 +38,7 @@ A workflow must have at least one trigger before it can be published. Triggers d
 > **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: input variable prompt dialog and `POST /workflows/{id}/executions` endpoint pending API + E06.
 > Decisions: trigger config (input variable definitions) stored as JSONB in `triggers` column; domain guards against duplicate trigger type per workflow (AddTrigger returns Conflict on second call for same type).
+> Diagram pending: `TriggerConfig` to be shown as a value object in workflow-model diagram (no `id`, 1-to-many relationship with WorkflowDefinition). Update `workflowModelDiagram()` in `generate-diagrams.mjs`.
 
 ---
 

@@ -40,6 +40,7 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 > **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
 > Gaps vs spec: No Application handlers for form task management; email notification dispatch and in-app notification pending E06 + notification infrastructure; role member resolution pending Identity integration.
 > Decisions: `FormSubmission.AccessToken` is a `Guid` (unique URL lookup key, not JWT); expiry is enforced via `ExpiresAt` field + `Expire()` domain method. Non-idempotent domain transition — `Expire()` throws if status is not Pending; idempotency is handled at the job/application level (caller checks status before invoking).
+> Diagram pending: `FormTaskStatus.Completed` → `Submitted` in form-model diagram (the status name better reflects the action — a form task is "submitted", not "completed"). Update `formModelDiagram()` in `generate-diagrams.mjs`.
 
 ---
 

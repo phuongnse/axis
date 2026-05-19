@@ -37,6 +37,7 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 
 > **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Decisions: DataClass fields stored as JSONB using the same FieldDefinitionConverter as DataModel; Relation/DataClass/File types blocked in domain by guard.
+> Diagram pending: `DataClassField` entity to be removed from data-model diagram — DataClassDefinition reuses `FieldDefinition` directly (same entity as ModelDefinition). Update `dataModelDiagram()` in `generate-diagrams.mjs`.
 
 ---
 

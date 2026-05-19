@@ -39,6 +39,7 @@ Each step has a type that determines what it does when executed. Users configure
 
 > **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: form picker UI, assignee expression evaluation, and timeout enforcement pending Frontend + E06.
+> Diagram pending: `StepType` enum missing `Start` and `End` values in workflow-model diagram. Update `workflowModelDiagram()` in `generate-diagrams.mjs`.
 > Decisions: step config (formId, assignee, timeout) stored as JSONB dict in `steps` column.
 
 ---

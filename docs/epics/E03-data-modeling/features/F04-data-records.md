@@ -41,6 +41,7 @@ Users can create, read, update, and delete records against any model. Records ar
 
 > **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: File field pre-upload step pending file storage service; Relation field existence check pending API layer.
+> Diagram pending: entity name `Record` → `DataRecord` in data-model diagram (`dataModelDiagram()` in `generate-diagrams.mjs`) — `Record` is a C# keyword and conflicts with the language reserved word.
 > Decisions: record data stored as `Dictionary<string, object?>` serialized to JSONB column `_data`.
 
 ---
