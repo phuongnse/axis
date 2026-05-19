@@ -172,10 +172,11 @@ Every time code changes, the relevant docs change too — in the **same PR, not 
 | Added, removed, or changed a library | `docs/TECH_STACK.md` — version table + ADR if applicable |
 | Established a new implementation pattern | `docs/playbooks/patterns.md` — add the pattern with an example |
 | Completed a US layer | Feature file `> **Implementation status**` callout — and remove any mention of that layer from the gap text (✅ and "pending X layer" in the same callout is always a contradiction) |
-| Completed a full layer for a module | Epic README status table + `docs/PROGRESS.md` |
+| Completed a full layer for a module | Epic README status table + `docs/PROGRESS.md` — one short paragraph per module, layer-status only; no class names, endpoint lists, connection strings, or per-PR implementation detail |
 | Changed architecture, added a cross-cutting rule | `CLAUDE.md` — the relevant section |
 | Changed the implementation workflow or layer order | `docs/playbooks/process.md` — update the affected checklist |
 | Changed project structure (added/removed projects) | `ARCHITECTURE.md` source tree + `docs/playbooks/process.md` new module setup table |
+| Moved or renamed a wireframe, diagram, or source folder | Search for the old path across all `docs/` files — update every cross-reference and path example, including code blocks inside `patterns.md` |
 | Changed `Program.cs` host/middleware wiring | `docs/playbooks/patterns.md` host setup section — verify the code example still matches |
 | Changed or removed a class/method/service referenced in a doc comment | Update the comment in the same file — stale comments are docs debt |
 | Replaced a framework or library with another | Every doc that names the old library — search for the old name across `docs/` and `src/` comments |
@@ -515,6 +516,9 @@ Answer each question explicitly. If the answer is "yes", update the relevant doc
 
 6. **Was there a spec gap (missing AC, ambiguous lifecycle, unstated constraint) that only became visible during implementation or CI?**
    If yes → add the missing AC to the feature file now.
+
+7. **Did I add a doc entry or code example that embeds a library version number, a specific endpoint URL, or a production class/type name in rule text (rather than in a clearly-labelled example block)?**
+   If yes → move the specific detail into an example block and add a generalization note (e.g. "substitute your actual types"). Rule text must state the principle; specifics belong only in illustrative examples.
 
 This gate exists because process gaps that surface during implementation are the highest-value moment to close them — the problem is fresh, the context is loaded, and the fix takes minutes. The same gap discovered six months later takes hours to reconstruct.
 
