@@ -57,7 +57,7 @@ const base = (extra = {}) => ({
   fillStyle: "solid",
   strokeWidth: 1.5,
   strokeStyle: "solid",
-  roughness: 0,
+  roughness: 1,
   opacity: 100,
   groupIds: [],
   frameId: null,
@@ -109,13 +109,13 @@ function text({ x, y, value, size = 13, color = C.text, bold = false, anchor = "
     height: size * 1.4,
     text: value,
     fontSize: size,
-    fontFamily: 4,
+    fontFamily: 1,
     textAlign: "center",
     verticalAlign: "middle",
     strokeColor: color,
     backgroundColor: "transparent",
     fillStyle: "solid",
-    roughness: 0,
+    roughness: 1,
     strokeWidth: 1,
     strokeStyle: "solid",
   };
@@ -138,7 +138,7 @@ function arrow({ x1, y1, x2, y2, label, color = C.arrow, dashed = false }) {
     fillStyle: "solid",
     strokeWidth: 1.5,
     strokeStyle: dashed ? "dashed" : "solid",
-    roughness: 0,
+    roughness: 1,
     startArrowhead: null,
     endArrowhead: "arrow",
     roundness: { type: 2 },
@@ -152,12 +152,42 @@ function arrow({ x1, y1, x2, y2, label, color = C.arrow, dashed = false }) {
   return els;
 }
 
+function routedArrow({ waypoints, label, color = C.arrow, dashed = false }) {
+  const [ox, oy] = waypoints[0];
+  const points = waypoints.map(([x, y]) => [x - ox, y - oy]);
+  const xs = waypoints.map(([x]) => x);
+  const ys = waypoints.map(([, y]) => y);
+  const el = {
+    ...base(),
+    type: "arrow",
+    x: ox, y: oy,
+    width: Math.max(...xs) - Math.min(...xs),
+    height: Math.max(...ys) - Math.min(...ys),
+    points,
+    strokeColor: color,
+    backgroundColor: "transparent",
+    fillStyle: "solid",
+    strokeWidth: 1.5,
+    strokeStyle: dashed ? "dashed" : "solid",
+    roughness: 1,
+    startArrowhead: null,
+    endArrowhead: "arrow",
+    roundness: { type: 2 },
+  };
+  const els = [el];
+  if (label) {
+    const mid = waypoints[Math.floor(waypoints.length / 2)];
+    els.push(text({ x: mid[0], y: mid[1] - 14, value: label, size: 10, color: C.muted, anchor: "center" }));
+  }
+  return els;
+}
+
 function badge({ x, y, label }) {
   const w = estimateWidth(label, 10) + 16;
   return [
     { ...base(), type: "rectangle", x, y, width: w, height: 22,
       backgroundColor: C.evtBg, strokeColor: C.evtBdr,
-      roundness: { type: 3, value: 11 }, strokeWidth: 1.5, roughness: 0 },
+      roundness: { type: 3, value: 11 }, strokeWidth: 1.5, roughness: 1 },
     text({ x: x + w / 2, y: y + 11, value: label, size: 10, color: "#92400e", anchor: "center" }),
   ];
 }
@@ -173,7 +203,7 @@ function hline({ x, y, w, color = C.border, dashed = false }) {
     strokeColor: color,
     strokeStyle: dashed ? "dashed" : "solid",
     strokeWidth: 1,
-    roughness: 0,
+    roughness: 1,
     startArrowhead: null,
     endArrowhead: null,
   }];
@@ -188,7 +218,7 @@ function vline({ x, y, h, color = C.border, dashed = false }) {
     strokeColor: color,
     strokeStyle: dashed ? "dashed" : "solid",
     strokeWidth: 1,
-    roughness: 0,
+    roughness: 1,
     startArrowhead: null,
     endArrowhead: null,
   }];
@@ -285,7 +315,7 @@ function systemContext() {
   els.push(...rect({ x: 830, y: 340, w: 160, h: 60, bg: C.extBg, stroke: C.extBdr, label: "External APIs", sub: "HTTP Request steps" }));
 
   els.push(...arrow({ x1: 160, y1: 220, x2: 260, y2: 220, label: "HTTPS" }));
-  els.push(...arrow({ x1: 160, y1: 440, x2: 260, y2: 300 }));
+  els.push(...routedArrow({ waypoints: [[160, 440], [260, 440], [260, 300]] }));
   els.push(...arrow({ x1: 400, y1: 190, x2: 400, y2: 240, label: "REST / WS" }));
   els.push(...arrow({ x1: 400, y1: 300, x2: 400, y2: 370 }));
   els.push(...arrow({ x1: 400, y1: 300, x2: 400, y2: 460 }));
@@ -624,9 +654,12 @@ function dataModelDiagram() {
   els.push(...arrow({ x1: mdl.midRight.x, y1: mdl.midRight.y, x2: fld.midLeft.x, y2: fld.midLeft.y, label: "1 *--" }));
   els.push(...arrow({ x1: fld.midRight.x, y1: fld.midRight.y, x2: ftype.midLeft.x, y2: ftype.midLeft.y, label: "has type" }));
   els.push(...arrow({ x1: dcd.midRight.x, y1: dcd.midRight.y, x2: dcf.midLeft.x, y2: dcf.midLeft.y, label: "1 *--" }));
-  els.push(...arrow({ x1: dcf.midRight.x, y1: dcf.midRight.y + 20, x2: ftype.midLeft.x, y2: ftype.midBottom.y - 20, label: "has type", dashed: true }));
-  els.push(...arrow({ x1: fld.midBottom.x - 20, y1: fld.midBottom.y, x2: dcd.midTop.x + 20, y2: dcd.midTop.y, label: "→ DataClass ref", dashed: true }));
-  els.push(...arrow({ x1: rec.midTop.x, y1: rec.midTop.y, x2: mdl.midBottom.x, y2: mdl.midBottom.y, label: "instance of", dashed: true }));
+  // dcf → ftype: route right to ftype.midBottom.x then up to ftype.midBottom
+  els.push(...routedArrow({ waypoints: [[dcf.midRight.x, dcf.midRight.y + 20], [ftype.midBottom.x, dcf.midRight.y + 20], [ftype.midBottom.x, ftype.midBottom.y]], label: "has type", dashed: true }));
+  // fld → dcd: route down to midpoint y, left, then down to dcd.midTop
+  els.push(...routedArrow({ waypoints: [[fld.midBottom.x - 20, fld.midBottom.y], [fld.midBottom.x - 20, 300], [dcd.midTop.x + 20, 300], [dcd.midTop.x + 20, dcd.midTop.y]], label: "→ DataClass ref", dashed: true }));
+  // rec → mdl: route left of all boxes to avoid crossing dcd
+  els.push(...routedArrow({ waypoints: [[rec.midLeft.x, rec.midLeft.y], [10, rec.midLeft.y], [10, mdl.midLeft.y], [mdl.midLeft.x, mdl.midLeft.y]], label: "instance of", dashed: true }));
 
   return excalidraw(els);
 }
@@ -672,11 +705,13 @@ function workflowModelDiagram() {
   els.push(...arrow({ x1: wfd.midBottom.x, y1: wfd.midBottom.y, x2: wfs.midTop.x, y2: wfs.midTop.y, label: "status" }));
   els.push(...arrow({ x1: wfd.midRight.x, y1: wfd.midRight.y - 10, x2: trig.midLeft.x, y2: trig.midLeft.y, label: "1 -- 1" }));
   els.push(...arrow({ x1: wfd.midRight.x, y1: wfd.midRight.y + 10, x2: step.midLeft.x, y2: step.midLeft.y, label: "1 *--" }));
-  els.push(...arrow({ x1: wfd.midRight.x, y1: wfd.midRight.y + 30, x2: trans.midLeft.x, y2: trans.midLeft.y, label: "1 *--" }));
+  // wfd → trans: route above all boxes to avoid crossing step
+  els.push(...routedArrow({ waypoints: [[wfd.midRight.x, wfd.midRight.y + 30], [wfd.midRight.x, 30], [trans.midTop.x, 30], [trans.midTop.x, trans.midTop.y]], label: "1 *--" }));
   els.push(...arrow({ x1: trig.midBottom.x, y1: trig.midBottom.y, x2: trigType.midTop.x, y2: trigType.midTop.y, label: "type" }));
   els.push(...arrow({ x1: step.midBottom.x, y1: step.midBottom.y, x2: stepType.midTop.x, y2: stepType.midTop.y, label: "type" }));
   els.push(...arrow({ x1: pg.midBottom.x, y1: pg.midBottom.y, x2: jt.midTop.x, y2: jt.midTop.y, label: "joinType" }));
-  els.push(...arrow({ x1: step.midRight.x, y1: step.midRight.y + 20, x2: pg.midLeft.x, y2: pg.midLeft.y, label: "0..1", dashed: true }));
+  // step → pg: route right then down
+  els.push(...routedArrow({ waypoints: [[step.midRight.x, step.midRight.y + 20], [760, step.midRight.y + 20], [760, pg.midLeft.y], [pg.midLeft.x, pg.midLeft.y]], label: "0..1", dashed: true }));
 
   return excalidraw(els);
 }
@@ -714,11 +749,14 @@ function formModelDiagram() {
 
   // Relationships
   els.push(...arrow({ x1: fdef.midRight.x, y1: fdef.midRight.y - 8, x2: fsec.midLeft.x, y2: fsec.midLeft.y, label: "1 *--" }));
-  els.push(...arrow({ x1: fdef.midRight.x, y1: fdef.midRight.y + 8, x2: ffield.midLeft.x, y2: ffield.midLeft.y, label: "1 *--" }));
-  els.push(...arrow({ x1: ffield.midRight.x, y1: ffield.midRight.y, x2: fft.midLeft.x, y2: fft.midLeft.y, label: "type" }));
+  // fdef → ffield: route right then down then right
+  els.push(...routedArrow({ waypoints: [[fdef.midRight.x, fdef.midRight.y + 8], [260, fdef.midRight.y + 8], [260, ffield.midLeft.y], [ffield.midLeft.x, ffield.midLeft.y]], label: "1 *--" }));
+  // ffield → fft: route right to fft.midBottom.x then up to fft.midBottom
+  els.push(...routedArrow({ waypoints: [[ffield.midRight.x, ffield.midRight.y], [fft.midBottom.x, ffield.midRight.y], [fft.midBottom.x, fft.midBottom.y]], label: "type" }));
   els.push(...arrow({ x1: fdef.midBottom.x, y1: fdef.midBottom.y, x2: ftask.midTop.x, y2: ftask.midTop.y, label: "→ runtime" }));
   els.push(...arrow({ x1: ftask.midBottom.x, y1: ftask.midBottom.y, x2: fts.midTop.x, y2: fts.midTop.y, label: "status" }));
-  els.push(...arrow({ x1: ftask.midRight.x, y1: ftask.midRight.y + 30, x2: fsub.midLeft.x, y2: fsub.midLeft.y, label: "1 -- 1" }));
+  // ftask → fsub: route right then down
+  els.push(...routedArrow({ waypoints: [[ftask.midRight.x, ftask.midRight.y + 30], [260, ftask.midRight.y + 30], [260, fsub.midLeft.y], [fsub.midLeft.x, fsub.midLeft.y]], label: "1 -- 1" }));
 
   return excalidraw(els);
 }
