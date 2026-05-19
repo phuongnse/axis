@@ -1447,7 +1447,27 @@ Common namespaces that agents forget to add as `using` directives:
 | `System.Net.HttpStatusCode` | `using System.Net;` |
 | `Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions` | `using Microsoft.AspNetCore.Diagnostics.HealthChecks;` |
 
-### 2. No scaffold placeholder files
+### 2. No restructuring to avoid a `using` directive
+
+When replacing `var` with an explicit type, if that type requires a new `using` directive — add the directive. Never restructure or inline code just to avoid importing a type. That is a workaround, not a fix.
+
+**Wrong** — inlines `.Id` to avoid importing `Role`:
+```csharp
+Guid viewerRoleId = ctx.Roles.First(r => r.Name == "Viewer" && r.OrganizationId == orgId).Id;
+// … then uses viewerRoleId directly
+```
+
+**Right** — uses the correct explicit type with a `using` directive:
+```csharp
+using Axis.Identity.Domain.Aggregates;
+// …
+Role viewerRole = ctx.Roles.First(r => r.Name == "Viewer" && r.OrganizationId == orgId);
+// … then uses viewerRole.Id, viewerRole.Name, etc. as needed
+```
+
+The restructured version hides what type is being worked with, discards future flexibility (e.g. if a second property is later needed), and violates the intent of "no `var`" — which is to make types explicit, not to obscure them by different means.
+
+### 3. No scaffold placeholder files
 
 Visual Studio scaffolds `Class1.cs` when creating a new project. These files must be deleted immediately — never committed. A `Class1.cs` anywhere in `src/` or `tests/` is always wrong.
 
