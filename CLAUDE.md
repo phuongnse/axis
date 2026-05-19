@@ -60,6 +60,7 @@ Scan this before acting. Full explanations are in the sections below.
 - Domain layer: zero external dependencies (pure C#)
 - Modules communicate only via Wolverine events or Application-layer interfaces — no shared DB transactions
 - Never commit without a completed, **written** Gate 2 walk-through — a mental check is not a walk-through
+- Never commit without a completed, **written** Gate 3 retrospective — same rule, same reason
 
 **P1 — Architectural (require user confirmation before deviating):**
 - Layer order: Domain → Application → Infrastructure → API → Frontend — no skipping
@@ -123,7 +124,7 @@ Before starting any task, read only what is relevant — not everything.
 
 **Step 3 — Read only the feature file(s)** for the task: `docs/epics/{folder}/features/F0{N}-*.md`
 
-**Step 4 — Map every AC to a concrete implementation step** before writing any code. For each AC in the US being implemented: identify which layer it belongs to, which file/method will implement it, and what the expected behavior is. Any AC that cannot be mapped to a specific implementation → stop and clarify first. This is the step most likely to surface missed requirements before they become bugs.
+**Step 4 — Map every AC to a concrete implementation step** before writing any code. Write this mapping out — do not keep it mental. For each AC: which layer, which file/method, what the expected behavior is. Any AC that cannot be mapped → stop and clarify first. This written map is the output that proves requirements were understood before coding began.
 
 **Step 5 — Check implementation status** in [`docs/PROGRESS.md`](docs/PROGRESS.md)
 
@@ -493,9 +494,10 @@ Run through this before marking any task ✅ or raising a PR:
 **Code quality**
 - Tests pass — `dotnet test unit-tests.slnf` / `npm run test`
 - Zero build warnings — `dotnet build` / `npm run ci`
-- No TODO or FIXME introduced in this PR
-- No placeholder, stub, or dead code committed
-- No commented-out code left in
+- Run and confirm empty output:
+  ```bash
+  grep -rn "TODO\|FIXME\|NotImplementedException\|placeholder\|stub" src/ tests/ frontend/src/ 2>/dev/null | grep -v obj/ | grep -v node_modules/
+  ```
 
 **Gate 2 — Doc correctness (run each check explicitly, not as a batch)**
 - Walk the Gate 2 table row by row. For every row whose trigger fired in this PR, confirm the target doc is updated.
@@ -508,7 +510,22 @@ Run through this before marking any task ✅ or raising a PR:
 
 **Gate 3 — Retrospective (mandatory, runs in every PR before the final commit)**
 
-Answer each question explicitly. If the answer is "yes", update the relevant doc in this PR — not later.
+**Must produce written output — not a mental check.** Answer every question with yes/no and, for yes answers, state what was done. Format:
+
+```
+Gate 3:
+1. Uncovered new rule from test failure? No
+2. Invented invariant without AC? No
+3. Infrastructure footgun? No
+4. Non-obvious test setup? No
+5. Changed direction mid-task? No
+6. Spec gap discovered? No
+7. Incident-level doc added? No
+```
+
+For each "yes": update the relevant doc before committing, then note what was changed in the Gate 3 output.
+
+**Questions:**
 
 1. **Did any test fail for a reason not covered by an existing rule in `CLAUDE.md` or `patterns.md`?**
    If yes → add the rule or pitfall now.
