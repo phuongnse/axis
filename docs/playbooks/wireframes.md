@@ -15,7 +15,7 @@ This playbook covers everything needed to work with the wireframe generation sys
 | `docs/wireframes/generate-template.mjs` | 34-section component kit — imports from `components.mjs`, exports all builders |
 | `docs/wireframes/generate-screens.mjs` | 27 screen wireframes — imports builders from the template, places them via `component()` |
 | `docs/wireframes/_template.excalidraw` | Generated output of `generate-template.mjs` |
-| `docs/wireframes/{E0N-*}/*.excalidraw` | Generated outputs of `generate-screens.mjs` |
+| `docs/epics/{E0N-*}/wireframes/*.excalidraw` | Generated outputs of `generate-screens.mjs` — co-located with each epic |
 
 **Regeneration commands:**
 
@@ -393,17 +393,19 @@ This is what makes `import { buildWorkflowCanvas } from './generate-template.mjs
 
 | Module | Files |
 |---|---|
-| `_shared/` | `app-shell` |
-| `E01-platform-foundation/` | `register-org`, `email-confirmation`, `verify-email`, `workspace-provisioning`, `pricing`, `settings-org`, `settings-org-delete-modal` |
-| `E02-identity-access/` | `login`, `register`, `forgot-password`, `change-password`, `accept-invitation`, `settings-users`, `settings-roles`, `settings-security` |
-| `E03-data-modeling/` | `data-models`, `data-classes`, `records` |
-| `E04-workflow-builder/` | `workflows`, `workflow-editor` |
-| `E05-form-builder/` | `forms`, `form-editor`, `form-submission` |
-| `E06-workflow-engine/` | `executions`, `execution-detail` |
+| `docs/wireframes/` (root) | `app-shell` |
+| `E01-platform-foundation/wireframes/` | `register-org`, `email-confirmation`, `verify-email`, `workspace-provisioning`, `pricing`, `settings-org`, `settings-org-delete-modal` |
+| `E02-identity-access/wireframes/` | `login`, `register`, `forgot-password`, `change-password`, `accept-invitation`, `settings-users`, `settings-roles`, `settings-security` |
+| `E03-data-modeling/wireframes/` | `data-models`, `data-classes`, `records` |
+| `E04-workflow-builder/wireframes/` | `workflows`, `workflow-editor` |
+| `E05-form-builder/wireframes/` | `forms`, `form-editor`, `form-submission` |
+| `E06-workflow-engine/wireframes/` | `executions`, `execution-detail` |
 
 ---
 
-## Current section inventory (37 sections)
+## Current section inventory
+
+> **Keep this table in sync with `generate-template.mjs`** — the TOC comment at the top of that file is the authoritative source. Whenever a section is added or removed, update both places together.
 
 | Group | Sections |
 |---|---|

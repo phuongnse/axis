@@ -1,6 +1,6 @@
-# F02 — Form Field Configuration & Validation
+﻿# F02 — Form Field Configuration & Validation
 
-> **Wireframe**: [docs/wireframes/E05-form-builder/form-editor.excalidraw](../../../wireframes/E05-form-builder/form-editor.excalidraw) · [preview](../../../wireframes/E05-form-builder/form-editor.svg)
+> **Wireframe**: [docs/epics/E05-form-builder/wireframes/form-editor.excalidraw](../wireframes/form-editor.excalidraw) · [preview](../wireframes/form-editor.svg)
 
 [← Back to E05](../README.md)
 

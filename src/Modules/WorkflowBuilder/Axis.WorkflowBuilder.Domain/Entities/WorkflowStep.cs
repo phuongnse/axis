@@ -31,4 +31,16 @@ public sealed class WorkflowStep : Entity<Guid>
         Name = name;
         Config = config;
     }
+
+    /// <summary>
+    /// Extracts the FormId from a Form step's config dictionary.
+    /// Returns null if this is not a Form step or the formId key is absent/invalid.
+    /// </summary>
+    public Guid? TryGetFormId()
+    {
+        if (Type != StepType.Form || Config is null) return null;
+        if (!Config.TryGetValue("formId", out object? raw) || raw is null) return null;
+        // raw is JsonElement when read back from JSONB; JsonElement.ToString() returns the unquoted string value.
+        return Guid.TryParse(raw.ToString(), out Guid id) ? id : null;
+    }
 }

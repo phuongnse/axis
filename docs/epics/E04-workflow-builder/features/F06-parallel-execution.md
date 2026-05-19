@@ -1,6 +1,6 @@
 ﻿# F06 — Parallel Step Execution
 
-> **Wireframe**: [docs/wireframes/E04-workflow-builder/workflow-editor.excalidraw](../../../wireframes/E04-workflow-builder/workflow-editor.excalidraw) · [preview](../../../wireframes/E04-workflow-builder/workflow-editor.svg)
+> **Wireframe**: [docs/epics/E04-workflow-builder/wireframes/workflow-editor.excalidraw](../wireframes/workflow-editor.excalidraw) · [preview](../wireframes/workflow-editor.svg)
 
 [← Back to E04](../README.md)
 
@@ -38,6 +38,7 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 
 > **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: canvas container node rendering and step nesting UI pending Frontend; parallel group represented via step config in existing JSONB storage.
+> Diagram pending: `ParallelGroup` and `JoinType` to be marked as "planned" (Phase 2) in workflow-model diagram. Update `workflowModelDiagram()` in `generate-diagrams.mjs`.
 
 ---
 

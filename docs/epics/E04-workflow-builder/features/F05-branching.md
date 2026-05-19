@@ -1,6 +1,6 @@
 ﻿# F05 — Branching & Conditional Logic
 
-> **Wireframe**: [docs/wireframes/E04-workflow-builder/workflow-editor.excalidraw](../../../wireframes/E04-workflow-builder/workflow-editor.excalidraw) · [preview](../../../wireframes/E04-workflow-builder/workflow-editor.svg)
+> **Wireframe**: [docs/epics/E04-workflow-builder/wireframes/workflow-editor.excalidraw](../wireframes/workflow-editor.excalidraw) · [preview](../wireframes/workflow-editor.svg)
 
 [← Back to E04](../README.md)
 
@@ -37,6 +37,7 @@ Workflows can take different execution paths based on data values using Conditio
 > **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: canvas branch label rendering pending Frontend; branch evaluation at execution time pending E06.
 > Decisions: cycle detection implemented in domain (DFS reachability check in AddTransition).
+> Diagram pending: `Transition` to be shown as a value object in workflow-model diagram (only `fromStepId`, `toStepId`, `condition` — no `id`, `workflowId`, `label`, `displayOrder`). Update `workflowModelDiagram()` in `generate-diagrams.mjs`.
 
 ---
 

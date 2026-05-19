@@ -1,6 +1,6 @@
 ﻿# F02 — Visual Workflow Canvas
 
-> **Wireframe**: [docs/wireframes/E04-workflow-builder/workflow-editor.excalidraw](../../../wireframes/E04-workflow-builder/workflow-editor.excalidraw) · [preview](../../../wireframes/E04-workflow-builder/workflow-editor.svg)
+> **Wireframe**: [docs/epics/E04-workflow-builder/wireframes/workflow-editor.excalidraw](../wireframes/workflow-editor.excalidraw) · [preview](../wireframes/workflow-editor.svg)
 
 [← Back to E04](../README.md)
 

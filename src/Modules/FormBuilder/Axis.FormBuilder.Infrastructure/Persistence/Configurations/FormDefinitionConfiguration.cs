@@ -15,10 +15,16 @@ internal sealed class FormDefinitionConfiguration : IEntityTypeConfiguration<For
         fields => JsonSerializer.Serialize(fields, FormJsonOptions.Options),
         json => JsonSerializer.Deserialize<List<FormField>>(json, FormJsonOptions.Options) ?? new List<FormField>());
 
+    // Snapshot uses deep-copy via serialization so mutations (e.g. DisplayOrder changes)
+    // are detected by EF Core's change tracker. Shallow ToList() would share references
+    // and miss in-place property mutations.
     private static readonly ValueComparer<List<FormField>> FieldsComparer = new(
-        (l1, l2) => l1 != null && l2 != null && l1.SequenceEqual(l2),
-        l => l.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
-        l => l.ToList());
+        (l1, l2) => JsonSerializer.Serialize(l1, FormJsonOptions.Options)
+                 == JsonSerializer.Serialize(l2, FormJsonOptions.Options),
+        l => JsonSerializer.Serialize(l, FormJsonOptions.Options).GetHashCode(),
+        l => JsonSerializer.Deserialize<List<FormField>>(
+            JsonSerializer.Serialize(l, FormJsonOptions.Options),
+            FormJsonOptions.Options) ?? new List<FormField>());
 
     public void Configure(EntityTypeBuilder<FormDefinition> builder)
     {

@@ -22,6 +22,26 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Axis.WorkflowEngine.Domain.Aggregates.WorkflowActiveStatus", b =>
+                {
+                    b.Property<Guid>("WorkflowId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("workflow_id");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.HasKey("WorkflowId");
+
+                    b.ToTable("workflow_active_statuses", (string)null);
+                });
+
             modelBuilder.Entity("Axis.WorkflowEngine.Domain.Aggregates.WorkflowExecution", b =>
                 {
                     b.Property<Guid>("Id")

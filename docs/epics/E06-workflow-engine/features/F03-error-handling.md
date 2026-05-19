@@ -1,6 +1,6 @@
-# F03 — Error Handling & Notification
+﻿# F03 — Error Handling & Notification
 
-> **Wireframe**: [docs/wireframes/E06-workflow-engine/execution-detail.excalidraw](../../../wireframes/E06-workflow-engine/execution-detail.excalidraw) · [preview](../../../wireframes/E06-workflow-engine/execution-detail.svg)
+> **Wireframe**: [docs/epics/E06-workflow-engine/wireframes/execution-detail.excalidraw](../wireframes/execution-detail.excalidraw) · [preview](../wireframes/execution-detail.svg)
 
 [← Back to E06](../README.md)
 

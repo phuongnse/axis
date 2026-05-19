@@ -32,7 +32,7 @@ A workflow builder without an execution engine is just a drawing tool. This epic
 
 ## Diagrams
 
-![Execution Flow](./diagrams/execution-flow.png)
+![Execution Flow](./diagrams/execution-flow.svg)
 
 ---
 

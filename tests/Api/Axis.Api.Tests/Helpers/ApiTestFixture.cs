@@ -1,10 +1,13 @@
 using System.Text.Json;
 using Axis.DataModeling.Infrastructure.Persistence;
+using Axis.FormBuilder.Infrastructure.Persistence;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Infrastructure.Persistence;
 using Axis.Identity.Infrastructure.Services;
 using Axis.WorkflowBuilder.Infrastructure.Persistence;
+using Axis.WorkflowEngine.Infrastructure.Persistence;
 using IDataModelingUnitOfWork = Axis.DataModeling.Application.Services.IUnitOfWork;
+using IFormBuilderUnitOfWork = Axis.FormBuilder.Application.Services.IUnitOfWork;
 using IWorkflowBuilderUnitOfWork = Axis.WorkflowBuilder.Application.Services.IUnitOfWork;
 using Axis.Shared.Application.Tenancy;
 using OpenIddict.Server.AspNetCore;
@@ -36,6 +39,8 @@ public sealed class ApiTestFixture : IAsyncLifetime
     private WebApplicationFactory<Program> _factory = null!;
     private string _dmConnectionString = null!;
     private string _wbConnectionString = null!;
+    private string _fbConnectionString = null!;
+    private string _weConnectionString = null!;
 
     public HttpClient Client { get; private set; } = null!;
 
@@ -52,6 +57,8 @@ public sealed class ApiTestFixture : IAsyncLifetime
         // Each module needs its own database so EnsureCreatedAsync creates tables correctly.
         _dmConnectionString = await CreateModuleDatabaseAsync("axis_dm_test");
         _wbConnectionString = await CreateModuleDatabaseAsync("axis_wb_test");
+        _fbConnectionString = await CreateModuleDatabaseAsync("axis_fb_test");
+        _weConnectionString = await CreateModuleDatabaseAsync("axis_we_test");
 
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -64,8 +71,8 @@ public sealed class ApiTestFixture : IAsyncLifetime
                     ["ConnectionStrings:Identity"] = _postgres.GetConnectionString(),
                     ["ConnectionStrings:DataModeling"] = _dmConnectionString,
                     ["ConnectionStrings:WorkflowBuilder"] = _wbConnectionString,
-                    ["ConnectionStrings:FormBuilder"] = _postgres.GetConnectionString(),
-                    ["ConnectionStrings:WorkflowEngine"] = _postgres.GetConnectionString(),
+                    ["ConnectionStrings:FormBuilder"] = _fbConnectionString,
+                    ["ConnectionStrings:WorkflowEngine"] = _weConnectionString,
                     ["Redis:ConnectionString"] = _redis.GetConnectionString(),
                 });
             });
@@ -104,6 +111,10 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.AddScoped<IWorkflowBuilderUnitOfWork>(sp =>
                     new NullWorkflowBuilderUnitOfWork(sp.GetRequiredService<WorkflowBuilderDbContext>()));
 
+                services.RemoveAll<IFormBuilderUnitOfWork>();
+                services.AddScoped<IFormBuilderUnitOfWork>(sp =>
+                    new NullFormBuilderUnitOfWork(sp.GetRequiredService<FormBuilderDbContext>()));
+
                 // Use a fixed "public" schema for all tenants
                 services.RemoveAll<ITenantContext>();
                 services.AddScoped<ITenantContext>(_ => new PublicSchemaTenantContext());
@@ -131,17 +142,29 @@ public sealed class ApiTestFixture : IAsyncLifetime
         // Seed the SPA client used by integration tests
         await SeedTestOpenIddictClientsAsync(scope.ServiceProvider);
 
-        var dmOptions = new DbContextOptionsBuilder<DataModelingDbContext>()
+        DbContextOptions<DataModelingDbContext> dmOptions = new DbContextOptionsBuilder<DataModelingDbContext>()
             .UseNpgsql(_dmConnectionString)
             .Options;
         await using DataModelingDbContext dmCtx = new(dmOptions, new PublicSchemaTenantContext());
         await dmCtx.Database.EnsureCreatedAsync();
 
-        var wbOptions = new DbContextOptionsBuilder<WorkflowBuilderDbContext>()
+        DbContextOptions<WorkflowBuilderDbContext> wbOptions = new DbContextOptionsBuilder<WorkflowBuilderDbContext>()
             .UseNpgsql(_wbConnectionString)
             .Options;
         await using WorkflowBuilderDbContext wbCtx = new(wbOptions, new PublicSchemaTenantContext());
         await wbCtx.Database.EnsureCreatedAsync();
+
+        DbContextOptions<FormBuilderDbContext> fbOptions = new DbContextOptionsBuilder<FormBuilderDbContext>()
+            .UseNpgsql(_fbConnectionString)
+            .Options;
+        await using FormBuilderDbContext fbCtx = new(fbOptions, new PublicSchemaTenantContext());
+        await fbCtx.Database.EnsureCreatedAsync();
+
+        DbContextOptions<WorkflowEngineDbContext> weOptions = new DbContextOptionsBuilder<WorkflowEngineDbContext>()
+            .UseNpgsql(_weConnectionString)
+            .Options;
+        await using WorkflowEngineDbContext weCtx = new(weOptions, new PublicSchemaTenantContext());
+        await weCtx.Database.EnsureCreatedAsync();
 
         Client = _factory.CreateClient(new WebApplicationFactoryClientOptions
         {

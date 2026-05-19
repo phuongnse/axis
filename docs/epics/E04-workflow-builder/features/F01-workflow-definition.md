@@ -1,6 +1,6 @@
 ﻿# F01 — Workflow Definition Management
 
-> **Wireframe**: [docs/wireframes/E04-workflow-builder/workflows.excalidraw](../../../wireframes/E04-workflow-builder/workflows.excalidraw) · [preview](../../../wireframes/E04-workflow-builder/workflows.svg)
+> **Wireframe**: [docs/epics/E04-workflow-builder/wireframes/workflows.excalidraw](../wireframes/workflows.excalidraw) · [preview](../wireframes/workflows.svg)
 
 [← Back to E04](../README.md)
 

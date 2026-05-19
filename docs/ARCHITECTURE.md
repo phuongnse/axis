@@ -6,7 +6,7 @@
 
 ## System Context
 
-![System Context](./diagrams/system-context.png)
+![System Context](./diagrams/system-context.svg)
 
 The Axis platform serves four actor types: **Platform Admins** (Axis team), **Organization Admins**, **Organization Members**, and **End Users**. External systems include an email service for notifications, external APIs called by workflow HTTP steps, and webhook targets that receive workflow events.
 
@@ -14,7 +14,7 @@ The Axis platform serves four actor types: **Platform Admins** (Axis team), **Or
 
 ## Containers
 
-![Container Diagram](./diagrams/container-diagram.png)
+![Container Diagram](./diagrams/container.svg)
 
 | Container | Technology | Responsibility |
 |---|---|---|
@@ -28,7 +28,7 @@ The Axis platform serves four actor types: **Platform Admins** (Axis team), **Or
 
 ## Modular Monolith Structure
 
-![Module Overview](./diagrams/module-overview.png)
+![Module Overview](./diagrams/module-overview.svg)
 
 ### Source Tree
 
@@ -138,7 +138,7 @@ WorkflowEngine → domain event → Wolverine → SignalR Hub → Browser
 
 ## Workflow Execution Architecture
 
-![Execution Flow](./epics/E06-workflow-engine/diagrams/execution-flow.png)
+![Execution Flow](./epics/E06-workflow-engine/diagrams/execution-flow.svg)
 
 Workflow execution is orchestrated by the **WorkflowEngine** module:
 

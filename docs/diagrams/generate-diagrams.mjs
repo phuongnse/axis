@@ -1,0 +1,833 @@
+/**
+ * generate-diagrams.mjs
+ * Generates Excalidraw JSON for all architecture diagrams.
+ * Run:  node docs/diagrams/generate-diagrams.mjs
+ * Then: docs/scripts/generate-diagrams.ps1  (to produce .svg files)
+ *
+ * Top-level (docs/diagrams/):
+ *   system-context  — who uses Axis, what external systems
+ *   container       — what runs inside Axis, per-module databases, Wolverine
+ *   module-overview — 6 modules + event-driven communication flows
+ *
+ * Epic-level (docs/epics/E0{N}-name/diagrams/):
+ *   tenant-provisioning — org registration & async schema provisioning  (E01)
+ *   auth-flow           — JWT + refresh token authentication flow         (E02)
+ *   data-model          — DataModeling entity relationships               (E03)
+ *   workflow-model      — WorkflowBuilder entity relationships            (E04)
+ *   form-model          — FormBuilder entity relationships                (E05)
+ *   execution-flow      — WorkflowEngine step execution loop             (E06)
+ */
+
+import { writeFileSync, mkdirSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+
+const __dir = dirname(fileURLToPath(import.meta.url));
+const epicDir = (folder) => join(__dir, "..", "epics", folder, "diagrams");
+
+// ─── Excalidraw primitives ────────────────────────────────────────────────────
+
+let _id = 1;
+const uid = () => `diag-${_id++}`;
+
+const C = {
+  bg:        "#f8fafc",
+  border:    "#94a3b8",
+  text:      "#1e293b",
+  muted:     "#64748b",
+  sysBg:     "#dbeafe",
+  sysBdr:    "#3b82f6",
+  modBg:     "#dcfce7",
+  modBdr:    "#16a34a",
+  extBg:     "#f3e8ff",
+  extBdr:    "#9333ea",
+  infraBg:   "#ffedd5",
+  infraBdr:  "#ea580c",
+  evtBg:     "#fef9c3",
+  evtBdr:    "#ca8a04",
+  arrow:     "#475569",
+};
+
+const base = (extra = {}) => ({
+  id: uid(),
+  x: 0, y: 0,
+  angle: 0,
+  strokeColor: C.border,
+  backgroundColor: "transparent",
+  fillStyle: "solid",
+  strokeWidth: 1.5,
+  strokeStyle: "solid",
+  roughness: 1,
+  opacity: 100,
+  groupIds: [],
+  frameId: null,
+  roundness: { type: 2 },
+  seed: Math.floor(Math.random() * 99999),
+  version: 1,
+  versionNonce: 0,
+  isDeleted: false,
+  boundElements: [],
+  updated: 1,
+  link: null,
+  locked: false,
+  ...extra,
+});
+
+function rect({ x, y, w, h, bg = "transparent", stroke = C.border, label, labelSize = 13, labelColor = C.text, labelBold = false, sub, rx = 6 }) {
+  const el = {
+    ...base(),
+    type: "rectangle",
+    x, y, width: w, height: h,
+    backgroundColor: bg,
+    strokeColor: stroke,
+    roundness: { type: 3, value: rx },
+  };
+  const els = [el];
+  if (label) {
+    els.push(text({
+      x: x + w / 2, y: sub ? y + h / 2 - 10 : y + h / 2,
+      value: label, size: labelSize, color: labelColor,
+      bold: labelBold, anchor: "center",
+    }));
+  }
+  if (sub) {
+    els.push(text({
+      x: x + w / 2, y: y + h / 2 + 8,
+      value: sub, size: 10, color: C.muted, anchor: "center",
+    }));
+  }
+  return els;
+}
+
+function text({ x, y, value, size = 13, color = C.text, bold = false, anchor = "left" }) {
+  return {
+    ...base(),
+    type: "text",
+    x: anchor === "center" ? x - estimateWidth(value, size) / 2 : x,
+    y: y - size / 2,
+    width: estimateWidth(value, size),
+    height: size * 1.4,
+    text: value,
+    fontSize: size,
+    fontFamily: 1,
+    textAlign: "center",
+    verticalAlign: "middle",
+    strokeColor: color,
+    backgroundColor: "transparent",
+    fillStyle: "solid",
+    roughness: 1,
+    strokeWidth: 1,
+    strokeStyle: "solid",
+  };
+}
+
+function estimateWidth(str, size) {
+  return Math.max(str.length * size * 0.55, 40);
+}
+
+function arrow({ x1, y1, x2, y2, label, color = C.arrow, dashed = false }) {
+  const el = {
+    ...base(),
+    type: "arrow",
+    x: x1, y: y1,
+    width: Math.abs(x2 - x1),
+    height: Math.abs(y2 - y1),
+    points: [[0, 0], [x2 - x1, y2 - y1]],
+    strokeColor: color,
+    backgroundColor: "transparent",
+    fillStyle: "solid",
+    strokeWidth: 1.5,
+    strokeStyle: dashed ? "dashed" : "solid",
+    roughness: 1,
+    startArrowhead: null,
+    endArrowhead: "arrow",
+    roundness: { type: 2 },
+  };
+  const els = [el];
+  if (label) {
+    const mx = (x1 + x2) / 2;
+    const my = (y1 + y2) / 2;
+    els.push(text({ x: mx, y: my - 14, value: label, size: 10, color: C.muted, anchor: "center" }));
+  }
+  return els;
+}
+
+function routedArrow({ waypoints, label, color = C.arrow, dashed = false }) {
+  const [ox, oy] = waypoints[0];
+  const points = waypoints.map(([x, y]) => [x - ox, y - oy]);
+  const xs = waypoints.map(([x]) => x);
+  const ys = waypoints.map(([, y]) => y);
+  const el = {
+    ...base(),
+    type: "arrow",
+    x: ox, y: oy,
+    width: Math.max(...xs) - Math.min(...xs),
+    height: Math.max(...ys) - Math.min(...ys),
+    points,
+    strokeColor: color,
+    backgroundColor: "transparent",
+    fillStyle: "solid",
+    strokeWidth: 1.5,
+    strokeStyle: dashed ? "dashed" : "solid",
+    roughness: 1,
+    startArrowhead: null,
+    endArrowhead: "arrow",
+    roundness: { type: 2 },
+  };
+  const els = [el];
+  if (label) {
+    const mid = waypoints[Math.floor(waypoints.length / 2)];
+    els.push(text({ x: mid[0], y: mid[1] - 14, value: label, size: 10, color: C.muted, anchor: "center" }));
+  }
+  return els;
+}
+
+function badge({ x, y, label }) {
+  const w = estimateWidth(label, 10) + 16;
+  return [
+    { ...base(), type: "rectangle", x, y, width: w, height: 22,
+      backgroundColor: C.evtBg, strokeColor: C.evtBdr,
+      roundness: { type: 3, value: 11 }, strokeWidth: 1.5, roughness: 1 },
+    text({ x: x + w / 2, y: y + 11, value: label, size: 10, color: "#92400e", anchor: "center" }),
+  ];
+}
+
+// ─── Line helpers (no arrowhead) ─────────────────────────────────────────────
+
+function hline({ x, y, w, color = C.border, dashed = false }) {
+  return [{
+    ...base({ roundness: { type: 2 } }),
+    type: "arrow",
+    x, y, width: w, height: 0,
+    points: [[0, 0], [w, 0]],
+    strokeColor: color,
+    strokeStyle: dashed ? "dashed" : "solid",
+    strokeWidth: 1,
+    roughness: 1,
+    startArrowhead: null,
+    endArrowhead: null,
+  }];
+}
+
+function vline({ x, y, h, color = C.border, dashed = false }) {
+  return [{
+    ...base({ roundness: { type: 2 } }),
+    type: "arrow",
+    x, y, width: 0, height: h,
+    points: [[0, 0], [0, h]],
+    strokeColor: color,
+    strokeStyle: dashed ? "dashed" : "solid",
+    strokeWidth: 1,
+    roughness: 1,
+    startArrowhead: null,
+    endArrowhead: null,
+  }];
+}
+
+// ─── Entity box (UML-style with header + attribute body) ─────────────────────
+
+function entityBox({ x, y, name, attrs = [], isEnum = false,
+                     headerBg = C.sysBg, stroke = C.sysBdr }) {
+  const W = 190, LH = 17;
+  const hdrH = isEnum ? 36 : 28;
+  const bodyH = attrs.length > 0 ? attrs.length * LH + 8 : 0;
+  const H = hdrH + bodyH;
+  const els = [];
+
+  // Full outer box (white body background + visible border)
+  els.push({
+    ...base(), type: "rectangle", x, y, width: W, height: H,
+    backgroundColor: "#ffffff", strokeColor: stroke,
+    roundness: { type: 3, value: 4 }, strokeWidth: 1.5,
+  });
+
+  // Header colored overlay (strokeColor = headerBg so border blends into fill)
+  els.push({
+    ...base(), type: "rectangle", x, y, width: W, height: hdrH,
+    backgroundColor: headerBg, strokeColor: headerBg,
+    roundness: { type: 3, value: 4 }, strokeWidth: 1,
+  });
+
+  // Separator between header and body
+  if (attrs.length > 0) {
+    els.push(...hline({ x, y: y + hdrH, w: W, color: stroke }));
+  }
+
+  // Name
+  if (isEnum) {
+    els.push(text({ x: x + W / 2, y: y + 11, value: "«enum»", size: 8.5, color: C.muted, anchor: "center" }));
+    els.push(text({ x: x + W / 2, y: y + 26, value: name, size: 11, bold: true, color: C.text, anchor: "center" }));
+  } else {
+    els.push(text({ x: x + W / 2, y: y + hdrH / 2, value: name, size: 11, bold: true, color: C.text, anchor: "center" }));
+  }
+
+  // Attributes
+  for (let i = 0; i < attrs.length; i++) {
+    els.push(text({ x: x + 7, y: y + hdrH + 4 + i * LH + LH / 2, value: attrs[i], size: 9.5, color: C.text }));
+  }
+
+  const [cx, cy] = [x + W / 2, y + H / 2];
+  return {
+    els, x, y, w: W, h: H, cx, cy,
+    midLeft:   { x,       y: cy },
+    midRight:  { x: x + W, y: cy },
+    midTop:    { x: cx,    y },
+    midBottom: { x: cx,    y: y + H },
+  };
+}
+
+function excalidraw(elements) {
+  return JSON.stringify({
+    type: "excalidraw",
+    version: 2,
+    source: "generated",
+    elements,
+    appState: { gridSize: null, viewBackgroundColor: C.bg },
+    files: {},
+  }, null, 2);
+}
+
+// ─── Diagram 1 — System Context ───────────────────────────────────────────────
+
+function systemContext() {
+  _id = 1;
+  const els = [];
+
+  els.push(text({ x: 540, y: 28, value: "Axis Platform — System Context", size: 18, bold: true, color: C.text, anchor: "center" }));
+
+  function actor(x, y, label, sub) {
+    els.push(...rect({ x: x - 22, y, w: 44, h: 44, bg: "#e0f2fe", stroke: "#0284c7", rx: 22, label: "👤", labelSize: 18 }));
+    els.push(text({ x, y: y + 56, value: label, size: 12, bold: true, anchor: "center" }));
+    if (sub) els.push(text({ x, y: y + 72, value: sub, size: 10, color: C.muted, anchor: "center" }));
+  }
+
+  actor(105, 195, "Org Admin", "[builds workflows & forms]");
+  actor(105, 460, "End User", "[submits forms, views pages]");
+
+  // Platform boundary
+  els.push(...rect({ x: 230, y: 65, w: 600, h: 650, bg: "#f0f9ff", stroke: C.sysBdr, label: "Axis Platform", labelSize: 14, labelBold: true, labelColor: C.sysBdr }));
+
+  // Inside platform — col 1 (left)
+  els.push(...rect({ x: 268, y: 120, w: 240, h: 70, bg: C.sysBg, stroke: C.sysBdr, label: "Web Application", sub: "React 18 + TypeScript" }));
+  els.push(...rect({ x: 268, y: 250, w: 240, h: 70, bg: C.sysBg, stroke: C.sysBdr, label: "API Server", sub: "ASP.NET Core 8 · Modular Monolith" }));
+  els.push(...rect({ x: 268, y: 395, w: 240, h: 70, bg: C.infraBg, stroke: C.infraBdr, label: "PostgreSQL 16", sub: "Per-module databases" }));
+  els.push(...rect({ x: 268, y: 505, w: 240, h: 70, bg: C.infraBg, stroke: C.infraBdr, label: "Redis 7", sub: "Cache · Session" }));
+
+  // Inside platform — col 2 (right)
+  els.push(...rect({ x: 558, y: 250, w: 220, h: 70, bg: C.modBg, stroke: C.modBdr, label: "Wolverine", sub: "Event bus · Durable outbox" }));
+  els.push(...rect({ x: 558, y: 395, w: 220, h: 70, bg: C.infraBg, stroke: C.infraBdr, label: "AWS S3", sub: "File storage" }));
+
+  // External services
+  els.push(...rect({ x: 890, y: 200, w: 170, h: 70, bg: C.extBg, stroke: C.extBdr, label: "Email Service", sub: "SMTP / MailKit" }));
+  els.push(...rect({ x: 890, y: 395, w: 170, h: 70, bg: C.extBg, stroke: C.extBdr, label: "External APIs", sub: "HTTP Request steps" }));
+
+  // Org Admin → Web App
+  els.push(...routedArrow({ waypoints: [[149, 217], [248, 217], [248, 155], [268, 155]], label: "HTTPS" }));
+  // End User → API Server (direct)
+  els.push(...routedArrow({ waypoints: [[149, 482], [248, 482], [248, 285], [268, 285]], label: "HTTPS" }));
+  // Web App → API Server
+  els.push(...arrow({ x1: 388, y1: 190, x2: 388, y2: 250, label: "REST / WS" }));
+  // API Server → PostgreSQL (straight down)
+  els.push(...arrow({ x1: 388, y1: 320, x2: 388, y2: 395 }));
+  // API Server → Redis (route around left to avoid crossing PostgreSQL)
+  els.push(...routedArrow({ waypoints: [[268, 285], [248, 285], [248, 540], [268, 540]] }));
+  // API Server → Wolverine
+  els.push(...arrow({ x1: 508, y1: 285, x2: 558, y2: 285 }));
+  // Wolverine → S3 (straight down)
+  els.push(...arrow({ x1: 668, y1: 320, x2: 668, y2: 395 }));
+  // Wolverine → Email (right then up)
+  els.push(...routedArrow({ waypoints: [[778, 270], [840, 270], [840, 235], [890, 235]] }));
+  // Wolverine → External APIs (right then down)
+  els.push(...routedArrow({ waypoints: [[778, 305], [840, 305], [840, 430], [890, 430]] }));
+
+  return excalidraw(els);
+}
+
+// ─── Diagram 2 — Container ────────────────────────────────────────────────────
+
+function containerDiagram() {
+  _id = 1;
+  const els = [];
+
+  els.push(text({ x: 565, y: 25, value: "Axis Platform — Container Diagram", size: 18, bold: true, color: C.text, anchor: "center" }));
+
+  // Platform boundary (right edge x=810)
+  els.push(...rect({ x: 50, y: 55, w: 760, h: 620, bg: "#f0f9ff", stroke: C.sysBdr }));
+  els.push(text({ x: 430, y: 80, value: "API Server — ASP.NET Core 8 Modular Monolith", size: 14, bold: true, color: C.sysBdr, anchor: "center" }));
+
+  // Modules — row 1 (y=105) and row 2 (y=245), 65px gap between rows
+  const MW = 165, MH = 75;
+  const modules = [
+    { label: "Identity",        x: 70,  y: 105 },
+    { label: "DataModeling",    x: 250, y: 105 },
+    { label: "WorkflowBuilder", x: 430, y: 105 },
+    { label: "FormBuilder",     x: 70,  y: 245 },
+    { label: "WorkflowEngine",  x: 250, y: 245 },
+    { label: "PageBuilder",     x: 430, y: 245 },
+  ];
+  for (const m of modules) {
+    els.push(...rect({ x: m.x, y: m.y, w: MW, h: MH, bg: C.modBg, stroke: C.modBdr, label: m.label, labelSize: 12 }));
+  }
+
+  // Wolverine event bus (55px gap below row 2 bottom at y=320)
+  els.push(...rect({ x: 70, y: 375, w: 550, h: 60, bg: C.evtBg, stroke: C.evtBdr,
+    label: "Wolverine — Event Bus + Durable Outbox (per-module)",
+    sub: "In-process · At-least-once delivery · Per-module outbox tables", labelSize: 12 }));
+
+  // OpenIddict + SignalR
+  els.push(...rect({ x: 70,  y: 465, w: 250, h: 55, bg: C.sysBg, stroke: C.sysBdr,
+    label: "OpenIddict 5.x", sub: "OAuth2/OIDC · Auth Code + PKCE" }));
+  els.push(...rect({ x: 335, y: 465, w: 285, h: 55, bg: C.sysBg, stroke: C.sysBdr,
+    label: "SignalR", sub: "Real-time execution status" }));
+
+  // Web Application band (bottom of platform)
+  els.push(...rect({ x: 50, y: 545, w: 760, h: 55, bg: C.sysBg, stroke: C.sysBdr,
+    label: "Web Application",
+    sub: "React 18 + TypeScript + Vite · shadcn/ui · React Flow · dnd-kit · TanStack Query · Zustand" }));
+
+  // DB column (right side; arrows from platform right edge x=810 → DB left edge x=870, 60px each)
+  const DBX = 870, DBW = 190, DBH = 55, DBGap = 10;
+  els.push(text({ x: DBX + DBW / 2, y: 65, value: "Per-Module Databases (PostgreSQL 16)", size: 12, bold: true, color: C.infraBdr, anchor: "center" }));
+
+  const dbs = [
+    { label: "axis_identity", sub: "public schema",         y: 100 },
+    { label: "axis_dm",       sub: "tenant schema per org", y: 100 + (DBH + DBGap) },
+    { label: "axis_wb",       sub: "wolverine outbox",      y: 100 + (DBH + DBGap) * 2 },
+    { label: "axis_we",       sub: "wolverine outbox",      y: 100 + (DBH + DBGap) * 3 },
+    { label: "axis_fb",       sub: "wolverine outbox",      y: 100 + (DBH + DBGap) * 4 },
+  ];
+  for (const db of dbs) {
+    els.push(...rect({ x: DBX, y: db.y, w: DBW, h: DBH, bg: C.infraBg, stroke: C.infraBdr, label: db.label, sub: db.sub, labelSize: 11 }));
+    els.push(...arrow({ x1: 810, y1: db.y + DBH / 2, x2: DBX, y2: db.y + DBH / 2, color: C.infraBdr }));
+  }
+
+  // Other infrastructure (right side, below DB column)
+  els.push(...rect({ x: DBX, y: 460, w: DBW, h: DBH, bg: C.infraBg, stroke: C.infraBdr, label: "Redis 7",       sub: "Cache · Session · Schema name" }));
+  els.push(...rect({ x: DBX, y: 530, w: DBW, h: DBH, bg: C.extBg,  stroke: C.extBdr,  label: "AWS S3",        sub: "File storage" }));
+  els.push(...rect({ x: DBX, y: 600, w: DBW, h: DBH, bg: C.extBg,  stroke: C.extBdr,  label: "Email Service", sub: "SMTP · MailKit" }));
+  els.push(...arrow({ x1: 810, y1: 487, x2: DBX, y2: 487, color: C.arrow }));
+
+  return excalidraw(els);
+}
+
+// ─── Diagram 3 — Module Overview (event-driven) ───────────────────────────────
+
+function moduleOverview() {
+  _id = 1;
+  const els = [];
+
+  els.push(text({ x: 530, y: 25, value: "Axis — Module Communication (Event-Driven)", size: 18, bold: true, color: C.text, anchor: "center" }));
+  els.push(text({ x: 530, y: 50, value: "Modules are data-sovereign. Cross-module communication via Wolverine domain events only — no shared DB access.", size: 11, color: C.muted, anchor: "center" }));
+
+  // Shared Kernel spans all 4 row-1 modules (x=60 to x=935)
+  els.push(...rect({ x: 60, y: 75, w: 875, h: 50, bg: "#e2e8f0", stroke: C.border,
+    label: "Shared Kernel  —  Domain Primitives · CQRS Abstractions · Multi-Tenancy · Event Bus", labelSize: 12 }));
+
+  function module(x, y, label, sub, color = { bg: C.modBg, stroke: C.modBdr }) {
+    return rect({ x, y, w: 200, h: 80, bg: color.bg, stroke: color.stroke, label, sub, labelSize: 13, labelBold: true });
+  }
+
+  // Row 1 (y=155): 4 modules with 25px gaps
+  els.push(...module(60,  155, "Identity",        "Auth · Users · Roles · RBAC", { bg: "#ede9fe", stroke: "#7c3aed" }));
+  els.push(...module(285, 155, "DataModeling",    "Models · Records · Data Classes"));
+  els.push(...module(510, 155, "WorkflowBuilder", "Definitions · Steps · Triggers"));
+  els.push(...module(735, 155, "FormBuilder",     "Forms · Fields · Submissions"));
+
+  // Event bus between rows (y=295; 60px gap below row 1 bottom at y=235)
+  els.push(...rect({ x: 60, y: 295, w: 875, h: 35, bg: C.evtBg, stroke: C.evtBdr }));
+  els.push(text({ x: 497, y: 312, value: "Wolverine Domain Event Bus  (durable outbox per module DB — at-least-once delivery)", size: 11, color: "#92400e", anchor: "center" }));
+
+  // Event badges (y=345; 15px gap below event bus bottom at y=330)
+  const events = [
+    { label: "WorkflowPublished",  x: 65 },
+    { label: "WorkflowArchived",   x: 220 },
+    { label: "WorkflowUnarchived", x: 380 },
+    { label: "FormCreated",        x: 545 },
+    { label: "FormTaskCreated",    x: 695 },
+    { label: "ExecutionStarted",   x: 830 },
+  ];
+  for (const e of events) {
+    els.push(...badge({ x: e.x, y: 345, label: e.label }));
+  }
+
+  // Row 2 (y=415; 85px gap below event bus bottom at y=330, clear of badges)
+  els.push(...module(285, 415, "WorkflowEngine", "Executions · Step Handlers"));
+  els.push(...module(510, 415, "PageBuilder",    "Pages · Widgets · Bindings", { bg: "#fce7f3", stroke: "#be185d" }));
+
+  // Arrows
+  // WorkflowBuilder (center x=610, bottom y=235) → event bus top (y=295)
+  els.push(...arrow({ x1: 610, y1: 235, x2: 610, y2: 295, color: C.evtBdr, label: "publishes" }));
+  // Event bus bottom (y=330) → WorkflowEngine top (center x=385, y=415)
+  els.push(...arrow({ x1: 385, y1: 330, x2: 385, y2: 415, color: C.evtBdr, label: "consumes" }));
+  // Event bus top (y=295) → FormBuilder bottom (center x=835, y=235) — FormBuilder is above the bus
+  els.push(...arrow({ x1: 835, y1: 295, x2: 835, y2: 235, color: C.evtBdr, label: "consumes" }));
+  // WorkflowEngine (bottom y=495) → reads own local copy
+  els.push(...arrow({ x1: 385, y1: 495, x2: 385, y2: 540, color: C.muted, dashed: true, label: "reads own copy" }));
+
+  // Legend
+  els.push(...rect({ x: 60, y: 560, w: 230, h: 105, bg: "transparent", stroke: C.border }));
+  els.push(text({ x: 175, y: 577, value: "Legend", size: 11, bold: true, anchor: "center" }));
+  els.push(...rect({ x: 75, y: 590, w: 16, h: 16, bg: C.modBg, stroke: C.modBdr }));
+  els.push(text({ x: 100, y: 598, value: "Module (owns its DB)", size: 10 }));
+  els.push(...rect({ x: 75, y: 614, w: 16, h: 16, bg: C.evtBg, stroke: C.evtBdr }));
+  els.push(text({ x: 100, y: 622, value: "Domain Event", size: 10 }));
+  els.push(...arrow({ x1: 75, y1: 638, x2: 107, y2: 638, color: C.evtBdr }));
+  els.push(text({ x: 112, y: 638, value: "Event-driven", size: 10 }));
+  els.push(...arrow({ x1: 75, y1: 653, x2: 107, y2: 653, color: C.muted, dashed: true }));
+  els.push(text({ x: 112, y: 653, value: "Local copy (denormalized)", size: 10 }));
+
+  return excalidraw(els);
+}
+
+// ─── Sequence diagram shared helpers ─────────────────────────────────────────
+
+function seqBuild({ title, participants, gap = 165, messages, sections = [], notes = [] }) {
+  const els = [];
+  const BOX_W = 125, BOX_H = 42, BOX_Y = 48;
+  const LIFE_TOP = BOX_Y + BOX_H;
+  const LIFE_BOT = messages.reduce((max, m) => Math.max(max, m.y), 0) + 50;
+
+  // Compute cx first — CANVAS_W depends on it
+  const ps = participants.map((p, i) => ({ ...p, cx: 60 + i * gap }));
+  const CANVAS_W = ps[ps.length - 1].cx + BOX_W / 2 + 30;
+
+  // Title
+  els.push(text({ x: CANVAS_W / 2, y: 20, value: title, size: 15, bold: true, color: C.text, anchor: "center" }));
+
+  // Participant boxes + lifelines
+  for (const p of ps) {
+    const boxBg = p.db ? C.infraBg : p.external ? C.extBg : C.sysBg;
+    const boxStroke = p.db ? C.infraBdr : p.external ? C.extBdr : C.sysBdr;
+    els.push(...rect({ x: p.cx - BOX_W / 2, y: BOX_Y, w: BOX_W, h: BOX_H, bg: boxBg, stroke: boxStroke, label: p.label, sub: p.sub, labelSize: 10, labelBold: false }));
+    els.push(...vline({ x: p.cx, y: LIFE_TOP, h: LIFE_BOT - LIFE_TOP, color: "#94a3b8", dashed: true }));
+  }
+
+  // Section dividers
+  for (const s of sections) {
+    els.push(...hline({ x: 20, y: s.y, w: CANVAS_W - 40, color: "#94a3b8", dashed: true }));
+    els.push(text({ x: CANVAS_W / 2, y: s.y + 12, value: `== ${s.label} ==`, size: 10, bold: true, color: C.muted, anchor: "center" }));
+  }
+
+  // Messages
+  for (const m of messages) {
+    const from = ps[m.from];
+    const to = ps[m.to];
+    els.push(...arrow({ x1: from.cx, y1: m.y, x2: to.cx, y2: m.y, label: m.label, dashed: m.dashed }));
+  }
+
+  // Notes (info boxes at bottom)
+  for (const n of notes) {
+    els.push(...rect({ x: n.x, y: n.y, w: n.w || 400, h: n.h || 32, bg: C.evtBg, stroke: C.evtBdr, label: n.label, labelSize: 10 }));
+  }
+
+  return excalidraw(els);
+}
+
+// ─── E01 — Tenant Provisioning ───────────────────────────────────────────────
+
+function tenantProvisioningDiagram() {
+  _id = 1;
+  const GAP = 165;
+  return seqBuild({
+    title: "Tenant Registration & Provisioning Flow",
+    gap: GAP,
+    participants: [
+      { label: "New Admin" },
+      { label: "Web App" },
+      { label: "API Server" },
+      { label: "Email", sub: "Service", external: true },
+      { label: "Wolverine", sub: "(Jobs)" },
+      { label: "PostgreSQL", sub: "(public)", db: true },
+      { label: "PostgreSQL", sub: "(tenant)", db: true },
+    ],
+    sections: [
+      { y: 342, label: "Email Verification" },
+      { y: 570, label: "Async Provisioning" },
+    ],
+    messages: [
+      { from: 0, to: 1, y: 160, label: "Fill registration form" },
+      { from: 1, to: 2, y: 200, label: "POST /auth/register" },
+      { from: 2, to: 5, y: 240, label: "Save org (PENDING) + user" },
+      { from: 2, to: 3, y: 280, label: "Send verification email" },
+      { from: 2, to: 1, y: 312, label: "202 Accepted", dashed: true },
+
+      { from: 0, to: 1, y: 368, label: "Click verification link" },
+      { from: 1, to: 2, y: 408, label: "POST /auth/verify-email" },
+      { from: 2, to: 5, y: 448, label: "Mark VERIFIED + PROVISIONING" },
+      { from: 2, to: 4, y: 488, label: "Enqueue ProvisionTenantJob" },
+      { from: 2, to: 1, y: 528, label: "200 OK → Redirect", dashed: true },
+
+      { from: 4, to: 5, y: 600, label: "Generate schema name" },
+      { from: 4, to: 6, y: 640, label: "CREATE SCHEMA tenant_{slug}" },
+      { from: 4, to: 6, y: 680, label: "Run EF Core migrations" },
+      { from: 4, to: 5, y: 720, label: "Assign Admin role + ACTIVE" },
+      { from: 4, to: 3, y: 760, label: "Send Welcome email" },
+    ],
+    notes: [
+      { x: 20, y: 800, w: 560, h: 30, label: "UI polls org.status = ACTIVE then shows dashboard" },
+    ],
+  });
+}
+
+// ─── E02 — Auth Flow ─────────────────────────────────────────────────────────
+
+function authFlowDiagram() {
+  _id = 1;
+  return seqBuild({
+    title: "Authentication Flow — JWT + Refresh Token",
+    gap: 175,
+    participants: [
+      { label: "User" },
+      { label: "Web App", sub: "(React SPA)" },
+      { label: "API Server", sub: "(OpenIddict)" },
+      { label: "Redis", sub: "(token blacklist)", db: true },
+      { label: "PostgreSQL", db: true },
+    ],
+    sections: [
+      { y: 140, label: "Sign In" },
+      { y: 320, label: "Authenticated Request" },
+      { y: 490, label: "Silent Token Refresh" },
+      { y: 640, label: "Sign Out" },
+    ],
+    messages: [
+      { from: 0, to: 1, y: 168, label: "Enter email + password" },
+      { from: 1, to: 2, y: 208, label: "POST /auth/token" },
+      { from: 2, to: 4, y: 248, label: "Validate credentials" },
+      { from: 2, to: 1, y: 288, label: "{access_token, refresh_token}", dashed: true },
+
+      { from: 0, to: 1, y: 348, label: "Navigate / perform action" },
+      { from: 1, to: 2, y: 388, label: "GET /resource (Bearer token)" },
+      { from: 2, to: 2, y: 428, label: "Validate JWT + set tenant" },
+      { from: 2, to: 1, y: 460, label: "200 OK + data", dashed: true },
+
+      { from: 1, to: 2, y: 518, label: "POST /auth/refresh (httpOnly cookie)" },
+      { from: 2, to: 4, y: 558, label: "Validate + rotate refresh token" },
+      { from: 2, to: 1, y: 598, label: "{new access_token, new refresh_token}", dashed: true },
+
+      { from: 0, to: 1, y: 668, label: "Click Sign Out" },
+      { from: 1, to: 2, y: 708, label: "POST /auth/signout" },
+      { from: 2, to: 3, y: 748, label: "Blacklist access_token JTI" },
+      { from: 2, to: 4, y: 788, label: "Revoke refresh token" },
+      { from: 2, to: 1, y: 828, label: "200 OK", dashed: true },
+    ],
+  });
+}
+
+// ─── E06 — Execution Flow ─────────────────────────────────────────────────────
+
+function executionFlowDiagram() {
+  _id = 1;
+  return seqBuild({
+    title: "Workflow Execution Flow",
+    gap: 160,
+    participants: [
+      { label: "Trigger", sub: "(Manual/Webhook)" },
+      { label: "Execution", sub: "Orchestrator" },
+      { label: "Step Handler", sub: "(per type)" },
+      { label: "Wolverine", sub: "(Jobs)" },
+      { label: "PostgreSQL", db: true },
+      { label: "SignalR Hub" },
+      { label: "Browser", external: true },
+    ],
+    sections: [
+      { y: 140, label: "Execution Start" },
+      { y: 390, label: "Step Execution Loop" },
+      { y: 750, label: "Execution Complete" },
+    ],
+    messages: [
+      { from: 0, to: 1, y: 168, label: "Start(workflowId, inputPayload)" },
+      { from: 1, to: 4, y: 208, label: "Create Execution (PENDING)" },
+      { from: 1, to: 4, y: 248, label: "Create StepExecution records" },
+      { from: 1, to: 3, y: 288, label: "Enqueue ExecuteNextStep" },
+      { from: 1, to: 5, y: 328, label: "ExecutionStarted event" },
+      { from: 5, to: 6, y: 360, label: "Push status update" },
+
+      { from: 3, to: 1, y: 418, label: "ExecuteNextStep(executionId)" },
+      { from: 1, to: 4, y: 458, label: "Update step (RUNNING)" },
+      { from: 1, to: 5, y: 490, label: "StepStarted event" },
+      { from: 1, to: 2, y: 530, label: "Execute(stepDefinition, context)" },
+      { from: 2, to: 4, y: 570, label: "[Form] Create FormTask (PENDING)" },
+      { from: 2, to: 3, y: 610, label: "[Form] Enqueue notification" },
+      { from: 2, to: 1, y: 650, label: "[Sync] StepResult(success, output)", dashed: true },
+      { from: 1, to: 4, y: 688, label: "Update step (COMPLETED)" },
+      { from: 1, to: 3, y: 720, label: "Enqueue ExecuteNextStep" },
+
+      { from: 1, to: 4, y: 778, label: "Update execution (COMPLETED)" },
+      { from: 1, to: 5, y: 818, label: "ExecutionCompleted event" },
+      { from: 5, to: 6, y: 858, label: "Push status update" },
+    ],
+  });
+}
+
+// ─── Entity diagram shared helpers ───────────────────────────────────────────
+
+function entityRelArrow(a, b, label, opts = {}) {
+  const { fromSide = "right", toSide = "left", dashed = false } = opts;
+  const p1 = a[`mid${fromSide.charAt(0).toUpperCase() + fromSide.slice(1)}`];
+  const p2 = b[`mid${toSide.charAt(0).toUpperCase() + toSide.slice(1)}`];
+  return arrow({ x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, label, dashed });
+}
+
+// ─── E03 — Data Model ────────────────────────────────────────────────────────
+
+function dataModelDiagram() {
+  _id = 1;
+  const els = [];
+
+  els.push(text({ x: 500, y: 20, value: "Data Modeling — Core Entity Relationships", size: 16, bold: true, color: C.text, anchor: "center" }));
+
+  const mdl = entityBox({ x: 40, y: 60, name: "ModelDefinition", headerBg: C.sysBg, stroke: C.sysBdr,
+    attrs: ["+id: UUID", "+name: string", "+slug: string", "+description: string", "+icon: string", "+color: string", "+createdAt: DateTime", "+updatedAt: DateTime"] });
+
+  const fld = entityBox({ x: 280, y: 60, name: "FieldDefinition", headerBg: C.sysBg, stroke: C.sysBdr,
+    attrs: ["+id: UUID", "+modelId: UUID", "+name: string", "+label: string", "+type: FieldType", "+required: boolean", "+displayOrder: int", "+config: JSONB", "+createdAt: DateTime"] });
+
+  const ftype = entityBox({ x: 520, y: 60, name: "FieldType", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
+    attrs: ["Text", "Number", "Boolean", "Date", "Enum", "Relation", "DataClass", "File", "JSON"] });
+
+  const dcd = entityBox({ x: 40, y: 350, name: "DataClassDefinition", headerBg: C.sysBg, stroke: C.sysBdr,
+    attrs: ["+id: UUID", "+name: string", "+description: string", "+createdAt: DateTime", "+updatedAt: DateTime"] });
+
+  const dcf = entityBox({ x: 280, y: 350, name: "DataClassField", headerBg: C.sysBg, stroke: C.sysBdr,
+    attrs: ["+id: UUID", "+dataClassId: UUID", "+name: string", "+label: string", "+type: FieldType", "+required: boolean", "+displayOrder: int", "+config: JSONB"] });
+
+  const rec = entityBox({ x: 40, y: 620, name: "Record", headerBg: C.modBg, stroke: C.modBdr,
+    attrs: ["+id: UUID", "+modelId: UUID", "+data: JSONB", "+createdAt: DateTime", "+updatedAt: DateTime", "+createdBy: UUID"] });
+
+  for (const b of [mdl, fld, ftype, dcd, dcf, rec]) els.push(...b.els);
+
+  // Relationships
+  els.push(...arrow({ x1: mdl.midRight.x, y1: mdl.midRight.y, x2: fld.midLeft.x, y2: fld.midLeft.y, label: "1 *--" }));
+  els.push(...arrow({ x1: fld.midRight.x, y1: fld.midRight.y, x2: ftype.midLeft.x, y2: ftype.midLeft.y, label: "has type" }));
+  els.push(...arrow({ x1: dcd.midRight.x, y1: dcd.midRight.y, x2: dcf.midLeft.x, y2: dcf.midLeft.y, label: "1 *--" }));
+  // dcf → ftype: route right to ftype.midBottom.x then up to ftype.midBottom
+  els.push(...routedArrow({ waypoints: [[dcf.midRight.x, dcf.midRight.y + 20], [ftype.midBottom.x, dcf.midRight.y + 20], [ftype.midBottom.x, ftype.midBottom.y]], label: "has type", dashed: true }));
+  // fld → dcd: route down to midpoint y, left, then down to dcd.midTop
+  els.push(...routedArrow({ waypoints: [[fld.midBottom.x - 20, fld.midBottom.y], [fld.midBottom.x - 20, 300], [dcd.midTop.x + 20, 300], [dcd.midTop.x + 20, dcd.midTop.y]], label: "→ DataClass ref", dashed: true }));
+  // rec → mdl: route left of all boxes to avoid crossing dcd
+  els.push(...routedArrow({ waypoints: [[rec.midLeft.x, rec.midLeft.y], [10, rec.midLeft.y], [10, mdl.midLeft.y], [mdl.midLeft.x, mdl.midLeft.y]], label: "instance of", dashed: true }));
+
+  return excalidraw(els);
+}
+
+// ─── E04 — Workflow Model ────────────────────────────────────────────────────
+
+function workflowModelDiagram() {
+  _id = 1;
+  const els = [];
+
+  els.push(text({ x: 600, y: 20, value: "Workflow Builder — Core Entity Relationships", size: 16, bold: true, color: C.text, anchor: "center" }));
+
+  const wfd = entityBox({ x: 40, y: 60, name: "WorkflowDefinition", headerBg: C.modBg, stroke: C.modBdr,
+    attrs: ["+id: UUID", "+name: string", "+slug: string", "+description: string", "+status: WorkflowStatus", "+version: int", "+createdAt: DateTime", "+updatedAt: DateTime"] });
+
+  const wfs = entityBox({ x: 40, y: 360, name: "WorkflowStatus", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
+    attrs: ["Draft", "Active", "Archived"] });
+
+  const trig = entityBox({ x: 290, y: 60, name: "TriggerConfig", headerBg: C.sysBg, stroke: C.sysBdr,
+    attrs: ["+id: UUID", "+workflowId: UUID", "+type: TriggerType", "+config: JSONB"] });
+
+  const trigType = entityBox({ x: 290, y: 290, name: "TriggerType", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
+    attrs: ["Manual", "Schedule", "Webhook", "Event"] });
+
+  const step = entityBox({ x: 540, y: 60, name: "StepDefinition", headerBg: C.sysBg, stroke: C.sysBdr,
+    attrs: ["+id: UUID", "+workflowId: UUID", "+name: string", "+type: StepType", "+config: JSONB", "+positionX: float", "+positionY: float", "+displayOrder: int"] });
+
+  const stepType = entityBox({ x: 540, y: 360, name: "StepType", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
+    attrs: ["Form", "HttpRequest", "Condition", "Script", "Notification"] });
+
+  const trans = entityBox({ x: 790, y: 60, name: "Transition", headerBg: C.sysBg, stroke: C.sysBdr,
+    attrs: ["+id: UUID", "+workflowId: UUID", "+fromStepId: UUID", "+toStepId: UUID", "+label: string", "+condition: string", "+displayOrder: int"] });
+
+  const pg = entityBox({ x: 790, y: 340, name: "ParallelGroup", headerBg: C.sysBg, stroke: C.sysBdr,
+    attrs: ["+id: UUID", "+workflowId: UUID", "+name: string", "+joinType: JoinType"] });
+
+  const jt = entityBox({ x: 790, y: 520, name: "JoinType", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
+    attrs: ["WaitAll", "WaitAny"] });
+
+  for (const b of [wfd, wfs, trig, trigType, step, stepType, trans, pg, jt]) els.push(...b.els);
+
+  // Relationships
+  els.push(...arrow({ x1: wfd.midBottom.x, y1: wfd.midBottom.y, x2: wfs.midTop.x, y2: wfs.midTop.y, label: "status" }));
+  els.push(...arrow({ x1: wfd.midRight.x, y1: wfd.midRight.y - 10, x2: trig.midLeft.x, y2: trig.midLeft.y, label: "1 -- 1" }));
+  els.push(...arrow({ x1: wfd.midRight.x, y1: wfd.midRight.y + 10, x2: step.midLeft.x, y2: step.midLeft.y, label: "1 *--" }));
+  // wfd → trans: route above all boxes to avoid crossing step
+  els.push(...routedArrow({ waypoints: [[wfd.midRight.x, wfd.midRight.y + 30], [wfd.midRight.x, 30], [trans.midTop.x, 30], [trans.midTop.x, trans.midTop.y]], label: "1 *--" }));
+  els.push(...arrow({ x1: trig.midBottom.x, y1: trig.midBottom.y, x2: trigType.midTop.x, y2: trigType.midTop.y, label: "type" }));
+  els.push(...arrow({ x1: step.midBottom.x, y1: step.midBottom.y, x2: stepType.midTop.x, y2: stepType.midTop.y, label: "type" }));
+  els.push(...arrow({ x1: pg.midBottom.x, y1: pg.midBottom.y, x2: jt.midTop.x, y2: jt.midTop.y, label: "joinType" }));
+  // step → pg: route right then down
+  els.push(...routedArrow({ waypoints: [[step.midRight.x, step.midRight.y + 20], [760, step.midRight.y + 20], [760, pg.midLeft.y], [pg.midLeft.x, pg.midLeft.y]], label: "0..1", dashed: true }));
+
+  return excalidraw(els);
+}
+
+// ─── E05 — Form Model ────────────────────────────────────────────────────────
+
+function formModelDiagram() {
+  _id = 1;
+  const els = [];
+
+  els.push(text({ x: 520, y: 20, value: "Form Builder — Core Entity Relationships", size: 16, bold: true, color: C.text, anchor: "center" }));
+
+  const fdef = entityBox({ x: 40, y: 60, name: "FormDefinition", headerBg: C.infraBg, stroke: C.infraBdr,
+    attrs: ["+id: UUID", "+name: string", "+description: string", "+organizationId: UUID", "+createdAt: DateTime", "+updatedAt: DateTime"] });
+
+  const fsec = entityBox({ x: 290, y: 60, name: "FormSection", headerBg: C.sysBg, stroke: C.sysBdr,
+    attrs: ["+id: UUID", "+formId: UUID", "+title: string", "+description: string", "+displayOrder: int"] });
+
+  const fft = entityBox({ x: 540, y: 60, name: "FormFieldType", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
+    attrs: ["Text", "Number", "Boolean", "Date", "Dropdown", "MultiSelect", "Checkbox", "FileUpload", "RelationPicker"] });
+
+  const ffield = entityBox({ x: 290, y: 300, name: "FormFieldDefinition", headerBg: C.sysBg, stroke: C.sysBdr,
+    attrs: ["+id: UUID", "+formId: UUID", "+key: string", "+label: string", "+type: FormFieldType", "+required: boolean", "+displayOrder: int", "+config: JSONB"] });
+
+  const ftask = entityBox({ x: 40, y: 440, name: "FormTask", headerBg: C.modBg, stroke: C.modBdr,
+    attrs: ["+id: UUID", "+formId: UUID", "+executionId: UUID", "+stepId: UUID", "+assigneeId: UUID", "+status: FormTaskStatus", "+token: string", "+expiresAt: DateTime", "+createdAt: DateTime"] });
+
+  const fts = entityBox({ x: 40, y: 730, name: "FormTaskStatus", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
+    attrs: ["Pending", "Completed", "Expired", "Cancelled"] });
+
+  const fsub = entityBox({ x: 290, y: 590, name: "FormSubmission", headerBg: C.sysBg, stroke: C.sysBdr,
+    attrs: ["+id: UUID", "+formTaskId: UUID", "+submittedBy: UUID", "+submittedAt: DateTime", "+data: JSONB"] });
+
+  for (const b of [fdef, fsec, fft, ffield, ftask, fts, fsub]) els.push(...b.els);
+
+  // Relationships
+  els.push(...arrow({ x1: fdef.midRight.x, y1: fdef.midRight.y - 8, x2: fsec.midLeft.x, y2: fsec.midLeft.y, label: "1 *--" }));
+  // fdef → ffield: route right then down then right
+  els.push(...routedArrow({ waypoints: [[fdef.midRight.x, fdef.midRight.y + 8], [260, fdef.midRight.y + 8], [260, ffield.midLeft.y], [ffield.midLeft.x, ffield.midLeft.y]], label: "1 *--" }));
+  // ffield → fft: route right to fft.midBottom.x then up to fft.midBottom
+  els.push(...routedArrow({ waypoints: [[ffield.midRight.x, ffield.midRight.y], [fft.midBottom.x, ffield.midRight.y], [fft.midBottom.x, fft.midBottom.y]], label: "type" }));
+  els.push(...arrow({ x1: fdef.midBottom.x, y1: fdef.midBottom.y, x2: ftask.midTop.x, y2: ftask.midTop.y, label: "→ runtime" }));
+  els.push(...arrow({ x1: ftask.midBottom.x, y1: ftask.midBottom.y, x2: fts.midTop.x, y2: fts.midTop.y, label: "status" }));
+  // ftask → fsub: route right then down
+  els.push(...routedArrow({ waypoints: [[ftask.midRight.x, ftask.midRight.y + 30], [260, ftask.midRight.y + 30], [260, fsub.midLeft.y], [fsub.midLeft.x, fsub.midLeft.y]], label: "1 -- 1" }));
+
+  return excalidraw(els);
+}
+
+// ─── Write all files ──────────────────────────────────────────────────────────
+
+const diagrams = [
+  // Top-level architecture diagrams
+  { name: "system-context",       fn: systemContext,           dir: __dir },
+  { name: "container",            fn: containerDiagram,        dir: __dir },
+  { name: "module-overview",      fn: moduleOverview,          dir: __dir },
+  // Epic-level diagrams
+  { name: "tenant-provisioning",  fn: tenantProvisioningDiagram, dir: epicDir("E01-platform-foundation") },
+  { name: "auth-flow",            fn: authFlowDiagram,           dir: epicDir("E02-identity-access") },
+  { name: "data-model",           fn: dataModelDiagram,          dir: epicDir("E03-data-modeling") },
+  { name: "workflow-model",       fn: workflowModelDiagram,      dir: epicDir("E04-workflow-builder") },
+  { name: "form-model",           fn: formModelDiagram,          dir: epicDir("E05-form-builder") },
+  { name: "execution-flow",       fn: executionFlowDiagram,      dir: epicDir("E06-workflow-engine") },
+];
+
+for (const { name, fn, dir } of diagrams) {
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, `${name}.excalidraw`);
+  writeFileSync(path, fn(), "utf8");
+  console.log(`✓ ${path.replace(join(__dir, ".."), "docs")}`);
+}
+
+console.log("\nNext: docs/scripts/generate-diagrams.ps1  (generates .svg from all .excalidraw files)");

@@ -31,7 +31,7 @@ Without this foundation, nothing else works. Every feature in every other epic r
 
 ## Diagrams
 
-![Tenant Provisioning Flow](./diagrams/tenant-provisioning.png)
+![Tenant Provisioning Flow](./diagrams/tenant-provisioning.svg)
 
 ---
 

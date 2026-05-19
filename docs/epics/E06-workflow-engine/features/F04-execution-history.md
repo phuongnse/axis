@@ -1,6 +1,6 @@
-# F04 — Execution History & Audit Log
+﻿# F04 — Execution History & Audit Log
 
-> **Wireframe**: [docs/wireframes/E06-workflow-engine/executions.excalidraw](../../../wireframes/E06-workflow-engine/executions.excalidraw) · [preview](../../../wireframes/E06-workflow-engine/executions.svg)
+> **Wireframe**: [docs/epics/E06-workflow-engine/wireframes/executions.excalidraw](../wireframes/executions.excalidraw) · [preview](../wireframes/executions.svg)
 
 [← Back to E06](../README.md)
 

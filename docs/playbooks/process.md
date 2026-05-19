@@ -85,6 +85,16 @@ For every `⚠️` found, decide explicitly:
 
 Also check cross-module Application dependencies: list every query or command the upcoming API layer will call from *other* modules' Application layers. If any are missing, add them now.
 
+**Cross-module data access sweep (mandatory before Step 5):**
+
+Run the following and inspect every result:
+
+```powershell
+grep -rn "SqlQueryRaw\|ExecuteSqlRaw\|FromSqlRaw\|ExecuteSqlInterpolated" src/Modules/ --include="*.cs"
+```
+
+For every match: confirm the SQL only references tables owned by that match's own module. Any reference to another module's table is a P0 violation — fix it using the event-driven local denormalization pattern in `patterns.md § Cross-module data pattern` before continuing.
+
 **Do not start Step 5 until every ⚠️ is resolved or explicitly documented as deferred with a reason.**
 
 #### Step 5 — API layer

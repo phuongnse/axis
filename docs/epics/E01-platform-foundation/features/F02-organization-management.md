@@ -1,9 +1,9 @@
-# F02 — Organization Management
+﻿# F02 — Organization Management
 
 [← Back to E01](../README.md)
 
-> **Wireframe**: [docs/wireframes/E01-platform-foundation/settings-org.excalidraw](../../../wireframes/E01-platform-foundation/settings-org.excalidraw) · [preview](../../../wireframes/E01-platform-foundation/settings-org.svg)
-> **Wireframe**: [docs/wireframes/E01-platform-foundation/settings-org-delete-modal.excalidraw](../../../wireframes/E01-platform-foundation/settings-org-delete-modal.excalidraw) · [preview](../../../wireframes/E01-platform-foundation/settings-org-delete-modal.svg)
+> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/settings-org.excalidraw](../wireframes/settings-org.excalidraw) · [preview](../wireframes/settings-org.svg)
+> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/settings-org-delete-modal.excalidraw](../wireframes/settings-org-delete-modal.excalidraw) · [preview](../wireframes/settings-org-delete-modal.svg)
 
 ---
 

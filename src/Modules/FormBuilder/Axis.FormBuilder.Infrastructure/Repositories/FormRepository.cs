@@ -27,13 +27,6 @@ internal sealed class FormRepository(FormBuilderDbContext context) : IFormReposi
                 && (excludeId == null || f.Id != excludeId), ct);
 
     public async Task<bool> IsReferencedByWorkflowAsync(Guid formId, CancellationToken ct = default)
-    {
-        string jsonContains = $"[{{\"type\":\"Form\",\"config\":{{\"formId\":\"{formId:D}\"}}}}]";
-        int count = await context.Database
-            .SqlQueryRaw<int>(
-                "SELECT CAST(COUNT(*) AS int) AS \"Value\" FROM workflow_definitions WHERE deleted_at IS NULL AND steps @> {0}::jsonb",
-                jsonContains)
-            .FirstAsync(ct);
-        return count > 0;
-    }
+        => await context.FormWorkflowReferences
+            .AnyAsync(r => r.FormId == formId && r.IsActive, ct);
 }

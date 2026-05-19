@@ -30,15 +30,21 @@ function Export-ExcalidrawToSvg {
     }
 }
 
-$wireframesRoot = Split-Path $PSScriptRoot -Parent | Join-Path -ChildPath "wireframes"
+$docsRoot      = Split-Path $PSScriptRoot -Parent
+$wireframesRoot = Join-Path $docsRoot "wireframes"
+$epicsRoot      = Join-Path $docsRoot "epics"
 
-$wireframes = Get-ChildItem -Path $wireframesRoot -Filter "*.excalidraw" -Recurse |
-    ForEach-Object {
-        @{
-            src = $_.FullName
-            svg = [System.IO.Path]::ChangeExtension($_.FullName, ".svg")
-        }
+# Collect from docs/wireframes/ (shared + template) and docs/epics/*/wireframes/
+$wireframes = @()
+$wireframes += Get-ChildItem -Path $wireframesRoot -Filter "*.excalidraw" -Recurse
+$wireframes += Get-ChildItem -Path $epicsRoot -Filter "*.excalidraw" -Recurse |
+    Where-Object { $_.DirectoryName -match '[\\/]wireframes$' }
+$wireframes = $wireframes | ForEach-Object {
+    @{
+        src = $_.FullName
+        svg = [System.IO.Path]::ChangeExtension($_.FullName, ".svg")
     }
+}
 
 $filtered = if ($Filter) { $wireframes | Where-Object { $_.src -like "*$Filter*" } } else { $wireframes }
 

@@ -3,7 +3,6 @@ using Axis.WorkflowEngine.Domain.Enums;
 using Axis.WorkflowEngine.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 
 namespace Axis.WorkflowEngine.Infrastructure.Tests.Repositories;
 
@@ -160,15 +159,10 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     {
         var wfId = Guid.NewGuid();
 
-        await using var conn = new NpgsqlConnection(fixture.ConnectionString);
-        await conn.OpenAsync();
-        await using var cmd = conn.CreateCommand();
-        cmd.CommandText =
-            $"INSERT INTO \"test_workflow_engine\".workflow_definitions (id, organization_id, status) " +
-            $"VALUES ('{wfId:D}', '{OrgId:D}', 'Active')";
-        await cmd.ExecuteNonQueryAsync();
-
         await using var ctx = fixture.CreateContext();
+        ctx.WorkflowActiveStatuses.Add(WorkflowActiveStatus.Activated(wfId, OrgId));
+        await ctx.SaveChangesAsync();
+
         var reader = new WorkflowDefinitionReader(ctx);
         var result = await reader.IsActiveAsync(wfId, OrgId);
 
@@ -176,18 +170,11 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     }
 
     [Fact]
-    public async Task WorkflowDefinitionReader_WhenWorkflowIsDraft_ReturnsFalse()
+    public async Task WorkflowDefinitionReader_WhenWorkflowIsNotActive_ReturnsFalse()
     {
         var wfId = Guid.NewGuid();
 
-        await using var conn = new NpgsqlConnection(fixture.ConnectionString);
-        await conn.OpenAsync();
-        await using var cmd = conn.CreateCommand();
-        cmd.CommandText =
-            $"INSERT INTO \"test_workflow_engine\".workflow_definitions (id, organization_id, status) " +
-            $"VALUES ('{wfId:D}', '{OrgId:D}', 'Draft')";
-        await cmd.ExecuteNonQueryAsync();
-
+        // Workflow never published → no row in workflow_active_statuses → false
         await using var ctx = fixture.CreateContext();
         var reader = new WorkflowDefinitionReader(ctx);
         var result = await reader.IsActiveAsync(wfId, OrgId);

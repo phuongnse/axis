@@ -30,7 +30,7 @@
 - [Result → HTTP status code mapping](#result--http-status-code-mapping) ★
 - [OpenAPI / Scalar setup](#openapi--scalar-setup) ★
 - [Wolverine patterns](#wolverine-patterns) ★
-- [Cross-module read pattern](#cross-module-read-pattern) ★
+- [Cross-module data pattern](#cross-module-data-pattern) ★
 - [Command idempotency pattern](#command-idempotency-pattern) ★
 - [Clean Code Principles](#clean-code-principles)
 - [Design Patterns in Practice](#design-patterns-in-practice)
@@ -60,9 +60,8 @@ Never throw `ValidationException` from a handler. Never return `Result` from inf
 ## NuGet / packaging rules
 
 - **Never use `dotnet add package`** — it corrupts `Directory.Packages.props` (CPM project). Always edit `Directory.Packages.props` directly.
-- **Search NuGet before assuming a package ID** — NuGet IDs often differ from project names (e.g. `WolverineFx` not `Wolverine`). Run `dotnet package search "<name>"` when unsure.
-- **Check transitive dependency versions** after adding any new infrastructure package — run `dotnet build` immediately to catch conflicts (e.g. WolverineFx 5.x requires EF Core 9.x).
-- **`UseInMemoryDatabase` requires `Microsoft.EntityFrameworkCore.InMemory`** — separate package, must be added explicitly to test projects.
+- **Search NuGet before assuming a package ID** — NuGet IDs often differ from project names. Run `dotnet package search "<name>"` when unsure of the correct ID.
+- **Check transitive dependency versions** after adding any new infrastructure package — run `dotnet build` immediately to catch conflicts introduced by the new dependency.
 - **Non-web test projects needing ASP.NET Core types** — use `<FrameworkReference Include="Microsoft.AspNetCore.App" />`, never `<PackageReference Include="Microsoft.AspNetCore.Http" />`.
 
 ## EF Core JSONB collection change tracking
@@ -73,38 +72,40 @@ Never throw `ValidationException` from a handler. Never return `Result` from inf
 ```csharp
 // ❌ incomplete workaround — only fires when entity is already Modified.
 // If ONLY the JSONB field mutated, entity state is Unchanged → changes are LOST silently.
-foreach (var entry in ChangeTracker.Entries<DataModel>()
+foreach (var entry in ChangeTracker.Entries<MyAggregate>()
     .Where(e => e.State == EntityState.Modified))
 {
-    entry.Property("_fields").IsModified = true;
+    entry.Property("_items").IsModified = true;
 }
 ```
 
 **Correct fix: always pair `HasConversion` with `HasValueComparer`**
 
-```csharp
-internal sealed class DataModelConfiguration : IEntityTypeConfiguration<DataModel>
-{
-    private static readonly ValueConverter<List<FieldDefinition>, string> FieldsConverter =
-        new(
-            fields => JsonSerializer.Serialize(fields, FieldJsonOptions.Options),
-            json => JsonSerializer.Deserialize<List<FieldDefinition>>(json, FieldJsonOptions.Options)
-                    ?? new List<FieldDefinition>());
+The example below uses `MyAggregate` / `ItemDto` as placeholders — substitute your actual aggregate and element types:
 
-    private static readonly ValueComparer<List<FieldDefinition>> FieldsComparer =
+```csharp
+internal sealed class MyAggregateConfiguration : IEntityTypeConfiguration<MyAggregate>
+{
+    private static readonly ValueConverter<List<ItemDto>, string> ItemsConverter =
+        new(
+            items => JsonSerializer.Serialize(items, JsonOptions.Options),
+            json => JsonSerializer.Deserialize<List<ItemDto>>(json, JsonOptions.Options)
+                    ?? new List<ItemDto>());
+
+    private static readonly ValueComparer<List<ItemDto>> ItemsComparer =
         new(
             (l1, l2) => l1 != null && l2 != null && l1.SequenceEqual(l2),
             l => l.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
             l => l.ToList()); // deep copy — this is what makes the snapshot correct
 
-    public void Configure(EntityTypeBuilder<DataModel> builder)
+    public void Configure(EntityTypeBuilder<MyAggregate> builder)
     {
-        builder.Property<List<FieldDefinition>>("_fields")
-            .HasField("_fields")
+        builder.Property<List<ItemDto>>("_items")
+            .HasField("_items")
             .UsePropertyAccessMode(PropertyAccessMode.Field)
-            .HasColumnName("fields")
+            .HasColumnName("items")
             .HasColumnType("jsonb")
-            .HasConversion(FieldsConverter, FieldsComparer) // ← always both together
+            .HasConversion(ItemsConverter, ItemsComparer) // ← always both together
             .IsRequired();
     }
 }
@@ -331,6 +332,8 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
 
 Use `OwnsMany` (not a standalone `DbSet<T>`) for entities that are part of an aggregate and stored in a separate table.
 
+The example below uses `WorkflowExecution`/`ExecutionStep` as concrete types — replace with your own aggregate root and owned entity. Key points are the backing-field accessor, the explicit FK, and the absence of a standalone `DbSet<T>`.
+
 ```csharp
 // ExecutionConfiguration.cs — inside Configure(EntityTypeBuilder<WorkflowExecution> builder)
 
@@ -483,14 +486,14 @@ _ = Task.Run(async () =>
 ## EF Core aggregate mapping patterns
 
 - **Private backing fields** (`_roleIds`, `_permissions`): use `PrimitiveCollection<List<T>>(fieldName).HasField(fieldName).UsePropertyAccessMode(PropertyAccessMode.Field)` — the type parameter must be the *collection* type, not the element type.
-- **No-args EF Core constructor**: when an aggregate's only constructor takes params EF Core can't bind (e.g. `IEnumerable<string>`), add `private Role() : base(default) { Name = null!; }`. Initialize all non-nullable fields to silence CS8618.
+- **No-args EF Core constructor**: when an aggregate's only constructor takes params EF Core can't bind (e.g. `IEnumerable<string>`), add a private no-args constructor: `private MyAggregate() : base(default) { RequiredField = null!; }`. Initialize all non-nullable reference-type fields to silence CS8618 — EF Core will never use these sentinel values because it always materialises via the real constructor path.
 - **Migrations strategy**: Infrastructure tests use `context.Database.EnsureCreated()` (fast, no migration files). Production deployments need one EF Core migration bundle per `DbContext`.
 - **Identity uses the global `public` schema** — `IdentityDbContext` is a plain `DbContext` with no `TenantSchemaInterceptor`. All other modules use `AxisDbContext` with `TenantSchemaInterceptor`.
 
 ## Testing rules
 
 - Never run `dotnet test --no-build` after editing test code — always let it recompile.
-- **Never hardcode environment configurations**: connection strings, API URLs, Docker endpoints (e.g. `tcp://localhost:2375`), secret keys must use environment variables, `appsettings.json`, or `.testcontainers.properties`.
+- **Never hardcode environment configurations**: connection strings, API URLs, Docker endpoints, secret keys must use environment variables, `appsettings.json`, or `.testcontainers.properties`.
 - **AI Agent Testing Scope**: run only unit tests locally via `dotnet test unit-tests.slnf`. Integration tests require Docker/Testcontainers and are verified by CI/CD on PR submission.
 - **`unit-tests.slnf`**: solution filter at repo root including only Domain + Application test projects. When adding a new unit test project, also add it to this file.
 
@@ -1038,7 +1041,7 @@ WorkflowDefinition wf = new WorkflowDefinitionBuilder()
 
 ### Domain event dispatch via Wolverine
 
-> ⚠️ **Current state — in-memory dispatch:** The durable PostgreSQL outbox (`UsePostgresqlPersistenceAndTransport` + `UseDurableLocalQueues`) is **not yet configured**. Domain events are dispatched in-memory by the `UnitOfWork` after `SaveChangesAsync`. Events do not survive a process crash between `SaveChanges` and dispatch. This is an accepted MVP trade-off tracked as an E01 gap.
+> ⚠️ **Current state — in-memory dispatch:** The durable PostgreSQL outbox is **not yet configured**. Domain events are dispatched in-memory by the `UnitOfWork` after `SaveChangesAsync`. Events do not survive a process crash between `SaveChanges` and dispatch. This is an accepted MVP trade-off tracked as an E01 gap.
 >
 > **Target state (when durable outbox is configured):** Wolverine will write events to a PostgreSQL outbox table in the same transaction as the aggregate write, then dispatch them asynchronously via a background process — guaranteeing at-least-once delivery even across process restarts.
 
@@ -1190,8 +1193,7 @@ builder.Host.UseWolverine(opts =>
     // Integrates Wolverine's outbox with EF Core SaveChangesAsync
     opts.UseEntityFrameworkCoreTransactions();
 
-    // NOTE: Durable PostgreSQL outbox (UsePostgresqlPersistenceAndTransport +
-    // UseDurableLocalQueues) is NOT yet configured. Domain events are dispatched
+    // NOTE: Durable PostgreSQL outbox is NOT yet configured. Domain events are dispatched
     // in-memory after SaveChangesAsync. The durable outbox is deferred until the
     // Wolverine persistence schema strategy is decided — tracked as E01 gap.
 });
@@ -1265,47 +1267,100 @@ opts.ScheduleJob<ArchiveOldExecutionsCommand>(cron: "0 2 * * *"); // daily at 02
 
 ---
 
-## Cross-module read pattern
+## Cross-module data pattern
 
-Modules never share DbContexts and never reference each other's repositories or Application assemblies.
+**Core rule: a module only queries its own tables. Always. No exceptions.**
 
-**Option A — Wolverine request/response (preferred for non-critical paths):**
+If module A needs data owned by module B, A must maintain its own local copy of that data, kept in sync via Wolverine domain events. This is the Share Nothing principle — modules are data-sovereign.
 
-Publish a query message via `_messageBus.InvokeAsync<TResponse>`. The responding module handles it in its own Application layer. Clean separation, but adds a small round-trip.
-
-**Option B — Raw SQL reader (for critical hot paths):**
-
-A thin reader class in the consuming module's Infrastructure layer executes a targeted SQL query directly on the source module's table. Acceptable when Wolverine round-trip latency is unacceptable (e.g., execution hot path). Must be documented with a comment.
+### ❌ Anti-pattern: cross-module raw SQL
 
 ```csharp
-// WorkflowEngine.Application/CrossModule/IWorkflowDefinitionReader.cs
-// Interface defined in Application — Infrastructure implements it.
-public interface IWorkflowDefinitionReader
+// WRONG — module A querying a table owned by module B
+int count = await context.Database
+    .SqlQueryRaw<int>("SELECT COUNT(*) FROM workflow_definitions WHERE steps @> {0}::jsonb", ...)
+    .FirstAsync(ct);
+```
+
+This silently breaks module isolation, causes test failures when modules use separate databases, and creates hidden coupling that makes the system fragile.
+
+### ✅ Correct pattern: event-driven local denormalization
+
+When module A needs to know something about module B's data, B publishes domain events when that data changes. A listens via Wolverine and maintains its own local copy.
+
+**Example** (FormBuilder / WorkflowBuilder — the principle applies to any two modules): FormBuilder needs to know whether a form is referenced by any workflow step.
+
+**Step 1 — Source module (WorkflowBuilder) raises events when its state changes:**
+
+```csharp
+// WorkflowBuilder.Domain/Events/FormStepAdded.cs
+public sealed record FormStepAdded(Guid WorkflowId, Guid StepId, Guid FormId) : IDomainEvent;
+
+// WorkflowBuilder.Domain/Events/FormStepRemoved.cs
+public sealed record FormStepRemoved(Guid WorkflowId, Guid StepId, Guid FormId) : IDomainEvent;
+
+// Raised inside WorkflowDefinition.AddStep() when StepType == Form
+RaiseDomainEvent(new FormStepAdded(Id, step.Id, formId));
+```
+
+**Step 2 — Consuming module (FormBuilder) stores its own local copy:**
+
+```csharp
+// FormBuilder.Domain/Entities/FormWorkflowReference.cs
+// Simple record — no aggregate, no lifecycle; owned by FormBuilder's DB
+public sealed class FormWorkflowReference
 {
-    Task<WorkflowSnapshot?> GetPublishedAsync(Guid workflowId, CancellationToken ct);
+    public Guid FormId { get; init; }
+    public Guid WorkflowId { get; init; }
+    public Guid StepId { get; init; }
 }
 
-// WorkflowEngine.Infrastructure/CrossModule/WorkflowDefinitionReader.cs
-internal sealed class WorkflowDefinitionReader(NpgsqlDataSource dataSource, ITenantContext tenant)
-    : IWorkflowDefinitionReader
+// FormBuilder.Infrastructure/Handlers/FormStepAddedHandler.cs
+public sealed class FormStepAddedHandler(FormBuilderDbContext db)
 {
-    // Cross-module raw SQL read — justified because WorkflowEngine reads the workflow definition
-    // on every step execution; Wolverine request/response would add unacceptable latency here.
-    public async Task<WorkflowSnapshot?> GetPublishedAsync(Guid workflowId, CancellationToken ct)
+    public async Task Handle(FormStepAdded evt, CancellationToken ct)
     {
-        string schema = tenant.Schema;
-        await using NpgsqlConnection conn = await dataSource.OpenConnectionAsync(ct);
-        // SELECT only the columns needed — never SELECT *
-        // Always filter by schema and status to avoid cross-tenant reads
+        // Idempotent: skip if already synced (Wolverine at-least-once delivery)
+        bool exists = await db.FormWorkflowReferences.AnyAsync(
+            r => r.FormId == evt.FormId && r.WorkflowId == evt.WorkflowId && r.StepId == evt.StepId, ct);
+        if (exists) return;
+
+        db.FormWorkflowReferences.Add(new FormWorkflowReference
+        {
+            FormId = evt.FormId, WorkflowId = evt.WorkflowId, StepId = evt.StepId
+        });
+        await db.SaveChangesAsync(ct);
     }
 }
 ```
 
-**Rules:**
-- `IWorkflowDefinitionReader` is defined in the Application layer of the consuming module — never imported from the source module's assembly.
-- Always prefix the table name with `ITenantContext.Schema`.
-- Always add a comment explaining why raw SQL cross-module was used over Wolverine request/response.
-- Select only the columns needed — never `SELECT *`.
+**Step 3 — Consuming module queries only its own table:**
+
+```csharp
+// FormRepository.IsReferencedByWorkflowAsync — queries FormBuilder's own DB
+public async Task<bool> IsReferencedByWorkflowAsync(Guid formId, CancellationToken ct = default)
+    => await context.FormWorkflowReferences.AnyAsync(r => r.FormId == formId, ct);
+```
+
+### Rules
+
+- **Never** use `SqlQueryRaw`, `ExecuteSqlRaw`, `FromSqlRaw`, or any raw SQL that references a table from another module.
+- **Never** inject another module's `DbContext` into your repositories or handlers.
+- The source module (B) owns the event — define it in B's Domain layer.
+- The consuming module (A) owns the handler and the local copy table — both in A's Infrastructure layer.
+- The Wolverine handler in A is idempotent: use upsert or check-before-insert to handle duplicate events.
+- **Cross-module event handlers must filter by `OrganizationId`** in addition to the entity foreign key. Filtering only by the entity ID leaves tenant isolation implicit — always make it explicit by including both keys in every `Where` clause.
+- If the consuming module needs derived state computed (e.g., "is the form referenced at all?"), compute it from the local copy at query time — do not try to sync aggregated state.
+
+### Pre-commit violation sweep
+
+Run this before every commit that touches Infrastructure code:
+
+```powershell
+grep -rn "SqlQueryRaw\|ExecuteSqlRaw\|FromSqlRaw\|ExecuteSqlInterpolated" src/Modules/ --include="*.cs"
+```
+
+For every match: confirm the SQL only references tables owned by that match's own module. If it references another module's table → P0 violation, must fix before committing.
 
 ---
 
@@ -1332,6 +1387,37 @@ public async Task<Result<Guid>> Handle(CreateWorkflowCommand cmd, CancellationTo
 **Pattern 2 — caller-supplied idempotency key (for external triggers):**
 
 Commands triggered by external systems (webhooks, scheduled jobs) accept a caller-supplied `IdempotencyKey` (UUID). The handler checks if a record with that key already exists and returns the existing result without re-executing.
+
+**Pattern 3 — try-catch `DbUpdateException` for Wolverine at-least-once concurrent INSERT race:**
+
+Check-before-insert (Pattern 1) handles the *sequential* duplicate case but not the *concurrent* race: two handler invocations can both read `existing = null`, both attempt INSERT, and one will throw a unique constraint violation. For Wolverine event handlers where at-least-once delivery can cause parallel execution, wrap `SaveChangesAsync` in a try-catch.
+
+The example below uses `WorkflowPublished`/`WorkflowActiveStatus` as concrete types — substitute your own event and read model:
+
+```csharp
+public async Task Handle(WorkflowPublished @event, CancellationToken ct)
+{
+    WorkflowActiveStatus? existing = await context.WorkflowActiveStatuses
+        .FirstOrDefaultAsync(w => w.WorkflowId == @event.WorkflowId, ct);
+
+    if (existing is null)
+        context.WorkflowActiveStatuses.Add(
+            WorkflowActiveStatus.Activated(@event.WorkflowId, @event.OrganizationId));
+    else
+        existing.Reactivate();
+
+    try
+    {
+        await context.SaveChangesAsync(ct);
+    }
+    catch (DbUpdateException)
+    {
+        // Concurrent duplicate event delivery — row already inserted by a parallel invocation.
+    }
+}
+```
+
+Use this pattern whenever a Wolverine handler does a check-before-insert and concurrent execution is plausible — check-before-insert is not race-safe on its own.
 
 **Migrations — idempotent raw SQL:**
 
@@ -1395,7 +1481,43 @@ Common namespaces that agents forget to add as `using` directives:
 | `System.Net.HttpStatusCode` | `using System.Net;` |
 | `Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions` | `using Microsoft.AspNetCore.Diagnostics.HealthChecks;` |
 
-### 2. No scaffold placeholder files
+### 2. No restructuring to avoid a `using` directive
+
+When replacing `var` with an explicit type, if that type requires a new `using` directive — add the directive. Never restructure or inline code just to avoid importing a type. That is a workaround, not a fix.
+
+**Wrong** — chains `.Id` onto the query to avoid declaring an explicit type:
+```csharp
+Guid itemId = ctx.Items.First(i => i.Name == "target" && i.OrgId == orgId).Id;
+// … then uses itemId directly — the full object is discarded
+```
+
+**Right** — declares the explicit type and adds the `using` directive:
+```csharp
+using My.Module.Domain.Aggregates;
+// …
+MyEntity item = ctx.Items.First(i => i.Name == "target" && i.OrgId == orgId);
+// … then uses item.Id, item.Name, etc. as needed
+```
+
+The restructured version hides what type is being worked with, discards future flexibility (e.g. if a second property is later needed), and violates the intent of "no `var`" — which is to make types explicit, not to obscure them by different means.
+
+### 3. Verify `!` is actually needed before adding it
+
+Before using the null-forgiving operator `!` to suppress a nullable annotation, check whether the assignment compiles without it. If the existing codebase already uses the same API without `!`, adding it is a workaround — not a fix.
+
+**Wrong** — `!` added without verifying it is necessary:
+```csharp
+MyType result = (await SomeApiAsync())!;
+```
+
+**Right** — if the return type is non-nullable (e.g. a value type or a `Task<T>` where T is a struct), `!` is unnecessary:
+```csharp
+MyType result = await SomeApiAsync();
+```
+
+The rule: grep the codebase for existing call sites of the same API before reaching for `!`. If they compile without it, yours should too. Never add `!` just because the compiler warns — resolve the underlying nullability issue instead.
+
+### 4. No scaffold placeholder files
 
 Visual Studio scaffolds `Class1.cs` when creating a new project. These files must be deleted immediately — never committed. A `Class1.cs` anywhere in `src/` or `tests/` is always wrong.
 
@@ -1404,7 +1526,7 @@ Visual Studio scaffolds `Class1.cs` when creating a new project. These files mus
 find src/ tests/ -name "Class1.cs" -not -path "*/obj/*"
 ```
 
-### 3. User input flowing into external identifiers
+### 5. User input flowing into external identifiers
 
 Any string derived from user input that becomes an external identifier — filename, ZIP entry name, URL slug, S3 key, Redis key — needs two checks:
 
@@ -1448,15 +1570,6 @@ git add <files>
 git commit -m "chore: ..."
 git push -u origin chore/my-fix
 gh pr create …
-```
-
-If a commit lands on `main` by mistake, move it before pushing:
-```bash
-git checkout -b chore/rescue-branch   # create branch at current (wrong) HEAD
-git checkout main
-git reset --hard origin/main          # reset main to remote — commit stays on rescue-branch
-git push                              # push clean main
-# then open a PR from rescue-branch
 ```
 
 
@@ -1636,7 +1749,7 @@ One subfolder per epic, mirroring `docs/epics/`. Shared screens (error pages, gl
 **Linking from a feature file** — add directly after the feature title, before the first user story:
 
 ```markdown
-> **Wireframe**: [docs/wireframes/E02-identity-access/login.excalidraw](../../../wireframes/E02-identity-access/login.excalidraw) · [preview](../../../wireframes/E02-identity-access/login.svg)
+> **Wireframe**: [docs/epics/E02-identity-access/wireframes/login.excalidraw](../../epics/E02-identity-access/wireframes/login.excalidraw) · [preview](../../epics/E02-identity-access/wireframes/login.svg)
 ```
 
 **Excalidraw settings** for consistent sketch aesthetic:

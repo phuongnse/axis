@@ -1,8 +1,8 @@
 ﻿# F05 — Password & Security Management
 
-> **Wireframe**: [docs/wireframes/E02-identity-access/settings-security.excalidraw](../../../wireframes/E02-identity-access/settings-security.excalidraw) · [preview](../../../wireframes/E02-identity-access/settings-security.svg)
-> **Wireframe**: [docs/wireframes/E02-identity-access/forgot-password.excalidraw](../../../wireframes/E02-identity-access/forgot-password.excalidraw) · [preview](../../../wireframes/E02-identity-access/forgot-password.svg)
-> **Wireframe**: [docs/wireframes/E02-identity-access/change-password.excalidraw](../../../wireframes/E02-identity-access/change-password.excalidraw) · [preview](../../../wireframes/E02-identity-access/change-password.svg)
+> **Wireframe**: [docs/epics/E02-identity-access/wireframes/settings-security.excalidraw](../wireframes/settings-security.excalidraw) · [preview](../wireframes/settings-security.svg)
+> **Wireframe**: [docs/epics/E02-identity-access/wireframes/forgot-password.excalidraw](../wireframes/forgot-password.excalidraw) · [preview](../wireframes/forgot-password.svg)
+> **Wireframe**: [docs/epics/E02-identity-access/wireframes/change-password.excalidraw](../wireframes/change-password.excalidraw) · [preview](../wireframes/change-password.svg)
 
 [← Back to E02](../README.md)
 

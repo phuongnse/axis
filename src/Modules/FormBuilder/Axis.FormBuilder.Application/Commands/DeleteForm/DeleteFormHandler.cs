@@ -21,7 +21,7 @@ public sealed class DeleteFormHandler(
         // US-078: cannot delete if referenced by non-Archived workflow steps
         if (await formRepo.IsReferencedByWorkflowAsync(command.FormId, cancellationToken))
             return Result.Failure(ErrorCodes.BusinessRule,
-                "This form is referenced by one or more workflow steps. Remove those references before deleting.");
+                "This form is referenced by one or more active workflow steps. Remove those references before deleting.");
 
         form.Delete();
         await uow.SaveChangesAsync(cancellationToken);

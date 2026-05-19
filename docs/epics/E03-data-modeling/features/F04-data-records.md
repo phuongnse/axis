@@ -1,6 +1,6 @@
 ﻿# F04 — Data Record CRUD
 
-> **Wireframe**: [docs/wireframes/E03-data-modeling/records.excalidraw](../../../wireframes/E03-data-modeling/records.excalidraw) · [preview](../../../wireframes/E03-data-modeling/records.svg)
+> **Wireframe**: [docs/epics/E03-data-modeling/wireframes/records.excalidraw](../wireframes/records.excalidraw) · [preview](../wireframes/records.svg)
 
 [← Back to E03](../README.md)
 
@@ -41,6 +41,7 @@ Users can create, read, update, and delete records against any model. Records ar
 
 > **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: File field pre-upload step pending file storage service; Relation field existence check pending API layer.
+> Diagram pending: entity name `Record` → `DataRecord` in data-model diagram (`dataModelDiagram()` in `generate-diagrams.mjs`) — `Record` is a C# keyword and conflicts with the language reserved word.
 > Decisions: record data stored as `Dictionary<string, object?>` serialized to JSONB column `_data`.
 
 ---

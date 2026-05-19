@@ -54,6 +54,10 @@ try
     builder.Host.UseWolverine(opts =>
     {
         opts.UseEntityFrameworkCoreTransactions();
+        // Infrastructure assemblies host Wolverine handlers (e.g. domain event consumers)
+        // but are not the entry assembly — include them explicitly for handler discovery.
+        opts.Discovery.IncludeAssembly(typeof(WorkflowEngineInfrastructureExtensions).Assembly);
+        opts.Discovery.IncludeAssembly(typeof(FormBuilderInfrastructureExtensions).Assembly);
     });
 
     // ── MediatR + validation pipeline ─────────────────────────────────────
@@ -199,6 +203,10 @@ try
         opts.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
         opts.SerializerOptions.PropertyNameCaseInsensitive = true;
         opts.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        opts.SerializerOptions.Converters.Add(new AddFieldRequestConverter());
+        opts.SerializerOptions.Converters.Add(new UpdateFieldRequestConverter());
+        opts.SerializerOptions.Converters.Add(new AddDataClassFieldRequestConverter());
+        opts.SerializerOptions.Converters.Add(new AddFormFieldRequestConverter());
     });
 
     // ── OpenAPI ────────────────────────────────────────────────────────────
@@ -272,6 +280,7 @@ try
     app.MapDataClassEndpoints();
     app.MapRecordEndpoints();
     app.MapWorkflowEndpoints();
+    app.MapFormEndpoints();
 
     app.Run();
 }

@@ -163,7 +163,7 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
 
         Status = WorkflowStatus.Active;
         UpdatedAt = DateTimeOffset.UtcNow;
-        RaiseDomainEvent(new WorkflowPublished(Id, OrganizationId));
+        RaiseDomainEvent(new WorkflowPublished(Id, OrganizationId, ExtractFormIds()));
     }
 
     /// <summary>US-050: Deactivates the workflow; running executions complete but no new ones start.</summary>
@@ -198,6 +198,7 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
 
         Status = WorkflowStatus.Active;
         UpdatedAt = DateTimeOffset.UtcNow;
+        RaiseDomainEvent(new WorkflowUnarchived(Id, OrganizationId, ExtractFormIds()));
     }
 
     /// <summary>US-051: Creates a full copy as a new Draft. Webhook URLs are NOT copied.</summary>
@@ -244,6 +245,9 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
         if (!_steps.Any(s => s.Id == stepId))
             throw new InvalidOperationException($"Step '{stepId}' not found in this workflow.");
     }
+
+    private IReadOnlyList<Guid> ExtractFormIds() =>
+        _steps.Select(s => s.TryGetFormId()).Where(id => id.HasValue).Select(id => id!.Value).ToList();
 
     /// <summary>DFS reachability: can we reach <paramref name="target"/> starting from <paramref name="start"/>?</summary>
     private bool CanReach(Guid start, Guid target)

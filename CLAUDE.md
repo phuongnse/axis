@@ -42,7 +42,7 @@ Multi-tenancy: schema-per-tenant in PostgreSQL (`tenant_{org_slug}`). Tenant res
 - **Domain**: zero external dependencies (pure C#). **Application**: depends on Domain only. **Infrastructure**: implements Application/Domain interfaces.
 - **Hard stops — never do any of the following:**
   - Reference another module's `Infrastructure` project from any layer
-  - Query another module's database tables directly (no cross-module `DbSet<T>` access)
+  - Query another module's database tables directly — via `DbSet<T>`, `SqlQueryRaw`, `ExecuteSqlRaw`, `FromSqlRaw`, or any other mechanism. **This applies to raw SQL too.** If module A needs data owned by module B, A must maintain its own local copy synced via Wolverine domain events (see `docs/playbooks/patterns.md § Cross-module data pattern`).
   - Share a `DbContext` instance across module boundaries
   - Use `IMediator` to dispatch a domain event (use Wolverine outbox only)
 
@@ -59,6 +59,9 @@ Scan this before acting. Full explanations are in the sections below.
 - Never bypass auth, silently skip an AC, or mark ✅ to avoid a difficult conversation
 - Domain layer: zero external dependencies (pure C#)
 - Modules communicate only via Wolverine events or Application-layer interfaces — no shared DB transactions
+- Never commit when Gate 1 fails — all relevant build and test commands must be green first (see Gate 1 table)
+- Never commit without a completed, **written** Gate 2 walk-through — a mental check is not a walk-through
+- Never commit without a completed, **written** Gate 3 retrospective — same rule, same reason
 
 **P1 — Architectural (require user confirmation before deviating):**
 - Layer order: Domain → Application → Infrastructure → API → Frontend — no skipping
@@ -122,7 +125,7 @@ Before starting any task, read only what is relevant — not everything.
 
 **Step 3 — Read only the feature file(s)** for the task: `docs/epics/{folder}/features/F0{N}-*.md`
 
-**Step 4 — Map every AC to a concrete implementation step** before writing any code. For each AC in the US being implemented: identify which layer it belongs to, which file/method will implement it, and what the expected behavior is. Any AC that cannot be mapped to a specific implementation → stop and clarify first. This is the step most likely to surface missed requirements before they become bugs.
+**Step 4 — Map every AC to a concrete implementation step** before writing any code. Write this mapping out — do not keep it mental. For each AC: which layer, which file/method, what the expected behavior is. Any AC that cannot be mapped → stop and clarify first. This written map is the output that proves requirements were understood before coding began.
 
 **Step 5 — Check implementation status** in [`docs/PROGRESS.md`](docs/PROGRESS.md)
 
@@ -172,16 +175,27 @@ Every time code changes, the relevant docs change too — in the **same PR, not 
 | Added, removed, or changed a library | `docs/TECH_STACK.md` — version table + ADR if applicable |
 | Established a new implementation pattern | `docs/playbooks/patterns.md` — add the pattern with an example |
 | Completed a US layer | Feature file `> **Implementation status**` callout — and remove any mention of that layer from the gap text (✅ and "pending X layer" in the same callout is always a contradiction) |
-| Completed a full layer for a module | Epic README status table + `docs/PROGRESS.md` |
+| Completed a full layer for a module | Epic README status table + `docs/PROGRESS.md` — one short paragraph per module, layer-status only; no class names, endpoint lists, connection strings, or per-PR implementation detail |
 | Changed architecture, added a cross-cutting rule | `CLAUDE.md` — the relevant section |
 | Changed the implementation workflow or layer order | `docs/playbooks/process.md` — update the affected checklist |
 | Changed project structure (added/removed projects) | `ARCHITECTURE.md` source tree + `docs/playbooks/process.md` new module setup table |
+| Moved or renamed a wireframe, diagram, or source folder | Search for the old path across all `docs/` files — update every cross-reference and path example, including code blocks inside `patterns.md` |
 | Changed `Program.cs` host/middleware wiring | `docs/playbooks/patterns.md` host setup section — verify the code example still matches |
 | Changed or removed a class/method/service referenced in a doc comment | Update the comment in the same file — stale comments are docs debt |
 | Replaced a framework or library with another | Every doc that names the old library — search for the old name across `docs/` and `src/` comments |
 | Decided a feature is out of scope or deferred | Document the decision explicitly in the affected feature file callout — never silently omit |
 
-**Gate 2 walk-through is mandatory.** Before every commit, go through the table above row by row. For each row, answer explicitly: did any change in this PR trigger this row? If yes, confirm the target doc is already updated in this PR. "I'll update docs later" = the docs are already out of date. Later never comes.
+**Gate 2 walk-through is mandatory and must produce written output — not a mental check.** Before every commit, work through the table row by row and write out which rows fired and what was updated. Format:
+
+```
+Gate 2:
+- Added/changed a library → not triggered
+- Established a new pattern → patterns.md § "..." updated
+- Completed a US layer → feature file callout updated
+- ...
+```
+
+If a row fired and the doc is not yet staged → update the doc first, then commit. An unwritten walk-through did not happen. "I'll update docs later" = the docs are already out of date.
 
 ### Docs navigation structure
 
@@ -202,7 +216,7 @@ When creating any new doc file, add the appropriate back-link as the first thing
 ### Process & Workflow
 - **Step-by-step workflow**: follow [`docs/playbooks/process.md`](docs/playbooks/process.md) at the start of every new US or module. Rules in this file govern HOW; PROCESS.md governs WHAT order.
 - **Language**: all code, docs, commit messages, PR descriptions, and comments must be in English.
-- **Git**: never push to `main` — always branch (`{type}/{short-description}` kebab-case, `type` ∈ `feat|fix|docs|refactor|test|chore`) and open a PR. When Claude Code auto-creates a worktree with a random branch name, rename before pushing.
+- **Git**: never push to `main` — always branch (`{type}/{short-description}` kebab-case, `type` ∈ `feat|fix|docs|refactor|test|chore`) and open a PR. When Claude Code auto-creates a worktree with a random branch name, rename before pushing. When addressing PR review comments, always commit to the **existing PR branch** — never create a new branch for review fixes. A new branch for review fixes means the PR never gets the changes and the branch history diverges.
 - **Conventional Commits**: `feat: add workflow step handler` — subject ≤ 72 chars, imperative mood, no period.
 - **Docs-first for new features**: before implementing any user story or new feature, read the relevant feature file. The doc defines the contract; code implements it. Never write code first and update docs after. For bug fixes, a doc update is only required if the fix reveals a spec deviation. Exception: production hotfixes under active incident — fix first, document the deviation immediately after.
 - **Deviation = immediate doc update**: whenever implementation diverges from what is currently documented — different project structure, different library, different startup wiring, different API path convention, removed class or method — the doc update is the very next action, before continuing to the next implementation step. Accumulating "code reality vs doc reality" debt is the primary source of staleness. Close it immediately, never defer.
@@ -232,7 +246,7 @@ See [`docs/playbooks/testing.md`](docs/playbooks/testing.md) for full patterns �
 ### Code Style (shared)
 - **Comments — WHY only**: default to no comments. Add one only when the WHY is non-obvious — a hidden constraint, a framework quirk, or surprising business logic. No WHAT comments.
 - **Scope discipline**: only modify code directly related to the current task. Do not perform opportunistic refactors, cleanups, or "while I'm here" improvements unless explicitly requested. If you notice something worth fixing outside the current scope, flag it to the user — do not silently fix it in the same PR.
-- **Violation sweep before fix**: when a task involves fixing an architectural violation (wrong access modifier, incorrect coupling, broken pattern), always grep for all occurrences of the same violation across the codebase before writing any fix. Resolve all instances in the same PR. Fixing only the reported instance while leaving identical violations elsewhere creates inconsistency and false confidence in correctness.
+- **Violation sweep before fix**: when a task involves fixing an architectural violation (wrong access modifier, incorrect coupling, broken pattern), always grep for all occurrences of the same violation across the **entire relevant scope** before writing any fix. A single reported instance implies the class of violation may exist throughout the entire layer or file type — sweep that scope, not just the reported file. Resolve all instances in the same PR. Fixing only the reported instance while leaving identical violations elsewhere creates inconsistency and false confidence in correctness.
 - **Simplest implementation first**: prefer concrete implementations first. Introduce abstractions only when variation, reuse, or lifecycle complexity is proven in the code — not anticipated. Speculative abstractions add maintenance cost without current benefit.
 - **No generic abstractions without 2 existing use cases**: do not introduce `BaseRepository`, `GenericService`, `AbstractHandlerFactory`, or similar generalised scaffolding unless at least 2 concrete implementations already exist in the codebase that would benefit from it. One use case is a concrete implementation, not an abstraction.
 - **Match existing local conventions**: within a module or file, prefer consistency with the patterns already present unless they directly conflict with CLAUDE.md or an official playbook. Docs override legacy code for correctness; local style overrides AI preference for consistency.
@@ -242,7 +256,7 @@ See [`docs/playbooks/testing.md`](docs/playbooks/testing.md) for full patterns �
 #### Code Style — .NET only
 - **Rules apply everywhere in .NET**: all rules below apply to both `src/` and `tests/` unless noted.
 - **No `var`**: always write the explicit type. For constructor calls, use target-typed new to avoid repeating the type name: `WorkflowDefinition workflow = new(id, name)` not `var workflow = new WorkflowDefinition(id, name)`.
-- **No inline fully-qualified type names**: always use `using` directives. Never write `System.Text.Encoding.UTF8`, `System.Security.Cryptography.SHA256`, `Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions`, etc. inline. Run the detection grep in PATTERNS.md § "Code hygiene checklist" before every commit.
+- **No inline fully-qualified type names**: always use `using` directives. Never write a type with its full namespace inline — add the `using` instead. Run the detection grep in PATTERNS.md § "Code hygiene checklist" before every commit.
 - **One type per file**: every class, record, interface, or enum lives in its own file named after the type. Never group multiple types in one file, including test helpers. This applies equally to `src/` and `tests/`. Allowed exceptions:
   - Generic overloads of the same concept may share a file (e.g. `Result` + `Result<T>` in `Result.cs`, `ICommand` + `ICommand<T>` in `ICommand.cs`).
   - An xUnit `[CollectionDefinition]` class may be co-located with its fixture class (xUnit convention requires them to be in the same assembly scope).
@@ -274,17 +288,18 @@ See [`docs/playbooks/testing.md`](docs/playbooks/testing.md) for full patterns �
 ### API Layer (.NET only)
 - **Minimal API (mandatory)**: all new endpoints use Minimal API (`MapGroup` + `IEndpointRouteBuilder` extension methods), not controllers. No logic in mapping files — only `mediator.Send(...)` and `Result` → `IResult` mapping. Use `ConfigureHttpJsonOptions` for JSON config.
 - **Authorization**: every endpoint must call `.RequireAuthorization()` unless explicitly public (login, register, health check). RBAC enforcement goes in the Command/Query handler via the user's claims — not in the endpoint mapping.
-- **OpenAPI**: every endpoint must declare `.WithName()`, `.WithSummary()`, `.WithTags()`, `.Produces<T>()`, `.ProducesProblem()` for each applicable status (400, 401, 403, 404, 409 as relevant). Scalar UI enabled in Development and Staging. See PATTERNS.md for setup.
+- **OpenAPI**: every endpoint must declare `.WithName()`, `.WithSummary()`, `.WithTags()`, `.Produces<T>()`, `.ProducesProblem()` for each status code the endpoint can return — see the Result → HTTP status code mapping table in PATTERNS.md. Scalar UI enabled in Development and Staging. See PATTERNS.md for setup.
 - **Error responses**: all failures map to `ProblemDetails` (RFC 7807) via `result.ToProblemDetails()`. No custom error JSON shapes or raw strings. See PATTERNS.md for the Result → HTTP status code mapping table.
 - **Pagination**: no endpoint returns an unbounded collection. All list endpoints accept `int page = 1`, `int pageSize = 20`, hard cap `pageSize ≤ 100`. Return `PagedResult<T>` from `Axis.Shared.Application`. See PATTERNS.md.
 
 ### Infrastructure & EF Core (.NET only)
 - **Fluent API only**: use `IEntityTypeConfiguration<T>` for all EF Core mappings. Data Annotations (`[Required]`, `[Table]`, etc.) are forbidden on domain entities.
-- **OwnsMany for aggregate-owned entities**: child entities that are part of an aggregate (see aggregate boundary rule above) must be mapped via `OwnsMany` inside the owner's `IEntityTypeConfiguration`. They must NOT have a standalone `DbSet<T>`, a standalone `IEntityTypeConfiguration`, or a repository. Always call `stepBuilder.WithOwner().HasForeignKey(s => s.ParentId)` explicitly to prevent EF from generating a redundant shadow FK column. See PATTERNS.md § "EF Core OwnsMany pattern".
+- **OwnsMany for aggregate-owned entities**: child entities that are part of an aggregate (see aggregate boundary rule above) must be mapped via `OwnsMany` inside the owner's `IEntityTypeConfiguration`. They must NOT have a standalone `DbSet<T>`, a standalone `IEntityTypeConfiguration`, or a repository. Always call `stepBuilder.WithOwner().HasForeignKey(s => s.{ownedEntityFk})` explicitly — using the owned entity's actual FK property name — to prevent EF from generating a redundant shadow FK column. See PATTERNS.md § "EF Core OwnsMany pattern".
 - **JSONB collections**: every `HasConversion` on a `List<T>` stored as JSONB must be paired with `HasValueComparer` in the same call. Converter without comparer = silent data loss. See PATTERNS.md.
 - **Read vs write**: `AsNoTracking()` on read-only paths only. Write paths must use tracked queries.
 - **Unit of Work**: `SaveChangesAsync` called only via `IUnitOfWork` in the handler, never inside a repository. Repositories only add/query `DbSet<T>`.
 - **No `IQueryable` from repositories**: repository methods return materialized types (`T?`, `List<T>`, `PagedResult<T>`).
+- **"No DbSet for this table" is a stop signal, not a raw SQL invitation**: if a repository method needs data from a table that has no `DbSet<T>` in the current module's `DbContext`, the correct response is always to stop and ask — never to reach for `SqlQueryRaw`/`ExecuteSqlRaw`. The absence of a `DbSet` means either (a) the data belongs to another module and must be accessed via event-driven local denormalization, or (b) the data is an owned entity accessed via the aggregate root. Raw SQL that names a table not owned by this module is a P0 violation regardless of how it is written. See PATTERNS.md § "Cross-module data pattern".
 - **No N+1**: lazy loading disabled globally. Always explicit `Include`/`ThenInclude`. List queries project to DTOs via `.Select()`. See PATTERNS.md.
 - **Projection-first for lists**: never materialise entities before projecting for list endpoints — call `.Select(...)` before `.ToListAsync()`, not after. Avoid `Include` chains on list queries; project directly to DTOs instead. Loading full aggregates to map them in memory is forbidden on list paths.
 - **NuGet**: check `Directory.Packages.props` before adding any library. Never `dotnet add package` — it corrupts CPM. See PATTERNS.md for the correct procedure.
@@ -305,7 +320,7 @@ See [`docs/playbooks/testing.md`](docs/playbooks/testing.md) for full patterns �
 - **Logging**: Serilog structured logging only — `Error` for system failures, `Warning` for unexpected handled edge cases, `Information` for critical business milestones. No PII or credentials in logs.
 - **Correlation ID**: every request carries `X-Correlation-Id`. Middleware generates a GUID if absent and echoes it on the response. All log entries enriched with `CorrelationId` via `LogContext.PushProperty`.
 - **No hardcoded secrets**: use `appsettings.Development.json` (gitignored) or environment variables. Testcontainers generates ephemeral credentials — never reference external credentials in test code.
-- **Rate limiting**: required on auth endpoints (`/connect/token`, `/connect/authorize`, password reset) and any unauthenticated input endpoints.
+- **Rate limiting**: required on all authentication endpoints (token issuance, code exchange, credential validation), password-sensitive operations (reset, change), and any unauthenticated input endpoint. Apply at middleware registration level, not per-endpoint.
 - **CORS**: named policy with explicit origin allowlist. Never `AllowAnyOrigin()` in production. Apply `app.UseCors()` before `app.UseAuthentication()`.
 - **Health checks**: `GET /health` (liveness) and `GET /health/ready` (readiness, includes PostgreSQL + Redis checks). Both anonymous, excluded from rate limiting.
 - **Execution-critical path discipline**: workflow execution paths must favour predictable allocation and query behaviour. Avoid reflection-heavy runtime dispatch (`Activator.CreateInstance`, dynamic type resolution), unbounded metadata queries, or per-step DB round-trips on hot paths unless explicitly benchmarked. Prefer pre-resolved handler registrations and compiled expression trees over runtime reflection.
@@ -333,16 +348,16 @@ See [`docs/playbooks/process.md`](docs/playbooks/process.md) for the full step-b
 
 #### Wireframe convention
 
-- **Location**: `docs/wireframes/{E0N-module-name}/{screen-slug}.excalidraw` (source) + `.svg` (rendered preview) — one subfolder per epic, mirroring `docs/epics/`
+- **Location**: `docs/epics/{E0N-module-name}/wireframes/{screen-slug}.excalidraw` (source) + `.svg` (rendered preview) — co-located with the epic's `features/` and `diagrams/` folders
 - **Naming**: screen slug in kebab-case matching the primary route segment — `login`, `data-models`, `workflow-detail`
-- **Shared screens** (error pages, global settings) that don't belong to a single module go in `docs/wireframes/_shared/`
+- **Shared layout references** (app shell, error pages) that don't belong to any epic go in `docs/wireframes/` root alongside `_template.excalidraw`
 - **Format**: Excalidraw JSON (`roughness: 1`, sketch aesthetic) — both files committed; `.excalidraw` is diffable, `.svg` is for quick preview
 - **One wireframe per screen** — multiple user stories on the same screen share one wireframe file
-- **Generate SVG** after every edit: run `docs/scripts/generate-wireframes.ps1` — recurses all subfolders and regenerates `.svg` files via Kroki.io
+- **Generate SVG** after every edit: run `docs/scripts/generate-wireframes.ps1` — scans `docs/wireframes/` (shared/template) and all `docs/epics/*/wireframes/` folders
 - **Link from feature file** — add a `> **Wireframe**` callout directly after the feature title, before the first user story:
 
   ```markdown
-  > **Wireframe**: [docs/wireframes/E02-identity-access/login.excalidraw](../../../wireframes/E02-identity-access/login.excalidraw) · [preview](../../../wireframes/E02-identity-access/login.svg)
+  > **Wireframe**: [docs/epics/E02-identity-access/wireframes/login.excalidraw](../wireframes/login.excalidraw) · [preview](../wireframes/login.svg)
   ```
 
 #### Component kit template (`docs/wireframes/_template.excalidraw`)
@@ -372,7 +387,7 @@ For section builder anatomy, `yC` offset rules, element ID prefix conventions, s
 
 ## Agent Integrity Rules
 
-These rules exist to prevent a specific failure mode: an agent hitting a blocker, silently working around it, updating docs to justify the deviation, then marking work as done. This has happened before on this project (OpenIddict replaced with custom JWT without user approval). These rules are non-negotiable.
+These rules exist to prevent a specific failure mode: an agent hitting a blocker, silently working around it, updating docs to justify the deviation, then marking work as done. These rules are non-negotiable.
 
 - **Tech stack is immutable without explicit user approval**: the Tech Stack section above is the authoritative list. Never substitute, add, or remove a library — even temporarily or "just to unblock". If a specified library cannot be used, STOP, describe the exact blocker, and wait for the user to decide.
 - **Spec → code. Never code → spec**: deviations from a feature file AC, Tech Stack entry, or ADR are gaps to document — never a reason to retroactively update the spec to match what you did.
@@ -450,12 +465,13 @@ A US or layer is NOT done until all of the following are complete in the **same 
 
 ### Keeping high-level docs current (applies to every PR)
 
-**Diagrams** (`docs/diagrams/*.puml` + `.png`) — update in the same PR when:
+**Diagrams** (`docs/diagrams/*.excalidraw` + `.svg` and `docs/epics/E0{N}-name/diagrams/*.excalidraw` + `.svg`) — update in the same PR when:
 - A new module is introduced or a module's public boundary changes (domain events emitted, API surface added)
 - A cross-module flow changes (e.g., how modules communicate via Wolverine events)
-- After editing any `.puml` file, run `docs/scripts/generate-diagrams.ps1` to regenerate the `.png`
+- After editing `docs/diagrams/generate-diagrams.mjs`, run `node docs/diagrams/generate-diagrams.mjs` to regenerate `.excalidraw` files, then `docs/scripts/generate-diagrams.ps1` to regenerate `.svg` files
+- **Never use PlantUML** — all diagrams are Excalidraw (`.excalidraw` + `.svg`). No `.puml` files exist in this project.
 
-**Wireframes** (`docs/wireframes/*.excalidraw` + `.svg`) — update in the same PR when:
+**Wireframes** (`docs/epics/*/wireframes/*.excalidraw` + `.svg` and `docs/wireframes/*.excalidraw` for shared/template) — update in the same PR when:
 - A new screen is introduced or an existing screen's layout changes
 - After editing any `.excalidraw` file, run `docs/scripts/generate-wireframes.ps1` to regenerate the `.svg`
 
@@ -479,9 +495,10 @@ Run through this before marking any task ✅ or raising a PR:
 **Code quality**
 - Tests pass — `dotnet test unit-tests.slnf` / `npm run test`
 - Zero build warnings — `dotnet build` / `npm run ci`
-- No TODO or FIXME introduced in this PR
-- No placeholder, stub, or dead code committed
-- No commented-out code left in
+- Run and confirm empty output:
+  ```bash
+  grep -rn "TODO\|FIXME\|NotImplementedException\|placeholder\|stub" src/ tests/ frontend/src/ 2>/dev/null | grep -v obj/ | grep -v node_modules/
+  ```
 
 **Gate 2 — Doc correctness (run each check explicitly, not as a batch)**
 - Walk the Gate 2 table row by row. For every row whose trigger fired in this PR, confirm the target doc is updated.
@@ -494,7 +511,22 @@ Run through this before marking any task ✅ or raising a PR:
 
 **Gate 3 — Retrospective (mandatory, runs in every PR before the final commit)**
 
-Answer each question explicitly. If the answer is "yes", update the relevant doc in this PR — not later.
+**Must produce written output — not a mental check.** Answer every question with yes/no and, for yes answers, state what was done. Format:
+
+```
+Gate 3:
+1. Uncovered new rule from test failure? No
+2. Invented invariant without AC? No
+3. Infrastructure footgun? No
+4. Non-obvious test setup? No
+5. Changed direction mid-task? No
+6. Spec gap discovered? No
+7. Incident-level doc added? No
+```
+
+For each "yes": update the relevant doc before committing, then note what was changed in the Gate 3 output.
+
+**Questions:**
 
 1. **Did any test fail for a reason not covered by an existing rule in `CLAUDE.md` or `patterns.md`?**
    If yes → add the rule or pitfall now.
@@ -513,6 +545,9 @@ Answer each question explicitly. If the answer is "yes", update the relevant doc
 
 6. **Was there a spec gap (missing AC, ambiguous lifecycle, unstated constraint) that only became visible during implementation or CI?**
    If yes → add the missing AC to the feature file now.
+
+7. **Did I add a doc entry or code example that embeds a library version number, a specific endpoint URL, or a production class/type name in rule text (rather than in a clearly-labelled example block)?**
+   If yes → move the specific detail into an example block and add a generalization note (e.g. "substitute your actual types"). Rule text must state the principle; specifics belong only in illustrative examples.
 
 This gate exists because process gaps that surface during implementation are the highest-value moment to close them — the problem is fresh, the context is loaded, and the fix takes minutes. The same gap discovered six months later takes hours to reconstruct.
 
@@ -538,8 +573,9 @@ For any **new** module: Domain → Application (no Docker needed) → Infrastruc
 - `docs/playbooks/wireframes.md` — component kit template rules (section builder anatomy, ID prefixes, offsets)
 - `docs/epics/E0{N}-*/README.md` — epic overview + implementation status table
 - `docs/epics/E0{N}-*/features/F0{N}-*.md` — feature + user stories with ACs
-- `docs/diagrams/` — system-level diagrams (.puml + .png)
-- `docs/scripts/generate-diagrams.ps1` — regenerates PNGs from .puml via Kroki.io POST API
+- `docs/diagrams/` — system-level diagrams (.excalidraw source + .svg preview); regenerate with `node docs/diagrams/generate-diagrams.mjs`
+- `docs/epics/E0{N}-name/diagrams/` — epic-level diagrams (.excalidraw + .svg); same generator as above
+- `docs/scripts/generate-diagrams.ps1` — regenerates SVGs from all .excalidraw diagram files via Kroki.io POST API
 - `docs/wireframes/` — screen wireframes (.excalidraw source + .svg preview)
 - `docs/scripts/generate-wireframes.ps1` — regenerates SVGs from .excalidraw via Kroki.io POST API
 

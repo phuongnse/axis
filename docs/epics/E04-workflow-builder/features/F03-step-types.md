@@ -1,6 +1,6 @@
 ﻿# F03 — Step Type Configuration
 
-> **Wireframe**: [docs/wireframes/E04-workflow-builder/workflow-editor.excalidraw](../../../wireframes/E04-workflow-builder/workflow-editor.excalidraw) · [preview](../../../wireframes/E04-workflow-builder/workflow-editor.svg)
+> **Wireframe**: [docs/epics/E04-workflow-builder/wireframes/workflow-editor.excalidraw](../wireframes/workflow-editor.excalidraw) · [preview](../wireframes/workflow-editor.svg)
 
 [← Back to E04](../README.md)
 
@@ -39,6 +39,7 @@ Each step has a type that determines what it does when executed. Users configure
 
 > **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: form picker UI, assignee expression evaluation, and timeout enforcement pending Frontend + E06.
+> Diagram pending: `StepType` enum missing `Start` and `End` values in workflow-model diagram. Update `workflowModelDiagram()` in `generate-diagrams.mjs`.
 > Decisions: step config (formId, assignee, timeout) stored as JSONB dict in `steps` column.
 
 ---

@@ -1,6 +1,6 @@
 ﻿# F03 — Data Class Management
 
-> **Wireframe**: [docs/wireframes/E03-data-modeling/data-classes.excalidraw](../../../wireframes/E03-data-modeling/data-classes.excalidraw) · [preview](../../../wireframes/E03-data-modeling/data-classes.svg)
+> **Wireframe**: [docs/epics/E03-data-modeling/wireframes/data-classes.excalidraw](../wireframes/data-classes.excalidraw) · [preview](../wireframes/data-classes.svg)
 
 [← Back to E03](../README.md)
 
@@ -37,6 +37,7 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 
 > **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Decisions: DataClass fields stored as JSONB using the same FieldDefinitionConverter as DataModel; Relation/DataClass/File types blocked in domain by guard.
+> Diagram pending: `DataClassField` entity to be removed from data-model diagram — DataClassDefinition reuses `FieldDefinition` directly (same entity as ModelDefinition). Update `dataModelDiagram()` in `generate-diagrams.mjs`.
 
 ---
 
