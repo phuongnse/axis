@@ -59,6 +59,7 @@ Scan this before acting. Full explanations are in the sections below.
 - Never bypass auth, silently skip an AC, or mark ✅ to avoid a difficult conversation
 - Domain layer: zero external dependencies (pure C#)
 - Modules communicate only via Wolverine events or Application-layer interfaces — no shared DB transactions
+- Never commit without a completed, **written** Gate 2 walk-through — a mental check is not a walk-through
 
 **P1 — Architectural (require user confirmation before deviating):**
 - Layer order: Domain → Application → Infrastructure → API → Frontend — no skipping
@@ -182,7 +183,17 @@ Every time code changes, the relevant docs change too — in the **same PR, not 
 | Replaced a framework or library with another | Every doc that names the old library — search for the old name across `docs/` and `src/` comments |
 | Decided a feature is out of scope or deferred | Document the decision explicitly in the affected feature file callout — never silently omit |
 
-**Gate 2 walk-through is mandatory.** Before every commit, go through the table above row by row. For each row, answer explicitly: did any change in this PR trigger this row? If yes, confirm the target doc is already updated in this PR. "I'll update docs later" = the docs are already out of date. Later never comes.
+**Gate 2 walk-through is mandatory and must produce written output — not a mental check.** Before every commit, work through the table row by row and write out which rows fired and what was updated. Format:
+
+```
+Gate 2:
+- Added/changed a library → not triggered
+- Established a new pattern → patterns.md § "..." updated
+- Completed a US layer → feature file callout updated
+- ...
+```
+
+If a row fired and the doc is not yet staged → update the doc first, then commit. An unwritten walk-through did not happen. "I'll update docs later" = the docs are already out of date.
 
 ### Docs navigation structure
 
