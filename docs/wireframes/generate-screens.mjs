@@ -9,7 +9,7 @@
  * (250 + 900 = 1150 < 1200). Never reduce W below 1200.
  *
  * Screens generated:
- *   _shared/app-shell
+ *   app-shell (root)
  *   E01: register-org, email-confirmation, verify-email,
  *        workspace-provisioning, pricing, settings-org,
  *        settings-org-delete-modal
@@ -139,7 +139,7 @@ function authCard(prefix, { title, subtitle = null, items = [], extraLink = null
   return els;
 }
 
-// ─── _shared ─────────────────────────────────────────────────────────────────
+// ─── App shell (shared layout reference) ─────────────────────────────────────
 
 function genAppShell() {
   const dashStats = component(buildStatsCards, cx, cy, 48);
@@ -172,7 +172,7 @@ function genAppShell() {
 
     text('as_act_view_all', cx + 20, cy + 420, 100, 16, 'View all activity →', 13, C.primary),
   ];
-  write('_shared/app-shell.excalidraw', els);
+  write('app-shell.excalidraw', els);
 }
 
 // ─── E01 Platform Foundation ─────────────────────────────────────────────────

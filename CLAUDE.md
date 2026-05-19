@@ -336,7 +336,7 @@ See [`docs/playbooks/process.md`](docs/playbooks/process.md) for the full step-b
 
 - **Location**: `docs/epics/{E0N-module-name}/wireframes/{screen-slug}.excalidraw` (source) + `.svg` (rendered preview) — co-located with the epic's `features/` and `diagrams/` folders
 - **Naming**: screen slug in kebab-case matching the primary route segment — `login`, `data-models`, `workflow-detail`
-- **Shared screens** (error pages, global settings) that don't belong to a single module go in `docs/wireframes/_shared/`
+- **Shared layout references** (app shell, error pages) that don't belong to any epic go in `docs/wireframes/` root alongside `_template.excalidraw`
 - **Format**: Excalidraw JSON (`roughness: 1`, sketch aesthetic) — both files committed; `.excalidraw` is diffable, `.svg` is for quick preview
 - **One wireframe per screen** — multiple user stories on the same screen share one wireframe file
 - **Generate SVG** after every edit: run `docs/scripts/generate-wireframes.ps1` — scans `docs/wireframes/` (shared/template) and all `docs/epics/*/wireframes/` folders

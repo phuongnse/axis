@@ -393,13 +393,13 @@ This is what makes `import { buildWorkflowCanvas } from './generate-template.mjs
 
 | Module | Files |
 |---|---|
-| `_shared/` | `app-shell` |
-| `E01-platform-foundation/` | `register-org`, `email-confirmation`, `verify-email`, `workspace-provisioning`, `pricing`, `settings-org`, `settings-org-delete-modal` |
-| `E02-identity-access/` | `login`, `register`, `forgot-password`, `change-password`, `accept-invitation`, `settings-users`, `settings-roles`, `settings-security` |
-| `E03-data-modeling/` | `data-models`, `data-classes`, `records` |
-| `E04-workflow-builder/` | `workflows`, `workflow-editor` |
-| `E05-form-builder/` | `forms`, `form-editor`, `form-submission` |
-| `E06-workflow-engine/` | `executions`, `execution-detail` |
+| `docs/wireframes/` (root) | `app-shell` |
+| `E01-platform-foundation/wireframes/` | `register-org`, `email-confirmation`, `verify-email`, `workspace-provisioning`, `pricing`, `settings-org`, `settings-org-delete-modal` |
+| `E02-identity-access/wireframes/` | `login`, `register`, `forgot-password`, `change-password`, `accept-invitation`, `settings-users`, `settings-roles`, `settings-security` |
+| `E03-data-modeling/wireframes/` | `data-models`, `data-classes`, `records` |
+| `E04-workflow-builder/wireframes/` | `workflows`, `workflow-editor` |
+| `E05-form-builder/wireframes/` | `forms`, `form-editor`, `form-submission` |
+| `E06-workflow-engine/wireframes/` | `executions`, `execution-detail` |
 
 ---
 
