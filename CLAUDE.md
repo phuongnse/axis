@@ -42,7 +42,7 @@ Multi-tenancy: schema-per-tenant in PostgreSQL (`tenant_{org_slug}`). Tenant res
 - **Domain**: zero external dependencies (pure C#). **Application**: depends on Domain only. **Infrastructure**: implements Application/Domain interfaces.
 - **Hard stops — never do any of the following:**
   - Reference another module's `Infrastructure` project from any layer
-  - Query another module's database tables directly (no cross-module `DbSet<T>` access)
+  - Query another module's database tables directly — via `DbSet<T>`, `SqlQueryRaw`, `ExecuteSqlRaw`, `FromSqlRaw`, or any other mechanism. **This applies to raw SQL too.** If module A needs data owned by module B, A must maintain its own local copy synced via Wolverine domain events (see `docs/playbooks/patterns.md § Cross-module data pattern`).
   - Share a `DbContext` instance across module boundaries
   - Use `IMediator` to dispatch a domain event (use Wolverine outbox only)
 
@@ -285,6 +285,7 @@ See [`docs/playbooks/testing.md`](docs/playbooks/testing.md) for full patterns �
 - **Read vs write**: `AsNoTracking()` on read-only paths only. Write paths must use tracked queries.
 - **Unit of Work**: `SaveChangesAsync` called only via `IUnitOfWork` in the handler, never inside a repository. Repositories only add/query `DbSet<T>`.
 - **No `IQueryable` from repositories**: repository methods return materialized types (`T?`, `List<T>`, `PagedResult<T>`).
+- **"No DbSet for this table" is a stop signal, not a raw SQL invitation**: if a repository method needs data from a table that has no `DbSet<T>` in the current module's `DbContext`, the correct response is always to stop and ask — never to reach for `SqlQueryRaw`/`ExecuteSqlRaw`. The absence of a `DbSet` means either (a) the data belongs to another module and must be accessed via event-driven local denormalization, or (b) the data is an owned entity accessed via the aggregate root. Raw SQL that names a table not owned by this module is a P0 violation regardless of how it is written. See PATTERNS.md § "Cross-module data pattern".
 - **No N+1**: lazy loading disabled globally. Always explicit `Include`/`ThenInclude`. List queries project to DTOs via `.Select()`. See PATTERNS.md.
 - **Projection-first for lists**: never materialise entities before projecting for list endpoints — call `.Select(...)` before `.ToListAsync()`, not after. Avoid `Include` chains on list queries; project directly to DTOs instead. Loading full aggregates to map them in memory is forbidden on list paths.
 - **NuGet**: check `Directory.Packages.props` before adding any library. Never `dotnet add package` — it corrupts CPM. See PATTERNS.md for the correct procedure.
@@ -450,10 +451,11 @@ A US or layer is NOT done until all of the following are complete in the **same 
 
 ### Keeping high-level docs current (applies to every PR)
 
-**Diagrams** (`docs/diagrams/*.puml` + `.png`) — update in the same PR when:
+**Diagrams** (`docs/diagrams/*.excalidraw` + `.svg` and `docs/epics/E0{N}-name/diagrams/*.excalidraw` + `.svg`) — update in the same PR when:
 - A new module is introduced or a module's public boundary changes (domain events emitted, API surface added)
 - A cross-module flow changes (e.g., how modules communicate via Wolverine events)
-- After editing any `.puml` file, run `docs/scripts/generate-diagrams.ps1` to regenerate the `.png`
+- After editing `docs/diagrams/generate-diagrams.mjs`, run `node docs/diagrams/generate-diagrams.mjs` to regenerate `.excalidraw` files, then `docs/scripts/generate-diagrams.ps1` to regenerate `.svg` files
+- **Never use PlantUML** — all diagrams are Excalidraw (`.excalidraw` + `.svg`). No `.puml` files exist in this project.
 
 **Wireframes** (`docs/wireframes/*.excalidraw` + `.svg`) — update in the same PR when:
 - A new screen is introduced or an existing screen's layout changes
@@ -538,8 +540,9 @@ For any **new** module: Domain → Application (no Docker needed) → Infrastruc
 - `docs/playbooks/wireframes.md` — component kit template rules (section builder anatomy, ID prefixes, offsets)
 - `docs/epics/E0{N}-*/README.md` — epic overview + implementation status table
 - `docs/epics/E0{N}-*/features/F0{N}-*.md` — feature + user stories with ACs
-- `docs/diagrams/` — system-level diagrams (.puml + .png)
-- `docs/scripts/generate-diagrams.ps1` — regenerates PNGs from .puml via Kroki.io POST API
+- `docs/diagrams/` — system-level diagrams (.excalidraw source + .svg preview); regenerate with `node docs/diagrams/generate-diagrams.mjs`
+- `docs/epics/E0{N}-name/diagrams/` — epic-level diagrams (.excalidraw + .svg); same generator as above
+- `docs/scripts/generate-diagrams.ps1` — regenerates SVGs from all .excalidraw diagram files via Kroki.io POST API
 - `docs/wireframes/` — screen wireframes (.excalidraw source + .svg preview)
 - `docs/scripts/generate-wireframes.ps1` — regenerates SVGs from .excalidraw via Kroki.io POST API
 

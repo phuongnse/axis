@@ -1,5 +1,5 @@
-using System.Text.Json;
 using Axis.DataModeling.Domain.Enums;
+using Axis.DataModeling.Domain.ValueObjects;
 
 namespace Axis.Api.Endpoints;
 
@@ -8,4 +8,4 @@ public record AddDataClassFieldRequest(
     string Label,
     FieldType Type,
     bool IsRequired,
-    JsonElement Config);
+    FieldConfig Config);

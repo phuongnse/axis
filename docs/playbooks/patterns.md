@@ -1265,47 +1265,94 @@ opts.ScheduleJob<ArchiveOldExecutionsCommand>(cron: "0 2 * * *"); // daily at 02
 
 ---
 
-## Cross-module read pattern
+## Cross-module data pattern
 
-Modules never share DbContexts and never reference each other's repositories or Application assemblies.
+**Core rule: a module only queries its own tables. Always. No exceptions.**
 
-**Option A — Wolverine request/response (preferred for non-critical paths):**
+If module A needs data owned by module B, A must maintain its own local copy of that data, kept in sync via Wolverine domain events. This is the Share Nothing principle — modules are data-sovereign.
 
-Publish a query message via `_messageBus.InvokeAsync<TResponse>`. The responding module handles it in its own Application layer. Clean separation, but adds a small round-trip.
-
-**Option B — Raw SQL reader (for critical hot paths):**
-
-A thin reader class in the consuming module's Infrastructure layer executes a targeted SQL query directly on the source module's table. Acceptable when Wolverine round-trip latency is unacceptable (e.g., execution hot path). Must be documented with a comment.
+### ❌ Anti-pattern: cross-module raw SQL (removed from codebase)
 
 ```csharp
-// WorkflowEngine.Application/CrossModule/IWorkflowDefinitionReader.cs
-// Interface defined in Application — Infrastructure implements it.
-public interface IWorkflowDefinitionReader
+// WRONG — FormRepository querying WorkflowBuilder's table directly
+int count = await context.Database
+    .SqlQueryRaw<int>("SELECT COUNT(*) FROM workflow_definitions WHERE steps @> {0}::jsonb", ...)
+    .FirstAsync(ct);
+```
+
+This pattern was previously documented here as "Option B — Raw SQL reader for hot paths". **That guidance was wrong and has been removed.** It silently breaks module isolation, causes test failures when modules use separate databases, and creates hidden coupling that makes the system fragile.
+
+### ✅ Correct pattern: event-driven local denormalization
+
+When module A needs to know something about module B's data, B publishes domain events when that data changes. A listens via Wolverine and maintains its own local copy.
+
+**Example: FormBuilder needs to know if a form is referenced by any workflow.**
+
+**Step 1 — Source module (WorkflowBuilder) raises events when its state changes:**
+
+```csharp
+// WorkflowBuilder.Domain/Events/FormStepAdded.cs
+public sealed record FormStepAdded(Guid WorkflowId, Guid StepId, Guid FormId) : IDomainEvent;
+
+// WorkflowBuilder.Domain/Events/FormStepRemoved.cs
+public sealed record FormStepRemoved(Guid WorkflowId, Guid StepId, Guid FormId) : IDomainEvent;
+
+// Raised inside WorkflowDefinition.AddStep() when StepType == Form
+RaiseDomainEvent(new FormStepAdded(Id, step.Id, formId));
+```
+
+**Step 2 — Consuming module (FormBuilder) stores its own local copy:**
+
+```csharp
+// FormBuilder.Domain/Entities/FormWorkflowReference.cs
+// Simple record — no aggregate, no lifecycle; owned by FormBuilder's DB
+public sealed class FormWorkflowReference
 {
-    Task<WorkflowSnapshot?> GetPublishedAsync(Guid workflowId, CancellationToken ct);
+    public Guid FormId { get; init; }
+    public Guid WorkflowId { get; init; }
+    public Guid StepId { get; init; }
 }
 
-// WorkflowEngine.Infrastructure/CrossModule/WorkflowDefinitionReader.cs
-internal sealed class WorkflowDefinitionReader(NpgsqlDataSource dataSource, ITenantContext tenant)
-    : IWorkflowDefinitionReader
+// FormBuilder.Infrastructure/Handlers/FormStepAddedHandler.cs
+public sealed class FormStepAddedHandler(FormBuilderDbContext db)
 {
-    // Cross-module raw SQL read — justified because WorkflowEngine reads the workflow definition
-    // on every step execution; Wolverine request/response would add unacceptable latency here.
-    public async Task<WorkflowSnapshot?> GetPublishedAsync(Guid workflowId, CancellationToken ct)
+    public async Task Handle(FormStepAdded evt, CancellationToken ct)
     {
-        string schema = tenant.Schema;
-        await using NpgsqlConnection conn = await dataSource.OpenConnectionAsync(ct);
-        // SELECT only the columns needed — never SELECT *
-        // Always filter by schema and status to avoid cross-tenant reads
+        db.FormWorkflowReferences.Add(new FormWorkflowReference
+        {
+            FormId = evt.FormId, WorkflowId = evt.WorkflowId, StepId = evt.StepId
+        });
+        await db.SaveChangesAsync(ct);
     }
 }
 ```
 
-**Rules:**
-- `IWorkflowDefinitionReader` is defined in the Application layer of the consuming module — never imported from the source module's assembly.
-- Always prefix the table name with `ITenantContext.Schema`.
-- Always add a comment explaining why raw SQL cross-module was used over Wolverine request/response.
-- Select only the columns needed — never `SELECT *`.
+**Step 3 — Consuming module queries only its own table:**
+
+```csharp
+// FormRepository.IsReferencedByWorkflowAsync — queries FormBuilder's own DB
+public async Task<bool> IsReferencedByWorkflowAsync(Guid formId, CancellationToken ct = default)
+    => await context.FormWorkflowReferences.AnyAsync(r => r.FormId == formId, ct);
+```
+
+### Rules
+
+- **Never** use `SqlQueryRaw`, `ExecuteSqlRaw`, `FromSqlRaw`, or any raw SQL that references a table from another module.
+- **Never** inject another module's `DbContext` into your repositories or handlers.
+- The source module (B) owns the event — define it in B's Domain layer.
+- The consuming module (A) owns the handler and the local copy table — both in A's Infrastructure layer.
+- The Wolverine handler in A is idempotent: use upsert or check-before-insert to handle duplicate events.
+- If the consuming module needs derived state (e.g., "is the form referenced at all?"), compute it from the local copy at query time — do not try to sync aggregated state.
+
+### Pre-commit violation sweep
+
+Run this before every commit that touches Infrastructure code:
+
+```powershell
+grep -rn "SqlQueryRaw\|ExecuteSqlRaw\|FromSqlRaw\|ExecuteSqlInterpolated" src/Modules/ --include="*.cs"
+```
+
+For every match: confirm the SQL only references tables owned by that match's own module. If it references another module's table → P0 violation, must fix before committing.
 
 ---
 

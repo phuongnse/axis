@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Axis.Api.Authorization;
 using Axis.Api.Extensions;
 using Axis.Api.Infrastructure;
@@ -202,7 +201,6 @@ public static class ModelEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        FieldConfig config = FieldConfigHelper.Deserialize(request.Type, request.Config);
         Result<Guid> result = await mediator.Send(new AddFieldCommand(
             modelId,
             currentUser.OrgId,
@@ -210,7 +208,7 @@ public static class ModelEndpoints
             request.Label,
             request.Type,
             request.IsRequired,
-            config), ct);
+            request.Config), ct);
 
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.Created($"/api/models/{modelId}/fields/{result.Value}", new { id = result.Value });
@@ -224,7 +222,6 @@ public static class ModelEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        FieldConfig config = FieldConfigHelper.Deserialize(request.Type, request.Config);
         Result result = await mediator.Send(new UpdateFieldCommand(
             modelId,
             fieldId,
@@ -232,7 +229,7 @@ public static class ModelEndpoints
             request.Label,
             request.HelpText,
             request.IsRequired,
-            config), ct);
+            request.Config), ct);
 
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();

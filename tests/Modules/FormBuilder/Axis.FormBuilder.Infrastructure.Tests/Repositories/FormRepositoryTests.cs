@@ -1,8 +1,8 @@
 using Axis.FormBuilder.Domain.Aggregates;
 using Axis.FormBuilder.Domain.Enums;
+using Axis.FormBuilder.Domain.ReadModels;
 using Axis.FormBuilder.Domain.ValueObjects;
 using FluentAssertions;
-using Npgsql;
 
 namespace Axis.FormBuilder.Infrastructure.Tests.Repositories;
 
@@ -146,16 +146,9 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
     {
         var form = MakeForm("Referenced Form");
         await _sut.AddAsync(form);
+        _ctx.FormWorkflowReferences.Add(
+            FormWorkflowReference.Create(Guid.NewGuid(), form.Id, form.OrganizationId));
         await _ctx.SaveChangesAsync();
-
-        // Insert a workflow_definitions row that references this form in its steps JSONB
-        await using var conn = new NpgsqlConnection(db.ConnectionString);
-        await conn.OpenAsync();
-        await using var cmd = conn.CreateCommand();
-        cmd.CommandText =
-            $"INSERT INTO \"test_form_builder\".workflow_definitions (id, steps) " +
-            $"VALUES (gen_random_uuid(), '[{{\"type\":\"Form\",\"config\":{{\"formId\":\"{form.Id:D}\"}}}}]'::jsonb)";
-        await cmd.ExecuteNonQueryAsync();
 
         var referenced = await _sut.IsReferencedByWorkflowAsync(form.Id);
 

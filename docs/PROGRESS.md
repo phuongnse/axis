@@ -40,11 +40,12 @@
 
 ## FormBuilder — E05-form-builder
 
-**Domain ✅ | Application ✅ | Infrastructure ✅ | API ⏳ | Frontend ⏳**
+**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳**
 
-- **Domain**: FormDefinition, FormField aggregates; all field types and domain events. FormSubmission aggregate (Pending/Submitted/Expired/Cancelled state machine; AccessToken Guid; FormTaskCreated/Submitted/Expired/Cancelled events).
+- **Domain**: FormDefinition, FormField aggregates; all field types and domain events. FormSubmission aggregate (Pending/Submitted/Expired/Cancelled state machine; AccessToken Guid; FormTaskCreated/Submitted/Expired/Cancelled events). `FormWorkflowReference` read model (local denormalization for cross-module isolation).
 - **Application**: CreateForm, DeleteForm, UpdateForm commands; GetForms, GetFormById queries; AddFieldToForm, RemoveFieldFromForm, ReorderFormFields commands. Decision: GetFormsHandler uses in-memory pagination (accepted MVP trade-off; Page/PageSize inputs clamped to valid range).
-- **Infrastructure**: FormBuilderDbContext, EF Core config (FormDefinition with fields as JSONB via FormFieldConverter — 9 field types, polymorphic FormFieldConfig), FormRepository (IsReferencedByWorkflowAsync cross-module JSONB query), 8 integration tests (Testcontainers)
+- **Infrastructure**: FormBuilderDbContext, EF Core config (FormDefinition with fields as JSONB via FormFieldConverter — 9 field types, polymorphic FormFieldConfig), `FormWorkflowReference` EF config + migration, Wolverine handlers (`WorkflowPublishedHandler`, `WorkflowArchivedHandler`, `WorkflowUnarchivedHandler`) maintaining local reference table — eliminates cross-module raw SQL. `IsReferencedByWorkflowAsync` queries `form_workflow_references` (own table). 8 integration tests (Testcontainers).
+- **API**: 11 Minimal API endpoints — `GET/POST /api/forms`, `GET/PUT/DELETE /api/forms/{id}`, `POST /api/forms/{id}/fields`, `PUT /api/forms/{id}/fields/{fieldId}`, `DELETE /api/forms/{id}/fields/{fieldId}`, `PUT /api/forms/{id}/fields/reorder`. NullFormBuilderUnitOfWork + FormBuilderDbContext EnsureCreatedAsync (own `axis_fb_test` DB) in ApiTestFixture. 21 API integration tests — all passing.
 
 ## WorkflowEngine — E06-workflow-engine
 
@@ -52,7 +53,7 @@
 
 - **Domain**: WorkflowExecution aggregate with execution state machine, domain events, and step management methods (AddStep/StartStep/CompleteStep/FailStep/WaitStep/SkipStep/CancelStep). ExecutionStep as owned Entity<Guid> (Pending/Running/Waiting/Completed/Failed/Skipped/Cancelled state machine; InputSnapshot/OutputSnapshot; IsTerminal for idempotency; StepType enum — events raised by WorkflowExecution, not ExecutionStep). `CreateRetryWithModifiedContext` added for US-102.
 - **Application**: StartExecution, CancelExecution, RetryExecution, RetryExecutionWithContext commands. GetExecution (with step timeline), GetExecutionsByWorkflow (paged + status filter), GetAllExecutions (paged + status filter), GetRetryHistory queries. DTOs: ExecutionSummaryResponse, ExecutionStepResponse, ExecutionResponse.
-- **Infrastructure**: WorkflowEngineDbContext (WorkflowExecution only — ExecutionStep is an owned entity, no standalone DbSet), EF Core config (WorkflowExecution `_context` as JSONB; ExecutionStep InputSnapshot/OutputSnapshot as JSONB, mapped via `OwnsMany` with `WithOwner().HasForeignKey(s => s.ExecutionId)`), ExecutionRepository (8 methods including paginated projection queries + GetWithStepsAsync via `Include(e => e.Steps)` + GetRetriesAsync), WorkflowDefinitionReader, WorkflowEngineUnitOfWork. EF migration `AddExecutionSteps` (creates `workflow_executions` + `execution_steps` tables with FK `ExecutionId → workflow_executions.Id`). 8 existing + 10 new integration tests (Testcontainers — require Docker).
+- **Infrastructure**: WorkflowEngineDbContext (WorkflowExecution only — ExecutionStep is an owned entity, no standalone DbSet), EF Core config (WorkflowExecution `_context` as JSONB; ExecutionStep InputSnapshot/OutputSnapshot as JSONB, mapped via `OwnsMany` with `WithOwner().HasForeignKey(s => s.ExecutionId)`), ExecutionRepository (8 methods including paginated projection queries + GetWithStepsAsync via `Include(e => e.Steps)` + GetRetriesAsync), WorkflowDefinitionReader (queries `workflow_active_statuses` — no cross-module SQL), WorkflowEngineUnitOfWork. `WorkflowActiveStatus` read model + EF config + migration `AddWorkflowActiveStatuses`. Wolverine handlers (`WorkflowPublishedHandler`, `WorkflowArchivedHandler`, `WorkflowUnarchivedHandler`) maintaining `workflow_active_statuses` — eliminates cross-module raw SQL into WorkflowBuilder's tables. EF migration `AddExecutionSteps`. 8 existing + 10 new integration tests (Testcontainers — require Docker).
 
 ## PageBuilder — E07-page-builder
 

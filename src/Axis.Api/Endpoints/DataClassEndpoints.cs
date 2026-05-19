@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Axis.Api.Authorization;
 using Axis.Api.Extensions;
 using Axis.Api.Infrastructure;
@@ -176,7 +175,6 @@ public static class DataClassEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        FieldConfig config = FieldConfigHelper.Deserialize(request.Type, request.Config);
         Result<Guid> result = await mediator.Send(new AddFieldToDataClassCommand(
             dataClassId,
             currentUser.OrgId,
@@ -184,7 +182,7 @@ public static class DataClassEndpoints
             request.Label,
             request.Type,
             request.IsRequired,
-            config), ct);
+            request.Config), ct);
 
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.Created($"/api/data-classes/{dataClassId}/fields/{result.Value}", new { id = result.Value });
