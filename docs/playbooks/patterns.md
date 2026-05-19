@@ -1347,10 +1347,7 @@ public async Task<bool> IsReferencedByWorkflowAsync(Guid formId, CancellationTok
 - The source module (B) owns the event — define it in B's Domain layer.
 - The consuming module (A) owns the handler and the local copy table — both in A's Infrastructure layer.
 - The Wolverine handler in A is idempotent: use upsert or check-before-insert to handle duplicate events.
-- **Cross-module event handlers must always filter by `OrganizationId`** in addition to the entity ID. A handler that queries only by `WorkflowId` (or similar) without `OrganizationId` can silently affect rows belonging to other tenants if the same ID happens to collide — or, more practically, it makes the tenant isolation assumption implicit and fragile. Always include both:
-  ```csharp
-  .Where(r => r.WorkflowId == @event.WorkflowId && r.OrganizationId == @event.OrganizationId)
-  ```
+- **Cross-module event handlers must filter by `OrganizationId`** in addition to the entity foreign key. Filtering only by the entity ID leaves tenant isolation implicit — always make it explicit by including both keys in every `Where` clause.
 - If the consuming module needs derived state computed (e.g., "is the form referenced at all?"), compute it from the local copy at query time — do not try to sync aggregated state.
 
 ### Pre-commit violation sweep
@@ -1416,7 +1413,7 @@ public async Task Handle(WorkflowPublished @event, CancellationToken ct)
 }
 ```
 
-Apply this pattern when: (a) the handler is a Wolverine consumer (at-least-once), (b) the operation involves an INSERT guarded by a unique constraint, and (c) concurrent handler execution is plausible (e.g., high-volume event bus, test environments with parallel test runs).
+Use this pattern whenever a Wolverine handler does a check-before-insert and concurrent execution is plausible — check-before-insert is not race-safe on its own.
 
 **Migrations — idempotent raw SQL:**
 
@@ -1500,24 +1497,21 @@ Role viewerRole = ctx.Roles.First(r => r.Name == "Viewer" && r.OrganizationId ==
 
 The restructured version hides what type is being worked with, discards future flexibility (e.g. if a second property is later needed), and violates the intent of "no `var`" — which is to make types explicit, not to obscure them by different means.
 
-### 3. `JsonElement` from `ReadFromJsonAsync` — no `!` needed in tests
+### 3. Verify `!` is actually needed before adding it
 
-`HttpContent.ReadFromJsonAsync<JsonElement>()` can be assigned directly to `JsonElement` without the null-forgiving operator `!`. The `!` is a workaround, not a fix.
+Before using the null-forgiving operator `!` to suppress a nullable annotation, check whether the assignment compiles without it. If the existing codebase already uses the same API without `!`, adding it is a workaround — not a fix.
 
-**Wrong** — unnecessary null-forgiving operator:
+**Wrong** — `!` added without verifying it is needed:
 ```csharp
 JsonElement body = (await resp.Content.ReadFromJsonAsync<JsonElement>(Json))!;
 ```
 
-**Right** — direct assignment, consistent with existing `AuthHelper.cs` pattern:
+**Right** — direct assignment works; `!` is unnecessary:
 ```csharp
 JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
 ```
 
-For array responses (`JsonElement[]`), use the nullable reference type since arrays are reference types:
-```csharp
-JsonElement[]? sessions = await resp.Content.ReadFromJsonAsync<JsonElement[]>(Json);
-```
+The rule: grep the codebase for the same API call before reaching for `!`. If existing call sites omit it and compile, you should too.
 
 ### 4. No scaffold placeholder files
 
