@@ -1641,7 +1641,7 @@ export function buildStatsCards(y0) {
 
   // Mini line chart (trend)
   els.push(hline('stat_trend_chart_base', 460, yC + 76, 100, C.gray100, 1));
-  const s = Date.now();
+  const s = nextSeed();
   els.push({
     ...({ type: 'line', strokeColor: C.primary, backgroundColor: 'transparent', fillStyle: 'solid', strokeWidth: 2, strokeStyle: 'solid', roughness: 1, roundness: { type: 2 }, seed: s, versionNonce: s + 1, lastCommittedPoint: null, startBinding: null, endBinding: null, startArrowhead: null, endArrowhead: null }),
     id: 'stat_trend_line',
