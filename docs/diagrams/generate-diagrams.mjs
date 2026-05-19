@@ -625,8 +625,8 @@ function dataModelDiagram() {
   els.push(...arrow({ x1: fld.midRight.x, y1: fld.midRight.y, x2: ftype.midLeft.x, y2: ftype.midLeft.y, label: "has type" }));
   els.push(...arrow({ x1: dcd.midRight.x, y1: dcd.midRight.y, x2: dcf.midLeft.x, y2: dcf.midLeft.y, label: "1 *--" }));
   els.push(...arrow({ x1: dcf.midRight.x, y1: dcf.midRight.y + 20, x2: ftype.midLeft.x, y2: ftype.midBottom.y - 20, label: "has type", dashed: true }));
-  els.push(...arrow({ x1: fld.midBottom.x - 20, y1: fld.bottom, x2: dcd.midTop.x + 20, y2: dcd.top, label: "→ DataClass ref", dashed: true }));
-  els.push(...arrow({ x1: rec.midTop.x, y1: rec.top, x2: mdl.midBottom.x, y2: mdl.bottom, label: "instance of", dashed: true }));
+  els.push(...arrow({ x1: fld.midBottom.x - 20, y1: fld.midBottom.y, x2: dcd.midTop.x + 20, y2: dcd.midTop.y, label: "→ DataClass ref", dashed: true }));
+  els.push(...arrow({ x1: rec.midTop.x, y1: rec.midTop.y, x2: mdl.midBottom.x, y2: mdl.midBottom.y, label: "instance of", dashed: true }));
 
   return excalidraw(els);
 }
@@ -669,13 +669,13 @@ function workflowModelDiagram() {
   for (const b of [wfd, wfs, trig, trigType, step, stepType, trans, pg, jt]) els.push(...b.els);
 
   // Relationships
-  els.push(...arrow({ x1: wfd.midBottom.x, y1: wfd.bottom, x2: wfs.midTop.x, y2: wfs.top, label: "status" }));
+  els.push(...arrow({ x1: wfd.midBottom.x, y1: wfd.midBottom.y, x2: wfs.midTop.x, y2: wfs.midTop.y, label: "status" }));
   els.push(...arrow({ x1: wfd.midRight.x, y1: wfd.midRight.y - 10, x2: trig.midLeft.x, y2: trig.midLeft.y, label: "1 -- 1" }));
   els.push(...arrow({ x1: wfd.midRight.x, y1: wfd.midRight.y + 10, x2: step.midLeft.x, y2: step.midLeft.y, label: "1 *--" }));
   els.push(...arrow({ x1: wfd.midRight.x, y1: wfd.midRight.y + 30, x2: trans.midLeft.x, y2: trans.midLeft.y, label: "1 *--" }));
-  els.push(...arrow({ x1: trig.midBottom.x, y1: trig.bottom, x2: trigType.midTop.x, y2: trigType.top, label: "type" }));
-  els.push(...arrow({ x1: step.midBottom.x, y1: step.bottom, x2: stepType.midTop.x, y2: stepType.top, label: "type" }));
-  els.push(...arrow({ x1: pg.midBottom.x, y1: pg.bottom, x2: jt.midTop.x, y2: jt.top, label: "joinType" }));
+  els.push(...arrow({ x1: trig.midBottom.x, y1: trig.midBottom.y, x2: trigType.midTop.x, y2: trigType.midTop.y, label: "type" }));
+  els.push(...arrow({ x1: step.midBottom.x, y1: step.midBottom.y, x2: stepType.midTop.x, y2: stepType.midTop.y, label: "type" }));
+  els.push(...arrow({ x1: pg.midBottom.x, y1: pg.midBottom.y, x2: jt.midTop.x, y2: jt.midTop.y, label: "joinType" }));
   els.push(...arrow({ x1: step.midRight.x, y1: step.midRight.y + 20, x2: pg.midLeft.x, y2: pg.midLeft.y, label: "0..1", dashed: true }));
 
   return excalidraw(els);
@@ -716,8 +716,8 @@ function formModelDiagram() {
   els.push(...arrow({ x1: fdef.midRight.x, y1: fdef.midRight.y - 8, x2: fsec.midLeft.x, y2: fsec.midLeft.y, label: "1 *--" }));
   els.push(...arrow({ x1: fdef.midRight.x, y1: fdef.midRight.y + 8, x2: ffield.midLeft.x, y2: ffield.midLeft.y, label: "1 *--" }));
   els.push(...arrow({ x1: ffield.midRight.x, y1: ffield.midRight.y, x2: fft.midLeft.x, y2: fft.midLeft.y, label: "type" }));
-  els.push(...arrow({ x1: fdef.midBottom.x, y1: fdef.bottom, x2: ftask.midTop.x, y2: ftask.top, label: "→ runtime" }));
-  els.push(...arrow({ x1: ftask.midBottom.x, y1: ftask.bottom, x2: fts.midTop.x, y2: fts.top, label: "status" }));
+  els.push(...arrow({ x1: fdef.midBottom.x, y1: fdef.midBottom.y, x2: ftask.midTop.x, y2: ftask.midTop.y, label: "→ runtime" }));
+  els.push(...arrow({ x1: ftask.midBottom.x, y1: ftask.midBottom.y, x2: fts.midTop.x, y2: fts.midTop.y, label: "status" }));
   els.push(...arrow({ x1: ftask.midRight.x, y1: ftask.midRight.y + 30, x2: fsub.midLeft.x, y2: fsub.midLeft.y, label: "1 -- 1" }));
 
   return excalidraw(els);
