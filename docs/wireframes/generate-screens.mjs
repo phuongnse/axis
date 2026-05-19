@@ -63,7 +63,15 @@ const NAV = ['Data Models', 'Workflows', 'Forms', 'Executions', 'Settings'];
 // ─── Write helper ─────────────────────────────────────────────────────────────
 
 function write(relativePath, elements) {
-  const full = join(__dir, relativePath);
+  let full;
+  if (/^E0\d-/.test(relativePath)) {
+    // Epic wireframe → docs/epics/{epic}/wireframes/{screen}
+    const [epicFolder, ...rest] = relativePath.split('/');
+    full = join(__dir, '..', 'epics', epicFolder, 'wireframes', ...rest);
+  } else {
+    // Shared wireframe → docs/wireframes/{path}
+    full = join(__dir, relativePath);
+  }
   mkdirSync(dirname(full), { recursive: true });
   writeExcalidraw(full, elements);
   console.log(`✓  ${relativePath}  (${elements.length} elements)`);

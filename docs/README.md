@@ -67,11 +67,11 @@ All diagrams are Excalidraw (`.excalidraw` source + `.svg` preview). Regenerate 
 
 ## Wireframes
 
-Excalidraw wireframes live in `docs/wireframes/`. Each feature file links to its wireframe via a `> **Wireframe**` callout directly after the feature title.
+Excalidraw wireframes live in `docs/epics/{E0N}/wireframes/`, co-located with each epic's features and diagrams. Shared screens (template, app-shell) remain in `docs/wireframes/`. Each feature file links to its wireframe via a `> **Wireframe**` callout directly after the feature title.
 
 | Screen | Source | Preview |
 |---|---|---|
-| Login | [login.excalidraw](./wireframes/E02-identity-access/login.excalidraw) | [login.svg](./wireframes/E02-identity-access/login.svg) |
+| Login | [login.excalidraw](./epics/E02-identity-access/wireframes/login.excalidraw) | [login.svg](./epics/E02-identity-access/wireframes/login.svg) |
 
 ---
 

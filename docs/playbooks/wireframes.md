@@ -15,7 +15,7 @@ This playbook covers everything needed to work with the wireframe generation sys
 | `docs/wireframes/generate-template.mjs` | 34-section component kit — imports from `components.mjs`, exports all builders |
 | `docs/wireframes/generate-screens.mjs` | 27 screen wireframes — imports builders from the template, places them via `component()` |
 | `docs/wireframes/_template.excalidraw` | Generated output of `generate-template.mjs` |
-| `docs/wireframes/{E0N-*}/*.excalidraw` | Generated outputs of `generate-screens.mjs` |
+| `docs/epics/{E0N-*}/wireframes/*.excalidraw` | Generated outputs of `generate-screens.mjs` — co-located with each epic |
 
 **Regeneration commands:**
 

@@ -1,6 +1,6 @@
 ﻿# F04 — Data Record CRUD
 
-> **Wireframe**: [docs/wireframes/E03-data-modeling/records.excalidraw](../../../wireframes/E03-data-modeling/records.excalidraw) · [preview](../../../wireframes/E03-data-modeling/records.svg)
+> **Wireframe**: [docs/epics/E03-data-modeling/wireframes/records.excalidraw](../wireframes/records.excalidraw) · [preview](../wireframes/records.svg)
 
 [← Back to E03](../README.md)
 

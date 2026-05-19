@@ -1,6 +1,6 @@
 ﻿# F04 — Permission System
 
-> **Wireframe**: [docs/wireframes/E02-identity-access/settings-roles.excalidraw](../../../wireframes/E02-identity-access/settings-roles.excalidraw) · [preview](../../../wireframes/E02-identity-access/settings-roles.svg)
+> **Wireframe**: [docs/epics/E02-identity-access/wireframes/settings-roles.excalidraw](../wireframes/settings-roles.excalidraw) · [preview](../wireframes/settings-roles.svg)
 
 [← Back to E02](../README.md)
 

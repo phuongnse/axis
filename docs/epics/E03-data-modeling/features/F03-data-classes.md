@@ -1,6 +1,6 @@
 ﻿# F03 — Data Class Management
 
-> **Wireframe**: [docs/wireframes/E03-data-modeling/data-classes.excalidraw](../../../wireframes/E03-data-modeling/data-classes.excalidraw) · [preview](../../../wireframes/E03-data-modeling/data-classes.svg)
+> **Wireframe**: [docs/epics/E03-data-modeling/wireframes/data-classes.excalidraw](../wireframes/data-classes.excalidraw) · [preview](../wireframes/data-classes.svg)
 
 [← Back to E03](../README.md)
 

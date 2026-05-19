@@ -1,8 +1,8 @@
-# F04 — Subscription Plan Management
+﻿# F04 — Subscription Plan Management
 
 [← Back to E01](../README.md)
 
-> **Wireframe**: [docs/wireframes/E01-platform-foundation/pricing.excalidraw](../../../wireframes/E01-platform-foundation/pricing.excalidraw) · [preview](../../../wireframes/E01-platform-foundation/pricing.svg)
+> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/pricing.excalidraw](../wireframes/pricing.excalidraw) · [preview](../wireframes/pricing.svg)
 
 ---
 

@@ -1,12 +1,12 @@
-# F01 — Tenant Registration & Provisioning
+﻿# F01 — Tenant Registration & Provisioning
 
 [← Back to E01](../README.md)
 
-> **Wireframe**: [docs/wireframes/E01-platform-foundation/register-org.excalidraw](../../../wireframes/E01-platform-foundation/register-org.excalidraw) · [preview](../../../wireframes/E01-platform-foundation/register-org.svg)
-> **Wireframe**: [docs/wireframes/E01-platform-foundation/email-confirmation.excalidraw](../../../wireframes/E01-platform-foundation/email-confirmation.excalidraw) · [preview](../../../wireframes/E01-platform-foundation/email-confirmation.svg)
-> **Wireframe**: [docs/wireframes/E01-platform-foundation/verify-email.excalidraw](../../../wireframes/E01-platform-foundation/verify-email.excalidraw) · [preview](../../../wireframes/E01-platform-foundation/verify-email.svg)
-> **Wireframe**: [docs/wireframes/E01-platform-foundation/workspace-provisioning.excalidraw](../../../wireframes/E01-platform-foundation/workspace-provisioning.excalidraw) · [preview](../../../wireframes/E01-platform-foundation/workspace-provisioning.svg)
-> **Wireframe**: [docs/wireframes/E01-platform-foundation/pricing.excalidraw](../../../wireframes/E01-platform-foundation/pricing.excalidraw) · [preview](../../../wireframes/E01-platform-foundation/pricing.svg)
+> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/register-org.excalidraw](../wireframes/register-org.excalidraw) · [preview](../wireframes/register-org.svg)
+> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/email-confirmation.excalidraw](../wireframes/email-confirmation.excalidraw) · [preview](../wireframes/email-confirmation.svg)
+> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/verify-email.excalidraw](../wireframes/verify-email.excalidraw) · [preview](../wireframes/verify-email.svg)
+> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/workspace-provisioning.excalidraw](../wireframes/workspace-provisioning.excalidraw) · [preview](../wireframes/workspace-provisioning.svg)
+> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/pricing.excalidraw](../wireframes/pricing.excalidraw) · [preview](../wireframes/pricing.svg)
 
 ---
 

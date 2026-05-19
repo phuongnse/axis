@@ -1,7 +1,7 @@
-# F01 — Authentication
+﻿# F01 — Authentication
 
-> **Wireframe**: [docs/wireframes/E02-identity-access/login.excalidraw](../../../wireframes/E02-identity-access/login.excalidraw) · [preview](../../../wireframes/E02-identity-access/login.svg)
-> **Wireframe**: [docs/wireframes/E02-identity-access/register.excalidraw](../../../wireframes/E02-identity-access/register.excalidraw) · [preview](../../../wireframes/E02-identity-access/register.svg)
+> **Wireframe**: [docs/epics/E02-identity-access/wireframes/login.excalidraw](../wireframes/login.excalidraw) · [preview](../wireframes/login.svg)
+> **Wireframe**: [docs/epics/E02-identity-access/wireframes/register.excalidraw](../wireframes/register.excalidraw) · [preview](../wireframes/register.svg)
 
 [← Back to E02](../README.md)
 

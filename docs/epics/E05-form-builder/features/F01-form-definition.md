@@ -1,6 +1,6 @@
-# F01 — Form Definition Management
+﻿# F01 — Form Definition Management
 
-> **Wireframe**: [docs/wireframes/E05-form-builder/forms.excalidraw](../../../wireframes/E05-form-builder/forms.excalidraw) · [preview](../../../wireframes/E05-form-builder/forms.svg)
+> **Wireframe**: [docs/epics/E05-form-builder/wireframes/forms.excalidraw](../wireframes/forms.excalidraw) · [preview](../wireframes/forms.svg)
 
 [← Back to E05](../README.md)
 
