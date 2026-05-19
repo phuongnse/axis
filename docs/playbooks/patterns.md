@@ -4,6 +4,8 @@
 
 > Read this file when the task involves any of: adding/updating NuGet packages, EF Core aggregate or JSONB mapping, Minimal API endpoint wiring, writing tests, implementing a list/query endpoint, adding async methods, defining response DTOs, writing repository methods, adding domain methods to an aggregate, working with multi-tenant raw SQL, Wolverine handlers or jobs, implementing a new step or field type, adding a cross-cutting concern, or any design decision about where logic should live. Skip otherwise.
 
+> **Contributing a new entry:** before adding a new section, check whether an existing section can absorb it. Write the *principle* first — the WHY and the class of problems it solves — then show one concrete example. A rule written only at the incident level ("when X happened, do Y") won't help a reader facing a different manifestation of the same problem.
+
 ## Contents
 
 - [Frontend Patterns](#frontend-patterns)
@@ -31,6 +33,7 @@
 - [Command idempotency pattern](#command-idempotency-pattern) ★
 - [Clean Code Principles](#clean-code-principles)
 - [Design Patterns in Practice](#design-patterns-in-practice)
+- [Code hygiene checklist](#code-hygiene-checklist)
 
 ---
 
@@ -298,6 +301,32 @@ public class MyCache(IServiceScopeFactory scopeFactory)
 ```
 
 **Rule:** Singletons must never depend on Scoped services directly. If a singleton needs scoped data, inject `IServiceScopeFactory` and resolve the scoped dependency per-operation. Check all singleton registrations in `Program.cs` — EF Core will warn about this at startup if `ValidateScopes` is enabled (it is in Development by default).
+
+### Eager configuration capture at registration time
+
+DI registrations run at startup. Any value captured at that point is frozen — overrides applied later (e.g., `WebApplicationFactory.ConfigureAppConfiguration` in tests) never take effect. Read configuration lazily inside the lambda, at resolution time.
+
+```csharp
+// ❌ wrong — connection string frozen at startup; test container overrides are ignored
+public static IServiceCollection AddWorkflowBuilderInfrastructure(
+    this IServiceCollection services, string connectionString)
+{
+    services.AddDbContext<WorkflowBuilderDbContext>(opts =>
+        opts.UseNpgsql(connectionString));
+}
+
+// ✅ correct — IConfiguration read inside the lambda, at DbContext resolution time.
+// Null guard ensures a missing connection string fails fast at startup, not on first request.
+public static IServiceCollection AddWorkflowBuilderInfrastructure(
+    this IServiceCollection services, IConfiguration configuration)
+{
+    services.AddDbContext<WorkflowBuilderDbContext>(opts =>
+        opts.UseNpgsql(configuration.GetConnectionString("WorkflowBuilder")
+            ?? throw new InvalidOperationException("Missing connection string 'WorkflowBuilder'.")));
+}
+```
+
+**Rule:** pass `IConfiguration` to every module infrastructure extension; read connection strings inside lambdas, never outside them. The null guard is not optional — it converts a cryptic NullReferenceException at first request into a clear startup failure.
 
 ---
 
@@ -745,9 +774,26 @@ public static WorkflowDefinition Create(string name, Guid organizationId, Guid c
 
 ---
 
+### New method — sibling contract check
+
+Before adding a method to any existing class (aggregate, handler, repository), read all sibling methods to understand the **implicit contract** they share. A new method must satisfy the same contract.
+
+For domain aggregates the shared contract across all mutating methods is: bump `UpdatedAt`, raise any required domain events, enforce spec-backed guards. Missing one of these compiles cleanly and may not be caught by a test that doesn't assert audit fields.
+
+**When adding a mutating method to an aggregate, verify against siblings:**
+- Every sibling bumps `UpdatedAt` → new method must too.
+- Some siblings raise domain events → decide explicitly whether the new method should (check the spec AC).
+- Sibling guards have spec ACs → new method's guards need spec ACs too (see Guard Clauses below).
+
+This principle applies beyond aggregates: a new repository method should match the `AsNoTracking` / `Include` / cancellation-token conventions of its siblings; a new handler should match the `IUnitOfWork` usage pattern of its siblings.
+
+---
+
 ### Guard Clauses — flat, readable invariant enforcement
 
 Use early-return guards in domain methods. The happy path stays at the bottom, readable at a glance.
+
+**Every guard must trace to a spec AC.** Before adding `throw InvalidOperationException(...)` in a domain method, identify the feature file AC that mandates this constraint. If no AC exists, add it to the spec first (see CLAUDE.md § "Domain invariants require spec backing"). A guard without a spec backing is an invented constraint that will silently block valid user workflows and contradict integration tests.
 
 ```csharp
 // ❌ wrong — nested if pyramid, hard to read
@@ -1267,7 +1313,40 @@ Visual Studio scaffolds `Class1.cs` when creating a new project. These files mus
 find src/ tests/ -name "Class1.cs" -not -path "*/obj/*"
 ```
 
-### 3. No direct commits to `main`
+### 3. User input flowing into external identifiers
+
+Any string derived from user input that becomes an external identifier — filename, ZIP entry name, URL slug, S3 key, Redis key — needs two checks:
+
+1. **Character safety**: use an allowlist, never a denylist or single-char replace. For filenames and ZIP entries the safe set is `[a-z0-9\-_]` after lowercasing and replacing spaces with `-`.
+2. **Uniqueness**: when the identifier is used in a set (ZIP archive, directory), handle the collision case — two workflows with the same name produce the same slug and will clash.
+
+```csharp
+// ❌ handles spaces only — "/" ":" "?" survive and corrupt filenames on Windows
+string slug = name.ToLowerInvariant().Replace(' ', '-');
+
+// ✅ allowlist — only safe chars survive; handle collisions at the call site
+private static string ToSafeSlug(string name)
+{
+    string slug = name.ToLowerInvariant().Replace(' ', '-');
+    slug = new string(slug.Where(c => char.IsAsciiLetterOrDigit(c) || c == '-' || c == '_').ToArray());
+    return slug.Trim('-', '_');
+}
+```
+
+Collision handling in a bulk operation:
+```csharp
+Dictionary<string, int> seen = new(StringComparer.Ordinal);
+foreach (WorkflowExportDto dto in workflows)
+{
+    string baseSlug = ToSafeSlug(dto.Name);
+    seen.TryGetValue(baseSlug, out int count);
+    string entrySlug = count == 0 ? baseSlug : $"{baseSlug}_{count + 1}";
+    seen[baseSlug] = count + 1;
+    // use entrySlug as the ZIP entry name
+}
+```
+
+### 4. No direct commits to `main`
 
 Every change — including one-line fixes — goes through a branch + PR. Steps:
 

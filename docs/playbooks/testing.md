@@ -36,6 +36,34 @@ Run `dotnet test unit-tests.slnf` before every commit. When adding a new unit te
 
 Any change affecting API response shape, status codes, or request contract must include updating all relevant files under `tests/Api/Axis.Api.Tests/` in the same PR. "Cannot run locally" is not an excuse.
 
+### ApiTestFixture — module database isolation
+
+**Every module that has its own `DbContext` must get its own isolated database** in `ApiTestFixture`. Never point two modules at the same PostgreSQL database.
+
+**Why:** `EnsureCreatedAsync` is a no-op when the target database already has tables — regardless of which module created them. If module B shares module A's database, and A runs `EnsureCreatedAsync` first, B's tables are never created and every test fails with `relation "..." does not exist`.
+
+**Pattern:** use the `CreateModuleDatabaseAsync` helper to provision a dedicated database before building the `WebApplicationFactory`:
+
+```csharp
+// ✅ correct — each module has its own isolated DB
+_dmConnectionString = await CreateModuleDatabaseAsync("axis_dm_test");
+_wbConnectionString = await CreateModuleDatabaseAsync("axis_wb_test");
+
+// configBuilder:
+["ConnectionStrings:DataModeling"] = _dmConnectionString,
+["ConnectionStrings:WorkflowBuilder"] = _wbConnectionString,
+
+// EnsureCreatedAsync for each module:
+var dmOptions = new DbContextOptionsBuilder<DataModelingDbContext>()
+    .UseNpgsql(_dmConnectionString).Options;
+await using DataModelingDbContext dmCtx = new(dmOptions, new PublicSchemaTenantContext());
+await dmCtx.Database.EnsureCreatedAsync();
+```
+
+Identity is the exception: it shares the host `postgres` database because OpenIddict stores are registered there and `IdentityDbContext` is intentionally `public`.
+
+**Rule:** when adding a new module to `ApiTestFixture`, always call `CreateModuleDatabaseAsync("{module}_test")` and use the returned connection string — never reuse `_postgres.GetConnectionString()` for a non-Identity module.
+
 ---
 
 ## Frontend testing

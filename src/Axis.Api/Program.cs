@@ -9,12 +9,10 @@ using Axis.Api.Infrastructure;
 using Axis.Api.Middleware;
 using Axis.DataModeling.Application.Commands.CreateModel;
 using Axis.DataModeling.Infrastructure.Extensions;
-using Axis.DataModeling.Infrastructure.Persistence;
 using Axis.FormBuilder.Application.Commands.CreateForm;
 using Axis.FormBuilder.Infrastructure.Extensions;
 using Axis.Identity.Application.Commands.RegisterOrganization;
 using Axis.Identity.Infrastructure.Extensions;
-using Axis.Identity.Infrastructure.Persistence;
 using Axis.Shared.Application.Behaviors;
 using Axis.Shared.Application.Tenancy;
 using Axis.Shared.Infrastructure.Tenancy;
@@ -168,9 +166,9 @@ try
     IConfiguration cfg = builder.Configuration;
     builder.Services.AddIdentityInfrastructure(cfg);
     builder.Services.AddDataModelingInfrastructure(cfg);
-    builder.Services.AddWorkflowBuilderInfrastructure(cfg.GetConnectionString("WorkflowBuilder")!);
-    builder.Services.AddFormBuilderInfrastructure(cfg.GetConnectionString("FormBuilder")!);
-    builder.Services.AddWorkflowEngineInfrastructure(cfg.GetConnectionString("WorkflowEngine")!);
+    builder.Services.AddWorkflowBuilderInfrastructure(cfg);
+    builder.Services.AddFormBuilderInfrastructure(cfg);
+    builder.Services.AddWorkflowEngineInfrastructure(cfg);
 
     // ── Redis ──────────────────────────────────────────────────────────────
     builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
@@ -273,6 +271,7 @@ try
     app.MapModelEndpoints();
     app.MapDataClassEndpoints();
     app.MapRecordEndpoints();
+    app.MapWorkflowEndpoints();
 
     app.Run();
 }

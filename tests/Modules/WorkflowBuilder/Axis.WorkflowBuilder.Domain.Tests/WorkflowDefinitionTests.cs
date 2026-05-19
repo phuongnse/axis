@@ -134,8 +134,8 @@ public class WorkflowDefinitionTests
     [Fact]
     public void Archive_WhenInDraftStatus_Throws()
     {
-        var wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
-        var act = () => wf.Archive();
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
+        Action act = () => wf.Archive();
         act.Should().Throw<InvalidOperationException>().WithMessage("*draft*");
     }
 
@@ -150,6 +150,25 @@ public class WorkflowDefinitionTests
         wf.Unarchive();
 
         wf.Status.Should().Be(WorkflowStatus.Active);
+    }
+
+    // ─── Delete ───────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Delete_WhenWorkflowIsDraft_SetsDeletedAt()
+    {
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
+        wf.Delete();
+        wf.DeletedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Delete_WhenWorkflowIsNotDraft_Throws()
+    {
+        WorkflowDefinition wf = CreatePublishableWorkflow();
+        wf.Publish();
+        Action act = () => wf.Delete();
+        act.Should().Throw<InvalidOperationException>().WithMessage("*draft*");
     }
 
     // ─── Update ───────────────────────────────────────────────────────────────

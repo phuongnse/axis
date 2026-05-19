@@ -30,11 +30,12 @@
 
 ## WorkflowBuilder — E04-workflow-builder
 
-**Domain ✅ | Application ✅ | Infrastructure ✅ | API ⏳ | Frontend ⏳**
+**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳**
 
 - **Domain**: WorkflowDefinition aggregate with Start/End nodes, step/transition/trigger management, cycle detection (DFS), ConfigureStep method, AddTrigger duplicate-type guard, Duplicate() deep-copy. All domain events.
 - **Application**: All 15 command/query handlers — CreateWorkflow, PublishWorkflow, ArchiveWorkflow, UnarchiveWorkflow, UpdateWorkflow, DuplicateWorkflow, AddStep, RemoveStep, ConfigureStep, AddTransition, RemoveTransition, AddTrigger, RemoveTrigger, ImportWorkflow, BulkExportWorkflows; GetWorkflows (paged), GetWorkflow (by ID), ExportWorkflow (with credential scrubbing) queries.
 - **Infrastructure**: WorkflowBuilderDbContext, WorkflowDefinition config (steps/transitions/triggers as JSONB with custom WorkflowStepConverter), WorkflowRepository, 7 integration tests (Testcontainers)
+- **API**: 18 Minimal API endpoints — `GET/POST /api/workflows`, `GET/PUT /api/workflows/{id}`, `POST /{id}/publish`, `POST /{id}/archive`, `POST /{id}/unarchive`, `POST /{id}/duplicate`, `GET /{id}/export` (JSON download), `POST /import`, `GET /export-all` (ZIP), step CRUD (`POST/PUT/DELETE /{id}/steps/{stepId}`), transition management (`POST/DELETE /{id}/transitions`), trigger management (`POST /{id}/triggers`, `DELETE /{id}/triggers/{type}`). NullWorkflowBuilderUnitOfWork + WorkflowBuilderDbContext EnsureCreatedAsync added to ApiTestFixture. 17 API integration tests.
 
 ## FormBuilder — E05-form-builder
 

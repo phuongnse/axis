@@ -170,7 +170,7 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
     public void Archive()
     {
         if (Status == WorkflowStatus.Draft)
-            throw new InvalidOperationException("Cannot archive a draft workflow. Publish it first.");
+            throw new InvalidOperationException("Cannot archive a draft workflow.");
 
         if (Status == WorkflowStatus.Archived)
             throw new InvalidOperationException("Workflow is already archived.");
@@ -178,6 +178,16 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
         Status = WorkflowStatus.Archived;
         UpdatedAt = DateTimeOffset.UtcNow;
         RaiseDomainEvent(new WorkflowArchived(Id, OrganizationId));
+    }
+
+    /// <summary>US-052: Soft-deletes a draft workflow.</summary>
+    public void Delete()
+    {
+        if (Status != WorkflowStatus.Draft)
+            throw new InvalidOperationException("Only draft workflows can be deleted.");
+
+        DeletedAt = DateTimeOffset.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     /// <summary>US-050: Restores an archived workflow to Active.</summary>
