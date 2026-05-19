@@ -3,7 +3,9 @@ using Axis.DataModeling.Infrastructure.Persistence;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Infrastructure.Persistence;
 using Axis.Identity.Infrastructure.Services;
+using Axis.WorkflowBuilder.Infrastructure.Persistence;
 using IDataModelingUnitOfWork = Axis.DataModeling.Application.Services.IUnitOfWork;
+using IWorkflowBuilderUnitOfWork = Axis.WorkflowBuilder.Application.Services.IUnitOfWork;
 using Axis.Shared.Application.Tenancy;
 using OpenIddict.Server.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
@@ -33,6 +35,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
     private WebApplicationFactory<Program> _factory = null!;
     private string _dmConnectionString = null!;
+    private string _wbConnectionString = null!;
 
     public HttpClient Client { get; private set; } = null!;
 
@@ -48,6 +51,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
         // Each module needs its own database so EnsureCreatedAsync creates tables correctly.
         _dmConnectionString = await CreateModuleDatabaseAsync("axis_dm_test");
+        _wbConnectionString = await CreateModuleDatabaseAsync("axis_wb_test");
 
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -59,7 +63,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 {
                     ["ConnectionStrings:Identity"] = _postgres.GetConnectionString(),
                     ["ConnectionStrings:DataModeling"] = _dmConnectionString,
-                    ["ConnectionStrings:WorkflowBuilder"] = _postgres.GetConnectionString(),
+                    ["ConnectionStrings:WorkflowBuilder"] = _wbConnectionString,
                     ["ConnectionStrings:FormBuilder"] = _postgres.GetConnectionString(),
                     ["ConnectionStrings:WorkflowEngine"] = _postgres.GetConnectionString(),
                     ["Redis:ConnectionString"] = _redis.GetConnectionString(),
@@ -96,6 +100,10 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.AddScoped<IDataModelingUnitOfWork>(sp =>
                     new NullDataModelingUnitOfWork(sp.GetRequiredService<DataModelingDbContext>()));
 
+                services.RemoveAll<IWorkflowBuilderUnitOfWork>();
+                services.AddScoped<IWorkflowBuilderUnitOfWork>(sp =>
+                    new NullWorkflowBuilderUnitOfWork(sp.GetRequiredService<WorkflowBuilderDbContext>()));
+
                 // Use a fixed "public" schema for all tenants
                 services.RemoveAll<ITenantContext>();
                 services.AddScoped<ITenantContext>(_ => new PublicSchemaTenantContext());
@@ -128,6 +136,12 @@ public sealed class ApiTestFixture : IAsyncLifetime
             .Options;
         await using DataModelingDbContext dmCtx = new(dmOptions, new PublicSchemaTenantContext());
         await dmCtx.Database.EnsureCreatedAsync();
+
+        var wbOptions = new DbContextOptionsBuilder<WorkflowBuilderDbContext>()
+            .UseNpgsql(_wbConnectionString)
+            .Options;
+        await using WorkflowBuilderDbContext wbCtx = new(wbOptions, new PublicSchemaTenantContext());
+        await wbCtx.Database.EnsureCreatedAsync();
 
         Client = _factory.CreateClient(new WebApplicationFactoryClientOptions
         {

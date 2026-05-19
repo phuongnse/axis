@@ -1,4 +1,4 @@
-# F02 — Visual Workflow Canvas
+﻿# F02 — Visual Workflow Canvas
 
 > **Wireframe**: [docs/wireframes/E04-workflow-builder/workflow-editor.excalidraw](../../../wireframes/E04-workflow-builder/workflow-editor.excalidraw) · [preview](../../../wireframes/E04-workflow-builder/workflow-editor.svg)
 
@@ -37,8 +37,8 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 *Out of scope*
 - Copy-paste of steps — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: canvas drag-drop UI and 1-second debounce auto-save pending Frontend + API layers.
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
+> Gaps vs spec: canvas drag-drop UI and 1-second debounce auto-save pending Frontend.
 
 ---
 
@@ -65,8 +65,8 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 *Out of scope*
 - Animated transitions showing flow direction — not in MVP (static arrows only).
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: canvas edge drawing and cycle-block toast pending Frontend; condition step label enforcement on connection pending Frontend + API.
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
+> Gaps vs spec: canvas edge drawing and cycle-block toast pending Frontend; condition step label enforcement on connection pending Frontend.
 
 ---
 
@@ -93,8 +93,8 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 *Out of scope*
 - Full-screen step config modal — the panel-based UI is the only config surface in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: slide-over panel, inline error indicators, and auto-save pending Frontend + API layers; step config stored as JSONB dict in `steps` column.
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
+> Gaps vs spec: slide-over panel, inline error indicators, and auto-save pending Frontend; step config stored as JSONB dict in `steps` column.
 
 ---
 

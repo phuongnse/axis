@@ -1,4 +1,4 @@
-# F01 — Workflow Definition Management
+﻿# F01 — Workflow Definition Management
 
 > **Wireframe**: [docs/wireframes/E04-workflow-builder/workflows.excalidraw](../../../wireframes/E04-workflow-builder/workflows.excalidraw) · [preview](../../../wireframes/E04-workflow-builder/workflows.svg)
 
@@ -8,7 +8,7 @@
 
 ## Description
 
-Users can create, view, edit, publish, archive, and duplicate workflow definitions. A workflow definition is the blueprint the execution engine follows when triggered.
+Users can create, view, edit, publish, archive, delete, and duplicate workflow definitions. A workflow definition is the blueprint the execution engine follows when triggered.
 
 ---
 
@@ -35,7 +35,7 @@ Users can create, view, edit, publish, archive, and duplicate workflow definitio
 *Out of scope*
 - Workflow templates / starter library — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: workflow plan-limit check (HTTP 402) pending billing layer (E01 F04).
 > Decisions: new workflow initialised with Start + End nodes by domain factory; all data stored in single `workflow_definitions` table.
 
@@ -62,7 +62,7 @@ Users can create, view, edit, publish, archive, and duplicate workflow definitio
 *Out of scope*
 - Workflow folders / tags — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: status-tab filter and last-execution-date column pending API layer; execution date requires WorkflowEngine integration.
 
 ---
@@ -88,7 +88,7 @@ Users can create, view, edit, publish, archive, and duplicate workflow definitio
 *Out of scope*
 - Approval workflow for publishing (e.g., requiring a second admin to approve) — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: cron job registration and webhook URL generation pending WorkflowEngine integration (E06); broken-step validation pending E03/E05 integration; draft versioning on re-edit pending API design.
 
 ---
@@ -104,6 +104,7 @@ Users can create, view, edit, publish, archive, and duplicate workflow definitio
 - [ ] Running executions at archive time are allowed to complete; no new executions can start.
 
 *Validation & errors*
+- [ ] Attempting to archive a `Draft` workflow returns HTTP 422: "Cannot archive a draft workflow."
 - [ ] Attempting to trigger an archived workflow via API or webhook returns HTTP 422: "This workflow is archived and cannot be triggered."
 
 *Edge cases*
@@ -113,7 +114,7 @@ Users can create, view, edit, publish, archive, and duplicate workflow definitio
 *Out of scope*
 - Automatic archiving after N days of inactivity — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: trigger deactivation on archive pending E06 integration; HTTP 422 on archived-workflow trigger pending API layer.
 
 ---
@@ -140,6 +141,28 @@ Users can create, view, edit, publish, archive, and duplicate workflow definitio
 *Out of scope*
 - Cross-org workflow duplication (copy to another org) — handled by Import/Export in F07.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: plan-limit check (HTTP 402) pending billing layer; webhook URL generation for duplicate pending E06.
 > Decisions: Duplicate() deep-copies all steps with new IDs and remaps transitions atomically in domain logic; handler resolves name collisions via "(2)", "(3)"… suffix loop up to 50, then Guid suffix.
+
+---
+
+### US-052 — Delete a Draft workflow
+
+**As an** Organization Member with `workflow:definition:write`, **I want to** delete a Draft workflow **so that** I can permanently remove workflows I no longer need without having to publish them first.
+
+**Acceptance Criteria:**
+
+*Happy path*
+- [ ] Deleting a Draft workflow removes it from the list permanently (soft-deleted; not recoverable via the UI).
+- [ ] Delete returns HTTP 204 No Content on success.
+
+*Validation & errors*
+- [ ] Only `Draft` workflows can be deleted. Attempting to delete an `Active` or `Archived` workflow returns HTTP 422: "Only draft workflows can be deleted."
+- [ ] Attempting to delete a workflow that does not exist returns HTTP 404.
+
+*Out of scope*
+- Hard delete / permanent purge — not in MVP.
+- Bulk delete — not in MVP.
+
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳

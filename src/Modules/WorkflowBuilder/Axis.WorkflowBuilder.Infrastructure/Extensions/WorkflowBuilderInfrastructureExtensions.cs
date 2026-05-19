@@ -3,6 +3,7 @@ using Axis.WorkflowBuilder.Application.Services;
 using Axis.WorkflowBuilder.Infrastructure.Persistence;
 using Axis.WorkflowBuilder.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Axis.WorkflowBuilder.Infrastructure.Extensions;
@@ -10,10 +11,11 @@ namespace Axis.WorkflowBuilder.Infrastructure.Extensions;
 public static class WorkflowBuilderInfrastructureExtensions
 {
     public static IServiceCollection AddWorkflowBuilderInfrastructure(
-        this IServiceCollection services, string connectionString)
+        this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<WorkflowBuilderDbContext>(opts =>
-            opts.UseNpgsql(connectionString));
+            opts.UseNpgsql(configuration.GetConnectionString("WorkflowBuilder")
+                ?? throw new InvalidOperationException("Missing connection string 'WorkflowBuilder'.")));
 
         services.AddScoped<IWorkflowRepository, WorkflowRepository>();
         services.AddScoped<IUnitOfWork, WorkflowBuilderUnitOfWork>();

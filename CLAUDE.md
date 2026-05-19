@@ -122,13 +122,15 @@ Before starting any task, read only what is relevant — not everything.
 
 **Step 3 — Read only the feature file(s)** for the task: `docs/epics/{folder}/features/F0{N}-*.md`
 
-**Step 4 — Check implementation status** in [`docs/PROGRESS.md`](docs/PROGRESS.md)
+**Step 4 — Map every AC to a concrete implementation step** before writing any code. For each AC in the US being implemented: identify which layer it belongs to, which file/method will implement it, and what the expected behavior is. Any AC that cannot be mapped to a specific implementation → stop and clarify first. This is the step most likely to surface missed requirements before they become bugs.
 
-**Step 5 — Read [`docs/playbooks/process.md`](docs/playbooks/process.md)** when starting a new module or implementing a new US — it has the step-by-step checklist (layer order, TDD gates, doc update triggers) for both backend and frontend.
+**Step 5 — Check implementation status** in [`docs/PROGRESS.md`](docs/PROGRESS.md)
 
-**Step 6 — Read [`docs/playbooks/patterns.md`](docs/playbooks/patterns.md)** when the task involves any of: NuGet packages, EF Core mapping or JSONB, Minimal API wiring, writing tests, list/query endpoints, async patterns, response DTOs, repository methods, domain aggregate methods, multi-tenant raw SQL, Wolverine handlers or jobs, new step/field types, cross-cutting concerns, or any design decision about where logic lives.
+**Step 6 — Read [`docs/playbooks/process.md`](docs/playbooks/process.md)** when starting a new module or implementing a new US — it has the step-by-step checklist (layer order, TDD gates, doc update triggers) for both backend and frontend.
 
-**Step 7 — Read [`docs/TECH_STACK.md`](docs/TECH_STACK.md)** when making any architectural decision, adding a library, or referencing an ADR.
+**Step 7 — Read [`docs/playbooks/patterns.md`](docs/playbooks/patterns.md)** when the task involves any of: NuGet packages, EF Core mapping or JSONB, Minimal API wiring, writing tests, list/query endpoints, async patterns, response DTOs, repository methods, domain aggregate methods, multi-tenant raw SQL, Wolverine handlers or jobs, new step/field types, cross-cutting concerns, or any design decision about where logic lives.
+
+**Step 8 — Read [`docs/TECH_STACK.md`](docs/TECH_STACK.md)** when making any architectural decision, adding a library, or referencing an ADR.
 
 ### Reading priority
 
@@ -169,7 +171,7 @@ Every time code changes, the relevant docs change too — in the **same PR, not 
 |---|---|
 | Added, removed, or changed a library | `docs/TECH_STACK.md` — version table + ADR if applicable |
 | Established a new implementation pattern | `docs/playbooks/patterns.md` — add the pattern with an example |
-| Completed a US layer | Feature file `> **Implementation status**` callout |
+| Completed a US layer | Feature file `> **Implementation status**` callout — and remove any mention of that layer from the gap text (✅ and "pending X layer" in the same callout is always a contradiction) |
 | Completed a full layer for a module | Epic README status table + `docs/PROGRESS.md` |
 | Changed architecture, added a cross-cutting rule | `CLAUDE.md` — the relevant section |
 | Changed the implementation workflow or layer order | `docs/playbooks/process.md` — update the affected checklist |
@@ -230,6 +232,7 @@ See [`docs/playbooks/testing.md`](docs/playbooks/testing.md) for full patterns �
 ### Code Style (shared)
 - **Comments — WHY only**: default to no comments. Add one only when the WHY is non-obvious — a hidden constraint, a framework quirk, or surprising business logic. No WHAT comments.
 - **Scope discipline**: only modify code directly related to the current task. Do not perform opportunistic refactors, cleanups, or "while I'm here" improvements unless explicitly requested. If you notice something worth fixing outside the current scope, flag it to the user — do not silently fix it in the same PR.
+- **Violation sweep before fix**: when a task involves fixing an architectural violation (wrong access modifier, incorrect coupling, broken pattern), always grep for all occurrences of the same violation across the codebase before writing any fix. Resolve all instances in the same PR. Fixing only the reported instance while leaving identical violations elsewhere creates inconsistency and false confidence in correctness.
 - **Simplest implementation first**: prefer concrete implementations first. Introduce abstractions only when variation, reuse, or lifecycle complexity is proven in the code — not anticipated. Speculative abstractions add maintenance cost without current benefit.
 - **No generic abstractions without 2 existing use cases**: do not introduce `BaseRepository`, `GenericService`, `AbstractHandlerFactory`, or similar generalised scaffolding unless at least 2 concrete implementations already exist in the codebase that would benefit from it. One use case is a concrete implementation, not an abstraction.
 - **Match existing local conventions**: within a module or file, prefer consistency with the patterns already present unless they directly conflict with CLAUDE.md or an official playbook. Docs override legacy code for correctness; local style overrides AI preference for consistency.
@@ -261,6 +264,7 @@ See [`docs/playbooks/testing.md`](docs/playbooks/testing.md) for full patterns �
 - **DDD depth by module**: rich aggregates for complex modules (WorkflowEngine, DataModeling) — full invariants, factory methods, domain events. Pragmatic for simpler CRUD modules (Identity) — still apply Result pattern, repository interfaces, value objects for typed IDs and Email, no Data Annotations on domain types.
 - **Aggregate boundary rule**: a class is an `Entity<TId>` within a parent aggregate — NOT a separate `AggregateRoot<TId>` — when all three hold: (1) it cannot exist without the parent, (2) it has no lifecycle independent of the parent, (3) it is only ever accessed via the parent. A FK field back to the owner is a red flag that aggregate boundaries may be wrong. When in doubt, consult patterns.md § "Mismodeled aggregate boundary". Consequences: child entities do NOT raise domain events themselves (the aggregate root raises them); child entities do NOT have `DeletedAt` (cascade covers them); EF Core maps them via `OwnsMany`, NOT a standalone `DbSet<T>`. See patterns.md § "EF Core OwnsMany pattern".
 - **Result Pattern**: Command/Query handlers return `Result` or `Result<T>` for business rule violations. `ValidationBehavior` pipeline handles FluentValidation — never throw `ValidationException` manually in a handler. Exceptions are for infrastructure failures only. Aggregates guard with `throw InvalidOperationException` for internal invariants.
+- **Domain invariants require spec backing**: every `throw InvalidOperationException` in a domain method must correspond to an explicit AC in the feature file. If no AC exists, do not add the throw — add the AC to the spec first. An invented guard with no spec backing is a hidden spec gap that will silently contradict integration tests. See patterns.md § "Guard Clauses".
 - **CQRS & messaging**: MediatR = Commands and Queries only (intra-module). Domain events = Wolverine outbox, regardless of whether the consumer is in the same module or another. Never use MediatR to dispatch domain events.
 - **Domain events**: raised inside aggregates via `AddDomainEvent`. Dispatched by `UnitOfWork` via Wolverine outbox after `SaveChangesAsync`. Never call `_messageBus.PublishAsync` for a domain event inside a handler.
 - **Response DTOs**: query handlers return dedicated `*Response` / `*Dto` record types defined in the Application layer. Domain entities must never appear in HTTP responses. Mapping happens inside the query handler.
@@ -378,6 +382,7 @@ These rules exist to prevent a specific failure mode: an agent hitting a blocker
 - **"No exceptions, no asking" does not apply to blockers**: the Priority Order governs direction of work only. Technical blockers or architectural ambiguity → always stop and ask.
 - **Legacy code is not authoritative**: if existing code conflicts with CLAUDE.md, PATTERNS.md, or a feature spec, the docs win. Do not imitate inconsistent or outdated patterns found in the codebase. If the conflict affects correctness, document it and surface it to the user.
 - **Uncertainty protocol**: if you are not confident about a business rule, an architectural constraint, or an existing project pattern — stop and ask rather than guess. Never invent: API endpoint paths, domain event names, DTO field names, database table or column names, or workflow step semantics. Fabricated identifiers silently corrupt the codebase and are hard to detect in review.
+- **Verify before claiming correctness**: before stating that a solution is "correct", "best practice", or "done", verify it is consistently applied everywhere it should be. Identify the rule being satisfied, grep for all places that rule applies, confirm no other violations remain. "It works for this case" is not the same as "it is correct."
 - **Document what is, not what was planned**: docs must reflect the code that actually exists — not the design intent before implementation. If a planned pattern (e.g., durable outbox, MigrateAsync at startup) was deferred or replaced, update the doc to describe the current reality and note the deferral explicitly. A doc that describes a future state as if it were current is as harmful as a missing doc.
 
 ---
@@ -486,6 +491,32 @@ Run through this before marking any task ✅ or raising a PR:
 - If a class, method, or service was renamed or removed: `grep` for the old name across `docs/` and `src/**/*.cs` comments — update every occurrence.
 - Every affected US has an updated `> **Implementation status**` callout.
 - Every library used in this layer appears in the approved Tech Stack.
+
+**Gate 3 — Retrospective (mandatory, runs in every PR before the final commit)**
+
+Answer each question explicitly. If the answer is "yes", update the relevant doc in this PR — not later.
+
+1. **Did any test fail for a reason not covered by an existing rule in `CLAUDE.md` or `patterns.md`?**
+   If yes → add the rule or pitfall now.
+
+2. **Did I invent a domain invariant (a `throw` in a domain method) that has no AC in the feature file?**
+   If yes → either add the AC to the spec first, or remove the throw. Never leave an unbacked guard.
+
+3. **Did I encounter a footgun in the infrastructure setup (connection strings, DI wiring, EF Core config) that surprised me?**
+   If yes → add it to `patterns.md` under the relevant pitfall section.
+
+4. **Did the test setup (fixture, containers, seed data) require a non-obvious workaround?**
+   If yes → document the pattern or constraint in `testing.md`.
+
+5. **Did I change direction mid-task — switch libraries, revert a commit, or undo an architectural choice?**
+   If yes → document the decision and the reason it was wrong in `patterns.md` or an ADR in `TECH_STACK.md`.
+
+6. **Was there a spec gap (missing AC, ambiguous lifecycle, unstated constraint) that only became visible during implementation or CI?**
+   If yes → add the missing AC to the feature file now.
+
+This gate exists because process gaps that surface during implementation are the highest-value moment to close them — the problem is fresh, the context is loaded, and the fix takes minutes. The same gap discovered six months later takes hours to reconstruct.
+
+**When any answer above requires updating docs:** write at the principle level, not the incident level. Ask: "Will a reader who has never seen this specific situation understand and apply this rule to analogous future cases?" If not, rewrite it at a higher level of abstraction. Before adding a new section, check whether an existing section can absorb the lesson — extend rather than accumulate.
 
 ---
 
