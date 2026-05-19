@@ -44,7 +44,7 @@ When a repository has a unique constraint (e.g. `(organization_id, name)`), a te
 
 ### Pre-commit gate
 
-Run `dotnet test unit-tests.slnf` before every commit. When adding a new unit test project, add it to `unit-tests.slnf`. Integration tests (requiring Docker) can be skipped unless explicitly instructed.
+See CLAUDE.md Gate 1 for the canonical pre-commit command table. Short form: run `dotnet test unit-tests.slnf` before every commit. When adding a new unit test project, also add it to `unit-tests.slnf`. Integration tests (requiring Docker) can be skipped locally unless explicitly instructed.
 
 ### Integration test maintenance
 
@@ -54,29 +54,29 @@ Any change affecting API response shape, status codes, or request contract must 
 
 **Every module that has its own `DbContext` must get its own isolated database** in `ApiTestFixture`. Never point two modules at the same PostgreSQL database.
 
-**Why:** `EnsureCreatedAsync` is a no-op when the target database already has tables — regardless of which module created them. If module B shares module A's database, and A runs `EnsureCreatedAsync` first, B's tables are never created and every test fails with `relation "..." does not exist`.
+**Why:** `EnsureCreatedAsync` is a no-op when the target database already has tables — regardless of which module created them. When two modules share a database and one runs `EnsureCreatedAsync` first, the second module's tables are never created and every test fails with `relation "..." does not exist`.
 
-**Pattern:** use the `CreateModuleDatabaseAsync` helper to provision a dedicated database before building the `WebApplicationFactory`:
+**Pattern:** use the `CreateModuleDatabaseAsync` helper to provision a dedicated database per module before building the `WebApplicationFactory`, then call `EnsureCreatedAsync` on each module's `DbContext` separately:
 
 ```csharp
-// ✅ correct — each module has its own isolated DB
-_dmConnectionString = await CreateModuleDatabaseAsync("axis_dm_test");
-_wbConnectionString = await CreateModuleDatabaseAsync("axis_wb_test");
+// ✅ correct — each module gets its own isolated DB
+string moduleAConnStr = await CreateModuleDatabaseAsync("axis_modulea_test");
+string moduleBConnStr = await CreateModuleDatabaseAsync("axis_moduleb_test");
 
-// configBuilder:
-["ConnectionStrings:DataModeling"] = _dmConnectionString,
-["ConnectionStrings:WorkflowBuilder"] = _wbConnectionString,
+// Wire each connection string into the host config:
+["ConnectionStrings:ModuleA"] = moduleAConnStr,
+["ConnectionStrings:ModuleB"] = moduleBConnStr,
 
-// EnsureCreatedAsync for each module:
-var dmOptions = new DbContextOptionsBuilder<DataModelingDbContext>()
-    .UseNpgsql(_dmConnectionString).Options;
-await using DataModelingDbContext dmCtx = new(dmOptions, new PublicSchemaTenantContext());
-await dmCtx.Database.EnsureCreatedAsync();
+// EnsureCreatedAsync for each module independently:
+DbContextOptions<ModuleADbContext> aOpts = new DbContextOptionsBuilder<ModuleADbContext>()
+    .UseNpgsql(moduleAConnStr).Options;
+await using ModuleADbContext aCtx = new(aOpts, new PublicSchemaTenantContext());
+await aCtx.Database.EnsureCreatedAsync();
 ```
 
-Identity is the exception: it shares the host `postgres` database because OpenIddict stores are registered there and `IdentityDbContext` is intentionally `public`.
+Identity is the exception: it uses the host `postgres` database because `IdentityDbContext` targets the global `public` schema — it must never be isolated to a module-specific database.
 
-**Rule:** when adding a new module to `ApiTestFixture`, always call `CreateModuleDatabaseAsync("{module}_test")` and use the returned connection string — never reuse `_postgres.GetConnectionString()` for a non-Identity module.
+**Rule:** when adding a new module to `ApiTestFixture`, always call `CreateModuleDatabaseAsync(...)` and wire the returned connection string into the host config — never reuse the root container connection string for a non-Identity module.
 
 ---
 

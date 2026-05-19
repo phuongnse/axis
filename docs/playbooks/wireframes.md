@@ -403,7 +403,9 @@ This is what makes `import { buildWorkflowCanvas } from './generate-template.mjs
 
 ---
 
-## Current section inventory (37 sections)
+## Current section inventory
+
+> **Keep this table in sync with `generate-template.mjs`** — the TOC comment at the top of that file is the authoritative source. Whenever a section is added or removed, update both places together.
 
 | Group | Sections |
 |---|---|
