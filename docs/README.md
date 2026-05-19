@@ -44,11 +44,26 @@
 
 ## Key Diagrams
 
-| Diagram | Description |
-|---|---|
-| [System Context](./diagrams/system-context.puml) | C4 Level 1 — actors and external systems |
-| [Container Diagram](./diagrams/container-diagram.puml) | C4 Level 2 — main containers |
-| [Module Overview](./diagrams/module-overview.puml) | Modular monolith modules and dependencies |
+All diagrams are Excalidraw (`.excalidraw` source + `.svg` preview). Regenerate with `node docs/diagrams/generate-diagrams.mjs` then `docs/scripts/generate-diagrams.ps1`.
+
+**System-level** (`docs/diagrams/`):
+
+| Diagram | Source | Preview |
+|---|---|---|
+| System Context | [system-context.excalidraw](./diagrams/system-context.excalidraw) | [system-context.svg](./diagrams/system-context.svg) |
+| Container Diagram | [container.excalidraw](./diagrams/container.excalidraw) | [container.svg](./diagrams/container.svg) |
+| Module Overview | [module-overview.excalidraw](./diagrams/module-overview.excalidraw) | [module-overview.svg](./diagrams/module-overview.svg) |
+
+**Epic-level** (in each `docs/epics/E0{N}-name/diagrams/`):
+
+| Diagram | Source | Preview |
+|---|---|---|
+| Tenant Provisioning | [tenant-provisioning.excalidraw](./epics/E01-platform-foundation/diagrams/tenant-provisioning.excalidraw) | [tenant-provisioning.svg](./epics/E01-platform-foundation/diagrams/tenant-provisioning.svg) |
+| Auth Flow | [auth-flow.excalidraw](./epics/E02-identity-access/diagrams/auth-flow.excalidraw) | [auth-flow.svg](./epics/E02-identity-access/diagrams/auth-flow.svg) |
+| Data Model | [data-model.excalidraw](./epics/E03-data-modeling/diagrams/data-model.excalidraw) | [data-model.svg](./epics/E03-data-modeling/diagrams/data-model.svg) |
+| Workflow Model | [workflow-model.excalidraw](./epics/E04-workflow-builder/diagrams/workflow-model.excalidraw) | [workflow-model.svg](./epics/E04-workflow-builder/diagrams/workflow-model.svg) |
+| Form Model | [form-model.excalidraw](./epics/E05-form-builder/diagrams/form-model.excalidraw) | [form-model.svg](./epics/E05-form-builder/diagrams/form-model.svg) |
+| Execution Flow | [execution-flow.excalidraw](./epics/E06-workflow-engine/diagrams/execution-flow.excalidraw) | [execution-flow.svg](./epics/E06-workflow-engine/diagrams/execution-flow.svg) |
 
 ## Wireframes
 

@@ -32,7 +32,7 @@ Without a UI builder, users need a developer to display and interact with their 
 
 ## Diagrams
 
-![Page Model](./diagrams/page-model.png)
+> **Pending** — page-model diagram not yet created. Add `page-model` to `docs/diagrams/generate-diagrams.mjs` when this epic begins.
 
 ---
 
