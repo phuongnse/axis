@@ -204,22 +204,22 @@ function entityBox({ x, y, name, attrs = [], isEnum = false,
   const H = hdrH + bodyH;
   const els = [];
 
-  // Full outer box
+  // Full outer box (white body background + visible border)
   els.push({
     ...base(), type: "rectangle", x, y, width: W, height: H,
-    backgroundColor: headerBg, strokeColor: stroke,
+    backgroundColor: "#ffffff", strokeColor: stroke,
     roundness: { type: 3, value: 4 }, strokeWidth: 1.5,
   });
 
-  // White body overlay (covers attribute area)
+  // Header colored overlay (strokeColor = headerBg so border blends into fill)
+  els.push({
+    ...base(), type: "rectangle", x, y, width: W, height: hdrH,
+    backgroundColor: headerBg, strokeColor: headerBg,
+    roundness: { type: 3, value: 4 }, strokeWidth: 1,
+  });
+
+  // Separator between header and body
   if (attrs.length > 0) {
-    els.push({
-      ...base({ roundness: null, strokeWidth: 0 }),
-      type: "rectangle",
-      x: x + 1, y: y + hdrH, width: W - 2, height: bodyH - 1,
-      backgroundColor: "#ffffff", strokeColor: "transparent",
-    });
-    // Separator line
     els.push(...hline({ x, y: y + hdrH, w: W, color: stroke }));
   }
 
