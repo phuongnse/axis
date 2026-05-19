@@ -28,7 +28,7 @@ public class FormEndpointTests(ApiTestFixture fixture)
         HttpResponseMessage resp = await client.GetAsync("/api/forms");
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement body = (await resp.Content.ReadFromJsonAsync<JsonElement>(Json))!;
+        JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
         body.GetProperty("items").EnumerateArray().ToList().Should().BeEmpty();
         body.GetProperty("total_count").GetInt32().Should().Be(0);
     }
@@ -55,11 +55,11 @@ public class FormEndpointTests(ApiTestFixture fixture)
         }, Json);
 
         createResp.StatusCode.Should().Be(HttpStatusCode.Created);
-        JsonElement body = (await createResp.Content.ReadFromJsonAsync<JsonElement>(Json))!;
+        JsonElement body = await createResp.Content.ReadFromJsonAsync<JsonElement>(Json);
         body.GetProperty("id").GetString().Should().NotBeNullOrEmpty();
 
         HttpResponseMessage listResp = await client.GetAsync("/api/forms");
-        JsonElement list = (await listResp.Content.ReadFromJsonAsync<JsonElement>(Json))!;
+        JsonElement list = await listResp.Content.ReadFromJsonAsync<JsonElement>(Json);
         list.GetProperty("items").EnumerateArray().ToList().Should().HaveCount(1);
     }
 
@@ -126,7 +126,7 @@ public class FormEndpointTests(ApiTestFixture fixture)
         HttpResponseMessage resp = await client.GetAsync($"/api/forms/{id}");
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement form = (await resp.Content.ReadFromJsonAsync<JsonElement>(Json))!;
+        JsonElement form = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
         form.GetProperty("name").GetString().Should().Be("Detail Form");
         form.GetProperty("description").GetString().Should().Be("A description");
         form.GetProperty("fields").GetArrayLength().Should().Be(0);
@@ -145,7 +145,7 @@ public class FormEndpointTests(ApiTestFixture fixture)
 
         updateResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        JsonElement detail = (await (await client.GetAsync($"/api/forms/{id}")).Content.ReadFromJsonAsync<JsonElement>(Json))!;
+        JsonElement detail = await (await client.GetAsync($"/api/forms/{id}")).Content.ReadFromJsonAsync<JsonElement>(Json);
         detail.GetProperty("name").GetString().Should().Be("New Name");
         detail.GetProperty("description").GetString().Should().Be("Updated");
     }
@@ -201,10 +201,10 @@ public class FormEndpointTests(ApiTestFixture fixture)
         }, Json);
 
         addResp.StatusCode.Should().Be(HttpStatusCode.Created);
-        JsonElement body = (await addResp.Content.ReadFromJsonAsync<JsonElement>(Json))!;
+        JsonElement body = await addResp.Content.ReadFromJsonAsync<JsonElement>(Json);
         body.GetProperty("id").GetString().Should().NotBeNullOrEmpty();
 
-        JsonElement detail = (await (await client.GetAsync($"/api/forms/{formId}")).Content.ReadFromJsonAsync<JsonElement>(Json))!;
+        JsonElement detail = await (await client.GetAsync($"/api/forms/{formId}")).Content.ReadFromJsonAsync<JsonElement>(Json);
         detail.GetProperty("fields").GetArrayLength().Should().Be(1);
         JsonElement field = detail.GetProperty("fields").EnumerateArray().First();
         field.GetProperty("key").GetString().Should().Be("first_name");
@@ -259,7 +259,7 @@ public class FormEndpointTests(ApiTestFixture fixture)
 
         deleteResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        JsonElement detail = (await (await client.GetAsync($"/api/forms/{formId}")).Content.ReadFromJsonAsync<JsonElement>(Json))!;
+        JsonElement detail = await (await client.GetAsync($"/api/forms/{formId}")).Content.ReadFromJsonAsync<JsonElement>(Json);
         detail.GetProperty("fields").GetArrayLength().Should().Be(0);
     }
 
@@ -287,7 +287,7 @@ public class FormEndpointTests(ApiTestFixture fixture)
 
         reorderResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        JsonElement detail = (await (await client.GetAsync($"/api/forms/{formId}")).Content.ReadFromJsonAsync<JsonElement>(Json))!;
+        JsonElement detail = await (await client.GetAsync($"/api/forms/{formId}")).Content.ReadFromJsonAsync<JsonElement>(Json);
         List<JsonElement> fields = detail.GetProperty("fields").EnumerateArray().ToList();
         fields[0].GetProperty("id").GetString().Should().Be(fieldB);
         fields[1].GetProperty("id").GetString().Should().Be(fieldA);
@@ -314,7 +314,7 @@ public class FormEndpointTests(ApiTestFixture fixture)
         HttpResponseMessage resp = await client.PostAsJsonAsync("/api/forms",
             new { name, description }, Json);
         resp.EnsureSuccessStatusCode();
-        JsonElement body = (await resp.Content.ReadFromJsonAsync<JsonElement>(Json))!;
+        JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
         return body.GetProperty("id").GetString()!;
     }
 
@@ -329,7 +329,7 @@ public class FormEndpointTests(ApiTestFixture fixture)
             config = (object?)null,
         }, Json);
         resp.EnsureSuccessStatusCode();
-        JsonElement body = (await resp.Content.ReadFromJsonAsync<JsonElement>(Json))!;
+        JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
         return body.GetProperty("id").GetString()!;
     }
 }

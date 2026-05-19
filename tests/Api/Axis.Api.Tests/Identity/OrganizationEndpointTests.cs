@@ -4,6 +4,7 @@ using System.Text.Json;
 using Axis.Api.Tests.Helpers;
 using Axis.Identity.Infrastructure.Persistence;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Axis.Api.Tests.Identity;
 
@@ -17,7 +18,7 @@ public class OrganizationEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task InviteUser_WhenNoToken_Returns401()
     {
-        var resp = await fixture.Client.PostAsJsonAsync(
+        HttpResponseMessage resp = await fixture.Client.PostAsJsonAsync(
             "/api/organizations/me/invitations",
             new { email = "someone@test.com", role_id = Guid.NewGuid() }, Json);
 
@@ -27,37 +28,37 @@ public class OrganizationEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task InviteUser_WhenSelfInvite_Returns422()
     {
-        var client = await AuthHelper.CreateAdminClientAsync(fixture, "orginv1");
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "orginv1");
 
-        var resp = await client.PostAsJsonAsync(
+        HttpResponseMessage resp = await client.PostAsJsonAsync(
             "/api/organizations/me/invitations",
             new { email = "adminorginv1@test.com", role_id = Guid.NewGuid() }, Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
-        var body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
         body.GetProperty("detail").GetString().Should().Contain("cannot invite yourself");
     }
 
     [Fact]
     public async Task InviteUser_WhenRequestIsValid_ReturnsOk()
     {
-        var client = await AuthHelper.CreateAdminClientAsync(fixture, "orginv2");
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "orginv2");
 
         // Get org_id from authenticated user, then fetch role scoped to that org
-        var meResp = await client.GetAsync("/api/users/me");
-        var me = await meResp.Content.ReadFromJsonAsync<JsonElement>(Json);
-        var orgId = Guid.Parse(me.GetProperty("org_id").GetString()!);
+        HttpResponseMessage meResp = await client.GetAsync("/api/users/me");
+        JsonElement me = await meResp.Content.ReadFromJsonAsync<JsonElement>(Json);
+        Guid orgId = Guid.Parse(me.GetProperty("org_id").GetString()!);
 
-        using var scope = fixture.CreateScope();
+        using IServiceScope scope = fixture.CreateScope();
         IdentityDbContext ctx = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        var viewerRole = ctx.Roles.First(r => r.Name == "Viewer" && r.OrganizationId == orgId);
+        Guid viewerRoleId = ctx.Roles.First(r => r.Name == "Viewer" && r.OrganizationId == orgId).Id;
 
-        var resp = await client.PostAsJsonAsync(
+        HttpResponseMessage resp = await client.PostAsJsonAsync(
             "/api/organizations/me/invitations",
-            new { email = "newuser@test.com", role_id = viewerRole.Id }, Json);
+            new { email = "newuser@test.com", role_id = viewerRoleId }, Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
         body.GetProperty("message").GetString().Should().Contain("newuser@test.com");
     }
 }

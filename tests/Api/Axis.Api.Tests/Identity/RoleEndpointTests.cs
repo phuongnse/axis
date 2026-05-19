@@ -16,20 +16,20 @@ public class RoleEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task GetRoles_WhenNoToken_Returns401()
     {
-        var resp = await fixture.Client.GetAsync("/api/roles");
+        HttpResponseMessage resp = await fixture.Client.GetAsync("/api/roles");
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
     public async Task GetRoles_WhenAuthenticated_ReturnsFourSeededSystemRoles()
     {
-        var client = await AuthHelper.CreateAdminClientAsync(fixture, "role1");
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "role1");
 
-        var resp = await client.GetAsync("/api/roles");
+        HttpResponseMessage resp = await client.GetAsync("/api/roles");
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
-        var items = body.GetProperty("items").EnumerateArray().ToList();
+        JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
+        List<JsonElement> items = body.GetProperty("items").EnumerateArray().ToList();
 
         // Admin, Editor, Viewer, End User seeded at registration
         items.Should().HaveCount(4);
@@ -40,11 +40,11 @@ public class RoleEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task GetRoles_WhenAuthenticated_SystemRolesAreFlagged()
     {
-        var client = await AuthHelper.CreateAdminClientAsync(fixture, "role2");
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "role2");
 
-        var resp = await client.GetAsync("/api/roles");
-        var body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
-        var roles = body.GetProperty("items").EnumerateArray().ToList();
+        HttpResponseMessage resp = await client.GetAsync("/api/roles");
+        JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
+        List<JsonElement> roles = body.GetProperty("items").EnumerateArray().ToList();
 
         roles.All(r => r.GetProperty("is_system").GetBoolean()).Should().BeTrue();
     }
@@ -54,7 +54,7 @@ public class RoleEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task CreateRole_WhenNoToken_Returns401()
     {
-        var resp = await fixture.Client.PostAsJsonAsync("/api/roles",
+        HttpResponseMessage resp = await fixture.Client.PostAsJsonAsync("/api/roles",
             new { name = "Analyst", permissions = new[] { "data_modeling:model:read" } }, Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
@@ -63,10 +63,10 @@ public class RoleEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task CreateRole_WhenRequestIsValid_ReturnsIdAndAppearsInList()
     {
-        var client = await AuthHelper.CreateAdminClientAsync(fixture, "role3");
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "role3");
 
         // Create
-        var createResp = await client.PostAsJsonAsync("/api/roles", new
+        HttpResponseMessage createResp = await client.PostAsJsonAsync("/api/roles", new
         {
             name = "Analyst",
             description = "Read-only analyst",
@@ -74,14 +74,14 @@ public class RoleEndpointTests(ApiTestFixture fixture)
         }, Json);
 
         createResp.StatusCode.Should().Be(HttpStatusCode.Created);
-        var createBody = await createResp.Content.ReadFromJsonAsync<JsonElement>(Json);
-        var newId = createBody.GetProperty("id").GetString();
+        JsonElement createBody = await createResp.Content.ReadFromJsonAsync<JsonElement>(Json);
+        string? newId = createBody.GetProperty("id").GetString();
         newId.Should().NotBeNullOrEmpty();
 
         // Verify appears in list
-        var listResp = await client.GetAsync("/api/roles");
-        var listBody = await listResp.Content.ReadFromJsonAsync<JsonElement>(Json);
-        var roles = listBody.GetProperty("items").EnumerateArray().ToList();
+        HttpResponseMessage listResp = await client.GetAsync("/api/roles");
+        JsonElement listBody = await listResp.Content.ReadFromJsonAsync<JsonElement>(Json);
+        List<JsonElement> roles = listBody.GetProperty("items").EnumerateArray().ToList();
 
         roles.Should().HaveCount(5); // 4 system + 1 custom
         roles.Select(r => r.GetProperty("name").GetString()).Should().Contain("Analyst");
@@ -92,7 +92,7 @@ public class RoleEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task UpdateRole_WhenNoToken_Returns401()
     {
-        var resp = await fixture.Client.PutAsJsonAsync($"/api/roles/{Guid.NewGuid()}",
+        HttpResponseMessage resp = await fixture.Client.PutAsJsonAsync($"/api/roles/{Guid.NewGuid()}",
             new { name = "X", permissions = Array.Empty<string>() }, Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
@@ -101,19 +101,19 @@ public class RoleEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task UpdateRole_WhenRoleIsCustom_ReturnsNoContent()
     {
-        var client = await AuthHelper.CreateAdminClientAsync(fixture, "role4");
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "role4");
 
         // Create a custom role first
-        var createResp = await client.PostAsJsonAsync("/api/roles", new
+        HttpResponseMessage createResp = await client.PostAsJsonAsync("/api/roles", new
         {
             name = "Temp",
             permissions = new[] { "data_modeling:model:read" },
         }, Json);
-        var createBody = await createResp.Content.ReadFromJsonAsync<JsonElement>(Json);
-        var roleId = createBody.GetProperty("id").GetString()!;
+        JsonElement createBody = await createResp.Content.ReadFromJsonAsync<JsonElement>(Json);
+        string roleId = createBody.GetProperty("id").GetString()!;
 
         // Update it
-        var updateResp = await client.PutAsJsonAsync($"/api/roles/{roleId}", new
+        HttpResponseMessage updateResp = await client.PutAsJsonAsync($"/api/roles/{roleId}", new
         {
             name = "Updated",
             description = "Updated description",
