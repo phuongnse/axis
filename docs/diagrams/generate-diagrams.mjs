@@ -293,36 +293,52 @@ function systemContext() {
   _id = 1;
   const els = [];
 
-  els.push(text({ x: 520, y: 30, value: "Axis Platform — System Context", size: 18, bold: true, color: C.text, anchor: "center" }));
+  els.push(text({ x: 540, y: 28, value: "Axis Platform — System Context", size: 18, bold: true, color: C.text, anchor: "center" }));
 
   function actor(x, y, label, sub) {
-    els.push(...rect({ x: x - 20, y, w: 40, h: 40, bg: "#e0f2fe", stroke: "#0284c7", rx: 20, label: "👤", labelSize: 18 }));
-    els.push(text({ x, y: y + 52, value: label, size: 12, bold: true, anchor: "center" }));
-    if (sub) els.push(text({ x, y: y + 68, value: sub, size: 10, color: C.muted, anchor: "center" }));
+    els.push(...rect({ x: x - 22, y, w: 44, h: 44, bg: "#e0f2fe", stroke: "#0284c7", rx: 22, label: "👤", labelSize: 18 }));
+    els.push(text({ x, y: y + 56, value: label, size: 12, bold: true, anchor: "center" }));
+    if (sub) els.push(text({ x, y: y + 72, value: sub, size: 10, color: C.muted, anchor: "center" }));
   }
 
-  actor(120, 200, "Org Admin", "[builds workflows & forms]");
-  actor(120, 420, "End User", "[submits forms, views pages]");
+  actor(105, 195, "Org Admin", "[builds workflows & forms]");
+  actor(105, 460, "End User", "[submits forms, views pages]");
 
-  els.push(...rect({ x: 260, y: 80, w: 520, h: 560, bg: "#f0f9ff", stroke: C.sysBdr, label: "Axis Platform", labelSize: 14, labelBold: true, labelColor: C.sysBdr }));
-  els.push(...rect({ x: 300, y: 130, w: 200, h: 60, bg: C.sysBg, stroke: C.sysBdr, label: "Web Application", sub: "React 18 + TypeScript" }));
-  els.push(...rect({ x: 300, y: 240, w: 200, h: 60, bg: C.sysBg, stroke: C.sysBdr, label: "API Server", sub: "ASP.NET Core 8 · Modular Monolith" }));
-  els.push(...rect({ x: 300, y: 370, w: 200, h: 60, bg: C.infraBg, stroke: C.infraBdr, label: "PostgreSQL 16", sub: "Per-module databases" }));
-  els.push(...rect({ x: 300, y: 460, w: 200, h: 60, bg: C.infraBg, stroke: C.infraBdr, label: "Redis 7", sub: "Cache · Session" }));
-  els.push(...rect({ x: 540, y: 240, w: 200, h: 60, bg: C.modBg, stroke: C.modBdr, label: "Wolverine", sub: "Event bus · Durable outbox" }));
-  els.push(...rect({ x: 540, y: 370, w: 200, h: 60, bg: C.infraBg, stroke: C.infraBdr, label: "AWS S3", sub: "File storage" }));
-  els.push(...rect({ x: 830, y: 200, w: 160, h: 60, bg: C.extBg, stroke: C.extBdr, label: "Email Service", sub: "SMTP / MailKit" }));
-  els.push(...rect({ x: 830, y: 340, w: 160, h: 60, bg: C.extBg, stroke: C.extBdr, label: "External APIs", sub: "HTTP Request steps" }));
+  // Platform boundary
+  els.push(...rect({ x: 230, y: 65, w: 600, h: 650, bg: "#f0f9ff", stroke: C.sysBdr, label: "Axis Platform", labelSize: 14, labelBold: true, labelColor: C.sysBdr }));
 
-  els.push(...arrow({ x1: 160, y1: 220, x2: 260, y2: 220, label: "HTTPS" }));
-  els.push(...routedArrow({ waypoints: [[160, 440], [260, 440], [260, 300]] }));
-  els.push(...arrow({ x1: 400, y1: 190, x2: 400, y2: 240, label: "REST / WS" }));
-  els.push(...arrow({ x1: 400, y1: 300, x2: 400, y2: 370 }));
-  els.push(...arrow({ x1: 400, y1: 300, x2: 400, y2: 460 }));
-  els.push(...arrow({ x1: 500, y1: 270, x2: 540, y2: 270 }));
-  els.push(...arrow({ x1: 640, y1: 300, x2: 640, y2: 370 }));
-  els.push(...arrow({ x1: 740, y1: 255, x2: 830, y2: 230 }));
-  els.push(...arrow({ x1: 740, y1: 280, x2: 830, y2: 360 }));
+  // Inside platform — col 1 (left)
+  els.push(...rect({ x: 268, y: 120, w: 240, h: 70, bg: C.sysBg, stroke: C.sysBdr, label: "Web Application", sub: "React 18 + TypeScript" }));
+  els.push(...rect({ x: 268, y: 250, w: 240, h: 70, bg: C.sysBg, stroke: C.sysBdr, label: "API Server", sub: "ASP.NET Core 8 · Modular Monolith" }));
+  els.push(...rect({ x: 268, y: 395, w: 240, h: 70, bg: C.infraBg, stroke: C.infraBdr, label: "PostgreSQL 16", sub: "Per-module databases" }));
+  els.push(...rect({ x: 268, y: 505, w: 240, h: 70, bg: C.infraBg, stroke: C.infraBdr, label: "Redis 7", sub: "Cache · Session" }));
+
+  // Inside platform — col 2 (right)
+  els.push(...rect({ x: 558, y: 250, w: 220, h: 70, bg: C.modBg, stroke: C.modBdr, label: "Wolverine", sub: "Event bus · Durable outbox" }));
+  els.push(...rect({ x: 558, y: 395, w: 220, h: 70, bg: C.infraBg, stroke: C.infraBdr, label: "AWS S3", sub: "File storage" }));
+
+  // External services
+  els.push(...rect({ x: 890, y: 200, w: 170, h: 70, bg: C.extBg, stroke: C.extBdr, label: "Email Service", sub: "SMTP / MailKit" }));
+  els.push(...rect({ x: 890, y: 395, w: 170, h: 70, bg: C.extBg, stroke: C.extBdr, label: "External APIs", sub: "HTTP Request steps" }));
+
+  // Org Admin → Web App
+  els.push(...routedArrow({ waypoints: [[149, 217], [248, 217], [248, 155], [268, 155]], label: "HTTPS" }));
+  // End User → API Server (direct)
+  els.push(...routedArrow({ waypoints: [[149, 482], [248, 482], [248, 285], [268, 285]], label: "HTTPS" }));
+  // Web App → API Server
+  els.push(...arrow({ x1: 388, y1: 190, x2: 388, y2: 250, label: "REST / WS" }));
+  // API Server → PostgreSQL (straight down)
+  els.push(...arrow({ x1: 388, y1: 320, x2: 388, y2: 395 }));
+  // API Server → Redis (route around left to avoid crossing PostgreSQL)
+  els.push(...routedArrow({ waypoints: [[268, 285], [248, 285], [248, 540], [268, 540]] }));
+  // API Server → Wolverine
+  els.push(...arrow({ x1: 508, y1: 285, x2: 558, y2: 285 }));
+  // Wolverine → S3 (straight down)
+  els.push(...arrow({ x1: 668, y1: 320, x2: 668, y2: 395 }));
+  // Wolverine → Email (right then up)
+  els.push(...routedArrow({ waypoints: [[778, 270], [840, 270], [840, 235], [890, 235]] }));
+  // Wolverine → External APIs (right then down)
+  els.push(...routedArrow({ waypoints: [[778, 305], [840, 305], [840, 430], [890, 430]] }));
 
   return excalidraw(els);
 }
@@ -333,46 +349,63 @@ function containerDiagram() {
   _id = 1;
   const els = [];
 
-  els.push(text({ x: 560, y: 25, value: "Axis Platform — Container Diagram", size: 18, bold: true, color: C.text, anchor: "center" }));
+  els.push(text({ x: 565, y: 25, value: "Axis Platform — Container Diagram", size: 18, bold: true, color: C.text, anchor: "center" }));
 
-  els.push(...rect({ x: 200, y: 60, w: 660, h: 700, bg: "#f0f9ff", stroke: C.sysBdr }));
-  els.push(text({ x: 530, y: 85, value: "API Server — ASP.NET Core 8 Modular Monolith", size: 14, bold: true, color: C.sysBdr, anchor: "center" }));
+  // Platform boundary (right edge x=810)
+  els.push(...rect({ x: 50, y: 55, w: 760, h: 620, bg: "#f0f9ff", stroke: C.sysBdr }));
+  els.push(text({ x: 430, y: 80, value: "API Server — ASP.NET Core 8 Modular Monolith", size: 14, bold: true, color: C.sysBdr, anchor: "center" }));
 
+  // Modules — row 1 (y=105) and row 2 (y=245), 65px gap between rows
+  const MW = 165, MH = 75;
   const modules = [
-    { label: "Identity", x: 220, y: 110 },
-    { label: "DataModeling", x: 380, y: 110 },
-    { label: "WorkflowBuilder", x: 560, y: 110 },
-    { label: "FormBuilder", x: 220, y: 210 },
-    { label: "WorkflowEngine", x: 400, y: 210 },
-    { label: "PageBuilder", x: 620, y: 210 },
+    { label: "Identity",        x: 70,  y: 105 },
+    { label: "DataModeling",    x: 250, y: 105 },
+    { label: "WorkflowBuilder", x: 430, y: 105 },
+    { label: "FormBuilder",     x: 70,  y: 245 },
+    { label: "WorkflowEngine",  x: 250, y: 245 },
+    { label: "PageBuilder",     x: 430, y: 245 },
   ];
   for (const m of modules) {
-    els.push(...rect({ x: m.x, y: m.y, w: 140, h: 70, bg: C.modBg, stroke: C.modBdr, label: m.label, labelSize: 12 }));
+    els.push(...rect({ x: m.x, y: m.y, w: MW, h: MH, bg: C.modBg, stroke: C.modBdr, label: m.label, labelSize: 12 }));
   }
 
-  els.push(...rect({ x: 220, y: 320, w: 620, h: 80, bg: C.evtBg, stroke: C.evtBdr, label: "Wolverine — Event Bus + Durable Outbox (per-module)", sub: "In-process relay · At-least-once delivery · Per-module outbox tables in each module DB", labelSize: 12 }));
-  els.push(...rect({ x: 220, y: 430, w: 280, h: 60, bg: C.sysBg, stroke: C.sysBdr, label: "OpenIddict 5.x", sub: "OAuth2/OIDC · Auth Code + PKCE · Client Credentials" }));
-  els.push(...rect({ x: 540, y: 430, w: 300, h: 60, bg: C.sysBg, stroke: C.sysBdr, label: "SignalR", sub: "Real-time execution status" }));
-  els.push(...rect({ x: 200, y: 520, w: 660, h: 60, bg: C.sysBg, stroke: C.sysBdr, label: "Web Application", sub: "React 18 + TypeScript + Vite · shadcn/ui · React Flow · dnd-kit · TanStack Query · Zustand" }));
+  // Wolverine event bus (55px gap below row 2 bottom at y=320)
+  els.push(...rect({ x: 70, y: 375, w: 550, h: 60, bg: C.evtBg, stroke: C.evtBdr,
+    label: "Wolverine — Event Bus + Durable Outbox (per-module)",
+    sub: "In-process · At-least-once delivery · Per-module outbox tables", labelSize: 12 }));
 
-  els.push(text({ x: 960, y: 70, value: "Per-Module Databases (PostgreSQL 16)", size: 13, bold: true, color: C.infraBdr, anchor: "center" }));
+  // OpenIddict + SignalR
+  els.push(...rect({ x: 70,  y: 465, w: 250, h: 55, bg: C.sysBg, stroke: C.sysBdr,
+    label: "OpenIddict 5.x", sub: "OAuth2/OIDC · Auth Code + PKCE" }));
+  els.push(...rect({ x: 335, y: 465, w: 285, h: 55, bg: C.sysBg, stroke: C.sysBdr,
+    label: "SignalR", sub: "Real-time execution status" }));
+
+  // Web Application band (bottom of platform)
+  els.push(...rect({ x: 50, y: 545, w: 760, h: 55, bg: C.sysBg, stroke: C.sysBdr,
+    label: "Web Application",
+    sub: "React 18 + TypeScript + Vite · shadcn/ui · React Flow · dnd-kit · TanStack Query · Zustand" }));
+
+  // DB column (right side; arrows from platform right edge x=810 → DB left edge x=870, 60px each)
+  const DBX = 870, DBW = 190, DBH = 55, DBGap = 10;
+  els.push(text({ x: DBX + DBW / 2, y: 65, value: "Per-Module Databases (PostgreSQL 16)", size: 12, bold: true, color: C.infraBdr, anchor: "center" }));
+
   const dbs = [
-    { label: "axis_identity", sub: "public schema", y: 100 },
-    { label: "axis_wb", sub: "wolverine schema (outbox)", y: 170 },
-    { label: "axis_we", sub: "wolverine schema (outbox)", y: 240 },
-    { label: "axis_fb", sub: "wolverine schema (outbox)", y: 310 },
-    { label: "axis_dm", sub: "tenant schema", y: 380 },
+    { label: "axis_identity", sub: "public schema",         y: 100 },
+    { label: "axis_dm",       sub: "tenant schema per org", y: 100 + (DBH + DBGap) },
+    { label: "axis_wb",       sub: "wolverine outbox",      y: 100 + (DBH + DBGap) * 2 },
+    { label: "axis_we",       sub: "wolverine outbox",      y: 100 + (DBH + DBGap) * 3 },
+    { label: "axis_fb",       sub: "wolverine outbox",      y: 100 + (DBH + DBGap) * 4 },
   ];
   for (const db of dbs) {
-    els.push(...rect({ x: 880, y: db.y, w: 180, h: 55, bg: C.infraBg, stroke: C.infraBdr, label: db.label, sub: db.sub, labelSize: 11 }));
-    els.push(...arrow({ x1: 860, y1: db.y + 28, x2: 870, y2: db.y + 28, color: C.infraBdr }));
+    els.push(...rect({ x: DBX, y: db.y, w: DBW, h: DBH, bg: C.infraBg, stroke: C.infraBdr, label: db.label, sub: db.sub, labelSize: 11 }));
+    els.push(...arrow({ x1: 810, y1: db.y + DBH / 2, x2: DBX, y2: db.y + DBH / 2, color: C.infraBdr }));
   }
 
-  els.push(...rect({ x: 880, y: 460, w: 180, h: 55, bg: C.infraBg, stroke: C.infraBdr, label: "Redis 7", sub: "Cache · Session · Schema name" }));
-  els.push(...rect({ x: 880, y: 540, w: 180, h: 55, bg: C.extBg, stroke: C.extBdr, label: "AWS S3", sub: "File storage" }));
-  els.push(...rect({ x: 880, y: 620, w: 180, h: 55, bg: C.extBg, stroke: C.extBdr, label: "Email Service", sub: "SMTP · MailKit" }));
-  els.push(...arrow({ x1: 860, y1: 270, x2: 880, y2: 270 }));
-  els.push(...arrow({ x1: 860, y1: 487, x2: 880, y2: 487 }));
+  // Other infrastructure (right side, below DB column)
+  els.push(...rect({ x: DBX, y: 460, w: DBW, h: DBH, bg: C.infraBg, stroke: C.infraBdr, label: "Redis 7",       sub: "Cache · Session · Schema name" }));
+  els.push(...rect({ x: DBX, y: 530, w: DBW, h: DBH, bg: C.extBg,  stroke: C.extBdr,  label: "AWS S3",        sub: "File storage" }));
+  els.push(...rect({ x: DBX, y: 600, w: DBW, h: DBH, bg: C.extBg,  stroke: C.extBdr,  label: "Email Service", sub: "SMTP · MailKit" }));
+  els.push(...arrow({ x1: 810, y1: 487, x2: DBX, y2: 487, color: C.arrow }));
 
   return excalidraw(els);
 }
@@ -383,52 +416,65 @@ function moduleOverview() {
   _id = 1;
   const els = [];
 
-  els.push(text({ x: 560, y: 25, value: "Axis — Module Communication (Event-Driven)", size: 18, bold: true, color: C.text, anchor: "center" }));
-  els.push(text({ x: 560, y: 50, value: "Modules are data-sovereign. Cross-module communication via Wolverine domain events only — no shared DB access.", size: 11, color: C.muted, anchor: "center" }));
+  els.push(text({ x: 530, y: 25, value: "Axis — Module Communication (Event-Driven)", size: 18, bold: true, color: C.text, anchor: "center" }));
+  els.push(text({ x: 530, y: 50, value: "Modules are data-sovereign. Cross-module communication via Wolverine domain events only — no shared DB access.", size: 11, color: C.muted, anchor: "center" }));
 
-  els.push(...rect({ x: 320, y: 75, w: 480, h: 55, bg: "#e2e8f0", stroke: C.border, label: "Shared Kernel  —  Domain Primitives · CQRS Abstractions · Multi-Tenancy · Event Bus", labelSize: 12 }));
+  // Shared Kernel spans all 4 row-1 modules (x=60 to x=935)
+  els.push(...rect({ x: 60, y: 75, w: 875, h: 50, bg: "#e2e8f0", stroke: C.border,
+    label: "Shared Kernel  —  Domain Primitives · CQRS Abstractions · Multi-Tenancy · Event Bus", labelSize: 12 }));
 
   function module(x, y, label, sub, color = { bg: C.modBg, stroke: C.modBdr }) {
     return rect({ x, y, w: 200, h: 80, bg: color.bg, stroke: color.stroke, label, sub, labelSize: 13, labelBold: true });
   }
 
-  els.push(...module(60, 180, "Identity", "Auth · Users · Roles · RBAC", { bg: "#ede9fe", stroke: "#7c3aed" }));
-  els.push(...module(300, 180, "DataModeling", "Models · Records · Data Classes"));
-  els.push(...module(540, 180, "WorkflowBuilder", "Definitions · Steps · Triggers"));
-  els.push(...module(780, 180, "FormBuilder", "Forms · Fields · Submissions"));
-  els.push(...module(300, 380, "WorkflowEngine", "Executions · Step Handlers"));
-  els.push(...module(540, 380, "PageBuilder", "Pages · Widgets · Bindings", { bg: "#fce7f3", stroke: "#be185d" }));
+  // Row 1 (y=155): 4 modules with 25px gaps
+  els.push(...module(60,  155, "Identity",        "Auth · Users · Roles · RBAC", { bg: "#ede9fe", stroke: "#7c3aed" }));
+  els.push(...module(285, 155, "DataModeling",    "Models · Records · Data Classes"));
+  els.push(...module(510, 155, "WorkflowBuilder", "Definitions · Steps · Triggers"));
+  els.push(...module(735, 155, "FormBuilder",     "Forms · Fields · Submissions"));
 
-  els.push(...rect({ x: 60, y: 320, w: 960, h: 30, bg: C.evtBg, stroke: C.evtBdr }));
-  els.push(text({ x: 540, y: 335, value: "Wolverine Domain Event Bus  (durable outbox per module DB — at-least-once delivery)", size: 11, color: "#92400e", anchor: "center" }));
+  // Event bus between rows (y=295; 60px gap below row 1 bottom at y=235)
+  els.push(...rect({ x: 60, y: 295, w: 875, h: 35, bg: C.evtBg, stroke: C.evtBdr }));
+  els.push(text({ x: 497, y: 312, value: "Wolverine Domain Event Bus  (durable outbox per module DB — at-least-once delivery)", size: 11, color: "#92400e", anchor: "center" }));
 
+  // Event badges (y=345; 15px gap below event bus bottom at y=330)
   const events = [
-    { label: "WorkflowPublished", x: 80 },
-    { label: "WorkflowArchived", x: 260 },
-    { label: "WorkflowUnarchived", x: 430 },
-    { label: "FormCreated", x: 620 },
-    { label: "FormTaskCreated", x: 770 },
-    { label: "ExecutionStarted", x: 900 },
+    { label: "WorkflowPublished",  x: 65 },
+    { label: "WorkflowArchived",   x: 220 },
+    { label: "WorkflowUnarchived", x: 380 },
+    { label: "FormCreated",        x: 545 },
+    { label: "FormTaskCreated",    x: 695 },
+    { label: "ExecutionStarted",   x: 830 },
   ];
   for (const e of events) {
-    els.push(...badge({ x: e.x, y: 358, label: e.label }));
+    els.push(...badge({ x: e.x, y: 345, label: e.label }));
   }
 
-  els.push(...arrow({ x1: 640, y1: 260, x2: 640, y2: 320, color: C.evtBdr, label: "publishes" }));
-  els.push(...arrow({ x1: 400, y1: 350, x2: 400, y2: 380, color: C.evtBdr, label: "consumes" }));
-  els.push(...arrow({ x1: 880, y1: 350, x2: 880, y2: 380, color: C.evtBdr, label: "consumes" }));
-  els.push(...arrow({ x1: 400, y1: 460, x2: 400, y2: 500, color: C.muted, dashed: true, label: "reads own copy" }));
+  // Row 2 (y=415; 85px gap below event bus bottom at y=330, clear of badges)
+  els.push(...module(285, 415, "WorkflowEngine", "Executions · Step Handlers"));
+  els.push(...module(510, 415, "PageBuilder",    "Pages · Widgets · Bindings", { bg: "#fce7f3", stroke: "#be185d" }));
 
-  els.push(...rect({ x: 60, y: 480, w: 220, h: 100, bg: "transparent", stroke: C.border }));
-  els.push(text({ x: 170, y: 497, value: "Legend", size: 11, bold: true, anchor: "center" }));
-  els.push(...rect({ x: 75, y: 510, w: 16, h: 16, bg: C.modBg, stroke: C.modBdr }));
-  els.push(text({ x: 100, y: 518, value: "Module (owns its DB)", size: 10 }));
-  els.push(...rect({ x: 75, y: 534, w: 16, h: 16, bg: C.evtBg, stroke: C.evtBdr }));
-  els.push(text({ x: 100, y: 542, value: "Domain Event", size: 10 }));
-  els.push(...arrow({ x1: 75, y1: 558, x2: 107, y2: 558, color: C.evtBdr }));
-  els.push(text({ x: 112, y: 558, value: "Event-driven", size: 10 }));
-  els.push(...arrow({ x1: 75, y1: 572, x2: 107, y2: 572, color: C.muted, dashed: true }));
-  els.push(text({ x: 112, y: 572, value: "Local copy (denormalized)", size: 10 }));
+  // Arrows
+  // WorkflowBuilder (center x=610, bottom y=235) → event bus top (y=295)
+  els.push(...arrow({ x1: 610, y1: 235, x2: 610, y2: 295, color: C.evtBdr, label: "publishes" }));
+  // Event bus bottom (y=330) → WorkflowEngine top (center x=385, y=415)
+  els.push(...arrow({ x1: 385, y1: 330, x2: 385, y2: 415, color: C.evtBdr, label: "consumes" }));
+  // Event bus top (y=295) → FormBuilder bottom (center x=835, y=235) — FormBuilder is above the bus
+  els.push(...arrow({ x1: 835, y1: 295, x2: 835, y2: 235, color: C.evtBdr, label: "consumes" }));
+  // WorkflowEngine (bottom y=495) → reads own local copy
+  els.push(...arrow({ x1: 385, y1: 495, x2: 385, y2: 540, color: C.muted, dashed: true, label: "reads own copy" }));
+
+  // Legend
+  els.push(...rect({ x: 60, y: 560, w: 230, h: 105, bg: "transparent", stroke: C.border }));
+  els.push(text({ x: 175, y: 577, value: "Legend", size: 11, bold: true, anchor: "center" }));
+  els.push(...rect({ x: 75, y: 590, w: 16, h: 16, bg: C.modBg, stroke: C.modBdr }));
+  els.push(text({ x: 100, y: 598, value: "Module (owns its DB)", size: 10 }));
+  els.push(...rect({ x: 75, y: 614, w: 16, h: 16, bg: C.evtBg, stroke: C.evtBdr }));
+  els.push(text({ x: 100, y: 622, value: "Domain Event", size: 10 }));
+  els.push(...arrow({ x1: 75, y1: 638, x2: 107, y2: 638, color: C.evtBdr }));
+  els.push(text({ x: 112, y: 638, value: "Event-driven", size: 10 }));
+  els.push(...arrow({ x1: 75, y1: 653, x2: 107, y2: 653, color: C.muted, dashed: true }));
+  els.push(text({ x: 112, y: 653, value: "Local copy (denormalized)", size: 10 }));
 
   return excalidraw(els);
 }
