@@ -45,8 +45,6 @@ const C = {
   infraBdr:  "#ea580c",
   evtBg:     "#fef9c3",
   evtBdr:    "#ca8a04",
-  voBg:      "#f1f5f9",
-  voBdr:     "#64748b",
   arrow:     "#475569",
 };
 
@@ -228,10 +226,10 @@ function vline({ x, y, h, color = C.border, dashed = false }) {
 
 // ─── Entity box (UML-style with header + attribute body) ─────────────────────
 
-function entityBox({ x, y, name, attrs = [], isEnum = false, isValueObject = false,
+function entityBox({ x, y, name, attrs = [], isEnum = false,
                      headerBg = C.sysBg, stroke = C.sysBdr }) {
   const W = 190, LH = 17;
-  const hdrH = (isEnum || isValueObject) ? 36 : 28;
+  const hdrH = isEnum ? 36 : 28;
   const bodyH = attrs.length > 0 ? attrs.length * LH + 8 : 0;
   const H = hdrH + bodyH;
   const els = [];
@@ -258,9 +256,6 @@ function entityBox({ x, y, name, attrs = [], isEnum = false, isValueObject = fal
   // Name
   if (isEnum) {
     els.push(text({ x: x + W / 2, y: y + 11, value: "«enum»", size: 8.5, color: C.muted, anchor: "center" }));
-    els.push(text({ x: x + W / 2, y: y + 26, value: name, size: 11, bold: true, color: C.text, anchor: "center" }));
-  } else if (isValueObject) {
-    els.push(text({ x: x + W / 2, y: y + 11, value: "«value»", size: 8.5, color: C.muted, anchor: "center" }));
     els.push(text({ x: x + W / 2, y: y + 26, value: name, size: 11, bold: true, color: C.text, anchor: "center" }));
   } else {
     els.push(text({ x: x + W / 2, y: y + hdrH / 2, value: name, size: 11, bold: true, color: C.text, anchor: "center" }));
@@ -633,45 +628,37 @@ function dataModelDiagram() {
   _id = 1;
   const els = [];
 
-  els.push(text({ x: 420, y: 20, value: "Data Modeling — Core Entity Relationships", size: 16, bold: true, color: C.text, anchor: "center" }));
+  els.push(text({ x: 500, y: 20, value: "Data Modeling — Core Entity Relationships", size: 16, bold: true, color: C.text, anchor: "center" }));
 
-  // DataModel aggregate — owns a FieldDefinition collection
-  const mdl = entityBox({ x: 40, y: 60, name: "DataModel", headerBg: C.sysBg, stroke: C.sysBdr,
-    attrs: ["+id: UUID", "+name: string", "+description?: string", "+icon?: string", "+color?: string",
-            "+organizationId: UUID", "+createdAt: DateTime", "+updatedAt: DateTime",
-            "+createdBy: string", "+deletedAt?: DateTime"] });
+  const mdl = entityBox({ x: 40, y: 60, name: "ModelDefinition", headerBg: C.sysBg, stroke: C.sysBdr,
+    attrs: ["+id: UUID", "+name: string", "+slug: string", "+description: string", "+icon: string", "+color: string", "+createdAt: DateTime", "+updatedAt: DateTime"] });
 
-  // FieldDefinition entity — shared: owned by DataModel AND DataClass
-  const fld = entityBox({ x: 290, y: 60, name: "FieldDefinition", headerBg: C.sysBg, stroke: C.sysBdr,
-    attrs: ["+id: UUID", "+name: string", "+label: string", "+helpText?: string",
-            "+type: FieldType", "+isRequired: bool", "+isSystem: bool",
-            "+displayOrder: int", "+config: FieldConfig"] });
+  const fld = entityBox({ x: 280, y: 60, name: "FieldDefinition", headerBg: C.sysBg, stroke: C.sysBdr,
+    attrs: ["+id: UUID", "+modelId: UUID", "+name: string", "+label: string", "+type: FieldType", "+required: boolean", "+displayOrder: int", "+config: JSONB", "+createdAt: DateTime"] });
 
-  // FieldType enum
-  const ftype = entityBox({ x: 540, y: 60, name: "FieldType", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
-    attrs: ["Text", "Number", "Boolean", "Date", "Enum", "Relation", "DataClass", "File", "Json"] });
+  const ftype = entityBox({ x: 520, y: 60, name: "FieldType", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
+    attrs: ["Text", "Number", "Boolean", "Date", "Enum", "Relation", "DataClass", "File", "JSON"] });
 
-  // DataClass aggregate — also owns FieldDefinition (same entity type as DataModel)
-  const dcd = entityBox({ x: 40, y: 380, name: "DataClass", headerBg: C.sysBg, stroke: C.sysBdr,
-    attrs: ["+id: UUID", "+name: string", "+description?: string", "+organizationId: UUID",
-            "+createdAt: DateTime", "+updatedAt: DateTime",
-            "+createdBy: string", "+deletedAt?: DateTime"] });
+  const dcd = entityBox({ x: 40, y: 350, name: "DataClassDefinition", headerBg: C.sysBg, stroke: C.sysBdr,
+    attrs: ["+id: UUID", "+name: string", "+description: string", "+createdAt: DateTime", "+updatedAt: DateTime"] });
 
-  // DataRecord aggregate — an instance of a DataModel
-  const rec = entityBox({ x: 40, y: 650, name: "DataRecord", headerBg: C.modBg, stroke: C.modBdr,
-    attrs: ["+id: UUID", "+modelId: UUID", "+organizationId: UUID",
-            "+data: JSONB", "+createdAt: DateTime", "+updatedAt: DateTime",
-            "+createdBy: string", "+deletedAt?: DateTime"] });
+  const dcf = entityBox({ x: 280, y: 350, name: "DataClassField", headerBg: C.sysBg, stroke: C.sysBdr,
+    attrs: ["+id: UUID", "+dataClassId: UUID", "+name: string", "+label: string", "+type: FieldType", "+required: boolean", "+displayOrder: int", "+config: JSONB"] });
 
-  for (const b of [mdl, fld, ftype, dcd, rec]) els.push(...b.els);
+  const rec = entityBox({ x: 40, y: 620, name: "Record", headerBg: C.modBg, stroke: C.modBdr,
+    attrs: ["+id: UUID", "+modelId: UUID", "+data: JSONB", "+createdAt: DateTime", "+updatedAt: DateTime", "+createdBy: UUID"] });
 
-  // DataModel 1--* FieldDefinition (horizontal)
+  for (const b of [mdl, fld, ftype, dcd, dcf, rec]) els.push(...b.els);
+
+  // Relationships
   els.push(...arrow({ x1: mdl.midRight.x, y1: mdl.midRight.y, x2: fld.midLeft.x, y2: fld.midLeft.y, label: "1 *--" }));
-  // FieldDefinition → FieldType (horizontal)
   els.push(...arrow({ x1: fld.midRight.x, y1: fld.midRight.y, x2: ftype.midLeft.x, y2: ftype.midLeft.y, label: "has type" }));
-  // DataClass 1--* FieldDefinition (same entity type): route right→up→right to avoid diagonal
-  els.push(...routedArrow({ waypoints: [[dcd.midRight.x, dcd.midRight.y], [270, dcd.midRight.y], [270, fld.midLeft.y], [fld.midLeft.x, fld.midLeft.y]], label: "1 *--" }));
-  // DataRecord → DataModel (instance of): route left margin to avoid crossing DataClass
+  els.push(...arrow({ x1: dcd.midRight.x, y1: dcd.midRight.y, x2: dcf.midLeft.x, y2: dcf.midLeft.y, label: "1 *--" }));
+  // dcf → ftype: route right to ftype.midBottom.x then up to ftype.midBottom
+  els.push(...routedArrow({ waypoints: [[dcf.midRight.x, dcf.midRight.y + 20], [ftype.midBottom.x, dcf.midRight.y + 20], [ftype.midBottom.x, ftype.midBottom.y]], label: "has type", dashed: true }));
+  // fld → dcd: route down to midpoint y, left, then down to dcd.midTop
+  els.push(...routedArrow({ waypoints: [[fld.midBottom.x - 20, fld.midBottom.y], [fld.midBottom.x - 20, 300], [dcd.midTop.x + 20, 300], [dcd.midTop.x + 20, dcd.midTop.y]], label: "→ DataClass ref", dashed: true }));
+  // rec → mdl: route left of all boxes to avoid crossing dcd
   els.push(...routedArrow({ waypoints: [[rec.midLeft.x, rec.midLeft.y], [10, rec.midLeft.y], [10, mdl.midLeft.y], [mdl.midLeft.x, mdl.midLeft.y]], label: "instance of", dashed: true }));
 
   return excalidraw(els);
@@ -683,53 +670,48 @@ function workflowModelDiagram() {
   _id = 1;
   const els = [];
 
-  els.push(text({ x: 490, y: 20, value: "Workflow Builder — Core Entity Relationships", size: 16, bold: true, color: C.text, anchor: "center" }));
+  els.push(text({ x: 600, y: 20, value: "Workflow Builder — Core Entity Relationships", size: 16, bold: true, color: C.text, anchor: "center" }));
 
-  // WorkflowDefinition aggregate — owns Steps, Transitions, Triggers
   const wfd = entityBox({ x: 40, y: 60, name: "WorkflowDefinition", headerBg: C.modBg, stroke: C.modBdr,
-    attrs: ["+id: UUID", "+name: string", "+description?: string",
-            "+status: WorkflowStatus", "+organizationId: UUID",
-            "+createdAt: DateTime", "+updatedAt: DateTime",
-            "+createdBy: string", "+deletedAt?: DateTime"] });
+    attrs: ["+id: UUID", "+name: string", "+slug: string", "+description: string", "+status: WorkflowStatus", "+version: int", "+createdAt: DateTime", "+updatedAt: DateTime"] });
 
-  // WorkflowStatus enum
-  const wfs = entityBox({ x: 40, y: 330, name: "WorkflowStatus", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
+  const wfs = entityBox({ x: 40, y: 360, name: "WorkflowStatus", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
     attrs: ["Draft", "Active", "Archived"] });
 
-  // WorkflowStep entity — owned by WorkflowDefinition
-  const step = entityBox({ x: 310, y: 60, name: "WorkflowStep", headerBg: C.sysBg, stroke: C.sysBdr,
-    attrs: ["+id: UUID", "+name: string", "+type: StepType", "+config?: JSONB"] });
+  const trig = entityBox({ x: 290, y: 60, name: "TriggerConfig", headerBg: C.sysBg, stroke: C.sysBdr,
+    attrs: ["+id: UUID", "+workflowId: UUID", "+type: TriggerType", "+config: JSONB"] });
 
-  // StepType enum
-  const stepType = entityBox({ x: 310, y: 240, name: "StepType", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
-    attrs: ["Start", "End", "Form", "HttpRequest", "Condition", "Script", "Notification"] });
-
-  // WorkflowTrigger value object — owned by WorkflowDefinition (1--*)
-  const trig = entityBox({ x: 580, y: 60, name: "WorkflowTrigger", isValueObject: true, headerBg: C.voBg, stroke: C.voBdr,
-    attrs: ["+type: TriggerType", "+config?: JSONB"] });
-
-  // TriggerType enum
-  const trigType = entityBox({ x: 580, y: 220, name: "TriggerType", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
+  const trigType = entityBox({ x: 290, y: 290, name: "TriggerType", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
     attrs: ["Manual", "Schedule", "Webhook", "Event"] });
 
-  // StepTransition value object — owned by WorkflowDefinition (1--*)
-  const trans = entityBox({ x: 580, y: 420, name: "StepTransition", isValueObject: true, headerBg: C.voBg, stroke: C.voBdr,
-    attrs: ["+fromStepId: UUID", "+toStepId: UUID", "+label?: string"] });
+  const step = entityBox({ x: 540, y: 60, name: "StepDefinition", headerBg: C.sysBg, stroke: C.sysBdr,
+    attrs: ["+id: UUID", "+workflowId: UUID", "+name: string", "+type: StepType", "+config: JSONB", "+positionX: float", "+positionY: float", "+displayOrder: int"] });
 
-  for (const b of [wfd, wfs, step, stepType, trig, trigType, trans]) els.push(...b.els);
+  const stepType = entityBox({ x: 540, y: 360, name: "StepType", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
+    attrs: ["Form", "HttpRequest", "Condition", "Script", "Notification"] });
 
-  // WorkflowDefinition → WorkflowStatus (vertical)
+  const trans = entityBox({ x: 790, y: 60, name: "Transition", headerBg: C.sysBg, stroke: C.sysBdr,
+    attrs: ["+id: UUID", "+workflowId: UUID", "+fromStepId: UUID", "+toStepId: UUID", "+label: string", "+condition: string", "+displayOrder: int"] });
+
+  const pg = entityBox({ x: 790, y: 340, name: "ParallelGroup", headerBg: C.sysBg, stroke: C.sysBdr,
+    attrs: ["+id: UUID", "+workflowId: UUID", "+name: string", "+joinType: JoinType"] });
+
+  const jt = entityBox({ x: 790, y: 520, name: "JoinType", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
+    attrs: ["WaitAll", "WaitAny"] });
+
+  for (const b of [wfd, wfs, trig, trigType, step, stepType, trans, pg, jt]) els.push(...b.els);
+
+  // Relationships
   els.push(...arrow({ x1: wfd.midBottom.x, y1: wfd.midBottom.y, x2: wfs.midTop.x, y2: wfs.midTop.y, label: "status" }));
-  // WorkflowDefinition → WorkflowStep (route right→up into step.midTop to stay clean)
-  els.push(...routedArrow({ waypoints: [[wfd.midRight.x, wfd.midRight.y - 10], [290, wfd.midRight.y - 10], [290, step.midTop.y + 14], [step.midTop.x, step.midTop.y + 14]], label: "1 *--" }));
-  // WorkflowDefinition → WorkflowTrigger (route above boxes)
-  els.push(...routedArrow({ waypoints: [[wfd.midRight.x, wfd.midRight.y + 10], [wfd.midRight.x, 40], [trig.midTop.x, 40], [trig.midTop.x, trig.midTop.y]], label: "1 *--" }));
-  // WorkflowDefinition → StepTransition (route right then down through the gap)
-  els.push(...routedArrow({ waypoints: [[wfd.midRight.x, wfd.midRight.y + 25], [560, wfd.midRight.y + 25], [560, trans.midLeft.y], [trans.midLeft.x, trans.midLeft.y]], label: "1 *--" }));
-  // WorkflowStep → StepType (vertical)
-  els.push(...arrow({ x1: step.midBottom.x, y1: step.midBottom.y, x2: stepType.midTop.x, y2: stepType.midTop.y, label: "type" }));
-  // WorkflowTrigger → TriggerType (vertical)
+  els.push(...arrow({ x1: wfd.midRight.x, y1: wfd.midRight.y - 10, x2: trig.midLeft.x, y2: trig.midLeft.y, label: "1 -- 1" }));
+  els.push(...arrow({ x1: wfd.midRight.x, y1: wfd.midRight.y + 10, x2: step.midLeft.x, y2: step.midLeft.y, label: "1 *--" }));
+  // wfd → trans: route above all boxes to avoid crossing step
+  els.push(...routedArrow({ waypoints: [[wfd.midRight.x, wfd.midRight.y + 30], [wfd.midRight.x, 30], [trans.midTop.x, 30], [trans.midTop.x, trans.midTop.y]], label: "1 *--" }));
   els.push(...arrow({ x1: trig.midBottom.x, y1: trig.midBottom.y, x2: trigType.midTop.x, y2: trigType.midTop.y, label: "type" }));
+  els.push(...arrow({ x1: step.midBottom.x, y1: step.midBottom.y, x2: stepType.midTop.x, y2: stepType.midTop.y, label: "type" }));
+  els.push(...arrow({ x1: pg.midBottom.x, y1: pg.midBottom.y, x2: jt.midTop.x, y2: jt.midTop.y, label: "joinType" }));
+  // step → pg: route right then down
+  els.push(...routedArrow({ waypoints: [[step.midRight.x, step.midRight.y + 20], [760, step.midRight.y + 20], [760, pg.midLeft.y], [pg.midLeft.x, pg.midLeft.y]], label: "0..1", dashed: true }));
 
   return excalidraw(els);
 }
@@ -740,48 +722,41 @@ function formModelDiagram() {
   _id = 1;
   const els = [];
 
-  els.push(text({ x: 440, y: 20, value: "Form Builder — Core Entity Relationships", size: 16, bold: true, color: C.text, anchor: "center" }));
+  els.push(text({ x: 520, y: 20, value: "Form Builder — Core Entity Relationships", size: 16, bold: true, color: C.text, anchor: "center" }));
 
-  // FormDefinition aggregate — owns a FormField collection
   const fdef = entityBox({ x: 40, y: 60, name: "FormDefinition", headerBg: C.infraBg, stroke: C.infraBdr,
-    attrs: ["+id: UUID", "+name: string", "+description?: string", "+organizationId: UUID",
-            "+createdAt: DateTime", "+updatedAt: DateTime",
-            "+createdBy: string", "+deletedAt?: DateTime"] });
+    attrs: ["+id: UUID", "+name: string", "+description: string", "+organizationId: UUID", "+createdAt: DateTime", "+updatedAt: DateTime"] });
 
-  // FormField entity — owned by FormDefinition
-  const ffield = entityBox({ x: 290, y: 60, name: "FormField", headerBg: C.sysBg, stroke: C.sysBdr,
-    attrs: ["+id: UUID", "+key: string", "+label: string", "+helpText?: string",
-            "+type: FormFieldType", "+isRequired: bool",
-            "+displayOrder: int", "+config?: FormFieldConfig"] });
+  const fsec = entityBox({ x: 290, y: 60, name: "FormSection", headerBg: C.sysBg, stroke: C.sysBdr,
+    attrs: ["+id: UUID", "+formId: UUID", "+title: string", "+description: string", "+displayOrder: int"] });
 
-  // FormFieldType enum
   const fft = entityBox({ x: 540, y: 60, name: "FormFieldType", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
-    attrs: ["Text", "Number", "Boolean", "Date", "Dropdown", "MultiSelect", "RelationPicker", "FileUpload", "Section"] });
+    attrs: ["Text", "Number", "Boolean", "Date", "Dropdown", "MultiSelect", "Checkbox", "FileUpload", "RelationPicker"] });
 
-  // FormSubmission aggregate — serves as both the task assignment AND the submission record
-  const fsub = entityBox({ x: 40, y: 360, name: "FormSubmission", headerBg: C.modBg, stroke: C.modBdr,
-    attrs: ["+id: UUID", "+formDefinitionId: UUID", "+organizationId: UUID",
-            "+executionId: UUID", "+executionStepId: UUID",
-            "+assigneeUserId?: UUID", "+assigneeRoleId?: UUID",
-            "+submittedByUserId?: UUID", "+accessToken: UUID",
-            "+status: FormSubmissionStatus",
-            "+expiresAt?: DateTime", "+submittedAt?: DateTime",
-            "+submittedData: JSONB", "+createdAt: DateTime", "+createdBy: string"] });
+  const ffield = entityBox({ x: 290, y: 300, name: "FormFieldDefinition", headerBg: C.sysBg, stroke: C.sysBdr,
+    attrs: ["+id: UUID", "+formId: UUID", "+key: string", "+label: string", "+type: FormFieldType", "+required: boolean", "+displayOrder: int", "+config: JSONB"] });
 
-  // FormSubmissionStatus enum
-  const fss = entityBox({ x: 310, y: 360, name: "FormSubmissionStatus", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
-    attrs: ["Pending", "Submitted", "Expired", "Cancelled"] });
+  const ftask = entityBox({ x: 40, y: 440, name: "FormTask", headerBg: C.modBg, stroke: C.modBdr,
+    attrs: ["+id: UUID", "+formId: UUID", "+executionId: UUID", "+stepId: UUID", "+assigneeId: UUID", "+status: FormTaskStatus", "+token: string", "+expiresAt: DateTime", "+createdAt: DateTime"] });
 
-  for (const b of [fdef, ffield, fft, fsub, fss]) els.push(...b.els);
+  const fts = entityBox({ x: 40, y: 730, name: "FormTaskStatus", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
+    attrs: ["Pending", "Completed", "Expired", "Cancelled"] });
 
-  // FormDefinition 1--* FormField (horizontal)
-  els.push(...arrow({ x1: fdef.midRight.x, y1: fdef.midRight.y, x2: ffield.midLeft.x, y2: ffield.midLeft.y, label: "1 *--" }));
-  // FormField → FormFieldType (horizontal)
-  els.push(...arrow({ x1: ffield.midRight.x, y1: ffield.midRight.y, x2: fft.midLeft.x, y2: fft.midLeft.y, label: "has type" }));
-  // FormDefinition 1--* FormSubmission (vertical)
-  els.push(...arrow({ x1: fdef.midBottom.x, y1: fdef.midBottom.y, x2: fsub.midTop.x, y2: fsub.midTop.y, label: "1 *--" }));
-  // FormSubmission → FormSubmissionStatus (route right then down to enum)
-  els.push(...routedArrow({ waypoints: [[fsub.midRight.x, fsub.midRight.y], [290, fsub.midRight.y], [290, fss.midLeft.y], [fss.midLeft.x, fss.midLeft.y]], label: "status" }));
+  const fsub = entityBox({ x: 290, y: 590, name: "FormSubmission", headerBg: C.sysBg, stroke: C.sysBdr,
+    attrs: ["+id: UUID", "+formTaskId: UUID", "+submittedBy: UUID", "+submittedAt: DateTime", "+data: JSONB"] });
+
+  for (const b of [fdef, fsec, fft, ffield, ftask, fts, fsub]) els.push(...b.els);
+
+  // Relationships
+  els.push(...arrow({ x1: fdef.midRight.x, y1: fdef.midRight.y - 8, x2: fsec.midLeft.x, y2: fsec.midLeft.y, label: "1 *--" }));
+  // fdef → ffield: route right then down then right
+  els.push(...routedArrow({ waypoints: [[fdef.midRight.x, fdef.midRight.y + 8], [260, fdef.midRight.y + 8], [260, ffield.midLeft.y], [ffield.midLeft.x, ffield.midLeft.y]], label: "1 *--" }));
+  // ffield → fft: route right to fft.midBottom.x then up to fft.midBottom
+  els.push(...routedArrow({ waypoints: [[ffield.midRight.x, ffield.midRight.y], [fft.midBottom.x, ffield.midRight.y], [fft.midBottom.x, fft.midBottom.y]], label: "type" }));
+  els.push(...arrow({ x1: fdef.midBottom.x, y1: fdef.midBottom.y, x2: ftask.midTop.x, y2: ftask.midTop.y, label: "→ runtime" }));
+  els.push(...arrow({ x1: ftask.midBottom.x, y1: ftask.midBottom.y, x2: fts.midTop.x, y2: fts.midTop.y, label: "status" }));
+  // ftask → fsub: route right then down
+  els.push(...routedArrow({ waypoints: [[ftask.midRight.x, ftask.midRight.y + 30], [260, ftask.midRight.y + 30], [260, fsub.midLeft.y], [fsub.midLeft.x, fsub.midLeft.y]], label: "1 -- 1" }));
 
   return excalidraw(els);
 }
