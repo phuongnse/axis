@@ -486,13 +486,13 @@ function seqBuild({ title, participants, gap = 165, messages, sections = [], not
   const BOX_W = 125, BOX_H = 42, BOX_Y = 48;
   const LIFE_TOP = BOX_Y + BOX_H;
   const LIFE_BOT = messages.reduce((max, m) => Math.max(max, m.y), 0) + 50;
-  const CANVAS_W = participants[participants.length - 1].cx + BOX_W / 2 + 30;
+
+  // Compute cx first — CANVAS_W depends on it
+  const ps = participants.map((p, i) => ({ ...p, cx: 60 + i * gap }));
+  const CANVAS_W = ps[ps.length - 1].cx + BOX_W / 2 + 30;
 
   // Title
   els.push(text({ x: CANVAS_W / 2, y: 20, value: title, size: 15, bold: true, color: C.text, anchor: "center" }));
-
-  // Compute cx for each participant
-  const ps = participants.map((p, i) => ({ ...p, cx: 60 + i * gap }));
 
   // Participant boxes + lifelines
   for (const p of ps) {

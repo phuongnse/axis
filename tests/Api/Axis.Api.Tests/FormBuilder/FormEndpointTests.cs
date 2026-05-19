@@ -16,19 +16,19 @@ public class FormEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task GetForms_WhenNoToken_Returns401()
     {
-        var resp = await fixture.Client.GetAsync("/api/forms");
+        HttpResponseMessage resp = await fixture.Client.GetAsync("/api/forms");
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
     public async Task GetForms_WhenOrgHasNoForms_ReturnsEmptyPagedResult()
     {
-        var client = await AuthHelper.CreateAdminClientAsync(fixture, "fm1");
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "fm1");
 
-        var resp = await client.GetAsync("/api/forms");
+        HttpResponseMessage resp = await client.GetAsync("/api/forms");
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement body = (await resp.Content.ReadFromJsonAsync<JsonElement>(Json))!;
         body.GetProperty("items").EnumerateArray().ToList().Should().BeEmpty();
         body.GetProperty("total_count").GetInt32().Should().Be(0);
     }
@@ -38,7 +38,7 @@ public class FormEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task CreateForm_WhenNoToken_Returns401()
     {
-        var resp = await fixture.Client.PostAsJsonAsync("/api/forms",
+        HttpResponseMessage resp = await fixture.Client.PostAsJsonAsync("/api/forms",
             new { name = "Test Form" }, Json);
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -46,30 +46,30 @@ public class FormEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task CreateForm_WhenRequestIsValid_Returns201AndAppearsInList()
     {
-        var client = await AuthHelper.CreateAdminClientAsync(fixture, "fm2");
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "fm2");
 
-        var createResp = await client.PostAsJsonAsync("/api/forms", new
+        HttpResponseMessage createResp = await client.PostAsJsonAsync("/api/forms", new
         {
             name = "Employee Onboarding",
             description = "New hire form",
         }, Json);
 
         createResp.StatusCode.Should().Be(HttpStatusCode.Created);
-        var body = await createResp.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement body = (await createResp.Content.ReadFromJsonAsync<JsonElement>(Json))!;
         body.GetProperty("id").GetString().Should().NotBeNullOrEmpty();
 
-        var listResp = await client.GetAsync("/api/forms");
-        var list = await listResp.Content.ReadFromJsonAsync<JsonElement>(Json);
+        HttpResponseMessage listResp = await client.GetAsync("/api/forms");
+        JsonElement list = (await listResp.Content.ReadFromJsonAsync<JsonElement>(Json))!;
         list.GetProperty("items").EnumerateArray().ToList().Should().HaveCount(1);
     }
 
     [Fact]
     public async Task CreateForm_WhenNameIsDuplicate_Returns409()
     {
-        var client = await AuthHelper.CreateAdminClientAsync(fixture, "fm3");
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "fm3");
         await CreateFormAsync(client, "Duplicate Form");
 
-        var resp = await client.PostAsJsonAsync("/api/forms",
+        HttpResponseMessage resp = await client.PostAsJsonAsync("/api/forms",
             new { name = "Duplicate Form", description = (string?)null }, Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.Conflict);
@@ -80,21 +80,21 @@ public class FormEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task GetFormPicker_WhenNoToken_Returns401()
     {
-        var resp = await fixture.Client.GetAsync("/api/forms/picker");
+        HttpResponseMessage resp = await fixture.Client.GetAsync("/api/forms/picker");
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
     public async Task GetFormPicker_WhenFormsExist_ReturnsFlatList()
     {
-        var client = await AuthHelper.CreateAdminClientAsync(fixture, "fm4");
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "fm4");
         await CreateFormAsync(client, "Form A");
         await CreateFormAsync(client, "Form B");
 
-        var resp = await client.GetAsync("/api/forms/picker");
+        HttpResponseMessage resp = await client.GetAsync("/api/forms/picker");
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
-        var items = await resp.Content.ReadFromJsonAsync<JsonElement[]>(Json);
+        JsonElement[]? items = await resp.Content.ReadFromJsonAsync<JsonElement[]>(Json);
         items.Should().HaveCount(2);
         items.Should().Contain(i => i.GetProperty("name").GetString() == "Form A");
         items.Should().Contain(i => i.GetProperty("name").GetString() == "Form B");
@@ -105,28 +105,28 @@ public class FormEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task GetFormById_WhenNoToken_Returns401()
     {
-        var resp = await fixture.Client.GetAsync($"/api/forms/{Guid.NewGuid()}");
+        HttpResponseMessage resp = await fixture.Client.GetAsync($"/api/forms/{Guid.NewGuid()}");
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
     public async Task GetFormById_WhenIdIsUnknown_Returns404()
     {
-        var client = await AuthHelper.CreateAdminClientAsync(fixture, "fm5");
-        var resp = await client.GetAsync($"/api/forms/{Guid.NewGuid()}");
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "fm5");
+        HttpResponseMessage resp = await client.GetAsync($"/api/forms/{Guid.NewGuid()}");
         resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
     public async Task GetFormById_WhenFormExists_ReturnsDetail()
     {
-        var client = await AuthHelper.CreateAdminClientAsync(fixture, "fm6");
-        var id = await CreateFormAsync(client, "Detail Form", "A description");
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "fm6");
+        string id = await CreateFormAsync(client, "Detail Form", "A description");
 
-        var resp = await client.GetAsync($"/api/forms/{id}");
+        HttpResponseMessage resp = await client.GetAsync($"/api/forms/{id}");
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
-        var form = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement form = (await resp.Content.ReadFromJsonAsync<JsonElement>(Json))!;
         form.GetProperty("name").GetString().Should().Be("Detail Form");
         form.GetProperty("description").GetString().Should().Be("A description");
         form.GetProperty("fields").GetArrayLength().Should().Be(0);
@@ -137,15 +137,15 @@ public class FormEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task UpdateForm_WhenRequestIsValid_Returns204AndChangesArePersisted()
     {
-        var client = await AuthHelper.CreateAdminClientAsync(fixture, "fm7");
-        var id = await CreateFormAsync(client, "Old Name");
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "fm7");
+        string id = await CreateFormAsync(client, "Old Name");
 
-        var updateResp = await client.PutAsJsonAsync($"/api/forms/{id}",
+        HttpResponseMessage updateResp = await client.PutAsJsonAsync($"/api/forms/{id}",
             new { name = "New Name", description = "Updated" }, Json);
 
         updateResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        var detail = await (await client.GetAsync($"/api/forms/{id}")).Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement detail = (await (await client.GetAsync($"/api/forms/{id}")).Content.ReadFromJsonAsync<JsonElement>(Json))!;
         detail.GetProperty("name").GetString().Should().Be("New Name");
         detail.GetProperty("description").GetString().Should().Be("Updated");
     }
@@ -153,8 +153,8 @@ public class FormEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task UpdateForm_WhenFormNotFound_Returns404()
     {
-        var client = await AuthHelper.CreateAdminClientAsync(fixture, "fm8");
-        var resp = await client.PutAsJsonAsync($"/api/forms/{Guid.NewGuid()}",
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "fm8");
+        HttpResponseMessage resp = await client.PutAsJsonAsync($"/api/forms/{Guid.NewGuid()}",
             new { name = "X", description = (string?)null }, Json);
         resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -164,22 +164,22 @@ public class FormEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task DeleteForm_WhenFormExists_Returns204AndFormIsGone()
     {
-        var client = await AuthHelper.CreateAdminClientAsync(fixture, "fm9");
-        var id = await CreateFormAsync(client, "To Delete");
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "fm9");
+        string id = await CreateFormAsync(client, "To Delete");
 
-        var deleteResp = await client.DeleteAsync($"/api/forms/{id}");
+        HttpResponseMessage deleteResp = await client.DeleteAsync($"/api/forms/{id}");
 
         deleteResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        var getResp = await client.GetAsync($"/api/forms/{id}");
+        HttpResponseMessage getResp = await client.GetAsync($"/api/forms/{id}");
         getResp.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
     public async Task DeleteForm_WhenFormNotFound_Returns404()
     {
-        var client = await AuthHelper.CreateAdminClientAsync(fixture, "fm10");
-        var resp = await client.DeleteAsync($"/api/forms/{Guid.NewGuid()}");
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "fm10");
+        HttpResponseMessage resp = await client.DeleteAsync($"/api/forms/{Guid.NewGuid()}");
         resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
@@ -188,10 +188,10 @@ public class FormEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task AddField_WhenRequestIsValid_Returns201AndFieldAppearsInForm()
     {
-        var client = await AuthHelper.CreateAdminClientAsync(fixture, "fm11");
-        var formId = await CreateFormAsync(client, "Field Form");
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "fm11");
+        string formId = await CreateFormAsync(client, "Field Form");
 
-        var addResp = await client.PostAsJsonAsync($"/api/forms/{formId}/fields", new
+        HttpResponseMessage addResp = await client.PostAsJsonAsync($"/api/forms/{formId}/fields", new
         {
             key = "first_name",
             label = "First Name",
@@ -201,10 +201,10 @@ public class FormEndpointTests(ApiTestFixture fixture)
         }, Json);
 
         addResp.StatusCode.Should().Be(HttpStatusCode.Created);
-        var body = await addResp.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement body = (await addResp.Content.ReadFromJsonAsync<JsonElement>(Json))!;
         body.GetProperty("id").GetString().Should().NotBeNullOrEmpty();
 
-        var detail = await (await client.GetAsync($"/api/forms/{formId}")).Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement detail = (await (await client.GetAsync($"/api/forms/{formId}")).Content.ReadFromJsonAsync<JsonElement>(Json))!;
         detail.GetProperty("fields").GetArrayLength().Should().Be(1);
         JsonElement field = detail.GetProperty("fields").EnumerateArray().First();
         field.GetProperty("key").GetString().Should().Be("first_name");
@@ -216,8 +216,8 @@ public class FormEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task AddField_WhenFormNotFound_Returns404()
     {
-        var client = await AuthHelper.CreateAdminClientAsync(fixture, "fm12");
-        var resp = await client.PostAsJsonAsync($"/api/forms/{Guid.NewGuid()}/fields", new
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "fm12");
+        HttpResponseMessage resp = await client.PostAsJsonAsync($"/api/forms/{Guid.NewGuid()}/fields", new
         {
             key = "field1",
             label = "Field 1",
@@ -231,11 +231,11 @@ public class FormEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task AddField_WhenKeyIsDuplicate_Returns422()
     {
-        var client = await AuthHelper.CreateAdminClientAsync(fixture, "fm13");
-        var formId = await CreateFormAsync(client, "Dup Key Form");
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "fm13");
+        string formId = await CreateFormAsync(client, "Dup Key Form");
         await AddTextFieldAsync(client, formId, "email", "Email");
 
-        var resp = await client.PostAsJsonAsync($"/api/forms/{formId}/fields", new
+        HttpResponseMessage resp = await client.PostAsJsonAsync($"/api/forms/{formId}/fields", new
         {
             key = "email",
             label = "Email Address",
@@ -251,24 +251,24 @@ public class FormEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task RemoveField_WhenFieldExists_Returns204AndFieldIsGone()
     {
-        var client = await AuthHelper.CreateAdminClientAsync(fixture, "fm14");
-        var formId = await CreateFormAsync(client, "Remove Field Form");
-        var fieldId = await AddTextFieldAsync(client, formId, "notes", "Notes");
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "fm14");
+        string formId = await CreateFormAsync(client, "Remove Field Form");
+        string fieldId = await AddTextFieldAsync(client, formId, "notes", "Notes");
 
-        var deleteResp = await client.DeleteAsync($"/api/forms/{formId}/fields/{fieldId}");
+        HttpResponseMessage deleteResp = await client.DeleteAsync($"/api/forms/{formId}/fields/{fieldId}");
 
         deleteResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        var detail = await (await client.GetAsync($"/api/forms/{formId}")).Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement detail = (await (await client.GetAsync($"/api/forms/{formId}")).Content.ReadFromJsonAsync<JsonElement>(Json))!;
         detail.GetProperty("fields").GetArrayLength().Should().Be(0);
     }
 
     [Fact]
     public async Task RemoveField_WhenFieldNotFound_Returns422()
     {
-        var client = await AuthHelper.CreateAdminClientAsync(fixture, "fm15");
-        var formId = await CreateFormAsync(client, "Remove Field 422");
-        var resp = await client.DeleteAsync($"/api/forms/{formId}/fields/{Guid.NewGuid()}");
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "fm15");
+        string formId = await CreateFormAsync(client, "Remove Field 422");
+        HttpResponseMessage resp = await client.DeleteAsync($"/api/forms/{formId}/fields/{Guid.NewGuid()}");
         resp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
@@ -277,18 +277,18 @@ public class FormEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task ReorderFields_WhenFieldIdsAreValid_Returns204AndOrderChanges()
     {
-        var client = await AuthHelper.CreateAdminClientAsync(fixture, "fm16");
-        var formId = await CreateFormAsync(client, "Reorder Form");
-        var fieldA = await AddTextFieldAsync(client, formId, "field_a", "Field A");
-        var fieldB = await AddTextFieldAsync(client, formId, "field_b", "Field B");
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "fm16");
+        string formId = await CreateFormAsync(client, "Reorder Form");
+        string fieldA = await AddTextFieldAsync(client, formId, "field_a", "Field A");
+        string fieldB = await AddTextFieldAsync(client, formId, "field_b", "Field B");
 
-        var reorderResp = await client.PutAsJsonAsync($"/api/forms/{formId}/fields/reorder",
+        HttpResponseMessage reorderResp = await client.PutAsJsonAsync($"/api/forms/{formId}/fields/reorder",
             new { field_ids = new[] { fieldB, fieldA } }, Json);
 
         reorderResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        var detail = await (await client.GetAsync($"/api/forms/{formId}")).Content.ReadFromJsonAsync<JsonElement>(Json);
-        var fields = detail.GetProperty("fields").EnumerateArray().ToList();
+        JsonElement detail = (await (await client.GetAsync($"/api/forms/{formId}")).Content.ReadFromJsonAsync<JsonElement>(Json))!;
+        List<JsonElement> fields = detail.GetProperty("fields").EnumerateArray().ToList();
         fields[0].GetProperty("id").GetString().Should().Be(fieldB);
         fields[1].GetProperty("id").GetString().Should().Be(fieldA);
     }
@@ -296,12 +296,12 @@ public class FormEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task ReorderFields_WhenFieldIdsMissing_Returns422()
     {
-        var client = await AuthHelper.CreateAdminClientAsync(fixture, "fm17");
-        var formId = await CreateFormAsync(client, "Reorder 422");
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "fm17");
+        string formId = await CreateFormAsync(client, "Reorder 422");
         await AddTextFieldAsync(client, formId, "only_field", "Only Field");
 
         // Send empty list — must contain all field IDs
-        var resp = await client.PutAsJsonAsync($"/api/forms/{formId}/fields/reorder",
+        HttpResponseMessage resp = await client.PutAsJsonAsync($"/api/forms/{formId}/fields/reorder",
             new { field_ids = Array.Empty<string>() }, Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
@@ -311,16 +311,16 @@ public class FormEndpointTests(ApiTestFixture fixture)
 
     private async Task<string> CreateFormAsync(HttpClient client, string name, string? description = null)
     {
-        var resp = await client.PostAsJsonAsync("/api/forms",
+        HttpResponseMessage resp = await client.PostAsJsonAsync("/api/forms",
             new { name, description }, Json);
         resp.EnsureSuccessStatusCode();
-        var body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement body = (await resp.Content.ReadFromJsonAsync<JsonElement>(Json))!;
         return body.GetProperty("id").GetString()!;
     }
 
     private async Task<string> AddTextFieldAsync(HttpClient client, string formId, string key, string label)
     {
-        var resp = await client.PostAsJsonAsync($"/api/forms/{formId}/fields", new
+        HttpResponseMessage resp = await client.PostAsJsonAsync($"/api/forms/{formId}/fields", new
         {
             key,
             label,
@@ -329,7 +329,7 @@ public class FormEndpointTests(ApiTestFixture fixture)
             config = (object?)null,
         }, Json);
         resp.EnsureSuccessStatusCode();
-        var body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement body = (await resp.Content.ReadFromJsonAsync<JsonElement>(Json))!;
         return body.GetProperty("id").GetString()!;
     }
 }

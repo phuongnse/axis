@@ -142,25 +142,25 @@ public sealed class ApiTestFixture : IAsyncLifetime
         // Seed the SPA client used by integration tests
         await SeedTestOpenIddictClientsAsync(scope.ServiceProvider);
 
-        var dmOptions = new DbContextOptionsBuilder<DataModelingDbContext>()
+        DbContextOptions<DataModelingDbContext> dmOptions = new DbContextOptionsBuilder<DataModelingDbContext>()
             .UseNpgsql(_dmConnectionString)
             .Options;
         await using DataModelingDbContext dmCtx = new(dmOptions, new PublicSchemaTenantContext());
         await dmCtx.Database.EnsureCreatedAsync();
 
-        var wbOptions = new DbContextOptionsBuilder<WorkflowBuilderDbContext>()
+        DbContextOptions<WorkflowBuilderDbContext> wbOptions = new DbContextOptionsBuilder<WorkflowBuilderDbContext>()
             .UseNpgsql(_wbConnectionString)
             .Options;
         await using WorkflowBuilderDbContext wbCtx = new(wbOptions, new PublicSchemaTenantContext());
         await wbCtx.Database.EnsureCreatedAsync();
 
-        var fbOptions = new DbContextOptionsBuilder<FormBuilderDbContext>()
+        DbContextOptions<FormBuilderDbContext> fbOptions = new DbContextOptionsBuilder<FormBuilderDbContext>()
             .UseNpgsql(_fbConnectionString)
             .Options;
         await using FormBuilderDbContext fbCtx = new(fbOptions, new PublicSchemaTenantContext());
         await fbCtx.Database.EnsureCreatedAsync();
 
-        var weOptions = new DbContextOptionsBuilder<WorkflowEngineDbContext>()
+        DbContextOptions<WorkflowEngineDbContext> weOptions = new DbContextOptionsBuilder<WorkflowEngineDbContext>()
             .UseNpgsql(_weConnectionString)
             .Options;
         await using WorkflowEngineDbContext weCtx = new(weOptions, new PublicSchemaTenantContext());

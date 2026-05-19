@@ -30,7 +30,7 @@
 - [Result → HTTP status code mapping](#result--http-status-code-mapping) ★
 - [OpenAPI / Scalar setup](#openapi--scalar-setup) ★
 - [Wolverine patterns](#wolverine-patterns) ★
-- [Cross-module read pattern](#cross-module-read-pattern) ★
+- [Cross-module data pattern](#cross-module-data-pattern) ★
 - [Command idempotency pattern](#command-idempotency-pattern) ★
 - [Clean Code Principles](#clean-code-principles)
 - [Design Patterns in Practice](#design-patterns-in-practice)
@@ -1318,6 +1318,11 @@ public sealed class FormStepAddedHandler(FormBuilderDbContext db)
 {
     public async Task Handle(FormStepAdded evt, CancellationToken ct)
     {
+        // Idempotent: skip if already synced (Wolverine at-least-once delivery)
+        bool exists = await db.FormWorkflowReferences.AnyAsync(
+            r => r.FormId == evt.FormId && r.WorkflowId == evt.WorkflowId && r.StepId == evt.StepId, ct);
+        if (exists) return;
+
         db.FormWorkflowReferences.Add(new FormWorkflowReference
         {
             FormId = evt.FormId, WorkflowId = evt.WorkflowId, StepId = evt.StepId
@@ -1342,7 +1347,7 @@ public async Task<bool> IsReferencedByWorkflowAsync(Guid formId, CancellationTok
 - The source module (B) owns the event — define it in B's Domain layer.
 - The consuming module (A) owns the handler and the local copy table — both in A's Infrastructure layer.
 - The Wolverine handler in A is idempotent: use upsert or check-before-insert to handle duplicate events.
-- If the consuming module needs derived state (e.g., "is the form referenced at all?"), compute it from the local copy at query time — do not try to sync aggregated state.
+- If the consuming module needs derived state computed (e.g., "is the form referenced at all?"), compute it from the local copy at query time — do not try to sync aggregated state.
 
 ### Pre-commit violation sweep
 

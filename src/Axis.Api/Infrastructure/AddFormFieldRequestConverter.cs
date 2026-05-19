@@ -17,9 +17,8 @@ public sealed class AddFormFieldRequestConverter : JsonConverter<AddFormFieldReq
         string label = root.GetProperty("label").GetString()!;
         FormFieldType type = JsonSerializer.Deserialize<FormFieldType>(root.GetProperty("type").GetRawText(), options);
         bool required = root.GetProperty("required").GetBoolean();
-        FormFieldConfig? config = root.TryGetProperty("config", out JsonElement configEl)
-            ? FormFieldConfigDeserializer.Deserialize(type, configEl, options)
-            : null;
+        JsonElement configEl = root.TryGetProperty("config", out JsonElement c) ? c : default;
+        FormFieldConfig? config = FormFieldConfigDeserializer.Deserialize(type, configEl, options);
 
         return new AddFormFieldRequest(key, label, type, required, config);
     }

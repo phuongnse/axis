@@ -18,6 +18,13 @@ internal sealed class WorkflowPublishedHandler(WorkflowEngineDbContext context)
         else
             existing.Reactivate();
 
-        await context.SaveChangesAsync(ct);
+        try
+        {
+            await context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            // Concurrent duplicate event delivery — row already inserted by a parallel handler invocation.
+        }
     }
 }

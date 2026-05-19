@@ -457,7 +457,7 @@ A US or layer is NOT done until all of the following are complete in the **same 
 - After editing `docs/diagrams/generate-diagrams.mjs`, run `node docs/diagrams/generate-diagrams.mjs` to regenerate `.excalidraw` files, then `docs/scripts/generate-diagrams.ps1` to regenerate `.svg` files
 - **Never use PlantUML** — all diagrams are Excalidraw (`.excalidraw` + `.svg`). No `.puml` files exist in this project.
 
-**Wireframes** (`docs/wireframes/*.excalidraw` + `.svg`) — update in the same PR when:
+**Wireframes** (`docs/epics/*/wireframes/*.excalidraw` + `.svg` and `docs/wireframes/*.excalidraw` for shared/template) — update in the same PR when:
 - A new screen is introduced or an existing screen's layout changes
 - After editing any `.excalidraw` file, run `docs/scripts/generate-wireframes.ps1` to regenerate the `.svg`
 

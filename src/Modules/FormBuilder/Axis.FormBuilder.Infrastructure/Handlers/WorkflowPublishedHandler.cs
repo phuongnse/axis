@@ -10,7 +10,7 @@ internal sealed class WorkflowPublishedHandler(FormBuilderDbContext context)
     public async Task Handle(WorkflowPublished @event, CancellationToken ct)
     {
         List<FormWorkflowReference> existing = await context.FormWorkflowReferences
-            .Where(r => r.WorkflowId == @event.WorkflowId)
+            .Where(r => r.WorkflowId == @event.WorkflowId && r.OrganizationId == @event.OrganizationId)
             .ToListAsync(ct);
 
         // Remove references no longer in the workflow
