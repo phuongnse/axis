@@ -59,6 +59,7 @@ Scan this before acting. Full explanations are in the sections below.
 - Never bypass auth, silently skip an AC, or mark ✅ to avoid a difficult conversation
 - Domain layer: zero external dependencies (pure C#)
 - Modules communicate only via Wolverine events or Application-layer interfaces — no shared DB transactions
+- Never commit when Gate 1 fails — all relevant build and test commands must be green first (see Gate 1 table)
 - Never commit without a completed, **written** Gate 2 walk-through — a mental check is not a walk-through
 - Never commit without a completed, **written** Gate 3 retrospective — same rule, same reason
 
