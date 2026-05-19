@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Axis.Api.Tests.Helpers;
+using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
@@ -51,11 +52,11 @@ public class OrganizationEndpointTests(ApiTestFixture fixture)
 
         using IServiceScope scope = fixture.CreateScope();
         IdentityDbContext ctx = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        Guid viewerRoleId = ctx.Roles.First(r => r.Name == "Viewer" && r.OrganizationId == orgId).Id;
+        Role viewerRole = ctx.Roles.First(r => r.Name == "Viewer" && r.OrganizationId == orgId);
 
         HttpResponseMessage resp = await client.PostAsJsonAsync(
             "/api/organizations/me/invitations",
-            new { email = "newuser@test.com", role_id = viewerRoleId }, Json);
+            new { email = "newuser@test.com", role_id = viewerRole.Id }, Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
