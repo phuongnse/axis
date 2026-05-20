@@ -416,8 +416,8 @@ This is what makes `import { buildWorkflowCanvas } from './generate-template.mjs
 | Module | Files |
 |---|---|
 | `docs/wireframes/` (root) | `app-shell` |
-| `E01-platform-foundation/wireframes/` | `register-org`, `email-confirmation`, `verify-email`, `verify-email-rate-limit`, `workspace-provisioning`, `pricing`, `settings-org`, `settings-org-upload-states`, `settings-org-usage-error`, `settings-org-deletion-scheduled`, `settings-org-delete-modal` |
-| `E02-identity-access/wireframes/` | `login`, `register`, `forgot-password`, `change-password`, `accept-invitation`, `settings-users`, `settings-roles`, `settings-security` |
+| `E01-platform-foundation/wireframes/` | `register-org`, `register-org-states`, `email-confirmation`, `verify-email`, `verify-email-rate-limit`, `workspace-provisioning`, `pricing`, `settings-org`, `settings-org-upload-states`, `settings-org-profile-states`, `settings-org-usage-error`, `settings-org-free-plan`, `settings-org-access-denied`, `settings-org-deletion-scheduled`, `settings-org-delete-modal`, `settings-org-delete-states` |
+| `E02-identity-access/wireframes/` | `login`, `login-unverified`, `register`, `forgot-password`, `change-password`, `accept-invitation`, `settings-users`, `settings-roles`, `settings-security` |
 | `E03-data-modeling/wireframes/` | `data-models`, `data-classes`, `records` |
 | `E04-workflow-builder/wireframes/` | `workflows`, `workflow-editor` |
 | `E05-form-builder/wireframes/` | `forms`, `form-editor`, `form-submission` |

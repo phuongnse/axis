@@ -3,9 +3,11 @@
 [← Back to E01](../README.md)
 
 > **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/register-org.excalidraw](../wireframes/register-org.excalidraw) · [preview](../wireframes/register-org.svg)
+> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/register-org-states.excalidraw](../wireframes/register-org-states.excalidraw) · [preview](../wireframes/register-org-states.svg)
 > **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/email-confirmation.excalidraw](../wireframes/email-confirmation.excalidraw) · [preview](../wireframes/email-confirmation.svg)
 > **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/verify-email.excalidraw](../wireframes/verify-email.excalidraw) · [preview](../wireframes/verify-email.svg)
 > **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/verify-email-rate-limit.excalidraw](../wireframes/verify-email-rate-limit.excalidraw) · [preview](../wireframes/verify-email-rate-limit.svg)
+> **Wireframe** (US-002 sign-in before verify): [docs/epics/E02-identity-access/wireframes/login-unverified.excalidraw](../../E02-identity-access/wireframes/login-unverified.excalidraw) · [preview](../../E02-identity-access/wireframes/login-unverified.svg)
 > **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/workspace-provisioning.excalidraw](../wireframes/workspace-provisioning.excalidraw) · [preview](../wireframes/workspace-provisioning.svg)
 > **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/pricing.excalidraw](../wireframes/pricing.excalidraw) · [preview](../wireframes/pricing.svg)
 

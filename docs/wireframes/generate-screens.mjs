@@ -12,8 +12,10 @@
  *   app-shell (root)
  *   E01: register-org, email-confirmation, verify-email,
  *        verify-email-rate-limit, workspace-provisioning, pricing, settings-org,
- *        settings-org-upload-states, settings-org-usage-error,
- *        settings-org-deletion-scheduled, settings-org-delete-modal
+ *        settings-org-upload-states, settings-org-profile-states, settings-org-usage-error,
+ *        settings-org-free-plan, settings-org-access-denied,
+ *        settings-org-deletion-scheduled, settings-org-delete-modal, settings-org-delete-states,
+ *        register-org-states
  *   E02: login, register, forgot-password, change-password,
  *        settings-users, settings-roles, settings-security, accept-invitation
  *   E03: data-models, data-classes, records
@@ -160,6 +162,22 @@ function authCard(prefix, { title, subtitle = null, items = [], extraLink = null
   return els;
 }
 
+/** Auth form field with optional inline error (US-001 / US-005). */
+function authFormField(prefix, cardX, y, cardW, label, value, errorMsg = null) {
+  const x = cardX + 24;
+  const innerW = cardW - 48;
+  const blockH = errorMsg ? 86 : 72;
+  const els = [
+    text(`${prefix}_fl`, x, y, innerW, 16, label, 11, C.gray500),
+    rect(`${prefix}_inp`, x, y + 18, innerW, 40, errorMsg ? C.dangerBorder : C.gray300, C.white, 1, true),
+    text(`${prefix}_val`, x + 12, y + 29, innerW - 24, 18, value, 13, C.gray900),
+  ];
+  if (errorMsg) {
+    els.push(text(`${prefix}_err`, x, y + 62, innerW, 14, errorMsg, 11, C.danger));
+  }
+  return { els, blockH };
+}
+
 // ─── App shell (shared layout reference) ─────────────────────────────────────
 
 function genAppShell() {
@@ -216,6 +234,82 @@ function genRegisterOrg() {
     ],
   }, 'Create organization', 'Already have an account? Sign in');
   write('E01-platform-foundation/register-org.excalidraw', els);
+}
+
+/**
+ * Register-Org states — US-001 validation + 5xx (two panels, spec reference).
+ */
+function genRegisterOrgStates() {
+  const els = [];
+  const panelW = 540;
+  const panelH = 620;
+  const gap = 60;
+  const startX = Math.round((W - (panelW * 2 + gap)) / 2);
+  const y0 = 56;
+
+  els.push(rect('ros_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
+  els.push(text('ros_pg', 0, 24, W, 20, 'Registration form — error states', 13, C.gray500, 'center'));
+
+  const panels = [
+    {
+      id: 'val',
+      x: startX,
+      lbl: 'Inline validation (field-level)',
+      lblColor: C.danger,
+      serverBanner: null,
+      fields: [
+        { label: 'Organization name', value: 'A', err: 'Must be between 2 and 100 characters.' },
+        { label: 'Admin full name', value: 'Alex Brown', err: null },
+        { label: 'Email address', value: 'not-an-email', err: 'Enter a valid email address.' },
+        { label: 'Password', value: '••••••••', err: 'Must be at least 8 characters with a letter and a number.' },
+        { label: 'Confirm password', value: '••••••••', err: 'Passwords do not match.' },
+      ],
+    },
+    {
+      id: 'srv',
+      x: startX + panelW + gap,
+      lbl: 'Server error (5xx)',
+      lblColor: C.danger,
+      serverBanner: 'Something went wrong. Please try again.',
+      fields: [
+        { label: 'Organization name', value: "O'Brien & Co.", err: null },
+        { label: 'Admin full name', value: 'Alex Brown', err: null },
+        { label: 'Email address', value: 'alex@company.com', err: null },
+        { label: 'Password', value: '••••••••', err: null },
+        { label: 'Confirm password', value: '••••••••', err: null },
+      ],
+    },
+  ];
+
+  panels.forEach(({ id, x, lbl, lblColor, serverBanner, fields }) => {
+    const cardY = y0 + 28;
+    els.push(text(`ros_${id}_lbl`, x, y0, panelW, 16, lbl, 12, lblColor));
+    els.push(rect(`ros_${id}_card`, x, cardY, panelW, panelH, C.gray300, C.white, 2, true));
+    els.push(text(`ros_${id}_logo`, x, cardY + 16, panelW, 28, '⬡  Axis', 18, C.primary, 'center'));
+    els.push(hline(`ros_${id}_hdiv`, x, cardY + 60, panelW, C.gray300));
+    els.push(text(`ros_${id}_title`, x + 24, cardY + 76, panelW - 48, 24, 'Create your organization', 17, C.gray900));
+    els.push(text(`ros_${id}_sub`, x + 24, cardY + 104, panelW - 48, 18, 'Plan: Free trial  ·  Change plan →', 13, C.gray700));
+
+    let fy = cardY + 136;
+    if (serverBanner) {
+      els.push(rect(`ros_${id}_ban`, x + 24, fy, panelW - 48, 40, C.dangerBorder, C.dangerBg, 1, true));
+      els.push(text(`ros_${id}_ban_t`, x + 36, fy + 12, panelW - 72, 16, serverBanner, 12, C.danger));
+      fy += 52;
+    }
+
+    fields.forEach((f, i) => {
+      const { els: fe, blockH } = authFormField(`ros_${id}_f${i}`, x, fy, panelW, f.label, f.value, f.err);
+      els.push(...fe);
+      fy += blockH;
+    });
+
+    const btnY = cardY + panelH - 68;
+    const btnW = panelW - 48;
+    els.push(rect(`ros_${id}_sbtn`, x + 24, btnY, btnW, 36, C.accentDark, C.accent, 2, true));
+    els.push(text(`ros_${id}_sbtn_t`, x + 24, btnY + 10, btnW, 16, 'Create organization', 13, C.white, 'center'));
+  });
+
+  write('E01-platform-foundation/register-org-states.excalidraw', els);
 }
 
 /**
@@ -483,6 +577,72 @@ function genSettingsOrgDeleteModal() {
 }
 
 /**
+ * Delete modal states — US-007 enabled confirm + queue failure.
+ */
+function genSettingsOrgDeleteStates() {
+  const els = [];
+  const panelW = 520;
+  const panelH = 320;
+  const gap = 80;
+  const startX = Math.round((W - (panelW * 2 + gap)) / 2);
+  const y0 = 120;
+
+  els.push(rect('sods_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
+  els.push(text('sods_pg', 0, 48, W, 20, 'Delete organization — modal states', 13, C.gray500, 'center'));
+
+  const modals = [
+    {
+      id: 'en',
+      x: startX,
+      lbl: 'Name matched — delete enabled',
+      lblColor: C.danger,
+      inp: 'Acme Corp',
+      delEnabled: true,
+      err: null,
+    },
+    {
+      id: 'err',
+      x: startX + panelW + gap,
+      lbl: 'Deletion queue failed',
+      lblColor: C.danger,
+      inp: 'Acme Corp',
+      delEnabled: true,
+      err: 'Could not schedule deletion. Please try again.',
+    },
+  ];
+
+  modals.forEach(({ id, x, lbl, lblColor, inp, delEnabled, err }) => {
+    const mY = y0 + 24;
+    els.push(text(`sods_${id}_lbl`, x, y0, panelW, 16, lbl, 12, lblColor));
+    els.push(rect(`sods_${id}_dim`, x, mY, panelW, panelH, C.gray300, C.gray50, 1, false));
+    const mW = 440;
+    const mH = 260;
+    const mX = x + Math.round((panelW - mW) / 2);
+    const mCardY = mY + 30;
+    els.push(rect(`sods_${id}_card`, mX, mCardY, mW, mH, C.gray700, C.white, 2, true));
+    els.push(text(`sods_${id}_ti`, mX + 20, mCardY + 18, mW - 40, 24, 'Delete organization', 16, C.danger));
+    els.push(hline(`sods_${id}_hd`, mX, mCardY + 50, mW, C.gray300));
+    if (err) {
+      els.push(rect(`sods_${id}_ban`, mX + 20, mCardY + 62, mW - 40, 36, C.dangerBorder, C.dangerBg, 1, true));
+      els.push(text(`sods_${id}_ban_t`, mX + 32, mCardY + 72, mW - 64, 16, err, 12, C.danger));
+    }
+    const inpY = err ? mCardY + 108 : mCardY + 68;
+    els.push(text(`sods_${id}_il`, mX + 20, inpY, mW - 40, 16, "Type 'Acme Corp' to confirm (case-sensitive):", 12, C.gray500));
+    els.push(...inputField(`sods_${id}_in`, mX + 20, inpY + 20, mW - 40, inp));
+    const delY = mCardY + mH - 48;
+    if (delEnabled) {
+      els.push(...btn(`sods_${id}_del`, mX + mW - 20 - 184, delY, 'Delete organization', 'danger'));
+    } else {
+      els.push(rect(`sods_${id}_del`, mX + mW - 20 - 184, delY, 184, 36, C.gray300, C.gray100, 1, true));
+      els.push(text(`sods_${id}_del_t`, mX + mW - 20 - 184, delY + 10, 184, 16, 'Delete organization', 13, C.gray300, 'center'));
+    }
+    els.push(...btn(`sods_${id}_can`, mX + 20, delY, 'Cancel', 'ghost'));
+  });
+
+  write('E01-platform-foundation/settings-org-delete-states.excalidraw', els);
+}
+
+/**
  * Pricing — US-004 (plan selection before registration), US-010 (public pricing page)
  * Public marketing page (no app shell). 3-column plan cards.
  * Signed-in users see "Current plan" badge on their active plan.
@@ -692,6 +852,76 @@ function genSettingsOrgUploadStates() {
   write('E01-platform-foundation/settings-org-upload-states.excalidraw', els);
 }
 
+/**
+ * Settings profile save states — US-005 inline validation, API error, success toast.
+ */
+function genSettingsOrgProfileStates() {
+  const els = [];
+  els.push(rect('sops_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
+  els.push(text('sops_t', 0, 48, W, 20, 'Organization profile — save states', 13, C.gray500, 'center'));
+
+  const cardW = 360;
+  const cardH = 240;
+  const gap = 30;
+  const startX = Math.round((W - (cardW * 3 + gap * 2)) / 2);
+  const y = 100;
+
+  const states = [
+    {
+      id: 'val',
+      title: 'Inline validation',
+      stroke: C.dangerBorder,
+      bg: C.dangerBg,
+      msg: 'Organization name must be between 2 and 100 characters.',
+      msgColor: C.danger,
+      fieldErr: true,
+      toast: null,
+    },
+    {
+      id: 'api',
+      title: 'Save failed (network/5xx)',
+      stroke: C.dangerBorder,
+      bg: C.dangerBg,
+      msg: 'Could not save changes. Your edits are still in the form.',
+      msgColor: C.danger,
+      fieldErr: false,
+      toast: null,
+    },
+    {
+      id: 'ok',
+      title: 'Save succeeded',
+      stroke: C.successBorder,
+      bg: C.successBg,
+      msg: 'Changes saved — reflected in header without reload.',
+      msgColor: C.success,
+      fieldErr: false,
+      toast: 'Organization profile saved',
+    },
+  ];
+
+  states.forEach((s, i) => {
+    const x = startX + i * (cardW + gap);
+    els.push(rect(`sops_${s.id}_c`, x, y, cardW, cardH, C.gray300, C.white, 1, true));
+    els.push(text(`sops_${s.id}_h`, x + 16, y + 16, cardW - 32, 20, s.title, 14, C.gray900));
+    els.push(rect(`sops_${s.id}_a`, x + 16, y + 44, cardW - 32, 48, s.stroke, s.bg, 1, true));
+    els.push(text(`sops_${s.id}_m`, x + 26, y + 58, cardW - 52, 32, s.msg, 12, s.msgColor));
+    els.push(text(`sops_${s.id}_nl`, x + 16, y + 108, cardW - 32, 16, 'Organization name', 11, C.gray500));
+    const inpStroke = s.fieldErr ? C.dangerBorder : C.gray300;
+    els.push(rect(`sops_${s.id}_inp`, x + 16, y + 126, cardW - 32, 40, inpStroke, C.white, 1, true));
+    els.push(text(`sops_${s.id}_v`, x + 28, y + 137, cardW - 56, 18, 'Acme Corp', 13, C.gray900));
+    if (s.fieldErr) {
+      els.push(text(`sops_${s.id}_e`, x + 16, y + 170, cardW - 32, 14, s.msg, 11, C.danger));
+    }
+    els.push(...btn(`sops_${s.id}_save`, x + 16, y + cardH - 52, 'Save changes', 'primary'));
+    if (s.toast) {
+      els.push(rect(`sops_${s.id}_tst`, x + cardW - 200, y + 8, 184, 32, C.successBorder, C.successBg, 1, true));
+      els.push(text(`sops_${s.id}_tst_t`, x + cardW - 192, y + 16, 168, 16, s.toast, 11, C.success, 'center'));
+    }
+  });
+
+  write('E01-platform-foundation/settings-org-profile-states.excalidraw', els);
+}
+
 function genSettingsOrgUsageError() {
   const els = [];
   els.push(...appShell('sue', W, H, NAV, 4, 'Settings — Organization'));
@@ -709,6 +939,51 @@ function genSettingsOrgUsageError() {
   });
 
   write('E01-platform-foundation/settings-org-usage-error.excalidraw', els);
+}
+
+/** US-006 edge case — free plan usage without denominator limits. */
+function genSettingsOrgFreePlan() {
+  const navIdx = 4;
+  const els = [];
+  els.push(...appShell('sofp', W, H, NAV, navIdx, 'Settings — Organization'));
+  els.push(text('sofp_h', cx, cy, 400, 28, 'Usage (Free plan — no configured limits)', 18, C.gray900));
+
+  const usageY = cy + 40;
+  els.push(rect('sofp_pl_b', cx + 128, usageY, 56, 22, C.infoBorder, C.infoBg, 1, true));
+  els.push(text('sofp_pl_t', cx + 128, usageY + 4, 56, 14, 'Free', 11, C.primary, 'center'));
+
+  const mY = usageY + 36;
+  const mW = Math.floor((cw - 40) / 3);
+  [
+    { label: 'Workflows', val: '12' },
+    { label: 'Executions this month', val: '340' },
+    { label: 'Team members', val: '3' },
+  ].forEach(({ label, val }, i) => {
+    const x = cx + i * (mW + 20);
+    els.push(rect(`sofp_m_${i}`, x, mY, mW, 72, C.gray300, C.white, 1, true));
+    els.push(text(`sofp_ml_${i}`, x + 12, mY + 10, mW - 24, 16, label, 11, C.gray500));
+    els.push(text(`sofp_mv_${i}`, x + 12, mY + 28, mW - 24, 24, val, 20, C.gray900));
+    els.push(text(`sofp_ms_${i}`, x + 12, mY + 54, mW - 24, 14, 'no limit configured', 11, C.gray300));
+  });
+
+  write('E01-platform-foundation/settings-org-free-plan.excalidraw', els);
+}
+
+/** US-006 — non-admin receives 403 (redirect target shown as message). */
+function genSettingsOrgAccessDenied() {
+  const navIdx = 4;
+  const els = [];
+  els.push(...appShell('soad', W, H, NAV, navIdx, 'Settings'));
+  const boxW = 480;
+  const boxX = cx + Math.round((cw - boxW) / 2);
+  const boxY = cy + 80;
+  els.push(rect('soad_box', boxX, boxY, boxW, 160, C.gray300, C.white, 2, true));
+  els.push(...stateHeadline('soad', boxX + 24, boxY + 24, boxW - 48, '✕', 'danger', 'Access denied', 16));
+  els.push(text('soad_body', boxX + 24, boxY + 88, boxW - 48, 40,
+    'You need the Admin role to view organization settings.\nRedirecting to dashboard…', 13, C.gray700));
+  els.push(...btn('soad_home', boxX + 24, boxY + 116, 'Go to dashboard', 'secondary'));
+
+  write('E01-platform-foundation/settings-org-access-denied.excalidraw', els);
 }
 
 function genSettingsOrgDeletionScheduled() {
@@ -740,6 +1015,43 @@ function genLogin() {
     extraLink: 'Forgot password?',
   }, 'Sign in', "Don't have an account? Sign up");
   write('E02-identity-access/login.excalidraw', els);
+}
+
+/** US-002 (F01) / US-013 — unverified email blocks sign-in. */
+function genLoginUnverified() {
+  const cardW = 440;
+  const cardH = 280;
+  const cardX = Math.round((W - cardW) / 2);
+  const cardY = Math.round((H - cardH) / 2);
+  const els = [];
+  els.push(rect('lu_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
+  els.push(rect('lu_card', cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
+  els.push(text('lu_logo', cardX, cardY + 16, cardW, 28, '⬡  Axis', 18, C.primary, 'center'));
+  els.push(hline('lu_hdiv', cardX, cardY + 60, cardW, C.gray300));
+  els.push(text('lu_title', cardX + 24, cardY + 76, cardW - 48, 24, 'Sign in to Axis', 17, C.gray900));
+
+  const ix = cardX + AUTH_CARD_PAD;
+  const innerW = cardW - AUTH_CARD_PAD * 2;
+  let fy = cardY + 112;
+  [
+    { label: 'Email address', value: 'alex@company.com' },
+    { label: 'Password', value: '••••••••' },
+  ].forEach((f, i) => {
+    const { els: fe, blockH } = authFormField(`lu_f${i}`, cardX, fy, cardW, f.label, f.value);
+    els.push(...fe);
+    fy += blockH;
+  });
+
+  const headY = fy + 8;
+  els.push(...stateHeadline('lu_blk', ix, headY, innerW, '✉', 'warning', 'Please verify your email before signing in.', 14));
+  els.push(text('lu_resend', ix, headY + AUTH_HEADLINE_H + 8, innerW, 16, 'Resend verification email →', 12, C.primary, 'center'));
+
+  const btnY = cardY + cardH - 68;
+  const btnW = cardW - 48;
+  els.push(rect('lu_sbtn', cardX + 24, btnY, btnW, 36, C.gray300, C.gray100, 1, true));
+  els.push(text('lu_sbtn_t', cardX + 24, btnY + 10, btnW, 16, 'Sign in', 13, C.gray300, 'center'));
+
+  write('E02-identity-access/login-unverified.excalidraw', els);
 }
 
 function genRegister() {
@@ -1301,6 +1613,7 @@ runScreen('app-shell', genAppShell);
 
 // E01 — Platform Foundation
 runScreen('E01/register-org', genRegisterOrg);
+runScreen('E01/register-org-states', genRegisterOrgStates);
 runScreen('E01/email-confirmation', genEmailConfirmation);
 runScreen('E01/verify-email', genVerifyEmail);
 runScreen('E01/verify-email-rate-limit', genVerifyEmailRateLimit);
@@ -1308,12 +1621,17 @@ runScreen('E01/workspace-provisioning', genWorkspaceProvisioning);
 runScreen('E01/pricing', genPricing);
 runScreen('E01/settings-org', genSettingsOrg);
 runScreen('E01/settings-org-upload-states', genSettingsOrgUploadStates);
+runScreen('E01/settings-org-profile-states', genSettingsOrgProfileStates);
 runScreen('E01/settings-org-usage-error', genSettingsOrgUsageError);
+runScreen('E01/settings-org-free-plan', genSettingsOrgFreePlan);
+runScreen('E01/settings-org-access-denied', genSettingsOrgAccessDenied);
 runScreen('E01/settings-org-deletion-scheduled', genSettingsOrgDeletionScheduled);
 runScreen('E01/settings-org-delete-modal', genSettingsOrgDeleteModal);
+runScreen('E01/settings-org-delete-states', genSettingsOrgDeleteStates);
 
 // E02 — auth screens (no sidebar)
 runScreen('E02/login', genLogin);
+runScreen('E02/login-unverified', genLoginUnverified);
 runScreen('E02/register', genRegister);
 runScreen('E02/forgot-password', genForgotPassword);
 runScreen('E02/change-password', genChangePassword);
