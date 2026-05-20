@@ -1,4 +1,5 @@
 using Axis.FormBuilder.Domain.Events;
+using Axis.Shared.Application;
 using Axis.WorkflowEngine.Application.Messages;
 using Axis.WorkflowEngine.Application.Services;
 using Axis.WorkflowEngine.Domain.Aggregates;
@@ -15,6 +16,7 @@ namespace Axis.WorkflowEngine.Infrastructure.Handlers;
 /// </summary>
 internal sealed class FormTaskSubmittedHandler(
     WorkflowEngineDbContext context,
+    IUnitOfWork uow,
     IStepDispatcher dispatcher,
     ILogger<FormTaskSubmittedHandler> logger)
 {
@@ -58,9 +60,9 @@ internal sealed class FormTaskSubmittedHandler(
 
         try
         {
-            await context.SaveChangesAsync(ct);
+            await uow.SaveChangesAsync(ct);
         }
-        catch (DbUpdateConcurrencyException)
+        catch (ConcurrencyException)
         {
             // Another Wolverine worker already committed this form step completion.
             logger.LogInformation(

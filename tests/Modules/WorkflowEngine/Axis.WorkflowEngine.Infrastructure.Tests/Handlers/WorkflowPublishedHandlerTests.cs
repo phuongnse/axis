@@ -1,7 +1,9 @@
+using Axis.WorkflowEngine.Application.Services;
 using Axis.WorkflowEngine.Domain.ReadModels;
 using Axis.WorkflowEngine.Infrastructure.Handlers;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using NSubstitute;
 using BuilderEvents = Axis.WorkflowBuilder.Domain.Events;
 
 namespace Axis.WorkflowEngine.Infrastructure.Tests.Handlers;
@@ -30,6 +32,14 @@ public sealed class WorkflowPublishedHandlerTests(WorkflowEngineDatabaseFixture 
             });
     }
 
+    private static WorkflowPublishedHandler CreateHandler(WorkflowEngineDbContext ctx)
+    {
+        IUnitOfWork uow = Substitute.For<IUnitOfWork>();
+        uow.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns(call => ctx.SaveChangesAsync(call.Arg<CancellationToken>()));
+        return new WorkflowPublishedHandler(ctx, uow);
+    }
+
     [Fact]
     public async Task Handle_WhenWorkflowFirstPublished_CreatesActiveStatusAndSnapshot()
     {
@@ -37,9 +47,7 @@ public sealed class WorkflowPublishedHandlerTests(WorkflowEngineDatabaseFixture 
         BuilderEvents.WorkflowPublished @event = BuildEvent(workflowId);
 
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
-        WorkflowPublishedHandler handler = new(ctx);
-
-        await handler.Handle(@event, CancellationToken.None);
+        await CreateHandler(ctx).Handle(@event, CancellationToken.None);
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
 
@@ -61,9 +69,8 @@ public sealed class WorkflowPublishedHandlerTests(WorkflowEngineDatabaseFixture 
         BuilderEvents.WorkflowPublished firstEvent = BuildEvent(workflowId);
 
         await using WorkflowEngineDbContext ctx1 = fixture.CreateContext();
-        await new WorkflowPublishedHandler(ctx1).Handle(firstEvent, CancellationToken.None);
+        await CreateHandler(ctx1).Handle(firstEvent, CancellationToken.None);
 
-        // Re-publish with different step count
         Guid newStepId = Guid.NewGuid();
         BuilderEvents.WorkflowPublished secondEvent = new(
             workflowId,
@@ -73,7 +80,7 @@ public sealed class WorkflowPublishedHandlerTests(WorkflowEngineDatabaseFixture 
             new List<BuilderEvents.TransitionSnapshot>());
 
         await using WorkflowEngineDbContext ctx2 = fixture.CreateContext();
-        await new WorkflowPublishedHandler(ctx2).Handle(secondEvent, CancellationToken.None);
+        await CreateHandler(ctx2).Handle(secondEvent, CancellationToken.None);
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         WorkflowSnapshot? snapshot = await readCtx.WorkflowSnapshots
@@ -91,11 +98,11 @@ public sealed class WorkflowPublishedHandlerTests(WorkflowEngineDatabaseFixture 
         BuilderEvents.WorkflowPublished @event = BuildEvent(workflowId);
 
         await using WorkflowEngineDbContext ctx1 = fixture.CreateContext();
-        await new WorkflowPublishedHandler(ctx1).Handle(@event, CancellationToken.None);
+        await CreateHandler(ctx1).Handle(@event, CancellationToken.None);
 
         // Second delivery of the same event — should not throw
         await using WorkflowEngineDbContext ctx2 = fixture.CreateContext();
-        Func<Task> act = () => new WorkflowPublishedHandler(ctx2).Handle(@event, CancellationToken.None);
+        Func<Task> act = () => CreateHandler(ctx2).Handle(@event, CancellationToken.None);
         await act.Should().NotThrowAsync();
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();

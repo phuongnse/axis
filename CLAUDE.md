@@ -160,9 +160,11 @@ Run only what the change touches, but run **all** of it:
 
 | What changed | Command(s) required | Must pass |
 |---|---|---|
-| `src/` or `tests/` only | `dotnet test unit-tests.slnf` | Zero errors, zero warnings |
+| `src/` or `tests/` only | `dotnet build` then `dotnet test unit-tests.slnf` | Zero errors, zero warnings |
 | `frontend/` only | `npm run ci` then `npm run test` | Zero errors, zero warnings |
 | Both | All of the above | Both gates, no skipping |
+
+**`dotnet build` is mandatory and must run before `dotnet test unit-tests.slnf`.** The solution filter only compiles Domain and Application test projects — Infrastructure, API, and other projects are not compiled by it. A build error in any of these layers is invisible to `dotnet test unit-tests.slnf` alone and will only surface in CI or production. Running `dotnet build` (full solution, no filter) first closes this gap.
 
 A commit that breaks the build or leaves a failing test is **never acceptable**, even as "temporary" or "just to save progress".
 
@@ -233,11 +235,11 @@ When creating any new doc file, add the appropriate back-link as the first thing
 
 | What changed | Command(s) required | Must pass |
 |---|---|---|
-| `src/` or `tests/` only | `dotnet test unit-tests.slnf` | Zero errors, zero warnings |
+| `src/` or `tests/` only | `dotnet build` then `dotnet test unit-tests.slnf` | Zero errors, zero warnings |
 | `frontend/` only | `npm run ci` then `npm run test` | Zero errors, zero warnings |
 | Both | All of the above | Both gates, no skipping |
 
-**Key .NET rules:** naming `{Subject}_{Condition}_{ExpectedOutcome}`; no `UseInMemoryDatabase`; Testcontainers for all DB tests; run unit tests before every commit; update `tests/Api/Axis.Api.Tests/` when API contracts change.
+**Key .NET rules:** naming `{Subject}_{Condition}_{ExpectedOutcome}`; no `UseInMemoryDatabase`; Testcontainers for all DB tests; run `dotnet build` then unit tests before every commit; update `tests/Api/Axis.Api.Tests/` when API contracts change.
 
 **Key frontend rules:** Vitest + `@testing-library/react`; test behaviour not implementation; `userEvent` not `fireEvent`; never mock child components unless they have external dependencies.
 
@@ -493,6 +495,7 @@ A US or layer is NOT done until all of the following are complete in the **same 
 Run through this before marking any task ✅ or raising a PR:
 
 **Code quality**
+- Full solution builds — `dotnet build` (no filter) — zero errors, zero warnings
 - Tests pass — `dotnet test unit-tests.slnf` / `npm run test`
 - Zero build warnings — `dotnet build` / `npm run ci`
 - Run and confirm empty output:

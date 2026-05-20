@@ -45,6 +45,17 @@ public sealed class FormTaskSubmittedHandlerTests(WorkflowEngineDatabaseFixture 
         return (exec, step);
     }
 
+    private static FormTaskSubmittedHandler CreateHandler(
+        WorkflowEngineDbContext ctx,
+        IStepDispatcher dispatcher,
+        ILogger<FormTaskSubmittedHandler> logger)
+    {
+        IUnitOfWork uow = Substitute.For<IUnitOfWork>();
+        uow.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns(call => ctx.SaveChangesAsync(call.Arg<CancellationToken>()));
+        return new FormTaskSubmittedHandler(ctx, uow, dispatcher, logger);
+    }
+
     [Fact]
     public async Task Handle_WhenFormSubmitted_CompletesStepMergesContextAndDispatchesNext()
     {
@@ -61,10 +72,8 @@ public sealed class FormTaskSubmittedHandlerTests(WorkflowEngineDatabaseFixture 
             execution.Id, step.Id, submittedData);
 
         await using WorkflowEngineDbContext handlerCtx = fixture.CreateContext();
-        FormTaskSubmittedHandler handler = new(handlerCtx, dispatcher, logger);
-        await handler.Handle(@event, CancellationToken.None);
+        await CreateHandler(handlerCtx, dispatcher, logger).Handle(@event, CancellationToken.None);
 
-        // Step should be Completed in DB
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         WorkflowExecution? loaded = await readCtx.WorkflowExecutions
             .Include(e => e.Steps)
@@ -89,7 +98,6 @@ public sealed class FormTaskSubmittedHandlerTests(WorkflowEngineDatabaseFixture 
         await using WorkflowEngineDbContext setupCtx = fixture.CreateContext();
         (WorkflowExecution execution, ExecutionStep step) = await SeedWaitingFormStep(formId, setupCtx);
 
-        // Advance step to Completed (simulate prior handling)
         WorkflowExecution? execToAdvance = await setupCtx.WorkflowExecutions
             .Include(e => e.Steps)
             .FirstOrDefaultAsync(e => e.Id == execution.Id);
@@ -102,8 +110,7 @@ public sealed class FormTaskSubmittedHandlerTests(WorkflowEngineDatabaseFixture 
             new Dictionary<string, object?> { ["answer"] = "yes" });
 
         await using WorkflowEngineDbContext handlerCtx = fixture.CreateContext();
-        FormTaskSubmittedHandler handler = new(handlerCtx, dispatcher, logger);
-        await handler.Handle(@event, CancellationToken.None);
+        await CreateHandler(handlerCtx, dispatcher, logger).Handle(@event, CancellationToken.None);
 
         await dispatcher.DidNotReceive().PublishAsync(
             Arg.Any<ExecuteNextStepMessage>(), Arg.Any<CancellationToken>());
@@ -117,13 +124,12 @@ public sealed class FormTaskSubmittedHandlerTests(WorkflowEngineDatabaseFixture 
 
         FormTaskSubmitted @event = new(
             Guid.NewGuid(), Guid.NewGuid(), OrgId,
-            Guid.NewGuid(), // non-existent execution
+            Guid.NewGuid(),
             Guid.NewGuid(),
             new Dictionary<string, object?>());
 
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
-        FormTaskSubmittedHandler handler = new(ctx, dispatcher, logger);
-        await handler.Handle(@event, CancellationToken.None);
+        await CreateHandler(ctx, dispatcher, logger).Handle(@event, CancellationToken.None);
 
         await dispatcher.DidNotReceive().PublishAsync(
             Arg.Any<object>(), Arg.Any<CancellationToken>());

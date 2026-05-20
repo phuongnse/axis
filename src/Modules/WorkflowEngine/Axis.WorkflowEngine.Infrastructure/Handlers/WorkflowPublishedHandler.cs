@@ -1,4 +1,6 @@
+using Axis.Shared.Application;
 using Axis.WorkflowBuilder.Domain.Events;
+using Axis.WorkflowEngine.Application.Services;
 using Axis.WorkflowEngine.Domain.Aggregates;
 using Axis.WorkflowEngine.Domain.Enums;
 using Axis.WorkflowEngine.Infrastructure.Persistence;
@@ -8,7 +10,7 @@ using BuilderEvents = Axis.WorkflowBuilder.Domain.Events;
 
 namespace Axis.WorkflowEngine.Infrastructure.Handlers;
 
-internal sealed class WorkflowPublishedHandler(WorkflowEngineDbContext context)
+internal sealed class WorkflowPublishedHandler(WorkflowEngineDbContext context, IUnitOfWork uow)
 {
     public async Task Handle(WorkflowPublished @event, CancellationToken ct)
     {
@@ -29,11 +31,15 @@ internal sealed class WorkflowPublishedHandler(WorkflowEngineDbContext context)
 
         try
         {
-            await context.SaveChangesAsync(ct);
+            await uow.SaveChangesAsync(ct);
         }
-        catch (DbUpdateException)
+        catch (ConcurrencyException)
         {
-            // Concurrent duplicate event delivery — row already inserted by a parallel handler invocation.
+            // Concurrent duplicate event delivery — another worker already committed this update.
+        }
+        catch (UniqueConstraintException)
+        {
+            // Concurrent insert race — row already created by a parallel handler invocation.
         }
     }
 
@@ -53,11 +59,15 @@ internal sealed class WorkflowPublishedHandler(WorkflowEngineDbContext context)
 
         try
         {
-            await context.SaveChangesAsync(ct);
+            await uow.SaveChangesAsync(ct);
         }
-        catch (DbUpdateException)
+        catch (ConcurrencyException)
         {
-            // Concurrent duplicate event delivery — row already upserted by parallel handler.
+            // Concurrent duplicate event delivery — another worker already committed this update.
+        }
+        catch (UniqueConstraintException)
+        {
+            // Concurrent insert race — row already created by a parallel handler invocation.
         }
     }
 
