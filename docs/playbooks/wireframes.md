@@ -35,6 +35,26 @@ docs/scripts/generate-wireframes.ps1
 
 `components.mjs` is the foundation. Nothing in the wireframe system defines primitives or colors anywhere else.
 
+### Deterministic seed rule (non-negotiable)
+
+All generated wireframes must use deterministic seeds per screen (`setSeed(deterministicSeedForScreen(screenKey))` in `generate-screens.mjs` before each screen generator runs).
+
+- Why: Excalidraw roughness depends on seed; order-dependent global seeds cause unrelated files to churn when a new screen is inserted.
+- Guarantee: adding/changing one screen does not rewrite untouched screens in other epics.
+- Implementation: keep `runScreen(screenKey, generator)` wrapper in `generate-screens.mjs` and call every `genXxx()` through it.
+- **Pre-commit check:** run `node docs/wireframes/generate-screens.mjs` twice; `git diff` must be empty after the second run (proves seeds are stable).
+
+### Auth outcome cards — `stateHeadline` (E01 email flows)
+
+Use one layout for informational / error states (`email-confirmation`, `verify-email` grid cards, `verify-email-rate-limit`):
+
+- **Row:** semantic-colored icon + title (`stateHeadline` in `components.mjs`)
+- **Accent:** short underline (64px) in `semanticVariantBorder` — not a full-width bar or alert box
+- **Body:** `C.gray700`; emphasize one line with `semanticVariantColor` (email address, countdown)
+- **Grid screens:** colored state label above each card (`Expired link`, etc.) — do not add circular icon badges
+
+Shared spacing constants in `generate-screens.mjs`: `AUTH_CARD_PAD`, `AUTH_SHELL_H`, `AUTH_HEADLINE_H`, `AUTH_BODY_GAP`.
+
 ### What lives in `components.mjs`
 
 | Export | Type | Description |
@@ -47,6 +67,8 @@ docs/scripts/generate-wireframes.ps1
 | `appShell(prefix, W, H, navItems, activeIdx, pageTitle)` | function | Parameterized app shell (matches S18 exactly) |
 | `writeExcalidraw(filePath, elements)` | function | Write `.excalidraw` JSON to disk |
 | `btn`, `inputField`, `selectField`, `badge`, `searchBar`, `pageHeader` | functions | Convenience UI builders with canonical dimensions |
+| `setSeed`, `semanticVariantColor`, `semanticVariantBorder` | functions | Per-screen seed reset; semantic text/border colors |
+| `stateHeadline` | function | Icon + title + short underline for auth outcome cards |
 
 ### Import pattern
 
@@ -394,7 +416,7 @@ This is what makes `import { buildWorkflowCanvas } from './generate-template.mjs
 | Module | Files |
 |---|---|
 | `docs/wireframes/` (root) | `app-shell` |
-| `E01-platform-foundation/wireframes/` | `register-org`, `email-confirmation`, `verify-email`, `workspace-provisioning`, `pricing`, `settings-org`, `settings-org-delete-modal` |
+| `E01-platform-foundation/wireframes/` | `register-org`, `email-confirmation`, `verify-email`, `verify-email-rate-limit`, `workspace-provisioning`, `pricing`, `settings-org`, `settings-org-upload-states`, `settings-org-usage-error`, `settings-org-deletion-scheduled`, `settings-org-delete-modal` |
 | `E02-identity-access/wireframes/` | `login`, `register`, `forgot-password`, `change-password`, `accept-invitation`, `settings-users`, `settings-roles`, `settings-security` |
 | `E03-data-modeling/wireframes/` | `data-models`, `data-classes`, `records` |
 | `E04-workflow-builder/wireframes/` | `workflows`, `workflow-editor` |

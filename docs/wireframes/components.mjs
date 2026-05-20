@@ -10,6 +10,9 @@ import { writeFileSync } from 'fs';
 // ─── Seed management ─────────────────────────────────────────────────────────
 let _seed = 1001;
 export const nextSeed = () => (_seed += 2);
+export const setSeed = (seed) => {
+  _seed = Math.max(1, Math.floor(seed));
+};
 export const BASE = { angle: 0, opacity: 100, groupIds: [], isDeleted: false, boundElements: null, updated: 1700000000000, link: null, locked: false, version: 1 };
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
@@ -249,6 +252,38 @@ export function badge(prefix, x, y, label, variant = 'active') {
   return [
     rect(`${prefix}_bdg`, x, y, w, 28, stroke, bg, 1, true),
     text(`${prefix}_bdg_t`, x, y + 6, w, 16, label, 12, tc, 'center'),
+  ];
+}
+
+/** Semantic text/border color for state screens. variant: success | warning | danger | info | neutral */
+export function semanticVariantColor(variant = 'info') {
+  return variant === 'success' ? C.success :
+    variant === 'warning' ? C.warning :
+    variant === 'danger'  ? C.danger  :
+    variant === 'neutral' ? C.gray700 :
+                            C.primary;
+}
+
+export function semanticVariantBorder(variant = 'info') {
+  return variant === 'success' ? C.successBorder :
+    variant === 'warning' ? C.warningBorder :
+    variant === 'danger'  ? C.dangerBorder  :
+    variant === 'neutral' ? C.gray300       :
+                            C.infoBorder;
+}
+
+/**
+ * Canonical state headline — icon + colored title on one row, short semantic underline.
+ * Use on all E01 auth outcome cards for a consistent layout (no circular badges).
+ */
+export function stateHeadline(prefix, x, y, w, icon, variant, title, titleFontSize = 14) {
+  const tc = semanticVariantColor(variant);
+  const iconCol = 28;
+  const rowH = titleFontSize >= 16 ? 26 : 24;
+  return [
+    text(`${prefix}_ic`, x, y + 2, iconCol, rowH, icon, titleFontSize + 2, tc),
+    text(`${prefix}_ti`, x + iconCol + 6, y, w - iconCol - 6, rowH + 6, title, titleFontSize, tc),
+    hline(`${prefix}_ulc`, x, y + rowH + 8, Math.min(64, w), semanticVariantBorder(variant), 2),
   ];
 }
 

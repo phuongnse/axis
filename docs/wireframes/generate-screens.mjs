@@ -11,8 +11,9 @@
  * Screens generated:
  *   app-shell (root)
  *   E01: register-org, email-confirmation, verify-email,
- *        workspace-provisioning, pricing, settings-org,
- *        settings-org-delete-modal
+ *        verify-email-rate-limit, workspace-provisioning, pricing, settings-org,
+ *        settings-org-upload-states, settings-org-usage-error,
+ *        settings-org-deletion-scheduled, settings-org-delete-modal
  *   E02: login, register, forgot-password, change-password,
  *        settings-users, settings-roles, settings-security, accept-invitation
  *   E03: data-models, data-classes, records
@@ -30,7 +31,8 @@ import {
   C, SB, HDR, CX, CY,
   rect, ellipse, text, hline, vline, arrow,
   btn, inputField, selectField, badge, searchBar, pageHeader,
-  appShell, component, translate, writeExcalidraw,
+  appShell, component, translate, writeExcalidraw, setSeed,
+  stateHeadline, semanticVariantColor,
 } from './components.mjs';
 
 import {
@@ -59,6 +61,25 @@ const cw = W - CX - PAD * 2;  // 930 — usable content width
 
 // Standard app nav labels
 const NAV = ['Data Models', 'Workflows', 'Forms', 'Executions', 'Settings'];
+
+// E01 auth outcome cards — shared shell + headline rhythm
+const AUTH_CARD_PAD = 20;
+const AUTH_SHELL_H = 36;       // mini logo + divider
+const AUTH_HEADLINE_H = 34;    // icon row + short underline
+const AUTH_BODY_GAP = 6;
+
+function deterministicSeedForScreen(screenKey) {
+  let hash = 0;
+  for (let i = 0; i < screenKey.length; i += 1) {
+    hash = (hash * 31 + screenKey.charCodeAt(i)) >>> 0;
+  }
+  return 1001 + (hash % 500000) * 2;
+}
+
+function runScreen(screenKey, generator) {
+  setSeed(deterministicSeedForScreen(screenKey));
+  generator();
+}
 
 // ─── Write helper ─────────────────────────────────────────────────────────────
 
@@ -199,11 +220,11 @@ function genRegisterOrg() {
 
 /**
  * Email-Confirmation — US-001 success state, US-002 resend
- * Informational card (no form): envelope icon, check-email message, resend link.
+ * Informational card (no form): compact icon, title, copy, resend link.
  */
 function genEmailConfirmation() {
   const cardW = 440;
-  const cardH = 300;
+  const cardH = 252;
   const cardX = Math.round((W - cardW) / 2);
   const cardY = Math.round((H - cardH) / 2);
   const els   = [];
@@ -215,16 +236,16 @@ function genEmailConfirmation() {
   els.push(text('ec_logo',  cardX,      cardY + 16,  cardW,      28, '⬡  Axis',            18, C.primary, 'center'));
   els.push(hline('ec_hdiv', cardX,      cardY + 60,  cardW,          C.gray300));
 
-  // Envelope icon (US-001 success state)
-  els.push(text('ec_icon',  cardX,      cardY + 76,  cardW,      36, '✉',                  28, C.primary, 'center'));
-
-  // Title + body
-  els.push(text('ec_title', cardX + 24, cardY + 128, cardW - 48, 24, 'Check your email',   17, C.gray900));
-  els.push(text('ec_body1', cardX + 24, cardY + 160, cardW - 48, 18, 'We sent a verification link to:', 13, C.gray700));
-  els.push(text('ec_body2', cardX + 24, cardY + 182, cardW - 48, 18, 'alex@company.com',   13, C.gray900));
+  const ecInnerW = cardW - AUTH_CARD_PAD * 2;
+  const ecX = cardX + AUTH_CARD_PAD;
+  const ecHeadY = cardY + 68;
+  els.push(...stateHeadline('ec', ecX, ecHeadY, ecInnerW, '✉', 'info', 'Check your email', 16));
+  const ecBodyY = ecHeadY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
+  els.push(text('ec_body1', ecX, ecBodyY, ecInnerW, 18, 'We sent a verification link to:', 13, C.gray700));
+  els.push(text('ec_body2', ecX, ecBodyY + 22, ecInnerW, 18, 'alex@company.com', 13, semanticVariantColor('info')));
 
   // Resend link (US-002)
-  els.push(text('ec_resend', cardX + 24, cardY + 220, cardW - 48, 16, "Didn't receive it?  Resend email →", 12, C.primary, 'center'));
+  els.push(text('ec_resend', ecX, ecBodyY + 52, ecInnerW, 16, "Didn't receive it?  Resend email →", 12, C.primary, 'center'));
 
   // Footer
   els.push(hline('ec_fdiv',   cardX,      cardY + cardH - 32, cardW,      C.gray300));
@@ -236,14 +257,14 @@ function genEmailConfirmation() {
 /**
  * Verify-Email — US-002 (all 4 outcome states)
  * 2×2 grid of state cards: success, expired, already-used, invalid.
- * Each card: 440×200. Grid centred at W=1200.
+ * Each card: 440×176. Grid centred at W=1200.
  */
 function genVerifyEmail() {
   const els   = [];
   const cardW = 440;
-  const cardH = 200;
+  const cardH = 176;
   const gapX  = 60;
-  const gapY  = 44;   // row gap; first 20px reserved for state label above card
+  const gapY  = 36;   // row gap; first 20px reserved for state label above card
   const col1X = Math.round((W - (cardW * 2 + gapX)) / 2);  // 130
   const col2X = col1X + cardW + gapX;
   const row1Y = 100;
@@ -255,56 +276,78 @@ function genVerifyEmail() {
   const states = [
     {
       id: 've_ok',   x: col1X, y: row1Y,
-      stateLbl: '✓  Success',       lblColor: C.success,
-      icon: '✓', iconColor: C.success,
+      stateLbl: '✓  Success',       lblColor: C.success, variant: 'success', icon: '✓',
       title: 'Email verified!',
       body:  'Your account is ready. Signing you in…',
       btnLabel: null, btnVariant: null,
     },
     {
       id: 've_exp',  x: col2X, y: row1Y,
-      stateLbl: 'Expired link',     lblColor: C.warning,
-      icon: '⏱', iconColor: C.warning,
+      stateLbl: 'Expired link',     lblColor: C.warning, variant: 'warning', icon: '⏱',
       title: 'Verification link expired',
       body:  'This link was valid for 24 hours.',
       btnLabel: 'Resend verification email', btnVariant: 'secondary',
     },
     {
       id: 've_used', x: col1X, y: row2Y,
-      stateLbl: 'Already verified', lblColor: C.gray500,
-      icon: '✓', iconColor: C.gray500,
+      stateLbl: 'Already verified', lblColor: C.gray500, variant: 'neutral', icon: '✓',
       title: 'Already verified',
       body:  'This link has already been used. Please sign in.',
       btnLabel: 'Sign in', btnVariant: 'ghost',
     },
     {
       id: 've_inv',  x: col2X, y: row2Y,
-      stateLbl: 'Invalid token',    lblColor: C.danger,
-      icon: '✕', iconColor: C.danger,
+      stateLbl: 'Invalid token',    lblColor: C.danger, variant: 'danger', icon: '✕',
       title: 'Invalid verification link',
       body:  'This link is invalid or has been tampered with.',
       btnLabel: null, btnVariant: null,
     },
   ];
 
-  states.forEach(({ id, x, y, stateLbl, lblColor, icon, iconColor, title, body, btnLabel, btnVariant }) => {
+  states.forEach(({ id, x, y, stateLbl, lblColor, variant, icon, title, body, btnLabel, btnVariant }) => {
     els.push(text(`${id}_lbl`,   x,      y - 20,  cardW,      16, stateLbl, 12, lblColor));
     els.push(rect(`${id}_card`,  x,      y,       cardW,      cardH, C.gray300, C.white, 2, true));
-    // Mini logo
     els.push(text(`${id}_logo`,  x,      y + 12,  cardW,      18, '⬡  Axis', 12, C.primary, 'center'));
-    els.push(hline(`${id}_hdiv`, x,      y + 36,  cardW,      C.gray300));
-    // Status icon
-    els.push(text(`${id}_icon`,  x,      y + 46,  cardW,      26, icon, 20, iconColor, 'center'));
-    // Title + body
-    els.push(text(`${id}_title`, x + 20, y + 84,  cardW - 40, 20, title, 14, C.gray900));
-    els.push(text(`${id}_body`,  x + 20, y + 108, cardW - 40, 32, body,  12, C.gray700));
-    // Optional CTA
+    els.push(hline(`${id}_hdiv`, x, y + 34, cardW, C.gray300));
+    const ix = x + AUTH_CARD_PAD;
+    const innerW = cardW - AUTH_CARD_PAD * 2;
+    const headY = y + 38;
+    els.push(...stateHeadline(`${id}`, ix, headY, innerW, icon, variant, title, 14));
+    els.push(text(`${id}_body`, ix, headY + AUTH_HEADLINE_H + AUTH_BODY_GAP, innerW, 36, body, 12, C.gray700));
     if (btnLabel) {
-      els.push(...btn(`${id}_cta`, x + 20, y + cardH - 44, btnLabel, btnVariant));
+      els.push(...btn(`${id}_cta`, ix, y + cardH - 40, btnLabel, btnVariant));
     }
   });
 
   write('E01-platform-foundation/verify-email.excalidraw', els);
+}
+
+function genVerifyEmailRateLimit() {
+  const cardW = 440;
+  const cardH = 228;
+  const cardX = Math.round((W - cardW) / 2);
+  const cardY = Math.round((H - cardH) / 2);
+  const els = [];
+
+  els.push(rect('vrl_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
+  els.push(text('vrl_lbl', 0, 76, W, 18, 'Resend rate limit state', 12, C.warning, 'center'));
+  els.push(rect('vrl_card', cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
+  els.push(text('vrl_logo', cardX, cardY + 12, cardW, 18, '⬡  Axis', 12, C.primary, 'center'));
+  els.push(hline('vrl_hdiv', cardX, cardY + 34, cardW, C.gray300));
+
+  const vrlX = cardX + AUTH_CARD_PAD;
+  const vrlInnerW = cardW - AUTH_CARD_PAD * 2;
+  const vrlHeadY = cardY + 38;
+  els.push(...stateHeadline('vrl', vrlX, vrlHeadY, vrlInnerW, '⏳', 'warning', 'Please wait before requesting another email.', 14));
+  const vrlBodyY = vrlHeadY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
+  els.push(text('vrl_body', vrlX, vrlBodyY, vrlInnerW, 32, 'You reached the resend limit (3 requests per hour).', 12, C.gray700));
+  els.push(text('vrl_cnt', vrlX, vrlBodyY + 34, vrlInnerW, 18, 'Try again in 37 minutes.', 13, semanticVariantColor('warning')));
+
+  els.push(rect('vrl_btn', cardX + AUTH_CARD_PAD, cardY + cardH - 40, 220, 36, C.gray300, C.gray100, 1, true));
+  els.push(text('vrl_btn_t', cardX + AUTH_CARD_PAD, cardY + cardH - 30, 220, 16, 'Resend verification email', 13, C.gray300, 'center'));
+  els.push(text('vrl_hint', cardX + 252, cardY + cardH - 26, 168, 16, 'Button disabled until timer ends', 10, C.gray500, 'center'));
+
+  write('E01-platform-foundation/verify-email-rate-limit.excalidraw', els);
 }
 
 /**
@@ -418,7 +461,7 @@ function genSettingsOrgDeleteModal() {
     'This action is permanent and cannot be undone.\nAll data will be deleted after a 30-day grace period.', 13, C.gray700));
 
   // Confirm input
-  els.push(text('sdm_inp_l', mX + 20, mY + 130, mW - 40, 16, "Type 'Acme Corp' to confirm:", 12, C.gray500));
+  els.push(text('sdm_inp_l', mX + 20, mY + 130, mW - 40, 16, "Type 'Acme Corp' to confirm (case-sensitive):", 12, C.gray500));
   els.push(...inputField('sdm_inp', mX + 20, mY + 150, mW - 40, 'Acme Corp'));
 
   // Footer
@@ -617,6 +660,72 @@ function genSettingsOrg() {
   els.push(...btn('so_del', delBtnX, dboxY + 12, delLabel, 'danger'));
 
   write('E01-platform-foundation/settings-org.excalidraw', els);
+}
+
+function genSettingsOrgUploadStates() {
+  const els = [];
+  els.push(rect('sou_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
+  els.push(text('sou_t', 0, 48, W, 20, 'Logo upload states', 13, C.gray500, 'center'));
+
+  const cardW = 340;
+  const cardH = 220;
+  const gap = 30;
+  const startX = Math.round((W - (cardW * 3 + gap * 2)) / 2);
+  const y = 120;
+  const states = [
+    { id: 'inv', title: 'Invalid file type/size', msg: 'Only PNG/JPG/SVG up to 2 MB.', stroke: C.dangerBorder, bg: C.dangerBg, txt: C.danger },
+    { id: 'up', title: 'Uploading logo...', msg: 'Uploading 68% · Please keep this tab open.', stroke: C.infoBorder, bg: C.infoBg, txt: C.primary },
+    { id: 'nav', title: 'Changes in progress', msg: 'You have an upload in progress. Leave page?', stroke: C.warningBorder, bg: C.warningBg, txt: C.warning },
+  ];
+
+  states.forEach((s, i) => {
+    const x = startX + i * (cardW + gap);
+    els.push(rect(`sou_${s.id}_c`, x, y, cardW, cardH, C.gray300, C.white, 1, true));
+    els.push(text(`sou_${s.id}_h`, x + 16, y + 16, cardW - 32, 20, s.title, 14, C.gray900));
+    els.push(rect(`sou_${s.id}_a`, x + 16, y + 48, cardW - 32, 56, s.stroke, s.bg, 1, true));
+    els.push(text(`sou_${s.id}_m`, x + 26, y + 68, cardW - 52, 20, s.msg, 12, s.txt));
+    els.push(text(`sou_${s.id}_l`, x + 16, y + 122, cardW - 32, 16, 'Logo upload field', 11, C.gray500));
+    els.push(rect(`sou_${s.id}_f`, x + 16, y + 140, cardW - 32, 40, C.gray300, C.white, 1, true));
+    els.push(text(`sou_${s.id}_p`, x + 28, y + 151, cardW - 56, 16, i === 1 ? 'acme-logo.png' : 'Select a file…', 13, C.gray500));
+  });
+
+  write('E01-platform-foundation/settings-org-upload-states.excalidraw', els);
+}
+
+function genSettingsOrgUsageError() {
+  const els = [];
+  els.push(...appShell('sue', W, H, NAV, 4, 'Settings — Organization'));
+  els.push(text('sue_h', cx, cy, 300, 28, 'Usage', 20, C.gray900));
+  els.push(text('sue_sub', cx, cy + 30, 420, 16, 'Usage stats are temporarily unavailable.', 12, C.gray700));
+
+  const mY = cy + 62;
+  const mW = Math.floor((cw - 40) / 3);
+  ['Workflows', 'Executions this month', 'Team members'].forEach((label, i) => {
+    const x = cx + i * (mW + 20);
+    els.push(rect(`sue_c_${i}`, x, mY, mW, 100, C.gray300, C.white, 1, true));
+    els.push(text(`sue_l_${i}`, x + 12, mY + 12, mW - 24, 16, label, 11, C.gray500));
+    els.push(text(`sue_v_${i}`, x + 12, mY + 36, mW - 24, 24, '—', 20, C.gray500));
+    els.push(...btn(`sue_r_${i}`, x + 12, mY + 60, 'Retry', 'ghost'));
+  });
+
+  write('E01-platform-foundation/settings-org-usage-error.excalidraw', els);
+}
+
+function genSettingsOrgDeletionScheduled() {
+  const els = [];
+  els.push(...appShell('sds', W, H, NAV, 4, 'Settings — Organization'));
+
+  const by = cy;
+  els.push(rect('sds_b', cx, by, cw, 88, C.warningBorder, C.warningBg, 1, true));
+  els.push(text('sds_t', cx + 16, by + 14, cw - 220, 20, 'Your organization is scheduled for deletion', 14, C.warning));
+  els.push(text('sds_d', cx + 16, by + 36, cw - 220, 32, 'All data will be permanently removed on Feb 14, 2026.\nYou can cancel deletion during the grace period.', 12, C.gray700));
+  els.push(...btn('sds_cancel', cx + cw - 180, by + 26, 'Cancel deletion', 'secondary'));
+
+  els.push(text('sds_stub', cx, by + 120, 400, 20, 'Organization Profile', 16, C.gray900));
+  els.push(rect('sds_stub_card', cx, by + 150, cw, 170, C.gray300, C.white, 1, true));
+  els.push(text('sds_stub_txt', cx + 20, by + 222, cw - 40, 16, 'Settings content continues below…', 12, C.gray500, 'center'));
+
+  write('E01-platform-foundation/settings-org-deletion-scheduled.excalidraw', els);
 }
 
 // ─── E02 Identity & Access — Auth screens (no sidebar) ───────────────────────
@@ -1188,45 +1297,49 @@ function genExecutionDetail() {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 // Shared
-genAppShell();
+runScreen('app-shell', genAppShell);
 
 // E01 — Platform Foundation
-genRegisterOrg();
-genEmailConfirmation();
-genVerifyEmail();
-genWorkspaceProvisioning();
-genPricing();
-genSettingsOrg();
-genSettingsOrgDeleteModal();
+runScreen('E01/register-org', genRegisterOrg);
+runScreen('E01/email-confirmation', genEmailConfirmation);
+runScreen('E01/verify-email', genVerifyEmail);
+runScreen('E01/verify-email-rate-limit', genVerifyEmailRateLimit);
+runScreen('E01/workspace-provisioning', genWorkspaceProvisioning);
+runScreen('E01/pricing', genPricing);
+runScreen('E01/settings-org', genSettingsOrg);
+runScreen('E01/settings-org-upload-states', genSettingsOrgUploadStates);
+runScreen('E01/settings-org-usage-error', genSettingsOrgUsageError);
+runScreen('E01/settings-org-deletion-scheduled', genSettingsOrgDeletionScheduled);
+runScreen('E01/settings-org-delete-modal', genSettingsOrgDeleteModal);
 
 // E02 — auth screens (no sidebar)
-genLogin();
-genRegister();
-genForgotPassword();
-genChangePassword();
-genAcceptInvitation();
+runScreen('E02/login', genLogin);
+runScreen('E02/register', genRegister);
+runScreen('E02/forgot-password', genForgotPassword);
+runScreen('E02/change-password', genChangePassword);
+runScreen('E02/accept-invitation', genAcceptInvitation);
 
 // E02 — settings screens (with sidebar)
-genSettingsUsers();
-genSettingsRoles();
-genSettingsSecurity();
+runScreen('E02/settings-users', genSettingsUsers);
+runScreen('E02/settings-roles', genSettingsRoles);
+runScreen('E02/settings-security', genSettingsSecurity);
 
 // E03
-genDataModels();
-genDataClasses();
-genRecords();
+runScreen('E03/data-models', genDataModels);
+runScreen('E03/data-classes', genDataClasses);
+runScreen('E03/records', genRecords);
 
 // E04
-genWorkflows();
-genWorkflowEditor();
+runScreen('E04/workflows', genWorkflows);
+runScreen('E04/workflow-editor', genWorkflowEditor);
 
 // E05
-genForms();
-genFormEditor();
-genFormSubmission();
+runScreen('E05/forms', genForms);
+runScreen('E05/form-editor', genFormEditor);
+runScreen('E05/form-submission', genFormSubmission);
 
 // E06
-genExecutions();
-genExecutionDetail();
+runScreen('E06/executions', genExecutions);
+runScreen('E06/execution-detail', genExecutionDetail);
 
 console.log('\n✅  All screen wireframes generated.');

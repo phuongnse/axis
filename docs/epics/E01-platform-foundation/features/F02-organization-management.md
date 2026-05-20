@@ -3,6 +3,9 @@
 [← Back to E01](../README.md)
 
 > **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/settings-org.excalidraw](../wireframes/settings-org.excalidraw) · [preview](../wireframes/settings-org.svg)
+> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/settings-org-upload-states.excalidraw](../wireframes/settings-org-upload-states.excalidraw) · [preview](../wireframes/settings-org-upload-states.svg)
+> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/settings-org-usage-error.excalidraw](../wireframes/settings-org-usage-error.excalidraw) · [preview](../wireframes/settings-org-usage-error.svg)
+> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/settings-org-deletion-scheduled.excalidraw](../wireframes/settings-org-deletion-scheduled.excalidraw) · [preview](../wireframes/settings-org-deletion-scheduled.svg)
 > **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/settings-org-delete-modal.excalidraw](../wireframes/settings-org-delete-modal.excalidraw) · [preview](../wireframes/settings-org-delete-modal.svg)
 
 ---
