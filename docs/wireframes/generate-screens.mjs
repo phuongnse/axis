@@ -30,7 +30,7 @@ import {
   C, SB, HDR, CX, CY,
   rect, ellipse, text, hline, vline, arrow,
   btn, inputField, selectField, badge, searchBar, pageHeader,
-  appShell, component, translate, writeExcalidraw,
+  appShell, component, translate, writeExcalidraw, resetSeed,
 } from './components.mjs';
 
 import {
@@ -75,6 +75,7 @@ function write(relativePath, elements) {
   mkdirSync(dirname(full), { recursive: true });
   writeExcalidraw(full, elements);
   console.log(`✓  ${relativePath}  (${elements.length} elements)`);
+  resetSeed(); // Ensure the PRNG seed is reset for the next file generated to avoid cascading diffs
 }
 
 // ─── Auth card helper — shared by all standalone auth screens ─────────────────

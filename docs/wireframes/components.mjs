@@ -9,6 +9,7 @@ import { writeFileSync } from 'fs';
 
 // ─── Seed management ─────────────────────────────────────────────────────────
 let _seed = 1001;
+export const resetSeed = () => { _seed = 1001; };
 export const nextSeed = () => (_seed += 2);
 export const BASE = { angle: 0, opacity: 100, groupIds: [], isDeleted: false, boundElements: null, updated: 1700000000000, link: null, locked: false, version: 1 };
 
