@@ -322,9 +322,26 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
 - Child entities are always accessed through the root — no standalone repository for them
 
 **Correct boundary (keep as separate AggregateRoot) when:**
-- The entity can be created without the parent (e.g. a `FormSubmission` that references a workflow execution by ID cross-module)
+- The entity can be created without the parent (e.g. a submission aggregate that references a workflow execution by ID cross-module)
 - The entity has its own soft-delete, audit lifecycle, and events independent of the parent
-- Volume is large enough that loading via parent is impractical (e.g. `DataRecord` — a tenant's records can number in the millions)
+- Volume is large enough that loading via parent is impractical (e.g. a records aggregate in a data-modeling module — can number in the millions)
+
+### 4a. When to split one concept into two aggregates
+
+The question "should these be one aggregate or two?" is separate from "entity vs aggregate root." It applies when two related concepts are both candidates to be aggregate roots. Only split when at least one of the following is true:
+
+1. **Relationship is 1:\*** — the relationship can grow to one-to-many. A 1:1 relationship that will never become 1:\* does not justify the overhead of a second aggregate root.
+2. **Independent domain behavior** — the second concept has its own domain methods, invariants, or events that make sense to reason about independently of the first. A pure data holder with no domain logic does not qualify.
+3. **Independent lifecycle** — the second concept can transition state, be created, or be deleted independently of the first. If both always change together (same command, same transaction), combining them is simpler and correct.
+
+**When to combine into one aggregate:** the relationship is 1:1, the second concept has no domain behavior of its own (it is a data record or state snapshot), and both concepts share the same lifecycle transitions. Creating a second aggregate root in this case adds indirection and a cross-aggregate join without any modelling benefit.
+
+```
+// Diagnostic questions — if all answers are "no", combine into one aggregate:
+// 1. Can the second concept exist without the first? (No → combine)
+// 2. Does the second concept have domain methods that make sense alone? (No → combine)
+// 3. Can the relationship become 1:* in this bounded context? (No → combine)
+```
 
 ---
 
