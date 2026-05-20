@@ -1266,6 +1266,82 @@ public sealed class SendWelcomeEmailHandler(IEmailSender emailSender)
 }
 ```
 
+### Step handler idempotency — at-least-once delivery
+
+Wolverine delivers messages at least once. Step handlers guard against redelivery using **`step.IsTerminal`** (Completed / Failed / Cancelled), not the Running status.
+
+**Why not the Running guard?** `ExecuteNextStepHandler` starts every step (sets it to `Running`) before dispatching the typed handler message. By the time `ExecuteHttpStepHandler`, `ExecuteConditionStepHandler`, etc. receive the message, the step is **already Running** — this is the expected, normal first-delivery state. A `if (step.Status == Running) return;` guard would therefore block all normal executions.
+
+```csharp
+// ✅ correct idempotency guard in typed step handlers (Http, Condition, Script, Notification)
+if (step.IsTerminal)   // Completed / Failed / Cancelled — already processed
+{
+    return;
+}
+
+// ⛔ wrong — Running is the normal first-delivery state for these handlers
+if (step.Status == StepExecutionStatus.Running)
+{
+    return;  // this would block every first delivery!
+}
+```
+
+**Form step exception:** `ExecuteFormStepHandler` checks `step.Status == Waiting` (not Running) for idempotency because its job is to *transition* Running → Waiting. If the step is already Waiting, the form task was already created.
+
+**True concurrent-duplicate protection** uses `UseXminAsConcurrencyToken()` — see the section below.
+
+### Concurrent-duplicate protection via xmin optimistic concurrency
+
+When two Wolverine workers receive the same message simultaneously, the **first writer wins**. The second writer is detected via PostgreSQL's built-in `xmin` system column and exits gracefully.
+
+#### Infrastructure setup — EF Core mapping
+
+```csharp
+// Inside OwnsMany / IEntityTypeConfiguration for the owned entity:
+stepBuilder.UseXminAsConcurrencyToken();
+// "No migration needed — xmin is a PostgreSQL built-in system column present on every row."
+```
+
+No `uint RowVersion` field on the domain entity is required. `UseXminAsConcurrencyToken()` is Npgsql-native — EF Core adds `WHERE xmin = @loadedXmin` to every UPDATE automatically. Any second concurrent UPDATE on the same row fails with `DbUpdateConcurrencyException`.
+
+#### Infrastructure setup — UnitOfWork translation
+
+`DbUpdateConcurrencyException` is an EF Core type and must not leak into the Application layer. The shared `UnitOfWork` translates it:
+
+```csharp
+// Axis.Shared.Infrastructure/Persistence/UnitOfWork.cs
+catch (DbUpdateConcurrencyException ex)
+{
+    throw new ConcurrencyException(ex);
+}
+```
+
+`ConcurrencyException` lives in `Axis.Shared.Application` — Application layer can reference it without taking an EF Core dependency.
+
+#### Application handler pattern — catch and exit
+
+```csharp
+// ✅ In every handler that calls uow.SaveChangesAsync:
+try
+{
+    await uow.SaveChangesAsync(ct);
+}
+catch (ConcurrencyException)
+{
+    // Another Wolverine worker already committed this change.
+    // The winning instance will complete the step — exit gracefully.
+    logger.LogInformation(
+        "Concurrent delivery detected for step {StepId} — skipping", stepId);
+    return;
+}
+```
+
+**Rules:**
+- Never re-throw `ConcurrencyException` as a step failure — the winning instance already completed the work.
+- Every `uow.SaveChangesAsync` call on a concurrency-sensitive path must be wrapped.
+- Do not use a Running status guard as the concurrency boundary — that blocks normal first deliveries (see idempotency section above).
+- `UseXminAsConcurrencyToken()` works on `OwnsMany` owned entities because each row in the owned table has its own `xmin` column. No special configuration is needed beyond the single `UseXminAsConcurrencyToken()` call.
+
 ### Scheduled / recurring job
 
 ```csharp

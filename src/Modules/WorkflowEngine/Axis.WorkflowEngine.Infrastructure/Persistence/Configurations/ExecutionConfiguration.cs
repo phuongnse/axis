@@ -104,6 +104,13 @@ internal sealed class ExecutionConfiguration : IEntityTypeConfiguration<Workflow
                 .HasConversion(snapshotConverter, snapshotComparer);
 
             stepBuilder.HasIndex(s => new { s.ExecutionId, s.OrganizationId });
+
+            // Optimistic concurrency via PostgreSQL xmin system column.
+            // EF Core includes "WHERE xmin = @loadedXmin" in UPDATEs so a concurrent
+            // write to the same step row raises DbUpdateConcurrencyException, translated
+            // to ConcurrencyException by UnitOfWork. No migration needed — xmin is a
+            // PostgreSQL built-in system column present on every row.
+            stepBuilder.UseXminAsConcurrencyToken();
         });
     }
 }

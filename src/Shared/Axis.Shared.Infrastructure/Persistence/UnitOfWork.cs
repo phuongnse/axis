@@ -31,6 +31,13 @@ public abstract class UnitOfWork(DbContext context, IMessageBus bus)
         {
             result = await context.SaveChangesAsync(ct);
         }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            // xmin mismatch: another Wolverine worker committed a change to the same row
+            // between our load and our save. Callers (step handlers) treat this as a signal
+            // that the concurrent instance already processed the message — exit gracefully.
+            throw new ConcurrencyException(ex);
+        }
         catch (DbUpdateException ex)
             when (ex.InnerException is PostgresException pg && pg.SqlState == "23505")
         {

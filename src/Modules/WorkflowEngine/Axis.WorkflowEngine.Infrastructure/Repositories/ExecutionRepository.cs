@@ -16,6 +16,11 @@ internal sealed class ExecutionRepository(WorkflowEngineDbContext context) : IEx
         => await context.WorkflowExecutions
             .FirstOrDefaultAsync(e => e.Id == id && e.OrganizationId == organizationId, ct);
 
+    public async Task<WorkflowExecution?> GetByIdWithStepsAsync(Guid id, Guid organizationId, CancellationToken ct = default)
+        => await context.WorkflowExecutions
+            .Include(e => e.Steps)
+            .FirstOrDefaultAsync(e => e.Id == id && e.OrganizationId == organizationId, ct);
+
     public async Task<IReadOnlyList<WorkflowExecution>> GetAllAsync(Guid organizationId, CancellationToken ct = default)
         => await context.WorkflowExecutions
             .Where(e => e.OrganizationId == organizationId)

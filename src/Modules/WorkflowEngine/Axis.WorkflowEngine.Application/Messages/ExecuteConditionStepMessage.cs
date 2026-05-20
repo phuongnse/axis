@@ -1,0 +1,17 @@
+namespace Axis.WorkflowEngine.Application.Messages;
+
+/// <summary>
+/// Dispatched by ExecuteNextStepHandler when the next step to run is a Condition step.
+/// Carries the snapshot of all step IDs so the handler can skip non-selected branches.
+/// </summary>
+public sealed record ExecuteConditionStepMessage(
+    Guid ExecutionId,
+    Guid StepId,
+    Guid OrganizationId,
+    IReadOnlyDictionary<string, object?>? StepConfig,
+    IReadOnlyDictionary<string, object?> Context,
+    IReadOnlyList<Guid> AllStepDefinitionIds,
+    IReadOnlyList<ConditionTransition> Transitions);
+
+/// <summary>A single transition in the condition graph, used to determine which branch to skip.</summary>
+public sealed record ConditionTransition(Guid FromStepId, Guid ToStepId, string? Label);

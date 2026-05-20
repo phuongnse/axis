@@ -93,6 +93,32 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                     b.ToTable("workflow_executions", (string)null);
                 });
 
+            modelBuilder.Entity("Axis.WorkflowEngine.Domain.ReadModels.WorkflowSnapshot", b =>
+                {
+                    b.Property<Guid>("WorkflowId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("workflow_id");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("Steps")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("steps");
+
+                    b.Property<string>("Transitions")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("transitions");
+
+                    b.HasKey("WorkflowId");
+
+                    b.ToTable("workflow_snapshots", (string)null);
+                });
+
             modelBuilder.Entity("Axis.WorkflowEngine.Domain.Aggregates.WorkflowExecution", b =>
                 {
                     b.OwnsMany("Axis.WorkflowEngine.Domain.Aggregates.ExecutionStep", "Steps", b1 =>

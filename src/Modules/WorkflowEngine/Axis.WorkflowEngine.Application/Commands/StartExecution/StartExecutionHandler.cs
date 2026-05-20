@@ -1,16 +1,22 @@
 using Axis.Shared.Application.CQRS;
 using Axis.Shared.Domain.Primitives;
+using Axis.WorkflowEngine.Application.Messages;
 using Axis.WorkflowEngine.Application.Repositories;
 using Axis.WorkflowEngine.Application.Services;
 using Axis.WorkflowEngine.Domain.Aggregates;
+using Axis.WorkflowEngine.Domain.ReadModels;
+using Microsoft.Extensions.Logging;
 
 namespace Axis.WorkflowEngine.Application.Commands.StartExecution;
 
-/// <summary>US-090: Validates workflow is active, creates Pending execution (async engine picks it up).</summary>
+/// <summary>US-090: Validates workflow is active, creates Pending execution with all steps,
+/// then dispatches ExecuteNextStepMessage so Wolverine picks up execution asynchronously.</summary>
 public sealed class StartExecutionHandler(
     IExecutionRepository execRepo,
     IWorkflowDefinitionReader workflowReader,
-    IUnitOfWork uow)
+    IUnitOfWork uow,
+    IStepDispatcher dispatcher,
+    ILogger<StartExecutionHandler> logger)
     : ICommandHandler<StartExecutionCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(StartExecutionCommand command, CancellationToken cancellationToken)
@@ -20,6 +26,18 @@ public sealed class StartExecutionHandler(
             return Result.Failure<Guid>(ErrorCodes.BusinessRule,
                 "This workflow cannot be triggered. Only active workflows can be executed.");
 
+        WorkflowSnapshot? snapshot = await workflowReader.GetSnapshotAsync(
+            command.WorkflowDefinitionId, command.OrganizationId, cancellationToken);
+
+        if (snapshot is null)
+        {
+            logger.LogError(
+                "No workflow snapshot found for workflow {WorkflowId} in org {OrgId}",
+                command.WorkflowDefinitionId, command.OrganizationId);
+            return Result.Failure<Guid>(ErrorCodes.BusinessRule,
+                "Workflow definition snapshot not found. Please re-publish the workflow.");
+        }
+
         WorkflowExecution execution = WorkflowExecution.Create(
             command.WorkflowDefinitionId,
             command.OrganizationId,
@@ -27,8 +45,14 @@ public sealed class StartExecutionHandler(
             command.TriggeredByUserId,
             command.Input);
 
+        execution.InitialiseSteps(snapshot.Steps);
+
         await execRepo.AddAsync(execution, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);
+
+        // Dispatch async — Wolverine picks up execution outside this request/transaction boundary
+        await dispatcher.PublishAsync(
+            new ExecuteNextStepMessage(execution.Id, execution.OrganizationId), cancellationToken);
 
         return execution.Id;
     }
