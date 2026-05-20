@@ -88,46 +88,55 @@ function write(relativePath, elements) {
 
 function authCard(prefix, { title, subtitle = null, items = [], extraLink = null }, submitLabel, footerText) {
   const cardW   = 440;
-  const headerH = subtitle ? 136 : 112;  // vertical space from card top to first field
+  // Reduced header height since logo and divider are removed.
+  // title (24) + optional subtitle (18) + paddings
+  const headerH = subtitle ? 76 : 56;
   const fieldH  = items.length * 72;     // 72px per field: label(16) + gap(2) + input(40) + gap(14)
-  const cardH   = headerH + fieldH + (extraLink ? 22 : 4) + 36 + 12 + 32;
+  // No extra height for extraLink because we move it inline with the password label.
+  const cardH   = headerH + fieldH + 36 + 12 + 32;
   const cardX   = Math.round((W - cardW) / 2);
   const cardY   = Math.round((H - cardH) / 2);
   const els     = [];
 
   // Page background
   els.push(rect(`${prefix}_bg`,   0,     0,     W,     H,     C.gray300, C.gray100, 1, false));
+
+  // Logo — placed top-left outside the card
+  els.push(text(`${prefix}_logo`, 30, 24, 150, 28, '⬡  Axis', 18, C.primary));
+
   // Card surface
   els.push(rect(`${prefix}_card`, cardX, cardY, cardW, cardH, C.gray300, C.white,   2, true));
 
-  // Logo — full-width bounding box so 'center' alignment is correct
-  els.push(text(`${prefix}_logo`, cardX, cardY + 16, cardW, 28, '⬡  Axis', 18, C.primary, 'center'));
-  els.push(hline(`${prefix}_hdiv`, cardX, cardY + 60, cardW, C.gray300));
-
-  // Title (always present)
-  els.push(text(`${prefix}_title`, cardX + 24, cardY + 76, cardW - 48, 24, title, 17, C.gray900));
+  // Title (always present, top of card)
+  els.push(text(`${prefix}_title`, cardX + 24, cardY + 24, cardW - 48, 24, title, 17, C.gray900));
 
   // Optional subtitle
   if (subtitle) {
-    els.push(text(`${prefix}_sub`, cardX + 24, cardY + 104, cardW - 48, 18, subtitle, 13, C.gray700));
+    els.push(text(`${prefix}_sub`, cardX + 24, cardY + 52, cardW - 48, 18, subtitle, 13, C.gray700));
   }
 
   // Fields — start at headerH from card top
   const fieldStartY = cardY + headerH;
-  items.forEach(({ label, placeholder }, i) => {
+  items.forEach(({ label, placeholder, hasEyeIcon }, i) => {
     const y = fieldStartY + i * 72;
     els.push(text(`${prefix}_fl_${i}`, cardX + 24, y,      cardW - 48, 16, label,       11, C.gray500));
+
+    // Extra link inline with Password label (e.g., Forgot password?)
+    if (extraLink && label === 'Password') {
+        els.push(text(`${prefix}_xl`, cardX + 24, y, cardW - 48, 16, extraLink, 11, C.primary, 'right'));
+    }
+
     els.push(...inputField(`${prefix}_fi_${i}`, cardX + 24, y + 18, cardW - 48, placeholder));
+
+    if (hasEyeIcon) {
+        // Draw eye icon on the right side of the input (inside the input box)
+        els.push(text(`${prefix}_eye_${i}`, cardX + cardW - 56, y + 28, 20, 20, '👁', 14, C.gray500));
+    }
   });
 
-  // Optional secondary link (e.g. 'Forgot password?') — right-aligned, 6px below last field
+  // Submit button
   const afterFieldsY = fieldStartY + fieldH;
-  if (extraLink) {
-    els.push(text(`${prefix}_xl`, cardX + 24, afterFieldsY + 6, cardW - 48, 16, extraLink, 12, C.primary, 'right'));
-  }
-
-  // Submit button — full card width minus 24px padding each side
-  const btnY = afterFieldsY + (extraLink ? 22 : 4);
+  const btnY = afterFieldsY;
   const btnW = cardW - 48;
   els.push(rect(`${prefix}_sbtn`,   cardX + 24, btnY,      btnW, 36, C.accentDark, C.accent, 2, true));
   els.push(text(`${prefix}_sbtn_t`, cardX + 24, btnY + 10, btnW, 16, submitLabel,  13, C.white, 'center'));
@@ -190,10 +199,33 @@ function genRegisterOrg() {
       { label: 'Organization name', placeholder: 'Acme Corp' },
       { label: 'Admin full name',   placeholder: 'Alex Brown' },
       { label: 'Email address',     placeholder: 'you@company.com' },
-      { label: 'Password',          placeholder: '••••••••' },
-      { label: 'Confirm password',  placeholder: '••••••••' },
+      { label: 'Password',          placeholder: '••••••••', hasEyeIcon: true },
     ],
   }, 'Create organization', 'Already have an account? Sign in');
+
+  // We'll also manually add a password strength indicator line just below the password field.
+  // The card layout returns an array of elements. We'll append our custom line to it before writing.
+  // The password input y position calculation:
+  // cardY + headerH + i * 72
+  // For 'ro', W=1200, H=800.
+  // subtitle is present -> headerH = 76.
+  // items length = 4 -> fieldH = 288.
+  // cardH = 76 + 288 + 36 + 12 + 32 = 444
+  // cardY = (800 - 444) / 2 = 178
+  // Password field is index 3. y = 178 + 76 + 3*72 = 254 + 216 = 470
+  // input field height is 40. so bottom of input is 470 + 18(gap) + 40 = 528.
+  // we add strength indicator at 532.
+
+  const cardW = 440;
+  const cardX = Math.round((W - cardW) / 2);
+  const indY = 532;
+
+  els.push(rect('ro_pwd_str_1', cardX + 24, indY, 60, 4, C.success, C.success, 1, true));
+  els.push(rect('ro_pwd_str_2', cardX + 88, indY, 60, 4, C.success, C.success, 1, true));
+  els.push(rect('ro_pwd_str_3', cardX + 152, indY, 60, 4, C.success, C.success, 1, true));
+  els.push(rect('ro_pwd_str_4', cardX + 216, indY, 60, 4, C.gray300, C.gray300, 1, true));
+  els.push(text('ro_pwd_str_t', cardX + 284, indY - 6, 80, 14, 'Strong', 10, C.success));
+
   write('E01-platform-foundation/register-org.excalidraw', els);
 }
 
@@ -203,28 +235,27 @@ function genRegisterOrg() {
  */
 function genEmailConfirmation() {
   const cardW = 440;
-  const cardH = 300;
+  // Shorter card height: padding + title(28) + gap(16) + body(18) + body(18) + gap(24) + resend(16) + gap(32) + footer(32)
+  const cardH = 210;
   const cardX = Math.round((W - cardW) / 2);
   const cardY = Math.round((H - cardH) / 2);
   const els   = [];
 
   els.push(rect('ec_bg',   0,     0,     W,     H,     C.gray300, C.gray100, 1, false));
+
+  // Logo in background
+  els.push(text('ec_logo', 30, 24, 150, 28, '⬡  Axis', 18, C.primary));
+
+  // Card surface
   els.push(rect('ec_card', cardX, cardY, cardW, cardH, C.gray300, C.white,   2, true));
 
-  // Logo row
-  els.push(text('ec_logo',  cardX,      cardY + 16,  cardW,      28, '⬡  Axis',            18, C.primary, 'center'));
-  els.push(hline('ec_hdiv', cardX,      cardY + 60,  cardW,          C.gray300));
+  // Title + body (shifted up since header/icon are removed)
+  els.push(text('ec_title', cardX + 24, cardY + 24, cardW - 48, 28, 'Check your email',   20, C.success));
+  els.push(text('ec_body1', cardX + 24, cardY + 68, cardW - 48, 18, 'We sent a verification link to:', 13, C.gray700));
+  els.push(text('ec_body2', cardX + 24, cardY + 90, cardW - 48, 18, 'alex@company.com',   13, C.gray900));
 
-  // Envelope icon (US-001 success state)
-  els.push(text('ec_icon',  cardX,      cardY + 76,  cardW,      36, '✉',                  28, C.primary, 'center'));
-
-  // Title + body
-  els.push(text('ec_title', cardX + 24, cardY + 128, cardW - 48, 24, 'Check your email',   17, C.gray900));
-  els.push(text('ec_body1', cardX + 24, cardY + 160, cardW - 48, 18, 'We sent a verification link to:', 13, C.gray700));
-  els.push(text('ec_body2', cardX + 24, cardY + 182, cardW - 48, 18, 'alex@company.com',   13, C.gray900));
-
-  // Resend link (US-002)
-  els.push(text('ec_resend', cardX + 24, cardY + 220, cardW - 48, 16, "Didn't receive it?  Resend email →", 12, C.primary, 'center'));
+  // Resend link
+  els.push(text('ec_resend', cardX + 24, cardY + 132, cardW - 48, 16, "Didn't receive it?  Resend email →", 12, C.primary, 'center'));
 
   // Footer
   els.push(hline('ec_fdiv',   cardX,      cardY + cardH - 32, cardW,      C.gray300));
@@ -241,7 +272,8 @@ function genEmailConfirmation() {
 function genVerifyEmail() {
   const els   = [];
   const cardW = 440;
-  const cardH = 200;
+  // Shorter card height since logo and big icon are gone
+  const cardH = 150;
   const gapX  = 60;
   const gapY  = 44;   // row gap; first 20px reserved for state label above card
   const col1X = Math.round((W - (cardW * 2 + gapX)) / 2);  // 130
@@ -256,51 +288,44 @@ function genVerifyEmail() {
     {
       id: 've_ok',   x: col1X, y: row1Y,
       stateLbl: '✓  Success',       lblColor: C.success,
-      icon: '✓', iconColor: C.success,
-      title: 'Email verified!',
+      title: 'Email verified!',     titleColor: C.success,
       body:  'Your account is ready. Signing you in…',
       btnLabel: null, btnVariant: null,
     },
     {
       id: 've_exp',  x: col2X, y: row1Y,
       stateLbl: 'Expired link',     lblColor: C.warning,
-      icon: '⏱', iconColor: C.warning,
-      title: 'Verification link expired',
+      title: 'Verification link expired', titleColor: C.warning,
       body:  'This link was valid for 24 hours.',
       btnLabel: 'Resend verification email', btnVariant: 'secondary',
     },
     {
       id: 've_used', x: col1X, y: row2Y,
       stateLbl: 'Already verified', lblColor: C.gray500,
-      icon: '✓', iconColor: C.gray500,
-      title: 'Already verified',
+      title: 'Already verified',    titleColor: C.gray700,
       body:  'This link has already been used. Please sign in.',
       btnLabel: 'Sign in', btnVariant: 'ghost',
     },
     {
       id: 've_inv',  x: col2X, y: row2Y,
       stateLbl: 'Invalid token',    lblColor: C.danger,
-      icon: '✕', iconColor: C.danger,
-      title: 'Invalid verification link',
+      title: 'Invalid verification link', titleColor: C.danger,
       body:  'This link is invalid or has been tampered with.',
       btnLabel: null, btnVariant: null,
     },
   ];
 
-  states.forEach(({ id, x, y, stateLbl, lblColor, icon, iconColor, title, body, btnLabel, btnVariant }) => {
+  states.forEach(({ id, x, y, stateLbl, lblColor, title, titleColor, body, btnLabel, btnVariant }) => {
     els.push(text(`${id}_lbl`,   x,      y - 20,  cardW,      16, stateLbl, 12, lblColor));
     els.push(rect(`${id}_card`,  x,      y,       cardW,      cardH, C.gray300, C.white, 2, true));
-    // Mini logo
-    els.push(text(`${id}_logo`,  x,      y + 12,  cardW,      18, '⬡  Axis', 12, C.primary, 'center'));
-    els.push(hline(`${id}_hdiv`, x,      y + 36,  cardW,      C.gray300));
-    // Status icon
-    els.push(text(`${id}_icon`,  x,      y + 46,  cardW,      26, icon, 20, iconColor, 'center'));
-    // Title + body
-    els.push(text(`${id}_title`, x + 20, y + 84,  cardW - 40, 20, title, 14, C.gray900));
-    els.push(text(`${id}_body`,  x + 20, y + 108, cardW - 40, 32, body,  12, C.gray700));
+
+    // Title + body (shifted up)
+    els.push(text(`${id}_title`, x + 24, y + 24,  cardW - 48, 24, title, 16, titleColor));
+    els.push(text(`${id}_body`,  x + 24, y + 60,  cardW - 48, 32, body,  12, C.gray700));
+
     // Optional CTA
     if (btnLabel) {
-      els.push(...btn(`${id}_cta`, x + 20, y + cardH - 44, btnLabel, btnVariant));
+      els.push(...btn(`${id}_cta`, x + 24, y + cardH - 46, btnLabel, btnVariant));
     }
   });
 
@@ -320,8 +345,8 @@ function genWorkspaceProvisioning() {
 
   els.push(rect('wp_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
 
-  // Shared header row
-  els.push(text('wp_logo',    0, 24, W, 28, '⬡  Axis',                  18, C.primary, 'center'));
+  // Shared header row (Logo at top left now)
+  els.push(text('wp_logo',    30, 24, 150, 28, '⬡  Axis',                  18, C.primary));
   els.push(text('wp_heading', 0, 60, W, 18, 'Workspace Setup — States', 12, C.gray500, 'center'));
   els.push(vline('wp_div', W / 2, 86, H - 86, C.gray300));
 
@@ -331,13 +356,13 @@ function genWorkspaceProvisioning() {
   const lMidX = W / 4;        // 300
 
   els.push(text('wp_l_lbl', lX, 90, lW, 16, '↻  In progress', 12, C.primary));
-  els.push(ellipse('wp_l_spin',   lMidX - 28, 116, 56, 56, C.infoBorder, C.infoBg, 2));
-  els.push(text('wp_l_spin_t',    lMidX - 28, 131, 56, 26, '↻', 18, C.primary, 'center'));
-  els.push(text('wp_l_title', lX, 190, lW, 26, 'Setting up your workspace…', 18, C.gray900, 'center'));
-  els.push(text('wp_l_org',   lX, 222, lW, 18, 'For Acme Corp',              13, C.accent,  'center'));
-  els.push(text('wp_l_sub',   lX, 246, lW, 14, "Don't close this tab.",      11, C.gray500, 'center'));
 
-  const stepsY  = 278;
+  // Title shifted up since big spinner is removed
+  els.push(text('wp_l_title', lX, 130, lW, 26, 'Setting up your workspace…', 18, C.primary, 'center'));
+  els.push(text('wp_l_org',   lX, 162, lW, 18, 'For Acme Corp',              13, C.accent,  'center'));
+  els.push(text('wp_l_sub',   lX, 186, lW, 14, "Don't close this tab.",      11, C.gray500, 'center'));
+
+  const stepsY  = 228;
   const lStepsX = lMidX - 160;  // 140
   [
     { icon: '✓', label: 'Email verified',          c: C.success },
@@ -352,16 +377,20 @@ function genWorkspaceProvisioning() {
   els.push(text('wp_l_note', lX, stepsY + 4 * 40 + 8, lW, 14,
     'Retrying automatically if this takes longer.', 10, C.gray300, 'center'));
 
+  // Educational tip
+  els.push(text('wp_l_tip', lX, stepsY + 4 * 40 + 48, lW, 14,
+    'Tip: Press Cmd+K anywhere to open the command palette', 11, C.gray500, 'center'));
+
   // ── Right: Failed (after 3 retries) ─────────────────────────────────────────
   const rX    = W / 2 + 40;    // 640
   const rW    = W / 2 - 80;    // 520
   const rMidX = (W * 3) / 4;   // 900
 
   els.push(text('wp_r_lbl', rX, 90, rW, 16, '✕  Failed (after 3 retries)', 12, C.danger));
-  els.push(ellipse('wp_r_err',   rMidX - 28, 116, 56, 56, C.dangerBorder, C.dangerBg, 2));
-  els.push(text('wp_r_err_t',    rMidX - 28, 131, 56, 26, '✕', 18, C.danger, 'center'));
-  els.push(text('wp_r_title', rX, 190, rW, 26, 'Setup failed',                                        18, C.gray900, 'center'));
-  els.push(text('wp_r_body',  rX, 222, rW, 36, 'Provisioning failed after 3 attempts.\nOur team has been notified.', 12, C.gray700, 'center'));
+
+  // Title shifted up since big icon is removed
+  els.push(text('wp_r_title', rX, 130, rW, 26, 'Setup failed',                                        18, C.danger, 'center'));
+  els.push(text('wp_r_body',  rX, 162, rW, 36, 'Provisioning failed after 3 attempts.\nOur team has been notified.', 12, C.gray700, 'center'));
 
   const rStepsX = rMidX - 160;  // 740
   [
@@ -376,6 +405,10 @@ function genWorkspaceProvisioning() {
   });
   els.push(text('wp_r_supp', rX, stepsY + 4 * 40 + 8, rW, 14,
     'Contact support if the issue persists →', 11, C.primary, 'center'));
+
+  // Educational tip
+  els.push(text('wp_r_tip', rX, stepsY + 4 * 40 + 48, rW, 14,
+    'Tip: Press Cmd+K anywhere to open the command palette', 11, C.gray500, 'center'));
 
   write('E01-platform-foundation/workspace-provisioning.excalidraw', els);
 }
@@ -543,9 +576,10 @@ function genSettingsOrg() {
   els.push(...appShell('so', W, H, NAV, navIdx, 'Settings — Organization'));
 
   // ── 1. Organization Profile ───────────────────────────────────────────────────
-  els.push(...pageHeader('so_ph', cx, cy, cw, 'Organization Profile', [
-    { label: 'Save changes', variant: 'primary' },
-  ]));
+  // Replaced "Save changes" button with an auto-save text indicator.
+  // We don't pass the button to pageHeader, instead we manually draw the success text.
+  els.push(...pageHeader('so_ph', cx, cy, cw, 'Organization Profile', []));
+  els.push(text('so_ph_saved', cx + cw - 120, cy + 8, 120, 16, '✓ All changes saved', 11, C.gray500, 'right'));
 
   const profY = cy + 44;  // 124 — first content row starts 16px below the page-header title
 
