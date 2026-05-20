@@ -28,7 +28,12 @@ const epicDir = (folder) => join(__dir, "..", "epics", folder, "diagrams");
 // ─── Excalidraw primitives ────────────────────────────────────────────────────
 
 let _id = 1;
-const uid = () => `diag-${_id++}`;
+// uid() increments _id; after the call _id-1 is the number just assigned.
+// We expose a seedOf() helper so base() can derive a deterministic seed
+// from the element's sequential number — same element always gets the same
+// seed across runs, so git diff is meaningful (only real changes show up).
+const uid   = () => `diag-${_id++}`;
+const seedOf = () => _id - 1;   // called immediately after uid()
 
 const C = {
   bg:        "#f8fafc",
@@ -48,30 +53,35 @@ const C = {
   arrow:     "#475569",
 };
 
-const base = (extra = {}) => ({
-  id: uid(),
-  x: 0, y: 0,
-  angle: 0,
-  strokeColor: C.border,
-  backgroundColor: "transparent",
-  fillStyle: "solid",
-  strokeWidth: 1.5,
-  strokeStyle: "solid",
-  roughness: 1,
-  opacity: 100,
-  groupIds: [],
-  frameId: null,
-  roundness: { type: 2 },
-  seed: Math.floor(Math.random() * 99999),
-  version: 1,
-  versionNonce: 0,
-  isDeleted: false,
-  boundElements: [],
-  updated: 1,
-  link: null,
-  locked: false,
-  ...extra,
-});
+const base = (extra = {}) => {
+  // Call uid() first so seedOf() captures the just-assigned number.
+  const id   = uid();
+  const seed = seedOf();
+  return {
+    id,
+    x: 0, y: 0,
+    angle: 0,
+    strokeColor: C.border,
+    backgroundColor: "transparent",
+    fillStyle: "solid",
+    strokeWidth: 1.5,
+    strokeStyle: "solid",
+    roughness: 1,
+    opacity: 100,
+    groupIds: [],
+    frameId: null,
+    roundness: { type: 2 },
+    seed,
+    version: 1,
+    versionNonce: 0,
+    isDeleted: false,
+    boundElements: [],
+    updated: 1,
+    link: null,
+    locked: false,
+    ...extra,
+  };
+};
 
 function rect({ x, y, w, h, bg = "transparent", stroke = C.border, label, labelSize = 13, labelColor = C.text, labelBold = false, sub, rx = 6 }) {
   const el = {
@@ -226,10 +236,12 @@ function vline({ x, y, h, color = C.border, dashed = false }) {
 
 // ─── Entity box (UML-style with header + attribute body) ─────────────────────
 
-function entityBox({ x, y, name, attrs = [], isEnum = false,
-                     headerBg = C.sysBg, stroke = C.sysBdr }) {
+function entityBox({ x, y, name, attrs = [], isEnum = false, isValueObject = false, planned = false,
+                     headerBg = null, stroke = null }) {
+  const effectiveBg     = headerBg ?? (isValueObject ? "#e2e8f0" : C.sysBg);
+  const effectiveStroke = stroke   ?? (isValueObject ? "#64748b" : C.sysBdr);
   const W = 190, LH = 17;
-  const hdrH = isEnum ? 36 : 28;
+  const hdrH = (isEnum || isValueObject) ? 36 : 28;
   const bodyH = attrs.length > 0 ? attrs.length * LH + 8 : 0;
   const H = hdrH + bodyH;
   const els = [];
@@ -237,25 +249,29 @@ function entityBox({ x, y, name, attrs = [], isEnum = false,
   // Full outer box (white body background + visible border)
   els.push({
     ...base(), type: "rectangle", x, y, width: W, height: H,
-    backgroundColor: "#ffffff", strokeColor: stroke,
+    backgroundColor: "#ffffff", strokeColor: effectiveStroke,
     roundness: { type: 3, value: 4 }, strokeWidth: 1.5,
+    strokeStyle: planned ? "dashed" : "solid",
   });
 
   // Header colored overlay (strokeColor = headerBg so border blends into fill)
   els.push({
     ...base(), type: "rectangle", x, y, width: W, height: hdrH,
-    backgroundColor: headerBg, strokeColor: headerBg,
+    backgroundColor: effectiveBg, strokeColor: effectiveBg,
     roundness: { type: 3, value: 4 }, strokeWidth: 1,
   });
 
   // Separator between header and body
   if (attrs.length > 0) {
-    els.push(...hline({ x, y: y + hdrH, w: W, color: stroke }));
+    els.push(...hline({ x, y: y + hdrH, w: W, color: effectiveStroke }));
   }
 
   // Name
   if (isEnum) {
     els.push(text({ x: x + W / 2, y: y + 11, value: "«enum»", size: 8.5, color: C.muted, anchor: "center" }));
+    els.push(text({ x: x + W / 2, y: y + 26, value: name, size: 11, bold: true, color: C.text, anchor: "center" }));
+  } else if (isValueObject) {
+    els.push(text({ x: x + W / 2, y: y + 11, value: "«value object»", size: 8.5, color: C.muted, anchor: "center" }));
     els.push(text({ x: x + W / 2, y: y + 26, value: name, size: 11, bold: true, color: C.text, anchor: "center" }));
   } else {
     els.push(text({ x: x + W / 2, y: y + hdrH / 2, value: name, size: 11, bold: true, color: C.text, anchor: "center" }));
@@ -676,6 +692,7 @@ function dataModelDiagram() {
 
   els.push(text({ x: 500, y: 20, value: "Data Modeling — Core Entity Relationships", size: 16, bold: true, color: C.text, anchor: "center" }));
 
+  // Row 1: ModelDefinition | FieldDefinition | FieldType
   const mdl = entityBox({ x: 40, y: 60, name: "ModelDefinition", headerBg: C.sysBg, stroke: C.sysBdr,
     attrs: ["+id: UUID", "+name: string", "+slug: string", "+description: string", "+icon: string", "+color: string", "+createdAt: DateTime", "+updatedAt: DateTime"] });
 
@@ -685,27 +702,27 @@ function dataModelDiagram() {
   const ftype = entityBox({ x: 520, y: 60, name: "FieldType", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
     attrs: ["Text", "Number", "Boolean", "Date", "Enum", "Relation", "DataClass", "File", "JSON"] });
 
-  const dcd = entityBox({ x: 40, y: 350, name: "DataClassDefinition", headerBg: C.sysBg, stroke: C.sysBdr,
-    attrs: ["+id: UUID", "+name: string", "+description: string", "+createdAt: DateTime", "+updatedAt: DateTime"] });
-
-  const dcf = entityBox({ x: 280, y: 350, name: "DataClassField", headerBg: C.sysBg, stroke: C.sysBdr,
-    attrs: ["+id: UUID", "+dataClassId: UUID", "+name: string", "+label: string", "+type: FieldType", "+required: boolean", "+displayOrder: int", "+config: JSONB"] });
-
-  const rec = entityBox({ x: 40, y: 620, name: "Record", headerBg: C.modBg, stroke: C.modBdr,
+  // Row 2: DataRecord | DataClassDefinition
+  // DataClassDefinition reuses FieldDefinition directly — no separate DataClassField entity
+  const rec = entityBox({ x: 40, y: 350, name: "DataRecord", headerBg: C.modBg, stroke: C.modBdr,
     attrs: ["+id: UUID", "+modelId: UUID", "+data: JSONB", "+createdAt: DateTime", "+updatedAt: DateTime", "+createdBy: UUID"] });
 
-  for (const b of [mdl, fld, ftype, dcd, dcf, rec]) els.push(...b.els);
+  const dcd = entityBox({ x: 280, y: 350, name: "DataClassDefinition", headerBg: C.sysBg, stroke: C.sysBdr,
+    attrs: ["+id: UUID", "+name: string", "+description: string", "+createdAt: DateTime", "+updatedAt: DateTime"] });
+
+  for (const b of [mdl, fld, ftype, rec, dcd]) els.push(...b.els);
 
   // Relationships
+  // mdl → fld: 1 owns many fields
   els.push(...arrow({ x1: mdl.midRight.x, y1: mdl.midRight.y, x2: fld.midLeft.x, y2: fld.midLeft.y, label: "1 *--" }));
+  // fld → ftype: each field has a type
   els.push(...arrow({ x1: fld.midRight.x, y1: fld.midRight.y, x2: ftype.midLeft.x, y2: ftype.midLeft.y, label: "has type" }));
-  els.push(...arrow({ x1: dcd.midRight.x, y1: dcd.midRight.y, x2: dcf.midLeft.x, y2: dcf.midLeft.y, label: "1 *--" }));
-  // dcf → ftype: route right to ftype.midBottom.x then up to ftype.midBottom
-  els.push(...routedArrow({ waypoints: [[dcf.midRight.x, dcf.midRight.y + 20], [ftype.midBottom.x, dcf.midRight.y + 20], [ftype.midBottom.x, ftype.midBottom.y]], label: "has type", dashed: true }));
-  // fld → dcd: route down to midpoint y, left, then down to dcd.midTop
-  els.push(...routedArrow({ waypoints: [[fld.midBottom.x - 20, fld.midBottom.y], [fld.midBottom.x - 20, 300], [dcd.midTop.x + 20, 300], [dcd.midTop.x + 20, dcd.midTop.y]], label: "→ DataClass ref", dashed: true }));
-  // rec → mdl: route left of all boxes to avoid crossing dcd
-  els.push(...routedArrow({ waypoints: [[rec.midLeft.x, rec.midLeft.y], [10, rec.midLeft.y], [10, mdl.midLeft.y], [mdl.midLeft.x, mdl.midLeft.y]], label: "instance of", dashed: true }));
+  // dcd → fld: data class reuses FieldDefinition (right channel, +15 offset, going up)
+  els.push(...arrow({ x1: dcd.midTop.x + 15, y1: dcd.midTop.y, x2: fld.midBottom.x + 15, y2: fld.midBottom.y, label: "1 *--" }));
+  // fld → dcd: FieldDefinition may reference a DataClass (left channel, -15 offset, going down, dashed)
+  els.push(...arrow({ x1: fld.midBottom.x - 15, y1: fld.midBottom.y, x2: dcd.midTop.x - 15, y2: dcd.midTop.y, label: "→ DataClass ref", dashed: true }));
+  // rec → mdl: record is an instance of a model (straight up)
+  els.push(...arrow({ x1: rec.midTop.x, y1: rec.midTop.y, x2: mdl.midBottom.x, y2: mdl.midBottom.y, label: "instance of", dashed: true }));
 
   return excalidraw(els);
 }
@@ -724,8 +741,9 @@ function workflowModelDiagram() {
   const wfs = entityBox({ x: 40, y: 360, name: "WorkflowStatus", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
     attrs: ["Draft", "Active", "Archived"] });
 
-  const trig = entityBox({ x: 290, y: 60, name: "TriggerConfig", headerBg: C.sysBg, stroke: C.sysBdr,
-    attrs: ["+id: UUID", "+workflowId: UUID", "+type: TriggerType", "+config: JSONB"] });
+  // TriggerConfig is a value object (no identity, owned by WorkflowDefinition)
+  const trig = entityBox({ x: 290, y: 60, name: "TriggerConfig", isValueObject: true,
+    attrs: ["+workflowId: UUID", "+type: TriggerType", "+config: JSONB"] });
 
   const trigType = entityBox({ x: 290, y: 290, name: "TriggerType", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
     attrs: ["Manual", "Schedule", "Webhook", "Event"] });
@@ -734,15 +752,17 @@ function workflowModelDiagram() {
     attrs: ["+id: UUID", "+workflowId: UUID", "+name: string", "+type: StepType", "+config: JSONB", "+positionX: float", "+positionY: float", "+displayOrder: int"] });
 
   const stepType = entityBox({ x: 540, y: 360, name: "StepType", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
-    attrs: ["Form", "HttpRequest", "Condition", "Script", "Notification"] });
+    attrs: ["Start", "End", "Form", "HttpRequest", "Condition", "Script", "Notification"] });
 
-  const trans = entityBox({ x: 790, y: 60, name: "Transition", headerBg: C.sysBg, stroke: C.sysBdr,
-    attrs: ["+id: UUID", "+workflowId: UUID", "+fromStepId: UUID", "+toStepId: UUID", "+label: string", "+condition: string", "+displayOrder: int"] });
+  // Transition is a value object (no identity, owned by WorkflowDefinition via OwnsMany)
+  const trans = entityBox({ x: 790, y: 60, name: "Transition", isValueObject: true,
+    attrs: ["+fromStepId: UUID", "+toStepId: UUID", "+condition: string"] });
 
-  const pg = entityBox({ x: 790, y: 340, name: "ParallelGroup", headerBg: C.sysBg, stroke: C.sysBdr,
+  // ParallelGroup and JoinType are planned (Phase 2) — dashed border
+  const pg = entityBox({ x: 790, y: 340, name: "ParallelGroup", planned: true, headerBg: C.sysBg, stroke: C.sysBdr,
     attrs: ["+id: UUID", "+workflowId: UUID", "+name: string", "+joinType: JoinType"] });
 
-  const jt = entityBox({ x: 790, y: 520, name: "JoinType", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
+  const jt = entityBox({ x: 790, y: 520, name: "JoinType", isEnum: true, planned: true, headerBg: "#ede9fe", stroke: "#7c3aed",
     attrs: ["WaitAll", "WaitAny"] });
 
   for (const b of [wfd, wfs, trig, trigType, step, stepType, trans, pg, jt]) els.push(...b.els);
@@ -756,7 +776,7 @@ function workflowModelDiagram() {
   els.push(...arrow({ x1: trig.midBottom.x, y1: trig.midBottom.y, x2: trigType.midTop.x, y2: trigType.midTop.y, label: "type" }));
   els.push(...arrow({ x1: step.midBottom.x, y1: step.midBottom.y, x2: stepType.midTop.x, y2: stepType.midTop.y, label: "type" }));
   els.push(...arrow({ x1: pg.midBottom.x, y1: pg.midBottom.y, x2: jt.midTop.x, y2: jt.midTop.y, label: "joinType" }));
-  // step → pg: route right then down
+  // step → pg: route right then down (planned relationship)
   els.push(...routedArrow({ waypoints: [[step.midRight.x, step.midRight.y + 20], [760, step.midRight.y + 20], [760, pg.midLeft.y], [pg.midLeft.x, pg.midLeft.y]], label: "0..1", dashed: true }));
 
   return excalidraw(els);
@@ -768,41 +788,38 @@ function formModelDiagram() {
   _id = 1;
   const els = [];
 
-  els.push(text({ x: 520, y: 20, value: "Form Builder — Core Entity Relationships", size: 16, bold: true, color: C.text, anchor: "center" }));
+  els.push(text({ x: 260, y: 20, value: "Form Builder — Core Entity Relationships", size: 16, bold: true, color: C.text, anchor: "center" }));
 
+  // Left column: FormDefinition → FormSubmission (runtime) → FormSubmissionStatus
   const fdef = entityBox({ x: 40, y: 60, name: "FormDefinition", headerBg: C.infraBg, stroke: C.infraBdr,
     attrs: ["+id: UUID", "+name: string", "+description: string", "+organizationId: UUID", "+createdAt: DateTime", "+updatedAt: DateTime"] });
 
-  const fsec = entityBox({ x: 290, y: 60, name: "FormSection", headerBg: C.sysBg, stroke: C.sysBdr,
-    attrs: ["+id: UUID", "+formId: UUID", "+title: string", "+description: string", "+displayOrder: int"] });
+  // Right column: FormFieldType enum | FormFieldDefinition
+  // Section is a field type — no separate FormSection structural entity
+  const fft = entityBox({ x: 290, y: 60, name: "FormFieldType", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
+    attrs: ["Text", "Number", "Boolean", "Date", "Dropdown", "MultiSelect", "RelationPicker", "FileUpload", "Section"] });
 
-  const fft = entityBox({ x: 540, y: 60, name: "FormFieldType", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
-    attrs: ["Text", "Number", "Boolean", "Date", "Dropdown", "MultiSelect", "Checkbox", "FileUpload", "RelationPicker"] });
-
-  const ffield = entityBox({ x: 290, y: 300, name: "FormFieldDefinition", headerBg: C.sysBg, stroke: C.sysBdr,
+  const ffield = entityBox({ x: 290, y: 330, name: "FormFieldDefinition", headerBg: C.sysBg, stroke: C.sysBdr,
     attrs: ["+id: UUID", "+formId: UUID", "+key: string", "+label: string", "+type: FormFieldType", "+required: boolean", "+displayOrder: int", "+config: JSONB"] });
 
-  const ftask = entityBox({ x: 40, y: 440, name: "FormTask", headerBg: C.modBg, stroke: C.modBdr,
-    attrs: ["+id: UUID", "+formId: UUID", "+executionId: UUID", "+stepId: UUID", "+assigneeId: UUID", "+status: FormTaskStatus", "+token: string", "+expiresAt: DateTime", "+createdAt: DateTime"] });
+  // FormSubmission: single aggregate combining assignment + captured data (1:1 relationship)
+  const fsub = entityBox({ x: 40, y: 440, name: "FormSubmission", headerBg: C.modBg, stroke: C.modBdr,
+    attrs: ["+id: UUID", "+formDefinitionId: UUID", "+executionId: UUID", "+executionStepId: UUID", "+assigneeUserId: UUID?", "+status: FormSubmissionStatus", "+accessToken: UUID", "+expiresAt: DateTime?", "+submittedData: JSONB", "+createdAt: DateTime"] });
 
-  const fts = entityBox({ x: 40, y: 730, name: "FormTaskStatus", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
-    attrs: ["Pending", "Completed", "Expired", "Cancelled"] });
+  const fss = entityBox({ x: 40, y: 705, name: "FormSubmissionStatus", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
+    attrs: ["Pending", "Submitted", "Expired", "Cancelled"] });
 
-  const fsub = entityBox({ x: 290, y: 590, name: "FormSubmission", headerBg: C.sysBg, stroke: C.sysBdr,
-    attrs: ["+id: UUID", "+formTaskId: UUID", "+submittedBy: UUID", "+submittedAt: DateTime", "+data: JSONB"] });
-
-  for (const b of [fdef, fsec, fft, ffield, ftask, fts, fsub]) els.push(...b.els);
+  for (const b of [fdef, fft, ffield, fsub, fss]) els.push(...b.els);
 
   // Relationships
-  els.push(...arrow({ x1: fdef.midRight.x, y1: fdef.midRight.y - 8, x2: fsec.midLeft.x, y2: fsec.midLeft.y, label: "1 *--" }));
-  // fdef → ffield: route right then down then right
-  els.push(...routedArrow({ waypoints: [[fdef.midRight.x, fdef.midRight.y + 8], [260, fdef.midRight.y + 8], [260, ffield.midLeft.y], [ffield.midLeft.x, ffield.midLeft.y]], label: "1 *--" }));
-  // ffield → fft: route right to fft.midBottom.x then up to fft.midBottom
-  els.push(...routedArrow({ waypoints: [[ffield.midRight.x, ffield.midRight.y], [fft.midBottom.x, ffield.midRight.y], [fft.midBottom.x, fft.midBottom.y]], label: "type" }));
-  els.push(...arrow({ x1: fdef.midBottom.x, y1: fdef.midBottom.y, x2: ftask.midTop.x, y2: ftask.midTop.y, label: "→ runtime" }));
-  els.push(...arrow({ x1: ftask.midBottom.x, y1: ftask.midBottom.y, x2: fts.midTop.x, y2: fts.midTop.y, label: "status" }));
-  // ftask → fsub: route right then down
-  els.push(...routedArrow({ waypoints: [[ftask.midRight.x, ftask.midRight.y + 30], [260, ftask.midRight.y + 30], [260, fsub.midLeft.y], [fsub.midLeft.x, fsub.midLeft.y]], label: "1 -- 1" }));
+  // fdef → ffield: definition owns fields (route right then down)
+  els.push(...routedArrow({ waypoints: [[fdef.midRight.x, fdef.midRight.y], [260, fdef.midRight.y], [260, ffield.midLeft.y], [ffield.midLeft.x, ffield.midLeft.y]], label: "1 *--" }));
+  // ffield → fft: field has a type (straight up to enum above)
+  els.push(...arrow({ x1: ffield.midTop.x, y1: ffield.midTop.y, x2: fft.midBottom.x, y2: fft.midBottom.y, label: "type" }));
+  // fdef → fsub: definition instantiated at runtime
+  els.push(...arrow({ x1: fdef.midBottom.x, y1: fdef.midBottom.y, x2: fsub.midTop.x, y2: fsub.midTop.y, label: "→ runtime" }));
+  // fsub → fss: submission has a status
+  els.push(...arrow({ x1: fsub.midBottom.x, y1: fsub.midBottom.y, x2: fss.midTop.x, y2: fss.midTop.y, label: "status" }));
 
   return excalidraw(els);
 }

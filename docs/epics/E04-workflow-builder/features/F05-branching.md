@@ -36,8 +36,7 @@ Workflows can take different execution paths based on data values using Conditio
 
 > **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: canvas branch label rendering pending Frontend; branch evaluation at execution time pending E06.
-> Decisions: cycle detection implemented in domain (DFS reachability check in AddTransition).
-> Diagram pending: `Transition` to be shown as a value object in workflow-model diagram (only `fromStepId`, `toStepId`, `condition` — no `id`, `workflowId`, `label`, `displayOrder`). Update `workflowModelDiagram()` in `generate-diagrams.mjs`.
+> Decisions: cycle detection implemented in domain (DFS reachability check in AddTransition). `Transition` is a value object (only `fromStepId`, `toStepId`, `condition` — no identity or ordering fields).
 
 ---
 

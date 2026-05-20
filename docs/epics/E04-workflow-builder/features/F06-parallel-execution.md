@@ -37,8 +37,7 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 - Dynamic parallelism (creating N parallel branches based on a list of records at runtime) — not in MVP.
 
 > **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: canvas container node rendering and step nesting UI pending Frontend; parallel group represented via step config in existing JSONB storage.
-> Diagram pending: `ParallelGroup` and `JoinType` to be marked as "planned" (Phase 2) in workflow-model diagram. Update `workflowModelDiagram()` in `generate-diagrams.mjs`.
+> Gaps vs spec: canvas container node rendering and step nesting UI pending Frontend; parallel group represented via step config in existing JSONB storage. `ParallelGroup` and `JoinType` are Phase 2 — shown as planned (dashed) in diagram.
 
 ---
 
