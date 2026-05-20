@@ -804,7 +804,7 @@ function formModelDiagram() {
 
   // FormSubmission: single aggregate combining assignment + captured data (1:1 relationship)
   const fsub = entityBox({ x: 40, y: 440, name: "FormSubmission", headerBg: C.modBg, stroke: C.modBdr,
-    attrs: ["+id: UUID", "+formDefinitionId: UUID", "+executionId: UUID", "+executionStepId: UUID", "+assigneeUserId: UUID?", "+status: FormSubmissionStatus", "+accessToken: UUID", "+expiresAt: DateTime?", "+submittedData: JSONB", "+createdAt: DateTime"] });
+    attrs: ["+id: UUID", "+formDefinitionId: UUID", "+executionId: UUID", "+executionStepId: UUID", "+assigneeUserId: UUID?", "+status: FormSubmissionStatus", "+accessToken: UUID", "+expiresAt: DateTime?", "+submittedData: JSONB", "+submittedAt: DateTime?"] });
 
   const fss = entityBox({ x: 40, y: 705, name: "FormSubmissionStatus", isEnum: true, headerBg: "#ede9fe", stroke: "#7c3aed",
     attrs: ["Pending", "Submitted", "Expired", "Cancelled"] });

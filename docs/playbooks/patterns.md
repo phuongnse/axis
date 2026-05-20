@@ -336,7 +336,7 @@ The question "should these be one aggregate or two?" is separate from "entity vs
 
 **When to combine into one aggregate:** the relationship is 1:1, the second concept has no domain behavior of its own (it is a data record or state snapshot), and both concepts share the same lifecycle transitions. Creating a second aggregate root in this case adds indirection and a cross-aggregate join without any modelling benefit.
 
-```
+```text
 // Diagnostic questions — if all answers are "no", combine into one aggregate:
 // 1. Can the second concept exist without the first? (No → combine)
 // 2. Does the second concept have domain methods that make sense alone? (No → combine)
