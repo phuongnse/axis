@@ -1853,4 +1853,8 @@ One subfolder per epic, mirroring `docs/epics/`. Shared screens (error pages, gl
 
 **Generate SVG** after every edit: run `docs/scripts/generate-wireframes.ps1` — regenerates all `.svg` files from `.excalidraw` source via Kroki.io. Commit both `.excalidraw` and `.svg` together.
 
+**Deterministic regeneration:** `generate-screens.mjs` must call each screen through `runScreen(screenKey, generator)` so Excalidraw `seed` values do not depend on global generation order. See [`wireframes.md` § Deterministic seed rule](wireframes.md#deterministic-seed-rule-non-negotiable). Before committing generator changes, run the script twice and confirm `git diff` is empty after the second run.
+
 **Pitfall:** committing only `.excalidraw` without `.svg` means the wireframe is invisible on GitHub without the VS Code extension. Always run the script and commit both.
+
+**Pitfall:** editing `generate-screens.mjs` without per-screen seeds causes dozens of unrelated epic wireframes to change in the same PR — always verify the second-run diff is empty.
