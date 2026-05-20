@@ -38,9 +38,8 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 - Escalation notifications if the form is not submitted after X hours — not in MVP (timeout causes failure, not escalation).
 
 > **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: No Application handlers for form task management; email notification dispatch and in-app notification pending E06 + notification infrastructure; role member resolution pending Identity integration.
-> Decisions: `FormSubmission.AccessToken` is a `Guid` (unique URL lookup key, not JWT); expiry is enforced via `ExpiresAt` field + `Expire()` domain method. Non-idempotent domain transition — `Expire()` throws if status is not Pending; idempotency is handled at the job/application level (caller checks status before invoking).
-> Diagram pending: `FormTaskStatus.Completed` → `Submitted` in form-model diagram (the status name better reflects the action — a form task is "submitted", not "completed"). Update `formModelDiagram()` in `generate-diagrams.mjs`.
+> Gaps vs spec: No Application handlers for form submission management; email notification dispatch and in-app notification pending E06 + notification infrastructure; role member resolution pending Identity integration.
+> Decisions: `FormSubmission` is a single aggregate combining task assignment (executionId, assigneeUserId, accessToken, expiresAt) and response data (submittedData, submittedAt). A separate FormTask entity would add no domain logic — the relationship is always 1:1 and both live within the same lifecycle (Pending → Submitted/Expired/Cancelled). Status enum is `FormSubmissionStatus`; `Submitted` used instead of `Completed` to name the action clearly. `AccessToken` is a `Guid` (unique URL key, not JWT); expiry enforced via `ExpiresAt` + `Expire()` domain method; `Expire()` is non-idempotent by design — idempotency handled at the caller level.
 
 ---
 
