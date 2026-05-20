@@ -5,12 +5,16 @@ using Axis.WorkflowEngine.Domain.Aggregates;
 using Axis.WorkflowEngine.Domain.Enums;
 using Axis.WorkflowEngine.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using EngineReadModels = Axis.WorkflowEngine.Domain.ReadModels;
 using BuilderEvents = Axis.WorkflowBuilder.Domain.Events;
 
 namespace Axis.WorkflowEngine.Infrastructure.Handlers;
 
-internal sealed class WorkflowPublishedHandler(WorkflowEngineDbContext context, IUnitOfWork uow)
+internal sealed class WorkflowPublishedHandler(
+    WorkflowEngineDbContext context,
+    IUnitOfWork uow,
+    ILogger<WorkflowPublishedHandler> logger)
 {
     public async Task Handle(WorkflowPublished @event, CancellationToken ct)
     {
@@ -35,12 +39,22 @@ internal sealed class WorkflowPublishedHandler(WorkflowEngineDbContext context, 
         }
         catch (ConcurrencyException)
         {
-            // Concurrent duplicate event delivery — another worker already committed this update.
+            logger.LogWarning(
+                "WorkflowPublishedHandler: concurrent delivery detected for active status of workflow {WorkflowId} — skipping",
+                @event.WorkflowId);
+            return;
         }
         catch (UniqueConstraintException)
         {
-            // Concurrent insert race — row already created by a parallel handler invocation.
+            logger.LogWarning(
+                "WorkflowPublishedHandler: concurrent insert detected for active status of workflow {WorkflowId} — skipping",
+                @event.WorkflowId);
+            return;
         }
+
+        logger.LogInformation(
+            "WorkflowPublishedHandler: active status upserted for workflow {WorkflowId} org {OrganizationId}",
+            @event.WorkflowId, @event.OrganizationId);
     }
 
     private async Task UpsertSnapshotAsync(WorkflowPublished @event, CancellationToken ct)
@@ -63,12 +77,22 @@ internal sealed class WorkflowPublishedHandler(WorkflowEngineDbContext context, 
         }
         catch (ConcurrencyException)
         {
-            // Concurrent duplicate event delivery — another worker already committed this update.
+            logger.LogWarning(
+                "WorkflowPublishedHandler: concurrent delivery detected for snapshot of workflow {WorkflowId} — skipping",
+                @event.WorkflowId);
+            return;
         }
         catch (UniqueConstraintException)
         {
-            // Concurrent insert race — row already created by a parallel handler invocation.
+            logger.LogWarning(
+                "WorkflowPublishedHandler: concurrent insert detected for snapshot of workflow {WorkflowId} — skipping",
+                @event.WorkflowId);
+            return;
         }
+
+        logger.LogInformation(
+            "WorkflowPublishedHandler: snapshot upserted for workflow {WorkflowId} with {StepCount} steps",
+            @event.WorkflowId, steps.Count);
     }
 
     private static IReadOnlyList<EngineReadModels.StepDefinitionSnapshot> MapSteps(

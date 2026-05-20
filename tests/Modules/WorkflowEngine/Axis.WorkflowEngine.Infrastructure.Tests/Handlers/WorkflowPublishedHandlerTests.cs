@@ -3,6 +3,7 @@ using Axis.WorkflowEngine.Domain.ReadModels;
 using Axis.WorkflowEngine.Infrastructure.Handlers;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 using BuilderEvents = Axis.WorkflowBuilder.Domain.Events;
 
@@ -37,7 +38,8 @@ public sealed class WorkflowPublishedHandlerTests(WorkflowEngineDatabaseFixture 
         IUnitOfWork uow = Substitute.For<IUnitOfWork>();
         uow.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(call => ctx.SaveChangesAsync(call.Arg<CancellationToken>()));
-        return new WorkflowPublishedHandler(ctx, uow);
+        ILogger<WorkflowPublishedHandler> logger = Substitute.For<ILogger<WorkflowPublishedHandler>>();
+        return new WorkflowPublishedHandler(ctx, uow, logger);
     }
 
     [Fact]
