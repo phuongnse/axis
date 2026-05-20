@@ -56,7 +56,18 @@ internal sealed class FormTaskSubmittedHandler(
         execution.CompleteStep(@event.ExecutionStepId, @event.SubmittedData);
         execution.MergeContext(@event.SubmittedData);
 
-        await context.SaveChangesAsync(ct);
+        try
+        {
+            await context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Another Wolverine worker already committed this form step completion.
+            logger.LogInformation(
+                "FormTaskSubmittedHandler: concurrent completion detected for step {StepId} — skipping",
+                @event.ExecutionStepId);
+            return;
+        }
 
         await dispatcher.PublishAsync(
             new ExecuteNextStepMessage(@event.ExecutionId, @event.OrganizationId), ct);
