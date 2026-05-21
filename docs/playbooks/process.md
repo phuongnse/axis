@@ -24,13 +24,13 @@ Complete in order when scaffolding a brand-new module:
 | Step | Action |
 |---|---|
 | 1 | Create three projects: `{Module}.Domain`, `{Module}.Application`, `{Module}.Infrastructure` under `src/Modules/{Module}/` (no per-module `.Api` project — all endpoints live in `src/Axis.Api/Endpoints/`) |
-| 2 | Add all three to `Axis.sln`; add Domain and Application test projects to `unit-tests.slnf` |
+| 2 | Add all three to `Axis.sln`; add all test projects to `Axis.sln` |
 | 3 | Wire project references: `Domain` ← `Application` ← `Infrastructure`; `Axis.Api` references `Infrastructure` (and transitively `Application`) |
 | 4 | Add `GlobalUsings.cs` to each project; add common usings to `Directory.Build.props` if not already present |
 | 5 | Create `AxisDbContext` subclass in Infrastructure with `TenantSchemaInterceptor`; register in DI |
 | 6 | Create `IEndpointRouteBuilder` extension class in `src/Axis.Api/Endpoints/{Module}Endpoints.cs`; wire it in `Axis.Api/Program.cs` |
 | 7 | Create test projects: `{Module}.Domain.Tests` (unit), `{Module}.Application.Tests` (unit), `{Module}.Infrastructure.Tests` (integration with Testcontainers) |
-| 8 | Add test projects to `Axis.sln`; add unit test projects to `unit-tests.slnf` |
+| 8 | Add test projects to `Axis.sln`; add all test projects to `Axis.sln` |
 | 9 | Run `dotnet build` — zero errors before writing any domain code |
 
 ### Per-US workflow
@@ -49,14 +49,14 @@ Repeat for every user story, in layer order: Domain → Application → Infrastr
 
 1. Write failing unit tests for aggregate behaviour, value object invariants, and domain events
 2. Implement: aggregate factory methods, domain methods, value objects, domain events, repository interface
-3. Run `dotnet test unit-tests.slnf` — must be **zero errors, zero warnings** before proceeding
+3. Run `dotnet build` then `dotnet test` — zero errors, zero warnings before proceeding
 4. No EF Core, no MediatR, no external dependencies — pure C# only
 
 #### Step 3 — Application layer (TDD)
 
 1. Write failing unit tests for the command/query handler (NSubstitute for repository)
 2. Implement: `ICommand` / `IQuery`, handler, `AbstractValidator<T>`, `*Response` / `*Dto` record
-3. Run `dotnet test unit-tests.slnf` — must be **zero errors, zero warnings** before proceeding
+3. Run `dotnet build` then `dotnet test` — zero errors, zero warnings before proceeding
 4. Handlers return `Result` / `Result<T>` for business rule violations — never throw
 
 #### Step 4 — Infrastructure layer (Testcontainers)
@@ -65,7 +65,7 @@ Repeat for every user story, in layer order: Domain → Application → Infrastr
 2. Implement repository — `AsNoTracking()` on reads, tracked queries on writes
 3. Run `dotnet ef migrations add {PascalCaseName} --project ... --startup-project ...`
 4. Verify migration is idempotent; run integration tests against Testcontainers PostgreSQL
-5. Run `dotnet test unit-tests.slnf` — still green
+5. Run `dotnet build` then `dotnet test` — still green
 
 #### Step 4.5 — Gap sweep (mandatory before API layer)
 
@@ -103,7 +103,7 @@ For every match: confirm the SQL only references tables owned by that match's ow
 2. Every endpoint calls `.RequireAuthorization()` unless explicitly public
 3. Mapping: `mediator.Send(...)` → `Result` → `result.ToProblemDetails()` — no logic in endpoint
 4. Add / update integration tests under `tests/Api/Axis.Api.Tests/`
-5. Run `dotnet test unit-tests.slnf` — must be **zero errors, zero warnings**
+5. Run `dotnet build` then `dotnet test` — zero errors, zero warnings
 
 #### Step 6 — Update docs (same PR)
 
@@ -152,3 +152,4 @@ Repeat for every screen / feature area. **Never skip the wireframe step** — it
 - If the full Frontend layer is done for the module: update `docs/PROGRESS.md`
 - If a new frontend pattern was established: add to `docs/playbooks/patterns.md`
 - If a library was added or changed: update `docs/TECH_STACK.md`
+- Run `./scripts/check-doc-drift.sh` before opening the PR

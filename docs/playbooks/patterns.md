@@ -513,8 +513,7 @@ _ = Task.Run(async () =>
 
 - Never run `dotnet test --no-build` after editing test code — always let it recompile.
 - **Never hardcode environment configurations**: connection strings, API URLs, Docker endpoints, secret keys must use environment variables, `appsettings.json`, or `.testcontainers.properties`.
-- **AI Agent Testing Scope**: run only unit tests locally via `dotnet test unit-tests.slnf`. Integration tests require Docker/Testcontainers and are verified by CI/CD on PR submission.
-- **`unit-tests.slnf`**: solution filter at repo root including only Domain + Application test projects. When adding a new unit test project, also add it to this file.
+- **Pre-commit / CI**: `dotnet build` then `dotnet test` on the full solution (`Axis.sln`). Includes Testcontainers integration and API tests — Docker required locally.
 
 **Test isolation pattern** — two levels of isolation to understand:
 

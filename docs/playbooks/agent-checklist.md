@@ -2,26 +2,23 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
 
-**Daily workflow.** Detail lives in playbooks; CI enforces the non-negotiable parts.
+**Daily workflow.** CI enforces build/test and doc drift; you paste gates in the PR as an audit trail.
 
 ---
 
-## Before coding (paste in PR)
+## Gate 0 — Ready (before code; paste in PR when shipping code)
+
+- AC map: every row has layer + file/test — **no blank cells**
+- Read: epic README → feature file → same-module code
+- Before API layer: `grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/epics/` — fix, defer with reason, or stop
 
 ```markdown
-## AC map
-| AC / US | Layer | File / endpoint / test |
-|---------|-------|----------------------|
-| …       | …     | …                    |
-
-## Docs touched
-- docs/epics/E0N-…/features/F0N-….md (callout)
-- Epic README / PROGRESS.md (if layer status changed)
+## Gate 0
+| AC / US | Layer | File / test |
+|---------|-------|-------------|
+| …       | …     | …           |
+Docs touched: docs/epics/…
 ```
-
-No row with a blank implementation cell → stop and ask.
-
-**Read:** epic README → feature file (US) → same-module code. Open playbooks only per table at bottom.
 
 ---
 
@@ -29,25 +26,46 @@ No row with a blank implementation cell → stop and ask.
 
 | Gate | Action |
 |------|--------|
-| **1** | `dotnet build` + `dotnet test unit-tests.slnf` if `src/`/`tests/` · `npm run ci` + `npm run test` if `frontend/` — **always paste Gate 1 in the PR** (use `not triggered` when that scope did not change) |
-| **2** | Update docs (table below) + paste Gate 2 block in PR |
-| **2b** | `./scripts/check-doc-drift.sh` — **CI fails if red** |
-| **3** | Paste Gate 3 block in PR |
+| **0** | AC map + docs touched (when `src/`, `tests/`, or `frontend/` change) |
+| **1** | Full .NET + frontend verification (table below) — **always paste** |
+| **2a** | `./scripts/check-doc-drift.sh` — **CI required** |
+| **2b** | Human doc walk-through (rows below) |
+| **3** | Retrospective (seven questions) |
 
-### Gate 1 — paste in every PR
+### Gate 1 — paste in every PR (local = CI)
+
+| Changed | Commands (all must pass when triggered) |
+|---------|----------------------------------------|
+| `src/` or `tests/` | `dotnet build` then `dotnet test` (full `Axis.sln` — includes Infrastructure, API, Testcontainers) |
+| `src/` or `tests/` | `dotnet format --verify-no-changes` |
+| `src/`, `tests/`, or `frontend/src/` | `grep -rn "TODO\|FIXME\|NotImplementedException\|placeholder\|stub" src/ tests/ frontend/src/` → empty |
+| `frontend/` | `npm run ci` then `npm run test` |
+| `src/Axis.Api/Endpoints/` or API contract | Update + run `tests/Api/Axis.Api.Tests/` |
 
 ```
 Gate 1:
-- dotnet build + dotnet test unit-tests.slnf → ran / not triggered (reason)
-- npm run ci + npm run test → ran / not triggered (reason)
+- dotnet build → ran / not triggered
+- dotnet test (full solution) → ran / not triggered
+- dotnet format --verify-no-changes → ran / not triggered
+- stub/TODO grep → ran / not triggered
+- npm run ci + npm run test → ran / not triggered
 ```
 
-Example (docs-only): `not triggered — no src/, tests/, or frontend/ changes`.
+Example (docs-only): every line `not triggered — no src/, tests/, or frontend/ changes`.
 
-### Gate 2 — full row list (work through every line)
+**Docker:** integration and API tests run as part of `dotnet test`; Docker must be available locally (same as CI agents with Testcontainers).
+
+### Gate 2a — automated
 
 ```
-Gate 2:
+Gate 2a:
+- ./scripts/check-doc-drift.sh → ran (green) / not triggered
+```
+
+### Gate 2b — full row list (work through every line)
+
+```
+Gate 2b:
 - Library → TECH_STACK.md / not triggered
 - New pattern → patterns.md / not triggered
 - US layer callout → docs/epics/…/features/… / not triggered
@@ -67,6 +85,7 @@ Gate 2:
 ```
 Gate 3: 1–7 No — or: N → updated <file>
 ```
+
 Questions: (1) test uncovered rule? (2) invented invariant? (3) infra footgun? (4) test setup quirk? (5) direction change? (6) spec gap? (7) incident-only doc text? → fix docs before merge.
 
 ---
@@ -85,12 +104,11 @@ Never ✅ and "pending …" in the same callout. Checkboxes in feature files are
 
 | Level | When | What to write |
 |-------|------|----------------|
-| **1 — US** | Any layer progress on a user story | `> **Implementation status**` in `docs/epics/…/features/F0N-….md` (per layer: ✅ / ⚠️ / ⏳; Gaps / Decisions lines when needed) |
-| **2 — Epic** | A layer is complete for the module (all USes in that layer) | Epic `README.md` implementation table (`API`, `Application`, etc.) |
-| **3 — Platform** | Module-wide layer summary changed | `docs/PROGRESS.md` — one short paragraph per module; **no** endpoint lists, class names, or per-PR detail |
+| **1 — US** | Any layer progress on a user story | `> **Implementation status**` in `docs/epics/…/features/F0N-….md` |
+| **2 — Epic** | A layer is complete for the module | Epic `README.md` implementation table |
+| **3 — Platform** | Module-wide summary changed | `docs/PROGRESS.md` — layer status only |
 
-Updating only `PROGRESS.md` while changing `src/` without any `docs/epics/` file → `check-doc-drift.sh` fails. Epic README `| API | ⏳` after shipping endpoints → drift fails.
-
+Updating only `PROGRESS.md` while changing `src/` without `docs/epics/` → drift fails. Epic README `| API | ⏳` after endpoints ship → drift fails.
 
 ---
 
@@ -98,10 +116,11 @@ Updating only `PROGRESS.md` while changing `src/` without any `docs/epics/` file
 
 - Spec → code, never the reverse
 - No cross-module SQL / shared `DbContext` / `IMediator` for domain events
-- New `*Handler.cs` → `*HandlerTests.cs` exists (`check-doc-drift.sh`)
-- Module code change → `docs/epics/{module}/` changes in **same PR** (not PROGRESS alone)
+- New `*Handler.cs` → `*HandlerTests.cs` (drift script)
+- Module code → `docs/epics/{module}/` in **same PR**
 - Frontend screen → wireframe + `> **Wireframe**` in feature file
 - No `.Skip()`, weakened tests, or ✅ when ACs are open
+- **Full solution only:** always `dotnet build` + `dotnet test` on `Axis.sln` (no solution filter)
 
 ---
 
@@ -110,10 +129,10 @@ Updating only `PROGRESS.md` while changing `src/` without any `docs/epics/` file
 | Code touch | Docs folder |
 |------------|-------------|
 | `Endpoints/Execution*`, WorkflowEngine module | `docs/epics/E06-workflow-engine/` |
-| `Endpoints/Form*`, FormBuilder, FormSubmission | `docs/epics/E05-form-builder/` |
-| WorkflowBuilder endpoints/module | `docs/epics/E04-workflow-builder/` |
-| DataModeling | `docs/epics/E03-data-modeling/` |
-| Identity, `Connect*`, `Auth*`, auth UI | `docs/epics/E02-identity-access/` |
+| `Endpoints/Form*`, FormBuilder | `docs/epics/E05-form-builder/` |
+| `Endpoints/Workflow*`, WorkflowBuilder | `docs/epics/E04-workflow-builder/` |
+| `Endpoints/Model*`, DataModeling | `docs/epics/E03-data-modeling/` |
+| Identity, `Connect*`, auth UI | `docs/epics/E02-identity-access/` |
 | `TenantSchema*`, org registration | `docs/epics/E01-platform-foundation/` |
 
 ---
