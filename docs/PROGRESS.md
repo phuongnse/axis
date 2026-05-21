@@ -12,9 +12,11 @@ Domain, Application, and Infrastructure layers complete.
 
 ## Identity — E02-identity-access
 
-**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳**
+**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⚠️**
 
 Full auth, user, role, invitation, and session management. OpenIddict 5.x OIDC server (Authorization Code + PKCE for SPA; Client Credentials for M2M). RBAC via custom permission policies. All Identity API endpoints covered by integration tests.
+
+**Frontend:** PKCE sign-in (`/login`, `/callback`), route guard (`/_authenticated`), app shell, global 401 redirect — Phase 1 complete. Module screens ⏳.
 
 ## DataModeling — E03-data-modeling
 
@@ -32,13 +34,13 @@ Workflow definitions with steps, transitions, triggers, cycle detection, publish
 
 **Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳**
 
-Form definitions with typed fields (9 field types, polymorphic config). Cross-module isolation via Wolverine event-driven local denormalization — no direct cross-module SQL. All endpoints covered by integration tests.
+Form definitions with typed fields (9 field types, polymorphic config). Form submission tasks (`FormSubmission` aggregate, token-based public submit, My Tasks queries). Cross-module isolation via Wolverine event-driven local denormalization — no direct cross-module SQL. `FormStepReached` handler creates tasks when workflow hits Form steps.
 
 ## WorkflowEngine — E06-workflow-engine
 
-**Domain ✅ | Application ✅ | Infrastructure ⚠️ | API ⏳ | Frontend ⏳**
+**Domain ✅ | Application ✅ | Infrastructure ⚠️ | API ✅ | Frontend ⏳**
 
-Execution lifecycle (start, cancel, retry, retry-with-context). Step state machine with per-step execution handlers (Form, HTTP, Condition, Script, Notification). `WorkflowSnapshot` local read model populated from `WorkflowPublished` events. Paged execution history and retry history queries. Cross-module isolation via local read models — WorkflowEngine never queries WorkflowBuilder or FormBuilder DBs. Infrastructure ⚠️: `IScriptExecutor` and `INotificationSender` are stubs (real dispatch deferred).
+Execution lifecycle (start, cancel, retry, retry-with-context). Step state machine with per-step execution handlers (Form, HTTP, Condition, Script, Notification). `WorkflowSnapshot` local read model populated from `WorkflowPublished` events. Paged execution history and retry history queries. REST API: `/api/executions`, `/api/workflows/{id}/executions`. Infrastructure ⚠️: `IScriptExecutor` and `INotificationSender` are stubs (real dispatch deferred).
 
 ## PageBuilder — E07-page-builder
 
@@ -48,6 +50,10 @@ Execution lifecycle (start, cancel, retry, retry-with-context). Step state machi
 
 ## Frontend Foundation
 
-**Status: ✅ Tooling complete — feature implementation ⏳**
+**Status: ⚠️ Phase 1 complete — feature screens ⏳**
 
-React 18 + TypeScript + Vite. TanStack Router, TanStack Query, Zustand, shadcn/ui, Tailwind. Biome (lint + format). `npm run ci` gate enforced. All module feature UIs remain ⏳.
+React 18 + TypeScript + Vite. TanStack Router, TanStack Query, Zustand, shadcn/ui, Tailwind. Biome (lint + format). `npm run ci` gate enforced. Auth flow (PKCE + `/login` + `/callback`), authenticated layout with sidebar, Vite dev proxy to API.
+
+## Platform Foundation — E01
+
+**Tenant provisioning (US-003):** `ITenantSchemaProvisioner` runs on email verification — creates `tenant_{org_id}` schema and migrates DataModeling (EnsureCreated), WorkflowBuilder, FormBuilder, and WorkflowEngine databases. Retry/alert UI deferred.

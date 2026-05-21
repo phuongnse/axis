@@ -3,6 +3,7 @@ using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.ValueObjects;
+using Axis.Shared.Application.Tenancy;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
@@ -14,10 +15,11 @@ public class VerifyEmailHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly ITenantSchemaProvisioner _tenantProvisioner = Substitute.For<ITenantSchemaProvisioner>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
 
-    private VerifyEmailHandler CreateHandler() => new(_userRepo, _uow);
+    private VerifyEmailHandler CreateHandler() => new(_userRepo, _uow, _tenantProvisioner);
 
     private static User MakeUnverifiedUser()
     {

@@ -18,6 +18,7 @@ public static class FormBuilderInfrastructureExtensions
                 ?? throw new InvalidOperationException("Missing connection string 'FormBuilder'.")));
 
         services.AddScoped<IFormRepository, FormRepository>();
+        services.AddScoped<IFormSubmissionRepository, FormSubmissionRepository>();
         services.AddScoped<IUnitOfWork, FormBuilderUnitOfWork>();
 
         return services;

@@ -14,11 +14,13 @@ internal sealed class FormBuilderDbContext(
 {
     public DbSet<FormDefinition> FormDefinitions => Set<FormDefinition>();
     public DbSet<FormWorkflowReference> FormWorkflowReferences => Set<FormWorkflowReference>();
+    public DbSet<FormSubmission> FormSubmissions => Set<FormSubmission>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfiguration(new FormDefinitionConfiguration());
         modelBuilder.ApplyConfiguration(new FormWorkflowReferenceConfiguration());
+        modelBuilder.ApplyConfiguration(new FormSubmissionConfiguration());
     }
 }

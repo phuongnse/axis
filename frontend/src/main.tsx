@@ -21,6 +21,7 @@ const router = createRouter({
   context: {
     queryClient,
   },
+  defaultNotFoundComponent: () => <p className="p-8">Page not found</p>,
   defaultPreload: 'intent',
   // Ensure loader is always called when route is preloaded or visited
   defaultPreloadStaleTime: 0,

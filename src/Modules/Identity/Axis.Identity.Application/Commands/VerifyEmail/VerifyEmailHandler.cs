@@ -2,11 +2,15 @@ using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Shared.Application.CQRS;
+using Axis.Shared.Application.Tenancy;
 using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Identity.Application.Commands.VerifyEmail;
 
-public sealed class VerifyEmailHandler(IUserRepository userRepo, IUnitOfWork uow)
+public sealed class VerifyEmailHandler(
+    IUserRepository userRepo,
+    IUnitOfWork uow,
+    ITenantSchemaProvisioner tenantProvisioner)
     : ICommandHandler<VerifyEmailCommand>
 {
     public async Task<Result> Handle(VerifyEmailCommand command, CancellationToken cancellationToken)
@@ -23,6 +27,8 @@ public sealed class VerifyEmailHandler(IUserRepository userRepo, IUnitOfWork uow
 
         user.VerifyEmail();
         await uow.SaveChangesAsync(cancellationToken);
+
+        await tenantProvisioner.ProvisionAsync(user.OrganizationId, cancellationToken);
 
         return Result.Success();
     }

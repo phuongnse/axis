@@ -119,6 +119,9 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.RemoveAll<ITenantContext>();
                 services.AddScoped<ITenantContext>(_ => new PublicSchemaTenantContext());
 
+                services.RemoveAll<ITenantSchemaProvisioner>();
+                services.AddScoped<ITenantSchemaProvisioner, NoOpTenantSchemaProvisioner>();
+
                 // WebApplicationFactory uses HTTP, not HTTPS. Disable OpenIddict's transport
                 // security check so the authorization endpoint is reachable in tests.
                 services.PostConfigure<OpenIddictServerAspNetCoreOptions>(opts =>
