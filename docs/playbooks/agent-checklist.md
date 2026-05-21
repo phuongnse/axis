@@ -71,6 +71,17 @@ Questions: (1) test uncovered rule? (2) invented invariant? (3) infra footgun? (
 
 Never ✅ and "pending …" in the same callout. Checkboxes in feature files are spec-only — **do not** tick them.
 
+### Status updates (three levels — same PR)
+
+| Level | When | What to write |
+|-------|------|----------------|
+| **1 — US** | Any layer progress on a user story | `> **Implementation status**` in `docs/epics/…/features/F0N-….md` (per layer: ✅ / ⚠️ / ⏳; Gaps / Decisions lines when needed) |
+| **2 — Epic** | A layer is complete for the module (all USes in that layer) | Epic `README.md` implementation table (`API`, `Application`, etc.) |
+| **3 — Platform** | Module-wide layer summary changed | `docs/PROGRESS.md` — one short paragraph per module; **no** endpoint lists, class names, or per-PR detail |
+
+Updating only `PROGRESS.md` while changing `src/` without any `docs/epics/` file → `check-doc-drift.sh` fails. Epic README `| API | ⏳` after shipping endpoints → drift fails.
+
+
 ---
 
 ## P0 (CI + culture)
@@ -102,6 +113,7 @@ Never ✅ and "pending …" in the same callout. Checkboxes in feature files are
 | Need | File |
 |------|------|
 | Layer order, TDD, gap sweep | [process.md](./process.md) |
+| Find the right patterns section | [patterns-index.md](./patterns-index.md) |
 | EF, API, Wolverine, tenancy | [patterns.md](./patterns.md) |
 | React, Query, a11y | [frontend.md](./frontend.md) |
 | Tests, Testcontainers | [testing.md](./testing.md) |

@@ -201,7 +201,9 @@ Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` chan
 | Doc | Use |
 |-----|-----|
 | [agent-checklist.md](docs/playbooks/agent-checklist.md) | **Agents — daily** |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Branches, PRs, drift script |
 | [process.md](docs/playbooks/process.md) | Layer workflow |
+| [patterns-index.md](docs/playbooks/patterns-index.md) | Jump table into patterns |
 | [patterns.md](docs/playbooks/patterns.md) | Implementation detail |
 | [testing.md](docs/playbooks/testing.md) | Test patterns |
 | [frontend.md](docs/playbooks/frontend.md) | SPA rules |

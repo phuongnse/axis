@@ -2,8 +2,6 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
 
-> **Agents:** [agent-checklist.md](./agent-checklist.md) first. Before a PR: `./scripts/check-doc-drift.sh` from repo root.
-
 > Step-by-step checklists for backend and frontend. Read this at the start of any new module or user story — before writing any code.
 
 ## Contents
@@ -109,8 +107,6 @@ For every match: confirm the SQL only references tables owned by that match's ow
 
 #### Step 6 — Update docs (same PR)
 
-- Run `./scripts/check-doc-drift.sh` (CI **Doc drift** job)
-- Paste Gate 2 and Gate 3 into the PR (`.github/PULL_REQUEST_TEMPLATE.md`)
 - Update feature file `> **Implementation status**` callout for this US
 - If all USes in the feature are complete for a layer: update Epic README status table
 - If the full layer is done for the module: update `docs/PROGRESS.md`
@@ -127,7 +123,7 @@ Complete in order before building any feature screen. Do not skip or reorder.
 
 | Step | What | Done when |
 |---|---|---|
-| 1 | **Auth flow** — React `/login` page collects email + password, POSTs to `/connect/token`; backend (OpenIddict) validates and sets `httpOnly` cookie; SPA navigates to dashboard on success | Login form renders, successful POST redirects to dashboard |
+| 1 | **Auth flow** — React `/login` collects email + password; SPA runs **Authorization Code + PKCE** (`GET /connect/authorize` → `POST /connect/login` for credentials → `POST /connect/token` for access + refresh tokens). Access token in memory; refresh token in `httpOnly` cookie; navigate to dashboard on success | Login form works; protected routes unreachable without a valid session |
 | 2 | **Route guard** — `_authenticated` layout route with `beforeLoad`; redirects to `/login` when session is absent | Unauthenticated navigation to any protected route → redirected |
 | 3 | **Global 401 handling** — `fetchApi` 401 branch navigates to `/login` and calls `queryClient.clear()` | Any expired-session API call redirects without per-feature handling |
 | 4 | **App shell** — root authenticated layout with sidebar + header; all protected routes render as `<Outlet />` inside it | Every protected page inherits sidebar + header automatically |

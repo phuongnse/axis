@@ -47,10 +47,20 @@ check_epic_docs() {
 
 check_epic_docs 'src/Axis\.Api/Endpoints/Execution' 'docs/epics/E06-workflow-engine' 'E06 WorkflowEngine API'
 check_epic_docs 'src/Modules/WorkflowEngine/' 'docs/epics/E06-workflow-engine' 'E06 WorkflowEngine module'
-check_epic_docs 'src/Axis\.Api/Endpoints/FormTask' 'docs/epics/E05-form-builder' 'E05 FormTask API'
-check_epic_docs 'src/Modules/FormBuilder/.*FormSubmission|SubmitForm|GetFormTask|GetMyFormTasks' 'docs/epics/E05-form-builder' 'E05 form submission'
+check_epic_docs 'src/Axis\.Api/Endpoints/Model' 'docs/epics/E03-data-modeling' 'E03 DataModeling API'
+check_epic_docs 'src/Modules/DataModeling/' 'docs/epics/E03-data-modeling' 'E03 DataModeling module'
+check_epic_docs 'src/Axis\.Api/Endpoints/Workflow' 'docs/epics/E04-workflow-builder' 'E04 WorkflowBuilder API'
+check_epic_docs 'src/Modules/WorkflowBuilder/' 'docs/epics/E04-workflow-builder' 'E04 WorkflowBuilder module'
+check_epic_docs 'src/Axis\.Api/Endpoints/Form' 'docs/epics/E05-form-builder' 'E05 FormBuilder API'
+check_epic_docs 'src/Modules/FormBuilder/' 'docs/epics/E05-form-builder' 'E05 FormBuilder module'
 check_epic_docs 'src/Axis\.Api/Infrastructure/TenantSchema' 'docs/epics/E01-platform-foundation' 'E01 tenant provisioning'
-check_epic_docs 'frontend/src/(features/auth|routes/login|components/layout/AppShell)' 'docs/epics/E02-identity-access' 'E02 auth frontend'
+check_epic_docs 'frontend/src/(features/auth|routes/|components/layout/AppShell)' 'docs/epics/E02-identity-access' 'E02 auth frontend'
+
+if any_changed '^frontend/src/'; then
+  if ! docs_changed_under 'docs/epics/'; then
+    fail "frontend/src/ changed but no files under docs/epics/ in this PR"
+  fi
+fi
 
 if any_changed '^src/' && docs_changed_under 'docs/PROGRESS.md'; then
   if ! echo "${CHANGED}" | grep -q '^docs/epics/'; then
@@ -86,7 +96,9 @@ check_readme_api() {
 }
 
 check_readme_api 'src/Axis\.Api/Endpoints/Execution' 'docs/epics/E06-workflow-engine'
-check_readme_api 'src/Axis\.Api/Endpoints/FormTask' 'docs/epics/E05-form-builder'
+check_readme_api 'src/Axis\.Api/Endpoints/Form' 'docs/epics/E05-form-builder'
+check_readme_api 'src/Axis\.Api/Endpoints/Model' 'docs/epics/E03-data-modeling'
+check_readme_api 'src/Axis\.Api/Endpoints/Workflow' 'docs/epics/E04-workflow-builder'
 
 if [ "${ERR}" -ne 0 ]; then
   echo "" >&2
