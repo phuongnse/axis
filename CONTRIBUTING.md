@@ -31,7 +31,7 @@ Thank you for contributing. This repo uses docs-first development: feature specs
 | Build & tests (backend) | `dotnet build` then `dotnet test unit-tests.slnf` when `src/` or `tests/` changed |
 | Build & tests (frontend) | `npm run ci` then `npm run test` when `frontend/` changed |
 | Doc drift (CI) | `./scripts/check-doc-drift.sh` |
-| Agent gates | Paste Gate 2 and Gate 3 blocks from [agent-checklist.md](docs/playbooks/agent-checklist.md) |
+| Agent gates | Paste **Gate 1, 2, and 3** blocks from [agent-checklist.md](docs/playbooks/agent-checklist.md) (Gate 1: `not triggered` when docs-only) |
 
 ### Documentation in the same PR
 
@@ -49,8 +49,9 @@ Thank you for contributing. This repo uses docs-first development: feature specs
 Use the checklist in [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md). Include:
 
 - AC map and docs touched
-- Gate 2 walk-through (which rows fired)
-- Gate 3 retrospective (yes/no per question)
+- **Gate 1** — build/tests run or `not triggered` with reason
+- **Gate 2** — walk-through (which rows fired)
+- **Gate 3** — retrospective (yes/no per question)
 
 ---
 

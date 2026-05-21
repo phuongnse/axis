@@ -10,6 +10,16 @@
 |---------|-------|------------------|
 | | | |
 
+## Gate 1 — Build & tests (required)
+
+Always paste this block. Use `not triggered` when that scope did not change (e.g. docs-only PR).
+
+```
+Gate 1:
+- dotnet build + dotnet test unit-tests.slnf →
+- npm run ci + npm run test →
+```
+
 ## Gate 2 — Docs (required)
 
 ```

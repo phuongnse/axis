@@ -29,10 +29,20 @@ No row with a blank implementation cell → stop and ask.
 
 | Gate | Action |
 |------|--------|
-| **1** | `dotnet build` + `dotnet test unit-tests.slnf` if `src/`/`tests/` · `npm run ci` + `npm run test` if `frontend/` |
+| **1** | `dotnet build` + `dotnet test unit-tests.slnf` if `src/`/`tests/` · `npm run ci` + `npm run test` if `frontend/` — **always paste Gate 1 in the PR** (use `not triggered` when that scope did not change) |
 | **2** | Update docs (table below) + paste Gate 2 block in PR |
 | **2b** | `./scripts/check-doc-drift.sh` — **CI fails if red** |
 | **3** | Paste Gate 3 block in PR |
+
+### Gate 1 — paste in every PR
+
+```
+Gate 1:
+- dotnet build + dotnet test unit-tests.slnf → ran / not triggered (reason)
+- npm run ci + npm run test → ran / not triggered (reason)
+```
+
+Example (docs-only): `not triggered — no src/, tests/, or frontend/ changes`.
 
 ### Gate 2 — full row list (work through every line)
 
