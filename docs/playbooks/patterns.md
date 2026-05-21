@@ -972,34 +972,61 @@ Use specifications for predicates that appear in more than one repository method
 
 ### Pipeline Behavior — cross-cutting concerns via MediatR
 
-Add cross-cutting concerns (logging, performance tracking, authorization checks) as MediatR pipeline behaviors — never inline in handlers.
+Add cross-cutting concerns (logging, validation, authorization checks) as MediatR pipeline behaviors — never inline in handlers.
+
+**Registered behaviors (order matters — outermost first):**
+
+| Order | Behavior | Purpose |
+|---|---|---|
+| 1 (outermost) | `LoggingBehavior<,>` | Debug entry/exit, Warning on Result.Failure, Error on unhandled exception |
+| 2 | `ValidationBehavior<,>` | FluentValidation — throws `ValidationException` on failure |
+
+Registration in `Program.cs`:
+```csharp
+builder.Services.AddMediatR(cfg =>
+{
+    cfg.RegisterServicesFromAssemblies(...);
+    cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));      // outermost — wraps validation + handler
+    cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));   // inner — throws on invalid input
+});
+```
+
+`LoggingBehavior` behavior (in `Axis.Shared.Application/Behaviors/`):
+
+| Scenario | Level | Content |
+|---|---|---|
+| Request starts | `Debug` | "Handling {RequestType}" |
+| Handler returns `Result.Success` | `Debug` | "Handled X in Yms" |
+| Handler returns `Result.Failure` | `Warning` | "failed: [error_code] message" |
+| `ValidationException` from inner behavior | `Warning` | "validation failed: ..." + rethrow |
+| Unhandled exception | `Error` | exception detail + rethrow |
+
+`LoggingBehavior` can observe `Result.Failure` outcomes because MediatR handlers return `Result<T>` — the behavior sees the return value. This is why per-handler milestone logs are rarely needed in command/query handlers (the Result outcome tells the story). Contrast with Wolverine handlers which return `void` — the middleware cannot observe the outcome, so per-handler business logs are mandatory (see Wolverine handler logging rule below).
 
 ```csharp
-// ❌ wrong — cross-cutting concern polluting every handler
+// ❌ wrong — cross-cutting log duplicated in every handler
 public async Task<Result> Handle(CreateWorkflowCommand cmd, CancellationToken ct)
 {
-    Stopwatch sw = Stopwatch.StartNew();
-    _logger.LogInformation("Handling {Command}", nameof(CreateWorkflowCommand));
-    // ... actual logic ...
-    _logger.LogInformation("Completed in {Ms}ms", sw.ElapsedMilliseconds);
+    _logger.LogInformation("Handling CreateWorkflowCommand");
+    // ... logic ...
+    _logger.LogInformation("Done");
+    return Result.Success();
 }
 
-// ✅ correct — one behavior, registered once, applies to all handlers
-public class PerformanceBehavior<TRequest, TResponse>(ILogger<PerformanceBehavior<TRequest, TResponse>> logger)
-    : IPipelineBehavior<TRequest, TResponse>
+// ✅ correct — LoggingBehavior handles it once for all handlers
+public async Task<Result> Handle(CreateWorkflowCommand cmd, CancellationToken ct)
 {
-    public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken ct)
-    {
-        Stopwatch sw = Stopwatch.StartNew();
-        TResponse response = await next();
-        if (sw.ElapsedMilliseconds > 500)
-            logger.LogWarning("Slow handler {Request} took {Ms}ms", typeof(TRequest).Name, sw.ElapsedMilliseconds);
-        return response;
-    }
+    // no entry/exit logs needed — LoggingBehavior provides them
+    WorkflowDefinition? workflow = await _repo.GetByIdAsync(cmd.WorkflowId, cmd.OrgId, ct);
+    if (workflow is null)
+        return Result.Failure(ErrorCodes.NotFound, "Workflow not found.");
+    // LoggingBehavior will log Warning with "not_found" error code automatically
+    // ...
+    return Result.Success();
 }
 ```
 
-Existing behaviors in the pipeline: `ValidationBehavior`. New cross-cutting concerns follow the same pattern.
+New cross-cutting concerns follow the same `IPipelineBehavior<TRequest, TResponse>` pattern. Per-handler `Warning`/`Information` logs are only needed when the context is richer than what the Result code conveys (e.g., which specific field caused a conflict, which tenant was involved).
 
 ---
 
