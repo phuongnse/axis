@@ -40,7 +40,7 @@ When a workflow execution fails at a step, users can manually retry from the fai
 - Automatic retry (without user action) — not in MVP.
 
 > **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: Retry button UI, skip-completed-steps engine logic, and archived-definition warning pending API + Frontend.
+> Gaps vs spec: `POST /api/executions/{id}/retry` and retry-with-context ✅. Retry UI and archived-definition warning pending Frontend.
 > Decisions: `CreateRetry()` produces a new `WorkflowExecution` with `RetryOfExecutionId` set; context is copied from original at time of retry.
 
 ---

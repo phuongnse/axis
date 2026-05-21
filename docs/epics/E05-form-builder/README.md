@@ -78,10 +78,10 @@ Workflow reaches Form step
 
 | Layer | Status | Notes |
 |---|---|---|
-| Domain | ⚠️ Partial | `FormDefinition`, `FormField` aggregates; all field types and domain events. Missing: `FormSubmission` aggregate (required for F04 form task lifecycle — submission, expiry, deduplication) |
-| Application | ✅ Done | `CreateFormCommand`, `DeleteFormCommand`, `UpdateFormCommand`, `GetFormsQuery`, `GetFormByIdQuery`, `AddFieldToFormCommand`, `RemoveFieldFromFormCommand`, `ReorderFormFieldsCommand`. Decision: `GetFormsHandler` uses in-memory pagination (accepted MVP trade-off; `Page`/`PageSize` clamped to valid range). |
-| Infrastructure | ✅ Done | FormBuilderDbContext, EF Core config (FormDefinition with fields as JSONB via FormFieldConverter), FormRepository (including cross-module IsReferencedByWorkflowAsync JSONB query), 8 integration tests (Testcontainers) |
-| API | ⏳ Pending | — |
+| Domain | ✅ Done | `FormDefinition`, `FormField`, `FormSubmission` aggregates; field types and form-task domain events |
+| Application | ⚠️ Partial | Form CRUD + field commands/queries ✅. F04: `SubmitFormByToken`, `GetFormTaskByToken`, `GetMyFormTasks` ✅. Gaps: field validation on submit, expiry Wolverine job, role assignee resolution |
+| Infrastructure | ✅ Done | FormBuilderDbContext, `FormSubmission` mapping + migration, `FormSubmissionRepository`, `FormStepReachedHandler`, integration tests (Testcontainers) |
+| API | ⚠️ Partial | `FormEndpoints` (CRUD) + `FormTaskEndpoints` (public token submit/get, authenticated mine). Gaps: full OpenAPI coverage for new routes, standalone form page |
 | Frontend | ⏳ Pending | — |
 
 ---

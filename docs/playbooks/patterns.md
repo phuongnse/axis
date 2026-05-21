@@ -472,6 +472,17 @@ await _context.WorkflowDefinitions
 
 **Rule:** Avoid raw SQL in tenant-aware contexts. When raw SQL is unavoidable (e.g. performance-critical bulk ops, cross-module reads), always prefix the table with the tenant schema from `ITenantContext.Schema` and add soft-delete filter manually. Document why raw SQL was needed with a comment.
 
+### Tenant schema provisioning (US-003)
+
+After email verification, the host provisions one PostgreSQL schema per organization and migrates every **tenant-scoped** module database into it. Identity stays on `public`.
+
+- **Interface**: `ITenantSchemaProvisioner` in `Axis.Shared.Application` — implement in the **API host** when the provisioner must touch multiple module `DbContext` types.
+- **Schema name**: `tenant_{organizationId:N}` (no slug — org slug can change).
+- **Idempotency**: `CREATE SCHEMA IF NOT EXISTS` plus `Database.MigrateAsync()` per context; safe to call twice for the same org.
+- **Tenant context during migrate**: use `FixedTenantContext` (or equivalent) so `TenantSchemaInterceptor` targets the new schema for each `MigrateAsync` call.
+- **Tests**: register `NoOpTenantSchemaProvisioner` in `WebApplicationFactory` fixtures — never run real provisioning in API integration tests.
+- **Trigger**: call from `VerifyEmailHandler` (or equivalent) **after** the user is verified, not at registration time (no tenant context at sign-up).
+
 ---
 
 ## Async fire-and-forget pitfalls

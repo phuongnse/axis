@@ -110,6 +110,10 @@ Self-service registration flow where a new organization signs up and is automati
 *Out of scope*
 - Custom schema naming chosen by the user — schema names are auto-generated.
 
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ⚠️ | API: ⚠️ | Frontend: ⏳
+> Gaps vs spec: `ITenantSchemaProvisioner` invoked from `VerifyEmailHandler` after verify (idempotent schema `tenant_{orgId}` + EF migrate for DataModeling, WorkflowBuilder, FormBuilder, WorkflowEngine). Retry job with backoff, platform alert, and "Setting up workspace…" UI not implemented. Admin role assignment on verify not wired in this path.
+> Decisions: Provisioner lives in `Axis.Api` host (needs all module `DbContext` types); tests use `NoOpTenantSchemaProvisioner`.
+
 ---
 
 ### US-004 — Select a subscription plan during registration

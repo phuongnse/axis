@@ -45,8 +45,8 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 - SSO / social login (Google, GitHub) — not in MVP.
 - 2FA / MFA — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: BroadcastChannel coordination for multi-tab refresh is Frontend-only. Sign-in is an OIDC Authorization Code + PKCE flow, not a simple POST `/api/auth/signin` — the SPA must initiate `/connect/authorize` with PKCE; the `/connect/login` endpoint handles credentials.
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⚠️
+> Gaps vs spec: Phase 1 login page (PKCE + `/connect/login`) ✅. Wireframe links (forgot/sign up) are placeholders until routes exist. BroadcastChannel, account lockout UI, unverified/deactivated messaging pending.
 > Decisions: OpenIddict 5.x serves as the in-process OAuth2/OIDC server. `AuthenticateUserCommand` validates credentials; `/connect/login` sets a 5-min httpOnly session cookie; `/connect/authorize` issues the authorization code; `/connect/token` exchanges it for access + refresh tokens. Refresh token stored as an opaque reference in DB (OpenIddict `OpenIddictTokens` table) and delivered as an httpOnly `Secure SameSite=Strict` cookie at `/connect` path via `ApplyRefreshTokenCookieHandler`.
 
 ---

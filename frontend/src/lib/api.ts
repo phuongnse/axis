@@ -1,4 +1,5 @@
-import { useAuthStore } from '@/features/auth/auth-store';
+import { getAccessToken } from '@/features/auth/auth-store';
+import { queryClient } from '@/lib/query-client';
 
 export class ApiError extends Error {
   status: number;
@@ -12,31 +13,33 @@ export class ApiError extends Error {
   }
 }
 
-const BASE_URL = import.meta.env.VITE_API_URL || '';
+const BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 interface FetchApiOptions extends RequestInit {
   timeout?: number;
 }
 
 export async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {}): Promise<T> {
-  const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  const url = `${BASE_URL}${path}`;
+  const url = `${BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
-  const token = useAuthStore.getState().accessToken;
   const headers: Record<string, string> = {
     Accept: 'application/json',
     ...((options.headers as Record<string, string>) || {}),
   };
 
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  const accessToken = getAccessToken();
+  if (accessToken && !headers.Authorization) {
+    headers.Authorization = `Bearer ${accessToken}`;
   }
 
+  // Only set Content-Type to JSON if it's not FormData
   if (!(options.body instanceof FormData)) {
     if (!headers['Content-Type']) {
       headers['Content-Type'] = 'application/json';
     }
   } else {
+    // If body is FormData, ensure Content-Type is NOT set so the browser
+    // automatically sets it with the correct multipart boundary.
     delete headers['Content-Type'];
   }
 
@@ -63,7 +66,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {
       }
 
       if (response.status === 401) {
-        useAuthStore.getState().clearSession();
+        queryClient.clear();
         if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
           window.location.href = '/login';
         }
@@ -76,12 +79,13 @@ export async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {
       return null as T;
     }
 
+    // Handle 200/201 that might surprisingly have no body
     const text = await response.text();
     if (!text) {
       return null as T;
     }
 
-    return JSON.parse(text) as T;
+    return JSON.parse(text);
   } catch (error: unknown) {
     clearTimeout(id);
     if (error instanceof Error && error.name === 'AbortError') {

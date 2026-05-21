@@ -71,8 +71,8 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 - Saving a draft of the form and resuming later — not in MVP.
 - The assignee being able to add comments or annotations to the form submission — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: No `SubmitFormCommand` handler; standalone form page (no login required), pre-signed URL file upload, and multi-tab deduplication pending Frontend + API.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⚠️ | Frontend: ⏳
+> Gaps vs spec: `SubmitFormByToken` + public `GET/POST /api/form-tasks/{token}` ✅. Field-level validation, standalone form page, pre-signed file upload, multi-tab UX pending.
 
 ---
 
