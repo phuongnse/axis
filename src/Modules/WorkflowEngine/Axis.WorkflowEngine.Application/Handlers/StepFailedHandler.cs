@@ -46,9 +46,10 @@ public sealed class StepFailedHandler(
             return;
         }
 
+        // ErrorDetails may contain external system responses — not safe to log directly.
         logger.LogWarning(
-            "Step {StepId} of type {StepType} failed in execution {ExecutionId}: {ErrorDetails}",
-            message.StepId, step.StepType, message.ExecutionId, message.ErrorDetails);
+            "Step {StepId} of type {StepType} failed in execution {ExecutionId}",
+            message.StepId, step.StepType, message.ExecutionId);
 
         execution.FailStep(message.StepId, message.ErrorDetails);
         execution.Fail(message.ErrorDetails);

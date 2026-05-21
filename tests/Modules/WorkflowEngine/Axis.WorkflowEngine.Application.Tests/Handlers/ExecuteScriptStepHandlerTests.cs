@@ -69,7 +69,7 @@ public class ExecuteScriptStepHandlerTests
             CancellationToken.None);
 
         await _dispatcher.Received(1).PublishAsync(
-            Arg.Is<StepFailedMessage>(m => m.ErrorDetails.Contains("Script error")),
+            Arg.Is<StepFailedMessage>(m => m.ErrorDetails == nameof(InvalidOperationException)),
             Arg.Any<CancellationToken>());
     }
 

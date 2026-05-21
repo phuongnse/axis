@@ -62,13 +62,15 @@ public sealed class ExecuteHttpStepHandler(
         }
         catch (Exception ex)
         {
+            // Log the full exception for diagnostics; ex.Message is not repeated as a template
+            // parameter to avoid leaking sensitive payload data (URLs, tokens, response bodies).
             logger.LogError(ex,
-                "HTTP step {StepId} failed in execution {ExecutionId}: {ErrorType} — {ErrorMessage}",
-                message.StepId, message.ExecutionId, ex.GetType().Name, ex.Message);
+                "HTTP step {StepId} failed in execution {ExecutionId}",
+                message.StepId, message.ExecutionId);
 
             await dispatcher.PublishAsync(new StepFailedMessage(
                 message.ExecutionId, message.StepId, message.OrganizationId,
-                $"{ex.GetType().Name}: {ex.Message}"), ct);
+                ex.GetType().Name), ct);
         }
     }
 }

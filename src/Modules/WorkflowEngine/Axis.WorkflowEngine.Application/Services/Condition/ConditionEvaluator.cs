@@ -22,11 +22,17 @@ public static class ConditionEvaluator
         IReadOnlyList<IReadOnlyDictionary<string, object?>> branches,
         IReadOnlyDictionary<string, object?> context)
     {
+        // Default branch is a fallback — evaluate all non-default branches first.
+        string? defaultLabel = null;
         foreach (IReadOnlyDictionary<string, object?> branch in branches)
         {
-            if (branch.TryGetValue("isDefault", out object? isDefaultRaw)
-                && isDefaultRaw is JsonElement { ValueKind: JsonValueKind.True })
-                return GetLabel(branch);
+            branch.TryGetValue("isDefault", out object? isDefaultRaw);
+            bool isDefault = isDefaultRaw is JsonElement { ValueKind: JsonValueKind.True } || isDefaultRaw is true;
+            if (isDefault)
+            {
+                defaultLabel = GetLabel(branch);
+                continue;
+            }
 
             if (!branch.TryGetValue("expression", out object? exprRaw) || exprRaw is null)
                 continue;
@@ -38,7 +44,7 @@ public static class ConditionEvaluator
                 return GetLabel(branch);
         }
 
-        return null;
+        return defaultLabel;
     }
 
     // ─── Expression tree evaluation ──────────────────────────────────────────
@@ -98,10 +104,10 @@ public static class ConditionEvaluator
         {
             "==" or "eq"           => ValuesEqual(leftValue, rightValue),
             "!=" or "neq"          => !ValuesEqual(leftValue, rightValue),
-            "<"  or "lt"           => CompareNumbers(leftValue, rightValue) < 0,
-            ">"  or "gt"           => CompareNumbers(leftValue, rightValue) > 0,
-            "<=" or "lte"          => CompareNumbers(leftValue, rightValue) <= 0,
-            ">=" or "gte"          => CompareNumbers(leftValue, rightValue) >= 0,
+            "<"  or "lt"           => TryCompareNumbers(leftValue, rightValue, out int lt)  && lt < 0,
+            ">"  or "gt"           => TryCompareNumbers(leftValue, rightValue, out int gt)  && gt > 0,
+            "<=" or "lte"          => TryCompareNumbers(leftValue, rightValue, out int lte) && lte <= 0,
+            ">=" or "gte"          => TryCompareNumbers(leftValue, rightValue, out int gte) && gte >= 0,
             "contains"             => StringContains(leftValue, rightValue),
             "starts_with"          => StringStartsWith(leftValue, rightValue),
             "ends_with"            => StringEndsWith(leftValue, rightValue),
@@ -136,11 +142,14 @@ public static class ConditionEvaluator
         return string.Equals(l, r, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static int CompareNumbers(object? left, object? right)
+    private static bool TryCompareNumbers(object? left, object? right, out int result)
     {
         double l = CoerceDouble(left);
         double r = CoerceDouble(right);
-        return l.CompareTo(r);
+        // NaN means the value is missing or non-numeric — comparisons are indeterminate, not false-positive.
+        if (double.IsNaN(l) || double.IsNaN(r)) { result = 0; return false; }
+        result = l.CompareTo(r);
+        return true;
     }
 
     private static bool StringContains(object? left, object? right)
@@ -178,9 +187,10 @@ public static class ConditionEvaluator
 
     private static double CoerceDouble(object? value)
     {
-        if (value is null) return 0;
+        // Return NaN for null or non-numeric values so callers can distinguish "missing" from zero.
+        if (value is null) return double.NaN;
         if (value is JsonElement je && je.TryGetDouble(out double d)) return d;
-        return double.TryParse(Coerce(value), out double r) ? r : 0;
+        return double.TryParse(Coerce(value), out double r) ? r : double.NaN;
     }
 
     // ─── JSON helpers ────────────────────────────────────────────────────────

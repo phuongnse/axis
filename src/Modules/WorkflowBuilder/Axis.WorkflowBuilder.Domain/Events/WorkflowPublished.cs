@@ -11,17 +11,3 @@ public sealed record WorkflowPublished(
     IReadOnlyList<Guid> ReferencedFormIds,
     IReadOnlyList<StepSnapshot> Steps,
     IReadOnlyList<TransitionSnapshot> Transitions) : IDomainEvent;
-
-/// <summary>Immutable snapshot of a single step definition at publish time.</summary>
-public sealed record StepSnapshot(
-    Guid Id,
-    string Name,
-    string StepType,
-    int DisplayOrder,
-    IReadOnlyDictionary<string, object?>? Config);
-
-/// <summary>Immutable snapshot of a transition (directed edge) at publish time.</summary>
-public sealed record TransitionSnapshot(
-    Guid FromStepId,
-    Guid ToStepId,
-    string? Label);

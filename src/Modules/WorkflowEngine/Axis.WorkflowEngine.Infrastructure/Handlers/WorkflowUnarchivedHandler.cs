@@ -16,7 +16,8 @@ internal sealed class WorkflowUnarchivedHandler(
     public async Task Handle(WorkflowUnarchived @event, CancellationToken ct)
     {
         WorkflowActiveStatus? existing = await context.WorkflowActiveStatuses
-            .FirstOrDefaultAsync(w => w.WorkflowId == @event.WorkflowId, ct);
+            .FirstOrDefaultAsync(w => w.WorkflowId == @event.WorkflowId
+                                   && w.OrganizationId == @event.OrganizationId, ct);
 
         if (existing is null)
         {

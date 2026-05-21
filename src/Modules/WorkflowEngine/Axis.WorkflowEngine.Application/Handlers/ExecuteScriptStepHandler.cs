@@ -61,13 +61,15 @@ public sealed class ExecuteScriptStepHandler(
         }
         catch (Exception ex)
         {
+            // Log the full exception for diagnostics; ex.Message is not repeated as a template
+            // parameter to avoid leaking sensitive script output or execution context data.
             logger.LogError(ex,
-                "Script step {StepId} failed in execution {ExecutionId}: {ErrorType} — {ErrorMessage}",
-                message.StepId, message.ExecutionId, ex.GetType().Name, ex.Message);
+                "Script step {StepId} failed in execution {ExecutionId}",
+                message.StepId, message.ExecutionId);
 
             await dispatcher.PublishAsync(new StepFailedMessage(
                 message.ExecutionId, message.StepId, message.OrganizationId,
-                $"{ex.GetType().Name}: {ex.Message}"), ct);
+                ex.GetType().Name), ct);
         }
     }
 }

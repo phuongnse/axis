@@ -28,7 +28,7 @@ internal sealed class HttpStepExecutor(
         if (stepConfig is null)
             throw new InvalidOperationException("HTTP step config is required.");
 
-        string method = GetString(stepConfig, "method") ?? "GET";
+        string method = (GetString(stepConfig, "method") ?? "GET").ToUpperInvariant();
         string? urlTemplate = GetString(stepConfig, "url");
         if (string.IsNullOrWhiteSpace(urlTemplate))
             throw new InvalidOperationException("HTTP step 'url' is required.");
@@ -40,7 +40,7 @@ internal sealed class HttpStepExecutor(
         using HttpClient client = httpClientFactory.CreateClient("StepExecutor");
         client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
 
-        using HttpRequestMessage request = new(new HttpMethod(method.ToUpperInvariant()), url);
+        using HttpRequestMessage request = new(new HttpMethod(method), url);
 
         // Apply headers
         if (stepConfig.TryGetValue("headers", out object? headersRaw)

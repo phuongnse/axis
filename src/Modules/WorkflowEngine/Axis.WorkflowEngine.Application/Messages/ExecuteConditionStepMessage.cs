@@ -13,5 +13,4 @@ public sealed record ExecuteConditionStepMessage(
     IReadOnlyList<Guid> AllStepDefinitionIds,
     IReadOnlyList<ConditionTransition> Transitions);
 
-/// <summary>A single transition in the condition graph, used to determine which branch to skip.</summary>
-public sealed record ConditionTransition(Guid FromStepId, Guid ToStepId, string? Label);
+

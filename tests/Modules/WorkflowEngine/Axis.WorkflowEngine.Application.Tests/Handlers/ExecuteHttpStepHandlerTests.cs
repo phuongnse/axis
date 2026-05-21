@@ -73,7 +73,7 @@ public class ExecuteHttpStepHandlerTests
         await _dispatcher.Received(1).PublishAsync(
             Arg.Is<StepFailedMessage>(m =>
                 m.ExecutionId == execution.Id &&
-                m.ErrorDetails.Contains("Connection refused")),
+                m.ErrorDetails == nameof(HttpRequestException)),
             Arg.Any<CancellationToken>());
         await _dispatcher.DidNotReceive().PublishAsync(
             Arg.Any<StepCompletedMessage>(), Arg.Any<CancellationToken>());
