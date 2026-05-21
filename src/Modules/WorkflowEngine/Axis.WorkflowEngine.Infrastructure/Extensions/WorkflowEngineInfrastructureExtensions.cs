@@ -3,6 +3,7 @@ using Axis.WorkflowEngine.Application.Services;
 using Axis.WorkflowEngine.Infrastructure.Persistence;
 using Axis.WorkflowEngine.Infrastructure.Repositories;
 using Axis.WorkflowEngine.Infrastructure.Services;
+using Axis.WorkflowEngine.Infrastructure.Services.StepExecutors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +22,17 @@ public static class WorkflowEngineInfrastructureExtensions
         services.AddScoped<IExecutionRepository, ExecutionRepository>();
         services.AddScoped<IWorkflowDefinitionReader, WorkflowDefinitionReader>();
         services.AddScoped<IUnitOfWork, WorkflowEngineUnitOfWork>();
+
+        // Step executor services (Infrastructure implements Application interfaces)
+        services.AddScoped<IHttpStepExecutor, HttpStepExecutor>();
+        services.AddScoped<IScriptExecutor, ScriptExecutor>();
+        services.AddScoped<INotificationSender, NotificationSender>();
+
+        // Wolverine message dispatcher abstraction
+        services.AddScoped<IStepDispatcher, WolverineStepDispatcher>();
+
+        // HttpClient for HTTP steps
+        services.AddHttpClient("StepExecutor");
 
         return services;
     }

@@ -1,5 +1,6 @@
 using Axis.WorkflowEngine.Domain.Aggregates;
 using Axis.WorkflowEngine.Domain.Enums;
+using Axis.WorkflowEngine.Domain.ReadModels;
 using Axis.WorkflowEngine.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -180,5 +181,88 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
         var result = await reader.IsActiveAsync(wfId, OrgId);
 
         result.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetByIdWithStepsAsync_WhenExecutionHasSteps_ReturnsExecutionWithAllSteps()
+    {
+        Guid wfId = Guid.NewGuid();
+        Guid stepDefId = Guid.NewGuid();
+
+        await using WorkflowEngineDbContext ctx = fixture.CreateContext();
+        ExecutionRepository repo = new(ctx);
+
+        WorkflowExecution execution = WorkflowExecution.Create(wfId, OrgId, TriggerType.Manual, null, new Dictionary<string, object?>());
+        execution.AddStep(stepDefId, "Form", StepType.Form, 0);
+        execution.AddStep(Guid.NewGuid(), "End", StepType.End, 1);
+
+        await repo.AddAsync(execution);
+        await ctx.SaveChangesAsync();
+
+        await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
+        ExecutionRepository readRepo = new(readCtx);
+        WorkflowExecution? loaded = await readRepo.GetByIdWithStepsAsync(execution.Id, OrgId);
+
+        loaded.Should().NotBeNull();
+        loaded!.Steps.Should().HaveCount(2);
+        loaded.Steps.Should().Contain(s => s.StepDefinitionId == stepDefId);
+    }
+
+    [Fact]
+    public async Task GetByIdWithStepsAsync_WhenOrgDoesNotMatch_ReturnsNull()
+    {
+        await using WorkflowEngineDbContext ctx = fixture.CreateContext();
+        ExecutionRepository repo = new(ctx);
+
+        WorkflowExecution execution = CreateExecution();
+        await repo.AddAsync(execution);
+        await ctx.SaveChangesAsync();
+
+        await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
+        ExecutionRepository readRepo = new(readCtx);
+        WorkflowExecution? result = await readRepo.GetByIdWithStepsAsync(execution.Id, OtherOrgId);
+
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task WorkflowDefinitionReader_GetSnapshotAsync_WhenSnapshotExists_ReturnsItWithStepsAndTransitions()
+    {
+        Guid wfId = Guid.NewGuid();
+        Guid step1Id = Guid.NewGuid();
+        Guid step2Id = Guid.NewGuid();
+
+        IReadOnlyList<StepDefinitionSnapshot> steps = new List<StepDefinitionSnapshot>
+        {
+            new() { Id = step1Id, Name = "Start", StepType = StepType.Start, DisplayOrder = 0 },
+            new() { Id = step2Id, Name = "Form", StepType = StepType.Form, DisplayOrder = 1, Config = new Dictionary<string, object?> { ["formId"] = Guid.NewGuid().ToString() } }
+        };
+        IReadOnlyList<TransitionSnapshot> transitions = new List<TransitionSnapshot>
+        {
+            new() { FromStepId = step1Id, ToStepId = step2Id }
+        };
+
+        await using WorkflowEngineDbContext setupCtx = fixture.CreateContext();
+        setupCtx.WorkflowSnapshots.Add(WorkflowSnapshot.Create(wfId, OrgId, steps, transitions));
+        await setupCtx.SaveChangesAsync();
+
+        await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
+        WorkflowDefinitionReader reader = new(readCtx);
+        WorkflowSnapshot? snapshot = await reader.GetSnapshotAsync(wfId, OrgId);
+
+        snapshot.Should().NotBeNull();
+        snapshot!.Steps.Should().HaveCount(2);
+        snapshot.Transitions.Should().HaveCount(1);
+        snapshot.Steps[1].Config.Should().ContainKey("formId");
+    }
+
+    [Fact]
+    public async Task WorkflowDefinitionReader_GetSnapshotAsync_WhenNoSnapshot_ReturnsNull()
+    {
+        await using WorkflowEngineDbContext ctx = fixture.CreateContext();
+        WorkflowDefinitionReader reader = new(ctx);
+        WorkflowSnapshot? result = await reader.GetSnapshotAsync(Guid.NewGuid(), OrgId);
+
+        result.Should().BeNull();
     }
 }

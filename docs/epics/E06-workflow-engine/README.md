@@ -84,9 +84,9 @@ Subsequent steps can reference context values using expressions like `{{context.
 
 | Layer | Status | Notes |
 |---|---|---|
-| Domain | ⚠️ Partial | `WorkflowExecution` aggregate with execution state machine and domain events. Missing: `ExecutionStep` aggregate (required for per-step status tracking, start/end times, step-level output — see US-093/098) |
-| Application | ⚠️ Partial | StartExecution, CancelExecution, RetryExecution commands. Missing: GetExecution, GetExecutionsByWorkflow, GetAllExecutions queries; RetryExecutionWithContext command |
-| Infrastructure | ✅ Done | `WorkflowEngineDbContext`, `ExecutionRepository`, `WorkflowDefinitionReader` (cross-module), `WorkflowEngineUnitOfWork`; `_context` as JSONB; 8 integration tests (Testcontainers) |
+| Domain | ✅ Done | `WorkflowExecution` aggregate + `ExecutionStep` entity; full execution state machine; `WorkflowSnapshot` local read model; domain events (ExecutionStarted, Completed, Failed, Cancelled, StepCompleted, StepFailed, FormStepReached) |
+| Application | ✅ Done | All commands/queries (StartExecution, Cancel, Retry, RetryWithContext, GetExecution, GetAllExecutions, GetExecutionsByWorkflow, GetRetryHistory); step handler messages and orchestrator (ExecuteNextStepHandler, StepCompletedHandler, StepFailedHandler, per-step handlers); ConditionEvaluator; IStepDispatcher / IHttpStepExecutor / IScriptExecutor / INotificationSender interfaces |
+| Infrastructure | ⚠️ Partial | `WorkflowEngineDbContext` + all repositories + step executors registered. `IScriptExecutor` and `INotificationSender` are stubs (real dispatch deferred). `FormTaskSubmittedHandler` cross-module handler implemented. 27 integration tests (Testcontainers). |
 | API | ⏳ Pending | — |
 | Frontend | ⏳ Pending | — |
 

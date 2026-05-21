@@ -972,34 +972,61 @@ Use specifications for predicates that appear in more than one repository method
 
 ### Pipeline Behavior — cross-cutting concerns via MediatR
 
-Add cross-cutting concerns (logging, performance tracking, authorization checks) as MediatR pipeline behaviors — never inline in handlers.
+Add cross-cutting concerns (logging, validation, authorization checks) as MediatR pipeline behaviors — never inline in handlers.
+
+**Registered behaviors (order matters — outermost first):**
+
+| Order | Behavior | Purpose |
+|---|---|---|
+| 1 (outermost) | `LoggingBehavior<,>` | Debug entry/exit, Warning on Result.Failure, Error on unhandled exception |
+| 2 | `ValidationBehavior<,>` | FluentValidation — throws `ValidationException` on failure |
+
+Registration in `Program.cs`:
+```csharp
+builder.Services.AddMediatR(cfg =>
+{
+    cfg.RegisterServicesFromAssemblies(...);
+    cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));      // outermost — wraps validation + handler
+    cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));   // inner — throws on invalid input
+});
+```
+
+`LoggingBehavior` behavior (in `Axis.Shared.Application/Behaviors/`):
+
+| Scenario | Level | Content |
+|---|---|---|
+| Request starts | `Debug` | "Handling {RequestType}" |
+| Handler returns `Result.Success` | `Debug` | "Handled X in Yms" |
+| Handler returns `Result.Failure` | `Warning` | "failed: [error_code] message" |
+| `ValidationException` from inner behavior | `Warning` | "validation failed: ..." + rethrow |
+| Unhandled exception | `Error` | exception detail + rethrow |
+
+`LoggingBehavior` can observe `Result.Failure` outcomes because MediatR handlers return `Result<T>` — the behavior sees the return value. This is why per-handler milestone logs are rarely needed in command/query handlers (the Result outcome tells the story). Contrast with Wolverine handlers which return `void` — the middleware cannot observe the outcome, so per-handler business logs are mandatory (see Wolverine handler logging rule below).
 
 ```csharp
-// ❌ wrong — cross-cutting concern polluting every handler
+// ❌ wrong — cross-cutting log duplicated in every handler
 public async Task<Result> Handle(CreateWorkflowCommand cmd, CancellationToken ct)
 {
-    Stopwatch sw = Stopwatch.StartNew();
-    _logger.LogInformation("Handling {Command}", nameof(CreateWorkflowCommand));
-    // ... actual logic ...
-    _logger.LogInformation("Completed in {Ms}ms", sw.ElapsedMilliseconds);
+    _logger.LogInformation("Handling CreateWorkflowCommand");
+    // ... logic ...
+    _logger.LogInformation("Done");
+    return Result.Success();
 }
 
-// ✅ correct — one behavior, registered once, applies to all handlers
-public class PerformanceBehavior<TRequest, TResponse>(ILogger<PerformanceBehavior<TRequest, TResponse>> logger)
-    : IPipelineBehavior<TRequest, TResponse>
+// ✅ correct — LoggingBehavior handles it once for all handlers
+public async Task<Result> Handle(CreateWorkflowCommand cmd, CancellationToken ct)
 {
-    public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken ct)
-    {
-        Stopwatch sw = Stopwatch.StartNew();
-        TResponse response = await next();
-        if (sw.ElapsedMilliseconds > 500)
-            logger.LogWarning("Slow handler {Request} took {Ms}ms", typeof(TRequest).Name, sw.ElapsedMilliseconds);
-        return response;
-    }
+    // no entry/exit logs needed — LoggingBehavior provides them
+    WorkflowDefinition? workflow = await _repo.GetByIdAsync(cmd.WorkflowId, cmd.OrgId, ct);
+    if (workflow is null)
+        return Result.Failure(ErrorCodes.NotFound, "Workflow not found.");
+    // LoggingBehavior will log Warning with "not_found" error code automatically
+    // ...
+    return Result.Success();
 }
 ```
 
-Existing behaviors in the pipeline: `ValidationBehavior`. New cross-cutting concerns follow the same pattern.
+New cross-cutting concerns follow the same `IPipelineBehavior<TRequest, TResponse>` pattern. Per-handler `Warning`/`Information` logs are only needed when the context is richer than what the Result code conveys (e.g., which specific field caused a conflict, which tenant was involved).
 
 ---
 
@@ -1265,6 +1292,138 @@ public sealed class SendWelcomeEmailHandler(IEmailSender emailSender)
     }
 }
 ```
+
+### Step handler idempotency — at-least-once delivery
+
+Wolverine delivers messages at least once. Step handlers guard against redelivery using **`step.IsTerminal`** (Completed / Failed / Cancelled), not the Running status.
+
+**Why not the Running guard?** `ExecuteNextStepHandler` starts every step (sets it to `Running`) before dispatching the typed handler message. By the time `ExecuteHttpStepHandler`, `ExecuteConditionStepHandler`, etc. receive the message, the step is **already Running** — this is the expected, normal first-delivery state. A `if (step.Status == Running) return;` guard would therefore block all normal executions.
+
+```csharp
+// ✅ correct idempotency guard in typed step handlers (Http, Condition, Script, Notification)
+if (step.IsTerminal)   // Completed / Failed / Cancelled — already processed
+{
+    return;
+}
+
+// ⛔ wrong — Running is the normal first-delivery state for these handlers
+if (step.Status == StepExecutionStatus.Running)
+{
+    return;  // this would block every first delivery!
+}
+```
+
+**Form step exception:** `ExecuteFormStepHandler` checks `step.Status == Waiting` (not Running) for idempotency because its job is to *transition* Running → Waiting. If the step is already Waiting, the form task was already created.
+
+**True concurrent-duplicate protection** uses `UseXminAsConcurrencyToken()` — see the section below.
+
+### Concurrent-duplicate protection via xmin optimistic concurrency
+
+When two Wolverine workers receive the same message simultaneously, the **first writer wins**. The second writer is detected via PostgreSQL's built-in `xmin` system column and exits gracefully.
+
+#### Infrastructure setup — EF Core mapping
+
+```csharp
+// On a top-level entity (EntityTypeBuilder<T>):
+builder.UseXminAsConcurrencyToken();
+
+// On an owned entity (OwnedNavigationBuilder) — UseXminAsConcurrencyToken() is NOT available;
+// configure xmin manually instead:
+stepBuilder.Property<uint>("xmin")
+    .HasColumnName("xmin")
+    .HasColumnType("xid")
+    .ValueGeneratedOnAddOrUpdate()
+    .IsConcurrencyToken();
+// "No migration needed — xmin is a PostgreSQL built-in system column present on every row."
+```
+
+No `uint RowVersion` field on the domain entity is required. EF Core adds `WHERE xmin = @loadedXmin` to every UPDATE automatically. Any second concurrent UPDATE on the same row fails with `DbUpdateConcurrencyException`.
+
+#### Infrastructure setup — UnitOfWork translation
+
+`DbUpdateConcurrencyException` is an EF Core type and must not leak into the Application layer. The shared `UnitOfWork` translates it:
+
+```csharp
+// Axis.Shared.Infrastructure/Persistence/UnitOfWork.cs
+catch (DbUpdateConcurrencyException ex)
+{
+    throw new ConcurrencyException(ex);
+}
+```
+
+`ConcurrencyException` lives in `Axis.Shared.Application` — Application layer can reference it without taking an EF Core dependency.
+
+#### Application handler pattern — catch and exit
+
+```csharp
+// ✅ In every handler that calls uow.SaveChangesAsync:
+try
+{
+    await uow.SaveChangesAsync(ct);
+}
+catch (ConcurrencyException)
+{
+    // Another Wolverine worker already committed this change.
+    // The winning instance will complete the step — exit gracefully.
+    logger.LogInformation(
+        "Concurrent delivery detected for step {StepId} — skipping", stepId);
+    return;
+}
+```
+
+**Rules:**
+- Never re-throw `ConcurrencyException` as a step failure — the winning instance already completed the work.
+- Every `uow.SaveChangesAsync` call on a concurrency-sensitive path must be wrapped.
+- Do not use a Running status guard as the concurrency boundary — that blocks normal first deliveries (see idempotency section above).
+- `UseXminAsConcurrencyToken()` is NOT available on `OwnedNavigationBuilder<TOwner, TDep>`. For owned entities configured with `OwnsMany`, configure xmin manually:
+  ```csharp
+  stepBuilder.Property<uint>("xmin")
+      .HasColumnName("xmin")
+      .HasColumnType("xid")
+      .ValueGeneratedOnAddOrUpdate()
+      .IsConcurrencyToken();
+  ```
+
+### Wolverine handler logging — two-layer rule
+
+Handler logging has two mandatory layers that serve different purposes:
+
+**Layer 1 — Cross-cutting infrastructure logging (Wolverine middleware)**
+
+`HandlerLoggingMiddleware` (in `Axis.Shared.Infrastructure/Wolverine/`) wraps every Wolverine handler automatically. Registered globally in `Program.cs`:
+
+```csharp
+builder.Host.UseWolverine(opts =>
+{
+    opts.Policies.AddMiddleware<HandlerLoggingMiddleware>();
+    opts.UseEntityFrameworkCoreTransactions();
+    // ...
+});
+```
+
+The middleware logs at `Debug` level (entry + elapsed time) and `Error` level (unhandled exceptions). It provides consistent operational traces without touching each handler — enforce it by policy, not by developer memory.
+
+**Layer 2 — Per-handler business milestone logging (mandatory)**
+
+Every Wolverine handler must log:
+
+| Scenario | Level | Example |
+|----------|-------|---------|
+| Entity not found (execution, step) | `Warning` | `"ExecutionId {Id} not found"` |
+| Idempotency skip (step already terminal) | `Information` | `"step {Id} already terminal ({Status}), skipping"` |
+| Concurrent delivery detected | `Information` | `"concurrent delivery for step {Id} — skipping"` |
+| Config error / invariant violation | `Warning` or `Error` | `"invalid config for step {Id}"` |
+| Dispatching StepFailedMessage | `Warning` | `"no branches configured — failing execution {Id}"` |
+| Successful business outcome | `Information` | `"step {Id} completed in execution {Id}, advancing"` |
+| Execution terminal state reached | `Information` | `"Execution {Id} completed successfully"` |
+
+**Rules:**
+- `ILogger<THandler>` is mandatory in every Wolverine handler (Application and Infrastructure layer). No handler may omit it.
+- Business milestones must be logged per-handler — the middleware has no domain context (execution ID, step type, branch label).
+- Log the failure reason before dispatching `StepFailedMessage` — the log must appear regardless of whether the downstream handler processes the failure.
+- Log successful outcomes BEFORE the final `dispatcher.PublishAsync` call — a dispatch that throws would otherwise leave a milestone un-logged.
+- The middleware `Error` log catches unhandled exceptions that bubble past the handler; per-handler `Error` logs are for handled error paths (e.g., invalid config, executor exception).
+- Domain layer: zero logging — aggregates have no external dependencies. API layer: zero per-endpoint logging — ASP.NET Core request logging middleware handles it.
 
 ### Scheduled / recurring job
 

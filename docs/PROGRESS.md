@@ -36,9 +36,9 @@ Form definitions with typed fields (9 field types, polymorphic config). Cross-mo
 
 ## WorkflowEngine — E06-workflow-engine
 
-**Domain ✅ | Application ✅ | Infrastructure ✅ | API ⏳ | Frontend ⏳**
+**Domain ✅ | Application ✅ | Infrastructure ⚠️ | API ⏳ | Frontend ⏳**
 
-Execution lifecycle (start, cancel, retry, retry-with-context). Step state machine. Paged execution history and retry history queries. Cross-module isolation via local `workflow_active_statuses` read model.
+Execution lifecycle (start, cancel, retry, retry-with-context). Step state machine with per-step execution handlers (Form, HTTP, Condition, Script, Notification). `WorkflowSnapshot` local read model populated from `WorkflowPublished` events. Paged execution history and retry history queries. Cross-module isolation via local read models — WorkflowEngine never queries WorkflowBuilder or FormBuilder DBs. Infrastructure ⚠️: `IScriptExecutor` and `INotificationSender` are stubs (real dispatch deferred).
 
 ## PageBuilder — E07-page-builder
 

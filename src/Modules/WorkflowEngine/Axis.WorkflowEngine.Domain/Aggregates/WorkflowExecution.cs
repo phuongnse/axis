@@ -1,6 +1,7 @@
 using Axis.Shared.Domain.Primitives;
 using Axis.WorkflowEngine.Domain.Enums;
 using Axis.WorkflowEngine.Domain.Events;
+using Axis.WorkflowEngine.Domain.ReadModels;
 
 namespace Axis.WorkflowEngine.Domain.Aggregates;
 
@@ -127,6 +128,20 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
         return step;
     }
 
+    /// <summary>
+    /// Creates ExecutionStep records for every step in the workflow snapshot (upfront creation).
+    /// Steps from the WorkflowBuilder StepType string are mapped to WorkflowEngine StepType.
+    /// Called by StartExecutionHandler before dispatching the first step message.
+    /// </summary>
+    public void InitialiseSteps(IReadOnlyList<StepDefinitionSnapshot> snapshotSteps)
+    {
+        if (_steps.Count > 0)
+            throw new InvalidOperationException("Steps are already initialised for this execution.");
+
+        foreach (StepDefinitionSnapshot stepDef in snapshotSteps.OrderBy(s => s.DisplayOrder))
+            _steps.Add(ExecutionStep.Create(Id, OrganizationId, stepDef.Id, stepDef.Name, stepDef.StepType, stepDef.DisplayOrder));
+    }
+
     public void StartStep(Guid stepId, IReadOnlyDictionary<string, object?> inputSnapshot)
         => GetStep(stepId).Start(inputSnapshot);
 
@@ -140,6 +155,19 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
     {
         GetStep(stepId).Fail(errorDetails);
         RaiseDomainEvent(new ExecutionStepFailed(Id, stepId, OrganizationId, errorDetails));
+    }
+
+    /// <summary>Transitions a Form step to Waiting and raises the FormStepReached event for cross-module dispatch.</summary>
+    public void ReachFormStep(
+        Guid stepId,
+        Guid formDefinitionId,
+        string? assigneeExpression,
+        int? timeoutHours)
+    {
+        GetStep(stepId).Wait();
+        RaiseDomainEvent(new FormStepReached(
+            Id, stepId, WorkflowDefinitionId, OrganizationId,
+            formDefinitionId, assigneeExpression, timeoutHours));
     }
 
     public void WaitStep(Guid stepId)

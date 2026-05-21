@@ -8,6 +8,10 @@ public interface IExecutionRepository
 {
     Task AddAsync(WorkflowExecution execution, CancellationToken ct = default);
     Task<WorkflowExecution?> GetByIdAsync(Guid id, Guid organizationId, CancellationToken ct = default);
+
+    /// <summary>Loads the execution with its steps for engine write operations. Returns a tracked entity.</summary>
+    Task<WorkflowExecution?> GetByIdWithStepsAsync(Guid id, Guid organizationId, CancellationToken ct = default);
+
     Task<IReadOnlyList<WorkflowExecution>> GetAllAsync(Guid organizationId, CancellationToken ct = default);
     Task<IReadOnlyList<WorkflowExecution>> GetByWorkflowAsync(Guid workflowId, Guid organizationId, CancellationToken ct = default);
 

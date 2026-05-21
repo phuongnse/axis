@@ -163,7 +163,11 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
 
         Status = WorkflowStatus.Active;
         UpdatedAt = DateTimeOffset.UtcNow;
-        RaiseDomainEvent(new WorkflowPublished(Id, OrganizationId, ExtractFormIds()));
+        RaiseDomainEvent(new WorkflowPublished(
+            Id, OrganizationId,
+            ExtractFormIds(),
+            ExtractStepSnapshots(),
+            ExtractTransitionSnapshots()));
     }
 
     /// <summary>US-050: Deactivates the workflow; running executions complete but no new ones start.</summary>
@@ -248,6 +252,26 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
 
     private IReadOnlyList<Guid> ExtractFormIds() =>
         _steps.Select(s => s.TryGetFormId()).Where(id => id.HasValue).Select(id => id!.Value).ToList();
+
+    private IReadOnlyList<StepSnapshot> ExtractStepSnapshots()
+    {
+        List<WorkflowStep> ordered = _steps
+            .OrderBy(s => s.Type == StepType.Start ? 0 : s.Type == StepType.End ? 2 : 1)
+            .ThenBy(s => s.Id)
+            .ToList();
+
+        // Assign display order: Start=0, End=last, others in definition order
+        List<StepSnapshot> snapshots = [];
+        int displayOrder = 0;
+        foreach (WorkflowStep step in ordered)
+            snapshots.Add(new StepSnapshot(step.Id, step.Name, step.Type.ToString(), displayOrder++, step.Config));
+        return snapshots;
+    }
+
+    private IReadOnlyList<TransitionSnapshot> ExtractTransitionSnapshots() =>
+        _transitions
+            .Select(t => new TransitionSnapshot(t.FromStepId, t.ToStepId, t.Label))
+            .ToList();
 
     /// <summary>DFS reachability: can we reach <paramref name="target"/> starting from <paramref name="start"/>?</summary>
     private bool CanReach(Guid start, Guid target)

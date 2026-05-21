@@ -5,6 +5,7 @@
     <ProjectReference Include="..\Axis.WorkflowEngine.Domain\Axis.WorkflowEngine.Domain.csproj" />
     <ProjectReference Include="..\..\..\Shared\Axis.Shared.Infrastructure\Axis.Shared.Infrastructure.csproj" />
     <ProjectReference Include="..\..\WorkflowBuilder\Axis.WorkflowBuilder.Domain\Axis.WorkflowBuilder.Domain.csproj" />
+    <ProjectReference Include="..\..\FormBuilder\Axis.FormBuilder.Domain\Axis.FormBuilder.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>
