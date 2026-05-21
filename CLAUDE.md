@@ -567,7 +567,7 @@ For any **new** module: Domain → Application (no Docker needed) → Infrastruc
 ## Epics & Docs Navigation
 
 - `docs/README.md` — master navigation hub
-- `docs/playbooks/agent-checklist.md` — **agents: read this first** (one page + `./scripts/check-doc-drift.sh`)
+- `docs/playbooks/agent-checklist.md` — **agents: read first** (one page + `./scripts/check-doc-drift.sh`)
 - `docs/TECH_STACK.md` — approved libraries, versions, and ADRs
 - `docs/PROGRESS.md` — current implementation status per module and layer
 - `docs/playbooks/process.md` — step-by-step implementation workflow; read at the start of every new US or module
