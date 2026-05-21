@@ -5,6 +5,7 @@ using Axis.WorkflowEngine.Domain.Aggregates;
 using Axis.WorkflowEngine.Domain.Enums;
 using Axis.WorkflowEngine.Domain.ReadModels;
 using Axis.WorkflowEngine.Infrastructure.Handlers;
+using Axis.WorkflowEngine.Infrastructure.Repositories;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -50,10 +51,11 @@ public sealed class FormTaskSubmittedHandlerTests(WorkflowEngineDatabaseFixture 
         IStepDispatcher dispatcher,
         ILogger<FormTaskSubmittedHandler> logger)
     {
+        ExecutionRepository execRepo = new(ctx);
         IUnitOfWork uow = Substitute.For<IUnitOfWork>();
         uow.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(call => ctx.SaveChangesAsync(call.Arg<CancellationToken>()));
-        return new FormTaskSubmittedHandler(ctx, uow, dispatcher, logger);
+        return new FormTaskSubmittedHandler(execRepo, uow, dispatcher, logger);
     }
 
     [Fact]

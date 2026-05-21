@@ -1297,12 +1297,20 @@ When two Wolverine workers receive the same message simultaneously, the **first 
 #### Infrastructure setup — EF Core mapping
 
 ```csharp
-// Inside OwnsMany / IEntityTypeConfiguration for the owned entity:
-stepBuilder.UseXminAsConcurrencyToken();
+// On a top-level entity (EntityTypeBuilder<T>):
+builder.UseXminAsConcurrencyToken();
+
+// On an owned entity (OwnedNavigationBuilder) — UseXminAsConcurrencyToken() is NOT available;
+// configure xmin manually instead:
+stepBuilder.Property<uint>("xmin")
+    .HasColumnName("xmin")
+    .HasColumnType("xid")
+    .ValueGeneratedOnAddOrUpdate()
+    .IsConcurrencyToken();
 // "No migration needed — xmin is a PostgreSQL built-in system column present on every row."
 ```
 
-No `uint RowVersion` field on the domain entity is required. `UseXminAsConcurrencyToken()` is Npgsql-native — EF Core adds `WHERE xmin = @loadedXmin` to every UPDATE automatically. Any second concurrent UPDATE on the same row fails with `DbUpdateConcurrencyException`.
+No `uint RowVersion` field on the domain entity is required. EF Core adds `WHERE xmin = @loadedXmin` to every UPDATE automatically. Any second concurrent UPDATE on the same row fails with `DbUpdateConcurrencyException`.
 
 #### Infrastructure setup — UnitOfWork translation
 
@@ -1340,7 +1348,55 @@ catch (ConcurrencyException)
 - Never re-throw `ConcurrencyException` as a step failure — the winning instance already completed the work.
 - Every `uow.SaveChangesAsync` call on a concurrency-sensitive path must be wrapped.
 - Do not use a Running status guard as the concurrency boundary — that blocks normal first deliveries (see idempotency section above).
-- `UseXminAsConcurrencyToken()` works on `OwnsMany` owned entities because each row in the owned table has its own `xmin` column. No special configuration is needed beyond the single `UseXminAsConcurrencyToken()` call.
+- `UseXminAsConcurrencyToken()` is NOT available on `OwnedNavigationBuilder<TOwner, TDep>`. For owned entities configured with `OwnsMany`, configure xmin manually:
+  ```csharp
+  stepBuilder.Property<uint>("xmin")
+      .HasColumnName("xmin")
+      .HasColumnType("xid")
+      .ValueGeneratedOnAddOrUpdate()
+      .IsConcurrencyToken();
+  ```
+
+### Wolverine handler logging — two-layer rule
+
+Handler logging has two mandatory layers that serve different purposes:
+
+**Layer 1 — Cross-cutting infrastructure logging (Wolverine middleware)**
+
+`HandlerLoggingMiddleware` (in `Axis.Shared.Infrastructure/Wolverine/`) wraps every Wolverine handler automatically. Registered globally in `Program.cs`:
+
+```csharp
+builder.Host.UseWolverine(opts =>
+{
+    opts.Policies.AddMiddleware<HandlerLoggingMiddleware>();
+    opts.UseEntityFrameworkCoreTransactions();
+    // ...
+});
+```
+
+The middleware logs at `Debug` level (entry + elapsed time) and `Error` level (unhandled exceptions). It provides consistent operational traces without touching each handler — enforce it by policy, not by developer memory.
+
+**Layer 2 — Per-handler business milestone logging (mandatory)**
+
+Every Wolverine handler must log:
+
+| Scenario | Level | Example |
+|----------|-------|---------|
+| Entity not found (execution, step) | `Warning` | `"ExecutionId {Id} not found"` |
+| Idempotency skip (step already terminal) | `Information` | `"step {Id} already terminal ({Status}), skipping"` |
+| Concurrent delivery detected | `Information` | `"concurrent delivery for step {Id} — skipping"` |
+| Config error / invariant violation | `Warning` or `Error` | `"invalid config for step {Id}"` |
+| Dispatching StepFailedMessage | `Warning` | `"no branches configured — failing execution {Id}"` |
+| Successful business outcome | `Information` | `"step {Id} completed in execution {Id}, advancing"` |
+| Execution terminal state reached | `Information` | `"Execution {Id} completed successfully"` |
+
+**Rules:**
+- `ILogger<THandler>` is mandatory in every Wolverine handler (Application and Infrastructure layer). No handler may omit it.
+- Business milestones must be logged per-handler — the middleware has no domain context (execution ID, step type, branch label).
+- Log the failure reason before dispatching `StepFailedMessage` — the log must appear regardless of whether the downstream handler processes the failure.
+- Log successful outcomes BEFORE the final `dispatcher.PublishAsync` call — a dispatch that throws would otherwise leave a milestone un-logged.
+- The middleware `Error` log catches unhandled exceptions that bubble past the handler; per-handler `Error` logs are for handled error paths (e.g., invalid config, executor exception).
+- Domain layer: zero logging — aggregates have no external dependencies. API layer: zero per-endpoint logging — ASP.NET Core request logging middleware handles it.
 
 ### Scheduled / recurring job
 

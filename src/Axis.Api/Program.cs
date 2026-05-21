@@ -31,6 +31,7 @@ using OpenIddict.Validation.AspNetCore;
 using Scalar.AspNetCore;
 using Serilog;
 using StackExchange.Redis;
+using Axis.Shared.Infrastructure.Wolverine;
 using Wolverine;
 using Wolverine.EntityFrameworkCore;
 using static OpenIddict.Abstractions.OpenIddictConstants;
@@ -53,6 +54,8 @@ try
     // ── Wolverine (messaging + domain event outbox) ────────────────────────
     builder.Host.UseWolverine(opts =>
     {
+        // Cross-cutting: Debug entry/exit traces + Error for unhandled exceptions on every handler.
+        opts.Policies.AddMiddleware<HandlerLoggingMiddleware>();
         opts.UseEntityFrameworkCoreTransactions();
         // Infrastructure assemblies host Wolverine handlers (e.g. domain event consumers)
         // but are not the entry assembly — include them explicitly for handler discovery.

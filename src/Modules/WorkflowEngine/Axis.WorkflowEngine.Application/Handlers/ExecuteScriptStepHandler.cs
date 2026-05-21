@@ -52,6 +52,10 @@ public sealed class ExecuteScriptStepHandler(
             IReadOnlyDictionary<string, object?> output = await executor.ExecuteAsync(
                 message.StepConfig, message.Context, ct);
 
+            logger.LogInformation(
+                "Script step {StepId} executed successfully in execution {ExecutionId}, dispatching completion",
+                message.StepId, message.ExecutionId);
+
             await dispatcher.PublishAsync(new StepCompletedMessage(
                 message.ExecutionId, message.StepId, message.OrganizationId, output), ct);
         }

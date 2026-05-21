@@ -63,6 +63,11 @@ public sealed class StepFailedHandler(
             logger.LogInformation(
                 "StepFailedHandler: concurrent failure detected for step {StepId} — skipping",
                 message.StepId);
+            return;
         }
+
+        logger.LogInformation(
+            "StepFailedHandler: execution {ExecutionId} marked failed due to step {StepId}",
+            message.ExecutionId, message.StepId);
     }
 }

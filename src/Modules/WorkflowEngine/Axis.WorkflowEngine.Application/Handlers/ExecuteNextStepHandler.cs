@@ -39,7 +39,12 @@ public sealed class ExecuteNextStepHandler(
         if (execution.Status is ExecutionStatus.Completed
             or ExecutionStatus.Failed
             or ExecutionStatus.Cancelled)
+        {
+            logger.LogWarning(
+                "ExecuteNextStepHandler: execution {ExecutionId} is already terminal ({Status}), skipping",
+                message.ExecutionId, execution.Status);
             return;
+        }
 
         // Transition Pending → Running on first step dispatch
         if (execution.Status == ExecutionStatus.Pending)
@@ -79,6 +84,10 @@ public sealed class ExecuteNextStepHandler(
                     nextStep.StepType, nextStep.Id, execution.Id);
                 return;
             }
+
+            logger.LogInformation(
+                "{StepType} step {StepId} auto-completed in execution {ExecutionId}",
+                nextStep.StepType, nextStep.Id, execution.Id);
 
             if (nextStep.StepType != StepType.End)
                 await dispatcher.PublishAsync(new ExecuteNextStepMessage(execution.Id, execution.OrganizationId), ct);

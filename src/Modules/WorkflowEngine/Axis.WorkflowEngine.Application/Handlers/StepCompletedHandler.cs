@@ -64,6 +64,10 @@ public sealed class StepCompletedHandler(
             return;
         }
 
+        logger.LogInformation(
+            "StepCompletedHandler: step {StepId} completed in execution {ExecutionId}, advancing",
+            message.StepId, message.ExecutionId);
+
         await dispatcher.PublishAsync(new ExecuteNextStepMessage(execution.Id, execution.OrganizationId), ct);
     }
 }

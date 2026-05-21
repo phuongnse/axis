@@ -56,6 +56,9 @@ public sealed class ExecuteConditionStepHandler(
         IReadOnlyList<IReadOnlyDictionary<string, object?>> branches = ExtractBranches(message.StepConfig);
         if (branches.Count == 0)
         {
+            logger.LogWarning(
+                "ExecuteConditionStepHandler: step {StepId} has no branches configured — failing execution {ExecutionId}",
+                message.StepId, message.ExecutionId);
             await dispatcher.PublishAsync(new StepFailedMessage(
                 message.ExecutionId, message.StepId, message.OrganizationId,
                 "Condition step has no branches configured."), ct);
@@ -66,6 +69,9 @@ public sealed class ExecuteConditionStepHandler(
 
         if (selectedLabel is null)
         {
+            logger.LogWarning(
+                "ExecuteConditionStepHandler: no branch matched context for step {StepId} in execution {ExecutionId} — failing",
+                message.StepId, message.ExecutionId);
             await dispatcher.PublishAsync(new StepFailedMessage(
                 message.ExecutionId, message.StepId, message.OrganizationId,
                 "No condition branch matched and no default branch is configured."), ct);
@@ -90,6 +96,9 @@ public sealed class ExecuteConditionStepHandler(
 
         if (selectedTransition is null)
         {
+            logger.LogWarning(
+                "ExecuteConditionStepHandler: no transition for branch '{Label}' from step {StepId} — failing execution {ExecutionId}",
+                selectedLabel, message.StepId, message.ExecutionId);
             await dispatcher.PublishAsync(new StepFailedMessage(
                 message.ExecutionId, message.StepId, message.OrganizationId,
                 $"No transition found for selected branch '{selectedLabel}'."), ct);
@@ -134,12 +143,12 @@ public sealed class ExecuteConditionStepHandler(
             return;
         }
 
-        await dispatcher.PublishAsync(new StepCompletedMessage(
-            message.ExecutionId, message.StepId, message.OrganizationId, output), ct);
-
         logger.LogInformation(
             "Condition step {StepId} in execution {ExecutionId} selected branch '{Label}'",
             message.StepId, message.ExecutionId, selectedLabel);
+
+        await dispatcher.PublishAsync(new StepCompletedMessage(
+            message.ExecutionId, message.StepId, message.OrganizationId, output), ct);
     }
 
     private static HashSet<Guid> GetReachable(Guid startId, IReadOnlyList<ConditionTransition> transitions)

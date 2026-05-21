@@ -1,10 +1,9 @@
 using Axis.FormBuilder.Domain.Events;
 using Axis.Shared.Application;
 using Axis.WorkflowEngine.Application.Messages;
+using Axis.WorkflowEngine.Application.Repositories;
 using Axis.WorkflowEngine.Application.Services;
 using Axis.WorkflowEngine.Domain.Aggregates;
-using Axis.WorkflowEngine.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Axis.WorkflowEngine.Infrastructure.Handlers;
@@ -15,16 +14,15 @@ namespace Axis.WorkflowEngine.Infrastructure.Handlers;
 /// Cross-module: FormBuilder publishes FormTaskSubmitted → WorkflowEngine consumes.
 /// </summary>
 internal sealed class FormTaskSubmittedHandler(
-    WorkflowEngineDbContext context,
+    IExecutionRepository execRepo,
     IUnitOfWork uow,
     IStepDispatcher dispatcher,
     ILogger<FormTaskSubmittedHandler> logger)
 {
     public async Task Handle(FormTaskSubmitted @event, CancellationToken ct)
     {
-        WorkflowExecution? execution = await context.WorkflowExecutions
-            .Include(e => e.Steps)
-            .FirstOrDefaultAsync(e => e.Id == @event.ExecutionId, ct);
+        WorkflowExecution? execution = await execRepo.GetByIdWithStepsAsync(
+            @event.ExecutionId, @event.OrganizationId, ct);
 
         if (execution is null)
         {

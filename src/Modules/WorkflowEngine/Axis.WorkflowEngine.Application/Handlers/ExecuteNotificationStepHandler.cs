@@ -61,6 +61,10 @@ public sealed class ExecuteNotificationStepHandler(
                 deliveryResult.TryGetValue("error", out object? err) ? err : "unknown");
         }
 
+        logger.LogInformation(
+            "Notification step {StepId} processed in execution {ExecutionId}, dispatching completion",
+            message.StepId, message.ExecutionId);
+
         await dispatcher.PublishAsync(new StepCompletedMessage(
             message.ExecutionId, message.StepId, message.OrganizationId, deliveryResult), ct);
     }
