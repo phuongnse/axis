@@ -20,6 +20,7 @@
 
 | Playbook | Description |
 |---|---|
+| [**Agent checklist**](./playbooks/agent-checklist.md) | **One page** — gates, epic map; `./scripts/check-doc-drift.sh` before every PR |
 | [Process](./playbooks/process.md) | Step-by-step implementation workflow — backend and frontend |
 | [Patterns](./playbooks/patterns.md) | Technical patterns, pitfalls, and code examples |
 | [Testing](./playbooks/testing.md) | Test isolation, naming, file layout, mocking rules — .NET and frontend |
