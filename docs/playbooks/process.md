@@ -107,6 +107,8 @@ For every match: confirm the SQL only references tables owned by that match's ow
 
 #### Step 6 — Update docs (same PR)
 
+- Run `./scripts/check-doc-drift.sh` (CI **Doc drift** job)
+- Paste Gate 2 and Gate 3 into the PR (`.github/PULL_REQUEST_TEMPLATE.md`)
 - Update feature file `> **Implementation status**` callout for this US
 - If all USes in the feature are complete for a layer: update Epic README status table
 - If the full layer is done for the module: update `docs/PROGRESS.md`
