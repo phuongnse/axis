@@ -5,32 +5,36 @@ using Wolverine;
 namespace Axis.Shared.Infrastructure.Wolverine;
 
 /// <summary>
-/// Wolverine handler middleware that emits Debug-level traces (entry, exit, elapsed ms)
-/// and Error-level logs for any unhandled exception on every message handler.
-/// Business-milestone logs (step dispatched, execution completed, branch selected) remain
-/// in each handler — middleware has no access to domain context (execution ID, step type).
-/// Registered globally via opts.Policies.AddMiddleware&lt;HandlerLoggingMiddleware&gt;() in Program.cs.
+/// Wolverine middleware that provides cross-cutting Debug-level entry/exit traces
+/// and Error-level logs for unhandled exceptions on every handler.
+/// Uses Before/Finally convention required by Wolverine's AddMiddleware policy.
+/// Registered globally in Program.cs via opts.Policies.AddMiddleware&lt;HandlerLoggingMiddleware&gt;().
+/// Wolverine creates one instance per message invocation — fields are safe for per-call state.
 /// </summary>
 public sealed class HandlerLoggingMiddleware(ILogger<HandlerLoggingMiddleware> logger)
 {
-    public async Task Handle(Envelope envelope, Func<Task> next)
+    private readonly Stopwatch _sw = new();
+    private string _messageType = string.Empty;
+
+    public void Before(Envelope envelope)
     {
-        string messageType = envelope.Message?.GetType().Name ?? envelope.MessageType ?? "Unknown";
-        Stopwatch sw = Stopwatch.StartNew();
+        _messageType = envelope.Message?.GetType().Name ?? envelope.MessageType ?? "Unknown";
+        _sw.Restart();
+        logger.LogDebug("Handling {MessageType}", _messageType);
+    }
 
-        logger.LogDebug("Handling {MessageType}", messageType);
-
-        try
-        {
-            await next();
-            logger.LogDebug("Handled {MessageType} in {ElapsedMs}ms", messageType, sw.ElapsedMilliseconds);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex,
+    /// <summary>
+    /// Wolverine generates a try/finally and injects the Exception if one was thrown; null on success.
+    /// </summary>
+    public void Finally(Exception? exception)
+    {
+        if (exception is not null)
+            logger.LogError(exception,
                 "Handler failed for {MessageType} after {ElapsedMs}ms",
-                messageType, sw.ElapsedMilliseconds);
-            throw;
-        }
+                _messageType, _sw.ElapsedMilliseconds);
+        else
+            logger.LogDebug(
+                "Handled {MessageType} in {ElapsedMs}ms",
+                _messageType, _sw.ElapsedMilliseconds);
     }
 }
