@@ -199,6 +199,8 @@ Gate 2:
 
 If a row fired and the doc is not yet staged → update the doc first, then commit. An unwritten walk-through did not happen. "I'll update docs later" = the docs are already out of date.
 
+**Automated:** `./scripts/check-doc-drift.sh` (CI job **Doc drift**). Fails when module code changes without `docs/epics/…` in the same PR, or a new `*Handler.cs` has no `*HandlerTests.cs`.
+
 ### Docs navigation structure
 
 Every doc file must support bidirectional navigation — a reader arriving from any link must be able to navigate back without using the browser's back button:
@@ -567,7 +569,6 @@ For any **new** module: Domain → Application (no Docker needed) → Infrastruc
 ## Epics & Docs Navigation
 
 - `docs/README.md` — master navigation hub
-- `docs/playbooks/agent-checklist.md` — **agents: read first** (one page + `./scripts/check-doc-drift.sh`)
 - `docs/TECH_STACK.md` — approved libraries, versions, and ADRs
 - `docs/PROGRESS.md` — current implementation status per module and layer
 - `docs/playbooks/process.md` — step-by-step implementation workflow; read at the start of every new US or module
