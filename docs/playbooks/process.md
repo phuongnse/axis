@@ -2,6 +2,8 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
 
+> **Agents:** [agent-checklist.md](./agent-checklist.md) first. Before a PR: `./scripts/check-doc-drift.sh` from repo root.
+
 > Step-by-step checklists for backend and frontend. Read this at the start of any new module or user story — before writing any code.
 
 ## Contents

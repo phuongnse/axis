@@ -1,5 +1,7 @@
 # Axis — Project Context for Claude
 
+> **Agents — start here:** [`docs/playbooks/agent-checklist.md`](docs/playbooks/agent-checklist.md) (one page). Before each PR: `./scripts/check-doc-drift.sh` and paste Gate 2/3 into the PR ([template](.github/PULL_REQUEST_TEMPLATE.md)).
+
 ## What is Axis
 Multi-tenant low-code SaaS platform for building data-driven workflow applications. Users define custom data models, design visual workflows, create forms, and build UI pages — all without writing code.
 
@@ -108,45 +110,9 @@ Skip this structure for single-file edits, simple bug fixes, and doc-only change
 
 ## How to navigate this project
 
-Before starting any task, read only what is relevant — not everything.
+Follow [`docs/playbooks/agent-checklist.md`](docs/playbooks/agent-checklist.md) — AC map in the PR, epic README + feature file for the US, then open playbooks only when the checklist says so.
 
-**Step 1 — Identify the module(s) affected.**
-
-| Module | Epic folder |
-|--------|-------------|
-| Identity | `docs/epics/E02-identity-access/` |
-| DataModeling | `docs/epics/E03-data-modeling/` |
-| WorkflowBuilder | `docs/epics/E04-workflow-builder/` |
-| FormBuilder | `docs/epics/E05-form-builder/` |
-| WorkflowEngine | `docs/epics/E06-workflow-engine/` |
-| PageBuilder | `docs/epics/E07-page-builder/` |
-
-**Step 2 — Read the epic README** for that module: `docs/epics/{folder}/README.md`
-
-**Step 3 — Read only the feature file(s)** for the task: `docs/epics/{folder}/features/F0{N}-*.md`
-
-**Step 4 — Map every AC to a concrete implementation step** before writing any code. Write this mapping out — do not keep it mental. For each AC: which layer, which file/method, what the expected behavior is. Any AC that cannot be mapped → stop and clarify first. This written map is the output that proves requirements were understood before coding began.
-
-**Step 5 — Check implementation status** in [`docs/PROGRESS.md`](docs/PROGRESS.md)
-
-**Step 6 — Read [`docs/playbooks/process.md`](docs/playbooks/process.md)** when starting a new module or implementing a new US — it has the step-by-step checklist (layer order, TDD gates, doc update triggers) for both backend and frontend.
-
-**Step 7 — Read [`docs/playbooks/patterns.md`](docs/playbooks/patterns.md)** when the task involves any of: NuGet packages, EF Core mapping or JSONB, Minimal API wiring, writing tests, list/query endpoints, async patterns, response DTOs, repository methods, domain aggregate methods, multi-tenant raw SQL, Wolverine handlers or jobs, new step/field types, cross-cutting concerns, or any design decision about where logic lives.
-
-**Step 8 — Read [`docs/TECH_STACK.md`](docs/TECH_STACK.md)** when making any architectural decision, adding a library, or referencing an ADR.
-
-### Reading priority
-
-When multiple sources are available, prefer in this order:
-1. Current feature file — authoritative for what to build
-2. Existing implementation in the **same module** — for patterns already established there
-3. `docs/playbooks/patterns.md` — canonical patterns and pitfalls
-4. Shared abstractions in `Axis.Shared.*` — reuse before creating
-5. Other modules — reference only; never copy-paste cross-module logic
-
-Do not read files preemptively. Read the minimum required to complete the task safely. If existing code in the codebase conflicts with CLAUDE.md or a feature spec, treat the docs as source of truth — do not imitate inconsistent legacy patterns.
-
-Avoid re-reading a file you have already processed in the same task — reference your prior findings instead. Re-read only when an inconsistency or ambiguity requires clarification. When you have enough information to act safely, act.
+**Priority:** feature file ACs → `CLAUDE.md` (P0/P1) → `patterns.md` / `process.md` → same-module code.
 
 ---
 
