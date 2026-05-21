@@ -73,6 +73,7 @@ try
             typeof(CreateFormCommand).Assembly,
             typeof(CancelExecutionCommand).Assembly
         );
+        cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
         cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
     });
 
