@@ -2,94 +2,107 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
 
-Use this instead of re-reading all of `CLAUDE.md`. Details live in playbooks; this page is **what to do and what CI enforces**.
+**Daily workflow.** Detail lives in playbooks; CI enforces the non-negotiable parts.
 
 ---
 
-## Before coding (write in PR description)
+## Before coding (paste in PR)
 
 ```markdown
 ## AC map
-| AC | Layer | File / endpoint |
-|----|-------|-----------------|
-| …  | …     | …               |
+| AC / US | Layer | File / endpoint / test |
+|---------|-------|----------------------|
+| …       | …     | …                    |
 
 ## Docs touched
-- Feature: docs/epics/E0N-…/features/F0N-….md (callout US-…)
-- Epic README + PROGRESS.md if layer status changed
+- docs/epics/E0N-…/features/F0N-….md (callout)
+- Epic README / PROGRESS.md (if layer status changed)
 ```
 
-Stop if any AC has no file/method — ask the user first.
+No row with a blank implementation cell → stop and ask.
 
-**Read (minimum):** epic README → feature file for the US → same-module code for patterns.
+**Read:** epic README → feature file (US) → same-module code. Open playbooks only per table at bottom.
 
 ---
 
 ## Gates (every PR)
 
-| Gate | Command / action |
-|------|------------------|
-| **1 — Build** | `src/` → `dotnet build` then `dotnet test unit-tests.slnf` · `frontend/` → `npm run ci` + `npm run test` |
-| **2 — Docs** | Update feature callout + epic README + `docs/PROGRESS.md` when a layer changes. Paste **Gate 2** block in PR (see template). |
-| **2b — Drift** | `./scripts/check-doc-drift.sh` (CI runs this — must pass) |
-| **3 — Retro** | Paste **Gate 3** block in PR (yes/no + what you changed in docs if yes) |
+| Gate | Action |
+|------|--------|
+| **1** | `dotnet build` + `dotnet test unit-tests.slnf` if `src/`/`tests/` · `npm run ci` + `npm run test` if `frontend/` |
+| **2** | Update docs (table below) + paste Gate 2 block in PR |
+| **2b** | `./scripts/check-doc-drift.sh` — **CI fails if red** |
+| **3** | Paste Gate 3 block in PR |
 
-### Gate 2 (copy into PR)
+### Gate 2 — full row list (work through every line)
 
 ```
 Gate 2:
-- Library → …
-- New pattern → …
-- US layer callout → …
-- Epic README / PROGRESS → …
+- Library → TECH_STACK.md / not triggered
+- New pattern → patterns.md / not triggered
+- US layer callout → docs/epics/…/features/… / not triggered
+- Epic README + PROGRESS → … / not triggered
+- Architecture rule → CLAUDE.md / not triggered
+- process.md workflow → … / not triggered
+- Project structure → ARCHITECTURE.md + process.md / not triggered
+- Wireframe/diagram path move → grep docs/ / not triggered
+- Program.cs host → patterns.md host section / not triggered
+- Stale code comment → same file / not triggered
+- Library rename → grep docs/ + src comments / not triggered
+- Deferred scope → feature callout gap / not triggered
 ```
 
-### Gate 3 (copy into PR)
+### Gate 3
 
 ```
-Gate 3: 1–7 all No — or list number + doc updated
+Gate 3: 1–7 No — or: N → updated <file>
 ```
+Questions: (1) test uncovered rule? (2) invented invariant? (3) infra footgun? (4) test setup quirk? (5) direction change? (6) spec gap? (7) incident-only doc text? → fix docs before merge.
 
 ---
 
-## Layer status rules
+## Layer status (feature callouts)
 
-- **✅** = every AC for that layer in this US is done.
-- **⚠️** = started but gaps remain (list in callout).
-- **⏳** = not started.
-- Never **✅** and "pending X" in the same callout.
+| Symbol | Meaning |
+|--------|---------|
+| ✅ | All ACs for that layer in this US done |
+| ⚠️ | Started; list gaps in callout |
+| ⏳ | Not started |
 
----
-
-## P0 reminders (no exceptions)
-
-- Spec → code, not the reverse.
-- No cross-module SQL / shared DbContext.
-- New `*Handler.cs` → matching `*HandlerTests.cs` must exist in the repo (CI checks).
-- Frontend screen → wireframe exists + linked in feature file.
-- Do not only update `PROGRESS.md` when epic/feature callouts are stale.
+Never ✅ and "pending …" in the same callout. Checkboxes in feature files are spec-only — **do not** tick them.
 
 ---
 
-## Epic map (code → docs folder)
+## P0 (CI + culture)
 
-| If you change… | Update docs under… |
-|----------------|-------------------|
-| `Endpoints/Execution*` | `docs/epics/E06-workflow-engine/` |
-| `Endpoints/Form*` / FormBuilder module | `docs/epics/E05-form-builder/` |
-| `Endpoints/Workflow*` / WorkflowBuilder | `docs/epics/E04-workflow-builder/` |
-| `Endpoints/Model*` / DataModeling | `docs/epics/E03-data-modeling/` |
-| Identity / `Connect*` / `Auth*` | `docs/epics/E02-identity-access/` |
-| `TenantSchema*` / org registration | `docs/epics/E01-platform-foundation/` |
-| `frontend/src/features/auth` or `routes/login` | `docs/epics/E02-identity-access/` |
+- Spec → code, never the reverse
+- No cross-module SQL / shared `DbContext` / `IMediator` for domain events
+- New `*Handler.cs` → `*HandlerTests.cs` exists (`check-doc-drift.sh`)
+- Module code change → `docs/epics/{module}/` changes in **same PR** (not PROGRESS alone)
+- Frontend screen → wireframe + `> **Wireframe**` in feature file
+- No `.Skip()`, weakened tests, or ✅ when ACs are open
 
 ---
 
-## When to open a playbook
+## Epic map (code → docs)
 
-| Task | Open |
+| Code touch | Docs folder |
+|------------|-------------|
+| `Endpoints/Execution*`, WorkflowEngine module | `docs/epics/E06-workflow-engine/` |
+| `Endpoints/Form*`, FormBuilder, FormSubmission | `docs/epics/E05-form-builder/` |
+| WorkflowBuilder endpoints/module | `docs/epics/E04-workflow-builder/` |
+| DataModeling | `docs/epics/E03-data-modeling/` |
+| Identity, `Connect*`, `Auth*`, auth UI | `docs/epics/E02-identity-access/` |
+| `TenantSchema*`, org registration | `docs/epics/E01-platform-foundation/` |
+
+---
+
+## Playbooks (open when needed)
+
+| Need | File |
 |------|------|
-| Layer order, TDD steps | [process.md](./process.md) |
+| Layer order, TDD, gap sweep | [process.md](./process.md) |
 | EF, API, Wolverine, tenancy | [patterns.md](./patterns.md) |
-| React, Query, routes | [frontend.md](./frontend.md) |
-| Tests | [testing.md](./testing.md) |
+| React, Query, a11y | [frontend.md](./frontend.md) |
+| Tests, Testcontainers | [testing.md](./testing.md) |
+| Wireframe kit | [wireframes.md](./wireframes.md) |
