@@ -14,7 +14,7 @@
 | **CQRS via MediatR** | 12.x | Command/Query separation | Clean separation of read/write paths, fits DDD |
 | **Entity Framework Core** | 9.x | ORM | Best-in-class ORM for .NET, great migration support |
 | **Npgsql** | 9.x | PostgreSQL driver | Official EF Core provider for PostgreSQL |
-| **Wolverine** | 5.x | Background jobs + messaging | Background jobs and domain event dispatch via Wolverine `IMessageBus`. Events dispatch in-process after `SaveChangesAsync` today; durable PostgreSQL outbox is deferred — see [PROGRESS.md](./PROGRESS.md) (E01 platform gap). Not Hangfire. |
+| **Wolverine** | 5.x | Background jobs + messaging | Handles background jobs, scheduling, intra- and inter-module domain event dispatch via durable outbox. Not Hangfire. |
 | **OpenIddict** | 5.x | Auth (OAuth2/OIDC) | Standards-compliant OAuth2/OIDC server. Authorization Code + PKCE for the SPA; Client Credentials for external system integrations (e.g. triggering workflows via API). |
 | **SignalR** | (built-in) | Real-time updates | Workflow execution status pushed to client |
 | **FluentValidation** | 11.x | Input validation | Declarative, testable validation |
@@ -40,8 +40,9 @@
 | **Tailwind CSS** | 3.x | Styling | Utility-first, fast iteration |
 | **@xyflow/react** (React Flow) | 12.x | Workflow canvas | Best-in-class drag & drop node-based diagram editor. ⏳ Not yet installed — add when workflow canvas is first implemented. |
 | **dnd-kit** | 6.x | Page builder drag & drop | Flexible, accessible DnD for UI builder. ⏳ Not yet installed — add when page builder is first implemented. |
-| **Zod** | 3.x | Schema validation | Runtime validation; source of truth for form types via `z.infer`. ⏳ Not yet installed — add when forms are first implemented. |
-| **react-hook-form** | 7.x | Form state management | Performant form handling; always paired with Zod via `zodResolver`. ⏳ Not yet installed — add alongside Zod. |
+| **Zod** | 3.x | Schema validation | Runtime validation; source of truth for form types via `z.infer`. |
+| **react-hook-form** | 7.x | Form state management | Performant form handling; always paired with Zod via `@hookform/resolvers/zod`. |
+| **@hookform/resolvers** | 3.x | Form validation bridge | Connects Zod schemas to react-hook-form via `zodResolver`. |
 | **Biome** | 2.x | Linter + formatter | Replaces ESLint + Prettier. Single tool for linting, formatting, and import sorting. See ADR-008. |
 | **Vitest** | 3.x | Frontend test runner | Fast Vite-native test runner; v3 deduplicates cleanly with vite 6 (v4 installs a nested vite 8, breaking `npm ci`). |
 | **@testing-library/react** | 16.x | Component testing | Behaviour-driven component tests; always paired with Vitest |

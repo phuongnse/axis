@@ -15,6 +15,7 @@
 - AC map: every row has layer + file/test — **no blank cells**
 - Read: epic README → feature file → same-module code
 - Before API layer: `grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/epics/` — fix, defer with reason, or stop
+- End of PR: [process.md § PR wrap-up](process.md) — deferred lines, host wiring, callouts (no user reminder)
 
 ```markdown
 ## Gate 0
@@ -65,6 +66,8 @@ Example (docs-only): every line `not triggered — no src/, tests/, or frontend/
 
 ### Gate 2 — docs walk-through
 
+Paste block format: header `Gate 2:` then one `-` line per row (Gate 3 uses the same bullet style).
+
 ```text
 Gate 2:
 - Library → TECH_STACK.md / not triggered
@@ -78,22 +81,26 @@ Gate 2:
 - Program.cs host → patterns.md host section / not triggered
 - Stale code comment → same file / not triggered
 - Library rename → grep docs/ + src comments / not triggered
-- Deferred scope → feature callout gap / not triggered
+- Deferred follow-up → `**Deferred (PR #N follow-up):**` on affected US + PROGRESS if cross-cutting / not triggered
+- Host wiring (`*Endpoints.cs` / `Program.cs`) → `Map*Endpoints` sweep in process.md / not triggered
 ```
+
+**Deferred follow-ups (mandatory when leaving work open):** do not wait for the user. Any skipped review item, thin-endpoint refactor, or partial layer needs a named `**Deferred (...):**` line — full rules in [process.md § Deferred follow-up](process.md). Remove the line when fixed.
+
 
 ### Gate 3 — retrospective
 
-Answer **Yes** or **No** on **each numbered line** (do not replace with `1–7 No`). If **Yes**, name the doc updated in this PR.
+Answer **Yes** or **No** on **each line** (same `-` bullet style as Gate 2 — do not collapse to `1–7 No`). If **Yes**, name the doc updated in this PR.
 
 ```text
 Gate 3:
-1. New rule from test failure? → No / Yes →
-2. Invented invariant without AC? → No / Yes →
-3. Infrastructure footgun? → No / Yes →
-4. Non-obvious test setup? → No / Yes →
-5. Changed direction mid-task? → No / Yes →
-6. Spec gap discovered? → No / Yes →
-7. Incident-level detail in rule text? → No / Yes →
+- New rule from test failure? → No
+- Invented invariant without AC? → No
+- Infrastructure footgun? → No
+- Non-obvious test setup? → No
+- Changed direction mid-task? → No
+- Spec gap discovered? → No
+- Incident-level detail in rule text? → No
 ```
 
 ---
@@ -112,7 +119,7 @@ Never ✅ and "pending …" in the same callout. Checkboxes in feature files are
 
 | Level | When | What to write |
 |-------|------|----------------|
-| **1 — US** | Any layer progress on a user story | `> **Implementation status**` in `docs/epics/…/features/F0N-….md` |
+| **1 — US** | Any layer progress on a user story | `> **Implementation status**`, `Gaps vs spec`, optional `**Deferred (PR #N follow-up):**` in `docs/epics/…/features/F0N-….md` |
 | **2 — Epic** | A layer is complete for the module | Epic `README.md` implementation table |
 | **3 — Platform** | Module-wide summary changed | `docs/PROGRESS.md` — layer status only |
 
@@ -149,7 +156,7 @@ Updating only `PROGRESS.md` while changing `src/` without `docs/epics/` → drif
 
 | Need | File |
 |------|------|
-| Layer order, TDD, gap sweep | [process.md](./process.md) |
+| Layer order, TDD, gap sweep, deferred docs, PR wrap-up | [process.md](./process.md) |
 | Find the right patterns section | [patterns-index.md](./patterns-index.md) |
 | EF, API, Wolverine, tenancy | [patterns.md](./patterns.md) |
 | React, Query, a11y | [frontend.md](./frontend.md) |

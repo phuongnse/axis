@@ -37,8 +37,8 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 *Out of scope*
 - Execution analytics dashboard (charts, trends) — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: Paginated history table, status/date/trigger filters, and running-first sort pending API + Frontend.
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⚠️ | Frontend: ⏳
+> Gaps vs spec: `GET /api/executions` and per-workflow paged list ✅. Filter UI, date/trigger query params, and running-first sort pending API + Frontend.
 > Decisions: `GetExecutionsByWorkflowHandler` and `GetAllExecutionsHandler` use `IExecutionRepository.GetPagedByWorkflowAsync`/`GetPagedAsync` — server-side pagination with `pageSize` clamped to 100. Status filter forwarded to repository. Date range filter and trigger type filter deferred to API layer query parameters.
 
 ---

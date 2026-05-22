@@ -8,6 +8,7 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
+        cta: 'border-[hsl(28_47%_45%)] bg-accent text-accent-foreground hover:bg-accent/90 focus-visible:ring-accent/30',
         default: 'bg-primary text-primary-foreground hover:bg-primary/80',
         outline:
           'border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50',

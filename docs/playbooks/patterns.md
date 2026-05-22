@@ -472,6 +472,18 @@ await _context.WorkflowDefinitions
 
 **Rule:** Avoid raw SQL in tenant-aware contexts. When raw SQL is unavoidable (e.g. performance-critical bulk ops, cross-module reads), always prefix the table with the tenant schema from `ITenantContext.Schema` and add soft-delete filter manually. Document why raw SQL was needed with a comment.
 
+### Tenant schema provisioning (US-003)
+
+After email verification, the host provisions one PostgreSQL schema per organization and migrates every **tenant-scoped** module database into it. Identity stays on `public`.
+
+- **Interface**: `ITenantSchemaProvisioner` in `Axis.Shared.Application` — implement in the **API host** when the provisioner must touch multiple module `DbContext` types.
+- **Schema name**: `tenant_{organizationId:N}` (no slug — org slug can change).
+- **Idempotency**: `CREATE SCHEMA IF NOT EXISTS` plus `Database.MigrateAsync()` per context; safe to call twice for the same org.
+- **Tenant context during migrate**: use `FixedTenantContext` (or equivalent) so `TenantSchemaInterceptor` targets the new schema for each `MigrateAsync` call.
+- **Tests**: register `NoOpTenantSchemaProvisioner` in `WebApplicationFactory` fixtures — never run real provisioning in API integration tests.
+- **Trigger**: `VerifyEmailHandler` persists `User.VerifyEmail()` via `SaveChangesAsync`, then enqueues `ProvisionTenantMessage` through `ITenantProvisioningScheduler` (Wolverine). Do **not** call `ITenantSchemaProvisioner` synchronously in the verify request — provisioning runs in `ProvisionTenantHandler` in the API host.
+- **Message**: `ProvisionTenantMessage(Guid OrganizationId)` in `Axis.Shared.Application.Tenancy`.
+
 ---
 
 ## Async fire-and-forget pitfalls
@@ -676,7 +688,7 @@ app.MapGet("/api/workflows", async (
 ## Minimal API endpoint wiring
 
 - Each module exposes a `Map{ModuleName}Endpoints(IEndpointRouteBuilder)` extension method.
-- No logic in the mapping file — only `mediator.Send(...)` dispatch and minimal request mapping.
+- No logic in the mapping file — only `mediator.Send(...)` dispatch and minimal request mapping. Do not parse `HttpContext` claims, build default command payloads, or map enums in the endpoint — that belongs in Application (PR #47 deferred: `FormTaskEndpoints.SubmitFormByToken`, `ExecutionEndpoints.StartExecution`).
 - Use `MapGroup` to apply route prefixes and auth policies at group level.
 - JSON configuration via `ConfigureHttpJsonOptions`, never via `AddControllers().AddJsonOptions(...)`.
 - **Required annotations on every endpoint**: `.WithName()`, `.WithSummary()`, `.WithTags()`, `.Produces<T>()`, `.ProducesProblem()` for each applicable status code (400, 401, 403, 404).
@@ -992,7 +1004,7 @@ builder.Host.UseWolverine(opts =>
 });
 ```
 
-The middleware logs at `Debug` level (entry + elapsed time) and `Error` level (unhandled exceptions). It provides consistent operational traces without touching each handler — enforce it by policy, not by developer memory.
+The middleware logs unhandled handler exceptions via `OnException(Exception, Envelope)` — do **not** add `Exception` to `Finally`; Wolverine treats it as a DI service. It provides consistent operational traces without touching each handler — enforce it by policy, not by developer memory.
 
 **Layer 2 — Per-handler business milestone logging (mandatory)**
 

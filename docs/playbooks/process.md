@@ -24,13 +24,13 @@ Complete in order when scaffolding a brand-new module:
 | Step | Action |
 |---|---|
 | 1 | Create three projects: `{Module}.Domain`, `{Module}.Application`, `{Module}.Infrastructure` under `src/Modules/{Module}/` (no per-module `.Api` project — all endpoints live in `src/Axis.Api/Endpoints/`) |
-| 2 | Add all three to `Axis.sln`; add all test projects to `Axis.sln` |
+| 2 | Add all three to `Axis.sln`; add Domain and Application test projects to `unit-tests.slnf` |
 | 3 | Wire project references: `Domain` ← `Application` ← `Infrastructure`; `Axis.Api` references `Infrastructure` (and transitively `Application`) |
 | 4 | Add `GlobalUsings.cs` to each project; add common usings to `Directory.Build.props` if not already present |
 | 5 | Create `AxisDbContext` subclass in Infrastructure with `TenantSchemaInterceptor`; register in DI |
 | 6 | Create `IEndpointRouteBuilder` extension class in `src/Axis.Api/Endpoints/{Module}Endpoints.cs`; wire it in `Axis.Api/Program.cs` |
 | 7 | Create test projects: `{Module}.Domain.Tests` (unit), `{Module}.Application.Tests` (unit), `{Module}.Infrastructure.Tests` (integration with Testcontainers) |
-| 8 | Add test projects to `Axis.sln`; add all test projects to `Axis.sln` |
+| 8 | Add test projects to `Axis.sln`; add unit test projects to `unit-tests.slnf` |
 | 9 | Run `dotnet build` — zero errors before writing any domain code |
 
 ### Per-US workflow
@@ -49,14 +49,14 @@ Repeat for every user story, in layer order: Domain → Application → Infrastr
 
 1. Write failing unit tests for aggregate behaviour, value object invariants, and domain events
 2. Implement: aggregate factory methods, domain methods, value objects, domain events, repository interface
-3. Run `dotnet build` then `dotnet test` — zero errors, zero warnings before proceeding
+3. Run `dotnet test unit-tests.slnf` — must be **zero errors, zero warnings** before proceeding
 4. No EF Core, no MediatR, no external dependencies — pure C# only
 
 #### Step 3 — Application layer (TDD)
 
 1. Write failing unit tests for the command/query handler (NSubstitute for repository)
 2. Implement: `ICommand` / `IQuery`, handler, `AbstractValidator<T>`, `*Response` / `*Dto` record
-3. Run `dotnet build` then `dotnet test` — zero errors, zero warnings before proceeding
+3. Run `dotnet test unit-tests.slnf` — must be **zero errors, zero warnings** before proceeding
 4. Handlers return `Result` / `Result<T>` for business rule violations — never throw
 
 #### Step 4 — Infrastructure layer (Testcontainers)
@@ -65,7 +65,7 @@ Repeat for every user story, in layer order: Domain → Application → Infrastr
 2. Implement repository — `AsNoTracking()` on reads, tracked queries on writes
 3. Run `dotnet ef migrations add {PascalCaseName} --project ... --startup-project ...`
 4. Verify migration is idempotent; run integration tests against Testcontainers PostgreSQL
-5. Run `dotnet build` then `dotnet test` — still green
+5. Run `dotnet test unit-tests.slnf` — still green
 
 #### Step 4.5 — Gap sweep (mandatory before API layer)
 
@@ -80,7 +80,7 @@ For every `⚠️` found, decide explicitly:
 | Verdict | Action |
 |---|---|
 | Actually done, docs stale | Update callout to ✅ |
-| Deferred — depends on a later module (e.g. E06) | Add explicit "deferred pending E0X" note to the gap line |
+| Deferred — depends on a later module (e.g. E06) | `Gaps vs spec` with `pending E0X` and/or `**Deferred (...):**` per agent-checklist deferred-callout rules (`**Deferred (PR #N follow-up):**`) |
 | Genuine miss | Fix it before proceeding |
 
 Also check cross-module Application dependencies: list every query or command the upcoming API layer will call from *other* modules' Application layers. If any are missing, add them now.
@@ -103,7 +103,7 @@ For every match: confirm the SQL only references tables owned by that match's ow
 2. Every endpoint calls `.RequireAuthorization()` unless explicitly public
 3. Mapping: `mediator.Send(...)` → `Result` → `result.ToProblemDetails()` — no logic in endpoint
 4. Add / update integration tests under `tests/Api/Axis.Api.Tests/`
-5. Run `dotnet build` then `dotnet test` — zero errors, zero warnings
+5. Run `dotnet test unit-tests.slnf` — must be **zero errors, zero warnings**
 
 #### Step 6 — Update docs (same PR)
 
@@ -123,7 +123,7 @@ Complete in order before building any feature screen. Do not skip or reorder.
 
 | Step | What | Done when |
 |---|---|---|
-| 1 | **Auth flow** — React `/login` collects email + password; SPA runs **Authorization Code + PKCE** (`GET /connect/authorize` → `POST /connect/login` for credentials → `POST /connect/token` for access + refresh tokens). Access token in memory; refresh token in `httpOnly` cookie; navigate to dashboard on success | Login form works; protected routes unreachable without a valid session |
+| 1 | **Auth flow** — `/login` POSTs credentials to `/connect/login`, then Authorization Code + PKCE via `/connect/authorize` → `/callback` → `/connect/token`; access token in memory, refresh token in httpOnly cookie | Login + callback complete; dashboard reachable |
 | 2 | **Route guard** — `_authenticated` layout route with `beforeLoad`; redirects to `/login` when session is absent | Unauthenticated navigation to any protected route → redirected |
 | 3 | **Global 401 handling** — `fetchApi` 401 branch navigates to `/login` and calls `queryClient.clear()` | Any expired-session API call redirects without per-feature handling |
 | 4 | **App shell** — root authenticated layout with sidebar + header; all protected routes render as `<Outlet />` inside it | Every protected page inherits sidebar + header automatically |
@@ -152,4 +152,3 @@ Repeat for every screen / feature area. **Never skip the wireframe step** — it
 - If the full Frontend layer is done for the module: update `docs/PROGRESS.md`
 - If a new frontend pattern was established: add to `docs/playbooks/patterns.md`
 - If a library was added or changed: update `docs/TECH_STACK.md`
-- Run `./scripts/check-doc-drift.sh` before opening the PR

@@ -8,55 +8,197 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router'
 
-import { Route as rootRouteImport } from './routes/__root';
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 
-const IndexLazyRouteImport = createFileRoute('/')();
+const RegisterLazyRouteImport = createFileRoute('/register')()
+const LoginLazyRouteImport = createFileRoute('/login')()
+const ForgotPasswordLazyRouteImport = createFileRoute('/forgot-password')()
+const CallbackLazyRouteImport = createFileRoute('/callback')()
+const IndexLazyRouteImport = createFileRoute('/')()
+const AuthenticatedDashboardLazyRouteImport = createFileRoute(
+  '/_authenticated/dashboard',
+)()
 
+const RegisterLazyRoute = RegisterLazyRouteImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/register.lazy').then((d) => d.Route))
+const LoginLazyRoute = LoginLazyRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/login.lazy').then((d) => d.Route))
+const ForgotPasswordLazyRoute = ForgotPasswordLazyRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/forgot-password.lazy').then((d) => d.Route),
+)
+const CallbackLazyRoute = CallbackLazyRouteImport.update({
+  id: '/callback',
+  path: '/callback',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/callback.lazy').then((d) => d.Route))
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexLazyRoute = IndexLazyRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
-} as any).lazy(() => import('./routes/index.lazy').then((d) => d.Route));
+} as any).lazy(() => import('./routes/index.lazy').then((d) => d.Route))
+const AuthenticatedDashboardLazyRoute =
+  AuthenticatedDashboardLazyRouteImport.update({
+    id: '/dashboard',
+    path: '/dashboard',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/dashboard.lazy').then((d) => d.Route),
+  )
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexLazyRoute;
+  '/': typeof IndexLazyRoute
+  '/callback': typeof CallbackLazyRoute
+  '/forgot-password': typeof ForgotPasswordLazyRoute
+  '/login': typeof LoginLazyRoute
+  '/register': typeof RegisterLazyRoute
+  '/dashboard': typeof AuthenticatedDashboardLazyRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexLazyRoute;
+  '/': typeof IndexLazyRoute
+  '/callback': typeof CallbackLazyRoute
+  '/forgot-password': typeof ForgotPasswordLazyRoute
+  '/login': typeof LoginLazyRoute
+  '/register': typeof RegisterLazyRoute
+  '/dashboard': typeof AuthenticatedDashboardLazyRoute
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport;
-  '/': typeof IndexLazyRoute;
+  __root__: typeof rootRouteImport
+  '/': typeof IndexLazyRoute
+  '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/callback': typeof CallbackLazyRoute
+  '/forgot-password': typeof ForgotPasswordLazyRoute
+  '/login': typeof LoginLazyRoute
+  '/register': typeof RegisterLazyRoute
+  '/_authenticated/dashboard': typeof AuthenticatedDashboardLazyRoute
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: '/';
-  fileRoutesByTo: FileRoutesByTo;
-  to: '/';
-  id: '__root__' | '/';
-  fileRoutesById: FileRoutesById;
+  fileRoutesByFullPath: FileRoutesByFullPath
+  fullPaths:
+    | '/'
+    | '/callback'
+    | '/forgot-password'
+    | '/login'
+    | '/register'
+    | '/dashboard'
+  fileRoutesByTo: FileRoutesByTo
+  to:
+    | '/'
+    | '/callback'
+    | '/forgot-password'
+    | '/login'
+    | '/register'
+    | '/dashboard'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/callback'
+    | '/forgot-password'
+    | '/login'
+    | '/register'
+    | '/_authenticated/dashboard'
+  fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexLazyRoute: typeof IndexLazyRoute;
+  IndexLazyRoute: typeof IndexLazyRoute
+  AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  CallbackLazyRoute: typeof CallbackLazyRoute
+  ForgotPasswordLazyRoute: typeof ForgotPasswordLazyRoute
+  LoginLazyRoute: typeof LoginLazyRoute
+  RegisterLazyRoute: typeof RegisterLazyRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterLazyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginLazyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordLazyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/callback': {
+      id: '/callback'
+      path: '/callback'
+      fullPath: '/callback'
+      preLoaderRoute: typeof CallbackLazyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
-      id: '/';
-      path: '/';
-      fullPath: '/';
-      preLoaderRoute: typeof IndexLazyRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexLazyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardLazyRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
+interface AuthenticatedRouteChildren {
+  AuthenticatedDashboardLazyRoute: typeof AuthenticatedDashboardLazyRoute
+}
+
+const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedDashboardLazyRoute: AuthenticatedDashboardLazyRoute,
+}
+
+const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
+  AuthenticatedRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexLazyRoute: IndexLazyRoute,
-};
+  AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  CallbackLazyRoute: CallbackLazyRoute,
+  ForgotPasswordLazyRoute: ForgotPasswordLazyRoute,
+  LoginLazyRoute: LoginLazyRoute,
+  RegisterLazyRoute: RegisterLazyRoute,
+}
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>();
+  ._addFileTypes<FileRouteTypes>()

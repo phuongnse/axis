@@ -10,9 +10,7 @@
 
 | Section | Description |
 |---|---|
-| [Contributing](../CONTRIBUTING.md) | Branch naming, PR checklist, doc drift, gates |
 | [Product Vision](./PRODUCT_VISION.md) | Goals, target users, problem & solution |
-| [Progress](./PROGRESS.md) | Module layer status (summary; epics hold detail) |
 | [Tech Stack](./TECH_STACK.md) | Technology decisions and rationale |
 | [Architecture](./ARCHITECTURE.md) | System design, modules, data strategy |
 | [Epics](./epics/README.md) | All epics, features, and user stories |
@@ -22,9 +20,7 @@
 
 | Playbook | Description |
 |---|---|
-| [**Agent checklist**](./playbooks/agent-checklist.md) | **One page** — gates, epic map; `./scripts/check-doc-drift.sh` before every PR |
-| [Process](./playbooks/process.md) | Step-by-step implementation workflow — backend and frontend |
-| [Patterns index](./playbooks/patterns-index.md) | Task → section map into `patterns.md` |
+| [Process](./playbooks/process.md) | Step-by-step implementation workflow — backend and frontend; deferred follow-ups and PR wrap-up checklist |
 | [Patterns](./playbooks/patterns.md) | Technical patterns, pitfalls, and code examples |
 | [Testing](./playbooks/testing.md) | Test isolation, naming, file layout, mocking rules — .NET and frontend |
 | [Frontend](./playbooks/frontend.md) | TanStack Query patterns, TypeScript discipline, routing, component design |

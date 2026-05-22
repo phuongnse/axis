@@ -99,6 +99,6 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 *Out of scope*
 - Pausing an execution and resuming it — not in MVP (cancel only).
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: cancel button UI, Wolverine job abandonment, Form Task cancellation pending API + engine.
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⚠️ | Frontend: ⏳
+> Gaps vs spec: `POST /api/executions/{id}/cancel` ✅. Cancel button UI, Wolverine job abandonment, and Form Task cancellation pending engine.
 > Decisions: `Cancel()` domain guard rejects terminal statuses (`Completed`, `Failed`, `Cancelled`) with `InvalidOperationException`.

@@ -39,8 +39,8 @@ When a workflow execution fails at a step, users can manually retry from the fai
 *Out of scope*
 - Automatic retry (without user action) — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: Retry button UI, skip-completed-steps engine logic, and archived-definition warning pending API + Frontend.
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⚠️ | Frontend: ⏳
+> Gaps vs spec: `POST /api/executions/{id}/retry` and retry-with-context ✅. Retry UI and archived-definition warning pending Frontend.
 > Decisions: `CreateRetry()` produces a new `WorkflowExecution` with `RetryOfExecutionId` set; context is copied from original at time of retry.
 
 ---
@@ -67,8 +67,8 @@ When a workflow execution fails at a step, users can manually retry from the fai
 *Out of scope*
 - Comparing two retry attempts side-by-side — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: Retry history section UI and interlinked execution chain navigation pending Frontend + API.
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⚠️ | Frontend: ⏳
+> Gaps vs spec: `GET /api/executions/{id}/retry-history` ✅. Retry history UI and interlinked execution chain navigation pending Frontend.
 
 ---
 
@@ -95,6 +95,6 @@ When a workflow execution fails at a step, users can manually retry from the fai
 *Out of scope*
 - Structured field-by-field editing of context (showing fields by step/variable name) — not in MVP; raw JSON editor only.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: JSON context editor UI and modified-context flag pending Frontend + API.
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⚠️ | Frontend: ⏳
+> Gaps vs spec: `POST /api/executions/{id}/retry-with-context` ✅. JSON context editor UI and modified-context flag pending Frontend.
 > Decisions: `CreateRetryWithModifiedContext` added to domain as private `CreateRetryCore` delegation — shares validation logic with `CreateRetry`.

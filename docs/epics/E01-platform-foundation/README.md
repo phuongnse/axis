@@ -52,7 +52,7 @@ Without this foundation, nothing else works. Every feature in every other epic r
 | Shared Application | ✅ Done | `ICommand/IQuery`, `ICommandHandler/IQueryHandler`, `ValidationBehavior`, `ITenantContext` |
 | Shared Infrastructure | ✅ Done | `AxisDbContext`, `TenantSchemaInterceptor`, `UnitOfWork` (Wolverine `IMessageBus`) |
 | Tenant Registration (US-001–002) | ⚠️ Partial | Domain + Application + Infrastructure + API done (`POST /api/organizations/`, `/api/auth/verify-email`, `/api/auth/resend-verification`); Frontend ⏳. Gap: rate-limiting on resend (max 3/hr) pending |
-| Tenant Provisioning (US-003) | ⏳ Pending | Schema auto-creation on registration not yet wired |
+| Tenant Provisioning (US-003) | ⚠️ Partial | `ITenantSchemaProvisioner` from verify-email; retry/alert/polling UI deferred (see F01 US-003 callout) |
 | Organization Management (F02) | ⏳ Pending | — |
 | Subscription Plans (F04) | ⏳ Pending | — |
 | Frontend | ⏳ Pending | — |

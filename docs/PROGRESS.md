@@ -30,15 +30,19 @@ Workflow definitions with steps, transitions, triggers, cycle detection, publish
 
 ## FormBuilder — E05-form-builder
 
-**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳**
+**Domain ✅ | Application ⚠️ | Infrastructure ✅ | API ⚠️ | Frontend ⏳**
 
-Form definitions with typed fields (9 field types, polymorphic config). Cross-module isolation via Wolverine event-driven local denormalization — no direct cross-module SQL. All endpoints covered by integration tests.
+Form definitions + F04 form tasks (`FormSubmission`, token submit, my tasks, expiry job). **PR #50 deferred:** move `submittedBy` parsing from `FormTaskEndpoints` to Application.
 
 ## WorkflowEngine — E06-workflow-engine
 
-**Domain ✅ | Application ✅ | Infrastructure ⚠️ | API ⏳ | Frontend ⏳**
+**Domain ✅ | Application ✅ | Infrastructure ⚠️ | API ⚠️ | Frontend ⏳**
 
-Execution lifecycle (start, cancel, retry, retry-with-context). Step state machine with per-step execution handlers (Form, HTTP, Condition, Script, Notification). `WorkflowSnapshot` local read model populated from `WorkflowPublished` events. Paged execution history and retry history queries. Cross-module isolation via local read models — WorkflowEngine never queries WorkflowBuilder or FormBuilder DBs. Infrastructure ⚠️: `IScriptExecutor` and `INotificationSender` are stubs (real dispatch deferred).
+Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoints` registered. **PR #50 deferred:** thin-endpoint refactor for `StartExecution` request shaping. Infrastructure ⚠️: `IScriptExecutor` and `INotificationSender` stubs.
+
+## Identity / E01 — tenant provisioning (cross-cutting)
+
+**Verify email → provision:** `VerifyEmailHandler` saves verified state, then enqueues `ProvisionTenantMessage` (Wolverine → `ProvisionTenantHandler` + `ITenantSchemaProvisioner`). **Deferred:** retry/backoff/alert on provision failures, provisioning wait UI, Admin role on verify per E01 US-003.
 
 ## PageBuilder — E07-page-builder
 

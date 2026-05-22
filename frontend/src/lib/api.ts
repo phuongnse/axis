@@ -1,3 +1,6 @@
+import { getAccessToken, useAuthStore } from '@/features/auth/auth-store';
+import { queryClient } from '@/lib/query-client';
+
 export class ApiError extends Error {
   status: number;
   data: unknown;
@@ -23,6 +26,11 @@ export async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {
     Accept: 'application/json',
     ...((options.headers as Record<string, string>) || {}),
   };
+
+  const accessToken = getAccessToken();
+  if (accessToken && !headers.Authorization) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
 
   // Only set Content-Type to JSON if it's not FormData
   if (!(options.body instanceof FormData)) {
@@ -58,7 +66,11 @@ export async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {
       }
 
       if (response.status === 401) {
-        // Handled globally (e.g. redirect to login)
+        useAuthStore.getState().clearSession();
+        queryClient.clear();
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+          window.location.href = '/login';
+        }
       }
 
       throw new ApiError(response.status, errorData);
