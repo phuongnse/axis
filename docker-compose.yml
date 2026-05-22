@@ -29,6 +29,100 @@ services:
       timeout: 3s
       retries: 10
 
+  maildev:
+    image: maildev/maildev:2.1.0
+    container_name: axis_maildev
+    ports:
+      - "1025:1025"  # SMTP
+      - "1080:1080"  # Web UI — open http://localhost:1080 to read outbound mail
+    healthcheck:
+      disable: true
+
+  localstack:
+    image: localstack/localstack:3.8
+    container_name: axis_localstack
+    environment:
+      SERVICES: s3
+      DEBUG: 0
+    ports:
+      - "4566:4566"
+    volumes:
+      - localstack_data:/var/lib/localstack
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    container_name: axis_api
+    working_dir: /src
+    command:
+      - bash
+      - -lc
+      - "dotnet restore src/Axis.Api/Axis.Api.csproj && dotnet watch --project src/Axis.Api/Axis.Api.csproj --non-interactive run --no-launch-profile"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      maildev:
+        condition: service_started
+      localstack:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      # Required for `dotnet watch` to detect file changes on a bind-mounted
+      # Windows filesystem (WSL2). inotify events do not propagate reliably.
+      DOTNET_USE_POLLING_FILE_WATCHER: "1"
+      DOTNET_WATCH_RESTART_ON_RUDE_EDIT: "1"
+      ConnectionStrings__Identity: "Host=postgres;Port=5432;Database=axis;Username=axis;Password=axis_dev_pass"
+      ConnectionStrings__DataModeling: "Host=postgres;Port=5432;Database=axis;Username=axis;Password=axis_dev_pass"
+      ConnectionStrings__WorkflowBuilder: "Host=postgres;Port=5432;Database=axis;Username=axis;Password=axis_dev_pass"
+      ConnectionStrings__FormBuilder: "Host=postgres;Port=5432;Database=axis;Username=axis;Password=axis_dev_pass"
+      ConnectionStrings__WorkflowEngine: "Host=postgres;Port=5432;Database=axis;Username=axis;Password=axis_dev_pass"
+      Redis__ConnectionString: "redis:6379"
+      Email__Host: maildev
+      Email__Port: "1025"
+      Aws__ServiceURL: "http://localstack:4566"
+      Cors__AllowedOrigins__0: "http://localhost:3000"
+    ports:
+      - "5280:8080"
+    volumes:
+      - ./src:/src/src
+      - ./Axis.sln:/src/Axis.sln:ro
+      - ./Directory.Build.props:/src/Directory.Build.props:ro
+      - ./Directory.Packages.props:/src/Directory.Packages.props:ro
+      - nuget_packages:/root/.nuget/packages
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: axis_web
+    depends_on:
+      - api
+    environment:
+      VITE_API_PROXY_TARGET: "http://api:8080"
+      # Vite chokidar polling — needed for file change events through WSL bind mounts.
+      VITE_USE_POLLING: "1"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - web_node_modules:/app/node_modules
+
 volumes:
   postgres_data:
   redis_data:
+  localstack_data:
+  web_node_modules:
+  nuget_packages:

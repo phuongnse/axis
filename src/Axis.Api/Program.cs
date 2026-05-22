@@ -9,6 +9,7 @@ using Axis.Api.Infrastructure;
 using Axis.Api.Middleware;
 using Axis.DataModeling.Application.Commands.CreateModel;
 using Axis.DataModeling.Infrastructure.Extensions;
+using Axis.Identity.Infrastructure.Persistence;
 using Axis.FormBuilder.Application.Commands.CreateForm;
 using Axis.FormBuilder.Infrastructure.Extensions;
 using Axis.Identity.Application.Commands.RegisterOrganization;
@@ -243,6 +244,16 @@ try
 
     // ── Build ──────────────────────────────────────────────────────────────
     WebApplication app = builder.Build();
+
+    // ── Dev bootstrap: ensure Identity/OpenIddict schema before hosted services
+    //    (OpenIddictSeeder) run. Tenant module schemas are provisioned per-org
+    //    by TenantSchemaProvisioner when an organization is registered.
+    if (app.Environment.IsDevelopment())
+    {
+        using IServiceScope scope = app.Services.CreateScope();
+        IdentityDbContext identityDb = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        identityDb.Database.EnsureCreated();
+    }
 
     app.UseMiddleware<CorrelationIdMiddleware>();
     app.UseMiddleware<ValidationExceptionMiddleware>();
