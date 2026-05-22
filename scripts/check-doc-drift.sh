@@ -68,6 +68,24 @@ if any_changed '^src/' && docs_changed_under 'docs/PROGRESS.md'; then
   fi
 fi
 
+# Cross-module raw-SQL guard (P0 in CLAUDE.md § Module boundaries).
+# Flag *newly introduced* raw-SQL calls in module code so review confirms the
+# SQL only touches that module's own tables. Use Wolverine events for any
+# cross-module data needs (see patterns.md § Cross-module data pattern).
+RAW_SQL_PATTERN='SqlQueryRaw|ExecuteSqlRaw|FromSqlRaw|ExecuteSqlInterpolated|FromSqlInterpolated'
+while IFS= read -r added; do
+  [ -z "${added}" ] && continue
+  fail "New raw-SQL call in module code — confirm same-module tables only: ${added}"
+done < <(
+  git diff --unified=0 "${RANGE}" -- 'src/Modules/*.cs' 2>/dev/null \
+    | awk -v pat="${RAW_SQL_PATTERN}" '
+        /^\+\+\+ b\// { file = substr($0, 7); next }
+        /^\+[^+]/ && $0 ~ pat { print file ": " substr($0, 2) }
+      '
+)
+
+# New OR renamed handler must have a matching test file.
+# Status A = added; R### = renamed (git emits `R100\tOLD\tNEW`).
 while IFS= read -r handler; do
   [ -z "${handler}" ] && continue
   module="$(echo "${handler}" | sed -n 's|src/Modules/\([^/]*\)/.*|\1|p')"
@@ -80,9 +98,16 @@ while IFS= read -r handler; do
   test_file="tests/Modules/${module}/Axis.${module}.Application.Tests/${subdir}/${handler_name}Tests.cs"
 
   if [ ! -f "${test_file}" ]; then
-    fail "New handler ${handler} — create ${test_file}"
+    fail "Handler ${handler} — create ${test_file}"
   fi
-done < <(git diff --name-status "${RANGE}" 2>/dev/null | awk '$1 == "A" && /src\/Modules\/.*\/(Commands|Queries)\/.*Handler\.cs$/ { print $2 }')
+done < <(
+  git diff --name-status "${RANGE}" 2>/dev/null | awk '
+    ($1 == "A" || $1 ~ /^R/) {
+      path = ($1 ~ /^R/) ? $3 : $2
+      if (path ~ /^src\/Modules\/.*\/(Commands|Queries)\/.*Handler\.cs$/) print path
+    }
+  '
+)
 
 check_readme_api() {
   local code_pattern="$1"
@@ -94,6 +119,24 @@ check_readme_api() {
     fi
   fi
 }
+
+# P2 hygiene: no new TODO / FIXME / NotImplementedException / placeholder / stub
+# in production or test code. Scans *added* lines only — existing markers don't
+# break unrelated PRs. Run from any shell (CI or local Git Bash on Windows).
+TODO_PATTERN='TODO|FIXME|NotImplementedException|placeholder|stub'
+while IFS= read -r added; do
+  [ -z "${added}" ] && continue
+  fail "New TODO/FIXME/stub marker introduced — resolve or open an issue: ${added}"
+done < <(
+  git diff --unified=0 "${RANGE}" \
+    -- 'src/*' 'tests/*' 'frontend/src/*' \
+    ':(exclude)**/obj/**' ':(exclude)**/node_modules/**' \
+    2>/dev/null \
+    | awk -v pat="${TODO_PATTERN}" '
+        /^\+\+\+ b\// { file = substr($0, 7); next }
+        /^\+[^+]/ && $0 ~ pat { print file ": " substr($0, 2) }
+      '
+)
 
 check_readme_api 'src/Axis\.Api/Endpoints/Execution' 'docs/epics/E06-workflow-engine'
 check_readme_api 'src/Axis\.Api/Endpoints/Form' 'docs/epics/E05-form-builder'

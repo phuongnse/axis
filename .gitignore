@@ -33,6 +33,8 @@ logs/
 *.ncrunchsolution
 *.ncrunchproject
 .ncrunch*/
+nCrunchTemp_*/
+nCrunchTemp_*.csproj
 
 # IDE
 .idea/

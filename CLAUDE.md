@@ -70,7 +70,7 @@ Multi-tenant low-code SaaS: custom data models, visual workflows, forms, and UI 
 - Never bypass auth, skip an AC silently, or mark ✅ to avoid a hard gap.
 - Domain: zero external dependencies.
 - Never commit with failing Gate 1; docs and requirements satisfied before merge (agent-checklist + PR template).
-- When `src/`, `tests/`, or `docs/epics/` change: run `./scripts/check-doc-drift.sh` before push; CI **Doc drift** must be green. Paste **Gate 2** in the PR — not a drift-script gate block.
+- When `src/`, `tests/`, or `docs/epics/` change: run `./scripts/check-doc-drift.sh` before push (bash — on Windows use Git Bash, not PowerShell); CI **Doc drift** must be green. Tick **Gate 2** in the PR template — do not paste drift-script output.
 
 **P1 — confirm with user before deviating:**
 
@@ -189,11 +189,7 @@ Full rules: [`patterns.md`](docs/playbooks/patterns.md) (EF, API, Wolverine, agg
 
 **Per layer / module:** all US callouts updated; epic README table; [`PROGRESS.md`](docs/PROGRESS.md) (layer summary only — not per-class detail).
 
-**Per PR before merge:** PR description = Summary + Requirements only (no CI status in description); run `./scripts/check-doc-drift.sh` before push when `src/`, `tests/`, or `docs/epics/` change; Gate 1 includes:
-
-```bash
-grep -rn "TODO\|FIXME\|NotImplementedException\|placeholder\|stub" src/ tests/ frontend/src/ 2>/dev/null | grep -v obj/ | grep -v node_modules/
-```
+**Per PR before merge:** PR description = Summary + Linked spec + Requirements only (no CI status, no commit list — Checks tab covers that). Run `./scripts/check-doc-drift.sh` before push when `src/`, `tests/`, or `docs/epics/` change — the script enforces epic-docs same-PR, new-handler tests, the no-new `TODO`/`FIXME`/`stub` rule, and new raw-SQL call review (cross-module guard).
 
 Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` changes.
 

@@ -2,15 +2,13 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
 
-**Daily workflow.** Gates 0–3 while implementing. **PR description:** only Summary + Requirements ([PR template](../../.github/PULL_REQUEST_TEMPLATE.md)) — not long gate paste blocks.
+**Daily workflow.** Walk Gates 0–3 **locally** while implementing; reflect outcomes in the [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) checkboxes. **PR description = Summary + Linked spec + Requirements only** — no Gate paste blocks, no commit list, no CI/Doc-drift status (GitHub Checks tab covers that).
 
+The paste-block templates below are for *your own* walk-through (agent reasoning, scratchpad, or PR thread comment if asked) — not for the PR description.
 
 ---
 
-
-**PR body:** Summary + ordered Requirements (spec→code, Gates 0–3). Do not list commits or CI/Doc drift status in the description — GitHub Checks tab covers that.
-
-## Gate 0 — Ready (before code; paste in PR when shipping code)
+## Gate 0 — Ready (before code)
 
 - AC map: every row has layer + file/test — **no blank cells**
 - Read: epic README → feature file → same-module code
@@ -29,7 +27,7 @@ Docs touched: docs/epics/…
 
 ## Gates (every PR)
 
-**Doc drift:** when `src/`, `tests/`, or `docs/epics/` change — run `./scripts/check-doc-drift.sh` **before push** (P0); CI job **Doc drift** must be green. Do **not** paste script output as a gate block — paste **Gate 2** walk-through instead.
+**Doc drift:** when `src/`, `tests/`, or `docs/epics/` change — run `./scripts/check-doc-drift.sh` **before push** (P0; bash — use Git Bash on Windows); CI job **Doc drift** must be green. Script output is not a PR artefact — walk Gate 2 rows below mentally and tick the Gate 2 checkbox.
 
 | Gate | Action |
 |------|--------|
@@ -38,7 +36,7 @@ Docs touched: docs/epics/…
 | **2** | Doc walk-through (rows below) |
 | **3** | Retrospective (seven questions) |
 
-**Priority:** Gate **1** blocks commit (failing build/tests). Gate **2** keeps docs in the same PR — required before merge, not a substitute for Gate 1. In PR descriptions, list Gate 1 before Gate 2 ([template](../../.github/PULL_REQUEST_TEMPLATE.md)).
+**Priority:** Gate **1** blocks commit (failing build/tests). Gate **2** keeps docs in the same PR — required before merge, not a substitute for Gate 1. The [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) lists Gate 1 before Gate 2.
 
 ### Gate 1 — verify before push (local = CI)
 
@@ -46,23 +44,22 @@ Docs touched: docs/epics/…
 |---------|----------------------------------------|
 | `src/` or `tests/` | `dotnet build` then `dotnet test` (full `Axis.sln` — includes Infrastructure, API, Testcontainers) |
 | `src/` or `tests/` | `dotnet format --verify-no-changes` |
-| `src/`, `tests/`, or `frontend/src/` | `grep -rn "TODO\|FIXME\|NotImplementedException\|placeholder\|stub" src/ tests/ frontend/src/` → empty |
 | `frontend/` | `npm run ci` then `npm run test` |
 | `src/Axis.Api/Endpoints/` or API contract | Update + run `tests/Api/Axis.Api.Tests/` |
+| Any of the above + `docs/epics/` | `./scripts/check-doc-drift.sh` (bash) — also enforces no-new `TODO`/`FIXME`/`stub` and reviews new raw-SQL calls |
 
 ```text
-Gate 1:
+Gate 1 self-check:
 - dotnet build → ran / not triggered (reason)
 - dotnet test (full solution) → ran / not triggered (reason)
 - dotnet format --verify-no-changes → ran / not triggered (reason)
-- stub/TODO grep → ran / not triggered (reason)
 - npm run ci + npm run test → ran / not triggered (reason)
 - ./scripts/check-doc-drift.sh → ran / not triggered (reason)
 ```
 
 Example (docs-only): every line `not triggered — no src/, tests/, or frontend/ changes`.
 
-**Docker:** integration and API tests run as part of `dotnet test`; Docker must be available locally (same as CI agents with Testcontainers).
+**Docker:** integration and API tests run as part of `dotnet test`; Docker must be available locally (same as CI runners with Testcontainers).
 
 ### Gate 2 — docs walk-through
 
