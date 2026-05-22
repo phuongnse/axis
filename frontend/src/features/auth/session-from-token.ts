@@ -5,8 +5,9 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   }
 
   try {
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const json = atob(base64);
+    const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), '=');
+    const json = atob(padded);
     return JSON.parse(json) as Record<string, unknown>;
   } catch {
     return null;
