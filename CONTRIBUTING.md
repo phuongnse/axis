@@ -30,7 +30,7 @@ Thank you for contributing. This repo uses docs-first development: feature specs
 |-------|------------------|
 | Build & tests (backend) | `dotnet build` then `dotnet test` (full solution) when `src/` or `tests/` changed |
 | Build & tests (frontend) | `npm run ci` then `npm run test` when `frontend/` changed |
-| Doc drift (CI) | PR check **Doc drift** — run `./scripts/check-doc-drift.sh` locally only when debugging |
+| Doc drift | Run `./scripts/check-doc-drift.sh` before push when `src/`, `tests/`, or `docs/epics/` change; CI job **Doc drift** must be green |
 | Agent gates | Paste **Gates 0–3** from [agent-checklist.md](docs/playbooks/agent-checklist.md) (Gate 1: `not triggered` when docs-only) |
 
 ### Documentation in the same PR
@@ -63,7 +63,7 @@ Use the checklist in [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_T
 - AC map and docs touched
 - **Gate 0** — AC map when code changes
 - **Gate 1** — full `dotnet build` + `dotnet test` (not a solution filter)
-- **Gate 2** — doc walk-through (drift enforced by CI, not pasted)
+- **Gate 2** — paste doc walk-through in PR (required). Drift **script** = run before push + CI check — do not paste script output as a gate block
 - **Gate 3** — retrospective
 
 ---

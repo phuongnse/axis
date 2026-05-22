@@ -24,11 +24,12 @@ Gate 1:
 - TODO/FIXME/placeholder/stub grep (empty) → ran / not triggered (reason)
 - npm run ci → ran / not triggered (reason)
 - npm run test → ran / not triggered (reason)
+- ./scripts/check-doc-drift.sh → ran / not triggered (reason)
 ```
 
 ## Gate 2 — Docs (required)
 
-Doc drift is enforced by the CI job **Doc drift** (no paste block needed). Walk through every row:
+Run `./scripts/check-doc-drift.sh` before push when code or `docs/epics/` change (also in Gate 1). CI job **Doc drift** must be green — do not paste script output here. **Paste Gate 2** walk-through:
 
 ```text
 Gate 2:
@@ -59,6 +60,7 @@ Gate 3:
 
 GitHub shows pass/fail for build, test, and **Doc drift** — no need to duplicate in Gate blocks above.
 
+- [ ] `./scripts/check-doc-drift.sh` locally before push (when `src/`, `tests/`, or `docs/epics/` changed)
 - [ ] All required CI checks green (including **Doc drift** when code changed)
 - [ ] `dotnet build` + `dotnet test` locally if you touched `src/` or `tests/` (full solution)
 - [ ] `npm run ci` + `npm run test` locally if you touched `frontend/`

@@ -70,7 +70,7 @@ Multi-tenant low-code SaaS: custom data models, visual workflows, forms, and UI 
 - Never bypass auth, skip an AC silently, or mark ✅ to avoid a hard gap.
 - Domain: zero external dependencies.
 - Never commit with failing Gate 1, or without **written** Gate 2 and Gate 3 in the PR.
-- Run `./scripts/check-doc-drift.sh` before push (CI **Doc drift** job).
+- When `src/`, `tests/`, or `docs/epics/` change: run `./scripts/check-doc-drift.sh` before push; CI **Doc drift** must be green. Paste **Gate 2** in the PR — not a drift-script gate block.
 
 **P1 — confirm with user before deviating:**
 
@@ -126,7 +126,7 @@ Skip for single-file fixes and doc-only edits.
 | `frontend/` | `npm run ci` then `npm run test` |
 | Both | All of the above |
 
-**Gate 2** — doc walk-through in PR ([agent-checklist.md § Gate 2](docs/playbooks/agent-checklist.md)). **Doc drift** — CI job only; script also fails when epic docs are missing alongside module code changes, or new handlers lack tests.
+**Gate 2** — paste doc walk-through in PR ([agent-checklist.md § Gate 2](docs/playbooks/agent-checklist.md)). **Doc drift** — run script before push when code/epics change; CI job must be green; do not paste script output in the PR body.
 
 **Gate 3** — seven yes/no questions (paste each line — not `1–7 No`) in [agent-checklist.md § Gate 3](docs/playbooks/agent-checklist.md); update `patterns.md` / feature file / `TECH_STACK.md` on any "yes".
 

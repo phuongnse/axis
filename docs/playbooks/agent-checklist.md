@@ -24,7 +24,7 @@ Docs touched: docs/epics/…
 
 ## Gates (every PR)
 
-**Doc drift:** enforced by CI job **Doc drift** (`./scripts/check-doc-drift.sh`). Use the PR checks UI — do **not** paste a Gate block for it. Run the script locally only when debugging a failure.
+**Doc drift:** when `src/`, `tests/`, or `docs/epics/` change — run `./scripts/check-doc-drift.sh` **before push** (P0); CI job **Doc drift** must be green. Do **not** paste script output as a gate block — paste **Gate 2** walk-through instead.
 
 | Gate | Action |
 |------|--------|
@@ -50,6 +50,7 @@ Gate 1:
 - dotnet format --verify-no-changes → ran / not triggered (reason)
 - stub/TODO grep → ran / not triggered (reason)
 - npm run ci + npm run test → ran / not triggered (reason)
+- ./scripts/check-doc-drift.sh → ran / not triggered (reason)
 ```
 
 Example (docs-only): every line `not triggered — no src/, tests/, or frontend/ changes`.
