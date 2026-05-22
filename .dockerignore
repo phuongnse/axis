@@ -1,0 +1,17 @@
+**/bin
+**/obj
+**/.vs
+**/.idea
+**/.vscode
+**/node_modules
+**/dist
+**/.git
+**/.github
+**/.ncrunch_*
+**/*.ncrunchsolution*
+**/*.user
+docs
+tests
+frontend
+**/TestResults
+**/coverage
