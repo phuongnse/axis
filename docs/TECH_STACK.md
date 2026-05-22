@@ -16,7 +16,7 @@
 | **Npgsql** | 9.x | PostgreSQL driver | Official EF Core provider for PostgreSQL |
 | **Wolverine** | 5.x | Background jobs + messaging | Handles background jobs, scheduling, intra- and inter-module domain event dispatch via durable outbox. Not Hangfire. |
 | **OpenIddict** | 5.x | Auth (OAuth2/OIDC) | Standards-compliant OAuth2/OIDC server. Authorization Code + PKCE for the SPA; Client Credentials for external system integrations (e.g. triggering workflows via API). |
-| **SignalR** | (built-in) | Real-time updates | Workflow execution status pushed to client. ⏳ Not yet wired — no `*Hub.cs` in `src/` yet. |
+| **SignalR** | (built-in) | Real-time updates | Capability available in ASP.NET Core; no `*Hub.cs` currently registered in `src/`. Status: [PROGRESS.md](./PROGRESS.md), epic acceptance: [E06](./epics/E06-workflow-engine/README.md). |
 | **FluentValidation** | 11.x | Input validation | Declarative, testable validation |
 | **Serilog** | 3.x | Structured logging | JSON logs, easy to ship to any log aggregator |
 | **Swashbuckle.AspNetCore** | 6.9.0 | OpenAPI metadata | `AddSwaggerGen` + `UseSwagger` generates the Swagger JSON document; wired with Bearer auth definition |

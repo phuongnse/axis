@@ -23,7 +23,7 @@ The Axis platform serves four actor types: **Platform Admins** (Axis team), **Or
 | Container | Responsibility |
 |---|---|
 | **Web Application** | SPA for all user interactions: workflow builder, form builder, page builder, data management |
-| **API Server** | Modular monolith exposing REST API; SignalR hub planned for execution push updates |
+| **API Server** | Modular monolith exposing REST API. Real-time execution push lives under [E06 Workflow Engine](./epics/E06-workflow-engine/README.md). |
 | **Background Job Runner** | In-process job/event runner — executes scheduled workflows, processes async steps, dispatches domain events |
 | **PostgreSQL** | Primary data store — schema-per-tenant |
 | **Redis** | Session cache, distributed locks, pub/sub for real-time events |
@@ -55,7 +55,7 @@ Cross-module communication is via Wolverine domain events or Application-layer i
 
 Each organization (tenant) is provisioned with its own **PostgreSQL schema** at sign-up. The `public` schema is reserved for platform-level data (organizations, subscriptions, identity).
 
-```
+```text
 PostgreSQL
 ├── public schema           # organizations, subscription_plans, users, roles
 └── tenant_{orgId} schemas  # per-tenant: models, workflows, executions, …

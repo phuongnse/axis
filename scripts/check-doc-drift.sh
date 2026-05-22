@@ -147,7 +147,7 @@ check_readme_api 'src/Axis\.Api/Endpoints/Workflow' 'docs/epics/E04-workflow-bui
 # not what is "planned" or "will be wired". Forward-looking status belongs in
 # docs/PROGRESS.md or an epic feature file — places readers know are
 # forward-looking. See docs/playbooks/docs-style.md § Anti-patterns.
-SPEC_PATTERN='Not yet implemented|planned design|Will be wired|To be implemented|Coming soon'
+SPEC_PATTERN='Not yet|\bplanned\b|Will be|To be implemented|Coming soon|in the future'
 SPEC_TARGETS=(
   'docs/ARCHITECTURE.md'
 )
