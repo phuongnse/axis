@@ -5,7 +5,7 @@
 
 ## Distributed-ready foundation rollout
 
-The project has pivoted from "modular monolith that can extract later" to **modulith with strict service boundaries** ([ADR-010](TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries--extract--redeploy)). The existing module implementations are functional but were built against the original assumption (shared DB, in-process events, shared kernel implementation). They must be migrated to the new contract before user-facing feature work continues.
+The project has pivoted from "modular monolith that can extract later" to **modulith with strict service boundaries** ([ADR-010](TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy)). The existing module implementations are functional but were built against the original assumption (shared DB, in-process events, shared kernel implementation). They must be migrated to the new contract before user-facing feature work continues.
 
 Foundation phases (each a sequence of small PRs):
 
@@ -14,14 +14,14 @@ Foundation phases (each a sequence of small PRs):
 | **Phase 0 — Foundation decisions** | ⚠️ in progress (this PR) | Rewrite ADR-001/002/009; add ADR-010..023; update `ARCHITECTURE.md` + `CLAUDE.md` + `patterns.md`. No code change. |
 | **Phase 1 — Infrastructure foundation** | ⏳ pending | Add Kafka + Schema Registry + Vault to `docker-compose.dev.yml`; wire WolverineFx.Kafka transport; refactor `Axis.Shared` to abstractions only; per-module DB connection separation + per-module Wolverine schema; OpenTelemetry instrumentation. |
 | **Phase 2 — Per-module HTTP/gRPC boundary** | ⏳ pending | One PR per module: introduce `Axis.{Module}.Contracts` (proto + Avro); expose gRPC server; rewrite `Axis.Api` to call modules through gRPC clients; replace in-process service interfaces. Identity goes first. |
-| **Phase 3 — Per-module EF migrations** | ⏳ pending | Generate initial migrations for Identity / DataModeling / PageBuilder (already done for FormBuilder / WorkflowBuilder / WorkflowEngine); switch test fixtures from `EnsureCreatedAsync` to `MigrateAsync` per [ADR-023](TECH_STACK.md#adr-023-per-module-ef-core-migrations-no-ensurecreated). |
+| **Phase 3 — Per-module EF migrations** | ⏳ pending | Generate initial migrations for Identity / DataModeling / PageBuilder (already done for FormBuilder / WorkflowBuilder / WorkflowEngine); switch test fixtures from `EnsureCreatedAsync` to `MigrateAsync` per [ADR-023](TECH_STACK.md#adr-023-per-module-ef-core-migrations-only). |
 | **Phase 4 — Deployment readiness** | ⏳ pending | Per-module Dockerfile; `docker-compose.dev.yml` runs each module as a separate container; CI builds per-module artifacts; K8s manifests; per-module Vault policies. |
 
 Feature work (Frontend feature UIs, E07 PageBuilder, remaining E01/E06 gaps) is paused until Phase 1–2 complete. Estimated timeline ~2–3 months.
 
 ## Shared Kernel ⚠️ (scope shrinking under ADR-017)
 
-Current state: Domain, Application, and Infrastructure layers exist. Under [ADR-017](TECH_STACK.md#adr-017-axisshared-is-abstractions-only--no-shared-implementation), `Axis.Shared.Infrastructure` is being narrowed to genuinely cross-cutting abstractions only; UnitOfWork base class, tenant-schema interceptor, and Wolverine middleware will move into the modules that own them. The migration ships incrementally with Phase 1 PRs.
+Current state: Domain, Application, and Infrastructure layers exist. Under [ADR-017](TECH_STACK.md#adr-017-axisshared-is-abstractions-only-no-shared-implementation), `Axis.Shared.Infrastructure` is being narrowed to genuinely cross-cutting abstractions only; UnitOfWork base class, tenant-schema interceptor, and Wolverine middleware will move into the modules that own them. The migration ships incrementally with Phase 1 PRs.
 
 ## Identity — E02-identity-access
 
@@ -29,7 +29,7 @@ Current state: Domain, Application, and Infrastructure layers exist. Under [ADR-
 
 Full auth, user, role, invitation, and session management. OpenIddict 5.x OIDC server (Authorization Code + PKCE for SPA; Client Credentials for M2M). RBAC via custom permission policies. All Identity API endpoints covered by integration tests.
 
-> ⏳ **Retrofit under [ADR-010](TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries--extract--redeploy):** introduce `Axis.Identity.Contracts` (gRPC `IdentityService` + Avro events for user/role lifecycle); expose JWKS for cross-module token validation; remove cross-module DbContext access from other modules' code; move Identity DbContext to its own `axis_identity` database; switch tests from `EnsureCreated` to migrations. Runs in Phase 2 — Identity goes first because every other module validates JWTs against it.
+> ⏳ **Retrofit under [ADR-010](TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy):** introduce `Axis.Identity.Contracts` (gRPC `IdentityService` + Avro events for user/role lifecycle); expose JWKS for cross-module token validation; remove cross-module DbContext access from other modules' code; move Identity DbContext to its own `axis_identity` database; switch tests from `EnsureCreated` to migrations. Runs in Phase 2 — Identity goes first because every other module validates JWTs against it.
 
 ## DataModeling — E03-data-modeling
 

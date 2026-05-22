@@ -10,20 +10,20 @@
 |---|---|---|---|
 | **C# / .NET 8** | 8.x LTS | Language & runtime | Mature, high-performance, strong ecosystem |
 | **ASP.NET Core** | 8.x | Web API & SignalR | Industry standard for .NET APIs |
-| **Modulith with strict service boundaries** | — | Architecture pattern | Per-module DB + broker + gRPC + JWT from day 1; extraction = redeploy. See [ADR-010](#adr-010-modulith-with-strict-service-boundaries--extract--redeploy). |
+| **Modulith with strict service boundaries** | — | Architecture pattern | Per-module DB + broker + gRPC + JWT from day 1; extraction = redeploy. See [ADR-010](#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy). |
 | **CQRS via MediatR** | 12.x | Intra-module command/query separation | Within a module only; cross-module communication uses Kafka + gRPC, never MediatR. |
-| **Entity Framework Core** | 9.x | ORM (per module) | Each module owns a DbContext + database. Migrations mandatory ([ADR-023](#adr-023-per-module-ef-core-migrations-no-ensurecreated)). |
-| **Npgsql** | 9.x | PostgreSQL driver | Per-module database; per-module Wolverine schema ([ADR-011](#adr-011-per-module-database--schema-per-tenant-inside), [ADR-012](#adr-012-per-module-wolverine-schema-in-the-modules-own-database)). |
+| **Entity Framework Core** | 9.x | ORM (per module) | Each module owns a DbContext + database. Migrations mandatory ([ADR-023](#adr-023-per-module-ef-core-migrations-only)). |
+| **Npgsql** | 9.x | PostgreSQL driver | Per-module database; per-module Wolverine schema ([ADR-011](#adr-011-per-module-database-with-schema-per-tenant-inside), [ADR-012](#adr-012-per-module-wolverine-schema-in-the-modules-own-database)). |
 | **Wolverine** | 5.x | In-module orchestration + outbox + saga runtime | Handlers, scheduled jobs, durable outbox (per-module schema), saga state. Cross-module transport is Kafka ([ADR-013](#adr-013-apache-kafka-as-the-cross-module-event-transport)). |
-| **Apache Kafka** | 3.x | Cross-module event transport | Durable log + replay for module bootstrap; Confluent Schema Registry for Avro payloads ([ADR-013](#adr-013-apache-kafka-as-the-cross-module-event-transport), [ADR-019](#adr-019-avro--schema-registry-for-event-payloads-cloudevents-envelope)). |
+| **Apache Kafka** | 3.x | Cross-module event transport | Durable log + replay for module bootstrap; Confluent Schema Registry for Avro payloads ([ADR-013](#adr-013-apache-kafka-as-the-cross-module-event-transport), [ADR-019](#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). |
 | **WolverineFx.Kafka** | 5.x | Kafka transport for Wolverine | Bridges Wolverine envelopes to/from Kafka topics. |
-| **gRPC + Protobuf** | — | Cross-module sync RPC | Internal-only; external API stays REST. Contracts in `Axis.{Module}.Contracts/*.proto` ([ADR-014](#adr-014-grpc-for-cross-module-sync-rpc-restopenapi-for-external-frontend-facing-api)). |
-| **CloudEvents 1.0 + Avro** | — | Event envelope + payload format | Routing/correlation metadata in CloudEvents envelope; payload in Avro with Confluent Schema Registry ([ADR-019](#adr-019-avro--schema-registry-for-event-payloads-cloudevents-envelope)). |
+| **gRPC + Protobuf** | — | Cross-module sync RPC | Internal-only; external API stays REST. Contracts in `Axis.{Module}.Contracts/*.proto` ([ADR-014](#adr-014-grpc-for-internal-sync-rpc-and-rest-openapi-for-external-api)). |
+| **CloudEvents 1.0 + Avro** | — | Event envelope + payload format | Routing/correlation metadata in CloudEvents envelope; payload in Avro with Confluent Schema Registry ([ADR-019](#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). |
 | **Confluent Schema Registry** | — | Event-schema evolution | Enforces backward-compatible event changes; rejects breaking changes on publish. |
 | **OpenIddict** | 5.x | Identity-module OAuth2/OIDC server | Identity issues JWTs; other modules validate via JWKS public-key endpoint ([ADR-015](#adr-015-identity-is-a-remote-dependency-from-day-1)). No cross-module DB lookup of Identity tables. |
-| **OpenTelemetry SDK** | 1.x | Tracing + metrics + structured logs | Vendor-neutral; trace IDs propagated through Wolverine + gRPC interceptors ([ADR-018](#adr-018-opentelemetry--grafana-stack-tempo--loki--prometheus--mimir)). |
+| **OpenTelemetry SDK** | 1.x | Tracing + metrics + structured logs | Vendor-neutral; trace IDs propagated through Wolverine + gRPC interceptors ([ADR-018](#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability)). |
 | **Grafana Tempo / Loki / Mimir** | latest | Observability backend | Tempo for traces, Loki for logs, Mimir for metrics; Grafana UI on top. |
-| **HashiCorp Vault** | 1.x | Secrets management (production) | Per-module policies; Vault Agent sidecar for fetch + rotate ([ADR-022](#adr-022-secrets-management--hashicorp-vault-in-production-env-files-in-development)). |
+| **HashiCorp Vault** | 1.x | Secrets management (production) | Per-module policies; Vault Agent sidecar for fetch + rotate ([ADR-022](#adr-022-secrets-management-via-hashicorp-vault-in-production)). |
 | **SignalR** | (built-in) | Real-time updates | Capability available in ASP.NET Core; no `*Hub.cs` currently registered in `src/`. Status: [PROGRESS.md](./PROGRESS.md), epic acceptance: [E06](./epics/E06-workflow-engine/README.md). |
 | **FluentValidation** | 11.x | Input validation | Declarative, testable validation |
 | **Serilog** | 3.x | Structured logging | JSON logs, easy to ship to any log aggregator |
@@ -61,15 +61,15 @@
 
 | Technology | Role | Rationale |
 |---|---|---|
-| **PostgreSQL 16** | Per-module databases (`axis_identity`, `axis_datamodeling`, …) | One database per module; schema-per-tenant inside each ([ADR-011](#adr-011-per-module-database--schema-per-tenant-inside)). JSONB for dynamic fields. |
+| **PostgreSQL 16** | Per-module databases (`axis_identity`, `axis_datamodeling`, …) | One database per module; schema-per-tenant inside each ([ADR-011](#adr-011-per-module-database-with-schema-per-tenant-inside)). JSONB for dynamic fields. |
 | **Apache Kafka 3.x** | Cross-module event broker | KRaft mode (no ZooKeeper). Topics partitioned by `organizationId`. ([ADR-013](#adr-013-apache-kafka-as-the-cross-module-event-transport)) |
 | **Confluent Schema Registry** | Event-schema evolution | Avro schemas with backward-compatibility rules. |
 | **Redis 7** | Cache + distributed lock | Session cache, prevent duplicate job execution. Per-module key prefixes. |
 | **AWS S3** | File storage | Stores uploaded files (attachments, exports). Accessed via AWSSDK.S3 + AWSSDK.Extensions.NETCore.Setup. |
-| **HashiCorp Vault 1.x** | Secrets management (production) | Per-module policies + Vault Agent sidecar ([ADR-022](#adr-022-secrets-management--hashicorp-vault-in-production-env-files-in-development)). |
+| **HashiCorp Vault 1.x** | Secrets management (production) | Per-module policies + Vault Agent sidecar ([ADR-022](#adr-022-secrets-management-via-hashicorp-vault-in-production)). |
 | **Grafana Tempo / Loki / Mimir** | Observability backend (production) | Traces / logs / long-term metrics. Prometheus scrapes module `/metrics`. |
 | **Docker / Docker Compose** | Local development | All modules + Kafka + Schema Registry + Postgres + Redis + Grafana stack as containers. |
-| **Kubernetes** | Production deployment target | Per-module Deployment + Service; service DNS for in-cluster discovery ([ADR-016](#adr-016-service-discovery--config-driven-in-modulith-mode-k8s-service-dns-in-production)). |
+| **Kubernetes** | Production deployment target | Per-module Deployment + Service; service DNS for in-cluster discovery ([ADR-016](#adr-016-service-discovery-via-config-in-modulith-mode-and-k8s-dns-in-production)). |
 
 ---
 
@@ -77,7 +77,7 @@
 
 ### ADR-001: Modular Monolith over Microservices
 
-**Status:** Superseded by [ADR-010](#adr-010-modulith-with-strict-service-boundaries--extract--redeploy).
+**Status:** Superseded by [ADR-010](#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy).
 
 **Original decision:** Start as a modular monolith.
 **Original reason:** Microservices add operational overhead that is not justified at the start. The modular structure allows splitting into services later without rewriting domain logic.
@@ -86,7 +86,7 @@
 
 ### ADR-002: Schema-per-Tenant
 
-**Status:** Superseded by [ADR-011](#adr-011-per-module-database--schema-per-tenant-inside).
+**Status:** Superseded by [ADR-011](#adr-011-per-module-database-with-schema-per-tenant-inside).
 
 **Original decision:** Each organization gets its own PostgreSQL schema.
 **Original reason:** Strong data isolation, no risk of data leakage between tenants. Simplifies backups and restores per tenant. Performance is acceptable at target scale.
@@ -127,7 +127,7 @@
 
 ---
 
-### ADR-010: Modulith with strict service boundaries — extract = redeploy
+### ADR-010: Modulith with strict service boundaries so extraction is a redeploy
 
 **Decision:** Treat every module as a future service from day 1. The application boots and ships as a single deployable today (the "modulith" packaging), but every cross-module interaction must use the same contract that would be used between independently-deployed services — broker-mediated events, gRPC for sync RPC, JWT for auth, config-driven service URLs. When a module is extracted, only the deployment topology changes; no domain or application code is rewritten.
 
@@ -156,13 +156,13 @@
 - "We'll add the broker later" — the broker exists from PR #1 of Phase 1.
 - "Tests can skip the network hops" — tests run with the same broker (Testcontainers) so failure modes match production.
 
-### ADR-011: Per-module database + schema-per-tenant inside
+### ADR-011: Per-module database with schema-per-tenant inside
 
 **Decision:** Each module owns its own PostgreSQL database (e.g. `axis_identity`, `axis_datamodeling`, `axis_workflowbuilder`, …). Tenant isolation within a module is **schema-per-tenant** (`tenant_{orgId:N}`) inside that module's database. Identity remains the only module that operates entirely in `public` (it has no tenant data of its own — only tenant *metadata*).
 
 **Reason:**
 
-- **Per-module DB is the prerequisite for [ADR-010](#adr-010-modulith-with-strict-service-boundaries--extract--redeploy).** A module cannot be extracted without its data; if data is shared, extraction means manual table-by-table copy + dual-write transition periods. Separate databases make extraction a connection-string change.
+- **Per-module DB is the prerequisite for [ADR-010](#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy).** A module cannot be extracted without its data; if data is shared, extraction means manual table-by-table copy + dual-write transition periods. Separate databases make extraction a connection-string change.
 - **Schema-per-tenant kept inside each module.** Three multitenancy models were evaluated:
   - **Database-per-tenant:** strongest isolation but explodes operations (`N modules × M tenants` databases). Rejected for cost at MVP scale, can be revisited per-module if a large tenant needs it.
   - **Row-level with Postgres RLS:** scales best with many small tenants but requires RLS discipline on every query and complicates per-tenant backups. Rejected because Axis prefers strong-isolation defaults.
@@ -178,14 +178,14 @@
 
 ### ADR-012: Per-module Wolverine schema in the module's own database
 
-**Decision:** Each module has its own Wolverine envelope schema (`wolverine`) inside the module's database (per [ADR-011](#adr-011-per-module-database--schema-per-tenant-inside)). Outbox writes commit in the same transaction as the module's aggregate save, exactly as the original [ADR-009](#adr-009-wolverine-durable-inboxoutbox-in-a-dedicated-wolverine-schema) intended, but localised so each module owns its envelope history.
+**Decision:** Each module has its own Wolverine envelope schema (`wolverine`) inside the module's database (per [ADR-011](#adr-011-per-module-database-with-schema-per-tenant-inside)). Outbox writes commit in the same transaction as the module's aggregate save, exactly as the original [ADR-009](#adr-009-wolverine-durable-inboxoutbox-in-a-dedicated-wolverine-schema) intended, but localised so each module owns its envelope history.
 
 **Reason:**
 
 - **Outbox locality matches data locality.** When a module is extracted, its outbox history extracts with it. Cross-module envelopes (events the module has published or received) live in the same DB as the aggregates that produced or consumed them, so replay/reconciliation works without cross-service coordination.
 - **Transactional guarantee preserved per module.** The atomic "aggregate save + envelope write" still holds because both still happen in the same DB transaction.
 - **Cross-module delivery uses the broker, not Postgres.** Envelopes destined for other modules are picked up by Wolverine and forwarded to Kafka ([ADR-013](#adr-013-apache-kafka-as-the-cross-module-event-transport)). The receiving module's Wolverine treats the Kafka message as an inbox envelope and durably tracks it in its own `wolverine.incoming_envelopes`.
-- **Schema migration per module.** Each module's Wolverine schema is created and migrated independently — production uses scripted SQL migrations in the module's CI pipeline; tests use EF Core migrations through the module's test fixture (see [ADR-023](#adr-023-per-module-ef-core-migrations-no-ensurecreated)).
+- **Schema migration per module.** Each module's Wolverine schema is created and migrated independently — production uses scripted SQL migrations in the module's CI pipeline; tests use EF Core migrations through the module's test fixture (see [ADR-023](#adr-023-per-module-ef-core-migrations-only)).
 
 ### ADR-013: Apache Kafka as the cross-module event transport
 
@@ -195,8 +195,8 @@
 
 - **Log-based replay is the killer feature for "extract = redeploy."** When a module is extracted, it needs to bootstrap its local read models. Kafka's durable log lets the new deployment replay from any offset (or from `earliest`) to rebuild state without cross-service coordination. RabbitMQ classic queues delete messages on consumption; RabbitMQ streams support replay but the ecosystem and operational maturity around event-sourcing is weaker than Kafka.
 - **Partitioning matches the tenancy model.** Topics partitioned by `organizationId` preserve per-tenant ordering, allow per-tenant scaling, and keep tenants isolated within the message bus.
-- **Industry standard for event-driven microservices.** Kafka is the safer choice for ops tooling, monitoring, schema-registry integrations (see [ADR-019](#adr-019-avro--schema-registry-for-event-payloads-cloudevents-envelope)), and engineering hires later.
-- **Operational cost accepted.** Kafka has heavier ops than RabbitMQ (broker tuning, partition planning, KRaft/ZooKeeper config). Per [ADR-010](#adr-010-modulith-with-strict-service-boundaries--extract--redeploy) the cost is paid up front.
+- **Industry standard for event-driven microservices.** Kafka is the safer choice for ops tooling, monitoring, schema-registry integrations (see [ADR-019](#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)), and engineering hires later.
+- **Operational cost accepted.** Kafka has heavier ops than RabbitMQ (broker tuning, partition planning, KRaft/ZooKeeper config). Per [ADR-010](#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy) the cost is paid up front.
 
 **Anti-patterns rejected:**
 
@@ -205,13 +205,13 @@
 - Postgres-as-queue (works at small scale but does not survive extraction — each module would need its own queue table, and cross-service handoff means broker anyway).
 - Wolverine in-memory bus for cross-module dispatch (violates ADR-010's "same contract in both modes").
 
-### ADR-014: gRPC for cross-module sync RPC; REST/OpenAPI for external (frontend-facing) API
+### ADR-014: gRPC for internal sync RPC and REST OpenAPI for external API
 
 **Decision:** Cross-module synchronous calls — used only when a local read model is insufficient — go over **gRPC** with proto-defined contracts. The external HTTP API exposed to the SPA stays **REST + OpenAPI** (JSON). gRPC is internal; REST is external.
 
 **Reason:**
 
-- **Most cross-module data flow is async via Kafka events.** Read models are maintained locally per [ADR-010](#adr-010-modulith-with-strict-service-boundaries--extract--redeploy)'s pattern. gRPC is the escape hatch for cases where eventual consistency is unacceptable (e.g. fresh-permission check at request time).
+- **Most cross-module data flow is async via Kafka events.** Read models are maintained locally per [ADR-010](#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy)'s pattern. gRPC is the escape hatch for cases where eventual consistency is unacceptable (e.g. fresh-permission check at request time).
 - **Proto contracts force versioned interfaces.** When a module changes its API shape, the proto file is the breaking-change boundary — code generation fails on incompatible consumers, surfacing the issue at compile time.
 - **HTTP/2 binary transport for internal hops.** Lower latency and bandwidth than JSON over HTTP/1.1, important when modules talk to each other on every request.
 - **REST/JSON externally because browsers prefer it.** Frontend → API is still standard REST with `application/json`; OpenAPI generates the SPA's TypeScript client.
@@ -233,7 +233,7 @@
 - **User/role lookup is rare.** Most requests carry the user identity in the JWT claims. Only flows like "fetch full user profile for display" or "fetch up-to-date permission list after a change" need a sync lookup — gRPC for these, sparingly.
 - **`Axis.Shared` shrinks accordingly.** Anything that touched Identity (e.g. `ICurrentUser`'s implementation) moves: the interface stays in `Axis.Shared.Application.Identity`, the implementation moves into each module's Infrastructure as a JWT-claim reader.
 
-### ADR-016: Service discovery — config-driven in modulith mode, K8s service DNS in production
+### ADR-016: Service discovery via config in modulith mode and K8s DNS in production
 
 **Decision:** Service URLs are declared in `appsettings.json` under `Modules:{ModuleName}:Url`. In modulith mode all URLs resolve to `http://localhost:{port}` (each module binds a distinct port). In production each URL resolves to a Kubernetes service DNS name (`http://axis-identity.axis.svc.cluster.local`). Consul, Eureka, and full service-mesh discovery are explicitly rejected for this stage.
 
@@ -244,7 +244,7 @@
 - **Health checks per module** (`/health`, `/health/ready`) are exposed via standard ASP.NET Core health-check endpoints and consumed by K8s probes. No external health registry needed.
 - **Service mesh (Istio/Linkerd) is overkill** until we have many services, complex traffic-shaping needs, or mutual-TLS requirements beyond what JWT + standard TLS provides. Adding a mesh is a future ADR if the need arises.
 
-### ADR-017: `Axis.Shared` is abstractions only — no shared implementation
+### ADR-017: Axis.Shared is abstractions only, no shared implementation
 
 **Decision:** The shared kernel projects (`Axis.Shared.Domain`, `Axis.Shared.Application`, `Axis.Shared.Infrastructure`) contain **only**: domain primitives (Result, Error, value-object base types), application interfaces (`IUnitOfWork`, `ICurrentUser`, `ITenantContext`), and infrastructure abstractions that *every* module needs identically (e.g. envelope serialisers). Concrete implementations live inside the module that uses them.
 
@@ -259,7 +259,7 @@
 - A "BaseRepository" in shared infrastructure — repositories belong in modules.
 - Shared EF Core configuration helpers that secretly require a specific DbContext shape — these belong in module infrastructure.
 
-### ADR-018: OpenTelemetry + Grafana stack (Tempo / Loki / Prometheus / Mimir)
+### ADR-018: OpenTelemetry SDK with Grafana stack for observability
 
 **Decision:** Every module uses the OpenTelemetry SDK to emit traces, metrics, and structured logs. In production, traces ship to **Grafana Tempo**, logs to **Grafana Loki**, metrics to **Prometheus** (scraped, with **Grafana Mimir** for long-term storage), all visualised in **Grafana**.
 
@@ -270,7 +270,7 @@
 - **Cross-service tracing is non-negotiable for distributed-ready.** Without OTEL, debugging a slow workflow across Identity → Workflow → Form modules requires correlating timestamps by hand. Trace IDs propagated by Wolverine + gRPC interceptors give a single timeline per request.
 - **Logs as a query target, not a tail.** Loki + LogQL gives structured-log search by trace ID, tenant ID, etc. Serilog continues to emit JSON; OTEL log exporter ships them to Loki.
 
-### ADR-019: Avro + Schema Registry for event payloads; CloudEvents envelope
+### ADR-019: Avro and Schema Registry for event payloads with CloudEvents envelope
 
 **Decision:** Cross-module event payloads are serialised as **Apache Avro** with schemas registered in **Confluent Schema Registry**. Each event is wrapped in a **CloudEvents** envelope (CE spec 1.0) so envelope-level metadata (event ID, source, time, type, correlation ID, tenant ID) is uniformly accessible regardless of payload format.
 
@@ -284,7 +284,7 @@
 **Anti-patterns rejected:**
 
 - Plain JSON events with no registry (no enforcement against breaking change).
-- Protobuf for events (we use Protobuf for gRPC sync RPC — see [ADR-014](#adr-014-grpc-for-cross-module-sync-rpc-restopenapi-for-external-frontend-facing-api) — but Avro is more idiomatic with Kafka and supports schema evolution better than Protobuf when used as event-store payload).
+- Protobuf for events (we use Protobuf for gRPC sync RPC — see [ADR-014](#adr-014-grpc-for-internal-sync-rpc-and-rest-openapi-for-external-api) — but Avro is more idiomatic with Kafka and supports schema evolution better than Protobuf when used as event-store payload).
 
 ### ADR-020: Saga orchestration for cross-module workflows
 
@@ -292,12 +292,12 @@
 
 **Reason:**
 
-- **Loss of cross-module transactions is given.** Per [ADR-010](#adr-010-modulith-with-strict-service-boundaries--extract--redeploy), no shared DB transaction crosses a module boundary. Sagas are the standard pattern for replacing that consistency.
+- **Loss of cross-module transactions is given.** Per [ADR-010](#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy), no shared DB transaction crosses a module boundary. Sagas are the standard pattern for replacing that consistency.
 - **Orchestration over choreography for debuggability.** Choreographed sagas (Module A publishes event → Module B reacts → publishes event → Module C reacts → …) are hard to reason about: there's no single place to see the flow. Orchestration centralises the script in one module, even if the steps fan out across modules.
 - **Wolverine is the orchestrator runtime.** A saga is a long-running Wolverine "handler" that holds state in the originating module's database (`saga_state` table per module). Wolverine 5 supports saga state natively.
 - **Compensating commands, not 2PC.** When a step fails, the orchestrator emits explicit compensating commands (e.g. "cancel reservation") rather than relying on distributed transaction coordinators.
 
-### ADR-021: API versioning — path-based `/v1/...` with N-2 support window
+### ADR-021: API versioning via path with N-2 support window
 
 **Decision:** All API surfaces (external REST, internal gRPC) version paths with `/v1/`, `/v2/`, etc. Two major versions are supported in parallel for a minimum of one quarter after a new version ships; older versions are end-of-lifed on a published schedule. Breaking changes always bump the major version. Backward-compatible additions ship under the same version.
 
@@ -307,7 +307,7 @@
 - **Path-based is the most explicit form.** Header-based versioning (`Accept: application/vnd.axis.v2+json`) is more REST-pure but harder to debug, route, and cache.
 - **N-2 keeps the support burden bounded.** Three concurrent versions in production is the practical maximum before code bifurcates uncontrollably.
 
-### ADR-022: Secrets management — HashiCorp Vault in production, `.env` files in development
+### ADR-022: Secrets management via HashiCorp Vault in production
 
 **Decision:** Production secrets (DB credentials, signing keys, broker credentials, API tokens) live in **HashiCorp Vault** with per-module policies. Applications fetch secrets at startup (and refresh on TTL) via the Vault Agent sidecar pattern. Local development uses `.env` files (gitignored) loaded via `dotnet user-secrets` or `DotNetEnv`. Plain `appsettings.Production.json` and naked Kubernetes Secrets are not used for sensitive values.
 
@@ -318,7 +318,7 @@
 - **Vault gives audit, rotation, and per-module scoping.** Each module's deployment gets a Vault role that only reads its own secrets. Compromise of one module does not leak others' credentials.
 - **Per-module rotation.** When a DB password rotates, only that module's pods restart — no global secret-bag to coordinate.
 
-### ADR-023: Per-module EF Core migrations — no `EnsureCreated`
+### ADR-023: Per-module EF Core migrations only
 
 **Decision:** Every module manages its database schema (both `public` and tenant schemas) via **EF Core migrations**. `Database.EnsureCreated()` is not used anywhere — not in production, not in development, not in tests. The integration-test fixture applies the same migrations production uses.
 

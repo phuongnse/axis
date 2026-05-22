@@ -16,7 +16,7 @@
 
 ## What is Axis
 
-Multi-tenant low-code SaaS: custom data models, visual workflows, forms, and UI pages — no end-user coding. Architecture: **modulith with strict service boundaries** ([ADR-010](docs/TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries--extract--redeploy)) — each module is a service contract from day 1; modulith packaging is the deployment shape today, independent services tomorrow. Extraction is a redeploy, not a refactor.
+Multi-tenant low-code SaaS: custom data models, visual workflows, forms, and UI pages — no end-user coding. Architecture: **modulith with strict service boundaries** ([ADR-010](docs/TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy)) — each module is a service contract from day 1; modulith packaging is the deployment shape today, independent services tomorrow. Extraction is a redeploy, not a refactor.
 
 ---
 
@@ -24,7 +24,7 @@ Multi-tenant low-code SaaS: custom data models, visual workflows, forms, and UI 
 
 Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md). Module list and per-module responsibilities are owned by [`docs/epics/README.md`](docs/epics/README.md). Architectural shape (containers, multi-tenancy, auth) is owned by [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). This file owns only the **rules** — the things below that must hold no matter which library version is in `Directory.Packages.props`.
 
-**Shared kernel:** `Axis.Shared.Domain`, `Axis.Shared.Application` — **abstractions only**, no shared implementation ([ADR-017](docs/TECH_STACK.md#adr-017-axisshared-is-abstractions-only--no-shared-implementation)). `Axis.Shared.Infrastructure` exists only for genuinely cross-cutting infrastructure (e.g. common JSON policy), never for per-module concerns like UnitOfWork or repository base classes.
+**Shared kernel:** `Axis.Shared.Domain`, `Axis.Shared.Application` — **abstractions only**, no shared implementation ([ADR-017](docs/TECH_STACK.md#adr-017-axisshared-is-abstractions-only-no-shared-implementation)). `Axis.Shared.Infrastructure` exists only for genuinely cross-cutting infrastructure (e.g. common JSON policy), never for per-module concerns like UnitOfWork or repository base classes.
 
 **Per-module databases:** each module owns its own PostgreSQL database (`axis_identity`, `axis_datamodeling`, `axis_workflowbuilder`, `axis_workflowengine`, `axis_formbuilder`, `axis_pagebuilder`). Schema-per-tenant `tenant_{organizationId:N}` *inside* each module DB. Per-module Wolverine envelope schema (`wolverine`) lives in the same DB as the module. Identity's `public` schema is the only registry — other modules **never** SQL-query Identity.
 
@@ -68,9 +68,9 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 - `Result` / `Result<T>` for business failures; exceptions for infrastructure only.
 - MediatR = intra-module commands/queries only; cross-module domain events = Wolverine outbox → Kafka topic.
 - Minimal API: `.RequireAuthorization()` unless explicitly public; JWT validated locally via Identity JWKS (no DB call to Identity).
-- Schema changes = EF Core migration ([ADR-023](docs/TECH_STACK.md#adr-023-per-module-ef-core-migrations-no-ensurecreated)); `EnsureCreated` forbidden everywhere (prod, dev, tests).
+- Schema changes = EF Core migration ([ADR-023](docs/TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)); `EnsureCreated` forbidden everywhere (prod, dev, tests).
 - New cross-module RPC = `.proto` in `Axis.{Module}.Contracts` first; never expose a new sync call without a versioned contract.
-- New cross-module event = Avro schema registered with Schema Registry + CloudEvents envelope ([ADR-019](docs/TECH_STACK.md#adr-019-avro--schema-registry-for-event-payloads-cloudevents-envelope)).
+- New cross-module event = Avro schema registered with Schema Registry + CloudEvents envelope ([ADR-019](docs/TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)).
 
 **P2 — every commit:**
 

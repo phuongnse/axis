@@ -20,7 +20,7 @@ The Axis platform serves four actor types: **Platform Admins** (Axis team), **Or
 
 ![Container Diagram](./diagrams/container.svg)
 
-Axis runs as a **modulith with strict service boundaries** — each module is a deployable service contract; modulith packaging is the deployment shape today, K8s services tomorrow. See [TECH_STACK.md § ADR-010](./TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries--extract--redeploy).
+Axis runs as a **modulith with strict service boundaries** — each module is a deployable service contract; modulith packaging is the deployment shape today, K8s services tomorrow. See [TECH_STACK.md § ADR-010](./TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy).
 
 | Container | Responsibility |
 |---|---|
@@ -32,12 +32,12 @@ Axis runs as a **modulith with strict service boundaries** — each module is a 
 | **WorkflowEngine service** | Execution lifecycle, step runtime, saga orchestrator. |
 | **FormBuilder service** | Form definitions, form-task submissions. |
 | **PageBuilder service** | Visual page builder (Phase 2). |
-| **Per-module PostgreSQL** | One database per module (`axis_identity`, `axis_datamodeling`, …). Schema-per-tenant inside each ([ADR-011](./TECH_STACK.md#adr-011-per-module-database--schema-per-tenant-inside)). Per-module Wolverine outbox schema lives alongside ([ADR-012](./TECH_STACK.md#adr-012-per-module-wolverine-schema-in-the-modules-own-database)). |
-| **Apache Kafka + Schema Registry** | Cross-module event transport. Topics partitioned by `organizationId`. Avro payloads with CloudEvents envelopes ([ADR-013](./TECH_STACK.md#adr-013-apache-kafka-as-the-cross-module-event-transport), [ADR-019](./TECH_STACK.md#adr-019-avro--schema-registry-for-event-payloads-cloudevents-envelope)). |
+| **Per-module PostgreSQL** | One database per module (`axis_identity`, `axis_datamodeling`, …). Schema-per-tenant inside each ([ADR-011](./TECH_STACK.md#adr-011-per-module-database-with-schema-per-tenant-inside)). Per-module Wolverine outbox schema lives alongside ([ADR-012](./TECH_STACK.md#adr-012-per-module-wolverine-schema-in-the-modules-own-database)). |
+| **Apache Kafka + Schema Registry** | Cross-module event transport. Topics partitioned by `organizationId`. Avro payloads with CloudEvents envelopes ([ADR-013](./TECH_STACK.md#adr-013-apache-kafka-as-the-cross-module-event-transport), [ADR-019](./TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). |
 | **Redis** | Session cache + distributed locks + per-tenant short-TTL caches (key-prefixed per module). |
 | **AWS S3** | File storage (attachments, exports). |
-| **HashiCorp Vault** | Secrets management in production. Per-module policies + Vault Agent sidecar ([ADR-022](./TECH_STACK.md#adr-022-secrets-management--hashicorp-vault-in-production-env-files-in-development)). |
-| **Grafana Tempo / Loki / Mimir** | Observability backend — traces, logs, metrics. OpenTelemetry SDK in every module ([ADR-018](./TECH_STACK.md#adr-018-opentelemetry--grafana-stack-tempo--loki--prometheus--mimir)). |
+| **HashiCorp Vault** | Secrets management in production. Per-module policies + Vault Agent sidecar ([ADR-022](./TECH_STACK.md#adr-022-secrets-management-via-hashicorp-vault-in-production)). |
+| **Grafana Tempo / Loki / Mimir** | Observability backend — traces, logs, metrics. OpenTelemetry SDK in every module ([ADR-018](./TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability)). |
 
 Concrete versions in [TECH_STACK.md](./TECH_STACK.md).
 
@@ -55,7 +55,7 @@ Each module *is* a service contract — modulith mode collocates them as in-proc
 |---|---|---|
 | **Contracts** (`Axis.{Module}.Contracts`) | `.proto` files for gRPC; Avro schemas for events; CloudEvents types | None — pure schema |
 | **Domain** | Entities, value objects, domain events, repository interfaces | `Axis.Shared.Domain` only (primitives + Result) |
-| **Application** | Commands, queries, handlers, DTOs, service interfaces, saga state | Domain, `Axis.Shared.Application` (interfaces only — see [ADR-017](./TECH_STACK.md#adr-017-axisshared-is-abstractions-only--no-shared-implementation)) |
+| **Application** | Commands, queries, handlers, DTOs, service interfaces, saga state | Domain, `Axis.Shared.Application` (interfaces only — see [ADR-017](./TECH_STACK.md#adr-017-axisshared-is-abstractions-only-no-shared-implementation)) |
 | **Infrastructure** | EF Core DbContext, repository impl, Wolverine handlers + outbox, gRPC server impl, Kafka producer/consumer | Application, Npgsql, WolverineFx, gRPC |
 | **API entrypoint** | gRPC server hosting (internal); REST endpoints exposing module operations through `Axis.Api` gateway (external) | Module Application + Contracts |
 
@@ -68,7 +68,7 @@ Each module *is* a service contract — modulith mode collocates them as in-proc
 | User identity on every request | JWT validated locally against Identity's JWKS | `Axis.Shared.Application.Identity.ICurrentUser` (interface); per-module JWT-claim-reader impl |
 | Long-running cross-module workflow | Saga orchestrated by originating module ([ADR-020](./TECH_STACK.md#adr-020-saga-orchestration-for-cross-module-workflows)) | Wolverine saga handler in originating module's Application |
 
-Forbidden: shared `DbContext`, direct C# method calls into another module's Application services, cross-module SQL, in-process `IMediator` for cross-module dispatch. The drift script and CI enforce these — see [CLAUDE.md § Service boundaries](../CLAUDE.md) and [playbooks/patterns.md § Cross-module communication](./playbooks/patterns.md#cross-module-data-pattern).
+Forbidden: shared `DbContext`, direct C# method calls into another module's Application services, cross-module SQL, in-process `IMediator` for cross-module dispatch. The drift script and CI enforce these — see [CLAUDE.md § Service boundaries](../CLAUDE.md) and [playbooks/patterns.md § Cross-module communication](./playbooks/patterns.md#cross-module-communication-pattern).
 
 ---
 
@@ -112,11 +112,11 @@ Detailed flow, redirect URIs, and error states: [docs/epics/E02-identity-access/
 
 ## Observability & Operations
 
-- **Tracing**: OpenTelemetry SDK in every module. Trace IDs propagate through Wolverine envelopes and gRPC interceptors so a single request spans modules end-to-end. Backend: Grafana Tempo ([ADR-018](./TECH_STACK.md#adr-018-opentelemetry--grafana-stack-tempo--loki--prometheus--mimir)).
+- **Tracing**: OpenTelemetry SDK in every module. Trace IDs propagate through Wolverine envelopes and gRPC interceptors so a single request spans modules end-to-end. Backend: Grafana Tempo ([ADR-018](./TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability)).
 - **Metrics**: Prometheus scrapes each module's `/metrics`. Long-term storage in Grafana Mimir.
 - **Logs**: Serilog → OTEL exporter → Loki. Structured by trace ID + tenant ID + module.
 - **Health checks**: `/health` (liveness) and `/health/ready` (readiness, includes DB + Kafka + downstream-module probes). Consumed by Kubernetes probes.
-- **Schema migrations**: per-module EF Core migrations; no `EnsureCreated` anywhere — see [ADR-023](./TECH_STACK.md#adr-023-per-module-ef-core-migrations-no-ensurecreated). Migrations run as a separate CI step before pod rollout.
+- **Schema migrations**: per-module EF Core migrations; no `EnsureCreated` anywhere — see [ADR-023](./TECH_STACK.md#adr-023-per-module-ef-core-migrations-only). Migrations run as a separate CI step before pod rollout.
 - **Secrets**: HashiCorp Vault with per-module policies in production; `.env` files for development.
 
 ---

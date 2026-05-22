@@ -34,7 +34,7 @@
 - [Result → HTTP status code mapping](#result--http-status-code-mapping) ★
 - [OpenAPI / Scalar setup](#openapi--scalar-setup) ★
 - [Wolverine patterns](#wolverine-patterns) ★
-- [Cross-module data pattern](#cross-module-data-pattern) ★
+- [Cross-module data pattern](#cross-module-communication-pattern) ★
 - [Command idempotency pattern](#command-idempotency-pattern) ★
 - [Code hygiene checklist](#code-hygiene-checklist)
 
@@ -704,7 +704,7 @@ Long-form SOLID and Gang-of-Four catalogs are intentionally omitted here — the
 | Business failures vs exceptions | [Result Pattern vs. exceptions](#result-pattern-vs-exceptions--when-to-use-what) |
 | HTTP status from `Result` | [Result → HTTP status code mapping](#result--http-status-code-mapping) |
 | Domain events / jobs | [Wolverine patterns](#wolverine-patterns) |
-| Another module's data | [Cross-module data pattern](#cross-module-data-pattern) |
+| Another module's data | [Cross-module data pattern](#cross-module-communication-pattern) |
 | Handler / repository layout | [Key patterns](#key-patterns) |
 
 ---
@@ -1048,7 +1048,7 @@ opts.ScheduleJob<ArchiveOldExecutionsCommand>(cron: "0 2 * * *"); // daily at 02
 
 ## Cross-module communication pattern
 
-**Core rule: a module only queries its own database. Always. No exceptions.** This is the Share Nothing principle from [ADR-010](../TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries--extract--redeploy) — modules are data-sovereign so that extraction is a redeploy, not a refactor.
+**Core rule: a module only queries its own database. Always. No exceptions.** This is the Share Nothing principle from [ADR-010](../TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy) — modules are data-sovereign so that extraction is a redeploy, not a refactor.
 
 Cross-module needs are met by exactly two mechanisms:
 
@@ -1079,7 +1079,7 @@ public class SomethingHandler(IWorkflowQueryService workflowQueries)  // ← B's
 }
 ```
 
-This compiles and runs in the modulith, but the moment module B is extracted, the project reference disappears and `IWorkflowQueryService` is no longer reachable. Cross-module sync **must** go through gRPC (with a versioned `.proto` contract) — see [ADR-014](../TECH_STACK.md#adr-014-grpc-for-cross-module-sync-rpc-restopenapi-for-external-frontend-facing-api).
+This compiles and runs in the modulith, but the moment module B is extracted, the project reference disappears and `IWorkflowQueryService` is no longer reachable. Cross-module sync **must** go through gRPC (with a versioned `.proto` contract) — see [ADR-014](../TECH_STACK.md#adr-014-grpc-for-internal-sync-rpc-and-rest-openapi-for-external-api).
 
 ### ✅ Pattern 1: event-driven local read model (default)
 
@@ -1103,7 +1103,7 @@ src/Modules/WorkflowBuilder/Axis.WorkflowBuilder.Contracts/Events/FormStepAdded.
 }
 ```
 
-The Avro file is registered with Confluent Schema Registry at build time. CI rejects breaking changes per [ADR-019](../TECH_STACK.md#adr-019-avro--schema-registry-for-event-payloads-cloudevents-envelope).
+The Avro file is registered with Confluent Schema Registry at build time. CI rejects breaking changes per [ADR-019](../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope).
 
 **Step 2 — Source module (WorkflowBuilder) raises the domain event and publishes it via the outbox:**
 
@@ -1213,7 +1213,7 @@ public sealed class PermissionGate(IdentityService.IdentityServiceClient identit
 }
 ```
 
-The gRPC channel is configured via `Modules:Identity:Url` (see [ADR-016](../TECH_STACK.md#adr-016-service-discovery--config-driven-in-modulith-mode-k8s-service-dns-in-production)) — `http://localhost:5001` in modulith mode, K8s service DNS in production.
+The gRPC channel is configured via `Modules:Identity:Url` (see [ADR-016](../TECH_STACK.md#adr-016-service-discovery-via-config-in-modulith-mode-and-k8s-dns-in-production)) — `http://localhost:5001` in modulith mode, K8s service DNS in production.
 
 ### Rules (P0)
 
