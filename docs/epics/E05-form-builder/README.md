@@ -81,7 +81,7 @@ Workflow reaches Form step
 | Domain | ✅ Done | `FormDefinition`, `FormField`, `FormSubmission` aggregates; field types and form-task domain events |
 | Application | ⚠️ Partial | Form definition CRUD + fields; F04: `SubmitFormByToken`, `GetFormTaskByToken`, `GetMyFormTasks`, `ExpireFormSubmissionHandler`. Notifications and role-based assignee resolution pending |
 | Infrastructure | ✅ Done | FormBuilderDbContext, `FormSubmission` EF config + repository, expiry scheduling via Wolverine from `FormStepReachedHandler` |
-| API | ⚠️ Partial | `FormEndpoints` (definitions) + `FormTaskEndpoints` (token submit, my tasks). **Deferred:** move `submittedBy` claim parsing out of `FormTaskEndpoints` into Application |
+| API | ✅ Done | `FormEndpoints` (definitions) + `FormTaskEndpoints` (token submit, my tasks). `submittedBy` resolved via `ICurrentUser` in Application |
 | Frontend | ⏳ Pending | — |
 
 ---

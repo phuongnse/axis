@@ -3,6 +3,7 @@ using Axis.FormBuilder.Application.Services;
 using Axis.FormBuilder.Domain.Aggregates;
 using Axis.FormBuilder.Domain.Enums;
 using Axis.Shared.Application.CQRS;
+using Axis.Shared.Application.Identity;
 using Axis.Shared.Domain.Primitives;
 
 namespace Axis.FormBuilder.Application.Commands.SubmitFormByToken;
@@ -10,7 +11,8 @@ namespace Axis.FormBuilder.Application.Commands.SubmitFormByToken;
 public sealed class SubmitFormByTokenHandler(
     IFormSubmissionRepository submissionRepo,
     IFormRepository formRepo,
-    IUnitOfWork uow)
+    IUnitOfWork uow,
+    ICurrentUser currentUser)
     : ICommandHandler<SubmitFormByTokenCommand>
 {
     public async Task<Result> Handle(SubmitFormByTokenCommand command, CancellationToken cancellationToken)
@@ -56,7 +58,7 @@ public sealed class SubmitFormByTokenHandler(
         if (fieldErrors.Count > 0)
             return Result.FieldValidation(fieldErrors);
 
-        Guid? submittedBy = command.SubmittedByUserId ?? submission.AssigneeUserId;
+        Guid? submittedBy = currentUser.UserId ?? submission.AssigneeUserId;
         if (submittedBy is null)
             return Result.Failure(ErrorCodes.BusinessRule, "Unable to determine who submitted this form.");
 

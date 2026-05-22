@@ -9,4 +9,4 @@ public sealed record StartExecutionCommand(
     Guid OrganizationId,
     TriggerType TriggerType,
     Guid? TriggeredByUserId,
-    IReadOnlyDictionary<string, object?> Input) : ICommand<Guid>;
+    IReadOnlyDictionary<string, object?>? Input) : ICommand<Guid>;

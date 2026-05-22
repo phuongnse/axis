@@ -43,7 +43,7 @@ public sealed class StartExecutionHandler(
             command.OrganizationId,
             command.TriggerType,
             command.TriggeredByUserId,
-            command.Input);
+            command.Input ?? new Dictionary<string, object?>());
 
         execution.InitialiseSteps(snapshot.Steps);
 

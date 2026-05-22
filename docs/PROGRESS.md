@@ -30,15 +30,15 @@ Workflow definitions with steps, transitions, triggers, cycle detection, publish
 
 ## FormBuilder — E05-form-builder
 
-**Domain ✅ | Application ⚠️ | Infrastructure ✅ | API ⚠️ | Frontend ⏳**
+**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳**
 
-Form definitions + F04 form tasks (`FormSubmission`, token submit, my tasks, expiry job). **PR #50 deferred:** move `submittedBy` parsing from `FormTaskEndpoints` to Application.
+Form definitions + F04 form tasks (`FormSubmission`, token submit, my tasks, expiry job). Submission user resolved via `ICurrentUser` in Application.
 
 ## WorkflowEngine — E06-workflow-engine
 
-**Domain ✅ | Application ✅ | Infrastructure ⚠️ | API ⚠️ | Frontend ⏳**
+**Domain ✅ | Application ✅ | Infrastructure ⚠️ | API ✅ | Frontend ⏳**
 
-Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoints` registered. **PR #50 deferred:** thin-endpoint refactor for `StartExecution` request shaping. Infrastructure ⚠️: `IScriptExecutor` and `INotificationSender` stubs.
+Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoints` registered; default-input shaping handled in `StartExecutionHandler`. Infrastructure ⚠️: `IScriptExecutor` and `INotificationSender` stubs.
 
 ## Identity / E01 — tenant provisioning (cross-cutting)
 
