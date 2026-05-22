@@ -60,6 +60,12 @@ public sealed class ApiTestFixture : IAsyncLifetime
         _fbConnectionString = await CreateModuleDatabaseAsync("axis_fb_test");
         _weConnectionString = await CreateModuleDatabaseAsync("axis_we_test");
 
+        // Wolverine's PersistMessagesWithPostgresql captures the connection string
+        // during host build, which runs before WebApplicationFactory's
+        // ConfigureAppConfiguration hook is applied to builder.Configuration.
+        // Set it via env var so the default config provider picks it up.
+        Environment.SetEnvironmentVariable("ConnectionStrings__Wolverine", _postgres.GetConnectionString());
+
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
@@ -180,6 +186,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
     {
         await _factory.DisposeAsync();
         await Task.WhenAll(_postgres.DisposeAsync().AsTask(), _redis.DisposeAsync().AsTask());
+        Environment.SetEnvironmentVariable("ConnectionStrings__Wolverine", null);
     }
 
     public IServiceScope CreateScope() => _factory.Services.CreateScope();
