@@ -226,7 +226,7 @@ internal sealed class DataRecordRepository(
         {
             "created_at" => "created_at " + dir,
             "updated_at" => "updated_at " + dir,
-            _            => "data->>'" + sortBy + "' " + dir
+            _ => "data->>'" + sortBy + "' " + dir
         };
     }
 }
