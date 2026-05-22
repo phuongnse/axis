@@ -26,23 +26,18 @@ Gate 1:
 - npm run test → ran / not triggered (reason)
 ```
 
-## Gate 2a — Doc drift (required)
+## Gate 2 — Docs (required)
+
+Doc drift is enforced by the CI job **Doc drift** (no paste block needed). Walk through every row:
 
 ```text
-Gate 2a:
-- ./scripts/check-doc-drift.sh → ran (green) / not triggered (reason)
-```
-
-## Gate 2b — Docs walk-through (required)
-
-```text
-Gate 2b:
+Gate 2:
 - Library → TECH_STACK.md / not triggered
 - New pattern → patterns.md or patterns-index.md / not triggered
 - US layer callout → docs/epics/…/features/… / not triggered
 - Epic README + PROGRESS → … / not triggered
 - Wireframe/diagram SVG regenerated → … / not triggered
-- (other Gate 2 rows from agent-checklist) →
+- (other rows from agent-checklist) →
 ```
 
 ## Gate 3 — Retrospective (required)
@@ -58,8 +53,10 @@ Gate 3:
 7. Incident-level detail in rule text?
 ```
 
-## Verification
+## CI checks
 
-- [ ] `./scripts/check-doc-drift.sh` (CI job **Doc drift**)
-- [ ] `dotnet build` + `dotnet test` (if `src/` or `tests/`) — full solution, not a filter
-- [ ] `npm run ci` + `npm run test` (if `frontend/`)
+GitHub shows pass/fail for build, test, and **Doc drift** — no need to duplicate in Gate blocks above.
+
+- [ ] All required CI checks green (including **Doc drift** when code changed)
+- [ ] `dotnet build` + `dotnet test` locally if you touched `src/` or `tests/` (full solution)
+- [ ] `npm run ci` + `npm run test` locally if you touched `frontend/`

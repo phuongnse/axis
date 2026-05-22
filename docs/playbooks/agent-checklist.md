@@ -24,12 +24,13 @@ Docs touched: docs/epics/…
 
 ## Gates (every PR)
 
+**Doc drift:** enforced by CI job **Doc drift** (`./scripts/check-doc-drift.sh`). Use the PR checks UI — do **not** paste a Gate block for it. Run the script locally only when debugging a failure.
+
 | Gate | Action |
 |------|--------|
 | **0** | AC map + docs touched (when `src/`, `tests/`, or `frontend/` change) |
 | **1** | Full .NET + frontend verification (table below) — **always paste** |
-| **2a** | `./scripts/check-doc-drift.sh` — **CI required** |
-| **2b** | Human doc walk-through (rows below) |
+| **2** | Doc walk-through (rows below) — **paste in PR** |
 | **3** | Retrospective (seven questions) |
 
 ### Gate 1 — paste in every PR (local = CI)
@@ -55,17 +56,11 @@ Example (docs-only): every line `not triggered — no src/, tests/, or frontend/
 
 **Docker:** integration and API tests run as part of `dotnet test`; Docker must be available locally (same as CI agents with Testcontainers).
 
-### Gate 2a — automated
+
+### Gate 2 — docs walk-through (paste in PR)
 
 ```text
-Gate 2a:
-- ./scripts/check-doc-drift.sh → ran (green) / not triggered (reason)
-```
-
-### Gate 2b — full row list (work through every line)
-
-```text
-Gate 2b:
+Gate 2:
 - Library → TECH_STACK.md / not triggered
 - New pattern → patterns.md / not triggered
 - US layer callout → docs/epics/…/features/… / not triggered

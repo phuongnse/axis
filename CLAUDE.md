@@ -1,6 +1,6 @@
 # Axis — Project Context for Claude
 
-> **Agents:** [`agent-checklist.md`](docs/playbooks/agent-checklist.md) first. Every PR: Gates 0–3 + `./scripts/check-doc-drift.sh` (CI **Doc drift**). Paste blocks from [PR template](.github/PULL_REQUEST_TEMPLATE.md).
+> **Agents:** [`agent-checklist.md`](docs/playbooks/agent-checklist.md) first. Every PR: paste **Gates 0–3** from [PR template](.github/PULL_REQUEST_TEMPLATE.md). **Doc drift** = CI check only (not a pasted gate).
 
 ## Contents
 
@@ -126,7 +126,7 @@ Skip for single-file fixes and doc-only edits.
 | `frontend/` | `npm run ci` then `npm run test` |
 | Both | All of the above |
 
-**Gate 2a** — `./scripts/check-doc-drift.sh` (CI required). **Gate 2b** — human doc rows: [agent-checklist.md § Gate 2](docs/playbooks/agent-checklist.md). **Automated:** `./scripts/check-doc-drift.sh` fails when epic docs are missing alongside module code changes, or new handlers lack tests.
+**Gate 2** — doc walk-through in PR ([agent-checklist.md § Gate 2](docs/playbooks/agent-checklist.md)). **Doc drift** — CI job only; script also fails when epic docs are missing alongside module code changes, or new handlers lack tests.
 
 **Gate 3** — seven yes/no questions in [agent-checklist.md § Gate 3](docs/playbooks/agent-checklist.md); update `patterns.md` / feature file / `TECH_STACK.md` on any "yes".
 
@@ -188,7 +188,7 @@ Full rules: [`patterns.md`](docs/playbooks/patterns.md) (EF, API, Wolverine, agg
 
 **Per layer / module:** all US callouts updated; epic README table; [`PROGRESS.md`](docs/PROGRESS.md) (layer summary only — not per-class detail).
 
-**Per PR before merge:** Gates 0–3 written; Gate 2a (`check-doc-drift.sh`) green; Gate 1 includes:
+**Per PR before merge:** Gates 0–3 written; CI **Doc drift** green when applicable; Gate 1 includes:
 
 ```bash
 grep -rn "TODO\|FIXME\|NotImplementedException\|placeholder\|stub" src/ tests/ frontend/src/ 2>/dev/null | grep -v obj/ | grep -v node_modules/
