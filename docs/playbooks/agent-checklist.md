@@ -42,13 +42,13 @@ Docs touched: docs/epics/…
 | `frontend/` | `npm run ci` then `npm run test` |
 | `src/Axis.Api/Endpoints/` or API contract | Update + run `tests/Api/Axis.Api.Tests/` |
 
-```
+```text
 Gate 1:
-- dotnet build → ran / not triggered
-- dotnet test (full solution) → ran / not triggered
-- dotnet format --verify-no-changes → ran / not triggered
-- stub/TODO grep → ran / not triggered
-- npm run ci + npm run test → ran / not triggered
+- dotnet build → ran / not triggered (reason)
+- dotnet test (full solution) → ran / not triggered (reason)
+- dotnet format --verify-no-changes → ran / not triggered (reason)
+- stub/TODO grep → ran / not triggered (reason)
+- npm run ci + npm run test → ran / not triggered (reason)
 ```
 
 Example (docs-only): every line `not triggered — no src/, tests/, or frontend/ changes`.
@@ -57,14 +57,14 @@ Example (docs-only): every line `not triggered — no src/, tests/, or frontend/
 
 ### Gate 2a — automated
 
-```
+```text
 Gate 2a:
-- ./scripts/check-doc-drift.sh → ran (green) / not triggered
+- ./scripts/check-doc-drift.sh → ran (green) / not triggered (reason)
 ```
 
 ### Gate 2b — full row list (work through every line)
 
-```
+```text
 Gate 2b:
 - Library → TECH_STACK.md / not triggered
 - New pattern → patterns.md / not triggered
@@ -82,7 +82,7 @@ Gate 2b:
 
 ### Gate 3
 
-```
+```text
 Gate 3: 1–7 No — or: N → updated <file>
 ```
 

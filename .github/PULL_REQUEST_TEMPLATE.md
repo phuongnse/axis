@@ -16,26 +16,26 @@
 
 Local commands must match CI. Use `not triggered` only when that path did not change.
 
-```
+```text
 Gate 1:
-- dotnet build →
-- dotnet test (full solution, same as CI) →
-- dotnet format --verify-no-changes →
-- TODO/FIXME/placeholder/stub grep (empty) →
-- npm run ci →
-- npm run test →
+- dotnet build → ran / not triggered (reason)
+- dotnet test (full solution, same as CI) → ran / not triggered (reason)
+- dotnet format --verify-no-changes → ran / not triggered (reason)
+- TODO/FIXME/placeholder/stub grep (empty) → ran / not triggered (reason)
+- npm run ci → ran / not triggered (reason)
+- npm run test → ran / not triggered (reason)
 ```
 
 ## Gate 2a — Doc drift (required)
 
-```
+```text
 Gate 2a:
-- ./scripts/check-doc-drift.sh → ran (green) / not triggered
+- ./scripts/check-doc-drift.sh → ran (green) / not triggered (reason)
 ```
 
 ## Gate 2b — Docs walk-through (required)
 
-```
+```text
 Gate 2b:
 - Library → TECH_STACK.md / not triggered
 - New pattern → patterns.md or patterns-index.md / not triggered
@@ -47,7 +47,7 @@ Gate 2b:
 
 ## Gate 3 — Retrospective (required)
 
-```
+```text
 Gate 3:
 1. New rule from test failure?
 2. Invented invariant without AC?
