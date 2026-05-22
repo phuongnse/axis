@@ -284,6 +284,7 @@ try
     app.MapDataClassEndpoints();
     app.MapRecordEndpoints();
     app.MapWorkflowEndpoints();
+    app.MapExecutionEndpoints();
     app.MapFormEndpoints();
     app.MapFormTaskEndpoints();
 
