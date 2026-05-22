@@ -73,7 +73,7 @@ Gate 2:
 - Epic README + PROGRESS → … / not triggered
 - Architecture rule → CLAUDE.md / not triggered
 - process.md workflow → … / not triggered
-- Project structure → ARCHITECTURE.md + process.md / not triggered
+- Project structure → CLAUDE.md § Solution tree + process.md / not triggered
 - Wireframe/diagram path move → grep docs/ / not triggered
 - Program.cs host → patterns.md host section / not triggered
 - Stale code comment → same file / not triggered

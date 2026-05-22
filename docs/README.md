@@ -75,13 +75,16 @@ Excalidraw wireframes live in `docs/epics/{E0N}/wireframes/`, co-located with ea
 
 ---
 
-## Roadmap
+## Single source of truth per topic
 
-### Phase 1 — MVP
-Core platform: multi-tenancy, auth, data modeling, workflow building, form builder, execution engine.
+When two docs disagree, the **owner** wins. Update the owner first; everything else is a pointer.
 
-### Phase 2 — UI Builder
-Drag & drop page builder, widget library, data binding.
-
-### Phase 3 — Ecosystem
-Marketplace connectors, AI-assisted workflow suggestions, analytics dashboard.
+| Topic | Owner |
+|---|---|
+| Product scope, target users, MVP cut | [PRODUCT_VISION.md](./PRODUCT_VISION.md) |
+| Library versions and ADRs | [TECH_STACK.md](./TECH_STACK.md) |
+| Source tree and module boundaries | [../CLAUDE.md](../CLAUDE.md) |
+| Per-feature ACs and current gaps | `docs/epics/{module}/features/F0N-*.md` |
+| Module-wide layer status | [PROGRESS.md](./PROGRESS.md) |
+| Daily agent workflow + gates | [playbooks/agent-checklist.md](./playbooks/agent-checklist.md) |
+| Implementation patterns and pitfalls | [playbooks/patterns.md](./playbooks/patterns.md) (start at [patterns-index.md](./playbooks/patterns-index.md)) |
