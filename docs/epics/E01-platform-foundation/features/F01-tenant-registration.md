@@ -111,8 +111,7 @@ Self-service registration flow where a new organization signs up and is automati
 - Custom schema naming chosen by the user — schema names are auto-generated.
 
 > **Implementation status** — Domain: ⏳ | Application: ⚠️ | Infrastructure: ⚠️ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: `ITenantSchemaProvisioner` + `TenantSchemaProvisioner` wired from `VerifyEmailHandler` (schema create + migrate on verify). Retry job, exponential backoff, platform alert, and "Setting up your workspace…" polling UI not implemented.
-> Gaps vs spec: retry job, exponential backoff, platform alert, and provisioning wait UI not implemented.
+> Gaps vs spec: `ITenantSchemaProvisioner` runs before verified state is saved (PR #50). Retry job, exponential backoff, platform alert, Admin role on verify, and provisioning wait UI not implemented.
 
 ---
 
