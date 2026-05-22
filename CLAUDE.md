@@ -16,7 +16,7 @@
 
 ## What is Axis
 
-Multi-tenant low-code SaaS: custom data models, visual workflows, forms, and UI pages — no end-user coding.
+Multi-tenant low-code SaaS: custom data models, visual workflows, forms, and UI pages — no end-user coding. Architecture: **modulith with strict service boundaries** ([ADR-010](docs/TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy)) — each module is a service contract from day 1; modulith packaging is the deployment shape today, independent services tomorrow. Extraction is a redeploy, not a refactor.
 
 ---
 
@@ -24,17 +24,29 @@ Multi-tenant low-code SaaS: custom data models, visual workflows, forms, and UI 
 
 Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md). Module list and per-module responsibilities are owned by [`docs/epics/README.md`](docs/epics/README.md). Architectural shape (containers, multi-tenancy, auth) is owned by [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). This file owns only the **rules** — the things below that must hold no matter which library version is in `Directory.Packages.props`.
 
-**Shared kernel:** `Axis.Shared.Domain`, `Axis.Shared.Application`, `Axis.Shared.Infrastructure`.
+**Shared kernel:** `Axis.Shared.Domain`, `Axis.Shared.Application` — **abstractions only**, no shared implementation ([ADR-017](docs/TECH_STACK.md#adr-017-axisshared-is-abstractions-only-no-shared-implementation)). `Axis.Shared.Infrastructure` exists only for genuinely cross-cutting infrastructure (e.g. common JSON policy), never for per-module concerns like UnitOfWork or repository base classes.
 
-**Multi-tenancy:** schema `tenant_{organizationId:N}`; tenant from JWT `org_id`; schema cached in Redis. Identity stays on `public`.
+**Per-module databases:** each module owns its own PostgreSQL database (`axis_identity`, `axis_datamodeling`, `axis_workflowbuilder`, `axis_workflowengine`, `axis_formbuilder`, `axis_pagebuilder`). Schema-per-tenant `tenant_{organizationId:N}` *inside* each module DB. Per-module Wolverine envelope schema (`wolverine`) lives in the same DB as the module. Identity's `public` schema is the only registry — other modules **never** SQL-query Identity.
 
-**Module boundaries (P0):**
+**Cross-module communication contract (P0):**
 
-- Communicate only via Wolverine domain events or Application-layer interfaces — no cross-module DB transactions.
-- **Never:** reference another module's `Infrastructure`; query another module's tables (`DbSet`, raw SQL, Dapper); share a `DbContext`; dispatch domain events with `IMediator`.
-- Cross-module data: local read model synced by events — see [`patterns.md` § Cross-module data](docs/playbooks/patterns.md).
+- **Events:** Kafka topics with Avro payloads + CloudEvents envelopes. Wolverine publishes from the originating module's outbox; consumers run in other modules' Wolverine handlers.
+- **Sync RPC:** gRPC only, contracts defined in `Axis.{Module}.Contracts/*.proto`. Used as escape hatch when a local read model is insufficient.
+- **Auth:** JWT issued by Identity; other modules validate locally via JWKS (no DB lookup of Identity).
+- **External API to SPA:** REST/OpenAPI through the `Axis.Api` gateway.
 
-**Layer dependency:** Domain (pure C#) ← Application ← Infrastructure ← `Axis.Api` ← `frontend/`.
+**Service boundaries (P0 — always wrong if violated):**
+
+- **No in-process method call into another module's Application or Infrastructure.** Cross-module = Kafka event OR gRPC call, never `services.GetRequiredService<IFooFromAnotherModule>()`.
+- **No project reference** from `Axis.{ModuleA}.*` to `Axis.{ModuleB}.*` except to `Axis.{ModuleB}.Contracts` (proto + Avro schemas only).
+- **No shared `DbContext`, no cross-module SQL, no cross-module aggregate references.**
+- **No shared kernel implementation.** `Axis.Shared.*` projects contain interfaces, primitives, and Result types — never UnitOfWork base classes, EF helpers, or repository bases.
+- **MediatR is intra-module only.** Cross-module dispatch always goes through Wolverine + Kafka.
+- **Auth checks read JWT claims locally.** Never `IdentityDbContext.Users.Find(...)` from outside Identity — call Identity's gRPC `IdentityService` or rely on JWT claims.
+
+**Cross-module data:** local read model synced by Kafka events — see [`patterns.md` § Cross-module communication](docs/playbooks/patterns.md). Saga orchestration ([ADR-020](docs/TECH_STACK.md#adr-020-saga-orchestration-for-cross-module-workflows)) for workflows that need transactional-looking semantics across modules.
+
+**Layer dependency (per module):** Contracts (pure schema) ← Domain (pure C#) ← Application ← Infrastructure ← module API entrypoint. `frontend/` calls only `Axis.Api` (REST). `Axis.Api` calls module Application directly (modulith mode) or module gRPC (extracted mode).
 
 ---
 
@@ -52,10 +64,13 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 
 **P1 — confirm with user before deviating:**
 
-- Layer order: Domain → Application → Infrastructure → API → Frontend.
+- Layer order: Contracts → Domain → Application → Infrastructure → module entrypoint → `Axis.Api` gateway → Frontend.
 - `Result` / `Result<T>` for business failures; exceptions for infrastructure only.
-- MediatR = commands/queries only; domain events = Wolverine outbox only.
-- Minimal API: `.RequireAuthorization()` unless explicitly public.
+- MediatR = intra-module commands/queries only; cross-module domain events = Wolverine outbox → Kafka topic.
+- Minimal API: `.RequireAuthorization()` unless explicitly public; JWT validated locally via Identity JWKS (no DB call to Identity).
+- Schema changes = EF Core migration ([ADR-023](docs/TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)); `EnsureCreated` forbidden everywhere (prod, dev, tests).
+- New cross-module RPC = `.proto` in `Axis.{Module}.Contracts` first; never expose a new sync call without a versioned contract.
+- New cross-module event = Avro schema registered with Schema Registry + CloudEvents envelope ([ADR-019](docs/TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)).
 
 **P2 — every commit:**
 
@@ -192,8 +207,12 @@ Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` chan
 **Solution tree:**
 
 ```text
-frontend/src/features/{name}/   # components, hooks, api.ts, types.ts
-src/Axis.Api/Endpoints/         # all HTTP endpoints
-src/Modules/{Module}/           # Domain, Application, Infrastructure
-tests/Modules/{Module}.*.Tests/
+frontend/src/features/{name}/         # components, hooks, api.ts, types.ts
+src/Axis.Api/Endpoints/               # REST gateway endpoints (route → module call)
+src/Modules/{Module}/
+├── Axis.{Module}.Contracts/          # .proto + Avro schemas (pure schema, no logic)
+├── Axis.{Module}.Domain/             # entities, value objects, domain events
+├── Axis.{Module}.Application/        # commands, queries, handlers, saga state
+└── Axis.{Module}.Infrastructure/     # DbContext, repos, Wolverine handlers, gRPC server, Kafka producer/consumer
+tests/Modules/{Module}.*.Tests/       # mirror src layout
 ```
