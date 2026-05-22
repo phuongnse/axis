@@ -47,15 +47,14 @@ Thank you for contributing. This repo uses docs-first development: feature specs
 
 ### Updating the PR description
 
-Keep the description **short**. Only three sections (see [PR template](.github/PULL_REQUEST_TEMPLATE.md)):
+Keep the description **short** (see [PR template](.github/PULL_REQUEST_TEMPLATE.md)):
 
 1. **Summary** — what the whole PR does (update only if scope changes)
-2. **Commits** — one table row per commit; **append** rows, never drop earlier commits
-3. **Requirements & rules followed** — checklist of what applies (CI, Gate 1, doc drift, docs same PR, spec → code, Gate 3)
+2. **Requirements & rules followed** — checklist, **most important first**; tick or N/A. Commits are on the PR **Commits** tab — no table in the description.
 
-Gates 0–3 in [agent-checklist.md](docs/playbooks/agent-checklist.md) are how you **verify** work before push; summarize the outcome in **Requirements**, do not paste long gate blocks into the PR.
+Gates 0–3 in [agent-checklist.md](docs/playbooks/agent-checklist.md) are how you **verify** before push; reflect the outcome in **Requirements** only.
 
-Agents: read the existing PR body before `update_pr`; merge new commits and tick requirements — do not replace Summary with only the latest commit.
+Agents: read the existing PR body before `update_pr`; update Summary if scope changes and refresh requirement ticks — do not rewrite the whole PR each push.
 
 ## Pull request template
 

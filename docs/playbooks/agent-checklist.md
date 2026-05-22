@@ -2,7 +2,7 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
 
-**Daily workflow.** Gates 0–3 while implementing. **PR description:** only Summary + Commits + Requirements ([PR template](../../.github/PULL_REQUEST_TEMPLATE.md)) — not long gate paste blocks.
+**Daily workflow.** Gates 0–3 while implementing. **PR description:** only Summary + Requirements ([PR template](../../.github/PULL_REQUEST_TEMPLATE.md)) — not long gate paste blocks.
 
 
 ---

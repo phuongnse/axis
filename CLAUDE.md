@@ -1,6 +1,6 @@
 # Axis — Project Context for Claude
 
-> **Agents:** [agent-checklist.md](docs/playbooks/agent-checklist.md) for gates during work; [PR template](.github/PULL_REQUEST_TEMPLATE.md) for description (**Summary + Commits + Requirements** only).
+> **Agents:** [agent-checklist.md](docs/playbooks/agent-checklist.md) for gates during work; [PR template](.github/PULL_REQUEST_TEMPLATE.md) for description (**Summary + Requirements** only.
 
 ## Contents
 
@@ -188,7 +188,7 @@ Full rules: [`patterns.md`](docs/playbooks/patterns.md) (EF, API, Wolverine, agg
 
 **Per layer / module:** all US callouts updated; epic README table; [`PROGRESS.md`](docs/PROGRESS.md) (layer summary only — not per-class detail).
 
-**Per PR before merge:** PR description = Summary + Commits + Requirements; CI **Doc drift** green when applicable; Gate 1 includes:
+**Per PR before merge:** PR description = Summary + Requirements; CI **Doc drift** green when applicable; Gate 1 includes:
 
 ```bash
 grep -rn "TODO\|FIXME\|NotImplementedException\|placeholder\|stub" src/ tests/ frontend/src/ 2>/dev/null | grep -v obj/ | grep -v node_modules/
