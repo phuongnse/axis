@@ -37,6 +37,8 @@ Docs touched: docs/epics/…
 | **2** | Doc walk-through (rows below) |
 | **3** | Retrospective (seven questions) |
 
+**Priority:** Gate **1** blocks commit (failing build/tests). Gate **2** keeps docs in the same PR — required before merge, not a substitute for Gate 1. In PR descriptions, list Gate 1 before Gate 2 ([template](../../.github/PULL_REQUEST_TEMPLATE.md)).
+
 ### Gate 1 — verify before push (local = CI)
 
 | Changed | Commands (all must pass when triggered) |
