@@ -1,6 +1,6 @@
 # Axis — Project Context for Claude
 
-> **Agents:** [`docs/playbooks/agent-checklist.md`](docs/playbooks/agent-checklist.md) first (one page). Every PR: `./scripts/check-doc-drift.sh` + Gate 2/3 in [PR template](.github/PULL_REQUEST_TEMPLATE.md). Humans: this file is architecture + P0 rules; playbooks are how-to.
+> **Agents:** [agent-checklist.md](docs/playbooks/agent-checklist.md) for gates during work; [PR template](.github/PULL_REQUEST_TEMPLATE.md) for description (**Summary + Requirements** only.
 
 ## Contents
 
@@ -69,8 +69,8 @@ Multi-tenant low-code SaaS: custom data models, visual workflows, forms, and UI 
 - Never weaken tests, `.Skip()`, or mock away behavior under test.
 - Never bypass auth, skip an AC silently, or mark ✅ to avoid a hard gap.
 - Domain: zero external dependencies.
-- Never commit with failing Gate 1, or without **written** Gate 2 and Gate 3 in the PR.
-- Run `./scripts/check-doc-drift.sh` before push (CI **Doc drift** job).
+- Never commit with failing Gate 1; docs and requirements satisfied before merge (agent-checklist + PR template).
+- When `src/`, `tests/`, or `docs/epics/` change: run `./scripts/check-doc-drift.sh` before push; CI **Doc drift** must be green. Paste **Gate 2** in the PR — not a drift-script gate block.
 
 **P1 — confirm with user before deviating:**
 
@@ -116,17 +116,19 @@ Skip for single-file fixes and doc-only edits.
 
 ### Gates
 
-**Gate 1** — scope-based (full `dotnet build` before `unit-tests.slnf`):
+**Gate 0** — AC map (no blank cells); gap sweep before API. Template: [agent-checklist.md § Gate 0](docs/playbooks/agent-checklist.md).
+
+**Gate 1** — scope-based (local = CI; full `Axis.sln`, no solution filter):
 
 | Changed | Commands |
 |---------|----------|
-| `src/` or `tests/` | `dotnet build` then `dotnet test unit-tests.slnf` |
+| `src/` or `tests/` | `dotnet build` → `dotnet test` → `dotnet format --verify-no-changes` |
 | `frontend/` | `npm run ci` then `npm run test` |
 | Both | All of the above |
 
-**Gate 2** — same PR as code. Full row checklist: [agent-checklist.md § Gate 2](docs/playbooks/agent-checklist.md). **Automated:** `./scripts/check-doc-drift.sh` fails when epic docs are missing alongside module code changes, or new handlers lack tests.
+**Gate 2** — docs in same PR ([agent-checklist.md § Gate 2](docs/playbooks/agent-checklist.md)). **Doc drift** — run script before push when code/epics change; CI job must be green.
 
-**Gate 3** — seven yes/no questions in [agent-checklist.md § Gate 3](docs/playbooks/agent-checklist.md); update `patterns.md` / feature file / `TECH_STACK.md` on any "yes".
+**Gate 3** — retrospective ([agent-checklist.md § Gate 3](docs/playbooks/agent-checklist.md)); update docs on any "yes".
 
 ### Git
 
@@ -186,7 +188,7 @@ Full rules: [`patterns.md`](docs/playbooks/patterns.md) (EF, API, Wolverine, agg
 
 **Per layer / module:** all US callouts updated; epic README table; [`PROGRESS.md`](docs/PROGRESS.md) (layer summary only — not per-class detail).
 
-**Per PR before merge:** Gate 1–3 written; `check-doc-drift.sh` green; optional grep:
+**Per PR before merge:** PR description = Summary + Requirements only (no CI status in description); run `./scripts/check-doc-drift.sh` before push when `src/`, `tests/`, or `docs/epics/` change; Gate 1 includes:
 
 ```bash
 grep -rn "TODO\|FIXME\|NotImplementedException\|placeholder\|stub" src/ tests/ frontend/src/ 2>/dev/null | grep -v obj/ | grep -v node_modules/
@@ -201,7 +203,9 @@ Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` chan
 | Doc | Use |
 |-----|-----|
 | [agent-checklist.md](docs/playbooks/agent-checklist.md) | **Agents — daily** |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Branches, PRs, drift script |
 | [process.md](docs/playbooks/process.md) | Layer workflow |
+| [patterns-index.md](docs/playbooks/patterns-index.md) | Jump table into patterns |
 | [patterns.md](docs/playbooks/patterns.md) | Implementation detail |
 | [testing.md](docs/playbooks/testing.md) | Test patterns |
 | [frontend.md](docs/playbooks/frontend.md) | SPA rules |

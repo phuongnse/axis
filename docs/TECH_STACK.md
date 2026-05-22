@@ -14,7 +14,7 @@
 | **CQRS via MediatR** | 12.x | Command/Query separation | Clean separation of read/write paths, fits DDD |
 | **Entity Framework Core** | 9.x | ORM | Best-in-class ORM for .NET, great migration support |
 | **Npgsql** | 9.x | PostgreSQL driver | Official EF Core provider for PostgreSQL |
-| **Wolverine** | 5.x | Background jobs + messaging | Handles background jobs, scheduling, intra- and inter-module domain event dispatch via durable outbox. Not Hangfire. |
+| **Wolverine** | 5.x | Background jobs + messaging | Background jobs and domain event dispatch via Wolverine `IMessageBus`. Events dispatch in-process after `SaveChangesAsync` today; durable PostgreSQL outbox is deferred — see [PROGRESS.md](./PROGRESS.md) (E01 platform gap). Not Hangfire. |
 | **OpenIddict** | 5.x | Auth (OAuth2/OIDC) | Standards-compliant OAuth2/OIDC server. Authorization Code + PKCE for the SPA; Client Credentials for external system integrations (e.g. triggering workflows via API). |
 | **SignalR** | (built-in) | Real-time updates | Workflow execution status pushed to client |
 | **FluentValidation** | 11.x | Input validation | Declarative, testable validation |

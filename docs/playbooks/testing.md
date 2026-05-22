@@ -44,7 +44,15 @@ When a repository has a unique constraint (e.g. `(organization_id, name)`), a te
 
 ### Pre-commit gate
 
-See CLAUDE.md Gate 1 for the canonical pre-commit command table. Short form: run `dotnet test unit-tests.slnf` before every commit. When adding a new unit test project, also add it to `unit-tests.slnf`. Integration tests (requiring Docker) can be skipped locally unless explicitly instructed.
+See [agent-checklist.md § Gate 1](./agent-checklist.md) and CLAUDE.md. When `src/` or `tests/` change:
+
+```bash
+dotnet build
+dotnet test
+dotnet format --verify-no-changes
+```
+
+`dotnet test` runs the **full** solution (Domain, Application, Infrastructure with Testcontainers, API tests). Docker must be available — same expectation as CI. When adding a test project, add it to `Axis.sln` only (no solution filter).
 
 ### Integration test maintenance
 

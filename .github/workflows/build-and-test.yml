@@ -5,22 +5,13 @@ on:
     branches: [ "main" ]
 
 jobs:
-  doc-drift:
-    name: Doc drift check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          fetch-depth: 0
-
-      - name: Check docs match code changes
-        run: chmod +x ./scripts/check-doc-drift.sh && ./scripts/check-doc-drift.sh
-
   dotnet:
     name: .NET — Build and Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
 
       - name: Setup .NET
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
@@ -44,6 +35,8 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -60,3 +53,17 @@ jobs:
 
       - name: Test
         run: npm run test
+
+  doc-drift:
+    name: Doc drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check doc drift
+        run: ./scripts/check-doc-drift.sh
+        env:
+          BASE_BRANCH: main

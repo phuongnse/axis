@@ -1,37 +1,13 @@
 ## Summary
 
-<!-- What changed and why (2–4 sentences) -->
+<!-- 2–4 sentences: what this PR does overall and why -->
 
-## AC map
+## Requirements & rules followed
 
-<!-- Required for feature work -->
+<!-- Most important first. Check what applies; mark N/A with a short reason. -->
 
-| AC / US | Layer | Implementation |
-|---------|-------|------------------|
-| | | |
-
-## Gate 2 — Docs (required)
-
-```
-Gate 2:
--
-```
-
-## Gate 3 — Retrospective (required)
-
-```
-Gate 3:
-1. New rule from test failure? 
-2. Invented invariant without AC? 
-3. Infrastructure footgun? 
-4. Non-obvious test setup? 
-5. Changed direction mid-task? 
-6. Spec gap discovered? 
-7. Incident-level detail in rule text? 
-```
-
-## Verification
-
-- [ ] `./scripts/check-doc-drift.sh`
-- [ ] `dotnet build` + `dotnet test unit-tests.slnf` (if `src/` or `tests/`)
-- [ ] `npm run ci` + `npm run test` (if `frontend/`)
+- [ ] **Spec → code** — changes match feature file ACs (or gaps documented in callouts)
+- [ ] **Gate 0** — AC map complete; epic/feature docs identified (when shipping code)
+- [ ] **Gate 1** — `dotnet build` + `dotnet test` (full solution), `dotnet format`, and/or `npm run ci` + `npm run test` for paths you changed (N/A with reason)
+- [ ] **Gate 2** — docs updated in same PR (callouts, epic README, `PROGRESS.md`, `TECH_STACK` / patterns as triggered)
+- [ ] **Gate 3** — retrospective done; `patterns.md` / feature file / `TECH_STACK.md` / `CLAUDE.md` updated if needed
