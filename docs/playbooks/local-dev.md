@@ -22,7 +22,7 @@ wsl -- bash -lc "cd /mnt/d/projects/axis && docker compose up -d"
 
 First boot:
 - Postgres / Redis / MailDev / LocalStack images pull (~600 MB total).
-- API container runs `dotnet restore` then `dotnet watch run` — first restore takes 1–2 min, cached afterwards in the `nuget_packages` volume.
+- API container runs `dotnet restore` then `dotnet watch run` — first restore takes 1–2 min, cached afterward in the `nuget_packages` volume.
 - Web container runs `npm ci` then `vite` — first install ~1 min, cached in `web_node_modules` volume.
 
 Add `--build` only if you change the `frontend/Dockerfile.dev` or the root `Dockerfile` (prod image).

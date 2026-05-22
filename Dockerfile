@@ -29,4 +29,9 @@ ENV ASPNETCORE_URLS=http://+:8080 \
 
 EXPOSE 8080
 COPY --from=build /app/publish ./
+
+# Drop privileges — APP_UID is the unprivileged 'app' user baked into the
+# mcr.microsoft.com/dotnet/aspnet:8.0 image (uid 1654).
+USER $APP_UID
+
 ENTRYPOINT ["dotnet", "Axis.Api.dll"]
