@@ -17,8 +17,8 @@ When **CodeRabbit** or a **human** leaves actionable comments on your PR:
 
 Template for an inline reply:
 
-> Fixed in `<sha>` — \<one sentence\>.  
-> Won’t fix — \<reason citing spec/CLAUDE\>.
+> Fixed in `<sha>` — one sentence what changed.  
+> Won’t fix — reason citing spec or CLAUDE.
 
 After a review-fix push: add a **Changelog** row to the PR body (do not replace the whole description).
  CI enforces build/test and doc drift; you paste gates in the PR as an audit trail.
