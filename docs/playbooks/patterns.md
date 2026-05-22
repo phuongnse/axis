@@ -1046,13 +1046,20 @@ opts.ScheduleJob<ArchiveOldExecutionsCommand>(cron: "0 2 * * *"); // daily at 02
 
 ---
 
-## Cross-module data pattern
+## Cross-module communication pattern
 
-**Core rule: a module only queries its own tables. Always. No exceptions.**
+**Core rule: a module only queries its own database. Always. No exceptions.** This is the Share Nothing principle from [ADR-010](../TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries--extract--redeploy) — modules are data-sovereign so that extraction is a redeploy, not a refactor.
 
-If module A needs data owned by module B, A must maintain its own local copy of that data, kept in sync via Wolverine domain events. This is the Share Nothing principle — modules are data-sovereign.
+Cross-module needs are met by exactly two mechanisms:
 
-### ❌ Anti-pattern: cross-module raw SQL
+| Need | Mechanism | When to use |
+|---|---|---|
+| React to state change in another module | **Kafka event** (Avro payload + CloudEvents envelope) | Always the default. The consuming module maintains a **local read model** populated by the event. |
+| Read fresh data the local read model cannot satisfy | **gRPC sync call** to the source module's `IdentityService` / `WorkflowService` / etc. | Escape hatch only. Used when eventual consistency is unacceptable (e.g. fresh permission check). |
+
+Direct DbContext access, in-process method calls into another module's services, raw SQL across modules, and `MediatR` dispatch across modules are all P0 violations.
+
+### ❌ Anti-pattern A: cross-module raw SQL
 
 ```csharp
 // WRONG — module A querying a table owned by module B
@@ -1061,85 +1068,171 @@ int count = await context.Database
     .FirstAsync(ct);
 ```
 
-This silently breaks module isolation, causes test failures when modules use separate databases, and creates hidden coupling that makes the system fragile.
-
-### ✅ Correct pattern: event-driven local denormalization
-
-When module A needs to know something about module B's data, B publishes domain events when that data changes. A listens via Wolverine and maintains its own local copy.
-
-**Example** (FormBuilder / WorkflowBuilder — the principle applies to any two modules): FormBuilder needs to know whether a form is referenced by any workflow step.
-
-**Step 1 — Source module (WorkflowBuilder) raises events when its state changes:**
+### ❌ Anti-pattern B: in-process call dressed as an interface
 
 ```csharp
-// WorkflowBuilder.Domain/Events/FormStepAdded.cs
-public sealed record FormStepAdded(Guid WorkflowId, Guid StepId, Guid FormId) : IDomainEvent;
-
-// WorkflowBuilder.Domain/Events/FormStepRemoved.cs
-public sealed record FormStepRemoved(Guid WorkflowId, Guid StepId, Guid FormId) : IDomainEvent;
-
-// Raised inside WorkflowDefinition.AddStep() when StepType == Form
-RaiseDomainEvent(new FormStepAdded(Id, step.Id, formId));
+// WRONG — module A injecting module B's Application service
+public class SomethingHandler(IWorkflowQueryService workflowQueries)  // ← B's service
+{
+    public async Task Handle(...)
+        => await workflowQueries.GetWorkflowAsync(...);   // ← in-process call, no contract
+}
 ```
 
-**Step 2 — Consuming module (FormBuilder) stores its own local copy:**
+This compiles and runs in the modulith, but the moment module B is extracted, the project reference disappears and `IWorkflowQueryService` is no longer reachable. Cross-module sync **must** go through gRPC (with a versioned `.proto` contract) — see [ADR-014](../TECH_STACK.md#adr-014-grpc-for-cross-module-sync-rpc-restopenapi-for-external-frontend-facing-api).
+
+### ✅ Pattern 1: event-driven local read model (default)
+
+When module A needs to know something about module B's data, B publishes an event when that data changes. A maintains its own local copy via a Wolverine handler that consumes from a Kafka topic.
+
+**Example** (FormBuilder / WorkflowBuilder): FormBuilder needs to know whether a form is referenced by any workflow step.
+
+**Step 1 — Define the event schema in B's Contracts project (Avro + CloudEvents):**
+
+```text
+src/Modules/WorkflowBuilder/Axis.WorkflowBuilder.Contracts/Events/FormStepAdded.avsc
+{
+  "type": "record",
+  "namespace": "axis.workflowbuilder",
+  "name": "FormStepAdded",
+  "fields": [
+    { "name": "workflowId", "type": { "type": "string", "logicalType": "uuid" } },
+    { "name": "stepId",     "type": { "type": "string", "logicalType": "uuid" } },
+    { "name": "formId",     "type": { "type": "string", "logicalType": "uuid" } }
+  ]
+}
+```
+
+The Avro file is registered with Confluent Schema Registry at build time. CI rejects breaking changes per [ADR-019](../TECH_STACK.md#adr-019-avro--schema-registry-for-event-payloads-cloudevents-envelope).
+
+**Step 2 — Source module (WorkflowBuilder) raises the domain event and publishes it via the outbox:**
 
 ```csharp
-// FormBuilder.Domain/Entities/FormWorkflowReference.cs
-// Simple record — no aggregate, no lifecycle; owned by FormBuilder's DB
+// WorkflowBuilder.Domain — raise the domain event inside the aggregate
+RaiseDomainEvent(new FormStepAdded(Id, step.Id, formId));
+
+// WorkflowBuilder.Infrastructure — Wolverine handler maps domain event → Kafka envelope
+public sealed class FormStepAddedPublisher
+{
+    public async Task Handle(FormStepAdded evt, IMessageBus bus, CancellationToken ct)
+    {
+        // Wolverine routes to the configured Kafka topic; Avro+CloudEvents serialisation
+        // is handled by middleware so handlers stay free of transport concerns.
+        await bus.PublishAsync(evt);
+    }
+}
+```
+
+**Step 3 — Consuming module (FormBuilder) stores its own local read-model copy:**
+
+```csharp
+// FormBuilder.Domain — local read model, owned by FormBuilder's DB
 public sealed class FormWorkflowReference
 {
     public Guid FormId { get; init; }
     public Guid WorkflowId { get; init; }
     public Guid StepId { get; init; }
+    public Guid OrganizationId { get; init; }
 }
 
-// FormBuilder.Infrastructure/Handlers/FormStepAddedHandler.cs
+// FormBuilder.Infrastructure — Wolverine handler reads from the Kafka inbox
 public sealed class FormStepAddedHandler(FormBuilderDbContext db)
 {
     public async Task Handle(FormStepAdded evt, CancellationToken ct)
     {
-        // Idempotent: skip if already synced (Wolverine at-least-once delivery)
+        // Idempotent: Kafka delivers at-least-once; Wolverine inbox dedupes by envelope ID
+        // but defensive upsert at the read-model level is still good practice.
         bool exists = await db.FormWorkflowReferences.AnyAsync(
-            r => r.FormId == evt.FormId && r.WorkflowId == evt.WorkflowId && r.StepId == evt.StepId, ct);
+            r => r.FormId == evt.FormId
+              && r.WorkflowId == evt.WorkflowId
+              && r.StepId == evt.StepId, ct);
         if (exists) return;
 
         db.FormWorkflowReferences.Add(new FormWorkflowReference
         {
-            FormId = evt.FormId, WorkflowId = evt.WorkflowId, StepId = evt.StepId
+            FormId = evt.FormId,
+            WorkflowId = evt.WorkflowId,
+            StepId = evt.StepId,
+            OrganizationId = evt.OrganizationId,   // always denormalise tenant
         });
         await db.SaveChangesAsync(ct);
     }
 }
 ```
 
-**Step 3 — Consuming module queries only its own table:**
+**Step 4 — Consuming module queries only its own table:**
 
 ```csharp
 // FormRepository.IsReferencedByWorkflowAsync — queries FormBuilder's own DB
-public async Task<bool> IsReferencedByWorkflowAsync(Guid formId, CancellationToken ct = default)
-    => await context.FormWorkflowReferences.AnyAsync(r => r.FormId == formId, ct);
+public async Task<bool> IsReferencedByWorkflowAsync(Guid formId, Guid orgId, CancellationToken ct = default)
+    => await context.FormWorkflowReferences.AnyAsync(
+           r => r.FormId == formId && r.OrganizationId == orgId, ct);
 ```
 
-### Rules
+### ✅ Pattern 2: gRPC sync call (escape hatch)
+
+Used only when a local read model is insufficient. Example: a workflow step needs to verify the *current* user's permissions at execution time (read model could be stale by milliseconds and that matters).
+
+**Step 1 — Define the contract in B's Contracts project:**
+
+```proto
+// src/Modules/Identity/Axis.Identity.Contracts/IdentityService.proto
+syntax = "proto3";
+package axis.identity.v1;
+
+service IdentityService {
+    rpc GetUserPermissions(GetUserPermissionsRequest) returns (GetUserPermissionsResponse);
+}
+
+message GetUserPermissionsRequest {
+    string user_id = 1;
+    string organization_id = 2;
+}
+
+message GetUserPermissionsResponse {
+    repeated string permissions = 1;
+}
+```
+
+**Step 2 — Consuming module gets a generated client via project reference (modulith) or NuGet (extracted):**
+
+```csharp
+// WorkflowEngine.Infrastructure — inject the Identity gRPC client
+public sealed class PermissionGate(IdentityService.IdentityServiceClient identity)
+{
+    public async Task<bool> CanExecuteAsync(Guid userId, Guid orgId, string permission, CancellationToken ct)
+    {
+        GetUserPermissionsResponse resp = await identity.GetUserPermissionsAsync(
+            new GetUserPermissionsRequest
+            {
+                UserId = userId.ToString(),
+                OrganizationId = orgId.ToString(),
+            }, cancellationToken: ct);
+        return resp.Permissions.Contains(permission);
+    }
+}
+```
+
+The gRPC channel is configured via `Modules:Identity:Url` (see [ADR-016](../TECH_STACK.md#adr-016-service-discovery--config-driven-in-modulith-mode-k8s-service-dns-in-production)) — `http://localhost:5001` in modulith mode, K8s service DNS in production.
+
+### Rules (P0)
 
 - **Never** use `SqlQueryRaw`, `ExecuteSqlRaw`, `FromSqlRaw`, or any raw SQL that references a table from another module.
-- **Never** inject another module's `DbContext` into your repositories or handlers.
-- The source module (B) owns the event — define it in B's Domain layer.
-- The consuming module (A) owns the handler and the local copy table — both in A's Infrastructure layer.
-- The Wolverine handler in A is idempotent: use upsert or check-before-insert to handle duplicate events.
-- **Cross-module event handlers must filter by `OrganizationId`** in addition to the entity foreign key. Filtering only by the entity ID leaves tenant isolation implicit — always make it explicit by including both keys in every `Where` clause.
-- If the consuming module needs derived state computed (e.g., "is the form referenced at all?"), compute it from the local copy at query time — do not try to sync aggregated state.
+- **Never** inject another module's `DbContext`, repository, or Application service into your code. Only `Axis.{Module}.Contracts` may be referenced cross-module.
+- **Never** dispatch a cross-module event through `IMediator` — `MediatR` is intra-module only.
+- The source module owns the event schema — define it in its `.Contracts` project's Avro file.
+- The consuming module owns the handler and the local read-model table — both in its Infrastructure layer.
+- Kafka handlers are idempotent: at-least-once delivery is the rule; design for replay.
+- **Cross-module handlers must filter by `OrganizationId`** in addition to entity foreign keys. Tenant isolation is always explicit.
+- Sync RPC (gRPC) is the escape hatch only. If you reach for it more than once or twice per module, you probably need another local read model instead.
 
 ### Pre-commit violation sweep
 
-Run this before every commit that touches Infrastructure code:
-
-```powershell
+```bash
 grep -rn "SqlQueryRaw\|ExecuteSqlRaw\|FromSqlRaw\|ExecuteSqlInterpolated" src/Modules/ --include="*.cs"
 ```
 
-For every match: confirm the SQL only references tables owned by that match's own module. If it references another module's table → P0 violation, must fix before committing.
+For every match: confirm the SQL only references tables owned by that match's own module. If it references another module's table → P0 violation, must fix before committing. The `check-doc-drift.sh` script also enforces this on PR.
 
 ---
 
