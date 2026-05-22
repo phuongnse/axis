@@ -4,7 +4,6 @@
 
 **Daily workflow.** CI enforces build/test and doc drift; you paste gates in the PR as an audit trail.
 
- CI enforces build/test and doc drift; you paste gates in the PR as an audit trail.
 
 ---
 
