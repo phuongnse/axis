@@ -68,8 +68,8 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 *Out of scope*
 - Real-time execution graph overlay on the workflow canvas — not in MVP (timeline list only).
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: SignalR push updates and execution detail page pending Frontend + API.
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⚠️ | Frontend: ⏳
+> Gaps vs spec: `GET /api/executions/{id}` detail ✅. SignalR push updates and execution detail UI pending Frontend.
 > Decisions: `GetExecutionHandler` delegates to `IExecutionRepository.GetWithStepsAsync`, which loads execution + steps in two queries (no EF navigation property — `ExecutionStep` is a separate aggregate).
 
 ---
@@ -99,6 +99,6 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 *Out of scope*
 - Pausing an execution and resuming it — not in MVP (cancel only).
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: cancel button UI, Wolverine job abandonment, Form Task cancellation pending API + engine.
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⚠️ | Frontend: ⏳
+> Gaps vs spec: `POST /api/executions/{id}/cancel` ✅. Cancel button UI, Wolverine job abandonment, and Form Task cancellation pending engine.
 > Decisions: `Cancel()` domain guard rejects terminal statuses (`Completed`, `Failed`, `Cancelled`) with `InvalidOperationException`.

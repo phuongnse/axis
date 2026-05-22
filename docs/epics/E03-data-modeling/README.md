@@ -83,7 +83,7 @@ A concrete instance of a Model. Records are stored in the tenant's schema using 
 |---|---|---|
 | Domain | ✅ Done | `DataModel`, `Field`, `DataRecord` aggregates; all field types and domain events |
 | Application | ✅ Done | All command/query handlers; `RecordFieldValidator`; `BulkDeleteRecordsHandler`; `ExportRecordsCsvHandler` |
-| Infrastructure | ✅ Done | EF Core mappings, repositories, JSONB field converters; `GetPagedAsync` with filter/sort; `BulkDeleteAsync`; `GetAllForExportAsync` (chunked streaming) |
+| Infrastructure | ✅ Done | EF Core mappings, repositories, JSONB field converters; `GetPagedAsync` with filter/sort; `BulkDeleteAsync`; `GetAllForExportAsync` (chunked streaming). `InternalsVisibleTo("Axis.Api")` for tenant schema migrations from [E01 US-003](../E01-platform-foundation/features/F01-tenant-registration.md). |
 | API | ✅ Done | 7 record endpoints (CRUD + bulk-delete + CSV export); filter/sort params; HTTP 422 `ValidationProblemDetails` on create/update |
 | Frontend | ⏳ Pending | — |
 

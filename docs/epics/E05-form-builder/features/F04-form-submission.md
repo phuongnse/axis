@@ -100,8 +100,8 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 - Delegating a task to another user — not in MVP.
 - Bulk task completion — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: No `GetMyFormTasksQuery` handler; "My Tasks" page, role-assigned task aggregation, and SignalR push updates pending Frontend + API + E06.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⚠️ | Frontend: ⏳
+> Gaps vs spec: `GetMyFormTasksQuery` + `GET /api/form-tasks/mine/pending|completed` ✅. Role-assigned aggregation, expired tab, and SignalR push updates pending.
 
 ---
 
