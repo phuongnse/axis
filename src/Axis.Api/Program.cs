@@ -23,12 +23,14 @@ using Axis.WorkflowBuilder.Infrastructure.Extensions;
 using Axis.WorkflowEngine.Application.Commands.CancelExecution;
 using Axis.WorkflowEngine.Infrastructure.Extensions;
 using FluentValidation;
+using JasperFx.Resources;
 using MediatR;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.OpenApi.Models;
 using OpenIddict.Server.AspNetCore;
+using Wolverine.Postgresql;
 using OpenIddict.Validation.AspNetCore;
 using Scalar.AspNetCore;
 using Serilog;
@@ -53,17 +55,31 @@ try
         .ReadFrom.Services(services)
         .Enrich.FromLogContext());
 
-    // ── Wolverine (messaging + domain event outbox) ────────────────────────
+    // ── Wolverine (messaging + durable inbox/outbox per ADR-009) ───────────
+    string wolverineConnectionString = builder.Configuration.GetConnectionString("Wolverine")
+        ?? throw new InvalidOperationException("ConnectionStrings:Wolverine is required");
+
     builder.Host.UseWolverine(opts =>
     {
         // Cross-cutting: Debug entry/exit traces + Error for unhandled exceptions on every handler.
         opts.Policies.AddMiddleware<HandlerLoggingMiddleware>();
         opts.UseEntityFrameworkCoreTransactions();
+
+        // Durable inbox/outbox in dedicated `wolverine` schema (ADR-009).
+        // Fully-qualified table names bypass tenant `search_path` set by HttpTenantContext.
+        opts.PersistMessagesWithPostgresql(wolverineConnectionString, "wolverine");
+
         // Infrastructure assemblies host Wolverine handlers (e.g. domain event consumers)
         // but are not the entry assembly — include them explicitly for handler discovery.
         opts.Discovery.IncludeAssembly(typeof(WorkflowEngineInfrastructureExtensions).Assembly);
         opts.Discovery.IncludeAssembly(typeof(FormBuilderInfrastructureExtensions).Assembly);
     });
+
+    // Development + integration tests: auto-create the `wolverine` schema + tables
+    // on startup. Production runs a scripted SQL migration as part of the CI pipeline
+    // (ADR-009).
+    if (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing"))
+        builder.Services.AddResourceSetupOnStartup();
 
     // ── MediatR + validation pipeline ─────────────────────────────────────
     builder.Services.AddMediatR(cfg =>

@@ -8,7 +8,7 @@
 Domain, Application, and Infrastructure layers complete.
 
 > ⚠️ **Remaining gap (deferred):**
-> - **Wolverine durable inbox/outbox not configured**: Wolverine is wired and `IMessageBus` resolves correctly. Domain events are dispatched in-memory after `SaveChangesAsync`. Persistence schema strategy decided in [ADR-009](TECH_STACK.md#adr-009-wolverine-durable-inboxoutbox-in-a-dedicated-wolverine-schema) (dedicated `wolverine` schema + `IntegrateWithWolverine()` per DbContext); implementation rollout pending — tracked as E01 Platform Foundation gap.
+> - **Wolverine durable inbox/outbox — partial**: `PersistMessagesWithPostgresql(..., "wolverine")` configured in `Axis.Api.Program`; dedicated `wolverine` schema auto-provisioned in Development + Testing via `AddResourceSetupOnStartup()` (production runs a scripted SQL migration). Per-module `IntegrateWithWolverine()` enlistment on `IdentityDbContext` / `DataModelingDbContext` / `WorkflowBuilderDbContext` / `FormBuilderDbContext` / `WorkflowEngineDbContext` / `PageBuilderDbContext` still pending — until then `Axis.Shared.Infrastructure.Persistence.UnitOfWork` continues to publish events in-memory after `SaveChangesAsync`. Rollout follows [ADR-009](TECH_STACK.md#adr-009-wolverine-durable-inboxoutbox-in-a-dedicated-wolverine-schema).
 
 ## Identity — E02-identity-access
 

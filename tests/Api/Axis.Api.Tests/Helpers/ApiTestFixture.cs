@@ -73,6 +73,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
                     ["ConnectionStrings:WorkflowBuilder"] = _wbConnectionString,
                     ["ConnectionStrings:FormBuilder"] = _fbConnectionString,
                     ["ConnectionStrings:WorkflowEngine"] = _weConnectionString,
+                    ["ConnectionStrings:Wolverine"] = _postgres.GetConnectionString(),
                     ["Redis:ConnectionString"] = _redis.GetConnectionString(),
                 });
             });
