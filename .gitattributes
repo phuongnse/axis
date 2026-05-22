@@ -1,0 +1,9 @@
+# Shell scripts must be LF — they break in WSL/Linux when autocrlf=true on
+# Windows rewrites them to CRLF (bash sees `pipefail\r` as an unknown option).
+*.sh text eol=lf
+
+# Same for Dockerfiles and other Unix-only tooling read inside containers.
+Dockerfile text eol=lf
+Dockerfile.* text eol=lf
+.dockerignore text eol=lf
+.gitattributes text eol=lf
