@@ -77,13 +77,3 @@ Define Data → Build Workflow → Collect via Form → Execute & Monitor
 | Execution history & error notifications | Yes |
 | Page & UI builder | No (Phase 2) |
 
----
-
-## Success Metrics
-
-| Metric | Target (6 months post-launch) |
-|---|---|
-| Paying organizations | 50 |
-| Workflows created per org (avg) | 5+ |
-| Workflow executions per day | 1,000+ |
-| Time to first workflow running | < 30 minutes |

@@ -2,6 +2,10 @@
 
 [← Back to Docs Home](./README.md)
 
+> **Scope:** Architectural shape — what containers exist, how tenancy and auth work end-to-end, where the modules sit. **Not** the source of truth for: library versions ([TECH_STACK.md](./TECH_STACK.md)), source tree ([CLAUDE.md](../CLAUDE.md) § Solution tree), feature behaviour (`docs/epics/`), implementation rules (`docs/playbooks/`).
+>
+> If two docs would disagree, this one defers.
+
 ---
 
 ## System Context
@@ -16,13 +20,15 @@ The Axis platform serves four actor types: **Platform Admins** (Axis team), **Or
 
 ![Container Diagram](./diagrams/container.svg)
 
-| Container | Technology | Responsibility |
-|---|---|---|
-| **Web Application** | React + TypeScript (Vite) | SPA for all user interactions: workflow builder, form builder, page builder, data management |
-| **API Server** | ASP.NET Core 8 | Modular monolith exposing REST API; SignalR hub ⏳ planned (see Real-Time Updates section) |
-| **Background Job Runner** | Wolverine (in-process) | Executes scheduled workflows, processes async steps, dispatches domain events |
-| **PostgreSQL** | PostgreSQL 16 | Primary data store — schema-per-tenant |
-| **Redis** | Redis 7 | Session cache, distributed locks, pub/sub for real-time events |
+| Container | Responsibility |
+|---|---|
+| **Web Application** | SPA for all user interactions: workflow builder, form builder, page builder, data management |
+| **API Server** | Modular monolith exposing REST API. Real-time execution push lives under [E06 Workflow Engine](./epics/E06-workflow-engine/README.md). |
+| **Background Job Runner** | In-process job/event runner — executes scheduled workflows, processes async steps, dispatches domain events |
+| **PostgreSQL** | Primary data store — schema-per-tenant |
+| **Redis** | Session cache, distributed locks, pub/sub for real-time events |
+
+Concrete technology choices and versions for each container live in [TECH_STACK.md](./TECH_STACK.md).
 
 ---
 
@@ -30,44 +36,7 @@ The Axis platform serves four actor types: **Platform Admins** (Axis team), **Or
 
 ![Module Overview](./diagrams/module-overview.svg)
 
-### Source Tree
-
-```
-src/
-├── Axis.Api/                    # ASP.NET Core host — all Minimal API endpoints, middleware, DI wiring
-│   └── Endpoints/               # One IEndpointRouteBuilder extension per module (e.g. ModelEndpoints.cs)
-├── Modules/
-│   ├── Identity/
-│   │   ├── Axis.Identity.Domain/
-│   │   ├── Axis.Identity.Application/
-│   │   └── Axis.Identity.Infrastructure/
-│   ├── DataModeling/
-│   │   ├── Axis.DataModeling.Domain/
-│   │   ├── Axis.DataModeling.Application/
-│   │   └── Axis.DataModeling.Infrastructure/
-│   ├── WorkflowBuilder/
-│   │   ├── Axis.WorkflowBuilder.Domain/
-│   │   ├── Axis.WorkflowBuilder.Application/
-│   │   └── Axis.WorkflowBuilder.Infrastructure/
-│   ├── FormBuilder/
-│   │   ├── Axis.FormBuilder.Domain/
-│   │   ├── Axis.FormBuilder.Application/
-│   │   └── Axis.FormBuilder.Infrastructure/
-│   ├── WorkflowEngine/
-│   │   ├── Axis.WorkflowEngine.Domain/
-│   │   ├── Axis.WorkflowEngine.Application/
-│   │   └── Axis.WorkflowEngine.Infrastructure/
-│   └── PageBuilder/
-│       ├── Axis.PageBuilder.Domain/
-│       ├── Axis.PageBuilder.Application/
-│       └── Axis.PageBuilder.Infrastructure/
-└── Shared/
-    ├── Axis.Shared.Domain/      # Base entities, value objects, domain events
-    ├── Axis.Shared.Application/ # Base handlers, pagination, CQRS abstractions
-    └── Axis.Shared.Infrastructure/ # Multi-tenancy, EF Core base, Redis, email
-```
-
-> **Note:** There are no per-module `.Api` projects. All HTTP endpoints are Minimal API methods defined in `src/Axis.Api/Endpoints/` and registered in `Program.cs`. Each module contributes one `IEndpointRouteBuilder` extension class.
+Source tree and project naming live in [CLAUDE.md § Solution tree](../CLAUDE.md#docs-index). Below is the per-module layer rule — the architectural invariant.
 
 ### Module Layer Convention (per module)
 
@@ -78,73 +47,39 @@ src/
 | **Infrastructure** | EF Core DbContext, repository implementations, external clients | Application, Shared.Infrastructure |
 | **Api** | Minimal API endpoint methods (in `Axis.Api/Endpoints/`), OpenAPI annotations | Application |
 
+Cross-module communication is via Wolverine domain events or Application-layer interfaces only — no shared `DbContext`, no cross-module raw SQL. See [CLAUDE.md § Module boundaries](../CLAUDE.md) and [playbooks/patterns.md § Cross-module data](./playbooks/patterns.md#cross-module-data-pattern).
+
 ---
 
 ## Multi-Tenancy Strategy
 
-Each organization (tenant) is provisioned with its own **PostgreSQL schema** at sign-up. The `public` schema is reserved for platform-level data (organizations, subscriptions).
+Each organization (tenant) is provisioned with its own **PostgreSQL schema** at sign-up. The `public` schema is reserved for platform-level data (organizations, subscriptions, identity).
 
-```
+```text
 PostgreSQL
-├── public schema
-│   ├── organizations
-│   ├── subscription_plans
-│   └── platform_users
-├── tenant_abc schema
-│   ├── users
-│   ├── roles
-│   ├── models
-│   ├── workflows
-│   ├── executions
-│   └── ...
-└── tenant_xyz schema
-    └── ...
+├── public schema           # organizations, subscription_plans, users, roles
+└── tenant_{orgId} schemas  # per-tenant: models, workflows, executions, …
 ```
 
-**Tenant resolution:** Every API request carries a JWT with an `org_id` claim. `HttpTenantContext` (an `ITenantContext` implementation) resolves the tenant lazily from the claim on first access. `TenantSchemaInterceptor` (an EF Core `DbConnectionInterceptor`) sets `search_path` to the tenant schema when a DB connection opens — no middleware switches the schema context in the pipeline.
+**Tenant resolution:** every API request carries a JWT with an `org_id` claim. `HttpTenantContext` (`ITenantContext`) resolves the tenant lazily from the claim on first access. `TenantSchemaInterceptor` (an EF Core `DbConnectionInterceptor`) sets `search_path` to the tenant schema when a DB connection opens — no middleware switches the schema context in the pipeline.
+
+Implementation details and pitfalls: [playbooks/patterns.md § Multi-tenancy](./playbooks/patterns.md#multi-tenancy-pitfalls).
 
 ---
 
-## Authentication Flow
+## Authentication
 
-> Auth is handled by **OpenIddict 5.x** — an in-process OAuth2/OIDC server. See ADR-004 in `docs/TECH_STACK.md`.
+Auth is handled by an in-process OAuth2/OIDC server (see [TECH_STACK.md ADR-004](./TECH_STACK.md#adr-004-openiddict-as-oauth2oidc-server)). Two flows are supported:
 
-### SPA flow (Authorization Code + PKCE)
-1. React SPA redirects user to `GET /connect/authorize` with PKCE challenge
-2. OpenIddict presents login, user authenticates with email + password
-3. OpenIddict issues **Authorization Code** → SPA exchanges it at `POST /connect/token` for **Access Token** (JWT, 15 min) + **Refresh Token**
-4. SPA sends `Authorization: Bearer <access_token>` on every API request
-5. JWT middleware validates token, extracts `org_id` + `user_id` + `permissions`, injects into `ITenantContext` / `ICurrentUser`
-6. SPA silently refreshes via `POST /connect/token` (refresh_token grant) before expiry
+- **SPA — Authorization Code + PKCE**: browser → `/connect/authorize` → `/connect/token` → short-lived access token (JWT) + refresh token in `httpOnly` cookie.
+- **External integrations — Client Credentials**: server-to-server `client_id` + `client_secret` → scoped access token, no user context.
 
-### External integration flow (Client Credentials)
-1. External system (e.g. third-party tool triggering a workflow) authenticates with its own `client_id` + `client_secret` at `POST /connect/token`
-2. OpenIddict issues a scoped **Access Token** — no user context, only granted scopes
-3. Token is validated the same way; handler checks for the required scope instead of user permissions
+Detailed flow, redirect URIs, and error states: [docs/epics/E02-identity-access/](./epics/E02-identity-access/README.md) and the auth-flow diagram.
 
 ---
 
-## Real-Time Updates (SignalR)
-
-> ⏳ **Not yet implemented.** SignalR is listed in the approved tech stack but no `*Hub.cs` exists in `src/` yet. The architecture below describes the planned design for when this is built.
-
-When a workflow execution changes state (started, step completed, failed, finished), the **WorkflowEngine** will publish a domain event. Wolverine will dispatch it to the SignalR hub, which will push the update to the connected client.
-
-```
-WorkflowEngine → domain event → Wolverine → SignalR Hub → Browser
-```
-
----
-
-## Workflow Execution Architecture
+## Workflow Execution
 
 ![Execution Flow](./epics/E06-workflow-engine/diagrams/execution-flow.svg)
 
-Workflow execution is orchestrated by the **WorkflowEngine** module:
-
-1. A trigger fires (manual API call, cron tick, incoming webhook, or internal event).
-2. The engine loads the workflow definition and creates an **Execution** record.
-3. Steps are executed in order (or in parallel where configured).
-4. Each step type has a dedicated **Step Handler** (Form, HTTP, Condition, Script, Notification).
-5. On failure, the engine marks the step as `Failed`, notifies configured channels, and halts (user retries manually).
-6. On completion, the execution record is marked `Completed` and a domain event is published.
+Full execution model — step lifecycle, retry semantics, history, real-time push — lives under [docs/epics/E06-workflow-engine/](./epics/E06-workflow-engine/README.md).

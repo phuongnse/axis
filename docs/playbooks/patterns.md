@@ -14,7 +14,7 @@
 - [Frontend Patterns](#frontend-patterns)
 - [Wireframe convention](#wireframe-convention)
 - [Key patterns](#key-patterns)
-- [Result Pattern vs. exceptions](#result-pattern-vs-exceptions----when-to-use-what)
+- [Result Pattern vs. exceptions](#result-pattern-vs-exceptions--when-to-use-what)
 - [NuGet / packaging rules](#nuget--packaging-rules)
 - [EF Core JSONB collection change tracking](#ef-core-jsonb-collection-change-tracking)
 - [EF Core common pitfalls](#ef-core-common-pitfalls)
@@ -701,7 +701,7 @@ Long-form SOLID and Gang-of-Four catalogs are intentionally omitted here — the
 
 | Task | Section in patterns.md |
 |------|------------------------|
-| Business failures vs exceptions | [Result Pattern vs. exceptions](#result-pattern-vs-exceptions----when-to-use-what) |
+| Business failures vs exceptions | [Result Pattern vs. exceptions](#result-pattern-vs-exceptions--when-to-use-what) |
 | HTTP status from `Result` | [Result → HTTP status code mapping](#result--http-status-code-mapping) |
 | Domain events / jobs | [Wolverine patterns](#wolverine-patterns) |
 | Another module's data | [Cross-module data pattern](#cross-module-data-pattern) |

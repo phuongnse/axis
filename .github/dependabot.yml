@@ -1,0 +1,17 @@
+# Auto-pin and keep GitHub Actions fresh.
+# Dependabot rewrites `@v2` -> `@<sha> # v2.4.1` on the first run and opens
+# PRs for new versions thereafter. This is the canonical alternative to
+# manually hunting SHAs.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      actions:
+        patterns:
+          - "*"

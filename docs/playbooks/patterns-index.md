@@ -31,7 +31,7 @@ One-page map into [`patterns.md`](./patterns.md). Open only the section you need
 | Pre-commit hygiene grep | [Code hygiene checklist](./patterns.md#code-hygiene-checklist) |
 | React / TanStack Query screen | [Frontend Patterns](./patterns.md#frontend-patterns) · [frontend.md](./frontend.md) |
 | Where logic belongs (handler vs aggregate) | [Axis layering](./patterns.md#axis-layering-srp-at-a-glance) · [Key patterns](./patterns.md#key-patterns) |
-| Business failure vs exception | [Result vs exceptions](./patterns.md#result-pattern-vs-exceptions----when-to-use-what) |
+| Business failure vs exception | [Result vs exceptions](./patterns.md#result-pattern-vs-exceptions--when-to-use-what) |
 
 ---
 
@@ -40,7 +40,7 @@ One-page map into [`patterns.md`](./patterns.md). Open only the section you need
 | # | Section |
 |---|---------|
 | 1 | [Key patterns](./patterns.md#key-patterns) |
-| 2 | [Result vs exceptions](./patterns.md#result-pattern-vs-exceptions----when-to-use-what) |
+| 2 | [Result vs exceptions](./patterns.md#result-pattern-vs-exceptions--when-to-use-what) |
 | 3 | [NuGet / packaging](./patterns.md#nuget--packaging-rules) |
 | 4 | [EF JSONB collections](./patterns.md#ef-core-jsonb-collection-change-tracking) |
 | 5 | [EF common pitfalls](./patterns.md#ef-core-common-pitfalls) |

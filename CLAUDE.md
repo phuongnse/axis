@@ -22,31 +22,9 @@ Multi-tenant low-code SaaS: custom data models, visual workflows, forms, and UI 
 
 ## Tech stack & architecture
 
-**Versions and ADRs:** [`docs/TECH_STACK.md`](docs/TECH_STACK.md).
+Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md). Module list and per-module responsibilities are owned by [`docs/epics/README.md`](docs/epics/README.md). Architectural shape (containers, multi-tenancy, auth) is owned by [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). This file owns only the **rules** — the things below that must hold no matter which library version is in `Directory.Packages.props`.
 
-| Area | Choice |
-|------|--------|
-| Backend | .NET 8, ASP.NET Core, DDD, CQRS (MediatR) |
-| Data | PostgreSQL 16, EF Core 9, schema-per-tenant |
-| Messaging / jobs | Wolverine (not Hangfire) — all domain events |
-| Auth | OpenIddict 5 — PKCE SPA + client credentials |
-| Cache | Redis 7 |
-| Frontend | React 18, TypeScript, Vite, TanStack Query/Router, Zustand, shadcn, Tailwind |
-| API docs | Swashbuckle + Scalar |
-| Tests | xUnit, FluentAssertions, NSubstitute, Testcontainers |
-
-**Modules** (each: Domain → Application → Infrastructure; endpoints in `Axis.Api`):
-
-| Module | Responsibility |
-|--------|----------------|
-| Identity | Auth, users, roles, RBAC (`public` schema) |
-| DataModeling | Models, fields, records |
-| WorkflowBuilder | Definitions, steps, triggers |
-| FormBuilder | Forms, fields, submissions |
-| WorkflowEngine | Execution, handlers, history |
-| PageBuilder | Pages, widgets (Phase 2) |
-
-**Shared:** `Axis.Shared.Domain`, `Axis.Shared.Application`, `Axis.Shared.Infrastructure`.
+**Shared kernel:** `Axis.Shared.Domain`, `Axis.Shared.Application`, `Axis.Shared.Infrastructure`.
 
 **Multi-tenancy:** schema `tenant_{organizationId:N}`; tenant from JWT `org_id`; schema cached in Redis. Identity stays on `public`.
 
@@ -70,7 +48,7 @@ Multi-tenant low-code SaaS: custom data models, visual workflows, forms, and UI 
 - Never bypass auth, skip an AC silently, or mark ✅ to avoid a hard gap.
 - Domain: zero external dependencies.
 - Never commit with failing Gate 1; docs and requirements satisfied before merge (agent-checklist + PR template).
-- When `src/`, `tests/`, or `docs/epics/` change: run `./scripts/check-doc-drift.sh` before push; CI **Doc drift** must be green. Paste **Gate 2** in the PR — not a drift-script gate block.
+- When `src/`, `tests/`, or `docs/epics/` change: run `./scripts/check-doc-drift.sh` before push (bash — on Windows use Git Bash, not PowerShell); CI **Doc drift** must be green. Tick **Gate 2** in the PR template — do not paste drift-script output.
 
 **P1 — confirm with user before deviating:**
 
@@ -189,11 +167,7 @@ Full rules: [`patterns.md`](docs/playbooks/patterns.md) (EF, API, Wolverine, agg
 
 **Per layer / module:** all US callouts updated; epic README table; [`PROGRESS.md`](docs/PROGRESS.md) (layer summary only — not per-class detail).
 
-**Per PR before merge:** PR description = Summary + Requirements only (no CI status in description); run `./scripts/check-doc-drift.sh` before push when `src/`, `tests/`, or `docs/epics/` change; Gate 1 includes:
-
-```bash
-grep -rn "TODO\|FIXME\|NotImplementedException\|placeholder\|stub" src/ tests/ frontend/src/ 2>/dev/null | grep -v obj/ | grep -v node_modules/
-```
+**Per PR before merge:** PR description = Summary + Linked spec + Requirements only (no CI status, no commit list — Checks tab covers that). Run `./scripts/check-doc-drift.sh` before push when `src/`, `tests/`, or `docs/epics/` change — the script enforces epic-docs same-PR, new-handler tests, the no-new `TODO`/`FIXME`/`stub` rule, and new raw-SQL call review (cross-module guard).
 
 Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` changes.
 
@@ -210,6 +184,7 @@ Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` chan
 | [patterns.md](docs/playbooks/patterns.md) | Implementation detail |
 | [testing.md](docs/playbooks/testing.md) | Test patterns |
 | [frontend.md](docs/playbooks/frontend.md) | SPA rules |
+| [docs-style.md](docs/playbooks/docs-style.md) | Doc anti-patterns + single-owner rule (read before adding a `.md`) |
 | [TECH_STACK.md](docs/TECH_STACK.md) | Libraries + ADRs |
 | [PROGRESS.md](docs/PROGRESS.md) | Module layer status |
 | [docs/epics/](docs/epics/README.md) | Features + ACs |
