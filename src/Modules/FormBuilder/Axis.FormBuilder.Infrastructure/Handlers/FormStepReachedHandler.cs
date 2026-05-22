@@ -20,6 +20,8 @@ internal sealed class FormStepReachedHandler(
     IMessageBus messageBus,
     ILogger<FormStepReachedHandler> logger)
 {
+    private const string SystemCreatedBy = "workflow-engine";
+
     public async Task Handle(FormStepReached @event, CancellationToken ct)
     {
         if (await submissionRepo.ExistsForExecutionStepAsync(@event.ExecutionId, @event.ExecutionStepId, ct))
@@ -54,7 +56,7 @@ internal sealed class FormStepReachedHandler(
             assigneeUserId,
             assigneeRoleId: null,
             expiresAt,
-            createdBy: "workflow-engine");
+            createdBy: SystemCreatedBy);
 
         await submissionRepo.AddAsync(submission, ct);
 

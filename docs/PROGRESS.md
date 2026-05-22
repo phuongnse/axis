@@ -32,17 +32,17 @@ Workflow definitions with steps, transitions, triggers, cycle detection, publish
 
 **Domain ✅ | Application ⚠️ | Infrastructure ✅ | API ⚠️ | Frontend ⏳**
 
-Form definitions + F04 form tasks (`FormSubmission`, token submit, my tasks, expiry job). **PR #47 deferred:** move `submittedBy` parsing from `FormTaskEndpoints` to Application.
+Form definitions + F04 form tasks (`FormSubmission`, token submit, my tasks, expiry job). **PR #50 deferred:** move `submittedBy` parsing from `FormTaskEndpoints` to Application.
 
 ## WorkflowEngine — E06-workflow-engine
 
 **Domain ✅ | Application ✅ | Infrastructure ⚠️ | API ⚠️ | Frontend ⏳**
 
-Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoints` registered. **PR #47 deferred:** thin-endpoint refactor for `StartExecution` request shaping. Infrastructure ⚠️: `IScriptExecutor` and `INotificationSender` stubs.
+Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoints` registered. **PR #50 deferred:** thin-endpoint refactor for `StartExecution` request shaping. Infrastructure ⚠️: `IScriptExecutor` and `INotificationSender` stubs.
 
 ## Identity / E01 — tenant provisioning (cross-cutting)
 
-**Verify email → provision:** `VerifyEmailHandler` invokes `ITenantSchemaProvisioner` after save. **PR #47 deferred:** provision-before-verify ordering, retry UI, and explicit Admin role on verify path per E01 US-002/US-003.
+**Verify email → provision:** `VerifyEmailHandler` provisions tenant schema before persisting verified state (PR #50). **Deferred:** retry job, provisioning wait UI, Admin role on verify path per E01 US-003.
 
 ## PageBuilder — E07-page-builder
 

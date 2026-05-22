@@ -80,7 +80,7 @@ For every `⚠️` found, decide explicitly:
 | Verdict | Action |
 |---|---|
 | Actually done, docs stale | Update callout to ✅ |
-| Deferred — depends on a later module (e.g. E06) | `Gaps vs spec` with `pending E0X` and/or `**Deferred (...):**` per [Deferred follow-up documentation](#deferred-follow-up-documentation-mandatory) |
+| Deferred — depends on a later module (e.g. E06) | `Gaps vs spec` with `pending E0X` and/or `**Deferred (...):**` per agent-checklist deferred-callout rules (`**Deferred (PR #N follow-up):**`) |
 | Genuine miss | Fix it before proceeding |
 
 Also check cross-module Application dependencies: list every query or command the upcoming API layer will call from *other* modules' Application layers. If any are missing, add them now.
@@ -123,7 +123,7 @@ Complete in order before building any feature screen. Do not skip or reorder.
 
 | Step | What | Done when |
 |---|---|---|
-| 1 | **Auth flow** — React `/login` page collects email + password, POSTs to `/connect/token`; backend (OpenIddict) validates and sets `httpOnly` cookie; SPA navigates to dashboard on success | Login form renders, successful POST redirects to dashboard |
+| 1 | **Auth flow** — `/login` POSTs credentials to `/connect/login`, then Authorization Code + PKCE via `/connect/authorize` → `/callback` → `/connect/token`; access token in memory, refresh token in httpOnly cookie | Login + callback complete; dashboard reachable |
 | 2 | **Route guard** — `_authenticated` layout route with `beforeLoad`; redirects to `/login` when session is absent | Unauthenticated navigation to any protected route → redirected |
 | 3 | **Global 401 handling** — `fetchApi` 401 branch navigates to `/login` and calls `queryClient.clear()` | Any expired-session API call redirects without per-feature handling |
 | 4 | **App shell** — root authenticated layout with sidebar + header; all protected routes render as `<Outlet />` inside it | Every protected page inherits sidebar + header automatically |

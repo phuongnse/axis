@@ -56,7 +56,6 @@ public class GetFormTaskByTokenHandlerTests
     public async Task Handle_WhenValid_ReturnsDtoWithFieldsOrderedByDisplayOrder()
     {
         FormSubmission submission = CreatePendingSubmission();
-        DateTimeOffset expiresAt = DateTimeOffset.UtcNow.AddDays(1);
 
         FormDefinition form = FormDefinition.Create("Onboarding", "desc", OrgId, "user");
         form.AddField("last_name", "Last Name", FormFieldType.Text, true, null);

@@ -64,7 +64,14 @@ export function useLogin() {
         redirect: 'manual',
       });
 
-      if (!response.ok && response.status !== 302) {
+      const isRedirect =
+        response.status === 302 ||
+        response.status === 303 ||
+        response.status === 307 ||
+        response.status === 308 ||
+        response.type === 'opaqueredirect';
+
+      if (!isRedirect && !response.ok) {
         const bodyText = await response.text();
         const mapped = mapLoginFailure(response.status, bodyText);
         setLoginError(mapped);

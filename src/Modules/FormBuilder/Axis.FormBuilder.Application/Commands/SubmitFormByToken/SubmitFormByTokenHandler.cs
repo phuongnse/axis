@@ -56,13 +56,13 @@ public sealed class SubmitFormByTokenHandler(
         if (fieldErrors.Count > 0)
             return Result.FieldValidation(fieldErrors);
 
-        Guid submittedBy = command.SubmittedByUserId
-            ?? submission.AssigneeUserId
-            ?? Guid.Empty;
+        Guid? submittedBy = command.SubmittedByUserId ?? submission.AssigneeUserId;
+        if (submittedBy is null)
+            return Result.Failure(ErrorCodes.BusinessRule, "Unable to determine who submitted this form.");
 
         try
         {
-            submission.Submit(submittedBy, command.Data);
+            submission.Submit(submittedBy.Value, command.Data);
         }
         catch (InvalidOperationException ex)
         {

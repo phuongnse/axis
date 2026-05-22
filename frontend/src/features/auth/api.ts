@@ -34,7 +34,7 @@ export async function exchangeAuthorizationCode(code: string): Promise<string> {
 
   const data = (await response.json()) as TokenResponse;
   clearPkceSession();
-  useAuthStore.getState().setAccessToken(data.access_token);
+  useAuthStore.getState().setSession(data.access_token);
   return data.access_token;
 }
 

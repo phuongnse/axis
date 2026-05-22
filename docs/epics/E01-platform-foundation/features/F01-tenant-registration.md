@@ -112,7 +112,7 @@ Self-service registration flow where a new organization signs up and is automati
 
 > **Implementation status** — Domain: ⏳ | Application: ⚠️ | Infrastructure: ⚠️ | API: ⏳ | Frontend: ⏳
 > Gaps vs spec: `ITenantSchemaProvisioner` + `TenantSchemaProvisioner` wired from `VerifyEmailHandler` (schema create + migrate on verify). Retry job, exponential backoff, platform alert, and "Setting up your workspace…" polling UI not implemented.
-> **Deferred (PR #47 follow-up):** same as US-002 — provision runs after email verified is persisted; failure leaves verified user without tenant schema until manual fix.
+> Gaps vs spec: retry job, exponential backoff, platform alert, and provisioning wait UI not implemented.
 
 ---
 

@@ -1,11 +1,13 @@
 import { Link, useRouterState } from '@tanstack/react-router';
 import { ChevronDown } from 'lucide-react';
-
 import { shellNavItems } from '@/components/layout/shell-nav';
+import { useAuthStore } from '@/features/auth/auth-store';
 import { cn } from '@/lib/utils';
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const userLabel = useAuthStore((state) => state.userLabel);
+  const userInitials = useAuthStore((state) => state.userInitials);
 
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-card min-h-screen">
@@ -59,9 +61,11 @@ export function AppSidebar() {
             className="flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/30 bg-secondary text-xs font-medium text-primary"
             aria-hidden
           >
-            AB
+            {userInitials ?? '?'}
           </div>
-          <span className="text-xs font-medium text-foreground truncate">Alex Brown</span>
+          <span className="text-xs font-medium text-foreground truncate">
+            {userLabel ?? 'User'}
+          </span>
         </div>
       </div>
     </aside>

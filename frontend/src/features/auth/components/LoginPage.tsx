@@ -32,10 +32,8 @@ export function LoginPage() {
           >
             {loginError.message}
             {loginError.kind === 'unverified' ? (
-              <p className="mt-2 text-center text-xs text-primary">
-                <button type="button" className="hover:underline" disabled>
-                  Resend verification email →
-                </button>
+              <p className="mt-2 text-center text-xs text-muted-foreground">
+                Check your inbox for the verification link.
               </p>
             ) : null}
           </div>

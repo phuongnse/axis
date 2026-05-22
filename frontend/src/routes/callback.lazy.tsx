@@ -24,7 +24,7 @@ function CallbackPage() {
     }
 
     exchangeAuthorizationCode(code)
-      .then(() => navigate({ to: '/dashboard' }))
+      .then(() => navigate({ to: '/dashboard', replace: true }))
       .catch(() => {
         clearPkceSession();
         setError('Could not complete sign-in. Please try again.');

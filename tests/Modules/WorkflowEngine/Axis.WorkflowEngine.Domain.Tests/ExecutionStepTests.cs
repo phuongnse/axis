@@ -179,6 +179,7 @@ public class ExecutionStepTests
         step.Fail("Form step timed out");
 
         step.Status.Should().Be(StepExecutionStatus.Failed);
+        step.CompletedAt.Should().NotBeNull();
         step.ErrorDetails.Should().Be("Form step timed out");
     }
 

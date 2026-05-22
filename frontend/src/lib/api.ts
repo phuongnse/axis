@@ -1,4 +1,4 @@
-import { getAccessToken } from '@/features/auth/auth-store';
+import { getAccessToken, useAuthStore } from '@/features/auth/auth-store';
 import { queryClient } from '@/lib/query-client';
 
 export class ApiError extends Error {
@@ -66,6 +66,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {
       }
 
       if (response.status === 401) {
+        useAuthStore.getState().clearSession();
         queryClient.clear();
         if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
           window.location.href = '/login';

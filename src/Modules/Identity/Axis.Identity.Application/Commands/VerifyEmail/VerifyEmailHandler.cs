@@ -25,10 +25,10 @@ public sealed class VerifyEmailHandler(
         if (user.IsEmailVerified)
             return Result.Failure(ErrorCodes.BusinessRule, "This link has already been used. Please sign in.");
 
+        await tenantProvisioner.ProvisionAsync(user.OrganizationId, cancellationToken);
+
         user.VerifyEmail();
         await uow.SaveChangesAsync(cancellationToken);
-
-        await tenantProvisioner.ProvisionAsync(user.OrganizationId, cancellationToken);
 
         return Result.Success();
     }

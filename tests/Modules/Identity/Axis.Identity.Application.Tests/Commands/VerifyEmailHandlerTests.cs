@@ -41,6 +41,8 @@ public class VerifyEmailHandlerTests
         result.IsSuccess.Should().BeTrue();
         user.IsEmailVerified.Should().BeTrue();
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        await _tenantProvisioner.Received(1)
+            .ProvisionAsync(user.OrganizationId, Arg.Any<CancellationToken>());
     }
 
     [Fact]
