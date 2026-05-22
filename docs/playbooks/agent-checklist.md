@@ -31,7 +31,7 @@ Docs touched: docs/epics/…
 | **0** | AC map + docs touched (when `src/`, `tests/`, or `frontend/` change) |
 | **1** | Full .NET + frontend verification (table below) — **always paste** |
 | **2** | Doc walk-through (rows below) — **paste in PR** |
-| **3** | Retrospective (seven questions) |
+| **3** | Retrospective — **paste all seven answers** (not `1–7 No`) |
 
 ### Gate 1 — paste in every PR (local = CI)
 
@@ -56,7 +56,6 @@ Example (docs-only): every line `not triggered — no src/, tests/, or frontend/
 
 **Docker:** integration and API tests run as part of `dotnet test`; Docker must be available locally (same as CI agents with Testcontainers).
 
-
 ### Gate 2 — docs walk-through (paste in PR)
 
 ```text
@@ -75,13 +74,20 @@ Gate 2:
 - Deferred scope → feature callout gap / not triggered
 ```
 
-### Gate 3
+### Gate 3 — retrospective (paste in PR)
+
+Answer **Yes** or **No** on **each numbered line** (do not replace with `1–7 No`). If **Yes**, name the doc updated in this PR.
 
 ```text
-Gate 3: 1–7 No — or: N → updated <file>
+Gate 3:
+1. New rule from test failure? → No / Yes →
+2. Invented invariant without AC? → No / Yes →
+3. Infrastructure footgun? → No / Yes →
+4. Non-obvious test setup? → No / Yes →
+5. Changed direction mid-task? → No / Yes →
+6. Spec gap discovered? → No / Yes →
+7. Incident-level detail in rule text? → No / Yes →
 ```
-
-Questions: (1) test uncovered rule? (2) invented invariant? (3) infra footgun? (4) test setup quirk? (5) direction change? (6) spec gap? (7) incident-only doc text? → fix docs before merge.
 
 ---
 

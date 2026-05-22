@@ -128,7 +128,7 @@ Skip for single-file fixes and doc-only edits.
 
 **Gate 2** — doc walk-through in PR ([agent-checklist.md § Gate 2](docs/playbooks/agent-checklist.md)). **Doc drift** — CI job only; script also fails when epic docs are missing alongside module code changes, or new handlers lack tests.
 
-**Gate 3** — seven yes/no questions in [agent-checklist.md § Gate 3](docs/playbooks/agent-checklist.md); update `patterns.md` / feature file / `TECH_STACK.md` on any "yes".
+**Gate 3** — seven yes/no questions (paste each line — not `1–7 No`) in [agent-checklist.md § Gate 3](docs/playbooks/agent-checklist.md); update `patterns.md` / feature file / `TECH_STACK.md` on any "yes".
 
 ### Git
 

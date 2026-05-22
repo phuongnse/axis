@@ -42,15 +42,17 @@ Gate 2:
 
 ## Gate 3 — Retrospective (required)
 
+Answer **Yes** or **No** on each line — do not write only `1–7 No`. If **Yes**, note which doc you updated in this PR.
+
 ```text
 Gate 3:
-1. New rule from test failure?
-2. Invented invariant without AC?
-3. Infrastructure footgun?
-4. Non-obvious test setup?
-5. Changed direction mid-task?
-6. Spec gap discovered?
-7. Incident-level detail in rule text?
+1. New rule from test failure? → No / Yes →
+2. Invented invariant without AC? → No / Yes →
+3. Infrastructure footgun? → No / Yes →
+4. Non-obvious test setup? → No / Yes →
+5. Changed direction mid-task? → No / Yes →
+6. Spec gap discovered? → No / Yes →
+7. Incident-level detail in rule text? → No / Yes →
 ```
 
 ## CI checks
