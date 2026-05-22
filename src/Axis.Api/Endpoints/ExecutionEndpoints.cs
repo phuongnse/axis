@@ -120,7 +120,7 @@ public static class ExecutionEndpoints
         [FromQuery] int pageSize = 20,
         [FromQuery] ExecutionStatus? status = null)
     {
-        
+
         PagedResult<ExecutionSummaryResponse> result = await mediator.Send(
             new GetAllExecutionsQuery(currentUser.OrgId, page, pageSize, status), ct);
         return Results.Ok(result);
@@ -135,7 +135,7 @@ public static class ExecutionEndpoints
         [FromQuery] int pageSize = 20,
         [FromQuery] ExecutionStatus? status = null)
     {
-        
+
         PagedResult<ExecutionSummaryResponse> result = await mediator.Send(
             new GetExecutionsByWorkflowQuery(workflowId, currentUser.OrgId, page, pageSize, status), ct);
         return Results.Ok(result);
@@ -160,15 +160,12 @@ public static class ExecutionEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        IReadOnlyDictionary<string, object?> input =
-            request?.Input ?? new Dictionary<string, object?>();
-
         Result<Guid> result = await mediator.Send(new StartExecutionCommand(
             workflowId,
             currentUser.OrgId,
             TriggerType.Manual,
             currentUser.UserId,
-            input), ct);
+            request?.Input), ct);
 
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.Created($"/api/executions/{result.Value}", new { id = result.Value });

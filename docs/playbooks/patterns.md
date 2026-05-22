@@ -688,7 +688,7 @@ app.MapGet("/api/workflows", async (
 ## Minimal API endpoint wiring
 
 - Each module exposes a `Map{ModuleName}Endpoints(IEndpointRouteBuilder)` extension method.
-- No logic in the mapping file — only `mediator.Send(...)` dispatch and minimal request mapping. Do not parse `HttpContext` claims, build default command payloads, or map enums in the endpoint — that belongs in Application (PR #47 deferred: `FormTaskEndpoints.SubmitFormByToken`, `ExecutionEndpoints.StartExecution`).
+- No logic in the mapping file — only `mediator.Send(...)` dispatch and minimal request mapping. Do not parse `HttpContext` claims, build default command payloads, or map enums in the endpoint — that belongs in Application. Inject `ICurrentUser` (`Axis.Shared.Application.Identity`) into handlers to resolve the caller; let handlers default optional payloads.
 - Use `MapGroup` to apply route prefixes and auth policies at group level.
 - JSON configuration via `ConfigureHttpJsonOptions`, never via `AddControllers().AddJsonOptions(...)`.
 - **Required annotations on every endpoint**: `.WithName()`, `.WithSummary()`, `.WithTags()`, `.Produces<T>()`, `.ProducesProblem()` for each applicable status code (400, 401, 403, 404).

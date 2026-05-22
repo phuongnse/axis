@@ -71,9 +71,8 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 - Saving a draft of the form and resuming later — not in MVP.
 - The assignee being able to add comments or annotations to the form submission — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⚠️ | Frontend: ⏳
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: `SubmitFormByTokenCommand` + anonymous `POST /api/form-tasks/{token}/submit` ✅. Standalone form page, field validation UX, pre-signed file upload, and multi-tab deduplication pending Frontend.
-> **Deferred (PR #47 follow-up):** `FormTaskEndpoints.SubmitFormByToken` parses optional `submittedBy` from `HttpContext.User` in the API layer — move claim resolution into Application (`SubmitFormByTokenHandler` / `ICurrentUser`) so the endpoint stays `mediator.Send` + `ToProblemDetails` only.
 
 ---
 

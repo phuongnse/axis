@@ -15,6 +15,7 @@ using Axis.FormBuilder.Infrastructure.Extensions;
 using Axis.Identity.Application.Commands.RegisterOrganization;
 using Axis.Identity.Infrastructure.Extensions;
 using Axis.Shared.Application.Behaviors;
+using Axis.Shared.Application.Identity;
 using Axis.Shared.Application.Tenancy;
 using Axis.Shared.Infrastructure.Tenancy;
 using Axis.WorkflowBuilder.Application.Commands.CreateWorkflow;
@@ -189,6 +190,7 @@ try
     // ── API services ───────────────────────────────────────────────────────
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddScoped<CurrentUser>();
+    builder.Services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
     builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
 
     // ── CORS ───────────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@ using Axis.FormBuilder.Domain.Enums;
 using Axis.FormBuilder.Application.Repositories;
 using Axis.FormBuilder.Application.Services;
 using Axis.Shared.Application;
+using Axis.Shared.Application.Identity;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
@@ -15,6 +16,7 @@ public class SubmitFormByTokenHandlerTests
     private readonly IFormSubmissionRepository _submissionRepo = Substitute.For<IFormSubmissionRepository>();
     private readonly IFormRepository _formRepo = Substitute.For<IFormRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
     private static readonly Guid FormId = Guid.NewGuid();
@@ -22,7 +24,7 @@ public class SubmitFormByTokenHandlerTests
     private static readonly Guid StepId = Guid.NewGuid();
     private static readonly Guid AssigneeId = Guid.NewGuid();
 
-    private SubmitFormByTokenHandler CreateHandler() => new(_submissionRepo, _formRepo, _uow);
+    private SubmitFormByTokenHandler CreateHandler() => new(_submissionRepo, _formRepo, _uow, _currentUser);
 
     private static FormSubmission CreatePendingSubmission(DateTimeOffset? expiresAt = null)
     {
@@ -46,7 +48,7 @@ public class SubmitFormByTokenHandlerTests
         _submissionRepo.GetByAccessTokenAsync(token, Arg.Any<CancellationToken>()).Returns((FormSubmission?)null);
 
         Result result = await CreateHandler().Handle(
-            new SubmitFormByTokenCommand(token, new Dictionary<string, object?>(), null),
+            new SubmitFormByTokenCommand(token, new Dictionary<string, object?>()),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -64,7 +66,7 @@ public class SubmitFormByTokenHandlerTests
             .Returns(submission);
 
         Result result = await CreateHandler().Handle(
-            new SubmitFormByTokenCommand(submission.AccessToken, new Dictionary<string, object?>(), null),
+            new SubmitFormByTokenCommand(submission.AccessToken, new Dictionary<string, object?>()),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -82,7 +84,7 @@ public class SubmitFormByTokenHandlerTests
             .Returns(submission);
 
         Result result = await CreateHandler().Handle(
-            new SubmitFormByTokenCommand(submission.AccessToken, new Dictionary<string, object?>(), null),
+            new SubmitFormByTokenCommand(submission.AccessToken, new Dictionary<string, object?>()),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -106,8 +108,10 @@ public class SubmitFormByTokenHandlerTests
             .GetByIdAsync(FormId, OrgId, Arg.Any<CancellationToken>())
             .Returns(form);
 
+        _currentUser.UserId.Returns(AssigneeId);
+
         Result result = await CreateHandler().Handle(
-            new SubmitFormByTokenCommand(submission.AccessToken, data, AssigneeId),
+            new SubmitFormByTokenCommand(submission.AccessToken, data),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -127,7 +131,7 @@ public class SubmitFormByTokenHandlerTests
             .Returns(submission);
 
         Result result = await CreateHandler().Handle(
-            new SubmitFormByTokenCommand(submission.AccessToken, new Dictionary<string, object?>(), null),
+            new SubmitFormByTokenCommand(submission.AccessToken, new Dictionary<string, object?>()),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -150,7 +154,7 @@ public class SubmitFormByTokenHandlerTests
             .Returns(form);
 
         Result result = await CreateHandler().Handle(
-            new SubmitFormByTokenCommand(submission.AccessToken, new Dictionary<string, object?>(), null),
+            new SubmitFormByTokenCommand(submission.AccessToken, new Dictionary<string, object?>()),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

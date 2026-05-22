@@ -71,18 +71,11 @@ public static class FormTaskEndpoints
     private static async Task<IResult> SubmitFormByToken(
         Guid accessToken,
         [FromBody] SubmitFormByTokenRequest request,
-        HttpContext httpContext,
         ISender mediator,
         CancellationToken ct)
     {
-        Guid? submittedBy = null;
-        string? sub = httpContext.User.FindFirst("sub")?.Value
-            ?? httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (Guid.TryParse(sub, out Guid userId))
-            submittedBy = userId;
-
-        Result result = await mediator.Send(new SubmitFormByTokenCommand(
-            accessToken, request.Data, submittedBy), ct);
+        Result result = await mediator.Send(
+            new SubmitFormByTokenCommand(accessToken, request.Data), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }

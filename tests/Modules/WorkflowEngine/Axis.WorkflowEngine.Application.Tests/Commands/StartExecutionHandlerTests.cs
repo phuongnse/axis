@@ -76,6 +76,23 @@ public class StartExecutionHandlerTests
     }
 
     [Fact]
+    public async Task StartExecution_WhenInputIsNull_DefaultsToEmptyDictionary()
+    {
+        WorkflowSnapshot snapshot = MakeSnapshot();
+        _workflowReader.IsActiveAsync(WorkflowId, OrgId).Returns(true);
+        _workflowReader.GetSnapshotAsync(WorkflowId, OrgId).Returns(snapshot);
+
+        Result<Guid> result = await CreateHandler().Handle(
+            new StartExecutionCommand(WorkflowId, OrgId, TriggerType.Manual, UserId, null),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        await _execRepo.Received(1).AddAsync(
+            Arg.Is<WorkflowExecution>(e => e.Context.Count == 0),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task StartExecution_WhenSnapshotNotFound_ReturnsBusinessRuleFailure()
     {
         _workflowReader.IsActiveAsync(WorkflowId, OrgId).Returns(true);
