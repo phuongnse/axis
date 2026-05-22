@@ -248,7 +248,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
         await cmd.ExecuteNonQueryAsync();
 
         NpgsqlConnectionStringBuilder csb = new(_postgres.GetConnectionString())
-            { Database = dbName };
+        { Database = dbName };
         return csb.ToString();
     }
 }

@@ -120,7 +120,7 @@ public static class ExecutionEndpoints
         [FromQuery] int pageSize = 20,
         [FromQuery] ExecutionStatus? status = null)
     {
-        
+
         PagedResult<ExecutionSummaryResponse> result = await mediator.Send(
             new GetAllExecutionsQuery(currentUser.OrgId, page, pageSize, status), ct);
         return Results.Ok(result);
@@ -135,7 +135,7 @@ public static class ExecutionEndpoints
         [FromQuery] int pageSize = 20,
         [FromQuery] ExecutionStatus? status = null)
     {
-        
+
         PagedResult<ExecutionSummaryResponse> result = await mediator.Send(
             new GetExecutionsByWorkflowQuery(workflowId, currentUser.OrgId, page, pageSize, status), ct);
         return Results.Ok(result);
