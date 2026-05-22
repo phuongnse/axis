@@ -59,9 +59,9 @@ public static class ConditionEvaluator
         return type switch
         {
             "AND" => EvaluateLogical(expr, context, true),
-            "OR" => EvaluateLogical(expr, context, false),
+            "OR"  => EvaluateLogical(expr, context, false),
             "NOT" => EvaluateNot(expr, context),
-            _ => EvaluateComparison(type, expr, context)
+            _     => EvaluateComparison(type, expr, context)
         };
     }
 
@@ -102,18 +102,18 @@ public static class ConditionEvaluator
 
         return @operator switch
         {
-            "==" or "eq" => ValuesEqual(leftValue, rightValue),
-            "!=" or "neq" => !ValuesEqual(leftValue, rightValue),
-            "<" or "lt" => TryCompareNumbers(leftValue, rightValue, out int lt) && lt < 0,
-            ">" or "gt" => TryCompareNumbers(leftValue, rightValue, out int gt) && gt > 0,
-            "<=" or "lte" => TryCompareNumbers(leftValue, rightValue, out int lte) && lte <= 0,
-            ">=" or "gte" => TryCompareNumbers(leftValue, rightValue, out int gte) && gte >= 0,
-            "contains" => StringContains(leftValue, rightValue),
-            "starts_with" => StringStartsWith(leftValue, rightValue),
-            "ends_with" => StringEndsWith(leftValue, rightValue),
-            "is_empty" => IsEmpty(leftValue),
-            "is_not_empty" => !IsEmpty(leftValue),
-            _ => false
+            "==" or "eq"           => ValuesEqual(leftValue, rightValue),
+            "!=" or "neq"          => !ValuesEqual(leftValue, rightValue),
+            "<"  or "lt"           => TryCompareNumbers(leftValue, rightValue, out int lt)  && lt < 0,
+            ">"  or "gt"           => TryCompareNumbers(leftValue, rightValue, out int gt)  && gt > 0,
+            "<=" or "lte"          => TryCompareNumbers(leftValue, rightValue, out int lte) && lte <= 0,
+            ">=" or "gte"          => TryCompareNumbers(leftValue, rightValue, out int gte) && gte >= 0,
+            "contains"             => StringContains(leftValue, rightValue),
+            "starts_with"          => StringStartsWith(leftValue, rightValue),
+            "ends_with"            => StringEndsWith(leftValue, rightValue),
+            "is_empty"             => IsEmpty(leftValue),
+            "is_not_empty"         => !IsEmpty(leftValue),
+            _                      => false
         };
     }
 

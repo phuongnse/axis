@@ -51,10 +51,10 @@ public sealed class ExportRecordsCsvHandler(
     private static string ResolveValue(DataRecord record, FieldDefinition field) =>
         field.Name switch
         {
-            "id" => record.Id.ToString(),
+            "id"         => record.Id.ToString(),
             "created_at" => record.CreatedAt.ToString("O"),
             "updated_at" => record.UpdatedAt.ToString("O"),
-            _ => record.Data.TryGetValue(field.Name, out object? val)
+            _            => record.Data.TryGetValue(field.Name, out object? val)
                                 ? val?.ToString() ?? string.Empty
                                 : string.Empty
         };
