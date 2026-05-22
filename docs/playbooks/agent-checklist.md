@@ -2,7 +2,26 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
 
-**Daily workflow.** CI enforces build/test and doc drift; you paste gates in the PR as an audit trail.
+**Daily workflow.**
+## PR review replies (required after each review round)
+
+When **CodeRabbit** or a **human** leaves actionable comments on your PR:
+
+1. **Read** all open review threads (`gh pr view <n> --comments` or GitHub **Files changed** → conversations).
+2. **Verify** each finding against current code — fix valid issues on the **PR branch**; skip invalid ones with a short reason.
+3. **Reply** on every thread you touched:
+   - Prefer an inline reply on the thread (GitHub **Reply**).
+   - If the token cannot post inline replies (e.g. cloud agent), post a **summary PR comment** that maps each thread → commit SHA or “won’t fix because …”.
+4. **Push** fixes **before** marking threads resolved.
+5. **Do not** resolve threads silently — no reply = incomplete.
+
+Template for an inline reply:
+
+> Fixed in `<sha>` — \<one sentence\>.  
+> Won’t fix — \<reason citing spec/CLAUDE\>.
+
+After a review-fix push: add a **Changelog** row to the PR body (do not replace the whole description).
+ CI enforces build/test and doc drift; you paste gates in the PR as an audit trail.
 
 ---
 

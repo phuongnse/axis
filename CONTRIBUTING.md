@@ -56,6 +56,18 @@ Do **not** replace the whole body on every push. Keep:
 
 Agents: read the existing PR body before `update_pr`; merge new work into the sections above.
 
+
+### Replying to PR review comments
+
+After CodeRabbit or a reviewer comments:
+
+1. Fix valid items on the PR branch and push.
+2. Reply on each thread (commit SHA or reason to skip).
+3. If inline replies are not available, add one summary comment on the PR linking threads to commits.
+4. Append a row to the PR **Changelog** — keep Summary + Scope cumulative.
+
+See [agent-checklist.md § PR review replies](docs/playbooks/agent-checklist.md).
+
 ## Pull request template
 
 Use the checklist in [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md). Include:
