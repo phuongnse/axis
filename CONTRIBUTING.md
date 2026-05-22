@@ -47,25 +47,19 @@ Thank you for contributing. This repo uses docs-first development: feature specs
 
 ### Updating the PR description
 
-Do **not** replace the whole body on every push. Keep:
+Keep the description **short**. Only three sections (see [PR template](.github/PULL_REQUEST_TEMPLATE.md)):
 
-1. **Summary** — full PR intent (stable unless scope changes)
-2. **Changelog** — one row per commit you add
-3. **Scope / files** — cumulative list
-4. **Gates 0–3** — refresh only lines that changed on the latest commit; gate blocks reflect *current* verification
+1. **Summary** — what the whole PR does (update only if scope changes)
+2. **Commits** — one table row per commit; **append** rows, never drop earlier commits
+3. **Requirements & rules followed** — checklist of what applies (CI, Gate 1, doc drift, docs same PR, spec → code, Gate 3)
 
-Agents: read the existing PR body before `update_pr`; merge new work into the sections above.
+Gates 0–3 in [agent-checklist.md](docs/playbooks/agent-checklist.md) are how you **verify** work before push; summarize the outcome in **Requirements**, do not paste long gate blocks into the PR.
 
+Agents: read the existing PR body before `update_pr`; merge new commits and tick requirements — do not replace Summary with only the latest commit.
 
 ## Pull request template
 
-Use the checklist in [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md). Include:
-
-- AC map and docs touched
-- **Gate 0** — AC map when code changes
-- **Gate 1** — full `dotnet build` + `dotnet test` (not a solution filter)
-- **Gate 2** — paste doc walk-through in PR (required). Drift **script** = run before push + CI check — do not paste script output as a gate block
-- **Gate 3** — retrospective
+Use [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md). During implementation, follow [agent-checklist.md](docs/playbooks/agent-checklist.md) (Gates 0–3).
 
 ---
 

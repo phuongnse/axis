@@ -2,10 +2,13 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
 
-**Daily workflow.** CI enforces build/test and doc drift; you paste gates in the PR as an audit trail.
+**Daily workflow.** Gates 0–3 while implementing. **PR description:** only Summary + Commits + Requirements ([PR template](../../.github/PULL_REQUEST_TEMPLATE.md)) — not long gate paste blocks.
 
 
 ---
+
+
+**PR body:** tick items in the template Requirements section; keep Gate 1/2/3 verification here, do not duplicate full blocks in the PR.
 
 ## Gate 0 — Ready (before code; paste in PR when shipping code)
 
@@ -30,11 +33,11 @@ Docs touched: docs/epics/…
 | Gate | Action |
 |------|--------|
 | **0** | AC map + docs touched (when `src/`, `tests/`, or `frontend/` change) |
-| **1** | Full .NET + frontend verification (table below) — **always paste** |
-| **2** | Doc walk-through (rows below) — **paste in PR** |
-| **3** | Retrospective — **paste all seven answers** (not `1–7 No`) |
+| **1** | Full .NET + frontend verification (table below) |
+| **2** | Doc walk-through (rows below) |
+| **3** | Retrospective (seven questions) |
 
-### Gate 1 — paste in every PR (local = CI)
+### Gate 1 — verify before push (local = CI)
 
 | Changed | Commands (all must pass when triggered) |
 |---------|----------------------------------------|
@@ -58,7 +61,7 @@ Example (docs-only): every line `not triggered — no src/, tests/, or frontend/
 
 **Docker:** integration and API tests run as part of `dotnet test`; Docker must be available locally (same as CI agents with Testcontainers).
 
-### Gate 2 — docs walk-through (paste in PR)
+### Gate 2 — docs walk-through
 
 ```text
 Gate 2:
@@ -76,7 +79,7 @@ Gate 2:
 - Deferred scope → feature callout gap / not triggered
 ```
 
-### Gate 3 — retrospective (paste in PR)
+### Gate 3 — retrospective
 
 Answer **Yes** or **No** on **each numbered line** (do not replace with `1–7 No`). If **Yes**, name the doc updated in this PR.
 

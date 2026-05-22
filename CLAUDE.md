@@ -1,6 +1,6 @@
 # Axis — Project Context for Claude
 
-> **Agents:** [`agent-checklist.md`](docs/playbooks/agent-checklist.md) first. Every PR: paste **Gates 0–3** from [PR template](.github/PULL_REQUEST_TEMPLATE.md). **Doc drift** = CI check only (not a pasted gate).
+> **Agents:** [agent-checklist.md](docs/playbooks/agent-checklist.md) for gates during work; [PR template](.github/PULL_REQUEST_TEMPLATE.md) for description (**Summary + Commits + Requirements** only).
 
 ## Contents
 
@@ -69,7 +69,7 @@ Multi-tenant low-code SaaS: custom data models, visual workflows, forms, and UI 
 - Never weaken tests, `.Skip()`, or mock away behavior under test.
 - Never bypass auth, skip an AC silently, or mark ✅ to avoid a hard gap.
 - Domain: zero external dependencies.
-- Never commit with failing Gate 1, or without **written** Gate 2 and Gate 3 in the PR.
+- Never commit with failing Gate 1; docs and requirements satisfied before merge (agent-checklist + PR template).
 - When `src/`, `tests/`, or `docs/epics/` change: run `./scripts/check-doc-drift.sh` before push; CI **Doc drift** must be green. Paste **Gate 2** in the PR — not a drift-script gate block.
 
 **P1 — confirm with user before deviating:**
@@ -126,9 +126,9 @@ Skip for single-file fixes and doc-only edits.
 | `frontend/` | `npm run ci` then `npm run test` |
 | Both | All of the above |
 
-**Gate 2** — paste doc walk-through in PR ([agent-checklist.md § Gate 2](docs/playbooks/agent-checklist.md)). **Doc drift** — run script before push when code/epics change; CI job must be green; do not paste script output in the PR body.
+**Gate 2** — docs in same PR ([agent-checklist.md § Gate 2](docs/playbooks/agent-checklist.md)). **Doc drift** — run script before push when code/epics change; CI job must be green.
 
-**Gate 3** — seven yes/no questions (paste each line — not `1–7 No`) in [agent-checklist.md § Gate 3](docs/playbooks/agent-checklist.md); update `patterns.md` / feature file / `TECH_STACK.md` on any "yes".
+**Gate 3** — retrospective ([agent-checklist.md § Gate 3](docs/playbooks/agent-checklist.md)); update docs on any "yes".
 
 ### Git
 
@@ -188,7 +188,7 @@ Full rules: [`patterns.md`](docs/playbooks/patterns.md) (EF, API, Wolverine, agg
 
 **Per layer / module:** all US callouts updated; epic README table; [`PROGRESS.md`](docs/PROGRESS.md) (layer summary only — not per-class detail).
 
-**Per PR before merge:** Gates 0–3 written; CI **Doc drift** green when applicable; Gate 1 includes:
+**Per PR before merge:** PR description = Summary + Commits + Requirements; CI **Doc drift** green when applicable; Gate 1 includes:
 
 ```bash
 grep -rn "TODO\|FIXME\|NotImplementedException\|placeholder\|stub" src/ tests/ frontend/src/ 2>/dev/null | grep -v obj/ | grep -v node_modules/
