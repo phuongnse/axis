@@ -143,6 +143,23 @@ check_readme_api 'src/Axis\.Api/Endpoints/Form' 'docs/epics/E05-form-builder'
 check_readme_api 'src/Axis\.Api/Endpoints/Model' 'docs/epics/E03-data-modeling'
 check_readme_api 'src/Axis\.Api/Endpoints/Workflow' 'docs/epics/E04-workflow-builder'
 
+# Speculation guard: reference docs (ARCHITECTURE) must describe what exists,
+# not what is "planned" or "will be wired". Forward-looking status belongs in
+# docs/PROGRESS.md or an epic feature file — places readers know are
+# forward-looking. See docs/playbooks/docs-style.md § Anti-patterns.
+SPEC_PATTERN='Not yet implemented|planned design|Will be wired|To be implemented|Coming soon'
+SPEC_TARGETS=(
+  'docs/ARCHITECTURE.md'
+)
+for target in "${SPEC_TARGETS[@]}"; do
+  [ -f "${target}" ] || continue
+  if matches="$(grep -nE "${SPEC_PATTERN}" "${target}" 2>/dev/null)"; then
+    while IFS= read -r line; do
+      fail "Speculation in reference doc — move to docs/PROGRESS.md or an epic feature file: ${target}:${line}"
+    done <<< "${matches}"
+  fi
+done
+
 if [ "${ERR}" -ne 0 ]; then
   echo "" >&2
   echo "See docs/playbooks/agent-checklist.md" >&2

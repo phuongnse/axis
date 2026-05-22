@@ -1,0 +1,37 @@
+# Lychee config — shared between local dev and CI so they agree.
+# Run locally:  lychee --config ./lychee.toml './**/*.md'
+# Docs:         https://lychee.cli.rs/usage/config/
+
+# Offline: resolve only local files and anchors. External http(s) is checked
+# in a separate scheduled job (not on every PR) so third-party 503s never
+# block a merge.
+offline = true
+
+# Include #anchor checks — catches the "Source Tree" / renamed-heading drift
+# class we hit in this repo.
+include_fragments = true
+
+# Markdown-style relative links and bare URLs.
+include_verbatim = true
+
+# Quiet output for CI.
+no_progress = true
+
+# Folders we never want to scan even when patterns are loose.
+exclude_path = [
+  "node_modules",
+  "bin",
+  "obj",
+  "TestResults",
+  "frontend/dist",
+  "frontend/node_modules",
+  ".git",
+]
+
+# Mailto + localhost examples in docs are not real links.
+exclude = [
+  "^mailto:",
+  "^https?://localhost",
+  "^https?://127\\.0\\.0\\.1",
+  "^https?://example\\.com",
+]

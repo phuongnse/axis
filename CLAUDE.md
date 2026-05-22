@@ -22,31 +22,9 @@ Multi-tenant low-code SaaS: custom data models, visual workflows, forms, and UI 
 
 ## Tech stack & architecture
 
-**Versions and ADRs:** [`docs/TECH_STACK.md`](docs/TECH_STACK.md).
+Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md). Module list and per-module responsibilities are owned by [`docs/epics/README.md`](docs/epics/README.md). Architectural shape (containers, multi-tenancy, auth) is owned by [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). This file owns only the **rules** — the things below that must hold no matter which library version is in `Directory.Packages.props`.
 
-| Area | Choice |
-|------|--------|
-| Backend | .NET 8, ASP.NET Core, DDD, CQRS (MediatR) |
-| Data | PostgreSQL 16, EF Core 9, schema-per-tenant |
-| Messaging / jobs | Wolverine (not Hangfire) — all domain events |
-| Auth | OpenIddict 5 — PKCE SPA + client credentials |
-| Cache | Redis 7 |
-| Frontend | React 18, TypeScript, Vite, TanStack Query/Router, Zustand, shadcn, Tailwind |
-| API docs | Swashbuckle + Scalar |
-| Tests | xUnit, FluentAssertions, NSubstitute, Testcontainers |
-
-**Modules** (each: Domain → Application → Infrastructure; endpoints in `Axis.Api`):
-
-| Module | Responsibility |
-|--------|----------------|
-| Identity | Auth, users, roles, RBAC (`public` schema) |
-| DataModeling | Models, fields, records |
-| WorkflowBuilder | Definitions, steps, triggers |
-| FormBuilder | Forms, fields, submissions |
-| WorkflowEngine | Execution, handlers, history |
-| PageBuilder | Pages, widgets (Phase 2) |
-
-**Shared:** `Axis.Shared.Domain`, `Axis.Shared.Application`, `Axis.Shared.Infrastructure`.
+**Shared kernel:** `Axis.Shared.Domain`, `Axis.Shared.Application`, `Axis.Shared.Infrastructure`.
 
 **Multi-tenancy:** schema `tenant_{organizationId:N}`; tenant from JWT `org_id`; schema cached in Redis. Identity stays on `public`.
 
@@ -206,6 +184,7 @@ Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` chan
 | [patterns.md](docs/playbooks/patterns.md) | Implementation detail |
 | [testing.md](docs/playbooks/testing.md) | Test patterns |
 | [frontend.md](docs/playbooks/frontend.md) | SPA rules |
+| [docs-style.md](docs/playbooks/docs-style.md) | Doc anti-patterns + single-owner rule (read before adding a `.md`) |
 | [TECH_STACK.md](docs/TECH_STACK.md) | Libraries + ADRs |
 | [PROGRESS.md](docs/PROGRESS.md) | Module layer status |
 | [docs/epics/](docs/epics/README.md) | Features + ACs |
