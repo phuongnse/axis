@@ -124,6 +124,8 @@ Never ✅ and "pending …" in the same callout. Checkboxes in feature files are
 
 Updating only `PROGRESS.md` while changing `src/` without `docs/epics/` → drift fails. Epic README `| API | ⏳` after endpoints ship → drift fails.
 
+**Chore/style PRs that touch module code:** drift still applies — add one small, accurate detail to the matching epic doc (a chunk size, a behavior nuance, a deferral note already true). Don't propose loosening the script, don't strand the format gunk waiting for a "real" PR, and don't invent fake content. The script's intent is *prompt the developer to look at docs*, not *require rewrite proportional to code change*.
+
 ---
 
 ## P0 (CI + culture)
