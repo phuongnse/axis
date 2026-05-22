@@ -8,7 +8,7 @@
 ---
 
 
-**PR body:** Summary + ordered Requirements (Gates 0–3, spec→code, CI). Do not list commits or paste CI/Doc drift results — Checks tab shows that.
+**PR body:** Summary + ordered Requirements (spec→code, Gates 0–3). Do not list commits or CI/Doc drift status in the description — GitHub Checks tab covers that.
 
 ## Gate 0 — Ready (before code; paste in PR when shipping code)
 
