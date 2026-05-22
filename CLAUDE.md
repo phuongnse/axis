@@ -70,7 +70,6 @@ Multi-tenant low-code SaaS: custom data models, visual workflows, forms, and UI 
 - Never bypass auth, skip an AC silently, or mark ✅ to avoid a hard gap.
 - Domain: zero external dependencies.
 - Never commit with failing Gate 1, or without **written** Gate 2 and Gate 3 in the PR.
-- After PR review comments: fix valid findings, **reply on each thread** (or one summary PR comment) — see [agent-checklist § PR review replies](docs/playbooks/agent-checklist.md).
 - When `src/`, `tests/`, or `docs/epics/` change: run `./scripts/check-doc-drift.sh` before push; CI **Doc drift** must be green. Paste **Gate 2** in the PR — not a drift-script gate block.
 
 **P1 — confirm with user before deviating:**
