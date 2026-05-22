@@ -3,12 +3,6 @@
 > Updated each time a layer is completed. Source of truth for current implementation state.
 > When completing a layer, update this file — **not** CLAUDE.md.
 
-## Platform Foundation — E01-platform-foundation
-
-**Domain + Application ✅ | Infrastructure ⚠️ | API ⚠️ | Frontend ⏳**
-
-Tenant registration and email verification API ✅. US-003 tenant schema provisioning wired on email verify (`ITenantSchemaProvisioner`) ⚠️ — retry job and provisioning UI deferred.
-
 ## Shared Kernel ⚠️
 
 Domain, Application, and Infrastructure layers complete.
@@ -26,7 +20,7 @@ Full auth, user, role, invitation, and session management. OpenIddict 5.x OIDC s
 
 **Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳**
 
-Custom model, field, data class, and record CRUD. Full-text search, per-field JSONB filters, sort-by-column, bulk delete, CSV export. Form CRUD endpoints covered by integration tests. F04 form-task token submit/get, mine lists, and expiry scheduling in progress on PR #47.
+Custom model, field, data class, and record CRUD. Full-text search, per-field JSONB filters, sort-by-column, bulk delete, CSV export. All endpoints covered by integration tests.
 
 ## WorkflowBuilder — E04-workflow-builder
 
@@ -36,7 +30,7 @@ Workflow definitions with steps, transitions, triggers, cycle detection, publish
 
 ## FormBuilder — E05-form-builder
 
-**Domain ✅ | Application ⚠️ | Infrastructure ✅ | API ⚠️ | Frontend ⏳**
+**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳**
 
 Form definitions with typed fields (9 field types, polymorphic config). Cross-module isolation via Wolverine event-driven local denormalization — no direct cross-module SQL. All endpoints covered by integration tests.
 
@@ -54,6 +48,6 @@ Execution lifecycle (start, cancel, retry, retry-with-context). Step state machi
 
 ## Frontend Foundation
 
-**Status: ✅ Tooling complete — feature implementation ⏳**
+**Status: ✅ Tooling complete — E02 auth shell ⚠️**
 
-React 18 + TypeScript + Vite. TanStack Router, TanStack Query, Zustand, shadcn/ui, Tailwind. Biome (lint + format). `npm run ci` gate enforced. All module feature UIs remain ⏳.
+React 18 + TypeScript + Vite. TanStack Router, TanStack Query, Zustand, shadcn/ui, Tailwind, Zod, react-hook-form. Biome (lint + format). `npm run ci` gate enforced. E02: login/app shell/dashboard match wireframe layout (Industrial Calm palette); OIDC PKCE form started; register/forgot are layout stubs. Other module UIs remain ⏳.
