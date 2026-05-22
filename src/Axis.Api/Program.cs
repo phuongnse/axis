@@ -61,7 +61,6 @@ try
         // but are not the entry assembly — include them explicitly for handler discovery.
         opts.Discovery.IncludeAssembly(typeof(WorkflowEngineInfrastructureExtensions).Assembly);
         opts.Discovery.IncludeAssembly(typeof(FormBuilderInfrastructureExtensions).Assembly);
-        opts.Discovery.IncludeAssembly(typeof(CreateFormCommand).Assembly);
     });
 
     // ── MediatR + validation pipeline ─────────────────────────────────────
@@ -285,6 +284,7 @@ try
     app.MapDataClassEndpoints();
     app.MapRecordEndpoints();
     app.MapWorkflowEndpoints();
+    app.MapExecutionEndpoints();
     app.MapFormEndpoints();
 
     app.Run();
