@@ -66,6 +66,8 @@ Example (docs-only): every line `not triggered — no src/, tests/, or frontend/
 
 ### Gate 2 — docs walk-through
 
+Paste block format: header `Gate 2:` then one `-` line per row (Gate 3 uses the same bullet style).
+
 ```text
 Gate 2:
 - Library → TECH_STACK.md / not triggered
@@ -88,17 +90,17 @@ Gate 2:
 
 ### Gate 3 — retrospective
 
-Answer **Yes** or **No** on **each numbered line** (do not replace with `1–7 No`). If **Yes**, name the doc updated in this PR.
+Answer **Yes** or **No** on **each line** (same `-` bullet style as Gate 2 — do not collapse to `1–7 No`). If **Yes**, name the doc updated in this PR.
 
 ```text
 Gate 3:
-1. New rule from test failure? → No / Yes →
-2. Invented invariant without AC? → No / Yes →
-3. Infrastructure footgun? → No / Yes →
-4. Non-obvious test setup? → No / Yes →
-5. Changed direction mid-task? → No / Yes →
-6. Spec gap discovered? → No / Yes →
-7. Incident-level detail in rule text? → No / Yes →
+- New rule from test failure? → No
+- Invented invariant without AC? → No
+- Infrastructure footgun? → No
+- Non-obvious test setup? → No
+- Changed direction mid-task? → No
+- Spec gap discovered? → No
+- Incident-level detail in rule text? → No
 ```
 
 ---
