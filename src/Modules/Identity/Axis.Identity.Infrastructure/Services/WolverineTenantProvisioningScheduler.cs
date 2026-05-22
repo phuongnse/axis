@@ -7,5 +7,8 @@ namespace Axis.Identity.Infrastructure.Services;
 internal sealed class WolverineTenantProvisioningScheduler(IMessageBus bus) : ITenantProvisioningScheduler
 {
     public Task EnqueueAsync(Guid organizationId, CancellationToken cancellationToken = default)
-        => bus.PublishAsync(new ProvisionTenantMessage(organizationId)).AsTask();
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return bus.PublishAsync(new ProvisionTenantMessage(organizationId)).AsTask();
+    }
 }

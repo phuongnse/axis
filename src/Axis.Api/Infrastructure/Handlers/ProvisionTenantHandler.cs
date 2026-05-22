@@ -14,5 +14,9 @@ public sealed class ProvisionTenantHandler(
             message.OrganizationId);
 
         await provisioner.ProvisionAsync(message.OrganizationId, cancellationToken);
+
+        logger.LogInformation(
+            "Tenant schema provisioned for organization {OrganizationId}",
+            message.OrganizationId);
     }
 }
