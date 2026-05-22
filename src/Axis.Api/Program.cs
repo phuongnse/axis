@@ -56,11 +56,16 @@ try
         .Enrich.FromLogContext());
 
     // ── Wolverine (messaging + durable inbox/outbox per ADR-009) ───────────
-    string wolverineConnectionString = builder.Configuration.GetConnectionString("Wolverine")
-        ?? throw new InvalidOperationException("ConnectionStrings:Wolverine is required");
+    // Capture the live ConfigurationManager and read inside the lambda so
+    // WebApplicationFactory.ConfigureAppConfiguration overrides applied later
+    // in test setup are picked up by Wolverine.
+    IConfiguration wolverineConfig = builder.Configuration;
 
     builder.Host.UseWolverine(opts =>
     {
+        string wolverineConnectionString = wolverineConfig.GetConnectionString("Wolverine")
+            ?? throw new InvalidOperationException("ConnectionStrings:Wolverine is required");
+
         // Cross-cutting: Debug entry/exit traces + Error for unhandled exceptions on every handler.
         opts.Policies.AddMiddleware<HandlerLoggingMiddleware>();
         opts.UseEntityFrameworkCoreTransactions();
