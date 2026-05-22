@@ -20,13 +20,15 @@ Without a UI builder, users need a developer to display and interact with their 
 
 ## Features
 
+> Feature files are not yet authored — E07 is Phase 2 and has not started. The rows below name the planned cuts; create `features/F0N-*.md` when the epic begins.
+
 | ID | Feature | Description |
 |---|---|---|
-| [F01](./features/F01-page-management.md) | Page Management | Create, edit, delete, publish/unpublish pages |
-| [F02](./features/F02-widget-library.md) | Widget Library | Pre-built widgets: List, Grid, Form, Chart, Button, Text, Image |
-| [F03](./features/F03-layout-builder.md) | Drag & Drop Layout Builder | Compose pages by dragging widgets onto a canvas, resize and arrange |
-| [F04](./features/F04-data-binding.md) | Data Binding | Bind widget data sources to models, records, and workflow outputs |
-| [F05](./features/F05-page-access.md) | Page Access Control | Control which roles can access each page |
+| F01 | Page Management | Create, edit, delete, publish/unpublish pages |
+| F02 | Widget Library | Pre-built widgets: List, Grid, Form, Chart, Button, Text, Image |
+| F03 | Drag & Drop Layout Builder | Compose pages by dragging widgets onto a canvas, resize and arrange |
+| F04 | Data Binding | Bind widget data sources to models, records, and workflow outputs |
+| F05 | Page Access Control | Control which roles can access each page |
 
 ---
 
