@@ -1004,7 +1004,7 @@ builder.Host.UseWolverine(opts =>
 });
 ```
 
-The middleware logs at `Debug` level (entry + elapsed time) and `Error` level (unhandled exceptions). It provides consistent operational traces without touching each handler — enforce it by policy, not by developer memory.
+The middleware logs unhandled handler exceptions via `OnException(Exception, Envelope)` — do **not** add `Exception` to `Finally`; Wolverine treats it as a DI service. It provides consistent operational traces without touching each handler — enforce it by policy, not by developer memory.
 
 **Layer 2 — Per-handler business milestone logging (mandatory)**
 

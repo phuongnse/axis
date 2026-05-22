@@ -6,7 +6,6 @@ using Axis.Api.Authorization;
 using Axis.Api.Endpoints;
 using Axis.Api.HealthChecks;
 using Axis.Api.Infrastructure;
-using Axis.Api.Infrastructure.Handlers;
 using Axis.Api.Middleware;
 using Axis.DataModeling.Application.Commands.CreateModel;
 using Axis.DataModeling.Infrastructure.Extensions;
@@ -285,7 +284,9 @@ try
     app.MapDataClassEndpoints();
     app.MapRecordEndpoints();
     app.MapWorkflowEndpoints();
+    app.MapExecutionEndpoints();
     app.MapFormEndpoints();
+    app.MapFormTaskEndpoints();
 
     app.Run();
 }
