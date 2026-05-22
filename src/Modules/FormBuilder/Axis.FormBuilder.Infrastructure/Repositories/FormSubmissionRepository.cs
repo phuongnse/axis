@@ -17,6 +17,15 @@ internal sealed class FormSubmissionRepository(FormBuilderDbContext context) : I
         => await context.FormSubmissions
             .FirstOrDefaultAsync(s => s.AccessToken == accessToken, cancellationToken);
 
+    public async Task<FormSubmission?> GetByIdAsync(
+        Guid id,
+        Guid organizationId,
+        CancellationToken cancellationToken = default)
+        => await context.FormSubmissions
+            .FirstOrDefaultAsync(
+                s => s.Id == id && s.OrganizationId == organizationId,
+                cancellationToken);
+
     public async Task<bool> ExistsForExecutionStepAsync(
         Guid executionId,
         Guid executionStepId,

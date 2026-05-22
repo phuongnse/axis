@@ -170,19 +170,31 @@ public class ExecutionStepTests
         step.ErrorDetails.Should().Be("Connection timeout after 5s");
     }
 
+    [Fact]
+    public void Fail_WhenWaiting_TransitionsToFailedWithErrorDetails()
+    {
+        ExecutionStep step = CreatePending(type: StepType.Form);
+        step.Start(SomeContext());
+        step.Wait();
+        step.Fail("Form step timed out");
+
+        step.Status.Should().Be(StepExecutionStatus.Failed);
+        step.ErrorDetails.Should().Be("Form step timed out");
+    }
+
     [Theory]
     [InlineData(StepExecutionStatus.Pending)]
     [InlineData(StepExecutionStatus.Completed)]
     [InlineData(StepExecutionStatus.Failed)]
     [InlineData(StepExecutionStatus.Skipped)]
     [InlineData(StepExecutionStatus.Cancelled)]
-    public void Fail_WhenNotRunning_Throws(StepExecutionStatus status)
+    public void Fail_WhenNotRunningOrWaiting_Throws(StepExecutionStatus status)
     {
-        var step = CreatePending();
+        ExecutionStep step = CreatePending();
         BringToStatus(step, status);
 
-        var act = () => step.Fail("error");
-        act.Should().Throw<InvalidOperationException>().WithMessage("*Running*");
+        Action act = () => step.Fail("error");
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Running or Waiting*");
     }
 
     // ─── Wait ─────────────────────────────────────────────────────────────────

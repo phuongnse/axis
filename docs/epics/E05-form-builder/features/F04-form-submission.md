@@ -37,8 +37,8 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 - Push notifications (mobile) — not in MVP.
 - Escalation notifications if the form is not submitted after X hours — not in MVP (timeout causes failure, not escalation).
 
-> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: No Application handlers for form submission management; email notification dispatch and in-app notification pending E06 + notification infrastructure; role member resolution pending Identity integration.
+> **Implementation status** — Domain: ✅ | Application: ⏳ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `FormStepReachedHandler` creates tasks ✅. Email/in-app notifications deferred (E06 + notification infrastructure). Role assignee resolution and no-members failure pending Identity integration.
 > Decisions: `FormSubmission` is a single aggregate combining task assignment (executionId, assigneeUserId, accessToken, expiresAt) and response data (submittedData, submittedAt). A separate FormTask entity would add no domain logic — the relationship is always 1:1 and both live within the same lifecycle (Pending → Submitted/Expired/Cancelled). Status enum is `FormSubmissionStatus`; `Submitted` used instead of `Completed` to name the action clearly. `AccessToken` is a `Guid` (unique URL key, not JWT); expiry enforced via `ExpiresAt` + `Expire()` domain method; `Expire()` is non-idempotent by design — idempotency handled at the caller level.
 
 ---
@@ -72,7 +72,7 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 - The assignee being able to add comments or annotations to the form submission — not in MVP.
 
 > **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⚠️ | Frontend: ⏳
-> Gaps vs spec: `SubmitFormByToken` + public `GET/POST /api/form-tasks/{token}` ✅. Field-level validation, standalone form page, pre-signed file upload, multi-tab UX pending.
+> Gaps vs spec: `SubmitFormByToken` + field validation (`FormSubmissionFieldValidator`) + public `GET/POST /api/form-tasks/{token}` ✅. Standalone form page, pre-signed file upload, multi-tab UX pending Frontend.
 
 ---
 
@@ -128,5 +128,5 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 *Out of scope*
 - Sending a reminder notification before timeout expires — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: Wolverine scheduled expiry job, task expiry marking, and workflow failure flow pending Application + Infrastructure.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `ExpireFormSubmissionMessage` scheduled on task create + `FormTaskExpiredHandler` (via `StepFailedMessage`) ✅. Cancelling scheduled job on submit deferred (idempotent expiry handles race). Workflow failure notifications pending.

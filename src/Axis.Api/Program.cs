@@ -61,6 +61,7 @@ try
         // but are not the entry assembly — include them explicitly for handler discovery.
         opts.Discovery.IncludeAssembly(typeof(WorkflowEngineInfrastructureExtensions).Assembly);
         opts.Discovery.IncludeAssembly(typeof(FormBuilderInfrastructureExtensions).Assembly);
+        opts.Discovery.IncludeAssembly(typeof(CreateFormCommand).Assembly);
     });
 
     // ── MediatR + validation pipeline ─────────────────────────────────────
@@ -189,7 +190,6 @@ try
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddScoped<CurrentUser>();
     builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
-    builder.Services.AddScoped<ITenantSchemaProvisioner, TenantSchemaProvisioner>();
 
     // ── CORS ───────────────────────────────────────────────────────────────
     string[] allowedOrigins = builder.Configuration
@@ -285,9 +285,7 @@ try
     app.MapDataClassEndpoints();
     app.MapRecordEndpoints();
     app.MapWorkflowEndpoints();
-    app.MapExecutionEndpoints();
     app.MapFormEndpoints();
-    app.MapFormTaskEndpoints();
 
     app.Run();
 }

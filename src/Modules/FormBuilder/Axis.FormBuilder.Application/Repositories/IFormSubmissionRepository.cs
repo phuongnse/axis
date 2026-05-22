@@ -9,6 +9,11 @@ public interface IFormSubmissionRepository
 
     Task<FormSubmission?> GetByAccessTokenAsync(Guid accessToken, CancellationToken cancellationToken = default);
 
+    Task<FormSubmission?> GetByIdAsync(
+        Guid id,
+        Guid organizationId,
+        CancellationToken cancellationToken = default);
+
     Task<bool> ExistsForExecutionStepAsync(
         Guid executionId,
         Guid executionStepId,

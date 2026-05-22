@@ -9,6 +9,7 @@ namespace Axis.FormBuilder.Application.Commands.SubmitFormByToken;
 
 public sealed class SubmitFormByTokenHandler(
     IFormSubmissionRepository submissionRepo,
+    IFormRepository formRepo,
     IUnitOfWork uow)
     : ICommandHandler<SubmitFormByTokenCommand>
 {
@@ -45,6 +46,15 @@ public sealed class SubmitFormByTokenHandler(
         if (submission.Status == FormSubmissionStatus.Cancelled)
             return Result.Failure(ErrorCodes.BusinessRule,
                 "This workflow has been cancelled.");
+
+        FormDefinition? form = await formRepo.GetByIdAsync(
+            submission.FormDefinitionId, submission.OrganizationId, cancellationToken);
+        if (form is null)
+            return Result.Failure(ErrorCodes.NotFound, "Form task not found.");
+
+        Dictionary<string, string[]> fieldErrors = FormSubmissionFieldValidator.Validate(command.Data, form.Fields);
+        if (fieldErrors.Count > 0)
+            return Result.FieldValidation(fieldErrors);
 
         Guid submittedBy = command.SubmittedByUserId
             ?? submission.AssigneeUserId

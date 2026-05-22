@@ -1,8 +1,8 @@
 using Axis.FormBuilder.Application.Commands.SubmitFormByToken;
-using Axis.FormBuilder.Application.Repositories;
-using Axis.FormBuilder.Application.Services;
 using Axis.FormBuilder.Domain.Aggregates;
 using Axis.FormBuilder.Domain.Enums;
+using Axis.FormBuilder.Application.Repositories;
+using Axis.FormBuilder.Application.Services;
 using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
@@ -13,6 +13,7 @@ namespace Axis.FormBuilder.Application.Tests.Commands;
 public class SubmitFormByTokenHandlerTests
 {
     private readonly IFormSubmissionRepository _submissionRepo = Substitute.For<IFormSubmissionRepository>();
+    private readonly IFormRepository _formRepo = Substitute.For<IFormRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
@@ -21,7 +22,7 @@ public class SubmitFormByTokenHandlerTests
     private static readonly Guid StepId = Guid.NewGuid();
     private static readonly Guid AssigneeId = Guid.NewGuid();
 
-    private SubmitFormByTokenHandler CreateHandler() => new(_submissionRepo, _uow);
+    private SubmitFormByTokenHandler CreateHandler() => new(_submissionRepo, _formRepo, _uow);
 
     private static FormSubmission CreatePendingSubmission(DateTimeOffset? expiresAt = null)
     {
@@ -95,9 +96,15 @@ public class SubmitFormByTokenHandlerTests
         FormSubmission submission = CreatePendingSubmission();
         Dictionary<string, object?> data = new() { ["name"] = "Jane" };
 
+        FormDefinition form = FormDefinition.Create("Test Form", null, OrgId, "user");
+        form.AddField("name", "Name", FormFieldType.Text, true, null);
+
         _submissionRepo
             .GetByAccessTokenAsync(submission.AccessToken, Arg.Any<CancellationToken>())
             .Returns(submission);
+        _formRepo
+            .GetByIdAsync(FormId, OrgId, Arg.Any<CancellationToken>())
+            .Returns(form);
 
         Result result = await CreateHandler().Handle(
             new SubmitFormByTokenCommand(submission.AccessToken, data, AssigneeId),
@@ -125,5 +132,28 @@ public class SubmitFormByTokenHandlerTests
 
         result.IsFailure.Should().BeTrue();
         result.Error.Should().Contain("cancelled");
+    }
+
+    [Fact]
+    public async Task SubmitFormByToken_WhenRequiredFieldMissing_ReturnsFieldValidation()
+    {
+        FormSubmission submission = CreatePendingSubmission();
+        FormDefinition form = FormDefinition.Create("Test Form", null, OrgId, "user");
+        form.AddField("name", "Name", FormFieldType.Text, true, null);
+
+        _submissionRepo
+            .GetByAccessTokenAsync(submission.AccessToken, Arg.Any<CancellationToken>())
+            .Returns(submission);
+        _formRepo
+            .GetByIdAsync(FormId, OrgId, Arg.Any<CancellationToken>())
+            .Returns(form);
+
+        Result result = await CreateHandler().Handle(
+            new SubmitFormByTokenCommand(submission.AccessToken, new Dictionary<string, object?>(), null),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.FieldValidation);
+        result.FieldErrors.Should().ContainKey("name");
     }
 }

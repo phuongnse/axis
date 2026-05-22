@@ -91,8 +91,9 @@ public sealed class ExecutionStep : Entity<Guid>
 
     public void Fail(string errorDetails)
     {
-        if (Status != StepExecutionStatus.Running)
-            throw new InvalidOperationException($"Cannot fail a step that is not Running. Current status: {Status}.");
+        if (Status is not (StepExecutionStatus.Running or StepExecutionStatus.Waiting))
+            throw new InvalidOperationException(
+                $"Cannot fail a step that is not Running or Waiting. Current status: {Status}.");
 
         Status = StepExecutionStatus.Failed;
         ErrorDetails = errorDetails;

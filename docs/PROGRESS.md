@@ -26,7 +26,7 @@ Full auth, user, role, invitation, and session management. OpenIddict 5.x OIDC s
 
 **Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳**
 
-Custom model, field, data class, and record CRUD. Full-text search, per-field JSONB filters, sort-by-column, bulk delete, CSV export. All endpoints covered by integration tests.
+Custom model, field, data class, and record CRUD. Full-text search, per-field JSONB filters, sort-by-column, bulk delete, CSV export. Form CRUD endpoints covered by integration tests. F04 form-task token submit/get, mine lists, and expiry scheduling in progress on PR #47.
 
 ## WorkflowBuilder — E04-workflow-builder
 
@@ -36,7 +36,7 @@ Workflow definitions with steps, transitions, triggers, cycle detection, publish
 
 ## FormBuilder — E05-form-builder
 
-**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳**
+**Domain ✅ | Application ⚠️ | Infrastructure ✅ | API ⚠️ | Frontend ⏳**
 
 Form definitions with typed fields (9 field types, polymorphic config). Cross-module isolation via Wolverine event-driven local denormalization — no direct cross-module SQL. All endpoints covered by integration tests.
 
