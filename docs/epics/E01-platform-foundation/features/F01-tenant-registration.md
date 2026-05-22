@@ -111,7 +111,8 @@ Self-service registration flow where a new organization signs up and is automati
 - Custom schema naming chosen by the user — schema names are auto-generated.
 
 > **Implementation status** — Domain: ⏳ | Application: ⚠️ | Infrastructure: ⚠️ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: `ITenantSchemaProvisioner` runs before verified state is saved (PR #50). Retry job, exponential backoff, platform alert, Admin role on verify, and provisioning wait UI not implemented.
+> Gaps vs spec: retry job with exponential backoff, platform alert after retries exhausted, Admin role assignment on verify, and provisioning wait UI (US-002) not implemented. Provisioner runs asynchronously via `ProvisionTenantMessage` after verified state is persisted.
+> **Deferred (PR #50 follow-up):** durable retry policy on `ProvisionTenantHandler`, org `Provisioning` status + polling endpoint for wait screen.
 
 ---
 

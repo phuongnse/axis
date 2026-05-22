@@ -2,7 +2,6 @@ using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Shared.Application.CQRS;
-using Axis.Shared.Application.Tenancy;
 using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Identity.Application.Commands.VerifyEmail;
@@ -10,7 +9,7 @@ namespace Axis.Identity.Application.Commands.VerifyEmail;
 public sealed class VerifyEmailHandler(
     IUserRepository userRepo,
     IUnitOfWork uow,
-    ITenantSchemaProvisioner tenantProvisioner)
+    ITenantProvisioningScheduler provisioningScheduler)
     : ICommandHandler<VerifyEmailCommand>
 {
     public async Task<Result> Handle(VerifyEmailCommand command, CancellationToken cancellationToken)
@@ -25,10 +24,10 @@ public sealed class VerifyEmailHandler(
         if (user.IsEmailVerified)
             return Result.Failure(ErrorCodes.BusinessRule, "This link has already been used. Please sign in.");
 
-        await tenantProvisioner.ProvisionAsync(user.OrganizationId, cancellationToken);
-
         user.VerifyEmail();
         await uow.SaveChangesAsync(cancellationToken);
+
+        await provisioningScheduler.EnqueueAsync(user.OrganizationId, cancellationToken);
 
         return Result.Success();
     }

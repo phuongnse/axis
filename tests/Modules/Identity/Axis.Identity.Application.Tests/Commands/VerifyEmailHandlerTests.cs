@@ -3,7 +3,6 @@ using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.ValueObjects;
-using Axis.Shared.Application.Tenancy;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
@@ -15,11 +14,11 @@ public class VerifyEmailHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
-    private readonly ITenantSchemaProvisioner _tenantProvisioner = Substitute.For<ITenantSchemaProvisioner>();
+    private readonly ITenantProvisioningScheduler _provisioningScheduler = Substitute.For<ITenantProvisioningScheduler>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
 
-    private VerifyEmailHandler CreateHandler() => new(_userRepo, _uow, _tenantProvisioner);
+    private VerifyEmailHandler CreateHandler() => new(_userRepo, _uow, _provisioningScheduler);
 
     private static User MakeUnverifiedUser()
     {
@@ -29,7 +28,7 @@ public class VerifyEmailHandlerTests
     }
 
     [Fact]
-    public async Task VerifyEmail_WhenTokenIsValid_VerifiesEmail()
+    public async Task VerifyEmail_WhenTokenIsValid_VerifiesEmailAndEnqueuesProvisioning()
     {
         User user = MakeUnverifiedUser();
         _userRepo.GetByIdPlatformWideAsync(user.Id).Returns(user);
@@ -42,13 +41,13 @@ public class VerifyEmailHandlerTests
         user.IsEmailVerified.Should().BeTrue();
         Received.InOrder(() =>
         {
-            _tenantProvisioner.ProvisionAsync(user.OrganizationId, Arg.Any<CancellationToken>());
             _uow.SaveChangesAsync(Arg.Any<CancellationToken>());
+            _provisioningScheduler.EnqueueAsync(user.OrganizationId, Arg.Any<CancellationToken>());
         });
     }
 
     [Fact]
-    public async Task VerifyEmail_WhenTokenFormatIsInvalid_ReturnsBusinessRuleFailure()
+    public async Task VerifyEmail_WhenTokenFormatIsInvalid_DoesNotEnqueueProvisioning()
     {
         Result result = await CreateHandler().Handle(
             new VerifyEmailCommand("not-a-guid"),
@@ -57,6 +56,8 @@ public class VerifyEmailHandlerTests
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
         result.Error.Should().Contain("Invalid verification link");
+        await _provisioningScheduler.DidNotReceive()
+            .EnqueueAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -71,6 +72,8 @@ public class VerifyEmailHandlerTests
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
         result.Error.Should().Contain("Invalid verification link");
+        await _provisioningScheduler.DidNotReceive()
+            .EnqueueAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -87,5 +90,7 @@ public class VerifyEmailHandlerTests
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
         result.Error.Should().Contain("already been used");
+        await _provisioningScheduler.DidNotReceive()
+            .EnqueueAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 }

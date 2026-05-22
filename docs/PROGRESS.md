@@ -42,7 +42,7 @@ Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoi
 
 ## Identity / E01 — tenant provisioning (cross-cutting)
 
-**Verify email → provision:** `VerifyEmailHandler` provisions tenant schema before persisting verified state (PR #50). **Deferred:** retry job, provisioning wait UI, Admin role on verify path per E01 US-003.
+**Verify email → provision:** `VerifyEmailHandler` saves verified state, then enqueues `ProvisionTenantMessage` (Wolverine → `ProvisionTenantHandler` + `ITenantSchemaProvisioner`). **Deferred:** retry/backoff/alert on provision failures, provisioning wait UI, Admin role on verify per E01 US-003.
 
 ## PageBuilder — E07-page-builder
 

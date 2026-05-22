@@ -481,7 +481,8 @@ After email verification, the host provisions one PostgreSQL schema per organiza
 - **Idempotency**: `CREATE SCHEMA IF NOT EXISTS` plus `Database.MigrateAsync()` per context; safe to call twice for the same org.
 - **Tenant context during migrate**: use `FixedTenantContext` (or equivalent) so `TenantSchemaInterceptor` targets the new schema for each `MigrateAsync` call.
 - **Tests**: register `NoOpTenantSchemaProvisioner` in `WebApplicationFactory` fixtures — never run real provisioning in API integration tests.
-- **Trigger**: call from `VerifyEmailHandler` (or equivalent) **after** the user is verified, not at registration time (no tenant context at sign-up).
+- **Trigger**: `VerifyEmailHandler` persists `User.VerifyEmail()` via `SaveChangesAsync`, then enqueues `ProvisionTenantMessage` through `ITenantProvisioningScheduler` (Wolverine). Do **not** call `ITenantSchemaProvisioner` synchronously in the verify request — provisioning runs in `ProvisionTenantHandler` in the API host.
+- **Message**: `ProvisionTenantMessage(Guid OrganizationId)` in `Axis.Shared.Application.Tenancy`.
 
 ---
 
