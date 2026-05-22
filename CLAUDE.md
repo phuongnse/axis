@@ -89,7 +89,7 @@ Multi-tenant low-code SaaS: custom data models, visual workflows, forms, and UI 
 
 **Source of truth (highest first):** feature file ACs → this file → playbooks → same-module code → agent guess (never invent IDs, events, endpoints, table names).
 
-**Integrity:** legacy code ≠ authority if it conflicts with docs; surface conflicts. Verify with grep before claiming "done". Document deferrals in callouts, not as ✅.
+**Integrity:** legacy code ≠ authority if it conflicts with docs; surface conflicts. Verify with grep before claiming "done". Document deferrals in callouts (`**Deferred (PR #N follow-up):**`), not as ✅ — **proactively**, without waiting for the user to ask ([process.md § Deferred follow-up](docs/playbooks/process.md)).
 
 **Work priority:** (1) gaps/bugs/failing tests (2) finish current layer (3) next layer in order. Before API work: `grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/epics/` — resolve or document deferrals ([process.md § 4.5](docs/playbooks/process.md)).
 
@@ -183,6 +183,7 @@ Full rules: [`patterns.md`](docs/playbooks/patterns.md) (EF, API, Wolverine, agg
 ```markdown
 > **Implementation status** — Domain: ✅ | Application: ⚠️ | …
 > Gaps vs spec: …
+> **Deferred (PR #N follow-up):** … (omit line if none)
 > Decisions: …
 ```
 
@@ -204,7 +205,7 @@ Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` chan
 |-----|-----|
 | [agent-checklist.md](docs/playbooks/agent-checklist.md) | **Agents — daily** |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Branches, PRs, drift script |
-| [process.md](docs/playbooks/process.md) | Layer workflow |
+| [process.md](docs/playbooks/process.md) | Layer workflow; deferred follow-ups; PR wrap-up |
 | [patterns-index.md](docs/playbooks/patterns-index.md) | Jump table into patterns |
 | [patterns.md](docs/playbooks/patterns.md) | Implementation detail |
 | [testing.md](docs/playbooks/testing.md) | Test patterns |

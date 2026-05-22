@@ -15,6 +15,7 @@
 - AC map: every row has layer + file/test — **no blank cells**
 - Read: epic README → feature file → same-module code
 - Before API layer: `grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/epics/` — fix, defer with reason, or stop
+- End of PR: [process.md § PR wrap-up](process.md) — deferred lines, host wiring, callouts (no user reminder)
 
 ```markdown
 ## Gate 0
@@ -78,8 +79,12 @@ Gate 2:
 - Program.cs host → patterns.md host section / not triggered
 - Stale code comment → same file / not triggered
 - Library rename → grep docs/ + src comments / not triggered
-- Deferred scope → feature callout gap / not triggered
+- Deferred follow-up → `**Deferred (PR #N follow-up):**` on affected US + PROGRESS if cross-cutting / not triggered
+- Host wiring (`*Endpoints.cs` / `Program.cs`) → `Map*Endpoints` sweep in process.md / not triggered
 ```
+
+**Deferred follow-ups (mandatory when leaving work open):** do not wait for the user. Any skipped review item, thin-endpoint refactor, or partial layer needs a named `**Deferred (...):**` line — full rules in [process.md § Deferred follow-up](process.md). Remove the line when fixed.
+
 
 ### Gate 3 — retrospective
 
@@ -112,7 +117,7 @@ Never ✅ and "pending …" in the same callout. Checkboxes in feature files are
 
 | Level | When | What to write |
 |-------|------|----------------|
-| **1 — US** | Any layer progress on a user story | `> **Implementation status**` in `docs/epics/…/features/F0N-….md` |
+| **1 — US** | Any layer progress on a user story | `> **Implementation status**`, `Gaps vs spec`, optional `**Deferred (PR #N follow-up):**` in `docs/epics/…/features/F0N-….md` |
 | **2 — Epic** | A layer is complete for the module | Epic `README.md` implementation table |
 | **3 — Platform** | Module-wide summary changed | `docs/PROGRESS.md` — layer status only |
 
@@ -149,7 +154,7 @@ Updating only `PROGRESS.md` while changing `src/` without `docs/epics/` → drif
 
 | Need | File |
 |------|------|
-| Layer order, TDD, gap sweep | [process.md](./process.md) |
+| Layer order, TDD, gap sweep, deferred docs, PR wrap-up | [process.md](./process.md) |
 | Find the right patterns section | [patterns-index.md](./patterns-index.md) |
 | EF, API, Wolverine, tenancy | [patterns.md](./patterns.md) |
 | React, Query, a11y | [frontend.md](./frontend.md) |
