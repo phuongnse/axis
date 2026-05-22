@@ -112,7 +112,8 @@ Self-service registration flow where a new organization signs up and is automati
 
 > **Implementation status** — Domain: ⏳ | Application: ⚠️ | Infrastructure: ⚠️ | API: ⏳ | Frontend: ⏳
 > Gaps vs spec: retry job with exponential backoff, platform alert after retries exhausted, Admin role assignment on verify, and provisioning wait UI (US-002) not implemented. Provisioner runs asynchronously via `ProvisionTenantMessage` after verified state is persisted.
-> **Deferred (PR #50 follow-up):** durable retry policy on `ProvisionTenantHandler`, org `Provisioning` status + polling endpoint for wait screen.
+> **Deferred (PR #50 follow-up):** durable retry policy on `ProvisionTenantHandler` (now unblocked — Wolverine Postgres persistence wired per [ADR-009](../../../TECH_STACK.md#adr-009-wolverine-durable-inboxoutbox-in-a-dedicated-wolverine-schema); pending `IdentityDbContext.IntegrateWithWolverine()` rollout), org `Provisioning` status + polling endpoint for wait screen.
+> Decisions: provisioning runs asynchronously via `ProvisionTenantMessage` after `Organization.MarkEmailVerified` is persisted, so the verify endpoint stays fast and the provisioning failure mode is decoupled from email verification. Tenant schema name is derived from `Organization.Id` as `tenant_{orgId:N}` (32-char hex, no dashes) — stable across the lifetime of the org and safe as a Postgres identifier. Provisioning will move from at-most-once in-memory dispatch to durable Wolverine outbox delivery once `IdentityDbContext` is enlisted per [ADR-009](../../../TECH_STACK.md#adr-009-wolverine-durable-inboxoutbox-in-a-dedicated-wolverine-schema).
 
 ---
 

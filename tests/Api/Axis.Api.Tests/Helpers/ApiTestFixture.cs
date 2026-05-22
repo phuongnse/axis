@@ -41,6 +41,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
     private string _wbConnectionString = null!;
     private string _fbConnectionString = null!;
     private string _weConnectionString = null!;
+    private string _wolverineConnectionString = null!;
 
     public HttpClient Client { get; private set; } = null!;
 
@@ -59,6 +60,17 @@ public sealed class ApiTestFixture : IAsyncLifetime
         _wbConnectionString = await CreateModuleDatabaseAsync("axis_wb_test");
         _fbConnectionString = await CreateModuleDatabaseAsync("axis_fb_test");
         _weConnectionString = await CreateModuleDatabaseAsync("axis_we_test");
+        // Wolverine in its own database so its AddResourceSetupOnStartup hosted
+        // service does not race IdentityDbContext.EnsureCreatedAsync (EF Core's
+        // "any user table exists ⇒ skip" heuristic would otherwise skip the
+        // OpenIddict tables once Wolverine had created its envelope tables).
+        _wolverineConnectionString = await CreateModuleDatabaseAsync("axis_wolverine_test");
+
+        // Wolverine's PersistMessagesWithPostgresql captures the connection string
+        // during host build, which runs before WebApplicationFactory's
+        // ConfigureAppConfiguration hook is applied to builder.Configuration.
+        // Set it via env var so the default config provider picks it up.
+        Environment.SetEnvironmentVariable("ConnectionStrings__Wolverine", _wolverineConnectionString);
 
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -73,6 +85,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
                     ["ConnectionStrings:WorkflowBuilder"] = _wbConnectionString,
                     ["ConnectionStrings:FormBuilder"] = _fbConnectionString,
                     ["ConnectionStrings:WorkflowEngine"] = _weConnectionString,
+                    ["ConnectionStrings:Wolverine"] = _postgres.GetConnectionString(),
                     ["Redis:ConnectionString"] = _redis.GetConnectionString(),
                 });
             });
@@ -179,6 +192,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
     {
         await _factory.DisposeAsync();
         await Task.WhenAll(_postgres.DisposeAsync().AsTask(), _redis.DisposeAsync().AsTask());
+        Environment.SetEnvironmentVariable("ConnectionStrings__Wolverine", null);
     }
 
     public IServiceScope CreateScope() => _factory.Services.CreateScope();
