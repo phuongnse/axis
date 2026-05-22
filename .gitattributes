@@ -1,9 +1,30 @@
-# Shell scripts must be LF — they break in WSL/Linux when autocrlf=true on
-# Windows rewrites them to CRLF (bash sees `pipefail\r` as an unknown option).
-*.sh text eol=lf
+# Force LF in the working tree for every text file. Without this, Git for
+# Windows with core.autocrlf=true rewrites checkouts to CRLF, which breaks:
+#   - bash scripts (`set -euo pipefail\r` is an unknown option)
+#   - Biome / Prettier / dotnet format CI gates (file content differs)
+#   - Dockerfiles and other tooling read from inside Linux containers
+# Setting `text=auto eol=lf` makes Git store and check out LF everywhere,
+# independent of the contributor's autocrlf setting.
 
-# Same for Dockerfiles and other Unix-only tooling read inside containers.
-Dockerfile text eol=lf
-Dockerfile.* text eol=lf
-.dockerignore text eol=lf
-.gitattributes text eol=lf
+* text=auto eol=lf
+
+# Binary file types — never normalize.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.tgz binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.otf binary
+*.dll binary
+*.exe binary
+*.pdb binary
+*.nupkg binary
+*.snk binary

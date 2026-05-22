@@ -44,3 +44,4 @@ nCrunchTemp_*.csproj
 # OS
 .DS_Store
 Thumbs.db
+.aider*
