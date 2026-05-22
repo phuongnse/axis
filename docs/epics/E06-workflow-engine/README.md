@@ -87,7 +87,7 @@ Subsequent steps can reference context values using expressions like `{{context.
 | Domain | ✅ Done | `WorkflowExecution` aggregate + `ExecutionStep` entity; full execution state machine; `WorkflowSnapshot` local read model; domain events (ExecutionStarted, Completed, Failed, Cancelled, StepCompleted, StepFailed, FormStepReached) |
 | Application | ✅ Done | All commands/queries (StartExecution, Cancel, Retry, RetryWithContext, GetExecution, GetAllExecutions, GetExecutionsByWorkflow, GetRetryHistory); step handler messages and orchestrator (ExecuteNextStepHandler, StepCompletedHandler, StepFailedHandler, per-step handlers); ConditionEvaluator; IStepDispatcher / IHttpStepExecutor / IScriptExecutor / INotificationSender interfaces |
 | Infrastructure | ⚠️ Partial | `WorkflowEngineDbContext` + all repositories + step executors registered. `IScriptExecutor` and `INotificationSender` are stubs (real dispatch deferred). `FormTaskSubmittedHandler` cross-module handler implemented. 27 integration tests (Testcontainers). |
-| API | ⚠️ Partial | `ExecutionEndpoints`: list, detail, cancel, retry, retry-with-context, retry-history, start-by-workflow. Gaps: SignalR, schedule/webhook/event triggers, stale-PENDING recovery |
+| API | ⚠️ Partial | `ExecutionEndpoints`: list, detail, start, cancel, retry, retry-with-context, retry history. **Deferred:** thin-endpoint refactor (`StartExecution` input shaping in API). Form task routes live under E05 `FormTaskEndpoints` |
 | Frontend | ⏳ Pending | — |
 
 ---

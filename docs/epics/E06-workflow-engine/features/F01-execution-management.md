@@ -38,8 +38,8 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 *Out of scope*
 - Triggering a specific version of a workflow (other than the current active version) — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⚠️ | Frontend: ⏳
-> Gaps vs spec: `POST /api/workflows/{id}/executions` manual start ✅. Schedule/webhook/event triggers and stale-PENDING recovery job still pending.
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: trigger HTTP endpoint, schedule/webhook/event trigger handlers, stale-PENDING recovery job pending API + E06 engine.
 > Decisions: `WorkflowExecution.Create` sets status `Pending`; `Start()` transitions to `Running` — engine calls both in sequence.
 
 ---
@@ -68,8 +68,8 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 *Out of scope*
 - Real-time execution graph overlay on the workflow canvas — not in MVP (timeline list only).
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⚠️ | Frontend: ⏳
-> Gaps vs spec: `GET /api/executions/{id}` detail ✅. SignalR push updates and execution detail UI pending Frontend.
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: SignalR push updates and execution detail page pending Frontend + API.
 > Decisions: `GetExecutionHandler` delegates to `IExecutionRepository.GetWithStepsAsync`, which loads execution + steps in two queries (no EF navigation property — `ExecutionStep` is a separate aggregate).
 
 ---

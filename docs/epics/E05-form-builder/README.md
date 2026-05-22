@@ -79,9 +79,9 @@ Workflow reaches Form step
 | Layer | Status | Notes |
 |---|---|---|
 | Domain | ✅ Done | `FormDefinition`, `FormField`, `FormSubmission` aggregates; field types and form-task domain events |
-| Application | ⚠️ Partial | Form CRUD + field commands/queries ✅. F04: `SubmitFormByToken`, `GetFormTaskByToken`, `GetMyFormTasks` ✅. Gaps: field validation on submit, expiry Wolverine job, role assignee resolution |
-| Infrastructure | ✅ Done | FormBuilderDbContext, `FormSubmission` mapping + migration, `FormSubmissionRepository`, `FormStepReachedHandler`, integration tests (Testcontainers) |
-| API | ⚠️ Partial | `FormEndpoints` (CRUD) + `FormTaskEndpoints` (public token submit/get, authenticated mine). Gaps: full OpenAPI coverage for new routes, standalone form page |
+| Application | ⚠️ Partial | Form definition CRUD + fields; F04: `SubmitFormByToken`, `GetFormTaskByToken`, `GetMyFormTasks`, `ExpireFormSubmissionHandler`. Notifications and role-based assignee resolution pending |
+| Infrastructure | ✅ Done | FormBuilderDbContext, `FormSubmission` EF config + repository, expiry scheduling via Wolverine from `FormStepReachedHandler` |
+| API | ⚠️ Partial | `FormEndpoints` (definitions) + `FormTaskEndpoints` (token submit, my tasks). **Deferred:** move `submittedBy` claim parsing out of `FormTaskEndpoints` into Application |
 | Frontend | ⏳ Pending | — |
 
 ---

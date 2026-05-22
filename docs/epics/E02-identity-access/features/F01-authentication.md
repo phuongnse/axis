@@ -45,8 +45,9 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 - SSO / social login (Google, GitHub) — not in MVP.
 - 2FA / MFA — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: BroadcastChannel coordination for multi-tab refresh is Frontend-only. Sign-in is an OIDC Authorization Code + PKCE flow, not a simple POST `/api/auth/signin` — the SPA must initiate `/connect/authorize` with PKCE; the `/connect/login` endpoint handles credentials.
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⚠️
+> Gaps vs spec: Login page + PKCE flow + app shell/dashboard scaffold on PR #47 branch. BroadcastChannel multi-tab refresh, account lockout UI, and unverified-email screen polish pending.
+> **Deferred (PR #47 follow-up):** none for this US.
 > Decisions: OpenIddict 5.x serves as the in-process OAuth2/OIDC server. `AuthenticateUserCommand` validates credentials; `/connect/login` sets a 5-min httpOnly session cookie; `/connect/authorize` issues the authorization code; `/connect/token` exchanges it for access + refresh tokens. Refresh token stored as an opaque reference in DB (OpenIddict `OpenIddictTokens` table) and delivered as an httpOnly `Secure SameSite=Strict` cookie at `/connect` path via `ApplyRefreshTokenCookieHandler`.
 
 ---
@@ -103,6 +104,5 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 *Out of scope*
 - "Sign out of all devices" from this flow — covered in [F05 Password & Security](./F05-password-security.md).
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⚠️
-> Gaps vs spec: BroadcastChannel sign-out notification across tabs not implemented.
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Decisions: `POST /api/auth/signout` [Authorize] reads the opaque refresh token from the httpOnly cookie, calls `IOpenIddictTokenManager.FindByReferenceIdAsync` + `TryRevokeAsync` to revoke it in DB, blacklists the access token JTI in Redis via `IJtiBlacklist` (TTL = remaining access token lifetime), clears the refresh token cookie and the PKCE session cookie. No Application handler — pure API/Infrastructure concern.
