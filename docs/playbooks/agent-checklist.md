@@ -8,7 +8,7 @@
 ---
 
 
-**PR body:** tick items in the template Requirements section; keep Gate 1/2/3 verification here, do not duplicate full blocks in the PR.
+**PR body:** Summary + ordered Requirements (Gates 0–3, spec→code, CI). Do not list commits or paste CI/Doc drift results — Checks tab shows that.
 
 ## Gate 0 — Ready (before code; paste in PR when shipping code)
 

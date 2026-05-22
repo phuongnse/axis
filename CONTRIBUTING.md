@@ -50,7 +50,7 @@ Thank you for contributing. This repo uses docs-first development: feature specs
 Keep the description **short** (see [PR template](.github/PULL_REQUEST_TEMPLATE.md)):
 
 1. **Summary** — what the whole PR does (update only if scope changes)
-2. **Requirements & rules followed** — checklist, **most important first**; tick or N/A. Commits are on the PR **Commits** tab — no table in the description.
+2. **Requirements & rules followed** — Gates 0–3 + spec→code + CI, **most important first**; tick or N/A. Do not duplicate CI job status (e.g. Doc drift) — the PR Checks tab is enough. No commit table in the description.
 
 Gates 0–3 in [agent-checklist.md](docs/playbooks/agent-checklist.md) are how you **verify** before push; reflect the outcome in **Requirements** only.
 

@@ -4,13 +4,11 @@
 
 ## Requirements & rules followed
 
-<!-- Most important first. Check what applies; mark N/A with a short reason. Commits: see the PR Commits tab. -->
+<!-- Most important first. Check what applies; mark N/A with a short reason. CI status: PR Checks tab (includes Doc drift). -->
 
 - [ ] **Spec → code** — changes match feature file ACs (or gaps documented in callouts)
-- [ ] **CI** — required jobs green (`.NET`, `Frontend`, **Doc drift** when applicable)
-- [ ] **Docs same PR** — `docs/epics/`, feature callouts, epic README, or `PROGRESS.md` updated when status changed
-- [ ] **Doc drift** — `./scripts/check-doc-drift.sh` before push when `src/`, `tests/`, or `docs/epics/` changed; CI **Doc drift** green
-- [ ] **Gate 1** — `dotnet build` + `dotnet test` (full solution) when `src/` or `tests/` changed
-- [ ] **Gate 1** — `dotnet format --verify-no-changes` when `src/` or `tests/` changed
-- [ ] **Gate 1** — `npm run ci` + `npm run test` when `frontend/` changed
-- [ ] **Gate 3** — no undocumented spec gaps; `patterns.md` / `TECH_STACK.md` / `CLAUDE.md` updated if a new rule applied
+- [ ] **Gate 0** — AC map complete; epic/feature docs identified (when shipping code)
+- [ ] **CI** — required PR checks green (`.NET`, `Frontend`, **Doc drift** when applicable)
+- [ ] **Gate 2** — docs updated in same PR (callouts, epic README, `PROGRESS.md`, `TECH_STACK` / patterns as triggered)
+- [ ] **Gate 1** — `dotnet build` + `dotnet test` (full solution), `dotnet format`, and/or `npm run ci` + `npm run test` for paths you changed (N/A with reason)
+- [ ] **Gate 3** — retrospective done; `patterns.md` / feature file / `TECH_STACK.md` / `CLAUDE.md` updated if needed
