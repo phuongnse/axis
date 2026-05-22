@@ -13,9 +13,12 @@ export function AppShell({ children }: AppShellProps) {
   const clearSession = useAuthStore((s) => s.clearSession);
 
   async function handleSignOut() {
-    await signOut();
-    clearSession();
-    window.location.href = '/login';
+    try {
+      await signOut();
+    } finally {
+      clearSession();
+      window.location.href = '/login';
+    }
   }
 
   return (

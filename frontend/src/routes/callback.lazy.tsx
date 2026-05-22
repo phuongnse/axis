@@ -1,7 +1,7 @@
 import { createLazyFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { exchangeAuthorizationCode } from '@/features/auth/api';
-import { loadPkceSession } from '@/features/auth/pkce';
+import { clearPkceSession, loadPkceSession } from '@/features/auth/pkce';
 
 export const Route = createLazyFileRoute('/callback')({
   component: CallbackPage,
@@ -18,13 +18,17 @@ function CallbackPage() {
     const pkce = loadPkceSession();
 
     if (!code || !pkce || state !== pkce.state) {
+      clearPkceSession();
       setError('Invalid authorization response. Please try signing in again.');
       return;
     }
 
     exchangeAuthorizationCode(code)
       .then(() => navigate({ to: '/dashboard' }))
-      .catch(() => setError('Could not complete sign-in. Please try again.'));
+      .catch(() => {
+        clearPkceSession();
+        setError('Could not complete sign-in. Please try again.');
+      });
   }, [navigate]);
 
   if (error) {

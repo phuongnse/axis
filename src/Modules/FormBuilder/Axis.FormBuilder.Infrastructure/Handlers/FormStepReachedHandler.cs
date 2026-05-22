@@ -2,6 +2,7 @@ using Axis.FormBuilder.Application.Messages;
 using Axis.FormBuilder.Application.Repositories;
 using Axis.FormBuilder.Application.Services;
 using Axis.FormBuilder.Domain.Aggregates;
+using Axis.Shared.Application;
 using Axis.WorkflowEngine.Domain.Events;
 using Microsoft.Extensions.Logging;
 using Wolverine;
@@ -56,7 +57,19 @@ internal sealed class FormStepReachedHandler(
             createdBy: "workflow-engine");
 
         await submissionRepo.AddAsync(submission, ct);
-        await uow.SaveChangesAsync(ct);
+
+        try
+        {
+            await uow.SaveChangesAsync(ct);
+        }
+        catch (UniqueConstraintException)
+        {
+            logger.LogWarning(
+                "FormStepReachedHandler: concurrent insert for execution {ExecutionId} step {StepId} — skipping",
+                @event.ExecutionId,
+                @event.ExecutionStepId);
+            return;
+        }
 
         if (expiresAt.HasValue)
         {

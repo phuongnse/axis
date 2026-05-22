@@ -131,6 +131,7 @@ public class SubmitFormByTokenHandlerTests
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
         result.Error.Should().Contain("cancelled");
     }
 

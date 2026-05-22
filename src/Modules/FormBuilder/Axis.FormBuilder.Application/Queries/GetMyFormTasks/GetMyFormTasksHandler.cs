@@ -18,12 +18,21 @@ public sealed class GetMyFormTasksHandler(
             : await submissionRepo.GetByUserAndStatusAsync(
                 query.UserId, query.OrganizationId, query.Status, cancellationToken);
 
-        List<FormTaskSummaryDto> results = new();
+        List<FormTaskSummaryDto> results = new(submissions.Count);
+        Dictionary<Guid, string> formNameCache = new();
+
         foreach (FormSubmission submission in submissions)
         {
-            FormDefinition? form = await formRepo.GetByIdAsync(
-                submission.FormDefinitionId, submission.OrganizationId, cancellationToken);
-            string formName = form?.Name ?? "Unknown form";
+            Guid formDefinitionId = submission.FormDefinitionId;
+            if (!formNameCache.ContainsKey(formDefinitionId))
+            {
+                FormDefinition? form = await formRepo.GetByIdAsync(
+                    formDefinitionId, submission.OrganizationId, cancellationToken);
+                formNameCache[formDefinitionId] = form?.Name ?? "Unknown form";
+            }
+
+            string formName = formNameCache[formDefinitionId];
+
             results.Add(new FormTaskSummaryDto(
                 submission.Id,
                 submission.FormDefinitionId,
