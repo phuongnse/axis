@@ -8,7 +8,7 @@
 Domain, Application, and Infrastructure layers complete.
 
 > ⚠️ **Remaining gap (deferred):**
-> - **Wolverine durable outbox not configured**: Wolverine is wired and `IMessageBus` resolves correctly. Domain events are dispatched in-memory after `SaveChangesAsync`. The durable PostgreSQL outbox (survives process restart) is deferred until a decision is made on the Wolverine persistence schema strategy — tracked as E01 Platform Foundation gap.
+> - **Wolverine durable inbox/outbox not configured**: Wolverine is wired and `IMessageBus` resolves correctly. Domain events are dispatched in-memory after `SaveChangesAsync`. Persistence schema strategy decided in [ADR-009](TECH_STACK.md#adr-009-wolverine-durable-inboxoutbox-in-a-dedicated-wolverine-schema) (dedicated `wolverine` schema + `IntegrateWithWolverine()` per DbContext); implementation rollout pending — tracked as E01 Platform Foundation gap.
 
 ## Identity — E02-identity-access
 
