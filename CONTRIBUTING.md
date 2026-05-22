@@ -44,6 +44,18 @@ Thank you for contributing. This repo uses docs-first development: feature specs
 
 ---
 
+
+### Updating the PR description
+
+Do **not** replace the whole body on every push. Keep:
+
+1. **Summary** — full PR intent (stable unless scope changes)
+2. **Changelog** — one row per commit you add
+3. **Scope / files** — cumulative list
+4. **Gates 0–3** — refresh only lines that changed on the latest commit; gate blocks reflect *current* verification
+
+Agents: read the existing PR body before `update_pr`; merge new work into the sections above.
+
 ## Pull request template
 
 Use the checklist in [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md). Include:
