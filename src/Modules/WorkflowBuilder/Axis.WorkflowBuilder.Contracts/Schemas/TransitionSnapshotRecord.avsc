@@ -1,0 +1,10 @@
+{
+  "namespace": "axis.workflowbuilder.events",
+  "type": "record",
+  "name": "TransitionSnapshotRecord",
+  "fields": [
+    { "name": "fromStepId", "type": "string" },
+    { "name": "toStepId", "type": "string" },
+    { "name": "label", "type": ["null", "string"], "default": null }
+  ]
+}

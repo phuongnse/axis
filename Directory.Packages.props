@@ -9,6 +9,12 @@
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
   </ItemGroup>
 
+  <ItemGroup Label="Messaging">
+    <PackageVersion Include="Apache.Avro" Version="1.12.1" />
+    <PackageVersion Include="Confluent.SchemaRegistry" Version="2.14.0" />
+    <PackageVersion Include="Confluent.SchemaRegistry.Serdes.Avro" Version="2.14.0" />
+  </ItemGroup>
+
   <ItemGroup Label="Observability">
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
     <PackageVersion Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.15.0-beta.1" />

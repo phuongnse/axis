@@ -1170,8 +1170,10 @@ When module A needs to know something about module B's data, B publishes an even
 
 **Step 1 — Define the event schema in B's Contracts project (Avro + CloudEvents):**
 
+Implemented for WorkflowBuilder lifecycle events in `Axis.WorkflowBuilder.Contracts/Schemas/` (regenerate C# with `avrogen` — see project `Schemas/` folder). Example shape:
+
 ```text
-src/Modules/WorkflowBuilder/Axis.WorkflowBuilder.Contracts/Events/FormStepAdded.avsc
+src/Modules/WorkflowBuilder/Axis.WorkflowBuilder.Contracts/Schemas/FormStepAdded.avsc
 {
   "type": "record",
   "namespace": "axis.workflowbuilder",

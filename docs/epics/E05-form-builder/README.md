@@ -80,7 +80,7 @@ Workflow reaches Form step
 |---|---|---|
 | Domain | ✅ Done | `FormDefinition`, `FormField`, `FormSubmission` aggregates; field types and form-task domain events |
 | Application | ⚠️ Partial | Form definition CRUD + fields; F04: `SubmitFormByToken`, `GetFormTaskByToken`, `GetMyFormTasks`, `ExpireFormSubmissionHandler`. Notifications and role-based assignee resolution pending |
-| Infrastructure | ✅ Done | Database `axis_formbuilder` ([ADR-011](../../TECH_STACK.md#adr-011-per-module-database-with-schema-per-tenant-inside)); EF migrations including `AddFormSubmissions`; tests/fixtures use `MigrateAsync` ([ADR-023](../../TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)). `FormSubmission` + expiry scheduling via Wolverine. DbContext + UnitOfWork inlined per ADR-017. |
+| Infrastructure | ✅ Done | Database `axis_formbuilder` ([ADR-011](../../TECH_STACK.md#adr-011-per-module-database-with-schema-per-tenant-inside)); EF migrations including `AddFormSubmissions`; tests/fixtures use `MigrateAsync` ([ADR-023](../../TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)). `FormSubmission` + expiry scheduling via Wolverine. DbContext + UnitOfWork inlined per ADR-017. Consumes WorkflowBuilder lifecycle events from `Axis.WorkflowBuilder.Contracts` only ([ADR-019](../../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). |
 | API | ✅ Done | `FormEndpoints` (definitions) + `FormTaskEndpoints` (token submit, my tasks). `submittedBy` resolved via `ICurrentUser` in Application |
 | Frontend | ⏳ Pending | — |
 

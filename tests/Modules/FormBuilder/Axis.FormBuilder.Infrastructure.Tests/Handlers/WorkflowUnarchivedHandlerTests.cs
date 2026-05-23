@@ -5,7 +5,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
-using Axis.WorkflowBuilder.Domain.Events;
+using axis.workflowbuilder.events;
 
 namespace Axis.FormBuilder.Infrastructure.Tests.Handlers;
 
@@ -46,7 +46,12 @@ public sealed class WorkflowUnarchivedHandlerTests(FormBuilderDatabaseFixture fi
 
         await using FormBuilderDbContext handlerCtx = fixture.CreateContext();
         await CreateHandler(handlerCtx).Handle(
-            new WorkflowUnarchived(workflowId, OrgId, new List<Guid>()),
+            new WorkflowUnarchivedEvent
+            {
+                workflowId = workflowId.ToString(),
+                organizationId = OrgId.ToString(),
+                referencedFormIds = [],
+            },
             CancellationToken.None);
 
         await using FormBuilderDbContext readCtx = fixture.CreateContext();
@@ -63,7 +68,12 @@ public sealed class WorkflowUnarchivedHandlerTests(FormBuilderDatabaseFixture fi
     {
         await using FormBuilderDbContext ctx = fixture.CreateContext();
         Func<Task> act = () => CreateHandler(ctx).Handle(
-            new WorkflowUnarchived(Guid.NewGuid(), OrgId, new List<Guid>()),
+            new WorkflowUnarchivedEvent
+            {
+                workflowId = Guid.NewGuid().ToString(),
+                organizationId = OrgId.ToString(),
+                referencedFormIds = [],
+            },
             CancellationToken.None);
 
         await act.Should().NotThrowAsync();

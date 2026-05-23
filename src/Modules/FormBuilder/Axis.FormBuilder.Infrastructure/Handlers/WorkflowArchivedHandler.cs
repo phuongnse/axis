@@ -1,8 +1,9 @@
+using axis.workflowbuilder.events;
 using Axis.FormBuilder.Application.Services;
 using Axis.FormBuilder.Domain.ReadModels;
 using Axis.FormBuilder.Infrastructure.Persistence;
 using Axis.Shared.Application;
-using Axis.WorkflowBuilder.Domain.Events;
+using Axis.WorkflowBuilder.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -13,17 +14,20 @@ internal sealed class WorkflowArchivedHandler(
     IUnitOfWork uow,
     ILogger<WorkflowArchivedHandler> logger)
 {
-    public async Task Handle(WorkflowArchived @event, CancellationToken ct)
+    public async Task Handle(WorkflowArchivedEvent @event, CancellationToken ct)
     {
+        Guid workflowId = @event.WorkflowId();
+        Guid organizationId = @event.OrganizationId();
+
         List<FormWorkflowReference> refs = await context.FormWorkflowReferences
-            .Where(r => r.WorkflowId == @event.WorkflowId && r.OrganizationId == @event.OrganizationId && r.IsActive)
+            .Where(r => r.WorkflowId == workflowId && r.OrganizationId == organizationId && r.IsActive)
             .ToListAsync(ct);
 
         if (refs.Count == 0)
         {
             logger.LogInformation(
                 "WorkflowArchivedHandler: no active references for workflow {WorkflowId} — skipping",
-                @event.WorkflowId);
+                workflowId);
             return;
         }
 
@@ -38,12 +42,12 @@ internal sealed class WorkflowArchivedHandler(
         {
             logger.LogWarning(
                 "WorkflowArchivedHandler: concurrent delivery detected for workflow {WorkflowId} — skipping",
-                @event.WorkflowId);
+                workflowId);
             return;
         }
 
         logger.LogInformation(
             "WorkflowArchivedHandler: deactivated {Count} reference(s) for workflow {WorkflowId}",
-            refs.Count, @event.WorkflowId);
+            refs.Count, workflowId);
     }
 }

@@ -1,0 +1,14 @@
+{
+  "namespace": "axis.workflowbuilder.events",
+  "type": "record",
+  "name": "WorkflowUnarchivedEvent",
+  "fields": [
+    { "name": "workflowId", "type": "string" },
+    { "name": "organizationId", "type": "string" },
+    {
+      "name": "referencedFormIds",
+      "type": { "type": "array", "items": "string" },
+      "default": []
+    }
+  ]
+}

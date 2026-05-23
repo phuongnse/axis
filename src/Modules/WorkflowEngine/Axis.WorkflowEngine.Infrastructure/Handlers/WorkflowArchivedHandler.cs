@@ -1,5 +1,6 @@
+using axis.workflowbuilder.events;
 using Axis.Shared.Application;
-using Axis.WorkflowBuilder.Domain.Events;
+using Axis.WorkflowBuilder.Contracts;
 using Axis.WorkflowEngine.Application.Services;
 using Axis.WorkflowEngine.Domain.Aggregates;
 using Axis.WorkflowEngine.Infrastructure.Persistence;
@@ -13,17 +14,20 @@ internal sealed class WorkflowArchivedHandler(
     IUnitOfWork uow,
     ILogger<WorkflowArchivedHandler> logger)
 {
-    public async Task Handle(WorkflowArchived @event, CancellationToken ct)
+    public async Task Handle(WorkflowArchivedEvent @event, CancellationToken ct)
     {
+        Guid workflowId = @event.WorkflowId();
+        Guid organizationId = @event.OrganizationId();
+
         WorkflowActiveStatus? existing = await context.WorkflowActiveStatuses
-            .FirstOrDefaultAsync(w => w.WorkflowId == @event.WorkflowId
-                                   && w.OrganizationId == @event.OrganizationId, ct);
+            .FirstOrDefaultAsync(w => w.WorkflowId == workflowId
+                                   && w.OrganizationId == organizationId, ct);
 
         if (existing is null)
         {
             logger.LogInformation(
                 "WorkflowArchivedHandler: active status for workflow {WorkflowId} not found — skipping",
-                @event.WorkflowId);
+                workflowId);
             return;
         }
 
@@ -37,12 +41,12 @@ internal sealed class WorkflowArchivedHandler(
         {
             logger.LogWarning(
                 "WorkflowArchivedHandler: concurrent delivery detected for workflow {WorkflowId} — skipping",
-                @event.WorkflowId);
+                workflowId);
             return;
         }
 
         logger.LogInformation(
             "WorkflowArchivedHandler: workflow {WorkflowId} deactivated for org {OrganizationId}",
-            @event.WorkflowId, @event.OrganizationId);
+            workflowId, organizationId);
     }
 }

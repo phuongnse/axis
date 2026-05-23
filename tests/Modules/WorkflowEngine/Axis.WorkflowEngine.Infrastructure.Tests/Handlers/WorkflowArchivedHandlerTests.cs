@@ -5,7 +5,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
-using Axis.WorkflowBuilder.Domain.Events;
+using axis.workflowbuilder.events;
 
 namespace Axis.WorkflowEngine.Infrastructure.Tests.Handlers;
 
@@ -33,7 +33,9 @@ public sealed class WorkflowArchivedHandlerTests(WorkflowEngineDatabaseFixture f
         await setupCtx.SaveChangesAsync();
 
         await using WorkflowEngineDbContext handlerCtx = fixture.CreateContext();
-        await CreateHandler(handlerCtx).Handle(new WorkflowArchived(workflowId, OrgId), CancellationToken.None);
+        await CreateHandler(handlerCtx).Handle(
+            new WorkflowArchivedEvent { workflowId = workflowId.ToString(), organizationId = OrgId.ToString() },
+            CancellationToken.None);
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         WorkflowActiveStatus? status = await readCtx.WorkflowActiveStatuses
@@ -48,7 +50,12 @@ public sealed class WorkflowArchivedHandlerTests(WorkflowEngineDatabaseFixture f
     {
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
         Func<Task> act = () => CreateHandler(ctx).Handle(
-            new WorkflowArchived(Guid.NewGuid(), OrgId), CancellationToken.None);
+            new WorkflowArchivedEvent
+            {
+                workflowId = Guid.NewGuid().ToString(),
+                organizationId = OrgId.ToString(),
+            },
+            CancellationToken.None);
 
         await act.Should().NotThrowAsync();
     }
@@ -62,7 +69,11 @@ public sealed class WorkflowArchivedHandlerTests(WorkflowEngineDatabaseFixture f
         setupCtx.WorkflowActiveStatuses.Add(WorkflowActiveStatus.Activated(workflowId, OrgId));
         await setupCtx.SaveChangesAsync();
 
-        WorkflowArchived @event = new(workflowId, OrgId);
+        WorkflowArchivedEvent @event = new()
+        {
+            workflowId = workflowId.ToString(),
+            organizationId = OrgId.ToString(),
+        };
 
         await using WorkflowEngineDbContext ctx1 = fixture.CreateContext();
         await CreateHandler(ctx1).Handle(@event, CancellationToken.None);

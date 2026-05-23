@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Axis.WorkflowBuilder.Application\Axis.WorkflowBuilder.Application.csproj" />
+    <ProjectReference Include="..\Axis.WorkflowBuilder.Contracts\Axis.WorkflowBuilder.Contracts.csproj" />
     <ProjectReference Include="..\Axis.WorkflowBuilder.Domain\Axis.WorkflowBuilder.Domain.csproj" />
     <ProjectReference Include="..\..\..\Shared\Axis.Shared.Infrastructure\Axis.Shared.Infrastructure.csproj" />
   </ItemGroup>

@@ -5,7 +5,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
-using Axis.WorkflowBuilder.Domain.Events;
+using axis.workflowbuilder.events;
 
 namespace Axis.FormBuilder.Infrastructure.Tests.Handlers;
 
@@ -23,8 +23,15 @@ public sealed class WorkflowPublishedHandlerTests(FormBuilderDatabaseFixture fix
         return new WorkflowPublishedHandler(ctx, uow, logger);
     }
 
-    private static WorkflowPublished BuildEvent(Guid workflowId, IReadOnlyList<Guid> formIds)
-        => new(workflowId, OrgId, formIds, new List<StepSnapshot>(), new List<TransitionSnapshot>());
+    private static WorkflowPublishedEvent BuildEvent(Guid workflowId, IReadOnlyList<Guid> formIds) =>
+        new()
+        {
+            workflowId = workflowId.ToString(),
+            organizationId = OrgId.ToString(),
+            referencedFormIds = formIds.Select(id => id.ToString()).ToList(),
+            steps = [],
+            transitions = [],
+        };
 
     [Fact]
     public async Task Handle_WhenWorkflowFirstPublished_CreatesFormReferences()
@@ -79,7 +86,7 @@ public sealed class WorkflowPublishedHandlerTests(FormBuilderDatabaseFixture fix
     {
         Guid workflowId = Guid.NewGuid();
         Guid formId = Guid.NewGuid();
-        WorkflowPublished @event = BuildEvent(workflowId, new List<Guid> { formId });
+        WorkflowPublishedEvent @event = BuildEvent(workflowId, new List<Guid> { formId });
 
         await using FormBuilderDbContext ctx1 = fixture.CreateContext();
         await CreateHandler(ctx1).Handle(@event, CancellationToken.None);
