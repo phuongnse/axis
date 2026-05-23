@@ -1,0 +1,30 @@
+root = true
+
+# Project-wide defaults. The `.gitattributes` already normalises text files
+# to LF in the repository — declaring `end_of_line = lf` here makes
+# `dotnet format` and other tooling respect the same convention on Windows
+# (where the platform default is CRLF). Without this, the format check
+# passes on Linux CI but reports thousands of pseudo-issues for local
+# Windows contributors.
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{cs,csproj,sln,props,targets,xml}]
+indent_size = 4
+
+[*.{js,jsx,ts,tsx,json,jsonc,md,yml,yaml,html,css,scss,svg}]
+indent_size = 2
+
+[{Makefile,*.mk}]
+indent_style = tab
+
+[*.{ps1,psm1,psd1}]
+indent_size = 4
+
+[*.sh]
+indent_size = 2
