@@ -1259,7 +1259,7 @@ Used only when a local read model is insufficient. Example: a workflow step need
 **Step 1 — Define the contract in B's Contracts project:**
 
 ```proto
-// src/Modules/Identity/Axis.Identity.Contracts/IdentityService.proto
+// src/Modules/Identity/Axis.Identity.Contracts/Protos/axis/identity/v1/identity_service.proto
 syntax = "proto3";
 package axis.identity.v1;
 

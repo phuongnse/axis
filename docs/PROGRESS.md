@@ -35,7 +35,7 @@ Feature work (Frontend feature UIs, E07 PageBuilder, remaining E01/E06 gaps) is 
 
 Full auth, user, role, invitation, and session management. OpenIddict 5.x OIDC server (Authorization Code + PKCE for SPA; Client Credentials for M2M). RBAC via custom permission policies. All Identity API endpoints covered by integration tests.
 
-> ⚠️ **Phase 2 (in progress):** `Axis.Identity.Contracts` with `IdentityService.GetUserPermissions` gRPC (proto in `Protos/identity_service.proto`); server mapped on `Axis.Api` via `MapIdentityGrpc()`. **Still pending:** Avro user/role lifecycle events, `OrganizationVerified` Kafka flow, gateway REST → gRPC client wiring, JWKS-only validation doc hardening for other modules.
+> ⚠️ **Phase 2 (in progress):** `Axis.Identity.Contracts` with `IdentityService.GetUserPermissions` gRPC (`Protos/axis/identity/v1/identity_service.proto`); server on `Axis.Api` via `MapIdentityGrpc()` (JWT + `auth` rate limit). **Deferred (PR #93 follow-up):** Avro user/role lifecycle events, `OrganizationVerified` Kafka flow, gateway REST → gRPC client wiring, JWKS-only validation doc hardening for other modules.
 
 ## DataModeling — E03-data-modeling
 

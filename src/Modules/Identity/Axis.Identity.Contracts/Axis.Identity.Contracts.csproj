@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Protobuf Include="Protos\identity_service.proto" GrpcServices="Both" />
+    <Protobuf Include="Protos\axis\identity\v1\identity_service.proto" GrpcServices="Both" />
   </ItemGroup>
 
 </Project>

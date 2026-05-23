@@ -5,7 +5,9 @@ using Axis.Identity.Infrastructure.Persistence;
 using Axis.Identity.Infrastructure.Repositories;
 using Axis.Identity.Infrastructure.Grpc;
 using Axis.Identity.Infrastructure.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -55,7 +57,9 @@ public static class IdentityInfrastructureExtensions
 
     public static WebApplication MapIdentityGrpc(this WebApplication app)
     {
-        app.MapGrpcService<IdentityGrpcService>();
+        app.MapGrpcService<IdentityGrpcService>()
+            .RequireAuthorization()
+            .RequireRateLimiting("auth");
         return app;
     }
 }
