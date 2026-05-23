@@ -219,6 +219,7 @@ services:
       ConnectionStrings__WorkflowEngine: "Host=postgres;Port=5432;Database=axis_workflowengine;Username=axis;Password=axis_dev_pass"
       Redis__ConnectionString: "redis:6379"
       Kafka__Brokers: "kafka:9092"
+      SchemaRegistry__Url: "http://schema-registry:8081"
       ConnectionStrings__RabbitMq: "amqp://axis:axis_dev_pass@rabbitmq:5672/"
       Email__Host: maildev
       Email__Port: "1025"

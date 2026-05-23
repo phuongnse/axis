@@ -1,3 +1,4 @@
+using axis.workflowbuilder.events;
 using Axis.WorkflowEngine.Application.Services;
 using Axis.WorkflowEngine.Domain.ReadModels;
 using Axis.WorkflowEngine.Infrastructure.Handlers;
@@ -5,7 +6,6 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
-using BuilderEvents = Axis.WorkflowBuilder.Domain.Events;
 
 namespace Axis.WorkflowEngine.Infrastructure.Tests.Handlers;
 
@@ -14,23 +14,32 @@ public sealed class WorkflowPublishedHandlerTests(WorkflowEngineDatabaseFixture 
 {
     private static readonly Guid OrgId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    private static BuilderEvents.WorkflowPublished BuildEvent(Guid workflowId, string stepType = "Form")
+    private static WorkflowPublishedEvent BuildEvent(Guid workflowId, string stepType = "Form")
     {
         Guid stepId = Guid.NewGuid();
         Guid step2Id = Guid.NewGuid();
-        return new BuilderEvents.WorkflowPublished(
-            workflowId,
-            OrgId,
-            new List<Guid>(),
-            new List<BuilderEvents.StepSnapshot>
-            {
-                new(stepId, "Start", "Start", 0, null),
-                new(step2Id, stepType, stepType, 1, new Dictionary<string, object?> { ["formId"] = Guid.NewGuid().ToString() })
-            },
-            new List<BuilderEvents.TransitionSnapshot>
-            {
-                new(stepId, step2Id, null)
-            });
+        return new WorkflowPublishedEvent
+        {
+            workflowId = workflowId.ToString(),
+            organizationId = OrgId.ToString(),
+            referencedFormIds = [],
+            steps =
+            [
+                new StepSnapshotRecord { id = stepId.ToString(), name = "Start", stepType = "Start", displayOrder = 0 },
+                new StepSnapshotRecord
+                {
+                    id = step2Id.ToString(),
+                    name = stepType,
+                    stepType = stepType,
+                    displayOrder = 1,
+                    configJson = $"{{\"formId\":\"{Guid.NewGuid()}\"}}",
+                },
+            ],
+            transitions =
+            [
+                new TransitionSnapshotRecord { fromStepId = stepId.ToString(), toStepId = step2Id.ToString() },
+            ],
+        };
     }
 
     private static WorkflowPublishedHandler CreateHandler(WorkflowEngineDbContext ctx)
@@ -46,7 +55,7 @@ public sealed class WorkflowPublishedHandlerTests(WorkflowEngineDatabaseFixture 
     public async Task Handle_WhenWorkflowFirstPublished_CreatesActiveStatusAndSnapshot()
     {
         Guid workflowId = Guid.NewGuid();
-        BuilderEvents.WorkflowPublished @event = BuildEvent(workflowId);
+        WorkflowPublishedEvent @event = BuildEvent(workflowId);
 
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
         await CreateHandler(ctx).Handle(@event, CancellationToken.None);
@@ -68,18 +77,20 @@ public sealed class WorkflowPublishedHandlerTests(WorkflowEngineDatabaseFixture 
     public async Task Handle_WhenWorkflowRepublished_UpdatesSnapshotAndKeepsActiveStatus()
     {
         Guid workflowId = Guid.NewGuid();
-        BuilderEvents.WorkflowPublished firstEvent = BuildEvent(workflowId);
+        WorkflowPublishedEvent firstEvent = BuildEvent(workflowId);
 
         await using WorkflowEngineDbContext ctx1 = fixture.CreateContext();
         await CreateHandler(ctx1).Handle(firstEvent, CancellationToken.None);
 
         Guid newStepId = Guid.NewGuid();
-        BuilderEvents.WorkflowPublished secondEvent = new(
-            workflowId,
-            OrgId,
-            new List<Guid>(),
-            new List<BuilderEvents.StepSnapshot> { new(newStepId, "Http", "HttpRequest", 0, null) },
-            new List<BuilderEvents.TransitionSnapshot>());
+        WorkflowPublishedEvent secondEvent = new()
+        {
+            workflowId = workflowId.ToString(),
+            organizationId = OrgId.ToString(),
+            referencedFormIds = [],
+            steps = [new StepSnapshotRecord { id = newStepId.ToString(), name = "Http", stepType = "HttpRequest", displayOrder = 0 }],
+            transitions = [],
+        };
 
         await using WorkflowEngineDbContext ctx2 = fixture.CreateContext();
         await CreateHandler(ctx2).Handle(secondEvent, CancellationToken.None);
@@ -97,12 +108,11 @@ public sealed class WorkflowPublishedHandlerTests(WorkflowEngineDatabaseFixture 
     public async Task Handle_WhenDeliveredTwice_IsIdempotent()
     {
         Guid workflowId = Guid.NewGuid();
-        BuilderEvents.WorkflowPublished @event = BuildEvent(workflowId);
+        WorkflowPublishedEvent @event = BuildEvent(workflowId);
 
         await using WorkflowEngineDbContext ctx1 = fixture.CreateContext();
         await CreateHandler(ctx1).Handle(@event, CancellationToken.None);
 
-        // Second delivery of the same event — should not throw
         await using WorkflowEngineDbContext ctx2 = fixture.CreateContext();
         Func<Task> act = () => CreateHandler(ctx2).Handle(@event, CancellationToken.None);
         await act.Should().NotThrowAsync();

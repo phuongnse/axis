@@ -1,6 +1,7 @@
 using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using Axis.WorkflowBuilder.Application.Services;
+using Axis.WorkflowBuilder.Infrastructure.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Npgsql;
@@ -41,7 +42,11 @@ internal sealed class WorkflowBuilderUnitOfWork(WorkflowBuilderDbContext context
         }
 
         foreach (IDomainEvent evt in events)
-            await bus.PublishAsync(evt);
+        {
+            object? integrationEvent = WorkflowBuilderEventMapper.ToIntegrationEvent(evt);
+            if (integrationEvent is not null)
+                await bus.PublishAsync(integrationEvent);
+        }
 
         return result;
     }

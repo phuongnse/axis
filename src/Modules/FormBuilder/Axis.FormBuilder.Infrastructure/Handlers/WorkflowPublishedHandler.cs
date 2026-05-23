@@ -1,8 +1,9 @@
+using axis.workflowbuilder.events;
 using Axis.FormBuilder.Application.Services;
 using Axis.FormBuilder.Domain.ReadModels;
 using Axis.FormBuilder.Infrastructure.Persistence;
 using Axis.Shared.Application;
-using Axis.WorkflowBuilder.Domain.Events;
+using Axis.WorkflowBuilder.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -13,14 +14,17 @@ internal sealed class WorkflowPublishedHandler(
     IUnitOfWork uow,
     ILogger<WorkflowPublishedHandler> logger)
 {
-    public async Task Handle(WorkflowPublished @event, CancellationToken ct)
+    public async Task Handle(WorkflowPublishedEvent @event, CancellationToken ct)
     {
+        Guid workflowId = @event.WorkflowId();
+        Guid organizationId = @event.OrganizationId();
+        IReadOnlyList<Guid> referencedFormIds = @event.ReferencedFormIds();
+
         List<FormWorkflowReference> existing = await context.FormWorkflowReferences
-            .Where(r => r.WorkflowId == @event.WorkflowId && r.OrganizationId == @event.OrganizationId)
+            .Where(r => r.WorkflowId == workflowId && r.OrganizationId == organizationId)
             .ToListAsync(ct);
 
-        // Remove references no longer in the workflow
-        HashSet<Guid> newFormIds = [.. @event.ReferencedFormIds];
+        HashSet<Guid> newFormIds = [.. referencedFormIds];
         int removedCount = 0;
         foreach (FormWorkflowReference old in existing.Where(r => !newFormIds.Contains(r.FormId)))
         {
@@ -28,19 +32,18 @@ internal sealed class WorkflowPublishedHandler(
             removedCount++;
         }
 
-        // Upsert current references
         int addedCount = 0;
-        foreach (Guid formId in @event.ReferencedFormIds)
+        foreach (Guid formId in newFormIds)
         {
-            FormWorkflowReference? existing_ = existing.FirstOrDefault(r => r.FormId == formId);
-            if (existing_ is null)
+            FormWorkflowReference? existingRef = existing.FirstOrDefault(r => r.FormId == formId);
+            if (existingRef is null)
             {
                 context.FormWorkflowReferences.Add(
-                    FormWorkflowReference.Create(@event.WorkflowId, formId, @event.OrganizationId));
+                    FormWorkflowReference.Create(workflowId, formId, organizationId));
                 addedCount++;
             }
             else
-                existing_.Reactivate();
+                existingRef.Reactivate();
         }
 
         try
@@ -51,19 +54,19 @@ internal sealed class WorkflowPublishedHandler(
         {
             logger.LogWarning(
                 "WorkflowPublishedHandler: concurrent delivery detected for workflow {WorkflowId} — skipping",
-                @event.WorkflowId);
+                workflowId);
             return;
         }
         catch (UniqueConstraintException)
         {
             logger.LogWarning(
                 "WorkflowPublishedHandler: concurrent insert detected for workflow {WorkflowId} — skipping",
-                @event.WorkflowId);
+                workflowId);
             return;
         }
 
         logger.LogInformation(
             "WorkflowPublishedHandler: references synced for workflow {WorkflowId} — added {Added}, removed {Removed}",
-            @event.WorkflowId, addedCount, removedCount);
+            workflowId, addedCount, removedCount);
     }
 }

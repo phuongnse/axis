@@ -44,7 +44,10 @@ using OpenIddict.Validation.AspNetCore;
 using Scalar.AspNetCore;
 using Serilog;
 using StackExchange.Redis;
+using axis.workflowbuilder.events;
+using Axis.Shared.Infrastructure.Messaging;
 using Axis.Shared.Infrastructure.Wolverine;
+using Axis.WorkflowBuilder.Contracts;
 using Wolverine;
 using Wolverine.EntityFrameworkCore;
 using static OpenIddict.Abstractions.OpenIddictConstants;
@@ -116,9 +119,8 @@ try
 
         // Cross-module event transport — `*Event`/`*Snapshot` messages.
         // Kafka also stores event-sourced aggregate logs. Per ADR-013 + the
-        // message-suffix routing rule in ADR-025. No PublishMessage<>.ToKafkaTopic()
-        // declarations yet — those land module-by-module. Payload format is
-        // JSON for now; Avro + Schema Registry per ADR-019 ships next.
+        // message-suffix routing rule in ADR-025. WorkflowBuilder lifecycle
+        // events use Avro + Schema Registry (ADR-019); other modules follow.
         //
         // Cross-module command/job/saga transport — `*Command`/`*Job`/`*SagaStep`.
         // Per ADR-024 + ADR-025. Work-queue semantics (ACK, requeue, DLX).
@@ -141,6 +143,26 @@ try
             opts.UseKafka(kafkaBrokers);
             opts.UseRabbitMq(new Uri(rabbitMqConnectionString));
         }
+
+        bool useKafkaEventTransport = !builder.Environment.IsEnvironment("Testing");
+        opts.UseAxisKafkaAvro(
+            wolverineConfig,
+            useKafkaEventTransport,
+            configureKafkaEvents: (o, serializer) =>
+            {
+                WolverineKafkaAvroExtensions.PublishAndListenWithAvro<WorkflowPublishedEvent>(
+                    o, WorkflowBuilderKafkaTopics.WorkflowPublished, serializer);
+                WolverineKafkaAvroExtensions.PublishAndListenWithAvro<WorkflowArchivedEvent>(
+                    o, WorkflowBuilderKafkaTopics.WorkflowArchived, serializer);
+                WolverineKafkaAvroExtensions.PublishAndListenWithAvro<WorkflowUnarchivedEvent>(
+                    o, WorkflowBuilderKafkaTopics.WorkflowUnarchived, serializer);
+            },
+            configureLocalEvents: o =>
+            {
+                WolverineKafkaAvroExtensions.PublishLocally<WorkflowPublishedEvent>(o);
+                WolverineKafkaAvroExtensions.PublishLocally<WorkflowArchivedEvent>(o);
+                WolverineKafkaAvroExtensions.PublishLocally<WorkflowUnarchivedEvent>(o);
+            });
 
         // Infrastructure assemblies host Wolverine handlers (e.g. domain event consumers)
         // but are not the entry assembly — include them explicitly for handler discovery.

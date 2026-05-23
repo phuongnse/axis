@@ -1,5 +1,7 @@
+using System.Text.Json;
+using axis.workflowbuilder.events;
 using Axis.Shared.Application;
-using Axis.WorkflowBuilder.Domain.Events;
+using Axis.WorkflowBuilder.Contracts;
 using Axis.WorkflowEngine.Application.Services;
 using Axis.WorkflowEngine.Domain.Aggregates;
 using Axis.WorkflowEngine.Domain.Enums;
@@ -7,7 +9,6 @@ using Axis.WorkflowEngine.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using EngineReadModels = Axis.WorkflowEngine.Domain.ReadModels;
-using BuilderEvents = Axis.WorkflowBuilder.Domain.Events;
 
 namespace Axis.WorkflowEngine.Infrastructure.Handlers;
 
@@ -16,20 +17,30 @@ internal sealed class WorkflowPublishedHandler(
     IUnitOfWork uow,
     ILogger<WorkflowPublishedHandler> logger)
 {
-    public async Task Handle(WorkflowPublished @event, CancellationToken ct)
+    private static readonly JsonSerializerOptions ConfigJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
+
+    public async Task Handle(WorkflowPublishedEvent @event, CancellationToken ct)
     {
         await UpsertActiveStatusAsync(@event, ct);
         await UpsertSnapshotAsync(@event, ct);
     }
 
-    private async Task UpsertActiveStatusAsync(WorkflowPublished @event, CancellationToken ct)
+    private async Task UpsertActiveStatusAsync(WorkflowPublishedEvent @event, CancellationToken ct)
     {
+        Guid workflowId = @event.WorkflowId();
+        Guid organizationId = @event.OrganizationId();
+
         WorkflowActiveStatus? existing = await context.WorkflowActiveStatuses
-            .FirstOrDefaultAsync(w => w.WorkflowId == @event.WorkflowId, ct);
+            .FirstOrDefaultAsync(
+                w => w.WorkflowId == workflowId && w.OrganizationId == organizationId,
+                ct);
 
         if (existing is null)
             context.WorkflowActiveStatuses.Add(
-                WorkflowActiveStatus.Activated(@event.WorkflowId, @event.OrganizationId));
+                WorkflowActiveStatus.Activated(workflowId, organizationId));
         else
             existing.Reactivate();
 
@@ -41,33 +52,37 @@ internal sealed class WorkflowPublishedHandler(
         {
             logger.LogWarning(
                 "WorkflowPublishedHandler: concurrent delivery detected for active status of workflow {WorkflowId} — skipping",
-                @event.WorkflowId);
+                workflowId);
             return;
         }
         catch (UniqueConstraintException)
         {
             logger.LogWarning(
                 "WorkflowPublishedHandler: concurrent insert detected for active status of workflow {WorkflowId} — skipping",
-                @event.WorkflowId);
+                workflowId);
             return;
         }
 
         logger.LogInformation(
             "WorkflowPublishedHandler: active status upserted for workflow {WorkflowId} org {OrganizationId}",
-            @event.WorkflowId, @event.OrganizationId);
+            workflowId, organizationId);
     }
 
-    private async Task UpsertSnapshotAsync(WorkflowPublished @event, CancellationToken ct)
+    private async Task UpsertSnapshotAsync(WorkflowPublishedEvent @event, CancellationToken ct)
     {
-        IReadOnlyList<EngineReadModels.StepDefinitionSnapshot> steps = MapSteps(@event.Steps);
-        IReadOnlyList<EngineReadModels.TransitionSnapshot> transitions = MapTransitions(@event.Transitions);
+        Guid workflowId = @event.WorkflowId();
+        Guid organizationId = @event.OrganizationId();
+        IReadOnlyList<EngineReadModels.StepDefinitionSnapshot> steps = MapSteps(@event.steps);
+        IReadOnlyList<EngineReadModels.TransitionSnapshot> transitions = MapTransitions(@event.transitions);
 
         EngineReadModels.WorkflowSnapshot? existing = await context.WorkflowSnapshots
-            .FirstOrDefaultAsync(w => w.WorkflowId == @event.WorkflowId, ct);
+            .FirstOrDefaultAsync(
+                w => w.WorkflowId == workflowId && w.OrganizationId == organizationId,
+                ct);
 
         if (existing is null)
             context.WorkflowSnapshots.Add(
-                EngineReadModels.WorkflowSnapshot.Create(@event.WorkflowId, @event.OrganizationId, steps, transitions));
+                EngineReadModels.WorkflowSnapshot.Create(workflowId, organizationId, steps, transitions));
         else
             existing.Update(steps, transitions);
 
@@ -79,41 +94,49 @@ internal sealed class WorkflowPublishedHandler(
         {
             logger.LogWarning(
                 "WorkflowPublishedHandler: concurrent delivery detected for snapshot of workflow {WorkflowId} — skipping",
-                @event.WorkflowId);
+                workflowId);
             return;
         }
         catch (UniqueConstraintException)
         {
             logger.LogWarning(
                 "WorkflowPublishedHandler: concurrent insert detected for snapshot of workflow {WorkflowId} — skipping",
-                @event.WorkflowId);
+                workflowId);
             return;
         }
 
         logger.LogInformation(
             "WorkflowPublishedHandler: snapshot upserted for workflow {WorkflowId} with {StepCount} steps",
-            @event.WorkflowId, steps.Count);
+            workflowId, steps.Count);
     }
 
     private static IReadOnlyList<EngineReadModels.StepDefinitionSnapshot> MapSteps(
-        IReadOnlyList<BuilderEvents.StepSnapshot> eventSteps)
+        IList<StepSnapshotRecord> eventSteps)
         => eventSteps.Select(s => new EngineReadModels.StepDefinitionSnapshot
         {
-            Id = s.Id,
-            Name = s.Name,
-            StepType = MapStepType(s.StepType),
-            DisplayOrder = s.DisplayOrder,
-            Config = s.Config
+            Id = Guid.Parse(s.id),
+            Name = s.name,
+            StepType = MapStepType(s.stepType),
+            DisplayOrder = s.displayOrder,
+            Config = DeserializeConfig(s.configJson),
         }).ToList();
 
     private static IReadOnlyList<EngineReadModels.TransitionSnapshot> MapTransitions(
-        IReadOnlyList<BuilderEvents.TransitionSnapshot> eventTransitions)
+        IList<TransitionSnapshotRecord> eventTransitions)
         => eventTransitions.Select(t => new EngineReadModels.TransitionSnapshot
         {
-            FromStepId = t.FromStepId,
-            ToStepId = t.ToStepId,
-            Label = t.Label
+            FromStepId = Guid.Parse(t.fromStepId),
+            ToStepId = Guid.Parse(t.toStepId),
+            Label = t.label,
         }).ToList();
+
+    private static Dictionary<string, object?>? DeserializeConfig(string? configJson)
+    {
+        if (string.IsNullOrWhiteSpace(configJson))
+            return null;
+
+        return JsonSerializer.Deserialize<Dictionary<string, object?>>(configJson, ConfigJsonOptions);
+    }
 
     private static StepType MapStepType(string stepTypeStr)
         => Enum.TryParse<StepType>(stepTypeStr, ignoreCase: true, out StepType result)

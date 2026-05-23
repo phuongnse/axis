@@ -129,6 +129,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axis.WorkflowEngine.Infrast
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axis.Testing", "tests\Shared\Axis.Testing\Axis.Testing.csproj", "{2F9B575F-3B1B-4361-A5C1-6748A2237278}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axis.WorkflowBuilder.Contracts", "src\Modules\WorkflowBuilder\Axis.WorkflowBuilder.Contracts\Axis.WorkflowBuilder.Contracts.csproj", "{515FEA6A-4A9A-44DF-A484-5D46FBBC3D51}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -667,6 +669,18 @@ Global
 		{2F9B575F-3B1B-4361-A5C1-6748A2237278}.Release|x64.Build.0 = Release|Any CPU
 		{2F9B575F-3B1B-4361-A5C1-6748A2237278}.Release|x86.ActiveCfg = Release|Any CPU
 		{2F9B575F-3B1B-4361-A5C1-6748A2237278}.Release|x86.Build.0 = Release|Any CPU
+		{515FEA6A-4A9A-44DF-A484-5D46FBBC3D51}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{515FEA6A-4A9A-44DF-A484-5D46FBBC3D51}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{515FEA6A-4A9A-44DF-A484-5D46FBBC3D51}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{515FEA6A-4A9A-44DF-A484-5D46FBBC3D51}.Debug|x64.Build.0 = Debug|Any CPU
+		{515FEA6A-4A9A-44DF-A484-5D46FBBC3D51}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{515FEA6A-4A9A-44DF-A484-5D46FBBC3D51}.Debug|x86.Build.0 = Debug|Any CPU
+		{515FEA6A-4A9A-44DF-A484-5D46FBBC3D51}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{515FEA6A-4A9A-44DF-A484-5D46FBBC3D51}.Release|Any CPU.Build.0 = Release|Any CPU
+		{515FEA6A-4A9A-44DF-A484-5D46FBBC3D51}.Release|x64.ActiveCfg = Release|Any CPU
+		{515FEA6A-4A9A-44DF-A484-5D46FBBC3D51}.Release|x64.Build.0 = Release|Any CPU
+		{515FEA6A-4A9A-44DF-A484-5D46FBBC3D51}.Release|x86.ActiveCfg = Release|Any CPU
+		{515FEA6A-4A9A-44DF-A484-5D46FBBC3D51}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -733,5 +747,6 @@ Global
 		{32ABADD4-8AED-46EF-BFAA-FFADDA514E7F} = {84CB25DB-F16E-45A5-B4F5-C1A98E8AC6CD}
 		{0499A406-7C1E-45D5-821B-A9C35D5A2466} = {644C31A5-0220-4F23-9665-3537AE72C226}
 		{2F9B575F-3B1B-4361-A5C1-6748A2237278} = {1954FA8D-7A7E-42F7-B92E-1187F56F0051}
+		{515FEA6A-4A9A-44DF-A484-5D46FBBC3D51} = {D41B6B79-F201-45B2-A99E-079DCFCECD23}
 	EndGlobalSection
 EndGlobal
