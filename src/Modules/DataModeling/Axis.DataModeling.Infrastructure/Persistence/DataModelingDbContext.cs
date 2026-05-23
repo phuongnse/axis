@@ -8,12 +8,19 @@ namespace Axis.DataModeling.Infrastructure.Persistence;
 
 internal sealed class DataModelingDbContext(
     DbContextOptions<DataModelingDbContext> options,
-    ITenantContext tenantContext)
-    : AxisDbContext(options, tenantContext)
+    ITenantContext tenantContext) : DbContext(options)
 {
     public DbSet<DataModel> DataModels => Set<DataModel>();
     public DbSet<DataClass> DataClasses => Set<DataClass>();
     public DbSet<DataRecord> DataRecords => Set<DataRecord>();
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        // Per ADR-017: interceptor wiring inlined here rather than inherited
+        // from a shared AxisDbContext base. TenantSchemaInterceptor stays in
+        // Axis.Shared.Infrastructure because every module needs it identically.
+        optionsBuilder.AddInterceptors(new TenantSchemaInterceptor(tenantContext));
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -8,14 +8,18 @@ namespace Axis.WorkflowBuilder.Infrastructure.Persistence;
 
 internal sealed class WorkflowBuilderDbContext(
     DbContextOptions<WorkflowBuilderDbContext> options,
-    ITenantContext tenantContext)
-    : AxisDbContext(options, tenantContext)
+    ITenantContext tenantContext) : DbContext(options)
 {
     public DbSet<WorkflowDefinition> WorkflowDefinitions => Set<WorkflowDefinition>();
 
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        // Per ADR-017: interceptor wiring inlined per module.
+        optionsBuilder.AddInterceptors(new TenantSchemaInterceptor(tenantContext));
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfiguration(new WorkflowDefinitionConfiguration());
     }
 }
