@@ -65,13 +65,13 @@ jobs:
           cache-dependency-path: '**/*.csproj'
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@31cffa6090e1c5d92ef5a73f6c4e7c4ba17a8c2d # v4.31.6
+        uses: github/codeql-action/init@dc73d59c2d7bd4f8194098a91219eeee6d8a1719 # v4
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-extended,security-and-quality
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@31cffa6090e1c5d92ef5a73f6c4e7c4ba17a8c2d # v4.31.6
+        uses: github/codeql-action/analyze@dc73d59c2d7bd4f8194098a91219eeee6d8a1719 # v4
         with:
           category: "/language:${{ matrix.language }}"
