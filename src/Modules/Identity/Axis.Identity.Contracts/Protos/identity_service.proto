@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+option csharp_namespace = "Axis.Identity.Contracts.Grpc";
+
+package axis.identity.v1;
+
+// Cross-module sync RPC (ADR-014). Escape hatch when JWT claims / local read models are insufficient.
+service IdentityService {
+  rpc GetUserPermissions(GetUserPermissionsRequest) returns (GetUserPermissionsResponse);
+}
+
+message GetUserPermissionsRequest {
+  string user_id = 1;
+  string organization_id = 2;
+}
+
+message GetUserPermissionsResponse {
+  repeated string permissions = 1;
+}

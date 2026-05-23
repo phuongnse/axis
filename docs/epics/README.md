@@ -42,6 +42,6 @@ Platform-wide infrastructure tracked in [PROGRESS.md](../PROGRESS.md) (not owned
 |---|---|---|
 | Phase 0 — ADRs & architecture | ✅ | ADR-010..023 |
 | Phase 1 — Infrastructure | ✅ | Per-module DBs, Kafka/RabbitMQ, OpenTelemetry ([ADR-018](../TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability)), Avro/Schema Registry pilot on WorkflowBuilder events ([ADR-019](../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)) |
-| Phase 2 — Module boundaries | ⏳ | gRPC + Contracts per module; Identity first |
+| Phase 2 — Module boundaries | ⚠️ | Identity `Axis.Identity.Contracts` + `GetUserPermissions` gRPC pilot; remaining modules + Kafka `OrganizationVerified` follow |
 
 Implementation patterns: [OpenTelemetry observability](../playbooks/patterns.md#opentelemetry-observability).

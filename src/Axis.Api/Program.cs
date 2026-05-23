@@ -411,6 +411,8 @@ try
     app.MapFormEndpoints();
     app.MapFormTaskEndpoints();
 
+    app.MapIdentityGrpc();
+
     app.Run();
 }
 catch (Exception ex)

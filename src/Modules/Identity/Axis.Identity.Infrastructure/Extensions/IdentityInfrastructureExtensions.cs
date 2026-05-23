@@ -3,7 +3,9 @@ using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Infrastructure.Persistence;
 using Axis.Identity.Infrastructure.Repositories;
+using Axis.Identity.Infrastructure.Grpc;
 using Axis.Identity.Infrastructure.Services;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -41,11 +43,19 @@ public static class IdentityInfrastructureExtensions
         services.AddScoped<IPasswordResetTokenStore, PasswordResetTokenStore>();
         services.AddScoped<ISessionStore, SessionStoreService>();
 
+        services.AddGrpc();
+
         services.AddHostedService<OpenIddictSeeder>();
 
         services.AddAWSService<IAmazonS3>();
         services.AddScoped<IAvatarStorageService, S3AvatarStorageService>();
 
         return services;
+    }
+
+    public static WebApplication MapIdentityGrpc(this WebApplication app)
+    {
+        app.MapGrpcService<IdentityGrpcService>();
+        return app;
     }
 }
