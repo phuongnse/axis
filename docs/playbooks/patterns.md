@@ -1259,7 +1259,7 @@ Used only when a local read model is insufficient. Example: a workflow step need
 **Step 1 — Define the contract in B's Contracts project:**
 
 ```proto
-// src/Modules/Identity/Axis.Identity.Contracts/IdentityService.proto
+// src/Modules/Identity/Axis.Identity.Contracts/Protos/axis/identity/v1/identity_service.proto
 syntax = "proto3";
 package axis.identity.v1;
 
@@ -1296,7 +1296,29 @@ public sealed class PermissionGate(IdentityService.IdentityServiceClient identit
 }
 ```
 
-The gRPC channel is configured via `Modules:Identity:Url` (see [ADR-016](../TECH_STACK.md#adr-016-service-discovery-via-config-in-modulith-mode-and-k8s-dns-in-production)) — `http://localhost:5001` in modulith mode, K8s service DNS in production.
+The gRPC channel is configured via `Modules:Identity:GrpcUrl` in `src/Axis.Api/appsettings.json` (see [ADR-016](../TECH_STACK.md#adr-016-service-discovery-via-config-in-modulith-mode-and-k8s-dns-in-production)) — `http://localhost:5280` on the modulith host in development, module service DNS in production when extracted.
+
+### Dev — verify GetUserPermissions with grpcurl
+
+Identity gRPC is mapped on the same Kestrel host as REST (`MapIdentityGrpc()`). The RPC requires a valid JWT (`RequireAuthorization`) and shares the `auth` rate limiter with login endpoints.
+
+Prerequisites:
+
+- [`grpcurl`](https://github.com/fullstorydev/grpcurl) installed locally.
+- `Axis.Api` running (e.g. `dotnet run --project src/Axis.Api` — default dev URL `http://localhost:5280`).
+- A Bearer access token from an authenticated session (PKCE login via the SPA, or the integration-test helpers in `tests/Api/Axis.Api.Tests/Helpers/AuthHelper.cs`).
+
+```bash
+# Optional: list services exposed on the host
+grpcurl -plaintext localhost:5280 list
+
+grpcurl -plaintext \
+  -H "authorization: Bearer <access_token>" \
+  -d '{"user_id":"<user-guid>","organization_id":"<org-guid>"}' \
+  localhost:5280 axis.identity.v1.IdentityService/GetUserPermissions
+```
+
+Replace `<access_token>`, `<user-guid>`, and `<org-guid>` with values from your tenant. `Unauthenticated` / `PermissionDenied` means the token is missing, expired, or invalid — obtain a fresh token from `POST /connect/token` after PKCE login.
 
 ### Rules (P0)
 

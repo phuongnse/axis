@@ -27,7 +27,7 @@ One-page map into [`patterns.md`](./patterns.md). Open only the section you need
 | Scalar / Swagger setup | [OpenAPI / Scalar setup](./patterns.md#openapi--scalar-setup) |
 | Domain events / Wolverine handlers | [Wolverine patterns](./patterns.md#wolverine-patterns) |
 | Traces / metrics / structured logs | [OpenTelemetry observability](./patterns.md#opentelemetry-observability) |
-| Data owned by another module | [Cross-module data pattern](./patterns.md#cross-module-communication-pattern) |
+| Data owned by another module | [Cross-module data pattern](./patterns.md#cross-module-communication-pattern) · [gRPC dev (grpcurl)](./patterns.md#dev--verify-getuserpermissions-with-grpcurl) |
 | Idempotent command / migration | [Command idempotency](./patterns.md#command-idempotency-pattern) |
 | Pre-commit hygiene grep | [Code hygiene checklist](./patterns.md#code-hygiene-checklist) |
 | React / TanStack Query screen | [Frontend Patterns](./patterns.md#frontend-patterns) · [frontend.md](./frontend.md) |

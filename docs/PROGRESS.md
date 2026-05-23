@@ -13,7 +13,7 @@ Foundation phases (each a sequence of small PRs):
 |---|---|---|
 | **Phase 0 — Foundation decisions** | ✅ done (PR #59) | Rewrote ADR-001/002/009; added ADR-010..023; updated `ARCHITECTURE.md` + `CLAUDE.md` + `patterns.md`. |
 | **Phase 1 — Infrastructure foundation** | ✅ done | PR #83–#90: Kafka/RabbitMQ (ADR-017), per-module DBs (ADR-011), Wolverine enroll (ADR-012), migrations (ADR-023), OpenTelemetry (ADR-018), **Avro + Schema Registry + CloudEvents** for WorkflowBuilder lifecycle events (ADR-019). |
-| **Phase 2 — Per-module HTTP/gRPC boundary** | ⏳ pending | One PR per module: introduce `Axis.{Module}.Contracts` (proto + Avro); expose gRPC server; rewrite `Axis.Api` to call modules through gRPC clients; replace in-process service interfaces. Identity goes first. |
+| **Phase 2 — Per-module HTTP/gRPC boundary** | ⚠️ in progress | Identity first: `Axis.Identity.Contracts` + `IdentityService` gRPC (`GetUserPermissions`) on modulith host; Avro lifecycle events + gateway gRPC clients per module follow in subsequent PRs. |
 | **Phase 3 — Per-module EF migrations** | ⚠️ in progress | Identity, DataModeling, FormBuilder, WorkflowBuilder, WorkflowEngine have migrations; tests use `MigrateAsync`. PageBuilder pending (module not started). |
 | **Phase 4 — Deployment readiness** | ⏳ pending | Per-module Dockerfile; `docker-compose.dev.yml` runs each module as a separate container; CI builds per-module artifacts; K8s manifests; per-module Vault policies. |
 
@@ -31,11 +31,11 @@ Feature work (Frontend feature UIs, E07 PageBuilder, remaining E01/E06 gaps) is 
 
 ## Identity — E02-identity-access
 
-**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳ · Service-boundary retrofit ⏳**
+**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳ · Service-boundary retrofit ⚠️**
 
 Full auth, user, role, invitation, and session management. OpenIddict 5.x OIDC server (Authorization Code + PKCE for SPA; Client Credentials for M2M). RBAC via custom permission policies. All Identity API endpoints covered by integration tests.
 
-> ⏳ **Retrofit under [ADR-010](TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy):** introduce `Axis.Identity.Contracts` (gRPC `IdentityService` + Avro events for user/role lifecycle); expose JWKS for cross-module token validation; remove cross-module DbContext access from other modules' code; move Identity DbContext to its own `axis_identity` database; switch tests from `EnsureCreated` to migrations. Runs in Phase 2 — Identity goes first because every other module validates JWTs against it.
+> ⚠️ **Phase 2 (in progress):** `Axis.Identity.Contracts` with `IdentityService.GetUserPermissions` gRPC (`Protos/axis/identity/v1/identity_service.proto`); server on `Axis.Api` via `MapIdentityGrpc()` (JWT + `auth` rate limit). **Deferred (PR #93 follow-up):** Avro user/role lifecycle events, `OrganizationVerified` Kafka flow, gateway REST → gRPC client wiring, JWKS-only validation doc hardening for other modules.
 
 ## DataModeling — E03-data-modeling
 
