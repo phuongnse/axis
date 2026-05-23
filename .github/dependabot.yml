@@ -21,23 +21,32 @@ updates:
       - dependencies
       - dotnet
     groups:
+      # Each named group restricts to minor + patch so major bumps land as
+      # individual review-required PRs. Without this restriction, a tool
+      # ecosystem (e.g. WolverineFx 5 → 6) would land grouped with patch
+      # updates and slip past code review.
       dotnet-minor-and-patch:
         update-types: [minor, patch]
       microsoft-extensions:
+        update-types: [minor, patch]
         patterns:
           - "Microsoft.Extensions.*"
           - "Microsoft.EntityFrameworkCore*"
           - "Microsoft.AspNetCore.*"
       wolverine:
+        update-types: [minor, patch]
         patterns:
           - "WolverineFx*"
       openiddict:
+        update-types: [minor, patch]
         patterns:
           - "OpenIddict*"
       serilog:
+        update-types: [minor, patch]
         patterns:
           - "Serilog*"
       testing:
+        update-types: [minor, patch]
         patterns:
           - "xunit*"
           - "FluentAssertions"
@@ -62,25 +71,40 @@ updates:
     labels:
       - dependencies
       - frontend
+    ignore:
+      # @types/node must track the Node runtime (frontend/.nvmrc). Major bumps
+      # arrive only when we bump the runtime version itself — a deliberate
+      # operational change, not a Dependabot drive-by.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
+      # See NuGet section above — each named group restricts to
+      # minor + patch so majors require individual review (Vite 6 → 8
+      # would break `@vitejs/plugin-react@5` and trigger nested-vite
+      # install via Vitest 4, both of which are documented gotchas in
+      # docs/TECH_STACK.md).
       frontend-minor-and-patch:
         update-types: [minor, patch]
       tanstack:
+        update-types: [minor, patch]
         patterns:
           - "@tanstack/*"
       react:
+        update-types: [minor, patch]
         patterns:
           - "react"
           - "react-dom"
           - "@types/react"
           - "@types/react-dom"
       vite:
+        update-types: [minor, patch]
         patterns:
           - "vite"
           - "@vitejs/*"
           - "vitest"
           - "@vitest/*"
       biome:
+        update-types: [minor, patch]
         patterns:
           - "@biomejs/*"
 
@@ -99,6 +123,11 @@ updates:
       - dependencies
       - github-actions
     groups:
+      # Cap the actions group to minor + patch so a surprise jump like
+      # actions/upload-artifact v4 → v7 (PR #62) can't slip past code review
+      # bundled with other safe bumps. Action majors are rare enough to
+      # warrant individual PRs.
       actions:
+        update-types: [minor, patch]
         patterns:
           - "*"
