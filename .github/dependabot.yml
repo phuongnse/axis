@@ -71,6 +71,12 @@ updates:
     labels:
       - dependencies
       - frontend
+    ignore:
+      # @types/node must track the Node runtime (frontend/.nvmrc). Major bumps
+      # arrive only when we bump the runtime version itself — a deliberate
+      # operational change, not a Dependabot drive-by.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       # See NuGet section above — each named group restricts to
       # minor + patch so majors require individual review (Vite 6 → 8
@@ -117,6 +123,11 @@ updates:
       - dependencies
       - github-actions
     groups:
+      # Cap the actions group to minor + patch so a surprise jump like
+      # actions/upload-artifact v4 → v7 (PR #62) can't slip past code review
+      # bundled with other safe bumps. Action majors are rare enough to
+      # warrant individual PRs.
       actions:
+        update-types: [minor, patch]
         patterns:
           - "*"
