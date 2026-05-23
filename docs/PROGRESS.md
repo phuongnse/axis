@@ -19,6 +19,12 @@ Foundation phases (each a sequence of small PRs):
 
 Feature work (Frontend feature UIs, E07 PageBuilder, remaining E01/E06 gaps) is paused until Phase 1–2 complete. Estimated timeline ~2–3 months.
 
+### Deferred decisions — surface when triggered
+
+| Decision | Trigger to write | Why deferred |
+|---|---|---|
+| **ADR-026 — Selective event sourcing** (likely `WorkflowExecution` first) | Phase 1 complete **or** team identifies a concrete aggregate that needs audit/time-travel | Premature without a concrete aggregate to design against; ADR quality benefits from implementation experience on the first conversion. Depends on Phase 1's Avro + Schema Registry (ADR-019) for event versioning. Kafka transport (PR #84) and routing rule (ADR-025) are already in place — no infra blockers, only design + implementation. The dedicated ADR + first-aggregate conversion ship together in one PR. |
+
 ## Shared Kernel ⚠️ (scope shrinking under ADR-017)
 
 Current state: Domain, Application, and Infrastructure layers exist. Under [ADR-017](TECH_STACK.md#adr-017-axisshared-is-abstractions-only-no-shared-implementation), `Axis.Shared.Infrastructure` is being narrowed to genuinely cross-cutting abstractions only; UnitOfWork base class, tenant-schema interceptor, and Wolverine middleware will move into the modules that own them. The migration ships incrementally with Phase 1 PRs.
