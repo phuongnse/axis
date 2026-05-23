@@ -15,15 +15,20 @@ jobs:
   dotnet:
     name: .NET — Build and Test
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
+      # setup-dotnet's built-in cache hashes every csproj + packages.lock.json
+      # (when present) and restores ~/.nuget/packages keyed on the hash.
       - name: Setup .NET
         uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
         with:
           dotnet-version: 8.0.x
+          cache: true
+          cache-dependency-path: '**/*.csproj'
 
       - name: Verify Docker is available (required by Testcontainers)
         run: docker info
@@ -34,12 +39,31 @@ jobs:
       - name: Build
         run: dotnet build --no-restore
 
+      # Format gate — see CLAUDE.md § Gate 1. Runs after build so analyzer
+      # diagnostics are populated. Fails the job on any whitespace / charset
+      # / style violation the local `dotnet format` would also catch.
+      - name: Verify formatting (dotnet format)
+        run: dotnet format Axis.sln --verify-no-changes --no-restore
+
       - name: Test
-        run: dotnet test --no-build --verbosity normal
+        run: >
+          dotnet test --no-build --verbosity normal
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory ${{ github.workspace }}/TestResults
+
+      # Upload TRX even on failure so PR annotations + post-mortem work.
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dotnet-test-results
+          path: ${{ github.workspace }}/TestResults/**/*.trx
+          retention-days: 14
 
   frontend:
     name: Frontend — Type Check, Lint, and Test
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: frontend
@@ -67,6 +91,7 @@ jobs:
   doc-drift:
     name: Doc drift
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -81,6 +106,7 @@ jobs:
   link-check:
     name: Markdown link check
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -94,3 +120,34 @@ jobs:
         with:
           args: --config ./lychee.toml './**/*.md'
           fail: true
+
+  # ──────────────────────────────────────────────────────────────────────
+  # GHAS-only checks — disabled until GitHub Advanced Security is provisioned
+  # ──────────────────────────────────────────────────────────────────────
+  # `actions/dependency-review-action` and CodeQL code-scanning both require
+  # GitHub Advanced Security for private repositories. CodeQL ran end-to-end
+  # on PR #60 (171 queries, no findings) but failed at upload with
+  #   "Code Security must be enabled for this repository to use code scanning"
+  # and dependency-review failed at start with the same root cause. Once
+  # GHAS is enabled, re-add:
+  #
+  #   dependency-review:
+  #     name: Dependency review
+  #     runs-on: ubuntu-latest
+  #     timeout-minutes: 5
+  #     steps:
+  #       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+  #         with:
+  #           persist-credentials: false
+  #       - uses: actions/dependency-review-action@67d4f4bd7a9b17a0db54d2a7519187c65e339de8 # v4.8.0
+  #         with:
+  #           fail-on-severity: high
+  #           comment-summary-in-pr: on-failure
+  #
+  # CodeQL: restore `.github/workflows/codeql.yml` from this commit's parent
+  # (or its git history). The workflow analyzed cleanly — only the upload
+  # step needs GHAS.
+  #
+  # In the meantime, Dependabot (.github/dependabot.yml) opens PRs for new
+  # advisories against existing dependencies, covering the same threat
+  # model with a publish-time delay.

@@ -1,16 +1,103 @@
-# Auto-pin and keep GitHub Actions fresh.
-# Dependabot rewrites `@v2` -> `@<sha> # v2.4.1` on the first run and opens
-# PRs for new versions thereafter. This is the canonical alternative to
-# manually hunting SHAs.
 version: 2
+
+# Dependabot opens a PR per ecosystem when an update is available, grouping
+# minor + patch bumps to reduce noise. Security advisories always open a PR
+# immediately, ignoring the schedule. Action SHAs are rewritten by Dependabot
+# (`@v2` -> `@<sha> # v2.4.1`) so manual SHA hunting is unnecessary.
 updates:
-  - package-ecosystem: "github-actions"
-    directory: "/"
+  # .NET — central package management (Directory.Packages.props) means
+  # NuGet bumps land in one file regardless of which csproj uses them.
+  - package-ecosystem: nuget
+    directory: /
     schedule:
-      interval: "weekly"
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Ho_Chi_Minh
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+      - dotnet
+    groups:
+      dotnet-minor-and-patch:
+        update-types: [minor, patch]
+      microsoft-extensions:
+        patterns:
+          - "Microsoft.Extensions.*"
+          - "Microsoft.EntityFrameworkCore*"
+          - "Microsoft.AspNetCore.*"
+      wolverine:
+        patterns:
+          - "WolverineFx*"
+      openiddict:
+        patterns:
+          - "OpenIddict*"
+      serilog:
+        patterns:
+          - "Serilog*"
+      testing:
+        patterns:
+          - "xunit*"
+          - "FluentAssertions"
+          - "NSubstitute*"
+          - "Testcontainers*"
+          - "Bogus"
+          - "Microsoft.NET.Test.Sdk"
+          - "coverlet.*"
+          - "Microsoft.AspNetCore.Mvc.Testing"
+
+  # Frontend npm
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Ho_Chi_Minh
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+      - frontend
+    groups:
+      frontend-minor-and-patch:
+        update-types: [minor, patch]
+      tanstack:
+        patterns:
+          - "@tanstack/*"
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      vite:
+        patterns:
+          - "vite"
+          - "@vitejs/*"
+          - "vitest"
+          - "@vitest/*"
+      biome:
+        patterns:
+          - "@biomejs/*"
+
+  # GitHub Actions in workflows
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Ho_Chi_Minh
     open-pull-requests-limit: 5
     commit-message:
-      prefix: "chore(ci)"
+      prefix: chore(ci)
+    labels:
+      - dependencies
+      - github-actions
     groups:
       actions:
         patterns:

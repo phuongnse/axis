@@ -1,4 +1,4 @@
-﻿using Axis.Shared.Application.Tenancy;
+using Axis.Shared.Application.Tenancy;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Testcontainers.PostgreSql;
