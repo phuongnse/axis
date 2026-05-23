@@ -95,7 +95,10 @@ services:
       CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
       KAFKA_LOG_DIRS: "/var/lib/kafka/data"
     ports:
-      - "9092:9092"      # internal-style PLAINTEXT (not used from host)
+      # Only the host listener is published. The in-network listener
+      # (PLAINTEXT on :9092) stays reachable inside the Compose network as
+      # `kafka:9092` and is intentionally not exposed — its advertised
+      # address would mis-resolve from the host.
       - "29092:29092"    # host PLAINTEXT — connect from local processes here
     volumes:
       - kafka_data:/var/lib/kafka/data
