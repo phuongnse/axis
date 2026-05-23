@@ -17,6 +17,7 @@ public sealed class IdentityDatabaseFixture : IAsyncLifetime
     {
         DbContextOptions<IdentityDbContext> options = new DbContextOptionsBuilder<IdentityDbContext>()
             .UseNpgsql(_connectionString)
+            .UseOpenIddict()
             .Options;
         return new IdentityDbContext(options);
     }
@@ -29,7 +30,11 @@ public sealed class IdentityDatabaseFixture : IAsyncLifetime
             "axis_identity_infra_test");
         await PostgresModuleTestDatabase.MigrateAsync<IdentityDbContext>(
             _connectionString,
-            opts => new IdentityDbContext(opts));
+            opts => new IdentityDbContext(
+                new DbContextOptionsBuilder<IdentityDbContext>()
+                    .UseNpgsql(_connectionString)
+                    .UseOpenIddict()
+                    .Options));
     }
 
     public Task DisposeAsync() => _postgres.DisposeAsync().AsTask();

@@ -1,3 +1,4 @@
+using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -18,5 +19,10 @@ internal sealed class PasswordResetTokenConfiguration : IEntityTypeConfiguration
 
         builder.HasIndex(t => t.TokenHash).IsUnique();
         builder.HasIndex(t => t.UserId);
+
+        builder.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(t => t.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

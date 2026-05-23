@@ -67,5 +67,10 @@ internal sealed class DataRecordConfiguration : IEntityTypeConfiguration<DataRec
         builder.Ignore(r => r.Data);
 
         builder.HasIndex(r => new { r.ModelId, r.OrganizationId });
+
+        builder.HasOne<DataModel>()
+            .WithMany()
+            .HasForeignKey(r => r.ModelId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
