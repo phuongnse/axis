@@ -1090,7 +1090,9 @@ After `WebApplication` is built:
 
 ```csharp
 app.UseAxisOpenTelemetry(); // Prometheus scrape endpoint when enabled
-app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseAuthentication();
+app.UseMiddleware<CorrelationIdMiddleware>(); // after auth so org_id → TenantId
+app.UseAuthorization();
 ```
 
 Implementation lives in `Axis.Shared.Infrastructure/Observability/OpenTelemetryServiceExtensions.cs`. Configuration section: `OpenTelemetry` in `appsettings.json`.

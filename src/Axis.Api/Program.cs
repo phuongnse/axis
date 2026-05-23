@@ -62,11 +62,13 @@ try
     builder.AddAxisOpenTelemetry();
 
     // ── Logging ────────────────────────────────────────────────────────────
-    builder.Host.UseSerilog((ctx, services, config) => config
-        .ReadFrom.Configuration(ctx.Configuration)
-        .ReadFrom.Services(services)
-        .Enrich.FromLogContext()
-        .Enrich.With<TraceContextSerilogEnricher>());
+    builder.Host.UseSerilog(
+        (ctx, services, config) => config
+            .ReadFrom.Configuration(ctx.Configuration)
+            .ReadFrom.Services(services)
+            .Enrich.FromLogContext()
+            .Enrich.With<TraceContextSerilogEnricher>(),
+        writeToProviders: true);
 
     // ── Wolverine (messaging + per-module durable inbox/outbox per ADR-012) ─
     // Capture the live ConfigurationManager and read inside the lambda so
@@ -343,12 +345,12 @@ try
     }
 
     app.UseAxisOpenTelemetry();
-    app.UseMiddleware<CorrelationIdMiddleware>();
     app.UseMiddleware<ValidationExceptionMiddleware>();
-    app.UseSerilogRequestLogging();
     app.UseCors("SpaOrigin");
     app.UseRateLimiter();
     app.UseAuthentication();
+    app.UseMiddleware<CorrelationIdMiddleware>();
+    app.UseSerilogRequestLogging();
     app.UseAuthorization();
 
     // ── OpenAPI / Scalar (dev + staging only) ─────────────────────────────

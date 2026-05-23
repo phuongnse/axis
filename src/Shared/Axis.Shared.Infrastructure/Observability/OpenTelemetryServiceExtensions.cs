@@ -31,6 +31,7 @@ public static class OpenTelemetryServiceExtensions
         string serviceVersion = options.ServiceVersion
             ?? typeof(OpenTelemetryServiceExtensions).Assembly.GetName().Version?.ToString()
             ?? "unknown";
+        string prometheusScrapePath = NormalizePath(options.Prometheus.ScrapeEndpointPath);
 
         builder.Services.AddOpenTelemetry()
             .ConfigureResource(resource => resource.AddService(
@@ -41,7 +42,8 @@ public static class OpenTelemetryServiceExtensions
                 tracing
                     .AddAspNetCoreInstrumentation(aspNet =>
                     {
-                        aspNet.Filter = context => ShouldInstrumentHttpRequest(context.Request);
+                        aspNet.Filter = context =>
+                            ShouldInstrumentHttpRequest(context.Request, prometheusScrapePath);
                         aspNet.RecordException = true;
                     })
                     .AddHttpClientInstrumentation(http =>
@@ -99,19 +101,27 @@ public static class OpenTelemetryServiceExtensions
         return app;
     }
 
-    private static bool ShouldInstrumentHttpRequest(HttpRequest request)
+    private static bool ShouldInstrumentHttpRequest(HttpRequest request, string prometheusScrapePath)
     {
         PathString path = request.Path;
         if (path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase))
             return false;
 
-        if (path.StartsWithSegments("/metrics", StringComparison.OrdinalIgnoreCase))
+        if (path.StartsWithSegments(prometheusScrapePath, StringComparison.OrdinalIgnoreCase))
             return false;
 
         if (path.StartsWithSegments("/swagger", StringComparison.OrdinalIgnoreCase))
             return false;
 
         return true;
+    }
+
+    private static string NormalizePath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return "/metrics";
+
+        return path.StartsWith('/') ? path : $"/{path}";
     }
 
     private static void ConfigureOtlpExporter(
