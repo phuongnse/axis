@@ -26,6 +26,7 @@ One-page map into [`patterns.md`](./patterns.md). Open only the section you need
 | `Result` → HTTP status | [Result → HTTP mapping](./patterns.md#result--http-status-code-mapping) |
 | Scalar / Swagger setup | [OpenAPI / Scalar setup](./patterns.md#openapi--scalar-setup) |
 | Domain events / Wolverine handlers | [Wolverine patterns](./patterns.md#wolverine-patterns) |
+| Traces / metrics / structured logs | [OpenTelemetry observability](./patterns.md#opentelemetry-observability) |
 | Data owned by another module | [Cross-module data pattern](./patterns.md#cross-module-communication-pattern) |
 | Idempotent command / migration | [Command idempotency](./patterns.md#command-idempotency-pattern) |
 | Pre-commit hygiene grep | [Code hygiene checklist](./patterns.md#code-hygiene-checklist) |
@@ -61,10 +62,11 @@ One-page map into [`patterns.md`](./patterns.md). Open only the section you need
 | 20 | [Result → HTTP](./patterns.md#result--http-status-code-mapping) |
 | 21 | [OpenAPI / Scalar](./patterns.md#openapi--scalar-setup) |
 | 22 | [Wolverine](./patterns.md#wolverine-patterns) |
-| 23 | [Cross-module data](./patterns.md#cross-module-communication-pattern) |
-| 24 | [Command idempotency](./patterns.md#command-idempotency-pattern) |
-| 25 | [Code hygiene](./patterns.md#code-hygiene-checklist) |
-| 26 | [Frontend patterns](./patterns.md#frontend-patterns) |
+| 23 | [OpenTelemetry](./patterns.md#opentelemetry-observability) |
+| 24 | [Cross-module data](./patterns.md#cross-module-communication-pattern) |
+| 25 | [Command idempotency](./patterns.md#command-idempotency-pattern) |
+| 26 | [Code hygiene](./patterns.md#code-hygiene-checklist) |
+| 27 | [Frontend patterns](./patterns.md#frontend-patterns) |
 
 ---
 

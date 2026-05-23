@@ -6,6 +6,7 @@ using Axis.Api.Authorization;
 using Axis.Api.Endpoints;
 using Axis.Api.HealthChecks;
 using Axis.Api.Infrastructure;
+using Axis.Shared.Infrastructure.Observability;
 using Axis.Api.Middleware;
 using Axis.DataModeling.Application.Commands.CreateModel;
 using Axis.DataModeling.Infrastructure.Extensions;
@@ -57,11 +58,15 @@ try
 {
     WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
+    // ── Observability (ADR-018) ─────────────────────────────────────────────
+    builder.AddAxisOpenTelemetry();
+
     // ── Logging ────────────────────────────────────────────────────────────
     builder.Host.UseSerilog((ctx, services, config) => config
         .ReadFrom.Configuration(ctx.Configuration)
         .ReadFrom.Services(services)
-        .Enrich.FromLogContext());
+        .Enrich.FromLogContext()
+        .Enrich.With<TraceContextSerilogEnricher>());
 
     // ── Wolverine (messaging + per-module durable inbox/outbox per ADR-012) ─
     // Capture the live ConfigurationManager and read inside the lambda so
@@ -337,6 +342,7 @@ try
         await identityDb.Database.MigrateAsync();
     }
 
+    app.UseAxisOpenTelemetry();
     app.UseMiddleware<CorrelationIdMiddleware>();
     app.UseMiddleware<ValidationExceptionMiddleware>();
     app.UseSerilogRequestLogging();

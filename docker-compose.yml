@@ -146,6 +146,23 @@ services:
       retries: 20
       start_period: 20s
 
+  # Optional local observability stack (ADR-018). Start with:
+  #   docker compose --profile observability up -d
+  otel-lgtm:
+    profiles: ["observability"]
+    image: grafana/otel-lgtm:0.11.8
+    container_name: axis_otel_lgtm
+    ports:
+      - "3001:3000"   # Grafana UI — http://localhost:3001
+      - "4317:4317"   # OTLP/gRPC (traces, metrics, logs)
+      - "4318:4318"   # OTLP/HTTP
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
   vault:
     # Dev mode — secrets live in memory only (lost on restart). Acceptable
     # for local development; production uses a separately-provisioned
@@ -207,6 +224,11 @@ services:
       Email__Port: "1025"
       Aws__ServiceURL: "http://localstack:4566"
       Cors__AllowedOrigins__0: "http://localhost:3000"
+      # OTLP export is off in the default compose API container (no LGTM dependency).
+      # For traces in Grafana: `docker compose --profile observability up -d otel-lgtm`
+      # then `dotnet run` on the host (appsettings.json → localhost:4317) or set
+      # OpenTelemetry__Otlp__Endpoint=http://otel-lgtm:4317 when running API in compose with the profile.
+      OpenTelemetry__Otlp__Endpoint: ""
     ports:
       - "5280:8080"
     volumes:
