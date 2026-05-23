@@ -9,16 +9,20 @@ namespace Axis.FormBuilder.Infrastructure.Persistence;
 
 internal sealed class FormBuilderDbContext(
     DbContextOptions<FormBuilderDbContext> options,
-    ITenantContext tenantContext)
-    : AxisDbContext(options, tenantContext)
+    ITenantContext tenantContext) : DbContext(options)
 {
     public DbSet<FormDefinition> FormDefinitions => Set<FormDefinition>();
     public DbSet<FormWorkflowReference> FormWorkflowReferences => Set<FormWorkflowReference>();
     public DbSet<FormSubmission> FormSubmissions => Set<FormSubmission>();
 
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        // Per ADR-017: interceptor wiring inlined per module.
+        optionsBuilder.AddInterceptors(new TenantSchemaInterceptor(tenantContext));
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfiguration(new FormDefinitionConfiguration());
         modelBuilder.ApplyConfiguration(new FormWorkflowReferenceConfiguration());
         modelBuilder.ApplyConfiguration(new FormSubmissionConfiguration());

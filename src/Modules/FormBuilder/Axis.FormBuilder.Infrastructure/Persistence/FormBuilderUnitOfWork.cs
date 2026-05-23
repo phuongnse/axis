@@ -1,8 +1,48 @@
 using Axis.FormBuilder.Application.Services;
-using Axis.Shared.Infrastructure.Persistence;
+using Axis.Shared.Application;
+using Axis.Shared.Domain.Primitives;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Npgsql;
 using Wolverine;
 
 namespace Axis.FormBuilder.Infrastructure.Persistence;
 
-internal sealed class FormBuilderUnitOfWork(FormBuilderDbContext context, IMessageBus bus)
-    : UnitOfWork(context, bus), IUnitOfWork;
+/// <summary>
+/// Collects domain events from tracked aggregates, persists the change set,
+/// then publishes events via Wolverine. Inlined per module per ADR-017.
+/// </summary>
+internal sealed class FormBuilderUnitOfWork(FormBuilderDbContext context, IMessageBus bus) : IUnitOfWork
+{
+    public async Task<int> SaveChangesAsync(CancellationToken ct = default)
+    {
+        List<IDomainEvent> events = context.ChangeTracker
+            .Entries<IHasDomainEvents>()
+            .SelectMany(e => e.Entity.DomainEvents)
+            .ToList();
+
+        foreach (EntityEntry<IHasDomainEvents> entry in context.ChangeTracker.Entries<IHasDomainEvents>())
+            entry.Entity.ClearDomainEvents();
+
+        int result;
+        try
+        {
+            result = await context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            throw new ConcurrencyException(ex);
+        }
+        catch (DbUpdateException ex)
+            when (ex.InnerException is PostgresException pg && pg.SqlState == "23505")
+        {
+            throw new UniqueConstraintException(
+                "A record with a conflicting unique key already exists.", ex);
+        }
+
+        foreach (IDomainEvent evt in events)
+            await bus.PublishAsync(evt);
+
+        return result;
+    }
+}
