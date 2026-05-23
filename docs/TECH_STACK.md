@@ -15,9 +15,9 @@
 | **Entity Framework Core** | 9.x | ORM (per module) | Each module owns a DbContext + database. Migrations mandatory ([ADR-023](#adr-023-per-module-ef-core-migrations-only)). |
 | **Npgsql** | 9.x | PostgreSQL driver | Per-module database; per-module Wolverine schema ([ADR-011](#adr-011-per-module-database-with-schema-per-tenant-inside), [ADR-012](#adr-012-per-module-wolverine-schema-in-the-modules-own-database)). |
 | **Wolverine** | 5.x | In-module orchestration + outbox + saga runtime | Handlers, scheduled jobs, durable outbox (per-module schema), saga state. Cross-module transports are Kafka + RabbitMQ ([ADR-013](#adr-013-apache-kafka-for-cross-module-domain-events-and-event-sourced-aggregates), [ADR-024](#adr-024-rabbitmq-for-commands-background-jobs-and-saga-orchestration)). |
-| **Apache Kafka** | 3.x | Cross-module event transport + event-sourced aggregate log | Durable log + replay for events; Confluent Schema Registry for Avro payloads ([ADR-013](#adr-013-apache-kafka-for-cross-module-domain-events-and-event-sourced-aggregates), [ADR-019](#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). Routing rule per [ADR-025](#adr-025-transport-selection-rule-commands-to-rabbitmq-events-to-kafka). |
+| **Apache Kafka** | 3.x | Cross-module event transport + event-sourced aggregate log | Durable log + replay for events; Confluent Schema Registry for Avro payloads ([ADR-013](#adr-013-apache-kafka-for-cross-module-domain-events-and-event-sourced-aggregates), [ADR-019](#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). Routing rule per [ADR-025](#adr-025-transport-selection-rule-by-message-name-suffix). |
 | **WolverineFx.Kafka** | 5.x | Kafka transport for Wolverine | Bridges Wolverine envelopes to/from Kafka topics. |
-| **RabbitMQ** | 3.x | Cross-module command + job + saga transport | Work-queue semantics (ACK, requeue, DLX, prefetch); Wolverine saga orchestration ([ADR-024](#adr-024-rabbitmq-for-commands-background-jobs-and-saga-orchestration)). Routing rule per [ADR-025](#adr-025-transport-selection-rule-commands-to-rabbitmq-events-to-kafka). |
+| **RabbitMQ** | 3.x | Cross-module command + job + saga transport | Work-queue semantics (ACK, requeue, DLX, prefetch); Wolverine saga orchestration ([ADR-024](#adr-024-rabbitmq-for-commands-background-jobs-and-saga-orchestration)). Routing rule per [ADR-025](#adr-025-transport-selection-rule-by-message-name-suffix). |
 | **WolverineFx.RabbitMq** | 5.x | RabbitMQ transport for Wolverine | Bridges Wolverine envelopes to/from RabbitMQ exchanges/queues. |
 | **gRPC + Protobuf** | — | Cross-module sync RPC | Internal-only; external API stays REST. Contracts in `Axis.{Module}.Contracts/*.proto` ([ADR-014](#adr-014-grpc-for-internal-sync-rpc-and-rest-openapi-for-external-api)). |
 | **CloudEvents 1.0 + Avro** | — | Event envelope + payload format | Routing/correlation metadata in CloudEvents envelope; payload in Avro with Confluent Schema Registry ([ADR-019](#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). |
@@ -192,7 +192,7 @@
 
 ### ADR-013: Apache Kafka for cross-module domain events and event-sourced aggregates
 
-**Decision:** Use Apache Kafka (via WolverineFx.Kafka) as the transport for **cross-module domain events** (facts that other modules need to react to) and as the **event store** for any aggregate the team chooses to event-source per the selective-event-sourcing convention (see ADR-026 when written). Commands, background jobs, sagas, and other work-queue traffic go through RabbitMQ instead — see [ADR-024](#adr-024-rabbitmq-for-commands-background-jobs-and-saga-orchestration) and [ADR-025](#adr-025-transport-selection-rule-commands-to-rabbitmq-events-to-kafka).
+**Decision:** Use Apache Kafka (via WolverineFx.Kafka) as the transport for **cross-module domain events** (facts that other modules need to react to) and as the **event store** for any aggregate the team chooses to event-source per the selective-event-sourcing convention (see ADR-026 when written). Commands, background jobs, sagas, and other work-queue traffic go through RabbitMQ instead — see [ADR-024](#adr-024-rabbitmq-for-commands-background-jobs-and-saga-orchestration) and [ADR-025](#adr-025-transport-selection-rule-by-message-name-suffix).
 
 **Reason:**
 
@@ -207,7 +207,7 @@
 - Commands (`*Command` — explicit intent to perform an action) → RabbitMQ.
 - Background jobs (`*Job` — fire-and-forget work) → RabbitMQ.
 - Saga step messages (orchestrator coordination) → RabbitMQ.
-- See [ADR-025](#adr-025-transport-selection-rule-commands-to-rabbitmq-events-to-kafka) for the per-message routing convention.
+- See [ADR-025](#adr-025-transport-selection-rule-by-message-name-suffix) for the per-message routing convention.
 
 **Anti-patterns rejected:**
 
@@ -347,7 +347,7 @@
 
 ### ADR-024: RabbitMQ for commands, background jobs, and saga orchestration
 
-**Decision:** Use **RabbitMQ** (via WolverineFx.RabbitMq) as the transport for cross-module **commands** (intent to perform an action), **background jobs** (fire-and-forget work), and **saga step messages** (cross-module orchestrator coordination). This sits alongside Kafka per [ADR-013](#adr-013-apache-kafka-for-cross-module-domain-events-and-event-sourced-aggregates), which keeps cross-module domain events and event-sourced aggregate logs. Per-message routing is defined in [ADR-025](#adr-025-transport-selection-rule-commands-to-rabbitmq-events-to-kafka).
+**Decision:** Use **RabbitMQ** (via WolverineFx.RabbitMq) as the transport for cross-module **commands** (intent to perform an action), **background jobs** (fire-and-forget work), and **saga step messages** (cross-module orchestrator coordination). This sits alongside Kafka per [ADR-013](#adr-013-apache-kafka-for-cross-module-domain-events-and-event-sourced-aggregates), which keeps cross-module domain events and event-sourced aggregate logs. Per-message routing is defined in [ADR-025](#adr-025-transport-selection-rule-by-message-name-suffix).
 
 **Reason:**
 
@@ -369,7 +369,7 @@
 - Kafka for commands/jobs (over-engineered; see [ADR-013](#adr-013-apache-kafka-for-cross-module-domain-events-and-event-sourced-aggregates) anti-pattern list).
 - Multiple brokers per ecosystem (one Kafka + one RabbitMQ is enough — adding NATS or SQS as a third would double the ops surface without commensurate gain).
 
-### ADR-025: Transport selection rule — commands to RabbitMQ, events to Kafka
+### ADR-025: Transport selection rule by message-name suffix
 
 **Decision:** Code-level convention that determines which transport carries which message. The rule keys off **message-name suffix** so it is grep-able, lint-able, and unambiguous at PR-review time:
 
