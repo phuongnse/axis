@@ -36,7 +36,7 @@
 
 | Technology | Version | Role | Rationale |
 |---|---|---|---|
-| **React** | 18.x | UI framework | Richest ecosystem for complex builder UIs |
+| **React** | 19.x | UI framework | Richest ecosystem for complex builder UIs. Bumped from 18 → 19 via Dependabot PR #64; `@vitejs/plugin-react@5` supports React 19 + Vite 6, so the rest of the toolchain stays put. |
 | **TypeScript** | 6.x | Type safety | Catches errors early, essential for a large codebase. `strict: true` + `noUnusedLocals/Parameters` enforced. |
 | **Vite** | 6.x | Build tool | Fast dev server and build |
 | **@vitejs/plugin-react** | 5.x | React Vite plugin | Babel-based React transform; v5 supports vite 4–7 |
