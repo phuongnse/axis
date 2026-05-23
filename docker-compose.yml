@@ -55,15 +55,11 @@ services:
       retries: 10
 
   # ── Distributed-ready foundation (ADR-013, ADR-019, ADR-022) ─────────
-  # Kafka + Schema Registry are the cross-module event transport (Phase 1
-  # of the rollout in docs/PROGRESS.md). Vault is the secrets store for
-  # production (dev uses .env). All three live behind the `distributed`
-  # Compose profile so a default `docker compose up` stays light; opt in
-  # with `docker compose --profile distributed up` once a module wires the
-  # WolverineFx.Kafka transport (Phase 1 PR #2).
-  #
-  # Profile will be removed (these services become mandatory like
-  # postgres/redis) once the first module's outbox publishes to Kafka.
+  # Kafka + Schema Registry are the cross-module event transport
+  # (configured in Axis.Api as the Wolverine transport per ADR-013).
+  # Vault is the secrets store for production (dev uses .env).
+  # All three are mandatory like postgres/redis — the api service waits
+  # for kafka:healthy before starting.
 
   kafka:
     # Confluent CP image (Community License — free for single-broker dev
@@ -71,7 +67,6 @@ services:
     # the current Confluent default (no ZooKeeper).
     image: confluentinc/cp-kafka:7.7.0
     container_name: axis_kafka
-    profiles: ["distributed"]
     environment:
       # Single-broker KRaft cluster — broker + controller in one process.
       KAFKA_NODE_ID: 1
@@ -112,7 +107,6 @@ services:
   schema-registry:
     image: confluentinc/cp-schema-registry:7.7.0
     container_name: axis_schema_registry
-    profiles: ["distributed"]
     depends_on:
       kafka:
         condition: service_healthy
@@ -137,7 +131,6 @@ services:
     # Vault cluster with persistent storage + unseal keys (ADR-022).
     image: hashicorp/vault:1.18
     container_name: axis_vault
-    profiles: ["distributed"]
     cap_add: [IPC_LOCK]    # required by Vault to prevent secrets being swapped to disk
     environment:
       VAULT_DEV_ROOT_TOKEN_ID: "axis-dev-root-token"
@@ -168,6 +161,10 @@ services:
         condition: service_started
       localstack:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
@@ -181,6 +178,7 @@ services:
       ConnectionStrings__FormBuilder: "Host=postgres;Port=5432;Database=axis;Username=axis;Password=axis_dev_pass"
       ConnectionStrings__WorkflowEngine: "Host=postgres;Port=5432;Database=axis;Username=axis;Password=axis_dev_pass"
       Redis__ConnectionString: "redis:6379"
+      Kafka__Brokers: "kafka:9092"
       Email__Host: maildev
       Email__Port: "1025"
       Aws__ServiceURL: "http://localstack:4566"

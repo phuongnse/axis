@@ -11,8 +11,8 @@ Foundation phases (each a sequence of small PRs):
 
 | Phase | Status | Deliverable |
 |---|---|---|
-| **Phase 0 — Foundation decisions** | ⚠️ in progress (this PR) | Rewrite ADR-001/002/009; add ADR-010..023; update `ARCHITECTURE.md` + `CLAUDE.md` + `patterns.md`. No code change. |
-| **Phase 1 — Infrastructure foundation** | ⏳ pending | Add Kafka + Schema Registry + Vault to `docker-compose.dev.yml`; wire WolverineFx.Kafka transport; refactor `Axis.Shared` to abstractions only; per-module DB connection separation + per-module Wolverine schema; OpenTelemetry instrumentation. |
+| **Phase 0 — Foundation decisions** | ✅ done (PR #59) | Rewrote ADR-001/002/009; added ADR-010..023; updated `ARCHITECTURE.md` + `CLAUDE.md` + `patterns.md`. |
+| **Phase 1 — Infrastructure foundation** | ⚠️ in progress | PR #83 added Kafka + Schema Registry + Vault to `docker-compose.yml`. **This PR** wires `WolverineFx.Kafka` as the cross-module transport (no module enlistments yet — those land in subsequent PRs). Still to do: refactor `Axis.Shared` to abstractions only (ADR-017), per-module DB connection separation (ADR-011), OpenTelemetry instrumentation (ADR-018), per-module Wolverine schema (ADR-012), Avro + Schema Registry payload format (ADR-019). |
 | **Phase 2 — Per-module HTTP/gRPC boundary** | ⏳ pending | One PR per module: introduce `Axis.{Module}.Contracts` (proto + Avro); expose gRPC server; rewrite `Axis.Api` to call modules through gRPC clients; replace in-process service interfaces. Identity goes first. |
 | **Phase 3 — Per-module EF migrations** | ⏳ pending | Generate initial migrations for Identity / DataModeling / PageBuilder (already done for FormBuilder / WorkflowBuilder / WorkflowEngine); switch test fixtures from `EnsureCreatedAsync` to `MigrateAsync` per [ADR-023](TECH_STACK.md#adr-023-per-module-ef-core-migrations-only). |
 | **Phase 4 — Deployment readiness** | ⏳ pending | Per-module Dockerfile; `docker-compose.dev.yml` runs each module as a separate container; CI builds per-module artifacts; K8s manifests; per-module Vault policies. |

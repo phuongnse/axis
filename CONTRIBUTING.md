@@ -19,20 +19,17 @@ Docs-first development: feature specs in `docs/epics/` are the contract; code im
 
 ## Local dev stack
 
-`docker-compose.yml` starts the default services (`postgres`, `redis`, `maildev`, `localstack`, `api`, `web`) with `docker compose up`. The Kafka + Schema Registry + Vault trio for the modulith service-boundary work (ADR-010, ADR-013, ADR-019, ADR-022) lives behind the `distributed` profile so a default up stays light:
-
-```bash
-docker compose up                            # default stack (postgres, redis, …)
-docker compose --profile distributed up      # adds kafka, schema-registry, vault
-```
+`docker compose up` starts the full stack — Postgres, Redis, Maildev, LocalStack, Kafka (KRaft single-broker), Schema Registry, Vault (dev mode), the .NET API, and the Vite frontend. The api container waits for `kafka` and `schema-registry` to be healthy before starting; Wolverine's `UseKafka` configuration in `Axis.Api/Program.cs` would fail-fast otherwise.
 
 | Service | Host port | Notes |
 |---|---|---|
-| Kafka (KRaft) | `29092` | Connect from local processes; `kafka:9092` from other containers. Cluster ID is fixed so metadata survives container recreate. |
-| Schema Registry | `8081` | `BACKWARD`-only compatibility — breaking schema changes need an explicit override at publish time. |
-| Vault dev | `8200` | Root token `axis-dev-root-token`. **In-memory only** — secrets are wiped on container restart, matching the "dev convenience, prod is a separate cluster" stance in [ADR-022](docs/TECH_STACK.md#adr-022-secrets-management-via-hashicorp-vault-in-production). |
-
-The `distributed` profile will be removed once the first module's outbox publishes to Kafka — see the rollout in [docs/PROGRESS.md § Distributed-ready foundation rollout](docs/PROGRESS.md).
+| Postgres | `5432` | `axis` database; `axis_dev_pass` |
+| Redis | `6379` | |
+| Maildev | `1025` SMTP / `1080` UI | Outbound mail viewer at `http://localhost:1080` |
+| LocalStack | `4566` | S3-only |
+| Kafka (KRaft) | `29092` | Connect from local `dotnet run`; in-network containers reach `kafka:9092` (intentionally not host-published). Cluster ID is fixed so metadata survives container recreate. |
+| Schema Registry | `8081` | `BACKWARD`-only compatibility — breaking schema changes need an explicit override at publish time (ADR-019). |
+| Vault dev | `8200` | Root token `axis-dev-root-token`. **In-memory only** — secrets wiped on restart; production uses a separately-provisioned cluster (ADR-022). |
 
 ## Where to read more
 
