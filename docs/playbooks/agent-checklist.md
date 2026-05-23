@@ -38,6 +38,8 @@ Docs touched: docs/epics/…
 
 **CI-only gates** (run automatically on PR, no local action required): **Doc drift** (enforces same-PR docs, new-handler tests, no-new TODO/FIXME, new raw-SQL review, [speculation guard](./docs-style.md#anti-patterns-dont-ship-these)) and **Markdown link check** (`lychee` — verifies internal links and `#anchors`).
 
+**Adding new CI checks — verify GitHub plan support first.** Some GitHub-native security workflows require **GitHub Advanced Security (GHAS)** on private repos (a paid add-on). On `phuong-labs/axis` this includes `actions/dependency-review-action` and CodeQL code-scanning *upload* (analysis runs, only the SARIF upload fails). Verify GHAS provisioning before adding such checks; otherwise the PR will fail and need a follow-up to disable. Dependabot security updates work on any plan and cover the same threat model with a publish-time delay — use it as the baseline. The disabled-job comment in [`.github/workflows/build-and-test.yml`](../../.github/workflows/build-and-test.yml) lists the specific jobs to restore when GHAS is provisioned.
+
 **Priority:** Gate **1** blocks commit (failing build/tests). Gate **2** keeps docs in the same PR — required before merge, not a substitute for Gate 1. The [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) lists Gate 1 before Gate 2.
 
 ### Gate 1 — verify before push (local = CI)
