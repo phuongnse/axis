@@ -64,7 +64,7 @@ Any change affecting API response shape, status codes, or request contract must 
 
 **Why:** `EnsureCreatedAsync` is a no-op when the target database already has tables — regardless of which module created them. When two modules share a database and one runs `EnsureCreatedAsync` first, the second module's tables are never created and every test fails with `relation "..." does not exist`.
 
-**Pattern:** use the `CreateModuleDatabaseAsync` helper to provision a dedicated database per module before building the `WebApplicationFactory`, then call `EnsureCreatedAsync` on each module's `DbContext` separately:
+**Pattern:** provision a dedicated database per module (`PostgresModuleTestDatabase.CreateAsync` in `tests/Shared/Axis.Testing`), then call `MigrateAsync` on each module's `DbContext` (same migrations as production):
 
 ```csharp
 // ✅ correct — each module gets its own isolated DB
@@ -79,7 +79,7 @@ string moduleBConnStr = await CreateModuleDatabaseAsync("axis_moduleb_test");
 DbContextOptions<ModuleADbContext> aOpts = new DbContextOptionsBuilder<ModuleADbContext>()
     .UseNpgsql(moduleAConnStr).Options;
 await using ModuleADbContext aCtx = new(aOpts, new PublicSchemaTenantContext());
-await aCtx.Database.EnsureCreatedAsync();
+await aCtx.Database.MigrateAsync();
 ```
 
 Identity is the exception: it uses the host `postgres` database because `IdentityDbContext` targets the global `public` schema — it must never be isolated to a module-specific database.

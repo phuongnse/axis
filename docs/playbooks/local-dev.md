@@ -39,7 +39,7 @@ Add `--build` only if you change the `frontend/Dockerfile.dev` or the root `Dock
 | API ready | <http://localhost:5280/health/ready> | Includes Postgres + Redis probes. |
 | Scalar / Swagger | <http://localhost:5280/scalar/v1> | OpenAPI explorer (dev/staging only). |
 | MailDev UI | <http://localhost:1080> | Outbound email lands here; nothing leaves the box. |
-| Postgres | `localhost:5432` | User `axis` / password `axis_dev_pass` / db `axis`. |
+| Postgres | `localhost:5432` | User `axis` / password `axis_dev_pass`. Module DBs: `axis_identity`, `axis_datamodeling`, `axis_workflowbuilder`, `axis_formbuilder`, `axis_workflowengine`, `axis_pagebuilder` (created on first `docker compose up` via `infra/postgres/init.d/`). |
 | Redis | `localhost:6379` | No auth. |
 | LocalStack | <http://localhost:4566> | S3 only (used for avatars). |
 

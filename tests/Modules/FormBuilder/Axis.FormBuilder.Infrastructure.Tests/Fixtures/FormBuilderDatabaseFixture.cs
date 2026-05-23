@@ -1,4 +1,6 @@
 using Axis.Shared.Application.Tenancy;
+using Axis.Testing;
+using Axis.FormBuilder.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Testcontainers.PostgreSql;
@@ -17,17 +19,21 @@ public sealed class FormBuilderDatabaseFixture : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
-        ConnectionString = _postgres.GetConnectionString();
+        ConnectionString = await PostgresModuleTestDatabase.CreateAsync(
+            _postgres.GetConnectionString(),
+            "axis_formbuilder_infra_test");
 
-        await using var conn = new NpgsqlConnection(ConnectionString);
+        await using NpgsqlConnection conn = new(ConnectionString);
         await conn.OpenAsync();
 
-        await using var schemaCmd = conn.CreateCommand();
+        await using NpgsqlCommand schemaCmd = conn.CreateCommand();
         schemaCmd.CommandText = $"""CREATE SCHEMA IF NOT EXISTS "{TestSchema}";""";
         await schemaCmd.ExecuteNonQueryAsync();
 
-        using var ctx = CreateContext();
-        await ctx.Database.EnsureCreatedAsync();
+        TestTenantContext tenantContext = new(TestSchema);
+        await PostgresModuleTestDatabase.MigrateAsync<FormBuilderDbContext>(
+            ConnectionString,
+            opts => new FormBuilderDbContext(opts, tenantContext));
 
         // Create a minimal workflow_definitions table so IsReferencedByWorkflowAsync can query it
         await using var wfCmd = conn.CreateCommand();

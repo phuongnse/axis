@@ -52,7 +52,7 @@ internal sealed class TenantSchemaProvisioner(
         DbContextOptionsBuilder<DataModelingDbContext> optionsBuilder = new();
         optionsBuilder.UseNpgsql(connectionString);
         await using DataModelingDbContext context = new(optionsBuilder.Options, tenantContext);
-        await context.Database.EnsureCreatedAsync(cancellationToken);
+        await context.Database.MigrateAsync(cancellationToken);
     }
 
     private async Task ProvisionWorkflowBuilderAsync(Guid organizationId, CancellationToken cancellationToken)

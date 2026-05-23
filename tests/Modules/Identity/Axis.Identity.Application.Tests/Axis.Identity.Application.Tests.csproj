@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\src\Modules\Identity\Axis.Identity.Application\Axis.Identity.Application.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Axis.Testing\Axis.Testing.csproj" />
   </ItemGroup>
 
 </Project>

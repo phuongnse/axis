@@ -29,6 +29,7 @@
     <PackageReference Include="WolverineFx.Postgresql" />
     <PackageReference Include="WolverineFx.Kafka" />
     <PackageReference Include="WolverineFx.RabbitMq" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="Npgsql" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
     <PackageReference Include="Scalar.AspNetCore" />

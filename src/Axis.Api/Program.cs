@@ -25,6 +25,12 @@ using Axis.WorkflowEngine.Infrastructure.Extensions;
 using FluentValidation;
 using JasperFx.Resources;
 using MediatR;
+using Wolverine.Persistence.Durability;
+using Axis.WorkflowEngine.Infrastructure.Persistence;
+using Axis.WorkflowBuilder.Infrastructure.Persistence;
+using Axis.FormBuilder.Infrastructure.Persistence;
+using Axis.DataModeling.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
@@ -57,7 +63,7 @@ try
         .ReadFrom.Services(services)
         .Enrich.FromLogContext());
 
-    // ── Wolverine (messaging + durable inbox/outbox per ADR-009) ───────────
+    // ── Wolverine (messaging + per-module durable inbox/outbox per ADR-012) ─
     // Capture the live ConfigurationManager and read inside the lambda so
     // WebApplicationFactory.ConfigureAppConfiguration overrides applied later
     // in test setup are picked up by Wolverine.
@@ -65,8 +71,16 @@ try
 
     builder.Host.UseWolverine(opts =>
     {
-        string wolverineConnectionString = wolverineConfig.GetConnectionString("Wolverine")
-            ?? throw new InvalidOperationException("ConnectionStrings:Wolverine is required");
+        string identityConnectionString = wolverineConfig.GetConnectionString("Identity")
+            ?? throw new InvalidOperationException("ConnectionStrings:Identity is required");
+        string dataModelingConnectionString = wolverineConfig.GetConnectionString("DataModeling")
+            ?? throw new InvalidOperationException("ConnectionStrings:DataModeling is required");
+        string workflowBuilderConnectionString = wolverineConfig.GetConnectionString("WorkflowBuilder")
+            ?? throw new InvalidOperationException("ConnectionStrings:WorkflowBuilder is required");
+        string formBuilderConnectionString = wolverineConfig.GetConnectionString("FormBuilder")
+            ?? throw new InvalidOperationException("ConnectionStrings:FormBuilder is required");
+        string workflowEngineConnectionString = wolverineConfig.GetConnectionString("WorkflowEngine")
+            ?? throw new InvalidOperationException("ConnectionStrings:WorkflowEngine is required");
 
         string kafkaBrokers = wolverineConfig["Kafka:Brokers"]
             ?? throw new InvalidOperationException("Kafka:Brokers is required");
@@ -78,9 +92,20 @@ try
         opts.Policies.AddMiddleware<HandlerLoggingMiddleware>();
         opts.UseEntityFrameworkCoreTransactions();
 
-        // Durable inbox/outbox in dedicated `wolverine` schema (ADR-009).
-        // Fully-qualified table names bypass tenant `search_path` set by HttpTenantContext.
-        opts.PersistMessagesWithPostgresql(wolverineConnectionString, "wolverine");
+        // Main store: node/agent coordination in Identity DB (ADR-011 + ADR-012).
+        opts.PersistMessagesWithPostgresql(identityConnectionString, "wolverine");
+
+        // Per-module ancillary outbox — `wolverine` schema colocated with each module DB.
+        opts.PersistMessagesWithPostgresql(identityConnectionString, "wolverine", MessageStoreRole.Ancillary)
+            .Enroll<IdentityDbContext>();
+        opts.PersistMessagesWithPostgresql(dataModelingConnectionString, "wolverine", MessageStoreRole.Ancillary)
+            .Enroll<DataModelingDbContext>();
+        opts.PersistMessagesWithPostgresql(workflowBuilderConnectionString, "wolverine", MessageStoreRole.Ancillary)
+            .Enroll<WorkflowBuilderDbContext>();
+        opts.PersistMessagesWithPostgresql(formBuilderConnectionString, "wolverine", MessageStoreRole.Ancillary)
+            .Enroll<FormBuilderDbContext>();
+        opts.PersistMessagesWithPostgresql(workflowEngineConnectionString, "wolverine", MessageStoreRole.Ancillary)
+            .Enroll<WorkflowEngineDbContext>();
 
         // Cross-module event transport — `*Event`/`*Snapshot` messages.
         // Kafka also stores event-sourced aggregate logs. Per ADR-013 + the
@@ -116,9 +141,8 @@ try
         opts.Discovery.IncludeAssembly(typeof(FormBuilderInfrastructureExtensions).Assembly);
     });
 
-    // Development + integration tests: auto-create the `wolverine` schema + tables
-    // on startup. Production runs a scripted SQL migration as part of the CI pipeline
-    // (ADR-009).
+    // Development + integration tests: auto-create each module's `wolverine` schema.
+    // Production runs scripted SQL migrations per module DB (ADR-012).
     if (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing"))
         builder.Services.AddResourceSetupOnStartup();
 
@@ -304,14 +328,13 @@ try
     // ── Build ──────────────────────────────────────────────────────────────
     WebApplication app = builder.Build();
 
-    // ── Dev bootstrap: ensure Identity/OpenIddict schema before hosted services
-    //    (OpenIddictSeeder) run. Tenant module schemas are provisioned per-org
-    //    by TenantSchemaProvisioner when an organization is registered.
-    if (app.Environment.IsDevelopment())
+    // ── Dev bootstrap: apply Identity migrations before OpenIddictSeeder runs.
+    //    Tenant module schemas are provisioned per-org by TenantSchemaProvisioner.
+    if (app.Environment.IsDevelopment() && !EF.IsDesignTime)
     {
         using IServiceScope scope = app.Services.CreateScope();
         IdentityDbContext identityDb = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        identityDb.Database.EnsureCreated();
+        await identityDb.Database.MigrateAsync();
     }
 
     app.UseMiddleware<CorrelationIdMiddleware>();

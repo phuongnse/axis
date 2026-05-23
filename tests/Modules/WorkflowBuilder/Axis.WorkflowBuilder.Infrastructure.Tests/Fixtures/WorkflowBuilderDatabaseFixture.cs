@@ -1,4 +1,6 @@
 using Axis.Shared.Application.Tenancy;
+using Axis.WorkflowBuilder.Infrastructure.Persistence;
+using Axis.Testing;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Testcontainers.PostgreSql;
@@ -17,16 +19,20 @@ public sealed class WorkflowBuilderDatabaseFixture : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
-        ConnectionString = _postgres.GetConnectionString();
+        ConnectionString = await PostgresModuleTestDatabase.CreateAsync(
+            _postgres.GetConnectionString(),
+            "axis_workflowbuilder_infra_test");
 
-        await using var conn = new NpgsqlConnection(ConnectionString);
+        await using NpgsqlConnection conn = new(ConnectionString);
         await conn.OpenAsync();
-        await using var cmd = conn.CreateCommand();
-        cmd.CommandText = $"""CREATE SCHEMA IF NOT EXISTS "{TestSchema}";""";
-        await cmd.ExecuteNonQueryAsync();
+        await using NpgsqlCommand command = conn.CreateCommand();
+        command.CommandText = $"""CREATE SCHEMA IF NOT EXISTS "{TestSchema}";""";
+        await command.ExecuteNonQueryAsync();
 
-        using var ctx = CreateContext();
-        await ctx.Database.EnsureCreatedAsync();
+        TestTenantContext tenantContext = new(TestSchema);
+        await PostgresModuleTestDatabase.MigrateAsync<WorkflowBuilderDbContext>(
+            ConnectionString,
+            opts => new WorkflowBuilderDbContext(opts, tenantContext));
     }
 
     public async Task DisposeAsync() => await _postgres.DisposeAsync();
