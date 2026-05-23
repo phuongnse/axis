@@ -4,42 +4,46 @@
   </PropertyGroup>
 
   <ItemGroup Label="Application">
-    <PackageVersion Include="MediatR" Version="12.4.1" />
-    <PackageVersion Include="FluentValidation" Version="11.11.0" />
-    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />
+    <PackageVersion Include="MediatR" Version="12.5.0" />
+    <PackageVersion Include="FluentValidation" Version="11.12.0" />
+    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="11.12.0" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
   </ItemGroup>
 
   <ItemGroup Label="Infrastructure">
-    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="9.0.5" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.5" />
+    <!-- EF Core trio aligned; mismatched majors/minors here trigger NU1605 downgrade warnings -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="9.0.16" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.16" />
+    <!-- Npgsql + provider aligned on 9.0.4 (provider has no 9.0.5 yet) -->
     <PackageVersion Include="Npgsql" Version="9.0.4" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
-    <PackageVersion Include="StackExchange.Redis" Version="2.8.16" />
-    <PackageVersion Include="WolverineFx" Version="5.38.0" />
-    <PackageVersion Include="WolverineFx.Http" Version="5.38.0" />
-    <PackageVersion Include="WolverineFx.EntityFrameworkCore" Version="5.38.0" />
-    <PackageVersion Include="WolverineFx.Postgresql" Version="5.38.0" />
-    <PackageVersion Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageVersion Include="StackExchange.Redis" Version="2.13.1" />
+    <!-- WolverineFx quad aligned; .Http 5.39.3 exists, Dependabot just missed it -->
+    <PackageVersion Include="WolverineFx" Version="5.39.3" />
+    <PackageVersion Include="WolverineFx.Http" Version="5.39.3" />
+    <PackageVersion Include="WolverineFx.EntityFrameworkCore" Version="5.39.3" />
+    <PackageVersion Include="WolverineFx.Postgresql" Version="5.39.3" />
+    <PackageVersion Include="BCrypt.Net-Next" Version="4.2.0" />
     <PackageVersion Include="MailKit" Version="4.16.0" />
-    <PackageVersion Include="AWSSDK.S3" Version="4.0.23" />
-    <PackageVersion Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.3.37" />
+    <PackageVersion Include="AWSSDK.S3" Version="4.0.23.4" />
+    <PackageVersion Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.4.1" />
     <PackageVersion Include="Serilog.AspNetCore" Version="9.0.0" />
-    <PackageVersion Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageVersion Include="Serilog.Sinks.Seq" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup Label="API">
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="6.9.0" />
-    <PackageVersion Include="Scalar.AspNetCore" Version="2.6.0" />
+    <PackageVersion Include="Scalar.AspNetCore" Version="2.14.14" />
   </ItemGroup>
 
   <ItemGroup Label="Auth">
-    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.11" />
+    <!-- ASP.NET Core 8.x packages aligned on 8.0.27 -->
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.27" />
     <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.18.0" />
     <PackageVersion Include="Microsoft.IdentityModel.Tokens" Version="8.18.0" />
-    <PackageVersion Include="OpenIddict.AspNetCore" Version="5.3.0" />
-    <PackageVersion Include="OpenIddict.EntityFrameworkCore" Version="5.3.0" />
+    <PackageVersion Include="OpenIddict.AspNetCore" Version="5.8.0" />
+    <PackageVersion Include="OpenIddict.EntityFrameworkCore" Version="5.8.0" />
   </ItemGroup>
 
   <ItemGroup Label="SignalR">
@@ -47,7 +51,7 @@
   </ItemGroup>
 
   <ItemGroup Label="Testing">
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
@@ -57,8 +61,8 @@
     <PackageVersion Include="Testcontainers" Version="3.10.0" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="3.10.0" />
     <PackageVersion Include="Testcontainers.Redis" Version="3.10.0" />
-    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.11" />
-    <PackageVersion Include="Bogus" Version="35.6.1" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.27" />
+    <PackageVersion Include="Bogus" Version="35.6.5" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.16" />
   </ItemGroup>
 </Project>
