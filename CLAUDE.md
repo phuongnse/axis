@@ -30,7 +30,8 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 
 **Cross-module communication contract (P0):**
 
-- **Events:** Kafka topics with Avro payloads + CloudEvents envelopes. Wolverine publishes from the originating module's outbox; consumers run in other modules' Wolverine handlers.
+- **Events (`*Event` / `*Snapshot`):** Kafka topics with Avro payloads + CloudEvents envelopes. Wolverine publishes from the originating module's outbox; consumers run in other modules' Wolverine handlers. Also the store for event-sourced aggregates (per ADR-013).
+- **Commands / Jobs / Saga steps (`*Command` / `*Job` / `*SagaStep`):** RabbitMQ exchanges/queues via Wolverine. Work-queue semantics (ACK, requeue, DLX). Per ADR-024 + the routing rule in ADR-025.
 - **Sync RPC:** gRPC only, contracts defined in `Axis.{Module}.Contracts/*.proto`. Used as escape hatch when a local read model is insufficient.
 - **Auth:** JWT issued by Identity; other modules validate locally via JWKS (no DB lookup of Identity).
 - **External API to SPA:** REST/OpenAPI through the `Axis.Api` gateway.
@@ -41,7 +42,7 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 - **No project reference** from `Axis.{ModuleA}.*` to `Axis.{ModuleB}.*` except to `Axis.{ModuleB}.Contracts` (proto + Avro schemas only).
 - **No shared `DbContext`, no cross-module SQL, no cross-module aggregate references.**
 - **No shared kernel implementation.** `Axis.Shared.*` projects contain interfaces, primitives, and Result types — never UnitOfWork base classes, EF helpers, or repository bases.
-- **MediatR is intra-module only.** Cross-module dispatch always goes through Wolverine + Kafka.
+- **MediatR is intra-module only.** Cross-module dispatch always goes through Wolverine: commands/jobs/saga steps via RabbitMQ, events via Kafka (suffix convention in ADR-025).
 - **Auth checks read JWT claims locally.** Never `IdentityDbContext.Users.Find(...)` from outside Identity — call Identity's gRPC `IdentityService` or rely on JWT claims.
 
 **Cross-module data:** local read model synced by Kafka events — see [`patterns.md` § Cross-module communication](docs/playbooks/patterns.md). Saga orchestration ([ADR-020](docs/TECH_STACK.md#adr-020-saga-orchestration-for-cross-module-workflows)) for workflows that need transactional-looking semantics across modules.
@@ -66,7 +67,7 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 
 - Layer order: Contracts → Domain → Application → Infrastructure → module entrypoint → `Axis.Api` gateway → Frontend.
 - `Result` / `Result<T>` for business failures; exceptions for infrastructure only.
-- MediatR = intra-module commands/queries only; cross-module domain events = Wolverine outbox → Kafka topic.
+- MediatR = intra-module commands/queries only; cross-module dispatch = Wolverine outbox → Kafka topic (`*Event`/`*Snapshot`) or RabbitMQ exchange (`*Command`/`*Job`/`*SagaStep`) per ADR-025.
 - Minimal API: `.RequireAuthorization()` unless explicitly public; JWT validated locally via Identity JWKS (no DB call to Identity).
 - Schema changes = EF Core migration ([ADR-023](docs/TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)); `EnsureCreated` forbidden everywhere (prod, dev, tests).
 - New cross-module RPC = `.proto` in `Axis.{Module}.Contracts` first; never expose a new sync call without a versioned contract.

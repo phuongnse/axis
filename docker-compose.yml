@@ -125,6 +125,27 @@ services:
       timeout: 5s
       retries: 20
 
+  rabbitmq:
+    # Management image bundles the web UI on :15672 — invaluable for
+    # debugging stuck queues, DLX contents, consumer lag. Single-node is
+    # fine for dev; production uses a clustered deployment per ADR-024.
+    image: rabbitmq:3.13-management-alpine
+    container_name: axis_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: axis
+      RABBITMQ_DEFAULT_PASS: axis_dev_pass
+    ports:
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # Management UI — http://localhost:15672 (axis / axis_dev_pass)
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
   vault:
     # Dev mode — secrets live in memory only (lost on restart). Acceptable
     # for local development; production uses a separately-provisioned
@@ -165,6 +186,8 @@ services:
         condition: service_healthy
       schema-registry:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
@@ -179,6 +202,7 @@ services:
       ConnectionStrings__WorkflowEngine: "Host=postgres;Port=5432;Database=axis;Username=axis;Password=axis_dev_pass"
       Redis__ConnectionString: "redis:6379"
       Kafka__Brokers: "kafka:9092"
+      ConnectionStrings__RabbitMq: "amqp://axis:axis_dev_pass@rabbitmq:5672/"
       Email__Host: maildev
       Email__Port: "1025"
       Aws__ServiceURL: "http://localstack:4566"
@@ -222,3 +246,4 @@ volumes:
   web_node_modules:
   nuget_packages:
   kafka_data:
+  rabbitmq_data:

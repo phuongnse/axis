@@ -14,9 +14,11 @@
 | **CQRS via MediatR** | 12.x | Intra-module command/query separation | Within a module only; cross-module communication uses Kafka + gRPC, never MediatR. |
 | **Entity Framework Core** | 9.x | ORM (per module) | Each module owns a DbContext + database. Migrations mandatory ([ADR-023](#adr-023-per-module-ef-core-migrations-only)). |
 | **Npgsql** | 9.x | PostgreSQL driver | Per-module database; per-module Wolverine schema ([ADR-011](#adr-011-per-module-database-with-schema-per-tenant-inside), [ADR-012](#adr-012-per-module-wolverine-schema-in-the-modules-own-database)). |
-| **Wolverine** | 5.x | In-module orchestration + outbox + saga runtime | Handlers, scheduled jobs, durable outbox (per-module schema), saga state. Cross-module transport is Kafka ([ADR-013](#adr-013-apache-kafka-as-the-cross-module-event-transport)). |
-| **Apache Kafka** | 3.x | Cross-module event transport | Durable log + replay for module bootstrap; Confluent Schema Registry for Avro payloads ([ADR-013](#adr-013-apache-kafka-as-the-cross-module-event-transport), [ADR-019](#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). |
+| **Wolverine** | 5.x | In-module orchestration + outbox + saga runtime | Handlers, scheduled jobs, durable outbox (per-module schema), saga state. Cross-module transports are Kafka + RabbitMQ ([ADR-013](#adr-013-apache-kafka-for-cross-module-domain-events-and-event-sourced-aggregates), [ADR-024](#adr-024-rabbitmq-for-commands-background-jobs-and-saga-orchestration)). |
+| **Apache Kafka** | 3.x | Cross-module event transport + event-sourced aggregate log | Durable log + replay for events; Confluent Schema Registry for Avro payloads ([ADR-013](#adr-013-apache-kafka-for-cross-module-domain-events-and-event-sourced-aggregates), [ADR-019](#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). Routing rule per [ADR-025](#adr-025-transport-selection-rule-by-message-name-suffix). |
 | **WolverineFx.Kafka** | 5.x | Kafka transport for Wolverine | Bridges Wolverine envelopes to/from Kafka topics. |
+| **RabbitMQ** | 3.x | Cross-module command + job + saga transport | Work-queue semantics (ACK, requeue, DLX, prefetch); Wolverine saga orchestration ([ADR-024](#adr-024-rabbitmq-for-commands-background-jobs-and-saga-orchestration)). Routing rule per [ADR-025](#adr-025-transport-selection-rule-by-message-name-suffix). |
+| **WolverineFx.RabbitMq** | 5.x | RabbitMQ transport for Wolverine | Bridges Wolverine envelopes to/from RabbitMQ exchanges/queues. |
 | **gRPC + Protobuf** | — | Cross-module sync RPC | Internal-only; external API stays REST. Contracts in `Axis.{Module}.Contracts/*.proto` ([ADR-014](#adr-014-grpc-for-internal-sync-rpc-and-rest-openapi-for-external-api)). |
 | **CloudEvents 1.0 + Avro** | — | Event envelope + payload format | Routing/correlation metadata in CloudEvents envelope; payload in Avro with Confluent Schema Registry ([ADR-019](#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). |
 | **Confluent Schema Registry** | — | Event-schema evolution | Enforces backward-compatible event changes; rejects breaking changes on publish. |
@@ -62,7 +64,8 @@
 | Technology | Role | Rationale |
 |---|---|---|
 | **PostgreSQL 16** | Per-module databases (`axis_identity`, `axis_datamodeling`, …) | One database per module; schema-per-tenant inside each ([ADR-011](#adr-011-per-module-database-with-schema-per-tenant-inside)). JSONB for dynamic fields. |
-| **Apache Kafka 3.x** | Cross-module event broker | KRaft mode (no ZooKeeper). Topics partitioned by `organizationId`. ([ADR-013](#adr-013-apache-kafka-as-the-cross-module-event-transport)) |
+| **Apache Kafka 3.x** | Cross-module event broker + event-sourced aggregate log | KRaft mode (no ZooKeeper). Topics partitioned by `organizationId`. ([ADR-013](#adr-013-apache-kafka-for-cross-module-domain-events-and-event-sourced-aggregates)) |
+| **RabbitMQ 3.x** | Cross-module command + job + saga broker | Single-node in dev; classic queues with DLX. Management UI on `:15672`. ([ADR-024](#adr-024-rabbitmq-for-commands-background-jobs-and-saga-orchestration)) |
 | **Confluent Schema Registry** | Event-schema evolution | Avro schemas with backward-compatibility rules. |
 | **Redis 7** | Cache + distributed lock | Session cache, prevent duplicate job execution. Per-module key prefixes. |
 | **AWS S3** | File storage | Stores uploaded files (attachments, exports). Accessed via AWSSDK.S3 + AWSSDK.Extensions.NETCore.Setup. |
@@ -184,25 +187,33 @@
 
 - **Outbox locality matches data locality.** When a module is extracted, its outbox history extracts with it. Cross-module envelopes (events the module has published or received) live in the same DB as the aggregates that produced or consumed them, so replay/reconciliation works without cross-service coordination.
 - **Transactional guarantee preserved per module.** The atomic "aggregate save + envelope write" still holds because both still happen in the same DB transaction.
-- **Cross-module delivery uses the broker, not Postgres.** Envelopes destined for other modules are picked up by Wolverine and forwarded to Kafka ([ADR-013](#adr-013-apache-kafka-as-the-cross-module-event-transport)). The receiving module's Wolverine treats the Kafka message as an inbox envelope and durably tracks it in its own `wolverine.incoming_envelopes`.
+- **Cross-module delivery uses the broker, not Postgres.** Envelopes destined for other modules are picked up by Wolverine and forwarded to Kafka ([ADR-013](#adr-013-apache-kafka-for-cross-module-domain-events-and-event-sourced-aggregates)). The receiving module's Wolverine treats the Kafka message as an inbox envelope and durably tracks it in its own `wolverine.incoming_envelopes`.
 - **Schema migration per module.** Each module's Wolverine schema is created and migrated independently — production uses scripted SQL migrations in the module's CI pipeline; tests use EF Core migrations through the module's test fixture (see [ADR-023](#adr-023-per-module-ef-core-migrations-only)).
 
-### ADR-013: Apache Kafka as the cross-module event transport
+### ADR-013: Apache Kafka for cross-module domain events and event-sourced aggregates
 
-**Decision:** Use Apache Kafka (via WolverineFx.Kafka) as the message broker for all cross-module events. RabbitMQ, NATS, and Postgres-as-queue were evaluated and rejected for this role.
+**Decision:** Use Apache Kafka (via WolverineFx.Kafka) as the transport for **cross-module domain events** (facts that other modules need to react to) and as the **event store** for any aggregate the team chooses to event-source per the selective-event-sourcing convention (see ADR-026 when written). Commands, background jobs, sagas, and other work-queue traffic go through RabbitMQ instead — see [ADR-024](#adr-024-rabbitmq-for-commands-background-jobs-and-saga-orchestration) and [ADR-025](#adr-025-transport-selection-rule-by-message-name-suffix).
 
 **Reason:**
 
-- **Log-based replay is the killer feature for "extract = redeploy."** When a module is extracted, it needs to bootstrap its local read models. Kafka's durable log lets the new deployment replay from any offset (or from `earliest`) to rebuild state without cross-service coordination. RabbitMQ classic queues delete messages on consumption; RabbitMQ streams support replay but the ecosystem and operational maturity around event-sourcing is weaker than Kafka.
+- **Log-based replay is mandatory for event sourcing.** Event-sourced aggregates rebuild state by replaying their event log; Kafka's durable, ordered, partitioned log is the canonical store. RabbitMQ classic queues delete messages on consumption; RabbitMQ streams can replay but its ecosystem around event-sourcing is weaker.
+- **Cross-module integration events are facts.** A `WorkflowExecutionCompleted` event is published once, consumed by many — possibly years later by a new analytics consumer that didn't exist when the event was emitted. Kafka's retention + replay model fits; RabbitMQ's "consume and forget" doesn't.
 - **Partitioning matches the tenancy model.** Topics partitioned by `organizationId` preserve per-tenant ordering, allow per-tenant scaling, and keep tenants isolated within the message bus.
-- **Industry standard for event-driven microservices.** Kafka is the safer choice for ops tooling, monitoring, schema-registry integrations (see [ADR-019](#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)), and engineering hires later.
-- **Operational cost accepted.** Kafka has heavier ops than RabbitMQ (broker tuning, partition planning, KRaft/ZooKeeper config). Per [ADR-010](#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy) the cost is paid up front.
+- **Industry standard for event-driven systems.** Kafka pairs naturally with schema registries ([ADR-019](#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)), event-lake / analytics tooling, and standard observability stacks.
+- **Operational cost accepted for events only.** Kafka has heavier ops than RabbitMQ (broker tuning, partition planning, KRaft config). Scoping Kafka to events + event sourcing rather than "everything" keeps the surface bounded — work-queue traffic goes through RabbitMQ which is operationally lighter.
+
+**What is NOT on Kafka:**
+
+- Commands (`*Command` — explicit intent to perform an action) → RabbitMQ.
+- Background jobs (`*Job` — fire-and-forget work) → RabbitMQ.
+- Saga step messages (orchestrator coordination) → RabbitMQ.
+- See [ADR-025](#adr-025-transport-selection-rule-by-message-name-suffix) for the per-message routing convention.
 
 **Anti-patterns rejected:**
 
-- RabbitMQ for primary event transport (no log replay; would need a parallel event store).
+- Kafka as universal message bus including commands/jobs (over-engineering — work-queue semantics belong on RabbitMQ; see [ADR-024](#adr-024-rabbitmq-for-commands-background-jobs-and-saga-orchestration)).
 - NATS JetStream (great tech, smaller .NET community + less Kafka-ecosystem parity).
-- Postgres-as-queue (works at small scale but does not survive extraction — each module would need its own queue table, and cross-service handoff means broker anyway).
+- Postgres-as-queue (works at small scale but does not survive extraction).
 - Wolverine in-memory bus for cross-module dispatch (violates ADR-010's "same contract in both modes").
 
 ### ADR-014: gRPC for internal sync RPC and REST OpenAPI for external API
@@ -333,3 +344,55 @@
 
 - `EnsureCreated` for "speed" in tests — speed difference is negligible vs the silent skip risk.
 - Auto-apply migrations on app startup in production — migrations run as a separate step in the CI/CD pipeline so failed migrations don't leave the app in a half-migrated state.
+
+### ADR-024: RabbitMQ for commands, background jobs, and saga orchestration
+
+**Decision:** Use **RabbitMQ** (via WolverineFx.RabbitMq) as the transport for cross-module **commands** (intent to perform an action), **background jobs** (fire-and-forget work), and **saga step messages** (cross-module orchestrator coordination). This sits alongside Kafka per [ADR-013](#adr-013-apache-kafka-for-cross-module-domain-events-and-event-sourced-aggregates), which keeps cross-module domain events and event-sourced aggregate logs. Per-message routing is defined in [ADR-025](#adr-025-transport-selection-rule-by-message-name-suffix).
+
+**Reason:**
+
+- **Work-queue semantics are RabbitMQ's sweet spot.** Per-message ACK, requeue, dead-letter exchange, prefetch count, retry-with-backoff via TTL — these are first-class in RabbitMQ and require non-trivial workarounds in Kafka (retry topics, DLQ topics, manual offset commits, …).
+- **Latency is lower for synchronous-ish flows.** A `ProvisionTenantCommand` round-trip through RabbitMQ is milliseconds; the equivalent through Kafka with consumer poll cycles is meaningfully slower.
+- **Wolverine + RabbitMQ pairing is mature.** Saga state in Postgres + RabbitMQ for messages is the canonical Wolverine pattern; long-running orchestrators (e.g. tenant provisioning with retry/backoff/alert per [E01 US-003](epics/E01-platform-foundation/features/F01-tenant-registration.md)) fit naturally.
+- **Ops cost is low.** Single-node RabbitMQ runs in a few hundred MB, clusters are well-understood, the management UI is excellent for debugging stuck queues.
+- **Replay semantics are absent — that's a feature.** A command consumed should NOT be replayable; the action's already been taken. RabbitMQ's "consume and forget" matches command semantics. Use Kafka when you want to replay.
+
+**What is NOT on RabbitMQ:**
+
+- Cross-module domain events (`*Event`) → Kafka.
+- Event-sourced aggregate logs → Kafka.
+- Intra-module commands/queries → MediatR (in-process; never crosses a module boundary).
+
+**Anti-patterns rejected:**
+
+- RabbitMQ as event store (no replay, no retention model).
+- Kafka for commands/jobs (over-engineered; see [ADR-013](#adr-013-apache-kafka-for-cross-module-domain-events-and-event-sourced-aggregates) anti-pattern list).
+- Multiple brokers per ecosystem (one Kafka + one RabbitMQ is enough — adding NATS or SQS as a third would double the ops surface without commensurate gain).
+
+### ADR-025: Transport selection rule by message-name suffix
+
+**Decision:** Code-level convention that determines which transport carries which message. The rule keys off **message-name suffix** so it is grep-able, lint-able, and unambiguous at PR-review time:
+
+| Suffix | Transport | Contract |
+|---|---|---|
+| `*Command` | **RabbitMQ** | Intent to perform an action; consumer is expected to execute exactly once (Wolverine's idempotency middleware handles at-least-once delivery). |
+| `*Job` | **RabbitMQ** | Fire-and-forget background work (`SendEmailJob`, `ExpireFormSubmissionJob`). Typically scheduled via Wolverine's durable scheduler. |
+| `*SagaStep` / `*OrchestratorMessage` | **RabbitMQ** | Saga state-machine transitions. State lives in Postgres `saga_state` table per module. |
+| `*Event` | **Kafka** | Past-tense fact emitted by an aggregate after a state change. May have zero, one, or many consumers — including future consumers that don't exist today. |
+| `*Snapshot` (event-sourced aggregates) | **Kafka** (separate compacted topic) | Periodic state snapshot to bound replay cost; consumers can start from the snapshot instead of replaying all history. |
+
+**Reason:**
+
+- **Suffix convention is self-enforcing.** A new contributor naming a class `ProvisionTenantEvent` will route it to Kafka — even if their intent was actually a command, the code review catches "this isn't a past-tense fact, rename to `ProvisionTenantCommand`."
+- **Wolverine config stays declarative.** `opts.PublishMessage<T>().ToRabbitExchange(…)` for each `*Command`/`*Job`; `opts.PublishMessage<T>().ToKafkaTopic(…)` for each `*Event`. The Program.cs section reads top-to-bottom as "this kind of message goes here."
+- **Grep-able in CI.** A lint step can fail the PR if a `*Event` is routed to RabbitMQ or a `*Command` is routed to Kafka. Mismatch = explicit override required in code with a comment explaining why.
+
+**Edge cases:**
+
+- **Integration commands from external systems** (e.g. external webhook triggers a workflow): wrap as an internal `*Command` on RabbitMQ — don't expose Kafka topics to outside consumers without a deliberate ADR.
+- **Read-model rebuild signals** (e.g. "reindex all FormSubmissions"): treat as `*Job` on RabbitMQ even though the implementation involves replaying Kafka events — the signal to start is fire-and-forget work, the data source is the event log.
+
+**Anti-patterns rejected:**
+
+- "Same message goes to both transports" — pick one based on semantics. Duplicating writes doubles failure modes.
+- Suffix-less message names (just `ProvisionTenant`) — ambiguous routing; pre-commit hook should reject.
