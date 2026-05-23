@@ -121,23 +121,33 @@ jobs:
           args: --config ./lychee.toml './**/*.md'
           fail: true
 
-  # NOTE: actions/dependency-review-action requires GitHub Advanced Security
-  # for private repositories (paid). Re-enable this job by uncommenting once
-  # GHAS is provisioned, or if/when the repo becomes public. In the meantime,
-  # Dependabot (configured in .github/dependabot.yml) opens PRs for new
-  # advisories against existing dependencies, which covers the same threat
-  # model with a delay.
+  # ──────────────────────────────────────────────────────────────────────
+  # GHAS-only checks — disabled until GitHub Advanced Security is provisioned
+  # ──────────────────────────────────────────────────────────────────────
+  # `actions/dependency-review-action` and CodeQL code-scanning both require
+  # GitHub Advanced Security for private repositories. CodeQL ran end-to-end
+  # on PR #60 (171 queries, no findings) but failed at upload with
+  #   "Code Security must be enabled for this repository to use code scanning"
+  # and dependency-review failed at start with the same root cause. Once
+  # GHAS is enabled, re-add:
   #
-  # dependency-review:
-  #   name: Dependency review
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 5
-  #   steps:
-  #     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-  #       with:
-  #         persist-credentials: false
-  #     - name: Dependency review
-  #       uses: actions/dependency-review-action@67d4f4bd7a9b17a0db54d2a7519187c65e339de8 # v4.8.0
-  #       with:
-  #         fail-on-severity: high
-  #         comment-summary-in-pr: on-failure
+  #   dependency-review:
+  #     name: Dependency review
+  #     runs-on: ubuntu-latest
+  #     timeout-minutes: 5
+  #     steps:
+  #       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+  #         with:
+  #           persist-credentials: false
+  #       - uses: actions/dependency-review-action@67d4f4bd7a9b17a0db54d2a7519187c65e339de8 # v4.8.0
+  #         with:
+  #           fail-on-severity: high
+  #           comment-summary-in-pr: on-failure
+  #
+  # CodeQL: restore `.github/workflows/codeql.yml` from this commit's parent
+  # (or its git history). The workflow analyzed cleanly — only the upload
+  # step needs GHAS.
+  #
+  # In the meantime, Dependabot (.github/dependabot.yml) opens PRs for new
+  # advisories against existing dependencies, covering the same threat
+  # model with a publish-time delay.
