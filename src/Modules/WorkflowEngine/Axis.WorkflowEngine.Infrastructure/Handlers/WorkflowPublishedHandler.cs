@@ -34,7 +34,9 @@ internal sealed class WorkflowPublishedHandler(
         Guid organizationId = @event.OrganizationId();
 
         WorkflowActiveStatus? existing = await context.WorkflowActiveStatuses
-            .FirstOrDefaultAsync(w => w.WorkflowId == workflowId, ct);
+            .FirstOrDefaultAsync(
+                w => w.WorkflowId == workflowId && w.OrganizationId == organizationId,
+                ct);
 
         if (existing is null)
             context.WorkflowActiveStatuses.Add(
@@ -74,7 +76,9 @@ internal sealed class WorkflowPublishedHandler(
         IReadOnlyList<EngineReadModels.TransitionSnapshot> transitions = MapTransitions(@event.transitions);
 
         EngineReadModels.WorkflowSnapshot? existing = await context.WorkflowSnapshots
-            .FirstOrDefaultAsync(w => w.WorkflowId == workflowId, ct);
+            .FirstOrDefaultAsync(
+                w => w.WorkflowId == workflowId && w.OrganizationId == organizationId,
+                ct);
 
         if (existing is null)
             context.WorkflowSnapshots.Add(

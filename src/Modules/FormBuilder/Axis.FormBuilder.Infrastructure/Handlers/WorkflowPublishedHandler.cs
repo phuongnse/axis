@@ -33,7 +33,7 @@ internal sealed class WorkflowPublishedHandler(
         }
 
         int addedCount = 0;
-        foreach (Guid formId in referencedFormIds)
+        foreach (Guid formId in newFormIds)
         {
             FormWorkflowReference? existingRef = existing.FirstOrDefault(r => r.FormId == formId);
             if (existingRef is null)

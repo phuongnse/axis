@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Reflection;
 using Wolverine;
 
 namespace Axis.Shared.Infrastructure.Messaging;
@@ -52,7 +53,7 @@ public sealed class CloudEventsEnvelopeRule : IEnvelopeRule
 
     private static string? ResolveTenantId(object message)
     {
-        System.Reflection.PropertyInfo? property = message.GetType().GetProperty("organizationId");
+        PropertyInfo? property = message.GetType().GetProperty("organizationId");
         if (property?.GetValue(message) is string organizationId && !string.IsNullOrWhiteSpace(organizationId))
             return organizationId;
 

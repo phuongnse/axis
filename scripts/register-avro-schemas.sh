@@ -10,6 +10,10 @@ SCHEMA_DIR="$ROOT/src/Modules/WorkflowBuilder/Axis.WorkflowBuilder.Contracts/Sch
 register() {
   local file="$1"
   local subject="$2"
+  if [[ ! -f "$file" ]]; then
+    echo "ERROR: schema file not found: $file (subject: $subject, registry: $SCHEMA_REGISTRY_URL)" >&2
+    exit 1
+  fi
   local schema
   schema="$(tr -d '\n' <"$file" | sed 's/"/\\"/g')"
   curl -fsS -X POST \

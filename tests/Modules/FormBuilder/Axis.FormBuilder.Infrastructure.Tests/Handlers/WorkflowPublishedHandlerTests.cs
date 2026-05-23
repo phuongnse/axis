@@ -82,6 +82,23 @@ public sealed class WorkflowPublishedHandlerTests(FormBuilderDatabaseFixture fix
     }
 
     [Fact]
+    public async Task Handle_WhenReferencedFormIdsContainDuplicates_PersistsOneRowPerForm()
+    {
+        Guid workflowId = Guid.NewGuid();
+        Guid formId = Guid.NewGuid();
+
+        await using FormBuilderDbContext ctx = fixture.CreateContext();
+        await CreateHandler(ctx).Handle(
+            BuildEvent(workflowId, new List<Guid> { formId, formId }),
+            CancellationToken.None);
+
+        await using FormBuilderDbContext readCtx = fixture.CreateContext();
+        int count = await readCtx.FormWorkflowReferences
+            .CountAsync(r => r.WorkflowId == workflowId && r.FormId == formId);
+        count.Should().Be(1);
+    }
+
+    [Fact]
     public async Task Handle_WhenDeliveredTwice_IsIdempotent()
     {
         Guid workflowId = Guid.NewGuid();
