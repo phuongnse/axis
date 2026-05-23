@@ -1,4 +1,5 @@
 using Axis.Identity.Infrastructure.Persistence;
+using Axis.Testing;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
 
@@ -10,19 +11,30 @@ public sealed class IdentityDatabaseFixture : IAsyncLifetime
         .WithImage("postgres:16-alpine")
         .Build();
 
+    private string _connectionString = null!;
+
     public IdentityDbContext CreateContext()
     {
-        var opts = new DbContextOptionsBuilder<IdentityDbContext>()
-            .UseNpgsql(_postgres.GetConnectionString())
+        DbContextOptions<IdentityDbContext> options = new DbContextOptionsBuilder<IdentityDbContext>()
+            .UseNpgsql(_connectionString)
+            .UseOpenIddict()
             .Options;
-        return new IdentityDbContext(opts);
+        return new IdentityDbContext(options);
     }
 
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
-        await using var ctx = CreateContext();
-        await ctx.Database.EnsureCreatedAsync();
+        _connectionString = await PostgresModuleTestDatabase.CreateAsync(
+            _postgres.GetConnectionString(),
+            "axis_identity_infra_test");
+        await PostgresModuleTestDatabase.MigrateAsync<IdentityDbContext>(
+            _connectionString,
+            opts => new IdentityDbContext(
+                new DbContextOptionsBuilder<IdentityDbContext>()
+                    .UseNpgsql(_connectionString)
+                    .UseOpenIddict()
+                    .Options));
     }
 
     public Task DisposeAsync() => _postgres.DisposeAsync().AsTask();

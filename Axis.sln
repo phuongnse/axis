@@ -127,6 +127,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axis.FormBuilder.Infrastruc
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axis.WorkflowEngine.Infrastructure.Tests", "tests\Modules\WorkflowEngine\Axis.WorkflowEngine.Infrastructure.Tests\Axis.WorkflowEngine.Infrastructure.Tests.csproj", "{0499A406-7C1E-45D5-821B-A9C35D5A2466}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axis.Testing", "tests\Shared\Axis.Testing\Axis.Testing.csproj", "{2F9B575F-3B1B-4361-A5C1-6748A2237278}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -653,6 +655,18 @@ Global
 		{0499A406-7C1E-45D5-821B-A9C35D5A2466}.Release|x64.Build.0 = Release|Any CPU
 		{0499A406-7C1E-45D5-821B-A9C35D5A2466}.Release|x86.ActiveCfg = Release|Any CPU
 		{0499A406-7C1E-45D5-821B-A9C35D5A2466}.Release|x86.Build.0 = Release|Any CPU
+		{2F9B575F-3B1B-4361-A5C1-6748A2237278}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2F9B575F-3B1B-4361-A5C1-6748A2237278}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2F9B575F-3B1B-4361-A5C1-6748A2237278}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{2F9B575F-3B1B-4361-A5C1-6748A2237278}.Debug|x64.Build.0 = Debug|Any CPU
+		{2F9B575F-3B1B-4361-A5C1-6748A2237278}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{2F9B575F-3B1B-4361-A5C1-6748A2237278}.Debug|x86.Build.0 = Debug|Any CPU
+		{2F9B575F-3B1B-4361-A5C1-6748A2237278}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2F9B575F-3B1B-4361-A5C1-6748A2237278}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2F9B575F-3B1B-4361-A5C1-6748A2237278}.Release|x64.ActiveCfg = Release|Any CPU
+		{2F9B575F-3B1B-4361-A5C1-6748A2237278}.Release|x64.Build.0 = Release|Any CPU
+		{2F9B575F-3B1B-4361-A5C1-6748A2237278}.Release|x86.ActiveCfg = Release|Any CPU
+		{2F9B575F-3B1B-4361-A5C1-6748A2237278}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -718,5 +732,6 @@ Global
 		{E126E1C3-7F3C-4CB3-B847-80E1CE75C5DB} = {8DE83762-8C63-46F3-840F-0E1FEB012365}
 		{32ABADD4-8AED-46EF-BFAA-FFADDA514E7F} = {84CB25DB-F16E-45A5-B4F5-C1A98E8AC6CD}
 		{0499A406-7C1E-45D5-821B-A9C35D5A2466} = {644C31A5-0220-4F23-9665-3537AE72C226}
+		{2F9B575F-3B1B-4361-A5C1-6748A2237278} = {1954FA8D-7A7E-42F7-B92E-1187F56F0051}
 	EndGlobalSection
 EndGlobal

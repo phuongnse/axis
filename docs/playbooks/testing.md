@@ -58,33 +58,28 @@ dotnet format --verify-no-changes
 
 Any change affecting API response shape, status codes, or request contract must include updating all relevant files under `tests/Api/Axis.Api.Tests/` in the same PR. "Cannot run locally" is not an excuse.
 
-### ApiTestFixture — module database isolation
+### ApiTestFixture — module database isolation (ADR-011 + ADR-023)
 
-**Every module that has its own `DbContext` must get its own isolated database** in `ApiTestFixture`. Never point two modules at the same PostgreSQL database.
+**Every module that has its own `DbContext` must get its own isolated PostgreSQL database** in `ApiTestFixture` (e.g. `axis_identity_test`, `axis_datamodeling_test`). Never point two modules at the same database.
 
-**Why:** `EnsureCreatedAsync` is a no-op when the target database already has tables — regardless of which module created them. When two modules share a database and one runs `EnsureCreatedAsync` first, the second module's tables are never created and every test fails with `relation "..." does not exist`.
+**Why:** `EnsureCreatedAsync` skips schema creation when *any* user table already exists in the database. **Migrations do not have this heuristic** — use `MigrateAsync` everywhere ([ADR-023](../TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)).
 
-**Pattern:** use the `CreateModuleDatabaseAsync` helper to provision a dedicated database per module before building the `WebApplicationFactory`, then call `EnsureCreatedAsync` on each module's `DbContext` separately:
+**Pattern:** use `PostgresModuleTestDatabase` (`tests/Shared/Axis.Testing`) to create a database per module, set `ConnectionStrings__{Module}` environment variables **before** `WebApplicationFactory` (Wolverine reads them at host build), then `MigrateAsync` each context before starting the host:
 
 ```csharp
-// ✅ correct — each module gets its own isolated DB
-string moduleAConnStr = await CreateModuleDatabaseAsync("axis_modulea_test");
-string moduleBConnStr = await CreateModuleDatabaseAsync("axis_moduleb_test");
+string identityConn = await PostgresModuleTestDatabase.CreateAsync(adminConn, "axis_identity_test");
+Environment.SetEnvironmentVariable("ConnectionStrings__Identity", identityConn);
 
-// Wire each connection string into the host config:
-["ConnectionStrings:ModuleA"] = moduleAConnStr,
-["ConnectionStrings:ModuleB"] = moduleBConnStr,
+await using (IdentityDbContext ctx = new(/* UseOpenIddict() */))
+    await ctx.Database.MigrateAsync();
 
-// EnsureCreatedAsync for each module independently:
-DbContextOptions<ModuleADbContext> aOpts = new DbContextOptionsBuilder<ModuleADbContext>()
-    .UseNpgsql(moduleAConnStr).Options;
-await using ModuleADbContext aCtx = new(aOpts, new PublicSchemaTenantContext());
-await aCtx.Database.EnsureCreatedAsync();
+await PostgresModuleTestDatabase.MigrateAsync<DataModelingDbContext>(
+    dmConn, opts => new DataModelingDbContext(opts, tenantContext));
 ```
 
-Identity is the exception: it uses the host `postgres` database because `IdentityDbContext` targets the global `public` schema — it must never be isolated to a module-specific database.
+**Wolverine:** no separate `axis_wolverine_test` database. Per-module `wolverine` schemas are created by `AddResourceSetupOnStartup()` in each module's database when the test host starts ([ADR-012](../TECH_STACK.md#adr-012-per-module-wolverine-schema-in-the-modules-own-database)).
 
-**Rule:** when adding a new module to `ApiTestFixture`, always call `CreateModuleDatabaseAsync(...)` and wire the returned connection string into the host config — never reuse the root container connection string for a non-Identity module.
+**Rule:** when adding a module to `ApiTestFixture`, add `CreateAsync` + env var + `MigrateAsync` — never `EnsureCreatedAsync`, never a shared Wolverine-only database.
 
 ---
 

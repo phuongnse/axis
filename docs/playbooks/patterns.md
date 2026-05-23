@@ -518,7 +518,7 @@ _ = Task.Run(async () =>
 
 - **Private backing fields** (`_roleIds`, `_permissions`): use `PrimitiveCollection<List<T>>(fieldName).HasField(fieldName).UsePropertyAccessMode(PropertyAccessMode.Field)` — the type parameter must be the *collection* type, not the element type.
 - **No-args EF Core constructor**: when an aggregate's only constructor takes params EF Core can't bind (e.g. `IEnumerable<string>`), add a private no-args constructor: `private MyAggregate() : base(default) { RequiredField = null!; }`. Initialize all non-nullable reference-type fields to silence CS8618 — EF Core will never use these sentinel values because it always materialises via the real constructor path.
-- **Migrations strategy**: Infrastructure tests use `context.Database.EnsureCreated()` (fast, no migration files). Production deployments need one EF Core migration bundle per `DbContext`.
+- **Migrations strategy** ([ADR-023](../TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)): every environment uses `Database.MigrateAsync()` — production, dev bootstrap, tenant provisioning, and Testcontainers fixtures. One EF migration chain per `DbContext`; never `EnsureCreated`/`EnsureCreatedAsync`.
 - **Identity uses the global `public` schema** — `IdentityDbContext` is a plain `DbContext` with no `TenantSchemaInterceptor`. All other modules use `AxisDbContext` with `TenantSchemaInterceptor`.
 
 ## Testing rules
@@ -828,27 +828,48 @@ Every endpoint must be fully annotated — see CLAUDE.md API Layer section for r
 
 ## Wolverine patterns
 
-### Host setup
+### Host setup (ADR-012 — per-module `wolverine` schema)
+
+Each module owns a `wolverine` schema **inside its own PostgreSQL database** ([ADR-011](../TECH_STACK.md#adr-011-per-module-database-with-schema-per-tenant-inside), [ADR-012](../TECH_STACK.md#adr-012-per-module-wolverine-schema-in-the-modules-own-database)). There is **no** `ConnectionStrings:Wolverine` — persistence is wired from each module's connection string.
 
 ```csharp
-// Program.cs
+// Axis.Api/Program.cs — excerpt
 builder.Host.UseWolverine(opts =>
 {
-    // Auto-wrap handlers that use EF Core DbContext in a transaction
-    opts.Policies.AutoApplyTransactions();
+    string identityConnectionString = configuration.GetConnectionString("Identity")!;
+    string dataModelingConnectionString = configuration.GetConnectionString("DataModeling")!;
+    // ... WorkflowBuilder, FormBuilder, WorkflowEngine ...
 
-    // Integrates Wolverine's outbox with EF Core SaveChangesAsync
+    opts.Policies.AddMiddleware<HandlerLoggingMiddleware>();
     opts.UseEntityFrameworkCoreTransactions();
 
-    // NOTE: Durable PostgreSQL outbox is NOT yet configured. Domain events are dispatched
-    // in-memory after SaveChangesAsync. The durable outbox is deferred until the
-    // Wolverine persistence schema strategy is decided — tracked as E01 gap.
+    // Main store: node/agent coordination (Identity DB).
+    opts.PersistMessagesWithPostgresql(identityConnectionString, "wolverine");
+
+    // Per-module ancillary outbox — enrolled per DbContext.
+    opts.PersistMessagesWithPostgresql(identityConnectionString, "wolverine", MessageStoreRole.Ancillary)
+        .Enroll<IdentityDbContext>();
+    opts.PersistMessagesWithPostgresql(dataModelingConnectionString, "wolverine", MessageStoreRole.Ancillary)
+        .Enroll<DataModelingDbContext>();
+    // ... Enroll WorkflowBuilderDbContext, FormBuilderDbContext, WorkflowEngineDbContext ...
+
+    // Cross-module transports (ADR-013, ADR-024, ADR-025) — Kafka + RabbitMQ ...
 });
+
+// Dev + Testing: Wolverine creates each module's `wolverine` tables on startup.
+if (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing"))
+    builder.Services.AddResourceSetupOnStartup();
 ```
+
+**Rules:**
+
+- Never point two modules at one shared `wolverine` schema in a shared database — extraction breaks.
+- `AddResourceSetupOnStartup()` is for dev/Testing only; production applies Wolverine DDL per module DB in CI.
+- Cross-module messages use Kafka (`*Event`/`*Snapshot`) and RabbitMQ (`*Command`/`*Job`/`*SagaStep`) per [ADR-025](../TECH_STACK.md#adr-025-transport-selection-rule-by-message-name-suffix) — not a central Postgres Wolverine connection string.
 
 ### Intra-module domain event handler
 
-Domain events raised by aggregates (`AddDomainEvent`) are dispatched by `UnitOfWork.SaveChangesAsync` via Wolverine after the transaction commits (in-memory today; durable when outbox is configured — see section above). Define the handler in the Application layer:
+Domain events raised by aggregates (`AddDomainEvent`) are collected in `UnitOfWork.SaveChangesAsync` and published via `IMessageBus` after `SaveChangesAsync` commits. With `UseEntityFrameworkCoreTransactions()` and `Enroll<TDbContext>()`, handler code that shares the enlisted `DbContext` participates in the durable outbox. Define the handler in the Application layer:
 
 ```csharp
 // WorkflowBuilder.Application/EventHandlers/WorkflowPublishedEventHandler.cs

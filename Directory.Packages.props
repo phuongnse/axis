@@ -14,6 +14,7 @@
     <!-- EF Core trio aligned; mismatched majors/minors here trigger NU1605 downgrade warnings -->
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="9.0.16" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.16" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.16" />
     <!-- Npgsql + provider aligned on 9.0.4 (provider has no 9.0.5 yet) -->
     <PackageVersion Include="Npgsql" Version="9.0.4" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />

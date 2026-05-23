@@ -52,7 +52,7 @@ Without this foundation, nothing else works. Every feature in every other epic r
 | Shared Application | ✅ Done | `ICommand/IQuery`, `ICommandHandler/IQueryHandler`, `ValidationBehavior`, `ITenantContext` |
 | Shared Infrastructure | ✅ Done | `AxisDbContext`, `TenantSchemaInterceptor`, `UnitOfWork` (Wolverine `IMessageBus`) |
 | Tenant Registration (US-001–002) | ⚠️ Partial | Domain + Application + Infrastructure + API done (`POST /api/organizations/`, `/api/auth/verify-email`, `/api/auth/resend-verification`); Frontend ⏳. Gap: rate-limiting on resend (max 3/hr) pending |
-| Tenant Provisioning (US-003) | ⚠️ Partial | `ITenantSchemaProvisioner` from verify-email; retry/alert/polling UI deferred (see F01 US-003 callout). Phase 1 of the distributed-ready rollout wires both transports — `WolverineFx.Kafka` for cross-module events (`ADR-013`) and `WolverineFx.RabbitMq` for commands/jobs/sagas including `ProvisionTenantMessage` (`ADR-024` + `ADR-025` routing). Durable-outbox retry policy for `ProvisionTenantHandler` lands once `IdentityDbContext.IntegrateWithWolverine()` is enlisted. |
+| Tenant Provisioning (US-003) | ⚠️ Partial | `ITenantSchemaProvisioner` provisions tenant schemas via `Database.MigrateAsync()` per module DB ([ADR-011](../../TECH_STACK.md#adr-011-per-module-database-with-schema-per-tenant-inside), [ADR-023](../../TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)). **Deferred (F01 US-003 follow-up):** retry/alert/polling UI. **Deferred (PR follow-up):** durable retry policy for `ProvisionTenantHandler`. `ProvisionTenantMessage` uses RabbitMQ per ADR-024/025. |
 | Organization Management (F02) | ⏳ Pending | — |
 | Subscription Plans (F04) | ⏳ Pending | — |
 | Frontend | ⏳ Pending | — |

@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\src\Modules\FormBuilder\Axis.FormBuilder.Infrastructure\Axis.FormBuilder.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Axis.Testing\Axis.Testing.csproj" />
   </ItemGroup>
 
 </Project>

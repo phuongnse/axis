@@ -10,6 +10,7 @@ using IDataModelingUnitOfWork = Axis.DataModeling.Application.Services.IUnitOfWo
 using IFormBuilderUnitOfWork = Axis.FormBuilder.Application.Services.IUnitOfWork;
 using IWorkflowBuilderUnitOfWork = Axis.WorkflowBuilder.Application.Services.IUnitOfWork;
 using Axis.Shared.Application.Tenancy;
+using Axis.Testing;
 using OpenIddict.Server.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -17,7 +18,6 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Npgsql;
 using OpenIddict.Abstractions;
 using StackExchange.Redis;
 using Testcontainers.Kafka;
@@ -46,19 +46,21 @@ public sealed class ApiTestFixture : IAsyncLifetime
         .WithImage("rabbitmq:3.13-management-alpine")
         .Build();
 
-    // Snapshots of env vars we override at fixture startup, so we restore the
-    // caller's values on dispose instead of clearing globally (caller may have
-    // set them for parallel suites or pre-flight scripts).
-    private string? _previousWolverineConnectionStringEnv;
+    private string? _previousIdentityConnectionStringEnv;
+    private string? _previousDataModelingConnectionStringEnv;
+    private string? _previousWorkflowBuilderConnectionStringEnv;
+    private string? _previousFormBuilderConnectionStringEnv;
+    private string? _previousWorkflowEngineConnectionStringEnv;
     private string? _previousKafkaBrokersEnv;
     private string? _previousRabbitMqConnectionStringEnv;
 
     private WebApplicationFactory<Program> _factory = null!;
-    private string _dmConnectionString = null!;
-    private string _wbConnectionString = null!;
-    private string _fbConnectionString = null!;
-    private string _weConnectionString = null!;
-    private string _wolverineConnectionString = null!;
+    private string _postgresAdminConnectionString = null!;
+    private string _identityConnectionString = null!;
+    private string _dataModelingConnectionString = null!;
+    private string _workflowBuilderConnectionString = null!;
+    private string _formBuilderConnectionString = null!;
+    private string _workflowEngineConnectionString = null!;
 
     public HttpClient Client { get; private set; } = null!;
 
@@ -76,28 +78,57 @@ public sealed class ApiTestFixture : IAsyncLifetime
             _kafka.StartAsync(),
             _rabbitMq.StartAsync());
 
-        // Each module needs its own database so EnsureCreatedAsync creates tables correctly.
-        _dmConnectionString = await CreateModuleDatabaseAsync("axis_dm_test");
-        _wbConnectionString = await CreateModuleDatabaseAsync("axis_wb_test");
-        _fbConnectionString = await CreateModuleDatabaseAsync("axis_fb_test");
-        _weConnectionString = await CreateModuleDatabaseAsync("axis_we_test");
-        // Wolverine in its own database so its AddResourceSetupOnStartup hosted
-        // service does not race IdentityDbContext.EnsureCreatedAsync (EF Core's
-        // "any user table exists ⇒ skip" heuristic would otherwise skip the
-        // OpenIddict tables once Wolverine had created its envelope tables).
-        _wolverineConnectionString = await CreateModuleDatabaseAsync("axis_wolverine_test");
+        _postgresAdminConnectionString = _postgres.GetConnectionString();
+        _identityConnectionString =
+            await PostgresModuleTestDatabase.CreateAsync(_postgresAdminConnectionString, "axis_identity_test");
+        _dataModelingConnectionString =
+            await PostgresModuleTestDatabase.CreateAsync(_postgresAdminConnectionString, "axis_datamodeling_test");
+        _workflowBuilderConnectionString =
+            await PostgresModuleTestDatabase.CreateAsync(_postgresAdminConnectionString, "axis_workflowbuilder_test");
+        _formBuilderConnectionString =
+            await PostgresModuleTestDatabase.CreateAsync(_postgresAdminConnectionString, "axis_formbuilder_test");
+        _workflowEngineConnectionString =
+            await PostgresModuleTestDatabase.CreateAsync(_postgresAdminConnectionString, "axis_workflowengine_test");
 
-        // Wolverine's PersistMessagesWithPostgresql + UseKafka capture their
-        // connection strings during host build, which runs before
-        // WebApplicationFactory.ConfigureAppConfiguration is applied. Set via
-        // env var so the default config provider picks them up; snapshot the
-        // prior values first so DisposeAsync can restore them.
-        _previousWolverineConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__Wolverine");
+        _previousIdentityConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__Identity");
+        _previousDataModelingConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__DataModeling");
+        _previousWorkflowBuilderConnectionStringEnv =
+            Environment.GetEnvironmentVariable("ConnectionStrings__WorkflowBuilder");
+        _previousFormBuilderConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__FormBuilder");
+        _previousWorkflowEngineConnectionStringEnv =
+            Environment.GetEnvironmentVariable("ConnectionStrings__WorkflowEngine");
         _previousKafkaBrokersEnv = Environment.GetEnvironmentVariable("Kafka__Brokers");
         _previousRabbitMqConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__RabbitMq");
-        Environment.SetEnvironmentVariable("ConnectionStrings__Wolverine", _wolverineConnectionString);
+
+        Environment.SetEnvironmentVariable("ConnectionStrings__Identity", _identityConnectionString);
+        Environment.SetEnvironmentVariable("ConnectionStrings__DataModeling", _dataModelingConnectionString);
+        Environment.SetEnvironmentVariable("ConnectionStrings__WorkflowBuilder", _workflowBuilderConnectionString);
+        Environment.SetEnvironmentVariable("ConnectionStrings__FormBuilder", _formBuilderConnectionString);
+        Environment.SetEnvironmentVariable("ConnectionStrings__WorkflowEngine", _workflowEngineConnectionString);
         Environment.SetEnvironmentVariable("Kafka__Brokers", _kafka.GetBootstrapAddress());
         Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", _rabbitMq.GetConnectionString());
+
+        DbContextOptions<IdentityDbContext> identityOptions = new DbContextOptionsBuilder<IdentityDbContext>()
+            .UseNpgsql(_identityConnectionString)
+            .UseOpenIddict()
+            .Options;
+        await using (IdentityDbContext identityCtx = new(identityOptions))
+        {
+            await identityCtx.Database.MigrateAsync();
+        }
+
+        await PostgresModuleTestDatabase.MigrateAsync<DataModelingDbContext>(
+            _dataModelingConnectionString,
+            opts => new DataModelingDbContext(opts, new PublicSchemaTenantContext()));
+        await PostgresModuleTestDatabase.MigrateAsync<WorkflowBuilderDbContext>(
+            _workflowBuilderConnectionString,
+            opts => new WorkflowBuilderDbContext(opts, new PublicSchemaTenantContext()));
+        await PostgresModuleTestDatabase.MigrateAsync<FormBuilderDbContext>(
+            _formBuilderConnectionString,
+            opts => new FormBuilderDbContext(opts, new PublicSchemaTenantContext()));
+        await PostgresModuleTestDatabase.MigrateAsync<WorkflowEngineDbContext>(
+            _workflowEngineConnectionString,
+            opts => new WorkflowEngineDbContext(opts, new PublicSchemaTenantContext()));
 
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -107,38 +138,32 @@ public sealed class ApiTestFixture : IAsyncLifetime
             {
                 configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
                 {
-                    ["ConnectionStrings:Identity"] = _postgres.GetConnectionString(),
-                    ["ConnectionStrings:DataModeling"] = _dmConnectionString,
-                    ["ConnectionStrings:WorkflowBuilder"] = _wbConnectionString,
-                    ["ConnectionStrings:FormBuilder"] = _fbConnectionString,
-                    ["ConnectionStrings:WorkflowEngine"] = _weConnectionString,
-                    ["ConnectionStrings:Wolverine"] = _postgres.GetConnectionString(),
+                    ["ConnectionStrings:Identity"] = _identityConnectionString,
+                    ["ConnectionStrings:DataModeling"] = _dataModelingConnectionString,
+                    ["ConnectionStrings:WorkflowBuilder"] = _workflowBuilderConnectionString,
+                    ["ConnectionStrings:FormBuilder"] = _formBuilderConnectionString,
+                    ["ConnectionStrings:WorkflowEngine"] = _workflowEngineConnectionString,
                     ["Redis:ConnectionString"] = _redis.GetConnectionString(),
                 });
             });
 
             builder.ConfigureTestServices(services =>
             {
-                // Replace IdentityDbContext with test container connection
                 services.RemoveAll<DbContextOptions<IdentityDbContext>>();
                 services.RemoveAll<IdentityDbContext>();
                 services.AddDbContext<IdentityDbContext>(opts =>
-                    opts.UseNpgsql(_postgres.GetConnectionString())
+                    opts.UseNpgsql(_identityConnectionString)
                         .UseOpenIddict());
 
-                // Replace Redis
                 services.RemoveAll<IConnectionMultiplexer>();
                 services.AddSingleton<IConnectionMultiplexer>(_ =>
                     ConnectionMultiplexer.Connect(_redis.GetConnectionString()));
 
-                // Replace external services with no-ops
                 services.RemoveAll<IEmailSender>();
                 services.AddScoped<IEmailSender, NullEmailSender>();
                 services.RemoveAll<IAvatarStorageService>();
                 services.AddScoped<IAvatarStorageService, NullAvatarStorageService>();
 
-                // Replace IUnitOfWork — IdentityUnitOfWork requires Wolverine.IMessageBus
-                // which is not registered in integration tests; domain events are irrelevant
                 services.RemoveAll<IUnitOfWork>();
                 services.AddScoped<IUnitOfWork>(sp =>
                     new NullUnitOfWork(sp.GetRequiredService<IdentityDbContext>()));
@@ -155,21 +180,15 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.AddScoped<IFormBuilderUnitOfWork>(sp =>
                     new NullFormBuilderUnitOfWork(sp.GetRequiredService<FormBuilderDbContext>()));
 
-                // Use a fixed "public" schema for all tenants
                 services.RemoveAll<ITenantContext>();
                 services.AddScoped<ITenantContext>(_ => new PublicSchemaTenantContext());
 
                 services.RemoveAll<ITenantSchemaProvisioner>();
                 services.AddScoped<ITenantSchemaProvisioner, NoOpTenantSchemaProvisioner>();
 
-                // WebApplicationFactory uses HTTP, not HTTPS. Disable OpenIddict's transport
-                // security check so the authorization endpoint is reachable in tests.
                 services.PostConfigure<OpenIddictServerAspNetCoreOptions>(opts =>
                     opts.DisableTransportSecurityRequirement = true);
 
-                // Remove OpenIddictSeeder: it is a hosted service that runs on app startup,
-                // before EnsureCreatedAsync is called here, causing "relation does not exist".
-                // The fixture seeds OpenIddict clients manually in SeedTestOpenIddictClientsAsync.
                 ServiceDescriptor? seederDescriptor = services.FirstOrDefault(
                     d => d.ImplementationType == typeof(OpenIddictSeeder));
                 if (seederDescriptor is not null)
@@ -178,36 +197,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
         });
 
         using IServiceScope scope = _factory.Services.CreateScope();
-
-        IdentityDbContext ctx = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        await ctx.Database.EnsureCreatedAsync();
-
-        // Seed the SPA client used by integration tests
         await SeedTestOpenIddictClientsAsync(scope.ServiceProvider);
-
-        DbContextOptions<DataModelingDbContext> dmOptions = new DbContextOptionsBuilder<DataModelingDbContext>()
-            .UseNpgsql(_dmConnectionString)
-            .Options;
-        await using DataModelingDbContext dmCtx = new(dmOptions, new PublicSchemaTenantContext());
-        await dmCtx.Database.EnsureCreatedAsync();
-
-        DbContextOptions<WorkflowBuilderDbContext> wbOptions = new DbContextOptionsBuilder<WorkflowBuilderDbContext>()
-            .UseNpgsql(_wbConnectionString)
-            .Options;
-        await using WorkflowBuilderDbContext wbCtx = new(wbOptions, new PublicSchemaTenantContext());
-        await wbCtx.Database.EnsureCreatedAsync();
-
-        DbContextOptions<FormBuilderDbContext> fbOptions = new DbContextOptionsBuilder<FormBuilderDbContext>()
-            .UseNpgsql(_fbConnectionString)
-            .Options;
-        await using FormBuilderDbContext fbCtx = new(fbOptions, new PublicSchemaTenantContext());
-        await fbCtx.Database.EnsureCreatedAsync();
-
-        DbContextOptions<WorkflowEngineDbContext> weOptions = new DbContextOptionsBuilder<WorkflowEngineDbContext>()
-            .UseNpgsql(_weConnectionString)
-            .Options;
-        await using WorkflowEngineDbContext weCtx = new(weOptions, new PublicSchemaTenantContext());
-        await weCtx.Database.EnsureCreatedAsync();
 
         Client = _factory.CreateClient(new WebApplicationFactoryClientOptions
         {
@@ -223,7 +213,12 @@ public sealed class ApiTestFixture : IAsyncLifetime
             _redis.DisposeAsync().AsTask(),
             _kafka.DisposeAsync().AsTask(),
             _rabbitMq.DisposeAsync().AsTask());
-        Environment.SetEnvironmentVariable("ConnectionStrings__Wolverine", _previousWolverineConnectionStringEnv);
+
+        Environment.SetEnvironmentVariable("ConnectionStrings__Identity", _previousIdentityConnectionStringEnv);
+        Environment.SetEnvironmentVariable("ConnectionStrings__DataModeling", _previousDataModelingConnectionStringEnv);
+        Environment.SetEnvironmentVariable("ConnectionStrings__WorkflowBuilder", _previousWorkflowBuilderConnectionStringEnv);
+        Environment.SetEnvironmentVariable("ConnectionStrings__FormBuilder", _previousFormBuilderConnectionStringEnv);
+        Environment.SetEnvironmentVariable("ConnectionStrings__WorkflowEngine", _previousWorkflowEngineConnectionStringEnv);
         Environment.SetEnvironmentVariable("Kafka__Brokers", _previousKafkaBrokersEnv);
         Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", _previousRabbitMqConnectionStringEnv);
     }
@@ -275,7 +270,6 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 RedirectUris =
                 {
                     new Uri("http://localhost:3000/callback"),
-                    // Test redirect — we instruct the HTTP client not to follow redirects
                     new Uri("http://localhost/callback"),
                 },
                 Requirements =
@@ -285,24 +279,8 @@ public sealed class ApiTestFixture : IAsyncLifetime
             });
         }
     }
-
-    private async Task<string> CreateModuleDatabaseAsync(string dbName)
-    {
-        await using NpgsqlConnection conn = new(_postgres.GetConnectionString());
-        await conn.OpenAsync();
-        await using NpgsqlCommand cmd = conn.CreateCommand();
-        cmd.CommandText = $"CREATE DATABASE \"{dbName}\"";
-        await cmd.ExecuteNonQueryAsync();
-
-        NpgsqlConnectionStringBuilder csb = new(_postgres.GetConnectionString())
-        { Database = dbName };
-        return csb.ToString();
-    }
 }
 
-/// <summary>
-/// Stub tenant context — all tests share the "public" schema.
-/// </summary>
 internal sealed class PublicSchemaTenantContext : ITenantContext
 {
     public Guid OrganizationId => Guid.Empty;

@@ -1,4 +1,6 @@
 using Axis.Shared.Application.Tenancy;
+using Axis.WorkflowEngine.Infrastructure.Persistence;
+using Axis.Testing;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Testcontainers.PostgreSql;
@@ -17,17 +19,21 @@ public sealed class WorkflowEngineDatabaseFixture : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
-        ConnectionString = _postgres.GetConnectionString();
+        ConnectionString = await PostgresModuleTestDatabase.CreateAsync(
+            _postgres.GetConnectionString(),
+            "axis_workflowengine_infra_test");
 
-        await using var conn = new NpgsqlConnection(ConnectionString);
+        await using NpgsqlConnection conn = new(ConnectionString);
         await conn.OpenAsync();
 
-        await using var schemaCmd = conn.CreateCommand();
+        await using NpgsqlCommand schemaCmd = conn.CreateCommand();
         schemaCmd.CommandText = $"""CREATE SCHEMA IF NOT EXISTS "{TestSchema}";""";
         await schemaCmd.ExecuteNonQueryAsync();
 
-        using var ctx = CreateContext();
-        await ctx.Database.EnsureCreatedAsync();
+        TestTenantContext tenantContext = new(TestSchema);
+        await PostgresModuleTestDatabase.MigrateAsync<WorkflowEngineDbContext>(
+            ConnectionString,
+            opts => new WorkflowEngineDbContext(opts, tenantContext));
 
         // Stub table for cross-module WorkflowDefinitionReader queries
         await using var wfCmd = conn.CreateCommand();

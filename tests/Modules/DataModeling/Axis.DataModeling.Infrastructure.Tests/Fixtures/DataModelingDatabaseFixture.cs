@@ -1,4 +1,6 @@
+using Axis.DataModeling.Infrastructure.Persistence;
 using Axis.Shared.Application.Tenancy;
+using Axis.Testing;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Testcontainers.PostgreSql;
@@ -12,22 +14,26 @@ public sealed class DataModelingDatabaseFixture : IAsyncLifetime
         .Build();
 
     private const string TestSchema = "test_data_modeling";
-    public string ConnectionString { get; private set; } = null!;
+    private string _connectionString = null!;
+
     public ITenantContext TenantContext { get; } = new TestTenantContext(TestSchema);
 
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
-        ConnectionString = _postgres.GetConnectionString();
+        _connectionString = await PostgresModuleTestDatabase.CreateAsync(
+            _postgres.GetConnectionString(),
+            "axis_datamodeling_infra_test");
 
-        await using var conn = new NpgsqlConnection(ConnectionString);
-        await conn.OpenAsync();
-        await using var cmd = conn.CreateCommand();
-        cmd.CommandText = $"""CREATE SCHEMA IF NOT EXISTS "{TestSchema}";""";
-        await cmd.ExecuteNonQueryAsync();
+        await using NpgsqlConnection connection = new(_connectionString);
+        await connection.OpenAsync();
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = $"""CREATE SCHEMA IF NOT EXISTS "{TestSchema}";""";
+        await command.ExecuteNonQueryAsync();
 
-        using var ctx = CreateContext();
-        await ctx.Database.EnsureCreatedAsync();
+        await PostgresModuleTestDatabase.MigrateAsync<DataModelingDbContext>(
+            _connectionString,
+            opts => new DataModelingDbContext(opts, TenantContext));
     }
 
     public async Task DisposeAsync() => await _postgres.DisposeAsync();
@@ -35,7 +41,7 @@ public sealed class DataModelingDatabaseFixture : IAsyncLifetime
     internal DataModelingDbContext CreateContext()
     {
         DbContextOptions<DataModelingDbContext> options = new DbContextOptionsBuilder<DataModelingDbContext>()
-            .UseNpgsql(ConnectionString)
+            .UseNpgsql(_connectionString)
             .Options;
         return new DataModelingDbContext(options, TenantContext);
     }
