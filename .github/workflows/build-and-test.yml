@@ -27,7 +27,7 @@ jobs:
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
-      doc-drift-scope: ${{ steps.filter.outputs.doc-drift-scope }}
+      doc-drift-scope: ${{ steps.filter.outputs['doc-drift-scope'] }}
       markdown: ${{ steps.filter.outputs.markdown }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -148,7 +148,7 @@ jobs:
   doc-drift:
     name: Doc drift
     needs: detect
-    if: needs.detect.outputs.doc-drift-scope == 'true'
+    if: needs.detect.outputs['doc-drift-scope'] == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
