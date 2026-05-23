@@ -27,6 +27,10 @@ jobs:
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
+      # GitHub Actions expressions parse `-` as subtraction in dot
+      # notation, so `outputs.doc-drift-scope` would resolve to nonsense.
+      # Hyphenated keys must use bracket syntax in every `${{ … }}` block,
+      # including the downstream `if: needs.detect.outputs[...]`.
       doc-drift-scope: ${{ steps.filter.outputs['doc-drift-scope'] }}
       markdown: ${{ steps.filter.outputs.markdown }}
     steps:
