@@ -34,6 +34,7 @@
 - [Result → HTTP status code mapping](#result--http-status-code-mapping) ★
 - [OpenAPI / Scalar setup](#openapi--scalar-setup) ★
 - [Wolverine patterns](#wolverine-patterns) ★
+- [OpenTelemetry observability](#opentelemetry-observability) ★
 - [Cross-module data pattern](#cross-module-communication-pattern) ★
 - [Command idempotency pattern](#command-idempotency-pattern) ★
 - [Code hygiene checklist](#code-hygiene-checklist)
@@ -1064,6 +1065,65 @@ opts.ScheduleJob<ArchiveOldExecutionsCommand>(cron: "0 2 * * *"); // daily at 02
 - Domain event handlers live in the **Application** layer of the consuming module; never in Domain or Infrastructure.
 - Never call `_messageBus.PublishAsync` for a domain event inside a Command handler — the `UnitOfWork` dispatches events automatically via Wolverine after commit.
 - Integration events to external systems (webhooks, third-party APIs) are Wolverine jobs scheduled from within a domain event handler, not from the command handler directly.
+
+---
+
+## OpenTelemetry observability
+
+**Principle:** Every host entrypoint emits traces, metrics, and structured logs via the OpenTelemetry SDK ([ADR-018](../TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability)). Backends are swappable (OTLP → Grafana Tempo/Loki/Mimir in production); application code never references vendor SDKs outside `Axis.Shared.Infrastructure`.
+
+### Host wiring (modulith today, per-module tomorrow)
+
+Register once on the host builder, before module infrastructure:
+
+```csharp
+builder.AddAxisOpenTelemetry();
+
+builder.Host.UseSerilog((ctx, services, config) => config
+    .ReadFrom.Configuration(ctx.Configuration)
+    .ReadFrom.Services(services)
+    .Enrich.FromLogContext()
+    .Enrich.With<TraceContextSerilogEnricher>());
+```
+
+After `WebApplication` is built:
+
+```csharp
+app.UseAxisOpenTelemetry(); // Prometheus scrape endpoint when enabled
+app.UseAuthentication();
+app.UseMiddleware<CorrelationIdMiddleware>(); // after auth so org_id → TenantId
+app.UseAuthorization();
+```
+
+Implementation lives in `Axis.Shared.Infrastructure/Observability/OpenTelemetryServiceExtensions.cs`. Configuration section: `OpenTelemetry` in `appsettings.json`.
+
+| Signal | Export path (dev) | Production backend |
+|--------|-------------------|--------------------|
+| Traces | OTLP/gRPC (`Otlp:Endpoint`) | Grafana Tempo |
+| Metrics | Prometheus scrape at `Prometheus:ScrapeEndpointPath` (default `/metrics`) + optional OTLP | Prometheus → Mimir |
+| Logs | Serilog console + `ILogger` → OTLP when `ExportLogs` is true | Grafana Loki |
+
+### Correlation and tenancy
+
+- `CorrelationIdMiddleware` uses `X-Correlation-Id` when present, otherwise the active W3C `Activity.TraceId`, and echoes the value on the response.
+- Serilog enricher `TraceContextSerilogEnricher` adds `TraceId` / `SpanId` so Loki queries join logs to Tempo traces.
+- When the JWT contains `org_id`, logs include `TenantId` and the span tag `tenant.id`.
+
+### Local Grafana stack
+
+```bash
+docker compose --profile observability up -d otel-lgtm
+dotnet run --project src/Axis.Api/Axis.Api.csproj
+```
+
+Grafana UI: `http://localhost:3001`. OTLP endpoint for host-run API: `http://localhost:4317` (default in `appsettings.json`).
+
+### Rules
+
+- Do **not** register OpenTelemetry in individual module Infrastructure projects while the modulith hosts all modules — one `AddAxisOpenTelemetry` on `Axis.Api` (or each extracted module's entrypoint when Phase 2 lands).
+- Disable telemetry in integration tests via `OpenTelemetry:DisableInTesting` (default `true`) — no Testcontainers for Tempo required.
+- Skip instrumentation for `/health`, `/metrics`, and `/swagger` paths (configured in `OpenTelemetryServiceExtensions`).
+- **Deferred (Phase 2):** propagate trace context through Wolverine envelope headers and gRPC interceptors for cross-process module calls ([ADR-018](../TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability)).
 
 ---
 
