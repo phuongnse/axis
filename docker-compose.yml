@@ -54,6 +54,103 @@ services:
       timeout: 5s
       retries: 10
 
+  # ── Distributed-ready foundation (ADR-013, ADR-019, ADR-022) ─────────
+  # Kafka + Schema Registry are the cross-module event transport (Phase 1
+  # of the rollout in docs/PROGRESS.md). Vault is the secrets store for
+  # production (dev uses .env). All three live behind the `distributed`
+  # Compose profile so a default `docker compose up` stays light; opt in
+  # with `docker compose --profile distributed up` once a module wires the
+  # WolverineFx.Kafka transport (Phase 1 PR #2).
+  #
+  # Profile will be removed (these services become mandatory like
+  # postgres/redis) once the first module's outbox publishes to Kafka.
+
+  kafka:
+    # Confluent CP image (Community License — free for single-broker dev
+    # and production). Pairs with cp-schema-registry below. KRaft mode is
+    # the current Confluent default (no ZooKeeper).
+    image: confluentinc/cp-kafka:7.7.0
+    container_name: axis_kafka
+    profiles: ["distributed"]
+    environment:
+      # Single-broker KRaft cluster — broker + controller in one process.
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:29092"
+      # Two advertised listeners: internal (PLAINTEXT for other containers
+      # on the compose network) and host (PLAINTEXT_HOST for processes
+      # running on the developer's machine).
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      # Single broker → replication 1 for all internal topics.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # Fixed cluster ID so KRaft metadata survives container recreate
+      # (must be 22-char Base64-URL). Generated once with `kafka-storage random-uuid`.
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+      KAFKA_LOG_DIRS: "/var/lib/kafka/data"
+    ports:
+      # Only the host listener is published. The in-network listener
+      # (PLAINTEXT on :9092) stays reachable inside the Compose network as
+      # `kafka:9092` and is intentionally not exposed — its advertised
+      # address would mis-resolve from the host.
+      - "29092:29092"    # host PLAINTEXT — connect from local processes here
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.7.0
+    container_name: axis_schema_registry
+    profiles: ["distributed"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: "schema-registry"
+      SCHEMA_REGISTRY_LISTENERS: "http://0.0.0.0:8081"
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: "PLAINTEXT://kafka:9092"
+      # Backward-compatible-only is the safest default; producers cannot
+      # ship a breaking schema change without explicit override.
+      SCHEMA_REGISTRY_SCHEMA_COMPATIBILITY_LEVEL: "BACKWARD"
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/subjects >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  vault:
+    # Dev mode — secrets live in memory only (lost on restart). Acceptable
+    # for local development; production uses a separately-provisioned
+    # Vault cluster with persistent storage + unseal keys (ADR-022).
+    image: hashicorp/vault:1.18
+    container_name: axis_vault
+    profiles: ["distributed"]
+    cap_add: [IPC_LOCK]    # required by Vault to prevent secrets being swapped to disk
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: "axis-dev-root-token"
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+      VAULT_ADDR: "http://0.0.0.0:8200"
+    ports:
+      - "8200:8200"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8200/v1/sys/health | grep -q '\"initialized\":true' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   api:
     image: mcr.microsoft.com/dotnet/sdk:8.0
     container_name: axis_api
@@ -126,3 +223,4 @@ volumes:
   localstack_data:
   web_node_modules:
   nuget_packages:
+  kafka_data:
