@@ -12,8 +12,62 @@ permissions:
   contents: read
 
 jobs:
+  # Detects which scopes the PR actually touches so the heavy jobs below
+  # can skip themselves on PRs that don't affect them. Job-level `if:`
+  # evaluating to false causes the job to report "Skipped", which counts
+  # as Successful for required-check branch protection (GitHub behaviour
+  # since 2022). Workflow-level `paths:` filters would silently never
+  # report at all and break required-check enforcement — that's why the
+  # filter lives here instead.
+  detect:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      doc-drift-scope: ${{ steps.filter.outputs.doc-drift-scope }}
+      markdown: ${{ steps.filter.outputs.markdown }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        id: filter
+        with:
+          # Every filter includes the workflow itself so CI changes are
+          # always validated against every job.
+          filters: |
+            backend:
+              - 'src/**'
+              - 'tests/**'
+              - 'Directory.Packages.props'
+              - 'Directory.Build.props'
+              - 'Axis.sln'
+              - '.editorconfig'
+              - 'global.json'
+              - '.github/workflows/build-and-test.yml'
+            frontend:
+              - 'frontend/**'
+              - '.editorconfig'
+              - '.github/workflows/build-and-test.yml'
+            doc-drift-scope:
+              - 'src/**'
+              - 'tests/**'
+              - 'docs/epics/**'
+              - 'docs/PROGRESS.md'
+              - 'scripts/check-doc-drift.sh'
+              - '.github/workflows/build-and-test.yml'
+            markdown:
+              - '**/*.md'
+              - 'lychee.toml'
+              - '.github/workflows/build-and-test.yml'
+
   dotnet:
     name: .NET — Build and Test
+    needs: detect
+    if: needs.detect.outputs.backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -62,6 +116,8 @@ jobs:
 
   frontend:
     name: Frontend — Type Check, Lint, and Test
+    needs: detect
+    if: needs.detect.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -90,6 +146,8 @@ jobs:
 
   doc-drift:
     name: Doc drift
+    needs: detect
+    if: needs.detect.outputs.doc-drift-scope == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -105,6 +163,8 @@ jobs:
 
   link-check:
     name: Markdown link check
+    needs: detect
+    if: needs.detect.outputs.markdown == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -133,6 +193,8 @@ jobs:
   #
   #   dependency-review:
   #     name: Dependency review
+  #     needs: detect
+  #     if: needs.detect.outputs.backend == 'true' || needs.detect.outputs.frontend == 'true'
   #     runs-on: ubuntu-latest
   #     timeout-minutes: 5
   #     steps:
