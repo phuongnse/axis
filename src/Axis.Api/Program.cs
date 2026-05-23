@@ -30,6 +30,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.OpenApi.Models;
 using OpenIddict.Server.AspNetCore;
+using Wolverine.Kafka;
 using Wolverine.Postgresql;
 using OpenIddict.Validation.AspNetCore;
 using Scalar.AspNetCore;
@@ -66,6 +67,9 @@ try
         string wolverineConnectionString = wolverineConfig.GetConnectionString("Wolverine")
             ?? throw new InvalidOperationException("ConnectionStrings:Wolverine is required");
 
+        string kafkaBrokers = wolverineConfig["Kafka:Brokers"]
+            ?? throw new InvalidOperationException("Kafka:Brokers is required");
+
         // Cross-cutting: Debug entry/exit traces + Error for unhandled exceptions on every handler.
         opts.Policies.AddMiddleware<HandlerLoggingMiddleware>();
         opts.UseEntityFrameworkCoreTransactions();
@@ -73,6 +77,15 @@ try
         // Durable inbox/outbox in dedicated `wolverine` schema (ADR-009).
         // Fully-qualified table names bypass tenant `search_path` set by HttpTenantContext.
         opts.PersistMessagesWithPostgresql(wolverineConnectionString, "wolverine");
+
+        // Cross-module event transport per ADR-013. AutoProvision creates topics
+        // on first publish so dev/test don't need pre-seeded topic schemas. No
+        // PublishMessage<>.ToKafkaTopic() declarations yet — those land
+        // module-by-module in subsequent PRs (first the Identity service per
+        // the rollout in docs/PROGRESS.md). Payload format is JSON for now;
+        // Avro + Confluent Schema Registry per ADR-019 ships in the next
+        // Phase 1 PR.
+        opts.UseKafka(kafkaBrokers).AutoProvision();
 
         // Infrastructure assemblies host Wolverine handlers (e.g. domain event consumers)
         // but are not the entry assembly — include them explicitly for handler discovery.

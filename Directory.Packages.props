@@ -18,11 +18,13 @@
     <PackageVersion Include="Npgsql" Version="9.0.4" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
     <PackageVersion Include="StackExchange.Redis" Version="2.13.1" />
-    <!-- WolverineFx quad aligned; .Http 5.39.3 exists, Dependabot just missed it -->
+    <!-- WolverineFx quint aligned (every member must move together — see
+         memory/feedback_version_family_alignment.md) -->
     <PackageVersion Include="WolverineFx" Version="5.39.3" />
     <PackageVersion Include="WolverineFx.Http" Version="5.39.3" />
     <PackageVersion Include="WolverineFx.EntityFrameworkCore" Version="5.39.3" />
     <PackageVersion Include="WolverineFx.Postgresql" Version="5.39.3" />
+    <PackageVersion Include="WolverineFx.Kafka" Version="5.39.3" />
     <PackageVersion Include="BCrypt.Net-Next" Version="4.2.0" />
     <PackageVersion Include="MailKit" Version="4.16.0" />
     <PackageVersion Include="AWSSDK.S3" Version="4.0.23.4" />
@@ -61,6 +63,7 @@
     <PackageVersion Include="Testcontainers" Version="3.10.0" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="3.10.0" />
     <PackageVersion Include="Testcontainers.Redis" Version="3.10.0" />
+    <PackageVersion Include="Testcontainers.Kafka" Version="3.10.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.27" />
     <PackageVersion Include="Bogus" Version="35.6.5" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.16" />

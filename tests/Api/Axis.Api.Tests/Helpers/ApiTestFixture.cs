@@ -20,6 +20,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using OpenIddict.Abstractions;
 using StackExchange.Redis;
+using Testcontainers.Kafka;
 using Testcontainers.PostgreSql;
 using Testcontainers.Redis;
 using static OpenIddict.Abstractions.OpenIddictConstants;
@@ -34,6 +35,10 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
     private readonly RedisContainer _redis = new RedisBuilder()
         .WithImage("redis:7-alpine")
+        .Build();
+
+    private readonly KafkaContainer _kafka = new KafkaBuilder()
+        .WithImage("confluentinc/cp-kafka:7.7.0")
         .Build();
 
     private WebApplicationFactory<Program> _factory = null!;
@@ -53,7 +58,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await Task.WhenAll(_postgres.StartAsync(), _redis.StartAsync());
+        await Task.WhenAll(_postgres.StartAsync(), _redis.StartAsync(), _kafka.StartAsync());
 
         // Each module needs its own database so EnsureCreatedAsync creates tables correctly.
         _dmConnectionString = await CreateModuleDatabaseAsync("axis_dm_test");
@@ -66,11 +71,12 @@ public sealed class ApiTestFixture : IAsyncLifetime
         // OpenIddict tables once Wolverine had created its envelope tables).
         _wolverineConnectionString = await CreateModuleDatabaseAsync("axis_wolverine_test");
 
-        // Wolverine's PersistMessagesWithPostgresql captures the connection string
-        // during host build, which runs before WebApplicationFactory's
-        // ConfigureAppConfiguration hook is applied to builder.Configuration.
-        // Set it via env var so the default config provider picks it up.
+        // Wolverine's PersistMessagesWithPostgresql + UseKafka capture their
+        // connection strings during host build, which runs before
+        // WebApplicationFactory.ConfigureAppConfiguration is applied. Set via
+        // env var so the default config provider picks them up.
         Environment.SetEnvironmentVariable("ConnectionStrings__Wolverine", _wolverineConnectionString);
+        Environment.SetEnvironmentVariable("Kafka__Brokers", _kafka.GetBootstrapAddress());
 
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -191,8 +197,12 @@ public sealed class ApiTestFixture : IAsyncLifetime
     public async Task DisposeAsync()
     {
         await _factory.DisposeAsync();
-        await Task.WhenAll(_postgres.DisposeAsync().AsTask(), _redis.DisposeAsync().AsTask());
+        await Task.WhenAll(
+            _postgres.DisposeAsync().AsTask(),
+            _redis.DisposeAsync().AsTask(),
+            _kafka.DisposeAsync().AsTask());
         Environment.SetEnvironmentVariable("ConnectionStrings__Wolverine", null);
+        Environment.SetEnvironmentVariable("Kafka__Brokers", null);
     }
 
     public IServiceScope CreateScope() => _factory.Services.CreateScope();
