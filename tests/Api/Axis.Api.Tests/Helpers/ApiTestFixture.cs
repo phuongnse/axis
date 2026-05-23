@@ -41,6 +41,12 @@ public sealed class ApiTestFixture : IAsyncLifetime
         .WithImage("confluentinc/cp-kafka:7.7.0")
         .Build();
 
+    // Snapshots of the two env vars we override at fixture startup, so we
+    // restore the caller's values on dispose instead of clearing globally
+    // (caller may have set them for parallel suites or pre-flight scripts).
+    private string? _previousWolverineConnectionStringEnv;
+    private string? _previousKafkaBrokersEnv;
+
     private WebApplicationFactory<Program> _factory = null!;
     private string _dmConnectionString = null!;
     private string _wbConnectionString = null!;
@@ -74,7 +80,10 @@ public sealed class ApiTestFixture : IAsyncLifetime
         // Wolverine's PersistMessagesWithPostgresql + UseKafka capture their
         // connection strings during host build, which runs before
         // WebApplicationFactory.ConfigureAppConfiguration is applied. Set via
-        // env var so the default config provider picks them up.
+        // env var so the default config provider picks them up; snapshot the
+        // prior values first so DisposeAsync can restore them.
+        _previousWolverineConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__Wolverine");
+        _previousKafkaBrokersEnv = Environment.GetEnvironmentVariable("Kafka__Brokers");
         Environment.SetEnvironmentVariable("ConnectionStrings__Wolverine", _wolverineConnectionString);
         Environment.SetEnvironmentVariable("Kafka__Brokers", _kafka.GetBootstrapAddress());
 
@@ -201,8 +210,8 @@ public sealed class ApiTestFixture : IAsyncLifetime
             _postgres.DisposeAsync().AsTask(),
             _redis.DisposeAsync().AsTask(),
             _kafka.DisposeAsync().AsTask());
-        Environment.SetEnvironmentVariable("ConnectionStrings__Wolverine", null);
-        Environment.SetEnvironmentVariable("Kafka__Brokers", null);
+        Environment.SetEnvironmentVariable("ConnectionStrings__Wolverine", _previousWolverineConnectionStringEnv);
+        Environment.SetEnvironmentVariable("Kafka__Brokers", _previousKafkaBrokersEnv);
     }
 
     public IServiceScope CreateScope() => _factory.Services.CreateScope();
