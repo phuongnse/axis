@@ -27,8 +27,9 @@ Docs-first development: feature specs in `docs/epics/` are the contract; code im
 | Redis | `6379` | |
 | Maildev | `1025` SMTP / `1080` UI | Outbound mail viewer at `http://localhost:1080` |
 | LocalStack | `4566` | S3-only |
-| Kafka (KRaft) | `29092` | Connect from local `dotnet run`; in-network containers reach `kafka:9092` (intentionally not host-published). Cluster ID is fixed so metadata survives container recreate. |
+| Kafka (KRaft) | `29092` | Connect from local `dotnet run`; in-network containers reach `kafka:9092` (intentionally not host-published). Cluster ID is fixed so metadata survives container recreate. Carries `*Event`/`*Snapshot` per [ADR-025](docs/TECH_STACK.md#adr-025-transport-selection-rule-commands-to-rabbitmq-events-to-kafka). |
 | Schema Registry | `8081` | `BACKWARD`-only compatibility — breaking schema changes need an explicit override at publish time (ADR-019). |
+| RabbitMQ | `5672` AMQP / `15672` UI | Credentials `axis` / `axis_dev_pass`. Carries `*Command`/`*Job`/`*SagaStep` per [ADR-024](docs/TECH_STACK.md#adr-024-rabbitmq-for-commands-background-jobs-and-saga-orchestration). Open `http://localhost:15672` for the management UI. |
 | Vault dev | `8200` | Root token `axis-dev-root-token`. **In-memory only** — secrets wiped on restart; production uses a separately-provisioned cluster (ADR-022). |
 
 ## Where to read more

@@ -22,6 +22,7 @@ using OpenIddict.Abstractions;
 using StackExchange.Redis;
 using Testcontainers.Kafka;
 using Testcontainers.PostgreSql;
+using Testcontainers.RabbitMq;
 using Testcontainers.Redis;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 
@@ -41,11 +42,16 @@ public sealed class ApiTestFixture : IAsyncLifetime
         .WithImage("confluentinc/cp-kafka:7.7.0")
         .Build();
 
-    // Snapshots of the two env vars we override at fixture startup, so we
-    // restore the caller's values on dispose instead of clearing globally
-    // (caller may have set them for parallel suites or pre-flight scripts).
+    private readonly RabbitMqContainer _rabbitMq = new RabbitMqBuilder()
+        .WithImage("rabbitmq:3.13-management-alpine")
+        .Build();
+
+    // Snapshots of env vars we override at fixture startup, so we restore the
+    // caller's values on dispose instead of clearing globally (caller may have
+    // set them for parallel suites or pre-flight scripts).
     private string? _previousWolverineConnectionStringEnv;
     private string? _previousKafkaBrokersEnv;
+    private string? _previousRabbitMqConnectionStringEnv;
 
     private WebApplicationFactory<Program> _factory = null!;
     private string _dmConnectionString = null!;
@@ -64,7 +70,11 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await Task.WhenAll(_postgres.StartAsync(), _redis.StartAsync(), _kafka.StartAsync());
+        await Task.WhenAll(
+            _postgres.StartAsync(),
+            _redis.StartAsync(),
+            _kafka.StartAsync(),
+            _rabbitMq.StartAsync());
 
         // Each module needs its own database so EnsureCreatedAsync creates tables correctly.
         _dmConnectionString = await CreateModuleDatabaseAsync("axis_dm_test");
@@ -84,8 +94,10 @@ public sealed class ApiTestFixture : IAsyncLifetime
         // prior values first so DisposeAsync can restore them.
         _previousWolverineConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__Wolverine");
         _previousKafkaBrokersEnv = Environment.GetEnvironmentVariable("Kafka__Brokers");
+        _previousRabbitMqConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__RabbitMq");
         Environment.SetEnvironmentVariable("ConnectionStrings__Wolverine", _wolverineConnectionString);
         Environment.SetEnvironmentVariable("Kafka__Brokers", _kafka.GetBootstrapAddress());
+        Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", _rabbitMq.GetConnectionString());
 
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -209,9 +221,11 @@ public sealed class ApiTestFixture : IAsyncLifetime
         await Task.WhenAll(
             _postgres.DisposeAsync().AsTask(),
             _redis.DisposeAsync().AsTask(),
-            _kafka.DisposeAsync().AsTask());
+            _kafka.DisposeAsync().AsTask(),
+            _rabbitMq.DisposeAsync().AsTask());
         Environment.SetEnvironmentVariable("ConnectionStrings__Wolverine", _previousWolverineConnectionStringEnv);
         Environment.SetEnvironmentVariable("Kafka__Brokers", _previousKafkaBrokersEnv);
+        Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", _previousRabbitMqConnectionStringEnv);
     }
 
     public IServiceScope CreateScope() => _factory.Services.CreateScope();
