@@ -39,11 +39,11 @@ Full auth, user, role, invitation, and session management. OpenIddict 5.x OIDC s
 
 ## DataModeling — E03-data-modeling
 
-**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳ · Service-boundary retrofit ⏳**
+**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳ · Service-boundary retrofit ✅**
 
 Custom model, field, data class, and record CRUD. Full-text search, per-field JSONB filters, sort-by-column, bulk delete, CSV export. All endpoints covered by integration tests.
 
-> ⏳ **Retrofit:** add `Axis.DataModeling.Contracts` (gRPC + Avro events for `ModelCreated`/`FieldAdded`/...); move to `axis_datamodeling` database; generate initial EF migration; switch tests to migrations.
+> ✅ **Phase 2 Contracts:** `Axis.DataModeling.Contracts` with 9 Avro lifecycle events (`ModelCreated`/`ModelDeleted`, `DataClass*`, `DataRecord*`, `FieldAdded`/`FieldUpdated`/`FieldRemoved`) published via Wolverine outbox → Kafka (CloudEvents, ADR-019). `DataModelingEventMapper` + domain field events. Per-module DB `axis_datamodeling` + `MigrateAsync` in tests. **Deferred:** gRPC service (no sync consumer yet); FormBuilder/WorkflowBuilder Kafka consumers for broken-reference detection.
 
 ## WorkflowBuilder — E04-workflow-builder
 

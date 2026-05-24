@@ -13,6 +13,7 @@
     <ProjectReference Include="..\Axis.DataModeling.Application\Axis.DataModeling.Application.csproj" />
     <ProjectReference Include="..\Axis.DataModeling.Domain\Axis.DataModeling.Domain.csproj" />
     <ProjectReference Include="..\..\..\Shared\Axis.Shared.Infrastructure\Axis.Shared.Infrastructure.csproj" />
+    <ProjectReference Include="..\Axis.DataModeling.Contracts\Axis.DataModeling.Contracts.csproj" />
     <ProjectReference Include="..\..\Identity\Axis.Identity.Contracts\Axis.Identity.Contracts.csproj" />
   </ItemGroup>
 

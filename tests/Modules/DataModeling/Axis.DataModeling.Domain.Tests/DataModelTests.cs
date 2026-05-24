@@ -1,4 +1,5 @@
 using Axis.DataModeling.Domain.Aggregates;
+using Axis.DataModeling.Domain.Entities;
 using Axis.DataModeling.Domain.Enums;
 using Axis.DataModeling.Domain.Events;
 using Axis.DataModeling.Domain.ValueObjects;

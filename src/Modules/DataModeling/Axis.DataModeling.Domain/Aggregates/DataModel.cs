@@ -85,6 +85,8 @@ public sealed class DataModel : AggregateRoot<Guid>
         FieldDefinition field = FieldDefinition.Create(name.ToLowerInvariant(), label, type, required, order, config);
         _fields.Add(field);
         UpdatedAt = DateTimeOffset.UtcNow;
+        RaiseDomainEvent(new FieldAdded(
+            Id, OrganizationId, field.Id, field.Name, field.Type, field.Label, field.IsRequired, field.DisplayOrder));
         return field;
     }
 

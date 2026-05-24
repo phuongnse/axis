@@ -1,0 +1,15 @@
+{
+  "namespace": "axis.datamodeling.events",
+  "type": "record",
+  "name": "ModelDeletedEvent",
+  "fields": [
+    {
+      "name": "modelId",
+      "type": "string"
+    },
+    {
+      "name": "organizationId",
+      "type": "string"
+    }
+  ]
+}

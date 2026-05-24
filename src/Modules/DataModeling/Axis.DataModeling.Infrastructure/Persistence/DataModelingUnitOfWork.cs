@@ -1,4 +1,5 @@
 using Axis.DataModeling.Application.Services;
+using Axis.DataModeling.Infrastructure.Messaging;
 using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using Microsoft.EntityFrameworkCore;
@@ -45,7 +46,11 @@ internal sealed class DataModelingUnitOfWork(DataModelingDbContext context, IMes
         // onto the outbox; no CancellationToken overload exists. The
         // outbox dispatch happens later out of this scope.
         foreach (IDomainEvent evt in events)
-            await bus.PublishAsync(evt);
+        {
+            object? integrationEvent = DataModelingEventMapper.ToIntegrationEvent(evt);
+            if (integrationEvent is not null)
+                await bus.PublishAsync(integrationEvent);
+        }
 
         return result;
     }

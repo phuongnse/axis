@@ -1,0 +1,39 @@
+{
+  "namespace": "axis.datamodeling.events",
+  "type": "record",
+  "name": "FieldAddedEvent",
+  "fields": [
+    {
+      "name": "modelId",
+      "type": "string"
+    },
+    {
+      "name": "organizationId",
+      "type": "string"
+    },
+    {
+      "name": "fieldId",
+      "type": "string"
+    },
+    {
+      "name": "fieldName",
+      "type": "string"
+    },
+    {
+      "name": "fieldType",
+      "type": "string"
+    },
+    {
+      "name": "label",
+      "type": "string"
+    },
+    {
+      "name": "isRequired",
+      "type": "boolean"
+    },
+    {
+      "name": "displayOrder",
+      "type": "int"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "namespace": "axis.datamodeling.events",
+  "type": "record",
+  "name": "ModelCreatedEvent",
+  "fields": [
+    {
+      "name": "modelId",
+      "type": "string"
+    },
+    {
+      "name": "organizationId",
+      "type": "string"
+    },
+    {
+      "name": "name",
+      "type": "string"
+    }
+  ]
+}
