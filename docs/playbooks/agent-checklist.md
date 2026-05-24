@@ -41,7 +41,7 @@ Docs touched: docs/epics/…
 
 - **Doc drift** — enforces same-PR docs, new-handler tests, no-new TODO/FIXME, new raw-SQL review, [WORKAROUND comment ↔ inventory sync](../WORKAROUNDS.md), [speculation guard](./docs-style.md#anti-patterns-dont-ship-these), `GetAwaiter().GetResult()` ban.
 - **Markdown link check** — `lychee` verifies internal links and `#anchors`.
-- **Secret scanning** — Gitleaks scans the full diff for committed secrets (API keys, passwords, tokens).
+- **Secret scanning** — TruffleHog scans the full PR diff for committed secrets (API keys, passwords, tokens) and verifies each finding against the alleged service before reporting (`--only-verified` cuts false positives).
 - **Vulnerable packages** — `dotnet list package --vulnerable --include-transitive` fails on any known CVE in the dep tree (covers transitive packages too).
 - **Architecture fitness tests** run as part of `dotnet test` — failures there mean a CLAUDE.md P0/P1 rule got violated structurally. See [tests README](../../tests/Architecture/Axis.Architecture.Tests/README.md).
 - **Coverage report** uploaded as artifact (`dotnet-coverage`). No threshold yet — see [CONTRIBUTING.md § Coverage](../../CONTRIBUTING.md#coverage).
