@@ -17,6 +17,24 @@ trim_trailing_whitespace = true
 [*.{cs,csproj,sln,props,targets,xml}]
 indent_size = 4
 
+# Microsoft.VisualStudio.Threading.Analyzers — selective rule overrides.
+# The analyzer is wired in Directory.Build.props; severities below tune
+# which rules block the build. Keep this list narrow and justify each
+# entry — every disabled rule is a class of bug the tool was offering
+# to catch for free.
+[*.cs]
+# VSTHRD200 ("Use 'Async' suffix") clashes with the MediatR/Wolverine
+# handler convention: those frameworks discover handlers by the literal
+# method name `Handle`, not `HandleAsync`. Renaming would break dispatch.
+# The deadlock-class rules (VSTHRD002 etc.) are unaffected.
+dotnet_diagnostic.VSTHRD200.severity = none
+
+# VSTHRD111 ("Use ConfigureAwait(bool)") is a WPF/WinForms safeguard.
+# Modern ASP.NET Core does not install a SynchronizationContext; .NET
+# guidance explicitly drops the `.ConfigureAwait(false)` rule for
+# library code that targets server frameworks only.
+dotnet_diagnostic.VSTHRD111.severity = none
+
 [*.{js,jsx,ts,tsx,json,jsonc,md,yml,yaml,html,css,scss,svg}]
 indent_size = 2
 

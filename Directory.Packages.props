@@ -2,6 +2,18 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
+  <ItemGroup Label="Analyzers">
+    <!--
+      VS Threading analyzers — catches sync-over-async (VSTHRD002:
+      "synchronously waiting on tasks may cause deadlocks") and related
+      async pitfalls with full type info. Replaces the originally-planned
+      custom Roslyn analyzer (PR #99 thread) — Microsoft ships this for
+      free and maintains it across .NET versions. Applied to every project
+      via Directory.Build.props.
+    -->
+    <PackageVersion Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.14.15" />
+  </ItemGroup>
+
   <ItemGroup Label="Security-driven explicit pins">
     <!--
       System.Formats.Asn1 below 8.0.1 has a High-severity advisory
