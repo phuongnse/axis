@@ -21,6 +21,13 @@
     <PackageReference Include="WolverineFx" />
     <PackageReference Include="WolverineFx.EntityFrameworkCore" />
     <PackageReference Include="WolverineFx.Kafka" />
+    <!--
+      CVE pin (GHSA-447r-wph3-92pm). Transitive via OpenIddict + ASP.NET
+      cryptography. Explicit reference here forces the patched version
+      (8.0.1) on every consumer in the project-reference chain.
+      See Directory.Packages.props for version.
+    -->
+    <PackageReference Include="System.Formats.Asn1" />
   </ItemGroup>
 
   <PropertyGroup>
