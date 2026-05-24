@@ -44,10 +44,12 @@ using OpenIddict.Validation.AspNetCore;
 using Scalar.AspNetCore;
 using Serilog;
 using StackExchange.Redis;
+using axis.datamodeling.events;
 using axis.formbuilder.events;
 using axis.identity.events;
 using axis.workflowbuilder.events;
 using axis.workflowengine.events;
+using Axis.DataModeling.Contracts;
 using Axis.FormBuilder.Contracts;
 using Axis.Identity.Contracts;
 using Axis.Shared.Infrastructure.Messaging;
@@ -180,6 +182,25 @@ try
                     o, FormBuilderKafkaTopics.FormTaskSubmitted, serializer);
                 WolverineKafkaAvroExtensions.PublishAndListenWithAvro<FormTaskExpiredEvent>(
                     o, FormBuilderKafkaTopics.FormTaskExpired, serializer);
+
+                WolverineKafkaAvroExtensions.PublishAndListenWithAvro<ModelCreatedEvent>(
+                    o, DataModelingKafkaTopics.ModelCreated, serializer);
+                WolverineKafkaAvroExtensions.PublishAndListenWithAvro<ModelDeletedEvent>(
+                    o, DataModelingKafkaTopics.ModelDeleted, serializer);
+                WolverineKafkaAvroExtensions.PublishAndListenWithAvro<DataClassCreatedEvent>(
+                    o, DataModelingKafkaTopics.DataClassCreated, serializer);
+                WolverineKafkaAvroExtensions.PublishAndListenWithAvro<DataClassDeletedEvent>(
+                    o, DataModelingKafkaTopics.DataClassDeleted, serializer);
+                WolverineKafkaAvroExtensions.PublishAndListenWithAvro<DataRecordCreatedEvent>(
+                    o, DataModelingKafkaTopics.DataRecordCreated, serializer);
+                WolverineKafkaAvroExtensions.PublishAndListenWithAvro<DataRecordDeletedEvent>(
+                    o, DataModelingKafkaTopics.DataRecordDeleted, serializer);
+                WolverineKafkaAvroExtensions.PublishAndListenWithAvro<FieldAddedEvent>(
+                    o, DataModelingKafkaTopics.FieldAdded, serializer);
+                WolverineKafkaAvroExtensions.PublishAndListenWithAvro<FieldUpdatedEvent>(
+                    o, DataModelingKafkaTopics.FieldUpdated, serializer);
+                WolverineKafkaAvroExtensions.PublishAndListenWithAvro<FieldRemovedEvent>(
+                    o, DataModelingKafkaTopics.FieldRemoved, serializer);
             },
             configureLocalEvents: o =>
             {
@@ -196,6 +217,16 @@ try
                 WolverineKafkaAvroExtensions.PublishLocally<FormStepReachedEvent>(o);
                 WolverineKafkaAvroExtensions.PublishLocally<FormTaskSubmittedEvent>(o);
                 WolverineKafkaAvroExtensions.PublishLocally<FormTaskExpiredEvent>(o);
+
+                WolverineKafkaAvroExtensions.PublishLocally<ModelCreatedEvent>(o);
+                WolverineKafkaAvroExtensions.PublishLocally<ModelDeletedEvent>(o);
+                WolverineKafkaAvroExtensions.PublishLocally<DataClassCreatedEvent>(o);
+                WolverineKafkaAvroExtensions.PublishLocally<DataClassDeletedEvent>(o);
+                WolverineKafkaAvroExtensions.PublishLocally<DataRecordCreatedEvent>(o);
+                WolverineKafkaAvroExtensions.PublishLocally<DataRecordDeletedEvent>(o);
+                WolverineKafkaAvroExtensions.PublishLocally<FieldAddedEvent>(o);
+                WolverineKafkaAvroExtensions.PublishLocally<FieldUpdatedEvent>(o);
+                WolverineKafkaAvroExtensions.PublishLocally<FieldRemovedEvent>(o);
             });
 
         // Infrastructure assemblies host Wolverine handlers (e.g. cross-module event

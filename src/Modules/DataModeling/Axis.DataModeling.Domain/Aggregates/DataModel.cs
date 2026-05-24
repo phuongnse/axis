@@ -85,6 +85,8 @@ public sealed class DataModel : AggregateRoot<Guid>
         FieldDefinition field = FieldDefinition.Create(name.ToLowerInvariant(), label, type, required, order, config);
         _fields.Add(field);
         UpdatedAt = DateTimeOffset.UtcNow;
+        RaiseDomainEvent(new FieldAdded(
+            Id, OrganizationId, field.Id, field.Name, field.Type, field.Label, field.IsRequired, field.DisplayOrder));
         return field;
     }
 
@@ -97,6 +99,8 @@ public sealed class DataModel : AggregateRoot<Guid>
             throw new InvalidOperationException("Cannot modify a system field.");
         field.Update(label, helpText, isRequired, config);
         UpdatedAt = DateTimeOffset.UtcNow;
+        RaiseDomainEvent(new FieldUpdated(
+            Id, OrganizationId, field.Id, field.Name, field.Type, field.Label, field.IsRequired));
     }
 
     public void RemoveField(Guid fieldId)
@@ -107,6 +111,7 @@ public sealed class DataModel : AggregateRoot<Guid>
         if (field.IsSystem)
             throw new InvalidOperationException("Cannot remove a system field.");
 
+        RaiseDomainEvent(new FieldRemoved(Id, OrganizationId, field.Id, field.Name));
         _fields.Remove(field);
         UpdatedAt = DateTimeOffset.UtcNow;
         RecalculateOrder();

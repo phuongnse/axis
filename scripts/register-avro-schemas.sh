@@ -23,8 +23,18 @@ register() {
   echo "registered $subject"
 }
 
-register "$SCHEMA_DIR/WorkflowPublishedEvent.avsc" "axis.workflowbuilder.workflow-published-value"
-register "$SCHEMA_DIR/WorkflowArchivedEvent.avsc" "axis.workflowbuilder.workflow-archived-value"
-register "$SCHEMA_DIR/WorkflowUnarchivedEvent.avsc" "axis.workflowbuilder.workflow-unarchived-value"
+register "$WB_SCHEMA_DIR/WorkflowPublishedEvent.avsc" "axis.workflowbuilder.workflow-published-value"
+register "$WB_SCHEMA_DIR/WorkflowArchivedEvent.avsc" "axis.workflowbuilder.workflow-archived-value"
+register "$WB_SCHEMA_DIR/WorkflowUnarchivedEvent.avsc" "axis.workflowbuilder.workflow-unarchived-value"
+
+register "$DM_SCHEMA_DIR/ModelCreatedEvent.avsc" "axis.datamodeling.model-created-value"
+register "$DM_SCHEMA_DIR/ModelDeletedEvent.avsc" "axis.datamodeling.model-deleted-value"
+register "$DM_SCHEMA_DIR/DataClassCreatedEvent.avsc" "axis.datamodeling.data-class-created-value"
+register "$DM_SCHEMA_DIR/DataClassDeletedEvent.avsc" "axis.datamodeling.data-class-deleted-value"
+register "$DM_SCHEMA_DIR/DataRecordCreatedEvent.avsc" "axis.datamodeling.data-record-created-value"
+register "$DM_SCHEMA_DIR/DataRecordDeletedEvent.avsc" "axis.datamodeling.data-record-deleted-value"
+register "$DM_SCHEMA_DIR/FieldAddedEvent.avsc" "axis.datamodeling.field-added-value"
+register "$DM_SCHEMA_DIR/FieldUpdatedEvent.avsc" "axis.datamodeling.field-updated-value"
+register "$DM_SCHEMA_DIR/FieldRemovedEvent.avsc" "axis.datamodeling.field-removed-value"
 
 echo "register-avro-schemas: OK"

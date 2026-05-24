@@ -1,0 +1,23 @@
+{
+  "namespace": "axis.datamodeling.events",
+  "type": "record",
+  "name": "FieldRemovedEvent",
+  "fields": [
+    {
+      "name": "modelId",
+      "type": "string"
+    },
+    {
+      "name": "organizationId",
+      "type": "string"
+    },
+    {
+      "name": "fieldId",
+      "type": "string"
+    },
+    {
+      "name": "fieldName",
+      "type": "string"
+    }
+  ]
+}

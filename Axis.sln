@@ -141,6 +141,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axis.WorkflowEngine.Contrac
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axis.FormBuilder.Contracts", "src\Modules\FormBuilder\Axis.FormBuilder.Contracts\Axis.FormBuilder.Contracts.csproj", "{A67E28FD-D0B5-4F2F-8A74-6E3C52C5AD08}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axis.DataModeling.Contracts", "src\Modules\DataModeling\Axis.DataModeling.Contracts\Axis.DataModeling.Contracts.csproj", "{9CBC2B7D-7A62-4CB1-B26E-557E3DEBAE73}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -739,6 +741,18 @@ Global
 		{A67E28FD-D0B5-4F2F-8A74-6E3C52C5AD08}.Release|x64.Build.0 = Release|Any CPU
 		{A67E28FD-D0B5-4F2F-8A74-6E3C52C5AD08}.Release|x86.ActiveCfg = Release|Any CPU
 		{A67E28FD-D0B5-4F2F-8A74-6E3C52C5AD08}.Release|x86.Build.0 = Release|Any CPU
+		{9CBC2B7D-7A62-4CB1-B26E-557E3DEBAE73}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9CBC2B7D-7A62-4CB1-B26E-557E3DEBAE73}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9CBC2B7D-7A62-4CB1-B26E-557E3DEBAE73}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{9CBC2B7D-7A62-4CB1-B26E-557E3DEBAE73}.Debug|x64.Build.0 = Debug|Any CPU
+		{9CBC2B7D-7A62-4CB1-B26E-557E3DEBAE73}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{9CBC2B7D-7A62-4CB1-B26E-557E3DEBAE73}.Debug|x86.Build.0 = Debug|Any CPU
+		{9CBC2B7D-7A62-4CB1-B26E-557E3DEBAE73}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9CBC2B7D-7A62-4CB1-B26E-557E3DEBAE73}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9CBC2B7D-7A62-4CB1-B26E-557E3DEBAE73}.Release|x64.ActiveCfg = Release|Any CPU
+		{9CBC2B7D-7A62-4CB1-B26E-557E3DEBAE73}.Release|x64.Build.0 = Release|Any CPU
+		{9CBC2B7D-7A62-4CB1-B26E-557E3DEBAE73}.Release|x86.ActiveCfg = Release|Any CPU
+		{9CBC2B7D-7A62-4CB1-B26E-557E3DEBAE73}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -811,5 +825,6 @@ Global
 		{5863BF69-495F-4BFA-AE4D-1E7C67E488D0} = {D41EF59B-94DD-8F5E-06DC-E7DE3AEE5F94}
 		{F0861A53-52CA-46E5-8247-A0103A6EBF0F} = {2FFA9F79-C702-4619-9829-8CA1EC414A70}
 		{A67E28FD-D0B5-4F2F-8A74-6E3C52C5AD08} = {C98B41B3-362C-4CC3-B22A-7C9DB21C8D19}
+		{9CBC2B7D-7A62-4CB1-B26E-557E3DEBAE73} = {4693C8F7-4B4A-4DCC-AEF7-9E31D0AA16D2}
 	EndGlobalSection
 EndGlobal
