@@ -26,6 +26,16 @@ internal sealed class OrganizationVerifiedHandler(
 
         await using NpgsqlConnection connection = new(connectionString);
         await connection.OpenAsync(cancellationToken);
+
+        // Serialize per-org provisioning via session-scoped advisory lock so two
+        // concurrent handler instances (Kafka at-least-once redelivery) don't race
+        // on __EFMigrationsHistory. The lock auto-releases when this connection
+        // closes (await using).
+        await using NpgsqlCommand acquireLock = connection.CreateCommand();
+        acquireLock.CommandText = "SELECT pg_advisory_lock(hashtextextended(@key, 0));";
+        acquireLock.Parameters.AddWithValue("key", $"axis.tenant.workflowbuilder:{organizationId:N}");
+        await acquireLock.ExecuteNonQueryAsync(cancellationToken);
+
         await using NpgsqlCommand createSchema = connection.CreateCommand();
         createSchema.CommandText = $"""CREATE SCHEMA IF NOT EXISTS "{schema}";""";
         await createSchema.ExecuteNonQueryAsync(cancellationToken);

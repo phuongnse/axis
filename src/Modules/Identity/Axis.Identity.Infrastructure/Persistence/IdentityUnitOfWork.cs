@@ -50,6 +50,10 @@ internal sealed class IdentityUnitOfWork(IdentityDbContext context, IMessageBus 
                 "A record with a conflicting unique key already exists.", ex);
         }
 
+        // Note: Wolverine's IMessageBus.PublishAsync signature is
+        // PublishAsync(object, DeliveryOptions?) — fire-and-forget enqueue
+        // onto the outbox; no CancellationToken overload exists. The
+        // outbox dispatch happens later out of this scope.
         foreach (IDomainEvent evt in events)
         {
             object? integrationEvent = IdentityEventMapper.ToIntegrationEvent(evt);

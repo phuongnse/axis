@@ -83,7 +83,9 @@ docker compose down -v   # drops the postgres_data + nuget + node_modules volume
 docker compose up -d
 ```
 
-On the next boot, `IdentityDbContext.Database.MigrateAsync()` runs at startup (dev only — see [`src/Axis.Api/Program.cs`](../../src/Axis.Api/Program.cs)) to recreate Identity + OpenIddict tables. Per-tenant module schemas (`tenant_{org-id}`) are provisioned on demand by each module's `OrganizationVerifiedHandler` (e.g. [`src/Modules/DataModeling/Axis.DataModeling.Infrastructure/Messaging/OrganizationVerifiedHandler.cs`](../../src/Modules/DataModeling/Axis.DataModeling.Infrastructure/Messaging/OrganizationVerifiedHandler.cs)), triggered by Identity's `OrganizationVerifiedEvent` (Kafka, ADR-019).
+On the next boot, `IdentityDbContext.Database.MigrateAsync()` runs at startup (dev only — see [`src/Axis.Api/Program.cs`](../../src/Axis.Api/Program.cs)) to recreate Identity + OpenIddict tables.
+
+Per-tenant module schemas (`tenant_{org-id}`) are provisioned on demand by each module's `OrganizationVerifiedHandler` (e.g. [`src/Modules/DataModeling/Axis.DataModeling.Infrastructure/Messaging/OrganizationVerifiedHandler.cs`](../../src/Modules/DataModeling/Axis.DataModeling.Infrastructure/Messaging/OrganizationVerifiedHandler.cs)). This handler is triggered by Identity's `OrganizationVerifiedEvent` published via Kafka (ADR-019).
 
 If you only want to wipe the DB and keep cached npm/nuget:
 
