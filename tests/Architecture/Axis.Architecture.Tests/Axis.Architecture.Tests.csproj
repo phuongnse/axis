@@ -1,0 +1,63 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <RootNamespace>Axis.Architecture.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="NetArchTest.Rules" />
+    <PackageReference Include="coverlet.collector" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <!--
+    Architecture tests inspect all Axis.* assemblies via reflection. We reference
+    every src project so MSBuild resolves the dependency graph and copies the
+    DLLs into our bin folder; the tests then load them by name. New module added
+    to the solution → add its csproj reference here so the fitness tests cover it.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Axis.Api\Axis.Api.csproj" />
+    <ProjectReference Include="..\..\..\src\Shared\Axis.Shared.Domain\Axis.Shared.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Shared\Axis.Shared.Application\Axis.Shared.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Shared\Axis.Shared.Infrastructure\Axis.Shared.Infrastructure.csproj" />
+
+    <ProjectReference Include="..\..\..\src\Modules\Identity\Axis.Identity.Contracts\Axis.Identity.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Identity\Axis.Identity.Domain\Axis.Identity.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Identity\Axis.Identity.Application\Axis.Identity.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Identity\Axis.Identity.Infrastructure\Axis.Identity.Infrastructure.csproj" />
+
+    <ProjectReference Include="..\..\..\src\Modules\DataModeling\Axis.DataModeling.Domain\Axis.DataModeling.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\DataModeling\Axis.DataModeling.Application\Axis.DataModeling.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\DataModeling\Axis.DataModeling.Infrastructure\Axis.DataModeling.Infrastructure.csproj" />
+
+    <ProjectReference Include="..\..\..\src\Modules\WorkflowBuilder\Axis.WorkflowBuilder.Contracts\Axis.WorkflowBuilder.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\WorkflowBuilder\Axis.WorkflowBuilder.Domain\Axis.WorkflowBuilder.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\WorkflowBuilder\Axis.WorkflowBuilder.Application\Axis.WorkflowBuilder.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\WorkflowBuilder\Axis.WorkflowBuilder.Infrastructure\Axis.WorkflowBuilder.Infrastructure.csproj" />
+
+    <ProjectReference Include="..\..\..\src\Modules\FormBuilder\Axis.FormBuilder.Domain\Axis.FormBuilder.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\FormBuilder\Axis.FormBuilder.Application\Axis.FormBuilder.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\FormBuilder\Axis.FormBuilder.Infrastructure\Axis.FormBuilder.Infrastructure.csproj" />
+
+    <ProjectReference Include="..\..\..\src\Modules\WorkflowEngine\Axis.WorkflowEngine.Domain\Axis.WorkflowEngine.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\WorkflowEngine\Axis.WorkflowEngine.Application\Axis.WorkflowEngine.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\WorkflowEngine\Axis.WorkflowEngine.Infrastructure\Axis.WorkflowEngine.Infrastructure.csproj" />
+
+    <ProjectReference Include="..\..\..\src\Modules\PageBuilder\Axis.PageBuilder.Domain\Axis.PageBuilder.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\PageBuilder\Axis.PageBuilder.Application\Axis.PageBuilder.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\PageBuilder\Axis.PageBuilder.Infrastructure\Axis.PageBuilder.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

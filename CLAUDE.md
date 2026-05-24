@@ -85,6 +85,8 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 
 **Integrity:** legacy code ≠ authority if it conflicts with docs; surface conflicts. Verify with grep before claiming "done". Document deferrals in callouts (`**Deferred (PR #N follow-up):**`), not as ✅ — **proactively**, without waiting for the user to ask ([process.md § Deferred follow-up](docs/playbooks/process.md)).
 
+**Workarounds:** if you intentionally ship code that violates a P0/P1 rule (because the proper solution is blocked), record it in [`docs/WORKAROUNDS.md`](docs/WORKAROUNDS.md) **in the same PR** with a cleanup trigger. Add a `// WORKAROUND: see docs/WORKAROUNDS.md#<slug>` comment at the violation site. The drift script and the architecture fitness tests (`tests/Architecture/Axis.Architecture.Tests`) enforce both ends.
+
 **Work priority:** (1) gaps/bugs/failing tests (2) finish current layer (3) next layer in order. Before API work: `grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/epics/` — resolve or document deferrals ([process.md § 4.5](docs/playbooks/process.md)).
 
 ---
@@ -116,7 +118,7 @@ Skip for single-file fixes and doc-only edits.
 
 | Changed | Commands |
 |---------|----------|
-| `src/` or `tests/` | `dotnet build` → `dotnet test` → `dotnet format --verify-no-changes` |
+| `src/` or `tests/` | `dotnet build` → `dotnet test` (includes [architecture fitness](tests/Architecture/Axis.Architecture.Tests/README.md)) → `dotnet format --verify-no-changes` |
 | `frontend/` | `npm run ci` then `npm run test` |
 | Both | All of the above |
 
@@ -203,6 +205,8 @@ Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` chan
 | [docs-style.md](docs/playbooks/docs-style.md) | Doc anti-patterns + single-owner rule (read before adding a `.md`) |
 | [TECH_STACK.md](docs/TECH_STACK.md) | Libraries + ADRs |
 | [PROGRESS.md](docs/PROGRESS.md) | Module layer status |
+| [WORKAROUNDS.md](docs/WORKAROUNDS.md) | Intentional rule violations + cleanup triggers (**read when touching legacy or shipping a known shortcut**) |
+| [Architecture tests README](tests/Architecture/Axis.Architecture.Tests/README.md) | What's mechanically enforced + how to add a new rule |
 | [docs/epics/](docs/epics/README.md) | Features + ACs |
 
 **Solution tree:**

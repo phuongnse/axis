@@ -53,7 +53,7 @@ check_epic_docs 'src/Axis\.Api/Endpoints/Workflow' 'docs/epics/E04-workflow-buil
 check_epic_docs 'src/Modules/WorkflowBuilder/' 'docs/epics/E04-workflow-builder' 'E04 WorkflowBuilder module'
 check_epic_docs 'src/Axis\.Api/Endpoints/Form' 'docs/epics/E05-form-builder' 'E05 FormBuilder API'
 check_epic_docs 'src/Modules/FormBuilder/' 'docs/epics/E05-form-builder' 'E05 FormBuilder module'
-check_epic_docs 'src/Axis\.Api/Infrastructure/TenantSchema' 'docs/epics/E01-platform-foundation' 'E01 tenant provisioning'
+check_epic_docs 'src/Modules/.*/.*OrganizationVerifiedHandler' 'docs/epics/E01-platform-foundation' 'E01 tenant provisioning'
 check_epic_docs 'frontend/src/(features/auth|routes/|components/layout/AppShell)' 'docs/epics/E02-identity-access' 'E02 auth frontend'
 
 if any_changed '^frontend/src/'; then
@@ -142,6 +142,53 @@ check_readme_api 'src/Axis\.Api/Endpoints/Execution' 'docs/epics/E06-workflow-en
 check_readme_api 'src/Axis\.Api/Endpoints/Form' 'docs/epics/E05-form-builder'
 check_readme_api 'src/Axis\.Api/Endpoints/Model' 'docs/epics/E03-data-modeling'
 check_readme_api 'src/Axis\.Api/Endpoints/Workflow' 'docs/epics/E04-workflow-builder'
+
+# WORKAROUND comment ↔ inventory cross-check (docs/WORKAROUNDS.md).
+#   Each `// WORKAROUND: see docs/WORKAROUNDS.md#<slug>` comment in production
+#   code must reference a real section in WORKAROUNDS.md. New violations of
+#   architectural rules should always be documented — silent shortcuts become
+#   permanent debt (see docs/WORKAROUNDS.md for the rationale).
+WORKAROUNDS_FILE="docs/WORKAROUNDS.md"
+if [ -f "${WORKAROUNDS_FILE}" ]; then
+  # Extract H3 slugs from WORKAROUNDS.md (### my-slug → my-slug). Lowercased.
+  known_slugs="$(awk '
+    /^### / {
+      sub(/^### /, "")
+      gsub(/[^A-Za-z0-9-]/, "")
+      print tolower($0)
+    }' "${WORKAROUNDS_FILE}")"
+
+  # Find WORKAROUND: comments referencing docs/WORKAROUNDS.md#slug.
+  # Match across src/ and tests/, .cs and .ts/.tsx and .md.
+  while IFS= read -r match; do
+    [ -z "${match}" ] && continue
+    file="$(echo "${match}" | cut -d: -f1)"
+    referenced="$(echo "${match}" \
+      | grep -oE 'docs/WORKAROUNDS\.md#[A-Za-z0-9-]+' \
+      | head -n1 \
+      | sed 's|.*#||' \
+      | tr '[:upper:]' '[:lower:]')"
+    [ -z "${referenced}" ] && continue
+    if ! echo "${known_slugs}" | grep -qx "${referenced}"; then
+      fail "WORKAROUND comment references unknown slug '${referenced}' — add a section to ${WORKAROUNDS_FILE} (or fix the slug): ${file}"
+    fi
+  done < <(
+    grep -rnE 'WORKAROUND:.*docs/WORKAROUNDS\.md#' \
+      src/ tests/ frontend/src/ 2>/dev/null \
+      || true
+  )
+
+  # Also flag WORKAROUND comments without the WORKAROUNDS.md link — they're
+  # invisible to the inventory.
+  while IFS= read -r match; do
+    [ -z "${match}" ] && continue
+    fail "WORKAROUND comment without docs/WORKAROUNDS.md reference — add link or rephrase: ${match}"
+  done < <(
+    grep -rnE 'WORKAROUND:' src/ tests/ frontend/src/ 2>/dev/null \
+      | grep -v 'docs/WORKAROUNDS\.md#' \
+      || true
+  )
+fi
 
 # Speculation guard: reference docs (ARCHITECTURE) must describe what exists,
 # not what is "planned" or "will be wired". Forward-looking status belongs in
