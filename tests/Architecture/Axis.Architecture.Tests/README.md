@@ -1,6 +1,6 @@
 # Axis Architecture Fitness Tests
 
-> [← tests](../../README.md) · [← CLAUDE.md](../../../CLAUDE.md) · [← docs/TECH_STACK.md](../../../docs/TECH_STACK.md)
+> [← CLAUDE.md](../../../CLAUDE.md) · [← docs/TECH_STACK.md](../../../docs/TECH_STACK.md) · [← docs/WORKAROUNDS.md](../../../docs/WORKAROUNDS.md)
 
 Tests in this project run under `dotnet test` like any other and enforce **CLAUDE.md P0/P1 architectural rules** as automated checks. When one of these tests fails, an agent (human or AI) has introduced a regression that the design forbids — fix the code, not the test.
 
