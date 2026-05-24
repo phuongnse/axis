@@ -230,7 +230,7 @@ jobs:
           persist-credentials: false
 
       - name: TruffleHog
-        uses: trufflesecurity/trufflehog@907ad0f15369e0fbed0fbb2200b89e60ef7d6c4f # v3.91.2
+        uses: trufflesecurity/trufflehog@37b77001d0174ebec2fcca2bd83ff83a6d45a3ab # v3.95.3
         with:
           base: ${{ github.event.pull_request.base.sha }}
           head: ${{ github.event.pull_request.head.sha }}
