@@ -11,9 +11,15 @@ public class GetFormByIdHandlerTests
 {
     private static readonly Guid OrgId = Guid.NewGuid();
     private readonly IFormRepository _repo = Substitute.For<IFormRepository>();
+    private readonly IFormModelReferenceRepository _formModelReferenceRepo = Substitute.For<IFormModelReferenceRepository>();
     private readonly GetFormByIdHandler _handler;
 
-    public GetFormByIdHandlerTests() => _handler = new GetFormByIdHandler(_repo);
+    public GetFormByIdHandlerTests()
+    {
+        _handler = new GetFormByIdHandler(_repo, _formModelReferenceRepo);
+        _formModelReferenceRepo.GetBrokenFieldIdsForFormAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new HashSet<Guid>());
+    }
 
     [Fact]
     public async Task Handle_WhenFormExists_ReturnsDetailDto()

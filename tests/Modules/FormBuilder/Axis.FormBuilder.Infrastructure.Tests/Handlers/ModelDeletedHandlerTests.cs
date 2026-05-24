@@ -1,0 +1,68 @@
+using axis.datamodeling.events;
+using Axis.FormBuilder.Domain.Aggregates;
+using Axis.FormBuilder.Domain.Enums;
+using Axis.FormBuilder.Domain.ReadModels;
+using Axis.FormBuilder.Domain.ValueObjects;
+using Axis.FormBuilder.Infrastructure.Handlers;
+using Axis.FormBuilder.Infrastructure.Persistence;
+using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using NSubstitute;
+
+namespace Axis.FormBuilder.Infrastructure.Tests.Handlers;
+
+[Collection("FormBuilderDb")]
+public sealed class ModelDeletedHandlerTests(FormBuilderDatabaseFixture fixture)
+{
+    private static readonly Guid OrgId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+    private ModelDeletedHandler CreateHandler()
+    {
+        IConfiguration config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:FormBuilder"] = fixture.ConnectionString,
+            })
+            .Build();
+        ILogger<ModelDeletedHandler> logger = Substitute.For<ILogger<ModelDeletedHandler>>();
+        return new ModelDeletedHandler(config, logger);
+    }
+
+    private static ModelDeletedEvent BuildEvent(Guid modelId) =>
+        new()
+        {
+            modelId = modelId.ToString(),
+            organizationId = OrgId.ToString(),
+        };
+
+    [Fact]
+    public async Task Handle_WhenRelationPickerTargetsDeletedModel_FlagsFieldAsBroken()
+    {
+        Guid targetModelId = Guid.NewGuid();
+        FormDefinition form = FormDefinition.Create("Intake", null, OrgId, "user");
+        form.AddField(
+            "company",
+            "Company",
+            FormFieldType.RelationPicker,
+            false,
+            new RelationPickerFieldConfig(targetModelId));
+
+        await using (FormBuilderDbContext writeCtx = fixture.CreateContext())
+        {
+            writeCtx.FormDefinitions.Add(form);
+            await writeCtx.SaveChangesAsync();
+        }
+
+        await CreateHandler().Handle(BuildEvent(targetModelId), CancellationToken.None);
+
+        await using FormBuilderDbContext readCtx = fixture.CreateContext();
+        FormModelReference? reference = await readCtx.FormModelReferences
+            .SingleOrDefaultAsync(r => r.FormId == form.Id);
+
+        reference.Should().NotBeNull();
+        reference!.IsBroken.Should().BeTrue();
+        reference.ModelId.Should().Be(targetModelId);
+    }
+}

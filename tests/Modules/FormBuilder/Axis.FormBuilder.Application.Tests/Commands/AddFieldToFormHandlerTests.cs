@@ -13,10 +13,12 @@ public class AddFieldToFormHandlerTests
 {
     private static readonly Guid OrgId = Guid.NewGuid();
     private readonly IFormRepository _repo = Substitute.For<IFormRepository>();
+    private readonly IFormModelReferenceSync _formModelReferenceSync = Substitute.For<IFormModelReferenceSync>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly AddFieldToFormHandler _handler;
 
-    public AddFieldToFormHandlerTests() => _handler = new AddFieldToFormHandler(_repo, _uow);
+    public AddFieldToFormHandlerTests()
+        => _handler = new AddFieldToFormHandler(_repo, _formModelReferenceSync, _uow);
 
     [Fact]
     public async Task Handle_WhenFormExists_AddsFieldAndReturnsFieldId()
