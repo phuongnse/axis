@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 # Fails when production code changes without matching doc updates, or new handlers lack tests.
+#
+# Adding a new regex check? Read first:
+#   docs/playbooks/patterns.md#drift-regex-constraints
+#
+# GNU awk silently degrades `\.`, `\(`, `\)`, `\b` — use POSIX bracket
+# expressions (`[.]`, `[(]`, etc.) for literal punctuation. The doc above
+# explains why and walks through the failure mode of the wrong syntax.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
