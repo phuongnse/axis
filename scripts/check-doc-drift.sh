@@ -68,6 +68,25 @@ if any_changed '^src/' && docs_changed_under 'docs/PROGRESS.md'; then
   fi
 fi
 
+# Sync-over-async guard: `GetAwaiter().GetResult()` blocks the thread on a Task
+# and is a classic deadlock recipe under any sync-context (ASP.NET classic,
+# WinForms). We flag it everywhere in src/ — Wolverine and Minimal API are both
+# fully async; there is no legitimate need. (`.Result` and `.Wait()` are not
+# grep-banned here because both names are used by domain types in this codebase;
+# the Roslyn analyzer in PR #98 will catch the Task-typed versions with type
+# info.)
+SYNC_OVER_ASYNC_PATTERN='GetAwaiter\(\)\.GetResult\(\)'
+while IFS= read -r added; do
+  [ -z "${added}" ] && continue
+  fail "Sync-over-async (.GetAwaiter().GetResult()) introduced — await the Task instead: ${added}"
+done < <(
+  git diff --unified=0 "${RANGE}" -- 'src/*.cs' 2>/dev/null \
+    | awk -v pat="${SYNC_OVER_ASYNC_PATTERN}" '
+        /^\+\+\+ b\// { file = substr($0, 7); next }
+        /^\+[^+]/ && $0 ~ pat { print file ": " substr($0, 2) }
+      '
+)
+
 # Cross-module raw-SQL guard (P0 in CLAUDE.md § Module boundaries).
 # Flag *newly introduced* raw-SQL calls in module code so review confirms the
 # SQL only touches that module's own tables. Use Wolverine events for any
