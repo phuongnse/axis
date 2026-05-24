@@ -103,6 +103,19 @@ public class DataModelTests
     // ─── AddField ─────────────────────────────────────────────────────────────
 
     [Fact]
+    public void AddField_WhenCustomFieldAdded_RaisesFieldAddedEvent()
+    {
+        var model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
+        model.ClearDomainEvents();
+        FieldDefinition field = model.AddField("amount", "Amount", FieldType.Text, required: true, new TextFieldConfig());
+
+        model.DomainEvents.Should().ContainSingle(e => e is FieldAdded);
+        FieldAdded added = model.DomainEvents.OfType<FieldAdded>().Single();
+        added.FieldId.Should().Be(field.Id);
+        added.FieldName.Should().Be("amount");
+    }
+
+    [Fact]
     public void AddField_WhenFieldIsTextField_AddsWithCorrectProperties()
     {
         var model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
@@ -180,17 +193,33 @@ public class DataModelTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*deleted*");
     }
 
+    // ─── UpdateField ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public void UpdateField_WhenFieldUpdated_RaisesFieldUpdatedEvent()
+    {
+        var model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
+        FieldDefinition field = model.AddField("amount", "Amount", FieldType.Text, false, new TextFieldConfig());
+        model.ClearDomainEvents();
+
+        model.UpdateField(field.Id, "Total Amount", null, true, new TextFieldConfig(MaxLength: 50));
+
+        model.DomainEvents.Should().ContainSingle(e => e is FieldUpdated);
+    }
+
     // ─── RemoveField ──────────────────────────────────────────────────────────
 
     [Fact]
-    public void RemoveField_WhenFieldIsCustom_RemovesField()
+    public void RemoveField_WhenFieldIsCustom_RemovesFieldAndRaisesFieldRemovedEvent()
     {
         var model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         var field = model.AddField("amount", "Amount", FieldType.Text, false, new TextFieldConfig());
+        model.ClearDomainEvents();
 
         model.RemoveField(field.Id);
 
         model.Fields.Should().NotContain(f => f.Name == "amount");
+        model.DomainEvents.Should().ContainSingle(e => e is FieldRemoved);
     }
 
     [Fact]
