@@ -44,11 +44,15 @@ using OpenIddict.Validation.AspNetCore;
 using Scalar.AspNetCore;
 using Serilog;
 using StackExchange.Redis;
+using axis.formbuilder.events;
 using axis.identity.events;
 using axis.workflowbuilder.events;
+using axis.workflowengine.events;
+using Axis.FormBuilder.Contracts;
 using Axis.Identity.Contracts;
 using Axis.Shared.Infrastructure.Messaging;
 using Axis.Shared.Infrastructure.Wolverine;
+using Axis.WorkflowEngine.Contracts;
 using Axis.WorkflowBuilder.Contracts;
 using Wolverine;
 using Wolverine.EntityFrameworkCore;
@@ -169,6 +173,13 @@ try
                     o, IdentityKafkaTopics.RoleAssigned, serializer);
                 WolverineKafkaAvroExtensions.PublishAndListenWithAvro<RoleRemovedEvent>(
                     o, IdentityKafkaTopics.RoleRemoved, serializer);
+
+                WolverineKafkaAvroExtensions.PublishAndListenWithAvro<FormStepReachedEvent>(
+                    o, WorkflowEngineKafkaTopics.FormStepReached, serializer);
+                WolverineKafkaAvroExtensions.PublishAndListenWithAvro<FormTaskSubmittedEvent>(
+                    o, FormBuilderKafkaTopics.FormTaskSubmitted, serializer);
+                WolverineKafkaAvroExtensions.PublishAndListenWithAvro<FormTaskExpiredEvent>(
+                    o, FormBuilderKafkaTopics.FormTaskExpired, serializer);
             },
             configureLocalEvents: o =>
             {
@@ -181,6 +192,10 @@ try
                 WolverineKafkaAvroExtensions.PublishLocally<UserReactivatedEvent>(o);
                 WolverineKafkaAvroExtensions.PublishLocally<RoleAssignedEvent>(o);
                 WolverineKafkaAvroExtensions.PublishLocally<RoleRemovedEvent>(o);
+
+                WolverineKafkaAvroExtensions.PublishLocally<FormStepReachedEvent>(o);
+                WolverineKafkaAvroExtensions.PublishLocally<FormTaskSubmittedEvent>(o);
+                WolverineKafkaAvroExtensions.PublishLocally<FormTaskExpiredEvent>(o);
             });
 
         // Infrastructure assemblies host Wolverine handlers (e.g. cross-module event

@@ -59,21 +59,4 @@ When the cleanup trigger fires and you remove the workaround:
 
 ## Active workarounds
 
-### formbuilder-consumes-workflowengine-domain
-
-- **Location**: `src/Modules/FormBuilder/Axis.FormBuilder.Infrastructure/Handlers/FormStepReachedHandler.cs`
-- **Violates**: CLAUDE.md P0 — "No project reference from `Axis.{ModuleA}.*` to `Axis.{ModuleB}.*` except to `Axis.{ModuleB}.Contracts`." `FormStepReachedHandler` imports `Axis.WorkflowEngine.Domain.Events.FormStepReached` to react to it in-process.
-- **Why it exists**: WorkflowEngine has not yet defined its `Axis.WorkflowEngine.Contracts` project with Avro schemas + gRPC service. Cross-module event flow currently uses in-process Wolverine pub instead of Kafka.
-- **Cleanup trigger**: PR that adds `Axis.WorkflowEngine.Contracts` with `FormStepReachedEvent` Avro schema and switches the publish path to Kafka. Tracked under "E06 Service-boundary retrofit ⏳" in `docs/PROGRESS.md`.
-- **Added**: pre-dates the architecture tests; surfaced when [`chore/architecture-fitness-and-workarounds-inventory`](../tests/Architecture/Axis.Architecture.Tests/ModuleBoundaryTests.cs) ran for the first time.
-
-### workflowengine-consumes-formbuilder-domain
-
-- **Location**:
-  - `src/Modules/WorkflowEngine/Axis.WorkflowEngine.Infrastructure/Handlers/FormTaskSubmittedHandler.cs`
-  - `src/Modules/WorkflowEngine/Axis.WorkflowEngine.Infrastructure/Handlers/FormTaskExpiredHandler.cs`
-- **Violates**: CLAUDE.md P0 — same rule as above. Both handlers import `Axis.FormBuilder.Domain.Events.FormTaskSubmitted` / `FormTaskExpired` to react in-process.
-- **Why it exists**: FormBuilder has not yet defined `Axis.FormBuilder.Contracts` with Avro schemas. The form-task lifecycle events stay as in-process domain events instead of Kafka integration events.
-- **Cleanup trigger**: PR that adds `Axis.FormBuilder.Contracts` with `FormTaskSubmittedEvent` / `FormTaskExpiredEvent` Avro schemas and converts the consumers to read from Kafka topics. Tracked under "E05 Service-boundary retrofit ⏳" in `docs/PROGRESS.md`.
-- **Added**: pre-dates the architecture tests; surfaced when this inventory was created.
-
+_(none — clean slate)_
