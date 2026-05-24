@@ -39,7 +39,8 @@ Users can create custom data models within their organization. A model defines t
 
 > **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: model plan-limit check (HTTP 402) pending billing layer (E01 F04); name format validation enforced in Application handler.
-> Decisions: system fields (id, created_at, updated_at) injected by domain factory; atomicity guaranteed by UnitOfWork.
+> **Deferred (PR #101 follow-up):** FormBuilder/WorkflowBuilder Kafka consumers for `ModelDeletedEvent` / field lifecycle events (broken-reference warnings per US-032/033).
+> Decisions: system fields (id, created_at, updated_at) injected by domain factory; atomicity guaranteed by UnitOfWork; `ModelCreatedEvent` published cross-module via `Axis.DataModeling.Contracts` (ADR-019).
 
 ---
 
