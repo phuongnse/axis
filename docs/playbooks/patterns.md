@@ -38,6 +38,7 @@
 - [Cross-module data pattern](#cross-module-communication-pattern) ★
 - [Command idempotency pattern](#command-idempotency-pattern) ★
 - [Code hygiene checklist](#code-hygiene-checklist)
+- [Drift script regex constraints](#drift-regex-constraints)
 
 ---
 
@@ -1592,6 +1593,47 @@ git commit -m "chore: ..."
 git push -u origin chore/my-fix
 gh pr create …
 ```
+
+---
+
+## Drift script regex constraints {#drift-regex-constraints}
+
+[`scripts/check-doc-drift.sh`](../../scripts/check-doc-drift.sh) feeds its forbidden-pattern regexes into **GNU awk**. Awk's regex dialect differs from grep/PCRE/.NET in two ways that silently degrade patterns instead of erroring out — anyone adding a new check to the drift script must follow these conventions.
+
+### Backslash escapes for punctuation are silently broken
+
+Backslash-escaped punctuation like `\.`, `\(`, `\)`, `\?`, `\+` triggers a GNU awk warning ("escape sequence treated as plain") and is then **silently degraded** to the unescaped character. The degraded pattern keeps running with surprising semantics:
+
+| What you wrote | What GNU awk runs | Consequence |
+|---|---|---|
+| `\.` | `.` (any character) | Broadened match — `DateTime\.Now` also matches `DateTimeXNow` |
+| `\(\)` | `()` (empty group) | Empty group matches the empty string anywhere — `GetAwaiter\(\)\.GetResult\(\)` actually matches the substring `GetAwaiterXGetResult` (one any-char between) |
+
+**Rule:** in any pattern fed to awk inside the drift script, escape literal punctuation with POSIX bracket expressions:
+
+| Wrong (silently degraded) | Right (literal match) |
+|---|---|
+| `DateTime\.Now` | `DateTime[.]Now` |
+| `GetAwaiter\(\)\.GetResult\(\)` | `GetAwaiter[(][)][.]GetResult[(][)]` |
+| `\?` | `[?]` |
+
+`[x]` is a POSIX bracket expression with a single character — awk treats every character inside `[…]` as a literal except the special set (`]`, `^`, `-`).
+
+### `\b` word boundary does not exist
+
+GNU awk has no word-boundary metacharacter. Patterns like `\bFoo\b` silently match nothing useful. If you need word-boundary semantics, accept that the regex will match substrings and document the false-positive risk in a comment next to the pattern. Don't try to fake it with `[^A-Za-z]` — that requires a non-letter character on both sides, which line ends won't provide and the pattern fails on edge cases.
+
+### Validation before commit
+
+Always test new patterns with the literal target string before pushing:
+
+```bash
+echo "DateTime.Now;" | awk '$0 ~ /DateTime[.]Now/ { print "MATCH" }'
+```
+
+The drift script's CI run will surface real failures, but `awk` warnings only appear on stderr — easy to miss.
+
+---
 
 
 ## Frontend Patterns

@@ -39,7 +39,7 @@ Docs touched: docs/epics/…
 
 **CI-only gates** (run automatically on PR, no local action required):
 
-- **Doc drift** — enforces same-PR docs, new-handler tests, no-new TODO/FIXME, new raw-SQL review, [WORKAROUND comment ↔ inventory sync](../WORKAROUNDS.md), [speculation guard](./docs-style.md#anti-patterns-dont-ship-these), `GetAwaiter().GetResult()` ban.
+- **Doc drift** — enforces same-PR docs, new-handler tests, no-new TODO/FIXME, new raw-SQL review, [WORKAROUND comment ↔ inventory sync](../WORKAROUNDS.md), [speculation guard](./docs-style.md#anti-patterns-dont-ship-these), `GetAwaiter().GetResult()` ban, hardcoded connection-string ban, `DateTime.Now` ban (use `UtcNow`).
 - **Markdown link check** — `lychee` verifies internal links and `#anchors`.
 - **Secret scanning** — TruffleHog scans the full PR diff for committed secrets (API keys, passwords, tokens) and verifies each finding against the alleged service before reporting (`--only-verified` cuts false positives).
 - **Vulnerable packages** — `dotnet list package --vulnerable --include-transitive` fails on any known CVE in the dep tree (covers transitive packages too).
