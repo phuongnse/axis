@@ -1,4 +1,5 @@
-using Axis.FormBuilder.Domain.Events;
+using axis.formbuilder.events;
+using Axis.FormBuilder.Contracts;
 using Axis.Shared.Application;
 using Axis.WorkflowEngine.Application.Messages;
 using Axis.WorkflowEngine.Application.Repositories;
@@ -11,7 +12,13 @@ namespace Axis.WorkflowEngine.Infrastructure.Handlers;
 /// <summary>
 /// Handles FormTaskSubmitted from FormBuilder: resumes the Waiting form step with
 /// the submitted data merged into the execution context, then advances execution.
-/// Cross-module: FormBuilder publishes FormTaskSubmitted → WorkflowEngine consumes.
+///
+/// <para>
+/// Cross-module consumer: subscribes to the Avro <see cref="FormTaskSubmittedEvent"/>
+/// published by FormBuilder over Kafka (ADR-019). Previously consumed the
+/// in-process domain event directly — that pattern violated ADR-010 and was
+/// tracked as a workaround until this PR.
+/// </para>
 /// </summary>
 internal sealed class FormTaskSubmittedHandler(
     IExecutionRepository execRepo,
@@ -19,24 +26,29 @@ internal sealed class FormTaskSubmittedHandler(
     IStepDispatcher dispatcher,
     ILogger<FormTaskSubmittedHandler> logger)
 {
-    public async Task Handle(FormTaskSubmitted @event, CancellationToken ct)
+    public async Task Handle(FormTaskSubmittedEvent @event, CancellationToken ct)
     {
+        Guid executionId = @event.ExecutionId();
+        Guid executionStepId = @event.ExecutionStepId();
+        Guid organizationId = @event.OrganizationId();
+        IReadOnlyDictionary<string, object?> submittedData = @event.SubmittedData();
+
         WorkflowExecution? execution = await execRepo.GetByIdWithStepsAsync(
-            @event.ExecutionId, @event.OrganizationId, ct);
+            executionId, organizationId, ct);
 
         if (execution is null)
         {
             logger.LogWarning(
-                "FormTaskSubmittedHandler: execution {ExecutionId} not found", @event.ExecutionId);
+                "FormTaskSubmittedHandler: execution {ExecutionId} not found", executionId);
             return;
         }
 
-        ExecutionStep? step = execution.Steps.FirstOrDefault(s => s.Id == @event.ExecutionStepId);
+        ExecutionStep? step = execution.Steps.FirstOrDefault(s => s.Id == executionStepId);
         if (step is null)
         {
             logger.LogWarning(
                 "FormTaskSubmittedHandler: step {StepId} not found in execution {ExecutionId}",
-                @event.ExecutionStepId, @event.ExecutionId);
+                executionStepId, executionId);
             return;
         }
 
@@ -45,16 +57,16 @@ internal sealed class FormTaskSubmittedHandler(
         {
             logger.LogInformation(
                 "FormTaskSubmittedHandler: step {StepId} already terminal ({Status}), skipping",
-                @event.ExecutionStepId, step.Status);
+                executionStepId, step.Status);
             return;
         }
 
         logger.LogInformation(
             "Resuming form step {StepId} in execution {ExecutionId} with {FieldCount} submitted fields",
-            @event.ExecutionStepId, @event.ExecutionId, @event.SubmittedData.Count);
+            executionStepId, executionId, submittedData.Count);
 
-        execution.CompleteStep(@event.ExecutionStepId, @event.SubmittedData);
-        execution.MergeContext(@event.SubmittedData);
+        execution.CompleteStep(executionStepId, submittedData);
+        execution.MergeContext(submittedData);
 
         try
         {
@@ -65,11 +77,11 @@ internal sealed class FormTaskSubmittedHandler(
             // Another Wolverine worker already committed this form step completion.
             logger.LogInformation(
                 "FormTaskSubmittedHandler: concurrent completion detected for step {StepId} — skipping",
-                @event.ExecutionStepId);
+                executionStepId);
             return;
         }
 
         await dispatcher.PublishAsync(
-            new ExecuteNextStepMessage(@event.ExecutionId, @event.OrganizationId), ct);
+            new ExecuteNextStepMessage(executionId, organizationId), ct);
     }
 }

@@ -2,11 +2,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Axis.WorkflowEngine.Application\Axis.WorkflowEngine.Application.csproj" />
+    <ProjectReference Include="..\Axis.WorkflowEngine.Contracts\Axis.WorkflowEngine.Contracts.csproj" />
     <ProjectReference Include="..\Axis.WorkflowEngine.Domain\Axis.WorkflowEngine.Domain.csproj" />
     <ProjectReference Include="..\..\..\Shared\Axis.Shared.Infrastructure\Axis.Shared.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Identity\Axis.Identity.Contracts\Axis.Identity.Contracts.csproj" />
     <ProjectReference Include="..\..\WorkflowBuilder\Axis.WorkflowBuilder.Contracts\Axis.WorkflowBuilder.Contracts.csproj" />
-    <ProjectReference Include="..\..\FormBuilder\Axis.FormBuilder.Domain\Axis.FormBuilder.Domain.csproj" />
+    <ProjectReference Include="..\..\FormBuilder\Axis.FormBuilder.Contracts\Axis.FormBuilder.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

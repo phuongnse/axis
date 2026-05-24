@@ -1,6 +1,7 @@
 using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using Axis.WorkflowEngine.Application.Services;
+using Axis.WorkflowEngine.Infrastructure.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Npgsql;
@@ -40,8 +41,16 @@ internal sealed class WorkflowEngineUnitOfWork(WorkflowEngineDbContext context, 
                 "A record with a conflicting unique key already exists.", ex);
         }
 
+        // Note: Wolverine's IMessageBus.PublishAsync signature is
+        // PublishAsync(object, DeliveryOptions?) — fire-and-forget enqueue
+        // onto the outbox; no CancellationToken overload exists. The
+        // outbox dispatch happens later out of this scope.
         foreach (IDomainEvent evt in events)
-            await bus.PublishAsync(evt);
+        {
+            object? integrationEvent = WorkflowEngineEventMapper.ToIntegrationEvent(evt);
+            if (integrationEvent is not null)
+                await bus.PublishAsync(integrationEvent);
+        }
 
         return result;
     }

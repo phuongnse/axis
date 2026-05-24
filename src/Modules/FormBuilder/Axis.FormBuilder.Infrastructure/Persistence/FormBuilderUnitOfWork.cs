@@ -1,4 +1,5 @@
 using Axis.FormBuilder.Application.Services;
+using Axis.FormBuilder.Infrastructure.Messaging;
 using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using Microsoft.EntityFrameworkCore;
@@ -40,8 +41,16 @@ internal sealed class FormBuilderUnitOfWork(FormBuilderDbContext context, IMessa
                 "A record with a conflicting unique key already exists.", ex);
         }
 
+        // Note: Wolverine's IMessageBus.PublishAsync signature is
+        // PublishAsync(object, DeliveryOptions?) — fire-and-forget enqueue
+        // onto the outbox; no CancellationToken overload exists. The
+        // outbox dispatch happens later out of this scope.
         foreach (IDomainEvent evt in events)
-            await bus.PublishAsync(evt);
+        {
+            object? integrationEvent = FormBuilderEventMapper.ToIntegrationEvent(evt);
+            if (integrationEvent is not null)
+                await bus.PublishAsync(integrationEvent);
+        }
 
         return result;
     }

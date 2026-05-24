@@ -1,4 +1,5 @@
-using Axis.FormBuilder.Domain.Events;
+using axis.formbuilder.events;
+using Axis.FormBuilder.Contracts;
 using Axis.WorkflowEngine.Application.Messages;
 using Axis.WorkflowEngine.Application.Repositories;
 using Axis.WorkflowEngine.Application.Services;
@@ -9,32 +10,42 @@ namespace Axis.WorkflowEngine.Infrastructure.Handlers;
 
 /// <summary>
 /// US-089: Fails the waiting form step and execution when a form task expires.
-/// Cross-module: FormBuilder publishes FormTaskExpired → WorkflowEngine consumes.
+///
+/// <para>
+/// Cross-module consumer: subscribes to the Avro <see cref="FormTaskExpiredEvent"/>
+/// published by FormBuilder over Kafka (ADR-019). Previously consumed the
+/// in-process domain event directly — that pattern violated ADR-010 and was
+/// tracked as a workaround until this PR.
+/// </para>
 /// </summary>
 internal sealed class FormTaskExpiredHandler(
     IExecutionRepository execRepo,
     IStepDispatcher dispatcher,
     ILogger<FormTaskExpiredHandler> logger)
 {
-    public async Task Handle(FormTaskExpired @event, CancellationToken ct)
+    public async Task Handle(FormTaskExpiredEvent @event, CancellationToken ct)
     {
+        Guid executionId = @event.ExecutionId();
+        Guid executionStepId = @event.ExecutionStepId();
+        Guid organizationId = @event.OrganizationId();
+
         WorkflowExecution? execution = await execRepo.GetByIdWithStepsAsync(
-            @event.ExecutionId, @event.OrganizationId, ct);
+            executionId, organizationId, ct);
 
         if (execution is null)
         {
             logger.LogWarning(
-                "FormTaskExpiredHandler: execution {ExecutionId} not found", @event.ExecutionId);
+                "FormTaskExpiredHandler: execution {ExecutionId} not found", executionId);
             return;
         }
 
-        ExecutionStep? step = execution.Steps.FirstOrDefault(s => s.Id == @event.ExecutionStepId);
+        ExecutionStep? step = execution.Steps.FirstOrDefault(s => s.Id == executionStepId);
         if (step is null)
         {
             logger.LogWarning(
                 "FormTaskExpiredHandler: step {StepId} not found in execution {ExecutionId}",
-                @event.ExecutionStepId,
-                @event.ExecutionId);
+                executionStepId,
+                executionId);
             return;
         }
 
@@ -42,7 +53,7 @@ internal sealed class FormTaskExpiredHandler(
         {
             logger.LogInformation(
                 "FormTaskExpiredHandler: step {StepId} already terminal ({Status}), skipping",
-                @event.ExecutionStepId,
+                executionStepId,
                 step.Status);
             return;
         }
@@ -52,14 +63,14 @@ internal sealed class FormTaskExpiredHandler(
 
         logger.LogWarning(
             "Form step {StepId} timed out in execution {ExecutionId}",
-            @event.ExecutionStepId,
-            @event.ExecutionId);
+            executionStepId,
+            executionId);
 
         await dispatcher.PublishAsync(
             new StepFailedMessage(
-                @event.ExecutionId,
-                @event.ExecutionStepId,
-                @event.OrganizationId,
+                executionId,
+                executionStepId,
+                organizationId,
                 errorDetails),
             ct);
     }

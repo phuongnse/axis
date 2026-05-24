@@ -33,27 +33,7 @@ public class ModuleBoundaryTests
     /// </para>
     /// </summary>
     private static readonly Dictionary<(string SourceModule, string SourceLayer, string TargetModule, string TargetLayer), HashSet<string>>
-        KnownBoundaryWorkarounds = new()
-        {
-            // FormBuilder consumes WorkflowEngine domain events in-process.
-            // Should consume via WorkflowEngine.Contracts (Avro + Kafka) once E04→E06
-            // retrofit lands. See docs/WORKAROUNDS.md#formbuilder-consumes-workflowengine-domain.
-            {
-                ("FormBuilder", "Infrastructure", "WorkflowEngine", "Domain"),
-                new() { "Axis.FormBuilder.Infrastructure.Handlers.FormStepReachedHandler" }
-            },
-            // WorkflowEngine consumes FormBuilder domain events in-process.
-            // Should consume via FormBuilder.Contracts (Avro + Kafka) once E05 retrofit lands.
-            // See docs/WORKAROUNDS.md#workflowengine-consumes-formbuilder-domain.
-            {
-                ("WorkflowEngine", "Infrastructure", "FormBuilder", "Domain"),
-                new()
-                {
-                    "Axis.WorkflowEngine.Infrastructure.Handlers.FormTaskExpiredHandler",
-                    "Axis.WorkflowEngine.Infrastructure.Handlers.FormTaskSubmittedHandler",
-                }
-            },
-        };
+        KnownBoundaryWorkarounds = new();
 
     public static IEnumerable<object[]> CrossModulePairs() =>
         from a in Conventions.ModuleNames

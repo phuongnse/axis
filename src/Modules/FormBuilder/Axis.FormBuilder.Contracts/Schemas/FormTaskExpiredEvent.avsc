@@ -1,0 +1,12 @@
+{
+  "namespace": "axis.formbuilder.events",
+  "type": "record",
+  "name": "FormTaskExpiredEvent",
+  "fields": [
+    { "name": "formSubmissionId", "type": "string" },
+    { "name": "formDefinitionId", "type": "string" },
+    { "name": "organizationId", "type": "string" },
+    { "name": "executionId", "type": "string" },
+    { "name": "executionStepId", "type": "string" }
+  ]
+}

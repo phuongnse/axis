@@ -55,19 +55,19 @@ Workflow definitions with steps, transitions, triggers, cycle detection, publish
 
 ## FormBuilder — E05-form-builder
 
-**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳ · Service-boundary retrofit ⏳**
+**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳ · Service-boundary retrofit ⚠️**
 
 Form definitions + F04 form tasks (`FormSubmission`, token submit, my tasks, expiry job). Submission user resolved via `ICurrentUser` in Application.
 
-> ⏳ **Retrofit:** add `Axis.FormBuilder.Contracts`; existing `FormStepReachedHandler` / `FormTaskSubmittedHandler` cross-module flow moves to Kafka transport (current Wolverine in-process pub becomes Kafka producer/consumer); move to `axis_formbuilder` database; tests switch to migrations.
+> ⚠️ **Retrofit (PR for E05+E06 closure):** `Axis.FormBuilder.Contracts` shipped with Avro schemas `FormTaskSubmittedEvent` + `FormTaskExpiredEvent` (CloudEvents envelope, ADR-019). `FormBuilderEventMapper` translates domain events at `SaveChangesAsync` time; WorkflowEngine consumes via Kafka topics `axis.formbuilder.form-task-submitted` / `axis.formbuilder.form-task-expired`. **Deferred:** gRPC service (no consumer yet); move to dedicated `axis_formbuilder` database; switch tests to `MigrateAsync`.
 
 ## WorkflowEngine — E06-workflow-engine
 
-**Domain ✅ | Application ✅ | Infrastructure ⚠️ | API ✅ | Frontend ⏳ · Service-boundary retrofit ⏳**
+**Domain ✅ | Application ✅ | Infrastructure ⚠️ | API ✅ | Frontend ⏳ · Service-boundary retrofit ⚠️**
 
 Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoints` registered; default-input shaping handled in `StartExecutionHandler`. Infrastructure ⚠️: `IScriptExecutor` and `INotificationSender` stubs.
 
-> ⏳ **Retrofit:** add `Axis.WorkflowEngine.Contracts`; saga orchestrator for execution-step coordination ([ADR-020](TECH_STACK.md#adr-020-saga-orchestration-for-cross-module-workflows)); cross-module FormTask flow goes via Kafka; move to `axis_workflowengine` database; tests switch to migrations.
+> ⚠️ **Retrofit (PR for E05+E06 closure):** `Axis.WorkflowEngine.Contracts` shipped with Avro schema `FormStepReachedEvent` (CloudEvents envelope, ADR-019). `WorkflowEngineEventMapper` translates domain events at `SaveChangesAsync` time; FormBuilder consumes via Kafka topic `axis.workflowengine.form-step-reached`. The 2 cross-module Domain references that were tracked in `WORKAROUNDS.md` are now resolved (ratchet shrunk). **Deferred:** gRPC service for sync RPC needs (none today); saga orchestrator ([ADR-020](TECH_STACK.md#adr-020-saga-orchestration-for-cross-module-workflows)); dedicated `axis_workflowengine` database; switch tests to `MigrateAsync`; real `IScriptExecutor` + `INotificationSender`.
 
 ## Identity / E01 — tenant provisioning (cross-cutting)
 

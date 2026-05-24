@@ -1,4 +1,5 @@
-using Axis.FormBuilder.Domain.Events;
+using System.Text.Json;
+using axis.formbuilder.events;
 using Axis.WorkflowEngine.Application.Messages;
 using Axis.WorkflowEngine.Application.Services;
 using Axis.WorkflowEngine.Domain.Aggregates;
@@ -69,9 +70,15 @@ public sealed class FormTaskSubmittedHandlerTests(WorkflowEngineDatabaseFixture 
         (WorkflowExecution execution, ExecutionStep step) = await SeedWaitingFormStep(formId, setupCtx);
 
         Dictionary<string, object?> submittedData = new() { ["answer"] = "yes" };
-        FormTaskSubmitted @event = new(
-            Guid.NewGuid(), formId, OrgId,
-            execution.Id, step.Id, submittedData);
+        FormTaskSubmittedEvent @event = new()
+        {
+            formSubmissionId = Guid.NewGuid().ToString(),
+            formDefinitionId = formId.ToString(),
+            organizationId = OrgId.ToString(),
+            executionId = execution.Id.ToString(),
+            executionStepId = step.Id.ToString(),
+            submittedDataJson = JsonSerializer.Serialize(submittedData),
+        };
 
         await using WorkflowEngineDbContext handlerCtx = fixture.CreateContext();
         await CreateHandler(handlerCtx, dispatcher, logger).Handle(@event, CancellationToken.None);
@@ -106,10 +113,15 @@ public sealed class FormTaskSubmittedHandlerTests(WorkflowEngineDatabaseFixture 
         execToAdvance!.CompleteStep(step.Id, new Dictionary<string, object?>());
         await setupCtx.SaveChangesAsync();
 
-        FormTaskSubmitted @event = new(
-            Guid.NewGuid(), formId, OrgId,
-            execution.Id, step.Id,
-            new Dictionary<string, object?> { ["answer"] = "yes" });
+        FormTaskSubmittedEvent @event = new()
+        {
+            formSubmissionId = Guid.NewGuid().ToString(),
+            formDefinitionId = formId.ToString(),
+            organizationId = OrgId.ToString(),
+            executionId = execution.Id.ToString(),
+            executionStepId = step.Id.ToString(),
+            submittedDataJson = JsonSerializer.Serialize(new Dictionary<string, object?> { ["answer"] = "yes" }),
+        };
 
         await using WorkflowEngineDbContext handlerCtx = fixture.CreateContext();
         await CreateHandler(handlerCtx, dispatcher, logger).Handle(@event, CancellationToken.None);
@@ -124,11 +136,15 @@ public sealed class FormTaskSubmittedHandlerTests(WorkflowEngineDatabaseFixture 
         IStepDispatcher dispatcher = Substitute.For<IStepDispatcher>();
         ILogger<FormTaskSubmittedHandler> logger = Substitute.For<ILogger<FormTaskSubmittedHandler>>();
 
-        FormTaskSubmitted @event = new(
-            Guid.NewGuid(), Guid.NewGuid(), OrgId,
-            Guid.NewGuid(),
-            Guid.NewGuid(),
-            new Dictionary<string, object?>());
+        FormTaskSubmittedEvent @event = new()
+        {
+            formSubmissionId = Guid.NewGuid().ToString(),
+            formDefinitionId = Guid.NewGuid().ToString(),
+            organizationId = OrgId.ToString(),
+            executionId = Guid.NewGuid().ToString(),
+            executionStepId = Guid.NewGuid().ToString(),
+            submittedDataJson = "{}",
+        };
 
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
         await CreateHandler(ctx, dispatcher, logger).Handle(@event, CancellationToken.None);

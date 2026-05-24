@@ -1,9 +1,10 @@
+using axis.workflowengine.events;
 using Axis.FormBuilder.Application.Messages;
 using Axis.FormBuilder.Application.Repositories;
 using Axis.FormBuilder.Application.Services;
 using Axis.FormBuilder.Domain.Aggregates;
 using Axis.Shared.Application;
-using Axis.WorkflowEngine.Domain.Events;
+using Axis.WorkflowEngine.Contracts;
 using Microsoft.Extensions.Logging;
 using Wolverine;
 
@@ -12,6 +13,13 @@ namespace Axis.FormBuilder.Infrastructure.Handlers;
 /// <summary>
 /// Creates a FormSubmission task when the workflow engine reaches a Form step (US-086).
 /// Schedules expiry when a timeout is configured (US-089).
+///
+/// <para>
+/// Cross-module consumer: subscribes to the Avro <see cref="FormStepReachedEvent"/>
+/// published by WorkflowEngine over Kafka (ADR-019). Previously consumed the
+/// in-process domain event directly — that pattern violated ADR-010 and was
+/// tracked as a workaround until this PR.
+/// </para>
 /// </summary>
 internal sealed class FormStepReachedHandler(
     IFormSubmissionRepository submissionRepo,
@@ -22,37 +30,42 @@ internal sealed class FormStepReachedHandler(
 {
     private const string SystemCreatedBy = "workflow-engine";
 
-    public async Task Handle(FormStepReached @event, CancellationToken ct)
+    public async Task Handle(FormStepReachedEvent @event, CancellationToken ct)
     {
-        if (await submissionRepo.ExistsForExecutionStepAsync(@event.ExecutionId, @event.ExecutionStepId, ct))
+        Guid executionId = @event.ExecutionId();
+        Guid executionStepId = @event.ExecutionStepId();
+        Guid organizationId = @event.OrganizationId();
+        Guid formDefinitionId = @event.FormDefinitionId();
+
+        if (await submissionRepo.ExistsForExecutionStepAsync(executionId, executionStepId, ct))
         {
             logger.LogInformation(
                 "FormStepReachedHandler: submission already exists for execution {ExecutionId} step {StepId}",
-                @event.ExecutionId,
-                @event.ExecutionStepId);
+                executionId,
+                executionStepId);
             return;
         }
 
-        FormDefinition? form = await formRepo.GetByIdAsync(@event.FormDefinitionId, @event.OrganizationId, ct);
+        FormDefinition? form = await formRepo.GetByIdAsync(formDefinitionId, organizationId, ct);
         if (form is null)
         {
             logger.LogError(
                 "FormStepReachedHandler: form {FormId} not found for org {OrgId}",
-                @event.FormDefinitionId,
-                @event.OrganizationId);
+                formDefinitionId,
+                organizationId);
             return;
         }
 
-        Guid? assigneeUserId = TryParseAssigneeUserId(@event.AssigneeExpression);
-        DateTimeOffset? expiresAt = @event.TimeoutHours.HasValue
-            ? DateTimeOffset.UtcNow.AddHours(@event.TimeoutHours.Value)
+        Guid? assigneeUserId = TryParseAssigneeUserId(@event.assigneeExpression);
+        DateTimeOffset? expiresAt = @event.timeoutHours.HasValue
+            ? DateTimeOffset.UtcNow.AddHours(@event.timeoutHours.Value)
             : null;
 
         FormSubmission submission = FormSubmission.Create(
-            @event.FormDefinitionId,
-            @event.OrganizationId,
-            @event.ExecutionId,
-            @event.ExecutionStepId,
+            formDefinitionId,
+            organizationId,
+            executionId,
+            executionStepId,
             assigneeUserId,
             assigneeRoleId: null,
             expiresAt,
@@ -68,8 +81,8 @@ internal sealed class FormStepReachedHandler(
         {
             logger.LogWarning(
                 "FormStepReachedHandler: concurrent insert for execution {ExecutionId} step {StepId} — skipping",
-                @event.ExecutionId,
-                @event.ExecutionStepId);
+                executionId,
+                executionStepId);
             return;
         }
 
@@ -87,7 +100,7 @@ internal sealed class FormStepReachedHandler(
         logger.LogInformation(
             "FormStepReachedHandler: created form task {SubmissionId} for execution {ExecutionId}",
             submission.Id,
-            @event.ExecutionId);
+            executionId);
     }
 
     private static Guid? TryParseAssigneeUserId(string? assigneeExpression)
