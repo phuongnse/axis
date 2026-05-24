@@ -6,12 +6,25 @@ Tests in this project run under `dotnet test` like any other and enforce **CLAUD
 
 ## What this catches
 
+### Structural rules
+
 | Test file | CLAUDE.md rule enforced |
 |---|---|
 | [DomainPurityTests](./DomainPurityTests.cs) | P0 — "Domain: zero external dependencies." Bans EF, MediatR, Wolverine, ASP.NET, etc. inside any `*.Domain` assembly. |
 | [ModuleBoundaryTests](./ModuleBoundaryTests.cs) | P0 — "No project reference from `Axis.{ModuleA}.*` to `Axis.{ModuleB}.*` except `Contracts`." Theory runs every (A,B,layer) tuple. Pre-existing violations are tracked in `KnownBoundaryWorkarounds` and must also appear in [`docs/WORKAROUNDS.md`](../../../docs/WORKAROUNDS.md). |
 | [SharedKernelTests](./SharedKernelTests.cs) | P0 (ADR-017) — `Axis.Shared.{Domain,Application}` are abstractions only; no EF/Wolverine/Npgsql. (MediatR is allowed in `Shared.Application` because the project-wide `ICommand`/`IQueryHandler` adapters live there.) Also future-proofs against a re-introduced shared `UnitOfWorkBase`. |
 | [MediatorScopeTests](./MediatorScopeTests.cs) | P0 — "MediatR is intra-module only." Marker test; the actual enforcement is in `ModuleBoundaryTests`. |
+
+### Convention rules
+
+These rules don't enforce a P0/P1 from CLAUDE.md directly — they encode the implementation conventions in `docs/playbooks/patterns.md` so a new agent writing a handler/repo/aggregate is forced into the same shape as existing code.
+
+| Test file | Convention enforced |
+|---|---|
+| [HandlerConventionTests](./HandlerConventionTests.cs) | Every MediatR handler accepts `CancellationToken` as the last `Handle` parameter and is `sealed`. |
+| [RepositoryConventionTests](./RepositoryConventionTests.cs) | Repository public methods don't return `IQueryable<>` (must materialize); repositories don't expose `SaveChanges*`/`Commit*` (that's `IUnitOfWork`'s job). |
+| [AggregateConventionTests](./AggregateConventionTests.cs) | Aggregate roots have no public mutable setters (init-only allowed for EF) and no public parameterless ctor — forces factory + behavior-method pattern. |
+| [EndpointConventionTests](./EndpointConventionTests.cs) | Static classes hosting `Map*` extension methods are named `*Endpoints`. (Authorization-presence check ships in PR #97 with the DI scanner.) |
 
 ## What this does NOT catch
 
