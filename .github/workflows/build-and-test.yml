@@ -219,8 +219,14 @@ jobs:
   # `--only-verified` cuts down false positives by querying the alleged
   # service for token validity before reporting. Scans the full diff
   # between PR base and HEAD (fetch-depth: 0 needed for that comparison).
+  # NOTE: keep the job `name:` tool-agnostic ("Secret scanning"). The
+  # required-check setting in branch protection references this exact
+  # string — if we ever swap TruffleHog for another scanner (as we just
+  # did Gitleaks → TruffleHog), changing the name would silently disable
+  # the requirement until the protection rule is updated. The tool name
+  # belongs in the step `name:` and surrounding comments.
   secret-scan:
-    name: Secret scanning (TruffleHog)
+    name: Secret scanning
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
