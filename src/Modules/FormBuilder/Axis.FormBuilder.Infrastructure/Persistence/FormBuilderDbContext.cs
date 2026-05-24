@@ -27,7 +27,6 @@ internal sealed class FormBuilderDbContext(
         modelBuilder.ApplyConfiguration(new FormDefinitionConfiguration());
         modelBuilder.ApplyConfiguration(new FormWorkflowReferenceConfiguration());
         modelBuilder.ApplyConfiguration(new FormModelReferenceConfiguration());
-        modelBuilder.ApplyConfiguration(new FormModelReferenceConfiguration());
         modelBuilder.ApplyConfiguration(new FormSubmissionConfiguration());
     }
 }
