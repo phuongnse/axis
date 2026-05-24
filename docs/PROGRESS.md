@@ -13,7 +13,7 @@ Foundation phases (each a sequence of small PRs):
 |---|---|---|
 | **Phase 0 — Foundation decisions** | ✅ done (PR #59) | Rewrote ADR-001/002/009; added ADR-010..023; updated `ARCHITECTURE.md` + `CLAUDE.md` + `patterns.md`. |
 | **Phase 1 — Infrastructure foundation** | ✅ done | PR #83–#90: Kafka/RabbitMQ (ADR-017), per-module DBs (ADR-011), Wolverine enroll (ADR-012), migrations (ADR-023), OpenTelemetry (ADR-018), **Avro + Schema Registry + CloudEvents** for WorkflowBuilder lifecycle events (ADR-019). |
-| **Phase 2 — Per-module HTTP/gRPC boundary** | ⚠️ in progress | Identity first: `Axis.Identity.Contracts` + `IdentityService` gRPC (`GetUserPermissions`) on modulith host; Avro lifecycle events + gateway gRPC clients per module follow in subsequent PRs. |
+| **Phase 2 — Per-module HTTP/gRPC boundary** | ⚠️ in progress | Identity complete: `Axis.Identity.Contracts` + `IdentityService` gRPC (`GetUserPermissions`) + Avro lifecycle events (`OrganizationVerifiedEvent`, `UserDeactivatedEvent`, `UserReactivatedEvent`, `RoleAssignedEvent`, `RoleRemovedEvent`) + per-module `OrganizationVerifiedHandler` (provisions each module's tenant schema from Kafka) + gateway `IdentityServiceClient` gRPC wiring. Remaining: DataModeling/FormBuilder/WorkflowBuilder/WorkflowEngine `Axis.{Module}.Contracts` projects with their own events. |
 | **Phase 3 — Per-module EF migrations** | ⚠️ in progress | Identity, DataModeling, FormBuilder, WorkflowBuilder, WorkflowEngine have migrations; tests use `MigrateAsync`. PageBuilder pending (module not started). |
 | **Phase 4 — Deployment readiness** | ⏳ pending | Per-module Dockerfile; `docker-compose.dev.yml` runs each module as a separate container; CI builds per-module artifacts; K8s manifests; per-module Vault policies. |
 
@@ -31,11 +31,11 @@ Feature work (Frontend feature UIs, E07 PageBuilder, remaining E01/E06 gaps) is 
 
 ## Identity — E02-identity-access
 
-**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳ · Service-boundary retrofit ⚠️**
+**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳ · Service-boundary retrofit ✅**
 
 Full auth, user, role, invitation, and session management. OpenIddict 5.x OIDC server (Authorization Code + PKCE for SPA; Client Credentials for M2M). RBAC via custom permission policies. All Identity API endpoints covered by integration tests.
 
-> ⚠️ **Phase 2 (in progress):** `Axis.Identity.Contracts` with `IdentityService.GetUserPermissions` gRPC (`Protos/axis/identity/v1/identity_service.proto`); server on `Axis.Api` via `MapIdentityGrpc()` (JWT + `auth` rate limit). **Deferred (PR #93 follow-up):** Avro user/role lifecycle events, `OrganizationVerified` Kafka flow, gateway REST → gRPC client wiring, JWKS-only validation doc hardening for other modules.
+> ✅ **Phase 2 complete (PR #93):** `Axis.Identity.Contracts` with `IdentityService.GetUserPermissions` gRPC + 5 Avro lifecycle event schemas (`OrganizationVerifiedEvent`, `UserDeactivatedEvent`, `UserReactivatedEvent`, `RoleAssignedEvent`, `RoleRemovedEvent`) published via Wolverine outbox → Kafka with CloudEvents envelope (ADR-019). Each of DataModeling/FormBuilder/WorkflowBuilder/WorkflowEngine subscribes to `OrganizationVerifiedEvent` and provisions its own tenant schema (central `TenantSchemaProvisioner` and `ProvisionTenantMessage` removed — extraction is now a redeploy per ADR-010). Gateway uses `AddGrpcClient<IdentityService.IdentityServiceClient>` with `Modules:Identity:GrpcUrl` config; JWKS-only validation rule documented in [patterns.md § Pattern 3](playbooks/patterns.md#-pattern-3-jwks-only-jwt-validation-in-consuming-modules).
 
 ## DataModeling — E03-data-modeling
 
@@ -71,7 +71,7 @@ Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoi
 
 ## Identity / E01 — tenant provisioning (cross-cutting)
 
-**Verify email → provision:** `VerifyEmailHandler` saves verified state, then enqueues `ProvisionTenantMessage` (Wolverine → `ProvisionTenantHandler` + `ITenantSchemaProvisioner`). Under the new architecture this flow becomes: Identity publishes `OrganizationVerified` to Kafka; each module subscribes and provisions its own tenant schema in its own DB. **Deferred:** retry/backoff/alert on provision failures, provisioning wait UI, Admin role on verify per E01 US-003 — these land in Phase 2 alongside the per-module Kafka subscribers.
+**Verify email → provision (PR #93):** `User.VerifyEmail()` raises an `OrganizationVerified` domain event; `IdentityUnitOfWork` maps it to `OrganizationVerifiedEvent` (Avro) and publishes via Wolverine outbox → Kafka topic `axis.identity.organization-verified`. Each of DataModeling/FormBuilder/WorkflowBuilder/WorkflowEngine has an `OrganizationVerifiedHandler` in its own Infrastructure project that `CREATE SCHEMA IF NOT EXISTS` + `MigrateAsync` for that module's DB, serialized per-org via a Postgres advisory lock to make Kafka redelivery safe against `__EFMigrationsHistory` races. **Deferred (F01 US-003 follow-up):** retry/backoff/alert on provision failures, provisioning wait UI, Admin role on verify per E01 US-003.
 
 ## PageBuilder — E07-page-builder
 

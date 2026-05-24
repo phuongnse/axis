@@ -1,0 +1,41 @@
+using axis.identity.events;
+using Axis.Identity.Domain.Events;
+using Axis.Shared.Domain.Primitives;
+
+namespace Axis.Identity.Infrastructure.Messaging;
+
+/// <summary>Maps Identity domain events to Avro contract messages for Kafka (ADR-019).</summary>
+internal static class IdentityEventMapper
+{
+    public static object? ToIntegrationEvent(IDomainEvent domainEvent) =>
+        domainEvent switch
+        {
+            OrganizationVerified verified => new OrganizationVerifiedEvent
+            {
+                organizationId = verified.OrganizationId.ToString(),
+            },
+            UserDeactivated deactivated => new UserDeactivatedEvent
+            {
+                userId = deactivated.UserId.ToString(),
+                organizationId = deactivated.OrganizationId.ToString(),
+            },
+            UserReactivated reactivated => new UserReactivatedEvent
+            {
+                userId = reactivated.UserId.ToString(),
+                organizationId = reactivated.OrganizationId.ToString(),
+            },
+            RoleAssigned assigned => new RoleAssignedEvent
+            {
+                userId = assigned.UserId.ToString(),
+                organizationId = assigned.OrganizationId.ToString(),
+                roleId = assigned.RoleId.ToString(),
+            },
+            RoleRemoved removed => new RoleRemovedEvent
+            {
+                userId = removed.UserId.ToString(),
+                organizationId = removed.OrganizationId.ToString(),
+                roleId = removed.RoleId.ToString(),
+            },
+            _ => null,
+        };
+}

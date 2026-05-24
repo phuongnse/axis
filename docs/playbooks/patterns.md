@@ -475,15 +475,14 @@ await _context.WorkflowDefinitions
 
 ### Tenant schema provisioning (US-003)
 
-After email verification, the host provisions one PostgreSQL schema per organization and migrates every **tenant-scoped** module database into it. Identity stays on `public`.
+After email verification, every **tenant-scoped** module provisions its own PostgreSQL schema for the organization. Identity stays on `public` and only publishes the verification event — it never touches another module's DB.
 
-- **Interface**: `ITenantSchemaProvisioner` in `Axis.Shared.Application` — implement in the **API host** when the provisioner must touch multiple module `DbContext` types.
+- **Ownership**: each tenant-scoped module's Infrastructure project owns an `OrganizationVerifiedHandler` (e.g. `Axis.DataModeling.Infrastructure.Messaging.OrganizationVerifiedHandler`) that subscribes to Identity's `OrganizationVerifiedEvent` Kafka topic. There is **no** central `ITenantSchemaProvisioner` — extraction of a module is a redeploy of its own handler ([ADR-010](../TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy)).
 - **Schema name**: `tenant_{organizationId:N}` (no slug — org slug can change).
-- **Idempotency**: `CREATE SCHEMA IF NOT EXISTS` plus `Database.MigrateAsync()` per context; safe to call twice for the same org.
-- **Tenant context during migrate**: use `FixedTenantContext` (or equivalent) so `TenantSchemaInterceptor` targets the new schema for each `MigrateAsync` call.
-- **Tests**: register `NoOpTenantSchemaProvisioner` in `WebApplicationFactory` fixtures — never run real provisioning in API integration tests.
-- **Trigger**: `VerifyEmailHandler` persists `User.VerifyEmail()` via `SaveChangesAsync`, then enqueues `ProvisionTenantMessage` through `ITenantProvisioningScheduler` (Wolverine). Do **not** call `ITenantSchemaProvisioner` synchronously in the verify request — provisioning runs in `ProvisionTenantHandler` in the API host.
-- **Message**: `ProvisionTenantMessage(Guid OrganizationId)` in `Axis.Shared.Application.Tenancy`.
+- **Idempotency**: `CREATE SCHEMA IF NOT EXISTS` plus `Database.MigrateAsync()` per context; safe to call twice for the same org (Kafka delivers at-least-once).
+- **Tenant context during migrate**: each handler constructs a `FixedTenantContext(organizationId)` from `Axis.Shared.Infrastructure.Tenancy` so `TenantSchemaInterceptor` targets the new schema for the `MigrateAsync` call.
+- **Trigger**: `User.VerifyEmail()` raises an `OrganizationVerified` domain event; `IdentityUnitOfWork` maps it to `OrganizationVerifiedEvent` (Avro) and publishes via Wolverine outbox → Kafka ([ADR-019](../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). Do **not** provision synchronously in the verify request handler.
+- **Schema + topic**: `Axis.Identity.Contracts/Schemas/OrganizationVerifiedEvent.avsc` + topic `axis.identity.organization-verified` (see `IdentityKafkaTopics`).
 
 ---
 
@@ -1320,6 +1319,50 @@ grpcurl -plaintext \
 
 Replace `<access_token>`, `<user-guid>`, and `<org-guid>` with values from your tenant. `Unauthenticated` / `PermissionDenied` means the token is missing, expired, or invalid — obtain a fresh token from `POST /connect/token` after PKCE login.
 
+### ✅ Pattern 3: JWKS-only JWT validation in consuming modules
+
+**Rule:** modules other than Identity validate JWTs **locally via Identity's JWKS endpoint** — never by calling `IdentityDbContext` or any Identity service. Asking Identity "is this user real?" on every request defeats the purpose of stateless JWT and re-introduces the coupling we removed.
+
+Why: Identity issues short-lived JWTs (15 minutes per [F01](../epics/E02-identity-access/features/F01-authentication.md)) signed with a key whose public half is published at `/.well-known/jwks.json` (OpenIddict default). Any module that receives a Bearer token can verify the signature, claims (`sub`, `org`, `permissions`), and expiry **without a network call to Identity for each request**. JWKS itself is cached locally by `Microsoft.AspNetCore.Authentication.JwtBearer`, so the network cost is once per key-rotation, not once per request.
+
+The escape hatch — when you need *fresh* permission state that the JWT's `permissions` claim cannot give you — is `IdentityService.GetUserPermissions` (gRPC), not a DB lookup.
+
+**Modulith mode (today):** `Axis.Api` is the only host, and OpenIddict validation runs in-process via `.UseLocalServer()` (see `Program.cs`). No JWKS fetch is needed because the issuer is the same process.
+
+**When a module is extracted:** the extracted module wires JWT validation against Identity's JWKS URL. Example for a future standalone `Axis.DataModeling.Service`:
+
+```csharp
+// DataModeling.Service Program.cs
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(opts =>
+    {
+        opts.Authority = configuration["Identity:Authority"];   // e.g. https://identity.axis.internal
+        opts.Audience  = "axis_api";
+        opts.RequireHttpsMetadata = !env.IsDevelopment();
+        // JwtBearer auto-fetches /.well-known/openid-configuration → JWKS URL,
+        // caches keys, and rotates on signature failure. No call to Identity per request.
+        opts.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ClockSkew = TimeSpan.FromSeconds(30),
+        };
+    });
+```
+
+**Anti-pattern — DB lookup of Identity from another module:**
+
+```csharp
+// WRONG — DataModeling reading Identity tables to authenticate
+public async Task<bool> IsActiveAsync(Guid userId)
+    => await _identityDb.Users.AnyAsync(u => u.Id == userId && u.Status == UserStatus.Active);
+```
+
+This violates the Share Nothing principle (cross-module DB query), forces every request to round-trip the Identity DB, and breaks the moment Identity is extracted (the project reference disappears). Use the JWT's `sub` + claims; for state newer than the token's TTL (e.g. immediate deactivation), consume `UserDeactivatedEvent` from Kafka and invalidate a local cache — never reach into Identity's DB.
+
 ### Rules (P0)
 
 - **Never** use `SqlQueryRaw`, `ExecuteSqlRaw`, `FromSqlRaw`, or any raw SQL that references a table from another module.
@@ -1330,6 +1373,7 @@ Replace `<access_token>`, `<user-guid>`, and `<org-guid>` with values from your 
 - Kafka handlers are idempotent: at-least-once delivery is the rule; design for replay.
 - **Cross-module handlers must filter by `OrganizationId`** in addition to entity foreign keys. Tenant isolation is always explicit.
 - Sync RPC (gRPC) is the escape hatch only. If you reach for it more than once or twice per module, you probably need another local read model instead.
+- **JWT validation is JWKS-only.** Consuming modules verify JWTs against Identity's JWKS endpoint locally; never call `IdentityDbContext` or any Identity service per request just to authenticate a user.
 
 ### Pre-commit violation sweep
 

@@ -1,0 +1,9 @@
+{
+  "namespace": "axis.identity.events",
+  "type": "record",
+  "name": "UserDeactivatedEvent",
+  "fields": [
+    { "name": "userId", "type": "string" },
+    { "name": "organizationId", "type": "string" }
+  ]
+}

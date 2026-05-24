@@ -1,0 +1,10 @@
+{
+  "namespace": "axis.identity.events",
+  "type": "record",
+  "name": "RoleAssignedEvent",
+  "fields": [
+    { "name": "userId", "type": "string" },
+    { "name": "organizationId", "type": "string" },
+    { "name": "roleId", "type": "string" }
+  ]
+}

@@ -44,7 +44,9 @@ using OpenIddict.Validation.AspNetCore;
 using Scalar.AspNetCore;
 using Serilog;
 using StackExchange.Redis;
+using axis.identity.events;
 using axis.workflowbuilder.events;
+using Axis.Identity.Contracts;
 using Axis.Shared.Infrastructure.Messaging;
 using Axis.Shared.Infrastructure.Wolverine;
 using Axis.WorkflowBuilder.Contracts;
@@ -156,16 +158,36 @@ try
                     o, WorkflowBuilderKafkaTopics.WorkflowArchived, serializer);
                 WolverineKafkaAvroExtensions.PublishAndListenWithAvro<WorkflowUnarchivedEvent>(
                     o, WorkflowBuilderKafkaTopics.WorkflowUnarchived, serializer);
+
+                WolverineKafkaAvroExtensions.PublishAndListenWithAvro<OrganizationVerifiedEvent>(
+                    o, IdentityKafkaTopics.OrganizationVerified, serializer);
+                WolverineKafkaAvroExtensions.PublishAndListenWithAvro<UserDeactivatedEvent>(
+                    o, IdentityKafkaTopics.UserDeactivated, serializer);
+                WolverineKafkaAvroExtensions.PublishAndListenWithAvro<UserReactivatedEvent>(
+                    o, IdentityKafkaTopics.UserReactivated, serializer);
+                WolverineKafkaAvroExtensions.PublishAndListenWithAvro<RoleAssignedEvent>(
+                    o, IdentityKafkaTopics.RoleAssigned, serializer);
+                WolverineKafkaAvroExtensions.PublishAndListenWithAvro<RoleRemovedEvent>(
+                    o, IdentityKafkaTopics.RoleRemoved, serializer);
             },
             configureLocalEvents: o =>
             {
                 WolverineKafkaAvroExtensions.PublishLocally<WorkflowPublishedEvent>(o);
                 WolverineKafkaAvroExtensions.PublishLocally<WorkflowArchivedEvent>(o);
                 WolverineKafkaAvroExtensions.PublishLocally<WorkflowUnarchivedEvent>(o);
+
+                WolverineKafkaAvroExtensions.PublishLocally<OrganizationVerifiedEvent>(o);
+                WolverineKafkaAvroExtensions.PublishLocally<UserDeactivatedEvent>(o);
+                WolverineKafkaAvroExtensions.PublishLocally<UserReactivatedEvent>(o);
+                WolverineKafkaAvroExtensions.PublishLocally<RoleAssignedEvent>(o);
+                WolverineKafkaAvroExtensions.PublishLocally<RoleRemovedEvent>(o);
             });
 
-        // Infrastructure assemblies host Wolverine handlers (e.g. domain event consumers)
-        // but are not the entry assembly — include them explicitly for handler discovery.
+        // Infrastructure assemblies host Wolverine handlers (e.g. cross-module event
+        // consumers like OrganizationVerifiedHandler) but are not the entry assembly —
+        // include them explicitly for handler discovery.
+        opts.Discovery.IncludeAssembly(typeof(DataModelingInfrastructureExtensions).Assembly);
+        opts.Discovery.IncludeAssembly(typeof(WorkflowBuilderInfrastructureExtensions).Assembly);
         opts.Discovery.IncludeAssembly(typeof(WorkflowEngineInfrastructureExtensions).Assembly);
         opts.Discovery.IncludeAssembly(typeof(FormBuilderInfrastructureExtensions).Assembly);
     });
@@ -289,6 +311,18 @@ try
     builder.Services.AddWorkflowBuilderInfrastructure(cfg);
     builder.Services.AddFormBuilderInfrastructure(cfg);
     builder.Services.AddWorkflowEngineInfrastructure(cfg);
+
+    // ── Cross-module gRPC clients (ADR-014) ────────────────────────────────
+    // In modulith mode the client loops back to the gateway's own gRPC server
+    // (Modules:Identity:GrpcUrl, default http://localhost:5280). When Identity
+    // extracts to its own deployment, only the URL changes — call sites stay
+    // identical, satisfying "extraction is a redeploy, not a refactor" (ADR-010).
+    string identityGrpcUrl = builder.Configuration["Modules:Identity:GrpcUrl"]
+        ?? "http://localhost:5280";
+    builder.Services.AddGrpcClient<Axis.Identity.Contracts.Grpc.IdentityService.IdentityServiceClient>(opts =>
+    {
+        opts.Address = new Uri(identityGrpcUrl);
+    });
 
     // ── Redis ──────────────────────────────────────────────────────────────
     builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>

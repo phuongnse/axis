@@ -39,7 +39,6 @@ public static class IdentityInfrastructureExtensions
         services.AddScoped<IInvitationRepository, InvitationRepository>();
 
         services.AddScoped<IUnitOfWork, IdentityUnitOfWork>();
-        services.AddScoped<ITenantProvisioningScheduler, WolverineTenantProvisioningScheduler>();
         services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
         services.AddScoped<IEmailSender, MailKitEmailSender>();
         services.AddScoped<IPasswordResetTokenStore, PasswordResetTokenStore>();

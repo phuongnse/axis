@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Apache.Avro" />
     <PackageReference Include="Google.Protobuf" />
     <PackageReference Include="Grpc.AspNetCore" />
     <PackageReference Include="Grpc.Tools">
@@ -18,6 +19,10 @@
 
   <ItemGroup>
     <Protobuf Include="Protos\axis\identity\v1\identity_service.proto" GrpcServices="Both" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Schemas/**/*.avsc" />
   </ItemGroup>
 
 </Project>

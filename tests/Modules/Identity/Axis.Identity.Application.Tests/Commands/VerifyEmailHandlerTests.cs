@@ -2,6 +2,7 @@ using Axis.Identity.Application.Commands.VerifyEmail;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Domain.Events;
 using Axis.Identity.Domain.ValueObjects;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
@@ -14,11 +15,10 @@ public class VerifyEmailHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
-    private readonly ITenantProvisioningScheduler _provisioningScheduler = Substitute.For<ITenantProvisioningScheduler>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
 
-    private VerifyEmailHandler CreateHandler() => new(_userRepo, _uow, _provisioningScheduler);
+    private VerifyEmailHandler CreateHandler() => new(_userRepo, _uow);
 
     private static User MakeUnverifiedUser()
     {
@@ -28,7 +28,7 @@ public class VerifyEmailHandlerTests
     }
 
     [Fact]
-    public async Task VerifyEmail_WhenTokenIsValid_VerifiesEmailAndEnqueuesProvisioning()
+    public async Task VerifyEmail_WhenTokenIsValid_VerifiesEmailAndRaisesDomainEvent()
     {
         User user = MakeUnverifiedUser();
         _userRepo.GetByIdPlatformWideAsync(user.Id).Returns(user);
@@ -39,15 +39,18 @@ public class VerifyEmailHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         user.IsEmailVerified.Should().BeTrue();
-        Received.InOrder(() =>
-        {
-            _uow.SaveChangesAsync(Arg.Any<CancellationToken>());
-            _provisioningScheduler.EnqueueAsync(user.OrganizationId, Arg.Any<CancellationToken>());
-        });
+
+        // Verify the OrganizationVerified domain event was raised. IdentityUnitOfWork
+        // maps it to OrganizationVerifiedEvent (Avro) and publishes via Kafka (ADR-019).
+        user.DomainEvents.Should().ContainSingle(e => e is OrganizationVerified)
+            .Which.Should().BeOfType<OrganizationVerified>()
+            .Which.OrganizationId.Should().Be(user.OrganizationId);
+
+        await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task VerifyEmail_WhenTokenFormatIsInvalid_DoesNotEnqueueProvisioning()
+    public async Task VerifyEmail_WhenTokenFormatIsInvalid_DoesNotSaveOrRaiseEvent()
     {
         Result result = await CreateHandler().Handle(
             new VerifyEmailCommand("not-a-guid"),
@@ -56,8 +59,7 @@ public class VerifyEmailHandlerTests
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
         result.Error.Should().Contain("Invalid verification link");
-        await _provisioningScheduler.DidNotReceive()
-            .EnqueueAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -72,8 +74,7 @@ public class VerifyEmailHandlerTests
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
         result.Error.Should().Contain("Invalid verification link");
-        await _provisioningScheduler.DidNotReceive()
-            .EnqueueAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -81,6 +82,7 @@ public class VerifyEmailHandlerTests
     {
         User user = MakeUnverifiedUser();
         user.VerifyEmail();
+        user.ClearDomainEvents();
         _userRepo.GetByIdPlatformWideAsync(user.Id).Returns(user);
 
         Result result = await CreateHandler().Handle(
@@ -90,7 +92,6 @@ public class VerifyEmailHandlerTests
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
         result.Error.Should().Contain("already been used");
-        await _provisioningScheduler.DidNotReceive()
-            .EnqueueAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 }

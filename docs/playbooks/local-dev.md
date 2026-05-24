@@ -83,7 +83,9 @@ docker compose down -v   # drops the postgres_data + nuget + node_modules volume
 docker compose up -d
 ```
 
-On the next boot, `IdentityDbContext.Database.EnsureCreated()` runs at startup (dev only — see [`src/Axis.Api/Program.cs`](../../src/Axis.Api/Program.cs)) to recreate Identity + OpenIddict tables. Per-tenant module schemas (`tenant_{org-id}`) are provisioned on demand by [`TenantSchemaProvisioner`](../../src/Axis.Api/Infrastructure/TenantSchemaProvisioner.cs) when an organisation registers.
+On the next boot, `IdentityDbContext.Database.MigrateAsync()` runs at startup (dev only — see [`src/Axis.Api/Program.cs`](../../src/Axis.Api/Program.cs)) to recreate Identity + OpenIddict tables.
+
+Per-tenant module schemas (`tenant_{org-id}`) are provisioned on demand by each module's `OrganizationVerifiedHandler` (e.g. [`src/Modules/DataModeling/Axis.DataModeling.Infrastructure/Messaging/OrganizationVerifiedHandler.cs`](../../src/Modules/DataModeling/Axis.DataModeling.Infrastructure/Messaging/OrganizationVerifiedHandler.cs)). This handler is triggered by Identity's `OrganizationVerifiedEvent` published via Kafka (ADR-019).
 
 If you only want to wipe the DB and keep cached npm/nuget:
 
@@ -100,7 +102,7 @@ docker compose up -d
 - **`launchSettings.json` is ignored** in the container. The compose command passes `--no-launch-profile` to `dotnet watch`; without it, the launch profile's `applicationUrl` overrides `ASPNETCORE_URLS` and the app only binds to `localhost:5280` *inside* the container — unreachable from the host. If you ever see "Connection reset by peer" against `:5280`, check that flag survived.
 - **`bin/` and `obj/` under `src/`** now contain Linux build artifacts produced by the container. If you also want to build on Windows (Rider, `dotnet build` from PowerShell), stop the API container first (`docker compose stop api`) or you'll get file-lock errors. Re-`dotnet build` on Windows will overwrite the Linux artifacts; the container will rebuild on next save.
 - **MailDev shows `unhealthy`** if you don't disable its baked-in healthcheck. The compose file disables it (`healthcheck: disable: true`) — nothing depends on its health.
-- **Migrations across modules** — the per-tenant DbContexts (DataModeling, WorkflowBuilder, FormBuilder, WorkflowEngine) apply their own migrations the first time `TenantSchemaProvisioner` runs for an org. There is no "migrate everything on startup" step; that only happens for the public-schema Identity context.
+- **Migrations across modules** — the per-tenant DbContexts (DataModeling, WorkflowBuilder, FormBuilder, WorkflowEngine) apply their own migrations the first time their own `OrganizationVerifiedHandler` runs for an org (consuming Identity's Kafka event). There is no "migrate everything on startup" step; that only happens for the public-schema Identity context.
 
 ---
 

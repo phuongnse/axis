@@ -6,10 +6,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Identity.Application.Commands.VerifyEmail;
 
-public sealed class VerifyEmailHandler(
-    IUserRepository userRepo,
-    IUnitOfWork uow,
-    ITenantProvisioningScheduler provisioningScheduler)
+public sealed class VerifyEmailHandler(IUserRepository userRepo, IUnitOfWork uow)
     : ICommandHandler<VerifyEmailCommand>
 {
     public async Task<Result> Handle(VerifyEmailCommand command, CancellationToken cancellationToken)
@@ -24,10 +21,11 @@ public sealed class VerifyEmailHandler(
         if (user.IsEmailVerified)
             return Result.Failure(ErrorCodes.BusinessRule, "This link has already been used. Please sign in.");
 
+        // VerifyEmail raises OrganizationVerified domain event; IdentityUnitOfWork maps to
+        // OrganizationVerifiedEvent (Avro) and publishes via Wolverine → Kafka (ADR-019).
+        // Each module's OrganizationVerifiedHandler subscribes and provisions its own schema.
         user.VerifyEmail();
         await uow.SaveChangesAsync(cancellationToken);
-
-        await provisioningScheduler.EnqueueAsync(user.OrganizationId, cancellationToken);
 
         return Result.Success();
     }
