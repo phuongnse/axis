@@ -17,6 +17,12 @@ Docs-first development: feature specs in `docs/epics/` are the contract; code im
 2. When `src/`, `tests/`, or `docs/epics/` change: run `./scripts/check-doc-drift.sh` (bash — use Git Bash on Windows). CI job **Doc drift** must be green.
 3. PR description: **Summary + Linked spec + Requirements only** — no commit list, no CI status (the Checks tab covers that). Template: [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md).
 
+## Coverage
+
+CI collects code coverage via coverlet on every PR and uploads `coverage.cobertura.xml` as an artifact (`dotnet-coverage`). **No threshold is enforced yet** — we want a measured baseline first before locking a floor. Open the artifact on a failing PR to see line/branch coverage per assembly; use it as a sanity check, not as a gate.
+
+When introducing a threshold (planned follow-up), set it from the **current measured value** of Domain + Application test projects minus a small buffer (e.g. 5 percentage points). Never aspirationally above the baseline — that breaks unrelated PRs.
+
 ## Local dev stack
 
 `docker compose up` starts the full stack — Postgres, Redis, Maildev, LocalStack, Kafka (KRaft single-broker), Schema Registry, Vault (dev mode), the .NET API, and the Vite frontend. The api container waits for `kafka` and `schema-registry` to be healthy before starting; Wolverine's `UseKafka` configuration in `Axis.Api/Program.cs` would fail-fast otherwise.

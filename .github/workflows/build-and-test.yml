@@ -105,6 +105,7 @@ jobs:
           dotnet test --no-build --verbosity normal
           --logger "trx;LogFileName=test-results.trx"
           --results-directory ${{ github.workspace }}/TestResults
+          --collect:"XPlat Code Coverage"
 
       # Upload TRX even on failure so PR annotations + post-mortem work.
       - name: Upload test results
@@ -114,6 +115,32 @@ jobs:
           name: dotnet-test-results
           path: ${{ github.workspace }}/TestResults/**/*.trx
           retention-days: 14
+
+      # Coverage from coverlet (cobertura). Upload as artifact for diff-coverage
+      # tools and PR comments; threshold enforcement is intentionally deferred
+      # until a baseline is established — see CONTRIBUTING.md § Coverage.
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dotnet-coverage
+          path: ${{ github.workspace }}/TestResults/**/coverage.cobertura.xml
+          retention-days: 14
+
+      # `dotnet list package --vulnerable` queries NuGet's known-advisory feed
+      # against every restored package (including transitives via --include-transitive).
+      # We grep for `>` lines because the command exits 0 even when advisories
+      # are found; the only signal is in the output table.
+      - name: Check for vulnerable packages
+        run: |
+          dotnet list package --vulnerable --include-transitive > vuln.txt 2>&1
+          cat vuln.txt
+          if grep -E '^\s*>' vuln.txt; then
+            echo ""
+            echo "::error::Vulnerable NuGet packages detected — bump the affected dependency or wait for the next Dependabot PR."
+            exit 1
+          fi
+          echo "No vulnerable packages found."
 
   frontend:
     name: Frontend — Type Check, Lint, and Test
@@ -183,6 +210,37 @@ jobs:
         with:
           args: --config ./lychee.toml './**/*.md'
           fail: true
+
+  # Secret scanning via TruffleHog. Free, open-source, no license required
+  # for any account type (gitleaks-action v2 broke this — its breaking
+  # update added a paid GITLEAKS_LICENSE requirement for org and personal
+  # accounts alike, see https://github.com/gitleaks/gitleaks-action#-announcement).
+  #
+  # `--only-verified` cuts down false positives by querying the alleged
+  # service for token validity before reporting. Scans the full diff
+  # between PR base and HEAD (fetch-depth: 0 needed for that comparison).
+  # NOTE: keep the job `name:` tool-agnostic ("Secret scanning"). The
+  # required-check setting in branch protection references this exact
+  # string — if we ever swap TruffleHog for another scanner (as we just
+  # did Gitleaks → TruffleHog), changing the name would silently disable
+  # the requirement until the protection rule is updated. The tool name
+  # belongs in the step `name:` and surrounding comments.
+  secret-scan:
+    name: Secret scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: TruffleHog
+        uses: trufflesecurity/trufflehog@37b77001d0174ebec2fcca2bd83ff83a6d45a3ab # v3.95.3
+        with:
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
+          extra_args: --only-verified
 
   # ──────────────────────────────────────────────────────────────────────
   # GHAS-only checks — disabled until GitHub Advanced Security is provisioned

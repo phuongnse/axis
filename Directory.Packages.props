@@ -2,6 +2,19 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
+  <ItemGroup Label="Security-driven explicit pins">
+    <!--
+      System.Formats.Asn1 below 8.0.1 has a High-severity advisory
+      (https://github.com/advisories/GHSA-447r-wph3-92pm). Surfaced by the
+      vulnerable-packages CI check added in PR #96. Pulled transitively via
+      OpenIddict + ASP.NET cryptography stack. When the check flags a new
+      project, add an explicit PackageReference to System.Formats.Asn1 in
+      that project (or the closest shared csproj on its dependency chain).
+      Note: XML comments forbid the two-hyphen sequence, so the prose here
+      spells out flags rather than writing them with leading dashes.
+    -->
+    <PackageVersion Include="System.Formats.Asn1" Version="8.0.1" />
+  </ItemGroup>
   <ItemGroup Label="Application">
     <PackageVersion Include="MediatR" Version="12.5.0" />
     <PackageVersion Include="FluentValidation" Version="11.12.0" />
