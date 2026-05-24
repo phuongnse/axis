@@ -20,6 +20,8 @@ public static class FormBuilderInfrastructureExtensions
 
         services.AddScoped<IFormRepository, FormRepository>();
         services.AddScoped<IFormSubmissionRepository, FormSubmissionRepository>();
+        services.AddScoped<IFormModelReferenceRepository, FormModelReferenceRepository>();
+        services.AddScoped<IFormModelReferenceSync, FormModelReferenceSync>();
         services.AddScoped<IUnitOfWork, FormBuilderUnitOfWork>();
 
         return services;

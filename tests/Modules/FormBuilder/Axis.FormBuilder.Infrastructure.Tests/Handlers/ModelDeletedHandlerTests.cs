@@ -1,4 +1,5 @@
 using axis.datamodeling.events;
+using Axis.FormBuilder.Application.Services;
 using Axis.FormBuilder.Domain.Aggregates;
 using Axis.FormBuilder.Domain.Enums;
 using Axis.FormBuilder.Domain.ReadModels;
@@ -7,7 +8,6 @@ using Axis.FormBuilder.Infrastructure.Handlers;
 using Axis.FormBuilder.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 
@@ -18,16 +18,13 @@ public sealed class ModelDeletedHandlerTests(FormBuilderDatabaseFixture fixture)
 {
     private static readonly Guid OrgId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    private ModelDeletedHandler CreateHandler()
+    private static ModelDeletedHandler CreateHandler(FormBuilderDbContext ctx)
     {
-        IConfiguration config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:FormBuilder"] = fixture.ConnectionString,
-            })
-            .Build();
+        IUnitOfWork uow = Substitute.For<IUnitOfWork>();
+        uow.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns(call => ctx.SaveChangesAsync(call.Arg<CancellationToken>()));
         ILogger<ModelDeletedHandler> logger = Substitute.For<ILogger<ModelDeletedHandler>>();
-        return new ModelDeletedHandler(config, logger);
+        return new ModelDeletedHandler(ctx, uow, logger);
     }
 
     private static ModelDeletedEvent BuildEvent(Guid modelId) =>
@@ -55,7 +52,8 @@ public sealed class ModelDeletedHandlerTests(FormBuilderDatabaseFixture fixture)
             await writeCtx.SaveChangesAsync();
         }
 
-        await CreateHandler().Handle(BuildEvent(targetModelId), CancellationToken.None);
+        await using FormBuilderDbContext handlerCtx = fixture.CreateContext();
+        await CreateHandler(handlerCtx).Handle(BuildEvent(targetModelId), CancellationToken.None);
 
         await using FormBuilderDbContext readCtx = fixture.CreateContext();
         FormModelReference? reference = await readCtx.FormModelReferences

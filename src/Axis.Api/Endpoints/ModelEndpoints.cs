@@ -188,8 +188,20 @@ public static class ModelEndpoints
         Guid modelId,
         CurrentUser currentUser,
         ISender mediator,
+        IFormModelReferenceRepository formModelReferences,
         CancellationToken ct)
     {
+        int formReferenceCount = await formModelReferences.CountActiveReferencesToModelAsync(
+            modelId, currentUser.OrgId, ct);
+        if (formReferenceCount > 0)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Conflict",
+                detail:
+                $"This model is used by {formReferenceCount} form(s). Remove those references before deleting.");
+        }
+
         Result result = await mediator.Send(new DeleteModelCommand(modelId, currentUser.OrgId), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
