@@ -211,14 +211,16 @@ jobs:
           args: --config ./lychee.toml './**/*.md'
           fail: true
 
-  # Secret scanning via Gitleaks. Free for personal accounts on private
-  # repos (no GITLEAKS_LICENSE needed); org accounts require a license but
-  # phuong-labs is currently a personal namespace. If we move to a paid org,
-  # set the GITLEAKS_LICENSE secret or switch to TruffleHog.
+  # Secret scanning via TruffleHog. Free, open-source, no license required
+  # for any account type (gitleaks-action v2 broke this — its breaking
+  # update added a paid GITLEAKS_LICENSE requirement for org and personal
+  # accounts alike, see https://github.com/gitleaks/gitleaks-action#-announcement).
   #
-  # Scans the full diff against main (depth 0 needed for that comparison).
+  # `--only-verified` cuts down false positives by querying the alleged
+  # service for token validity before reporting. Scans the full diff
+  # between PR base and HEAD (fetch-depth: 0 needed for that comparison).
   secret-scan:
-    name: Secret scanning (Gitleaks)
+    name: Secret scanning (TruffleHog)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -227,10 +229,12 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Gitleaks
-        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: TruffleHog
+        uses: trufflesecurity/trufflehog@907ad0f15369e0fbed0fbb2200b89e60ef7d6c4f # v3.91.2
+        with:
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
+          extra_args: --only-verified
 
   # ──────────────────────────────────────────────────────────────────────
   # GHAS-only checks — disabled until GitHub Advanced Security is provisioned
