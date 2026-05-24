@@ -34,12 +34,29 @@ public class RepositoryConventionTests
             .Where(t => t.Name.EndsWith("Repository", StringComparison.Ordinal))
             .Select(t => new object[] { t });
 
+    [Fact]
+    public void RepositoryDiscovery_WhenRunOnLoadedAssemblies_FindsAtLeastOneRepository()
+    {
+        // Guard against the silent-skip failure mode: if Infrastructure assemblies
+        // fail to load, AllRepositoryClasses returns empty and the Theory tests
+        // below produce zero cases (xUnit reports "Passed" with no warnings).
+        AllRepositoryClasses().Should().NotBeEmpty(
+            "Repository convention checks must run against real repositories — empty discovery " +
+            "means Infrastructure assemblies aren't being loaded and convention enforcement is silently off.");
+    }
+
     [Theory]
     [MemberData(nameof(AllRepositoryClasses))]
-    public void Repository_PublicMethods_DoNotReturnIQueryable(Type repoType)
+    public void Repository_WhenInspected_HasNoPublicMethodsReturningIQueryable(Type repoType)
     {
+        // Walk the full public instance surface (incl. inherited from base
+        // repositories) — DeclaredOnly would let forbidden APIs declared on a
+        // base repo evade the rule on derived types. Exclude System.Object
+        // members (Equals/GetHashCode/ToString/GetType) which can never return
+        // IQueryable anyway and just add noise to debug output.
         IEnumerable<MethodInfo> leakingMethods = repoType
-            .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance)
+            .Where(m => m.DeclaringType != typeof(object))
             .Where(m => ReturnsIQueryable(m.ReturnType));
 
         leakingMethods.Should().BeEmpty(
@@ -52,14 +69,15 @@ public class RepositoryConventionTests
 
     [Theory]
     [MemberData(nameof(AllRepositoryClasses))]
-    public void Repository_DoesNotCallSaveChangesAsync(Type repoType)
+    public void Repository_WhenInspected_ExposesNoCommitStyleMethods(Type repoType)
     {
         // We can't easily inspect call sites with reflection alone, but we CAN
         // detect a SaveChanges/SaveChangesAsync helper exposed on the repository
         // itself — which would invite handlers to commit via the repo. The
         // contract is: persistence is IUnitOfWork's job, period.
         MethodInfo[] suspectMethods = repoType
-            .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance)
+            .Where(m => m.DeclaringType != typeof(object))
             .Where(m =>
                 m.Name.Equals("SaveChanges", StringComparison.Ordinal)
                 || m.Name.Equals("SaveChangesAsync", StringComparison.Ordinal)
@@ -75,11 +93,11 @@ public class RepositoryConventionTests
 
     private static bool ReturnsIQueryable(Type returnType)
     {
+        // Use assignability rather than exact-type match so concrete types that
+        // implement IQueryable (e.g. EF Core's IIncludableQueryable<,>, or a
+        // custom IQueryable wrapper) are still flagged.
         Type unwrapped = UnwrapTask(returnType);
-        if (!unwrapped.IsGenericType)
-            return unwrapped == typeof(IQueryable);
-        Type def = unwrapped.GetGenericTypeDefinition();
-        return def == typeof(IQueryable<>);
+        return typeof(IQueryable).IsAssignableFrom(unwrapped);
     }
 
     private static Type UnwrapTask(Type type)

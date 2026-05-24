@@ -28,9 +28,10 @@ public class EndpointConventionTests
 {
     public static IEnumerable<object[]> AllEndpointHostClasses()
     {
-        Assembly? api = Conventions.TryLoad("Axis.Api");
-        if (api is null)
-            yield break;
+        Assembly api = Conventions.TryLoad("Axis.Api")
+            ?? throw new InvalidOperationException(
+                "Axis.Api assembly could not be loaded; endpoint convention checks were not executed. " +
+                "Add the missing ProjectReference to Axis.Architecture.Tests.csproj.");
 
         IEnumerable<Type> hosts = api.GetTypes()
             .Where(t => t.IsClass && t.IsAbstract && t.IsSealed) // static = abstract + sealed
@@ -40,9 +41,18 @@ public class EndpointConventionTests
             yield return new object[] { t };
     }
 
+    [Fact]
+    public void EndpointHostDiscovery_WhenRunOnAxisApi_FindsAtLeastOneHost()
+    {
+        // Guard against the silent-skip failure mode (see sibling tests).
+        AllEndpointHostClasses().Should().NotBeEmpty(
+            "Endpoint convention checks must run against real endpoint host classes — empty " +
+            "discovery means MapXxx methods aren't recognised and convention enforcement is silently off.");
+    }
+
     [Theory]
     [MemberData(nameof(AllEndpointHostClasses))]
-    public void EndpointHostClass_NameEndsWithEndpoints(Type endpointHost)
+    public void EndpointHostClass_WhenInspected_HasNameEndingWithEndpoints(Type endpointHost)
     {
         endpointHost.Name.Should().EndWith("Endpoints",
             $"{endpointHost.FullName} hosts Map* extension methods returning IEndpointRouteBuilder " +

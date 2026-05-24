@@ -31,9 +31,21 @@ public class AggregateConventionTests
             .Where(t => t is { IsClass: true, IsAbstract: false } && DerivesFromAggregateRoot(t))
             .Select(t => new object[] { t });
 
+    [Fact]
+    public void AggregateDiscovery_WhenRunOnLoadedAssemblies_FindsAtLeastOneAggregate()
+    {
+        // Guard against the silent-skip failure mode: if Domain assemblies fail
+        // to load, AllAggregateRoots returns empty and both Theory tests below
+        // produce zero cases (xUnit reports "Passed" with no warnings). This
+        // Fact ensures the suite fails loudly when discovery is broken.
+        AllAggregateRoots().Should().NotBeEmpty(
+            "Aggregate convention checks must run against real aggregates — empty discovery " +
+            "means Domain assemblies aren't being loaded and convention enforcement is silently off.");
+    }
+
     [Theory]
     [MemberData(nameof(AllAggregateRoots))]
-    public void AggregateRoot_HasNoPublicMutableSetters(Type aggregateType)
+    public void AggregateRoot_WhenInspected_HasNoPublicMutableSetters(Type aggregateType)
     {
         IEnumerable<PropertyInfo> publicMutableProperties = aggregateType
             .GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
@@ -48,7 +60,7 @@ public class AggregateConventionTests
 
     [Theory]
     [MemberData(nameof(AllAggregateRoots))]
-    public void AggregateRoot_DoesNotExposeParameterlessPublicConstructor(Type aggregateType)
+    public void AggregateRoot_WhenInspected_ExposesNoPublicParameterlessConstructor(Type aggregateType)
     {
         ConstructorInfo[] publicCtors = aggregateType
             .GetConstructors(BindingFlags.Public | BindingFlags.Instance);

@@ -36,9 +36,20 @@ public class HandlerConventionTests
             .Where(ImplementsRequestHandler)
             .Select(t => new object[] { t });
 
+    [Fact]
+    public void HandlerDiscovery_WhenRunOnLoadedAssemblies_FindsAtLeastOneHandler()
+    {
+        // Guard against the silent-skip failure mode: if Application assemblies
+        // fail to load, AllRequestHandlers returns empty and the Theory tests
+        // below produce zero cases (xUnit reports "Passed" with no warnings).
+        AllRequestHandlers().Should().NotBeEmpty(
+            "Handler convention checks must run against real handlers — empty discovery means " +
+            "Application assemblies aren't being loaded and convention enforcement is silently off.");
+    }
+
     [Theory]
     [MemberData(nameof(AllRequestHandlers))]
-    public void Handler_HandleMethod_AcceptsCancellationTokenAsLastParameter(Type handlerType)
+    public void Handler_WhenInvoked_AcceptsCancellationTokenAsLastParameter(Type handlerType)
     {
         MethodInfo handle = FindHandleMethod(handlerType);
         ParameterInfo[] parameters = handle.GetParameters();
@@ -55,7 +66,7 @@ public class HandlerConventionTests
 
     [Theory]
     [MemberData(nameof(AllRequestHandlers))]
-    public void Handler_IsSealed(Type handlerType)
+    public void Handler_WhenDeclared_IsSealed(Type handlerType)
     {
         handlerType.IsSealed.Should().BeTrue(
             $"{handlerType.FullName} is a MediatR handler — leaf type. Mark it 'sealed' so future " +
