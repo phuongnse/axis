@@ -31,10 +31,11 @@ You add a workaround when you ship code that **knowingly** violates a rule. Step
 
 When the cleanup trigger fires and you remove the workaround:
 
-1. Move the entry from **Active workarounds** to **Resolved workarounds**. Add a "Resolved in" line with the PR number.
-2. Remove the `WORKAROUND:` code comment.
-3. Remove the test allow-list entry (the test will catch this for you — it fails with "stale entries: …").
-4. If the workaround entry is older than 6 months and the cleanup trigger never fired, the entry should be **revisited** during the next architecture audit — either the trigger needs to be re-stated, or the workaround needs to be promoted into the design (ADR amendment).
+1. **Delete the entry** from **Active workarounds**. Git history is the audit trail — `git log -p docs/WORKAROUNDS.md` shows when and why each entry was removed; no need for an in-file archive.
+2. Remove the `// WORKAROUND:` code comment at the violation site.
+3. Remove the test allow-list entry (the test will catch this for you — it fails with "stale entries: …" pointing at the exact line to delete).
+4. **If the resolution taught a durable lesson** (e.g. "centralised X in the gateway breaks ADR-Y"), capture it in `docs/playbooks/patterns.md` as a pattern or anti-pattern, or amend the relevant ADR. The lesson belongs where future readers will find it; WORKAROUNDS.md is for *current* debt, not history.
+5. If the workaround has lived longer than 6 months without its trigger firing, the entry should be **revisited** during the next architecture audit — either the trigger needs to be re-stated, or the workaround needs to be promoted into the design (ADR amendment).
 
 ### Reviewing
 
@@ -76,14 +77,3 @@ When the cleanup trigger fires and you remove the workaround:
 - **Cleanup trigger**: PR that adds `Axis.FormBuilder.Contracts` with `FormTaskSubmittedEvent` / `FormTaskExpiredEvent` Avro schemas and converts the consumers to read from Kafka topics. Tracked under "E05 Service-boundary retrofit ⏳" in `docs/PROGRESS.md`.
 - **Added**: pre-dates the architecture tests; surfaced when this inventory was created.
 
----
-
-## Resolved workarounds
-
-### central-tenant-schema-provisioner
-
-- **Location** (removed): `src/Axis.Api/Infrastructure/TenantSchemaProvisioner.cs`, `src/Axis.Api/Infrastructure/Handlers/ProvisionTenantHandler.cs`, `src/Shared/Axis.Shared.Application/Tenancy/ProvisionTenantMessage.cs`, `src/Shared/Axis.Shared.Application/Tenancy/ITenantSchemaProvisioner.cs`
-- **Violated**: ADR-010 — "extraction is a redeploy, not a refactor." The central provisioner sat in `Axis.Api` and directly imported `DataModelingDbContext`, `FormBuilderDbContext`, `WorkflowBuilderDbContext`, `WorkflowEngineDbContext` so that extracting any of those modules required moving the provisioning code AND wiring a new Kafka consumer.
-- **Why it existed**: written for E01 US-003 before ADR-010 and ADR-019 (Avro + Schema Registry) were defined. Tenant provisioning needed *some* implementation and Kafka infra wasn't in place yet.
-- **Cleanup trigger**: PR that wired Avro + Schema Registry for Identity → fired in PR #93.
-- **Resolved in**: PR #93. Replaced with per-module `OrganizationVerifiedHandler` consuming `OrganizationVerifiedEvent` over Kafka.
