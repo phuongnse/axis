@@ -475,15 +475,14 @@ await _context.WorkflowDefinitions
 
 ### Tenant schema provisioning (US-003)
 
-After email verification, the host provisions one PostgreSQL schema per organization and migrates every **tenant-scoped** module database into it. Identity stays on `public`.
+After email verification, every **tenant-scoped** module provisions its own PostgreSQL schema for the organization. Identity stays on `public` and only publishes the verification event — it never touches another module's DB.
 
-- **Interface**: `ITenantSchemaProvisioner` in `Axis.Shared.Application` — implement in the **API host** when the provisioner must touch multiple module `DbContext` types.
+- **Ownership**: each tenant-scoped module's Infrastructure project owns an `OrganizationVerifiedHandler` (e.g. `Axis.DataModeling.Infrastructure.Messaging.OrganizationVerifiedHandler`) that subscribes to Identity's `OrganizationVerifiedEvent` Kafka topic. There is **no** central `ITenantSchemaProvisioner` — extraction of a module is a redeploy of its own handler ([ADR-010](../TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy)).
 - **Schema name**: `tenant_{organizationId:N}` (no slug — org slug can change).
-- **Idempotency**: `CREATE SCHEMA IF NOT EXISTS` plus `Database.MigrateAsync()` per context; safe to call twice for the same org.
-- **Tenant context during migrate**: use `FixedTenantContext` (or equivalent) so `TenantSchemaInterceptor` targets the new schema for each `MigrateAsync` call.
-- **Tests**: register `NoOpTenantSchemaProvisioner` in `WebApplicationFactory` fixtures — never run real provisioning in API integration tests.
-- **Trigger**: `VerifyEmailHandler` persists `User.VerifyEmail()` via `SaveChangesAsync`, then enqueues `ProvisionTenantMessage` through `ITenantProvisioningScheduler` (Wolverine). Do **not** call `ITenantSchemaProvisioner` synchronously in the verify request — provisioning runs in `ProvisionTenantHandler` in the API host.
-- **Message**: `ProvisionTenantMessage(Guid OrganizationId)` in `Axis.Shared.Application.Tenancy`.
+- **Idempotency**: `CREATE SCHEMA IF NOT EXISTS` plus `Database.MigrateAsync()` per context; safe to call twice for the same org (Kafka delivers at-least-once).
+- **Tenant context during migrate**: each handler constructs a `FixedTenantContext(organizationId)` from `Axis.Shared.Infrastructure.Tenancy` so `TenantSchemaInterceptor` targets the new schema for the `MigrateAsync` call.
+- **Trigger**: `User.VerifyEmail()` raises an `OrganizationVerified` domain event; `IdentityUnitOfWork` maps it to `OrganizationVerifiedEvent` (Avro) and publishes via Wolverine outbox → Kafka ([ADR-019](../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). Do **not** provision synchronously in the verify request handler.
+- **Schema + topic**: `Axis.Identity.Contracts/Schemas/OrganizationVerifiedEvent.avsc` + topic `axis.identity.organization-verified` (see `IdentityKafkaTopics`).
 
 ---
 
