@@ -580,6 +580,17 @@ public class CreateWorkflowTests : IAsyncLifetime
 - **Never sync-over-async**: `.Result`, `.Wait()`, and `.GetAwaiter().GetResult()` on a `Task` inside an async call stack causes thread-pool deadlock under ASP.NET Core. Always `await`.
 - **Always propagate `CancellationToken`**: every `async` method signature must accept `CancellationToken cancellationToken` and pass it to every downstream call (EF Core, HttpClient, Redis). Use `CancellationToken.None` only at the outermost entry point (e.g. a Wolverine background job handler where the runtime owns the token).
 
+These rules are enforced at build time by **`Microsoft.VisualStudio.Threading.Analyzers`**, wired in [`Directory.Build.props`](../../Directory.Build.props). The relevant diagnostics:
+
+- **VSTHRD002** — synchronously waiting on a Task may cause deadlocks. Catches `.Result` / `.Wait()` / `.GetAwaiter().GetResult()` with type information (no grep false positives from domain types named `Wait` / `Result`).
+- **VSTHRD100** — async void methods are unrecoverable; use `async Task` instead.
+- **VSTHRD110** — observe the return value of async methods (catches forgotten `await`).
+
+Two rules are intentionally disabled in [`.editorconfig`](../../.editorconfig):
+
+- **VSTHRD200** (Async-suffix naming) clashes with MediatR/Wolverine handler discovery — those frameworks bind on the literal method name `Handle`, not `HandleAsync`.
+- **VSTHRD111** (`ConfigureAwait(bool)`) is a WPF/WinForms safeguard; modern ASP.NET Core does not install a `SynchronizationContext` so `.ConfigureAwait(false)` is no-op.
+
 ```csharp
 // ✅ correct
 public async Task<Result<WorkflowDto>> Handle(
