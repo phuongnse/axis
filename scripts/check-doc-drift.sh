@@ -87,6 +87,39 @@ done < <(
       '
 )
 
+# Hardcoded connection-string guard. Connection strings belong in
+# appsettings.json / env vars / Vault — never inline in C#. Pattern matches
+# the three most common forms (Postgres "Host=", SQL Server "Server=" and
+# "Data Source="). Scope: src/*.cs only, since appsettings.json is the
+# right home for these values.
+CONNSTRING_PATTERN='"(Host=|Server=|Data Source=)'
+while IFS= read -r added; do
+  [ -z "${added}" ] && continue
+  fail "Hardcoded connection string — move to appsettings.json / env / Vault: ${added}"
+done < <(
+  git diff --unified=0 "${RANGE}" -- 'src/*.cs' 2>/dev/null \
+    | awk -v pat="${CONNSTRING_PATTERN}" '
+        /^\+\+\+ b\// { file = substr($0, 7); next }
+        /^\+[^+]/ && $0 ~ pat { print file ": " substr($0, 2) }
+      '
+)
+
+# DateTime.Now guard. Server-side code must use DateTime.UtcNow (or a
+# clock abstraction in tests) so timestamps are timezone-independent and
+# round-trip safely through Postgres `timestamptz`. DateTime.Now silently
+# bakes the host's local TZ into stored values — a classic prod-vs-CI bug.
+DATETIME_NOW_PATTERN='\bDateTime\.Now\b'
+while IFS= read -r added; do
+  [ -z "${added}" ] && continue
+  fail "DateTime.Now introduced — use DateTime.UtcNow (TZ-dependent values poison Postgres timestamptz): ${added}"
+done < <(
+  git diff --unified=0 "${RANGE}" -- 'src/*.cs' 'tests/*.cs' 2>/dev/null \
+    | awk -v pat="${DATETIME_NOW_PATTERN}" '
+        /^\+\+\+ b\// { file = substr($0, 7); next }
+        /^\+[^+]/ && $0 ~ pat { print file ": " substr($0, 2) }
+      '
+)
+
 # Cross-module raw-SQL guard (P0 in CLAUDE.md § Module boundaries).
 # Flag *newly introduced* raw-SQL calls in module code so review confirms the
 # SQL only touches that module's own tables. Use Wolverine events for any
