@@ -73,9 +73,14 @@ fi
 # WinForms). We flag it everywhere in src/ — Wolverine and Minimal API are both
 # fully async; there is no legitimate need. (`.Result` and `.Wait()` are not
 # grep-banned here because both names are used by domain types in this codebase;
-# the Roslyn analyzer in PR #98 will catch the Task-typed versions with type
+# the Roslyn analyzer in PR #99 will catch the Task-typed versions with type
 # info.)
-SYNC_OVER_ASYNC_PATTERN='GetAwaiter\(\)\.GetResult\(\)'
+#
+# `[(]` `[)]` `[.]` instead of `\(` `\)` `\.` to escape literal punctuation:
+# GNU awk warns on those backslash-escapes and silently treats them as plain
+# chars, which would make `\(\)` an empty group matching anywhere and break
+# the check.
+SYNC_OVER_ASYNC_PATTERN='GetAwaiter[(][)][.]GetResult[(][)]'
 while IFS= read -r added; do
   [ -z "${added}" ] && continue
   fail "Sync-over-async (.GetAwaiter().GetResult()) introduced — await the Task instead: ${added}"
@@ -108,7 +113,18 @@ done < <(
 # clock abstraction in tests) so timestamps are timezone-independent and
 # round-trip safely through Postgres `timestamptz`. DateTime.Now silently
 # bakes the host's local TZ into stored values — a classic prod-vs-CI bug.
-DATETIME_NOW_PATTERN='\bDateTime\.Now\b'
+#
+# `[.]` instead of `\.` for the literal dot: GNU awk warns on `\.` and
+# silently treats it as any-char, which would broaden matches. We do NOT
+# use a word boundary (GNU awk lacks `\b`) — false positives from a
+# custom `MyDateTime.Now` are vanishingly unlikely and not worth the
+# detection cost; add a more specific guard if one shows up.
+#
+# DateTimeOffset.Now is NOT flagged here: its return type preserves the
+# offset, so Postgres `timestamptz` round-trips cleanly even from local
+# time. Consistency with `DateTimeOffset.UtcNow` is preferred but is a
+# style call, not a correctness one.
+DATETIME_NOW_PATTERN='DateTime[.]Now'
 while IFS= read -r added; do
   [ -z "${added}" ] && continue
   fail "DateTime.Now introduced — use DateTime.UtcNow (TZ-dependent values poison Postgres timestamptz): ${added}"
