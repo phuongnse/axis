@@ -12,7 +12,11 @@ public static class InvitationEndpoints
 {
     public static IEndpointRouteBuilder MapInvitationEndpoints(this IEndpointRouteBuilder app)
     {
-        RouteGroupBuilder group = app.MapGroup("/api/invitations");
+        // The {token} segment IS the auth factor for these endpoints (one-time
+        // signed invitation link). Mark the group AllowAnonymous so route-level
+        // auth metadata is explicit; individual endpoints validate token + email
+        // inside their handlers.
+        RouteGroupBuilder group = app.MapGroup("/api/invitations").AllowAnonymous();
 
         group.MapGet("/{token}", GetInvitation)
             .WithName("GetInvitation")

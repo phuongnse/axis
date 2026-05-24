@@ -28,6 +28,7 @@ public static class AuthEndpoints
             .ProducesProblem(401);
 
         group.MapPost("/verify-email", VerifyEmail)
+            .AllowAnonymous()
             .WithName("VerifyEmail")
             .WithSummary("Verify email address with a one-time token")
             .WithTags("Identity")
@@ -35,18 +36,21 @@ public static class AuthEndpoints
             .ProducesProblem(400);
 
         group.MapPost("/resend-verification", ResendVerification)
+            .AllowAnonymous()
             .WithName("ResendEmailVerification")
             .WithSummary("Resend email verification link")
             .WithTags("Identity")
             .Produces(204);
 
         group.MapPost("/forgot-password", ForgotPassword)
+            .AllowAnonymous()
             .WithName("ForgotPassword")
             .WithSummary("Request a password reset link")
             .WithTags("Identity")
             .Produces<object>();
 
         group.MapPost("/reset-password", ResetPassword)
+            .AllowAnonymous()
             .WithName("ResetPassword")
             .WithSummary("Reset password using a one-time token")
             .WithTags("Identity")

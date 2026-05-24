@@ -16,6 +16,7 @@ public static class OrganizationEndpoints
         RouteGroupBuilder group = app.MapGroup("/api/organizations");
 
         group.MapPost("/", Register)
+            .AllowAnonymous()
             .WithName("RegisterOrganization")
             .WithSummary("Register a new organization and admin account")
             .WithTags("Identity")
