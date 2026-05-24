@@ -1,4 +1,5 @@
 using Axis.Identity.Application.Services;
+using Axis.Identity.Infrastructure.Messaging;
 using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using Microsoft.EntityFrameworkCore;
@@ -50,7 +51,11 @@ internal sealed class IdentityUnitOfWork(IdentityDbContext context, IMessageBus 
         }
 
         foreach (IDomainEvent evt in events)
-            await bus.PublishAsync(evt);
+        {
+            object? integrationEvent = IdentityEventMapper.ToIntegrationEvent(evt);
+            if (integrationEvent is not null)
+                await bus.PublishAsync(integrationEvent);
+        }
 
         return result;
     }

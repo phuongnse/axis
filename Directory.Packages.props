@@ -55,6 +55,7 @@
   <ItemGroup Label="gRPC">
     <PackageVersion Include="Google.Protobuf" Version="3.29.3" />
     <PackageVersion Include="Grpc.AspNetCore" Version="2.67.0" />
+    <PackageVersion Include="Grpc.Net.ClientFactory" Version="2.67.0" />
     <PackageVersion Include="Grpc.Tools" Version="2.67.0" />
   </ItemGroup>
   <ItemGroup Label="Auth">

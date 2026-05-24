@@ -62,7 +62,11 @@ public sealed class User : AggregateRoot<Guid>
 
     public void VerifyEmail()
     {
+        if (IsEmailVerified)
+            return;
+
         IsEmailVerified = true;
+        RaiseDomainEvent(new OrganizationVerified(OrganizationId));
     }
 
     public void RecordFailedLogin()
@@ -88,6 +92,7 @@ public sealed class User : AggregateRoot<Guid>
             throw new InvalidOperationException("User is already inactive.");
 
         Status = UserStatus.Inactive;
+        RaiseDomainEvent(new UserDeactivated(Id, OrganizationId));
     }
 
     public void Reactivate()
@@ -96,6 +101,7 @@ public sealed class User : AggregateRoot<Guid>
             throw new InvalidOperationException("User is already active.");
 
         Status = UserStatus.Active;
+        RaiseDomainEvent(new UserReactivated(Id, OrganizationId));
     }
 
     public void UpdateProfile(string firstName, string lastName)
@@ -112,10 +118,18 @@ public sealed class User : AggregateRoot<Guid>
 
     public void AssignRole(Guid roleId)
     {
-        if (!_roleIds.Contains(roleId))
-            _roleIds.Add(roleId);
+        if (_roleIds.Contains(roleId))
+            return;
+
+        _roleIds.Add(roleId);
+        RaiseDomainEvent(new RoleAssigned(Id, OrganizationId, roleId));
     }
 
-    public void RemoveRole(Guid roleId) =>
-        _roleIds.Remove(roleId);
+    public void RemoveRole(Guid roleId)
+    {
+        if (!_roleIds.Remove(roleId))
+            return;
+
+        RaiseDomainEvent(new RoleRemoved(Id, OrganizationId, roleId));
+    }
 }

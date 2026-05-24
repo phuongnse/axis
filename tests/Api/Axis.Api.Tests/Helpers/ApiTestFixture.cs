@@ -183,9 +183,6 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.RemoveAll<ITenantContext>();
                 services.AddScoped<ITenantContext>(_ => new PublicSchemaTenantContext());
 
-                services.RemoveAll<ITenantSchemaProvisioner>();
-                services.AddScoped<ITenantSchemaProvisioner, NoOpTenantSchemaProvisioner>();
-
                 services.PostConfigure<OpenIddictServerAspNetCoreOptions>(opts =>
                     opts.DisableTransportSecurityRequirement = true);
 
