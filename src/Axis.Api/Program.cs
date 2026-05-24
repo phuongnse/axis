@@ -9,6 +9,7 @@ using Axis.Api.Infrastructure;
 using Axis.Shared.Infrastructure.Observability;
 using Axis.Api.Middleware;
 using Axis.DataModeling.Application.Commands.CreateModel;
+using Axis.DataModeling.Application.Services;
 using Axis.DataModeling.Infrastructure.Extensions;
 using Axis.Identity.Infrastructure.Persistence;
 using Axis.FormBuilder.Application.Commands.CreateForm;
@@ -356,6 +357,7 @@ try
     builder.Services.AddDataModelingInfrastructure(cfg);
     builder.Services.AddWorkflowBuilderInfrastructure(cfg);
     builder.Services.AddFormBuilderInfrastructure(cfg);
+    builder.Services.AddScoped<IModelDeletionGuard, FormModelDeletionGuard>();
     builder.Services.AddWorkflowEngineInfrastructure(cfg);
 
     // ── Cross-module gRPC clients (ADR-014) ────────────────────────────────

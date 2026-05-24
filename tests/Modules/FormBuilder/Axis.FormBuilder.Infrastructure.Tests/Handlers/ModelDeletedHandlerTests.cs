@@ -1,6 +1,7 @@
 using axis.datamodeling.events;
 using Axis.FormBuilder.Application.Services;
 using Axis.FormBuilder.Domain.Aggregates;
+using Axis.FormBuilder.Domain.Entities;
 using Axis.FormBuilder.Domain.Enums;
 using Axis.FormBuilder.Domain.ReadModels;
 using Axis.FormBuilder.Domain.ValueObjects;
@@ -35,11 +36,11 @@ public sealed class ModelDeletedHandlerTests(FormBuilderDatabaseFixture fixture)
         };
 
     [Fact]
-    public async Task Handle_WhenRelationPickerTargetsDeletedModel_FlagsFieldAsBroken()
+    public async Task Handle_WhenRelationPickerTargetsDeletedModel_CreatesBrokenReference()
     {
         Guid targetModelId = Guid.NewGuid();
         FormDefinition form = FormDefinition.Create("Intake", null, OrgId, "user");
-        form.AddField(
+        FormField field = form.AddField(
             "company",
             "Company",
             FormFieldType.RelationPicker,
@@ -57,10 +58,40 @@ public sealed class ModelDeletedHandlerTests(FormBuilderDatabaseFixture fixture)
 
         await using FormBuilderDbContext readCtx = fixture.CreateContext();
         FormModelReference? reference = await readCtx.FormModelReferences
-            .SingleOrDefaultAsync(r => r.FormId == form.Id);
+            .SingleOrDefaultAsync(r => r.FormId == form.Id && r.FormFieldId == field.Id);
 
         reference.Should().NotBeNull();
         reference!.IsBroken.Should().BeTrue();
         reference.ModelId.Should().Be(targetModelId);
+    }
+
+    [Fact]
+    public async Task Handle_WhenHealthyReferenceExists_MarksItBroken()
+    {
+        Guid targetModelId = Guid.NewGuid();
+        FormDefinition form = FormDefinition.Create("Intake", null, OrgId, "user");
+        FormField field = form.AddField(
+            "company",
+            "Company",
+            FormFieldType.RelationPicker,
+            false,
+            new RelationPickerFieldConfig(targetModelId));
+
+        await using (FormBuilderDbContext writeCtx = fixture.CreateContext())
+        {
+            writeCtx.FormDefinitions.Add(form);
+            writeCtx.FormModelReferences.Add(
+                FormModelReference.Create(form.Id, field.Id, targetModelId, OrgId, isBroken: false));
+            await writeCtx.SaveChangesAsync();
+        }
+
+        await using FormBuilderDbContext handlerCtx = fixture.CreateContext();
+        await CreateHandler(handlerCtx).Handle(BuildEvent(targetModelId), CancellationToken.None);
+
+        await using FormBuilderDbContext readCtx = fixture.CreateContext();
+        FormModelReference reference = await readCtx.FormModelReferences
+            .SingleAsync(r => r.FormId == form.Id && r.FormFieldId == field.Id);
+
+        reference.IsBroken.Should().BeTrue();
     }
 }

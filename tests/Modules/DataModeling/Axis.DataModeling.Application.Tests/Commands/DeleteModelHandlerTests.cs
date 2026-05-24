@@ -12,12 +12,19 @@ namespace Axis.DataModeling.Application.Tests.Commands;
 public class DeleteModelHandlerTests
 {
     private readonly IDataModelRepository _modelRepo = Substitute.For<IDataModelRepository>();
+    private readonly IModelDeletionGuard _deletionGuard = Substitute.For<IModelDeletionGuard>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
     private const string UserId = "user-123";
 
-    private DeleteModelHandler CreateHandler() => new(_modelRepo, _uow);
+    public DeleteModelHandlerTests()
+    {
+        _deletionGuard.ValidateCanDeleteAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success());
+    }
+
+    private DeleteModelHandler CreateHandler() => new(_modelRepo, _deletionGuard, _uow);
 
     [Fact]
     public async Task DeleteModel_WhenModelExists_SoftDeletesModel()

@@ -33,6 +33,8 @@ public class AddFieldToFormHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeEmpty();
         form.Fields.Should().ContainSingle(f => f.Key == "full_name" && f.Label == "Full Name");
+        await _formModelReferenceSync.Received(1)
+            .SyncRelationPickerReferencesAsync(form, Arg.Any<CancellationToken>());
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 

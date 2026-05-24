@@ -33,6 +33,8 @@ public class RemoveFieldFromFormHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         form.Fields.Should().BeEmpty();
+        await _formModelReferenceSync.Received(1)
+            .SyncRelationPickerReferencesAsync(form, Arg.Any<CancellationToken>());
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
