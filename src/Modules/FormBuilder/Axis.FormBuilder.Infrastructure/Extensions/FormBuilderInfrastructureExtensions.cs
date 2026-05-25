@@ -1,7 +1,10 @@
 using Axis.FormBuilder.Application.Repositories;
 using Axis.FormBuilder.Application.Services;
+using Axis.FormBuilder.Infrastructure.Grpc;
 using Axis.FormBuilder.Infrastructure.Persistence;
 using Axis.FormBuilder.Infrastructure.Repositories;
+using Axis.FormBuilder.Infrastructure.Services;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,8 +22,19 @@ public static class FormBuilderInfrastructureExtensions
 
         services.AddScoped<IFormRepository, FormRepository>();
         services.AddScoped<IFormSubmissionRepository, FormSubmissionRepository>();
+        services.AddScoped<IFormModelReferenceRepository, FormModelReferenceRepository>();
+        services.AddScoped<IFormModelReferenceSync, FormModelReferenceSync>();
         services.AddScoped<IUnitOfWork, FormBuilderUnitOfWork>();
 
+        services.AddGrpc();
+
         return services;
+    }
+
+    public static WebApplication MapFormBuilderGrpc(this WebApplication app)
+    {
+        app.MapGrpcService<FormModelReferenceGrpcService>()
+            .RequireAuthorization();
+        return app;
     }
 }

@@ -39,8 +39,7 @@ Users can create custom data models within their organization. A model defines t
 
 > **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
 > Gaps vs spec: model plan-limit check (HTTP 402) pending billing layer (E01 F04); name format validation enforced in Application handler.
-> **Deferred (PR #101 follow-up):** FormBuilder/WorkflowBuilder Kafka consumers for `ModelDeletedEvent` / field lifecycle events (broken-reference warnings per US-032/033).
-> Decisions: system fields (id, created_at, updated_at) injected by domain factory; atomicity guaranteed by UnitOfWork; `ModelCreatedEvent` published cross-module via `Axis.DataModeling.Contracts` (ADR-019).
+> Decisions: system fields (id, created_at, updated_at) injected by domain factory; atomicity guaranteed by UnitOfWork.
 
 ---
 
@@ -124,4 +123,5 @@ Users can create custom data models within their organization. A model defines t
 - Recovering a soft-deleted model — not in MVP.
 
 > **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: workflow/form reference check pending E04/E05 integration; 30-day purge background job pending infrastructure job scheduler.
+> Gaps vs spec: workflow reference check pending E04; form Relation Picker refs blocked/flagged via FormBuilder `ModelDeletedEvent` consumer (US-033 partial); 30-day purge background job pending.
+> **Deferred:** WorkflowBuilder `record.*` trigger broken flags; DataModeling relation fields on other models flagged broken when target model deleted.

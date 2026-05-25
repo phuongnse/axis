@@ -12,6 +12,7 @@ Tests in this project run under `dotnet test` like any other and enforce **CLAUD
 |---|---|
 | [DomainPurityTests](./DomainPurityTests.cs) | P0 — "Domain: zero external dependencies." Bans EF, MediatR, Wolverine, ASP.NET, etc. inside any `*.Domain` assembly. |
 | [ModuleBoundaryTests](./ModuleBoundaryTests.cs) | P0 — "No project reference from `Axis.{ModuleA}.*` to `Axis.{ModuleB}.*` except `Contracts`." Theory runs every (A,B,layer) tuple. Pre-existing violations are tracked in `KnownBoundaryWorkarounds` and must also appear in [`docs/WORKAROUNDS.md`](../../../docs/WORKAROUNDS.md). |
+| [GatewayBoundaryTests](./GatewayBoundaryTests.cs) | P0 — `Axis.Api.Endpoints` must not depend on another module's `Application.Repositories`; `Axis.Api.Infrastructure` must not depend on another module's `Application.Repositories` or `Application.Services`. |
 | [SharedKernelTests](./SharedKernelTests.cs) | P0 (ADR-017) — `Axis.Shared.{Domain,Application}` are abstractions only; no EF/Wolverine/Npgsql. (MediatR is allowed in `Shared.Application` because the project-wide `ICommand`/`IQueryHandler` adapters live there.) Also future-proofs against a re-introduced shared `UnitOfWorkBase`. |
 | [MediatorScopeTests](./MediatorScopeTests.cs) | P0 — "MediatR is intra-module only." Marker test; the actual enforcement is in `ModuleBoundaryTests`. |
 
