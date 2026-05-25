@@ -4,5 +4,11 @@ namespace Axis.WorkflowBuilder.Application.Services;
 
 public interface IWorkflowReferenceSync
 {
-    Task SyncAsync(WorkflowDefinition workflow, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Updates form/model reference rows for <paramref name="workflow"/> and reports whether any
+    /// remaining reference is broken (evaluated on the in-memory read model, before save).
+    /// </summary>
+    Task<WorkflowReferenceSyncResult> SyncAsync(
+        WorkflowDefinition workflow,
+        CancellationToken cancellationToken = default);
 }

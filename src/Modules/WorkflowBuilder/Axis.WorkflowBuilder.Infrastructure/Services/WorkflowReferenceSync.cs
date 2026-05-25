@@ -6,15 +6,42 @@ using Axis.WorkflowBuilder.Domain.ReadModels;
 using Axis.WorkflowBuilder.Domain.ValueObjects;
 using Axis.WorkflowBuilder.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace Axis.WorkflowBuilder.Infrastructure.Services;
 
 internal sealed class WorkflowReferenceSync(WorkflowBuilderDbContext context) : IWorkflowReferenceSync
 {
-    public async Task SyncAsync(WorkflowDefinition workflow, CancellationToken cancellationToken = default)
+    public async Task<WorkflowReferenceSyncResult> SyncAsync(
+        WorkflowDefinition workflow,
+        CancellationToken cancellationToken = default)
     {
         await SyncFormReferencesAsync(workflow, cancellationToken);
         await SyncModelReferencesAsync(workflow, cancellationToken);
+
+        bool hasBroken = HasBrokenReferencesForWorkflow(workflow.Id);
+        return new WorkflowReferenceSyncResult(hasBroken);
+    }
+
+    private bool HasBrokenReferencesForWorkflow(Guid workflowId)
+    {
+        foreach (EntityEntry entry in context.ChangeTracker.Entries())
+        {
+            if (entry.State == EntityState.Deleted)
+                continue;
+
+            if (entry.Entity is WorkflowFormReference formRef
+                && formRef.WorkflowId == workflowId
+                && formRef.IsBroken)
+                return true;
+
+            if (entry.Entity is WorkflowModelReference modelRef
+                && modelRef.WorkflowId == workflowId
+                && modelRef.IsBroken)
+                return true;
+        }
+
+        return false;
     }
 
     private async Task SyncFormReferencesAsync(WorkflowDefinition workflow, CancellationToken cancellationToken)

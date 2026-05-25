@@ -19,7 +19,13 @@ public class RemoveStepHandlerTests
 
     private readonly IWorkflowReferenceSync _referenceSync = Substitute.For<IWorkflowReferenceSync>();
 
-    public RemoveStepHandlerTests() => _handler = new RemoveStepHandler(_repo, _referenceSync, _uow);
+    public RemoveStepHandlerTests()
+    {
+        _referenceSync
+            .SyncAsync(Arg.Any<WorkflowDefinition>(), Arg.Any<CancellationToken>())
+            .Returns(new WorkflowReferenceSyncResult(HasBrokenReferences: false));
+        _handler = new RemoveStepHandler(_repo, _referenceSync, _uow);
+    }
 
     [Fact]
     public async Task Handle_WhenStepExists_RemovesStepAndSaves()

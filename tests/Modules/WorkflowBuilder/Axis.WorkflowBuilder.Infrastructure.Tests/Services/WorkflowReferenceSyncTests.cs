@@ -1,20 +1,19 @@
+using Axis.WorkflowBuilder.Application.Services;
 using Axis.WorkflowBuilder.Domain.Aggregates;
-using Axis.WorkflowBuilder.Domain.Entities;
 using Axis.WorkflowBuilder.Domain.Enums;
 using Axis.WorkflowBuilder.Domain.ReadModels;
-using Axis.WorkflowBuilder.Infrastructure.Repositories;
 using Axis.WorkflowBuilder.Infrastructure.Services;
 using FluentAssertions;
 
-namespace Axis.WorkflowBuilder.Infrastructure.Tests.Repositories;
+namespace Axis.WorkflowBuilder.Infrastructure.Tests.Services;
 
 [Collection("WorkflowBuilderDb")]
-public sealed class WorkflowReferenceRepositoryTests(WorkflowBuilderDatabaseFixture fixture)
+public sealed class WorkflowReferenceSyncTests(WorkflowBuilderDatabaseFixture fixture)
 {
     private static readonly Guid OrgId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     [Fact]
-    public async Task HasBrokenReferencesAsync_AfterSyncWithoutSave_SeesTrackedBrokenState()
+    public async Task SyncAsync_WhenReferenceIsBroken_ReturnsHasBrokenWithoutSave()
     {
         Guid formId = Guid.NewGuid();
         WorkflowDefinition workflow = WorkflowDefinition.Create($"Flow-{Guid.NewGuid():N}", null, OrgId, "user");
@@ -32,12 +31,9 @@ public sealed class WorkflowReferenceRepositoryTests(WorkflowBuilderDatabaseFixt
         await using WorkflowBuilderDbContext ctx = fixture.CreateContext();
         WorkflowDefinition loaded = (await ctx.WorkflowDefinitions.FindAsync(workflow.Id))!;
         WorkflowReferenceSync sync = new(ctx);
-        WorkflowReferenceRepository repo = new(ctx);
 
-        await sync.SyncAsync(loaded, CancellationToken.None);
+        WorkflowReferenceSyncResult result = await sync.SyncAsync(loaded, CancellationToken.None);
 
-        bool hasBroken = await repo.HasBrokenReferencesAsync(workflow.Id, CancellationToken.None);
-
-        hasBroken.Should().BeTrue("broken flag must be visible before SaveChanges when using tracked read-model rows");
+        result.HasBrokenReferences.Should().BeTrue();
     }
 }

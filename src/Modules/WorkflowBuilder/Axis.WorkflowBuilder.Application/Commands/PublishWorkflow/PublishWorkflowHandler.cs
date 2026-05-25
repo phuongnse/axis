@@ -9,7 +9,6 @@ namespace Axis.WorkflowBuilder.Application.Commands.PublishWorkflow;
 /// <summary>US-049: Loads the workflow and delegates publish logic to the aggregate.</summary>
 public sealed class PublishWorkflowHandler(
     IWorkflowRepository workflowRepo,
-    IWorkflowReferenceRepository referenceRepo,
     IWorkflowReferenceSync referenceSync,
     IUnitOfWork uow)
     : ICommandHandler<PublishWorkflowCommand>
@@ -21,9 +20,10 @@ public sealed class PublishWorkflowHandler(
         if (workflow is null)
             return Result.Failure(ErrorCodes.NotFound, "Workflow not found.");
 
-        await referenceSync.SyncAsync(workflow, cancellationToken);
+        WorkflowReferenceSyncResult syncResult =
+            await referenceSync.SyncAsync(workflow, cancellationToken);
 
-        if (await referenceRepo.HasBrokenReferencesAsync(workflow.Id, cancellationToken))
+        if (syncResult.HasBrokenReferences)
         {
             return Result.Failure(
                 ErrorCodes.BusinessRule,

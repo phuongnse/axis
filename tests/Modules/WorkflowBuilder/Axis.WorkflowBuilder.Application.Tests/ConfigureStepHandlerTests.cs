@@ -19,7 +19,13 @@ public class ConfigureStepHandlerTests
 
     private readonly IWorkflowReferenceSync _referenceSync = Substitute.For<IWorkflowReferenceSync>();
 
-    public ConfigureStepHandlerTests() => _handler = new ConfigureStepHandler(_repo, _referenceSync, _uow);
+    public ConfigureStepHandlerTests()
+    {
+        _referenceSync
+            .SyncAsync(Arg.Any<WorkflowDefinition>(), Arg.Any<CancellationToken>())
+            .Returns(new WorkflowReferenceSyncResult(HasBrokenReferences: false));
+        _handler = new ConfigureStepHandler(_repo, _referenceSync, _uow);
+    }
 
     [Fact]
     public async Task Handle_WhenStepExists_UpdatesConfigAndSaves()

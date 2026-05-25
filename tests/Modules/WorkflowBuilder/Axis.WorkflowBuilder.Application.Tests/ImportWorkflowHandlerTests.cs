@@ -19,7 +19,13 @@ public class ImportWorkflowHandlerTests
 
     private readonly IWorkflowReferenceSync _referenceSync = Substitute.For<IWorkflowReferenceSync>();
 
-    public ImportWorkflowHandlerTests() => _handler = new ImportWorkflowHandler(_repo, _referenceSync, _uow);
+    public ImportWorkflowHandlerTests()
+    {
+        _referenceSync
+            .SyncAsync(Arg.Any<WorkflowDefinition>(), Arg.Any<CancellationToken>())
+            .Returns(new WorkflowReferenceSyncResult(HasBrokenReferences: false));
+        _handler = new ImportWorkflowHandler(_repo, _referenceSync, _uow);
+    }
 
     private static WorkflowExportDto BuildExportDto(string name = "Imported Workflow") =>
         new(
