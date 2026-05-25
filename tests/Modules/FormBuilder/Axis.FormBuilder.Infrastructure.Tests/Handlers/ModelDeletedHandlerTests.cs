@@ -39,7 +39,7 @@ public sealed class ModelDeletedHandlerTests(FormBuilderDatabaseFixture fixture)
     public async Task Handle_WhenRelationPickerTargetsDeletedModel_CreatesBrokenReference()
     {
         Guid targetModelId = Guid.NewGuid();
-        FormDefinition form = FormDefinition.Create("Intake", null, OrgId, "user");
+        FormDefinition form = FormDefinition.Create($"Intake-{Guid.NewGuid():N}", null, OrgId, "user");
         FormField field = form.AddField(
             "company",
             "Company",
@@ -69,7 +69,7 @@ public sealed class ModelDeletedHandlerTests(FormBuilderDatabaseFixture fixture)
     public async Task Handle_WhenHealthyReferenceExists_MarksItBroken()
     {
         Guid targetModelId = Guid.NewGuid();
-        FormDefinition form = FormDefinition.Create("Intake", null, OrgId, "user");
+        FormDefinition form = FormDefinition.Create($"Intake-{Guid.NewGuid():N}", null, OrgId, "user");
         FormField field = form.AddField(
             "company",
             "Company",
