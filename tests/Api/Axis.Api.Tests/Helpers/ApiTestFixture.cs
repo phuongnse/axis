@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Axis.DataModeling.Infrastructure.Persistence;
+using Axis.FormBuilder.Contracts.Grpc;
 using Axis.FormBuilder.Infrastructure.Persistence;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Infrastructure.Persistence;
@@ -18,6 +19,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Grpc.Net.ClientFactory;
 using OpenIddict.Abstractions;
 using StackExchange.Redis;
 using Testcontainers.Kafka;
@@ -130,7 +132,13 @@ public sealed class ApiTestFixture : IAsyncLifetime
             _workflowEngineConnectionString,
             opts => new WorkflowEngineDbContext(opts, new PublicSchemaTenantContext()));
 
-        _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
+
+        WebApplicationFactory<Program> factory = null!;
+        Lazy<HttpMessageHandler> grpcTestServerHandler =
+            new(() => factory.Server.CreateHandler());
+
+        factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
 
@@ -149,6 +157,12 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
             builder.ConfigureTestServices(services =>
             {
+                services.RemoveAll<FormModelReferenceService.FormModelReferenceServiceClient>();
+                services.AddGrpcClient<FormModelReferenceService.FormModelReferenceServiceClient>(options =>
+                {
+                    options.Address = new Uri("http://localhost");
+                })
+                .ConfigurePrimaryHttpMessageHandler(() => grpcTestServerHandler.Value);
                 services.RemoveAll<DbContextOptions<IdentityDbContext>>();
                 services.RemoveAll<IdentityDbContext>();
                 services.AddDbContext<IdentityDbContext>(opts =>
@@ -192,6 +206,8 @@ public sealed class ApiTestFixture : IAsyncLifetime
                     services.Remove(seederDescriptor);
             });
         });
+
+        _factory = factory;
 
         using IServiceScope scope = _factory.Services.CreateScope();
         await SeedTestOpenIddictClientsAsync(scope.ServiceProvider);
