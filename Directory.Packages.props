@@ -90,7 +90,7 @@
     <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.18.0" />
     <PackageVersion Include="Microsoft.IdentityModel.Tokens" Version="8.18.0" />
     <PackageVersion Include="OpenIddict.AspNetCore" Version="5.8.0" />
-    <PackageVersion Include="OpenIddict.EntityFrameworkCore" Version="5.8.0" />
+    <PackageVersion Include="OpenIddict.EntityFrameworkCore" Version="7.5.0" />
   </ItemGroup>
   <ItemGroup Label="SignalR">
     <PackageVersion Include="Microsoft.AspNetCore.SignalR.Client" Version="9.0.5" />
