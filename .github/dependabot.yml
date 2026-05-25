@@ -1,133 +1,71 @@
 version: 2
 
-# Dependabot opens a PR per ecosystem when an update is available, grouping
-# minor + patch bumps to reduce noise. Security advisories always open a PR
-# immediately, ignoring the schedule. Action SHAs are rewritten by Dependabot
-# (`@v2` -> `@<sha> # v2.4.1`) so manual SHA hunting is unnecessary.
+# Dependabot opens PRs on a monthly schedule. Minor + patch bumps are grouped into
+# one PR per ecosystem (NuGet, npm, GitHub Actions). Security advisories still
+# open immediately. Semver-major version updates are ignored for selected
+# packages — bump those in a deliberate chore PR when ready.
 updates:
-  # .NET — central package management (Directory.Packages.props) means
-  # NuGet bumps land in one file regardless of which csproj uses them.
+  # .NET — central package management (Directory.Packages.props).
   - package-ecosystem: nuget
     directory: /
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
       time: "06:00"
       timezone: Asia/Ho_Chi_Minh
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     commit-message:
       prefix: chore(deps)
     labels:
       - dependencies
-      - dotnet
+    ignore:
+      # Major bumps need explicit review (license, API, test tooling). Open a
+      # manual chore PR when upgrading; do not rely on the monthly group PR.
+      - dependency-name: "FluentAssertions"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "coverlet.collector"
+        update-types: ["version-update:semver-major"]
     groups:
-      # Each named group restricts to minor + patch so major bumps land as
-      # individual review-required PRs. Without this restriction, a tool
-      # ecosystem (e.g. WolverineFx 5 → 6) would land grouped with patch
-      # updates and slip past code review.
       dotnet-minor-and-patch:
         update-types: [minor, patch]
-      microsoft-extensions:
-        update-types: [minor, patch]
         patterns:
-          - "Microsoft.Extensions.*"
-          - "Microsoft.EntityFrameworkCore*"
-          - "Microsoft.AspNetCore.*"
-      wolverine:
-        update-types: [minor, patch]
-        patterns:
-          - "WolverineFx*"
-      openiddict:
-        update-types: [minor, patch]
-        patterns:
-          - "OpenIddict*"
-      serilog:
-        update-types: [minor, patch]
-        patterns:
-          - "Serilog*"
-      testing:
-        update-types: [minor, patch]
-        patterns:
-          - "xunit*"
-          - "FluentAssertions"
-          - "NSubstitute*"
-          - "Testcontainers*"
-          - "Bogus"
-          - "Microsoft.NET.Test.Sdk"
-          - "coverlet.*"
-          - "Microsoft.AspNetCore.Mvc.Testing"
+          - "*"
 
   # Frontend npm
   - package-ecosystem: npm
     directory: /frontend
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
       time: "06:00"
       timezone: Asia/Ho_Chi_Minh
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 3
     commit-message:
       prefix: chore(deps)
     labels:
       - dependencies
-      - frontend
     ignore:
-      # @types/node must track the Node runtime (frontend/.nvmrc). Major bumps
-      # arrive only when we bump the runtime version itself — a deliberate
-      # operational change, not a Dependabot drive-by.
+      # @types/node must track the Node runtime (frontend/.nvmrc).
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
     groups:
-      # See NuGet section above — each named group restricts to
-      # minor + patch so majors require individual review (Vite 6 → 8
-      # would break `@vitejs/plugin-react@5` and trigger nested-vite
-      # install via Vitest 4, both of which are documented gotchas in
-      # docs/TECH_STACK.md).
       frontend-minor-and-patch:
         update-types: [minor, patch]
-      tanstack:
-        update-types: [minor, patch]
         patterns:
-          - "@tanstack/*"
-      react:
-        update-types: [minor, patch]
-        patterns:
-          - "react"
-          - "react-dom"
-          - "@types/react"
-          - "@types/react-dom"
-      vite:
-        update-types: [minor, patch]
-        patterns:
-          - "vite"
-          - "@vitejs/*"
-          - "vitest"
-          - "@vitest/*"
-      biome:
-        update-types: [minor, patch]
-        patterns:
-          - "@biomejs/*"
+          - "*"
 
   # GitHub Actions in workflows
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
       time: "06:00"
       timezone: Asia/Ho_Chi_Minh
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     commit-message:
       prefix: chore(ci)
     labels:
       - dependencies
-      - github-actions
     groups:
-      # Cap the actions group to minor + patch so a surprise jump like
-      # actions/upload-artifact v4 → v7 (PR #62) can't slip past code review
-      # bundled with other safe bumps. Action majors are rare enough to
-      # warrant individual PRs.
-      actions:
+      actions-minor-and-patch:
         update-types: [minor, patch]
         patterns:
           - "*"

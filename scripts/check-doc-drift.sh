@@ -46,8 +46,12 @@ check_epic_docs() {
   local doc_prefix="$2"
   local label="$3"
   if any_changed "${code_pattern}"; then
-    if ! docs_changed_under "${doc_prefix}"; then
-      fail "${label}: code changed but no files under ${doc_prefix}/ in this PR"
+    # Dependabot sometimes adds PackageReference lines in .csproj only; that is not
+    # a feature change and must not require epic docs (see PR #104).
+    if echo "${CHANGED}" | grep -E "${code_pattern}" | grep -Ev '\.csproj$' | grep -q .; then
+      if ! docs_changed_under "${doc_prefix}"; then
+        fail "${label}: code changed but no files under ${doc_prefix}/ in this PR"
+      fi
     fi
   fi
 }
