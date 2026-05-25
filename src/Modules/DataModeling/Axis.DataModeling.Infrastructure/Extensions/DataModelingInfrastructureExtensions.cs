@@ -1,7 +1,9 @@
 using Axis.DataModeling.Application.Repositories;
 using Axis.DataModeling.Application.Services;
+using Axis.DataModeling.Infrastructure.Grpc;
 using Axis.DataModeling.Infrastructure.Persistence;
 using Axis.DataModeling.Infrastructure.Repositories;
+using Axis.FormBuilder.Contracts.Grpc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +22,14 @@ public static class DataModelingInfrastructureExtensions
         services.AddScoped<IDataClassRepository, DataClassRepository>();
         services.AddScoped<IDataRecordRepository, DataRecordRepository>();
         services.AddScoped<IUnitOfWork, DataModelingUnitOfWork>();
+        services.AddScoped<IModelDeletionGuard, FormModelDeletionGuard>();
+
+        string formBuilderGrpcUrl = configuration["Modules:FormBuilder:GrpcUrl"]
+            ?? "http://localhost:5280";
+        services.AddGrpcClient<FormModelReferenceService.FormModelReferenceServiceClient>(opts =>
+        {
+            opts.Address = new Uri(formBuilderGrpcUrl);
+        });
 
         return services;
     }

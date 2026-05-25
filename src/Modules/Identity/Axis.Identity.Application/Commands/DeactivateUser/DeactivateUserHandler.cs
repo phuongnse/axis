@@ -8,6 +8,8 @@ namespace Axis.Identity.Application.Commands.DeactivateUser;
 
 public sealed class DeactivateUserHandler(
     IUserRepository userRepo,
+    IRoleRepository roleRepo,
+    ISessionStore sessionStore,
     IUnitOfWork uow)
     : ICommandHandler<DeactivateUserCommand>
 {
@@ -21,14 +23,18 @@ public sealed class DeactivateUserHandler(
         if (user is null)
             return Result.Failure(ErrorCodes.NotFound, "User not found.");
 
+        Role? adminRole = await roleRepo.GetByNameAsync("Admin", command.OrganizationId, cancellationToken);
+        Guid adminRoleId = adminRole?.Id ?? Guid.Empty;
+
         // US-019: cannot deactivate last admin
         int adminCount = await userRepo.CountAdminsAsync(
-            command.OrganizationId, command.AdminRoleId, cancellationToken);
-        if (adminCount <= 1 && user.RoleIds.Contains(command.AdminRoleId))
+            command.OrganizationId, adminRoleId, cancellationToken);
+        if (adminCount <= 1 && user.RoleIds.Contains(adminRoleId))
             return Result.Failure(ErrorCodes.BusinessRule, "You cannot deactivate the last admin of the organization.");
 
         user.Deactivate();
         await uow.SaveChangesAsync(cancellationToken);
+        await sessionStore.RevokeAllAsync(command.UserId, cancellationToken);
         return Result.Success();
     }
 }

@@ -6,10 +6,9 @@ using Axis.Identity.Application.Commands.ChangePassword;
 using Axis.Identity.Application.Commands.DeactivateUser;
 using Axis.Identity.Application.Commands.RevokeSession;
 using Axis.Identity.Application.Commands.UpdateUserProfile;
+using Axis.Identity.Application.Queries.GetCurrentUserProfile;
 using Axis.Identity.Application.Queries.GetUserSessions;
-using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
-using Axis.Identity.Domain.Aggregates;
 using Axis.Shared.Domain.Primitives;
 using MediatR;
 using Microsoft.AspNetCore.Authentication;
@@ -98,23 +97,29 @@ public static class UserEndpoints
 
     private static async Task<IResult> GetMe(
         CurrentUser currentUser,
-        IUserRepository userRepository,
+        ISender mediator,
         CancellationToken ct)
     {
-        User? user = await userRepository.GetByIdPlatformWideAsync(currentUser.UserId, ct);
-        if (user is null) return Results.NotFound();
+        CurrentUserProfileDto? profile = await mediator.Send(
+            new GetCurrentUserProfileQuery(
+                currentUser.UserId,
+                currentUser.OrgId,
+                currentUser.Permissions),
+            ct);
+        if (profile is null)
+            return Results.NotFound();
 
         return Results.Ok(new
         {
-            id = user.Id,
-            email = user.Email.Value,
-            first_name = user.FirstName,
-            last_name = user.LastName,
-            full_name = $"{user.FirstName} {user.LastName}",
-            avatar_url = user.AvatarUrl,
-            is_active = user.Status == UserStatus.Active,
-            org_id = currentUser.OrgId,
-            permissions = currentUser.Permissions,
+            id = profile.Id,
+            email = profile.Email,
+            first_name = profile.FirstName,
+            last_name = profile.LastName,
+            full_name = profile.FullName,
+            avatar_url = profile.AvatarUrl,
+            is_active = profile.IsActive,
+            org_id = profile.OrgId,
+            permissions = profile.Permissions,
         });
     }
 
@@ -216,8 +221,6 @@ public static class UserEndpoints
         [FromBody] UpdateStatusRequest request,
         CurrentUser currentUser,
         ISender mediator,
-        IRoleRepository roleRepository,
-        ISessionStore sessionStore,
         CancellationToken ct)
     {
         if (userId == currentUser.UserId)
@@ -227,16 +230,11 @@ public static class UserEndpoints
 
         if (!request.IsActive)
         {
-            Role? adminRole = await roleRepository.GetByNameAsync("Admin", currentUser.OrgId, ct);
-            Guid adminRoleId = adminRole?.Id ?? Guid.Empty;
-
-            Result deactivateResult = await mediator.Send(new DeactivateUserCommand(
-                userId, currentUser.OrgId, currentUser.UserId, adminRoleId), ct);
+            Result deactivateResult = await mediator.Send(
+                new DeactivateUserCommand(userId, currentUser.OrgId, currentUser.UserId),
+                ct);
 
             if (deactivateResult.IsFailure) return deactivateResult.ToProblemDetails();
-
-            // Revoke all active refresh tokens so the deactivated user can't silently renew
-            await sessionStore.RevokeAllAsync(userId, ct);
         }
         else
         {

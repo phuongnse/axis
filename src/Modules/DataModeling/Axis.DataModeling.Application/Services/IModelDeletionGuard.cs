@@ -4,7 +4,7 @@ namespace Axis.DataModeling.Application.Services;
 
 /// <summary>
 /// Cross-module guard for US-033: blocks model deletion when referenced by active form fields.
-/// Implemented at the API composition root (modulith); not a FormBuilder dependency from DataModeling.
+/// Implemented in DataModeling.Infrastructure via FormBuilder gRPC (ADR-014).
 /// </summary>
 public interface IModelDeletionGuard
 {

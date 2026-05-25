@@ -1,6 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <PackageReference Include="Grpc.Net.ClientFactory" />
+    <PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>
@@ -15,6 +17,7 @@
     <ProjectReference Include="..\..\..\Shared\Axis.Shared.Infrastructure\Axis.Shared.Infrastructure.csproj" />
     <ProjectReference Include="..\Axis.DataModeling.Contracts\Axis.DataModeling.Contracts.csproj" />
     <ProjectReference Include="..\..\Identity\Axis.Identity.Contracts\Axis.Identity.Contracts.csproj" />
+    <ProjectReference Include="..\..\FormBuilder\Axis.FormBuilder.Contracts\Axis.FormBuilder.Contracts.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
