@@ -11,8 +11,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Google.Protobuf" />
-    <PackageReference Include="Grpc.AspNetCore" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
   </ItemGroup>
