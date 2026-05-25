@@ -4,6 +4,7 @@ using Axis.Api.Infrastructure;
 using Axis.Identity.Application.Commands.RequestPasswordReset;
 using Axis.Identity.Application.Commands.ResetPassword;
 using Axis.Identity.Application.Commands.VerifyEmail;
+using Axis.Identity.Application.Queries.GetProvisioningStatus;
 using Axis.Shared.Domain.Primitives;
 using MediatR;
 using Microsoft.AspNetCore.Authentication;
@@ -34,6 +35,14 @@ public static class AuthEndpoints
             .WithTags("Identity")
             .Produces(204)
             .ProducesProblem(400);
+
+        group.MapGet("/provisioning-status", GetProvisioningStatus)
+            .AllowAnonymous()
+            .WithName("GetProvisioningStatus")
+            .WithSummary("Poll tenant provisioning progress after email verification (US-003)")
+            .WithTags("Identity")
+            .Produces<ProvisioningStatusDto>()
+            .Produces(404);
 
         group.MapPost("/resend-verification", ResendVerification)
             .AllowAnonymous()
@@ -106,6 +115,18 @@ public static class AuthEndpoints
         Result result = await mediator.Send(new VerifyEmailCommand(request.Token), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
+    }
+
+    private static async Task<IResult> GetProvisioningStatus(
+        [FromQuery] string token,
+        ISender mediator,
+        CancellationToken ct)
+    {
+        ProvisioningStatusDto? status = await mediator.Send(new GetProvisioningStatusQuery(token), ct);
+        if (status is null)
+            return Results.NotFound();
+
+        return Results.Ok(status);
     }
 
     private static async Task<IResult> ResendVerification(

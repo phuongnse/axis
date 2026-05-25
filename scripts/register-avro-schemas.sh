@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Registers WorkflowBuilder Avro schemas with Confluent Schema Registry (ADR-019).
+# Registers module Avro schemas with Confluent Schema Registry (ADR-019).
 # Usage: SCHEMA_REGISTRY_URL=http://localhost:8081 ./scripts/register-avro-schemas.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SCHEMA_REGISTRY_URL="${SCHEMA_REGISTRY_URL:-http://localhost:8081}"
-SCHEMA_DIR="$ROOT/src/Modules/WorkflowBuilder/Axis.WorkflowBuilder.Contracts/Schemas"
+WB_SCHEMA_DIR="$ROOT/src/Modules/WorkflowBuilder/Axis.WorkflowBuilder.Contracts/Schemas"
+DM_SCHEMA_DIR="$ROOT/src/Modules/DataModeling/Axis.DataModeling.Contracts/Schemas"
+ID_SCHEMA_DIR="$ROOT/src/Modules/Identity/Axis.Identity.Contracts/Schemas"
 
 register() {
   local file="$1"
@@ -38,6 +40,9 @@ register "$DM_SCHEMA_DIR/FieldUpdatedEvent.avsc" "axis.datamodeling.field-update
 register "$DM_SCHEMA_DIR/FieldRemovedEvent.avsc" "axis.datamodeling.field-removed-value"
 
 FB_SCHEMA_DIR="$ROOT/src/Modules/FormBuilder/Axis.FormBuilder.Contracts/Schemas"
+
+register "$ID_SCHEMA_DIR/OrganizationVerifiedEvent.avsc" "axis.identity.organization-verified-value"
+register "$ID_SCHEMA_DIR/TenantModuleProvisionReportEvent.avsc" "axis.identity.tenant-module-provision-report-value"
 register "$FB_SCHEMA_DIR/FormDeletedEvent.avsc" "axis.formbuilder.form-deleted-value"
 
 echo "register-avro-schemas: OK"

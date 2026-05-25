@@ -167,6 +167,8 @@ try
 
                 WolverineKafkaAvroExtensions.PublishAndListenWithAvro<OrganizationVerifiedEvent>(
                     o, IdentityKafkaTopics.OrganizationVerified, serializer);
+                WolverineKafkaAvroExtensions.PublishAndListenWithAvro<TenantModuleProvisionReportEvent>(
+                    o, IdentityKafkaTopics.TenantModuleProvisionReport, serializer);
                 WolverineKafkaAvroExtensions.PublishAndListenWithAvro<UserDeactivatedEvent>(
                     o, IdentityKafkaTopics.UserDeactivated, serializer);
                 WolverineKafkaAvroExtensions.PublishAndListenWithAvro<UserReactivatedEvent>(
@@ -211,6 +213,7 @@ try
                 WolverineKafkaAvroExtensions.PublishLocally<WorkflowUnarchivedEvent>(o);
 
                 WolverineKafkaAvroExtensions.PublishLocally<OrganizationVerifiedEvent>(o);
+                WolverineKafkaAvroExtensions.PublishLocally<TenantModuleProvisionReportEvent>(o);
                 WolverineKafkaAvroExtensions.PublishLocally<UserDeactivatedEvent>(o);
                 WolverineKafkaAvroExtensions.PublishLocally<UserReactivatedEvent>(o);
                 WolverineKafkaAvroExtensions.PublishLocally<RoleAssignedEvent>(o);
@@ -235,6 +238,7 @@ try
         // Infrastructure assemblies host Wolverine handlers (e.g. cross-module event
         // consumers like OrganizationVerifiedHandler) but are not the entry assembly —
         // include them explicitly for handler discovery.
+        opts.Discovery.IncludeAssembly(typeof(IdentityInfrastructureExtensions).Assembly);
         opts.Discovery.IncludeAssembly(typeof(DataModelingInfrastructureExtensions).Assembly);
         opts.Discovery.IncludeAssembly(typeof(WorkflowBuilderInfrastructureExtensions).Assembly);
         opts.Discovery.IncludeAssembly(typeof(WorkflowEngineInfrastructureExtensions).Assembly);

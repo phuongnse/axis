@@ -1,0 +1,26 @@
+using Axis.Identity.Contracts;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Wolverine;
+
+namespace Axis.DataModeling.Infrastructure.Messaging;
+
+internal sealed class RetryTenantModuleProvisionHandler(
+    IConfiguration configuration,
+    IMessageBus messageBus,
+    ILogger<RetryTenantModuleProvisionHandler> logger)
+{
+    public Task Handle(RetryTenantModuleProvisionMessage message, CancellationToken cancellationToken)
+    {
+        if (!string.Equals(message.Module, TenantModuleNames.DataModeling, StringComparison.Ordinal))
+            return Task.CompletedTask;
+
+        return TenantModuleProvisionAttempt.RunAsync(
+            message.OrganizationId,
+            message.Attempt,
+            configuration,
+            messageBus,
+            logger,
+            cancellationToken);
+    }
+}

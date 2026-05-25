@@ -4,6 +4,7 @@ namespace Axis.Identity.Contracts;
 public static class IdentityKafkaTopics
 {
     public const string OrganizationVerified = "axis.identity.organization-verified";
+    public const string TenantModuleProvisionReport = "axis.identity.tenant-module-provision-report";
     public const string UserDeactivated = "axis.identity.user-deactivated";
     public const string UserReactivated = "axis.identity.user-reactivated";
     public const string RoleAssigned = "axis.identity.role-assigned";

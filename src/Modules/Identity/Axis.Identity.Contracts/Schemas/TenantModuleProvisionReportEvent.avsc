@@ -1,0 +1,31 @@
+{
+  "namespace": "axis.identity.events",
+  "type": "record",
+  "name": "TenantModuleProvisionReportEvent",
+  "fields": [
+    {
+      "name": "organizationId",
+      "type": "string"
+    },
+    {
+      "name": "module",
+      "type": "string"
+    },
+    {
+      "name": "succeeded",
+      "type": "boolean"
+    },
+    {
+      "name": "attempt",
+      "type": "int"
+    },
+    {
+      "name": "errorMessage",
+      "default": null,
+      "type": [
+        "null",
+        "string"
+      ]
+    }
+  ]
+}

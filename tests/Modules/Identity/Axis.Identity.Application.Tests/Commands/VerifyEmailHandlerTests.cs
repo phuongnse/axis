@@ -1,8 +1,10 @@
 using Axis.Identity.Application.Commands.VerifyEmail;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
+using Axis.Identity.Contracts;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.Events;
+using Axis.Identity.Domain.Provisioning;
 using Axis.Identity.Domain.ValueObjects;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
@@ -14,24 +16,37 @@ namespace Axis.Identity.Application.Tests.Commands;
 public class VerifyEmailHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
+    private readonly IOrganizationRepository _organizationRepo = Substitute.For<IOrganizationRepository>();
+    private readonly ITenantModuleProvisioningRepository _provisioningRepo =
+        Substitute.For<ITenantModuleProvisioningRepository>();
+    private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
 
-    private VerifyEmailHandler CreateHandler() => new(_userRepo, _uow);
+    private VerifyEmailHandler CreateHandler() =>
+        new(_userRepo, _organizationRepo, _provisioningRepo, _roleRepo, _uow);
 
-    private static User MakeUnverifiedUser()
+    private static (User User, Organization Organization) MakeUnverifiedUserWithOrg()
     {
-        User user = User.Create("Alice", "Smith", Email.Create("alice@acme.com").Value, OrgId);
+        Email email = Email.Create("alice@acme.com").Value!;
+        Organization organization = Organization.Create(
+            "Acme",
+            OrganizationSlug.Create("acme").Value!,
+            email);
+        User user = User.Create("Alice", "Smith", email, organization.Id);
         user.SetPasswordHash("hashed");
-        return user;
+        return (user, organization);
     }
 
     [Fact]
     public async Task VerifyEmail_WhenTokenIsValid_VerifiesEmailAndRaisesDomainEvent()
     {
-        User user = MakeUnverifiedUser();
+        (User user, Organization organization) = MakeUnverifiedUserWithOrg();
+        Role adminRole = Role.CreateSystem("Admin", organization.Id, ["users:read"]);
         _userRepo.GetByIdPlatformWideAsync(user.Id).Returns(user);
+        _organizationRepo.GetByIdAsync(organization.Id).Returns(organization);
+        _roleRepo.GetByNameAsync("Admin", organization.Id).Returns(adminRole);
 
         Result result = await CreateHandler().Handle(
             new VerifyEmailCommand(user.Id.ToString()),
@@ -39,6 +54,11 @@ public class VerifyEmailHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         user.IsEmailVerified.Should().BeTrue();
+        organization.Status.Should().Be(OrganizationStatus.Provisioning);
+
+        await _provisioningRepo.Received(1).AddRangeAsync(
+            Arg.Is<IEnumerable<TenantModuleProvisioning>>(rows => rows.Count() == TenantModuleNames.All.Count),
+            Arg.Any<CancellationToken>());
 
         // Verify the OrganizationVerified domain event was raised. IdentityUnitOfWork
         // maps it to OrganizationVerifiedEvent (Avro) and publishes via Kafka (ADR-019).
@@ -80,7 +100,7 @@ public class VerifyEmailHandlerTests
     [Fact]
     public async Task VerifyEmail_WhenAlreadyVerified_ReturnsBusinessRuleFailure()
     {
-        User user = MakeUnverifiedUser();
+        (User user, Organization _) = MakeUnverifiedUserWithOrg();
         user.VerifyEmail();
         user.ClearDomainEvents();
         _userRepo.GetByIdPlatformWideAsync(user.Id).Returns(user);

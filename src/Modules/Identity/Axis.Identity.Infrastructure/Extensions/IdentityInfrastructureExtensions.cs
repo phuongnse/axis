@@ -34,6 +34,8 @@ public static class IdentityInfrastructureExtensions
             });
 
         services.AddScoped<IOrganizationRepository, OrganizationRepository>();
+        services.AddScoped<ITenantModuleProvisioningRepository, TenantModuleProvisioningRepository>();
+        services.AddScoped<IPlatformProvisioningAlert, LoggingPlatformProvisioningAlert>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRoleRepository, RoleRepository>();
         services.AddScoped<IInvitationRepository, InvitationRepository>();

@@ -8,6 +8,9 @@ public static class IdentityEventExtensions
     public static Guid OrganizationId(this OrganizationVerifiedEvent @event)
         => ParseRequiredGuid(@event.organizationId, nameof(@event.organizationId));
 
+    public static Guid OrganizationId(this TenantModuleProvisionReportEvent @event)
+        => ParseRequiredGuid(@event.organizationId, nameof(@event.organizationId));
+
     public static Guid UserId(this UserDeactivatedEvent @event)
         => ParseRequiredGuid(@event.userId, nameof(@event.userId));
 
