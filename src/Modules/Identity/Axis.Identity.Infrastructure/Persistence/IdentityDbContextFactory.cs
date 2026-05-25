@@ -8,9 +8,18 @@ internal sealed class IdentityDbContextFactory : IDesignTimeDbContextFactory<Ide
 {
     public IdentityDbContext CreateDbContext(string[] args)
     {
+        string? connectionString =
+            Environment.GetEnvironmentVariable("ConnectionStrings__Identity")
+            ?? Environment.GetEnvironmentVariable("IDENTITY_CONNECTION_STRING");
+
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException(
+                "Set ConnectionStrings__Identity or IDENTITY_CONNECTION_STRING before running dotnet ef.");
+        }
+
         DbContextOptionsBuilder<IdentityDbContext> builder = new DbContextOptionsBuilder<IdentityDbContext>();
-        builder.UseNpgsql("Host=127.0.0.1;Database=axis_identity_design;Username=postgres;Password=postgres")
-            .UseOpenIddict();
+        builder.UseNpgsql(connectionString).UseOpenIddict();
         return new IdentityDbContext(builder.Options);
     }
 }
