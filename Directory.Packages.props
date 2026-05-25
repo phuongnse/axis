@@ -54,7 +54,7 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.16" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.16" />
     <!-- Npgsql + provider aligned on 9.0.4 (provider has no 9.0.5 yet) -->
-    <PackageVersion Include="Npgsql" Version="9.0.5" />
+    <PackageVersion Include="Npgsql" Version="10.0.2" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
     <PackageVersion Include="StackExchange.Redis" Version="2.13.1" />
     <!-- WolverineFx quint aligned (every member must move together — see
