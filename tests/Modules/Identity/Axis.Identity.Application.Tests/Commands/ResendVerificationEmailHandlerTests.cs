@@ -3,6 +3,7 @@ using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.ValueObjects;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
 using NSubstitute.ReturnsExtensions;
@@ -13,11 +14,12 @@ public class ResendVerificationEmailHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
     private readonly IEmailSender _emailSender = Substitute.For<IEmailSender>();
-    private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly IResendVerificationRateLimiter _rateLimiter = Substitute.For<IResendVerificationRateLimiter>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
 
-    private ResendVerificationEmailHandler CreateHandler() => new(_userRepo, _emailSender);
+    private ResendVerificationEmailHandler CreateHandler() =>
+        new(_userRepo, _emailSender, _rateLimiter);
 
     private static User MakeUnverifiedUser(string email = "alice@acme.com")
     {
@@ -31,6 +33,8 @@ public class ResendVerificationEmailHandlerTests
     {
         User user = MakeUnverifiedUser();
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).Returns(user);
+        _rateLimiter.TryRecordResendAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success());
 
         await CreateHandler().Handle(
             new ResendVerificationEmailCommand("alice@acme.com"),
@@ -66,6 +70,28 @@ public class ResendVerificationEmailHandlerTests
             new ResendVerificationEmailCommand("alice@acme.com"),
             CancellationToken.None);
 
+        await _emailSender.DidNotReceive().SendVerificationEmailAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _rateLimiter.DidNotReceive().TryRecordResendAsync(
+            Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ResendVerificationEmail_WhenRateLimited_ReturnsRateLimitedWithoutSendingEmail()
+    {
+        User user = MakeUnverifiedUser();
+        _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).Returns(user);
+        _rateLimiter.TryRecordResendAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Failure(
+                ErrorCodes.RateLimited,
+                "Please wait before requesting another email."));
+
+        Result result = await CreateHandler().Handle(
+            new ResendVerificationEmailCommand("alice@acme.com"),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.RateLimited);
         await _emailSender.DidNotReceive().SendVerificationEmailAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }

@@ -10,6 +10,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using OpenIddict.Abstractions;
 
 namespace Axis.Api.Endpoints;
@@ -30,6 +31,7 @@ public static class AuthEndpoints
 
         group.MapPost("/verify-email", VerifyEmail)
             .AllowAnonymous()
+            .RequireRateLimiting("auth")
             .WithName("VerifyEmail")
             .WithSummary("Verify email address with a one-time token")
             .WithTags("Identity")
@@ -38,6 +40,7 @@ public static class AuthEndpoints
 
         group.MapGet("/provisioning-status", GetProvisioningStatus)
             .AllowAnonymous()
+            .RequireRateLimiting("auth")
             .WithName("GetProvisioningStatus")
             .WithSummary("Poll tenant provisioning progress after email verification (US-003)")
             .WithTags("Identity")
@@ -46,13 +49,16 @@ public static class AuthEndpoints
 
         group.MapPost("/resend-verification", ResendVerification)
             .AllowAnonymous()
+            .RequireRateLimiting("auth")
             .WithName("ResendEmailVerification")
             .WithSummary("Resend email verification link")
             .WithTags("Identity")
-            .Produces(204);
+            .Produces(204)
+            .ProducesProblem(429);
 
         group.MapPost("/forgot-password", ForgotPassword)
             .AllowAnonymous()
+            .RequireRateLimiting("auth")
             .WithName("ForgotPassword")
             .WithSummary("Request a password reset link")
             .WithTags("Identity")
@@ -60,6 +66,7 @@ public static class AuthEndpoints
 
         group.MapPost("/reset-password", ResetPassword)
             .AllowAnonymous()
+            .RequireRateLimiting("auth")
             .WithName("ResetPassword")
             .WithSummary("Reset password using a one-time token")
             .WithTags("Identity")
@@ -134,7 +141,10 @@ public static class AuthEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        await mediator.Send(new ResendVerificationEmailCommand(request.Email), ct);
+        Result result = await mediator.Send(new ResendVerificationEmailCommand(request.Email), ct);
+        if (result.IsFailure)
+            return result.ToProblemDetails();
+
         return Results.NoContent();
     }
 

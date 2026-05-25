@@ -41,16 +41,20 @@ public static class OrganizationEndpoints
 
     private static async Task<IResult> Register(
         [FromBody] RegisterOrganizationRequest request,
+        HttpContext httpContext,
         ISender mediator,
         CancellationToken ct)
     {
+        string? idempotencyKey = httpContext.Request.Headers["Idempotency-Key"].FirstOrDefault();
+
         await mediator.Send(new RegisterOrganizationCommand(
             request.OrgName,
             request.AdminFirstName,
             request.AdminLastName,
             request.AdminEmail,
             request.Password,
-            request.PasswordConfirmation), ct);
+            request.PasswordConfirmation,
+            idempotencyKey), ct);
 
         // Per US-001: always return the same success screen — no email-existence leakage
         return Results.Ok(new

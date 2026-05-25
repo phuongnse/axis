@@ -12,6 +12,7 @@ public sealed class RegisterOrganizationHandler(
     IOrganizationRepository orgRepo,
     IUserRepository userRepo,
     IRoleRepository roleRepo,
+    IRegistrationIdempotencyRepository idempotencyRepo,
     IPasswordHasher hasher,
     IEmailSender emailSender,
     IUnitOfWork uow)
@@ -57,9 +58,17 @@ public sealed class RegisterOrganizationHandler(
 
     public async Task<Result> Handle(RegisterOrganizationCommand command, CancellationToken cancellationToken)
     {
+        if (!string.IsNullOrWhiteSpace(command.IdempotencyKey))
+        {
+            bool claimed = await idempotencyRepo.TryClaimAsync(command.IdempotencyKey, cancellationToken);
+            if (!claimed)
+                return Result.Success();
+        }
+
         // Per US-001: always show the same screen — no leakage if email already exists
         Result<Email> email = Email.Create(command.AdminEmail);
-        if (email.IsFailure) return Result.Success(); // validation layer handles this before handler is reached
+        if (email.IsFailure)
+            return Result.Success(); // validation layer handles this before handler is reached
 
         if (await userRepo.EmailExistsPlatformWideAsync(email.Value, cancellationToken))
             return Result.Success(); // silently succeed — same confirmation screen shown

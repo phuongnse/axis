@@ -51,7 +51,7 @@ Without this foundation, nothing else works. Every feature in every other epic r
 | Shared Domain | ✅ Done | `Entity`, `AggregateRoot`, `ValueObject`, `IDomainEvent`, `Result<T>` |
 | Shared Application | ✅ Done | `ICommand/IQuery`, `ICommandHandler/IQueryHandler`, `ValidationBehavior`, `ITenantContext` |
 | Shared Infrastructure | ✅ Done | `TenantSchemaInterceptor`, per-module `UnitOfWork` ([ADR-017](../../TECH_STACK.md#adr-017-axisshared-is-abstractions-only-no-shared-implementation)); **OpenTelemetry** host wiring on `Axis.Api` ([ADR-018](../../TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability), [patterns § OpenTelemetry](../../playbooks/patterns.md#opentelemetry-observability)) |
-| Tenant Registration (US-001–002) | ⚠️ Partial | Domain + Application + Infrastructure + API done (`POST /api/organizations/`, `/api/auth/verify-email`, `/api/auth/resend-verification`); Frontend ⏳. Gap: rate-limiting on resend (max 3/hr) pending |
+| Tenant Registration (US-001–002) | ⚠️ Partial | Domain + Application + Infrastructure + API done (`POST /api/organizations/` with `Idempotency-Key`, verify/resend auth endpoints, resend 3/email/hr); Frontend ⏳ |
 | Tenant Provisioning (US-003) | ⚠️ Partial | Kafka-driven per-module provisioning with `TenantSchemaProvisioner` helper, `TenantModuleProvisionReportEvent`, Identity coordinator (retry + alert), `tenant_module_provisions` tracking, `GET /api/auth/provisioning-status`. Frontend wait screen ⏳. |
 | Organization Management (F02) | ⏳ Pending | — |
 | Subscription Plans (F04) | ⏳ Pending | — |

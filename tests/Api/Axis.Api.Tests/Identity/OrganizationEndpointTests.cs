@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Axis.Api.Tests.Helpers;
@@ -13,6 +14,46 @@ namespace Axis.Api.Tests.Identity;
 public class OrganizationEndpointTests(ApiTestFixture fixture)
 {
     private static readonly JsonSerializerOptions Json = ApiTestFixture.JsonOptions;
+
+    private static object RegisterPayload(string suffix) => new
+    {
+        org_name = $"TestOrg{suffix}",
+        admin_first_name = "Test",
+        admin_last_name = "Admin",
+        admin_email = $"admin{suffix}@test.com",
+        password = "TestPass1",
+        password_confirmation = "TestPass1",
+    };
+
+    [Fact]
+    public async Task Register_WhenSameIdempotencyKeyTwice_CreatesOnlyOneOrganization()
+    {
+        string idempotencyKey = Guid.NewGuid().ToString();
+        object payload = RegisterPayload("idem1");
+
+        using HttpRequestMessage first = new(HttpMethod.Post, "/api/organizations")
+        {
+            Content = JsonContent.Create(payload, options: Json),
+        };
+        first.Headers.Add("Idempotency-Key", idempotencyKey);
+
+        using HttpRequestMessage second = new(HttpMethod.Post, "/api/organizations")
+        {
+            Content = JsonContent.Create(payload, options: Json),
+        };
+        second.Headers.Add("Idempotency-Key", idempotencyKey);
+
+        HttpResponseMessage firstResp = await fixture.Client.SendAsync(first);
+        HttpResponseMessage secondResp = await fixture.Client.SendAsync(second);
+
+        firstResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        secondResp.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using IServiceScope scope = fixture.CreateScope();
+        IdentityDbContext ctx = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        int orgCount = ctx.Organizations.Count(o => o.Name == "TestOrgidem1");
+        orgCount.Should().Be(1);
+    }
 
     // POST /api/organizations/me/invitations
 
