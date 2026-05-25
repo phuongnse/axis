@@ -81,7 +81,7 @@ Self-service registration flow where a new organization signs up and is automati
 - Automatic re-send after X minutes — not in MVP.
 
 > **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: auto sign-in after verification click pending Frontend. **Done:** resend rate limit 3/email/hour (Redis, HTTP 429 + message); login returns "Please verify your email" when unverified.
+> Gaps vs spec: auto sign-in after verification click pending Frontend. **Done:** resend rate limit 3/email/hour via `IResendVerificationRateLimiter` (Redis INCR per hashed email, HTTP 429 + message); login returns "Please verify your email" when unverified. IP-level `auth` limiter applies to `/connect/login` and Identity gRPC only — not on verify/resend (avoids starving integration tests).
 > Decisions: verification token is simplified as `user.Id` (Guid string) — `VerifyEmailCommand(token)` parses it as Guid, looks up user by ID platform-wide, calls `User.VerifyEmail()`. Production will use a dedicated token table; this is documented as a gap. `ResendVerificationEmailCommand` silently succeeds for unknown/already-verified emails (no info leakage).
 
 ---
