@@ -41,6 +41,10 @@ internal sealed class FormWorkflowDeletionGuard(
                 ErrorCodes.BusinessRule,
                 "Unable to verify workflow references for form deletion.");
         }
+        catch (RpcException ex) when (ex.StatusCode == StatusCode.Cancelled && cancellationToken.IsCancellationRequested)
+        {
+            throw new OperationCanceledException(cancellationToken);
+        }
         catch (RpcException ex) when (ex.StatusCode is StatusCode.DeadlineExceeded or StatusCode.Cancelled)
         {
             return Result.Failure(

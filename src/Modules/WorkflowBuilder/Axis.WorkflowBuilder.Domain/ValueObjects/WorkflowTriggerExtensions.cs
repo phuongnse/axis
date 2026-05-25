@@ -15,6 +15,9 @@ public static class WorkflowTriggerExtensions
         if (!trigger.Config.TryGetValue("modelId", out object? raw) || raw is null)
             return null;
 
-        return Guid.TryParse(raw.ToString(), out Guid id) ? id : null;
+        if (!Guid.TryParse(raw.ToString(), out Guid id) || id == Guid.Empty)
+            return null;
+
+        return id;
     }
 }

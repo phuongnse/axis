@@ -84,7 +84,7 @@ internal sealed class WorkflowReferenceSync(WorkflowBuilderDbContext context) : 
 
         HashSet<Guid> currentModelIds = workflow.Triggers
             .Select(t => t.TryGetEventModelId())
-            .Where(id => id.HasValue)
+            .Where(id => id.HasValue && id.Value != Guid.Empty)
             .Select(id => id!.Value)
             .ToHashSet();
 
