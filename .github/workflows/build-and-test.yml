@@ -232,12 +232,12 @@ jobs:
             exit 1
           fi
           if git rev-parse "${BASE_REF}:buf.yaml" >/dev/null 2>&1; then
-            buf breaking --against ".git#branch=${BASE_REF}"
+            buf breaking --against ".git#ref=${BASE_REF}"
           else
             echo "Base has no buf.yaml yet — per-module breaking against ${BASE_REF}"
             awk '/^[[:space:]]*- path: / { print $3 }' buf.yaml | while read -r dir; do
               echo "buf breaking ${dir}"
-              buf breaking "${dir}" --against ".git#branch=${BASE_REF},subdir=${dir}"
+              buf breaking "${dir}" --against ".git#ref=${BASE_REF},subdir=${dir}"
             done
           fi
 
