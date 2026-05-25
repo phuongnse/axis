@@ -46,7 +46,7 @@ public class PublishWorkflowHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         wf.Status.Should().Be(WorkflowStatus.Active);
-        await _uow.Received(2).SaveChangesAsync(Arg.Any<CancellationToken>());
+        await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -110,6 +110,6 @@ public class PublishWorkflowHandlerTests
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
         result.Error.Should().Contain("broken");
-        await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 }

@@ -22,7 +22,6 @@ public sealed class PublishWorkflowHandler(
             return Result.Failure(ErrorCodes.NotFound, "Workflow not found.");
 
         await referenceSync.SyncAsync(workflow, cancellationToken);
-        await uow.SaveChangesAsync(cancellationToken);
 
         if (await referenceRepo.HasBrokenReferencesAsync(workflow.Id, cancellationToken))
         {

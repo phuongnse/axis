@@ -1,5 +1,6 @@
 using Axis.WorkflowBuilder.Application.Repositories;
 using Axis.WorkflowBuilder.Domain.Enums;
+using Axis.WorkflowBuilder.Domain.ReadModels;
 using Axis.WorkflowBuilder.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,14 +10,19 @@ internal sealed class WorkflowReferenceRepository(WorkflowBuilderDbContext conte
 {
     public async Task<bool> HasBrokenReferencesAsync(Guid workflowId, CancellationToken cancellationToken = default)
     {
-        bool brokenForm = await context.WorkflowFormReferences
-            .AnyAsync(r => r.WorkflowId == workflowId && r.IsBroken, cancellationToken);
+        // Materialize so pending sync changes on tracked rows are visible (AnyAsync is SQL-only).
+        List<WorkflowFormReference> formRefs = await context.WorkflowFormReferences
+            .Where(r => r.WorkflowId == workflowId)
+            .ToListAsync(cancellationToken);
 
-        if (brokenForm)
+        if (formRefs.Any(r => r.IsBroken))
             return true;
 
-        return await context.WorkflowModelReferences
-            .AnyAsync(r => r.WorkflowId == workflowId && r.IsBroken, cancellationToken);
+        List<WorkflowModelReference> modelRefs = await context.WorkflowModelReferences
+            .Where(r => r.WorkflowId == workflowId)
+            .ToListAsync(cancellationToken);
+
+        return modelRefs.Any(r => r.IsBroken);
     }
 
     public async Task<int> CountBlockingFormReferencesAsync(
