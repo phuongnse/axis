@@ -35,7 +35,7 @@ Docs touched: docs/epics/…
 | **0** | AC map + docs touched (when `src/`, `tests/`, or `frontend/` change) |
 | **1** | Full .NET + frontend verification (table below) |
 | **2** | Doc walk-through (rows below) |
-| **3** | Retrospective (seven questions) |
+| **3** | Retrospective (questions below) |
 
 **CI-only gates** (run automatically on PR, no local action required):
 
@@ -97,10 +97,25 @@ Gate 2:
 
 **Deferred follow-ups (mandatory when leaving work open):** do not wait for the user. Any skipped review item, thin-endpoint refactor, or partial layer needs a named `**Deferred (...):**` line — full rules in [process.md § Deferred follow-up](process.md). Remove the line when fixed.
 
+### Review feedback (CodeRabbit / human)
+
+Apply **before** resolving review threads (no user reminder required). Bots are **signal**, not authority — validate against [patterns.md](./patterns.md) and [CLAUDE.md](../../CLAUDE.md).
+
+Do **not** ship the first diff that only makes CI green or closes the thread. For each comment, ask:
+
+1. **Is this already best practice** for this codebase (patterns, layer boundaries, siblings in the same module)?
+2. **Can I improve or enhance** beyond what the reviewer suggested (clearer ownership, fewer round-trips, one transaction boundary, consistent error handling)?
+3. If a better design is feasible but skipped, is that a deliberate **minimal diff** (user asked) or should it be **`**Deferred (...):**`**?
+
+**Default:** prefer the design you would defend in review. **Exception:** user explicitly requests the smallest change — say so in the PR Summary.
+
+**PR Summary (one line when review fixes are non-trivial):** `Review fixes: improved — <what>` or `Review fixes: minimal — <why>`.
+
+**Examples** (illustrative — not an exhaustive list): splitting an invariant across “mutate then query”; external calls with catch-only patches; duplicating logic to silence a linter. In those cases, look for a single owner of the invariant or parity with existing guards/handlers in the repo.
 
 ### Gate 3 — retrospective
 
-Answer **Yes** or **No** on **each line** (same `-` bullet style as Gate 2 — do not collapse to `1–7 No`). If **Yes**, name the doc updated in this PR.
+Answer **Yes** or **No** on **each line** (same `-` bullet style as Gate 2 — do not collapse to a single `No`). If **Yes**, name the doc updated in this PR.
 
 ```text
 Gate 3:
@@ -109,6 +124,7 @@ Gate 3:
 - Infrastructure footgun? → No
 - Non-obvious test setup? → No
 - Changed direction mid-task? → No
+- Review-driven change left as a shortcut when a better design was feasible? → No
 - Spec gap discovered? → No
 - Incident-level detail in rule text? → No
 ```

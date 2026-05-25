@@ -6,7 +6,10 @@ using Axis.WorkflowBuilder.Domain.Aggregates;
 
 namespace Axis.WorkflowBuilder.Application.Commands.AddTrigger;
 
-public sealed class AddTriggerHandler(IWorkflowRepository workflowRepo, IUnitOfWork uow)
+public sealed class AddTriggerHandler(
+    IWorkflowRepository workflowRepo,
+    IWorkflowReferenceSync referenceSync,
+    IUnitOfWork uow)
     : ICommandHandler<AddTriggerCommand>
 {
     public async Task<Result> Handle(AddTriggerCommand command, CancellationToken cancellationToken)
@@ -27,6 +30,7 @@ public sealed class AddTriggerHandler(IWorkflowRepository workflowRepo, IUnitOfW
                 $"A {command.TriggerType} trigger is already configured on this workflow.");
         }
 
+        await referenceSync.SyncAsync(workflow, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }

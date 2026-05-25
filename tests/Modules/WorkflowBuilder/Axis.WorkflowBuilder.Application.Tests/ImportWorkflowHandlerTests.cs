@@ -17,7 +17,15 @@ public class ImportWorkflowHandlerTests
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly ImportWorkflowHandler _handler;
 
-    public ImportWorkflowHandlerTests() => _handler = new ImportWorkflowHandler(_repo, _uow);
+    private readonly IWorkflowReferenceSync _referenceSync = Substitute.For<IWorkflowReferenceSync>();
+
+    public ImportWorkflowHandlerTests()
+    {
+        _referenceSync
+            .SyncAsync(Arg.Any<WorkflowDefinition>(), Arg.Any<CancellationToken>())
+            .Returns(new WorkflowReferenceSyncResult(HasBrokenReferences: false));
+        _handler = new ImportWorkflowHandler(_repo, _referenceSync, _uow);
+    }
 
     private static WorkflowExportDto BuildExportDto(string name = "Imported Workflow") =>
         new(

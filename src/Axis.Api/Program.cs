@@ -182,6 +182,8 @@ try
                     o, FormBuilderKafkaTopics.FormTaskSubmitted, serializer);
                 WolverineKafkaAvroExtensions.PublishAndListenWithAvro<FormTaskExpiredEvent>(
                     o, FormBuilderKafkaTopics.FormTaskExpired, serializer);
+                WolverineKafkaAvroExtensions.PublishAndListenWithAvro<FormDeletedEvent>(
+                    o, FormBuilderKafkaTopics.FormDeleted, serializer);
 
                 WolverineKafkaAvroExtensions.PublishAndListenWithAvro<ModelCreatedEvent>(
                     o, DataModelingKafkaTopics.ModelCreated, serializer);
@@ -217,6 +219,7 @@ try
                 WolverineKafkaAvroExtensions.PublishLocally<FormStepReachedEvent>(o);
                 WolverineKafkaAvroExtensions.PublishLocally<FormTaskSubmittedEvent>(o);
                 WolverineKafkaAvroExtensions.PublishLocally<FormTaskExpiredEvent>(o);
+                WolverineKafkaAvroExtensions.PublishLocally<FormDeletedEvent>(o);
 
                 WolverineKafkaAvroExtensions.PublishLocally<ModelCreatedEvent>(o);
                 WolverineKafkaAvroExtensions.PublishLocally<ModelDeletedEvent>(o);
@@ -493,6 +496,7 @@ try
 
     app.MapIdentityGrpc();
     app.MapFormBuilderGrpc();
+    app.MapWorkflowBuilderGrpc();
 
     app.Run();
 }

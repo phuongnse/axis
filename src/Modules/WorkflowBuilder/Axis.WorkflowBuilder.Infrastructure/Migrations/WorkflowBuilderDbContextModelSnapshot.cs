@@ -91,6 +91,64 @@ namespace Axis.WorkflowBuilder.Infrastructure.Migrations
 
                     b.ToTable("workflow_definitions", (string)null);
                 });
+
+            modelBuilder.Entity("Axis.WorkflowBuilder.Domain.ReadModels.WorkflowFormReference", b =>
+                {
+                    b.Property<Guid>("WorkflowId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workflow_id");
+
+                    b.Property<Guid>("StepId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("step_id");
+
+                    b.Property<Guid>("FormId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_id");
+
+                    b.Property<bool>("IsBroken")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_broken");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.HasKey("WorkflowId", "StepId");
+
+                    b.HasIndex("FormId");
+
+                    b.HasIndex("OrganizationId", "FormId");
+
+                    b.ToTable("workflow_form_references", (string)null);
+                });
+
+            modelBuilder.Entity("Axis.WorkflowBuilder.Domain.ReadModels.WorkflowModelReference", b =>
+                {
+                    b.Property<Guid>("WorkflowId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workflow_id");
+
+                    b.Property<bool>("IsBroken")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_broken");
+
+                    b.Property<Guid>("ModelId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("model_id");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.HasKey("WorkflowId", "ModelId");
+
+                    b.HasIndex("ModelId");
+
+                    b.HasIndex("OrganizationId", "ModelId");
+
+                    b.ToTable("workflow_model_references", (string)null);
+                });
 #pragma warning restore 612, 618
         }
     }

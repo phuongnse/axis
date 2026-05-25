@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Axis.DataModeling.Infrastructure.Persistence;
 using Axis.FormBuilder.Contracts.Grpc;
+using Axis.WorkflowBuilder.Contracts.Grpc;
 using Axis.FormBuilder.Infrastructure.Persistence;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Infrastructure.Persistence;
@@ -153,6 +154,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
                     ["ConnectionStrings:WorkflowEngine"] = _workflowEngineConnectionString,
                     ["Redis:ConnectionString"] = _redis.GetConnectionString(),
                     ["Modules:FormBuilder:GrpcUrl"] = "http://localhost",
+                    ["Modules:WorkflowBuilder:GrpcUrl"] = "http://localhost",
                 });
             });
 
@@ -160,6 +162,12 @@ public sealed class ApiTestFixture : IAsyncLifetime
             {
                 services.RemoveAll<FormModelReferenceService.FormModelReferenceServiceClient>();
                 services.AddGrpcClient<FormModelReferenceService.FormModelReferenceServiceClient>(options =>
+                {
+                    options.Address = new Uri("http://localhost");
+                })
+                .ConfigurePrimaryHttpMessageHandler(() => grpcTestServerHandler.Value);
+                services.RemoveAll<WorkflowFormReferenceService.WorkflowFormReferenceServiceClient>();
+                services.AddGrpcClient<WorkflowFormReferenceService.WorkflowFormReferenceServiceClient>(options =>
                 {
                     options.Address = new Uri("http://localhost");
                 })

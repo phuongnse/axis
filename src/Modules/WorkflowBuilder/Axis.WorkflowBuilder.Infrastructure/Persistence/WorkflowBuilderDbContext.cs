@@ -1,6 +1,7 @@
 using Axis.Shared.Application.Tenancy;
 using Axis.Shared.Infrastructure.Persistence;
 using Axis.WorkflowBuilder.Domain.Aggregates;
+using Axis.WorkflowBuilder.Domain.ReadModels;
 using Axis.WorkflowBuilder.Infrastructure.Persistence.Configurations;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,6 +12,8 @@ internal sealed class WorkflowBuilderDbContext(
     ITenantContext tenantContext) : DbContext(options)
 {
     public DbSet<WorkflowDefinition> WorkflowDefinitions => Set<WorkflowDefinition>();
+    public DbSet<WorkflowFormReference> WorkflowFormReferences => Set<WorkflowFormReference>();
+    public DbSet<WorkflowModelReference> WorkflowModelReferences => Set<WorkflowModelReference>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -21,5 +24,7 @@ internal sealed class WorkflowBuilderDbContext(
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfiguration(new WorkflowDefinitionConfiguration());
+        modelBuilder.ApplyConfiguration(new WorkflowFormReferenceConfiguration());
+        modelBuilder.ApplyConfiguration(new WorkflowModelReferenceConfiguration());
     }
 }

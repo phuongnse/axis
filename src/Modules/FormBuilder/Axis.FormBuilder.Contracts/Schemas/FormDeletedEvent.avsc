@@ -1,0 +1,15 @@
+{
+  "namespace": "axis.formbuilder.events",
+  "type": "record",
+  "name": "FormDeletedEvent",
+  "fields": [
+    {
+      "name": "formId",
+      "type": "string"
+    },
+    {
+      "name": "organizationId",
+      "type": "string"
+    }
+  ]
+}
