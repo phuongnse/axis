@@ -66,8 +66,10 @@ internal static class TenantProvisioningCoordinator
         IReadOnlyList<TenantModuleProvisioning> all =
             await provisioningRepo.GetAllForOrganizationAsync(organizationId, cancellationToken);
 
-        if (all.Count > 0
-            && all.All(p => p.Status == TenantModuleProvisioningStatus.Succeeded)
+        if (TenantModuleNames.All.All(moduleName =>
+                all.Any(p =>
+                    p.Module == moduleName
+                    && p.Status == TenantModuleProvisioningStatus.Succeeded))
             && organization.Status == OrganizationStatus.Provisioning)
         {
             organization.CompleteProvisioning();

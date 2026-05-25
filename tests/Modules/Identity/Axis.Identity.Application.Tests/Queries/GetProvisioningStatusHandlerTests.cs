@@ -103,6 +103,29 @@ public sealed class GetProvisioningStatusHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WhenOnlySubsetOfModulesSucceeded_ReturnsNotReady()
+    {
+        (User user, Organization organization) = MakeVerifiedUserWithOrg();
+        TenantModuleProvisioning succeeded = TenantModuleProvisioning.CreatePending(
+            organization.Id,
+            TenantModuleNames.DataModeling);
+        succeeded.RecordSuccess();
+        IReadOnlyList<TenantModuleProvisioning> modules = [succeeded];
+
+        _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
+        _organizationRepo.GetByIdAsync(organization.Id, Arg.Any<CancellationToken>()).Returns(organization);
+        _provisioningRepo.GetAllForOrganizationAsync(organization.Id, Arg.Any<CancellationToken>())
+            .Returns(modules);
+
+        ProvisioningStatusDto? dto = await CreateHandler().Handle(
+            new GetProvisioningStatusQuery(user.Id.ToString()),
+            CancellationToken.None);
+
+        dto.Should().NotBeNull();
+        dto!.IsReady.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Handle_WhenOrganizationStillProvisioning_ReturnsNotReady()
     {
         (User user, Organization organization) = MakeVerifiedUserWithOrg();

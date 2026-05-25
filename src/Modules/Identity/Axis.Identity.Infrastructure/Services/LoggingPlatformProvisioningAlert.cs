@@ -15,8 +15,10 @@ internal sealed class LoggingPlatformProvisioningAlert(ILogger<LoggingPlatformPr
         CancellationToken cancellationToken = default)
     {
         logger.LogCritical(
-            "Tenant provisioning failed for organization {OrganizationId} module {Module} after {AttemptCount} attempts. Last error: {LastError}",
-            organizationId, module, attemptCount, lastError);
+            "Tenant provisioning failed for module {Module} after {AttemptCount} attempts. Last error: {LastError}",
+            module,
+            attemptCount,
+            lastError);
         return Task.CompletedTask;
     }
 }

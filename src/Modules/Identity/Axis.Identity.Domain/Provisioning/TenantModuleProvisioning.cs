@@ -32,13 +32,20 @@ public sealed class TenantModuleProvisioning : Entity<(Guid OrganizationId, stri
     }
 
     public static TenantModuleProvisioning CreatePending(Guid organizationId, string module)
-        => new(
+    {
+        if (organizationId == Guid.Empty)
+            throw new ArgumentException("Organization id is required.", nameof(organizationId));
+        if (string.IsNullOrWhiteSpace(module))
+            throw new ArgumentException("Module name is required.", nameof(module));
+
+        return new(
             organizationId,
             module,
             TenantModuleProvisioningStatus.Pending,
             attemptCount: 0,
             lastError: null,
             DateTimeOffset.UtcNow);
+    }
 
     public void RecordSuccess()
     {
@@ -49,6 +56,11 @@ public sealed class TenantModuleProvisioning : Entity<(Guid OrganizationId, stri
 
     public void RecordFailure(string error, int attemptCount)
     {
+        if (string.IsNullOrWhiteSpace(error))
+            throw new ArgumentException("Error message is required.", nameof(error));
+        if (attemptCount < 1)
+            throw new ArgumentException("Attempt count must be at least 1.", nameof(attemptCount));
+
         Status = TenantModuleProvisioningStatus.Failed;
         AttemptCount = attemptCount;
         LastError = error;

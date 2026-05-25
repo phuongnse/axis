@@ -38,6 +38,7 @@ internal static class TenantModuleProvisionAttempt
                 TenantModuleNames.DataModeling,
                 cancellationToken);
 
+            cancellationToken.ThrowIfCancellationRequested();
             await messageBus.PublishAsync(
                 TenantModuleProvisionReportEventFactory.Create(
                     organizationId, TenantModuleNames.DataModeling, succeeded: true, attempt));
@@ -46,10 +47,10 @@ internal static class TenantModuleProvisionAttempt
         {
             logger.LogError(
                 ex,
-                "DataModeling tenant provisioning failed for organization {OrganizationId} attempt {Attempt}",
-                organizationId,
+                "DataModeling tenant provisioning failed on attempt {Attempt}",
                 attempt);
 
+            cancellationToken.ThrowIfCancellationRequested();
             await messageBus.PublishAsync(
                 TenantModuleProvisionReportEventFactory.Create(
                     organizationId,

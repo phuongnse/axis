@@ -9,6 +9,9 @@ namespace Axis.Shared.Infrastructure.Tenancy;
 /// </summary>
 public static class TenantSchemaProvisioner
 {
+    private const int MaxAdvisoryLockAttempts = 30;
+    private static readonly TimeSpan AdvisoryLockRetryDelay = TimeSpan.FromMilliseconds(100);
+
     public static async Task ProvisionAsync(
         string connectionString,
         string advisoryLockKey,
@@ -23,10 +26,7 @@ public static class TenantSchemaProvisioner
         await using NpgsqlConnection connection = new(connectionString);
         await connection.OpenAsync(cancellationToken);
 
-        await using NpgsqlCommand acquireLock = connection.CreateCommand();
-        acquireLock.CommandText = "SELECT pg_advisory_lock(hashtextextended(@key, 0));";
-        acquireLock.Parameters.AddWithValue("key", advisoryLockKey);
-        await acquireLock.ExecuteNonQueryAsync(cancellationToken);
+        await AcquireAdvisoryLockAsync(connection, advisoryLockKey, moduleName, cancellationToken);
 
         await using NpgsqlCommand createSchema = connection.CreateCommand();
         createSchema.CommandText = $"""CREATE SCHEMA IF NOT EXISTS "{schema}";""";
@@ -35,8 +35,34 @@ public static class TenantSchemaProvisioner
         await migrateTenantSchemaAsync(cancellationToken);
 
         logger.LogInformation(
-            "{Module} tenant schema {Schema} provisioned for organization {OrganizationId}",
-            moduleName, schema, organizationId);
+            "{Module} tenant schema {Schema} provisioned",
+            moduleName,
+            schema);
+    }
+
+    private static async Task AcquireAdvisoryLockAsync(
+        NpgsqlConnection connection,
+        string advisoryLockKey,
+        string moduleName,
+        CancellationToken cancellationToken)
+    {
+        for (int attempt = 1; attempt <= MaxAdvisoryLockAttempts; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            await using NpgsqlCommand tryLock = connection.CreateCommand();
+            tryLock.CommandText = "SELECT pg_try_advisory_lock(hashtextextended(@key, 0));";
+            tryLock.Parameters.AddWithValue("key", advisoryLockKey);
+            object? result = await tryLock.ExecuteScalarAsync(cancellationToken);
+            if (result is bool acquired && acquired)
+                return;
+
+            if (attempt < MaxAdvisoryLockAttempts)
+                await Task.Delay(AdvisoryLockRetryDelay, cancellationToken);
+        }
+
+        throw new InvalidOperationException(
+            $"Could not acquire tenant provisioning advisory lock for module '{moduleName}' after {MaxAdvisoryLockAttempts} attempts.");
     }
 
     public static async Task MigrateWithFixedTenantAsync<TContext>(
@@ -46,7 +72,6 @@ public static class TenantSchemaProvisioner
         CancellationToken cancellationToken)
         where TContext : DbContext
     {
-        FixedTenantContext tenantContext = new(organizationId);
         DbContextOptionsBuilder<TContext> optionsBuilder = new();
         optionsBuilder.UseNpgsql(connectionString);
         await using TContext context = createContext(optionsBuilder.Options);

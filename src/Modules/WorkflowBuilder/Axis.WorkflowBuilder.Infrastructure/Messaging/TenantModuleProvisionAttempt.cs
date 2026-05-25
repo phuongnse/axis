@@ -37,6 +37,7 @@ internal static class TenantModuleProvisionAttempt
                 TenantModuleNames.WorkflowBuilder,
                 cancellationToken);
 
+            cancellationToken.ThrowIfCancellationRequested();
             await messageBus.PublishAsync(
                 TenantModuleProvisionReportEventFactory.Create(
                     organizationId, TenantModuleNames.WorkflowBuilder, succeeded: true, attempt));
@@ -45,10 +46,10 @@ internal static class TenantModuleProvisionAttempt
         {
             logger.LogError(
                 ex,
-                "WorkflowBuilder tenant provisioning failed for organization {OrganizationId} attempt {Attempt}",
-                organizationId,
+                "WorkflowBuilder tenant provisioning failed on attempt {Attempt}",
                 attempt);
 
+            cancellationToken.ThrowIfCancellationRequested();
             await messageBus.PublishAsync(
                 TenantModuleProvisionReportEventFactory.Create(
                     organizationId,

@@ -1,4 +1,5 @@
 using Axis.Identity.Application.Repositories;
+using Axis.Identity.Contracts;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.Provisioning;
 using Axis.Shared.Application.CQRS;
@@ -30,8 +31,10 @@ public sealed class GetProvisioningStatusHandler(
             await provisioningRepo.GetAllForOrganizationAsync(user.OrganizationId, cancellationToken);
 
         bool isReady = organization.Status == OrganizationStatus.Active
-            && modules.Count > 0
-            && modules.All(m => m.Status == TenantModuleProvisioningStatus.Succeeded);
+            && TenantModuleNames.All.All(moduleName =>
+                modules.Any(m =>
+                    m.Module == moduleName
+                    && m.Status == TenantModuleProvisioningStatus.Succeeded));
 
         return new ProvisioningStatusDto(
             organization.Id,
