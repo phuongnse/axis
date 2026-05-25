@@ -13,12 +13,15 @@ namespace Axis.WorkflowBuilder.Application.Tests.Commands;
 public class PublishWorkflowHandlerTests
 {
     private readonly IWorkflowRepository _workflowRepo = Substitute.For<IWorkflowRepository>();
+    private readonly IWorkflowReferenceRepository _referenceRepo = Substitute.For<IWorkflowReferenceRepository>();
+    private readonly IWorkflowReferenceSync _referenceSync = Substitute.For<IWorkflowReferenceSync>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
     private const string UserId = "user-123";
 
-    private PublishWorkflowHandler CreateHandler() => new(_workflowRepo, _uow);
+    private PublishWorkflowHandler CreateHandler() =>
+        new(_workflowRepo, _referenceRepo, _referenceSync, _uow);
 
     private static WorkflowDefinition MakePublishableWorkflow()
     {
@@ -37,6 +40,7 @@ public class PublishWorkflowHandlerTests
     {
         WorkflowDefinition wf = MakePublishableWorkflow();
         _workflowRepo.GetByIdAsync(wf.Id, OrgId).Returns(wf);
+        _referenceRepo.HasBrokenReferencesAsync(wf.Id, Arg.Any<CancellationToken>()).Returns(false);
 
         Result result = await CreateHandler().Handle(new PublishWorkflowCommand(wf.Id, OrgId), CancellationToken.None);
 
@@ -90,5 +94,22 @@ public class PublishWorkflowHandlerTests
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
         result.Error.Should().Contain("trigger");
+    }
+
+    [Fact]
+    public async Task PublishWorkflow_WhenBrokenReferencesExist_ReturnsBusinessRuleFailure()
+    {
+        WorkflowDefinition wf = MakePublishableWorkflow();
+        _workflowRepo.GetByIdAsync(wf.Id, OrgId).Returns(wf);
+        _referenceRepo.HasBrokenReferencesAsync(wf.Id, Arg.Any<CancellationToken>()).Returns(true);
+
+        Result result = await CreateHandler().Handle(
+            new PublishWorkflowCommand(wf.Id, OrgId),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.Error.Should().Contain("broken");
+        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 }

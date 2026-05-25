@@ -6,7 +6,10 @@ using Axis.WorkflowBuilder.Domain.Aggregates;
 
 namespace Axis.WorkflowBuilder.Application.Commands.ConfigureStep;
 
-public sealed class ConfigureStepHandler(IWorkflowRepository workflowRepo, IUnitOfWork uow)
+public sealed class ConfigureStepHandler(
+    IWorkflowRepository workflowRepo,
+    IWorkflowReferenceSync referenceSync,
+    IUnitOfWork uow)
     : ICommandHandler<ConfigureStepCommand>
 {
     public async Task<Result> Handle(ConfigureStepCommand command, CancellationToken cancellationToken)
@@ -26,6 +29,7 @@ public sealed class ConfigureStepHandler(IWorkflowRepository workflowRepo, IUnit
             return Result.Failure(ErrorCodes.BusinessRule, ex.Message);
         }
 
+        await referenceSync.SyncAsync(workflow, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }

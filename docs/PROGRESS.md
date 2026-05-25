@@ -13,7 +13,7 @@ Foundation phases (each a sequence of small PRs):
 |---|---|---|
 | **Phase 0 — Foundation decisions** | ✅ done (PR #59) | Rewrote ADR-001/002/009; added ADR-010..023; updated `ARCHITECTURE.md` + `CLAUDE.md` + `patterns.md`. |
 | **Phase 1 — Infrastructure foundation** | ✅ done | PR #83–#90: Kafka/RabbitMQ (ADR-017), per-module DBs (ADR-011), Wolverine enroll (ADR-012), migrations (ADR-023), OpenTelemetry (ADR-018), **Avro + Schema Registry + CloudEvents** for WorkflowBuilder lifecycle events (ADR-019). |
-| **Phase 2 — Per-module HTTP/gRPC boundary** | ⚠️ in progress | Identity complete: `Axis.Identity.Contracts` + `IdentityService` gRPC (`GetUserPermissions`) + Avro lifecycle events (`OrganizationVerifiedEvent`, `UserDeactivatedEvent`, `UserReactivatedEvent`, `RoleAssignedEvent`, `RoleRemovedEvent`) + per-module `OrganizationVerifiedHandler` (provisions each module's tenant schema from Kafka) + gateway `IdentityServiceClient` gRPC wiring. Remaining: DataModeling/FormBuilder/WorkflowBuilder/WorkflowEngine `Axis.{Module}.Contracts` projects with their own events. |
+| **Phase 2 — Per-module HTTP/gRPC boundary** | ⚠️ in progress | All MVP modules have `Axis.{Module}.Contracts` + Kafka Avro events. Identity + FormBuilder gRPC services wired. WorkflowBuilder `WorkflowFormReferenceService` gRPC + `FormDeletedEvent` Kafka. **Deferred:** DataModeling gRPC. |
 | **Phase 3 — Per-module EF migrations** | ⚠️ in progress | Identity, DataModeling, FormBuilder, WorkflowBuilder, WorkflowEngine have migrations; tests use `MigrateAsync`. PageBuilder pending (module not started). |
 | **Phase 4 — Deployment readiness** | ⏳ pending | Per-module Dockerfile; `docker-compose.dev.yml` runs each module as a separate container; CI builds per-module artifacts; K8s manifests; per-module Vault policies. |
 
@@ -39,19 +39,19 @@ Full auth, user, role, invitation, and session management. OpenIddict 5.x OIDC s
 
 ## DataModeling — E03-data-modeling
 
-**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳ · Service-boundary retrofit ⏳**
+**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳ · Service-boundary retrofit ✅**
 
 Custom model, field, data class, and record CRUD. Full-text search, per-field JSONB filters, sort-by-column, bulk delete, CSV export. All endpoints covered by integration tests.
 
-> ⏳ **Retrofit:** add `Axis.DataModeling.Contracts` (gRPC + Avro events for `ModelCreated`/`FieldAdded`/...); move to `axis_datamodeling` database; generate initial EF migration; switch tests to migrations.
+> ✅ **Contracts + Kafka:** `Axis.DataModeling.Contracts` publishes lifecycle events; FormBuilder + WorkflowBuilder consume `ModelDeletedEvent` for broken refs. **Deferred:** relation fields on other models flagged broken when target model deleted.
 
 ## WorkflowBuilder — E04-workflow-builder
 
-**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳ · Service-boundary retrofit ⏳**
+**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳ · Service-boundary retrofit ⚠️**
 
 Workflow definitions with steps, transitions, triggers, cycle detection, publish/archive lifecycle. Import/export (JSON + ZIP). All endpoints covered by integration tests.
 
-> ⏳ **Retrofit:** add `Axis.WorkflowBuilder.Contracts`; existing cross-module events (`FormStepAdded`, `WorkflowPublished`, ...) become Kafka-published with Avro schemas; move to `axis_workflowbuilder` database; existing EF migrations stay but tests switch from `EnsureCreated` to `MigrateAsync`.
+> ✅ **Broken refs:** `workflow_form_references` + `workflow_model_references` read models; sync on step/trigger changes; `ModelDeletedHandler` + `FormDeletedHandler` (Kafka); publish blocked when broken; `GetWorkflow` exposes `isBroken`; `WorkflowFormReferenceService` gRPC for form delete guard (draft + active workflows).
 
 ## FormBuilder — E05-form-builder
 
@@ -59,7 +59,7 @@ Workflow definitions with steps, transitions, triggers, cycle detection, publish
 
 Form definitions + F04 form tasks (`FormSubmission`, token submit, my tasks, expiry job). Submission user resolved via `ICurrentUser` in Application.
 
-> ✅ **Phase 2 Contracts:** Avro form-task events; `form_model_references` + `ModelDeletedHandler` (DataModeling Kafka) for Relation Picker broken refs; delete-model blocked when active form references exist. **Deferred:** gRPC service.
+> ✅ **Phase 2 Contracts:** Avro form-task + `FormDeletedEvent`; `form_model_references` + `ModelDeletedHandler`; delete-model guard via FormBuilder gRPC; delete-form guard via WorkflowBuilder gRPC (`WorkflowFormReferenceService`).
 
 ## WorkflowEngine — E06-workflow-engine
 

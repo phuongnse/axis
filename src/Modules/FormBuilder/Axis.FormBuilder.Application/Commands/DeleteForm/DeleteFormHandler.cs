@@ -9,6 +9,7 @@ namespace Axis.FormBuilder.Application.Commands.DeleteForm;
 /// <summary>US-078: Guards against referenced forms; soft-deletes if safe.</summary>
 public sealed class DeleteFormHandler(
     IFormRepository formRepo,
+    IFormDeletionGuard formDeletionGuard,
     IUnitOfWork uow)
     : ICommandHandler<DeleteFormCommand>
 {
@@ -18,10 +19,10 @@ public sealed class DeleteFormHandler(
         if (form is null)
             return Result.Failure(ErrorCodes.NotFound, "Form not found.");
 
-        // US-078: cannot delete if referenced by non-Archived workflow steps
-        if (await formRepo.IsReferencedByWorkflowAsync(command.FormId, cancellationToken))
-            return Result.Failure(ErrorCodes.BusinessRule,
-                "This form is referenced by one or more active workflow steps. Remove those references before deleting.");
+        Result guardResult = await formDeletionGuard.ValidateCanDeleteAsync(
+            command.FormId, command.OrganizationId, cancellationToken);
+        if (guardResult.IsFailure)
+            return guardResult;
 
         form.Delete();
         await uow.SaveChangesAsync(cancellationToken);

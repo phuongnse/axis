@@ -9,7 +9,10 @@ using Axis.WorkflowBuilder.Domain.Enums;
 
 namespace Axis.WorkflowBuilder.Application.Commands.ImportWorkflow;
 
-public sealed class ImportWorkflowHandler(IWorkflowRepository workflowRepo, IUnitOfWork uow)
+public sealed class ImportWorkflowHandler(
+    IWorkflowRepository workflowRepo,
+    IWorkflowReferenceSync referenceSync,
+    IUnitOfWork uow)
     : ICommandHandler<ImportWorkflowCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(ImportWorkflowCommand command, CancellationToken cancellationToken)
@@ -28,6 +31,7 @@ public sealed class ImportWorkflowHandler(IWorkflowRepository workflowRepo, IUni
         ImportTriggers(workflow, data.Triggers);
 
         await workflowRepo.AddAsync(workflow, cancellationToken);
+        await referenceSync.SyncAsync(workflow, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);
         return workflow.Id;
     }

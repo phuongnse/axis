@@ -1,6 +1,7 @@
 using Axis.FormBuilder.Application.Repositories;
 using Axis.FormBuilder.Application.Services;
 using Axis.FormBuilder.Infrastructure.Grpc;
+using Axis.WorkflowBuilder.Contracts.Grpc;
 using Axis.FormBuilder.Infrastructure.Persistence;
 using Axis.FormBuilder.Infrastructure.Repositories;
 using Axis.FormBuilder.Infrastructure.Services;
@@ -24,7 +25,20 @@ public static class FormBuilderInfrastructureExtensions
         services.AddScoped<IFormSubmissionRepository, FormSubmissionRepository>();
         services.AddScoped<IFormModelReferenceRepository, FormModelReferenceRepository>();
         services.AddScoped<IFormModelReferenceSync, FormModelReferenceSync>();
+        services.AddScoped<IFormDeletionGuard, FormWorkflowDeletionGuard>();
         services.AddScoped<IUnitOfWork, FormBuilderUnitOfWork>();
+
+        string? workflowBuilderGrpcUrl = configuration["Modules:WorkflowBuilder:GrpcUrl"];
+        if (string.IsNullOrWhiteSpace(workflowBuilderGrpcUrl))
+        {
+            throw new InvalidOperationException(
+                "Missing configuration 'Modules:WorkflowBuilder:GrpcUrl'.");
+        }
+
+        services.AddGrpcClient<WorkflowFormReferenceService.WorkflowFormReferenceServiceClient>(opts =>
+        {
+            opts.Address = new Uri(workflowBuilderGrpcUrl);
+        });
 
         services.AddGrpc();
 

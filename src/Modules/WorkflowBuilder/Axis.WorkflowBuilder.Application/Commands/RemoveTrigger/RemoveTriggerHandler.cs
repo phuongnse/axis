@@ -6,7 +6,10 @@ using Axis.WorkflowBuilder.Domain.Aggregates;
 
 namespace Axis.WorkflowBuilder.Application.Commands.RemoveTrigger;
 
-public sealed class RemoveTriggerHandler(IWorkflowRepository workflowRepo, IUnitOfWork uow)
+public sealed class RemoveTriggerHandler(
+    IWorkflowRepository workflowRepo,
+    IWorkflowReferenceSync referenceSync,
+    IUnitOfWork uow)
     : ICommandHandler<RemoveTriggerCommand>
 {
     public async Task<Result> Handle(RemoveTriggerCommand command, CancellationToken cancellationToken)
@@ -18,6 +21,7 @@ public sealed class RemoveTriggerHandler(IWorkflowRepository workflowRepo, IUnit
             return Result.Failure(ErrorCodes.NotFound, "Workflow not found.");
 
         workflow.RemoveTrigger(command.TriggerType);
+        await referenceSync.SyncAsync(workflow, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }

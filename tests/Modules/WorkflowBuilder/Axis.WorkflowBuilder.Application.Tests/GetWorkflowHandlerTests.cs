@@ -13,9 +13,10 @@ public class GetWorkflowHandlerTests
 {
     private static readonly Guid OrgId = Guid.NewGuid();
     private readonly IWorkflowRepository _repo = Substitute.For<IWorkflowRepository>();
+    private readonly IWorkflowReferenceRepository _referenceRepo = Substitute.For<IWorkflowReferenceRepository>();
     private readonly GetWorkflowHandler _handler;
 
-    public GetWorkflowHandlerTests() => _handler = new GetWorkflowHandler(_repo);
+    public GetWorkflowHandlerTests() => _handler = new GetWorkflowHandler(_repo, _referenceRepo);
 
     [Fact]
     public async Task Handle_WhenWorkflowExists_ReturnsDetailDto()
@@ -24,6 +25,9 @@ public class GetWorkflowHandlerTests
         wf.AddTrigger(TriggerType.Manual, null);
         WorkflowStep step = wf.AddStep("Review", StepType.Form, new Dictionary<string, object?> { ["form_id"] = "abc" });
         _repo.GetByIdAsync(wf.Id, OrgId, Arg.Any<CancellationToken>()).Returns(wf);
+        _referenceRepo.GetBrokenStepIdsAsync(wf.Id, Arg.Any<CancellationToken>())
+            .Returns(new HashSet<Guid>());
+        _referenceRepo.HasBrokenEventTriggerAsync(wf.Id, Arg.Any<CancellationToken>()).Returns(false);
 
         WorkflowDetailDto? dto = await _handler.Handle(new GetWorkflowQuery(wf.Id, OrgId), CancellationToken.None);
 
