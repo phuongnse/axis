@@ -1288,6 +1288,15 @@ message GetUserPermissionsResponse {
 }
 ```
 
+**Buf (repo-wide lint + breaking)** — register every new module proto root before merge:
+
+1. Place files under `src/Modules/{Module}/Axis.{Module}.Contracts/Protos/axis/{module}/v{n}/` with `package axis.{module}.v{n};` matching the directory (`PACKAGE_DIRECTORY_MATCH`).
+2. Add the `Protos` directory to `modules:` in [`buf.yaml`](../../buf.yaml) at the repo root (copy an existing line).
+3. Keep `Grpc.Tools` `<Protobuf Include=...>` in the `.csproj` — Buf does not replace codegen.
+4. Run `buf lint` locally (`buf` CLI) and `./scripts/check-buf-modules.sh` (also runs in CI **Doc drift**).
+
+CI runs `buf lint` and `buf breaking` against `main` when `.proto` or `buf.yaml` changes.
+
 **Step 2 — Consuming module gets a generated client via project reference (modulith) or NuGet (extracted):**
 
 ```csharp
