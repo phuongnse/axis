@@ -6,7 +6,10 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.FormBuilder.Application.Commands.RemoveFieldFromForm;
 
-public sealed class RemoveFieldFromFormHandler(IFormRepository formRepo, IUnitOfWork uow)
+public sealed class RemoveFieldFromFormHandler(
+    IFormRepository formRepo,
+    IFormModelReferenceSync formModelReferenceSync,
+    IUnitOfWork uow)
     : ICommandHandler<RemoveFieldFromFormCommand>
 {
     public async Task<Result> Handle(RemoveFieldFromFormCommand command, CancellationToken cancellationToken)
@@ -24,6 +27,7 @@ public sealed class RemoveFieldFromFormHandler(IFormRepository formRepo, IUnitOf
             return Result.Failure(ErrorCodes.BusinessRule, ex.Message);
         }
 
+        await formModelReferenceSync.SyncRelationPickerReferencesAsync(form, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }

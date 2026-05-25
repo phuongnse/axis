@@ -1,7 +1,6 @@
 using Axis.Api.Extensions;
 using Axis.Identity.Application.Commands.AcceptInvitation;
-using Axis.Identity.Application.Repositories;
-using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Application.Queries.GetInvitationByToken;
 using Axis.Shared.Domain.Primitives;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -40,18 +39,18 @@ public static class InvitationEndpoints
 
     private static async Task<IResult> GetInvitation(
         string token,
-        IInvitationRepository invitationRepository,
+        ISender mediator,
         CancellationToken ct)
     {
-        Invitation? invitation = await invitationRepository.GetByTokenAsync(token, ct);
+        InvitationByTokenDto? invitation = await mediator.Send(new GetInvitationByTokenQuery(token), ct);
         if (invitation is null)
             return Results.Problem("Invitation not found.", statusCode: StatusCodes.Status404NotFound);
 
         return Results.Ok(new
         {
-            invitation_id = invitation.Id,
-            email = invitation.Email.Value,
-            status = invitation.Status.ToString().ToLower(),
+            invitation_id = invitation.InvitationId,
+            email = invitation.Email,
+            status = invitation.Status,
             expires_at = invitation.ExpiresAt,
         });
     }

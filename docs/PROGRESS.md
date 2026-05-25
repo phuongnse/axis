@@ -39,11 +39,11 @@ Full auth, user, role, invitation, and session management. OpenIddict 5.x OIDC s
 
 ## DataModeling — E03-data-modeling
 
-**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳ · Service-boundary retrofit ✅**
+**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳ · Service-boundary retrofit ⏳**
 
 Custom model, field, data class, and record CRUD. Full-text search, per-field JSONB filters, sort-by-column, bulk delete, CSV export. All endpoints covered by integration tests.
 
-> ✅ **Phase 2 Contracts:** `Axis.DataModeling.Contracts` with 9 Avro lifecycle events (`ModelCreated`/`ModelDeleted`, `DataClass*`, `DataRecord*`, `FieldAdded`/`FieldUpdated`/`FieldRemoved`) published via Wolverine outbox → Kafka (CloudEvents, ADR-019). `DataModelingEventMapper` + domain field events. Per-module DB `axis_datamodeling` + `MigrateAsync` in tests. **Deferred:** gRPC service (no sync consumer yet); FormBuilder/WorkflowBuilder Kafka consumers for broken-reference detection.
+> ⏳ **Retrofit:** add `Axis.DataModeling.Contracts` (gRPC + Avro events for `ModelCreated`/`FieldAdded`/...); move to `axis_datamodeling` database; generate initial EF migration; switch tests to migrations.
 
 ## WorkflowBuilder — E04-workflow-builder
 
@@ -59,7 +59,7 @@ Workflow definitions with steps, transitions, triggers, cycle detection, publish
 
 Form definitions + F04 form tasks (`FormSubmission`, token submit, my tasks, expiry job). Submission user resolved via `ICurrentUser` in Application.
 
-> ⚠️ **Retrofit (PR for E05+E06 closure):** `Axis.FormBuilder.Contracts` shipped with Avro schemas `FormTaskSubmittedEvent` + `FormTaskExpiredEvent` (CloudEvents envelope, ADR-019). `FormBuilderEventMapper` translates domain events at `SaveChangesAsync` time; WorkflowEngine consumes via Kafka topics `axis.formbuilder.form-task-submitted` / `axis.formbuilder.form-task-expired`. **Deferred:** gRPC service (no consumer yet); move to dedicated `axis_formbuilder` database; switch tests to `MigrateAsync`.
+> ✅ **Phase 2 Contracts:** Avro form-task events; `form_model_references` + `ModelDeletedHandler` (DataModeling Kafka) for Relation Picker broken refs; delete-model blocked when active form references exist. **Deferred:** gRPC service.
 
 ## WorkflowEngine — E06-workflow-engine
 

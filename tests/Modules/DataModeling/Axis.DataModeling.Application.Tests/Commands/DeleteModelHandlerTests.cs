@@ -12,12 +12,19 @@ namespace Axis.DataModeling.Application.Tests.Commands;
 public class DeleteModelHandlerTests
 {
     private readonly IDataModelRepository _modelRepo = Substitute.For<IDataModelRepository>();
+    private readonly IModelDeletionGuard _deletionGuard = Substitute.For<IModelDeletionGuard>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
     private const string UserId = "user-123";
 
-    private DeleteModelHandler CreateHandler() => new(_modelRepo, _uow);
+    public DeleteModelHandlerTests()
+    {
+        _deletionGuard.ValidateCanDeleteAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success());
+    }
+
+    private DeleteModelHandler CreateHandler() => new(_modelRepo, _deletionGuard, _uow);
 
     [Fact]
     public async Task DeleteModel_WhenModelExists_SoftDeletesModel()
@@ -57,5 +64,21 @@ public class DeleteModelHandlerTests
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+    }
+
+    [Fact]
+    public async Task DeleteModel_WhenGuardBlocksDeletion_ReturnsConflictWithoutDeleting()
+    {
+        DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
+        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
+        _deletionGuard.ValidateCanDeleteAsync(model.Id, OrgId, Arg.Any<CancellationToken>())
+            .Returns(Result.Failure(ErrorCodes.Conflict, "This model is used by 2 form(s). Remove those references before deleting."));
+
+        Result result = await CreateHandler().Handle(new DeleteModelCommand(model.Id, OrgId), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.Conflict);
+        model.DeletedAt.Should().BeNull();
+        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 }

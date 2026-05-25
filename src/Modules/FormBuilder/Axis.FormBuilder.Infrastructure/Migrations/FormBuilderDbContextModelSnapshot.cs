@@ -156,6 +156,37 @@ namespace Axis.FormBuilder.Infrastructure.Migrations
                     b.ToTable("form_submissions", (string)null);
                 });
 
+            modelBuilder.Entity("Axis.FormBuilder.Domain.ReadModels.FormModelReference", b =>
+                {
+                    b.Property<Guid>("FormId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_id");
+
+                    b.Property<Guid>("FormFieldId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_field_id");
+
+                    b.Property<bool>("IsBroken")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_broken");
+
+                    b.Property<Guid>("ModelId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("model_id");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.HasKey("FormId", "FormFieldId");
+
+                    b.HasIndex("FormId");
+
+                    b.HasIndex("ModelId", "OrganizationId");
+
+                    b.ToTable("form_model_references", (string)null);
+                });
+
             modelBuilder.Entity("Axis.FormBuilder.Domain.ReadModels.FormWorkflowReference", b =>
                 {
                     b.Property<Guid>("WorkflowId")

@@ -492,6 +492,7 @@ try
     app.MapFormTaskEndpoints();
 
     app.MapIdentityGrpc();
+    app.MapFormBuilderGrpc();
 
     app.Run();
 }

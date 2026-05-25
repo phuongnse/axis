@@ -14,10 +14,12 @@ public class RemoveFieldFromFormHandlerTests
 {
     private static readonly Guid OrgId = Guid.NewGuid();
     private readonly IFormRepository _repo = Substitute.For<IFormRepository>();
+    private readonly IFormModelReferenceSync _formModelReferenceSync = Substitute.For<IFormModelReferenceSync>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly RemoveFieldFromFormHandler _handler;
 
-    public RemoveFieldFromFormHandlerTests() => _handler = new RemoveFieldFromFormHandler(_repo, _uow);
+    public RemoveFieldFromFormHandlerTests()
+        => _handler = new RemoveFieldFromFormHandler(_repo, _formModelReferenceSync, _uow);
 
     [Fact]
     public async Task Handle_WhenFieldExists_RemovesAndSaves()
@@ -31,6 +33,8 @@ public class RemoveFieldFromFormHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         form.Fields.Should().BeEmpty();
+        await _formModelReferenceSync.Received(1)
+            .SyncRelationPickerReferencesAsync(form, Arg.Any<CancellationToken>());
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 

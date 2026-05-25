@@ -4,7 +4,9 @@ using Axis.Shared.Application.CQRS;
 
 namespace Axis.FormBuilder.Application.Queries.GetFormById;
 
-public sealed class GetFormByIdHandler(IFormRepository formRepo)
+public sealed class GetFormByIdHandler(
+    IFormRepository formRepo,
+    IFormModelReferenceRepository formModelReferenceRepo)
     : IQueryHandler<GetFormByIdQuery, FormDetailDto?>
 {
     public async Task<FormDetailDto?> Handle(GetFormByIdQuery query, CancellationToken cancellationToken)
@@ -12,9 +14,14 @@ public sealed class GetFormByIdHandler(IFormRepository formRepo)
         FormDefinition? form = await formRepo.GetByIdAsync(query.FormId, query.OrganizationId, cancellationToken);
         if (form is null) return null;
 
+        IReadOnlySet<Guid> brokenFieldIds = await formModelReferenceRepo.GetBrokenFieldIdsForFormAsync(
+            query.FormId, cancellationToken);
+
         IReadOnlyList<FormFieldDto> fields = form.Fields
             .OrderBy(f => f.DisplayOrder)
-            .Select(f => new FormFieldDto(f.Id, f.Key, f.Label, f.Type, f.IsRequired, f.DisplayOrder, f.Config))
+            .Select(f => new FormFieldDto(
+                f.Id, f.Key, f.Label, f.Type, f.IsRequired, f.DisplayOrder, f.Config,
+                brokenFieldIds.Contains(f.Id)))
             .ToList();
 
         return new FormDetailDto(

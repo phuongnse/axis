@@ -75,7 +75,8 @@ public static class ModelEndpoints
             .Produces(204)
             .ProducesProblem(401)
             .ProducesProblem(403)
-            .ProducesProblem(404);
+            .ProducesProblem(404)
+            .ProducesProblem(409);
 
         // Field management
         group.MapPost("/{modelId:guid}/fields", AddField)

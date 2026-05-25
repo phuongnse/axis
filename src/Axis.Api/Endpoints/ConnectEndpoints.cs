@@ -2,8 +2,7 @@ using System.Security.Claims;
 using Axis.Api.Authorization;
 using Axis.Api.Infrastructure;
 using Axis.Identity.Application.Commands.AuthenticateUser;
-using Axis.Identity.Application.Repositories;
-using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Application.Queries.GetUserTokenClaims;
 using Axis.Shared.Domain.Primitives;
 using MediatR;
 using Microsoft.AspNetCore;
@@ -139,8 +138,7 @@ public static class ConnectEndpoints
     // ── POST /connect/token ───────────────────────────────────────────────────
     private static async Task<IResult> Token(
         HttpContext httpContext,
-        IUserRepository userRepo,
-        IRoleRepository roleRepo,
+        ISender mediator,
         CancellationToken ct)
     {
         OpenIddictRequest request = httpContext.GetOpenIddictServerRequest()
@@ -179,9 +177,14 @@ public static class ConnectEndpoints
                     [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
             }
 
-            // Load fresh user state (catches deactivation between token issuances)
-            User? user = await userRepo.GetByIdPlatformWideAsync(userId, ct);
-            if (user is null || user.Status != UserStatus.Active)
+            string? orgIdStr = result.Principal!.GetClaim("org_id");
+            Guid? orgId = Guid.TryParse(orgIdStr, out Guid parsedOrgId) ? parsedOrgId : null;
+
+            Result<UserTokenClaimsDto> claimsResult = await mediator.Send(
+                new GetUserTokenClaimsQuery(userId, orgId),
+                ct);
+
+            if (claimsResult.IsFailure)
             {
                 return Results.Challenge(
                     new AuthenticationProperties(new Dictionary<string, string?>
@@ -189,28 +192,19 @@ public static class ConnectEndpoints
                         [OpenIddictServerAspNetCoreConstants.Properties.Error] =
                             Errors.InvalidGrant,
                         [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] =
-                            "The account is no longer active.",
+                            claimsResult.Error,
                     }),
                     [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
             }
 
-            // Resolve org_id from the existing principal (set at authorize/login time)
-            string? orgIdStr = result.Principal!.GetClaim("org_id");
-            Guid orgId = Guid.TryParse(orgIdStr, out Guid parsedOrgId)
-                ? parsedOrgId
-                : user.OrganizationId;
-
-            // Always load fresh permissions so role changes take effect on next refresh
-            IReadOnlyList<Role> roles = await roleRepo.GetByIdsAsync(user.RoleIds, orgId, ct);
-            List<string> permissions = roles
-                .SelectMany(r => r.Permissions)
-                .Distinct()
-                .ToList();
-
+            UserTokenClaimsDto claims = claimsResult.Value;
             ClaimsPrincipal principal = BuildUserPrincipal(
-                userId, orgId,
-                user.Email.Value, $"{user.FirstName} {user.LastName}",
-                permissions, result.Principal!.GetScopes());
+                claims.UserId,
+                claims.OrganizationId,
+                claims.Email,
+                claims.FullName,
+                claims.Permissions.ToList(),
+                result.Principal!.GetScopes());
 
             return Results.SignIn(
                 principal,
