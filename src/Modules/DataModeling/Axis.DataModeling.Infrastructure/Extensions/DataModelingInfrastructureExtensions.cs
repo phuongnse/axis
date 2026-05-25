@@ -24,8 +24,13 @@ public static class DataModelingInfrastructureExtensions
         services.AddScoped<IUnitOfWork, DataModelingUnitOfWork>();
         services.AddScoped<IModelDeletionGuard, FormModelDeletionGuard>();
 
-        string formBuilderGrpcUrl = configuration["Modules:FormBuilder:GrpcUrl"]
-            ?? "http://localhost:5280";
+        string? formBuilderGrpcUrl = configuration["Modules:FormBuilder:GrpcUrl"];
+        if (string.IsNullOrWhiteSpace(formBuilderGrpcUrl))
+        {
+            throw new InvalidOperationException(
+                "Missing configuration 'Modules:FormBuilder:GrpcUrl'.");
+        }
+
         services.AddGrpcClient<FormModelReferenceService.FormModelReferenceServiceClient>(opts =>
         {
             opts.Address = new Uri(formBuilderGrpcUrl);

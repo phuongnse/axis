@@ -152,6 +152,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
                     ["ConnectionStrings:FormBuilder"] = _formBuilderConnectionString,
                     ["ConnectionStrings:WorkflowEngine"] = _workflowEngineConnectionString,
                     ["Redis:ConnectionString"] = _redis.GetConnectionString(),
+                    ["Modules:FormBuilder:GrpcUrl"] = "http://localhost",
                 });
             });
 

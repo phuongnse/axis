@@ -97,6 +97,22 @@ public class DeactivateUserHandlerTests
     }
 
     [Fact]
+    public async Task DeactivateUser_WhenAdminRoleMissing_ReturnsNotFound()
+    {
+        User target = MakeUser();
+        _userRepo.GetByIdAsync(target.Id, OrgId).Returns(target);
+        _roleRepo.GetByNameAsync("Admin", OrgId, Arg.Any<CancellationToken>()).Returns((Role?)null);
+
+        Result result = await CreateHandler().Handle(
+            new DeactivateUserCommand(target.Id, OrgId, RequesterId),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        result.Error.Should().Contain("Admin role not found");
+    }
+
+    [Fact]
     public async Task DeactivateUser_WhenUserBelongsToAnotherOrg_ReturnsNotFound()
     {
         User target = MakeUser();

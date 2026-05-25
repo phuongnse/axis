@@ -24,7 +24,10 @@ public sealed class DeactivateUserHandler(
             return Result.Failure(ErrorCodes.NotFound, "User not found.");
 
         Role? adminRole = await roleRepo.GetByNameAsync("Admin", command.OrganizationId, cancellationToken);
-        Guid adminRoleId = adminRole?.Id ?? Guid.Empty;
+        if (adminRole is null)
+            return Result.Failure(ErrorCodes.NotFound, "Admin role not found.");
+
+        Guid adminRoleId = adminRole.Id;
 
         // US-019: cannot deactivate last admin
         int adminCount = await userRepo.CountAdminsAsync(

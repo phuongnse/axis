@@ -60,7 +60,7 @@ internal sealed class FormModelDeletionGuard(
         Metadata headers = new();
         string? authorization = httpContextAccessor.HttpContext?.Request.Headers.Authorization.ToString();
         if (!string.IsNullOrWhiteSpace(authorization))
-            headers.Add("Authorization", authorization);
+            headers.Add("authorization", authorization);
 
         return headers;
     }

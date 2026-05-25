@@ -67,6 +67,25 @@ public sealed class GetUserTokenClaimsHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WhenOrganizationIdMismatchesUser_ReturnsBusinessRuleFailure()
+    {
+        User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value, OrgId);
+        _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
+
+        Guid otherOrgId = Guid.NewGuid();
+        Result<UserTokenClaimsDto> result = await CreateHandler().Handle(
+            new GetUserTokenClaimsQuery(user.Id, otherOrgId),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        await _roleRepo.DidNotReceive().GetByIdsAsync(
+            Arg.Any<IEnumerable<Guid>>(),
+            Arg.Any<Guid>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Handle_WhenUserActive_ReturnsTokenClaims()
     {
         User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value, OrgId);

@@ -22,7 +22,14 @@ public sealed class GetUserTokenClaimsHandler(
                 "The account is no longer active.");
         }
 
-        Guid orgId = query.OrganizationId ?? user.OrganizationId;
+        if (query.OrganizationId.HasValue && query.OrganizationId.Value != user.OrganizationId)
+        {
+            return Result.Failure<UserTokenClaimsDto>(
+                ErrorCodes.BusinessRule,
+                "Invalid organization scope for this user.");
+        }
+
+        Guid orgId = user.OrganizationId;
 
         IReadOnlyList<Role> roles = await roleRepo.GetByIdsAsync(user.RoleIds, orgId, cancellationToken);
         List<string> permissions = roles

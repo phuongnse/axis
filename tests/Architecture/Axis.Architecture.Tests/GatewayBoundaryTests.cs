@@ -23,7 +23,9 @@ public class GatewayBoundaryTests
         api.Should().NotBeNull("Axis.Api assembly must be referenced by architecture tests.");
 
         IEnumerable<Type> endpointTypes = api!.GetTypes()
-            .Where(t => t.IsClass && t.Namespace == "Axis.Api.Endpoints");
+            .Where(t =>
+                t.IsClass &&
+                t.Namespace?.StartsWith("Axis.Api.Endpoints", StringComparison.Ordinal) == true);
 
         foreach (Type endpointType in endpointTypes)
         {
