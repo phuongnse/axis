@@ -2,9 +2,10 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Axis.Api.Tests.Helpers;
-using Axis.Identity.Domain.Aggregates;
-using Axis.Identity.Domain.ValueObjects;
+using Axis.Identity.Application.Services;
 using Axis.Identity.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Axis.Identity.Infrastructure.Persistence.Entities;
 using FluentAssertions;
 
 namespace Axis.Api.Tests.Identity;
@@ -62,15 +63,11 @@ public class AuthEndpointTests(ApiTestFixture fixture)
         // Register
         await _client.PostAsJsonAsync("/api/organizations", RegisterPayload("auth_pkce1"), Json);
 
-        // Verify email
-        using IServiceScope scope = fixture.CreateScope();
-        IdentityDbContext ctx =
-            scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        User user = ctx.Users
-            .First(u => u.Email == Email.Create("adminauth_pkce1@test.com").Value);
+        string verifyToken = fixture.EmailCapture.GetVerificationToken("adminauth_pkce1@test.com")
+            ?? throw new InvalidOperationException("Verification token not captured.");
 
         HttpResponseMessage verifyResp = await _client.PostAsJsonAsync(
-            "/api/auth/verify-email", new { token = user.Id.ToString() }, Json);
+            "/api/auth/verify-email", new { token = verifyToken }, Json);
         verifyResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         // Full PKCE flow on independent client (isolated cookie jar)
@@ -108,12 +105,9 @@ public class AuthEndpointTests(ApiTestFixture fixture)
         // Register + verify
         await _client.PostAsJsonAsync("/api/organizations", RegisterPayload("auth_badpwd1"), Json);
 
-        using IServiceScope scope = fixture.CreateScope();
-        IdentityDbContext ctx =
-            scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        User user = ctx.Users
-            .First(u => u.Email == Email.Create("adminauth_badpwd1@test.com").Value);
-        await _client.PostAsJsonAsync("/api/auth/verify-email", new { token = user.Id.ToString() }, Json);
+        string verifyToken = fixture.EmailCapture.GetVerificationToken("adminauth_badpwd1@test.com")
+            ?? throw new InvalidOperationException("Verification token not captured.");
+        await _client.PostAsJsonAsync("/api/auth/verify-email", new { token = verifyToken }, Json);
 
         // Attempt login with wrong password
         HttpClient pkceClient = fixture.CreateNewClient();
@@ -214,13 +208,8 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     {
         await _client.PostAsJsonAsync("/api/organizations", RegisterPayload("verify_used1"), Json);
 
-        using IServiceScope scope = fixture.CreateScope();
-        IdentityDbContext ctx =
-            scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        User user = ctx.Users
-            .First(u => u.Email == Email.Create("adminverify_used1@test.com").Value);
-
-        string token = user.Id.ToString();
+        string token = fixture.EmailCapture.GetVerificationToken("adminverify_used1@test.com")
+            ?? throw new InvalidOperationException("Verification token not captured.");
         HttpResponseMessage first = await _client.PostAsJsonAsync(
             "/api/auth/verify-email", new { token }, Json);
         first.StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -230,6 +219,30 @@ public class AuthEndpointTests(ApiTestFixture fixture)
         second.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
         JsonElement body = await second.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("detail").GetString().Should().Contain("already been used");
+    }
+
+    [Fact]
+    public async Task VerifyEmail_WhenTokenExpired_ReturnsExpiredMessage()
+    {
+        await _client.PostAsJsonAsync("/api/organizations", RegisterPayload("verify_exp1"), Json);
+
+        string token = fixture.EmailCapture.GetVerificationToken("adminverify_exp1@test.com")
+            ?? throw new InvalidOperationException("Verification token not captured.");
+        string tokenHash = OpaqueTokenGenerator.Hash(token);
+
+        using IServiceScope scope = fixture.CreateScope();
+        IdentityDbContext ctx = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        EmailVerificationToken row = await ctx.EmailVerificationTokens
+            .SingleAsync(t => t.TokenHash == tokenHash);
+        row.ExpiresAt = DateTime.UtcNow.AddHours(-1);
+        await ctx.SaveChangesAsync();
+
+        HttpResponseMessage resp = await _client.PostAsJsonAsync(
+            "/api/auth/verify-email", new { token }, Json);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("detail").GetString().Should().Contain("expired");
     }
 
     // ── Token Refresh ─────────────────────────────────────────────────────────
@@ -242,12 +255,9 @@ public class AuthEndpointTests(ApiTestFixture fixture)
 
         await _client.PostAsJsonAsync("/api/organizations", RegisterPayload("auth_refresh1"), Json);
 
-        using IServiceScope scope = fixture.CreateScope();
-        IdentityDbContext ctx =
-            scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        User user = ctx.Users
-            .First(u => u.Email == Email.Create("adminauth_refresh1@test.com").Value);
-        await _client.PostAsJsonAsync("/api/auth/verify-email", new { token = user.Id.ToString() }, Json);
+        string verifyToken = fixture.EmailCapture.GetVerificationToken("adminauth_refresh1@test.com")
+            ?? throw new InvalidOperationException("Verification token not captured.");
+        await _client.PostAsJsonAsync("/api/auth/verify-email", new { token = verifyToken }, Json);
 
         // PKCE flow sets refresh_token cookie on pkceClient
         string firstAccessToken = await AuthHelper.CompletePkceFlowAsync(

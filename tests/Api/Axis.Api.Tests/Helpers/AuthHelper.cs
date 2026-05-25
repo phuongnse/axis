@@ -44,13 +44,10 @@ public static class AuthHelper
         if (!regResp.IsSuccessStatusCode)
             throw new InvalidOperationException($"Registration failed: {regResp.StatusCode}");
 
-        // 2. Verify email (token is user.Id per RegisterOrganizationHandler)
-        using IServiceScope scope = fixture.CreateScope();
-        IdentityDbContext ctx =
-            scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        User user = ctx.Users
-            .First(u => u.Email == Email.Create(email).Value);
-        string verifyToken = user.Id.ToString();
+        // 2. Verify email (opaque token from registration email)
+        string verifyToken = fixture.EmailCapture.GetVerificationToken(email)
+            ?? throw new InvalidOperationException(
+                $"No verification token captured for {email}.");
 
         HttpResponseMessage verifyResp = await fixture.Client.PostAsJsonAsync(
             "/api/auth/verify-email", new { token = verifyToken }, Json);

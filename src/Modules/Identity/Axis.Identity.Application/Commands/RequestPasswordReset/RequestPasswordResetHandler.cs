@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
@@ -28,10 +26,7 @@ public sealed class RequestPasswordResetHandler(
         // Invalidate any prior tokens before issuing a new one (per US-027 edge case)
         await tokenStore.InvalidateAllForUserAsync(user.Id, cancellationToken);
 
-        // Generate a cryptographically random opaque token
-        string rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-        string tokenHash = Convert.ToHexString(SHA256.HashData(
-            Encoding.UTF8.GetBytes(rawToken)));
+        (string rawToken, string tokenHash) = OpaqueTokenGenerator.Create();
 
         await tokenStore.CreateAsync(
             user.Id, tokenHash, DateTime.UtcNow.Add(TokenLifetime), cancellationToken);

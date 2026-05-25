@@ -1,4 +1,5 @@
 using Axis.Identity.Application.Repositories;
+using Axis.Identity.Application.Services;
 using Axis.Identity.Contracts;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.Provisioning;
@@ -7,6 +8,7 @@ using Axis.Shared.Application.CQRS;
 namespace Axis.Identity.Application.Queries.GetProvisioningStatus;
 
 public sealed class GetProvisioningStatusHandler(
+    IEmailVerificationTokenStore verificationTokenStore,
     IUserRepository userRepo,
     IOrganizationRepository organizationRepo,
     ITenantModuleProvisioningRepository provisioningRepo)
@@ -16,10 +18,17 @@ public sealed class GetProvisioningStatusHandler(
         GetProvisioningStatusQuery query,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(query.Token, out Guid userId))
+        if (string.IsNullOrWhiteSpace(query.Token))
             return null;
 
-        Domain.Aggregates.User? user = await userRepo.GetByIdPlatformWideAsync(userId, cancellationToken);
+        string tokenHash = OpaqueTokenGenerator.Hash(query.Token.Trim());
+        Guid? userId = await verificationTokenStore.ResolveUserIdForProvisioningPollAsync(
+            tokenHash,
+            cancellationToken);
+        if (userId is null)
+            return null;
+
+        Domain.Aggregates.User? user = await userRepo.GetByIdPlatformWideAsync(userId.Value, cancellationToken);
         if (user is null || !user.IsEmailVerified)
             return null;
 

@@ -9,10 +9,13 @@ namespace Axis.Identity.Application.Commands.VerifyEmail;
 
 public sealed class ResendVerificationEmailHandler(
     IUserRepository userRepo,
+    IEmailVerificationTokenStore tokenStore,
     IEmailSender emailSender,
     IResendVerificationRateLimiter rateLimiter)
     : ICommandHandler<ResendVerificationEmailCommand>
 {
+    private static readonly TimeSpan TokenLifetime = TimeSpan.FromHours(24);
+
     public async Task<Result> Handle(ResendVerificationEmailCommand command, CancellationToken cancellationToken)
     {
         Result<Email> email = Email.Create(command.Email);
@@ -25,8 +28,14 @@ public sealed class ResendVerificationEmailHandler(
         if (rateLimit.IsFailure)
             return rateLimit;
 
+        await tokenStore.InvalidateAllForUserAsync(user.Id, cancellationToken);
+
+        (string rawToken, string tokenHash) = OpaqueTokenGenerator.Create();
+        await tokenStore.CreateAsync(
+            user.Id, tokenHash, DateTime.UtcNow.Add(TokenLifetime), cancellationToken);
+
         await emailSender.SendVerificationEmailAsync(
-            user.Email.Value, user.Id.ToString(), cancellationToken);
+            user.Email.Value, rawToken, cancellationToken);
 
         return Result.Success();
     }

@@ -15,6 +15,7 @@ namespace Axis.Identity.Application.Tests.Commands;
 
 public class VerifyEmailHandlerTests
 {
+    private readonly IEmailVerificationTokenStore _tokenStore = Substitute.For<IEmailVerificationTokenStore>();
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
     private readonly IOrganizationRepository _organizationRepo = Substitute.For<IOrganizationRepository>();
     private readonly ITenantModuleProvisioningRepository _provisioningRepo =
@@ -22,10 +23,8 @@ public class VerifyEmailHandlerTests
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private static readonly Guid OrgId = Guid.NewGuid();
-
     private VerifyEmailHandler CreateHandler() =>
-        new(_userRepo, _organizationRepo, _provisioningRepo, _roleRepo, _uow);
+        new(_tokenStore, _userRepo, _organizationRepo, _provisioningRepo, _roleRepo, _uow);
 
     private static (User User, Organization Organization) MakeUnverifiedUserWithOrg()
     {
@@ -44,12 +43,17 @@ public class VerifyEmailHandlerTests
     {
         (User user, Organization organization) = MakeUnverifiedUserWithOrg();
         Role adminRole = Role.CreateSystem("Admin", organization.Id, ["users:read"]);
+        string rawToken = "valid-raw-token";
+        string tokenHash = OpaqueTokenGenerator.Hash(rawToken);
+
+        _tokenStore.ResolveForVerificationAsync(tokenHash, Arg.Any<CancellationToken>())
+            .Returns(new EmailVerificationTokenResolveResult(EmailVerificationTokenState.Valid, user.Id));
         _userRepo.GetByIdPlatformWideAsync(user.Id).Returns(user);
         _organizationRepo.GetByIdAsync(organization.Id).Returns(organization);
         _roleRepo.GetByNameAsync("Admin", organization.Id).Returns(adminRole);
 
         Result result = await CreateHandler().Handle(
-            new VerifyEmailCommand(user.Id.ToString()),
+            new VerifyEmailCommand(rawToken),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -60,20 +64,23 @@ public class VerifyEmailHandlerTests
             Arg.Is<IEnumerable<TenantModuleProvisioning>>(rows => rows.Count() == TenantModuleNames.All.Count),
             Arg.Any<CancellationToken>());
 
-        // Verify the OrganizationVerified domain event was raised. IdentityUnitOfWork
-        // maps it to OrganizationVerifiedEvent (Avro) and publishes via Kafka (ADR-019).
         user.DomainEvents.Should().ContainSingle(e => e is OrganizationVerified)
             .Which.Should().BeOfType<OrganizationVerified>()
             .Which.OrganizationId.Should().Be(user.OrganizationId);
 
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        await _tokenStore.Received(1).InvalidateAsync(tokenHash, Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task VerifyEmail_WhenTokenFormatIsInvalid_DoesNotSaveOrRaiseEvent()
+    public async Task VerifyEmail_WhenTokenIsUnknown_DoesNotSaveOrRaiseEvent()
     {
+        string tokenHash = OpaqueTokenGenerator.Hash("unknown-token");
+        _tokenStore.ResolveForVerificationAsync(tokenHash, Arg.Any<CancellationToken>())
+            .Returns(new EmailVerificationTokenResolveResult(EmailVerificationTokenState.NotFound, null));
+
         Result result = await CreateHandler().Handle(
-            new VerifyEmailCommand("not-a-guid"),
+            new VerifyEmailCommand("unknown-token"),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -83,30 +90,55 @@ public class VerifyEmailHandlerTests
     }
 
     [Fact]
-    public async Task VerifyEmail_WhenTokenNotFound_ReturnsBusinessRuleFailure()
+    public async Task VerifyEmail_WhenTokenExpired_ReturnsExpiredMessage()
     {
-        _userRepo.GetByIdPlatformWideAsync(Arg.Any<Guid>()).ReturnsNull();
+        string rawToken = "expired-token";
+        string tokenHash = OpaqueTokenGenerator.Hash(rawToken);
+        _tokenStore.ResolveForVerificationAsync(tokenHash, Arg.Any<CancellationToken>())
+            .Returns(new EmailVerificationTokenResolveResult(EmailVerificationTokenState.Expired, Guid.NewGuid()));
 
         Result result = await CreateHandler().Handle(
-            new VerifyEmailCommand(Guid.NewGuid().ToString()),
+            new VerifyEmailCommand(rawToken),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
-        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
-        result.Error.Should().Contain("Invalid verification link");
+        result.Error.Should().Contain("expired");
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task VerifyEmail_WhenAlreadyVerified_ReturnsBusinessRuleFailure()
+    public async Task VerifyEmail_WhenTokenAlreadyUsed_ReturnsBusinessRuleFailure()
+    {
+        (User user, Organization _) = MakeUnverifiedUserWithOrg();
+        string rawToken = "used-token";
+        string tokenHash = OpaqueTokenGenerator.Hash(rawToken);
+        _tokenStore.ResolveForVerificationAsync(tokenHash, Arg.Any<CancellationToken>())
+            .Returns(new EmailVerificationTokenResolveResult(EmailVerificationTokenState.AlreadyUsed, user.Id));
+
+        Result result = await CreateHandler().Handle(
+            new VerifyEmailCommand(rawToken),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.Error.Should().Contain("already been used");
+        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task VerifyEmail_WhenUserAlreadyVerified_ReturnsBusinessRuleFailure()
     {
         (User user, Organization _) = MakeUnverifiedUserWithOrg();
         user.VerifyEmail();
         user.ClearDomainEvents();
+        string rawToken = "still-valid-token";
+        string tokenHash = OpaqueTokenGenerator.Hash(rawToken);
+        _tokenStore.ResolveForVerificationAsync(tokenHash, Arg.Any<CancellationToken>())
+            .Returns(new EmailVerificationTokenResolveResult(EmailVerificationTokenState.Valid, user.Id));
         _userRepo.GetByIdPlatformWideAsync(user.Id).Returns(user);
 
         Result result = await CreateHandler().Handle(
-            new VerifyEmailCommand(user.Id.ToString()),
+            new VerifyEmailCommand(rawToken),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
