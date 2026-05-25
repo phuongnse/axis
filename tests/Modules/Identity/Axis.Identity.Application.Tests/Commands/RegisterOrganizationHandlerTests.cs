@@ -14,12 +14,14 @@ public class RegisterOrganizationHandlerTests
     private readonly IOrganizationRepository _orgRepo = Substitute.For<IOrganizationRepository>();
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
+    private readonly IRegistrationIdempotencyRepository _idempotencyRepo =
+        Substitute.For<IRegistrationIdempotencyRepository>();
     private readonly IPasswordHasher _hasher = Substitute.For<IPasswordHasher>();
     private readonly IEmailSender _emailSender = Substitute.For<IEmailSender>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     private RegisterOrganizationHandler CreateHandler() =>
-        new(_orgRepo, _userRepo, _roleRepo, _hasher, _emailSender, _uow);
+        new(_orgRepo, _userRepo, _roleRepo, _idempotencyRepo, _hasher, _emailSender, _uow);
 
     private static RegisterOrganizationCommand ValidCommand() => new(
         OrgName: "Acme Corp",
@@ -34,6 +36,8 @@ public class RegisterOrganizationHandlerTests
     {
         _orgRepo.SlugExistsAsync(Arg.Any<OrganizationSlug>()).Returns(false);
         _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>()).Returns(false);
+        _idempotencyRepo.AcquireAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(RegistrationIdempotencyAcquireResult.Acquired);
         _hasher.Hash(Arg.Any<string>()).Returns("hashed");
 
         await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
@@ -49,6 +53,8 @@ public class RegisterOrganizationHandlerTests
     {
         _orgRepo.SlugExistsAsync(Arg.Any<OrganizationSlug>()).Returns(false);
         _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>()).Returns(false);
+        _idempotencyRepo.AcquireAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(RegistrationIdempotencyAcquireResult.Acquired);
         _hasher.Hash(Arg.Any<string>()).Returns("hashed");
 
         await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
@@ -78,6 +84,8 @@ public class RegisterOrganizationHandlerTests
         _orgRepo.SlugExistsAsync(Arg.Any<OrganizationSlug>())
             .Returns(true, false); // first call: exists, second: free
         _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>()).Returns(false);
+        _idempotencyRepo.AcquireAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(RegistrationIdempotencyAcquireResult.Acquired);
         _hasher.Hash(Arg.Any<string>()).Returns("hashed");
 
         await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
@@ -90,6 +98,8 @@ public class RegisterOrganizationHandlerTests
     {
         _orgRepo.SlugExistsAsync(Arg.Any<OrganizationSlug>()).Returns(false);
         _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>()).Returns(false);
+        _idempotencyRepo.AcquireAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(RegistrationIdempotencyAcquireResult.Acquired);
         _hasher.Hash("SecurePass1").Returns("hashed_password");
 
         await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
@@ -98,5 +108,40 @@ public class RegisterOrganizationHandlerTests
         await _userRepo.Received(1).AddAsync(
             Arg.Is<User>(u => u.PasswordHash == "hashed_password"),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RegisterOrganization_WhenIdempotencyKeyAlreadyCompleted_SkipsRegistration()
+    {
+        _idempotencyRepo.AcquireAsync("idem-1", Arg.Any<CancellationToken>())
+            .Returns(RegistrationIdempotencyAcquireResult.AlreadyCompleted);
+
+        RegisterOrganizationCommand command = ValidCommand() with { IdempotencyKey = "idem-1" };
+        await CreateHandler().Handle(command, CancellationToken.None);
+
+        await _orgRepo.DidNotReceive().AddAsync(Arg.Any<Organization>(), Arg.Any<CancellationToken>());
+        await _emailSender.DidNotReceive().SendVerificationEmailAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RegisterOrganization_WhenSaveFails_MarksIdempotencyFailedSoRetryCanProceed()
+    {
+        _orgRepo.SlugExistsAsync(Arg.Any<OrganizationSlug>()).Returns(false);
+        _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>()).Returns(false);
+        _idempotencyRepo.AcquireAsync("idem-retry", Arg.Any<CancellationToken>())
+            .Returns(RegistrationIdempotencyAcquireResult.Acquired);
+        _hasher.Hash(Arg.Any<string>()).Returns("hashed");
+        _uow.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns(_ => Task.FromException<int>(new InvalidOperationException("db down")));
+
+        RegisterOrganizationCommand command = ValidCommand() with { IdempotencyKey = "idem-retry" };
+
+        Func<Task> act = async () => await CreateHandler().Handle(command, CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        await _idempotencyRepo.Received(1).MarkFailedAsync("idem-retry", Arg.Any<CancellationToken>());
+        await _idempotencyRepo.DidNotReceive().MarkCompletedAsync(
+            Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 }

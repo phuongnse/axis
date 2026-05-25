@@ -50,8 +50,9 @@ Self-service registration flow where a new organization signs up and is automati
 - Social/SSO sign-up (Google, GitHub) — not in MVP.
 - CAPTCHA — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: idempotency key (rapid submission dedup) pending API layer.
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
+> Gaps vs spec: none for backend US-001. `Idempotency-Key` header on `POST /api/organizations/` deduplicates rapid resubmits (Pending/Completed/Failed state).
+> **Deferred (PR #124 follow-up):** Frontend registration confirmation-screen behavior alignment for US-001.
 > Decisions: duplicate email returns silently without creating anything — matches "same confirmation screen" AC. `RegisterOrganizationCommandValidator` enforces: org name 2–100 chars, valid email, password min 8 chars + letter + number, confirmation match. Org slug auto-generated with uniqueness retry loop; BCrypt work factor 12. 4 default system roles seeded atomically in the same transaction.
 
 ---
@@ -80,8 +81,9 @@ Self-service registration flow where a new organization signs up and is automati
 *Out of scope*
 - Automatic re-send after X minutes — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⚠️ | Frontend: ⏳
-> Gaps vs spec: rate limiting (max 3 resends/hour) on resend endpoint not implemented. Auto sign-in after verification click pending Frontend layer.
+> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
+> Gaps vs spec: auto sign-in after verification click pending Frontend. **Done:** resend rate limit 3/email/hour via `IResendVerificationRateLimiter` (Redis atomic INCR+EXPIRE per hashed email, HTTP 429 + message); login returns "Please verify your email" when unverified. IP-level `auth` limiter applies to `/connect/login` and Identity gRPC only — not on verify/resend (avoids starving integration tests).
+> **Deferred (PR #124 follow-up):** Frontend verify-email flow, provisioning wait screen, and post-verify auto sign-in (US-002).
 > Decisions: verification token is simplified as `user.Id` (Guid string) — `VerifyEmailCommand(token)` parses it as Guid, looks up user by ID platform-wide, calls `User.VerifyEmail()`. Production will use a dedicated token table; this is documented as a gap. `ResendVerificationEmailCommand` silently succeeds for unknown/already-verified emails (no info leakage).
 
 ---

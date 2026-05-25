@@ -186,6 +186,52 @@ public class AuthEndpointTests(ApiTestFixture fixture)
         resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
+    [Fact]
+    public async Task ResendVerification_WhenFourthRequestWithinHour_Returns429()
+    {
+        await _client.PostAsJsonAsync("/api/organizations", RegisterPayload("resend_rl1"), Json);
+
+        string email = "adminresend_rl1@test.com";
+        for (int i = 0; i < 3; i++)
+        {
+            HttpResponseMessage ok = await _client.PostAsJsonAsync(
+                "/api/auth/resend-verification",
+                new { email });
+            ok.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        }
+
+        HttpResponseMessage limited = await _client.PostAsJsonAsync(
+            "/api/auth/resend-verification",
+            new { email });
+
+        limited.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+        JsonElement body = await limited.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("detail").GetString().Should().Contain("Please wait");
+    }
+
+    [Fact]
+    public async Task VerifyEmail_WhenTokenAlreadyUsed_ReturnsBusinessRuleProblem()
+    {
+        await _client.PostAsJsonAsync("/api/organizations", RegisterPayload("verify_used1"), Json);
+
+        using IServiceScope scope = fixture.CreateScope();
+        IdentityDbContext ctx =
+            scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        User user = ctx.Users
+            .First(u => u.Email == Email.Create("adminverify_used1@test.com").Value);
+
+        string token = user.Id.ToString();
+        HttpResponseMessage first = await _client.PostAsJsonAsync(
+            "/api/auth/verify-email", new { token }, Json);
+        first.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        HttpResponseMessage second = await _client.PostAsJsonAsync(
+            "/api/auth/verify-email", new { token }, Json);
+        second.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        JsonElement body = await second.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("detail").GetString().Should().Contain("already been used");
+    }
+
     // ── Token Refresh ─────────────────────────────────────────────────────────
 
     [Fact]

@@ -49,7 +49,8 @@ public static class AuthEndpoints
             .WithName("ResendEmailVerification")
             .WithSummary("Resend email verification link")
             .WithTags("Identity")
-            .Produces(204);
+            .Produces(204)
+            .ProducesProblem(429);
 
         group.MapPost("/forgot-password", ForgotPassword)
             .AllowAnonymous()
@@ -134,7 +135,10 @@ public static class AuthEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        await mediator.Send(new ResendVerificationEmailCommand(request.Email), ct);
+        Result result = await mediator.Send(new ResendVerificationEmailCommand(request.Email), ct);
+        if (result.IsFailure)
+            return result.ToProblemDetails();
+
         return Results.NoContent();
     }
 

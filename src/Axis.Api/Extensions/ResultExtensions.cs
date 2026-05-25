@@ -26,6 +26,7 @@ public static class ResultExtensions
             ErrorCodes.Conflict => Results.Problem(result.Error, statusCode: StatusCodes.Status409Conflict),
             ErrorCodes.PlanLimit => Results.Problem(result.Error, statusCode: StatusCodes.Status402PaymentRequired),
             ErrorCodes.InvalidInput => Results.Problem(result.Error, statusCode: StatusCodes.Status400BadRequest),
+            ErrorCodes.RateLimited => Results.Problem(result.Error, statusCode: StatusCodes.Status429TooManyRequests),
             _ => Results.Problem(result.Error, statusCode: StatusCodes.Status422UnprocessableEntity),
         };
     }

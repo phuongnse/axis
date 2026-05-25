@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Axis.Api.Tests.Helpers;
 using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Domain.ValueObjects;
 using Axis.Identity.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,6 +14,48 @@ namespace Axis.Api.Tests.Identity;
 public class OrganizationEndpointTests(ApiTestFixture fixture)
 {
     private static readonly JsonSerializerOptions Json = ApiTestFixture.JsonOptions;
+
+    private static object RegisterPayload(string suffix) => new
+    {
+        org_name = $"TestOrg{suffix}",
+        admin_first_name = "Test",
+        admin_last_name = "Admin",
+        admin_email = $"admin{suffix}@test.com",
+        password = "TestPass1",
+        password_confirmation = "TestPass1",
+    };
+
+    [Fact]
+    public async Task Register_WhenSameIdempotencyKeyTwice_CreatesOnlyOneOrganization()
+    {
+        string idempotencyKey = Guid.NewGuid().ToString();
+        object firstPayload = RegisterPayload("idem1a");
+        object secondPayload = RegisterPayload("idem1b");
+
+        using HttpRequestMessage first = new(HttpMethod.Post, "/api/organizations")
+        {
+            Content = JsonContent.Create(firstPayload, options: Json),
+        };
+        first.Headers.Add("Idempotency-Key", idempotencyKey);
+
+        using HttpRequestMessage second = new(HttpMethod.Post, "/api/organizations")
+        {
+            Content = JsonContent.Create(secondPayload, options: Json),
+        };
+        second.Headers.Add("Idempotency-Key", idempotencyKey);
+
+        HttpResponseMessage firstResp = await fixture.Client.SendAsync(first);
+        HttpResponseMessage secondResp = await fixture.Client.SendAsync(second);
+
+        firstResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        secondResp.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using IServiceScope scope = fixture.CreateScope();
+        IdentityDbContext ctx = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        ctx.Organizations.Count(o => o.Name == "TestOrgidem1a").Should().Be(1);
+        ctx.Organizations.Count(o => o.Name == "TestOrgidem1b").Should().Be(0);
+        ctx.Users.Count(u => u.Email == Email.Create("adminidem1b@test.com").Value).Should().Be(0);
+    }
 
     // POST /api/organizations/me/invitations
 

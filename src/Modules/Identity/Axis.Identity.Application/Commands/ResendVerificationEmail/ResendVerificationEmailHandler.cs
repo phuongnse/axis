@@ -7,7 +7,10 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Identity.Application.Commands.VerifyEmail;
 
-public sealed class ResendVerificationEmailHandler(IUserRepository userRepo, IEmailSender emailSender)
+public sealed class ResendVerificationEmailHandler(
+    IUserRepository userRepo,
+    IEmailSender emailSender,
+    IResendVerificationRateLimiter rateLimiter)
     : ICommandHandler<ResendVerificationEmailCommand>
 {
     public async Task<Result> Handle(ResendVerificationEmailCommand command, CancellationToken cancellationToken)
@@ -18,7 +21,10 @@ public sealed class ResendVerificationEmailHandler(IUserRepository userRepo, IEm
         User? user = await userRepo.FindByEmailGloballyAsync(email.Value, cancellationToken);
         if (user is null || user.IsEmailVerified) return Result.Success(); // silent — no info leakage
 
-        // Rate limiting is an Infrastructure/API concern; Application layer just sends
+        Result rateLimit = await rateLimiter.TryRecordResendAsync(email.Value.Value, cancellationToken);
+        if (rateLimit.IsFailure)
+            return rateLimit;
+
         await emailSender.SendVerificationEmailAsync(
             user.Email.Value, user.Id.ToString(), cancellationToken);
 

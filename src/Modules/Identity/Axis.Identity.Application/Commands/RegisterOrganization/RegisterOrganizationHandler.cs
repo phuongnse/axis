@@ -12,6 +12,7 @@ public sealed class RegisterOrganizationHandler(
     IOrganizationRepository orgRepo,
     IUserRepository userRepo,
     IRoleRepository roleRepo,
+    IRegistrationIdempotencyRepository idempotencyRepo,
     IPasswordHasher hasher,
     IEmailSender emailSender,
     IUnitOfWork uow)
@@ -57,48 +58,82 @@ public sealed class RegisterOrganizationHandler(
 
     public async Task<Result> Handle(RegisterOrganizationCommand command, CancellationToken cancellationToken)
     {
-        // Per US-001: always show the same screen — no leakage if email already exists
-        Result<Email> email = Email.Create(command.AdminEmail);
-        if (email.IsFailure) return Result.Success(); // validation layer handles this before handler is reached
+        string? idempotencyKey = string.IsNullOrWhiteSpace(command.IdempotencyKey)
+            ? null
+            : command.IdempotencyKey.Trim();
 
-        if (await userRepo.EmailExistsPlatformWideAsync(email.Value, cancellationToken))
-            return Result.Success(); // silently succeed — same confirmation screen shown
+        RegistrationIdempotencyAcquireResult acquireResult = RegistrationIdempotencyAcquireResult.Acquired;
+        if (idempotencyKey is not null)
+        {
+            acquireResult = await idempotencyRepo.AcquireAsync(idempotencyKey, cancellationToken);
+            if (acquireResult == RegistrationIdempotencyAcquireResult.AlreadyCompleted
+                || acquireResult == RegistrationIdempotencyAcquireResult.InProgress)
+            {
+                return Result.Success();
+            }
+        }
 
-        // Generate unique slug from org name
-        OrganizationSlug slug = await GenerateUniqueSlugAsync(command.OrgName, cancellationToken);
+        try
+        {
+            Result<Email> email = Email.Create(command.AdminEmail);
+            if (email.IsFailure)
+            {
+                await MarkIdempotencyCompletedIfNeededAsync(idempotencyKey, cancellationToken);
+                return Result.Success();
+            }
 
-        // Create Organization
-        Organization org = Organization.Create(command.OrgName, slug, email.Value);
-        await orgRepo.AddAsync(org, cancellationToken);
+            if (await userRepo.EmailExistsPlatformWideAsync(email.Value, cancellationToken))
+            {
+                await MarkIdempotencyCompletedIfNeededAsync(idempotencyKey, cancellationToken);
+                return Result.Success();
+            }
 
-        // Seed 4 system roles for this org
-        Role adminRole = Role.CreateSystem("Admin", org.Id, AdminPermissions);
-        Role editorRole = Role.CreateSystem("Editor", org.Id, EditorPermissions);
-        Role viewerRole = Role.CreateSystem("Viewer", org.Id, ViewerPermissions);
-        Role endUserRole = Role.CreateSystem("End User", org.Id, EndUserPermissions);
+            OrganizationSlug slug = await GenerateUniqueSlugAsync(command.OrgName, cancellationToken);
 
-        await roleRepo.AddAsync(adminRole, cancellationToken);
-        await roleRepo.AddAsync(editorRole, cancellationToken);
-        await roleRepo.AddAsync(viewerRole, cancellationToken);
-        await roleRepo.AddAsync(endUserRole, cancellationToken);
+            Organization org = Organization.Create(command.OrgName, slug, email.Value);
+            await orgRepo.AddAsync(org, cancellationToken);
 
-        // Create admin user
-        string passwordHash = hasher.Hash(command.Password);
-        User user = User.Create(command.AdminFirstName, command.AdminLastName, email.Value, org.Id);
-        user.SetPasswordHash(passwordHash);
-        user.AssignRole(adminRole.Id);
-        await userRepo.AddAsync(user, cancellationToken);
+            Role adminRole = Role.CreateSystem("Admin", org.Id, AdminPermissions);
+            Role editorRole = Role.CreateSystem("Editor", org.Id, EditorPermissions);
+            Role viewerRole = Role.CreateSystem("Viewer", org.Id, ViewerPermissions);
+            Role endUserRole = Role.CreateSystem("End User", org.Id, EndUserPermissions);
 
-        await uow.SaveChangesAsync(cancellationToken);
+            await roleRepo.AddAsync(adminRole, cancellationToken);
+            await roleRepo.AddAsync(editorRole, cancellationToken);
+            await roleRepo.AddAsync(viewerRole, cancellationToken);
+            await roleRepo.AddAsync(endUserRole, cancellationToken);
 
-        // Send verification email (fire-and-forget style — failure doesn't roll back registration)
-        await emailSender.SendVerificationEmailAsync(
-            email.Value.Value,
-            verificationToken: user.Id.ToString(), // simplified; real impl uses a dedicated token
-            cancellationToken);
+            string passwordHash = hasher.Hash(command.Password);
+            User user = User.Create(command.AdminFirstName, command.AdminLastName, email.Value, org.Id);
+            user.SetPasswordHash(passwordHash);
+            user.AssignRole(adminRole.Id);
+            await userRepo.AddAsync(user, cancellationToken);
 
-        return Result.Success();
+            await uow.SaveChangesAsync(cancellationToken);
+
+            await emailSender.SendVerificationEmailAsync(
+                email.Value.Value,
+                verificationToken: user.Id.ToString(),
+                cancellationToken);
+
+            await MarkIdempotencyCompletedIfNeededAsync(idempotencyKey, cancellationToken);
+            return Result.Success();
+        }
+        catch
+        {
+            if (idempotencyKey is not null && acquireResult == RegistrationIdempotencyAcquireResult.Acquired)
+                await idempotencyRepo.MarkFailedAsync(idempotencyKey, cancellationToken);
+
+            throw;
+        }
     }
+
+    private Task MarkIdempotencyCompletedIfNeededAsync(
+        string? idempotencyKey,
+        CancellationToken cancellationToken) =>
+        idempotencyKey is null
+            ? Task.CompletedTask
+            : idempotencyRepo.MarkCompletedAsync(idempotencyKey, cancellationToken);
 
     private async Task<OrganizationSlug> GenerateUniqueSlugAsync(string orgName, CancellationToken ct)
     {
@@ -108,7 +143,6 @@ public sealed class RegisterOrganizationHandler(
         if (candidate.IsSuccess && !await orgRepo.SlugExistsAsync(candidate.Value, ct))
             return candidate.Value;
 
-        // Append random suffix until unique
         for (int i = 0; i < 10; i++)
         {
             string suffix = Random.Shared.Next(1000, 9999).ToString();
@@ -117,7 +151,6 @@ public sealed class RegisterOrganizationHandler(
                 return withSuffix.Value;
         }
 
-        // Fallback: use a UUID-based slug
         return OrganizationSlug.Create($"org-{Guid.NewGuid():N}"[..20]).Value;
     }
 

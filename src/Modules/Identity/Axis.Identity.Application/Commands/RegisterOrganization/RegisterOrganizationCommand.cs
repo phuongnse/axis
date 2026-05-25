@@ -8,4 +8,5 @@ public record RegisterOrganizationCommand(
     string AdminLastName,
     string AdminEmail,
     string Password,
-    string PasswordConfirmation) : ICommand;
+    string PasswordConfirmation,
+    string? IdempotencyKey = null) : ICommand;

@@ -39,10 +39,12 @@ public static class IdentityInfrastructureExtensions
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRoleRepository, RoleRepository>();
         services.AddScoped<IInvitationRepository, InvitationRepository>();
+        services.AddScoped<IRegistrationIdempotencyRepository, RegistrationIdempotencyRepository>();
 
         services.AddScoped<IUnitOfWork, IdentityUnitOfWork>();
         services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
         services.AddScoped<IEmailSender, MailKitEmailSender>();
+        services.AddSingleton<IResendVerificationRateLimiter, RedisResendVerificationRateLimiter>();
         services.AddScoped<IPasswordResetTokenStore, PasswordResetTokenStore>();
         services.AddScoped<ISessionStore, SessionStoreService>();
 
