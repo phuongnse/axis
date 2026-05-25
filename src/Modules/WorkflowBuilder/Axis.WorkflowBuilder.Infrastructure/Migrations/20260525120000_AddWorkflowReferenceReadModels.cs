@@ -37,7 +37,7 @@ namespace Axis.WorkflowBuilder.Infrastructure.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_workflow_model_references", x => x.workflow_id);
+                    table.PrimaryKey("PK_workflow_model_references", x => new { x.workflow_id, x.model_id });
                 });
 
             migrationBuilder.CreateIndex(

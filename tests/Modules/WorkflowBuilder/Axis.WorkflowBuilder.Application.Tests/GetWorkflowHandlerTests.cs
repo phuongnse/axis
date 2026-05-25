@@ -27,7 +27,8 @@ public class GetWorkflowHandlerTests
         _repo.GetByIdAsync(wf.Id, OrgId, Arg.Any<CancellationToken>()).Returns(wf);
         _referenceRepo.GetBrokenStepIdsAsync(wf.Id, Arg.Any<CancellationToken>())
             .Returns(new HashSet<Guid>());
-        _referenceRepo.HasBrokenEventTriggerAsync(wf.Id, Arg.Any<CancellationToken>()).Returns(false);
+        _referenceRepo.GetBrokenModelIdsAsync(wf.Id, Arg.Any<CancellationToken>())
+            .Returns(new HashSet<Guid>());
 
         WorkflowDetailDto? dto = await _handler.Handle(new GetWorkflowQuery(wf.Id, OrgId), CancellationToken.None);
 

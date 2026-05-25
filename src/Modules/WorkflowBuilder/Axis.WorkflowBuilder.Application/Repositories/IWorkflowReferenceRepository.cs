@@ -13,7 +13,7 @@ public interface IWorkflowReferenceRepository
         Guid workflowId,
         CancellationToken cancellationToken = default);
 
-    Task<bool> HasBrokenEventTriggerAsync(
+    Task<IReadOnlySet<Guid>> GetBrokenModelIdsAsync(
         Guid workflowId,
         CancellationToken cancellationToken = default);
 }

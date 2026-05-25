@@ -9,7 +9,7 @@ public static class WorkflowTriggerExtensions
     /// </summary>
     public static Guid? TryGetEventModelId(this WorkflowTrigger trigger)
     {
-        if (trigger.Type != TriggerType.Event || trigger.Config is null)
+        if (trigger is null || trigger.Type != TriggerType.Event || trigger.Config is null)
             return null;
 
         if (!trigger.Config.TryGetValue("modelId", out object? raw) || raw is null)

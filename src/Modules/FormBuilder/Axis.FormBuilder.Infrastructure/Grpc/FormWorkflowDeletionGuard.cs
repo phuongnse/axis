@@ -12,6 +12,8 @@ internal sealed class FormWorkflowDeletionGuard(
     IHttpContextAccessor httpContextAccessor)
     : IFormDeletionGuard
 {
+    private static readonly TimeSpan RpcDeadline = TimeSpan.FromSeconds(30);
+
     public async Task<Result> ValidateCanDeleteAsync(
         Guid formId,
         Guid organizationId,
@@ -29,6 +31,7 @@ internal sealed class FormWorkflowDeletionGuard(
                     OrganizationId = organizationId.ToString(),
                 },
                 headers: headers,
+                deadline: DateTime.UtcNow.Add(RpcDeadline),
                 cancellationToken: cancellationToken);
         }
         catch (RpcException ex) when (ex.StatusCode == StatusCode.Unauthenticated
@@ -37,6 +40,12 @@ internal sealed class FormWorkflowDeletionGuard(
             return Result.Failure(
                 ErrorCodes.BusinessRule,
                 "Unable to verify workflow references for form deletion.");
+        }
+        catch (RpcException ex) when (ex.StatusCode is StatusCode.DeadlineExceeded or StatusCode.Cancelled)
+        {
+            return Result.Failure(
+                ErrorCodes.BusinessRule,
+                "Workflow reference check timed out. Try again shortly.");
         }
         catch (RpcException ex) when (ex.StatusCode == StatusCode.Unavailable)
         {

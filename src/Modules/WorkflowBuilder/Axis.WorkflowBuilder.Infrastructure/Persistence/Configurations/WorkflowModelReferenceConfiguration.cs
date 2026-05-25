@@ -9,7 +9,7 @@ internal sealed class WorkflowModelReferenceConfiguration : IEntityTypeConfigura
     public void Configure(EntityTypeBuilder<WorkflowModelReference> builder)
     {
         builder.ToTable("workflow_model_references");
-        builder.HasKey(r => r.WorkflowId);
+        builder.HasKey(r => new { r.WorkflowId, r.ModelId });
 
         builder.Property(r => r.WorkflowId).HasColumnName("workflow_id").IsRequired();
         builder.Property(r => r.ModelId).HasColumnName("model_id").IsRequired();

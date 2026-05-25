@@ -2,6 +2,7 @@ using Axis.Shared.Application.CQRS;
 using Axis.WorkflowBuilder.Application.Repositories;
 using Axis.WorkflowBuilder.Domain.Aggregates;
 using Axis.WorkflowBuilder.Domain.Enums;
+using Axis.WorkflowBuilder.Domain.ValueObjects;
 
 namespace Axis.WorkflowBuilder.Application.Queries.GetWorkflow;
 
@@ -20,7 +21,7 @@ public sealed class GetWorkflowHandler(
 
         IReadOnlySet<Guid> brokenStepIds = await referenceRepo.GetBrokenStepIdsAsync(
             workflow.Id, cancellationToken);
-        bool brokenEventTrigger = await referenceRepo.HasBrokenEventTriggerAsync(
+        IReadOnlySet<Guid> brokenModelIds = await referenceRepo.GetBrokenModelIdsAsync(
             workflow.Id, cancellationToken);
 
         return new WorkflowDetailDto(
@@ -40,7 +41,9 @@ public sealed class GetWorkflowHandler(
                 .Select(t => new WorkflowTriggerDto(
                     t.Type,
                     t.Config,
-                    t.Type == TriggerType.Event && brokenEventTrigger))
+                    t.Type == TriggerType.Event
+                    && t.TryGetEventModelId() is Guid modelId
+                    && brokenModelIds.Contains(modelId)))
                 .ToList());
     }
 }

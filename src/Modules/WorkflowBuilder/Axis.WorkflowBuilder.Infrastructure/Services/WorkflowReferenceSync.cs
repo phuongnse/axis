@@ -46,34 +46,31 @@ internal sealed class WorkflowReferenceSync(WorkflowBuilderDbContext context) : 
             }
             else if (row.FormId != formId.Value)
                 row.Retarget(formId.Value);
-            else
-                row.MarkHealthy();
         }
     }
 
     private async Task SyncModelReferencesAsync(WorkflowDefinition workflow, CancellationToken cancellationToken)
     {
-        WorkflowTrigger? eventTrigger = workflow.Triggers.FirstOrDefault(t => t.Type == TriggerType.Event);
-        Guid? modelId = eventTrigger?.TryGetEventModelId();
+        List<WorkflowModelReference> existing = await context.WorkflowModelReferences
+            .Where(r => r.WorkflowId == workflow.Id)
+            .ToListAsync(cancellationToken);
 
-        WorkflowModelReference? existing = await context.WorkflowModelReferences
-            .FirstOrDefaultAsync(r => r.WorkflowId == workflow.Id, cancellationToken);
+        HashSet<Guid> currentModelIds = workflow.Triggers
+            .Select(t => t.TryGetEventModelId())
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .ToHashSet();
 
-        if (!modelId.HasValue)
+        foreach (WorkflowModelReference stale in existing.Where(r => !currentModelIds.Contains(r.ModelId)))
+            context.WorkflowModelReferences.Remove(stale);
+
+        foreach (Guid modelId in currentModelIds)
         {
-            if (existing is not null)
-                context.WorkflowModelReferences.Remove(existing);
-            return;
-        }
+            if (existing.Any(r => r.ModelId == modelId))
+                continue;
 
-        if (existing is null)
-        {
             context.WorkflowModelReferences.Add(
-                WorkflowModelReference.Create(workflow.Id, modelId.Value, workflow.OrganizationId));
+                WorkflowModelReference.Create(workflow.Id, modelId, workflow.OrganizationId));
         }
-        else if (existing.ModelId != modelId.Value)
-            existing.Retarget(modelId.Value);
-        else
-            existing.MarkHealthy();
     }
 }

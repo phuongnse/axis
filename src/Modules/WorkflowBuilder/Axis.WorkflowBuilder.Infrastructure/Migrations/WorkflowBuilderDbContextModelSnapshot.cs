@@ -141,7 +141,7 @@ namespace Axis.WorkflowBuilder.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("organization_id");
 
-                    b.HasKey("WorkflowId");
+                    b.HasKey("WorkflowId", "ModelId");
 
                     b.HasIndex("ModelId");
 

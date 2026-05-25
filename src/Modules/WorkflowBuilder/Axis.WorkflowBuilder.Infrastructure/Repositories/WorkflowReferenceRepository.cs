@@ -48,9 +48,15 @@ internal sealed class WorkflowReferenceRepository(WorkflowBuilderDbContext conte
         return stepIds.ToHashSet();
     }
 
-    public async Task<bool> HasBrokenEventTriggerAsync(
+    public async Task<IReadOnlySet<Guid>> GetBrokenModelIdsAsync(
         Guid workflowId,
         CancellationToken cancellationToken = default)
-        => await context.WorkflowModelReferences
-            .AnyAsync(r => r.WorkflowId == workflowId && r.IsBroken, cancellationToken);
+    {
+        List<Guid> modelIds = await context.WorkflowModelReferences
+            .Where(r => r.WorkflowId == workflowId && r.IsBroken)
+            .Select(r => r.ModelId)
+            .ToListAsync(cancellationToken);
+
+        return modelIds.ToHashSet();
+    }
 }
