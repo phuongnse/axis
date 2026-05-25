@@ -8,27 +8,67 @@ namespace Axis.Identity.Infrastructure.Repositories;
 internal sealed class RegistrationIdempotencyRepository(IdentityDbContext context)
     : IRegistrationIdempotencyRepository
 {
-    public async Task<bool> TryClaimAsync(string idempotencyKey, CancellationToken cancellationToken = default)
+    public async Task<RegistrationIdempotencyAcquireResult> AcquireAsync(
+        string idempotencyKey,
+        CancellationToken cancellationToken = default)
     {
-        bool exists = await context.Set<RegistrationIdempotencyRecord>()
-            .AnyAsync(r => r.IdempotencyKey == idempotencyKey, cancellationToken);
-        if (exists)
-            return false;
+        RegistrationIdempotencyRecord? existing = await context.Set<RegistrationIdempotencyRecord>()
+            .FirstOrDefaultAsync(r => r.IdempotencyKey == idempotencyKey, cancellationToken);
+
+        if (existing is not null)
+        {
+            if (existing.Status == RegistrationIdempotencyStatus.Completed)
+                return RegistrationIdempotencyAcquireResult.AlreadyCompleted;
+
+            if (existing.Status == RegistrationIdempotencyStatus.Pending)
+                return RegistrationIdempotencyAcquireResult.InProgress;
+
+            existing.Status = RegistrationIdempotencyStatus.Pending;
+            existing.UpdatedAt = DateTimeOffset.UtcNow;
+            await context.SaveChangesAsync(cancellationToken);
+            return RegistrationIdempotencyAcquireResult.Acquired;
+        }
 
         context.Set<RegistrationIdempotencyRecord>().Add(new RegistrationIdempotencyRecord
         {
             IdempotencyKey = idempotencyKey,
+            Status = RegistrationIdempotencyStatus.Pending,
             CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
         });
 
         try
         {
             await context.SaveChangesAsync(cancellationToken);
-            return true;
+            return RegistrationIdempotencyAcquireResult.Acquired;
         }
         catch (DbUpdateException)
         {
-            return false;
+            return RegistrationIdempotencyAcquireResult.InProgress;
         }
+    }
+
+    public async Task MarkCompletedAsync(string idempotencyKey, CancellationToken cancellationToken = default)
+    {
+        RegistrationIdempotencyRecord? row = await context.Set<RegistrationIdempotencyRecord>()
+            .FirstOrDefaultAsync(r => r.IdempotencyKey == idempotencyKey, cancellationToken);
+        if (row is null)
+            return;
+
+        row.Status = RegistrationIdempotencyStatus.Completed;
+        row.UpdatedAt = DateTimeOffset.UtcNow;
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task MarkFailedAsync(string idempotencyKey, CancellationToken cancellationToken = default)
+    {
+        RegistrationIdempotencyRecord? row = await context.Set<RegistrationIdempotencyRecord>()
+            .FirstOrDefaultAsync(r => r.IdempotencyKey == idempotencyKey, cancellationToken);
+        if (row is null)
+            return;
+
+        row.Status = RegistrationIdempotencyStatus.Failed;
+        row.UpdatedAt = DateTimeOffset.UtcNow;
+        await context.SaveChangesAsync(cancellationToken);
     }
 }

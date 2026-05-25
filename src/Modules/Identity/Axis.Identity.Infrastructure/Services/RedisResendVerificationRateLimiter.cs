@@ -6,11 +6,20 @@ using StackExchange.Redis;
 
 namespace Axis.Identity.Infrastructure.Services;
 
-/// <summary>US-002: sliding window via Redis INCR + 1h TTL (no email in key — SHA-256 hash only).</summary>
+/// <summary>US-002: per-email resend cap with atomic INCR+EXPIRE (Lua; no PII in key).</summary>
 internal sealed class RedisResendVerificationRateLimiter(IConnectionMultiplexer redis) : IResendVerificationRateLimiter
 {
     private const int MaxResendsPerHour = 3;
     private static readonly TimeSpan Window = TimeSpan.FromHours(1);
+
+    private const string IncrementWithExpiryScript =
+        """
+        local count = redis.call('INCR', KEYS[1])
+        if count == 1 then
+          redis.call('EXPIRE', KEYS[1], ARGV[1])
+        end
+        return count
+        """;
 
     public async Task<Result> TryRecordResendAsync(
         string normalizedEmail,
@@ -22,10 +31,12 @@ internal sealed class RedisResendVerificationRateLimiter(IConnectionMultiplexer 
         string key = BuildKey(normalizedEmail);
         IDatabase db = redis.GetDatabase();
 
-        long count = await db.StringIncrementAsync(key);
-        if (count == 1)
-            await db.KeyExpireAsync(key, Window);
+        RedisResult scriptResult = await db.ScriptEvaluateAsync(
+            IncrementWithExpiryScript,
+            [(RedisKey)key],
+            [(RedisValue)(int)Window.TotalSeconds]);
 
+        long count = (long)scriptResult;
         if (count > MaxResendsPerHour)
         {
             return Result.Failure(

@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Axis.Api.Tests.Helpers;
 using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Domain.ValueObjects;
 using Axis.Identity.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,17 +29,18 @@ public class OrganizationEndpointTests(ApiTestFixture fixture)
     public async Task Register_WhenSameIdempotencyKeyTwice_CreatesOnlyOneOrganization()
     {
         string idempotencyKey = Guid.NewGuid().ToString();
-        object payload = RegisterPayload("idem1");
+        object firstPayload = RegisterPayload("idem1a");
+        object secondPayload = RegisterPayload("idem1b");
 
         using HttpRequestMessage first = new(HttpMethod.Post, "/api/organizations")
         {
-            Content = JsonContent.Create(payload, options: Json),
+            Content = JsonContent.Create(firstPayload, options: Json),
         };
         first.Headers.Add("Idempotency-Key", idempotencyKey);
 
         using HttpRequestMessage second = new(HttpMethod.Post, "/api/organizations")
         {
-            Content = JsonContent.Create(payload, options: Json),
+            Content = JsonContent.Create(secondPayload, options: Json),
         };
         second.Headers.Add("Idempotency-Key", idempotencyKey);
 
@@ -50,8 +52,9 @@ public class OrganizationEndpointTests(ApiTestFixture fixture)
 
         using IServiceScope scope = fixture.CreateScope();
         IdentityDbContext ctx = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        int orgCount = ctx.Organizations.Count(o => o.Name == "TestOrgidem1");
-        orgCount.Should().Be(1);
+        ctx.Organizations.Count(o => o.Name == "TestOrgidem1a").Should().Be(1);
+        ctx.Organizations.Count(o => o.Name == "TestOrgidem1b").Should().Be(0);
+        ctx.Users.Count(u => u.Email == Email.Create("adminidem1b@test.com").Value).Should().Be(0);
     }
 
     // POST /api/organizations/me/invitations

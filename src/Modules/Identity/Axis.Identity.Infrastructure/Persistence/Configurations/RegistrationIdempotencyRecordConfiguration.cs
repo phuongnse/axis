@@ -12,6 +12,11 @@ internal sealed class RegistrationIdempotencyRecordConfiguration
         builder.ToTable("registration_idempotency");
         builder.HasKey(r => r.IdempotencyKey);
         builder.Property(r => r.IdempotencyKey).HasMaxLength(128);
+        builder.Property(r => r.Status)
+            .HasConversion<string>()
+            .HasMaxLength(32)
+            .IsRequired();
         builder.Property(r => r.CreatedAt).IsRequired();
+        builder.Property(r => r.UpdatedAt).IsRequired();
     }
 }
