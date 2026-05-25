@@ -2,12 +2,15 @@ using Axis.Identity.Application.Repositories;
 using Axis.Identity.Infrastructure.Persistence;
 using Axis.Identity.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Axis.Identity.Infrastructure.Repositories;
 
 internal sealed class RegistrationIdempotencyRepository(IdentityDbContext context)
     : IRegistrationIdempotencyRepository
 {
+    private static readonly TimeSpan PendingLeaseDuration = TimeSpan.FromMinutes(15);
+
     public async Task<RegistrationIdempotencyAcquireResult> AcquireAsync(
         string idempotencyKey,
         CancellationToken cancellationToken = default)
@@ -21,7 +24,14 @@ internal sealed class RegistrationIdempotencyRepository(IdentityDbContext contex
                 return RegistrationIdempotencyAcquireResult.AlreadyCompleted;
 
             if (existing.Status == RegistrationIdempotencyStatus.Pending)
-                return RegistrationIdempotencyAcquireResult.InProgress;
+            {
+                if (DateTimeOffset.UtcNow - existing.UpdatedAt < PendingLeaseDuration)
+                    return RegistrationIdempotencyAcquireResult.InProgress;
+
+                existing.UpdatedAt = DateTimeOffset.UtcNow;
+                await context.SaveChangesAsync(cancellationToken);
+                return RegistrationIdempotencyAcquireResult.Acquired;
+            }
 
             existing.Status = RegistrationIdempotencyStatus.Pending;
             existing.UpdatedAt = DateTimeOffset.UtcNow;
@@ -42,7 +52,8 @@ internal sealed class RegistrationIdempotencyRepository(IdentityDbContext contex
             await context.SaveChangesAsync(cancellationToken);
             return RegistrationIdempotencyAcquireResult.Acquired;
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex)
+            when (ex.InnerException is PostgresException pg && pg.SqlState == "23505")
         {
             return RegistrationIdempotencyAcquireResult.InProgress;
         }

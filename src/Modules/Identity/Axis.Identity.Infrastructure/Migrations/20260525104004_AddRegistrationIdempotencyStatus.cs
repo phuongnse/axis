@@ -17,7 +17,7 @@ namespace Axis.Identity.Infrastructure.Migrations
                 type: "character varying(32)",
                 maxLength: 32,
                 nullable: false,
-                defaultValue: "");
+                defaultValue: "Completed");
 
             migrationBuilder.AddColumn<DateTimeOffset>(
                 name: "UpdatedAt",
@@ -25,6 +25,13 @@ namespace Axis.Identity.Infrastructure.Migrations
                 type: "timestamp with time zone",
                 nullable: false,
                 defaultValue: new DateTimeOffset(new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)));
+
+            migrationBuilder.Sql(
+                """
+                UPDATE registration_idempotency
+                SET "UpdatedAt" = "CreatedAt"
+                WHERE "UpdatedAt" = TIMESTAMPTZ '0001-01-01 00:00:00+00';
+                """);
         }
 
         /// <inheritdoc />
