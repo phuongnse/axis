@@ -7,7 +7,10 @@ using Axis.WorkflowBuilder.Domain.Entities;
 
 namespace Axis.WorkflowBuilder.Application.Commands.AddStep;
 
-public sealed class AddStepHandler(IWorkflowRepository workflowRepo, IUnitOfWork uow)
+public sealed class AddStepHandler(
+    IWorkflowRepository workflowRepo,
+    IWorkflowReferenceSync referenceSync,
+    IUnitOfWork uow)
     : ICommandHandler<AddStepCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(AddStepCommand command, CancellationToken cancellationToken)
@@ -28,6 +31,7 @@ public sealed class AddStepHandler(IWorkflowRepository workflowRepo, IUnitOfWork
             return Result.Failure<Guid>(ErrorCodes.BusinessRule, ex.Message);
         }
 
+        await referenceSync.SyncAsync(workflow, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);
         return step.Id;
     }

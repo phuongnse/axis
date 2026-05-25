@@ -39,7 +39,10 @@ register "$DM_SCHEMA_DIR/FieldAddedEvent.avsc" "axis.datamodeling.field-added-va
 register "$DM_SCHEMA_DIR/FieldUpdatedEvent.avsc" "axis.datamodeling.field-updated-value"
 register "$DM_SCHEMA_DIR/FieldRemovedEvent.avsc" "axis.datamodeling.field-removed-value"
 
+FB_SCHEMA_DIR="$ROOT/src/Modules/FormBuilder/Axis.FormBuilder.Contracts/Schemas"
+
 register "$ID_SCHEMA_DIR/OrganizationVerifiedEvent.avsc" "axis.identity.organization-verified-value"
 register "$ID_SCHEMA_DIR/TenantModuleProvisionReportEvent.avsc" "axis.identity.tenant-module-provision-report-value"
+register "$FB_SCHEMA_DIR/FormDeletedEvent.avsc" "axis.formbuilder.form-deleted-value"
 
 echo "register-avro-schemas: OK"

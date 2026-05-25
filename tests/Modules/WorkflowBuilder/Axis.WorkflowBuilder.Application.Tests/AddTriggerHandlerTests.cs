@@ -16,7 +16,15 @@ public class AddTriggerHandlerTests
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly AddTriggerHandler _handler;
 
-    public AddTriggerHandlerTests() => _handler = new AddTriggerHandler(_repo, _uow);
+    private readonly IWorkflowReferenceSync _referenceSync = Substitute.For<IWorkflowReferenceSync>();
+
+    public AddTriggerHandlerTests()
+    {
+        _referenceSync
+            .SyncAsync(Arg.Any<WorkflowDefinition>(), Arg.Any<CancellationToken>())
+            .Returns(new WorkflowReferenceSyncResult(HasBrokenReferences: false));
+        _handler = new AddTriggerHandler(_repo, _referenceSync, _uow);
+    }
 
     [Fact]
     public async Task Handle_WhenTriggerTypeIsNew_AddsTriggerAndSaves()

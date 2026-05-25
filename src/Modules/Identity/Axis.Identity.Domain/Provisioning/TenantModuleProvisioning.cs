@@ -69,6 +69,9 @@ public sealed class TenantModuleProvisioning : Entity<(Guid OrganizationId, stri
 
     public void MarkRetryScheduled(int attemptCount)
     {
+        if (attemptCount < 1)
+            throw new ArgumentException("Attempt count must be at least 1.", nameof(attemptCount));
+
         Status = TenantModuleProvisioningStatus.Pending;
         AttemptCount = attemptCount;
         UpdatedAt = DateTimeOffset.UtcNow;

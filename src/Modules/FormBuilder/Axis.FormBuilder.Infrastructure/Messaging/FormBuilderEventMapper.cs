@@ -36,6 +36,11 @@ internal static class FormBuilderEventMapper
                 executionId = expired.ExecutionId.ToString(),
                 executionStepId = expired.ExecutionStepId.ToString(),
             },
+            FormDeleted deleted => new FormDeletedEvent
+            {
+                formId = deleted.FormId.ToString(),
+                organizationId = deleted.OrganizationId.ToString(),
+            },
             _ => null,
         };
 }

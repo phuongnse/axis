@@ -1,7 +1,10 @@
 using Axis.WorkflowBuilder.Application.Repositories;
 using Axis.WorkflowBuilder.Application.Services;
+using Axis.WorkflowBuilder.Infrastructure.Grpc;
 using Axis.WorkflowBuilder.Infrastructure.Persistence;
 using Axis.WorkflowBuilder.Infrastructure.Repositories;
+using Axis.WorkflowBuilder.Infrastructure.Services;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,8 +21,19 @@ public static class WorkflowBuilderInfrastructureExtensions
                 ?? throw new InvalidOperationException("Missing connection string 'WorkflowBuilder'.")));
 
         services.AddScoped<IWorkflowRepository, WorkflowRepository>();
+        services.AddScoped<IWorkflowReferenceRepository, WorkflowReferenceRepository>();
+        services.AddScoped<IWorkflowReferenceSync, WorkflowReferenceSync>();
         services.AddScoped<IUnitOfWork, WorkflowBuilderUnitOfWork>();
 
+        services.AddGrpc();
+
         return services;
+    }
+
+    public static WebApplication MapWorkflowBuilderGrpc(this WebApplication app)
+    {
+        app.MapGrpcService<WorkflowFormReferenceGrpcService>()
+            .RequireAuthorization();
+        return app;
     }
 }

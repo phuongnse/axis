@@ -12,19 +12,21 @@ namespace Axis.FormBuilder.Application.Tests.Commands;
 public class DeleteFormHandlerTests
 {
     private readonly IFormRepository _formRepo = Substitute.For<IFormRepository>();
+    private readonly IFormDeletionGuard _formDeletionGuard = Substitute.For<IFormDeletionGuard>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
     private const string UserId = "user-123";
 
-    private DeleteFormHandler CreateHandler() => new(_formRepo, _uow);
+    private DeleteFormHandler CreateHandler() => new(_formRepo, _formDeletionGuard, _uow);
 
     [Fact]
     public async Task DeleteForm_WhenFormNotReferenced_SoftDeletesForm()
     {
         FormDefinition form = FormDefinition.Create("Employee Intake", null, OrgId, UserId);
         _formRepo.GetByIdAsync(form.Id, OrgId).Returns(form);
-        _formRepo.IsReferencedByWorkflowAsync(form.Id).Returns(false);
+        _formDeletionGuard.ValidateCanDeleteAsync(form.Id, OrgId, Arg.Any<CancellationToken>())
+            .Returns(Result.Success());
 
         Result result = await CreateHandler().Handle(new DeleteFormCommand(form.Id, OrgId), CancellationToken.None);
 
@@ -38,7 +40,9 @@ public class DeleteFormHandlerTests
     {
         FormDefinition form = FormDefinition.Create("Employee Intake", null, OrgId, UserId);
         _formRepo.GetByIdAsync(form.Id, OrgId).Returns(form);
-        _formRepo.IsReferencedByWorkflowAsync(form.Id).Returns(true);
+        _formDeletionGuard.ValidateCanDeleteAsync(form.Id, OrgId, Arg.Any<CancellationToken>())
+            .Returns(Result.Failure(ErrorCodes.BusinessRule,
+                "This form is referenced by one or more active workflow steps. Remove those references before deleting."));
 
         Result result = await CreateHandler().Handle(new DeleteFormCommand(form.Id, OrgId), CancellationToken.None);
 

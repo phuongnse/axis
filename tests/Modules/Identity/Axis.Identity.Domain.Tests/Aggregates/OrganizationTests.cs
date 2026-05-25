@@ -74,4 +74,39 @@ public class OrganizationTests
 
         act.Should().Throw<ArgumentException>();
     }
+
+    [Fact]
+    public void BeginProvisioning_WhenProvisioningFailed_AllowsRetry()
+    {
+        Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail);
+        org.BeginProvisioning();
+        org.MarkProvisioningFailed();
+
+        org.BeginProvisioning();
+
+        org.Status.Should().Be(OrganizationStatus.Provisioning);
+    }
+
+    [Fact]
+    public void MarkProvisioningFailed_WhenNotProvisioning_Throws()
+    {
+        Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail);
+
+        Action act = () => org.MarkProvisioningFailed();
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Only provisioning organizations*");
+    }
+
+    [Fact]
+    public void MarkProvisioningFailed_WhenAlreadyFailed_IsIdempotent()
+    {
+        Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail);
+        org.BeginProvisioning();
+        org.MarkProvisioningFailed();
+
+        org.MarkProvisioningFailed();
+
+        org.Status.Should().Be(OrganizationStatus.ProvisioningFailed);
+    }
 }

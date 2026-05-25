@@ -42,8 +42,9 @@ public sealed class Organization : AggregateRoot<Guid>
         if (Status == OrganizationStatus.Provisioning)
             return;
 
-        if (Status != OrganizationStatus.Active)
-            throw new InvalidOperationException("Only active organizations can enter provisioning.");
+        if (Status != OrganizationStatus.Active && Status != OrganizationStatus.ProvisioningFailed)
+            throw new InvalidOperationException(
+                "Only active or provisioning-failed organizations can enter provisioning.");
 
         Status = OrganizationStatus.Provisioning;
     }
@@ -58,6 +59,12 @@ public sealed class Organization : AggregateRoot<Guid>
 
     public void MarkProvisioningFailed()
     {
+        if (Status == OrganizationStatus.ProvisioningFailed)
+            return;
+
+        if (Status != OrganizationStatus.Provisioning)
+            throw new InvalidOperationException("Only provisioning organizations can be marked as failed.");
+
         Status = OrganizationStatus.ProvisioningFailed;
     }
 

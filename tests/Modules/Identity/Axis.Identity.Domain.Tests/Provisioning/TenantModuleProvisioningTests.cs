@@ -32,4 +32,14 @@ public sealed class TenantModuleProvisioningTests
 
         act.Should().Throw<ArgumentException>().WithParameterName("attemptCount");
     }
+
+    [Fact]
+    public void MarkRetryScheduled_WhenAttemptCountZero_Throws()
+    {
+        TenantModuleProvisioning row = TenantModuleProvisioning.CreatePending(Guid.NewGuid(), "datamodeling");
+
+        Action act = () => row.MarkRetryScheduled(attemptCount: 0);
+
+        act.Should().Throw<ArgumentException>().WithParameterName("attemptCount");
+    }
 }

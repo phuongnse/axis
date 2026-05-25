@@ -58,6 +58,12 @@ public static class FormBuilderEventExtensions
     public static Guid ExecutionStepId(this FormTaskExpiredEvent @event)
         => ParseRequiredGuid(@event.executionStepId, nameof(@event.executionStepId));
 
+    public static Guid FormId(this FormDeletedEvent @event)
+        => ParseRequiredGuid(@event.formId, nameof(@event.formId));
+
+    public static Guid OrganizationId(this FormDeletedEvent @event)
+        => ParseRequiredGuid(@event.organizationId, nameof(@event.organizationId));
+
     private static Guid ParseRequiredGuid(string value, string fieldName)
         => Guid.TryParse(value, out Guid parsed)
             ? parsed

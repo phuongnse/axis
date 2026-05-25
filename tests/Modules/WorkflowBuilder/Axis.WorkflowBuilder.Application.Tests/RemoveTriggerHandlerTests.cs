@@ -16,7 +16,15 @@ public class RemoveTriggerHandlerTests
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly RemoveTriggerHandler _handler;
 
-    public RemoveTriggerHandlerTests() => _handler = new RemoveTriggerHandler(_repo, _uow);
+    private readonly IWorkflowReferenceSync _referenceSync = Substitute.For<IWorkflowReferenceSync>();
+
+    public RemoveTriggerHandlerTests()
+    {
+        _referenceSync
+            .SyncAsync(Arg.Any<WorkflowDefinition>(), Arg.Any<CancellationToken>())
+            .Returns(new WorkflowReferenceSyncResult(HasBrokenReferences: false));
+        _handler = new RemoveTriggerHandler(_repo, _referenceSync, _uow);
+    }
 
     [Fact]
     public async Task Handle_WhenTriggerExists_RemovesAndSaves()

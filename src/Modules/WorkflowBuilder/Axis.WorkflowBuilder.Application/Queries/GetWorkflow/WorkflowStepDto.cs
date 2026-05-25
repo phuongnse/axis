@@ -6,4 +6,5 @@ public sealed record WorkflowStepDto(
     Guid Id,
     string Name,
     StepType Type,
-    IReadOnlyDictionary<string, object?>? Config);
+    IReadOnlyDictionary<string, object?>? Config,
+    bool IsBroken);
