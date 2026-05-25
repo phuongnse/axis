@@ -71,7 +71,7 @@ Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoi
 
 ## Identity / E01 — tenant provisioning (cross-cutting)
 
-**Verify email → provision (PR #93):** `User.VerifyEmail()` raises an `OrganizationVerified` domain event; `IdentityUnitOfWork` maps it to `OrganizationVerifiedEvent` (Avro) and publishes via Wolverine outbox → Kafka topic `axis.identity.organization-verified`. Each of DataModeling/FormBuilder/WorkflowBuilder/WorkflowEngine has an `OrganizationVerifiedHandler` in its own Infrastructure project that `CREATE SCHEMA IF NOT EXISTS` + `MigrateAsync` for that module's DB, serialized per-org via a Postgres advisory lock to make Kafka redelivery safe against `__EFMigrationsHistory` races. **Deferred (F01 US-003 follow-up):** retry/backoff/alert on provision failures, provisioning wait UI, Admin role on verify per E01 US-003.
+**Verify email → provision:** `User.VerifyEmail()` sets org `Provisioning`, seeds `tenant_module_provisions`, publishes `OrganizationVerifiedEvent` → each module provisions and reports via `TenantModuleProvisionReportEvent`; Identity coordinator retries (3×, exponential backoff) and logs critical alert on exhaustion; `GET /api/auth/provisioning-status?token=` for polling. **Deferred:** provisioning wait UI (Frontend).
 
 ## PageBuilder — E07-page-builder
 

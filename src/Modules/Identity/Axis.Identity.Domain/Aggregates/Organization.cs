@@ -37,6 +37,30 @@ public sealed class Organization : AggregateRoot<Guid>
         return org;
     }
 
+    public void BeginProvisioning()
+    {
+        if (Status == OrganizationStatus.Provisioning)
+            return;
+
+        if (Status != OrganizationStatus.Active)
+            throw new InvalidOperationException("Only active organizations can enter provisioning.");
+
+        Status = OrganizationStatus.Provisioning;
+    }
+
+    public void CompleteProvisioning()
+    {
+        if (Status != OrganizationStatus.Provisioning)
+            throw new InvalidOperationException("Organization is not in provisioning state.");
+
+        Status = OrganizationStatus.Active;
+    }
+
+    public void MarkProvisioningFailed()
+    {
+        Status = OrganizationStatus.ProvisioningFailed;
+    }
+
     public void Archive()
     {
         if (Status == OrganizationStatus.Archived)

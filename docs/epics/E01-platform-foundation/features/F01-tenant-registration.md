@@ -110,9 +110,9 @@ Self-service registration flow where a new organization signs up and is automati
 *Out of scope*
 - Custom schema naming chosen by the user — schema names are auto-generated.
 
-> **Implementation status** — Domain: ⏳ | Application: ⚠️ | Infrastructure: ⚠️ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: retry job with exponential backoff, platform alert after retries exhausted, Admin role assignment on verify, and provisioning wait UI (US-002) not implemented. Provisioning runs asynchronously: `User.VerifyEmail()` raises `OrganizationVerified`; Identity publishes Avro `OrganizationVerifiedEvent` via Wolverine outbox → Kafka; each module's `OrganizationVerifiedHandler` provisions its own tenant schema.
-> **Deferred (F01 US-003 follow-up):** durable retry/alert policy on the per-module `OrganizationVerifiedHandler` instances, org `Provisioning` status + polling endpoint for wait screen, Admin role assignment on verify.
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⚠️ | Frontend: ⏳
+> Gaps vs spec: provisioning wait UI (US-002) pending Frontend. **Done:** org enters `Provisioning` on verify; per-module `TenantModuleProvisionReportEvent` + Identity coordinator schedules up to 3 retries with exponential backoff; critical log alert when exhausted; `GET /api/auth/provisioning-status?token=` for polling.
+> **Deferred:** external paging integration for platform alerts (critical log is the MVP signal).
 > Decisions: provisioning is fully event-driven over Kafka per [ADR-019](../../../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope) — no central provisioner. The verify endpoint stays fast, the provisioning failure mode is decoupled from email verification, and each module owns its own schema lifecycle (satisfies ADR-010 "extraction is a redeploy"). Tenant schema name is derived from `Organization.Id` as `tenant_{orgId:N}` (32-char hex, no dashes) — stable across the lifetime of the org and safe as a Postgres identifier.
 
 ---
