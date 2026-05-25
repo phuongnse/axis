@@ -97,6 +97,23 @@ Gate 2:
 
 **Deferred follow-ups (mandatory when leaving work open):** do not wait for the user. Any skipped review item, thin-endpoint refactor, or partial layer needs a named `**Deferred (...):**` line — full rules in [process.md § Deferred follow-up](process.md). Remove the line when fixed.
 
+### Review comment fixes (CodeRabbit / human) — default structural
+
+Do **not** ship the first diff that makes CI green or silences the bot. Apply this **before** resolving review threads (no user reminder required).
+
+| If the review points at… | Band-aid (avoid unless user asks for minimal diff) | Structural default |
+|--------------------------|------------------------------------------------------|--------------------|
+| Mutation in `DbContext` / sync service, then **SQL** `AnyAsync` / repository query on same rows | Extra `SaveChangesAsync` mid-command so SQL sees updates | Return outcome from the mutator (`*Result`, `bool`) or evaluate **change tracker** in the same service; **one** `SaveChanges` at command end |
+| EF “query might miss pending changes” | Rely on `ToListAsync` instead of `AnyAsync` without documenting why | Same as above — mutator owns the invariant |
+| gRPC / HTTP call without deadline | Only add `catch` | Deadline + transient status handling; match sibling guards in the repo |
+
+**Self-check (mandatory when touching Application + Infrastructure in one handler):**
+
+1. After mutating read models, does anything **query the DB** for the same invariant? If yes → who owns that invariant?
+2. Would you accept **two commits** in one use case on PR review? If it feels wrong → redesign before push.
+3. In PR **Summary** (one line): `Review fixes: structural — <what>` or `Review fixes: tactical — <why minimal>`.
+
+CodeRabbit and similar bots are **signal**, not authority — validate against [patterns.md § Cross-module data](patterns.md) and UoW boundaries in [CLAUDE.md](../../CLAUDE.md).
 
 ### Gate 3 — retrospective
 
@@ -109,6 +126,7 @@ Gate 3:
 - Infrastructure footgun? → No
 - Non-obvious test setup? → No
 - Changed direction mid-task? → No
+- Review fix band-aid (mid-command save / EF query hack)? → No
 - Spec gap discovered? → No
 - Incident-level detail in rule text? → No
 ```
