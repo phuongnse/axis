@@ -271,6 +271,5 @@ jobs:
   # (or its git history). The workflow analyzed cleanly — only the upload
   # step needs GHAS.
   #
-  # In the meantime, Dependabot (.github/dependabot.yml) opens PRs for new
-  # advisories against existing dependencies, covering the same threat
-  # model with a publish-time delay.
+  # In the meantime, Dependabot (.github/dependabot.yml) opens monthly grouped
+  # minor/patch PRs plus immediate PRs for security advisories.
