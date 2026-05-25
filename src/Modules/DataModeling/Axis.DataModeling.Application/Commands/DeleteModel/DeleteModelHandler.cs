@@ -8,6 +8,7 @@ namespace Axis.DataModeling.Application.Commands.DeleteModel;
 /// <summary>US-033: Validates model exists, then soft-deletes it.</summary>
 public sealed class DeleteModelHandler(
     IDataModelRepository modelRepo,
+    IModelDeletionGuard deletionGuard,
     IUnitOfWork uow)
     : ICommandHandler<DeleteModelCommand>
 {
@@ -16,6 +17,11 @@ public sealed class DeleteModelHandler(
         DataModeling.Domain.Aggregates.DataModel? model = await modelRepo.GetByIdAsync(command.ModelId, command.OrganizationId, cancellationToken);
         if (model is null)
             return Result.Failure(ErrorCodes.NotFound, "Model not found.");
+
+        Result guardResult = await deletionGuard.ValidateCanDeleteAsync(
+            command.ModelId, command.OrganizationId, cancellationToken);
+        if (guardResult.IsFailure)
+            return guardResult;
 
         model.Delete();
         await uow.SaveChangesAsync(cancellationToken);

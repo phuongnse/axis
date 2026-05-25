@@ -13,10 +13,12 @@ public class AddFieldToFormHandlerTests
 {
     private static readonly Guid OrgId = Guid.NewGuid();
     private readonly IFormRepository _repo = Substitute.For<IFormRepository>();
+    private readonly IFormModelReferenceSync _formModelReferenceSync = Substitute.For<IFormModelReferenceSync>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly AddFieldToFormHandler _handler;
 
-    public AddFieldToFormHandlerTests() => _handler = new AddFieldToFormHandler(_repo, _uow);
+    public AddFieldToFormHandlerTests()
+        => _handler = new AddFieldToFormHandler(_repo, _formModelReferenceSync, _uow);
 
     [Fact]
     public async Task Handle_WhenFormExists_AddsFieldAndReturnsFieldId()
@@ -31,6 +33,8 @@ public class AddFieldToFormHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeEmpty();
         form.Fields.Should().ContainSingle(f => f.Key == "full_name" && f.Label == "Full Name");
+        await _formModelReferenceSync.Received(1)
+            .SyncRelationPickerReferencesAsync(form, Arg.Any<CancellationToken>());
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 

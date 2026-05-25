@@ -85,6 +85,7 @@
   </ItemGroup>
   <ItemGroup Label="Auth">
     <!-- ASP.NET Core 8.x packages aligned on 8.0.27 -->
+    <PackageVersion Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.2.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.27" />
     <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.18.0" />
     <PackageVersion Include="Microsoft.IdentityModel.Tokens" Version="8.18.0" />

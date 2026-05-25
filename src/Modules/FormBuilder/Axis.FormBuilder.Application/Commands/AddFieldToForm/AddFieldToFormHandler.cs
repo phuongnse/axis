@@ -7,7 +7,10 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.FormBuilder.Application.Commands.AddFieldToForm;
 
-public sealed class AddFieldToFormHandler(IFormRepository formRepo, IUnitOfWork uow)
+public sealed class AddFieldToFormHandler(
+    IFormRepository formRepo,
+    IFormModelReferenceSync formModelReferenceSync,
+    IUnitOfWork uow)
     : ICommandHandler<AddFieldToFormCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(AddFieldToFormCommand command, CancellationToken cancellationToken)
@@ -26,6 +29,7 @@ public sealed class AddFieldToFormHandler(IFormRepository formRepo, IUnitOfWork 
             return Result.Failure<Guid>(ErrorCodes.BusinessRule, ex.Message);
         }
 
+        await formModelReferenceSync.SyncRelationPickerReferencesAsync(form, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);
         return field.Id;
     }

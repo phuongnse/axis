@@ -10,4 +10,5 @@ public sealed record FormFieldDto(
     FormFieldType Type,
     bool Required,
     int DisplayOrder,
-    FormFieldConfig? Config);
+    FormFieldConfig? Config,
+    bool IsBroken = false);
