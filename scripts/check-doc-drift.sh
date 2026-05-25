@@ -286,6 +286,8 @@ for target in "${SPEC_TARGETS[@]}"; do
   fi
 done
 
+"${ROOT}/scripts/check-buf-modules.sh" || ERR=1
+
 if [ "${ERR}" -ne 0 ]; then
   echo "" >&2
   echo "See docs/playbooks/agent-checklist.md" >&2

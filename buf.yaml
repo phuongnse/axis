@@ -1,0 +1,19 @@
+# Buf v2 — one module per Axis.{Module}.Contracts/Protos root.
+# Layout: Protos/axis/{module}/v{n}/*.proto with `package axis.{module}.v{n};`
+# Codegen stays on Grpc.Tools in each Contracts csproj; Buf enforces lint + breaking.
+#
+# When adding a module with .proto files: register its Protos path below and run
+# ./scripts/check-buf-modules.sh (also enforced in CI doc drift when protos change).
+version: v2
+modules:
+  - path: src/Modules/Identity/Axis.Identity.Contracts/Protos
+  - path: src/Modules/FormBuilder/Axis.FormBuilder.Contracts/Protos
+lint:
+  use:
+    - STANDARD
+  except:
+    # RPC request/response types follow {Rpc}Request / {Rpc}Response in .proto files.
+    - RPC_REQUEST_RESPONSE_UNIQUE
+breaking:
+  use:
+    - FILE

@@ -16,6 +16,7 @@ Docs-first development: feature specs in `docs/epics/` are the contract; code im
 1. Walk **Gates 0–3** in [docs/playbooks/agent-checklist.md](docs/playbooks/agent-checklist.md) locally; tick the matching boxes in the PR body.
 2. When `src/`, `tests/`, or `docs/epics/` change: run `./scripts/check-doc-drift.sh` (bash — use Git Bash on Windows). CI job **Doc drift** must be green.
 3. PR description: **Summary + Linked spec + Requirements only** — no commit list, no CI status (the Checks tab covers that). Template: [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md).
+4. When adding or changing `.proto` files: register the module `Protos` path in [`buf.yaml`](buf.yaml), run `buf lint`, and `./scripts/check-buf-modules.sh` (included in **Doc drift**). CI job **Protobuf — Buf lint and breaking** runs on proto/`buf.yaml` changes — see [patterns.md § gRPC](docs/playbooks/patterns.md).
 
 ## Dependency updates (Dependabot)
 
