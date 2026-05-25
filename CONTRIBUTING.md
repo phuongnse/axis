@@ -29,7 +29,7 @@ Docs-first development: feature specs in `docs/epics/` are the contract; code im
 
 **Security advisories** still open a dedicated PR as soon as GitHub publishes them (not waiting for the monthly schedule).
 
-**Semver-major** NuGet bumps for `FluentAssertions` and `coverlet.collector` are **ignored** by Dependabot — upgrade those in an intentional `chore(deps)` PR when the team is ready (license/API/test impact).
+**Semver-major** bumps (NuGet, npm, GitHub Actions) are **ignored** by Dependabot — upgrade in an intentional `chore(deps)` PR when ready (major versions often need code changes; auto-PRs will fail CI until then).
 
 CI also runs `dotnet list package --vulnerable` on every build; merge security PRs promptly even if the monthly bundle is still open.
 

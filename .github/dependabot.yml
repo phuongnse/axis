@@ -2,8 +2,8 @@ version: 2
 
 # Dependabot opens PRs on a monthly schedule. Minor + patch bumps are grouped into
 # one PR per ecosystem (NuGet, npm, GitHub Actions). Security advisories still
-# open immediately. Semver-major version updates are ignored for selected
-# packages — bump those in a deliberate chore PR when ready.
+# open immediately. All semver-major updates are ignored — upgrade majors in a
+# deliberate chore PR when ready (API breaks require code changes, not auto-merge).
 updates:
   # .NET — central package management (Directory.Packages.props).
   - package-ecosystem: nuget
@@ -18,11 +18,7 @@ updates:
     labels:
       - dependencies
     ignore:
-      # Major bumps need explicit review (license, API, test tooling). Open a
-      # manual chore PR when upgrading; do not rely on the monthly group PR.
-      - dependency-name: "FluentAssertions"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "coverlet.collector"
+      - dependency-name: "*"
         update-types: ["version-update:semver-major"]
     groups:
       dotnet-minor-and-patch:
@@ -43,8 +39,7 @@ updates:
     labels:
       - dependencies
     ignore:
-      # @types/node must track the Node runtime (frontend/.nvmrc).
-      - dependency-name: "@types/node"
+      - dependency-name: "*"
         update-types: ["version-update:semver-major"]
     groups:
       frontend-minor-and-patch:
@@ -64,6 +59,9 @@ updates:
       prefix: chore(ci)
     labels:
       - dependencies
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       actions-minor-and-patch:
         update-types: [minor, patch]
