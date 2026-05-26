@@ -6,11 +6,24 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Axis.WorkflowEngine.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class AddExecutionSteps : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.CreateTable(
+                name: "workflow_active_statuses",
+                columns: table => new
+                {
+                    workflow_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    organization_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    is_active = table.Column<bool>(type: "boolean", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_workflow_active_statuses", x => x.workflow_id);
+                });
+
             migrationBuilder.CreateTable(
                 name: "workflow_executions",
                 columns: table => new
@@ -35,6 +48,20 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "workflow_snapshots",
+                columns: table => new
+                {
+                    workflow_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    organization_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    steps = table.Column<string>(type: "jsonb", nullable: false),
+                    transitions = table.Column<string>(type: "jsonb", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_workflow_snapshots", x => x.workflow_id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "execution_steps",
                 columns: table => new
                 {
@@ -51,7 +78,8 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                     ErrorDetails = table.Column<string>(type: "text", nullable: true),
                     StartedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     CompletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -75,6 +103,12 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
         {
             migrationBuilder.DropTable(
                 name: "execution_steps");
+
+            migrationBuilder.DropTable(
+                name: "workflow_active_statuses");
+
+            migrationBuilder.DropTable(
+                name: "workflow_snapshots");
 
             migrationBuilder.DropTable(
                 name: "workflow_executions");

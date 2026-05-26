@@ -110,7 +110,9 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasColumnName("status");
 
                     b.Property<Guid>("SubscriptionPlanId")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
+                        .HasDefaultValue(new Guid("11111111-1111-1111-1111-111111111101"))
                         .HasColumnName("subscription_plan_id");
 
                     b.HasKey("Id");
@@ -119,95 +121,6 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("organizations", (string)null);
-                });
-
-            modelBuilder.Entity("Axis.Identity.Domain.Subscriptions.SubscriptionPlan", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_active");
-
-                    b.Property<bool>("IsAvailableForNewSignups")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_available_for_new_signups");
-
-                    b.Property<int?>("MaxExecutionsPerMonth")
-                        .HasColumnType("integer")
-                        .HasColumnName("max_executions_per_month");
-
-                    b.Property<long?>("MaxStorageMegabytes")
-                        .HasColumnType("bigint")
-                        .HasColumnName("max_storage_megabytes");
-
-                    b.Property<int?>("MaxUsers")
-                        .HasColumnType("integer")
-                        .HasColumnName("max_users");
-
-                    b.Property<int?>("MaxWorkflows")
-                        .HasColumnType("integer")
-                        .HasColumnName("max_workflows");
-
-                    b.Property<int>("MonthlyPriceCents")
-                        .HasColumnType("integer")
-                        .HasColumnName("monthly_price_cents");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("name");
-
-                    b.Property<string>("Slug")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("slug");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Slug")
-                        .IsUnique();
-
-                    b.ToTable("subscription_plans", (string)null);
-                });
-
-            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.OrganizationPlanChangeLog", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("ChangedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("changed_at");
-
-                    b.Property<Guid>("ChangedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("changed_by_user_id");
-
-                    b.Property<Guid>("NewPlanId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("new_plan_id");
-
-                    b.Property<Guid>("OrganizationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("organization_id");
-
-                    b.Property<Guid>("PreviousPlanId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("previous_plan_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OrganizationId");
-
-                    b.ToTable("organization_plan_change_logs", (string)null);
                 });
 
             modelBuilder.Entity("Axis.Identity.Domain.Aggregates.Role", b =>
@@ -361,6 +274,61 @@ namespace Axis.Identity.Infrastructure.Migrations
                     b.ToTable("tenant_module_provisions", (string)null);
                 });
 
+            modelBuilder.Entity("Axis.Identity.Domain.Subscriptions.SubscriptionPlan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsAvailableForNewSignups")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_available_for_new_signups");
+
+                    b.Property<int?>("MaxExecutionsPerMonth")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_executions_per_month");
+
+                    b.Property<long?>("MaxStorageMegabytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("max_storage_megabytes");
+
+                    b.Property<int?>("MaxUsers")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_users");
+
+                    b.Property<int?>("MaxWorkflows")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_workflows");
+
+                    b.Property<int>("MonthlyPriceCents")
+                        .HasColumnType("integer")
+                        .HasColumnName("monthly_price_cents");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("slug");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Slug")
+                        .IsUnique();
+
+                    b.ToTable("subscription_plans", (string)null);
+                });
+
             modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.EmailVerificationToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -391,6 +359,40 @@ namespace Axis.Identity.Infrastructure.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("email_verification_tokens", (string)null);
+                });
+
+            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.OrganizationPlanChangeLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at");
+
+                    b.Property<Guid>("ChangedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("changed_by_user_id");
+
+                    b.Property<Guid>("NewPlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("new_plan_id");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<Guid>("PreviousPlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("previous_plan_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.ToTable("organization_plan_change_logs", (string)null);
                 });
 
             modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.PasswordResetToken", b =>

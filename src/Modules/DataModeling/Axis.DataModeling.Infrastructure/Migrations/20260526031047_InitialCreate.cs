@@ -67,6 +67,12 @@ namespace Axis.DataModeling.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_data_records", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_data_records_data_models_model_id",
+                        column: x => x.model_id,
+                        principalTable: "data_models",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateIndex(
@@ -92,10 +98,10 @@ namespace Axis.DataModeling.Infrastructure.Migrations
                 name: "data_classes");
 
             migrationBuilder.DropTable(
-                name: "data_models");
+                name: "data_records");
 
             migrationBuilder.DropTable(
-                name: "data_records");
+                name: "data_models");
         }
     }
 }

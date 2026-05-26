@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Axis.DataModeling.Infrastructure.Migrations
 {
     [DbContext(typeof(DataModelingDbContext))]
-    [Migration("20260523085039_AddDataRecordModelForeignKey")]
-    partial class AddDataRecordModelForeignKey
+    [Migration("20260526031047_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

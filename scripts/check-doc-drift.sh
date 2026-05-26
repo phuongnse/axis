@@ -286,6 +286,21 @@ for target in "${SPEC_TARGETS[@]}"; do
   fi
 done
 
+# EF migration pairs: every non-snapshot Migration .cs must have a .Designer.cs
+# (hand-written migrations often forget the Designer and never apply in MigrateAsync).
+while IFS= read -r migration; do
+  [ -z "${migration}" ] && continue
+  designer="${migration%.cs}.Designer.cs"
+  if [ ! -f "${designer}" ]; then
+    fail "EF migration missing .Designer.cs — regenerate with dotnet ef: ${migration}"
+  fi
+done < <(
+  find "${ROOT}/src/Modules" -path '*/Migrations/*.cs' \
+    ! -name '*Snapshot*' \
+    ! -name '*.Designer.cs' 2>/dev/null \
+    || true
+)
+
 "${ROOT}/scripts/check-buf-modules.sh" || ERR=1
 
 if [ "${ERR}" -ne 0 ]; then

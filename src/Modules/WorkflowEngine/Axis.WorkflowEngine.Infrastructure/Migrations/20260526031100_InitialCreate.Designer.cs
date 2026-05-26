@@ -12,18 +12,38 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Axis.WorkflowEngine.Infrastructure.Migrations
 {
     [DbContext(typeof(WorkflowEngineDbContext))]
-    [Migration("20260517150217_AddExecutionSteps")]
-    partial class AddExecutionSteps
+    [Migration("20260526031100_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.5")
+                .HasAnnotation("ProductVersion", "9.0.16")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.Entity("Axis.WorkflowEngine.Domain.Aggregates.WorkflowActiveStatus", b =>
+                {
+                    b.Property<Guid>("WorkflowId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("workflow_id");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.HasKey("WorkflowId");
+
+                    b.ToTable("workflow_active_statuses", (string)null);
+                });
 
             modelBuilder.Entity("Axis.WorkflowEngine.Domain.Aggregates.WorkflowExecution", b =>
                 {
@@ -76,6 +96,32 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                     b.ToTable("workflow_executions", (string)null);
                 });
 
+            modelBuilder.Entity("Axis.WorkflowEngine.Domain.ReadModels.WorkflowSnapshot", b =>
+                {
+                    b.Property<Guid>("WorkflowId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("workflow_id");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("Steps")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("steps");
+
+                    b.Property<string>("Transitions")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("transitions");
+
+                    b.HasKey("WorkflowId");
+
+                    b.ToTable("workflow_snapshots", (string)null);
+                });
+
             modelBuilder.Entity("Axis.WorkflowEngine.Domain.Aggregates.WorkflowExecution", b =>
                 {
                     b.OwnsMany("Axis.WorkflowEngine.Domain.Aggregates.ExecutionStep", "Steps", b1 =>
@@ -126,6 +172,12 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                             b1.Property<string>("StepType")
                                 .IsRequired()
                                 .HasColumnType("text");
+
+                            b1.Property<uint>("xmin")
+                                .IsConcurrencyToken()
+                                .ValueGeneratedOnAddOrUpdate()
+                                .HasColumnType("xid")
+                                .HasColumnName("xmin");
 
                             b1.HasKey("Id");
 

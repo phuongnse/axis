@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Axis.FormBuilder.Infrastructure.Migrations
 {
     [DbContext(typeof(FormBuilderDbContext))]
-    [Migration("20260523082220_SyncPendingModelChanges")]
-    partial class SyncPendingModelChanges
+    [Migration("20260526031056_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -157,6 +157,37 @@ namespace Axis.FormBuilder.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("form_submissions", (string)null);
+                });
+
+            modelBuilder.Entity("Axis.FormBuilder.Domain.ReadModels.FormModelReference", b =>
+                {
+                    b.Property<Guid>("FormId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_id");
+
+                    b.Property<Guid>("FormFieldId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_field_id");
+
+                    b.Property<bool>("IsBroken")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_broken");
+
+                    b.Property<Guid>("ModelId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("model_id");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.HasKey("FormId", "FormFieldId");
+
+                    b.HasIndex("FormId");
+
+                    b.HasIndex("ModelId", "OrganizationId");
+
+                    b.ToTable("form_model_references", (string)null);
                 });
 
             modelBuilder.Entity("Axis.FormBuilder.Domain.ReadModels.FormWorkflowReference", b =>
