@@ -9,4 +9,5 @@ public record RegisterOrganizationCommand(
     string AdminEmail,
     string Password,
     string PasswordConfirmation,
+    Guid? SubscriptionPlanId = null,
     string? IdempotencyKey = null) : ICommand;

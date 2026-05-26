@@ -2,9 +2,11 @@ using Amazon.S3;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Infrastructure.Persistence;
+using Axis.Identity.Infrastructure.PlanLimits;
 using Axis.Identity.Infrastructure.Repositories;
 using Axis.Identity.Infrastructure.Grpc;
 using Axis.Identity.Infrastructure.Services;
+using Axis.Shared.Application.PlanLimits;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.RateLimiting;
@@ -34,6 +36,10 @@ public static class IdentityInfrastructureExtensions
             });
 
         services.AddScoped<IOrganizationRepository, OrganizationRepository>();
+        services.AddScoped<ISubscriptionPlanRepository, SubscriptionPlanRepository>();
+        services.AddScoped<IOrganizationPlanChangeLogRepository, OrganizationPlanChangeLogRepository>();
+        services.AddScoped<IPlatformAdminAuthorization, ConfigPlatformAdminAuthorization>();
+        services.AddScoped<IPlanLimitUsageCounter, UserPlanLimitUsageCounter>();
         services.AddScoped<ITenantModuleProvisioningRepository, TenantModuleProvisioningRepository>();
         services.AddScoped<IPlatformProvisioningAlert, LoggingPlatformProvisioningAlert>();
         services.AddScoped<IUserRepository, UserRepository>();
@@ -52,6 +58,7 @@ public static class IdentityInfrastructureExtensions
         services.AddGrpc();
 
         services.AddHostedService<OpenIddictSeeder>();
+        services.AddHostedService<SubscriptionPlanSeeder>();
 
         services.AddAWSService<IAmazonS3>();
         services.AddScoped<IAvatarStorageService, S3AvatarStorageService>();

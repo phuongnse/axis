@@ -6,4 +6,5 @@ public record RegisterOrganizationRequest(
     string AdminLastName,
     string AdminEmail,
     string Password,
-    string PasswordConfirmation);
+    string PasswordConfirmation,
+    Guid? SubscriptionPlanId = null);

@@ -3,6 +3,7 @@ using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Contracts;
 using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Domain.Subscriptions;
 using Axis.Identity.Domain.Events;
 using Axis.Identity.Domain.Provisioning;
 using Axis.Identity.Domain.ValueObjects;
@@ -32,7 +33,8 @@ public class VerifyEmailHandlerTests
         Organization organization = Organization.Create(
             "Acme",
             OrganizationSlug.Create("acme").Value!,
-            email);
+            email,
+            WellKnownSubscriptionPlans.FreeId);
         User user = User.Create("Alice", "Smith", email, organization.Id);
         user.SetPasswordHash("hashed");
         return (user, organization);

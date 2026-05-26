@@ -85,5 +85,7 @@ Define subscription plan tiers with feature limits and enforce those limits at t
 *Out of scope*
 - Org-initiated plan upgrade — Phase 2 (requires billing integration).
 
-> **Implementation status** — Domain: ⏳ | Application: ⏳ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: No wireframe for the Platform Admin "Change plan" UI. US-012 is an internal back-office action performed by the Axis team (Platform Admin role), not by org users. It belongs to a separate Platform Admin portal that has not been designed yet — the regular app wireframes (E01–E06) cover org-user flows only. For MVP, Platform Admins can use the Scalar/Swagger UI to call the API directly. A dedicated admin portal wireframe should be created when the Platform Admin dashboard is scoped.
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
+> Gaps vs spec: pricing UI and "Current plan" badge (Frontend). Redis cached counters deferred — enforcement uses live DB counts with structured HTTP 402 (`plan_limit_exceeded`). Bulk import workflow limit pre-check deferred. Platform Admin portal UI deferred — `PUT /api/platform/organizations/{id}/plan` + `PlatformAdmin:UserIds` config for US-012.
+> **Deferred (PR follow-up):** Redis INCR/TTL counters and bulk-import limit checks (US-011 edge cases).
+> Decisions: catalog in Identity `subscription_plans` (seeded migration + startup seeder); `IPlanLimitService` in `Axis.Shared.Application` with module usage counters wired at `Axis.Api` composition root; register accepts optional `subscriptionPlanId` (defaults to Free).

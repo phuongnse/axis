@@ -1,3 +1,4 @@
+using Axis.Shared.Application.PlanLimits;
 using Axis.Shared.Domain.Primitives;
 using Axis.WorkflowEngine.Application.Commands.StartExecution;
 using Axis.WorkflowEngine.Application.Messages;
@@ -20,12 +21,18 @@ public class StartExecutionHandlerTests
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly IStepDispatcher _dispatcher = Substitute.For<IStepDispatcher>();
     private readonly ILogger<StartExecutionHandler> _logger = Substitute.For<ILogger<StartExecutionHandler>>();
+    private readonly IPlanLimitService _planLimitService = Substitute.For<IPlanLimitService>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
     private static readonly Guid WorkflowId = Guid.NewGuid();
     private static readonly Guid UserId = Guid.NewGuid();
 
-    private StartExecutionHandler CreateHandler() => new(_execRepo, _workflowReader, _uow, _dispatcher, _logger);
+    private StartExecutionHandler CreateHandler()
+    {
+        _planLimitService.EnsureWithinLimitAsync(Arg.Any<Guid>(), Arg.Any<PlanLimitResourceType>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success());
+        return new(_planLimitService, _execRepo, _workflowReader, _uow, _dispatcher, _logger);
+    }
 
     private static WorkflowSnapshot MakeSnapshot() => WorkflowSnapshot.Create(
         WorkflowId, OrgId,

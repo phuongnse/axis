@@ -364,6 +364,7 @@ try
     builder.Services.AddWorkflowBuilderInfrastructure(cfg);
     builder.Services.AddFormBuilderInfrastructure(cfg);
     builder.Services.AddWorkflowEngineInfrastructure(cfg);
+    builder.Services.AddScoped<Axis.Shared.Application.PlanLimits.IPlanLimitService, Axis.Api.Infrastructure.PlanLimits.PlanLimitService>();
 
     // ── Cross-module gRPC clients (ADR-014) ────────────────────────────────
     // In modulith mode the client loops back to the gateway's own gRPC server
@@ -486,7 +487,9 @@ try
 
     // ── Module endpoints ───────────────────────────────────────────────────
     app.MapAuthEndpoints();
+    app.MapPlanEndpoints();
     app.MapOrganizationEndpoints();
+    app.MapPlatformOrganizationEndpoints();
     app.MapInvitationEndpoints();
     app.MapUserEndpoints();
     app.MapRoleEndpoints();

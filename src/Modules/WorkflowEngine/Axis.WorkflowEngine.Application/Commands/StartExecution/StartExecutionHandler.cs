@@ -1,4 +1,5 @@
 using Axis.Shared.Application.CQRS;
+using Axis.Shared.Application.PlanLimits;
 using Axis.Shared.Domain.Primitives;
 using Axis.WorkflowEngine.Application.Messages;
 using Axis.WorkflowEngine.Application.Repositories;
@@ -12,6 +13,7 @@ namespace Axis.WorkflowEngine.Application.Commands.StartExecution;
 /// <summary>US-090: Validates workflow is active, creates Pending execution with all steps,
 /// then dispatches ExecuteNextStepMessage so Wolverine picks up execution asynchronously.</summary>
 public sealed class StartExecutionHandler(
+    IPlanLimitService planLimitService,
     IExecutionRepository execRepo,
     IWorkflowDefinitionReader workflowReader,
     IUnitOfWork uow,
@@ -21,6 +23,18 @@ public sealed class StartExecutionHandler(
 {
     public async Task<Result<Guid>> Handle(StartExecutionCommand command, CancellationToken cancellationToken)
     {
+        Result planCheck = await planLimitService.EnsureWithinLimitAsync(
+            command.OrganizationId,
+            PlanLimitResourceType.ExecutionsPerMonth,
+            increment: 1,
+            cancellationToken);
+        if (planCheck.IsFailure)
+        {
+            if (planCheck.PlanLimitDetails is PlanLimitFailureDetails details)
+                return Result<Guid>.PlanLimitFailure(details);
+            return Result.Failure<Guid>(planCheck.ErrorCode!, planCheck.Error);
+        }
+
         // US-090: only Active workflows can be triggered
         if (!await workflowReader.IsActiveAsync(command.WorkflowDefinitionId, command.OrganizationId, cancellationToken))
             return Result.Failure<Guid>(ErrorCodes.BusinessRule,

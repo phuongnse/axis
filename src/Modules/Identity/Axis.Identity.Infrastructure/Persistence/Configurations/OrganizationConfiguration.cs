@@ -45,5 +45,9 @@ internal sealed class OrganizationConfiguration : IEntityTypeConfiguration<Organ
         builder.Property(o => o.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
+
+        builder.Property(o => o.SubscriptionPlanId)
+            .HasColumnName("subscription_plan_id")
+            .IsRequired();
     }
 }

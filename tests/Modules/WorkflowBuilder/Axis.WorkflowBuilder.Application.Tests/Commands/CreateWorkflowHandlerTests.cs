@@ -1,3 +1,4 @@
+using Axis.Shared.Application.PlanLimits;
 using Axis.Shared.Domain.Primitives;
 using Axis.WorkflowBuilder.Application.Commands.CreateWorkflow;
 using Axis.WorkflowBuilder.Application.Repositories;
@@ -12,11 +13,17 @@ public class CreateWorkflowHandlerTests
 {
     private readonly IWorkflowRepository _workflowRepo = Substitute.For<IWorkflowRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly IPlanLimitService _planLimitService = Substitute.For<IPlanLimitService>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
     private const string UserId = "user-123";
 
-    private CreateWorkflowHandler CreateHandler() => new(_workflowRepo, _uow);
+    private CreateWorkflowHandler CreateHandler()
+    {
+        _planLimitService.EnsureWithinLimitAsync(Arg.Any<Guid>(), Arg.Any<PlanLimitResourceType>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success());
+        return new(_planLimitService, _workflowRepo, _uow);
+    }
 
     [Fact]
     public async Task CreateWorkflow_WhenNameIsUnique_CreatesDraftWorkflowAndReturnsId()

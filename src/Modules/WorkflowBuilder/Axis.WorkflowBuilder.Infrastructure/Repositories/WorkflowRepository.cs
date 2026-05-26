@@ -41,4 +41,7 @@ internal sealed class WorkflowRepository(WorkflowBuilderDbContext context) : IWo
             .AnyAsync(w => w.OrganizationId == organizationId
                 && w.Name.ToLower() == name.ToLower()
                 && (excludeId == null || w.Id != excludeId), ct);
+
+    public Task<int> CountByOrganizationAsync(Guid organizationId, CancellationToken ct = default) =>
+        context.WorkflowDefinitions.CountAsync(w => w.OrganizationId == organizationId, ct);
 }

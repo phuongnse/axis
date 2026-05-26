@@ -19,4 +19,9 @@ internal sealed class InvitationRepository(IdentityDbContext context) : IInvitat
             .FirstOrDefaultAsync(i => i.Email == email
                                    && i.OrganizationId == organizationId
                                    && i.Status == InvitationStatus.Pending, ct);
+
+    public Task<int> CountPendingAsync(Guid organizationId, CancellationToken ct = default) =>
+        context.Invitations.CountAsync(
+            i => i.OrganizationId == organizationId && i.Status == InvitationStatus.Pending,
+            ct);
 }

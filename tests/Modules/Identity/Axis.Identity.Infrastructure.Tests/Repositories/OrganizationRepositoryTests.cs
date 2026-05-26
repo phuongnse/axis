@@ -1,4 +1,5 @@
 using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Domain.Subscriptions;
 using Axis.Identity.Domain.ValueObjects;
 using Axis.Identity.Infrastructure.Repositories;
 using Axis.Identity.Infrastructure.Tests.Fixtures;
@@ -25,7 +26,8 @@ public class OrganizationRepositoryTests(IdentityDatabaseFixture db) : IAsyncLif
         Organization.Create(
             "Test Org",
             OrganizationSlug.Create(slug).Value,
-            Email.Create("owner@example.com").Value);
+            Email.Create("owner@example.com").Value,
+            WellKnownSubscriptionPlans.FreeId);
 
     [Fact]
     public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()

@@ -51,7 +51,8 @@ Without this foundation, nothing else works. Every feature in every other epic r
 | Shared Domain | ✅ Done | `Entity`, `AggregateRoot`, `ValueObject`, `IDomainEvent`, `Result<T>` |
 | Shared Application | ✅ Done | `ICommand/IQuery`, `ICommandHandler/IQueryHandler`, `ValidationBehavior`, `ITenantContext` |
 | Shared Infrastructure | ✅ Done | `TenantSchemaInterceptor`, per-module `UnitOfWork` ([ADR-017](../../TECH_STACK.md#adr-017-axisshared-is-abstractions-only-no-shared-implementation)); **OpenTelemetry** host wiring on `Axis.Api` ([ADR-018](../../TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability), [patterns § OpenTelemetry](../../playbooks/patterns.md#opentelemetry-observability)) |
-| Tenant Registration (US-001–002) | ⚠️ Partial | Domain + Application + Infrastructure + API done (`POST /api/organizations/` with `Idempotency-Key`, opaque verify tokens 24h, verify/resend auth endpoints, resend 3/email/hr); Frontend ⏳ |
+| Tenant Registration (US-001–004 backend) | ⚠️ Partial | US-001–002 + plan on register (US-004 backend): opaque verify tokens, resend limit, optional `subscriptionPlanId` (default Free). Frontend ⏳ |
+| Subscription Plans (F04 US-010–012 backend) | ⚠️ Partial | `GET /api/plans`, plan limits 402 on create workflow / invite / start execution, platform admin plan change API. Frontend + Redis counters ⏳ |
 | Tenant Provisioning (US-003) | ⚠️ Partial | Kafka-driven per-module provisioning with `TenantSchemaProvisioner` helper, `TenantModuleProvisionReportEvent`, Identity coordinator (retry + alert), `tenant_module_provisions` tracking, `GET /api/auth/provisioning-status`. Frontend wait screen ⏳. |
 | Organization Management (F02) | ⏳ Pending | — |
 | Subscription Plans (F04) | ⏳ Pending | — |

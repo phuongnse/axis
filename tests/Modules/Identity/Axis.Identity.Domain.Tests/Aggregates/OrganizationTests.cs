@@ -1,5 +1,6 @@
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.Events;
+using Axis.Identity.Domain.Subscriptions;
 using Axis.Identity.Domain.ValueObjects;
 using FluentAssertions;
 
@@ -13,7 +14,7 @@ public class OrganizationTests
     [Fact]
     public void Organization_WhenCreated_ProducesValidOrganization()
     {
-        var org = Organization.Create("Acme Corp", ValidSlug, ValidEmail);
+        Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail, WellKnownSubscriptionPlans.FreeId);
 
         org.Name.Should().Be("Acme Corp");
         org.Slug.Should().Be(ValidSlug);
@@ -24,7 +25,7 @@ public class OrganizationTests
     [Fact]
     public void Organization_WhenCreated_RaisesOrganizationCreatedEvent()
     {
-        var org = Organization.Create("Acme Corp", ValidSlug, ValidEmail);
+        Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail, WellKnownSubscriptionPlans.FreeId);
 
         org.DomainEvents.Should().ContainSingle()
             .Which.Should().BeOfType<OrganizationCreated>();
@@ -33,7 +34,7 @@ public class OrganizationTests
     [Fact]
     public void Organization_WhenCreated_OrganizationCreatedEventContainsCorrectData()
     {
-        var org = Organization.Create("Acme Corp", ValidSlug, ValidEmail);
+        Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail, WellKnownSubscriptionPlans.FreeId);
 
         var evt = org.DomainEvents.OfType<OrganizationCreated>().Single();
         evt.OrganizationId.Should().Be(org.Id);
@@ -45,7 +46,7 @@ public class OrganizationTests
     [Fact]
     public void Organization_WhenArchived_ChangesStatusToArchived()
     {
-        var org = Organization.Create("Acme Corp", ValidSlug, ValidEmail);
+        Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail, WellKnownSubscriptionPlans.FreeId);
         org.ClearDomainEvents();
 
         org.Archive();
@@ -56,7 +57,7 @@ public class OrganizationTests
     [Fact]
     public void Organization_WhenAlreadyArchived_ArchiveThrows()
     {
-        var org = Organization.Create("Acme Corp", ValidSlug, ValidEmail);
+        Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail, WellKnownSubscriptionPlans.FreeId);
         org.Archive();
 
         var act = () => org.Archive();
@@ -70,7 +71,7 @@ public class OrganizationTests
     [InlineData("   ")]
     public void Organization_WhenCreatedWithEmptyName_Throws(string name)
     {
-        var act = () => Organization.Create(name, ValidSlug, ValidEmail);
+        Action act = () => Organization.Create(name, ValidSlug, ValidEmail, WellKnownSubscriptionPlans.FreeId);
 
         act.Should().Throw<ArgumentException>();
     }
@@ -78,7 +79,7 @@ public class OrganizationTests
     [Fact]
     public void BeginProvisioning_WhenProvisioningFailed_AllowsRetry()
     {
-        Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail);
+        Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail, WellKnownSubscriptionPlans.FreeId);
         org.BeginProvisioning();
         org.MarkProvisioningFailed();
 
@@ -90,7 +91,7 @@ public class OrganizationTests
     [Fact]
     public void MarkProvisioningFailed_WhenNotProvisioning_Throws()
     {
-        Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail);
+        Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail, WellKnownSubscriptionPlans.FreeId);
 
         Action act = () => org.MarkProvisioningFailed();
 
@@ -101,7 +102,7 @@ public class OrganizationTests
     [Fact]
     public void MarkProvisioningFailed_WhenAlreadyFailed_IsIdempotent()
     {
-        Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail);
+        Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail, WellKnownSubscriptionPlans.FreeId);
         org.BeginProvisioning();
         org.MarkProvisioningFailed();
 

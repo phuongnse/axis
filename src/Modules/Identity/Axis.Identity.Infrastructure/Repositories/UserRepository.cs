@@ -33,4 +33,9 @@ internal sealed class UserRepository(IdentityDbContext context) : IUserRepositor
             .Where(u => u.OrganizationId == organizationId
                      && EF.Property<List<Guid>>(u, "_roleIds").Contains(adminRoleId))
             .CountAsync(ct);
+
+    public Task<int> CountActiveUsersAsync(Guid organizationId, CancellationToken ct = default) =>
+        context.Users.CountAsync(
+            u => u.OrganizationId == organizationId && u.Status == UserStatus.Active,
+            ct);
 }

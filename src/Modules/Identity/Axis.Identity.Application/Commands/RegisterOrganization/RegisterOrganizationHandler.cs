@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Domain.Subscriptions;
 using Axis.Identity.Domain.ValueObjects;
 using Axis.Shared.Application.CQRS;
 using Axis.Shared.Domain.Primitives;
@@ -10,6 +11,7 @@ namespace Axis.Identity.Application.Commands.RegisterOrganization;
 
 public sealed class RegisterOrganizationHandler(
     IOrganizationRepository orgRepo,
+    ISubscriptionPlanRepository planRepo,
     IUserRepository userRepo,
     IRoleRepository roleRepo,
     IRegistrationIdempotencyRepository idempotencyRepo,
@@ -92,7 +94,9 @@ public sealed class RegisterOrganizationHandler(
 
             OrganizationSlug slug = await GenerateUniqueSlugAsync(command.OrgName, cancellationToken);
 
-            Organization org = Organization.Create(command.OrgName, slug, email.Value);
+            Guid planId = await ResolveSubscriptionPlanIdAsync(command.SubscriptionPlanId, cancellationToken);
+
+            Organization org = Organization.Create(command.OrgName, slug, email.Value, planId);
             await orgRepo.AddAsync(org, cancellationToken);
 
             Role adminRole = Role.CreateSystem("Admin", org.Id, AdminPermissions);
@@ -166,4 +170,21 @@ public sealed class RegisterOrganizationHandler(
     private static string GenerateSlugFromName(string name) =>
         Regex.Replace(name.ToLowerInvariant().Trim(), @"[^a-z0-9]+", "-")
             .Trim('-');
+
+    private async Task<Guid> ResolveSubscriptionPlanIdAsync(Guid? requestedPlanId, CancellationToken cancellationToken)
+    {
+        if (requestedPlanId is Guid planId && planId != Guid.Empty)
+        {
+            Domain.Subscriptions.SubscriptionPlan? plan = await planRepo.GetByIdAsync(planId, cancellationToken);
+            if (plan is not null && plan.IsActive && plan.IsAvailableForNewSignups)
+                return plan.Id;
+        }
+
+        Domain.Subscriptions.SubscriptionPlan? freePlan =
+            await planRepo.GetByIdAsync(WellKnownSubscriptionPlans.FreeId, cancellationToken);
+        if (freePlan is not null)
+            return freePlan.Id;
+
+        return WellKnownSubscriptionPlans.FreeId;
+    }
 }

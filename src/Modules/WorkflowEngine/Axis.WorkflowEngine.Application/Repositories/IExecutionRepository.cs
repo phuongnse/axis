@@ -22,4 +22,6 @@ public interface IExecutionRepository
         Guid workflowId, Guid organizationId, int page, int pageSize, ExecutionStatus? status = null, CancellationToken ct = default);
     Task<IReadOnlyList<ExecutionSummaryResponse>> GetRetriesAsync(
         Guid originalExecutionId, Guid organizationId, CancellationToken ct = default);
+
+    Task<int> CountCreatedSinceUtcAsync(Guid organizationId, DateTime sinceUtc, CancellationToken ct = default);
 }
