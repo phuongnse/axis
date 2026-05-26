@@ -13,7 +13,7 @@
 | 1 | This page → **Open work** on the epic README | Prioritized gaps for that epic (backend vs frontend called out) |
 | 2 | `docs/epics/{epic}/features/F0N-*.md` | Per–user-story `> **Implementation status**` + `Gaps vs spec` + `**Done:**` / `**Deferred:**` |
 | 3 | `docs/PROGRESS.md` | Module layer summary (Domain → Frontend); cross-cutting foundation phases |
-| 4 | `grep -rE "\| Application \| ⚠️|\| Infrastructure \| ⚠️|\| API \| ⚠️" docs/epics/` | US rows with partial backend layers ([agent-checklist](../playbooks/agent-checklist.md)) |
+| 4 | `grep -rE "\\| Application \\| ⚠️\\|\\| Infrastructure \\| ⚠️\\|\\| API \\| ⚠️" docs/epics/` | US rows with partial backend layers ([agent-checklist](../playbooks/agent-checklist.md)) |
 
 **Symbols** (per layer **on this US**, not the whole module):
 

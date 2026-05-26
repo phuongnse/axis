@@ -228,9 +228,10 @@ def main() -> int:
     deprecated_issues: list[str] = []
 
     for path in sorted(ROOT.glob(FEATURE_GLOB)):
-        deprecated_issues.extend(check_deprecated_format(path))
         if process_file(path, check_only=args.check):
             changed_files.append(str(path.relative_to(ROOT)))
+        if args.check:
+            deprecated_issues.extend(check_deprecated_format(path))
 
     exit_code = 0
 

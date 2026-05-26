@@ -11,9 +11,7 @@
 | email-confirmation | [source](../wireframes/email-confirmation.excalidraw) | [preview](../wireframes/email-confirmation.svg) |
 | verify-email | [source](../wireframes/verify-email.excalidraw) | [preview](../wireframes/verify-email.svg) |
 | verify-email-rate-limit | [source](../wireframes/verify-email-rate-limit.excalidraw) | [preview](../wireframes/verify-email-rate-limit.svg) |
-
-> **Wireframe** (US-002 sign-in before verify): [docs/epics/E02-identity-access/wireframes/login-unverified.excalidraw](../../E02-identity-access/wireframes/login-unverified.excalidraw) · [preview](../../E02-identity-access/wireframes/login-unverified.svg)
-## Wireframes
+| login-unverified (US-002 sign-in before verify) | [source](../../E02-identity-access/wireframes/login-unverified.excalidraw) | [preview](../../E02-identity-access/wireframes/login-unverified.svg) |
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
@@ -151,7 +149,7 @@ Self-service registration flow where a new organization signs up and is automati
 > | Frontend | ⚠️ |
 >
 > **Gaps vs spec:** provisioning wait UI (US-002) pending Frontend. **Done:** org enters `Provisioning` on verify; per-module `TenantModuleProvisionReportEvent` + Identity coordinator schedules up to 3 retries with exponential backoff; critical log alert when exhausted; `GET /api/auth/provisioning-status?token=` for polling.
-> **Deferred (PR follow-up):** external paging integration for platform alerts (critical log is the MVP signal).
+> **Deferred (PR #N follow-up):** external paging integration for platform alerts (critical log is the MVP signal).
 > **Decisions:** provisioning is fully event-driven over Kafka per [ADR-019](../../../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope) — no central provisioner. The verify endpoint stays fast, the provisioning failure mode is decoupled from email verification, and each module owns its own schema lifecycle (satisfies ADR-010 "extraction is a redeploy"). Tenant schema name is derived from `Organization.Id` as `tenant_{orgId:N}` (32-char hex, no dashes) — stable across the lifetime of the org and safe as a Postgres identifier.
 
 ---
