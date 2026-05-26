@@ -9,4 +9,6 @@ public sealed record SubscriptionPlanDto(
     int? MaxExecutionsPerMonth,
     int? MaxUsers,
     long? MaxStorageMegabytes,
-    bool IsCurrent);
+    IReadOnlyList<string> FeatureFlags,
+    bool IsCurrent,
+    bool IsAvailableForNewSignups);

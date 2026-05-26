@@ -20,7 +20,8 @@ public class CreateWorkflowHandlerTests
 
     private CreateWorkflowHandler CreateHandler()
     {
-        _planLimitService.EnsureWithinLimitAsync(Arg.Any<Guid>(), Arg.Any<PlanLimitResourceType>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+        _planLimitService
+            .EnsureWithinLimitAsync(Arg.Any<Guid>(), Arg.Any<PlanLimitResourceType>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Result.Success());
         return new(_planLimitService, _workflowRepo, _uow);
     }

@@ -1,3 +1,4 @@
+using Axis.Shared.Application.PlanLimits;
 using Axis.Shared.Domain.Primitives;
 using Axis.WorkflowBuilder.Application.Commands.ImportWorkflow;
 using Axis.WorkflowBuilder.Application.Queries.ExportWorkflow;
@@ -13,6 +14,7 @@ namespace Axis.WorkflowBuilder.Application.Tests;
 public class ImportWorkflowHandlerTests
 {
     private static readonly Guid OrgId = Guid.NewGuid();
+    private readonly IPlanLimitService _planLimitService = Substitute.For<IPlanLimitService>();
     private readonly IWorkflowRepository _repo = Substitute.For<IWorkflowRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly ImportWorkflowHandler _handler;
@@ -21,10 +23,12 @@ public class ImportWorkflowHandlerTests
 
     public ImportWorkflowHandlerTests()
     {
+        _planLimitService.EnsureWithinLimitAsync(Arg.Any<Guid>(), Arg.Any<PlanLimitResourceType>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success());
         _referenceSync
             .SyncAsync(Arg.Any<WorkflowDefinition>(), Arg.Any<CancellationToken>())
             .Returns(new WorkflowReferenceSyncResult(HasBrokenReferences: false));
-        _handler = new ImportWorkflowHandler(_repo, _referenceSync, _uow);
+        _handler = new ImportWorkflowHandler(_planLimitService, _repo, _referenceSync, _uow);
     }
 
     private static WorkflowExportDto BuildExportDto(string name = "Imported Workflow") =>

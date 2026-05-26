@@ -1,4 +1,5 @@
 using Axis.Identity.Application.Repositories;
+using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.Subscriptions;
 using Axis.Shared.Application.CQRS;
 
@@ -13,13 +14,21 @@ public sealed class ListSubscriptionPlansHandler(
         ListSubscriptionPlansQuery query,
         CancellationToken cancellationToken)
     {
-        IReadOnlyList<SubscriptionPlan> plans = await planRepo.ListAvailableForNewSignupsAsync(cancellationToken);
+        List<SubscriptionPlan> plans = (await planRepo.ListAvailableForNewSignupsAsync(cancellationToken)).ToList();
 
         Guid? currentPlanId = null;
         if (query.CurrentOrganizationId is Guid orgId)
         {
-            Domain.Aggregates.Organization? org = await orgRepo.GetByIdAsync(orgId, cancellationToken);
+            Organization? org = await orgRepo.GetByIdAsync(orgId, cancellationToken);
             currentPlanId = org?.SubscriptionPlanId;
+        }
+
+        // US-010 edge: retired plans stay visible to orgs still on that plan.
+        if (currentPlanId is Guid planId && plans.All(p => p.Id != planId))
+        {
+            SubscriptionPlan? currentPlan = await planRepo.GetByIdAsync(planId, cancellationToken);
+            if (currentPlan is not null && currentPlan.IsActive)
+                plans.Add(currentPlan);
         }
 
         return plans.Select(plan => Map(plan, currentPlanId)).ToList();
@@ -35,5 +44,7 @@ public sealed class ListSubscriptionPlansHandler(
             plan.MaxExecutionsPerMonth,
             plan.MaxUsers,
             plan.MaxStorageMegabytes,
-            currentPlanId == plan.Id);
+            SubscriptionPlanFeatureFlags.ForSlug(plan.Slug),
+            currentPlanId == plan.Id,
+            plan.IsAvailableForNewSignups);
 }

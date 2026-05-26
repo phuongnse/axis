@@ -85,7 +85,7 @@ Define subscription plan tiers with feature limits and enforce those limits at t
 *Out of scope*
 - Org-initiated plan upgrade — Phase 2 (requires billing integration).
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: pricing UI and "Current plan" badge (Frontend). Redis cached counters deferred — enforcement uses live DB counts with structured HTTP 402 (`plan_limit_exceeded`). Bulk import workflow limit pre-check deferred. Platform Admin portal UI deferred — `PUT /api/platform/organizations/{id}/plan` + `PlatformAdmin:UserIds` config for US-012.
-> **Deferred (PR follow-up):** Redis INCR/TTL counters and bulk-import limit checks (US-011 edge cases).
-> Decisions: catalog in Identity `subscription_plans` (seeded migration + startup seeder); `IPlanLimitService` in `Axis.Shared.Application` with module usage counters wired at `Axis.Api` composition root; register accepts optional `subscriptionPlanId` (defaults to Free).
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ (backend AC) | Frontend: ⏳
+> Gaps vs spec: US-010 pricing page UI, static fallback on load failure, "Current plan" badge (Frontend only). No multi-workflow bulk-import API yet — single-workflow import/duplicate enforce +1 before save (US-011 bulk AC applies when bulk endpoint exists).
+> **Done (backend):** `GET /api/plans` with limits + `featureFlags` + `isAvailableForNewSignups`; signed-in org on retired plan still sees that plan; 402 on create/duplicate/import workflow, invite user, start execution; Redis read-through cache + INCR/DECR on mutate + execution key TTL to month-end UTC; DB fallback + warning when Redis write/read fails; delete workflow decrements cache; platform plan change 403 + audit log + cache refresh; downgrade over limit blocks new creates via existing usage check (resources not deleted).
+> Decisions: `featureFlags` derived from plan slug for MVP (no JSON column); `PlatformAdmin:UserIds` config for US-012.

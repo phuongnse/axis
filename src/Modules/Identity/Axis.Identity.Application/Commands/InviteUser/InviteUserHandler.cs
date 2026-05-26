@@ -57,6 +57,11 @@ public sealed class InviteUserHandler(
         Invitation invitation = Invitation.Create(email, command.OrganizationId, command.RoleId, command.InvitedById);
         await invitationRepo.AddAsync(invitation, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);
+        await planLimitService.RecordUsageDeltaAsync(
+            command.OrganizationId,
+            PlanLimitResourceType.Users,
+            delta: 1,
+            cancellationToken);
 
         await emailSender.SendInvitationEmailAsync(
             email.Value, org.Name, invitation.Token, cancellationToken);

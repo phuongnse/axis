@@ -46,6 +46,12 @@ public sealed class CreateWorkflowHandler(
             return Result.Failure<Guid>(ErrorCodes.Conflict, $"A workflow named '{command.Name}' already exists.");
         }
 
+        await planLimitService.RecordUsageDeltaAsync(
+            command.OrganizationId,
+            PlanLimitResourceType.Workflows,
+            delta: 1,
+            cancellationToken);
+
         return workflow.Id;
     }
 }

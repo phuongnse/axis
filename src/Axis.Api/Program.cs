@@ -364,6 +364,7 @@ try
     builder.Services.AddWorkflowBuilderInfrastructure(cfg);
     builder.Services.AddFormBuilderInfrastructure(cfg);
     builder.Services.AddWorkflowEngineInfrastructure(cfg);
+    builder.Services.AddSingleton<Axis.Api.Infrastructure.PlanLimits.PlanLimitRedisCache>();
     builder.Services.AddScoped<Axis.Shared.Application.PlanLimits.IPlanLimitService, Axis.Api.Infrastructure.PlanLimits.PlanLimitService>();
 
     // ── Cross-module gRPC clients (ADR-014) ────────────────────────────────

@@ -1,3 +1,4 @@
+using Axis.Shared.Application.PlanLimits;
 using Axis.Shared.Domain.Primitives;
 using Axis.WorkflowBuilder.Application.Commands.DeleteWorkflow;
 using Axis.WorkflowBuilder.Application.Repositories;
@@ -13,11 +14,12 @@ namespace Axis.WorkflowBuilder.Application.Tests;
 public class DeleteWorkflowHandlerTests
 {
     private static readonly Guid OrgId = Guid.NewGuid();
+    private readonly IPlanLimitService _planLimitService = Substitute.For<IPlanLimitService>();
     private readonly IWorkflowRepository _repo = Substitute.For<IWorkflowRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly DeleteWorkflowHandler _handler;
 
-    public DeleteWorkflowHandlerTests() => _handler = new DeleteWorkflowHandler(_repo, _uow);
+    public DeleteWorkflowHandlerTests() => _handler = new DeleteWorkflowHandler(_planLimitService, _repo, _uow);
 
     [Fact]
     public async Task Handle_WhenWorkflowIsDraft_DeletesAndSaves()

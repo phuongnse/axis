@@ -23,6 +23,7 @@ public static class ResultExtensions
         return result.ErrorCode switch
         {
             ErrorCodes.NotFound => Results.Problem(result.Error, statusCode: StatusCodes.Status404NotFound),
+            ErrorCodes.Forbidden => Results.Problem(result.Error, statusCode: StatusCodes.Status403Forbidden),
             ErrorCodes.Conflict => Results.Problem(result.Error, statusCode: StatusCodes.Status409Conflict),
             ErrorCodes.PlanLimit when result.PlanLimitDetails is PlanLimitFailureDetails details =>
                 Results.Json(

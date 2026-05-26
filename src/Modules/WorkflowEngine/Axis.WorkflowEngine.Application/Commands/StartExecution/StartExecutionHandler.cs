@@ -63,6 +63,11 @@ public sealed class StartExecutionHandler(
 
         await execRepo.AddAsync(execution, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);
+        await planLimitService.RecordUsageDeltaAsync(
+            command.OrganizationId,
+            PlanLimitResourceType.ExecutionsPerMonth,
+            delta: 1,
+            cancellationToken);
 
         // Dispatch async — Wolverine picks up execution outside this request/transaction boundary
         await dispatcher.PublishAsync(

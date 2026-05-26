@@ -19,7 +19,7 @@ public sealed class ChangeOrganizationPlanHandler(
     public async Task<Result> Handle(ChangeOrganizationPlanCommand command, CancellationToken cancellationToken)
     {
         if (!platformAdminAuthorization.IsPlatformAdmin(command.ChangedByUserId))
-            return Result.Failure(ErrorCodes.BusinessRule, "Only platform administrators can change organization plans.");
+            return Result.Failure(ErrorCodes.Forbidden, "Only platform administrators can change organization plans.");
 
         Domain.Aggregates.Organization? organization =
             await orgRepo.GetByIdAsync(command.OrganizationId, cancellationToken);

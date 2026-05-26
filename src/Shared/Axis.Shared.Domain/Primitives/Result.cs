@@ -9,6 +9,7 @@ public static class ErrorCodes
     public const string NotFound = "not_found";
     public const string Conflict = "conflict";
     public const string BusinessRule = "business_rule";
+    public const string Forbidden = "forbidden";
     public const string PlanLimit = "plan_limit";
     public const string FieldValidation = "field_validation";
     public const string InvalidInput = "invalid_input";

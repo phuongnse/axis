@@ -12,6 +12,7 @@ public sealed class PlanLimitService(
     IOrganizationRepository organizationRepository,
     ISubscriptionPlanRepository subscriptionPlanRepository,
     IEnumerable<IPlanLimitUsageCounter> usageCounters,
+    PlanLimitRedisCache redisCache,
     IConfiguration configuration,
     ILogger<PlanLimitService> logger) : IPlanLimitService
 {
@@ -35,16 +36,7 @@ public sealed class PlanLimitService(
         if (!plan.HasLimit(limit))
             return Result.Success();
 
-        IPlanLimitUsageCounter? counter = usageCounters.FirstOrDefault(c => c.ResourceType == resourceType);
-        if (counter is null)
-        {
-            logger.LogWarning(
-                "No plan-limit usage counter registered for {ResourceType}; allowing operation.",
-                resourceType);
-            return Result.Success();
-        }
-
-        int current = await counter.GetCurrentUsageAsync(organizationId, cancellationToken);
+        int current = await GetCurrentUsageAsync(organizationId, resourceType, cancellationToken);
         if (plan.IsWithinLimit(limit, current, increment))
             return Result.Success();
 
@@ -61,7 +53,69 @@ public sealed class PlanLimitService(
     }
 
     public Task RefreshCachedLimitsAsync(Guid organizationId, CancellationToken cancellationToken = default) =>
-        Task.CompletedTask;
+        redisCache.TryInvalidateOrganizationAsync(organizationId, cancellationToken);
+
+    public Task RecordUsageDeltaAsync(
+        Guid organizationId,
+        PlanLimitResourceType resourceType,
+        int delta,
+        CancellationToken cancellationToken = default)
+    {
+        if (delta == 0)
+            return Task.CompletedTask;
+
+        return redisCache.TryAdjustUsageAsync(organizationId, resourceType, delta, cancellationToken);
+    }
+
+    private async Task<int> GetCurrentUsageAsync(
+        Guid organizationId,
+        PlanLimitResourceType resourceType,
+        CancellationToken cancellationToken)
+    {
+        long? cached = await redisCache.TryGetCachedUsageAsync(organizationId, resourceType, cancellationToken);
+        if (cached is not null)
+            return (int)cached.Value;
+
+        IPlanLimitUsageCounter? counter = usageCounters.FirstOrDefault(c => c.ResourceType == resourceType);
+        if (counter is null)
+        {
+            logger.LogWarning(
+                "No plan-limit usage counter registered for {ResourceType}; treating usage as zero.",
+                resourceType);
+            return 0;
+        }
+
+        int usage;
+        try
+        {
+            usage = await counter.GetCurrentUsageAsync(organizationId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Plan limit usage counter failed for org {OrganizationId} resource {ResourceType}; treating usage as zero.",
+                organizationId,
+                resourceType);
+            return 0;
+        }
+
+        bool cachedWrite = await redisCache.TrySetCachedUsageAsync(
+            organizationId,
+            resourceType,
+            usage,
+            cancellationToken);
+        if (!cachedWrite)
+        {
+            logger.LogWarning(
+                "Redis unavailable for plan limit cache (org {OrganizationId}, {ResourceType}); using database count {Usage}.",
+                organizationId,
+                resourceType,
+                usage);
+        }
+
+        return usage;
+    }
 
     private static int? GetLimit(SubscriptionPlan plan, PlanLimitResourceType resourceType) =>
         resourceType switch
