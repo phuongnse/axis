@@ -16,6 +16,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 COMPOSE_FILE = ROOT / "docker-compose.yml"
 LOCAL_DEV_FILE = ROOT / "docs/playbooks/local-dev.md"
+TECH_STACK_FILE = ROOT / "docs/TECH_STACK.md"
+
+TECH_STACK_FRAGMENT_LINK = re.compile(r"\]\(\.\./TECH_STACK\.md#([^)]+)\)")
+TECH_STACK_KNOWN_ANCHOR = re.compile(r"\(#([^)]+)\)")
 
 SERVICE_BLOCK = re.compile(
     r"^  ([a-z0-9_-]+):\n((?:    .*\n)*)",
@@ -118,6 +122,15 @@ def check_local_dev_doc() -> list[str]:
 
     if "AutoProvision" not in doc:
         errors.append("local-dev.md should mention Wolverine AutoProvision in Development")
+
+    if TECH_STACK_FILE.is_file():
+        known_anchors = set(TECH_STACK_KNOWN_ANCHOR.findall(TECH_STACK_FILE.read_text(encoding="utf-8")))
+        for fragment in TECH_STACK_FRAGMENT_LINK.findall(doc):
+            if fragment not in known_anchors:
+                errors.append(
+                    f"local-dev.md broken TECH_STACK link fragment #{fragment} "
+                    f"(not found in {TECH_STACK_FILE.relative_to(ROOT)})"
+                )
 
     return errors
 
