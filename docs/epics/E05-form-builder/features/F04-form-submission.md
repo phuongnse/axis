@@ -1,6 +1,11 @@
 ﻿# F04 — Form Submission Handling
 
-> **Wireframe**: [docs/epics/E05-form-builder/wireframes/form-submission.excalidraw](../wireframes/form-submission.excalidraw) · [preview](../wireframes/form-submission.svg)
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| form-submission | [source](../wireframes/form-submission.excalidraw) | [preview](../wireframes/form-submission.svg) |
+
 
 [← Back to E05](../README.md)
 
@@ -37,9 +42,18 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 - Push notifications (mobile) — not in MVP.
 - Escalation notifications if the form is not submitted after X hours — not in MVP (timeout causes failure, not escalation).
 
-> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: No Application handlers for form submission management; email notification dispatch and in-app notification pending E06 + notification infrastructure; role member resolution pending Identity integration.
-> Decisions: `FormSubmission` is a single aggregate combining task assignment (executionId, assigneeUserId, accessToken, expiresAt) and response data (submittedData, submittedAt). A separate FormTask entity would add no domain logic — the relationship is always 1:1 and both live within the same lifecycle (Pending → Submitted/Expired/Cancelled). Status enum is `FormSubmissionStatus`; `Submitted` used instead of `Completed` to name the action clearly. `AccessToken` is a `Guid` (unique URL key, not JWT); expiry enforced via `ExpiresAt` + `Expire()` domain method; `Expire()` is non-idempotent by design — idempotency handled at the caller level.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ⚠️ |
+> | Infrastructure | ✅ |
+> | API | ⏳ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** No notification dispatch on assign; email/in-app notification pending E06 + notification infrastructure; role member resolution pending Identity integration. **Done:** `FormSubmission` aggregate + `FormStepReachedHandler` creates pending submission with access token.
+> **Decisions:** `FormSubmission` is a single aggregate combining task assignment (executionId, assigneeUserId, accessToken, expiresAt) and response data (submittedData, submittedAt). A separate FormTask entity would add no domain logic — the relationship is always 1:1 and both live within the same lifecycle (Pending → Submitted/Expired/Cancelled). Status enum is `FormSubmissionStatus`; `Submitted` used instead of `Completed` to name the action clearly. `AccessToken` is a `Guid` (unique URL key, not JWT); expiry enforced via `ExpiresAt` + `Expire()` domain method; `Expire()` is non-idempotent by design — idempotency handled at the caller level.
 
 ---
 
@@ -71,8 +85,17 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 - Saving a draft of the form and resuming later — not in MVP.
 - The assignee being able to add comments or annotations to the form submission — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: `SubmitFormByTokenCommand` + anonymous `POST /api/form-tasks/{token}/submit` ✅. Standalone form page, field validation UX, pre-signed file upload, and multi-tab deduplication pending Frontend.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** `SubmitFormByTokenCommand` + anonymous `POST /api/form-tasks/{token}/submit` ✅. Standalone form page, field validation UX, pre-signed file upload, and multi-tab deduplication pending Frontend.
 
 ---
 
@@ -100,8 +123,17 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 - Delegating a task to another user — not in MVP.
 - Bulk task completion — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: **Done:** `GetMyFormTasksQuery` + authenticated list endpoints. Role-assigned task aggregation (not only direct assignee), SignalR push, and "My Tasks" UI pending Frontend + E06.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** **Done:** `GetMyFormTasksQuery` + authenticated list endpoints. Role-assigned task aggregation (not only direct assignee), SignalR push, and "My Tasks" UI pending Frontend + E06.
 
 ---
 
@@ -128,5 +160,14 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 *Out of scope*
 - Sending a reminder notification before timeout expires — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: **Done:** `ExpireFormSubmissionMessage` scheduled from `FormStepReachedHandler`; `ExpireFormSubmissionHandler` marks submission expired. Workflow execution → `Failed` + error notification on expiry pending E06 coordination.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ⚠️ |
+> | Infrastructure | ✅ |
+> | API | ⏳ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** **Done:** `ExpireFormSubmissionMessage` scheduled from `FormStepReachedHandler`; `ExpireFormSubmissionHandler` marks submission expired. Workflow execution → `Failed` + error notification on expiry pending E06 coordination.

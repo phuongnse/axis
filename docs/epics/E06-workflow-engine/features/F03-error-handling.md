@@ -1,6 +1,11 @@
 ﻿# F03 — Error Handling & Notification
 
-> **Wireframe**: [docs/epics/E06-workflow-engine/wireframes/execution-detail.excalidraw](../wireframes/execution-detail.excalidraw) · [preview](../wireframes/execution-detail.svg)
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| execution-detail | [source](../wireframes/execution-detail.excalidraw) | [preview](../wireframes/execution-detail.svg) |
+
 
 [← Back to E06](../README.md)
 
@@ -36,8 +41,17 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 *Out of scope*
 - PagerDuty / OpsGenie / Slack integration for error notifications — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: no Application-layer notification dispatch handler; `ExecutionFailed` domain event raised but notification channels not wired; email/in-app/webhook dispatch and rate-limiting pending Application layer + a future cross-cutting notification service (outside WorkflowEngine Infrastructure, which is complete).
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ⚠️ |
+> | Infrastructure | ✅ |
+> | API | ⏳ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** no Application-layer notification dispatch handler; `ExecutionFailed` domain event raised but notification channels not wired; email/in-app/webhook dispatch and rate-limiting pending Application layer + a future cross-cutting notification service (outside WorkflowEngine Infrastructure, which is complete).
 
 ---
 
@@ -64,8 +78,17 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 *Out of scope*
 - Sharing a link to a specific error detail view with another user — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: `GetExecutionQuery` (returning step-level error details) not yet implemented; error detail UI (stack trace, redacted fields) pending Frontend + API.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ⚠️ |
+> | Infrastructure | ✅ |
+> | API | ⏳ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** `GetExecutionQuery` (returning step-level error details) not yet implemented; error detail UI (stack trace, redacted fields) pending Frontend + API.
 
 ---
 
@@ -92,5 +115,14 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 *Out of scope*
 - Different notification channels for different failure scenarios (e.g., "only notify on HTTP step failures") — not in MVP; all failures use the same channels.
 
-> **Implementation status** — Domain: ⚠️ | Application: ⚠️ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: error notification channel config is not modeled in the domain (no channel list on `WorkflowExecution`); no `UpdateErrorNotificationChannelsCommand` handler; notification channel configuration UI and per-workflow channel storage pending API + Frontend.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ⚠️ |
+> | Application | ⚠️ |
+> | Infrastructure | ⏳ |
+> | API | ⏳ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** error notification channel config is not modeled in the domain (no channel list on `WorkflowExecution`); no `UpdateErrorNotificationChannelsCommand` handler; notification channel configuration UI and per-workflow channel storage pending API + Frontend.

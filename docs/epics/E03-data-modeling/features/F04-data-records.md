@@ -1,6 +1,11 @@
 ﻿# F04 — Data Record CRUD
 
-> **Wireframe**: [docs/epics/E03-data-modeling/wireframes/records.excalidraw](../wireframes/records.excalidraw) · [preview](../wireframes/records.svg)
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| records | [source](../wireframes/records.excalidraw) | [preview](../wireframes/records.svg) |
+
 
 [← Back to E03](../README.md)
 
@@ -39,10 +44,19 @@ Users can create, read, update, and delete records against any model. Records ar
 *Out of scope*
 - Record templates (pre-filled forms) — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: File field pre-upload step pending file storage service; Relation field existence check pending API layer.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** File field pre-upload step pending file storage service; Relation field existence check backend polish — see gaps below.
 > Diagram pending: entity name `Record` → `DataRecord` in data-model diagram (`dataModelDiagram()` in `generate-diagrams.mjs`) — `Record` is a C# keyword and conflicts with the language reserved word.
-> Decisions: record data stored as `Dictionary<string, object?>` serialized to JSONB column `_data`.
+> **Decisions:** record data stored as `Dictionary<string, object?>` serialized to JSONB column `_data`.
 
 ---
 
@@ -71,8 +85,17 @@ Users can create, read, update, and delete records against any model. Records ar
 - Saved views / custom column configurations — not in MVP.
 - Inline editing in the list — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: Relation display-field resolution (showing target record's display_field value instead of raw UUID) pending API layer.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** Relation display-field resolution (showing target record's display_field value instead of raw UUID) backend polish — see gaps below.
 
 ---
 
@@ -100,9 +123,18 @@ Users can create, read, update, and delete records against any model. Records ar
 - OR-logic between filters — not in MVP.
 - Saved filters — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: filter-state URL persistence is a frontend concern (query params round-tripped via `?filter=field:op:value`); filter on a deleted field falls back gracefully (RecordFilter.TryParse validates field name format, unknown fields simply match no JSONB data). A filter on a deleted field currently returns 0 results rather than showing a warning toast — that warning is a frontend concern.
-> Decisions: per-field filters encoded as repeated `?filter=field:op:value` query params (URL-shareable); ops supported: eq, contains, gt, lt, isEmpty, isNotEmpty; multiple filters combined with AND; sort via `?sortBy=field&sortDir=asc|desc`; unknown/unsafe field names in sort fall back to `created_at DESC`.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** filter-state URL persistence is a frontend concern (query params round-tripped via `?filter=field:op:value`); filter on a deleted field falls back gracefully (RecordFilter.TryParse validates field name format, unknown fields simply match no JSONB data). A filter on a deleted field currently returns 0 results rather than showing a warning toast — that warning is a frontend concern.
+> **Decisions:** per-field filters encoded as repeated `?filter=field:op:value` query params (URL-shareable); ops supported: eq, contains, gt, lt, isEmpty, isNotEmpty; multiple filters combined with AND; sort via `?sortBy=field&sortDir=asc|desc`; unknown/unsafe field names in sort fall back to `created_at DESC`.
 
 ---
 
@@ -128,8 +160,17 @@ Users can create, read, update, and delete records against any model. Records ar
 *Out of scope*
 - Edit history / audit trail per record — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: HTTP 409 optimistic concurrency (updated_at comparison) pending API layer.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** HTTP 409 optimistic concurrency (updated_at comparison) backend polish — see gaps below.
 
 ---
 
@@ -155,8 +196,17 @@ Users can create, read, update, and delete records against any model. Records ar
 *Out of scope*
 - Restoring a soft-deleted record — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: Relation broken-reference warning pending E04 integration; 30-day purge pending background job scheduler.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** Relation broken-reference warning pending E04 integration; 30-day purge pending background job scheduler.
 
 ---
 
@@ -182,6 +232,15 @@ Users can create, read, update, and delete records against any model. Records ar
 *Out of scope*
 - Bulk edit (updating multiple records at once) — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: async export for >5,000 records deferred — pending Wolverine background job + in-app notification infrastructure; current sync CSV export has no size limit (streams in 500-record chunks). "Select all N records across all pages" for bulk delete is a frontend concern.
-> Decisions: bulk delete via `POST /api/models/{id}/records/bulk-delete` with `{ "ids": [...] }` body; CSV export via `GET /api/models/{id}/records/export` (same filter/sort params as list); field names for export header taken from model's FieldDefinition labels; CSV uses RFC 4180 escaping.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** async export for >5,000 records deferred — pending Wolverine background job + in-app notification infrastructure; current sync CSV export has no size limit (streams in 500-record chunks). "Select all N records across all pages" for bulk delete is a frontend concern.
+> **Decisions:** bulk delete via `POST /api/models/{id}/records/bulk-delete` with `{ "ids": [...] }` body; CSV export via `GET /api/models/{id}/records/export` (same filter/sort params as list); field names for export header taken from model's FieldDefinition labels; CSV uses RFC 4180 escaping.

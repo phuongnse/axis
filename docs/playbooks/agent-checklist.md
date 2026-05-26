@@ -105,7 +105,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 | `src/` or `tests/` | `dotnet format --verify-no-changes` |
 | `frontend/` | `npm run ci` then `npm run test` |
 | `src/Axis.Api/Endpoints/` or API contract | Update + run `tests/Api/Axis.Api.Tests/` |
-| Any of the above + `docs/epics/` | `./scripts/check-doc-drift.sh` (bash) — also enforces no-new `TODO`/`FIXME`/`stub` and reviews new raw-SQL calls |
+| Any of the above + `docs/epics/` | `./scripts/check-doc-drift.sh` (bash) — also runs `normalize-feature-docs.py --check`, enforces no-new `TODO`/`FIXME`/`stub`, reviews new raw-SQL calls |
 
 ```text
 Gate 1 self-check:
@@ -128,7 +128,7 @@ Paste block format: header `Gate 2:` then one `-` line per row (Gate 3 uses the 
 Gate 2:
 - Library → TECH_STACK.md / not triggered
 - New pattern → patterns.md / not triggered
-- US layer callout → docs/epics/…/features/… / not triggered
+- US layer callout → docs/epics/…/features/… (table layout per [docs-style § Feature files](./docs-style.md#feature-files--wireframes--implementation-status)) / not triggered
 - Epic README + PROGRESS → … / not triggered
 - Architecture rule → CLAUDE.md / not triggered
 - process.md workflow → … / not triggered

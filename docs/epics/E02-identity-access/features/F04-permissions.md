@@ -1,6 +1,11 @@
 ﻿# F04 — Permission System
 
-> **Wireframe**: [docs/epics/E02-identity-access/wireframes/settings-roles.excalidraw](../wireframes/settings-roles.excalidraw) · [preview](../wireframes/settings-roles.svg)
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| settings-roles | [source](../wireframes/settings-roles.excalidraw) | [preview](../wireframes/settings-roles.svg) |
+
 
 [← Back to E02](../README.md)
 
@@ -83,9 +88,18 @@ A resource-based permission system where each permission grants the ability to p
 *Out of scope*
 - Row-level security (e.g., "user can only edit their own records") — not in MVP; all permission checks are type-level.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: policy-based authorization middleware, `[RequirePermission]` attribute, and automated permission tests pending API layer.
-> Decisions: permissions are included as a flat array in JWT claims at sign-in time (union of all role permissions); checked via ASP.NET Core custom policy at API layer.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** policy-based authorization middleware, `[RequirePermission]` attribute, and automated permission tests backend polish — see gaps below.
+> **Decisions:** permissions are included as a flat array in JWT claims at sign-in time (union of all role permissions); checked via ASP.NET Core custom policy at API layer.
 
 ---
 
@@ -111,5 +125,14 @@ A resource-based permission system where each permission grants the ability to p
 *Out of scope*
 - Per-record UI permissions (e.g., hiding individual table rows) — not in MVP.
 
-> **Implementation status** — Domain + Application: ⏳ | Infrastructure: ⏳ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: all ACs are frontend + API concerns — no Application-layer handler needed. Pending API layer for policy middleware and Frontend for UI hiding logic.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ⏳ |
+> | Application | ⏳ |
+> | Infrastructure | ⏳ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** all ACs are frontend + API concerns — no Application-layer handler needed. Pending API layer for policy middleware and Frontend for UI hiding logic.

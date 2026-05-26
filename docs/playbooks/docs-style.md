@@ -40,6 +40,51 @@ When you find yourself editing the same fact in two files, the architecture is w
 
 ---
 
+## Feature files — wireframes & implementation status
+
+Every `docs/epics/*/features/F0N-*.md` file uses these layouts so agents can scan status without parsing inline pipes.
+
+### Wireframes (top of file, after title / back-link)
+
+```markdown
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| login | [source](../wireframes/login.excalidraw) | [preview](../wireframes/login.svg) |
+```
+
+One row per screen. **Do not** stack multiple `> **Wireframe**:` blockquote lines — they are hard to read and drift from the table format.
+
+### Implementation status (after each US AC block)
+
+```markdown
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** …
+> **Done:** …
+> **Deferred (PR #N follow-up):** …
+> **Decisions:** …
+```
+
+Rules:
+
+- **One row per layer** — split `Domain + Application` into two rows.
+- **`Gaps vs spec`** lists remaining AC bullets; never write `pending API layer` when endpoints already exist — say what is missing (`403 test`, `date filter query param`, etc.).
+- **`API ✅`** on a US means in-scope REST/OpenAPI AC for that story are shipped; Frontend-only gaps do not downgrade API to ⚠️.
+
+**Bulk normalize:** `python3 scripts/normalize-feature-docs.py` (add `--check` for CI — also run via `check-doc-drift.sh`).
+
+---
+
 ## When you add a new `.md` file
 
 1. Add the back-link header (per [`docs/README.md`](../README.md)): `> **Navigation**: [← parent.md](...)` so future readers can climb back up.

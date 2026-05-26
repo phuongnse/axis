@@ -47,7 +47,7 @@ Custom model, field, data class, and record CRUD. Full-text search, per-field JS
 
 ## WorkflowBuilder — E04-workflow-builder
 
-**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳ · Service-boundary retrofit ⚠️**
+**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳ · Service-boundary retrofit ✅**
 
 Workflow definitions with steps, transitions, triggers, cycle detection, publish/archive lifecycle. Import/export (JSON + ZIP). All endpoints covered by integration tests.
 
@@ -55,7 +55,7 @@ Workflow definitions with steps, transitions, triggers, cycle detection, publish
 
 ## FormBuilder — E05-form-builder
 
-**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳ · Service-boundary retrofit ⚠️**
+**Domain ✅ | Application ✅ | Infrastructure ✅ | API ✅ | Frontend ⏳ · Service-boundary retrofit ✅**
 
 Form definitions + F04 form tasks (`FormSubmission`, token submit, my tasks, expiry job). Submission user resolved via `ICurrentUser` in Application.
 
@@ -63,17 +63,17 @@ Form definitions + F04 form tasks (`FormSubmission`, token submit, my tasks, exp
 
 ## WorkflowEngine — E06-workflow-engine
 
-**Domain ✅ | Application ✅ | Infrastructure ⚠️ | API ✅ | Frontend ⏳ · Service-boundary retrofit ⚠️**
+**Domain ✅ | Application ✅ | Infrastructure ⚠️ | API ✅ | Frontend ⏳ · Service-boundary retrofit ✅**
 
-Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoints` registered; default-input shaping handled in `StartExecutionHandler`. Infrastructure ⚠️: `IScriptExecutor` and `INotificationSender` stubs.
+Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoints` registered; default-input shaping handled in `StartExecutionHandler`. Database `axis_workflowengine` with EF migrations; tests use `MigrateAsync`. Infrastructure ⚠️: real `IScriptExecutor` and `INotificationSender` still stubs.
 
-> ⚠️ **Retrofit (PR for E05+E06 closure):** `Axis.WorkflowEngine.Contracts` shipped with Avro schema `FormStepReachedEvent` (CloudEvents envelope, ADR-019). `WorkflowEngineEventMapper` translates domain events at `SaveChangesAsync` time; FormBuilder consumes via Kafka topic `axis.workflowengine.form-step-reached`. The 2 cross-module Domain references that were tracked in `WORKAROUNDS.md` are now resolved (ratchet shrunk). **Deferred:** gRPC service for sync RPC needs (none today); saga orchestrator ([ADR-020](TECH_STACK.md#adr-020-saga-orchestration-for-cross-module-workflows)); dedicated `axis_workflowengine` database; switch tests to `MigrateAsync`; real `IScriptExecutor` + `INotificationSender`.
+> ✅ **Retrofit:** `Axis.WorkflowEngine.Contracts` with Avro `FormStepReachedEvent` (CloudEvents, ADR-019). `WorkflowEngineEventMapper` + Kafka outbox; FormBuilder consumes `axis.workflowengine.form-step-reached`. Cross-module Domain references in `WORKAROUNDS.md` resolved. **Deferred:** gRPC (no sync RPC needs today); saga orchestrator ([ADR-020](TECH_STACK.md#adr-020-saga-orchestration-for-cross-module-workflows)); trigger handlers (schedule/webhook/event); SignalR live updates; error-notification dispatch.
 
 ## E01 — Platform Foundation
 
 **F01 tenant registration (backend):** ✅ register, verify (opaque tokens), resend limit, idempotency, Kafka provisioning coordinator, optional `subscriptionPlanId` on register.
 
-**F04 subscription plans (backend):** ⚠️ `GET /api/plans`, platform plan change, 402 limits (workflows / users / executions), Redis counters. Frontend pricing UI ⏳. Bulk multi-workflow import limit AC deferred until API exists.
+**F04 subscription plans (backend):** ✅ `GET /api/plans`, platform plan change, 402 limits (workflows / users / executions), Redis counters. Frontend pricing UI ⏳. **Deferred:** atomic execution counter under concurrency; fail-closed when Redis unavailable; bulk multi-workflow import limit AC until bulk endpoint exists.
 
 **F02 organization management (backend):** ✅ US-005–007 — profile API, settings + usage, scheduled deletion with 30-day hard-delete job. Frontend ⏳.
 
@@ -95,4 +95,4 @@ Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoi
 
 **Status: ✅ Tooling complete — feature implementation ⏳**
 
-React 18 + TypeScript + Vite. TanStack Router, TanStack Query, Zustand, shadcn/ui, Tailwind. Biome (lint + format). `npm run ci` gate enforced. All module feature UIs remain ⏳.
+React 19 + TypeScript + Vite. TanStack Router, TanStack Query, Zustand, shadcn/ui, Tailwind. Biome (lint + format). `npm run ci` gate enforced. All module feature UIs remain ⏳.
