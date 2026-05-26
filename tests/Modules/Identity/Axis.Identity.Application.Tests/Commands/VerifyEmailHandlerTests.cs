@@ -69,7 +69,7 @@ public class VerifyEmailHandlerTests
             .Which.OrganizationId.Should().Be(user.OrganizationId);
 
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
-        await _tokenStore.Received(1).InvalidateAsync(tokenHash, Arg.Any<CancellationToken>());
+        await _tokenStore.DidNotReceive().InvalidateAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

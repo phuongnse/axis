@@ -28,7 +28,7 @@ public sealed class GetProvisioningStatusHandler(
         if (userId is null)
             return null;
 
-        Domain.Aggregates.User? user = await userRepo.GetByIdPlatformWideAsync(userId.Value, cancellationToken);
+        User? user = await userRepo.GetByIdPlatformWideAsync(userId.Value, cancellationToken);
         if (user is null || !user.IsEmailVerified)
             return null;
 

@@ -26,7 +26,22 @@ internal sealed class EmailVerificationTokenStore(IdentityDbContext context) : I
         string tokenHash,
         CancellationToken ct = default)
     {
+        DateTime now = DateTime.UtcNow;
+        int consumed = await context.Set<EmailVerificationToken>()
+            .Where(t => t.TokenHash == tokenHash && t.UsedAt == null && t.ExpiresAt > now)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, now), ct);
+
+        if (consumed == 1)
+        {
+            Guid userId = await context.Set<EmailVerificationToken>()
+                .Where(t => t.TokenHash == tokenHash)
+                .Select(t => t.UserId)
+                .FirstAsync(ct);
+            return new EmailVerificationTokenResolveResult(EmailVerificationTokenState.Valid, userId);
+        }
+
         EmailVerificationToken? token = await context.Set<EmailVerificationToken>()
+            .AsNoTracking()
             .FirstOrDefaultAsync(t => t.TokenHash == tokenHash, ct);
 
         if (token is null)
@@ -35,10 +50,10 @@ internal sealed class EmailVerificationTokenStore(IdentityDbContext context) : I
         if (token.UsedAt is not null)
             return new EmailVerificationTokenResolveResult(EmailVerificationTokenState.AlreadyUsed, token.UserId);
 
-        if (DateTime.UtcNow >= token.ExpiresAt)
+        if (now >= token.ExpiresAt)
             return new EmailVerificationTokenResolveResult(EmailVerificationTokenState.Expired, token.UserId);
 
-        return new EmailVerificationTokenResolveResult(EmailVerificationTokenState.Valid, token.UserId);
+        return new EmailVerificationTokenResolveResult(EmailVerificationTokenState.AlreadyUsed, token.UserId);
     }
 
     public async Task<Guid?> ResolveUserIdForProvisioningPollAsync(

@@ -40,7 +40,6 @@ public sealed class VerifyEmailHandler(
                     "This link has already been used. Please sign in."),
             EmailVerificationTokenState.Valid => await VerifyUserAsync(
                 resolved.UserId!.Value,
-                tokenHash,
                 cancellationToken),
             _ => Result.Failure(ErrorCodes.BusinessRule, "Invalid verification link."),
         };
@@ -48,7 +47,6 @@ public sealed class VerifyEmailHandler(
 
     private async Task<Result> VerifyUserAsync(
         Guid userId,
-        string tokenHash,
         CancellationToken cancellationToken)
     {
         User? user = await userRepo.GetByIdPlatformWideAsync(userId, cancellationToken);
@@ -75,7 +73,6 @@ public sealed class VerifyEmailHandler(
 
         user.VerifyEmail();
         await uow.SaveChangesAsync(cancellationToken);
-        await tokenStore.InvalidateAsync(tokenHash, cancellationToken);
 
         return Result.Success();
     }

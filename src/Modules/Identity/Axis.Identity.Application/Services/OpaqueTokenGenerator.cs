@@ -8,7 +8,7 @@ public static class OpaqueTokenGenerator
 {
     public static (string RawToken, string TokenHash) Create()
     {
-        string rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        string rawToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
         string tokenHash = Hash(rawToken);
         return (rawToken, tokenHash);
     }
