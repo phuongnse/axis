@@ -67,6 +67,10 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
     public HttpClient Client { get; private set; } = null!;
 
+    private readonly CapturingEmailSender _emailCapture = new();
+
+    public CapturingEmailSender EmailCapture => _emailCapture;
+
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
@@ -183,7 +187,8 @@ public sealed class ApiTestFixture : IAsyncLifetime
                     ConnectionMultiplexer.Connect(_redis.GetConnectionString()));
 
                 services.RemoveAll<IEmailSender>();
-                services.AddScoped<IEmailSender, NullEmailSender>();
+                services.AddSingleton(_emailCapture);
+                services.AddSingleton<IEmailSender>(_emailCapture);
                 services.RemoveAll<IAvatarStorageService>();
                 services.AddScoped<IAvatarStorageService, NullAvatarStorageService>();
 

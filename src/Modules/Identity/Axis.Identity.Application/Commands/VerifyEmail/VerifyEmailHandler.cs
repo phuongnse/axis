@@ -1,7 +1,7 @@
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
-using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Contracts;
+using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.Provisioning;
 using Axis.Shared.Application.CQRS;
 using Axis.Shared.Domain.Primitives;
@@ -9,6 +9,7 @@ using Axis.Shared.Domain.Primitives;
 namespace Axis.Identity.Application.Commands.VerifyEmail;
 
 public sealed class VerifyEmailHandler(
+    IEmailVerificationTokenStore tokenStore,
     IUserRepository userRepo,
     IOrganizationRepository organizationRepo,
     ITenantModuleProvisioningRepository provisioningRepo,
@@ -18,9 +19,36 @@ public sealed class VerifyEmailHandler(
 {
     public async Task<Result> Handle(VerifyEmailCommand command, CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(command.Token, out Guid userId))
+        if (string.IsNullOrWhiteSpace(command.Token))
             return Result.Failure(ErrorCodes.BusinessRule, "Invalid verification link.");
 
+        string tokenHash = OpaqueTokenGenerator.Hash(command.Token.Trim());
+        EmailVerificationTokenResolveResult resolved =
+            await tokenStore.ResolveForVerificationAsync(tokenHash, cancellationToken);
+
+        return resolved.State switch
+        {
+            EmailVerificationTokenState.NotFound =>
+                Result.Failure(ErrorCodes.BusinessRule, "Invalid verification link."),
+            EmailVerificationTokenState.Expired =>
+                Result.Failure(
+                    ErrorCodes.BusinessRule,
+                    "This verification link has expired. Please request a new verification email."),
+            EmailVerificationTokenState.AlreadyUsed =>
+                Result.Failure(
+                    ErrorCodes.BusinessRule,
+                    "This link has already been used. Please sign in."),
+            EmailVerificationTokenState.Valid => await VerifyUserAsync(
+                resolved.UserId!.Value,
+                cancellationToken),
+            _ => Result.Failure(ErrorCodes.BusinessRule, "Invalid verification link."),
+        };
+    }
+
+    private async Task<Result> VerifyUserAsync(
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
         User? user = await userRepo.GetByIdPlatformWideAsync(userId, cancellationToken);
         if (user is null)
             return Result.Failure(ErrorCodes.BusinessRule, "Invalid verification link.");
@@ -39,12 +67,10 @@ public sealed class VerifyEmailHandler(
             .ToList();
         await provisioningRepo.AddRangeAsync(pendingModules, cancellationToken);
 
-        // Admin role is assigned at registration; ensure it remains after verify (US-003).
         Role? adminRole = await roleRepo.GetByNameAsync("Admin", organization.Id, cancellationToken);
         if (adminRole is not null && !user.RoleIds.Contains(adminRole.Id))
             user.AssignRole(adminRole.Id);
 
-        // VerifyEmail raises OrganizationVerified; modules provision asynchronously (ADR-019).
         user.VerifyEmail();
         await uow.SaveChangesAsync(cancellationToken);
 

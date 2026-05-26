@@ -16,12 +16,14 @@ public class RegisterOrganizationHandlerTests
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
     private readonly IRegistrationIdempotencyRepository _idempotencyRepo =
         Substitute.For<IRegistrationIdempotencyRepository>();
+    private readonly IEmailVerificationTokenStore _verificationTokenStore =
+        Substitute.For<IEmailVerificationTokenStore>();
     private readonly IPasswordHasher _hasher = Substitute.For<IPasswordHasher>();
     private readonly IEmailSender _emailSender = Substitute.For<IEmailSender>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     private RegisterOrganizationHandler CreateHandler() =>
-        new(_orgRepo, _userRepo, _roleRepo, _idempotencyRepo, _hasher, _emailSender, _uow);
+        new(_orgRepo, _userRepo, _roleRepo, _idempotencyRepo, _verificationTokenStore, _hasher, _emailSender, _uow);
 
     private static RegisterOrganizationCommand ValidCommand() => new(
         OrgName: "Acme Corp",
@@ -59,6 +61,8 @@ public class RegisterOrganizationHandlerTests
 
         await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
+        await _verificationTokenStore.Received(1).CreateAsync(
+            Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
         await _emailSender.Received(1).SendVerificationEmailAsync(
             "alice@acme.com", Arg.Any<string>(), Arg.Any<CancellationToken>());
     }

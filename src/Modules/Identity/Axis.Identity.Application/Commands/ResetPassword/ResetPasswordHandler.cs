@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
@@ -24,8 +22,7 @@ public sealed class ResetPasswordHandler(
             return Result.Failure(ErrorCodes.BusinessRule,
                 "Password must be at least 8 characters and contain at least one letter and one number.");
 
-        string tokenHash = Convert.ToHexString(SHA256.HashData(
-            Encoding.UTF8.GetBytes(command.Token)));
+        string tokenHash = OpaqueTokenGenerator.Hash(command.Token);
 
         Guid? userId = await tokenStore.FindUserIdByTokenHashAsync(tokenHash, cancellationToken);
         if (userId is null)

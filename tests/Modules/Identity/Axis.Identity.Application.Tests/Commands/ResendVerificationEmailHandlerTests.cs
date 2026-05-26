@@ -13,13 +13,14 @@ namespace Axis.Identity.Application.Tests.Commands;
 public class ResendVerificationEmailHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
+    private readonly IEmailVerificationTokenStore _tokenStore = Substitute.For<IEmailVerificationTokenStore>();
     private readonly IEmailSender _emailSender = Substitute.For<IEmailSender>();
     private readonly IResendVerificationRateLimiter _rateLimiter = Substitute.For<IResendVerificationRateLimiter>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
 
     private ResendVerificationEmailHandler CreateHandler() =>
-        new(_userRepo, _emailSender, _rateLimiter);
+        new(_userRepo, _tokenStore, _emailSender, _rateLimiter);
 
     private static User MakeUnverifiedUser(string email = "alice@acme.com")
     {
@@ -40,8 +41,11 @@ public class ResendVerificationEmailHandlerTests
             new ResendVerificationEmailCommand("alice@acme.com"),
             CancellationToken.None);
 
+        await _tokenStore.Received(1).InvalidateAllForUserAsync(user.Id, Arg.Any<CancellationToken>());
+        await _tokenStore.Received(1).CreateAsync(
+            user.Id, Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
         await _emailSender.Received(1).SendVerificationEmailAsync(
-            "alice@acme.com", user.Id.ToString(), Arg.Any<CancellationToken>());
+            "alice@acme.com", Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

@@ -82,9 +82,9 @@ Self-service registration flow where a new organization signs up and is automati
 - Automatic re-send after X minutes — not in MVP.
 
 > **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: auto sign-in after verification click pending Frontend. **Done:** resend rate limit 3/email/hour via `IResendVerificationRateLimiter` (Redis atomic INCR+EXPIRE per hashed email, HTTP 429 + message); login returns "Please verify your email" when unverified. IP-level `auth` limiter applies to `/connect/login` and Identity gRPC only — not on verify/resend (avoids starving integration tests).
-> **Deferred (PR #124 follow-up):** Frontend verify-email flow, provisioning wait screen, and post-verify auto sign-in (US-002).
-> Decisions: verification token is simplified as `user.Id` (Guid string) — `VerifyEmailCommand(token)` parses it as Guid, looks up user by ID platform-wide, calls `User.VerifyEmail()`. Production will use a dedicated token table; this is documented as a gap. `ResendVerificationEmailCommand` silently succeeds for unknown/already-verified emails (no info leakage).
+> Gaps vs spec: auto sign-in after verification click pending Frontend. **Done:** opaque one-time verification tokens in `email_verification_tokens` (SHA-256 hash at rest, 24h TTL, invalidate on verify/resend); resend rate limit 3/email/hour via `IResendVerificationRateLimiter` (Redis atomic INCR+EXPIRE per hashed email, HTTP 429 + message); login returns "Please verify your email" when unverified; `GET /api/auth/provisioning-status?token=` accepts the same link token after verify (including used tokens within TTL). IP-level `auth` limiter applies to `/connect/login` and Identity gRPC only — not on verify/resend (avoids starving integration tests).
+> **Deferred (PR #125 follow-up):** Frontend verify-email flow, provisioning wait screen, and post-verify auto sign-in (US-002).
+> Decisions: `ResendVerificationEmailCommand` silently succeeds for unknown/already-verified emails (no info leakage).
 
 ---
 

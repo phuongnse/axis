@@ -13,11 +13,13 @@ public sealed class RegisterOrganizationHandler(
     IUserRepository userRepo,
     IRoleRepository roleRepo,
     IRegistrationIdempotencyRepository idempotencyRepo,
+    IEmailVerificationTokenStore verificationTokenStore,
     IPasswordHasher hasher,
     IEmailSender emailSender,
     IUnitOfWork uow)
     : ICommandHandler<RegisterOrganizationCommand>
 {
+    private static readonly TimeSpan VerificationTokenLifetime = TimeSpan.FromHours(24);
     // Permission catalogue — matches F04 docs
     private static readonly string[] AdminPermissions =
     [
@@ -111,9 +113,16 @@ public sealed class RegisterOrganizationHandler(
 
             await uow.SaveChangesAsync(cancellationToken);
 
+            (string rawToken, string tokenHash) = OpaqueTokenGenerator.Create();
+            await verificationTokenStore.CreateAsync(
+                user.Id,
+                tokenHash,
+                DateTime.UtcNow.Add(VerificationTokenLifetime),
+                cancellationToken);
+
             await emailSender.SendVerificationEmailAsync(
                 email.Value.Value,
-                verificationToken: user.Id.ToString(),
+                rawToken,
                 cancellationToken);
 
             await MarkIdempotencyCompletedIfNeededAsync(idempotencyKey, cancellationToken);
