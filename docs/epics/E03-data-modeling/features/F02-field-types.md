@@ -1,6 +1,11 @@
 ﻿# F02 — Field Type System
 
-> **Wireframe**: [docs/epics/E03-data-modeling/wireframes/data-models.excalidraw](../wireframes/data-models.excalidraw) · [preview](../wireframes/data-models.svg)
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| data-models | [source](../wireframes/data-models.excalidraw) | [preview](../wireframes/data-models.svg) |
+
 
 [← Back to E03](../README.md)
 
@@ -57,8 +62,17 @@ Each field in a model has a type that determines what data it stores, how it's v
 *Out of scope*
 - Computed / formula fields (e.g., "full_name = first_name + last_name") — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Decisions: all 9 field types serialized to JSONB via custom `FieldDefinitionConverter` — polymorphic FieldConfig deserialized using the `type` discriminator in the JSON object.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Decisions:** all 9 field types serialized to JSONB via custom `FieldDefinitionConverter` — polymorphic FieldConfig deserialized using the `type` discriminator in the JSON object.
 
 ---
 
@@ -86,8 +100,17 @@ Each field in a model has a type that determines what data it stores, how it's v
 *Out of scope*
 - Cross-field validation (e.g., "end_date must be after start_date") — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: server-side per-field validation on record create/update is in Application handlers but HTTP 422 structured errors pending API layer.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ⏳ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** server-side per-field validation on record create/update is in Application handlers but HTTP 422 structured errors backend polish — see gaps below.
 
 ---
 
@@ -112,5 +135,14 @@ Each field in a model has a type that determines what data it stores, how it's v
 *Out of scope*
 - Hiding fields from the default list view per user — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: drag-drop reorder UX and immediate-save endpoint pending Frontend layer; `displayOrder` persisted in JSONB field list.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** drag-drop reorder UX and immediate-save endpoint pending Frontend layer; `displayOrder` persisted in JSONB field list.

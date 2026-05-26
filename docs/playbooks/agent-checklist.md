@@ -128,7 +128,7 @@ Paste block format: header `Gate 2:` then one `-` line per row (Gate 3 uses the 
 Gate 2:
 - Library → TECH_STACK.md / not triggered
 - New pattern → patterns.md / not triggered
-- US layer callout → docs/epics/…/features/… / not triggered
+- US layer callout → docs/epics/…/features/… (table layout per [docs-style § Feature files](./docs-style.md#feature-files--wireframes--implementation-status)) / not triggered
 - Epic README + PROGRESS → … / not triggered
 - Architecture rule → CLAUDE.md / not triggered
 - process.md workflow → … / not triggered

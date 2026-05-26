@@ -2,7 +2,12 @@
 
 [← Back to E01](../README.md)
 
-> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/pricing.excalidraw](../wireframes/pricing.excalidraw) · [preview](../wireframes/pricing.svg)
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| pricing | [source](../wireframes/pricing.excalidraw) | [preview](../wireframes/pricing.svg) |
+
 
 ---
 
@@ -85,8 +90,17 @@ Define subscription plan tiers with feature limits and enforce those limits at t
 *Out of scope*
 - Org-initiated plan upgrade — Phase 2 (requires billing integration).
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ (backend AC) | Frontend: ⏳
-> Gaps vs spec: US-010 pricing page UI, static fallback on load failure, "Current plan" badge (Frontend only). No multi-workflow bulk-import API yet — single-workflow import/duplicate enforce +1 before save (US-011 bulk AC applies when bulk endpoint exists).
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ (backend AC) |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** US-010 pricing page UI, static fallback on load failure, "Current plan" badge (Frontend only). No multi-workflow bulk-import API yet — single-workflow import/duplicate enforce +1 before save (US-011 bulk AC applies when bulk endpoint exists).
 > **Done (backend):** `GET /api/plans` with limits + `featureFlags` + `isAvailableForNewSignups`; signed-in org on retired plan still sees that plan; 402 on create/duplicate/import workflow, invite user, start execution; Redis read-through cache + INCR/DECR on mutate + execution key TTL to month-end UTC; DB fallback + warning when Redis write/read fails; delete workflow decrements cache; platform plan change 403 + audit log + cache refresh; downgrade over limit blocks new creates via existing usage check (resources not deleted).
 > **Deferred (follow-up PR):** atomic check-and-consume for monthly execution starts (race can briefly exceed cap under concurrency); fail-closed when usage counter/Redis unavailable (today logs warning and treats usage as 0).
-> Decisions: `featureFlags` derived from plan slug for MVP (no JSON column); `PlatformAdmin:UserIds` config for US-012.
+> **Decisions:** `featureFlags` derived from plan slug for MVP (no JSON column); `PlatformAdmin:UserIds` config for US-012.

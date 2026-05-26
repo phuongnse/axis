@@ -1,6 +1,11 @@
 ﻿# F06 — Parallel Step Execution
 
-> **Wireframe**: [docs/epics/E04-workflow-builder/wireframes/workflow-editor.excalidraw](../wireframes/workflow-editor.excalidraw) · [preview](../wireframes/workflow-editor.svg)
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| workflow-editor | [source](../wireframes/workflow-editor.excalidraw) | [preview](../wireframes/workflow-editor.svg) |
+
 
 [← Back to E04](../README.md)
 
@@ -36,8 +41,17 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 *Out of scope*
 - Dynamic parallelism (creating N parallel branches based on a list of records at runtime) — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: canvas container node rendering and step nesting UI pending Frontend; parallel group represented via step config in existing JSONB storage. `ParallelGroup` and `JoinType` are Phase 2 — shown as planned (dashed) in diagram.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** canvas container node rendering and step nesting UI pending Frontend; parallel group represented via step config in existing JSONB storage. `ParallelGroup` and `JoinType` are Phase 2 — shown as planned (dashed) in diagram.
 
 ---
 
@@ -64,8 +78,17 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 *Out of scope*
 - "Wait for N of M" join type (e.g., wait for 2 out of 3 branches) — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: AND/OR join execution, branch cancellation, and grace period pending E06.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** AND/OR join execution, branch cancellation, and grace period pending E06.
 
 ---
 
@@ -89,5 +112,14 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 *Out of scope*
 - Merging/reducing outputs from parallel branches with built-in aggregation functions — not in MVP; use a Script step after the group for custom aggregation.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: context namespacing by step ID and sibling-output blocking pending E06; design-time duplicate output warning pending API layer.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** context namespacing by step ID and sibling-output blocking pending E06; design-time duplicate output warning backend polish — see gaps below.

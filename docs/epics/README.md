@@ -13,11 +13,22 @@
 | 1 | This page → **Open work** on the epic README | Prioritized gaps for that epic (backend vs frontend called out) |
 | 2 | `docs/epics/{epic}/features/F0N-*.md` | Per–user-story `> **Implementation status**` + `Gaps vs spec` + `**Done:**` / `**Deferred:**` |
 | 3 | `docs/PROGRESS.md` | Module layer summary (Domain → Frontend); cross-cutting foundation phases |
-| 4 | `grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/epics/` | US rows still blocked before API work ([agent-checklist](../playbooks/agent-checklist.md)) |
+| 4 | `grep -rE "\| Application \| ⚠️|\| Infrastructure \| ⚠️|\| API \| ⚠️" docs/epics/` | US rows with partial backend layers ([agent-checklist](../playbooks/agent-checklist.md)) |
 
-**Symbols** (same as [agent-checklist § Layer status](../playbooks/agent-checklist.md)): ✅ done for that layer on this US · ⚠️ partial (read `Gaps vs spec`) · ⏳ not started.
+**Symbols** (per layer **on this US**, not the whole module):
 
-When you ship code, update **US callout → epic README table → epic Open work → PROGRESS** in the same PR. Never mark ✅ while `Gaps vs spec` still lists backend work for that layer.
+| Symbol | Meaning |
+|--------|---------|
+| ✅ | All **in-scope backend AC** for this layer on this US are implemented (or Frontend-only AC when layer is Frontend). |
+| ⚠️ | Layer partially shipped — read `**Gaps vs spec**` for what remains on this US. |
+| ⏳ | Layer not started for this US. |
+| N/A | Layer does not apply (e.g. Frontend-only US → Domain N/A). |
+
+**Epic README `API ✅ Done`** = core REST routes exist for the module. **US callout `API`** = AC-level truth for that story (filters, SignalR, CSV export, etc. may still be ⚠️/⏳).
+
+When you ship code, update **US callout → epic README table → epic Open work → PROGRESS** in the same PR. Never mark ✅ while `**Gaps vs spec**` still lists backend work for that layer.
+
+**Feature file layout:** wireframes as a `## Wireframes` table; implementation status as a blockquote + layer table — see [docs-style § Feature files](./docs-style.md#feature-files-wireframes--implementation-status). After bulk edits, run `python3 scripts/normalize-feature-docs.py`.
 
 **Full AC coverage (all cases, not happy path only):** [agent-checklist § AC coverage](../playbooks/agent-checklist.md#ac-coverage--avoid-happy-path-only) — Gate 0 AC map + TDD + `Gaps vs spec` on every PR.
 

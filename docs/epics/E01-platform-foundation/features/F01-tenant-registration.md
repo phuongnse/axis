@@ -2,14 +2,24 @@
 
 [← Back to E01](../README.md)
 
-> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/register-org.excalidraw](../wireframes/register-org.excalidraw) · [preview](../wireframes/register-org.svg)
-> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/register-org-states.excalidraw](../wireframes/register-org-states.excalidraw) · [preview](../wireframes/register-org-states.svg)
-> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/email-confirmation.excalidraw](../wireframes/email-confirmation.excalidraw) · [preview](../wireframes/email-confirmation.svg)
-> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/verify-email.excalidraw](../wireframes/verify-email.excalidraw) · [preview](../wireframes/verify-email.svg)
-> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/verify-email-rate-limit.excalidraw](../wireframes/verify-email-rate-limit.excalidraw) · [preview](../wireframes/verify-email-rate-limit.svg)
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| register-org | [source](../wireframes/register-org.excalidraw) | [preview](../wireframes/register-org.svg) |
+| register-org-states | [source](../wireframes/register-org-states.excalidraw) | [preview](../wireframes/register-org-states.svg) |
+| email-confirmation | [source](../wireframes/email-confirmation.excalidraw) | [preview](../wireframes/email-confirmation.svg) |
+| verify-email | [source](../wireframes/verify-email.excalidraw) | [preview](../wireframes/verify-email.svg) |
+| verify-email-rate-limit | [source](../wireframes/verify-email-rate-limit.excalidraw) | [preview](../wireframes/verify-email-rate-limit.svg) |
+
 > **Wireframe** (US-002 sign-in before verify): [docs/epics/E02-identity-access/wireframes/login-unverified.excalidraw](../../E02-identity-access/wireframes/login-unverified.excalidraw) · [preview](../../E02-identity-access/wireframes/login-unverified.svg)
-> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/workspace-provisioning.excalidraw](../wireframes/workspace-provisioning.excalidraw) · [preview](../wireframes/workspace-provisioning.svg)
-> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/pricing.excalidraw](../wireframes/pricing.excalidraw) · [preview](../wireframes/pricing.svg)
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| workspace-provisioning | [source](../wireframes/workspace-provisioning.excalidraw) | [preview](../wireframes/workspace-provisioning.svg) |
+| pricing | [source](../wireframes/pricing.excalidraw) | [preview](../wireframes/pricing.svg) |
+
 
 ---
 
@@ -50,10 +60,19 @@ Self-service registration flow where a new organization signs up and is automati
 - Social/SSO sign-up (Google, GitHub) — not in MVP.
 - CAPTCHA — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: none for backend US-001. `Idempotency-Key` header on `POST /api/organizations/` deduplicates rapid resubmits (Pending/Completed/Failed state).
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** none for backend US-001. `Idempotency-Key` header on `POST /api/organizations/` deduplicates rapid resubmits (Pending/Completed/Failed state).
 > **Deferred (PR #124 follow-up):** Frontend registration confirmation-screen behavior alignment for US-001.
-> Decisions: duplicate email returns silently without creating anything — matches "same confirmation screen" AC. `RegisterOrganizationCommandValidator` enforces: org name 2–100 chars, valid email, password min 8 chars + letter + number, confirmation match. Org slug auto-generated with uniqueness retry loop; BCrypt work factor 12. 4 default system roles seeded atomically in the same transaction.
+> **Decisions:** duplicate email returns silently without creating anything — matches "same confirmation screen" AC. `RegisterOrganizationCommandValidator` enforces: org name 2–100 chars, valid email, password min 8 chars + letter + number, confirmation match. Org slug auto-generated with uniqueness retry loop; BCrypt work factor 12. 4 default system roles seeded atomically in the same transaction.
 
 ---
 
@@ -81,10 +100,19 @@ Self-service registration flow where a new organization signs up and is automati
 *Out of scope*
 - Automatic re-send after X minutes — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: auto sign-in after verification click pending Frontend. **Done:** opaque one-time verification tokens in `email_verification_tokens` (SHA-256 hash at rest, 24h TTL, invalidate on verify/resend); resend rate limit 3/email/hour via `IResendVerificationRateLimiter` (Redis atomic INCR+EXPIRE per hashed email, HTTP 429 + message); login returns "Please verify your email" when unverified; `GET /api/auth/provisioning-status?token=` accepts the same link token after verify (including used tokens within TTL). IP-level `auth` limiter applies to `/connect/login` and Identity gRPC only — not on verify/resend (avoids starving integration tests).
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** auto sign-in after verification click pending Frontend. **Done:** opaque one-time verification tokens in `email_verification_tokens` (SHA-256 hash at rest, 24h TTL, invalidate on verify/resend); resend rate limit 3/email/hour via `IResendVerificationRateLimiter` (Redis atomic INCR+EXPIRE per hashed email, HTTP 429 + message); login returns "Please verify your email" when unverified; `GET /api/auth/provisioning-status?token=` accepts the same link token after verify (including used tokens within TTL). IP-level `auth` limiter applies to `/connect/login` and Identity gRPC only — not on verify/resend (avoids starving integration tests).
 > **Deferred (PR #125 follow-up):** Frontend verify-email flow, provisioning wait screen, and post-verify auto sign-in (US-002).
-> Decisions: `ResendVerificationEmailCommand` silently succeeds for unknown/already-verified emails (no info leakage).
+> **Decisions:** `ResendVerificationEmailCommand` silently succeeds for unknown/already-verified emails (no info leakage).
 
 ---
 
@@ -112,10 +140,19 @@ Self-service registration flow where a new organization signs up and is automati
 *Out of scope*
 - Custom schema naming chosen by the user — schema names are auto-generated.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⚠️ | Frontend: ⚠️
-> Gaps vs spec: provisioning wait UI (US-002) pending Frontend. **Done:** org enters `Provisioning` on verify; per-module `TenantModuleProvisionReportEvent` + Identity coordinator schedules up to 3 retries with exponential backoff; critical log alert when exhausted; `GET /api/auth/provisioning-status?token=` for polling.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ⚠️ |
+> | Frontend | ⚠️ |
+>
+> **Gaps vs spec:** provisioning wait UI (US-002) pending Frontend. **Done:** org enters `Provisioning` on verify; per-module `TenantModuleProvisionReportEvent` + Identity coordinator schedules up to 3 retries with exponential backoff; critical log alert when exhausted; `GET /api/auth/provisioning-status?token=` for polling.
 > **Deferred (PR follow-up):** external paging integration for platform alerts (critical log is the MVP signal).
-> Decisions: provisioning is fully event-driven over Kafka per [ADR-019](../../../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope) — no central provisioner. The verify endpoint stays fast, the provisioning failure mode is decoupled from email verification, and each module owns its own schema lifecycle (satisfies ADR-010 "extraction is a redeploy"). Tenant schema name is derived from `Organization.Id` as `tenant_{orgId:N}` (32-char hex, no dashes) — stable across the lifetime of the org and safe as a Postgres identifier.
+> **Decisions:** provisioning is fully event-driven over Kafka per [ADR-019](../../../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope) — no central provisioner. The verify endpoint stays fast, the provisioning failure mode is decoupled from email verification, and each module owns its own schema lifecycle (satisfies ADR-010 "extraction is a redeploy"). Tenant schema name is derived from `Organization.Id` as `tenant_{orgId:N}` (32-char hex, no dashes) — stable across the lifetime of the org and safe as a Postgres identifier.
 
 ---
 
@@ -142,6 +179,15 @@ Self-service registration flow where a new organization signs up and is automati
 - Credit card collection and payment processing — Phase 2.
 - Plan upgrade/downgrade self-service — covered in F04.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: pricing comparison table and workspace header plan name pending Frontend. **Done (backend):** `POST /api/organizations/` accepts optional `subscriptionPlanId`; invalid/unavailable plan ids fall back to Free; org stores `subscription_plan_id`; F04 enforces limits (402) after provisioning.
-> Decisions: MVP paid plan selection has no billing flag column yet — treat as normal plan assignment until billing Phase 2.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** pricing comparison table and workspace header plan name pending Frontend. **Done (backend):** `POST /api/organizations/` accepts optional `subscriptionPlanId`; invalid/unavailable plan ids fall back to Free; org stores `subscription_plan_id`; F04 enforces limits (402) after provisioning.
+> **Decisions:** MVP paid plan selection has no billing flag column yet — treat as normal plan assignment until billing Phase 2.

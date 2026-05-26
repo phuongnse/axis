@@ -1,6 +1,11 @@
 ﻿# F03 — Data Class Management
 
-> **Wireframe**: [docs/epics/E03-data-modeling/wireframes/data-classes.excalidraw](../wireframes/data-classes.excalidraw) · [preview](../wireframes/data-classes.svg)
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| data-classes | [source](../wireframes/data-classes.excalidraw) | [preview](../wireframes/data-classes.svg) |
+
 
 [← Back to E03](../README.md)
 
@@ -35,8 +40,17 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 *Out of scope*
 - Nested data classes (data class within a data class) — depth limited to 1 in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Decisions: DataClass fields stored as JSONB using the same FieldDefinitionConverter as DataModel; Relation/DataClass/File types blocked in domain by guard. DataClassDefinition reuses `FieldDefinition` directly — no separate DataClassField entity.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Decisions:** DataClass fields stored as JSONB using the same FieldDefinitionConverter as DataModel; Relation/DataClass/File types blocked in domain by guard. DataClassDefinition reuses `FieldDefinition` directly — no separate DataClassField entity.
 
 ---
 
@@ -63,8 +77,17 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 *Out of scope*
 - A field referencing a data class from another org — tenant-isolated, not possible.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: sub-form rendering and record-list summary display pending Frontend layer.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** sub-form rendering and record-list summary display pending Frontend layer.
 
 ---
 
@@ -88,8 +111,17 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 *Out of scope*
 - Version history of data class changes — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: "models affected" warning on field delete pending API/Frontend layer; auto-downgrade-to-optional for required fields on existing-record models pending API layer.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** "models affected" warning on field delete pending API/Frontend layer; auto-downgrade-to-optional for required fields on existing-record models backend polish — see gaps below.
 
 ---
 
@@ -113,6 +145,15 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 *Out of scope*
 - Merging two data classes into one — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: HTTP 409 on delete-while-referenced enforced in Application handler; reference check uses PostgreSQL JSONB `@>` containment query.
-> Decisions: `IsReferencedByAnyModelAsync` uses raw SQL `fields @> {0}::jsonb` to query nested JSON without loading all models into memory.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** HTTP 409 on delete-while-referenced enforced in Application handler; reference check uses PostgreSQL JSONB `@>` containment query.
+> **Decisions:** `IsReferencedByAnyModelAsync` uses raw SQL `fields @> {0}::jsonb` to query nested JSON without loading all models into memory.

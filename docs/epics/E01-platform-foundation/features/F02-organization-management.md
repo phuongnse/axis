@@ -2,15 +2,20 @@
 
 [← Back to E01](../README.md)
 
-> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/settings-org.excalidraw](../wireframes/settings-org.excalidraw) · [preview](../wireframes/settings-org.svg)
-> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/settings-org-upload-states.excalidraw](../wireframes/settings-org-upload-states.excalidraw) · [preview](../wireframes/settings-org-upload-states.svg)
-> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/settings-org-profile-states.excalidraw](../wireframes/settings-org-profile-states.excalidraw) · [preview](../wireframes/settings-org-profile-states.svg)
-> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/settings-org-usage-error.excalidraw](../wireframes/settings-org-usage-error.excalidraw) · [preview](../wireframes/settings-org-usage-error.svg)
-> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/settings-org-free-plan.excalidraw](../wireframes/settings-org-free-plan.excalidraw) · [preview](../wireframes/settings-org-free-plan.svg)
-> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/settings-org-access-denied.excalidraw](../wireframes/settings-org-access-denied.excalidraw) · [preview](../wireframes/settings-org-access-denied.svg)
-> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/settings-org-deletion-scheduled.excalidraw](../wireframes/settings-org-deletion-scheduled.excalidraw) · [preview](../wireframes/settings-org-deletion-scheduled.svg)
-> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/settings-org-delete-modal.excalidraw](../wireframes/settings-org-delete-modal.excalidraw) · [preview](../wireframes/settings-org-delete-modal.svg)
-> **Wireframe**: [docs/epics/E01-platform-foundation/wireframes/settings-org-delete-states.excalidraw](../wireframes/settings-org-delete-states.excalidraw) · [preview](../wireframes/settings-org-delete-states.svg)
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| settings-org | [source](../wireframes/settings-org.excalidraw) | [preview](../wireframes/settings-org.svg) |
+| settings-org-upload-states | [source](../wireframes/settings-org-upload-states.excalidraw) | [preview](../wireframes/settings-org-upload-states.svg) |
+| settings-org-profile-states | [source](../wireframes/settings-org-profile-states.excalidraw) | [preview](../wireframes/settings-org-profile-states.svg) |
+| settings-org-usage-error | [source](../wireframes/settings-org-usage-error.excalidraw) | [preview](../wireframes/settings-org-usage-error.svg) |
+| settings-org-free-plan | [source](../wireframes/settings-org-free-plan.excalidraw) | [preview](../wireframes/settings-org-free-plan.svg) |
+| settings-org-access-denied | [source](../wireframes/settings-org-access-denied.excalidraw) | [preview](../wireframes/settings-org-access-denied.svg) |
+| settings-org-deletion-scheduled | [source](../wireframes/settings-org-deletion-scheduled.excalidraw) | [preview](../wireframes/settings-org-deletion-scheduled.svg) |
+| settings-org-delete-modal | [source](../wireframes/settings-org-delete-modal.excalidraw) | [preview](../wireframes/settings-org-delete-modal.svg) |
+| settings-org-delete-states | [source](../wireframes/settings-org-delete-states.excalidraw) | [preview](../wireframes/settings-org-delete-states.svg) |
+
 
 ---
 
@@ -48,8 +53,17 @@ Allow organization admins to manage their organization's profile, settings, and 
 - Custom domain / vanity URL — not in MVP.
 - White-label theming (custom colors, fonts) — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: Frontend-only AC: toast, upload progress, navigate-away warning. **Done (backend):** language tag validation (`en`, `en-US`).
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** Frontend-only AC: toast, upload progress, navigate-away warning. **Done (backend):** language tag validation (`en`, `en-US`).
 > **Done:** `Organization` profile fields + `UpdateOrganizationProfileCommand`; S3 logo storage; IANA timezone validation.
 
 ---
@@ -74,8 +88,17 @@ Allow organization admins to manage their organization's profile, settings, and 
 *Out of scope*
 - Editing all settings inline on this page — this page is read-only for stats; editing is in sub-sections.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: Frontend-only: usage retry UI, redirect on 403. **Done (backend):** Redis usage cache TTL ≤ 5 minutes (`PlanLimitRedisCache.UsageStatsMaxStaleness`); existing Admin roles backfilled via `OrganizationSettingsPermissionSeeder`.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** Frontend-only: usage retry UI, redirect on 403. **Done (backend):** Redis usage cache TTL ≤ 5 minutes (`PlanLimitRedisCache.UsageStatsMaxStaleness`); existing Admin roles backfilled via `OrganizationSettingsPermissionSeeder`.
 > **Done:** `GET /api/organizations/current/settings` returns plan name, profile, usage limits, deletion schedule metadata.
 
 ---
@@ -107,6 +130,15 @@ Allow organization admins to manage their organization's profile, settings, and 
 - Data export before deletion — available separately as a future feature.
 - Immediate hard delete without grace period — the 30-day window is non-negotiable in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: **Deferred (PR #127 follow-up):** marketing-page redirect + forced sign-out after schedule (Frontend/session); abandon in-flight Wolverine step dispatch beyond execution + form-task cancel; cross-module hard-delete steps via RabbitMQ commands when modules are extracted (see `docs/WORKAROUNDS.md#org-hard-delete-modulith-cancellers`).
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** **Deferred (PR #127 follow-up):** marketing-page redirect + forced sign-out after schedule (Frontend/session); abandon in-flight Wolverine step dispatch beyond execution + form-task cancel; cross-module hard-delete steps via RabbitMQ commands when modules are extracted (see `docs/WORKAROUNDS.md#org-hard-delete-modulith-cancellers`).
 > **Done:** schedule rollback when job queue fails; hard-delete cancels executions + pending form tasks, drops tenant schemas, deletes logo S3 object, purges Identity platform rows (users, roles, invitations, provisioning); login returns org-not-found when org row removed.

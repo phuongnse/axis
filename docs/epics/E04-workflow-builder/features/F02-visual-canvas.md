@@ -1,6 +1,11 @@
 ﻿# F02 — Visual Workflow Canvas
 
-> **Wireframe**: [docs/epics/E04-workflow-builder/wireframes/workflow-editor.excalidraw](../wireframes/workflow-editor.excalidraw) · [preview](../wireframes/workflow-editor.svg)
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| workflow-editor | [source](../wireframes/workflow-editor.excalidraw) | [preview](../wireframes/workflow-editor.svg) |
+
 
 [← Back to E04](../README.md)
 
@@ -37,8 +42,17 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 *Out of scope*
 - Copy-paste of steps — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: canvas drag-drop UI and 1-second debounce auto-save pending Frontend.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** canvas drag-drop UI and 1-second debounce auto-save pending Frontend.
 
 ---
 
@@ -65,8 +79,17 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 *Out of scope*
 - Animated transitions showing flow direction — not in MVP (static arrows only).
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: canvas edge drawing and cycle-block toast pending Frontend; condition step label enforcement on connection pending Frontend.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** canvas edge drawing and cycle-block toast pending Frontend; condition step label enforcement on connection pending Frontend.
 
 ---
 
@@ -93,8 +116,17 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 *Out of scope*
 - Full-screen step config modal — the panel-based UI is the only config surface in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: slide-over panel, inline error indicators, and auto-save pending Frontend; step config stored as JSONB dict in `steps` column.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** slide-over panel, inline error indicators, and auto-save pending Frontend; step config stored as JSONB dict in `steps` column.
 
 ---
 
@@ -120,7 +152,13 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 *Out of scope*
 - Touch/gesture controls for tablet use — not in MVP.
 
-> **Implementation status** — N/A (frontend-only) | API: N/A | Frontend: ⏳
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | API | N/A |
+> | Frontend | ⏳ |
+>
 > No backend domain or infrastructure work; canvas navigation is a pure client-side concern.
 
 ---
@@ -148,5 +186,11 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 *Out of scope*
 - Server-side version history with named snapshots — not in MVP.
 
-> **Implementation status** — N/A (frontend-only) | API: N/A | Frontend: ⏳
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | API | N/A |
+> | Frontend | ⏳ |
+>
 > Undo/redo is in-memory client state only; no server round-trip required.

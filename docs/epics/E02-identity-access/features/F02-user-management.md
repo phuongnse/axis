@@ -1,7 +1,12 @@
 ﻿# F02 — User Management
 
-> **Wireframe**: [docs/epics/E02-identity-access/wireframes/settings-users.excalidraw](../wireframes/settings-users.excalidraw) · [preview](../wireframes/settings-users.svg)
-> **Wireframe**: [docs/epics/E02-identity-access/wireframes/accept-invitation.excalidraw](../wireframes/accept-invitation.excalidraw) · [preview](../wireframes/accept-invitation.svg)
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| settings-users | [source](../wireframes/settings-users.excalidraw) | [preview](../wireframes/settings-users.svg) |
+| accept-invitation | [source](../wireframes/accept-invitation.excalidraw) | [preview](../wireframes/accept-invitation.svg) |
+
 
 [← Back to E02](../README.md)
 
@@ -42,9 +47,18 @@ Organization admins can invite new members, manage their accounts, and deactivat
 *Out of scope*
 - Bulk invitation via CSV upload — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: **Done:** HTTP 402 when user plan limit reached (`InviteUserHandler`, E01 F04). Admin self-invite check not implemented — pending API layer (compare invite email to `ICurrentUser` email).
-> Decisions: existing-member and pending-invitation checks throw `ValidationException` with specific messages matching AC wording.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** **Done:** HTTP 402 when user plan limit reached (`InviteUserHandler`, E01 F04). Admin self-invite check not implemented — backend polish — see gaps below (compare invite email to `ICurrentUser` email).
+> **Decisions:** existing-member and pending-invitation checks throw `ValidationException` with specific messages matching AC wording.
 
 ---
 
@@ -72,9 +86,18 @@ Organization admins can invite new members, manage their accounts, and deactivat
 *Out of scope*
 - Inviting users who already have accounts on other orgs to join a second org simultaneously — each user belongs to one org in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: session sign-in after accept is an API/auth concern, pending.
-> Decisions: expired/accepted/cancelled invitation states enforced in `Invitation.Accept()` domain method, wrapped as `ValidationException` in handler. Platform-wide email check runs after invitation validation — throws `ValidationException` directing user to sign in with existing credentials. `AcceptInvitationHandler` calls `user.VerifyEmail()` — the invitation link proves mailbox ownership (no separate verification email).
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** session sign-in after accept is an API/auth concern, pending.
+> **Decisions:** expired/accepted/cancelled invitation states enforced in `Invitation.Accept()` domain method, wrapped as `ValidationException` in handler. Platform-wide email check runs after invitation validation — throws `ValidationException` directing user to sign in with existing credentials. `AcceptInvitationHandler` calls `user.VerifyEmail()` — the invitation link proves mailbox ownership (no separate verification email).
 
 ---
 
@@ -103,9 +126,18 @@ Organization admins can invite new members, manage their accounts, and deactivat
 *Out of scope*
 - Transferring ownership of content from a deactivated user — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: session revocation (refresh token revoke + access token blacklist) not implemented — pending auth infrastructure (OpenIddict + Redis). Self-deactivation guard and 403 check require current user identity from JWT — pending API layer. Deactivated-user sign-in message handled at auth layer (pending).
-> Decisions: "last admin" check queries `CountAdminsAsync` in the repository before deactivating — domain enforces via `ApplicationException` if violated.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** session revocation (refresh token revoke + access token blacklist) not implemented — auth infrastructure polish — see gaps below. Self-deactivation guard and 403 check require current user identity from JWT — backend polish — see gaps below. Deactivated-user sign-in message handled at auth layer (pending).
+> **Decisions:** "last admin" check queries `CountAdminsAsync` in the repository before deactivating — domain enforces via `ApplicationException` if violated.
 
 ---
 
@@ -131,6 +163,15 @@ Organization admins can invite new members, manage their accounts, and deactivat
 *Out of scope*
 - Public profile visibility — all profiles are private within the org in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: email change flow (F05) not started.
-> Decisions: name update is a direct property mutation on `User` aggregate with a `UserProfileUpdatedEvent`. Avatar upload fully wired in `UpdateUserProfileHandler` — validates type (PNG/JPG only) and size (max 1 MB), uploads to S3, deletes old file on replacement.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** email change flow (F05) not started.
+> **Decisions:** name update is a direct property mutation on `User` aggregate with a `UserProfileUpdatedEvent`. Avatar upload fully wired in `UpdateUserProfileHandler` — validates type (PNG/JPG only) and size (max 1 MB), uploads to S3, deletes old file on replacement.

@@ -303,6 +303,22 @@ done < <(
 
 "${ROOT}/scripts/check-buf-modules.sh" || ERR=1
 
+# Feature file layout: table-based wireframes + implementation status (docs-style.md).
+if any_changed '^docs/epics/.*/features/.*\.md$'; then
+  while IFS= read -r match; do
+    [ -z "${match}" ] && continue
+    fail "Deprecated single-line Implementation status — use table layout; run: python3 scripts/normalize-feature-docs.py (${match})"
+  done < <(
+    grep -rnE '^\> \*\*Implementation status\*\* — ' docs/epics/ 2>/dev/null || true
+  )
+  while IFS= read -r match; do
+    [ -z "${match}" ] && continue
+    fail "Deprecated inline Wireframe blockquote — use ## Wireframes table; run: python3 scripts/normalize-feature-docs.py (${match})"
+  done < <(
+    grep -rnE '^\> \*\*Wireframe\*\*:' docs/epics/ 2>/dev/null || true
+  )
+fi
+
 if [ "${ERR}" -ne 0 ]; then
   echo "" >&2
   echo "See docs/playbooks/agent-checklist.md" >&2

@@ -1,6 +1,11 @@
 ﻿# F01 — Form Definition Management
 
-> **Wireframe**: [docs/epics/E05-form-builder/wireframes/forms.excalidraw](../wireframes/forms.excalidraw) · [preview](../wireframes/forms.svg)
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| forms | [source](../wireframes/forms.excalidraw) | [preview](../wireframes/forms.svg) |
+
 
 [← Back to E05](../README.md)
 
@@ -34,9 +39,18 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 *Out of scope*
 - Form templates / starter library — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: live preview panel and form editor pending Frontend.
-> Decisions: all form fields stored as JSONB via custom FormFieldConverter using FormFieldType as polymorphic discriminator.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** live preview panel and form editor pending Frontend.
+> **Decisions:** all form fields stored as JSONB via custom FormFieldConverter using FormFieldType as polymorphic discriminator.
 
 ---
 
@@ -61,9 +75,18 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 *Out of scope*
 - Folders/categories for organizing forms — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: "Used in N workflow(s)" count pending cross-module query — not supported at Application layer without inter-module dependency; deferred to API/Frontend aggregation.
-> Decisions: `GetFormsHandler` paginates in-memory (GetAllAsync + LINQ Skip/Take). This is an accepted trade-off for MVP: adding a `GetPagedAsync` repository method would push sorting/paging logic into Infrastructure without additional correctness benefit at this scale. `Page` and `PageSize` are clamped to ≥ 1 and ≤ 100 in the handler.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** "Used in N workflow(s)" count pending cross-module query — not supported at Application layer without inter-module dependency; deferred to API/Frontend aggregation.
+> **Decisions:** `GetFormsHandler` paginates in-memory (GetAllAsync + LINQ Skip/Take). This is an accepted trade-off for MVP: adding a `GetPagedAsync` repository method would push sorting/paging logic into Infrastructure without additional correctness benefit at this scale. `Page` and `PageSize` are clamped to ≥ 1 and ≤ 100 in the handler.
 
 ---
 
@@ -88,9 +111,18 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 *Out of scope*
 - Form versioning (publishing a new "version" of a form) — not in MVP; edits are live immediately.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: live-workflow warning banner (informational) and definition snapshot for in-progress tasks pending API + E06.
-> Decisions: `UpdateFormHandler` checks name uniqueness via `NameExistsAsync(name, orgId, excludeId)` before calling `form.Update()`; TOCTOU race requires a unique DB index on `(name, org_id)` at Infrastructure layer.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** live-workflow warning banner (informational) and definition snapshot for in-progress tasks pending API + E06.
+> **Decisions:** `UpdateFormHandler` checks name uniqueness via `NameExistsAsync(name, orgId, excludeId)` before calling `form.Update()`; TOCTOU race requires a unique DB index on `(name, org_id)` at Infrastructure layer.
 
 ---
 
@@ -115,6 +147,15 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 *Out of scope*
 - Recovering a soft-deleted form — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: HTTP 409 on delete-while-referenced enforced via `IsReferencedByWorkflowAsync` JSONB query across `workflow_definitions.steps`; archived-workflow exception pending API layer.
-> Decisions: `IsReferencedByWorkflowAsync` uses raw SQL `workflow_definitions.steps @> [{...}]::jsonb` — cross-module table query within the same tenant schema.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** HTTP 409 on delete-while-referenced enforced via `IsReferencedByWorkflowAsync` JSONB query across `workflow_definitions.steps`; archived-workflow exception backend polish — see gaps below.
+> **Decisions:** `IsReferencedByWorkflowAsync` uses raw SQL `workflow_definitions.steps @> [{...}]::jsonb` — cross-module table query within the same tenant schema.

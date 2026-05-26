@@ -1,6 +1,11 @@
 ﻿# F02 — Form Field Configuration & Validation
 
-> **Wireframe**: [docs/epics/E05-form-builder/wireframes/form-editor.excalidraw](../wireframes/form-editor.excalidraw) · [preview](../wireframes/form-editor.svg)
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| form-editor | [source](../wireframes/form-editor.excalidraw) | [preview](../wireframes/form-editor.svg) |
+
 
 [← Back to E05](../README.md)
 
@@ -39,9 +44,18 @@ Form fields define what data the form collects. Each field has a type, label, he
 *Out of scope*
 - Conditional field visibility (show field only if another field has a certain value) — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: type picker UI, live preview update, and extension validation for File Upload pending Frontend + API layers.
-> Decisions: `AddFieldToFormHandler` catches both `ArgumentException` (invalid key format) and `InvalidOperationException` (duplicate key) from the domain and returns `ErrorCodes.BusinessRule`. Field config polymorphism handled by FormFieldConverter using FormFieldType enum as discriminator.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** type picker UI, live preview update, and extension validation for File Upload pending Frontend + API layers.
+> **Decisions:** `AddFieldToFormHandler` catches both `ArgumentException` (invalid key format) and `InvalidOperationException` (duplicate key) from the domain and returns `ErrorCodes.BusinessRule`. Field config polymorphism handled by FormFieldConverter using FormFieldType enum as discriminator.
 
 ---
 
@@ -69,8 +83,17 @@ Form fields define what data the form collects. Each field has a type, label, he
 *Out of scope*
 - Cross-field validation (e.g., "end date must be after start date") — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: no `UpdateFieldValidationCommand` handler — field validation config is part of `AddFieldToForm` (set on creation only); client-side validation (React Hook Form + Zod) pending Frontend; HTTP 422 structured errors pending API layer.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** no `UpdateFieldValidationCommand` handler — field validation config is part of `AddFieldToForm` (set on creation only); client-side validation (React Hook Form + Zod) pending Frontend; HTTP 422 structured errors backend polish — see gaps below.
 
 ---
 
@@ -95,9 +118,18 @@ Form fields define what data the form collects. Each field has a type, label, he
 *Out of scope*
 - Multi-column form layouts — not in MVP (single-column only).
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: drag-handle UI and real-time preview reorder pending Frontend.
-> Decisions: `ReorderFormFieldsHandler` catches `ArgumentException` from domain (IDs don't match all fields) and returns `ErrorCodes.BusinessRule`.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** drag-handle UI and real-time preview reorder pending Frontend.
+> **Decisions:** `ReorderFormFieldsHandler` catches `ArgumentException` from domain (IDs don't match all fields) and returns `ErrorCodes.BusinessRule`.
 
 ---
 
@@ -122,6 +154,15 @@ Form fields define what data the form collects. Each field has a type, label, he
 *Out of scope*
 - Collapsible sections — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: section grouping visual rendering pending Frontend.
-> Decisions: sections use `FormFieldType.Section` + `SectionFieldConfig` and flow through the same `AddFieldToFormCommand` as regular fields.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** section grouping visual rendering pending Frontend.
+> **Decisions:** sections use `FormFieldType.Section` + `SectionFieldConfig` and flow through the same `AddFieldToFormCommand` as regular fields.

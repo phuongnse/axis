@@ -1,6 +1,11 @@
 ﻿# F05 — Manual Retry
 
-> **Wireframe**: [docs/epics/E06-workflow-engine/wireframes/execution-detail.excalidraw](../wireframes/execution-detail.excalidraw) · [preview](../wireframes/execution-detail.svg)
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| execution-detail | [source](../wireframes/execution-detail.excalidraw) | [preview](../wireframes/execution-detail.svg) |
+
 
 [← Back to E06](../README.md)
 
@@ -39,9 +44,18 @@ When a workflow execution fails at a step, users can manually retry from the fai
 *Out of scope*
 - Automatic retry (without user action) — not in MVP.
 
-> **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ⚠️ | Frontend: ⏳
-> Gaps vs spec: `POST /api/executions/{id}/retry` and retry-with-context ✅. Retry UI and archived-definition warning pending Frontend.
-> Decisions: `CreateRetry()` produces a new `WorkflowExecution` with `RetryOfExecutionId` set; context is copied from original at time of retry.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** `POST /api/executions/{id}/retry` and retry-with-context ✅. Retry UI and archived-definition warning pending Frontend.
+> **Decisions:** `CreateRetry()` produces a new `WorkflowExecution` with `RetryOfExecutionId` set; context is copied from original at time of retry.
 
 ---
 
@@ -67,8 +81,17 @@ When a workflow execution fails at a step, users can manually retry from the fai
 *Out of scope*
 - Comparing two retry attempts side-by-side — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⚠️ | Frontend: ⏳
-> Gaps vs spec: `GET /api/executions/{id}/retry-history` ✅. Retry history UI and interlinked execution chain navigation pending Frontend.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** `GET /api/executions/{id}/retry-history` ✅. Retry history UI and interlinked execution chain navigation pending Frontend.
 
 ---
 
@@ -95,6 +118,15 @@ When a workflow execution fails at a step, users can manually retry from the fai
 *Out of scope*
 - Structured field-by-field editing of context (showing fields by step/variable name) — not in MVP; raw JSON editor only.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ⚠️ | Frontend: ⏳
-> Gaps vs spec: `POST /api/executions/{id}/retry-with-context` ✅. JSON context editor UI and modified-context flag pending Frontend.
-> Decisions: `CreateRetryWithModifiedContext` added to domain as private `CreateRetryCore` delegation — shares validation logic with `CreateRetry`.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** `POST /api/executions/{id}/retry-with-context` ✅. JSON context editor UI and modified-context flag pending Frontend.
+> **Decisions:** `CreateRetryWithModifiedContext` added to domain as private `CreateRetryCore` delegation — shares validation logic with `CreateRetry`.

@@ -324,7 +324,7 @@ function systemContext() {
   els.push(...rect({ x: 230, y: 65, w: 600, h: 650, bg: "#f0f9ff", stroke: C.sysBdr, label: "Axis Platform", labelSize: 14, labelBold: true, labelColor: C.sysBdr }));
 
   // Inside platform — col 1 (left)
-  els.push(...rect({ x: 268, y: 120, w: 240, h: 70, bg: C.sysBg, stroke: C.sysBdr, label: "Web Application", sub: "React 18 + TypeScript" }));
+  els.push(...rect({ x: 268, y: 120, w: 240, h: 70, bg: C.sysBg, stroke: C.sysBdr, label: "Web Application", sub: "React 19 + TypeScript" }));
   els.push(...rect({ x: 268, y: 250, w: 240, h: 70, bg: C.sysBg, stroke: C.sysBdr, label: "API Server", sub: "ASP.NET Core 8 · Modular Monolith" }));
   els.push(...rect({ x: 268, y: 395, w: 240, h: 70, bg: C.infraBg, stroke: C.infraBdr, label: "PostgreSQL 16", sub: "Per-module databases" }));
   els.push(...rect({ x: 268, y: 505, w: 240, h: 70, bg: C.infraBg, stroke: C.infraBdr, label: "Redis 7", sub: "Cache · Session" }));
@@ -399,7 +399,7 @@ function containerDiagram() {
   // Web Application band (bottom of platform)
   els.push(...rect({ x: 50, y: 545, w: 760, h: 55, bg: C.sysBg, stroke: C.sysBdr,
     label: "Web Application",
-    sub: "React 18 + TypeScript + Vite · shadcn/ui · React Flow · dnd-kit · TanStack Query · Zustand" }));
+    sub: "React 19 + TypeScript + Vite · shadcn/ui · React Flow · dnd-kit · TanStack Query · Zustand" }));
 
   // DB column (right side; arrows from platform right edge x=810 → DB left edge x=870, 60px each)
   const DBX = 870, DBW = 190, DBH = 55, DBGap = 10;

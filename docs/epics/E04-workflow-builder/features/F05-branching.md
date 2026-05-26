@@ -1,6 +1,11 @@
 ﻿# F05 — Branching & Conditional Logic
 
-> **Wireframe**: [docs/epics/E04-workflow-builder/wireframes/workflow-editor.excalidraw](../wireframes/workflow-editor.excalidraw) · [preview](../wireframes/workflow-editor.svg)
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| workflow-editor | [source](../wireframes/workflow-editor.excalidraw) | [preview](../wireframes/workflow-editor.svg) |
+
 
 [← Back to E04](../README.md)
 
@@ -34,9 +39,18 @@ Workflows can take different execution paths based on data values using Conditio
 *Out of scope*
 - Loop-back branching (sending execution back to an earlier step) — cycles are blocked in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: canvas branch label rendering pending Frontend; branch evaluation at execution time pending E06.
-> Decisions: cycle detection implemented in domain (DFS reachability check in AddTransition). `Transition` is a value object (only `fromStepId`, `toStepId`, `condition` — no identity or ordering fields).
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** canvas branch label rendering pending Frontend; branch evaluation at execution time pending E06.
+> **Decisions:** cycle detection implemented in domain (DFS reachability check in AddTransition). `Transition` is a value object (only `fromStepId`, `toStepId`, `condition` — no identity or ordering fields).
 
 ---
 
@@ -64,8 +78,17 @@ Workflows can take different execution paths based on data values using Conditio
 *Out of scope*
 - Regex-based branch matching — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: branch drag-to-reorder UI and default-branch validation at publish pending Frontend + API.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** branch drag-to-reorder UI and default-branch validation at publish pending Frontend + API.
 
 ---
 
@@ -90,5 +113,14 @@ Workflows can take different execution paths based on data values using Conditio
 *Out of scope*
 - Explicit merge/join nodes on the canvas — merging is implicit (any step with multiple incoming edges acts as a merge point). An explicit Join node is used only in Parallel Groups (F06).
 
-> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: OR-merge deduplication (execute-once on first arrival) is an execution engine concern — pending E06.
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** OR-merge deduplication (execute-once on first arrival) is an execution engine concern — pending E06.
