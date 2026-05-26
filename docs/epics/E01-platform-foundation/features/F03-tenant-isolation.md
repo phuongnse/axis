@@ -46,9 +46,19 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 > | API | ⚠️ |
 > | Frontend | N/A |
 >
-> **Done:** `TenantSchemaInterceptor` sets PostgreSQL `search_path` per connection for module `DbContext`s; `TenantSchemaInterceptorTests` (two schemas, no cross-read). `HttpTenantContext` on `Axis.Api`; `FixedTenantContext` in Wolverine provision handlers.
-> **Gaps vs spec:** no module integration test proving Tenant A records invisible to Tenant B end-to-end; no explicit guard that tenant-scoped queries cannot target `public` for module data; pool `search_path` reset not load-tested.
-> **Next:** add cross-tenant API integration test in one module (e.g. DataModeling); document connection-pool behavior in [patterns.md](../../../playbooks/patterns.md) if verified.
+> **Done:**
+> - `TenantSchemaInterceptor` sets PostgreSQL `search_path` per connection for module `DbContext`s
+> - `TenantSchemaInterceptorTests` (two schemas, no cross-read). `HttpTenantContext` on `Axis.Api`
+> - `FixedTenantContext` in Wolverine provision handlers.
+>
+> **Gaps vs spec:**
+> - no module integration test proving Tenant A records invisible to Tenant B end-to-end
+> - no explicit guard that tenant-scoped queries cannot target `public` for module data
+> - pool `search_path` reset not load-tested.
+>
+> **Next:**
+> - add cross-tenant API integration test in one module (e.g. DataModeling)
+> - document connection-pool behavior in [patterns.md](../../../playbooks/patterns.md) if verified.
 
 ---
 
@@ -87,6 +97,17 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 > | API | ⚠️ |
 > | Frontend | N/A |
 >
-> **Done:** `org_id` claim issued at login (`ConnectEndpoints`); handlers use `ITenantContext` / `ICurrentUser` — schema `tenant_{orgId:N}` derived in `HttpTenantContext` (no separate DB lookup).
-> **Gaps vs spec:** no Redis cache for schema name (spec allows cache miss → DB; MVP derives deterministically so cache is optional); deleted/suspended org → 403 on tenant routes not centrally enforced; Wolverine tenant header propagation not documented in one place; background jobs rely on `FixedTenantContext` in known handlers only.
-> **Next:** middleware or filter rejecting JWT for `OrganizationStatus` not Active/Provisioning-complete; audit all Wolverine handlers for tenant context injection.
+> **Done:**
+> - `org_id` claim issued at login (`ConnectEndpoints`)
+> - handlers use `ITenantContext` / `ICurrentUser` — schema `tenant_{orgId:N}` derived in `HttpTenantContext` (no separate DB lookup).
+>
+> **Gaps vs spec:**
+> - no Redis cache for schema name (spec allows cache miss → DB
+> - MVP derives deterministically so cache is optional)
+> - deleted/suspended org → 403 on tenant routes not centrally enforced
+> - Wolverine tenant header propagation not documented in one place
+> - background jobs rely on `FixedTenantContext` in known handlers only.
+>
+> **Next:**
+> - middleware or filter rejecting JWT for `OrganizationStatus` not Active/Provisioning-complete
+> - audit all Wolverine handlers for tenant context injection.

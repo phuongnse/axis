@@ -6,7 +6,6 @@
 |--------|------------|---------|
 | data-models | [source](../wireframes/data-models.excalidraw) | [preview](../wireframes/data-models.svg) |
 
-
 [← Back to E03](../README.md)
 
 ---

@@ -6,7 +6,6 @@
 |--------|------------|---------|
 | execution-detail | [source](../wireframes/execution-detail.excalidraw) | [preview](../wireframes/execution-detail.svg) |
 
-
 [← Back to E06](../README.md)
 
 ---
@@ -107,8 +106,11 @@ Each step type has a dedicated handler that executes it in isolation. Handlers r
 > | API | ⏳ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** 
+> **Gaps vs spec:**
 > - AC "concurrent delivery: second detects Running and exits" — spec wording updated in decision below; concurrent-duplicate protection is implemented via `UseXminAsConcurrencyToken()` on `execution_steps` rows. The second concurrent writer receives a `DbUpdateConcurrencyException` (translated to `ConcurrencyException`), logs, and exits gracefully. The "Running guard" approach was deliberately rejected — see Decisions.
 > - Engine-level 5-minute step timeout not yet implemented (E06 F03 scope).
 > - `IScriptExecutor` and `INotificationSender` are stubs returning empty/success; real JS sandbox engine and email/webhook dispatch are deferred.
-> **Decisions:** `ExecutionStep.IsTerminal` covers Completed/Failed/Cancelled. `Skipped` is a pre-start terminal state set by the Condition handler for rejected branches. `StepType` is an enum (Start, End, Form, HttpRequest, Condition, Script, Notification). `WorkflowSnapshot` is a local read model populated from `WorkflowPublished` domain events — WorkflowEngine never queries WorkflowBuilder's DB. Concurrent-duplicate protection uses PostgreSQL `xmin` system column (`UseXminAsConcurrencyToken()` on the owned `execution_steps` table) — no migration required. All step handlers and `StepCompletedHandler`/`StepFailedHandler` catch `ConcurrencyException` from `IUnitOfWork.SaveChangesAsync` and exit gracefully, letting the winning instance complete the step. The Running guard (`if step.Status == Running → skip`) was rejected because `ExecuteNextStepHandler` always starts a step (→ Running) before dispatching; a Running guard would block all normal first-delivery executions.
+>
+> **Decisions:**
+> - `ExecutionStep.IsTerminal` covers Completed/Failed/Cancelled. `Skipped` is a pre-start terminal state set by the Condition handler for rejected branches. `StepType` is an enum (Start, End, Form, HttpRequest, Condition, Script, Notification). `WorkflowSnapshot` is a local read model populated from `WorkflowPublished` domain events — WorkflowEngine never queries WorkflowBuilder's DB. Concurrent-duplicate protection uses PostgreSQL `xmin` system column (`UseXminAsConcurrencyToken()` on the owned `execution_steps` table) — no migration required. All step handlers and `StepCompletedHandler`/`StepFailedHandler` catch `ConcurrencyException` from `IUnitOfWork.SaveChangesAsync` and exit gracefully, letting the winning instance complete the step. The Running guard (`if step.Status == Running → skip`) was rejected because `ExecuteNextStepHandler` always starts a step (→ Running) before dispatching
+> - a Running guard would block all normal first-delivery executions.

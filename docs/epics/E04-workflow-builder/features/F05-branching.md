@@ -6,7 +6,6 @@
 |--------|------------|---------|
 | workflow-editor | [source](../wireframes/workflow-editor.excalidraw) | [preview](../wireframes/workflow-editor.svg) |
 
-
 [← Back to E04](../README.md)
 
 ---
@@ -50,6 +49,7 @@ Workflows can take different execution paths based on data values using Conditio
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** canvas branch label rendering pending Frontend; branch evaluation at execution time pending E06.
+>
 > **Decisions:** cycle detection implemented in domain (DFS reachability check in AddTransition). `Transition` is a value object (only `fromStepId`, `toStepId`, `condition` — no identity or ordering fields).
 
 ---

@@ -47,8 +47,12 @@ One paragraph describing the feature.
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** …
-> **Done:** …
+>
+> **Done:**
+> - …
+>
 > **Deferred (PR #N follow-up):** … (omit line if none)
+>
 > **Decisions:** …
 
 ---

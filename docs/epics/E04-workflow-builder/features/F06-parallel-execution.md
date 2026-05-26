@@ -6,7 +6,6 @@
 |--------|------------|---------|
 | workflow-editor | [source](../wireframes/workflow-editor.excalidraw) | [preview](../wireframes/workflow-editor.svg) |
 
-
 [← Back to E04](../README.md)
 
 ---
@@ -51,7 +50,9 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** canvas container node rendering and step nesting UI pending Frontend; parallel group represented via step config in existing JSONB storage. `ParallelGroup` and `JoinType` are Phase 2 — shown as planned (dashed) in diagram.
+> **Gaps vs spec:**
+> - canvas container node rendering and step nesting UI pending Frontend
+> - parallel group represented via step config in existing JSONB storage. `ParallelGroup` and `JoinType` are Phase 2 — shown as planned (dashed) in diagram.
 
 ---
 
@@ -122,4 +123,6 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** context namespacing by step ID and sibling-output blocking pending E06; design-time duplicate output warning backend polish — see gaps below.
+> **Gaps vs spec:**
+> - context namespacing by step ID and sibling-output blocking pending E06
+> - design-time duplicate output warning backend polish — see gaps below.

@@ -16,7 +16,6 @@
 | settings-org-delete-modal | [source](../wireframes/settings-org-delete-modal.excalidraw) | [preview](../wireframes/settings-org-delete-modal.svg) |
 | settings-org-delete-states | [source](../wireframes/settings-org-delete-states.excalidraw) | [preview](../wireframes/settings-org-delete-states.svg) |
 
-
 ---
 
 ## Description
@@ -64,6 +63,7 @@ Allow organization admins to manage their organization's profile, settings, and 
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** Frontend-only AC: toast, upload progress, navigate-away warning. **Done (backend):** language tag validation (`en`, `en-US`).
+>
 > **Done:** `Organization` profile fields + `UpdateOrganizationProfileCommand`; S3 logo storage; IANA timezone validation.
 
 ---
@@ -98,7 +98,10 @@ Allow organization admins to manage their organization's profile, settings, and 
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** Frontend-only: usage retry UI, redirect on 403. **Done (backend):** Redis usage cache TTL ≤ 5 minutes (`PlanLimitRedisCache.UsageStatsMaxStaleness`); existing Admin roles backfilled via `OrganizationSettingsPermissionSeeder`.
+> **Gaps vs spec:**
+> - Frontend-only: usage retry UI, redirect on 403. **Done (backend):** Redis usage cache TTL ≤ 5 minutes (`PlanLimitRedisCache.UsageStatsMaxStaleness`)
+> - existing Admin roles backfilled via `OrganizationSettingsPermissionSeeder`.
+>
 > **Done:** `GET /api/organizations/current/settings` returns plan name, profile, usage limits, deletion schedule metadata.
 
 ---
@@ -140,6 +143,17 @@ Allow organization admins to manage their organization's profile, settings, and 
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** marketing-page redirect + forced sign-out after schedule (Frontend/session); abandon in-flight Wolverine step dispatch beyond execution + form-task cancel; cross-module hard-delete steps via RabbitMQ commands when modules are extracted (see `docs/WORKAROUNDS.md#org-hard-delete-modulith-cancellers`).
-> **Deferred (PR #127 follow-up):** marketing-page redirect + forced sign-out after schedule (Frontend/session); abandon in-flight Wolverine step dispatch beyond execution + form-task cancel; cross-module hard-delete steps via RabbitMQ commands when modules are extracted (see `docs/WORKAROUNDS.md#org-hard-delete-modulith-cancellers`).
-> **Done:** schedule rollback when job queue fails; hard-delete cancels executions + pending form tasks, drops tenant schemas, deletes logo S3 object, purges Identity platform rows (users, roles, invitations, provisioning); login returns org-not-found when org row removed.
+> **Gaps vs spec:**
+> - marketing-page redirect + forced sign-out after schedule (Frontend/session)
+> - abandon in-flight Wolverine step dispatch beyond execution + form-task cancel
+> - cross-module hard-delete steps via RabbitMQ commands when modules are extracted (see `docs/WORKAROUNDS.md#org-hard-delete-modulith-cancellers`).
+>
+> **Deferred (PR #127 follow-up):**
+> - marketing-page redirect + forced sign-out after schedule (Frontend/session)
+> - abandon in-flight Wolverine step dispatch beyond execution + form-task cancel
+> - cross-module hard-delete steps via RabbitMQ commands when modules are extracted (see `docs/WORKAROUNDS.md#org-hard-delete-modulith-cancellers`).
+>
+> **Done:**
+> - schedule rollback when job queue fails
+> - hard-delete cancels executions + pending form tasks, drops tenant schemas, deletes logo S3 object, purges Identity platform rows (users, roles, invitations, provisioning)
+> - login returns org-not-found when org row removed.

@@ -8,7 +8,6 @@
 | forgot-password | [source](../wireframes/forgot-password.excalidraw) | [preview](../wireframes/forgot-password.svg) |
 | change-password | [source](../wireframes/change-password.excalidraw) | [preview](../wireframes/change-password.svg) |
 
-
 [← Back to E02](../README.md)
 
 ---
@@ -61,7 +60,11 @@ Allow users to reset forgotten passwords, change their current password, and man
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** rate limiting (max 3 requests/hour) is an API/Infrastructure concern — backend polish — see gaps below. Auto sign-in after reset backend polish — see gaps below.
-> **Decisions:** reset token is a cryptographically random 32-byte value; stored as SHA-256 hash in `password_reset_tokens` table; raw token sent by email. New request invalidates all prior tokens for the user. Token lifetime: 1 hour.
+>
+> **Decisions:**
+> - reset token is a cryptographically random 32-byte value
+> - stored as SHA-256 hash in `password_reset_tokens` table
+> - raw token sent by email. New request invalidates all prior tokens for the user. Token lifetime: 1 hour.
 
 ---
 
@@ -100,6 +103,7 @@ Allow users to reset forgotten passwords, change their current password, and man
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** failed-attempt lockout for change-password form (3 attempts / 15 min) backend polish — see gaps below. Revoking other-device sessions after change backend polish — see gaps below (OpenIddict token revocation).
+>
 > **Decisions:** notification email failure is swallowed at handler level and logged separately at Infrastructure — password change still succeeds per US-028 AC.
 
 ---
@@ -138,5 +142,10 @@ Allow users to reset forgotten passwords, change their current password, and man
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** `ISessionStore` interface defined in Application; implementation pending Infrastructure (OpenIddict token manager wrapper). Session list UI, revoke button, and "sign out everywhere" pending Frontend + API.
-> **Decisions:** sessions are modelled as OpenIddict refresh tokens; `ISessionStore` wraps `IOpenIddictTokenManager` at Infrastructure layer. `RevokeSessionCommand(sessionId: null)` triggers "revoke all" via `RevokeAllAsync`.
+> **Gaps vs spec:**
+> - `ISessionStore` interface defined in Application
+> - implementation pending Infrastructure (OpenIddict token manager wrapper). Session list UI, revoke button, and "sign out everywhere" pending Frontend + API.
+>
+> **Decisions:**
+> - sessions are modelled as OpenIddict refresh tokens
+> - `ISessionStore` wraps `IOpenIddictTokenManager` at Infrastructure layer. `RevokeSessionCommand(sessionId: null)` triggers "revoke all" via `RevokeAllAsync`.

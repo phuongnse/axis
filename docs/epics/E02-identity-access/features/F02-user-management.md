@@ -7,7 +7,6 @@
 | settings-users | [source](../wireframes/settings-users.excalidraw) | [preview](../wireframes/settings-users.svg) |
 | accept-invitation | [source](../wireframes/accept-invitation.excalidraw) | [preview](../wireframes/accept-invitation.svg) |
 
-
 [← Back to E02](../README.md)
 
 ---
@@ -57,7 +56,10 @@ Organization admins can invite new members, manage their accounts, and deactivat
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** **Done:** HTTP 402 when user plan limit reached (`InviteUserHandler`, E01 F04). Admin self-invite check not implemented — backend polish — see gaps below (compare invite email to `ICurrentUser` email).
+> **Gaps vs spec:** 
+>
+> **Done:** HTTP 402 when user plan limit reached (`InviteUserHandler`, E01 F04). Admin self-invite check not implemented — backend polish — see gaps below (compare invite email to `ICurrentUser` email).
+>
 > **Decisions:** existing-member and pending-invitation checks throw `ValidationException` with specific messages matching AC wording.
 
 ---
@@ -97,6 +99,7 @@ Organization admins can invite new members, manage their accounts, and deactivat
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** session sign-in after accept is an API/auth concern, pending.
+>
 > **Decisions:** expired/accepted/cancelled invitation states enforced in `Invitation.Accept()` domain method, wrapped as `ValidationException` in handler. Platform-wide email check runs after invitation validation — throws `ValidationException` directing user to sign in with existing credentials. `AcceptInvitationHandler` calls `user.VerifyEmail()` — the invitation link proves mailbox ownership (no separate verification email).
 
 ---
@@ -137,6 +140,7 @@ Organization admins can invite new members, manage their accounts, and deactivat
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** session revocation (refresh token revoke + access token blacklist) not implemented — auth infrastructure polish — see gaps below. Self-deactivation guard and 403 check require current user identity from JWT — backend polish — see gaps below. Deactivated-user sign-in message handled at auth layer (pending).
+>
 > **Decisions:** "last admin" check queries `CountAdminsAsync` in the repository before deactivating — domain enforces via `ApplicationException` if violated.
 
 ---
@@ -174,4 +178,5 @@ Organization admins can invite new members, manage their accounts, and deactivat
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** email change flow (F05) not started.
+>
 > **Decisions:** name update is a direct property mutation on `User` aggregate with a `UserProfileUpdatedEvent`. Avatar upload fully wired in `UpdateUserProfileHandler` — validates type (PNG/JPG only) and size (max 1 MB), uploads to S3, deletes old file on replacement.

@@ -6,7 +6,6 @@
 |--------|------------|---------|
 | data-models | [source](../wireframes/data-models.excalidraw) | [preview](../wireframes/data-models.svg) |
 
-
 [← Back to E03](../README.md)
 
 ---
@@ -52,7 +51,10 @@ Users can create custom data models within their organization. A model defines t
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** model plan-limit check (HTTP 402) pending billing layer (E01 F04); name format validation enforced in Application handler.
+> **Gaps vs spec:**
+> - model plan-limit check (HTTP 402) pending billing layer (E01 F04)
+> - name format validation enforced in Application handler.
+>
 > **Decisions:** system fields (id, created_at, updated_at) injected by domain factory; atomicity guaranteed by UnitOfWork.
 
 ---
@@ -89,7 +91,9 @@ Users can create custom data models within their organization. A model defines t
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** record count column pending denormalized counter or API-layer aggregation; field count is derived from Fields.Count at query time.
+> **Gaps vs spec:**
+> - record count column pending denormalized counter or API-layer aggregation
+> - field count is derived from Fields.Count at query time.
 
 ---
 
@@ -127,7 +131,9 @@ Users can create custom data models within their organization. A model defines t
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** HTTP 409 version-conflict check backend polish — see gaps below (updated_at comparison); active-workflow warning pending E04 integration.
+> **Gaps vs spec:**
+> - HTTP 409 version-conflict check backend polish — see gaps below (updated_at comparison)
+> - active-workflow warning pending E04 integration.
 
 ---
 
@@ -164,5 +170,9 @@ Users can create custom data models within their organization. A model defines t
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** workflow reference check pending E04; form Relation Picker refs blocked/flagged via FormBuilder `ModelDeletedEvent` consumer (US-033 partial); 30-day purge background job pending.
+> **Gaps vs spec:**
+> - workflow reference check pending E04
+> - form Relation Picker refs blocked/flagged via FormBuilder `ModelDeletedEvent` consumer (US-033 partial)
+> - 30-day purge background job pending.
+>
 > **Deferred (PR #N follow-up):** DataModeling relation fields on other models flagged broken when target model deleted. WorkflowBuilder `record.*` trigger broken flags shipped via `ModelDeletedHandler` (Kafka).

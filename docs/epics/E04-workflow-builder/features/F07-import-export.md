@@ -6,7 +6,6 @@
 |--------|------------|---------|
 | workflows | [source](../wireframes/workflows.excalidraw) | [preview](../wireframes/workflows.svg) |
 
-
 [← Back to E04](../README.md)
 
 ---
@@ -49,7 +48,10 @@ Workflow definitions can be exported as portable JSON files and imported into an
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** broken-reference `"broken": true` flag pending E03/E05 integration; export notice and broken-reference warning UI pending Frontend.
+> **Gaps vs spec:**
+> - broken-reference `"broken": true` flag pending E03/E05 integration
+> - export notice and broken-reference warning UI pending Frontend.
+>
 > **Decisions:** credential scrubbing in `ExportWorkflowHandler` — keys matching token/api_key/apikey/secret/password/authorization/auth_token/hmac_secret/client_secret/private_key/bearer/access_token/refresh_token replaced with `[REDACTED]` (OrdinalIgnoreCase).
 
 ---
@@ -90,7 +92,9 @@ Workflow definitions can be exported as portable JSON files and imported into an
 > | API | ⚠️ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** import preview dialog, form/model resolution (auto-create or prompt), and file-picker UI pending Frontend; handler skips invalid transitions/triggers rather than stopping — full transactional rollback not yet implemented in the API layer.
+> **Gaps vs spec:**
+> - import preview dialog, form/model resolution (auto-create or prompt), and file-picker UI pending Frontend
+> - handler skips invalid transitions/triggers rather than stopping — full transactional rollback not yet implemented in the API layer.
 
 ---
 
@@ -124,4 +128,6 @@ Workflow definitions can be exported as portable JSON files and imported into an
 > | API | ⚠️ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** async notification for large exports (> 20 workflows) and org-slug prefix in ZIP filename pending API; empty-org README.txt and file-picker UI pending Frontend.
+> **Gaps vs spec:**
+> - async notification for large exports (> 20 workflows) and org-slug prefix in ZIP filename pending API
+> - empty-org README.txt and file-picker UI pending Frontend.

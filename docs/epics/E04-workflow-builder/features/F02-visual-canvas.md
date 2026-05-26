@@ -6,7 +6,6 @@
 |--------|------------|---------|
 | workflow-editor | [source](../wireframes/workflow-editor.excalidraw) | [preview](../wireframes/workflow-editor.svg) |
 
-
 [← Back to E04](../README.md)
 
 ---
@@ -89,7 +88,9 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** canvas edge drawing and cycle-block toast pending Frontend; condition step label enforcement on connection pending Frontend.
+> **Gaps vs spec:**
+> - canvas edge drawing and cycle-block toast pending Frontend
+> - condition step label enforcement on connection pending Frontend.
 
 ---
 
@@ -126,7 +127,9 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** slide-over panel, inline error indicators, and auto-save pending Frontend; step config stored as JSONB dict in `steps` column.
+> **Gaps vs spec:**
+> - slide-over panel, inline error indicators, and auto-save pending Frontend
+> - step config stored as JSONB dict in `steps` column.
 
 ---
 

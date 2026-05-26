@@ -6,7 +6,6 @@
 |--------|------------|---------|
 | form-submission | [source](../wireframes/form-submission.excalidraw) | [preview](../wireframes/form-submission.svg) |
 
-
 [← Back to E05](../README.md)
 
 ---
@@ -52,8 +51,18 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 > | API | ⏳ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** No notification dispatch on assign; email/in-app notification pending E06 + notification infrastructure; role member resolution pending Identity integration. **Done:** `FormSubmission` aggregate + `FormStepReachedHandler` creates pending submission with access token.
-> **Decisions:** `FormSubmission` is a single aggregate combining task assignment (executionId, assigneeUserId, accessToken, expiresAt) and response data (submittedData, submittedAt). A separate FormTask entity would add no domain logic — the relationship is always 1:1 and both live within the same lifecycle (Pending → Submitted/Expired/Cancelled). Status enum is `FormSubmissionStatus`; `Submitted` used instead of `Completed` to name the action clearly. `AccessToken` is a `Guid` (unique URL key, not JWT); expiry enforced via `ExpiresAt` + `Expire()` domain method; `Expire()` is non-idempotent by design — idempotency handled at the caller level.
+> **Gaps vs spec:**
+> - No notification dispatch on assign
+> - email/in-app notification pending E06 + notification infrastructure
+> - role member resolution pending Identity integration.
+>
+> **Done:** `FormSubmission` aggregate + `FormStepReachedHandler` creates pending submission with access token.
+>
+> **Decisions:**
+> - `FormSubmission` is a single aggregate combining task assignment (executionId, assigneeUserId, accessToken, expiresAt) and response data (submittedData, submittedAt). A separate FormTask entity would add no domain logic — the relationship is always 1:1 and both live within the same lifecycle (Pending → Submitted/Expired/Cancelled). Status enum is `FormSubmissionStatus`
+> - `Submitted` used instead of `Completed` to name the action clearly. `AccessToken` is a `Guid` (unique URL key, not JWT)
+> - expiry enforced via `ExpiresAt` + `Expire()` domain method
+> - `Expire()` is non-idempotent by design — idempotency handled at the caller level.
 
 ---
 
@@ -133,7 +142,9 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** **Done:** `GetMyFormTasksQuery` + authenticated list endpoints. Role-assigned task aggregation (not only direct assignee), SignalR push, and "My Tasks" UI pending Frontend + E06.
+> **Gaps vs spec:** 
+>
+> **Done:** `GetMyFormTasksQuery` + authenticated list endpoints. Role-assigned task aggregation (not only direct assignee), SignalR push, and "My Tasks" UI pending Frontend + E06.
 
 ---
 
@@ -170,4 +181,8 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 > | API | ⏳ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** **Done:** `ExpireFormSubmissionMessage` scheduled from `FormStepReachedHandler`; `ExpireFormSubmissionHandler` marks submission expired. Workflow execution → `Failed` + error notification on expiry pending E06 coordination.
+> **Gaps vs spec:** 
+>
+> **Done:**
+> - `ExpireFormSubmissionMessage` scheduled from `FormStepReachedHandler`
+> - `ExpireFormSubmissionHandler` marks submission expired. Workflow execution → `Failed` + error notification on expiry pending E06 coordination.

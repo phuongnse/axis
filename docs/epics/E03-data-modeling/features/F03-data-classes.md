@@ -6,7 +6,6 @@
 |--------|------------|---------|
 | data-classes | [source](../wireframes/data-classes.excalidraw) | [preview](../wireframes/data-classes.svg) |
 
-
 [← Back to E03](../README.md)
 
 ---
@@ -50,7 +49,9 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Decisions:** DataClass fields stored as JSONB using the same FieldDefinitionConverter as DataModel; Relation/DataClass/File types blocked in domain by guard. DataClassDefinition reuses `FieldDefinition` directly — no separate DataClassField entity.
+> **Decisions:**
+> - DataClass fields stored as JSONB using the same FieldDefinitionConverter as DataModel
+> - Relation/DataClass/File types blocked in domain by guard. DataClassDefinition reuses `FieldDefinition` directly — no separate DataClassField entity.
 
 ---
 
@@ -121,7 +122,9 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** "models affected" warning on field delete pending API/Frontend layer; auto-downgrade-to-optional for required fields on existing-record models backend polish — see gaps below.
+> **Gaps vs spec:**
+> - "models affected" warning on field delete pending API/Frontend layer
+> - auto-downgrade-to-optional for required fields on existing-record models backend polish — see gaps below.
 
 ---
 
@@ -155,5 +158,8 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** HTTP 409 on delete-while-referenced enforced in Application handler; reference check uses PostgreSQL JSONB `@>` containment query.
+> **Gaps vs spec:**
+> - HTTP 409 on delete-while-referenced enforced in Application handler
+> - reference check uses PostgreSQL JSONB `@>` containment query.
+>
 > **Decisions:** `IsReferencedByAnyModelAsync` uses raw SQL `fields @> {0}::jsonb` to query nested JSON without loading all models into memory.
