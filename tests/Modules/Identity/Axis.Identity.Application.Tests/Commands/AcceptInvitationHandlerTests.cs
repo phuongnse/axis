@@ -52,6 +52,7 @@ public class AcceptInvitationHandlerTests
                 u.FirstName == "Bob" &&
                 u.LastName == "Jones" &&
                 u.OrganizationId == OrgId &&
+                u.IsEmailVerified &&
                 u.RoleIds.Contains(RoleId) &&
                 u.PasswordHash == "hashed"),
             Arg.Any<CancellationToken>());
