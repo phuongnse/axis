@@ -35,8 +35,7 @@ public class OrganizationTests
     public void Organization_WhenCreated_OrganizationCreatedEventContainsCorrectData()
     {
         Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail, WellKnownSubscriptionPlans.FreeId);
-
-        var evt = org.DomainEvents.OfType<OrganizationCreated>().Single();
+        OrganizationCreated evt = org.DomainEvents.OfType<OrganizationCreated>().Single();
         evt.OrganizationId.Should().Be(org.Id);
         evt.Name.Should().Be("Acme Corp");
         evt.Slug.Should().Be("acme-corp");
@@ -60,7 +59,7 @@ public class OrganizationTests
         Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail, WellKnownSubscriptionPlans.FreeId);
         org.Archive();
 
-        var act = () => org.Archive();
+        Action act = () => org.Archive();
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*already archived*");

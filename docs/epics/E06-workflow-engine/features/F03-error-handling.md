@@ -6,7 +6,6 @@
 |--------|------------|---------|
 | execution-detail | [source](../wireframes/execution-detail.excalidraw) | [preview](../wireframes/execution-detail.svg) |
 
-
 [← Back to E06](../README.md)
 
 ---
@@ -51,7 +50,10 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 > | API | ⏳ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** no Application-layer notification dispatch handler; `ExecutionFailed` domain event raised but notification channels not wired; email/in-app/webhook dispatch and rate-limiting pending Application layer + a future cross-cutting notification service (outside WorkflowEngine Infrastructure, which is complete).
+> **Gaps vs spec:**
+> - no Application-layer notification dispatch handler
+> - `ExecutionFailed` domain event raised but notification channels not wired
+> - email/in-app/webhook dispatch and rate-limiting pending Application layer + a future cross-cutting notification service (outside WorkflowEngine Infrastructure, which is complete).
 
 ---
 
@@ -88,7 +90,9 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 > | API | ⏳ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** `GetExecutionQuery` (returning step-level error details) not yet implemented; error detail UI (stack trace, redacted fields) pending Frontend + API.
+> **Gaps vs spec:**
+> - `GetExecutionQuery` (returning step-level error details) not yet implemented
+> - error detail UI (stack trace, redacted fields) pending Frontend + API.
 
 ---
 
@@ -125,4 +129,7 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 > | API | ⏳ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** error notification channel config is not modeled in the domain (no channel list on `WorkflowExecution`); no `UpdateErrorNotificationChannelsCommand` handler; notification channel configuration UI and per-workflow channel storage pending API + Frontend.
+> **Gaps vs spec:**
+> - error notification channel config is not modeled in the domain (no channel list on `WorkflowExecution`)
+> - no `UpdateErrorNotificationChannelsCommand` handler
+> - notification channel configuration UI and per-workflow channel storage pending API + Frontend.

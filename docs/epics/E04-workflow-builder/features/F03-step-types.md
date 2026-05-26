@@ -6,7 +6,6 @@
 |--------|------------|---------|
 | workflow-editor | [source](../wireframes/workflow-editor.excalidraw) | [preview](../wireframes/workflow-editor.svg) |
 
-
 [← Back to E04](../README.md)
 
 ---
@@ -53,6 +52,7 @@ Each step has a type that determines what it does when executed. Users configure
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** form picker UI, assignee expression evaluation, and timeout enforcement pending Frontend + E06.
+>
 > **Decisions:** step config (formId, assignee, timeout) stored as JSONB dict in `steps` column. `StepType` enum includes `Start` and `End` values.
 
 ---
@@ -93,7 +93,9 @@ Each step has a type that determines what it does when executed. Users configure
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** HTTP execution and Test request button pending E06 + Frontend; credential storage redaction is enforced at export (keys matching token/api_key/secret/password/authorization/etc. replaced with `[REDACTED]` in `ExportWorkflowHandler`).
+> **Gaps vs spec:**
+> - HTTP execution and Test request button pending E06 + Frontend
+> - credential storage redaction is enforced at export (keys matching token/api_key/secret/password/authorization/etc. replaced with `[REDACTED]` in `ExportWorkflowHandler`).
 
 ---
 

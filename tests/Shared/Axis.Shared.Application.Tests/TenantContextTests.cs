@@ -8,8 +8,8 @@ public class TenantContextTests
     [Fact]
     public void TenantContext_WhenCreatedWithOrgId_DerivesSchemaNameFromOrgId()
     {
-        var orgId = Guid.NewGuid();
-        var context = new TenantContext(orgId);
+        Guid orgId = Guid.NewGuid();
+        TenantContext context = new TenantContext(orgId);
 
         context.SchemaName.Should().Be($"tenant_{orgId:N}");
     }
@@ -17,8 +17,8 @@ public class TenantContextTests
     [Fact]
     public void TenantContext_WhenCreatedWithOrgId_ExposesOrganizationId()
     {
-        var orgId = Guid.NewGuid();
-        var context = new TenantContext(orgId);
+        Guid orgId = Guid.NewGuid();
+        TenantContext context = new TenantContext(orgId);
 
         context.OrganizationId.Should().Be(orgId);
     }

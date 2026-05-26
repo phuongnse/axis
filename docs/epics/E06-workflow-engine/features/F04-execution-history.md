@@ -6,7 +6,6 @@
 |--------|------------|---------|
 | executions | [source](../wireframes/executions.excalidraw) | [preview](../wireframes/executions.svg) |
 
-
 [← Back to E06](../README.md)
 
 ---
@@ -53,6 +52,7 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** `GET /api/executions` and per-workflow paged list ✅. Filter UI, date/trigger query params, and running-first sort pending API + Frontend.
+>
 > **Decisions:** `GetExecutionsByWorkflowHandler` and `GetAllExecutionsHandler` use `IExecutionRepository.GetPagedByWorkflowAsync`/`GetPagedAsync` — server-side pagination with `pageSize` clamped to 100. Status filter forwarded to repository. Date range filter and trigger type filter deferred to API layer query parameters.
 
 ---
@@ -90,7 +90,9 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** Step timeline UI, context snapshot display, and parallel group rendering pending Frontend. **Done:** `GET /api/executions/{id}` returns execution + steps.
+> **Gaps vs spec:** Step timeline UI, context snapshot display, and parallel group rendering pending Frontend.
+>
+> **Done:** `GET /api/executions/{id}` returns execution + steps.
 
 ---
 
@@ -125,7 +127,9 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 > | API | ⚠️ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** **Done:** `GET /api/executions` org-wide list (paginated). CSV export, role-scoped visibility enforcement, and async export notification pending API + Frontend.
+> **Gaps vs spec:** CSV export, role-scoped visibility enforcement, and async export notification pending API + Frontend.
+>
+> **Done:** `GET /api/executions` org-wide list (paginated).
 
 ---
 

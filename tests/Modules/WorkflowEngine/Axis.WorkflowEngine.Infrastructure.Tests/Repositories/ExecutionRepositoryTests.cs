@@ -26,16 +26,15 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     [Fact]
     public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
     {
-        await using var ctx = fixture.CreateContext();
-        var repo = new ExecutionRepository(ctx);
-
-        var execution = CreateExecution();
+        await using WorkflowEngineDbContext ctx = fixture.CreateContext();
+        ExecutionRepository repo = new ExecutionRepository(ctx);
+        WorkflowExecution execution = CreateExecution();
         await repo.AddAsync(execution);
         await ctx.SaveChangesAsync();
 
-        await using var readCtx = fixture.CreateContext();
-        var readRepo = new ExecutionRepository(readCtx);
-        var loaded = await readRepo.GetByIdAsync(execution.Id, OrgId);
+        await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
+        ExecutionRepository readRepo = new ExecutionRepository(readCtx);
+        WorkflowExecution? loaded = await readRepo.GetByIdAsync(execution.Id, OrgId);
 
         loaded.Should().NotBeNull();
         loaded!.Id.Should().Be(execution.Id);
@@ -46,16 +45,15 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     [Fact]
     public async Task GetByIdAsync_WhenOrgDoesNotMatch_ReturnsNull()
     {
-        await using var ctx = fixture.CreateContext();
-        var repo = new ExecutionRepository(ctx);
-
-        var execution = CreateExecution(orgId: OrgId);
+        await using WorkflowEngineDbContext ctx = fixture.CreateContext();
+        ExecutionRepository repo = new ExecutionRepository(ctx);
+        WorkflowExecution execution = CreateExecution(orgId: OrgId);
         await repo.AddAsync(execution);
         await ctx.SaveChangesAsync();
 
-        await using var readCtx = fixture.CreateContext();
-        var readRepo = new ExecutionRepository(readCtx);
-        var result = await readRepo.GetByIdAsync(execution.Id, OtherOrgId);
+        await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
+        ExecutionRepository readRepo = new ExecutionRepository(readCtx);
+        WorkflowExecution? result = await readRepo.GetByIdAsync(execution.Id, OtherOrgId);
 
         result.Should().BeNull();
     }
@@ -63,23 +61,22 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     [Fact]
     public async Task GetAllAsync_WhenMultipleExecutionsExist_ReturnsOnlyOrgExecutionsOrderedNewestFirst()
     {
-        await using var ctx = fixture.CreateContext();
-        var repo = new ExecutionRepository(ctx);
-        var wfId = Guid.NewGuid();
-
-        var first = CreateExecution(workflowId: wfId);
+        await using WorkflowEngineDbContext ctx = fixture.CreateContext();
+        ExecutionRepository repo = new ExecutionRepository(ctx);
+        Guid wfId = Guid.NewGuid();
+        WorkflowExecution first = CreateExecution(workflowId: wfId);
         await Task.Delay(5); // ensure distinct CreatedAt
-        var second = CreateExecution(workflowId: wfId);
-        var other = CreateExecution(orgId: OtherOrgId);
+        WorkflowExecution second = CreateExecution(workflowId: wfId);
+        WorkflowExecution other = CreateExecution(orgId: OtherOrgId);
 
         await repo.AddAsync(first);
         await repo.AddAsync(second);
         await repo.AddAsync(other);
         await ctx.SaveChangesAsync();
 
-        await using var readCtx = fixture.CreateContext();
-        var readRepo = new ExecutionRepository(readCtx);
-        var results = await readRepo.GetAllAsync(OrgId);
+        await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
+        ExecutionRepository readRepo = new ExecutionRepository(readCtx);
+        IReadOnlyList<WorkflowExecution> results = await readRepo.GetAllAsync(OrgId);
 
         results.Should().HaveCountGreaterThanOrEqualTo(2);
         results.Should().OnlyContain(e => e.OrganizationId == OrgId);
@@ -89,23 +86,22 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     [Fact]
     public async Task GetByWorkflowAsync_WhenFilteredByWorkflowAndOrg_ReturnsMatchingExecutions()
     {
-        await using var ctx = fixture.CreateContext();
-        var repo = new ExecutionRepository(ctx);
-        var wfId = Guid.NewGuid();
-        var otherWfId = Guid.NewGuid();
-
-        var match = CreateExecution(workflowId: wfId);
-        var wrongWf = CreateExecution(workflowId: otherWfId);
-        var wrongOrg = CreateExecution(workflowId: wfId, orgId: OtherOrgId);
+        await using WorkflowEngineDbContext ctx = fixture.CreateContext();
+        ExecutionRepository repo = new ExecutionRepository(ctx);
+        Guid wfId = Guid.NewGuid();
+        Guid otherWfId = Guid.NewGuid();
+        WorkflowExecution match = CreateExecution(workflowId: wfId);
+        WorkflowExecution wrongWf = CreateExecution(workflowId: otherWfId);
+        WorkflowExecution wrongOrg = CreateExecution(workflowId: wfId, orgId: OtherOrgId);
 
         await repo.AddAsync(match);
         await repo.AddAsync(wrongWf);
         await repo.AddAsync(wrongOrg);
         await ctx.SaveChangesAsync();
 
-        await using var readCtx = fixture.CreateContext();
-        var readRepo = new ExecutionRepository(readCtx);
-        var results = await readRepo.GetByWorkflowAsync(wfId, OrgId);
+        await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
+        ExecutionRepository readRepo = new ExecutionRepository(readCtx);
+        IReadOnlyList<WorkflowExecution> results = await readRepo.GetByWorkflowAsync(wfId, OrgId);
 
         results.Should().ContainSingle();
         results[0].Id.Should().Be(match.Id);
@@ -114,19 +110,18 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     [Fact]
     public async Task AddAsync_WhenExecutionHasContextDictionary_PersistsAndLoadsContext()
     {
-        await using var ctx = fixture.CreateContext();
-        var repo = new ExecutionRepository(ctx);
-
-        var execution = WorkflowExecution.Create(
-            Guid.NewGuid(), OrgId, TriggerType.Webhook, null,
-            new Dictionary<string, object?> { ["input_name"] = "Alice", ["input_count"] = 42 });
+        await using WorkflowEngineDbContext ctx = fixture.CreateContext();
+        ExecutionRepository repo = new ExecutionRepository(ctx);
+        WorkflowExecution execution = WorkflowExecution.Create(
+                    Guid.NewGuid(), OrgId, TriggerType.Webhook, null,
+                    new Dictionary<string, object?> { ["input_name"] = "Alice", ["input_count"] = 42 });
 
         await repo.AddAsync(execution);
         await ctx.SaveChangesAsync();
 
-        await using var readCtx = fixture.CreateContext();
-        var readRepo = new ExecutionRepository(readCtx);
-        var loaded = await readRepo.GetByIdAsync(execution.Id, OrgId);
+        await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
+        ExecutionRepository readRepo = new ExecutionRepository(readCtx);
+        WorkflowExecution? loaded = await readRepo.GetByIdAsync(execution.Id, OrgId);
 
         loaded!.Context.Should().ContainKey("input_name");
         loaded.Context.Should().ContainKey("input_count");
@@ -135,10 +130,9 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     [Fact]
     public async Task SaveChangesAsync_WhenStatusTransitionsOccur_PersistsStatusTransitions()
     {
-        await using var ctx = fixture.CreateContext();
-        var repo = new ExecutionRepository(ctx);
-
-        var execution = CreateExecution();
+        await using WorkflowEngineDbContext ctx = fixture.CreateContext();
+        ExecutionRepository repo = new ExecutionRepository(ctx);
+        WorkflowExecution execution = CreateExecution();
         await repo.AddAsync(execution);
         await ctx.SaveChangesAsync();
 
@@ -146,9 +140,9 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
         execution.Complete();
         await ctx.SaveChangesAsync();
 
-        await using var readCtx = fixture.CreateContext();
-        var readRepo = new ExecutionRepository(readCtx);
-        var loaded = await readRepo.GetByIdAsync(execution.Id, OrgId);
+        await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
+        ExecutionRepository readRepo = new ExecutionRepository(readCtx);
+        WorkflowExecution? loaded = await readRepo.GetByIdAsync(execution.Id, OrgId);
 
         loaded!.Status.Should().Be(ExecutionStatus.Completed);
         loaded.StartedAt.Should().NotBeNull();
@@ -158,14 +152,13 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     [Fact]
     public async Task WorkflowDefinitionReader_WhenWorkflowIsActive_ReturnsTrue()
     {
-        var wfId = Guid.NewGuid();
+        Guid wfId = Guid.NewGuid();
 
-        await using var ctx = fixture.CreateContext();
+        await using WorkflowEngineDbContext ctx = fixture.CreateContext();
         ctx.WorkflowActiveStatuses.Add(WorkflowActiveStatus.Activated(wfId, OrgId));
         await ctx.SaveChangesAsync();
-
-        var reader = new WorkflowDefinitionReader(ctx);
-        var result = await reader.IsActiveAsync(wfId, OrgId);
+        WorkflowDefinitionReader reader = new WorkflowDefinitionReader(ctx);
+        bool result = await reader.IsActiveAsync(wfId, OrgId);
 
         result.Should().BeTrue();
     }
@@ -173,12 +166,12 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     [Fact]
     public async Task WorkflowDefinitionReader_WhenWorkflowIsNotActive_ReturnsFalse()
     {
-        var wfId = Guid.NewGuid();
+        Guid wfId = Guid.NewGuid();
 
         // Workflow never published → no row in workflow_active_statuses → false
-        await using var ctx = fixture.CreateContext();
-        var reader = new WorkflowDefinitionReader(ctx);
-        var result = await reader.IsActiveAsync(wfId, OrgId);
+        await using WorkflowEngineDbContext ctx = fixture.CreateContext();
+        WorkflowDefinitionReader reader = new WorkflowDefinitionReader(ctx);
+        bool result = await reader.IsActiveAsync(wfId, OrgId);
 
         result.Should().BeFalse();
     }

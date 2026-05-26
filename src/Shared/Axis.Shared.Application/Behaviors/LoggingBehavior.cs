@@ -29,7 +29,7 @@ public sealed class LoggingBehavior<TRequest, TResponse>(
 
         try
         {
-            TResponse response = await next();
+            TResponse response = await next(cancellationToken);
 
             if (response is Result result && result.IsFailure)
             {

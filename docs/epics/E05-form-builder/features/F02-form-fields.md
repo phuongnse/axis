@@ -6,7 +6,6 @@
 |--------|------------|---------|
 | form-editor | [source](../wireframes/form-editor.excalidraw) | [preview](../wireframes/form-editor.svg) |
 
-
 [← Back to E05](../README.md)
 
 ---
@@ -55,6 +54,7 @@ Form fields define what data the form collects. Each field has a type, label, he
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** type picker UI, live preview update, and extension validation for File Upload pending Frontend + API layers.
+>
 > **Decisions:** `AddFieldToFormHandler` catches both `ArgumentException` (invalid key format) and `InvalidOperationException` (duplicate key) from the domain and returns `ErrorCodes.BusinessRule`. Field config polymorphism handled by FormFieldConverter using FormFieldType enum as discriminator.
 
 ---
@@ -93,7 +93,10 @@ Form fields define what data the form collects. Each field has a type, label, he
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** no `UpdateFieldValidationCommand` handler — field validation config is part of `AddFieldToForm` (set on creation only); client-side validation (React Hook Form + Zod) pending Frontend; HTTP 422 structured errors backend polish — see gaps below.
+> **Gaps vs spec:**
+> - no `UpdateFieldValidationCommand` handler — field validation config is part of `AddFieldToForm` (set on creation only)
+> - client-side validation (React Hook Form + Zod) pending Frontend
+> - HTTP 422 structured errors backend polish — see gaps below.
 
 ---
 
@@ -129,6 +132,7 @@ Form fields define what data the form collects. Each field has a type, label, he
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** drag-handle UI and real-time preview reorder pending Frontend.
+>
 > **Decisions:** `ReorderFormFieldsHandler` catches `ArgumentException` from domain (IDs don't match all fields) and returns `ErrorCodes.BusinessRule`.
 
 ---
@@ -165,4 +169,5 @@ Form fields define what data the form collects. Each field has a type, label, he
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** section grouping visual rendering pending Frontend.
+>
 > **Decisions:** sections use `FormFieldType.Section` + `SectionFieldConfig` and flow through the same `AddFieldToFormCommand` as regular fields.

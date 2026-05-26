@@ -9,10 +9,10 @@ internal sealed class PermissionAuthorizationHandler
         AuthorizationHandlerContext context,
         PermissionRequirement requirement)
     {
-        var permissions = context.User
-            .FindAll("permissions")
-            .Select(c => c.Value)
-            .ToHashSet();
+        HashSet<string> permissions = context.User
+                    .FindAll("permissions")
+                    .Select(c => c.Value)
+                    .ToHashSet();
 
         if (permissions.Contains(requirement.Permission))
             context.Succeed(requirement);

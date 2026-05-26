@@ -1,5 +1,5 @@
-using Axis.DataModeling.Domain.Aggregates;
 using Axis.DataModeling.Application.Queries.GetRecords;
+using Axis.DataModeling.Domain.Aggregates;
 
 namespace Axis.DataModeling.Application.Repositories;
 

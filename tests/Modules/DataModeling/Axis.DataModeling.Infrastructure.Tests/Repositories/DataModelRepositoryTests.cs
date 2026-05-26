@@ -1,4 +1,5 @@
 using Axis.DataModeling.Domain.Aggregates;
+using Axis.DataModeling.Domain.Entities;
 using Axis.DataModeling.Domain.Enums;
 using Axis.DataModeling.Domain.ValueObjects;
 using FluentAssertions;
@@ -53,8 +54,7 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
         await _sut.AddAsync(deleted);
         await _sut.AddAsync(otherOrg);
         await _ctx.SaveChangesAsync();
-
-        var result = await _sut.GetAllAsync(orgId);
+        IReadOnlyList<DataModel> result = await _sut.GetAllAsync(orgId);
 
         result.Should().ContainSingle().Which.Name.Should().Be("Active");
     }
@@ -87,11 +87,10 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     [Fact]
     public async Task AddAsync_WhenModelCreated_PersistsAndReloadsSystemFields()
     {
-        var model = MakeModel("Order");
+        DataModel model = MakeModel("Order");
         await _sut.AddAsync(model);
         await _ctx.SaveChangesAsync();
-
-        var loaded = await _sut.GetByIdAsync(model.Id, OrgId);
+        DataModel? loaded = await _sut.GetByIdAsync(model.Id, OrgId);
 
         loaded!.Fields.Should().HaveCount(3); // id, created_at, updated_at
         loaded.Fields.Should().Contain(f => f.Name == "id" && f.IsSystem);
@@ -102,7 +101,7 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     [Fact]
     public async Task AddAsync_WhenModelHasCustomFields_PersistsAndReloadsAllFieldTypes()
     {
-        var model = MakeModel("Product");
+        DataModel model = MakeModel("Product");
         model.AddField("title", "Title", FieldType.Text, true,
             new TextFieldConfig(MaxLength: 200));
         model.AddField("price", "Price", FieldType.Number, true,
@@ -115,15 +114,14 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
 
         await _sut.AddAsync(model);
         await _ctx.SaveChangesAsync();
-
-        var loaded = await _sut.GetByIdAsync(model.Id, OrgId);
-        var customFields = loaded!.Fields.Where(f => !f.IsSystem).ToList();
+        DataModel? loaded = await _sut.GetByIdAsync(model.Id, OrgId);
+        List<FieldDefinition> customFields = loaded!.Fields.Where(f => !f.IsSystem).ToList();
 
         customFields.Should().HaveCount(4);
-        var textField = customFields.Single(f => f.Name == "title");
+        FieldDefinition textField = customFields.Single(f => f.Name == "title");
         textField.Config.Should().BeOfType<TextFieldConfig>()
             .Which.MaxLength.Should().Be(200);
-        var enumField = customFields.Single(f => f.Name == "status");
+        FieldDefinition enumField = customFields.Single(f => f.Name == "status");
         enumField.Config.Should().BeOfType<EnumFieldConfig>()
             .Which.Options.Should().HaveCount(2);
     }

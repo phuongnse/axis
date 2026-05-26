@@ -6,7 +6,6 @@
 |--------|------------|---------|
 | settings-roles | [source](../wireframes/settings-roles.excalidraw) | [preview](../wireframes/settings-roles.svg) |
 
-
 [← Back to E02](../README.md)
 
 ---
@@ -87,6 +86,7 @@ Organization admins can create custom roles, assign permissions to each role, an
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** 403 permission check requires JWT identity from API layer — pending. Case-insensitive name uniqueness check is done in handler against existing roles in org.
+>
 > **Decisions:** `Role.CreateCustom(name, orgId, permissions[])` factory method; minimum 1 permission enforced in domain.
 
 ---
@@ -161,4 +161,5 @@ Organization admins can create custom roles, assign permissions to each role, an
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** 403 check backend polish — see gaps below. "At least one role" guard and "last admin" guard both implemented in handler.
+>
 > **Decisions:** roles stored as `List<Guid>` (`_roleIds`) on `User` aggregate — effective permissions are the union of all assigned roles' permission lists, computed at token issuance time (pending auth layer).

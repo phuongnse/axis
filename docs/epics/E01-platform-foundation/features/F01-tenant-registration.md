@@ -12,12 +12,8 @@
 | verify-email | [source](../wireframes/verify-email.excalidraw) | [preview](../wireframes/verify-email.svg) |
 | verify-email-rate-limit | [source](../wireframes/verify-email-rate-limit.excalidraw) | [preview](../wireframes/verify-email-rate-limit.svg) |
 | login-unverified (US-002 sign-in before verify) | [source](../../E02-identity-access/wireframes/login-unverified.excalidraw) | [preview](../../E02-identity-access/wireframes/login-unverified.svg) |
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
 | workspace-provisioning | [source](../wireframes/workspace-provisioning.excalidraw) | [preview](../wireframes/workspace-provisioning.svg) |
 | pricing | [source](../wireframes/pricing.excalidraw) | [preview](../wireframes/pricing.svg) |
-
 
 ---
 
@@ -69,8 +65,12 @@ Self-service registration flow where a new organization signs up and is automati
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** none for backend US-001. `Idempotency-Key` header on `POST /api/organizations/` deduplicates rapid resubmits (Pending/Completed/Failed state).
+>
 > **Deferred (PR #124 follow-up):** Frontend registration confirmation-screen behavior alignment for US-001.
-> **Decisions:** duplicate email returns silently without creating anything — matches "same confirmation screen" AC. `RegisterOrganizationCommandValidator` enforces: org name 2–100 chars, valid email, password min 8 chars + letter + number, confirmation match. Org slug auto-generated with uniqueness retry loop; BCrypt work factor 12. 4 default system roles seeded atomically in the same transaction.
+>
+> **Decisions:**
+> - duplicate email returns silently without creating anything — matches "same confirmation screen" AC. `RegisterOrganizationCommandValidator` enforces: org name 2–100 chars, valid email, password min 8 chars + letter + number, confirmation match. Org slug auto-generated with uniqueness retry loop
+> - BCrypt work factor 12. 4 default system roles seeded atomically in the same transaction.
 
 ---
 
@@ -108,8 +108,16 @@ Self-service registration flow where a new organization signs up and is automati
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** auto sign-in after verification click pending Frontend. **Done:** opaque one-time verification tokens in `email_verification_tokens` (SHA-256 hash at rest, 24h TTL, invalidate on verify/resend); resend rate limit 3/email/hour via `IResendVerificationRateLimiter` (Redis atomic INCR+EXPIRE per hashed email, HTTP 429 + message); login returns "Please verify your email" when unverified; `GET /api/auth/provisioning-status?token=` accepts the same link token after verify (including used tokens within TTL). IP-level `auth` limiter applies to `/connect/login` and Identity gRPC only — not on verify/resend (avoids starving integration tests).
+> **Gaps vs spec:** auto sign-in after verification click pending Frontend.
+>
+> **Done:**
+> - opaque one-time verification tokens in `email_verification_tokens` (SHA-256 hash at rest, 24h TTL, invalidate on verify/resend)
+> - resend rate limit 3/email/hour via `IResendVerificationRateLimiter` (Redis atomic INCR+EXPIRE per hashed email, HTTP 429 + message)
+> - login returns "Please verify your email" when unverified
+> - `GET /api/auth/provisioning-status?token=` accepts the same link token after verify (including used tokens within TTL). IP-level `auth` limiter applies to `/connect/login` and Identity gRPC only — not on verify/resend (avoids starving integration tests).
+>
 > **Deferred (PR #125 follow-up):** Frontend verify-email flow, provisioning wait screen, and post-verify auto sign-in (US-002).
+>
 > **Decisions:** `ResendVerificationEmailCommand` silently succeeds for unknown/already-verified emails (no info leakage).
 
 ---
@@ -148,8 +156,16 @@ Self-service registration flow where a new organization signs up and is automati
 > | API | ⚠️ |
 > | Frontend | ⚠️ |
 >
-> **Gaps vs spec:** provisioning wait UI (US-002) pending Frontend. **Done:** org enters `Provisioning` on verify; per-module `TenantModuleProvisionReportEvent` + Identity coordinator schedules up to 3 retries with exponential backoff; critical log alert when exhausted; `GET /api/auth/provisioning-status?token=` for polling.
+> **Gaps vs spec:** provisioning wait UI (US-002) pending Frontend.
+>
+> **Done:**
+> - org enters `Provisioning` on verify
+> - per-module `TenantModuleProvisionReportEvent` + Identity coordinator schedules up to 3 retries with exponential backoff
+> - critical log alert when exhausted
+> - `GET /api/auth/provisioning-status?token=` for polling.
+>
 > **Deferred (PR #N follow-up):** external paging integration for platform alerts (critical log is the MVP signal).
+>
 > **Decisions:** provisioning is fully event-driven over Kafka per [ADR-019](../../../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope) — no central provisioner. The verify endpoint stays fast, the provisioning failure mode is decoupled from email verification, and each module owns its own schema lifecycle (satisfies ADR-010 "extraction is a redeploy"). Tenant schema name is derived from `Organization.Id` as `tenant_{orgId:N}` (32-char hex, no dashes) — stable across the lifetime of the org and safe as a Postgres identifier.
 
 ---
@@ -187,5 +203,10 @@ Self-service registration flow where a new organization signs up and is automati
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** pricing comparison table and workspace header plan name pending Frontend. **Done (backend):** `POST /api/organizations/` accepts optional `subscriptionPlanId`; invalid/unavailable plan ids fall back to Free; org stores `subscription_plan_id`; F04 enforces limits (402) after provisioning.
+> **Gaps vs spec:**
+> - pricing comparison table and workspace header plan name pending Frontend. **Done (backend):** `POST /api/organizations/` accepts optional `subscriptionPlanId`
+> - invalid/unavailable plan ids fall back to Free
+> - org stores `subscription_plan_id`
+> - F04 enforces limits (402) after provisioning.
+>
 > **Decisions:** MVP paid plan selection has no billing flag column yet — treat as normal plan assignment until billing Phase 2.

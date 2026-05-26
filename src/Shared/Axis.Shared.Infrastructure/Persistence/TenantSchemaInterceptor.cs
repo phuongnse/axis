@@ -21,14 +21,14 @@ public sealed class TenantSchemaInterceptor(ITenantContext tenantContext) : DbCo
 
     public override void ConnectionOpened(DbConnection connection, ConnectionEndEventData eventData)
     {
-        using var cmd = connection.CreateCommand();
+        using DbCommand cmd = connection.CreateCommand();
         cmd.CommandText = BuildSearchPathSql();
         cmd.ExecuteNonQuery();
     }
 
     private async Task SetSearchPathAsync(DbConnection connection, CancellationToken ct)
     {
-        await using var cmd = connection.CreateCommand();
+        await using DbCommand cmd = connection.CreateCommand();
         cmd.CommandText = BuildSearchPathSql();
         await cmd.ExecuteNonQueryAsync(ct);
     }

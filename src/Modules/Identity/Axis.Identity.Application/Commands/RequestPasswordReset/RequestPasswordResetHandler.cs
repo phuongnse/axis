@@ -10,7 +10,8 @@ namespace Axis.Identity.Application.Commands.RequestPasswordReset;
 public sealed class RequestPasswordResetHandler(
     IUserRepository userRepo,
     IPasswordResetTokenStore tokenStore,
-    IEmailSender emailSender)
+    IEmailSender emailSender,
+    IUnitOfWork uow)
     : ICommandHandler<RequestPasswordResetCommand>
 {
     private static readonly TimeSpan TokenLifetime = TimeSpan.FromHours(1);
@@ -33,6 +34,8 @@ public sealed class RequestPasswordResetHandler(
 
         await emailSender.SendPasswordResetEmailAsync(
             user.Email.Value, rawToken, cancellationToken);
+
+        await uow.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

@@ -1,6 +1,6 @@
 using Axis.Shared.Application.Tenancy;
-using Axis.WorkflowBuilder.Infrastructure.Persistence;
 using Axis.Testing;
+using Axis.WorkflowBuilder.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Testcontainers.PostgreSql;
@@ -39,9 +39,9 @@ public sealed class WorkflowBuilderDatabaseFixture : IAsyncLifetime
 
     internal WorkflowBuilderDbContext CreateContext()
     {
-        var options = new DbContextOptionsBuilder<WorkflowBuilderDbContext>()
-            .UseNpgsql(ConnectionString)
-            .Options;
+        DbContextOptions<WorkflowBuilderDbContext> options = new DbContextOptionsBuilder<WorkflowBuilderDbContext>()
+                    .UseNpgsql(ConnectionString)
+                    .Options;
         return new WorkflowBuilderDbContext(options, new TestTenantContext(TestSchema));
     }
 }

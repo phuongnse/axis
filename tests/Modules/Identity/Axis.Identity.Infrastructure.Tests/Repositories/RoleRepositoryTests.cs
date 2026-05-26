@@ -28,11 +28,10 @@ public class RoleRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     [Fact]
     public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
     {
-        var role = MakeRole("CustomRole-GetById");
+        Role role = MakeRole("CustomRole-GetById");
         await _sut.AddAsync(role);
         await _ctx.SaveChangesAsync();
-
-        var loaded = await _sut.GetByIdAsync(role.Id, OrgId);
+        Role? loaded = await _sut.GetByIdAsync(role.Id, OrgId);
 
         loaded.Should().NotBeNull();
         loaded!.Name.Should().Be("CustomRole-GetById");
@@ -43,11 +42,10 @@ public class RoleRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     [Fact]
     public async Task GetByNameAsync_WhenNameExists_ReturnsMatchingRole()
     {
-        var role = MakeRole("NamedRole-FindMe");
+        Role role = MakeRole("NamedRole-FindMe");
         await _sut.AddAsync(role);
         await _ctx.SaveChangesAsync();
-
-        var loaded = await _sut.GetByNameAsync("NamedRole-FindMe", OrgId);
+        Role? loaded = await _sut.GetByNameAsync("NamedRole-FindMe", OrgId);
 
         loaded.Should().NotBeNull();
         loaded!.Id.Should().Be(role.Id);
@@ -56,13 +54,12 @@ public class RoleRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     [Fact]
     public async Task GetAllAsync_WhenMultipleRolesExist_ReturnsAllRolesForOrg()
     {
-        var r1 = MakeRole($"BulkRole-A-{Guid.NewGuid():N}");
-        var r2 = MakeRole($"BulkRole-B-{Guid.NewGuid():N}");
+        Role r1 = MakeRole($"BulkRole-A-{Guid.NewGuid():N}");
+        Role r2 = MakeRole($"BulkRole-B-{Guid.NewGuid():N}");
         await _sut.AddAsync(r1);
         await _sut.AddAsync(r2);
         await _ctx.SaveChangesAsync();
-
-        var all = await _sut.GetAllAsync(OrgId);
+        IReadOnlyList<Role> all = await _sut.GetAllAsync(OrgId);
 
         all.Should().Contain(r => r.Id == r1.Id);
         all.Should().Contain(r => r.Id == r2.Id);
@@ -71,11 +68,10 @@ public class RoleRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     [Fact]
     public async Task NameExistsAsync_WhenNameExistsInOrg_ReturnsTrue()
     {
-        var role = MakeRole($"DupeName-{Guid.NewGuid():N}");
+        Role role = MakeRole($"DupeName-{Guid.NewGuid():N}");
         await _sut.AddAsync(role);
         await _ctx.SaveChangesAsync();
-
-        var exists = await _sut.NameExistsAsync(role.Name, OrgId);
+        bool exists = await _sut.NameExistsAsync(role.Name, OrgId);
         exists.Should().BeTrue();
     }
 

@@ -12,7 +12,7 @@ public class UserEmailVerificationTests
     [Fact]
     public void User_WhenCreated_IsNotEmailVerified()
     {
-        var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
+        User user = User.Create("Alice", "Smith", ValidEmail, OrgId);
 
         user.IsEmailVerified.Should().BeFalse();
     }
@@ -20,7 +20,7 @@ public class UserEmailVerificationTests
     [Fact]
     public void VerifyEmail_WhenCalled_MarksUserAsVerified()
     {
-        var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
+        User user = User.Create("Alice", "Smith", ValidEmail, OrgId);
 
         user.VerifyEmail();
 
@@ -30,10 +30,10 @@ public class UserEmailVerificationTests
     [Fact]
     public void VerifyEmail_WhenAlreadyVerified_IsIdempotent()
     {
-        var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
+        User user = User.Create("Alice", "Smith", ValidEmail, OrgId);
         user.VerifyEmail();
 
-        var act = () => user.VerifyEmail();
+        Action act = () => user.VerifyEmail();
 
         act.Should().NotThrow();
         user.IsEmailVerified.Should().BeTrue();
@@ -42,7 +42,7 @@ public class UserEmailVerificationTests
     [Fact]
     public void RecordFailedLogin_WhenCalled_IncrementsCounter()
     {
-        var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
+        User user = User.Create("Alice", "Smith", ValidEmail, OrgId);
         user.VerifyEmail();
 
         user.RecordFailedLogin();
@@ -54,7 +54,7 @@ public class UserEmailVerificationTests
     [Fact]
     public void RecordFailedLogin_WhenFiveAttempts_LocksAccount()
     {
-        var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
+        User user = User.Create("Alice", "Smith", ValidEmail, OrgId);
         user.VerifyEmail();
 
         for (int i = 0; i < 5; i++)
@@ -68,7 +68,7 @@ public class UserEmailVerificationTests
     [Fact]
     public void ResetFailedLogins_WhenCalled_ClearsCounterAndLockout()
     {
-        var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
+        User user = User.Create("Alice", "Smith", ValidEmail, OrgId);
         user.VerifyEmail();
         for (int i = 0; i < 5; i++) user.RecordFailedLogin();
 
@@ -81,7 +81,7 @@ public class UserEmailVerificationTests
     [Fact]
     public void IsLockedOut_WhenLockoutHasExpired_ReturnsFalse()
     {
-        var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
+        User user = User.Create("Alice", "Smith", ValidEmail, OrgId);
         user.VerifyEmail();
         // force lockout in the past
         for (int i = 0; i < 5; i++) user.RecordFailedLogin();

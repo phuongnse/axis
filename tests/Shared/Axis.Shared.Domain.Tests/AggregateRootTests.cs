@@ -15,7 +15,7 @@ public class AggregateRootTests
     [Fact]
     public void AggregateRoot_WhenCreated_HasNoDomainEvents()
     {
-        var aggregate = new TestAggregate(Guid.NewGuid());
+        TestAggregate aggregate = new TestAggregate(Guid.NewGuid());
 
         aggregate.DomainEvents.Should().BeEmpty();
     }
@@ -23,7 +23,7 @@ public class AggregateRootTests
     [Fact]
     public void AggregateRoot_WhenEventRaised_AddsEventToDomainEvents()
     {
-        var aggregate = new TestAggregate(Guid.NewGuid());
+        TestAggregate aggregate = new TestAggregate(Guid.NewGuid());
 
         aggregate.DoSomething();
 
@@ -34,7 +34,7 @@ public class AggregateRootTests
     [Fact]
     public void ClearDomainEvents_WhenCalled_RemovesAllEvents()
     {
-        var aggregate = new TestAggregate(Guid.NewGuid());
+        TestAggregate aggregate = new TestAggregate(Guid.NewGuid());
         aggregate.DoSomething();
         aggregate.DoSomething();
 
@@ -46,7 +46,7 @@ public class AggregateRootTests
     [Fact]
     public void AggregateRoot_WhenMultipleEventsRaised_CollectsAllInOrder()
     {
-        var aggregate = new TestAggregate(Guid.NewGuid());
+        TestAggregate aggregate = new TestAggregate(Guid.NewGuid());
 
         aggregate.DoSomething();
         aggregate.DoSomething();

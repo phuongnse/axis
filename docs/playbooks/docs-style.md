@@ -55,7 +55,7 @@ Every `docs/epics/*/features/F0N-*.md` file uses these layouts so agents can sca
 | login | [source](../wireframes/login.excalidraw) | [preview](../wireframes/login.svg) |
 ```
 
-One row per screen. **Do not** stack multiple `> **Wireframe**:` blockquote lines — they are hard to read and drift from the table format.
+One row per screen. **One table per feature file** — do not split wireframes into multiple `| Screen |` tables (merge registration vs provisioning screens into the same table). **Do not** stack multiple `> **Wireframe**:` blockquote lines — they are hard to read and drift from the table format.
 
 ### Implementation status (after each US AC block)
 
@@ -70,15 +70,21 @@ One row per screen. **Do not** stack multiple `> **Wireframe**:` blockquote line
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** …
-> **Done:** …
-> **Deferred (PR #N follow-up):** …
+> **Gaps vs spec:** none for backend on this US.
+>
+> **Done:**
+> - Handler X; endpoint Y.
+>
+> **Deferred (PR #N follow-up):** Frontend-only gap (one line).
+>
 > **Decisions:** …
 ```
 
 Rules:
 
 - **One row per layer** — split `Domain + Application` into two rows.
+- **Blank blockquote line** (`>`) between **Gaps vs spec**, **Done**, **Deferred**, and **Decisions** — never glue `**Done:**` onto the same line as **Gaps vs spec**.
+- Use a **bullet list** under **Done** (or **Gaps vs spec**) when there are several semicolon-separated backend notes; keep a single sentence on one line when it is short.
 - **`Gaps vs spec`** lists remaining AC bullets; never write `pending API layer` when endpoints already exist — say what is missing (`403 test`, `date filter query param`, etc.).
 - **`API ✅`** on a US means in-scope REST/OpenAPI AC for that story are shipped; Frontend-only gaps do not downgrade API to ⚠️.
 

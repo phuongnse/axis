@@ -8,7 +8,6 @@
 | login-unverified | [source](../wireframes/login-unverified.excalidraw) | [preview](../wireframes/login-unverified.svg) |
 | register | [source](../wireframes/register.excalidraw) | [preview](../wireframes/register.svg) |
 
-
 [← Back to E02](../README.md)
 
 ---
@@ -61,8 +60,14 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 > | Frontend | ⚠️ |
 >
 > **Gaps vs spec:** Login page + PKCE flow + app shell/dashboard scaffold on PR #50 branch. BroadcastChannel multi-tab refresh, account lockout UI, and unverified-email screen polish pending.
+>
 > **Deferred (PR #50 follow-up):** none for this US.
-> **Decisions:** OpenIddict 5.x serves as the in-process OAuth2/OIDC server. `AuthenticateUserCommand` validates credentials; `/connect/login` sets a 5-min httpOnly session cookie; `/connect/authorize` issues the authorization code; `/connect/token` exchanges it for access + refresh tokens. Refresh token stored as an opaque reference in DB (OpenIddict `OpenIddictTokens` table) and delivered as an httpOnly `Secure SameSite=Strict` cookie at `/connect` path via `ApplyRefreshTokenCookieHandler`.
+>
+> **Decisions:**
+> - OpenIddict 5.x serves as the in-process OAuth2/OIDC server. `AuthenticateUserCommand` validates credentials
+> - `/connect/login` sets a 5-min httpOnly session cookie
+> - `/connect/authorize` issues the authorization code
+> - `/connect/token` exchanges it for access + refresh tokens. Refresh token stored as an opaque reference in DB (OpenIddict `OpenIddictTokens` table) and delivered as an httpOnly `Secure SameSite=Strict` cookie at `/connect` path via `ApplyRefreshTokenCookieHandler`.
 
 ---
 
@@ -100,7 +105,10 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** BroadcastChannel multi-tab coordination is Frontend-only. Endpoint is `POST /connect/token` (grant_type=refresh_token) instead of `/api/auth/refresh`.
-> **Decisions:** OpenIddict handles token rotation natively. `ExtractRefreshTokenFromCookieHandler` reads the refresh token from the httpOnly cookie into the OpenIddict request. `POST /connect/token` with grant_type=refresh_token validates the opaque reference token, loads fresh user+permissions, rotates the refresh token, returns a new access token in the JSON body and a new refresh token cookie. Replay detection: reference tokens are single-use; replaying revoked token returns `invalid_grant`.
+>
+> **Decisions:**
+> - OpenIddict handles token rotation natively. `ExtractRefreshTokenFromCookieHandler` reads the refresh token from the httpOnly cookie into the OpenIddict request. `POST /connect/token` with grant_type=refresh_token validates the opaque reference token, loads fresh user+permissions, rotates the refresh token, returns a new access token in the JSON body and a new refresh token cookie. Replay detection: reference tokens are single-use
+> - replaying revoked token returns `invalid_grant`.
 
 ---
 

@@ -10,21 +10,20 @@ internal sealed class FormFieldConverter : JsonConverter<FormField>
 {
     public override FormField Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
-        using var doc = JsonDocument.ParseValue(ref reader);
-        var root = doc.RootElement;
-
-        var id = root.GetProperty("id").GetGuid();
-        var key = root.GetProperty("key").GetString()!;
-        var label = root.GetProperty("label").GetString()!;
-        string? helpText = root.TryGetProperty("helpText", out var htEl) && htEl.ValueKind != JsonValueKind.Null
+        using JsonDocument doc = JsonDocument.ParseValue(ref reader);
+        JsonElement root = doc.RootElement;
+        Guid id = root.GetProperty("id").GetGuid();
+        string key = root.GetProperty("key").GetString()!;
+        string label = root.GetProperty("label").GetString()!;
+        string? helpText = root.TryGetProperty("helpText", out JsonElement htEl) && htEl.ValueKind != JsonValueKind.Null
             ? htEl.GetString()
             : null;
-        var type = Enum.Parse<FormFieldType>(root.GetProperty("type").GetString()!, ignoreCase: true);
-        var isRequired = root.GetProperty("isRequired").GetBoolean();
-        var displayOrder = root.GetProperty("displayOrder").GetInt32();
+        FormFieldType type = Enum.Parse<FormFieldType>(root.GetProperty("type").GetString()!, ignoreCase: true);
+        bool isRequired = root.GetProperty("isRequired").GetBoolean();
+        int displayOrder = root.GetProperty("displayOrder").GetInt32();
 
         FormFieldConfig? config = null;
-        if (root.TryGetProperty("config", out var configEl) && configEl.ValueKind != JsonValueKind.Null)
+        if (root.TryGetProperty("config", out JsonElement configEl) && configEl.ValueKind != JsonValueKind.Null)
             config = DeserializeConfig(type, configEl.GetRawText(), options);
 
         return FormField.Reconstitute(id, key, label, helpText, type, isRequired, displayOrder, config);

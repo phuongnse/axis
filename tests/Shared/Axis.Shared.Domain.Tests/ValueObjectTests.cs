@@ -30,8 +30,8 @@ public class ValueObjectTests
     [Fact]
     public void ValueObject_WhenComponentsAreIdentical_AreEqual()
     {
-        var a = new Money(100, "USD");
-        var b = new Money(100, "USD");
+        Money a = new Money(100, "USD");
+        Money b = new Money(100, "USD");
 
         a.Should().Be(b);
         (a == b).Should().BeTrue();
@@ -40,8 +40,8 @@ public class ValueObjectTests
     [Fact]
     public void ValueObject_WhenComponentsDiffer_AreNotEqual()
     {
-        var a = new Money(100, "USD");
-        var b = new Money(200, "USD");
+        Money a = new Money(100, "USD");
+        Money b = new Money(200, "USD");
 
         a.Should().NotBe(b);
         (a != b).Should().BeTrue();
@@ -50,8 +50,8 @@ public class ValueObjectTests
     [Fact]
     public void ValueObject_WhenCurrencyDiffers_AreNotEqual()
     {
-        var a = new Money(100, "USD");
-        var b = new Money(100, "EUR");
+        Money a = new Money(100, "USD");
+        Money b = new Money(100, "EUR");
 
         a.Should().NotBe(b);
     }
@@ -59,7 +59,7 @@ public class ValueObjectTests
     [Fact]
     public void ValueObject_WhenComparedToNull_IsNotEqual()
     {
-        var a = new Money(100, "USD");
+        Money a = new Money(100, "USD");
 
         a.Equals(null).Should().BeFalse();
         (a == null!).Should().BeFalse();
@@ -68,8 +68,8 @@ public class ValueObjectTests
     [Fact]
     public void ValueObject_WhenComponentsAreIdentical_HaveSameHashCode()
     {
-        var a = new Money(100, "USD");
-        var b = new Money(100, "USD");
+        Money a = new Money(100, "USD");
+        Money b = new Money(100, "USD");
 
         a.GetHashCode().Should().Be(b.GetHashCode());
     }
@@ -77,8 +77,8 @@ public class ValueObjectTests
     [Fact]
     public void ValueObject_WhenTypesAreDifferent_AreNotEqual()
     {
-        var money = new Money(100, "USD");
-        var single = new SingleValue("100");
+        Money money = new Money(100, "USD");
+        SingleValue single = new SingleValue("100");
 
         money.Equals(single).Should().BeFalse();
     }

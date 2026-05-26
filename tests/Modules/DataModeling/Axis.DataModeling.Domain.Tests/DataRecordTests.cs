@@ -16,8 +16,8 @@ public class DataRecordTests
     [Fact]
     public void DataRecord_WhenCreated_SetsModelIdOrgIdAndData()
     {
-        var data = SampleData();
-        var record = DataRecord.Create(ModelId, OrgId, data, UserId);
+        IReadOnlyDictionary<string, object?> data = SampleData();
+        DataRecord record = DataRecord.Create(ModelId, OrgId, data, UserId);
 
         record.ModelId.Should().Be(ModelId);
         record.OrganizationId.Should().Be(OrgId);
@@ -28,8 +28,8 @@ public class DataRecordTests
     [Fact]
     public void DataRecord_WhenCreated_SetsCreatedByAndTimestamps()
     {
-        var before = DateTimeOffset.UtcNow;
-        var record = DataRecord.Create(ModelId, OrgId, SampleData(), UserId);
+        DateTimeOffset before = DateTimeOffset.UtcNow;
+        DataRecord record = DataRecord.Create(ModelId, OrgId, SampleData(), UserId);
 
         record.CreatedBy.Should().Be(UserId);
         record.CreatedAt.Should().BeOnOrAfter(before);
@@ -39,10 +39,9 @@ public class DataRecordTests
     [Fact]
     public void DataRecord_WhenUpdated_ReplacesDataAndBumpsUpdatedAt()
     {
-        var record = DataRecord.Create(ModelId, OrgId, SampleData(), UserId);
-        var before = record.UpdatedAt;
-
-        var newData = new Dictionary<string, object?> { ["amount"] = 200, ["notes"] = "updated" };
+        DataRecord record = DataRecord.Create(ModelId, OrgId, SampleData(), UserId);
+        DateTimeOffset before = record.UpdatedAt;
+        Dictionary<string, object?> newData = new Dictionary<string, object?> { ["amount"] = 200, ["notes"] = "updated" };
         record.Update(newData);
 
         record.Data["amount"].Should().Be(200);
@@ -52,8 +51,8 @@ public class DataRecordTests
     [Fact]
     public void Delete_WhenCalled_SetsDeletedAtAndRaisesEvent()
     {
-        var record = DataRecord.Create(ModelId, OrgId, SampleData(), UserId);
-        var before = DateTimeOffset.UtcNow;
+        DataRecord record = DataRecord.Create(ModelId, OrgId, SampleData(), UserId);
+        DateTimeOffset before = DateTimeOffset.UtcNow;
         record.Delete();
 
         record.DeletedAt.Should().NotBeNull();
@@ -64,10 +63,10 @@ public class DataRecordTests
     [Fact]
     public void Delete_WhenAlreadyDeleted_Throws()
     {
-        var record = DataRecord.Create(ModelId, OrgId, SampleData(), UserId);
+        DataRecord record = DataRecord.Create(ModelId, OrgId, SampleData(), UserId);
         record.Delete();
 
-        var act = () => record.Delete();
+        Action act = () => record.Delete();
         act.Should().Throw<InvalidOperationException>().WithMessage("*already deleted*");
     }
 }

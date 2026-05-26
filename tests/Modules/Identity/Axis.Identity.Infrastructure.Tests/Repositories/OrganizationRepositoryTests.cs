@@ -32,11 +32,10 @@ public class OrganizationRepositoryTests(IdentityDatabaseFixture db) : IAsyncLif
     [Fact]
     public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
     {
-        var org = MakeOrg("org-add-get");
+        Organization org = MakeOrg("org-add-get");
         await _sut.AddAsync(org);
         await _ctx.SaveChangesAsync();
-
-        var loaded = await _sut.GetByIdAsync(org.Id);
+        Organization? loaded = await _sut.GetByIdAsync(org.Id);
 
         loaded.Should().NotBeNull();
         loaded!.Name.Should().Be(org.Name);
@@ -49,12 +48,11 @@ public class OrganizationRepositoryTests(IdentityDatabaseFixture db) : IAsyncLif
     [Fact]
     public async Task GetBySlugAsync_WhenSlugExists_ReturnsMatchingOrg()
     {
-        var org = MakeOrg("org-by-slug");
+        Organization org = MakeOrg("org-by-slug");
         await _sut.AddAsync(org);
         await _ctx.SaveChangesAsync();
-
-        var slug = OrganizationSlug.Create("org-by-slug").Value;
-        var loaded = await _sut.GetBySlugAsync(slug);
+        OrganizationSlug slug = OrganizationSlug.Create("org-by-slug").Value;
+        Organization? loaded = await _sut.GetBySlugAsync(slug);
 
         loaded.Should().NotBeNull();
         loaded!.Id.Should().Be(org.Id);
@@ -63,19 +61,18 @@ public class OrganizationRepositoryTests(IdentityDatabaseFixture db) : IAsyncLif
     [Fact]
     public async Task GetBySlugAsync_WhenSlugDoesNotExist_ReturnsNull()
     {
-        var slug = OrganizationSlug.Create("does-not-exist").Value;
-        var result = await _sut.GetBySlugAsync(slug);
+        OrganizationSlug slug = OrganizationSlug.Create("does-not-exist").Value;
+        Organization? result = await _sut.GetBySlugAsync(slug);
         result.Should().BeNull();
     }
 
     [Fact]
     public async Task SlugExistsAsync_WhenSlugIsTaken_ReturnsTrue()
     {
-        var org = MakeOrg("slug-exists-check");
+        Organization org = MakeOrg("slug-exists-check");
         await _sut.AddAsync(org);
         await _ctx.SaveChangesAsync();
-
-        var exists = await _sut.SlugExistsAsync(OrganizationSlug.Create("slug-exists-check").Value);
+        bool exists = await _sut.SlugExistsAsync(OrganizationSlug.Create("slug-exists-check").Value);
         exists.Should().BeTrue();
     }
 

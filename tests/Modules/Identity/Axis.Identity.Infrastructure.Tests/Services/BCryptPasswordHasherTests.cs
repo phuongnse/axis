@@ -10,29 +10,29 @@ public class BCryptPasswordHasherTests
     [Fact]
     public void Hash_WhenCalled_ReturnsNonEmptyString()
     {
-        var hash = _sut.Hash("secret123");
+        string hash = _sut.Hash("secret123");
         hash.Should().NotBeNullOrEmpty();
     }
 
     [Fact]
     public void Hash_WhenCalledMultipleTimes_ProducesDifferentHashEachTime()
     {
-        var h1 = _sut.Hash("secret123");
-        var h2 = _sut.Hash("secret123");
+        string h1 = _sut.Hash("secret123");
+        string h2 = _sut.Hash("secret123");
         h1.Should().NotBe(h2); // bcrypt includes random salt
     }
 
     [Fact]
     public void Verify_WhenPasswordIsCorrect_ReturnsTrue()
     {
-        var hash = _sut.Hash("correct-password");
+        string hash = _sut.Hash("correct-password");
         _sut.Verify("correct-password", hash).Should().BeTrue();
     }
 
     [Fact]
     public void Verify_WhenPasswordIsWrong_ReturnsFalse()
     {
-        var hash = _sut.Hash("correct-password");
+        string hash = _sut.Hash("correct-password");
         _sut.Verify("wrong-password", hash).Should().BeFalse();
     }
 }

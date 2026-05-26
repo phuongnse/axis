@@ -47,8 +47,14 @@ One paragraph describing the feature.
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** …
-> **Done:** …
-> **Deferred (PR #N follow-up):** … (omit line if none)
+>
+> **Done:**
+> - …
+>
+> **Deferred (PR #N follow-up):** …
+>
+> _(Omit the entire Deferred line when there are no deferrals.)_
+>
 > **Decisions:** …
 
 ---

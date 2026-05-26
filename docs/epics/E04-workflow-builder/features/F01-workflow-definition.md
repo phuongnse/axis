@@ -6,7 +6,6 @@
 |--------|------------|---------|
 | workflows | [source](../wireframes/workflows.excalidraw) | [preview](../wireframes/workflows.svg) |
 
-
 [← Back to E04](../README.md)
 
 ---
@@ -50,8 +49,13 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** canvas/list UI only (backend). **Done:** HTTP 402 on create when workflow plan limit reached (`CreateWorkflowHandler` + E01 F04).
-> **Decisions:** new workflow initialised with Start + End nodes by domain factory; all data stored in single `workflow_definitions` table.
+> **Gaps vs spec:** canvas/list UI only (backend).
+>
+> **Done:** HTTP 402 on create when workflow plan limit reached (`CreateWorkflowHandler` + E01 F04).
+>
+> **Decisions:**
+> - new workflow initialised with Start + End nodes by domain factory
+> - all data stored in single `workflow_definitions` table.
 
 ---
 
@@ -86,7 +90,9 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** status-tab filter and last-execution-date column backend polish — see gaps below; execution date requires WorkflowEngine integration.
+> **Gaps vs spec:**
+> - status-tab filter and last-execution-date column backend polish — see gaps below
+> - execution date requires WorkflowEngine integration.
 
 ---
 
@@ -121,7 +127,10 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** cron job registration and webhook URL generation pending WorkflowEngine integration (E06); broken-step validation pending E03/E05 integration; draft versioning on re-edit pending API design.
+> **Gaps vs spec:**
+> - cron job registration and webhook URL generation pending WorkflowEngine integration (E06)
+> - broken-step validation pending E03/E05 integration
+> - draft versioning on re-edit pending API design.
 
 ---
 
@@ -156,7 +165,9 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** trigger deactivation on archive pending E06 integration; HTTP 422 on archived-workflow trigger backend polish — see gaps below.
+> **Gaps vs spec:**
+> - trigger deactivation on archive pending E06 integration
+> - HTTP 422 on archived-workflow trigger backend polish — see gaps below.
 
 ---
 
@@ -192,8 +203,13 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** webhook URL generation for duplicate pending E06. **Done:** HTTP 402 on duplicate when at workflow limit (`DuplicateWorkflowHandler`).
-> **Decisions:** Duplicate() deep-copies all steps with new IDs and remaps transitions atomically in domain logic; handler resolves name collisions via "(2)", "(3)"… suffix loop up to 50, then Guid suffix.
+> **Gaps vs spec:** webhook URL generation for duplicate pending E06.
+>
+> **Done:** HTTP 402 on duplicate when at workflow limit (`DuplicateWorkflowHandler`).
+>
+> **Decisions:**
+> - Duplicate() deep-copies all steps with new IDs and remaps transitions atomically in domain logic
+> - handler resolves name collisions via "(2)", "(3)"… suffix loop up to 50, then Guid suffix.
 
 ---
 

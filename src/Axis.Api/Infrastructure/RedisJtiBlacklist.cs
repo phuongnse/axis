@@ -8,13 +8,13 @@ internal sealed class RedisJtiBlacklist(IConnectionMultiplexer redis) : IJtiBlac
 
     public async Task BlacklistAsync(string jti, TimeSpan ttl, CancellationToken ct = default)
     {
-        var db = redis.GetDatabase();
+        IDatabase db = redis.GetDatabase();
         await db.StringSetAsync(Key(jti), "1", ttl);
     }
 
     public async Task<bool> IsBlacklistedAsync(string jti, CancellationToken ct = default)
     {
-        var db = redis.GetDatabase();
+        IDatabase db = redis.GetDatabase();
         return await db.KeyExistsAsync(Key(jti));
     }
 }

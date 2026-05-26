@@ -149,11 +149,11 @@ Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, epics
 
 | | .NET | Frontend |
 |---|------|----------|
-| Types | No `var`; explicit types; one type per file | `const`/`let`, no `var`; strict TS, no `any` |
-| Hygiene | `using` not FQCN; `dotnet format` | Biome via `npm run ci` |
+| Types | No `var` for locals (see `.editorconfig`); explicit types; one type per file | `const`/`let`, no `var`; strict TS, no `any` |
+| Hygiene | `using` not FQCN; `dotnet format Axis.sln` before push (CI `--verify-no-changes`) | Biome via `npm run ci` |
 | Scope | Fix violation class in one PR, not one file | Feature folders; no cross-feature imports except `index.ts` |
 
-Full rules: [`patterns.md`](docs/playbooks/patterns.md) (EF, API, Wolverine, aggregates) and [`frontend.md`](docs/playbooks/frontend.md).
+**Enforced C# rules** live in [`.editorconfig`](.editorconfig) at the repo root (naming, braces, file-scoped namespaces, analyzer severities). Do not restate style here — run `dotnet format` and follow the file. Architecture patterns: [`patterns.md`](docs/playbooks/patterns.md). Frontend: [`frontend.md`](docs/playbooks/frontend.md).
 
 **Architecture (.NET) — consult patterns before coding:**
 

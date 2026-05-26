@@ -47,8 +47,7 @@ public class DataClassRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
         dc.AddField("phone", "Phone", FieldType.Text, false, new TextFieldConfig(MaxLength: 20));
         await _sut.AddAsync(dc);
         await _ctx.SaveChangesAsync();
-
-        var loaded = await _sut.GetByIdAsync(dc.Id, OrgId);
+        DataClass? loaded = await _sut.GetByIdAsync(dc.Id, OrgId);
 
         loaded!.Fields.Should().HaveCount(2);
         loaded.Fields.Single(f => f.Name == "email").Config

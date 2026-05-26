@@ -13,7 +13,7 @@ public class UserTests
     [Fact]
     public void User_WhenCreated_ProducesValidUser()
     {
-        var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
+        User user = User.Create("Alice", "Smith", ValidEmail, OrgId);
 
         user.FirstName.Should().Be("Alice");
         user.LastName.Should().Be("Smith");
@@ -25,7 +25,7 @@ public class UserTests
     [Fact]
     public void User_WhenCreated_RaisesUserRegisteredEvent()
     {
-        var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
+        User user = User.Create("Alice", "Smith", ValidEmail, OrgId);
 
         user.DomainEvents.Should().ContainSingle()
             .Which.Should().BeOfType<UserRegistered>();
@@ -34,9 +34,8 @@ public class UserTests
     [Fact]
     public void User_WhenCreated_UserRegisteredEventContainsCorrectData()
     {
-        var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
-
-        var evt = user.DomainEvents.OfType<UserRegistered>().Single();
+        User user = User.Create("Alice", "Smith", ValidEmail, OrgId);
+        UserRegistered evt = user.DomainEvents.OfType<UserRegistered>().Single();
         evt.UserId.Should().Be(user.Id);
         evt.OrganizationId.Should().Be(OrgId);
         evt.Email.Should().Be("alice@acme.com");
@@ -45,7 +44,7 @@ public class UserTests
     [Fact]
     public void User_WhenDeactivated_ChangesStatusToInactive()
     {
-        var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
+        User user = User.Create("Alice", "Smith", ValidEmail, OrgId);
         user.ClearDomainEvents();
 
         user.Deactivate();
@@ -56,10 +55,10 @@ public class UserTests
     [Fact]
     public void User_WhenAlreadyInactive_DeactivateThrows()
     {
-        var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
+        User user = User.Create("Alice", "Smith", ValidEmail, OrgId);
         user.Deactivate();
 
-        var act = () => user.Deactivate();
+        Action act = () => user.Deactivate();
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*already inactive*");
@@ -68,8 +67,8 @@ public class UserTests
     [Fact]
     public void User_WhenRoleAssigned_AddsToRolesCollection()
     {
-        var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
-        var roleId = Guid.NewGuid();
+        User user = User.Create("Alice", "Smith", ValidEmail, OrgId);
+        Guid roleId = Guid.NewGuid();
 
         user.AssignRole(roleId);
 
@@ -79,8 +78,8 @@ public class UserTests
     [Fact]
     public void User_WhenSameRoleAssignedTwice_IsIdempotent()
     {
-        var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
-        var roleId = Guid.NewGuid();
+        User user = User.Create("Alice", "Smith", ValidEmail, OrgId);
+        Guid roleId = Guid.NewGuid();
 
         user.AssignRole(roleId);
         user.AssignRole(roleId);
@@ -91,8 +90,8 @@ public class UserTests
     [Fact]
     public void User_WhenRoleRemoved_RemovesFromRolesCollection()
     {
-        var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
-        var roleId = Guid.NewGuid();
+        User user = User.Create("Alice", "Smith", ValidEmail, OrgId);
+        Guid roleId = Guid.NewGuid();
         user.AssignRole(roleId);
 
         user.RemoveRole(roleId);
@@ -103,7 +102,7 @@ public class UserTests
     [Fact]
     public void User_WhenAccessed_FullNameCombinesFirstAndLastName()
     {
-        var user = User.Create("Alice", "Smith", ValidEmail, OrgId);
+        User user = User.Create("Alice", "Smith", ValidEmail, OrgId);
 
         user.FullName.Should().Be("Alice Smith");
     }

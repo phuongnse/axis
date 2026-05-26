@@ -1,6 +1,6 @@
+using Axis.FormBuilder.Infrastructure.Persistence;
 using Axis.Shared.Application.Tenancy;
 using Axis.Testing;
-using Axis.FormBuilder.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Testcontainers.PostgreSql;
@@ -36,7 +36,7 @@ public sealed class FormBuilderDatabaseFixture : IAsyncLifetime
             opts => new FormBuilderDbContext(opts, tenantContext));
 
         // Create a minimal workflow_definitions table so IsReferencedByWorkflowAsync can query it
-        await using var wfCmd = conn.CreateCommand();
+        await using NpgsqlCommand wfCmd = conn.CreateCommand();
         wfCmd.CommandText = $"""
             CREATE TABLE IF NOT EXISTS "{TestSchema}".workflow_definitions (
                 id UUID PRIMARY KEY,
@@ -51,9 +51,9 @@ public sealed class FormBuilderDatabaseFixture : IAsyncLifetime
 
     internal FormBuilderDbContext CreateContext()
     {
-        var options = new DbContextOptionsBuilder<FormBuilderDbContext>()
-            .UseNpgsql(ConnectionString)
-            .Options;
+        DbContextOptions<FormBuilderDbContext> options = new DbContextOptionsBuilder<FormBuilderDbContext>()
+                    .UseNpgsql(ConnectionString)
+                    .Options;
         return new FormBuilderDbContext(options, new TestTenantContext(TestSchema));
     }
 }

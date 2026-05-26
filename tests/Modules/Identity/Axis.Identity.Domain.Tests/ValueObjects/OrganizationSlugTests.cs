@@ -1,4 +1,5 @@
 using Axis.Identity.Domain.ValueObjects;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 
 namespace Axis.Identity.Domain.Tests.ValueObjects;
@@ -12,7 +13,7 @@ public class OrganizationSlugTests
     [InlineData("a")]
     public void OrganizationSlug_WhenValueIsValid_IsCreatedSuccessfully(string value)
     {
-        var result = OrganizationSlug.Create(value);
+        Result<OrganizationSlug> result = OrganizationSlug.Create(value);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Value.Should().Be(value);
@@ -29,7 +30,7 @@ public class OrganizationSlugTests
     [InlineData("ends-with-dash-")]
     public void OrganizationSlug_WhenValueIsInvalid_ReturnsFailure(string value)
     {
-        var result = OrganizationSlug.Create(value);
+        Result<OrganizationSlug> result = OrganizationSlug.Create(value);
 
         result.IsFailure.Should().BeTrue();
     }
@@ -37,9 +38,8 @@ public class OrganizationSlugTests
     [Fact]
     public void OrganizationSlug_WhenExceedsMaxLength_ReturnsFailure()
     {
-        var tooLong = new string('a', 64);
-
-        var result = OrganizationSlug.Create(tooLong);
+        string tooLong = new string('a', 64);
+        Result<OrganizationSlug> result = OrganizationSlug.Create(tooLong);
 
         result.IsFailure.Should().BeTrue();
         result.Error.Should().Contain("63");
@@ -48,8 +48,8 @@ public class OrganizationSlugTests
     [Fact]
     public void OrganizationSlug_WhenValuesAreIdentical_AreEqual()
     {
-        var a = OrganizationSlug.Create("acme-corp").Value;
-        var b = OrganizationSlug.Create("acme-corp").Value;
+        OrganizationSlug a = OrganizationSlug.Create("acme-corp").Value;
+        OrganizationSlug b = OrganizationSlug.Create("acme-corp").Value;
 
         a.Should().Be(b);
     }

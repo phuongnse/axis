@@ -6,7 +6,6 @@
 |--------|------------|---------|
 | executions | [source](../wireframes/executions.excalidraw) | [preview](../wireframes/executions.svg) |
 
-
 [← Back to E06](../README.md)
 
 ---
@@ -54,6 +53,7 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** trigger HTTP endpoint, schedule/webhook/event trigger handlers, stale-PENDING recovery job pending API + E06 engine.
+>
 > **Decisions:** `WorkflowExecution.Create` sets status `Pending`; `Start()` transitions to `Running` — engine calls both in sequence.
 
 ---
@@ -92,7 +92,10 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** SignalR push updates and execution detail page pending Frontend. **Done:** `GET /api/executions/{id}` returns step timeline via `GetExecutionHandler`.
+> **Gaps vs spec:** SignalR push updates and execution detail page pending Frontend.
+>
+> **Done:** `GET /api/executions/{id}` returns step timeline via `GetExecutionHandler`.
+>
 > **Decisions:** `GetExecutionHandler` delegates to `IExecutionRepository.GetWithStepsAsync`, which loads execution + steps in two queries (no EF navigation property — `ExecutionStep` is a separate aggregate).
 
 ---
@@ -133,4 +136,5 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** `POST /api/executions/{id}/cancel` ✅. Cancel button UI, Wolverine job abandonment, and Form Task cancellation pending engine.
+>
 > **Decisions:** `Cancel()` domain guard rejects terminal statuses (`Completed`, `Failed`, `Cancelled`) with `InvalidOperationException`.

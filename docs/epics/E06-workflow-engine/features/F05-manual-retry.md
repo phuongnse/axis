@@ -6,7 +6,6 @@
 |--------|------------|---------|
 | execution-detail | [source](../wireframes/execution-detail.excalidraw) | [preview](../wireframes/execution-detail.svg) |
 
-
 [← Back to E06](../README.md)
 
 ---
@@ -55,7 +54,10 @@ When a workflow execution fails at a step, users can manually retry from the fai
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** `POST /api/executions/{id}/retry` and retry-with-context ✅. Retry UI and archived-definition warning pending Frontend.
-> **Decisions:** `CreateRetry()` produces a new `WorkflowExecution` with `RetryOfExecutionId` set; context is copied from original at time of retry.
+>
+> **Decisions:**
+> - `CreateRetry()` produces a new `WorkflowExecution` with `RetryOfExecutionId` set
+> - context is copied from original at time of retry.
 
 ---
 
@@ -129,4 +131,5 @@ When a workflow execution fails at a step, users can manually retry from the fai
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** `POST /api/executions/{id}/retry-with-context` ✅. JSON context editor UI and modified-context flag pending Frontend.
+>
 > **Decisions:** `CreateRetryWithModifiedContext` added to domain as private `CreateRetryCore` delegation — shares validation logic with `CreateRetry`.

@@ -96,7 +96,7 @@ public class RegisterOrganizationHandlerTests
         // Per US-001: no information leakage — same response whether email exists or not
         _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>()).Returns(true);
 
-        var act = async () => await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
+        Func<Task<Shared.Domain.Primitives.Result>> act = async () => await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
         await act.Should().NotThrowAsync();
         await _orgRepo.DidNotReceive().AddAsync(Arg.Any<Organization>(), Arg.Any<CancellationToken>());

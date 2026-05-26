@@ -18,15 +18,13 @@ public class TenantSchemaInterceptorTests : IAsyncLifetime
 
     private DbContext BuildContext(string schemaName)
     {
-        var tenantContext = Substitute.For<ITenantContext>();
+        ITenantContext tenantContext = Substitute.For<ITenantContext>();
         tenantContext.SchemaName.Returns(schemaName);
-
-        var interceptor = new TenantSchemaInterceptor(tenantContext);
-
-        var options = new DbContextOptionsBuilder<ProbeDbContext>()
-            .UseNpgsql(_postgres.GetConnectionString())
-            .AddInterceptors(interceptor)
-            .Options;
+        TenantSchemaInterceptor interceptor = new TenantSchemaInterceptor(tenantContext);
+        DbContextOptions<ProbeDbContext> options = new DbContextOptionsBuilder<ProbeDbContext>()
+                    .UseNpgsql(_postgres.GetConnectionString())
+                    .AddInterceptors(interceptor)
+                    .Options;
 
         return new ProbeDbContext(options);
     }
@@ -35,14 +33,13 @@ public class TenantSchemaInterceptorTests : IAsyncLifetime
     public async Task TenantSchemaInterceptor_WhenConnectionOpened_UsesTenantSchema()
     {
         const string schema = "tenant_acme";
-        await using var ctx = BuildContext(schema);
+        await using DbContext ctx = BuildContext(schema);
 
         // Ensure schema exists
         await ctx.Database.ExecuteSqlRawAsync($"CREATE SCHEMA IF NOT EXISTS \"{schema}\"");
-
-        var result = await ctx.Database
-            .SqlQueryRaw<string>("SELECT current_schema() AS \"Value\"")
-            .FirstAsync();
+        string result = await ctx.Database
+                    .SqlQueryRaw<string>("SELECT current_schema() AS \"Value\"")
+                    .FirstAsync();
 
         result.Should().Be(schema);
     }
@@ -53,19 +50,17 @@ public class TenantSchemaInterceptorTests : IAsyncLifetime
         const string schemaA = "tenant_alpha";
         const string schemaB = "tenant_beta";
 
-        await using var ctxA = BuildContext(schemaA);
-        await using var ctxB = BuildContext(schemaB);
+        await using DbContext ctxA = BuildContext(schemaA);
+        await using DbContext ctxB = BuildContext(schemaB);
 
         await ctxA.Database.ExecuteSqlRawAsync($"CREATE SCHEMA IF NOT EXISTS \"{schemaA}\"");
         await ctxB.Database.ExecuteSqlRawAsync($"CREATE SCHEMA IF NOT EXISTS \"{schemaB}\"");
-
-        var resultA = await ctxA.Database
-            .SqlQueryRaw<string>("SELECT current_schema() AS \"Value\"")
-            .FirstAsync();
-
-        var resultB = await ctxB.Database
-            .SqlQueryRaw<string>("SELECT current_schema() AS \"Value\"")
-            .FirstAsync();
+        string resultA = await ctxA.Database
+                    .SqlQueryRaw<string>("SELECT current_schema() AS \"Value\"")
+                    .FirstAsync();
+        string resultB = await ctxB.Database
+                    .SqlQueryRaw<string>("SELECT current_schema() AS \"Value\"")
+                    .FirstAsync();
 
         resultA.Should().Be(schemaA);
         resultB.Should().Be(schemaB);
