@@ -44,6 +44,41 @@ public class UpdateOrganizationProfileHandlerTests
     }
 
     [Fact]
+    public async Task UpdateOrganizationProfile_WhenValidLanguageTags_Accepted()
+    {
+        Organization org = MakeOrganization();
+        _orgRepo.GetByIdAsync(OrgId, Arg.Any<CancellationToken>()).Returns(org);
+
+        Result result = await CreateHandler().Handle(
+            new UpdateOrganizationProfileCommand(OrgId, "Acme", null, "zh-Hant", null, null),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        org.DefaultLanguage.Should().Be("zh-Hant");
+    }
+
+    [Fact]
+    public async Task UpdateOrganizationProfile_WhenSaveFails_DeletesUploadedLogo()
+    {
+        Organization org = MakeOrganization();
+        _orgRepo.GetByIdAsync(OrgId, Arg.Any<CancellationToken>()).Returns(org);
+        byte[] logo = [0x89, 0x50, 0x4E, 0x47];
+        _logoStorage.UploadLogoAsync(OrgId, logo, "image/png", Arg.Any<CancellationToken>())
+            .Returns("https://bucket.s3.amazonaws.com/org-logos/new.png");
+        _uow.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<int>(new InvalidOperationException("db down")));
+
+        Func<Task> act = () => CreateHandler().Handle(
+            new UpdateOrganizationProfileCommand(OrgId, "Acme", null, null, logo, "image/png"),
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        await _logoStorage.Received(1).DeleteLogoAsync(
+            "https://bucket.s3.amazonaws.com/org-logos/new.png",
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task UpdateOrganizationProfile_WhenValid_UpdatesWithoutLogo()
     {
         Organization org = MakeOrganization();

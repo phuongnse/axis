@@ -7,18 +7,6 @@ public static class OrganizationTimeZoneValidator
         if (string.IsNullOrWhiteSpace(timeZoneId))
             return true;
 
-        try
-        {
-            _ = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId.Trim());
-            return true;
-        }
-        catch (TimeZoneNotFoundException)
-        {
-            return false;
-        }
-        catch (InvalidTimeZoneException)
-        {
-            return false;
-        }
+        return TimeZoneInfo.TryFindSystemTimeZoneById(timeZoneId.Trim(), out _);
     }
 }

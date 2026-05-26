@@ -50,21 +50,44 @@ public sealed class UpdateOrganizationProfileHandler(
             return Result.Failure(ErrorCodes.BusinessRule, ex.Message);
         }
 
+        string? oldLogoUrl = null;
+        string? uploadedLogoUrl = null;
+
         if (command.LogoBytes is not null)
         {
-            string? oldLogoUrl = organization.LogoUrl;
-            string newUrl = await logoStorage.UploadLogoAsync(
+            oldLogoUrl = organization.LogoUrl;
+            uploadedLogoUrl = await logoStorage.UploadLogoAsync(
                 command.OrganizationId,
                 command.LogoBytes,
                 command.LogoContentType!,
                 cancellationToken);
-            organization.UpdateLogoUrl(newUrl);
-
-            if (oldLogoUrl is not null)
-                await logoStorage.DeleteLogoAsync(oldLogoUrl, cancellationToken);
+            organization.UpdateLogoUrl(uploadedLogoUrl);
         }
 
-        await uow.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await uow.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            if (uploadedLogoUrl is not null)
+            {
+                try
+                {
+                    await logoStorage.DeleteLogoAsync(uploadedLogoUrl, cancellationToken);
+                }
+                catch
+                {
+                    // Best-effort rollback of orphaned upload.
+                }
+            }
+
+            throw;
+        }
+
+        if (oldLogoUrl is not null && uploadedLogoUrl is not null)
+            await logoStorage.DeleteLogoAsync(oldLogoUrl, cancellationToken);
+
         return Result.Success();
     }
 }

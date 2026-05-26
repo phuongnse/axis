@@ -109,7 +109,20 @@ public static class OrganizationSettingsEndpoints
 
         if (request.LogoBase64 is not null)
         {
-            logoBytes = Convert.FromBase64String(request.LogoBase64);
+            try
+            {
+                logoBytes = Convert.FromBase64String(request.LogoBase64);
+            }
+            catch (FormatException)
+            {
+                return Results.ValidationProblem(
+                    new Dictionary<string, string[]>
+                    {
+                        ["logo_base64"] = ["Logo must be valid Base64-encoded data."],
+                    },
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
             logoContentType = request.LogoContentType ?? "image/png";
         }
 

@@ -20,6 +20,16 @@ public class RoleGrantPermissionsTests
     }
 
     [Fact]
+    public void GrantMissingPermissions_WhenPermissionsNull_Throws()
+    {
+        Role role = Role.CreateSystem("Admin", Guid.NewGuid(), ["users:read"]);
+
+        Action act = () => role.GrantMissingPermissions(null!);
+
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
     public void GrantMissingPermissions_WhenNotAdmin_Throws()
     {
         Role role = Role.CreateSystem("Viewer", Guid.NewGuid(), ["page:read"]);

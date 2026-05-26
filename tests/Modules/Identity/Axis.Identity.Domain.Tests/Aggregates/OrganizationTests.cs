@@ -123,6 +123,17 @@ public class OrganizationTests
     }
 
     [Fact]
+    public void UpdateLogoUrl_WhenDeleted_Throws()
+    {
+        Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail, WellKnownSubscriptionPlans.FreeId);
+        org.MarkDeleted();
+
+        Action act = () => org.UpdateLogoUrl("https://example.com/logo.png");
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
     public void ScheduleDeletion_WhenActive_SetsDeletionScheduledAndGraceDate()
     {
         Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail, WellKnownSubscriptionPlans.FreeId);

@@ -82,7 +82,11 @@ public sealed class Organization : AggregateRoot<Guid>
         DefaultLanguage = string.IsNullOrWhiteSpace(defaultLanguage) ? null : defaultLanguage.Trim();
     }
 
-    public void UpdateLogoUrl(string? logoUrl) => LogoUrl = logoUrl;
+    public void UpdateLogoUrl(string? logoUrl)
+    {
+        EnsureCanManageSettings();
+        LogoUrl = logoUrl;
+    }
 
     public void ScheduleDeletion(DateTime utcNow)
     {

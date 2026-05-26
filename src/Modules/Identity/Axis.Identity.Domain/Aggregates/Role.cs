@@ -86,6 +86,9 @@ public sealed class Role : AggregateRoot<Guid>
         if (!IsSystem || !string.Equals(Name, "Admin", StringComparison.Ordinal))
             throw new InvalidOperationException("Only the system Admin role supports permission backfill.");
 
+        if (permissions is null)
+            throw new ArgumentNullException(nameof(permissions));
+
         bool changed = false;
         foreach (string permission in permissions.Distinct())
         {

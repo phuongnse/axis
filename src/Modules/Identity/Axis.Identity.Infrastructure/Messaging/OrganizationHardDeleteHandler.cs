@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Axis.Identity.Infrastructure.Messaging;
 
+// WORKAROUND: see docs/WORKAROUNDS.md#org-hard-delete-modulith-cancellers
 internal sealed class OrganizationHardDeleteHandler(
     IOrganizationRepository orgRepo,
     IOrganizationExecutionCanceller executionCanceller,

@@ -17,25 +17,60 @@ public class OrganizationSettingsEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task GetSettings_WhenViewerRole_Returns403()
     {
+        const string viewerEmail = "viewerorgset1@test.com";
+        const string viewerPassword = "ViewerPass1";
+
         HttpClient admin = await AuthHelper.CreateAdminClientAsync(fixture, "orgset1");
         HttpResponseMessage meResp = await admin.GetAsync("/api/users/me");
         JsonElement me = await meResp.Content.ReadFromJsonAsync<JsonElement>(Json);
         Guid orgId = Guid.Parse(me.GetProperty("org_id").GetString()!);
 
-        using IServiceScope scope = fixture.CreateScope();
-        IdentityDbContext ctx = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        Role viewerRole = ctx.Roles.First(r => r.Name == "Viewer" && r.OrganizationId == orgId);
+        using (IServiceScope scope = fixture.CreateScope())
+        {
+            IdentityDbContext ctx = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+            Role viewerRole = ctx.Roles.First(r => r.Name == "Viewer" && r.OrganizationId == orgId);
 
-        HttpResponseMessage inviteResp = await admin.PostAsJsonAsync(
-            "/api/organizations/me/invitations",
-            new { email = "viewerorgset1@test.com", role_id = viewerRole.Id },
+            HttpResponseMessage inviteResp = await admin.PostAsJsonAsync(
+                "/api/organizations/me/invitations",
+                new { email = viewerEmail, role_id = viewerRole.Id },
+                Json);
+            inviteResp.EnsureSuccessStatusCode();
+
+            string token = ctx.Invitations.Single(i => i.Email.Value == viewerEmail).Token;
+
+            HttpClient acceptClient = fixture.CreateNewClient();
+            HttpResponseMessage acceptResp = await acceptClient.PostAsJsonAsync(
+                $"/api/invitations/{token}/accept",
+                new
+                {
+                    first_name = "View",
+                    last_name = "Only",
+                    password = viewerPassword,
+                },
+                Json);
+            acceptResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        }
+
+        HttpClient viewerClient = fixture.CreateNewClient();
+        string accessToken = await AuthHelper.CompletePkceFlowAsync(viewerClient, viewerEmail, viewerPassword);
+        viewerClient.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+
+        HttpResponseMessage resp = await viewerClient.GetAsync("/api/organizations/current/settings");
+        resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_WhenLogoBase64IsMalformed_Returns400()
+    {
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "orgset3c");
+
+        HttpResponseMessage resp = await client.PutAsJsonAsync(
+            "/api/organizations/current/profile",
+            new { name = "Test Org", logo_base64 = "not-valid-base64!!!" },
             Json);
-        inviteResp.EnsureSuccessStatusCode();
 
-        // Accept invitation flow omitted — use admin for negative test on missing permission:
-        HttpClient anon = fixture.CreateNewClient();
-        HttpResponseMessage resp = await anon.GetAsync("/api/organizations/current/settings");
-        resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]

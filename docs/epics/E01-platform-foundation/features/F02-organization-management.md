@@ -108,5 +108,5 @@ Allow organization admins to manage their organization's profile, settings, and 
 - Immediate hard delete without grace period — the 30-day window is non-negotiable in MVP.
 
 > **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: **Deferred (follow-up):** marketing-page redirect + forced sign-out after schedule (Frontend/session); abandon in-flight Wolverine step dispatch beyond execution + form-task cancel.
+> Gaps vs spec: **Deferred (PR #127 follow-up):** marketing-page redirect + forced sign-out after schedule (Frontend/session); abandon in-flight Wolverine step dispatch beyond execution + form-task cancel; cross-module hard-delete steps via RabbitMQ commands when modules are extracted (see `docs/WORKAROUNDS.md#org-hard-delete-modulith-cancellers`).
 > **Done:** schedule rollback when job queue fails; hard-delete cancels executions + pending form tasks, drops tenant schemas, deletes logo S3 object, purges Identity platform rows (users, roles, invitations, provisioning); login returns org-not-found when org row removed.

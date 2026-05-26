@@ -23,21 +23,17 @@ internal sealed class OrganizationIdentityPurger(
             }
         }
 
-        List<Guid> userIds = await context.Users
+        IQueryable<Guid> userIds = context.Users
             .Where(u => u.OrganizationId == organizationId)
-            .Select(u => u.Id)
-            .ToListAsync(cancellationToken);
+            .Select(u => u.Id);
 
-        if (userIds.Count > 0)
-        {
-            await context.EmailVerificationTokens
-                .Where(t => userIds.Contains(t.UserId))
-                .ExecuteDeleteAsync(cancellationToken);
+        await context.EmailVerificationTokens
+            .Where(t => userIds.Contains(t.UserId))
+            .ExecuteDeleteAsync(cancellationToken);
 
-            await context.PasswordResetTokens
-                .Where(t => userIds.Contains(t.UserId))
-                .ExecuteDeleteAsync(cancellationToken);
-        }
+        await context.PasswordResetTokens
+            .Where(t => userIds.Contains(t.UserId))
+            .ExecuteDeleteAsync(cancellationToken);
 
         await context.Invitations
             .Where(i => i.OrganizationId == organizationId)

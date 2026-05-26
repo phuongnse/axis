@@ -3,24 +3,26 @@ using FluentAssertions;
 
 namespace Axis.Identity.Application.Tests.Services;
 
-public class OrganizationLanguageValidatorTests
+public sealed class OrganizationLanguageValidatorTests
 {
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("en")]
     [InlineData("en-US")]
-    public void IsValid_WhenWellFormed_ReturnsTrue(string? language)
+    [InlineData("zh-Hant")]
+    [InlineData("de-CH")]
+    public void IsValid_WhenWellFormedTag_ReturnsTrue(string? tag)
     {
-        OrganizationLanguageValidator.IsValid(language).Should().BeTrue();
+        OrganizationLanguageValidator.IsValid(tag).Should().BeTrue();
     }
 
     [Theory]
-    [InlineData("EN")]
     [InlineData("english")]
-    [InlineData("en-us")]
-    public void IsValid_WhenMalformed_ReturnsFalse(string language)
+    [InlineData("en_US")]
+    [InlineData("x")]
+    public void IsValid_WhenMalformedTag_ReturnsFalse(string tag)
     {
-        OrganizationLanguageValidator.IsValid(language).Should().BeFalse();
+        OrganizationLanguageValidator.IsValid(tag).Should().BeFalse();
     }
 }
