@@ -36,7 +36,12 @@ public class OrganizationSettingsEndpointTests(ApiTestFixture fixture)
                 Json);
             inviteResp.EnsureSuccessStatusCode();
 
-            string token = ctx.Invitations.Single(i => i.Email.Value == viewerEmail).Token;
+            // Email is a value object — avoid .Value in LINQ (EF cannot translate it).
+            string token = ctx.Invitations
+                .Where(i => i.OrganizationId == orgId)
+                .OrderByDescending(i => i.CreatedAt)
+                .Select(i => i.Token)
+                .First();
 
             HttpClient acceptClient = fixture.CreateNewClient();
             HttpResponseMessage acceptResp = await acceptClient.PostAsJsonAsync(
