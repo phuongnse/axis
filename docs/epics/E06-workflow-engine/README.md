@@ -98,7 +98,7 @@ Subsequent steps can reference context values using expressions like `{{context.
 | Area | Status | Detail |
 |------|--------|--------|
 | **Backend — high** | ⚠️ | [F01](./features/F01-execution-management.md): schedule/webhook/event triggers, stale-PENDING recovery. [F03](./features/F03-error-handling.md): notification dispatch, `GetExecution` error detail, channel config. [F02](./features/F02-step-handlers.md): real `IScriptExecutor` / `INotificationSender` (stubs today). |
-| **Backend — medium** | ⚠️ | [F04](./features/F04-execution-history.md): date/trigger filters, CSV export, role-scoped list. Cancel: abandon Wolverine jobs + cancel form tasks. |
+| **Backend — medium** | ⚠️ | [F04](./features/F04-execution-history.md): date/trigger filters, CSV export, role-scoped list. Cancel: abandon Wolverine jobs + cancel form tasks. **E01 F02 US-007:** `OrganizationExecutionCanceller` cancels Pending/Running executions before org hard-delete (`FixedTenantContext`). |
 | **Frontend** | ⏳ | Execution monitor, retry UI, SignalR live updates — all F01–F05 US. |
 
 Start here when E04 “pending E06” items block runtime behavior; feature callouts list exact US gaps.
