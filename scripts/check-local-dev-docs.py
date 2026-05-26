@@ -19,7 +19,7 @@ LOCAL_DEV_FILE = ROOT / "docs/playbooks/local-dev.md"
 TECH_STACK_FILE = ROOT / "docs/TECH_STACK.md"
 
 TECH_STACK_FRAGMENT_LINK = re.compile(r"\]\(\.\./TECH_STACK\.md#([^)]+)\)")
-TECH_STACK_KNOWN_ANCHOR = re.compile(r"\(#([^)]+)\)")
+TECH_STACK_KNOWN_ANCHOR = re.compile(r"\[[^\]]+\]\(#([^)]+)\)")
 
 SERVICE_BLOCK = re.compile(
     r"^  ([a-z0-9_-]+):\n((?:    .*\n)*)",
@@ -27,9 +27,6 @@ SERVICE_BLOCK = re.compile(
 )
 PORT_MAPPING = re.compile(r'^\s+-\s+"(\d+):\d+"', re.MULTILINE)
 PROFILE_LINE = re.compile(r'^\s+profiles:\s*\[(.+)\]', re.MULTILINE)
-
-# Host ports for profile-gated services — documented under optional observability.
-OPTIONAL_PROFILE_PORTS = {3001, 4317, 4318}
 
 STALE_MARKERS = [
     ("EnsureCreated", "Identity bootstrap uses MigrateAsync — remove EnsureCreated references"),
@@ -74,9 +71,9 @@ def parse_compose() -> tuple[dict[str, list[int]], set[str]]:
 def mandatory_host_ports(services: dict[str, list[int]], optional: set[str]) -> set[int]:
     ports: set[int] = set()
     for name, mapped in services.items():
+        if name in optional:
+            continue
         for host_port in mapped:
-            if name in optional or host_port in OPTIONAL_PROFILE_PORTS:
-                continue
             ports.add(host_port)
     return ports
 
@@ -124,7 +121,8 @@ def check_local_dev_doc() -> list[str]:
         errors.append("local-dev.md should mention Wolverine AutoProvision in Development")
 
     if TECH_STACK_FILE.is_file():
-        known_anchors = set(TECH_STACK_KNOWN_ANCHOR.findall(TECH_STACK_FILE.read_text(encoding="utf-8")))
+        tech_stack_text = TECH_STACK_FILE.read_text(encoding="utf-8")
+        known_anchors = set(TECH_STACK_KNOWN_ANCHOR.findall(tech_stack_text))
         for fragment in TECH_STACK_FRAGMENT_LINK.findall(doc):
             if fragment not in known_anchors:
                 errors.append(
