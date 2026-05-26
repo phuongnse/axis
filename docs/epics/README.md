@@ -19,6 +19,8 @@
 
 When you ship code, update **US callout → epic README table → epic Open work → PROGRESS** in the same PR. Never mark ✅ while `Gaps vs spec` still lists backend work for that layer.
 
+**Full AC coverage (all cases, not happy path only):** [agent-checklist § AC coverage](../playbooks/agent-checklist.md#ac-coverage--avoid-happy-path-only) — Gate 0 AC map + TDD + `Gaps vs spec` on every PR.
+
 ---
 
 ## All Epics

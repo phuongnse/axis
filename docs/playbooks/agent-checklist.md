@@ -24,6 +24,33 @@ The paste-block templates below are for *your own* walk-through (agent reasoning
 Docs touched: docs/epics/…
 ```
 
+### AC coverage — avoid happy-path-only
+
+Feature files group ACs under **Happy path**, **Validation & errors**, **Edge cases**, and **Out of scope**. Agents must cover **every bullet in scope for the layer you are shipping**, not only the first block.
+
+**Before writing code (per US):**
+
+1. Copy **each** `- [ ]` line from the US into an AC map row (one row per bullet, or one row per bullet group only when a single test proves all of them).
+2. Tag the row: `happy` | `validation` | `edge` | `out-of-scope` (skip implementation for `out-of-scope`; do not “forget” it — leave it in the map as N/A).
+3. Name the **test or handler** that will prove the row (`CreateWorkflow_WhenAtPlanLimit_Returns402`, integration test for wrong-tenant isolation, etc.). **No blank “File / test” cells** for in-scope rows.
+4. If a bullet is **Frontend-only** while you are on backend (or the reverse), mark the row `N/A this PR — Frontend` / `N/A this PR — API` so it is not silently dropped.
+
+**While implementing (TDD):**
+
+- [process.md § Per-US workflow](./process.md#per-us-workflow): Domain → Application → Infrastructure → API; tests green per layer before the next.
+- [testing.md § Required test coverage](./testing.md#required-test-coverage-for-integration-tests): integration tests need happy path **and** not-found/isolation **and** constraint violations where applicable — not one happy test per handler.
+
+**Before opening / updating the PR:**
+
+| Check | Action |
+|-------|--------|
+| Map complete? | Every in-scope AC row has code + test (or explicit deferral). |
+| Callout honest? | `> **Implementation status**` lists remaining bullets under `Gaps vs spec` — never ✅ on a layer with open backend gaps. |
+| Deferred? | `**Deferred (PR #N follow-up):**` names the **AC bullet** deferred, not a vague “later”. |
+| Out of scope? | Do not implement; do not mark ✅ as if done. |
+
+**Self-audit command** (after implementation, before push): re-read the US in the feature file and tick mentally each bullet against your AC map — same order as the spec (happy → validation → edge).
+
 ---
 
 ## Gates (every PR)
