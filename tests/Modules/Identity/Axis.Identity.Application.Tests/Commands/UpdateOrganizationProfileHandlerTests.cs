@@ -79,6 +79,26 @@ public class UpdateOrganizationProfileHandlerTests
     }
 
     [Fact]
+    public async Task UpdateOrganizationProfile_WhenOldLogoDeleteFailsAfterSave_StillSucceeds()
+    {
+        Organization org = MakeOrganization();
+        org.UpdateLogoUrl("https://bucket.s3.amazonaws.com/org-logos/old.png");
+        _orgRepo.GetByIdAsync(OrgId, Arg.Any<CancellationToken>()).Returns(org);
+        byte[] logo = [0x89, 0x50, 0x4E, 0x47];
+        _logoStorage.UploadLogoAsync(OrgId, logo, "image/png", Arg.Any<CancellationToken>())
+            .Returns("https://bucket.s3.amazonaws.com/org-logos/new.png");
+        _logoStorage.DeleteLogoAsync("https://bucket.s3.amazonaws.com/org-logos/old.png", Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new InvalidOperationException("s3 delete failed")));
+
+        Result result = await CreateHandler().Handle(
+            new UpdateOrganizationProfileCommand(OrgId, "Acme", null, null, logo, "image/png"),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task UpdateOrganizationProfile_WhenValid_UpdatesWithoutLogo()
     {
         Organization org = MakeOrganization();

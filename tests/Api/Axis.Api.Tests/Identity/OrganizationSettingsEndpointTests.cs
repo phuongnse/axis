@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Axis.Api.Tests.Helpers;
@@ -59,7 +60,7 @@ public class OrganizationSettingsEndpointTests(ApiTestFixture fixture)
         HttpClient viewerClient = fixture.CreateNewClient();
         string accessToken = await AuthHelper.CompletePkceFlowAsync(viewerClient, viewerEmail, viewerPassword);
         viewerClient.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+            new AuthenticationHeaderValue("Bearer", accessToken);
 
         HttpResponseMessage resp = await viewerClient.GetAsync("/api/organizations/current/settings");
         resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);

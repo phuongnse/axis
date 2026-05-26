@@ -85,7 +85,7 @@ public sealed class Organization : AggregateRoot<Guid>
     public void UpdateLogoUrl(string? logoUrl)
     {
         EnsureCanManageSettings();
-        LogoUrl = logoUrl;
+        LogoUrl = string.IsNullOrWhiteSpace(logoUrl) ? null : logoUrl.Trim();
     }
 
     public void ScheduleDeletion(DateTime utcNow)

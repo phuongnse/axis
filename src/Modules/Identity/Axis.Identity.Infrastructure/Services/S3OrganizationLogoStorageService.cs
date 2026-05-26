@@ -36,8 +36,26 @@ internal sealed class S3OrganizationLogoStorageService(IAmazonS3 s3, IConfigurat
     {
         Uri uri = new(logoUrl);
         string bucket = ResolveBucketName(uri);
-        string key = uri.AbsolutePath.TrimStart('/');
+        string key = ResolveObjectKey(uri);
         await s3.DeleteObjectAsync(bucket, key, ct);
+    }
+
+    private static string ResolveObjectKey(Uri logoUri)
+    {
+        string host = logoUri.Host;
+
+        if (host.EndsWith(".s3.amazonaws.com", StringComparison.OrdinalIgnoreCase))
+            return logoUri.AbsolutePath.TrimStart('/');
+
+        if (host.StartsWith("s3.", StringComparison.OrdinalIgnoreCase) ||
+            host.Contains(".s3.", StringComparison.OrdinalIgnoreCase))
+        {
+            string[] segments = logoUri.AbsolutePath.Trim('/').Split('/', 2, StringSplitOptions.RemoveEmptyEntries);
+            if (segments.Length == 2)
+                return segments[1];
+        }
+
+        throw new InvalidOperationException($"Cannot resolve S3 object key from logo URL: {logoUri}");
     }
 
     private static string ResolveBucketName(Uri logoUri)

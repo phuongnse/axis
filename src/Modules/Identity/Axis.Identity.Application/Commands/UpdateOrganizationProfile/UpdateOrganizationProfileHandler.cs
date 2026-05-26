@@ -86,7 +86,16 @@ public sealed class UpdateOrganizationProfileHandler(
         }
 
         if (oldLogoUrl is not null && uploadedLogoUrl is not null)
-            await logoStorage.DeleteLogoAsync(oldLogoUrl, cancellationToken);
+        {
+            try
+            {
+                await logoStorage.DeleteLogoAsync(oldLogoUrl, cancellationToken);
+            }
+            catch
+            {
+                // Best-effort cleanup; profile update already committed.
+            }
+        }
 
         return Result.Success();
     }
