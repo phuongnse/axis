@@ -93,7 +93,7 @@ Workflow reaches Form step
 |------|--------|--------|
 | **Backend** | ⚠️ | [F04](./features/F04-form-submission.md): notification on assign; expiry → execution failure (E06); role-based My Tasks aggregation. Token submit + My Tasks API ✅. |
 | **Frontend** | ⏳ | Form editor, field picker, standalone submit page, My Tasks — all F01–F04 US. |
-| **Cross-module** | E06 | Form step execution, context expressions, `FormStepReached` consumer path — coordinate with E06. |
+| **Cross-module** | E06 | Form step execution, context expressions, `FormStepReached` consumer path — coordinate with E06. **E01 F02 US-007:** `OrganizationFormTaskCanceller` cancels pending form tasks before org hard-delete (Identity-owned job). |
 
 ---
 

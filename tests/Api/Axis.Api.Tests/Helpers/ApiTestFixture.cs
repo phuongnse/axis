@@ -192,6 +192,8 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.AddSingleton<IEmailSender>(_emailCapture);
                 services.RemoveAll<IAvatarStorageService>();
                 services.AddScoped<IAvatarStorageService, NullAvatarStorageService>();
+                services.RemoveAll<IOrganizationLogoStorageService>();
+                services.AddScoped<IOrganizationLogoStorageService, NullOrganizationLogoStorageService>();
 
                 services.RemoveAll<IUnitOfWork>();
                 services.AddScoped<IUnitOfWork>(sp =>

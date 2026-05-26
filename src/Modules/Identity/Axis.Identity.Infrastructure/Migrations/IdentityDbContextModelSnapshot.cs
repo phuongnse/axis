@@ -86,6 +86,16 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("DefaultLanguage")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("default_language");
+
+                    b.Property<string>("LogoUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("logo_url");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -97,6 +107,10 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasMaxLength(320)
                         .HasColumnType("character varying(320)")
                         .HasColumnName("owner_email");
+
+                    b.Property<DateTime?>("ScheduledHardDeleteAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("scheduled_hard_delete_at");
 
                     b.Property<string>("Slug")
                         .IsRequired()
@@ -114,6 +128,11 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasDefaultValue(new Guid("11111111-1111-1111-1111-111111111101"))
                         .HasColumnName("subscription_plan_id");
+
+                    b.Property<string>("TimeZoneId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("time_zone_id");
 
                     b.HasKey("Id");
 

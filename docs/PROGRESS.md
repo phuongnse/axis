@@ -75,7 +75,7 @@ Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoi
 
 **F04 subscription plans (backend):** ⚠️ `GET /api/plans`, platform plan change, 402 limits (workflows / users / executions), Redis counters. Frontend pricing UI ⏳. Bulk multi-workflow import limit AC deferred until API exists.
 
-**F02 organization management:** ⏳ not started (no profile/settings/delete APIs).
+**F02 organization management (backend):** ✅ US-005–007 — profile API, settings + usage, scheduled deletion with 30-day hard-delete job. Frontend ⏳.
 
 **F03 tenant isolation:** ⚠️ `TenantSchemaInterceptor` + `ITenantContext` shipped; cross-tenant integration tests and org-status 403 gaps — see [E01 F03](./epics/E01-platform-foundation/features/F03-tenant-isolation.md).
 

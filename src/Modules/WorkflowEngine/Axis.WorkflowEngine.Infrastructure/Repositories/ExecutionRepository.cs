@@ -164,4 +164,12 @@ internal sealed class ExecutionRepository(WorkflowEngineDbContext context) : IEx
         context.WorkflowExecutions.CountAsync(
             e => e.OrganizationId == organizationId && e.CreatedAt >= sinceUtc,
             ct);
+
+    public async Task<IReadOnlyList<WorkflowExecution>> GetCancellableByOrganizationAsync(
+        Guid organizationId,
+        CancellationToken ct = default) =>
+        await context.WorkflowExecutions
+            .Where(e => e.OrganizationId == organizationId
+                        && (e.Status == ExecutionStatus.Pending || e.Status == ExecutionStatus.Running))
+            .ToListAsync(ct);
 }

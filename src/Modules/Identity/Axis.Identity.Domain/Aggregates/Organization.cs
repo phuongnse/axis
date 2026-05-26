@@ -6,12 +6,20 @@ namespace Axis.Identity.Domain.Aggregates;
 
 public sealed class Organization : AggregateRoot<Guid>
 {
+    public const int DeletionGracePeriodDays = 30;
+    public const int MinNameLength = 2;
+    public const int MaxNameLength = 100;
+
     public string Name { get; private set; }
     public OrganizationSlug Slug { get; private set; }
     public Email OwnerEmail { get; private set; }
     public OrganizationStatus Status { get; private set; }
     public Guid SubscriptionPlanId { get; private set; }
     public DateTime CreatedAt { get; private set; }
+    public string? LogoUrl { get; private set; }
+    public string? TimeZoneId { get; private set; }
+    public string? DefaultLanguage { get; private set; }
+    public DateTime? ScheduledHardDeleteAt { get; private set; }
 
     private Organization(
         Guid id,
@@ -56,6 +64,59 @@ public sealed class Organization : AggregateRoot<Guid>
         SubscriptionPlanId = newPlanId;
     }
 
+    public void UpdateProfile(string name, string? timeZoneId, string? defaultLanguage)
+    {
+        EnsureCanManageSettings();
+
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Organization name is required.", nameof(name));
+
+        string trimmed = name.Trim();
+        if (trimmed.Length < MinNameLength || trimmed.Length > MaxNameLength)
+            throw new ArgumentException(
+                $"Organization name must be between {MinNameLength} and {MaxNameLength} characters.",
+                nameof(name));
+
+        Name = trimmed;
+        TimeZoneId = string.IsNullOrWhiteSpace(timeZoneId) ? null : timeZoneId.Trim();
+        DefaultLanguage = string.IsNullOrWhiteSpace(defaultLanguage) ? null : defaultLanguage.Trim();
+    }
+
+    public void UpdateLogoUrl(string? logoUrl)
+    {
+        EnsureCanManageSettings();
+        LogoUrl = string.IsNullOrWhiteSpace(logoUrl) ? null : logoUrl.Trim();
+    }
+
+    public void ScheduleDeletion(DateTime utcNow)
+    {
+        EnsureCanManageSettings();
+
+        if (Status == OrganizationStatus.DeletionScheduled)
+            throw new InvalidOperationException("Organization deletion is already scheduled.");
+
+        Status = OrganizationStatus.DeletionScheduled;
+        ScheduledHardDeleteAt = utcNow.AddDays(DeletionGracePeriodDays);
+    }
+
+    public void CancelScheduledDeletion()
+    {
+        if (Status != OrganizationStatus.DeletionScheduled)
+            throw new InvalidOperationException("Organization is not scheduled for deletion.");
+
+        Status = OrganizationStatus.Active;
+        ScheduledHardDeleteAt = null;
+    }
+
+    public void MarkDeleted()
+    {
+        if (Status == OrganizationStatus.Deleted)
+            return;
+
+        Status = OrganizationStatus.Deleted;
+        ScheduledHardDeleteAt = null;
+    }
+
     public void BeginProvisioning()
     {
         if (Status == OrganizationStatus.Provisioning)
@@ -93,5 +154,20 @@ public sealed class Organization : AggregateRoot<Guid>
             throw new InvalidOperationException("Organization is already archived.");
 
         Status = OrganizationStatus.Archived;
+    }
+
+    public bool AllowsSignIn() =>
+        Status is OrganizationStatus.Active
+            or OrganizationStatus.Provisioning
+            or OrganizationStatus.ProvisioningFailed
+            or OrganizationStatus.DeletionScheduled;
+
+    private void EnsureCanManageSettings()
+    {
+        if (Status == OrganizationStatus.Deleted)
+            throw new InvalidOperationException("Organization has been deleted.");
+
+        if (Status == OrganizationStatus.Archived)
+            throw new InvalidOperationException("Organization is archived.");
     }
 }

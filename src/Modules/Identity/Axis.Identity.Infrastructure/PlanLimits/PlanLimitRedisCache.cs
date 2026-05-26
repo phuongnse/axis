@@ -5,6 +5,9 @@ namespace Axis.Identity.Infrastructure.PlanLimits;
 
 public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
 {
+    /// <summary>US-006: usage stats on settings page must be at most this stale.</summary>
+    public static readonly TimeSpan UsageStatsMaxStaleness = TimeSpan.FromMinutes(5);
+
     private const string DecrementFloorZeroScript =
         """
         local v = redis.call('GET', KEYS[1])
@@ -47,11 +50,7 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
         {
             IDatabase db = redis.GetDatabase();
             RedisKey key = BuildKey(organizationId, resourceType);
-            TimeSpan? expiry = GetExpiry(resourceType);
-            if (expiry.HasValue)
-                return await db.StringSetAsync(key, usage, expiry.Value);
-
-            return await db.StringSetAsync(key, usage);
+            return await db.StringSetAsync(key, usage, GetExpiry(resourceType));
         }
         catch (RedisException)
         {
@@ -73,9 +72,7 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
             if (delta >= 0)
             {
                 long count = await db.StringIncrementAsync(key, delta);
-                TimeSpan? expiry = GetExpiry(resourceType);
-                if (expiry.HasValue)
-                    await db.KeyExpireAsync(key, expiry);
+                await db.KeyExpireAsync(key, GetExpiry(resourceType));
                 return true;
             }
 
@@ -120,13 +117,16 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
             _ => $"plan:{organizationId:N}:{resourceType}",
         };
 
-    private static TimeSpan? GetExpiry(PlanLimitResourceType resourceType)
+    private static TimeSpan GetExpiry(PlanLimitResourceType resourceType)
     {
-        if (resourceType != PlanLimitResourceType.ExecutionsPerMonth)
-            return null;
+        if (resourceType == PlanLimitResourceType.ExecutionsPerMonth)
+        {
+            DateTime now = DateTime.UtcNow;
+            DateTime nextMonth = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(1);
+            TimeSpan untilMonthEnd = nextMonth - now;
+            return untilMonthEnd < UsageStatsMaxStaleness ? untilMonthEnd : UsageStatsMaxStaleness;
+        }
 
-        DateTime now = DateTime.UtcNow;
-        DateTime nextMonth = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(1);
-        return nextMonth - now;
+        return UsageStatsMaxStaleness;
     }
 }

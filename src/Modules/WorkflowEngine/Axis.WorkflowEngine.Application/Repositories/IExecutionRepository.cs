@@ -24,4 +24,8 @@ public interface IExecutionRepository
         Guid originalExecutionId, Guid organizationId, CancellationToken ct = default);
 
     Task<int> CountCreatedSinceUtcAsync(Guid organizationId, DateTime sinceUtc, CancellationToken ct = default);
+
+    Task<IReadOnlyList<WorkflowExecution>> GetCancellableByOrganizationAsync(
+        Guid organizationId,
+        CancellationToken ct = default);
 }

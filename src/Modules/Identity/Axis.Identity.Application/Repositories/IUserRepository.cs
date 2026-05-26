@@ -23,4 +23,6 @@ public interface IUserRepository
 
     /// <summary>Active users in the organization (US-011 user limit).</summary>
     Task<int> CountActiveUsersAsync(Guid organizationId, CancellationToken ct = default);
+
+    Task<IReadOnlyList<User>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken ct = default);
 }

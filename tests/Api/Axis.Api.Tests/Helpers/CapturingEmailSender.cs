@@ -25,4 +25,10 @@ public sealed class CapturingEmailSender : IEmailSender
 
     public Task SendPasswordChangedNotificationAsync(string toEmail, CancellationToken ct = default) =>
         Task.CompletedTask;
+
+    public Task SendOrganizationDeletionScheduledEmailAsync(
+        string toEmail,
+        string organizationName,
+        CancellationToken ct = default) =>
+        Task.CompletedTask;
 }

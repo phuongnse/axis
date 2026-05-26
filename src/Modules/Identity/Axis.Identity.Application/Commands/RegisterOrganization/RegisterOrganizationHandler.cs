@@ -33,7 +33,8 @@ public sealed class RegisterOrganizationHandler(
         "execution:read", "execution:cancel", "execution:retry",
         "page:read", "page:write", "page:publish",
         "users:read", "users:invite", "users:deactivate",
-        "roles:read", "roles:write"
+        "roles:read", "roles:write",
+        "organization:settings:read", "organization:settings:write", "organization:delete"
     ];
 
     private static readonly string[] EditorPermissions =

@@ -488,6 +488,7 @@ try
     app.MapAuthEndpoints();
     app.MapPlanEndpoints();
     app.MapOrganizationEndpoints();
+    app.MapOrganizationSettingsEndpoints();
     app.MapPlatformOrganizationEndpoints();
     app.MapInvitationEndpoints();
     app.MapUserEndpoints();
