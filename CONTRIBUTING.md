@@ -14,9 +14,10 @@ Docs-first development: feature specs in `docs/epics/` are the contract; code im
 ## Before you push
 
 1. Walk **Gates 0–3** in [docs/playbooks/agent-checklist.md](docs/playbooks/agent-checklist.md) locally; tick the matching boxes in the PR body.
-2. Run `./scripts/check-doc-drift.sh` (bash — use Git Bash on Windows) when `src/`, `tests/`, or `docs/epics/` change. For feature files (`docs/epics/**/features/*.md`), use the layout in [docs/epics/_template-feature-us.md](docs/epics/_template-feature-us.md) and run `python3 scripts/normalize-feature-docs.py --check` (also invoked by the drift script). If `docker-compose.yml` changes, update [docs/playbooks/local-dev.md](docs/playbooks/local-dev.md) in the same PR (`check-local-dev-docs.py` runs inside the drift script). CI job **Doc drift** must be green.
-3. PR description: **Summary + Linked spec + Requirements only** — no commit list, no CI status (the Checks tab covers that). Template: [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md).
-4. When adding or changing `.proto` files: register the module `Protos` path in [`buf.yaml`](buf.yaml), run `buf lint`, and `./scripts/check-buf-modules.sh` (included in **Doc drift**). CI job **Protobuf — Buf lint and breaking** runs on proto/`buf.yaml` changes — see [patterns.md § gRPC](docs/playbooks/patterns.md).
+2. When you touch C# under `src/` or `tests/`, run `dotnet format Axis.sln` — style and naming rules live in [`.editorconfig`](.editorconfig) (CI runs `dotnet format --verify-no-changes`).
+3. Run `./scripts/check-doc-drift.sh` (bash — use Git Bash on Windows) when `src/`, `tests/`, or `docs/epics/` change. For feature files (`docs/epics/**/features/*.md`), use the layout in [docs/epics/_template-feature-us.md](docs/epics/_template-feature-us.md) and run `python3 scripts/normalize-feature-docs.py --check` (also invoked by the drift script). If `docker-compose.yml` changes, update [docs/playbooks/local-dev.md](docs/playbooks/local-dev.md) in the same PR (`check-local-dev-docs.py` runs inside the drift script). CI job **Doc drift** must be green.
+4. PR description: **Summary + Linked spec + Requirements only** — no commit list, no CI status (the Checks tab covers that). Template: [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md).
+5. When adding or changing `.proto` files: register the module `Protos` path in [`buf.yaml`](buf.yaml), run `buf lint`, and `./scripts/check-buf-modules.sh` (included in **Doc drift**). CI job **Protobuf — Buf lint and breaking** runs on proto/`buf.yaml` changes — see [patterns.md § gRPC](docs/playbooks/patterns.md).
 
 ## Dependency updates (Dependabot)
 

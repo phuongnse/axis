@@ -1,6 +1,0 @@
-<Project>
-  <!-- Tooling under scripts/ is not part of Axis.sln — skip repo-wide analyzer injection. -->
-  <ItemGroup>
-    <PackageReference Remove="Microsoft.VisualStudio.Threading.Analyzers" />
-  </ItemGroup>
-</Project>
