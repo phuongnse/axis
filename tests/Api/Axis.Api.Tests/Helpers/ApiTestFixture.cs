@@ -214,10 +214,15 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.PostConfigure<OpenIddictServerAspNetCoreOptions>(opts =>
                     opts.DisableTransportSecurityRequirement = true);
 
-                ServiceDescriptor? seederDescriptor = services.FirstOrDefault(
+                ServiceDescriptor? openIddictSeederDescriptor = services.FirstOrDefault(
                     d => d.ImplementationType == typeof(OpenIddictSeeder));
-                if (seederDescriptor is not null)
-                    services.Remove(seederDescriptor);
+                if (openIddictSeederDescriptor is not null)
+                    services.Remove(openIddictSeederDescriptor);
+
+                ServiceDescriptor? subscriptionPlanSeederDescriptor = services.FirstOrDefault(
+                    d => d.ImplementationType == typeof(SubscriptionPlanSeeder));
+                if (subscriptionPlanSeederDescriptor is not null)
+                    services.Remove(subscriptionPlanSeederDescriptor);
             });
         });
 
