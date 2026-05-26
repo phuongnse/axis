@@ -79,4 +79,23 @@ public sealed class Role : AggregateRoot<Guid>
 
     public bool HasPermission(string permission) =>
         _permissions.Contains(permission);
+
+    /// <summary>Adds catalog permissions missing from the system Admin role (F02 permission backfill).</summary>
+    public bool GrantMissingPermissions(IEnumerable<string> permissions)
+    {
+        if (!IsSystem || !string.Equals(Name, "Admin", StringComparison.Ordinal))
+            throw new InvalidOperationException("Only the system Admin role supports permission backfill.");
+
+        bool changed = false;
+        foreach (string permission in permissions.Distinct())
+        {
+            if (_permissions.Contains(permission))
+                continue;
+
+            _permissions.Add(permission);
+            changed = true;
+        }
+
+        return changed;
+    }
 }

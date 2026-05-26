@@ -39,13 +39,34 @@ public sealed class ScheduleOrganizationDeletionHandler(
 
         await uow.SaveChangesAsync(cancellationToken);
 
+        if (organization.ScheduledHardDeleteAt is not DateTime hardDeleteAt)
+            return Result.Failure(ErrorCodes.BusinessRule, "Deletion schedule was not created.");
+
+        try
+        {
+            await deletionScheduler.ScheduleHardDeleteAsync(organization.Id, hardDeleteAt, cancellationToken);
+        }
+        catch (Exception)
+        {
+            try
+            {
+                organization.CancelScheduledDeletion();
+                await uow.SaveChangesAsync(cancellationToken);
+            }
+            catch (InvalidOperationException)
+            {
+                // Org state could not be rolled back — surface queue failure to caller.
+            }
+
+            return Result.Failure(
+                ErrorCodes.BusinessRule,
+                "Failed to queue organization deletion. The organization was not scheduled for deletion.");
+        }
+
         await emailSender.SendOrganizationDeletionScheduledEmailAsync(
             requester.Email.Value,
             organization.Name,
             cancellationToken);
-
-        if (organization.ScheduledHardDeleteAt is DateTime hardDeleteAt)
-            await deletionScheduler.ScheduleHardDeleteAsync(organization.Id, hardDeleteAt, cancellationToken);
 
         return Result.Success();
     }

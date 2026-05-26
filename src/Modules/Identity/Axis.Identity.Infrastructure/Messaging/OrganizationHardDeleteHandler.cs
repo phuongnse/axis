@@ -11,9 +11,9 @@ namespace Axis.Identity.Infrastructure.Messaging;
 
 internal sealed class OrganizationHardDeleteHandler(
     IOrganizationRepository orgRepo,
-    IUserRepository userRepo,
     IOrganizationExecutionCanceller executionCanceller,
-    IUnitOfWork uow,
+    IOrganizationFormTaskCanceller formTaskCanceller,
+    IOrganizationIdentityPurger identityPurger,
     IConfiguration configuration,
     ILogger<OrganizationHardDeleteHandler> logger)
 {
@@ -29,20 +29,12 @@ internal sealed class OrganizationHardDeleteHandler(
         if (organization.ScheduledHardDeleteAt is DateTime scheduled && scheduled > DateTime.UtcNow)
             return;
 
+        string? logoUrl = organization.LogoUrl;
+
         await executionCanceller.CancelAllForOrganizationAsync(job.OrganizationId, cancellationToken);
-
+        await formTaskCanceller.CancelPendingForOrganizationAsync(job.OrganizationId, cancellationToken);
         await DropModuleSchemasAsync(job.OrganizationId, cancellationToken);
-
-        IReadOnlyList<Domain.Aggregates.User> users =
-            await userRepo.GetAllByOrganizationAsync(job.OrganizationId, cancellationToken);
-        foreach (Domain.Aggregates.User user in users)
-        {
-            if (user.Status == Domain.Aggregates.UserStatus.Active)
-                user.Deactivate();
-        }
-
-        organization.MarkDeleted();
-        await uow.SaveChangesAsync(cancellationToken);
+        await identityPurger.PurgeAsync(job.OrganizationId, logoUrl, cancellationToken);
     }
 
     private async Task DropModuleSchemasAsync(Guid organizationId, CancellationToken cancellationToken)

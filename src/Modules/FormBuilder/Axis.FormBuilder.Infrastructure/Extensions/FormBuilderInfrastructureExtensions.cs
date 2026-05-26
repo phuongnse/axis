@@ -1,5 +1,7 @@
 using Axis.FormBuilder.Application.Repositories;
 using Axis.FormBuilder.Application.Services;
+using Axis.FormBuilder.Infrastructure.Organizations;
+using Axis.Shared.Application.Organizations;
 using Axis.FormBuilder.Infrastructure.Grpc;
 using Axis.WorkflowBuilder.Contracts.Grpc;
 using Axis.FormBuilder.Infrastructure.Persistence;
@@ -27,6 +29,7 @@ public static class FormBuilderInfrastructureExtensions
         services.AddScoped<IFormModelReferenceSync, FormModelReferenceSync>();
         services.AddScoped<IFormDeletionGuard, FormWorkflowDeletionGuard>();
         services.AddScoped<IUnitOfWork, FormBuilderUnitOfWork>();
+        services.AddScoped<IOrganizationFormTaskCanceller, OrganizationFormTaskCanceller>();
 
         string? workflowBuilderGrpcUrl = configuration["Modules:WorkflowBuilder:GrpcUrl"];
         if (string.IsNullOrWhiteSpace(workflowBuilderGrpcUrl))

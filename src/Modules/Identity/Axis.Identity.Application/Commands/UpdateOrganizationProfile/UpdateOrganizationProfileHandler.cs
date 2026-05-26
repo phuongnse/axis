@@ -30,6 +30,9 @@ public sealed class UpdateOrganizationProfileHandler(
         if (!OrganizationTimeZoneValidator.IsValidIanaTimeZone(command.TimeZoneId))
             return Result.Failure(ErrorCodes.BusinessRule, "Timezone must be a valid IANA timezone.");
 
+        if (!OrganizationLanguageValidator.IsValid(command.DefaultLanguage))
+            return Result.Failure(ErrorCodes.BusinessRule, "Default language must be a valid language tag (e.g. en or en-US).");
+
         Organization? organization = await orgRepo.GetByIdAsync(command.OrganizationId, cancellationToken);
         if (organization is null)
             return Result.Failure(ErrorCodes.NotFound, "Organization not found.");

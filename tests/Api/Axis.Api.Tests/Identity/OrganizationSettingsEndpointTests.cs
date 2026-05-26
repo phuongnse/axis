@@ -63,6 +63,19 @@ public class OrganizationSettingsEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
+    public async Task UpdateProfile_WhenInvalidLanguage_Returns422()
+    {
+        HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "orgset3b");
+
+        HttpResponseMessage resp = await client.PutAsJsonAsync(
+            "/api/organizations/current/profile",
+            new { name = "Test Org", default_language = "english" },
+            Json);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+    }
+
+    [Fact]
     public async Task UpdateProfile_WhenInvalidTimezone_Returns422()
     {
         HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "orgset3");

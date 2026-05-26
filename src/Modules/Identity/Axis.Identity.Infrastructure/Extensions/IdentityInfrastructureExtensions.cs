@@ -61,11 +61,13 @@ public static class IdentityInfrastructureExtensions
 
         services.AddHostedService<OpenIddictSeeder>();
         services.AddHostedService<SubscriptionPlanSeeder>();
+        services.AddHostedService<OrganizationSettingsPermissionSeeder>();
 
         services.AddAWSService<IAmazonS3>();
         services.AddScoped<IAvatarStorageService, S3AvatarStorageService>();
         services.AddScoped<IOrganizationLogoStorageService, S3OrganizationLogoStorageService>();
         services.AddScoped<IOrganizationDeletionScheduler, WolverineOrganizationDeletionScheduler>();
+        services.AddScoped<IOrganizationIdentityPurger, OrganizationIdentityPurger>();
 
         return services;
     }

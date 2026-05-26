@@ -49,7 +49,7 @@ Allow organization admins to manage their organization's profile, settings, and 
 - White-label theming (custom colors, fonts) — not in MVP.
 
 > **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: none for backend US-005. Logo upload via base64 on `PUT /api/organizations/current/profile` (same pattern as user avatar). Frontend-only AC: toast, upload progress, navigate-away warning.
+> Gaps vs spec: Frontend-only AC: toast, upload progress, navigate-away warning. **Done (backend):** language tag validation (`en`, `en-US`).
 > **Done:** `Organization` profile fields + `UpdateOrganizationProfileCommand`; S3 logo storage; IANA timezone validation.
 
 ---
@@ -75,7 +75,7 @@ Allow organization admins to manage their organization's profile, settings, and 
 - Editing all settings inline on this page — this page is read-only for stats; editing is in sub-sections.
 
 > **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: none for backend US-006. Usage from `IPlanLimitService.GetUsageSnapshotAsync` (Redis read-through + module counters). Admin-only via `organization:settings:read` policy. Frontend-only: usage retry UI, redirect on 403.
+> Gaps vs spec: Frontend-only: usage retry UI, redirect on 403. **Done (backend):** Redis usage cache TTL ≤ 5 minutes (`PlanLimitRedisCache.UsageStatsMaxStaleness`); existing Admin roles backfilled via `OrganizationSettingsPermissionSeeder`.
 > **Done:** `GET /api/organizations/current/settings` returns plan name, profile, usage limits, deletion schedule metadata.
 
 ---
@@ -108,5 +108,5 @@ Allow organization admins to manage their organization's profile, settings, and 
 - Immediate hard delete without grace period — the 30-day window is non-negotiable in MVP.
 
 > **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: none for backend US-007 core flow. **Deferred (follow-up):** marketing-page redirect + forced sign-out after schedule (Frontend/session); explicit Wolverine job abandon for in-flight step messages beyond execution cancel.
-> **Done:** `ScheduleOrganizationDeletion` / `CancelOrganizationDeletion`; 30-day grace via `OrganizationHardDeleteJob`; confirmation email; `IOrganizationExecutionCanceller` + tenant schema drop across module DBs; login blocked for deleted orgs.
+> Gaps vs spec: **Deferred (follow-up):** marketing-page redirect + forced sign-out after schedule (Frontend/session); abandon in-flight Wolverine step dispatch beyond execution + form-task cancel.
+> **Done:** schedule rollback when job queue fails; hard-delete cancels executions + pending form tasks, drops tenant schemas, deletes logo S3 object, purges Identity platform rows (users, roles, invitations, provisioning); login returns org-not-found when org row removed.
