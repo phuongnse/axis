@@ -50,8 +50,7 @@ public class StartExecutionHandlerTests
         _workflowReader.IsActiveAsync(WorkflowId, OrgId).Returns(true);
         _workflowReader.GetSnapshotAsync(WorkflowId, OrgId).Returns(snapshot);
 
-        StartExecutionHandler handler = new(_planLimitService, _execRepo, _workflowReader, _uow, _dispatcher, _logger);
-        Result<Guid> result = await handler.Handle(
+        Result<Guid> result = await CreateHandler().Handle(
             new StartExecutionCommand(WorkflowId, OrgId, TriggerType.Manual, UserId, new Dictionary<string, object?>()),
             CancellationToken.None);
 
@@ -118,14 +117,21 @@ public class StartExecutionHandlerTests
     [Fact]
     public async Task StartExecution_WhenPlanLimitExceeded_ReturnsFailureWithoutSideEffects()
     {
+        PlanLimitFailureDetails details = new(
+            "executions_per_month",
+            1_000,
+            1_000,
+            "/pricing",
+            "Execution limit reached.");
         _planLimitService.EnsureWithinLimitAsync(
                 OrgId,
                 PlanLimitResourceType.ExecutionsPerMonth,
                 1,
                 Arg.Any<CancellationToken>())
-            .Returns(Result.Failure(ErrorCodes.PlanLimit, "Execution limit reached."));
+            .Returns(Result.PlanLimitFailure(details));
 
-        Result<Guid> result = await CreateHandler().Handle(
+        StartExecutionHandler handler = new(_planLimitService, _execRepo, _workflowReader, _uow, _dispatcher, _logger);
+        Result<Guid> result = await handler.Handle(
             new StartExecutionCommand(WorkflowId, OrgId, TriggerType.Manual, UserId, new Dictionary<string, object?>()),
             CancellationToken.None);
 
