@@ -20,6 +20,7 @@ When you find yourself editing the same fact in two files, the architecture is w
 |---|---|---|
 | **Speculation in reference docs** ("Not yet implemented", "planned design", "Will be wired") | Reads as reference, is actually guesswork; the real design will diverge | Put forward-looking content in `docs/PROGRESS.md` (current status) or an epic feature file (spec). Enforced for `docs/ARCHITECTURE.md` by the drift script. |
 | **Duplicating versions / paths / commands** across docs | Both copies drift; readers don't know which is canonical | Link to the owner doc (see ownership table) |
+| **Duplicating compose ports / service URLs** | Playbooks drift from `docker-compose.yml` | Owner: [local-dev.md](./local-dev.md) + compose file; enforced by [`check-local-dev-docs.py`](../../scripts/check-local-dev-docs.py) |
 | **Aspirational metrics** in engineering docs (e.g. "50 customers in 6 months") | Nobody measures or tests against them; they age into embarrassment | Keep in pitch deck / `PRODUCT_VISION.md` if anywhere; do not pollute technical reference |
 | **Empty "TODO: fill later" sections** | Look authoritative, contain nothing, lie to readers | Delete the section. Add it when there's content to add. |
 | **"Process about process"** docs > 100 lines | Nobody reads them; the rules don't get followed | Embed the rule into the **drift script** or a **template**. Doctrine without enforcement is decoration. |

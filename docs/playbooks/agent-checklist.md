@@ -73,7 +73,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 ## Gates (every PR)
 
-**Doc drift:** when `src/`, `tests/`, or `docs/epics/` change — run `./scripts/check-doc-drift.sh` **before push** (P0; bash — use Git Bash on Windows); CI job **Doc drift** must be green. Script output is not a PR artefact — walk Gate 2 rows below mentally and tick the Gate 2 checkbox.
+**Doc drift:** when `src/`, `tests/`, or `docs/epics/` change — run `./scripts/check-doc-drift.sh` **before push** (P0; bash — use Git Bash on Windows); CI job **Doc drift** must be green. When `docker-compose.yml` changes, update [local-dev.md](./local-dev.md) in the same PR (`check-local-dev-docs.py` runs inside the drift script). Script output is not a PR artefact — walk Gate 2 rows below mentally and tick the Gate 2 checkbox.
 
 | Gate | Action |
 |------|--------|
@@ -90,6 +90,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 - **Vulnerable packages** — `dotnet list package --vulnerable --include-transitive` fails on any known CVE in the dep tree (covers transitive packages too).
 - **Architecture fitness tests** run as part of `dotnet test` — failures there mean a CLAUDE.md P0/P1 rule got violated structurally. See [tests README](../../tests/Architecture/Axis.Architecture.Tests/README.md).
 - **EF migrations** — only `dotnet ef migrations add` (no hand-written `.cs` / orphan `.Designer.cs`). Each `{Name}.cs` needs `{Name}.Designer.cs`. See [local-dev.md § EF Core migrations](./local-dev.md#ef-core-migrations-dotnet-ef).
+- **Local dev docs** — [`docker-compose.yml`](../../docker-compose.yml) changes require [`docs/playbooks/local-dev.md`](./local-dev.md) in the same PR; CI runs [`scripts/check-local-dev-docs.py`](../../scripts/check-local-dev-docs.py).
 - **Async-safety analyzers** (`Microsoft.VisualStudio.Threading.Analyzers`) — type-aware checks at build time for sync-over-async (VSTHRD002), async-void (VSTHRD100), unobserved async results (VSTHRD110). Rule selection rationale in [patterns.md § Async patterns](./patterns.md#async-patterns).
 - **Coverage report** uploaded as artifact (`dotnet-coverage`). No threshold yet — see [CONTRIBUTING.md § Coverage](../../CONTRIBUTING.md#coverage).
 
@@ -105,7 +106,8 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 | `src/` or `tests/` | `dotnet format --verify-no-changes` |
 | `frontend/` | `npm run ci` then `npm run test` |
 | `src/Axis.Api/Endpoints/` or API contract | Update + run `tests/Api/Axis.Api.Tests/` |
-| Any of the above + `docs/epics/` | `./scripts/check-doc-drift.sh` (bash) — also runs `normalize-feature-docs.py --check`, enforces no-new `TODO`/`FIXME`/`stub`, reviews new raw-SQL calls |
+| Any of the above + `docs/epics/` | `./scripts/check-doc-drift.sh` (bash) — also runs `normalize-feature-docs.py --check` and `check-local-dev-docs.py`, enforces no-new `TODO`/`FIXME`/`stub`, reviews new raw-SQL calls |
+| `docker-compose.yml` | Update [local-dev.md](./local-dev.md) in same PR; `./scripts/check-doc-drift.sh` |
 
 ```text
 Gate 1 self-check:
