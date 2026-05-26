@@ -40,6 +40,8 @@ public static class IdentityInfrastructureExtensions
         services.AddScoped<IOrganizationPlanChangeLogRepository, OrganizationPlanChangeLogRepository>();
         services.AddScoped<IPlatformAdminAuthorization, ConfigPlatformAdminAuthorization>();
         services.AddScoped<IPlanLimitUsageCounter, UserPlanLimitUsageCounter>();
+        services.AddSingleton<PlanLimitRedisCache>();
+        services.AddScoped<IPlanLimitService, PlanLimitService>();
         services.AddScoped<ITenantModuleProvisioningRepository, TenantModuleProvisioningRepository>();
         services.AddScoped<IPlatformProvisioningAlert, LoggingPlatformProvisioningAlert>();
         services.AddScoped<IUserRepository, UserRepository>();

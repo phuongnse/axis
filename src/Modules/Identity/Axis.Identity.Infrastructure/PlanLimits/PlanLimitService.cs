@@ -6,7 +6,7 @@ using Axis.Shared.Domain.Primitives;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
-namespace Axis.Api.Infrastructure.PlanLimits;
+namespace Axis.Identity.Infrastructure.PlanLimits;
 
 public sealed class PlanLimitService(
     IOrganizationRepository organizationRepository,

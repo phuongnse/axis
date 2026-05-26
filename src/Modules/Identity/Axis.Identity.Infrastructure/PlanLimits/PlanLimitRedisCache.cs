@@ -1,7 +1,7 @@
 using Axis.Shared.Application.PlanLimits;
 using StackExchange.Redis;
 
-namespace Axis.Api.Infrastructure.PlanLimits;
+namespace Axis.Identity.Infrastructure.PlanLimits;
 
 public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
 {
