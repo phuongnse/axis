@@ -48,6 +48,10 @@ Allow organization admins to manage their organization's profile, settings, and 
 - Custom domain / vanity URL — not in MVP.
 - White-label theming (custom colors, fonts) — not in MVP.
 
+> **Implementation status** — Domain: ⏳ | Application: ⏳ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `Organization` has only `Name`, `Slug`, `OwnerEmail`, `Status`, `SubscriptionPlanId`, `CreatedAt` — no logo, timezone, or language. No `UpdateOrganizationProfileCommand`, logo upload, or settings endpoints.
+> **Next (backend):** extend aggregate + migration; `PUT /api/organizations/current` (or settings sub-resource); validate IANA timezone and logo MIME/size per AC.
+
 ---
 
 ### US-006 — View organization settings
@@ -69,6 +73,10 @@ Allow organization admins to manage their organization's profile, settings, and 
 
 *Out of scope*
 - Editing all settings inline on this page — this page is read-only for stats; editing is in sub-sections.
+
+> **Implementation status** — Domain: ⏳ | Application: ⏳ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: no read-model query for org settings + usage (workflows/users/executions). **Can reuse:** `IPlanLimitService` / plan limits for numerators; `GET /api/plans` for plan name. Admin-only 403 at API layer not wired.
+> **Next (backend):** `GetOrganizationSettingsQuery` + authenticated GET; aggregate usage from plan-limit counters or DB counts.
 
 ---
 
@@ -98,3 +106,7 @@ Allow organization admins to manage their organization's profile, settings, and 
 *Out of scope*
 - Data export before deletion — available separately as a future feature.
 - Immediate hard delete without grace period — the 30-day window is non-negotiable in MVP.
+
+> **Implementation status** — Domain: ⏳ | Application: ⏳ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: `Organization.Archive()` exists but no scheduled-deletion job, grace-period cancel, schema hard-delete, or deletion confirmation email. No delete API or typed-name confirmation flow.
+> **Next (backend):** deletion request aggregate/state; Wolverine job for grace period + hard delete; cancel-running-executions hook before schema drop (coordinate E06).

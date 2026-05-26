@@ -82,6 +82,17 @@ The workflow builder is the heart of the platform. It is what differentiates Axi
 
 ---
 
+## Open work (agents)
+
+| Area | Status | Detail |
+|------|--------|--------|
+| **Backend** | ⚠️ mostly ✅ | CRUD/publish/import/export ✅; plan limits 402 ✅ (E01 F04). **Engine-owned:** triggers (cron/webhook/event), step execution, parallel/join — tracked in [E06](../E06-workflow-engine/README.md#open-work-agents). **API polish:** list filters (last execution date), import transactional rollback — [F07](./features/F07-import-export.md). |
+| **Frontend** | ⏳ | Visual canvas, step config panels, trigger UI — every F02–F07 US. |
+
+Do not re-implement plan limits here; update stale “pending E01 F04” lines if you see them in feature callouts.
+
+---
+
 ## Dependencies
 
 - [E01 — Platform Foundation](../E01-platform-foundation/README.md)

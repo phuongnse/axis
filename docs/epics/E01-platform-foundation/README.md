@@ -52,11 +52,24 @@ Without this foundation, nothing else works. Every feature in every other epic r
 | Shared Application | ✅ Done | `ICommand/IQuery`, `ICommandHandler/IQueryHandler`, `ValidationBehavior`, `ITenantContext` |
 | Shared Infrastructure | ✅ Done | `TenantSchemaInterceptor`, per-module `UnitOfWork` ([ADR-017](../../TECH_STACK.md#adr-017-axisshared-is-abstractions-only-no-shared-implementation)); **OpenTelemetry** host wiring on `Axis.Api` ([ADR-018](../../TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability), [patterns § OpenTelemetry](../../playbooks/patterns.md#opentelemetry-observability)) |
 | Tenant Registration (US-001–004 backend) | ⚠️ Partial | US-001–002 + plan on register (US-004 backend): opaque verify tokens, resend limit, optional `subscriptionPlanId` (default Free). Frontend ⏳ |
-| Subscription Plans (F04 US-010–012 backend) | ⚠️ Partial | `GET /api/plans`, plan limits 402 on create workflow / invite / start execution, platform admin plan change API. Frontend + Redis counters ⏳ |
+| Subscription Plans (F04 US-010–012 backend) | ⚠️ Partial | `GET /api/plans`, 402 limits (workflow / user / execution), Redis read-through counters, platform plan change. Frontend pricing UI ⏳ |
 | Tenant Provisioning (US-003) | ⚠️ Partial | Kafka-driven per-module provisioning with `TenantSchemaProvisioner` helper, `TenantModuleProvisionReportEvent`, Identity coordinator (retry + alert), `tenant_module_provisions` tracking, `GET /api/auth/provisioning-status`. Frontend wait screen ⏳. |
-| Organization Management (F02) | ⏳ Pending | — |
-| Subscription Plans (F04) | ⏳ Pending | — |
-| Frontend | ⏳ Pending | — |
+| Tenant isolation (F03 US-008–009) | ⚠️ Partial | `TenantSchemaInterceptor` + `HttpTenantContext` + `FixedTenantContext` for jobs; unit tests. Gaps: cross-tenant integration tests, schema Redis cache, deleted-org 403 — see [F03](./features/F03-tenant-isolation.md) |
+| Organization Management (F02) | ⏳ Pending | No profile/settings/delete APIs — see [F02](./features/F02-organization-management.md) |
+| Frontend | ⏳ Pending | Registration, verify, provisioning, settings, pricing |
+
+---
+
+## Open work (agents)
+
+| Priority | Item | Where |
+|----------|------|--------|
+| **Backend next** | F02 US-005–007: org profile (name/logo/timezone/language), settings read + usage stats API, scheduled deletion | [F02](./features/F02-organization-management.md) |
+| Backend | F03: cross-tenant isolation tests; optional schema-name Redis cache per US-009 | [F03](./features/F03-tenant-isolation.md) |
+| Backend | F04: bulk workflow import endpoint (multi-workflow) if product needs US-011 bulk AC | [F04](./features/F04-subscription-plans.md) |
+| Frontend | F01 US-002 verify + provisioning wait + auto sign-in; F04 pricing page; all F02 settings wireframes | [F01](./features/F01-tenant-registration.md), [F04](./features/F04-subscription-plans.md) |
+
+Epic-level checkboxes above remain spec-only; status is in feature **Implementation status** callouts.
 
 ---
 

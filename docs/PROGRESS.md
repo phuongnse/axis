@@ -17,7 +17,7 @@ Foundation phases (each a sequence of small PRs):
 | **Phase 3 — Per-module EF migrations** | ⚠️ in progress | Identity, DataModeling, FormBuilder, WorkflowBuilder, WorkflowEngine have migrations; tests use `MigrateAsync`. PageBuilder pending (module not started). |
 | **Phase 4 — Deployment readiness** | ⏳ pending | Per-module Dockerfile; `docker-compose.dev.yml` runs each module as a separate container; CI builds per-module artifacts; K8s manifests; per-module Vault policies. |
 
-Feature work (Frontend feature UIs, E07 PageBuilder, remaining E01/E06 gaps) is paused until Phase 1–2 complete. Estimated timeline ~2–3 months.
+Feature work (Frontend feature UIs, E07 PageBuilder) tracks per-epic **Open work** in [docs/epics/README.md](./epics/README.md#how-agents-find-open-work). Foundation phases 1–2 remain ⚠️ in places; E02–E06 backend APIs are largely shipped — agents should read US **Implementation status** callouts, not epic `- [ ]` checkboxes.
 
 ### Deferred decisions — surface when triggered
 
@@ -68,6 +68,18 @@ Form definitions + F04 form tasks (`FormSubmission`, token submit, my tasks, exp
 Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoints` registered; default-input shaping handled in `StartExecutionHandler`. Infrastructure ⚠️: `IScriptExecutor` and `INotificationSender` stubs.
 
 > ⚠️ **Retrofit (PR for E05+E06 closure):** `Axis.WorkflowEngine.Contracts` shipped with Avro schema `FormStepReachedEvent` (CloudEvents envelope, ADR-019). `WorkflowEngineEventMapper` translates domain events at `SaveChangesAsync` time; FormBuilder consumes via Kafka topic `axis.workflowengine.form-step-reached`. The 2 cross-module Domain references that were tracked in `WORKAROUNDS.md` are now resolved (ratchet shrunk). **Deferred:** gRPC service for sync RPC needs (none today); saga orchestrator ([ADR-020](TECH_STACK.md#adr-020-saga-orchestration-for-cross-module-workflows)); dedicated `axis_workflowengine` database; switch tests to `MigrateAsync`; real `IScriptExecutor` + `INotificationSender`.
+
+## E01 — Platform Foundation
+
+**F01 tenant registration (backend):** ✅ register, verify (opaque tokens), resend limit, idempotency, Kafka provisioning coordinator, optional `subscriptionPlanId` on register.
+
+**F04 subscription plans (backend):** ⚠️ `GET /api/plans`, platform plan change, 402 limits (workflows / users / executions), Redis counters. Frontend pricing UI ⏳. Bulk multi-workflow import limit AC deferred until API exists.
+
+**F02 organization management:** ⏳ not started (no profile/settings/delete APIs).
+
+**F03 tenant isolation:** ⚠️ `TenantSchemaInterceptor` + `ITenantContext` shipped; cross-tenant integration tests and org-status 403 gaps — see [E01 F03](./epics/E01-platform-foundation/features/F03-tenant-isolation.md).
+
+**Agents:** per-US truth in feature `Implementation status` callouts; epic [Open work](./epics/E01-platform-foundation/README.md#open-work-agents) lists next backend/frontend items.
 
 ## Identity / E01 — tenant provisioning (cross-cutting)
 

@@ -4,6 +4,23 @@
 
 ---
 
+## How agents find open work
+
+**Do not use `- [ ]` checkboxes in feature files as progress** — they stay unchecked by convention (spec only). Use this order:
+
+| Step | Source | What you learn |
+|------|--------|----------------|
+| 1 | This page → **Open work** on the epic README | Prioritized gaps for that epic (backend vs frontend called out) |
+| 2 | `docs/epics/{epic}/features/F0N-*.md` | Per–user-story `> **Implementation status**` + `Gaps vs spec` + `**Done:**` / `**Deferred:**` |
+| 3 | `docs/PROGRESS.md` | Module layer summary (Domain → Frontend); cross-cutting foundation phases |
+| 4 | `grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/epics/` | US rows still blocked before API work ([agent-checklist](../playbooks/agent-checklist.md)) |
+
+**Symbols** (same as [agent-checklist § Layer status](../playbooks/agent-checklist.md)): ✅ done for that layer on this US · ⚠️ partial (read `Gaps vs spec`) · ⏳ not started.
+
+When you ship code, update **US callout → epic README table → epic Open work → PROGRESS** in the same PR. Never mark ✅ while `Gaps vs spec` still lists backend work for that layer.
+
+---
+
 ## All Epics
 
 | ID | Epic | Phase | Features |

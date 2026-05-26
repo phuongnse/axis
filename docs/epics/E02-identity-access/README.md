@@ -80,6 +80,17 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 
 ---
 
+## Open work (agents)
+
+| Area | Status | Detail |
+|------|--------|--------|
+| **Backend** | ⚠️ polish | [F05](./features/F05-password-security.md): reset/change-password rate limits, session list API wiring. [F04](./features/F04-permissions.md): `[RequirePermission]` / policy tests. [F02](./features/F02-user-management.md): block admin self-invite at API. |
+| **Frontend** | ⏳ | Register, settings, invitation accept, session management UI — see per-US callouts in [F01](./features/F01-authentication.md)–[F05](./features/F05-password-security.md). |
+
+Core auth/OIDC/RBAC backend is ✅; use feature **Gaps vs spec** for the next US, not epic checkboxes.
+
+---
+
 ## Dependencies
 
 - [E01 — Platform Foundation](../E01-platform-foundation/README.md)

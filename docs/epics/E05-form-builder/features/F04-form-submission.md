@@ -100,8 +100,8 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 - Delegating a task to another user — not in MVP.
 - Bulk task completion — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: No `GetMyFormTasksQuery` handler; "My Tasks" page, role-assigned task aggregation, and SignalR push updates pending Frontend + API + E06.
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
+> Gaps vs spec: **Done:** `GetMyFormTasksQuery` + authenticated list endpoints. Role-assigned task aggregation (not only direct assignee), SignalR push, and "My Tasks" UI pending Frontend + E06.
 
 ---
 
@@ -128,5 +128,5 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 *Out of scope*
 - Sending a reminder notification before timeout expires — not in MVP.
 
-> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: Wolverine scheduled expiry job, task expiry marking, and workflow failure flow pending Application + Infrastructure.
+> **Implementation status** — Domain: ✅ | Application: ⚠️ | Infrastructure: ✅ | API: ⏳ | Frontend: ⏳
+> Gaps vs spec: **Done:** `ExpireFormSubmissionMessage` scheduled from `FormStepReachedHandler`; `ExpireFormSubmissionHandler` marks submission expired. Workflow execution → `Failed` + error notification on expiry pending E06 coordination.

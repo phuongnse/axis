@@ -146,10 +146,12 @@ Never ✅ and "pending …" in the same callout. Checkboxes in feature files are
 | Level | When | What to write |
 |-------|------|----------------|
 | **1 — US** | Any layer progress on a user story | `> **Implementation status**`, `Gaps vs spec`, optional `**Deferred (PR #N follow-up):**` in `docs/epics/…/features/F0N-….md` |
-| **2 — Epic** | A layer is complete for the module | Epic `README.md` implementation table |
+| **2 — Epic** | A layer is complete for the module | Epic `README.md` implementation table + **Open work (agents)** section (remove or reword items you closed) |
 | **3 — Platform** | Module-wide summary changed | `docs/PROGRESS.md` — layer status only |
 
 Updating only `PROGRESS.md` while changing `src/` without `docs/epics/` → drift fails. Epic README `| API | ⏳` after endpoints ship → drift fails.
+
+**Agents starting a task:** read [epics README § How agents find open work](../epics/README.md#how-agents-find-open-work) — checkboxes in feature files are not progress.
 
 **Chore/style PRs that touch module code:** drift still applies — add one small, accurate detail to the matching epic doc (a chunk size, a behavior nuance, a deferral note already true). Don't propose loosening the script, don't strand the format gunk waiting for a "real" PR, and don't invent fake content. The script's intent is *prompt the developer to look at docs*, not *require rewrite proportional to code change*.
 

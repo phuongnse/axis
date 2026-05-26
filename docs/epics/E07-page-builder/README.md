@@ -63,6 +63,12 @@ Without a UI builder, users need a developer to display and interact with their 
 
 ---
 
+## Open work (agents)
+
+**⏳ Phase 2 — not started.** No `src/Modules/PageBuilder`, no feature files under `docs/epics/E07-page-builder/features/`. Do not implement until MVP loop (E01–E06) gaps are closed unless explicitly scoped.
+
+---
+
 ## Dependencies
 
 - [E01 — Platform Foundation](../E01-platform-foundation/README.md)
