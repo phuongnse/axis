@@ -60,6 +60,7 @@ jobs:
               - 'docs/epics/**'
               - 'docs/PROGRESS.md'
               - 'scripts/check-doc-drift.sh'
+              - 'scripts/check-local-dev-docs.py'
               - 'scripts/check-buf-modules.sh'
               - 'buf.yaml'
               - '.github/workflows/build-and-test.yml'
