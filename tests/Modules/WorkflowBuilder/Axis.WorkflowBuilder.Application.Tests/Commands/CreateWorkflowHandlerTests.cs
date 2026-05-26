@@ -1,7 +1,9 @@
+using Axis.Shared.Application.PlanLimits;
 using Axis.Shared.Domain.Primitives;
 using Axis.WorkflowBuilder.Application.Commands.CreateWorkflow;
 using Axis.WorkflowBuilder.Application.Repositories;
 using Axis.WorkflowBuilder.Application.Services;
+using Axis.WorkflowBuilder.Domain.Aggregates;
 using Axis.WorkflowBuilder.Domain.Enums;
 using FluentAssertions;
 using NSubstitute;
@@ -12,11 +14,18 @@ public class CreateWorkflowHandlerTests
 {
     private readonly IWorkflowRepository _workflowRepo = Substitute.For<IWorkflowRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly IPlanLimitService _planLimitService = Substitute.For<IPlanLimitService>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
     private const string UserId = "user-123";
 
-    private CreateWorkflowHandler CreateHandler() => new(_workflowRepo, _uow);
+    private CreateWorkflowHandler CreateHandler()
+    {
+        _planLimitService
+            .EnsureWithinLimitAsync(Arg.Any<Guid>(), Arg.Any<PlanLimitResourceType>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success());
+        return new(_planLimitService, _workflowRepo, _uow);
+    }
 
     [Fact]
     public async Task CreateWorkflow_WhenNameIsUnique_CreatesDraftWorkflowAndReturnsId()
@@ -30,10 +39,20 @@ public class CreateWorkflowHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeEmpty();
         await _workflowRepo.Received(1).AddAsync(
-            Arg.Is<Domain.Aggregates.WorkflowDefinition>(w =>
+            Arg.Is<WorkflowDefinition>(w =>
                 w.Name == "Invoice Approval" &&
                 w.Status == WorkflowStatus.Draft &&
                 w.CreatedBy == UserId),
+            Arg.Any<CancellationToken>());
+        await _planLimitService.Received(1).EnsureWithinLimitAsync(
+            OrgId,
+            PlanLimitResourceType.Workflows,
+            1,
+            Arg.Any<CancellationToken>());
+        await _planLimitService.Received(1).RecordUsageDeltaAsync(
+            OrgId,
+            PlanLimitResourceType.Workflows,
+            1,
             Arg.Any<CancellationToken>());
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }

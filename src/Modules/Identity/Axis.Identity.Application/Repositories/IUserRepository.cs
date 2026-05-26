@@ -20,4 +20,7 @@ public interface IUserRepository
 
     /// <summary>Returns count of users with Admin role in the org.</summary>
     Task<int> CountAdminsAsync(Guid organizationId, Guid adminRoleId, CancellationToken ct = default);
+
+    /// <summary>Active users in the organization (US-011 user limit).</summary>
+    Task<int> CountActiveUsersAsync(Guid organizationId, CancellationToken ct = default);
 }

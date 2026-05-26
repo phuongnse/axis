@@ -24,6 +24,33 @@ The paste-block templates below are for *your own* walk-through (agent reasoning
 Docs touched: docs/epics/…
 ```
 
+### AC coverage — avoid happy-path-only
+
+Feature files group ACs under **Happy path**, **Validation & errors**, **Edge cases**, and **Out of scope**. Agents must cover **every bullet in scope for the layer you are shipping**, not only the first block.
+
+**Before writing code (per US):**
+
+1. Copy **each** `- [ ]` line from the US into an AC map row (one row per bullet, or one row per bullet group only when a single test proves all of them).
+2. Tag the row: `happy` | `validation` | `edge` | `out-of-scope` (skip implementation for `out-of-scope`; do not “forget” it — leave it in the map as N/A).
+3. Name the **test or handler** that will prove the row (`CreateWorkflow_WhenAtPlanLimit_Returns402`, integration test for wrong-tenant isolation, etc.). **No blank “File / test” cells** for in-scope rows.
+4. If a bullet is **Frontend-only** while you are on backend (or the reverse), mark the row `N/A this PR — Frontend` / `N/A this PR — API` so it is not silently dropped.
+
+**While implementing (TDD):**
+
+- [process.md § Per-US workflow](./process.md#per-us-workflow): Domain → Application → Infrastructure → API; tests green per layer before the next.
+- [testing.md § Required test coverage](./testing.md#required-test-coverage-for-integration-tests): integration tests need happy path **and** not-found/isolation **and** constraint violations where applicable — not one happy test per handler.
+
+**Before opening / updating the PR:**
+
+| Check | Action |
+|-------|--------|
+| Map complete? | Every in-scope AC row has code + test (or explicit deferral). |
+| Callout honest? | `> **Implementation status**` lists remaining bullets under `Gaps vs spec` — never ✅ on a layer with open backend gaps. |
+| Deferred? | `**Deferred (PR #N follow-up):**` names the **AC bullet** deferred, not a vague “later”. |
+| Out of scope? | Do not implement; do not mark ✅ as if done. |
+
+**Self-audit command** (after implementation, before push): re-read the US in the feature file and tick mentally each bullet against your AC map — same order as the spec (happy → validation → edge).
+
 ---
 
 ## Gates (every PR)
@@ -44,6 +71,7 @@ Docs touched: docs/epics/…
 - **Secret scanning** — TruffleHog scans the full PR diff for committed secrets (API keys, passwords, tokens) and verifies each finding against the alleged service before reporting (`--only-verified` cuts false positives).
 - **Vulnerable packages** — `dotnet list package --vulnerable --include-transitive` fails on any known CVE in the dep tree (covers transitive packages too).
 - **Architecture fitness tests** run as part of `dotnet test` — failures there mean a CLAUDE.md P0/P1 rule got violated structurally. See [tests README](../../tests/Architecture/Axis.Architecture.Tests/README.md).
+- **EF migrations** — only `dotnet ef migrations add` (no hand-written `.cs` / orphan `.Designer.cs`). Each `{Name}.cs` needs `{Name}.Designer.cs`. See [local-dev.md § EF Core migrations](./local-dev.md#ef-core-migrations-dotnet-ef).
 - **Async-safety analyzers** (`Microsoft.VisualStudio.Threading.Analyzers`) — type-aware checks at build time for sync-over-async (VSTHRD002), async-void (VSTHRD100), unobserved async results (VSTHRD110). Rule selection rationale in [patterns.md § Async patterns](./patterns.md#async-patterns).
 - **Coverage report** uploaded as artifact (`dotnet-coverage`). No threshold yet — see [CONTRIBUTING.md § Coverage](../../CONTRIBUTING.md#coverage).
 
@@ -146,10 +174,12 @@ Never ✅ and "pending …" in the same callout. Checkboxes in feature files are
 | Level | When | What to write |
 |-------|------|----------------|
 | **1 — US** | Any layer progress on a user story | `> **Implementation status**`, `Gaps vs spec`, optional `**Deferred (PR #N follow-up):**` in `docs/epics/…/features/F0N-….md` |
-| **2 — Epic** | A layer is complete for the module | Epic `README.md` implementation table |
+| **2 — Epic** | A layer is complete for the module | Epic `README.md` implementation table + **Open work (agents)** section (remove or reword items you closed) |
 | **3 — Platform** | Module-wide summary changed | `docs/PROGRESS.md` — layer status only |
 
 Updating only `PROGRESS.md` while changing `src/` without `docs/epics/` → drift fails. Epic README `| API | ⏳` after endpoints ship → drift fails.
+
+**Agents starting a task:** read [epics README § How agents find open work](../epics/README.md#how-agents-find-open-work) — checkboxes in feature files are not progress.
 
 **Chore/style PRs that touch module code:** drift still applies — add one small, accurate detail to the matching epic doc (a chunk size, a behavior nuance, a deferral note already true). Don't propose loosening the script, don't strand the format gunk waiting for a "real" PR, and don't invent fake content. The script's intent is *prompt the developer to look at docs*, not *require rewrite proportional to code change*.
 

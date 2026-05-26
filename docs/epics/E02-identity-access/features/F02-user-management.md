@@ -43,7 +43,7 @@ Organization admins can invite new members, manage their accounts, and deactivat
 - Bulk invitation via CSV upload — not in MVP.
 
 > **Implementation status** — Domain + Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
-> Gaps vs spec: user limit check not implemented (no subscription/plan concept yet — pending E01 F04). Admin self-invite check not implemented — pending API layer (requires current user identity from JWT).
+> Gaps vs spec: **Done:** HTTP 402 when user plan limit reached (`InviteUserHandler`, E01 F04). Admin self-invite check not implemented — pending API layer (compare invite email to `ICurrentUser` email).
 > Decisions: existing-member and pending-invitation checks throw `ValidationException` with specific messages matching AC wording.
 
 ---

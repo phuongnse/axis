@@ -9,6 +9,7 @@ public static class ErrorCodes
     public const string NotFound = "not_found";
     public const string Conflict = "conflict";
     public const string BusinessRule = "business_rule";
+    public const string Forbidden = "forbidden";
     public const string PlanLimit = "plan_limit";
     public const string FieldValidation = "field_validation";
     public const string InvalidInput = "invalid_input";
@@ -21,8 +22,12 @@ public static class ErrorCodes
 /// </summary>
 public class Result
 {
-    protected Result(bool isSuccess, string? errorCode, string? error,
-        IReadOnlyDictionary<string, string[]>? fieldErrors = null)
+    protected Result(
+        bool isSuccess,
+        string? errorCode,
+        string? error,
+        IReadOnlyDictionary<string, string[]>? fieldErrors = null,
+        PlanLimitFailureDetails? planLimitDetails = null)
     {
         if (isSuccess && error is not null)
             throw new InvalidOperationException("A success result cannot have an error.");
@@ -34,6 +39,7 @@ public class Result
         _error = error;
         // Defensive copy: prevents callers from mutating error payloads after result creation.
         _fieldErrors = fieldErrors?.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray());
+        _planLimitDetails = planLimitDetails;
     }
 
     public bool IsSuccess { get; }
@@ -42,6 +48,9 @@ public class Result
     private readonly string? _errorCode;
     private readonly string? _error;
     private readonly IReadOnlyDictionary<string, string[]>? _fieldErrors;
+    private readonly PlanLimitFailureDetails? _planLimitDetails;
+
+    public PlanLimitFailureDetails? PlanLimitDetails => _planLimitDetails;
 
     /// <summary>Well-known code from ErrorCodes — used by ToProblemDetails() to pick HTTP status.</summary>
     public string? ErrorCode => IsFailure
@@ -65,6 +74,9 @@ public class Result
     /// <summary>Failure with a well-known code from <see cref="ErrorCodes"/> — maps to the correct HTTP status.</summary>
     public static Result Failure(string code, string error) => new(false, code, error);
 
+    public static Result PlanLimitFailure(PlanLimitFailureDetails details) =>
+        new(false, ErrorCodes.PlanLimit, details.Message, null, details);
+
     /// <summary>Field-level validation failure — maps to HTTP 422 ValidationProblemDetails with per-field errors.</summary>
     public static Result FieldValidation(IReadOnlyDictionary<string, string[]> fieldErrors)
         => new(false, ErrorCodes.FieldValidation, "One or more validation errors occurred.", fieldErrors);
@@ -85,9 +97,14 @@ public sealed class Result<TValue> : Result
 {
     private readonly TValue? _value;
 
-    private Result(bool isSuccess, TValue? value, string? errorCode, string? error,
-        IReadOnlyDictionary<string, string[]>? fieldErrors = null)
-        : base(isSuccess, errorCode, error, fieldErrors)
+    private Result(
+        bool isSuccess,
+        TValue? value,
+        string? errorCode,
+        string? error,
+        IReadOnlyDictionary<string, string[]>? fieldErrors = null,
+        PlanLimitFailureDetails? planLimitDetails = null)
+        : base(isSuccess, errorCode, error, fieldErrors, planLimitDetails)
     {
         _value = value;
     }
@@ -99,6 +116,9 @@ public sealed class Result<TValue> : Result
     public static Result<TValue> Success(TValue value) => new(true, value, null, null);
     public new static Result<TValue> Failure(string error) => new(false, default, null, error);
     public new static Result<TValue> Failure(string code, string error) => new(false, default, code, error);
+
+    public new static Result<TValue> PlanLimitFailure(PlanLimitFailureDetails details) =>
+        new(false, default, ErrorCodes.PlanLimit, details.Message, null, details);
     public new static Result<TValue> FieldValidation(IReadOnlyDictionary<string, string[]> fieldErrors)
         => new(false, default, ErrorCodes.FieldValidation, "One or more validation errors occurred.", fieldErrors);
 

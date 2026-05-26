@@ -159,4 +159,9 @@ internal sealed class ExecutionRepository(WorkflowEngineDbContext context) : IEx
                 e.StartedAt,
                 e.CompletedAt))
             .ToListAsync(ct);
+
+    public Task<int> CountCreatedSinceUtcAsync(Guid organizationId, DateTime sinceUtc, CancellationToken ct = default) =>
+        context.WorkflowExecutions.CountAsync(
+            e => e.OrganizationId == organizationId && e.CreatedAt >= sinceUtc,
+            ct);
 }

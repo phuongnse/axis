@@ -17,7 +17,7 @@ namespace Axis.WorkflowBuilder.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.5")
+                .HasAnnotation("ProductVersion", "9.0.16")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -129,13 +129,13 @@ namespace Axis.WorkflowBuilder.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("workflow_id");
 
-                    b.Property<bool>("IsBroken")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_broken");
-
                     b.Property<Guid>("ModelId")
                         .HasColumnType("uuid")
                         .HasColumnName("model_id");
+
+                    b.Property<bool>("IsBroken")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_broken");
 
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")

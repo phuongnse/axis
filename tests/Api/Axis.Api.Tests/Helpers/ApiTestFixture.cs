@@ -122,6 +122,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
         await using (IdentityDbContext identityCtx = new(identityOptions))
         {
             await identityCtx.Database.MigrateAsync();
+            await SubscriptionPlanSeeder.EnsureWellKnownPlansAsync(identityCtx);
         }
 
         await PostgresModuleTestDatabase.MigrateAsync<DataModelingDbContext>(
@@ -214,10 +215,11 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.PostConfigure<OpenIddictServerAspNetCoreOptions>(opts =>
                     opts.DisableTransportSecurityRequirement = true);
 
-                ServiceDescriptor? seederDescriptor = services.FirstOrDefault(
+                ServiceDescriptor? openIddictSeederDescriptor = services.FirstOrDefault(
                     d => d.ImplementationType == typeof(OpenIddictSeeder));
-                if (seederDescriptor is not null)
-                    services.Remove(seederDescriptor);
+                if (openIddictSeederDescriptor is not null)
+                    services.Remove(openIddictSeederDescriptor);
+
             });
         });
 

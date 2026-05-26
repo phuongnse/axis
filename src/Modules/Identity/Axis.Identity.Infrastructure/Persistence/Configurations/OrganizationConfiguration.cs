@@ -1,4 +1,5 @@
 using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Domain.Subscriptions;
 using Axis.Identity.Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -45,5 +46,15 @@ internal sealed class OrganizationConfiguration : IEntityTypeConfiguration<Organ
         builder.Property(o => o.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
+
+        builder.Property(o => o.SubscriptionPlanId)
+            .HasColumnName("subscription_plan_id")
+            .HasDefaultValue(WellKnownSubscriptionPlans.FreeId)
+            .IsRequired();
+
+        builder.HasOne<SubscriptionPlan>()
+            .WithMany()
+            .HasForeignKey(o => o.SubscriptionPlanId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

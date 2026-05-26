@@ -2,6 +2,7 @@ using Axis.Identity.Application.Commands.RegisterOrganization;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Domain.Subscriptions;
 using Axis.Identity.Domain.ValueObjects;
 using FluentAssertions;
 using NSubstitute;
@@ -12,6 +13,7 @@ namespace Axis.Identity.Application.Tests.Commands;
 public class RegisterOrganizationHandlerTests
 {
     private readonly IOrganizationRepository _orgRepo = Substitute.For<IOrganizationRepository>();
+    private readonly ISubscriptionPlanRepository _planRepo = Substitute.For<ISubscriptionPlanRepository>();
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
     private readonly IRegistrationIdempotencyRepository _idempotencyRepo =
@@ -23,7 +25,7 @@ public class RegisterOrganizationHandlerTests
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     private RegisterOrganizationHandler CreateHandler() =>
-        new(_orgRepo, _userRepo, _roleRepo, _idempotencyRepo, _verificationTokenStore, _hasher, _emailSender, _uow);
+        new(_orgRepo, _planRepo, _userRepo, _roleRepo, _idempotencyRepo, _verificationTokenStore, _hasher, _emailSender, _uow);
 
     private static RegisterOrganizationCommand ValidCommand() => new(
         OrgName: "Acme Corp",
@@ -33,9 +35,29 @@ public class RegisterOrganizationHandlerTests
         Password: "SecurePass1",
         PasswordConfirmation: "SecurePass1");
 
+    private void SetupDefaultPlan()
+    {
+        SubscriptionPlan freePlan = SubscriptionPlan.Create(
+            WellKnownSubscriptionPlans.FreeId,
+            "Free",
+            "free",
+            0,
+            3,
+            1_000,
+            3,
+            500,
+            true,
+            true);
+        _planRepo.GetByIdAsync(WellKnownSubscriptionPlans.FreeId, Arg.Any<CancellationToken>())
+            .Returns(freePlan);
+        _planRepo.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(freePlan);
+    }
+
     [Fact]
     public async Task RegisterOrganization_WhenCommandIsValid_CreatesOrgUserAndSystemRoles()
     {
+        SetupDefaultPlan();
         _orgRepo.SlugExistsAsync(Arg.Any<OrganizationSlug>()).Returns(false);
         _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>()).Returns(false);
         _idempotencyRepo.AcquireAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
@@ -53,6 +75,7 @@ public class RegisterOrganizationHandlerTests
     [Fact]
     public async Task RegisterOrganization_WhenCommandIsValid_SendsVerificationEmail()
     {
+        SetupDefaultPlan();
         _orgRepo.SlugExistsAsync(Arg.Any<OrganizationSlug>()).Returns(false);
         _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>()).Returns(false);
         _idempotencyRepo.AcquireAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
@@ -84,6 +107,7 @@ public class RegisterOrganizationHandlerTests
     [Fact]
     public async Task RegisterOrganization_WhenSlugCollides_GeneratesUniqueSlug()
     {
+        SetupDefaultPlan();
         // First slug attempt collides, second should be unique
         _orgRepo.SlugExistsAsync(Arg.Any<OrganizationSlug>())
             .Returns(true, false); // first call: exists, second: free
@@ -100,6 +124,7 @@ public class RegisterOrganizationHandlerTests
     [Fact]
     public async Task RegisterOrganization_WhenCommandIsValid_HashesAndStoresPassword()
     {
+        SetupDefaultPlan();
         _orgRepo.SlugExistsAsync(Arg.Any<OrganizationSlug>()).Returns(false);
         _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>()).Returns(false);
         _idempotencyRepo.AcquireAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
@@ -131,6 +156,7 @@ public class RegisterOrganizationHandlerTests
     [Fact]
     public async Task RegisterOrganization_WhenSaveFails_MarksIdempotencyFailedSoRetryCanProceed()
     {
+        SetupDefaultPlan();
         _orgRepo.SlugExistsAsync(Arg.Any<OrganizationSlug>()).Returns(false);
         _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>()).Returns(false);
         _idempotencyRepo.AcquireAsync("idem-retry", Arg.Any<CancellationToken>())

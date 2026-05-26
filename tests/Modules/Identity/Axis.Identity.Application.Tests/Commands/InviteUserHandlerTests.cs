@@ -3,6 +3,7 @@ using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.ValueObjects;
+using Axis.Shared.Application.PlanLimits;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
@@ -18,13 +19,18 @@ public class InviteUserHandlerTests
     private readonly IOrganizationRepository _orgRepo = Substitute.For<IOrganizationRepository>();
     private readonly IEmailSender _emailSender = Substitute.For<IEmailSender>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly IPlanLimitService _planLimitService = Substitute.For<IPlanLimitService>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
     private static readonly Guid RoleId = Guid.NewGuid();
     private static readonly Guid InvitedById = Guid.NewGuid();
 
-    private InviteUserHandler CreateHandler() =>
-        new(_userRepo, _roleRepo, _invitationRepo, _orgRepo, _emailSender, _uow);
+    private InviteUserHandler CreateHandler()
+    {
+        _planLimitService.EnsureWithinLimitAsync(Arg.Any<Guid>(), Arg.Any<PlanLimitResourceType>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success());
+        return new(_planLimitService, _userRepo, _roleRepo, _invitationRepo, _orgRepo, _emailSender, _uow);
+    }
 
     private InviteUserCommand ValidCommand() =>
         new(OrgId, "invited@example.com", RoleId, InvitedById);
@@ -37,8 +43,11 @@ public class InviteUserHandlerTests
         _invitationRepo.GetPendingByEmailAsync(Arg.Any<Email>(), OrgId).ReturnsNull();
         Role role = Role.Create("Editor", null, OrgId, ["workflow:definition:read"]);
         _roleRepo.GetByIdAsync(RoleId, OrgId).Returns(role);
-        Organization org = Organization.Create("Acme", OrganizationSlug.Create("acme").Value,
-            Email.Create("admin@acme.com").Value);
+        Organization org = Organization.Create(
+            "Acme",
+            OrganizationSlug.Create("acme").Value,
+            Email.Create("admin@acme.com").Value,
+            Domain.Subscriptions.WellKnownSubscriptionPlans.FreeId);
         _orgRepo.GetByIdAsync(OrgId).Returns(org);
 
         Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);

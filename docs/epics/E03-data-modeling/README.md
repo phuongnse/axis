@@ -89,6 +89,17 @@ A concrete instance of a Model. Records are stored in the tenant's schema using 
 
 ---
 
+## Open work (agents)
+
+| Area | Status | Detail |
+|------|--------|--------|
+| **Backend** | ⚠️ polish | HTTP 422/409 on records ([F04](./features/F04-data-records.md)); relation display-field resolution; model plan limits **not in F04** (spec mentions 402 — product decision). 30-day purge jobs deferred. |
+| **Frontend** | ⏳ | Model/record UI, filters, data-class sub-forms — all US callouts mark Frontend ⏳. |
+
+Module API is largely ✅; grep `API: ⏳` in [features/](./features/) only when adding endpoints.
+
+---
+
 ## Dependencies
 
 - [E01 — Platform Foundation](../E01-platform-foundation/README.md)

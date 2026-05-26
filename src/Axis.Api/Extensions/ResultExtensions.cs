@@ -23,7 +23,20 @@ public static class ResultExtensions
         return result.ErrorCode switch
         {
             ErrorCodes.NotFound => Results.Problem(result.Error, statusCode: StatusCodes.Status404NotFound),
+            ErrorCodes.Forbidden => Results.Problem(result.Error, statusCode: StatusCodes.Status403Forbidden),
             ErrorCodes.Conflict => Results.Problem(result.Error, statusCode: StatusCodes.Status409Conflict),
+            ErrorCodes.PlanLimit when result.PlanLimitDetails is PlanLimitFailureDetails details =>
+                Results.Json(
+                    new
+                    {
+                        error = details.Error,
+                        limit_type = details.LimitType,
+                        current = details.Current,
+                        max = details.Max,
+                        upgrade_url = details.UpgradeUrl,
+                        message = details.Message,
+                    },
+                    statusCode: StatusCodes.Status402PaymentRequired),
             ErrorCodes.PlanLimit => Results.Problem(result.Error, statusCode: StatusCodes.Status402PaymentRequired),
             ErrorCodes.InvalidInput => Results.Problem(result.Error, statusCode: StatusCodes.Status400BadRequest),
             ErrorCodes.RateLimited => Results.Problem(result.Error, statusCode: StatusCodes.Status429TooManyRequests),

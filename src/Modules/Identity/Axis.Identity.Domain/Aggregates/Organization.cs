@@ -10,6 +10,7 @@ public sealed class Organization : AggregateRoot<Guid>
     public OrganizationSlug Slug { get; private set; }
     public Email OwnerEmail { get; private set; }
     public OrganizationStatus Status { get; private set; }
+    public Guid SubscriptionPlanId { get; private set; }
     public DateTime CreatedAt { get; private set; }
 
     private Organization(
@@ -17,24 +18,42 @@ public sealed class Organization : AggregateRoot<Guid>
         string name,
         OrganizationSlug slug,
         Email ownerEmail,
+        Guid subscriptionPlanId,
         DateTime createdAt)
         : base(id)
     {
         Name = name;
         Slug = slug;
         OwnerEmail = ownerEmail;
+        SubscriptionPlanId = subscriptionPlanId;
         Status = OrganizationStatus.Active;
         CreatedAt = createdAt;
     }
 
-    public static Organization Create(string name, OrganizationSlug slug, Email ownerEmail)
+    public static Organization Create(string name, OrganizationSlug slug, Email ownerEmail, Guid subscriptionPlanId)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Organization name is required.", nameof(name));
+        if (subscriptionPlanId == Guid.Empty)
+            throw new ArgumentException("Subscription plan is required.", nameof(subscriptionPlanId));
 
-        Organization org = new Organization(Guid.NewGuid(), name.Trim(), slug, ownerEmail, DateTime.UtcNow);
+        Organization org = new Organization(
+            Guid.NewGuid(),
+            name.Trim(),
+            slug,
+            ownerEmail,
+            subscriptionPlanId,
+            DateTime.UtcNow);
         org.RaiseDomainEvent(new OrganizationCreated(org.Id, org.Name, slug.Value, ownerEmail.Value));
         return org;
+    }
+
+    public void ChangeSubscriptionPlan(Guid newPlanId)
+    {
+        if (newPlanId == Guid.Empty)
+            throw new ArgumentException("Subscription plan is required.", nameof(newPlanId));
+
+        SubscriptionPlanId = newPlanId;
     }
 
     public void BeginProvisioning()

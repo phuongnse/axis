@@ -1,4 +1,5 @@
 using Axis.Shared.Application.CQRS;
+using Axis.Shared.Application.PlanLimits;
 using Axis.Shared.Domain.Primitives;
 using Axis.WorkflowBuilder.Application.Queries.ExportWorkflow;
 using Axis.WorkflowBuilder.Application.Repositories;
@@ -10,6 +11,7 @@ using Axis.WorkflowBuilder.Domain.Enums;
 namespace Axis.WorkflowBuilder.Application.Commands.ImportWorkflow;
 
 public sealed class ImportWorkflowHandler(
+    IPlanLimitService planLimitService,
     IWorkflowRepository workflowRepo,
     IWorkflowReferenceSync referenceSync,
     IUnitOfWork uow)
@@ -17,6 +19,18 @@ public sealed class ImportWorkflowHandler(
 {
     public async Task<Result<Guid>> Handle(ImportWorkflowCommand command, CancellationToken cancellationToken)
     {
+        Result planCheck = await planLimitService.EnsureWithinLimitAsync(
+            command.OrganizationId,
+            PlanLimitResourceType.Workflows,
+            increment: 1,
+            cancellationToken);
+        if (planCheck.IsFailure)
+        {
+            if (planCheck.PlanLimitDetails is PlanLimitFailureDetails details)
+                return Result<Guid>.PlanLimitFailure(details);
+            return Result.Failure<Guid>(planCheck.ErrorCode!, planCheck.Error);
+        }
+
         WorkflowExportDto data = command.ExportData;
 
         if (await workflowRepo.NameExistsAsync(data.Name, command.OrganizationId, null, cancellationToken))
@@ -33,6 +47,11 @@ public sealed class ImportWorkflowHandler(
         await workflowRepo.AddAsync(workflow, cancellationToken);
         await referenceSync.SyncAsync(workflow, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);
+        await planLimitService.RecordUsageDeltaAsync(
+            command.OrganizationId,
+            PlanLimitResourceType.Workflows,
+            delta: 1,
+            cancellationToken);
         return workflow.Id;
     }
 

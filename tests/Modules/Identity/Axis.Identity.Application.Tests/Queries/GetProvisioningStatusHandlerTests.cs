@@ -3,6 +3,7 @@ using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Contracts;
 using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Domain.Subscriptions;
 using Axis.Identity.Domain.Provisioning;
 using Axis.Identity.Domain.ValueObjects;
 using FluentAssertions;
@@ -38,7 +39,8 @@ public sealed class GetProvisioningStatusHandlerTests
         Organization organization = Organization.Create(
             "Acme",
             OrganizationSlug.Create("acme").Value!,
-            email);
+            email,
+            WellKnownSubscriptionPlans.FreeId);
         User user = User.Create("Alice", "Smith", email, organization.Id);
         user.VerifyEmail();
         return (user, organization);
@@ -81,7 +83,8 @@ public sealed class GetProvisioningStatusHandlerTests
         Organization organization = Organization.Create(
             "Acme",
             OrganizationSlug.Create("acme").Value!,
-            email);
+            email,
+            WellKnownSubscriptionPlans.FreeId);
         User user = User.Create("Bob", "Smith", email, organization.Id);
         StubProvisioningPollForUser(user);
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);

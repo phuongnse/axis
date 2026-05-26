@@ -1,4 +1,5 @@
 using Axis.Shared.Application.CQRS;
+using Axis.Shared.Application.PlanLimits;
 using Axis.Shared.Domain.Primitives;
 using Axis.WorkflowBuilder.Application.Repositories;
 using Axis.WorkflowBuilder.Application.Services;
@@ -6,7 +7,10 @@ using Axis.WorkflowBuilder.Domain.Aggregates;
 
 namespace Axis.WorkflowBuilder.Application.Commands.DeleteWorkflow;
 
-public sealed class DeleteWorkflowHandler(IWorkflowRepository workflowRepo, IUnitOfWork uow)
+public sealed class DeleteWorkflowHandler(
+    IPlanLimitService planLimitService,
+    IWorkflowRepository workflowRepo,
+    IUnitOfWork uow)
     : ICommandHandler<DeleteWorkflowCommand>
 {
     public async Task<Result> Handle(DeleteWorkflowCommand command, CancellationToken cancellationToken)
@@ -27,6 +31,11 @@ public sealed class DeleteWorkflowHandler(IWorkflowRepository workflowRepo, IUni
         }
 
         await uow.SaveChangesAsync(cancellationToken);
+        await planLimitService.RecordUsageDeltaAsync(
+            command.OrganizationId,
+            PlanLimitResourceType.Workflows,
+            delta: -1,
+            cancellationToken);
         return Result.Success();
     }
 }
