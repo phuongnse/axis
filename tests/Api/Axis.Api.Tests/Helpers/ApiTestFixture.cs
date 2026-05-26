@@ -122,6 +122,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
         await using (IdentityDbContext identityCtx = new(identityOptions))
         {
             await identityCtx.Database.MigrateAsync();
+            await SubscriptionPlanSeeder.EnsureWellKnownPlansAsync(identityCtx);
         }
 
         await PostgresModuleTestDatabase.MigrateAsync<DataModelingDbContext>(
@@ -219,10 +220,6 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 if (openIddictSeederDescriptor is not null)
                     services.Remove(openIddictSeederDescriptor);
 
-                ServiceDescriptor? subscriptionPlanSeederDescriptor = services.FirstOrDefault(
-                    d => d.ImplementationType == typeof(SubscriptionPlanSeeder));
-                if (subscriptionPlanSeederDescriptor is not null)
-                    services.Remove(subscriptionPlanSeederDescriptor);
             });
         });
 

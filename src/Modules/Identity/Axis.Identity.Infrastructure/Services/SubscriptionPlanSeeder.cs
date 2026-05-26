@@ -15,43 +15,17 @@ public sealed class SubscriptionPlanSeeder(IServiceProvider services, ILogger<Su
     {
         using IServiceScope scope = services.CreateScope();
         IdentityDbContext context = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        SubscriptionPlan[] expectedPlans =
-        [
-            SubscriptionPlan.Create(
-                WellKnownSubscriptionPlans.FreeId,
-                "Free",
-                "free",
-                monthlyPriceCents: 0,
-                maxWorkflows: 3,
-                maxExecutionsPerMonth: 1_000,
-                maxUsers: 3,
-                maxStorageMegabytes: 500,
-                isActive: true,
-                isAvailableForNewSignups: true),
-            SubscriptionPlan.Create(
-                WellKnownSubscriptionPlans.ProId,
-                "Pro",
-                "pro",
-                monthlyPriceCents: 4900,
-                maxWorkflows: 25,
-                maxExecutionsPerMonth: 50_000,
-                maxUsers: 25,
-                maxStorageMegabytes: 10_240,
-                isActive: true,
-                isAvailableForNewSignups: true),
-            SubscriptionPlan.Create(
-                WellKnownSubscriptionPlans.EnterpriseId,
-                "Enterprise",
-                "enterprise",
-                monthlyPriceCents: 0,
-                maxWorkflows: null,
-                maxExecutionsPerMonth: null,
-                maxUsers: null,
-                maxStorageMegabytes: null,
-                isActive: true,
-                isAvailableForNewSignups: false),
-        ];
+        int seeded = await EnsureWellKnownPlansAsync(context, cancellationToken);
+        if (seeded > 0)
+            logger.LogInformation("Seeded {Count} missing subscription plans.", seeded);
+    }
 
+    /// <summary>Idempotent seed for well-known catalog plans (startup + integration tests).</summary>
+    public static async Task<int> EnsureWellKnownPlansAsync(
+        IdentityDbContext context,
+        CancellationToken cancellationToken = default)
+    {
+        SubscriptionPlan[] expectedPlans = CreateWellKnownPlans();
         Guid[] expectedIds = expectedPlans.Select(p => p.Id).ToArray();
         HashSet<Guid> existingIds = await context.SubscriptionPlans
             .Where(p => expectedIds.Contains(p.Id))
@@ -60,12 +34,49 @@ public sealed class SubscriptionPlanSeeder(IServiceProvider services, ILogger<Su
 
         SubscriptionPlan[] missingPlans = expectedPlans.Where(p => !existingIds.Contains(p.Id)).ToArray();
         if (missingPlans.Length == 0)
-            return;
+            return 0;
 
         await context.SubscriptionPlans.AddRangeAsync(missingPlans, cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
-        logger.LogInformation("Seeded {Count} missing subscription plans.", missingPlans.Length);
+        return missingPlans.Length;
     }
+
+    private static SubscriptionPlan[] CreateWellKnownPlans() =>
+    [
+        SubscriptionPlan.Create(
+            WellKnownSubscriptionPlans.FreeId,
+            "Free",
+            "free",
+            monthlyPriceCents: 0,
+            maxWorkflows: 3,
+            maxExecutionsPerMonth: 1_000,
+            maxUsers: 3,
+            maxStorageMegabytes: 500,
+            isActive: true,
+            isAvailableForNewSignups: true),
+        SubscriptionPlan.Create(
+            WellKnownSubscriptionPlans.ProId,
+            "Pro",
+            "pro",
+            monthlyPriceCents: 4900,
+            maxWorkflows: 25,
+            maxExecutionsPerMonth: 50_000,
+            maxUsers: 25,
+            maxStorageMegabytes: 10_240,
+            isActive: true,
+            isAvailableForNewSignups: true),
+        SubscriptionPlan.Create(
+            WellKnownSubscriptionPlans.EnterpriseId,
+            "Enterprise",
+            "enterprise",
+            monthlyPriceCents: 0,
+            maxWorkflows: null,
+            maxExecutionsPerMonth: null,
+            maxUsers: null,
+            maxStorageMegabytes: null,
+            isActive: true,
+            isAvailableForNewSignups: false),
+    ];
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }
