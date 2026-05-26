@@ -522,6 +522,20 @@ _ = Task.Run(async () =>
 - **Migrations strategy** ([ADR-023](../TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)): every environment uses `Database.MigrateAsync()` — production, dev bootstrap, tenant provisioning, and Testcontainers fixtures. One EF migration chain per `DbContext`; never `EnsureCreated`/`EnsureCreatedAsync`.
 - **Identity uses the global `public` schema** — `IdentityDbContext` is a plain `DbContext` with no `TenantSchemaInterceptor`. All other modules use `AxisDbContext` with `TenantSchemaInterceptor`.
 
+## Tenant isolation
+
+HTTP API requests that carry a JWT with `org_id` pass through **`TenantOrganizationAccessMiddleware`** (`Axis.Api`) after authentication:
+
+- Missing `org_id` on an authenticated principal → **401**
+- Unknown organization, `Deleted`, or `Archived` → **403** (not 404 — avoids org enumeration)
+- `Provisioning`, `ProvisioningFailed`, `DeletionScheduled`, and `Active` → allowed (`Organization.AllowsSignIn()`)
+
+**Schema-per-tenant:** `HttpTenantContext` derives `tenant_{organizationId:N}`. `TenantSchemaInterceptor` runs `SET search_path` on **every** `ConnectionOpened` (including pooled connections returned from the pool). Handlers must still pass `OrganizationId` into Application commands/queries — schema isolation is necessary but not sufficient when tests or jobs use the `public` schema.
+
+**Background jobs:** Wolverine handlers that touch tenant data construct `FixedTenantContext(organizationId)` before opening the module `DbContext` (provisioning, hard-delete, module-specific jobs). Do not rely on `HttpTenantContext` outside an HTTP request.
+
+**Tests:** `TenantIsolationEndpointTests` (API, org filter + JWT), `TenantSchemaIsolationTests` (DataModeling, per-schema), `TenantOrganizationAccessEndpointTests` (deleted/archived org).
+
 ## Testing rules
 
 - Never run `dotnet test --no-build` after editing test code — always let it recompile.

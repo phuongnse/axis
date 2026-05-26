@@ -54,7 +54,7 @@ Without this foundation, nothing else works. Every feature in every other epic r
 | Tenant Registration (US-001–004 backend) | ⚠️ Partial | US-001–002 + plan on register (US-004 backend): opaque verify tokens, resend limit, optional `subscriptionPlanId` (default Free). Frontend ⏳ |
 | Subscription Plans (F04 US-010–012 backend) | ✅ Done | `GET /api/plans`, 402 limits (workflow / user / execution), Redis read-through counters, platform plan change. Frontend pricing UI ⏳. **Deferred:** atomic execution counter; fail-closed Redis. |
 | Tenant Provisioning (US-003) | ⚠️ Partial | Kafka-driven per-module provisioning with `TenantSchemaProvisioner` helper, `TenantModuleProvisionReportEvent`, Identity coordinator (retry + alert), `tenant_module_provisions` tracking, `GET /api/auth/provisioning-status`. Frontend wait screen ⏳. |
-| Tenant isolation (F03 US-008–009) | ⚠️ Partial | `TenantSchemaInterceptor` + `HttpTenantContext` + `FixedTenantContext` for jobs; unit tests. Gaps: cross-tenant integration tests, schema Redis cache, deleted-org 403 — see [F03](./features/F03-tenant-isolation.md) |
+| Tenant isolation (F03 US-008–009) | ✅ Done | `TenantSchemaInterceptor`, `HttpTenantContext`, `TenantOrganizationAccessMiddleware` (401/403), cross-tenant API + schema isolation tests — see [F03](./features/F03-tenant-isolation.md). Redis schema cache optional (deterministic `tenant_{orgId:N}`). |
 | Organization Management (F02 US-005–007 backend) | ✅ Done | Profile, settings + usage, scheduled deletion + hard-delete job ✅. Frontend settings UI ⏳ — see [F02](./features/F02-organization-management.md) |
 | Frontend | ⏳ Pending | Registration, verify, provisioning, settings, pricing |
 
@@ -64,7 +64,7 @@ Without this foundation, nothing else works. Every feature in every other epic r
 
 | Priority | Item | Where |
 |----------|------|--------|
-| **Backend next** | F03: cross-tenant isolation tests; optional schema-name Redis cache per US-009 | [F03](./features/F03-tenant-isolation.md) |
+| **Backend next** | E01 backend complete — remaining work is Frontend (F01–F04 UIs) unless product requests F04 bulk workflow import API | [F01](./features/F01-tenant-registration.md), [F04](./features/F04-subscription-plans.md) |
 | Backend | F02 Frontend: settings wireframes, deletion UX | [F02](./features/F02-organization-management.md) |
 | Backend | F04: bulk workflow import endpoint (multi-workflow) if product needs US-011 bulk AC | [F04](./features/F04-subscription-plans.md) |
 | Frontend | F01 US-002 verify + provisioning wait + auto sign-in; F04 pricing page; all F02 settings wireframes | [F01](./features/F01-tenant-registration.md), [F04](./features/F04-subscription-plans.md) |

@@ -458,6 +458,7 @@ try
     app.UseCors("SpaOrigin");
     app.UseRateLimiter();
     app.UseAuthentication();
+    app.UseMiddleware<TenantOrganizationAccessMiddleware>();
     app.UseMiddleware<CorrelationIdMiddleware>();
     app.UseSerilogRequestLogging();
     app.UseAuthorization();
