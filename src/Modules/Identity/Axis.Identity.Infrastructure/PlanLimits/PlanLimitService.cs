@@ -77,8 +77,15 @@ public sealed class PlanLimitService(
         {
             if (cached.Value >= int.MaxValue)
                 return int.MaxValue;
-            if (cached.Value <= int.MinValue)
-                return int.MinValue;
+            if (cached.Value <= 0)
+            {
+                logger.LogWarning(
+                    "Cached plan-limit usage is non-positive for org {OrganizationId} resource {ResourceType}: {CachedUsage}",
+                    organizationId,
+                    resourceType,
+                    cached.Value);
+                return 0;
+            }
 
             return (int)cached.Value;
         }
