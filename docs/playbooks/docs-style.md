@@ -81,7 +81,7 @@ Rules:
 - **`Gaps vs spec`** lists remaining AC bullets; never write `pending API layer` when endpoints already exist — say what is missing (`403 test`, `date filter query param`, etc.).
 - **`API ✅`** on a US means in-scope REST/OpenAPI AC for that story are shipped; Frontend-only gaps do not downgrade API to ⚠️.
 
-**Bulk normalize:** `python3 scripts/normalize-feature-docs.py` (also enforced by `check-doc-drift.sh` on changed feature files).
+**Bulk normalize:** `python3 scripts/normalize-feature-docs.py` (add `--check` for CI — also run via `check-doc-drift.sh`).
 
 ---
 

@@ -303,7 +303,9 @@ done < <(
 
 "${ROOT}/scripts/check-buf-modules.sh" || ERR=1
 
-# Feature file layout: table-based wireframes + implementation status (docs-style.md).
+# Feature file layout: table wireframes + table implementation status (docs-style.md).
+python3 "${ROOT}/scripts/normalize-feature-docs.py" --check || ERR=1
+
 if any_changed '^docs/epics/.*/features/.*\.md$'; then
   while IFS= read -r match; do
     [ -z "${match}" ] && continue

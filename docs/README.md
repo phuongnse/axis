@@ -13,7 +13,7 @@
 | [Product Vision](./PRODUCT_VISION.md) | Goals, target users, problem & solution |
 | [Tech Stack](./TECH_STACK.md) | Technology decisions and rationale |
 | [Architecture](./ARCHITECTURE.md) | System design, modules, data strategy |
-| [Epics](./epics/README.md) | All epics, features, and user stories — **[how agents find open work](./epics/README.md#how-agents-find-open-work)** |
+| [Epics](./epics/README.md) | All epics, features, and user stories — **[how agents find open work](./epics/README.md#how-agents-find-open-work)** · [US template](./epics/_template-feature-us.md) |
 | [Wireframes](./wireframes/) | Screen wireframes — Excalidraw source + SVG preview |
 
 ### Playbooks (how-to guides)
@@ -69,7 +69,7 @@ All diagrams are Excalidraw (`.excalidraw` source + `.svg` preview). Regenerate 
 
 ## Wireframes
 
-Excalidraw wireframes live in `docs/epics/{E0N}/wireframes/`, co-located with each epic's features and diagrams. Shared screens (template, app-shell) remain in `docs/wireframes/`. Each feature file links to its wireframe via a `> **Wireframe**` callout directly after the feature title.
+Excalidraw wireframes live in `docs/epics/{E0N}/wireframes/`, co-located with each epic's features and diagrams. Shared screens (template, app-shell) remain in `docs/wireframes/`. Each feature file lists wireframes in a `## Wireframes` table (see [US template](./epics/_template-feature-us.md)).
 
 | Screen | Source | Preview |
 |---|---|---|
@@ -83,6 +83,7 @@ When two docs disagree, the **owner** wins. Update the owner first; everything e
 
 | Topic | Owner |
 |---|---|
+| Feature US layout (wireframes + status tables) | [epics/_template-feature-us.md](./epics/_template-feature-us.md) + [playbooks/docs-style.md](./playbooks/docs-style.md#feature-files--wireframes--implementation-status) |
 | Product scope, target users, MVP cut | [PRODUCT_VISION.md](./PRODUCT_VISION.md) |
 | Library versions and ADRs | [TECH_STACK.md](./TECH_STACK.md) |
 | Source tree and module boundaries | [../CLAUDE.md](../CLAUDE.md) |

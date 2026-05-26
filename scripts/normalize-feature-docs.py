@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
-"""Normalize feature file wireframe lists and Implementation status callouts."""
+"""Normalize feature file wireframe lists and Implementation status callouts.
+
+Usage:
+  python3 scripts/normalize-feature-docs.py          # rewrite files in place
+  python3 scripts/normalize-feature-docs.py --check  # exit 1 if rewrite needed (CI)
+"""
 
 from __future__ import annotations
 
+import argparse
 import re
 import sys
 from pathlib import Path
@@ -30,6 +36,9 @@ STATUS_HEADER = re.compile(
 LAYER_PART = re.compile(
     r"^(.+?): (.+)$"
 )
+
+DEPRECATED_STATUS = re.compile(r"^\> \*\*Implementation status\*\* — ")
+DEPRECATED_WIREFRAME = re.compile(r"^\> \*\*Wireframe\*\*:")
 
 
 def slug_from_excalidraw(path: str) -> str:
@@ -144,8 +153,7 @@ def normalize_content(text: str) -> str:
     return text
 
 
-def process_file(path: Path) -> bool:
-    original = path.read_text(encoding="utf-8")
+def transform_text(original: str) -> tuple[str, bool]:
     lines = original.splitlines()
     changed = False
     output: list[str] = []
@@ -186,23 +194,69 @@ def process_file(path: Path) -> bool:
     new_text = normalize_content("\n".join(output) + ("\n" if original.endswith("\n") else ""))
     if new_text != original:
         changed = True
+    return new_text, changed
+
+
+def check_deprecated_format(path: Path) -> list[str]:
+    issues: list[str] = []
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        if DEPRECATED_STATUS.match(line):
+            issues.append(f"{path}:{line_number}: deprecated single-line Implementation status")
+        if DEPRECATED_WIREFRAME.match(line):
+            issues.append(f"{path}:{line_number}: deprecated inline Wireframe blockquote")
+    return issues
+
+
+def process_file(path: Path, check_only: bool) -> bool:
+    original = path.read_text(encoding="utf-8")
+    new_text, changed = transform_text(original)
+    if changed and not check_only:
         path.write_text(new_text, encoding="utf-8")
     return changed
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Do not write files; exit 1 if any feature file needs normalization",
+    )
+    args = parser.parse_args()
+
     changed_files: list[str] = []
+    deprecated_issues: list[str] = []
+
     for path in sorted(ROOT.glob(FEATURE_GLOB)):
-        if process_file(path):
+        deprecated_issues.extend(check_deprecated_format(path))
+        if process_file(path, check_only=args.check):
             changed_files.append(str(path.relative_to(ROOT)))
 
+    exit_code = 0
+
+    if deprecated_issues:
+        exit_code = 1
+        print("Deprecated feature file format detected:", file=sys.stderr)
+        for issue in deprecated_issues:
+            print(f"  {issue}", file=sys.stderr)
+        print("Run: python3 scripts/normalize-feature-docs.py", file=sys.stderr)
+
     if changed_files:
-        print(f"Normalized {len(changed_files)} feature file(s):")
+        exit_code = 1
+        mode = "needs normalization" if args.check else "normalized"
+        print(f"Feature files {mode} ({len(changed_files)}):", file=sys.stderr)
         for file_path in changed_files:
-            print(f"  - {file_path}")
-    else:
-        print("No feature files needed normalization.")
-    return 0
+            print(f"  - {file_path}", file=sys.stderr)
+        if args.check:
+            print("Run: python3 scripts/normalize-feature-docs.py", file=sys.stderr)
+        else:
+            print(f"Normalized {len(changed_files)} feature file(s):")
+            for file_path in changed_files:
+                print(f"  - {file_path}")
+
+    if exit_code == 0:
+        print("normalize-feature-docs: OK")
+    return exit_code
 
 
 if __name__ == "__main__":

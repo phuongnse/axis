@@ -28,7 +28,7 @@
 
 When you ship code, update **US callout → epic README table → epic Open work → PROGRESS** in the same PR. Never mark ✅ while `**Gaps vs spec**` still lists backend work for that layer.
 
-**Feature file layout:** wireframes as a `## Wireframes` table; implementation status as a blockquote + layer table — see [docs-style § Feature files](./docs-style.md#feature-files-wireframes--implementation-status). After bulk edits, run `python3 scripts/normalize-feature-docs.py`.
+**Feature file layout:** wireframes as a `## Wireframes` table; implementation status as a blockquote + layer table — see [docs-style § Feature files](../playbooks/docs-style.md#feature-files--wireframes--implementation-status). After bulk edits, run `python3 scripts/normalize-feature-docs.py --check` (or omit `--check` to rewrite).
 
 **Full AC coverage (all cases, not happy path only):** [agent-checklist § AC coverage](../playbooks/agent-checklist.md#ac-coverage--avoid-happy-path-only) — Gate 0 AC map + TDD + `Gaps vs spec` on every PR.
 
