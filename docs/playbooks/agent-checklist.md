@@ -51,6 +51,24 @@ Feature files group ACs under **Happy path**, **Validation & errors**, **Edge ca
 
 **Self-audit command** (after implementation, before push): re-read the US in the feature file and tick mentally each bullet against your AC map — same order as the spec (happy → validation → edge).
 
+### Anti-pattern: `Gaps vs spec: none` after happy path only
+
+Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because the main API flow works. That is not Gate 0 complete.
+
+| Wrong | Right |
+|-------|--------|
+| Ship register → settings → delete endpoints, then claim backend ✅ | AC map row per bullet (happy, validation, edge) with file/test or explicit deferral |
+| Wait for the user to ask “đã cover đủ AC chưa?” | Run the self-audit **before the first PR push** — that question is the agent’s job |
+| Fix gaps only in a follow-up commit after review | Same PR when possible; otherwise `**Deferred (PR #N):**` + **exact AC bullet text** in the feature callout |
+
+**Before push checklist (backend feature PRs):**
+
+1. Re-read every in-scope `- [ ]` under the US (all sections, not only *Happy path*).
+2. For each bullet: implemented + test, `N/A this PR — Frontend`, or named deferral.
+3. Only then set `Gaps vs spec: none for backend` (or list what remains).
+
+**Lesson (E01 F02):** A first pass shipped profile/settings/deletion APIs but missed Redis usage TTL (≤5 min), schedule rollback on queue failure, hard-delete purge, and form-task cancel — caught by spec review, not by “flow works.” See [F02 callouts](../epics/E01-platform-foundation/features/F02-organization-management.md) for what “done” looks like after self-audit.
+
 ---
 
 ## Gates (every PR)
