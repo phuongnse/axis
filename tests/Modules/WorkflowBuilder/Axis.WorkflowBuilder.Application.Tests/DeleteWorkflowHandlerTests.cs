@@ -31,6 +31,11 @@ public class DeleteWorkflowHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         wf.DeletedAt.Should().NotBeNull();
+        await _planLimitService.Received(1).RecordUsageDeltaAsync(
+            OrgId,
+            PlanLimitResourceType.Workflows,
+            -1,
+            Arg.Any<CancellationToken>());
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
@@ -43,6 +48,11 @@ public class DeleteWorkflowHandlerTests
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        await _planLimitService.DidNotReceive().RecordUsageDeltaAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<PlanLimitResourceType>(),
+            Arg.Any<int>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -56,6 +66,11 @@ public class DeleteWorkflowHandlerTests
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        await _planLimitService.DidNotReceive().RecordUsageDeltaAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<PlanLimitResourceType>(),
+            Arg.Any<int>(),
+            Arg.Any<CancellationToken>());
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 

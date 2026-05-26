@@ -51,5 +51,10 @@ internal sealed class OrganizationConfiguration : IEntityTypeConfiguration<Organ
             .HasColumnName("subscription_plan_id")
             .HasDefaultValue(WellKnownSubscriptionPlans.FreeId)
             .IsRequired();
+
+        builder.HasOne<SubscriptionPlan>()
+            .WithMany()
+            .HasForeignKey(o => o.SubscriptionPlanId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -3,6 +3,7 @@ using Axis.Shared.Domain.Primitives;
 using Axis.WorkflowBuilder.Application.Commands.CreateWorkflow;
 using Axis.WorkflowBuilder.Application.Repositories;
 using Axis.WorkflowBuilder.Application.Services;
+using Axis.WorkflowBuilder.Domain.Aggregates;
 using Axis.WorkflowBuilder.Domain.Enums;
 using FluentAssertions;
 using NSubstitute;
@@ -38,10 +39,20 @@ public class CreateWorkflowHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeEmpty();
         await _workflowRepo.Received(1).AddAsync(
-            Arg.Is<Domain.Aggregates.WorkflowDefinition>(w =>
+            Arg.Is<WorkflowDefinition>(w =>
                 w.Name == "Invoice Approval" &&
                 w.Status == WorkflowStatus.Draft &&
                 w.CreatedBy == UserId),
+            Arg.Any<CancellationToken>());
+        await _planLimitService.Received(1).EnsureWithinLimitAsync(
+            OrgId,
+            PlanLimitResourceType.Workflows,
+            1,
+            Arg.Any<CancellationToken>());
+        await _planLimitService.Received(1).RecordUsageDeltaAsync(
+            OrgId,
+            PlanLimitResourceType.Workflows,
+            1,
             Arg.Any<CancellationToken>());
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }

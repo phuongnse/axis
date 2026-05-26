@@ -11,7 +11,7 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
         if not v then return 0 end
         local n = tonumber(v) + tonumber(ARGV[1])
         if n < 0 then n = 0 end
-        redis.call('SET', KEYS[1], n)
+        redis.call('SET', KEYS[1], n, 'KEEPTTL')
         return n
         """;
 
@@ -20,6 +20,7 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
         PlanLimitResourceType resourceType,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
             IDatabase db = redis.GetDatabase();
@@ -41,6 +42,7 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
         long usage,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
             IDatabase db = redis.GetDatabase();
@@ -63,6 +65,7 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
         int delta,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
             IDatabase db = redis.GetDatabase();
@@ -90,6 +93,7 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
 
     public async Task TryInvalidateOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
             IDatabase db = redis.GetDatabase();

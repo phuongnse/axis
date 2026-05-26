@@ -19,6 +19,7 @@ public static class PlatformOrganizationEndpoints
             .WithSummary("Platform admin: change an organization's subscription plan (US-012)")
             .WithTags("Platform")
             .Produces<object>()
+            .ProducesProblem(401)
             .ProducesProblem(403)
             .ProducesProblem(404);
 

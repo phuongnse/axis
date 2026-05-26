@@ -77,39 +77,6 @@ namespace Axis.Identity.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "organization_plan_change_logs",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    organization_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    previous_plan_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    new_plan_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    changed_by_user_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    changed_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_organization_plan_change_logs", x => x.id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "organizations",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    slug = table.Column<string>(type: "character varying(63)", maxLength: 63, nullable: false),
-                    owner_email = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: false),
-                    status = table.Column<string>(type: "text", nullable: false),
-                    subscription_plan_id = table.Column<Guid>(type: "uuid", nullable: false, defaultValue: new Guid("11111111-1111-1111-1111-111111111101")),
-                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_organizations", x => x.id);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "registration_idempotency",
                 columns: table => new
                 {
@@ -224,6 +191,29 @@ namespace Axis.Identity.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "organizations",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    slug = table.Column<string>(type: "character varying(63)", maxLength: 63, nullable: false),
+                    owner_email = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: false),
+                    status = table.Column<string>(type: "text", nullable: false),
+                    subscription_plan_id = table.Column<Guid>(type: "uuid", nullable: false, defaultValue: new Guid("11111111-1111-1111-1111-111111111101")),
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_organizations", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_organizations_subscription_plans_subscription_plan_id",
+                        column: x => x.subscription_plan_id,
+                        principalTable: "subscription_plans",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "email_verification_tokens",
                 columns: table => new
                 {
@@ -300,6 +290,40 @@ namespace Axis.Identity.Infrastructure.Migrations
                         principalColumn: "Id");
                 });
 
+            migrationBuilder.CreateTable(
+                name: "organization_plan_change_logs",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    organization_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    previous_plan_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    new_plan_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    changed_by_user_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    changed_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_organization_plan_change_logs", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_organization_plan_change_logs_organizations_organization_id",
+                        column: x => x.organization_id,
+                        principalTable: "organizations",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_organization_plan_change_logs_subscription_plans_new_plan_id",
+                        column: x => x.new_plan_id,
+                        principalTable: "subscription_plans",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_organization_plan_change_logs_subscription_plans_previous_p~",
+                        column: x => x.previous_plan_id,
+                        principalTable: "subscription_plans",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
             migrationBuilder.CreateIndex(
                 name: "IX_email_verification_tokens_TokenHash",
                 table: "email_verification_tokens",
@@ -351,15 +375,30 @@ namespace Axis.Identity.Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_organization_plan_change_logs_new_plan_id",
+                table: "organization_plan_change_logs",
+                column: "new_plan_id");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_organization_plan_change_logs_organization_id",
                 table: "organization_plan_change_logs",
                 column: "organization_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_organization_plan_change_logs_previous_plan_id",
+                table: "organization_plan_change_logs",
+                column: "previous_plan_id");
 
             migrationBuilder.CreateIndex(
                 name: "IX_organizations_slug",
                 table: "organizations",
                 column: "slug",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_organizations_subscription_plan_id",
+                table: "organizations",
+                column: "subscription_plan_id");
 
             migrationBuilder.CreateIndex(
                 name: "IX_password_reset_tokens_TokenHash",
@@ -410,9 +449,6 @@ namespace Axis.Identity.Infrastructure.Migrations
                 name: "organization_plan_change_logs");
 
             migrationBuilder.DropTable(
-                name: "organizations");
-
-            migrationBuilder.DropTable(
                 name: "password_reset_tokens");
 
             migrationBuilder.DropTable(
@@ -422,19 +458,22 @@ namespace Axis.Identity.Infrastructure.Migrations
                 name: "roles");
 
             migrationBuilder.DropTable(
-                name: "subscription_plans");
-
-            migrationBuilder.DropTable(
                 name: "tenant_module_provisions");
 
             migrationBuilder.DropTable(
                 name: "OpenIddictAuthorizations");
 
             migrationBuilder.DropTable(
+                name: "organizations");
+
+            migrationBuilder.DropTable(
                 name: "users");
 
             migrationBuilder.DropTable(
                 name: "OpenIddictApplications");
+
+            migrationBuilder.DropTable(
+                name: "subscription_plans");
         }
     }
 }

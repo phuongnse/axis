@@ -175,12 +175,12 @@ public sealed class RegisterOrganizationHandler(
     {
         if (requestedPlanId is Guid planId && planId != Guid.Empty)
         {
-            Domain.Subscriptions.SubscriptionPlan? plan = await planRepo.GetByIdAsync(planId, cancellationToken);
+            SubscriptionPlan? plan = await planRepo.GetByIdAsync(planId, cancellationToken);
             if (plan is not null && plan.IsActive && plan.IsAvailableForNewSignups)
                 return plan.Id;
         }
 
-        Domain.Subscriptions.SubscriptionPlan? freePlan =
+        SubscriptionPlan? freePlan =
             await planRepo.GetByIdAsync(WellKnownSubscriptionPlans.FreeId, cancellationToken);
         if (freePlan is not null)
             return freePlan.Id;

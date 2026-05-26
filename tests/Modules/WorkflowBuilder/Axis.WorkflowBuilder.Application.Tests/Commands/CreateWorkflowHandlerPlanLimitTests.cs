@@ -3,6 +3,7 @@ using Axis.Shared.Domain.Primitives;
 using Axis.WorkflowBuilder.Application.Commands.CreateWorkflow;
 using Axis.WorkflowBuilder.Application.Repositories;
 using Axis.WorkflowBuilder.Application.Services;
+using Axis.WorkflowBuilder.Domain.Aggregates;
 using FluentAssertions;
 using NSubstitute;
 
@@ -36,8 +37,9 @@ public class CreateWorkflowHandlerPlanLimitTests
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.PlanLimit);
         result.PlanLimitDetails.Should().BeEquivalentTo(details);
-        await _workflowRepo.DidNotReceive().AddAsync(Arg.Any<Domain.Aggregates.WorkflowDefinition>(), Arg.Any<CancellationToken>());
+        await _workflowRepo.DidNotReceive().AddAsync(Arg.Any<WorkflowDefinition>(), Arg.Any<CancellationToken>());
         await _planLimitService.DidNotReceive().RecordUsageDeltaAsync(
             Arg.Any<Guid>(), Arg.Any<PlanLimitResourceType>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 }

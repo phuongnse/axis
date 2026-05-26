@@ -120,6 +120,8 @@ namespace Axis.Identity.Infrastructure.Migrations
                     b.HasIndex("Slug")
                         .IsUnique();
 
+                    b.HasIndex("SubscriptionPlanId");
+
                     b.ToTable("organizations", (string)null);
                 });
 
@@ -390,7 +392,11 @@ namespace Axis.Identity.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("NewPlanId");
+
                     b.HasIndex("OrganizationId");
+
+                    b.HasIndex("PreviousPlanId");
 
                     b.ToTable("organization_plan_change_logs", (string)null);
                 });
@@ -657,12 +663,42 @@ namespace Axis.Identity.Infrastructure.Migrations
                     b.ToTable("OpenIddictTokens", (string)null);
                 });
 
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.Organization", b =>
+                {
+                    b.HasOne("Axis.Identity.Domain.Subscriptions.SubscriptionPlan", null)
+                        .WithMany()
+                        .HasForeignKey("SubscriptionPlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.EmailVerificationToken", b =>
                 {
                     b.HasOne("Axis.Identity.Domain.Aggregates.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.OrganizationPlanChangeLog", b =>
+                {
+                    b.HasOne("Axis.Identity.Domain.Subscriptions.SubscriptionPlan", null)
+                        .WithMany()
+                        .HasForeignKey("NewPlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Axis.Identity.Domain.Aggregates.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Axis.Identity.Domain.Subscriptions.SubscriptionPlan", null)
+                        .WithMany()
+                        .HasForeignKey("PreviousPlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

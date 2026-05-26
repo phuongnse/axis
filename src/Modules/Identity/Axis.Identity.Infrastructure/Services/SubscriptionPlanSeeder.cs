@@ -15,11 +15,7 @@ public sealed class SubscriptionPlanSeeder(IServiceProvider services, ILogger<Su
     {
         using IServiceScope scope = services.CreateScope();
         IdentityDbContext context = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-
-        if (await context.SubscriptionPlans.AnyAsync(cancellationToken))
-            return;
-
-        SubscriptionPlan[] plans =
+        SubscriptionPlan[] expectedPlans =
         [
             SubscriptionPlan.Create(
                 WellKnownSubscriptionPlans.FreeId,
@@ -56,9 +52,19 @@ public sealed class SubscriptionPlanSeeder(IServiceProvider services, ILogger<Su
                 isAvailableForNewSignups: false),
         ];
 
-        await context.SubscriptionPlans.AddRangeAsync(plans, cancellationToken);
+        Guid[] expectedIds = expectedPlans.Select(p => p.Id).ToArray();
+        HashSet<Guid> existingIds = await context.SubscriptionPlans
+            .Where(p => expectedIds.Contains(p.Id))
+            .Select(p => p.Id)
+            .ToHashSetAsync(cancellationToken);
+
+        SubscriptionPlan[] missingPlans = expectedPlans.Where(p => !existingIds.Contains(p.Id)).ToArray();
+        if (missingPlans.Length == 0)
+            return;
+
+        await context.SubscriptionPlans.AddRangeAsync(missingPlans, cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
-        logger.LogInformation("Seeded {Count} subscription plans.", plans.Length);
+        logger.LogInformation("Seeded {Count} missing subscription plans.", missingPlans.Length);
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;

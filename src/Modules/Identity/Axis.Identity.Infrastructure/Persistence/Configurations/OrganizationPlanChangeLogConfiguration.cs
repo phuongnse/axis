@@ -1,3 +1,5 @@
+using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Domain.Subscriptions;
 using Axis.Identity.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -17,5 +19,20 @@ internal sealed class OrganizationPlanChangeLogConfiguration : IEntityTypeConfig
         builder.Property(x => x.ChangedByUserId).HasColumnName("changed_by_user_id").IsRequired();
         builder.Property(x => x.ChangedAt).HasColumnName("changed_at").IsRequired();
         builder.HasIndex(x => x.OrganizationId);
+
+        builder.HasOne<Organization>()
+            .WithMany()
+            .HasForeignKey(x => x.OrganizationId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne<SubscriptionPlan>()
+            .WithMany()
+            .HasForeignKey(x => x.PreviousPlanId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<SubscriptionPlan>()
+            .WithMany()
+            .HasForeignKey(x => x.NewPlanId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -36,6 +36,16 @@ public sealed class SubscriptionPlan
             throw new ArgumentException("Plan name is required.", nameof(name));
         if (string.IsNullOrWhiteSpace(slug))
             throw new ArgumentException("Plan slug is required.", nameof(slug));
+        if (monthlyPriceCents < 0)
+            throw new ArgumentOutOfRangeException(nameof(monthlyPriceCents), "Monthly price cannot be negative.");
+        if (maxWorkflows is <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxWorkflows), "Max workflows must be greater than zero.");
+        if (maxExecutionsPerMonth is <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxExecutionsPerMonth), "Max executions per month must be greater than zero.");
+        if (maxUsers is <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxUsers), "Max users must be greater than zero.");
+        if (maxStorageMegabytes is <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxStorageMegabytes), "Max storage megabytes must be greater than zero.");
 
         return new SubscriptionPlan
         {

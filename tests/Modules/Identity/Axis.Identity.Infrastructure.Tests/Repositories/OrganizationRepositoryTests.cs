@@ -43,6 +43,7 @@ public class OrganizationRepositoryTests(IdentityDatabaseFixture db) : IAsyncLif
         loaded.Slug.Value.Should().Be("org-add-get");
         loaded.OwnerEmail.Value.Should().Be("owner@example.com");
         loaded.Status.Should().Be(OrganizationStatus.Active);
+        loaded.SubscriptionPlanId.Should().Be(WellKnownSubscriptionPlans.FreeId);
     }
 
     [Fact]

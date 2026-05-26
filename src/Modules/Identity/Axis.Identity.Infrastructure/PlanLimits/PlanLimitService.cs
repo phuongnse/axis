@@ -74,7 +74,14 @@ public sealed class PlanLimitService(
     {
         long? cached = await redisCache.TryGetCachedUsageAsync(organizationId, resourceType, cancellationToken);
         if (cached is not null)
+        {
+            if (cached.Value >= int.MaxValue)
+                return int.MaxValue;
+            if (cached.Value <= int.MinValue)
+                return int.MinValue;
+
             return (int)cached.Value;
+        }
 
         IPlanLimitUsageCounter? counter = usageCounters.FirstOrDefault(c => c.ResourceType == resourceType);
         if (counter is null)

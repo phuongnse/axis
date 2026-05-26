@@ -86,4 +86,26 @@ public class DuplicateWorkflowHandlerTests
         await _repo.Received(1).GetByIdAsync(wf.Id, otherOrgId, Arg.Any<CancellationToken>());
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task Handle_WhenPlanLimitExceeded_ReturnsPlanLimitAndDoesNotPersist()
+    {
+        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, OrgId, "user");
+        _repo.GetByIdAsync(wf.Id, OrgId, Arg.Any<CancellationToken>()).Returns(wf);
+        _planLimitService.EnsureWithinLimitAsync(
+                OrgId,
+                PlanLimitResourceType.Workflows,
+                1,
+                Arg.Any<CancellationToken>())
+            .Returns(Result.Failure(ErrorCodes.PlanLimit, "Workflow limit reached."));
+
+        Result<Guid> result = await _handler.Handle(
+            new DuplicateWorkflowCommand(wf.Id, OrgId, "user"),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.PlanLimit);
+        await _repo.DidNotReceive().AddAsync(Arg.Any<WorkflowDefinition>(), Arg.Any<CancellationToken>());
+        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
 }
