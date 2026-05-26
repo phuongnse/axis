@@ -6,4 +6,5 @@ public enum AuthFailureReason
     AccountLocked,
     AccountDeactivated,
     EmailNotVerified,
+    OrganizationDeleted,
 }

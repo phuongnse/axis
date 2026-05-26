@@ -64,6 +64,8 @@ public static class IdentityInfrastructureExtensions
 
         services.AddAWSService<IAmazonS3>();
         services.AddScoped<IAvatarStorageService, S3AvatarStorageService>();
+        services.AddScoped<IOrganizationLogoStorageService, S3OrganizationLogoStorageService>();
+        services.AddScoped<IOrganizationDeletionScheduler, WolverineOrganizationDeletionScheduler>();
 
         return services;
     }

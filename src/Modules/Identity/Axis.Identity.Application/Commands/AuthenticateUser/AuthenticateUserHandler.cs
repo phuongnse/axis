@@ -9,6 +9,7 @@ namespace Axis.Identity.Application.Commands.AuthenticateUser;
 
 public sealed class AuthenticateUserHandler(
     IUserRepository userRepo,
+    IOrganizationRepository organizationRepo,
     IRoleRepository roleRepo,
     IPasswordHasher hasher,
     IUnitOfWork uow)
@@ -30,6 +31,10 @@ public sealed class AuthenticateUserHandler(
 
         if (!user.IsEmailVerified)
             return AuthenticationResult.Fail(AuthFailureReason.EmailNotVerified);
+
+        Organization? organization = await organizationRepo.GetByIdAsync(user.OrganizationId, cancellationToken);
+        if (organization is null || !organization.AllowsSignIn())
+            return AuthenticationResult.Fail(AuthFailureReason.OrganizationDeleted);
 
         if (user.IsLockedOut)
             return AuthenticationResult.Fail(AuthFailureReason.AccountLocked, user.LockedUntil);

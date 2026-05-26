@@ -48,9 +48,9 @@ Allow organization admins to manage their organization's profile, settings, and 
 - Custom domain / vanity URL — not in MVP.
 - White-label theming (custom colors, fonts) — not in MVP.
 
-> **Implementation status** — Domain: ⏳ | Application: ⏳ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: `Organization` has only `Name`, `Slug`, `OwnerEmail`, `Status`, `SubscriptionPlanId`, `CreatedAt` — no logo, timezone, or language. No `UpdateOrganizationProfileCommand`, logo upload, or settings endpoints.
-> **Next (backend):** extend aggregate + migration; `PUT /api/organizations/current` (or settings sub-resource); validate IANA timezone and logo MIME/size per AC.
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
+> Gaps vs spec: none for backend US-005. Logo upload via base64 on `PUT /api/organizations/current/profile` (same pattern as user avatar). Frontend-only AC: toast, upload progress, navigate-away warning.
+> **Done:** `Organization` profile fields + `UpdateOrganizationProfileCommand`; S3 logo storage; IANA timezone validation.
 
 ---
 
@@ -74,9 +74,9 @@ Allow organization admins to manage their organization's profile, settings, and 
 *Out of scope*
 - Editing all settings inline on this page — this page is read-only for stats; editing is in sub-sections.
 
-> **Implementation status** — Domain: ⏳ | Application: ⏳ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: no read-model query for org settings + usage (workflows/users/executions). **Can reuse:** `IPlanLimitService` / plan limits for numerators; `GET /api/plans` for plan name. Admin-only 403 at API layer not wired.
-> **Next (backend):** `GetOrganizationSettingsQuery` + authenticated GET; aggregate usage from plan-limit counters or DB counts.
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
+> Gaps vs spec: none for backend US-006. Usage from `IPlanLimitService.GetUsageSnapshotAsync` (Redis read-through + module counters). Admin-only via `organization:settings:read` policy. Frontend-only: usage retry UI, redirect on 403.
+> **Done:** `GET /api/organizations/current/settings` returns plan name, profile, usage limits, deletion schedule metadata.
 
 ---
 
@@ -107,6 +107,6 @@ Allow organization admins to manage their organization's profile, settings, and 
 - Data export before deletion — available separately as a future feature.
 - Immediate hard delete without grace period — the 30-day window is non-negotiable in MVP.
 
-> **Implementation status** — Domain: ⏳ | Application: ⏳ | Infrastructure: ⏳ | API: ⏳ | Frontend: ⏳
-> Gaps vs spec: `Organization.Archive()` exists but no scheduled-deletion job, grace-period cancel, schema hard-delete, or deletion confirmation email. No delete API or typed-name confirmation flow.
-> **Next (backend):** deletion request aggregate/state; Wolverine job for grace period + hard delete; cancel-running-executions hook before schema drop (coordinate E06).
+> **Implementation status** — Domain: ✅ | Application: ✅ | Infrastructure: ✅ | API: ✅ | Frontend: ⏳
+> Gaps vs spec: none for backend US-007 core flow. **Deferred (follow-up):** marketing-page redirect + forced sign-out after schedule (Frontend/session); explicit Wolverine job abandon for in-flight step messages beyond execution cancel.
+> **Done:** `ScheduleOrganizationDeletion` / `CancelOrganizationDeletion`; 30-day grace via `OrganizationHardDeleteJob`; confirmation email; `IOrganizationExecutionCanceller` + tenant schema drop across module DBs; login blocked for deleted orgs.

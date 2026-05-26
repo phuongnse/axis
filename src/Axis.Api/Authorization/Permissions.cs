@@ -53,4 +53,11 @@ public static class Permissions
         public const string Read = "roles:read";
         public const string Write = "roles:write";
     }
+
+    public static class Organization
+    {
+        public const string SettingsRead = "organization:settings:read";
+        public const string SettingsWrite = "organization:settings:write";
+        public const string Delete = "organization:delete";
+    }
 }

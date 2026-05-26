@@ -100,6 +100,8 @@ public static class ConnectEndpoints
                     "Your account has been deactivated. Contact your organization admin.",
                 AuthFailureReason.EmailNotVerified =>
                     "Please verify your email before signing in.",
+                AuthFailureReason.OrganizationDeleted =>
+                    "This organization no longer exists.",
                 _ => "Incorrect email or password.",
             };
             return Results.Problem(detail: detail, statusCode: StatusCodes.Status401Unauthorized);

@@ -52,6 +52,21 @@ internal sealed class OrganizationConfiguration : IEntityTypeConfiguration<Organ
             .HasDefaultValue(WellKnownSubscriptionPlans.FreeId)
             .IsRequired();
 
+        builder.Property(o => o.LogoUrl)
+            .HasColumnName("logo_url")
+            .HasMaxLength(2048);
+
+        builder.Property(o => o.TimeZoneId)
+            .HasColumnName("time_zone_id")
+            .HasMaxLength(64);
+
+        builder.Property(o => o.DefaultLanguage)
+            .HasColumnName("default_language")
+            .HasMaxLength(16);
+
+        builder.Property(o => o.ScheduledHardDeleteAt)
+            .HasColumnName("scheduled_hard_delete_at");
+
         builder.HasOne<SubscriptionPlan>()
             .WithMany()
             .HasForeignKey(o => o.SubscriptionPlanId)

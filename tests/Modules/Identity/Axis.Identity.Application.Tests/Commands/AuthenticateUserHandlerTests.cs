@@ -2,6 +2,7 @@ using Axis.Identity.Application.Commands.AuthenticateUser;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Domain.Subscriptions;
 using Axis.Identity.Domain.ValueObjects;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
@@ -13,6 +14,7 @@ namespace Axis.Identity.Application.Tests.Commands;
 public class AuthenticateUserHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
+    private readonly IOrganizationRepository _orgRepo = Substitute.For<IOrganizationRepository>();
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
     private readonly IPasswordHasher _hasher = Substitute.For<IPasswordHasher>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
@@ -20,8 +22,16 @@ public class AuthenticateUserHandlerTests
     private static readonly Guid OrgId = Guid.NewGuid();
     private static readonly Guid RoleId = Guid.NewGuid();
 
-    private AuthenticateUserHandler CreateHandler() =>
-        new(_userRepo, _roleRepo, _hasher, _uow);
+    private AuthenticateUserHandler CreateHandler()
+    {
+        Organization organization = Organization.Create(
+            "Acme",
+            OrganizationSlug.Create("acme").Value,
+            Email.Create("owner@acme.com").Value,
+            WellKnownSubscriptionPlans.FreeId);
+        _orgRepo.GetByIdAsync(OrgId, Arg.Any<CancellationToken>()).Returns(organization);
+        return new(_userRepo, _orgRepo, _roleRepo, _hasher, _uow);
+    }
 
     private static User MakeActiveUser(string email = "alice@acme.com")
     {
@@ -34,6 +44,28 @@ public class AuthenticateUserHandlerTests
 
     private static Role MakeRole(string[] permissions) =>
         Role.CreateSystem("Admin", OrgId, permissions);
+
+    [Fact]
+    public async Task AuthenticateUser_WhenOrganizationDeleted_ReturnsOrganizationDeleted()
+    {
+        User user = MakeActiveUser();
+        Organization organization = Organization.Create(
+            "Acme",
+            OrganizationSlug.Create("acme").Value,
+            Email.Create("owner@acme.com").Value,
+            WellKnownSubscriptionPlans.FreeId);
+        organization.MarkDeleted();
+        _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).Returns(user);
+        _orgRepo.GetByIdAsync(user.OrganizationId, Arg.Any<CancellationToken>()).Returns(organization);
+
+        AuthenticateUserHandler handler = new(_userRepo, _orgRepo, _roleRepo, _hasher, _uow);
+        Result<AuthenticationResult> result = await handler.Handle(
+            new AuthenticateUserCommand("alice@acme.com", "password123"),
+            CancellationToken.None);
+
+        result.Value.Success.Should().BeFalse();
+        result.Value.FailureReason.Should().Be(AuthFailureReason.OrganizationDeleted);
+    }
 
     [Fact]
     public async Task AuthenticateUser_WhenCredentialsAreValid_ReturnsSuccessWithUserInfoAndPermissions()

@@ -38,4 +38,9 @@ internal sealed class UserRepository(IdentityDbContext context) : IUserRepositor
         context.Users.CountAsync(
             u => u.OrganizationId == organizationId && u.Status == UserStatus.Active,
             ct);
+
+    public async Task<IReadOnlyList<User>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken ct = default) =>
+        await context.Users
+            .Where(u => u.OrganizationId == organizationId)
+            .ToListAsync(ct);
 }

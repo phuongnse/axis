@@ -5,5 +5,7 @@ public enum OrganizationStatus
     Active,
     Provisioning,
     ProvisioningFailed,
-    Archived
+    DeletionScheduled,
+    Deleted,
+    Archived,
 }

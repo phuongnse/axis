@@ -22,4 +22,9 @@ public interface IPlanLimitService
         PlanLimitResourceType resourceType,
         int delta,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Current usage vs plan limits for organization settings (US-006).</summary>
+    Task<PlanLimitUsageSnapshot?> GetUsageSnapshotAsync(
+        Guid organizationId,
+        CancellationToken cancellationToken = default);
 }

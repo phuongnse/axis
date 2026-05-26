@@ -100,6 +100,53 @@ public class OrganizationTests
     }
 
     [Fact]
+    public void UpdateProfile_WhenValid_UpdatesNameTimezoneAndLanguage()
+    {
+        Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail, WellKnownSubscriptionPlans.FreeId);
+
+        org.UpdateProfile("New Name", "Europe/Berlin", "de-DE");
+
+        org.Name.Should().Be("New Name");
+        org.TimeZoneId.Should().Be("Europe/Berlin");
+        org.DefaultLanguage.Should().Be("de-DE");
+        org.Slug.Should().Be(ValidSlug);
+    }
+
+    [Fact]
+    public void UpdateProfile_WhenNameTooShort_Throws()
+    {
+        Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail, WellKnownSubscriptionPlans.FreeId);
+
+        Action act = () => org.UpdateProfile("A", null, null);
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void ScheduleDeletion_WhenActive_SetsDeletionScheduledAndGraceDate()
+    {
+        Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail, WellKnownSubscriptionPlans.FreeId);
+        DateTime now = new(2026, 5, 26, 12, 0, 0, DateTimeKind.Utc);
+
+        org.ScheduleDeletion(now);
+
+        org.Status.Should().Be(OrganizationStatus.DeletionScheduled);
+        org.ScheduledHardDeleteAt.Should().Be(now.AddDays(Organization.DeletionGracePeriodDays));
+    }
+
+    [Fact]
+    public void CancelScheduledDeletion_WhenScheduled_RestoresActive()
+    {
+        Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail, WellKnownSubscriptionPlans.FreeId);
+        org.ScheduleDeletion(DateTime.UtcNow);
+
+        org.CancelScheduledDeletion();
+
+        org.Status.Should().Be(OrganizationStatus.Active);
+        org.ScheduledHardDeleteAt.Should().BeNull();
+    }
+
+    [Fact]
     public void MarkProvisioningFailed_WhenAlreadyFailed_IsIdempotent()
     {
         Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail, WellKnownSubscriptionPlans.FreeId);

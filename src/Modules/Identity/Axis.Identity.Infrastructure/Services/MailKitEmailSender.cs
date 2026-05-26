@@ -35,6 +35,17 @@ internal sealed class MailKitEmailSender(IConfiguration configuration) : IEmailS
         await SendAsync(toEmail, subject, body, ct);
     }
 
+    public async Task SendOrganizationDeletionScheduledEmailAsync(
+        string toEmail,
+        string organizationName,
+        CancellationToken ct = default)
+    {
+        string subject = $"Deletion scheduled for {organizationName}";
+        string body =
+            "Your organization has been scheduled for deletion. All data will be permanently removed in 30 days.";
+        await SendAsync(toEmail, subject, body, ct);
+    }
+
     private async Task SendAsync(string toEmail, string subject, string body, CancellationToken ct)
     {
         var smtp = configuration.GetSection("Email:Smtp");

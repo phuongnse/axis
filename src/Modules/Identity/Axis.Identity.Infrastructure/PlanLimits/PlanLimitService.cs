@@ -67,6 +67,34 @@ public sealed class PlanLimitService(
         return redisCache.TryAdjustUsageAsync(organizationId, resourceType, delta, cancellationToken);
     }
 
+    public async Task<PlanLimitUsageSnapshot?> GetUsageSnapshotAsync(
+        Guid organizationId,
+        CancellationToken cancellationToken = default)
+    {
+        Organization? organization =
+            await organizationRepository.GetByIdAsync(organizationId, cancellationToken);
+        if (organization is null)
+            return null;
+
+        SubscriptionPlan? plan =
+            await subscriptionPlanRepository.GetByIdAsync(organization.SubscriptionPlanId, cancellationToken);
+        if (plan is null)
+            return null;
+
+        int workflowsUsed = await GetCurrentUsageAsync(organizationId, PlanLimitResourceType.Workflows, cancellationToken);
+        int executionsUsed =
+            await GetCurrentUsageAsync(organizationId, PlanLimitResourceType.ExecutionsPerMonth, cancellationToken);
+        int usersUsed = await GetCurrentUsageAsync(organizationId, PlanLimitResourceType.Users, cancellationToken);
+
+        return new PlanLimitUsageSnapshot(
+            workflowsUsed,
+            plan.MaxWorkflows,
+            executionsUsed,
+            plan.MaxExecutionsPerMonth,
+            usersUsed,
+            plan.MaxUsers);
+    }
+
     private async Task<int> GetCurrentUsageAsync(
         Guid organizationId,
         PlanLimitResourceType resourceType,
