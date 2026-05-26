@@ -72,7 +72,7 @@ The workflow builder is the heart of the platform. It is what differentiates Axi
 
 ## Code style
 
-Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced via [`.editorconfig`](../../.editorconfig). Run `dotnet format Axis.sln` before push ([CONTRIBUTING.md](../../CONTRIBUTING.md)).
+Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced via [`.editorconfig`](../../../.editorconfig). Run `dotnet format Axis.sln` before push ([CONTRIBUTING.md](../../../CONTRIBUTING.md)).
 
 ---
 
