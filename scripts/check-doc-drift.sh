@@ -321,6 +321,14 @@ if any_changed '^docs/epics/.*/features/.*\.md$'; then
   )
 fi
 
+python3 "${ROOT}/scripts/check-local-dev-docs.py" --check || ERR=1
+
+if any_changed '^docker-compose\.yml$'; then
+  if ! docs_changed_under 'docs/playbooks/local-dev.md'; then
+    fail "docker-compose.yml changed but docs/playbooks/local-dev.md not updated in this PR"
+  fi
+fi
+
 if [ "${ERR}" -ne 0 ]; then
   echo "" >&2
   echo "See docs/playbooks/agent-checklist.md" >&2

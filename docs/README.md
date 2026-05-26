@@ -90,4 +90,5 @@ When two docs disagree, the **owner** wins. Update the owner first; everything e
 | Per-feature ACs and current gaps | `docs/epics/{module}/features/F0N-*.md` |
 | Module-wide layer status | [PROGRESS.md](./PROGRESS.md) |
 | Daily agent workflow + gates | [playbooks/agent-checklist.md](./playbooks/agent-checklist.md) |
+| Local dev (compose, ports, URLs) | [playbooks/local-dev.md](./playbooks/local-dev.md) + [`docker-compose.yml`](../docker-compose.yml) |
 | Implementation patterns and pitfalls | [playbooks/patterns.md](./playbooks/patterns.md) (start at [patterns-index.md](./playbooks/patterns-index.md)) |
