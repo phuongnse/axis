@@ -1,5 +1,5 @@
-using Axis.Shared.Domain.Primitives;
 using System.Text.RegularExpressions;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Identity.Domain.ValueObjects;
 

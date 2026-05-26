@@ -9,8 +9,8 @@ internal sealed class WorkflowStepConverter : JsonConverter<WorkflowStep>
 {
     public override WorkflowStep Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
-        using var doc = JsonDocument.ParseValue(ref reader);
-        var root = doc.RootElement;
+        using JsonDocument doc = JsonDocument.ParseValue(ref reader);
+        JsonElement root = doc.RootElement;
 
         Guid id = root.GetProperty("id").GetGuid();
         string name = root.GetProperty("name").GetString()!;

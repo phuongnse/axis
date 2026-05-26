@@ -1,3 +1,4 @@
+using axis.workflowbuilder.events;
 using Axis.WorkflowEngine.Application.Services;
 using Axis.WorkflowEngine.Domain.Aggregates;
 using Axis.WorkflowEngine.Infrastructure.Handlers;
@@ -5,7 +6,6 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
-using axis.workflowbuilder.events;
 
 namespace Axis.WorkflowEngine.Infrastructure.Tests.Handlers;
 

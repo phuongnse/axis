@@ -1,5 +1,5 @@
-using Axis.WorkflowBuilder.Domain.Enums;
 using Axis.Shared.Domain.Primitives;
+using Axis.WorkflowBuilder.Domain.Enums;
 
 namespace Axis.WorkflowBuilder.Domain.Entities;
 

@@ -23,7 +23,7 @@ public class WorkflowExecutionTests
     [Fact]
     public void WorkflowExecution_WhenCreated_SetsWorkflowOrgTriggerAndPendingStatus()
     {
-        var exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
 
         exec.WorkflowDefinitionId.Should().Be(WorkflowId);
         exec.OrganizationId.Should().Be(OrgId);
@@ -36,7 +36,7 @@ public class WorkflowExecutionTests
     [Fact]
     public void WorkflowExecution_WhenCreated_RaisesExecutionStartedEvent()
     {
-        var exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.DomainEvents.Should().ContainSingle(e => e is ExecutionStarted);
     }
 
@@ -45,7 +45,7 @@ public class WorkflowExecutionTests
     [Fact]
     public void Start_WhenExecutionIsPending_TransitionsToRunning()
     {
-        var exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.Start();
 
         exec.Status.Should().Be(ExecutionStatus.Running);
@@ -55,10 +55,10 @@ public class WorkflowExecutionTests
     [Fact]
     public void Start_WhenNotInPendingStatus_Throws()
     {
-        var exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.Start();
 
-        var act = () => exec.Start();
+        Action act = () => exec.Start();
         act.Should().Throw<InvalidOperationException>().WithMessage("*already*");
     }
 
@@ -67,7 +67,7 @@ public class WorkflowExecutionTests
     [Fact]
     public void Complete_WhenExecutionIsRunning_TransitionsToCompleted()
     {
-        var exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.Start();
         exec.Complete();
 
@@ -79,8 +79,8 @@ public class WorkflowExecutionTests
     [Fact]
     public void Complete_WhenNotRunning_Throws()
     {
-        var exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
-        var act = () => exec.Complete();
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        Action act = () => exec.Complete();
         act.Should().Throw<InvalidOperationException>().WithMessage("*running*");
     }
 
@@ -89,7 +89,7 @@ public class WorkflowExecutionTests
     [Fact]
     public void Fail_WhenExecutionIsRunning_TransitionsToFailedWithErrorMessage()
     {
-        var exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.Start();
         exec.Fail("Step X: connection timeout");
 
@@ -103,7 +103,7 @@ public class WorkflowExecutionTests
     [Fact]
     public void Cancel_WhenRunning_TransitionsToCancelled()
     {
-        var exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.Start();
         exec.Cancel();
 
@@ -114,7 +114,7 @@ public class WorkflowExecutionTests
     [Fact]
     public void Cancel_WhenPending_TransitionsToCancelled()
     {
-        var exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.Cancel();
         exec.Status.Should().Be(ExecutionStatus.Cancelled);
     }
@@ -125,7 +125,7 @@ public class WorkflowExecutionTests
     [InlineData(ExecutionStatus.Cancelled)]
     public void Cancel_WhenExecutionIsInTerminalState_Throws(ExecutionStatus terminal)
     {
-        var exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.Start();
 
         // Bring to terminal state
@@ -133,7 +133,7 @@ public class WorkflowExecutionTests
         else if (terminal == ExecutionStatus.Failed) exec.Fail("error");
         else exec.Cancel();
 
-        var act = () => exec.Cancel();
+        Action act = () => exec.Cancel();
         act.Should().Throw<InvalidOperationException>().WithMessage("*cancel*");
     }
 
@@ -247,11 +247,10 @@ public class WorkflowExecutionTests
     [Fact]
     public void CreateRetry_WhenExecutionHasFailed_CreatesNewExecutionLinkedToOriginal()
     {
-        var original = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution original = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
         original.Start();
         original.Fail("error");
-
-        var retry = original.CreateRetry(TriggeredBy);
+        WorkflowExecution retry = original.CreateRetry(TriggeredBy);
 
         retry.RetryOfExecutionId.Should().Be(original.Id);
         retry.Status.Should().Be(ExecutionStatus.Pending);
@@ -261,10 +260,10 @@ public class WorkflowExecutionTests
     [Fact]
     public void CreateRetry_WhenExecutionIsNotFailed_Throws()
     {
-        var exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.Start();
 
-        var act = () => exec.CreateRetry(TriggeredBy);
+        Func<WorkflowExecution> act = () => exec.CreateRetry(TriggeredBy);
         act.Should().Throw<InvalidOperationException>().WithMessage("*failed*");
     }
 }

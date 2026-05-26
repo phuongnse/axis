@@ -1,7 +1,7 @@
 using Axis.Identity.Application.Services;
 using MailKit.Net.Smtp;
-using MimeKit;
 using Microsoft.Extensions.Configuration;
+using MimeKit;
 
 namespace Axis.Identity.Infrastructure.Services;
 
@@ -9,29 +9,29 @@ internal sealed class MailKitEmailSender(IConfiguration configuration) : IEmailS
 {
     public async Task SendVerificationEmailAsync(string toEmail, string verificationToken, CancellationToken ct = default)
     {
-        var subject = "Verify your email address";
-        var body = $"Click the link to verify your email: {GetBaseUrl()}/auth/verify?token={verificationToken}";
+        string subject = "Verify your email address";
+        string body = $"Click the link to verify your email: {GetBaseUrl()}/auth/verify?token={verificationToken}";
         await SendAsync(toEmail, subject, body, ct);
     }
 
     public async Task SendInvitationEmailAsync(string toEmail, string orgName, string invitationToken, CancellationToken ct = default)
     {
-        var subject = $"You've been invited to join {orgName} on Axis";
-        var body = $"Click the link to accept your invitation: {GetBaseUrl()}/invitations/accept?token={invitationToken}";
+        string subject = $"You've been invited to join {orgName} on Axis";
+        string body = $"Click the link to accept your invitation: {GetBaseUrl()}/invitations/accept?token={invitationToken}";
         await SendAsync(toEmail, subject, body, ct);
     }
 
     public async Task SendPasswordResetEmailAsync(string toEmail, string resetToken, CancellationToken ct = default)
     {
-        var subject = "Reset your Axis password";
-        var body = $"Click the link to reset your password (valid for 1 hour): {GetBaseUrl()}/auth/reset-password?token={resetToken}";
+        string subject = "Reset your Axis password";
+        string body = $"Click the link to reset your password (valid for 1 hour): {GetBaseUrl()}/auth/reset-password?token={resetToken}";
         await SendAsync(toEmail, subject, body, ct);
     }
 
     public async Task SendPasswordChangedNotificationAsync(string toEmail, CancellationToken ct = default)
     {
-        var subject = "Your Axis password was changed";
-        var body = "Your password was recently changed. If this wasn't you, contact support immediately.";
+        string subject = "Your Axis password was changed";
+        string body = "Your password was recently changed. If this wasn't you, contact support immediately.";
         await SendAsync(toEmail, subject, body, ct);
     }
 
@@ -48,15 +48,14 @@ internal sealed class MailKitEmailSender(IConfiguration configuration) : IEmailS
 
     private async Task SendAsync(string toEmail, string subject, string body, CancellationToken ct)
     {
-        var smtp = configuration.GetSection("Email:Smtp");
-
-        var message = new MimeMessage();
+        IConfigurationSection smtp = configuration.GetSection("Email:Smtp");
+        MimeMessage message = new MimeMessage();
         message.From.Add(MailboxAddress.Parse(smtp["From"] ?? "noreply@axis.app"));
         message.To.Add(MailboxAddress.Parse(toEmail));
         message.Subject = subject;
         message.Body = new TextPart("plain") { Text = body };
 
-        using var client = new SmtpClient();
+        using SmtpClient client = new SmtpClient();
         await client.ConnectAsync(smtp["Host"] ?? "localhost", int.Parse(smtp["Port"] ?? "587"), cancellationToken: ct);
 
         if (!string.IsNullOrEmpty(smtp["Username"]))

@@ -60,7 +60,7 @@ public class ExecutionStepTests
     [Fact]
     public void ExecutionStep_WhenCreated_SetsPropertiesAndPendingStatus()
     {
-        var step = CreatePending("Approve Request", StepType.Form, 3);
+        ExecutionStep step = CreatePending("Approve Request", StepType.Form, 3);
 
         step.ExecutionId.Should().Be(ExecutionId);
         step.OrganizationId.Should().Be(OrgId);
@@ -79,8 +79,8 @@ public class ExecutionStepTests
     [Fact]
     public void ExecutionStep_WhenCreated_SetsCreatedAt()
     {
-        var before = DateTimeOffset.UtcNow;
-        var step = CreatePending();
+        DateTimeOffset before = DateTimeOffset.UtcNow;
+        ExecutionStep step = CreatePending();
 
         step.CreatedAt.Should().BeOnOrAfter(before);
     }
@@ -90,8 +90,8 @@ public class ExecutionStepTests
     [Fact]
     public void Start_WhenPending_TransitionsToRunningAndRecordsSnapshot()
     {
-        var step = CreatePending();
-        var input = SomeContext();
+        ExecutionStep step = CreatePending();
+        IReadOnlyDictionary<string, object?> input = SomeContext();
         step.Start(input);
 
         step.Status.Should().Be(StepExecutionStatus.Running);
@@ -107,10 +107,10 @@ public class ExecutionStepTests
     [InlineData(StepExecutionStatus.Cancelled)]
     public void Start_WhenNotPending_Throws(StepExecutionStatus status)
     {
-        var step = CreatePending();
+        ExecutionStep step = CreatePending();
         BringToStatus(step, status);
 
-        var act = () => step.Start(SomeContext());
+        Action act = () => step.Start(SomeContext());
         act.Should().Throw<InvalidOperationException>().WithMessage("*Pending*");
     }
 
@@ -119,9 +119,9 @@ public class ExecutionStepTests
     [Fact]
     public void Complete_WhenRunning_TransitionsToCompletedWithOutput()
     {
-        var step = CreatePending();
+        ExecutionStep step = CreatePending();
         step.Start(SomeContext());
-        var output = new Dictionary<string, object?> { ["result"] = 42 };
+        Dictionary<string, object?> output = new Dictionary<string, object?> { ["result"] = 42 };
         step.Complete(output);
 
         step.Status.Should().Be(StepExecutionStatus.Completed);
@@ -132,10 +132,10 @@ public class ExecutionStepTests
     [Fact]
     public void Complete_WhenWaiting_TransitionsToCompleted()
     {
-        var step = CreatePending(type: StepType.Form);
+        ExecutionStep step = CreatePending(type: StepType.Form);
         step.Start(SomeContext());
         step.Wait();
-        var output = new Dictionary<string, object?> { ["approved"] = true };
+        Dictionary<string, object?> output = new Dictionary<string, object?> { ["approved"] = true };
         step.Complete(output);
 
         step.Status.Should().Be(StepExecutionStatus.Completed);
@@ -149,10 +149,10 @@ public class ExecutionStepTests
     [InlineData(StepExecutionStatus.Cancelled)]
     public void Complete_WhenNotRunningOrWaiting_Throws(StepExecutionStatus status)
     {
-        var step = CreatePending();
+        ExecutionStep step = CreatePending();
         BringToStatus(step, status);
 
-        var act = () => step.Complete(SomeContext());
+        Action act = () => step.Complete(SomeContext());
         act.Should().Throw<InvalidOperationException>().WithMessage("*Running*");
     }
 
@@ -161,7 +161,7 @@ public class ExecutionStepTests
     [Fact]
     public void Fail_WhenRunning_TransitionsToFailedWithErrorDetails()
     {
-        var step = CreatePending();
+        ExecutionStep step = CreatePending();
         step.Start(SomeContext());
         step.Fail("Connection timeout after 5s");
 
@@ -203,7 +203,7 @@ public class ExecutionStepTests
     [Fact]
     public void Wait_WhenRunning_TransitionsToWaiting()
     {
-        var step = CreatePending(type: StepType.Form);
+        ExecutionStep step = CreatePending(type: StepType.Form);
         step.Start(SomeContext());
         step.Wait();
 
@@ -218,10 +218,10 @@ public class ExecutionStepTests
     [InlineData(StepExecutionStatus.Cancelled)]
     public void Wait_WhenNotRunning_Throws(StepExecutionStatus status)
     {
-        var step = CreatePending();
+        ExecutionStep step = CreatePending();
         BringToStatus(step, status);
 
-        var act = () => step.Wait();
+        Action act = () => step.Wait();
         act.Should().Throw<InvalidOperationException>().WithMessage("*Running*");
     }
 
@@ -230,7 +230,7 @@ public class ExecutionStepTests
     [Fact]
     public void Skip_WhenPending_TransitionsToSkipped()
     {
-        var step = CreatePending(type: StepType.Condition);
+        ExecutionStep step = CreatePending(type: StepType.Condition);
         step.Skip("Branch condition not taken");
 
         step.Status.Should().Be(StepExecutionStatus.Skipped);
@@ -246,10 +246,10 @@ public class ExecutionStepTests
     [InlineData(StepExecutionStatus.Cancelled)]
     public void Skip_WhenNotPending_Throws(StepExecutionStatus status)
     {
-        var step = CreatePending();
+        ExecutionStep step = CreatePending();
         BringToStatus(step, status);
 
-        var act = () => step.Skip("reason");
+        Action act = () => step.Skip("reason");
         act.Should().Throw<InvalidOperationException>().WithMessage("*Pending*");
     }
 
@@ -261,7 +261,7 @@ public class ExecutionStepTests
     [InlineData(StepExecutionStatus.Waiting)]
     public void Cancel_WhenNonTerminal_TransitionsToCancelled(StepExecutionStatus status)
     {
-        var step = CreatePending();
+        ExecutionStep step = CreatePending();
         BringToStatus(step, status);
         step.Cancel();
 
@@ -276,10 +276,10 @@ public class ExecutionStepTests
     [InlineData(StepExecutionStatus.Cancelled)]
     public void Cancel_WhenAlreadyTerminal_Throws(StepExecutionStatus status)
     {
-        var step = CreatePending();
+        ExecutionStep step = CreatePending();
         BringToStatus(step, status);
 
-        var act = () => step.Cancel();
+        Action act = () => step.Cancel();
         act.Should().Throw<InvalidOperationException>().WithMessage("*cancel*");
     }
 
@@ -291,7 +291,7 @@ public class ExecutionStepTests
     [InlineData(StepExecutionStatus.Cancelled)]
     public void IsTerminal_WhenInTerminalState_ReturnsTrue(StepExecutionStatus status)
     {
-        var step = CreatePending();
+        ExecutionStep step = CreatePending();
         BringToStatus(step, status);
 
         step.IsTerminal.Should().BeTrue();
@@ -304,7 +304,7 @@ public class ExecutionStepTests
     [InlineData(StepExecutionStatus.Skipped)]
     public void IsTerminal_WhenNotInTerminalState_ReturnsFalse(StepExecutionStatus status)
     {
-        var step = CreatePending();
+        ExecutionStep step = CreatePending();
         BringToStatus(step, status);
 
         step.IsTerminal.Should().BeFalse();

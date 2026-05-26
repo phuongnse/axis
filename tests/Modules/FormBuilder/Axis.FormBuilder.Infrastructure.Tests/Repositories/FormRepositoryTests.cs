@@ -45,18 +45,17 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
     [Fact]
     public async Task GetAllAsync_WhenMultipleFormsExist_ExcludesDeletedAndOtherOrgs()
     {
-        var orgId = Guid.NewGuid();
-        var active = MakeForm("Active Form", orgId);
-        var deleted = MakeForm("Deleted Form", orgId);
+        Guid orgId = Guid.NewGuid();
+        FormDefinition active = MakeForm("Active Form", orgId);
+        FormDefinition deleted = MakeForm("Deleted Form", orgId);
         deleted.Delete();
-        var other = MakeForm("Other Org Form", Guid.NewGuid());
+        FormDefinition other = MakeForm("Other Org Form", Guid.NewGuid());
 
         await _sut.AddAsync(active);
         await _sut.AddAsync(deleted);
         await _sut.AddAsync(other);
         await _ctx.SaveChangesAsync();
-
-        var result = await _sut.GetAllAsync(orgId);
+        IReadOnlyList<FormDefinition> result = await _sut.GetAllAsync(orgId);
 
         result.Should().ContainSingle().Which.Name.Should().Be("Active Form");
     }
@@ -64,13 +63,12 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
     [Fact]
     public async Task GetByIdAsync_WhenFormIsDeleted_ReturnsNull()
     {
-        var orgId = Guid.NewGuid();
-        var form = MakeForm("To Delete", orgId);
+        Guid orgId = Guid.NewGuid();
+        FormDefinition form = MakeForm("To Delete", orgId);
         form.Delete();
         await _sut.AddAsync(form);
         await _ctx.SaveChangesAsync();
-
-        var loaded = await _sut.GetByIdAsync(form.Id, orgId);
+        FormDefinition? loaded = await _sut.GetByIdAsync(form.Id, orgId);
 
         loaded.Should().BeNull();
     }
@@ -78,7 +76,7 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
     [Fact]
     public async Task NameExistsAsync_WhenNameExists_IsCaseInsensitive()
     {
-        var orgId = Guid.NewGuid();
+        Guid orgId = Guid.NewGuid();
         await _sut.AddAsync(MakeForm("Feedback Form", orgId));
         await _ctx.SaveChangesAsync();
 
@@ -89,12 +87,11 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
     [Fact]
     public async Task NameExistsAsync_WhenExcludeIdProvided_ExcludesThatFormFromCheck()
     {
-        var orgId = Guid.NewGuid();
-        var form = MakeForm("Survey Form", orgId);
+        Guid orgId = Guid.NewGuid();
+        FormDefinition form = MakeForm("Survey Form", orgId);
         await _sut.AddAsync(form);
         await _ctx.SaveChangesAsync();
-
-        var exists = await _sut.NameExistsAsync("Survey Form", orgId, excludeId: form.Id);
+        bool exists = await _sut.NameExistsAsync("Survey Form", orgId, excludeId: form.Id);
 
         exists.Should().BeFalse();
     }
@@ -102,7 +99,7 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
     [Fact]
     public async Task AddAsync_WhenFormHasFieldsWithVariousConfigTypes_PersistsAndReloadsAllFields()
     {
-        var form = MakeForm("Multi-type Form");
+        FormDefinition form = MakeForm("Multi-type Form");
         form.AddField("title", "Title", FormFieldType.Text, true,
             new TextFormFieldConfig(MaxLength: 200, Placeholder: "Enter title"));
         form.AddField("age", "Age", FormFieldType.Number, false,
@@ -115,8 +112,7 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
 
         await _sut.AddAsync(form);
         await _ctx.SaveChangesAsync();
-
-        var loaded = await _sut.GetByIdAsync(form.Id, OrgId);
+        FormDefinition? loaded = await _sut.GetByIdAsync(form.Id, OrgId);
 
         loaded!.Fields.Should().HaveCount(5);
         loaded.Fields.Single(f => f.Key == "title").Config
@@ -124,19 +120,18 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
         loaded.Fields.Single(f => f.Key == "age").Config
             .Should().BeOfType<NumberFormFieldConfig>().Which.Max.Should().Be(120);
         loaded.Fields.Single(f => f.Key == "accepted").Config.Should().BeNull();
-        var dropdownConfig = loaded.Fields.Single(f => f.Key == "status").Config
-            .Should().BeOfType<DropdownFieldConfig>().Subject;
+        DropdownFieldConfig dropdownConfig = loaded.Fields.Single(f => f.Key == "status").Config
+                    .Should().BeOfType<DropdownFieldConfig>().Subject;
         dropdownConfig.Options.Should().HaveCount(2);
     }
 
     [Fact]
     public async Task IsReferencedByWorkflowAsync_WhenFormNotReferenced_ReturnsFalse()
     {
-        var form = MakeForm("Unreferenced Form");
+        FormDefinition form = MakeForm("Unreferenced Form");
         await _sut.AddAsync(form);
         await _ctx.SaveChangesAsync();
-
-        var referenced = await _sut.IsReferencedByWorkflowAsync(form.Id);
+        bool referenced = await _sut.IsReferencedByWorkflowAsync(form.Id);
 
         referenced.Should().BeFalse();
     }
@@ -144,13 +139,12 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
     [Fact]
     public async Task IsReferencedByWorkflowAsync_WhenFormUsedInWorkflowStep_ReturnsTrue()
     {
-        var form = MakeForm("Referenced Form");
+        FormDefinition form = MakeForm("Referenced Form");
         await _sut.AddAsync(form);
         _ctx.FormWorkflowReferences.Add(
             FormWorkflowReference.Create(Guid.NewGuid(), form.Id, form.OrganizationId));
         await _ctx.SaveChangesAsync();
-
-        var referenced = await _sut.IsReferencedByWorkflowAsync(form.Id);
+        bool referenced = await _sut.IsReferencedByWorkflowAsync(form.Id);
 
         referenced.Should().BeTrue();
     }

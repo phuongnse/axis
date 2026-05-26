@@ -36,8 +36,8 @@ public class FormSubmissionTests
     [Fact]
     public void FormSubmission_WhenCreated_SetsPropertiesAndPendingStatus()
     {
-        var expiry = DateTimeOffset.UtcNow.AddHours(24);
-        var submission = CreatePending(expiresAt: expiry);
+        DateTimeOffset expiry = DateTimeOffset.UtcNow.AddHours(24);
+        FormSubmission submission = CreatePending(expiresAt: expiry);
 
         submission.FormDefinitionId.Should().Be(FormDefinitionId);
         submission.OrganizationId.Should().Be(OrgId);
@@ -55,7 +55,7 @@ public class FormSubmissionTests
     [Fact]
     public void FormSubmission_WhenCreated_GeneratesNonEmptyAccessToken()
     {
-        var submission = CreatePending();
+        FormSubmission submission = CreatePending();
 
         submission.AccessToken.Should().NotBe(Guid.Empty);
     }
@@ -63,8 +63,8 @@ public class FormSubmissionTests
     [Fact]
     public void FormSubmission_WhenCreatedTwice_GeneratesDifferentAccessTokens()
     {
-        var a = CreatePending();
-        var b = CreatePending();
+        FormSubmission a = CreatePending();
+        FormSubmission b = CreatePending();
 
         a.AccessToken.Should().NotBe(b.AccessToken);
     }
@@ -72,8 +72,8 @@ public class FormSubmissionTests
     [Fact]
     public void FormSubmission_WhenCreated_SetsCreatedAtAndCreatedBy()
     {
-        var before = DateTimeOffset.UtcNow;
-        var submission = CreatePending();
+        DateTimeOffset before = DateTimeOffset.UtcNow;
+        FormSubmission submission = CreatePending();
 
         submission.CreatedAt.Should().BeOnOrAfter(before);
         submission.CreatedBy.Should().Be(CreatedBy);
@@ -82,7 +82,7 @@ public class FormSubmissionTests
     [Fact]
     public void FormSubmission_WhenCreated_RaisesFormTaskCreatedEvent()
     {
-        var submission = CreatePending();
+        FormSubmission submission = CreatePending();
 
         submission.DomainEvents.Should().ContainSingle(e => e is FormTaskCreated);
     }
@@ -90,9 +90,8 @@ public class FormSubmissionTests
     [Fact]
     public void FormSubmission_WhenCreated_FormTaskCreatedEventContainsAccessToken()
     {
-        var submission = CreatePending();
-
-        var evt = submission.DomainEvents.OfType<FormTaskCreated>().Single();
+        FormSubmission submission = CreatePending();
+        FormTaskCreated evt = submission.DomainEvents.OfType<FormTaskCreated>().Single();
         evt.AccessToken.Should().Be(submission.AccessToken);
         evt.FormSubmissionId.Should().Be(submission.Id);
         evt.FormDefinitionId.Should().Be(FormDefinitionId);
@@ -103,17 +102,17 @@ public class FormSubmissionTests
     [Fact]
     public void FormSubmission_WhenCreatedWithNoExpiry_HasNullExpiresAt()
     {
-        var submission = CreatePending(expiresAt: null);
+        FormSubmission submission = CreatePending(expiresAt: null);
         submission.ExpiresAt.Should().BeNull();
     }
 
     [Fact]
     public void FormSubmission_WhenCreatedWithRoleAssignee_SetsRoleId()
     {
-        var roleId = Guid.NewGuid();
-        var submission = FormSubmission.Create(
-            FormDefinitionId, OrgId, ExecutionId, ExecutionStepId,
-            assigneeUserId: null, assigneeRoleId: roleId, expiresAt: null, CreatedBy);
+        Guid roleId = Guid.NewGuid();
+        FormSubmission submission = FormSubmission.Create(
+                    FormDefinitionId, OrgId, ExecutionId, ExecutionStepId,
+                    assigneeUserId: null, assigneeRoleId: roleId, expiresAt: null, CreatedBy);
 
         submission.AssigneeUserId.Should().BeNull();
         submission.AssigneeRoleId.Should().Be(roleId);
@@ -124,9 +123,9 @@ public class FormSubmissionTests
     [Fact]
     public void Submit_WhenPending_TransitionsToSubmittedWithData()
     {
-        var submission = CreatePending();
-        var submittedBy = Guid.NewGuid();
-        var data = SomeData();
+        FormSubmission submission = CreatePending();
+        Guid submittedBy = Guid.NewGuid();
+        IReadOnlyDictionary<string, object?> data = SomeData();
         submission.Submit(submittedBy, data);
 
         submission.Status.Should().Be(FormSubmissionStatus.Submitted);
@@ -139,12 +138,11 @@ public class FormSubmissionTests
     [Fact]
     public void Submit_RaisesEventWithCorrectPayload()
     {
-        var submission = CreatePending();
-        var submittedBy = Guid.NewGuid();
-        var data = SomeData();
+        FormSubmission submission = CreatePending();
+        Guid submittedBy = Guid.NewGuid();
+        IReadOnlyDictionary<string, object?> data = SomeData();
         submission.Submit(submittedBy, data);
-
-        var evt = submission.DomainEvents.OfType<FormTaskSubmitted>().Single();
+        FormTaskSubmitted evt = submission.DomainEvents.OfType<FormTaskSubmitted>().Single();
         evt.FormSubmissionId.Should().Be(submission.Id);
         evt.ExecutionId.Should().Be(ExecutionId);
         evt.ExecutionStepId.Should().Be(ExecutionStepId);
@@ -158,10 +156,10 @@ public class FormSubmissionTests
     [InlineData(FormSubmissionStatus.Cancelled)]
     public void Submit_WhenNotPending_Throws(FormSubmissionStatus status)
     {
-        var submission = CreatePending();
+        FormSubmission submission = CreatePending();
         BringToStatus(submission, status);
 
-        var act = () => submission.Submit(Guid.NewGuid(), SomeData());
+        Action act = () => submission.Submit(Guid.NewGuid(), SomeData());
         act.Should().Throw<InvalidOperationException>().WithMessage("*already*");
     }
 
@@ -170,7 +168,7 @@ public class FormSubmissionTests
     [Fact]
     public void Expire_WhenPending_TransitionsToExpired()
     {
-        var submission = CreatePending(expiresAt: DateTimeOffset.UtcNow.AddHours(1));
+        FormSubmission submission = CreatePending(expiresAt: DateTimeOffset.UtcNow.AddHours(1));
         submission.Expire();
 
         submission.Status.Should().Be(FormSubmissionStatus.Expired);
@@ -180,10 +178,9 @@ public class FormSubmissionTests
     [Fact]
     public void Expire_RaisesEventWithCorrectPayload()
     {
-        var submission = CreatePending(expiresAt: DateTimeOffset.UtcNow.AddHours(1));
+        FormSubmission submission = CreatePending(expiresAt: DateTimeOffset.UtcNow.AddHours(1));
         submission.Expire();
-
-        var evt = submission.DomainEvents.OfType<FormTaskExpired>().Single();
+        FormTaskExpired evt = submission.DomainEvents.OfType<FormTaskExpired>().Single();
         evt.FormSubmissionId.Should().Be(submission.Id);
         evt.ExecutionId.Should().Be(ExecutionId);
         evt.ExecutionStepId.Should().Be(ExecutionStepId);
@@ -196,10 +193,10 @@ public class FormSubmissionTests
     [InlineData(FormSubmissionStatus.Cancelled)]
     public void Expire_WhenNotPending_Throws(FormSubmissionStatus status)
     {
-        var submission = CreatePending();
+        FormSubmission submission = CreatePending();
         BringToStatus(submission, status);
 
-        var act = () => submission.Expire();
+        Action act = () => submission.Expire();
         act.Should().Throw<InvalidOperationException>().WithMessage("*Pending*");
     }
 
@@ -208,7 +205,7 @@ public class FormSubmissionTests
     [Fact]
     public void Cancel_WhenPending_TransitionsToCancelled()
     {
-        var submission = CreatePending();
+        FormSubmission submission = CreatePending();
         submission.Cancel();
 
         submission.Status.Should().Be(FormSubmissionStatus.Cancelled);
@@ -218,10 +215,9 @@ public class FormSubmissionTests
     [Fact]
     public void Cancel_RaisesEventWithCorrectPayload()
     {
-        var submission = CreatePending();
+        FormSubmission submission = CreatePending();
         submission.Cancel();
-
-        var evt = submission.DomainEvents.OfType<FormTaskCancelled>().Single();
+        FormTaskCancelled evt = submission.DomainEvents.OfType<FormTaskCancelled>().Single();
         evt.FormSubmissionId.Should().Be(submission.Id);
         evt.ExecutionId.Should().Be(ExecutionId);
         evt.OrganizationId.Should().Be(OrgId);
@@ -233,10 +229,10 @@ public class FormSubmissionTests
     [InlineData(FormSubmissionStatus.Cancelled)]
     public void Cancel_WhenNotPending_Throws(FormSubmissionStatus status)
     {
-        var submission = CreatePending();
+        FormSubmission submission = CreatePending();
         BringToStatus(submission, status);
 
-        var act = () => submission.Cancel();
+        Action act = () => submission.Cancel();
         act.Should().Throw<InvalidOperationException>().WithMessage("*Pending*");
     }
 
@@ -284,7 +280,7 @@ public class FormSubmissionTests
     [Fact]
     public void Submit_WhenCallerMutatesSourceDictionary_SubmittedDataIsUnaffected()
     {
-        var submission = CreatePending();
+        FormSubmission submission = CreatePending();
         Dictionary<string, object?> mutableData = new() { ["field"] = "original" };
         submission.Submit(Guid.NewGuid(), mutableData);
 
@@ -300,10 +296,10 @@ public class FormSubmissionTests
     [Fact]
     public void Expire_WhenAlreadyExpired_Throws()
     {
-        var submission = CreatePending(expiresAt: DateTimeOffset.UtcNow.AddHours(1));
+        FormSubmission submission = CreatePending(expiresAt: DateTimeOffset.UtcNow.AddHours(1));
         submission.Expire();
 
-        var act = () => submission.Expire();
+        Action act = () => submission.Expire();
         act.Should().Throw<InvalidOperationException>().WithMessage("*Pending*");
     }
 

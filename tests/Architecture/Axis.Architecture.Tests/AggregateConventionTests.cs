@@ -1,7 +1,7 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using FluentAssertions;
 using Axis.Shared.Domain.Primitives;
+using FluentAssertions;
 
 namespace Axis.Architecture.Tests;
 

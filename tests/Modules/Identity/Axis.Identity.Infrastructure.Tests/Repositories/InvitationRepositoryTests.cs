@@ -31,11 +31,10 @@ public class InvitationRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifet
     [Fact]
     public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedByToken()
     {
-        var invitation = MakeInvitation("invite-token@example.com");
+        Invitation invitation = MakeInvitation("invite-token@example.com");
         await _sut.AddAsync(invitation);
         await _ctx.SaveChangesAsync();
-
-        var loaded = await _sut.GetByTokenAsync(invitation.Token);
+        Invitation? loaded = await _sut.GetByTokenAsync(invitation.Token);
 
         loaded.Should().NotBeNull();
         loaded!.Id.Should().Be(invitation.Id);
@@ -46,19 +45,18 @@ public class InvitationRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifet
     [Fact]
     public async Task GetByTokenAsync_WhenTokenDoesNotExist_ReturnsNull()
     {
-        var result = await _sut.GetByTokenAsync("nonexistent-token");
+        Invitation? result = await _sut.GetByTokenAsync("nonexistent-token");
         result.Should().BeNull();
     }
 
     [Fact]
     public async Task GetPendingByEmailAsync_WhenPendingInvitationExists_ReturnsInvitation()
     {
-        var invitation = MakeInvitation("pending@example.com");
+        Invitation invitation = MakeInvitation("pending@example.com");
         await _sut.AddAsync(invitation);
         await _ctx.SaveChangesAsync();
-
-        var email = Email.Create("pending@example.com").Value;
-        var loaded = await _sut.GetPendingByEmailAsync(email, OrgId);
+        Email email = Email.Create("pending@example.com").Value;
+        Invitation? loaded = await _sut.GetPendingByEmailAsync(email, OrgId);
 
         loaded.Should().NotBeNull();
         loaded!.Id.Should().Be(invitation.Id);
@@ -67,15 +65,14 @@ public class InvitationRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifet
     [Fact]
     public async Task GetPendingByEmailAsync_WhenInvitationHasBeenAccepted_ReturnsNull()
     {
-        var invitation = MakeInvitation("accepted@example.com");
+        Invitation invitation = MakeInvitation("accepted@example.com");
         await _sut.AddAsync(invitation);
         await _ctx.SaveChangesAsync();
 
         invitation.Accept();
         await _ctx.SaveChangesAsync();
-
-        var email = Email.Create("accepted@example.com").Value;
-        var result = await _sut.GetPendingByEmailAsync(email, OrgId);
+        Email email = Email.Create("accepted@example.com").Value;
+        Invitation? result = await _sut.GetPendingByEmailAsync(email, OrgId);
         result.Should().BeNull();
     }
 }

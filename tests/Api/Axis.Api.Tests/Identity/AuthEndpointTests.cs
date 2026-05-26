@@ -4,9 +4,9 @@ using System.Text.Json;
 using Axis.Api.Tests.Helpers;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
 using Axis.Identity.Infrastructure.Persistence.Entities;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 
 namespace Axis.Api.Tests.Identity;
 

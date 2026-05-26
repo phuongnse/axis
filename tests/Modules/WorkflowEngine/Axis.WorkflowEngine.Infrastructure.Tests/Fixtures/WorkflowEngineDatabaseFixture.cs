@@ -1,6 +1,6 @@
 using Axis.Shared.Application.Tenancy;
-using Axis.WorkflowEngine.Infrastructure.Persistence;
 using Axis.Testing;
+using Axis.WorkflowEngine.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Testcontainers.PostgreSql;
@@ -36,7 +36,7 @@ public sealed class WorkflowEngineDatabaseFixture : IAsyncLifetime
             opts => new WorkflowEngineDbContext(opts, tenantContext));
 
         // Stub table for cross-module WorkflowDefinitionReader queries
-        await using var wfCmd = conn.CreateCommand();
+        await using NpgsqlCommand wfCmd = conn.CreateCommand();
         wfCmd.CommandText = $"""
             CREATE TABLE IF NOT EXISTS "{TestSchema}".workflow_definitions (
                 id UUID PRIMARY KEY,
@@ -51,9 +51,9 @@ public sealed class WorkflowEngineDatabaseFixture : IAsyncLifetime
 
     internal WorkflowEngineDbContext CreateContext()
     {
-        var options = new DbContextOptionsBuilder<WorkflowEngineDbContext>()
-            .UseNpgsql(ConnectionString)
-            .Options;
+        DbContextOptions<WorkflowEngineDbContext> options = new DbContextOptionsBuilder<WorkflowEngineDbContext>()
+                    .UseNpgsql(ConnectionString)
+                    .Options;
         return new WorkflowEngineDbContext(options, new TestTenantContext(TestSchema));
     }
 }

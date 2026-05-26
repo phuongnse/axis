@@ -1,6 +1,7 @@
 using Axis.Shared.Application.Behaviors;
 using Axis.Shared.Application.CQRS;
 using FluentAssertions;
+using FluentAssertions.Specialized;
 using FluentValidation;
 using MediatR;
 using NSubstitute;
@@ -26,8 +27,8 @@ public class ValidationBehaviorTests
     [Fact]
     public async Task ValidationBehavior_WhenNoValidationErrors_PassesThroughToNext()
     {
-        var validators = new[] { new TestCommandValidator() };
-        var behavior = new ValidationBehavior<TestCommand, string>(validators);
+        TestCommandValidator[] validators = new[] { new TestCommandValidator() };
+        ValidationBehavior<TestCommand, string> behavior = new ValidationBehavior<TestCommand, string>(validators);
         _next.Invoke().Returns("ok");
 
         await behavior.Handle(new TestCommand("Alice"), _next, CancellationToken.None);
@@ -38,10 +39,10 @@ public class ValidationBehaviorTests
     [Fact]
     public async Task ValidationBehavior_WhenCommandIsInvalid_ThrowsValidationException()
     {
-        var validators = new[] { new TestCommandValidator() };
-        var behavior = new ValidationBehavior<TestCommand, string>(validators);
+        TestCommandValidator[] validators = new[] { new TestCommandValidator() };
+        ValidationBehavior<TestCommand, string> behavior = new ValidationBehavior<TestCommand, string>(validators);
 
-        var act = async () =>
+        Func<Task<string>> act = async () =>
             await behavior.Handle(new TestCommand(""), _next, CancellationToken.None);
 
         await act.Should().ThrowAsync<ValidationException>()
@@ -51,24 +52,22 @@ public class ValidationBehaviorTests
     [Fact]
     public async Task ValidationBehavior_WhenMultipleViolations_ReportsAllErrors()
     {
-        var validators = new[] { new TestCommandValidator() };
-        var behavior = new ValidationBehavior<TestCommand, string>(validators);
-        var tooLong = new string('x', 51);
+        TestCommandValidator[] validators = new[] { new TestCommandValidator() };
+        ValidationBehavior<TestCommand, string> behavior = new ValidationBehavior<TestCommand, string>(validators);
+        string tooLong = new string('x', 51);
 
-        var act = async () =>
+        Func<Task<string>> act = async () =>
             await behavior.Handle(new TestCommand(tooLong), _next, CancellationToken.None);
-
-        var ex = await act.Should().ThrowAsync<ValidationException>();
+        ExceptionAssertions<ValidationException> ex = await act.Should().ThrowAsync<ValidationException>();
         ex.Which.Errors.Should().HaveCount(1); // only MaxLength violated
     }
 
     [Fact]
     public async Task ValidationBehavior_WhenNoValidators_PassesThroughToNext()
     {
-        var behavior = new ValidationBehavior<TestCommand, string>([]);
+        ValidationBehavior<TestCommand, string> behavior = new ValidationBehavior<TestCommand, string>([]);
         _next.Invoke().Returns("ok");
-
-        var result = await behavior.Handle(new TestCommand("Alice"), _next, CancellationToken.None);
+        string result = await behavior.Handle(new TestCommand("Alice"), _next, CancellationToken.None);
 
         result.Should().Be("ok");
     }

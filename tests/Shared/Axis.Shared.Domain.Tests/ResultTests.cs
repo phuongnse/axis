@@ -8,7 +8,7 @@ public class ResultTests
     [Fact]
     public void Result_WhenSuccess_IsSuccessful()
     {
-        var result = Result.Success();
+        Result result = Result.Success();
 
         result.IsSuccess.Should().BeTrue();
         result.IsFailure.Should().BeFalse();
@@ -17,7 +17,7 @@ public class ResultTests
     [Fact]
     public void Result_WhenFailure_IsNotSuccessful()
     {
-        var result = Result.Failure("Something went wrong");
+        Result result = Result.Failure("Something went wrong");
 
         result.IsSuccess.Should().BeFalse();
         result.IsFailure.Should().BeTrue();
@@ -27,7 +27,7 @@ public class ResultTests
     [Fact]
     public void ResultT_WhenSuccess_HoldsValue()
     {
-        var result = Result<int>.Success(42);
+        Result<int> result = Result<int>.Success(42);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().Be(42);
@@ -36,7 +36,7 @@ public class ResultTests
     [Fact]
     public void ResultT_WhenFailure_HasError()
     {
-        var result = Result<int>.Failure("Not found");
+        Result<int> result = Result<int>.Failure("Not found");
 
         result.IsFailure.Should().BeTrue();
         result.Error.Should().Be("Not found");
@@ -45,9 +45,9 @@ public class ResultTests
     [Fact]
     public void ResultT_WhenAccessingValueOnFailure_Throws()
     {
-        var result = Result<int>.Failure("error");
+        Result<int> result = Result<int>.Failure("error");
 
-        var act = () => result.Value;
+        Func<int> act = () => result.Value;
 
         act.Should().Throw<InvalidOperationException>();
     }
@@ -55,9 +55,9 @@ public class ResultTests
     [Fact]
     public void Result_WhenAccessingErrorOnSuccess_Throws()
     {
-        var result = Result.Success();
+        Result result = Result.Success();
 
-        var act = () => result.Error;
+        Func<string> act = () => result.Error;
 
         act.Should().Throw<InvalidOperationException>();
     }

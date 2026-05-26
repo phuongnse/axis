@@ -10,21 +10,20 @@ internal sealed class FieldDefinitionConverter : JsonConverter<FieldDefinition>
 {
     public override FieldDefinition Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
-        using var doc = JsonDocument.ParseValue(ref reader);
-        var root = doc.RootElement;
-
-        var id = root.GetProperty("id").GetGuid();
-        var name = root.GetProperty("name").GetString()!;
-        var label = root.GetProperty("label").GetString()!;
+        using JsonDocument doc = JsonDocument.ParseValue(ref reader);
+        JsonElement root = doc.RootElement;
+        Guid id = root.GetProperty("id").GetGuid();
+        string name = root.GetProperty("name").GetString()!;
+        string label = root.GetProperty("label").GetString()!;
         string? helpText = null;
-        if (root.TryGetProperty("helpText", out var htEl) && htEl.ValueKind != JsonValueKind.Null)
+        if (root.TryGetProperty("helpText", out JsonElement htEl) && htEl.ValueKind != JsonValueKind.Null)
             helpText = htEl.GetString();
-        var type = Enum.Parse<FieldType>(root.GetProperty("type").GetString()!);
-        var isRequired = root.GetProperty("isRequired").GetBoolean();
-        var isSystem = root.GetProperty("isSystem").GetBoolean();
-        var displayOrder = root.GetProperty("displayOrder").GetInt32();
-        var configJson = root.GetProperty("config").GetRawText();
-        var config = DeserializeConfig(type, configJson, options);
+        FieldType type = Enum.Parse<FieldType>(root.GetProperty("type").GetString()!);
+        bool isRequired = root.GetProperty("isRequired").GetBoolean();
+        bool isSystem = root.GetProperty("isSystem").GetBoolean();
+        int displayOrder = root.GetProperty("displayOrder").GetInt32();
+        string configJson = root.GetProperty("config").GetRawText();
+        FieldConfig config = DeserializeConfig(type, configJson, options);
 
         return FieldDefinition.Reconstitute(id, name, label, helpText, type, isRequired, isSystem, displayOrder, config);
     }

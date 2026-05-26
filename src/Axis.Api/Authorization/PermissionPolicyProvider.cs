@@ -19,10 +19,10 @@ internal sealed class PermissionPolicyProvider(IOptions<AuthorizationOptions> op
     {
         if (policyName.Contains(':'))
         {
-            var policy = new AuthorizationPolicyBuilder(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)
-                .RequireAuthenticatedUser()
-                .AddRequirements(new PermissionRequirement(policyName))
-                .Build();
+            AuthorizationPolicy policy = new AuthorizationPolicyBuilder(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)
+                            .RequireAuthenticatedUser()
+                            .AddRequirements(new PermissionRequirement(policyName))
+                            .Build();
             return Task.FromResult<AuthorizationPolicy?>(policy);
         }
 

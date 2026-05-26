@@ -1,4 +1,5 @@
 using Axis.WorkflowBuilder.Domain.Aggregates;
+using Axis.WorkflowBuilder.Domain.Entities;
 using Axis.WorkflowBuilder.Domain.Enums;
 using FluentAssertions;
 
@@ -28,11 +29,10 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     [Fact]
     public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
     {
-        var wf = MakeWorkflow("Order Approval");
+        WorkflowDefinition wf = MakeWorkflow("Order Approval");
         await _sut.AddAsync(wf);
         await _ctx.SaveChangesAsync();
-
-        var loaded = await _sut.GetByIdAsync(wf.Id, OrgId);
+        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, OrgId);
 
         loaded.Should().NotBeNull();
         loaded!.Name.Should().Be("Order Approval");
@@ -43,17 +43,16 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     [Fact]
     public async Task GetAllAsync_WhenMultipleWorkflowsExist_ReturnsOnlyOrgWorkflows()
     {
-        var orgId = Guid.NewGuid();
-        var w1 = MakeWorkflow("WF-A", orgId);
-        var w2 = MakeWorkflow("WF-B", orgId);
-        var other = MakeWorkflow("WF-Other", Guid.NewGuid());
+        Guid orgId = Guid.NewGuid();
+        WorkflowDefinition w1 = MakeWorkflow("WF-A", orgId);
+        WorkflowDefinition w2 = MakeWorkflow("WF-B", orgId);
+        WorkflowDefinition other = MakeWorkflow("WF-Other", Guid.NewGuid());
 
         await _sut.AddAsync(w1);
         await _sut.AddAsync(w2);
         await _sut.AddAsync(other);
         await _ctx.SaveChangesAsync();
-
-        var result = await _sut.GetAllAsync(orgId);
+        IReadOnlyList<WorkflowDefinition> result = await _sut.GetAllAsync(orgId);
 
         result.Should().HaveCount(2);
         result.Select(w => w.Name).Should().BeEquivalentTo(["WF-A", "WF-B"]);
@@ -62,7 +61,7 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     [Fact]
     public async Task NameExistsAsync_WhenNameExists_IsCaseInsensitive()
     {
-        var orgId = Guid.NewGuid();
+        Guid orgId = Guid.NewGuid();
         await _sut.AddAsync(MakeWorkflow("Employee Onboarding", orgId));
         await _ctx.SaveChangesAsync();
 
@@ -73,12 +72,11 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     [Fact]
     public async Task NameExistsAsync_WhenExcludeIdProvided_ExcludesThatWorkflowFromCheck()
     {
-        var orgId = Guid.NewGuid();
-        var wf = MakeWorkflow("Invoice Review", orgId);
+        Guid orgId = Guid.NewGuid();
+        WorkflowDefinition wf = MakeWorkflow("Invoice Review", orgId);
         await _sut.AddAsync(wf);
         await _ctx.SaveChangesAsync();
-
-        var exists = await _sut.NameExistsAsync("Invoice Review", orgId, excludeId: wf.Id);
+        bool exists = await _sut.NameExistsAsync("Invoice Review", orgId, excludeId: wf.Id);
 
         exists.Should().BeFalse();
     }
@@ -86,15 +84,14 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     [Fact]
     public async Task AddAsync_WhenWorkflowHasStepsAndTransitions_PersistsAndReloadsThem()
     {
-        var wf = MakeWorkflow("Approval Flow");
-        var step = wf.AddStep("Review", StepType.Form, new Dictionary<string, object?> { ["formId"] = "form-123" });
+        WorkflowDefinition wf = MakeWorkflow("Approval Flow");
+        WorkflowStep step = wf.AddStep("Review", StepType.Form, new Dictionary<string, object?> { ["formId"] = "form-123" });
         wf.AddTransition(wf.Steps.First(s => s.Type == StepType.Start).Id, step.Id, null);
         wf.AddTransition(step.Id, wf.Steps.First(s => s.Type == StepType.End).Id, "approved");
 
         await _sut.AddAsync(wf);
         await _ctx.SaveChangesAsync();
-
-        var loaded = await _sut.GetByIdAsync(wf.Id, OrgId);
+        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, OrgId);
 
         loaded!.Steps.Should().HaveCount(3); // Start + Review + End
         loaded.Steps.Should().Contain(s => s.Name == "Review" && s.Type == StepType.Form);
@@ -105,14 +102,13 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     [Fact]
     public async Task AddAsync_WhenWorkflowHasTriggers_PersistsAndReloadsTriggers()
     {
-        var wf = MakeWorkflow("Scheduled Report");
+        WorkflowDefinition wf = MakeWorkflow("Scheduled Report");
         wf.AddTrigger(TriggerType.Schedule, new Dictionary<string, object?> { ["cron"] = "0 9 * * 1" });
         wf.AddTrigger(TriggerType.Manual, null);
 
         await _sut.AddAsync(wf);
         await _ctx.SaveChangesAsync();
-
-        var loaded = await _sut.GetByIdAsync(wf.Id, OrgId);
+        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, OrgId);
 
         loaded!.Triggers.Should().HaveCount(2);
         loaded.Triggers.Should().Contain(t => t.Type == TriggerType.Schedule);

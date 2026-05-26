@@ -1,3 +1,4 @@
+using axis.workflowbuilder.events;
 using Axis.FormBuilder.Application.Services;
 using Axis.FormBuilder.Domain.ReadModels;
 using Axis.FormBuilder.Infrastructure.Handlers;
@@ -5,7 +6,6 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
-using axis.workflowbuilder.events;
 
 namespace Axis.FormBuilder.Infrastructure.Tests.Handlers;
 
