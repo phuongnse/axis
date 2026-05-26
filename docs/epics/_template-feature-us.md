@@ -51,7 +51,9 @@ One paragraph describing the feature.
 > **Done:**
 > - …
 >
-> **Deferred (PR #N follow-up):** … (omit line if none)
+> **Deferred (PR #N follow-up):** …
+>
+> _(Omit the entire Deferred line when there are no deferrals.)_
 >
 > **Decisions:** …
 

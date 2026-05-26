@@ -143,11 +143,6 @@ Allow organization admins to manage their organization's profile, settings, and 
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:**
-> - marketing-page redirect + forced sign-out after schedule (Frontend/session)
-> - abandon in-flight Wolverine step dispatch beyond execution + form-task cancel
-> - cross-module hard-delete steps via RabbitMQ commands when modules are extracted (see `docs/WORKAROUNDS.md#org-hard-delete-modulith-cancellers`).
->
 > **Deferred (PR #127 follow-up):**
 > - marketing-page redirect + forced sign-out after schedule (Frontend/session)
 > - abandon in-flight Wolverine step dispatch beyond execution + form-task cancel

@@ -201,7 +201,7 @@ public class WorkflowDefinitionTests
     public void AddStep_WhenAddingStartOrEndStep_Throws(StepType type)
     {
         WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
-        Func<Entities.WorkflowStep> act = () => wf.AddStep("Node", type, null);
+        Func<WorkflowStep> act = () => wf.AddStep("Node", type, null);
         act.Should().Throw<InvalidOperationException>().WithMessage("*reserved*");
     }
 

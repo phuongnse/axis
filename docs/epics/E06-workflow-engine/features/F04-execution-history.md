@@ -127,9 +127,9 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 > | API | ⚠️ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** 
+> **Gaps vs spec:** CSV export, role-scoped visibility enforcement, and async export notification pending API + Frontend.
 >
-> **Done:** `GET /api/executions` org-wide list (paginated). CSV export, role-scoped visibility enforcement, and async export notification pending API + Frontend.
+> **Done:** `GET /api/executions` org-wide list (paginated).
 
 ---
 

@@ -56,9 +56,9 @@ Organization admins can invite new members, manage their accounts, and deactivat
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** 
+> **Gaps vs spec:** Admin self-invite check not implemented (compare invite email to `ICurrentUser` email).
 >
-> **Done:** HTTP 402 when user plan limit reached (`InviteUserHandler`, E01 F04). Admin self-invite check not implemented — backend polish — see gaps below (compare invite email to `ICurrentUser` email).
+> **Done:** HTTP 402 when user plan limit reached (`InviteUserHandler`, E01 F04).
 >
 > **Decisions:** existing-member and pending-invitation checks throw `ValidationException` with specific messages matching AC wording.
 

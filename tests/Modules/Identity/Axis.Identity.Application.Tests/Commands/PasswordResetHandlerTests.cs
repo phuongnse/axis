@@ -16,11 +16,12 @@ public class RequestPasswordResetHandlerTests
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
     private readonly IPasswordResetTokenStore _tokenStore = Substitute.For<IPasswordResetTokenStore>();
     private readonly IEmailSender _emailSender = Substitute.For<IEmailSender>();
+    private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
 
     private RequestPasswordResetHandler CreateHandler() =>
-        new(_userRepo, _tokenStore, _emailSender);
+        new(_userRepo, _tokenStore, _emailSender, _uow);
 
     private static User MakeUser()
     {
@@ -45,6 +46,7 @@ public class RequestPasswordResetHandlerTests
             user.Id, Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
         await _emailSender.Received(1).SendPasswordResetEmailAsync(
             "alice@acme.com", Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -60,6 +62,7 @@ public class RequestPasswordResetHandlerTests
         await act.Should().NotThrowAsync();
         await _emailSender.DidNotReceive().SendPasswordResetEmailAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -74,5 +77,6 @@ public class RequestPasswordResetHandlerTests
 
         // Prior tokens must be invalidated before creating the new one
         await _tokenStore.Received(1).InvalidateAllForUserAsync(user.Id, Arg.Any<CancellationToken>());
+        await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 }

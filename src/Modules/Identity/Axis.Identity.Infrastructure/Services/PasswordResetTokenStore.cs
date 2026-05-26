@@ -19,7 +19,6 @@ internal sealed class PasswordResetTokenStore(IdentityDbContext context) : IPass
             CreatedAt = DateTime.UtcNow,
         };
         await context.PasswordResetTokens.AddAsync(token, ct);
-        await context.SaveChangesAsync(ct);
     }
 
     public async Task<Guid?> FindUserIdByTokenHashAsync(string tokenHash, CancellationToken ct = default)
@@ -36,10 +35,7 @@ internal sealed class PasswordResetTokenStore(IdentityDbContext context) : IPass
                     .FirstOrDefaultAsync(t => t.TokenHash == tokenHash, ct);
 
         if (token is not null)
-        {
             token.UsedAt = DateTime.UtcNow;
-            await context.SaveChangesAsync(ct);
-        }
     }
 
     public async Task InvalidateAllForUserAsync(Guid userId, CancellationToken ct = default)
@@ -50,8 +46,5 @@ internal sealed class PasswordResetTokenStore(IdentityDbContext context) : IPass
 
         foreach (PasswordResetToken token in tokens)
             token.UsedAt = DateTime.UtcNow;
-
-        if (tokens.Count > 0)
-            await context.SaveChangesAsync(ct);
     }
 }
