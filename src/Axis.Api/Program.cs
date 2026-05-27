@@ -152,7 +152,10 @@ try
             opts.UseRabbitMq(new Uri(rabbitMqConnectionString));
         }
 
-        bool useKafkaEventTransport = !builder.Environment.IsEnvironment("Testing");
+        // When Kafka:UseEventTransport is absent the value defaults to true (Kafka enabled).
+        // ApiTestFixture sets it to "false" so endpoint tests route events locally instead,
+        // keeping them deterministic without depending on Kafka consumer-group assignment timing.
+        bool useKafkaEventTransport = wolverineConfig.GetValue<bool>("Kafka:UseEventTransport", true);
         opts.UseAxisKafkaAvro(
             wolverineConfig,
             useKafkaEventTransport,

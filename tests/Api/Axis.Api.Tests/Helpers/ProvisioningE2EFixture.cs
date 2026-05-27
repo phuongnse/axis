@@ -64,6 +64,12 @@ public sealed class ProvisioningE2EFixture : IAsyncLifetime
         .WithImage("rabbitmq:3.13-management-alpine")
         .Build();
 
+    // In-process Schema Registry so Wolverine's Avro serializer can register and
+    // look up schemas over HTTP without a separate container. The modulith runs all
+    // producers and consumers in the same process, so a single in-memory registry
+    // is correct and sufficient — no distributed consistency issue.
+    private InProcessSchemaRegistryServer _schemaRegistry = null!;
+
     private string? _previousIdentityConnectionStringEnv;
     private string? _previousDataModelingConnectionStringEnv;
     private string? _previousWorkflowBuilderConnectionStringEnv;
@@ -94,6 +100,10 @@ public sealed class ProvisioningE2EFixture : IAsyncLifetime
             _redis.StartAsync(),
             _kafka.StartAsync(),
             _rabbitMq.StartAsync());
+
+        // Start the in-process Schema Registry before the WebApplicationFactory so
+        // its URL is known when Wolverine reads SchemaRegistry:Url during host build.
+        _schemaRegistry = await InProcessSchemaRegistryServer.StartAsync();
 
         _postgresAdminConnectionString = _postgres.GetConnectionString();
         _identityConnectionString =
@@ -170,6 +180,10 @@ public sealed class ProvisioningE2EFixture : IAsyncLifetime
                     ["ConnectionStrings:FormBuilder"] = _formBuilderConnectionString,
                     ["ConnectionStrings:WorkflowEngine"] = _workflowEngineConnectionString,
                     ["Redis:ConnectionString"] = _redis.GetConnectionString(),
+                    // Point the Avro serializer at the in-process Schema Registry.
+                    // Kafka:UseEventTransport is intentionally absent — it defaults to true
+                    // so this fixture exercises the real Kafka transport layer end-to-end.
+                    ["SchemaRegistry:Url"] = _schemaRegistry.BaseUrl,
                     ["Modules:FormBuilder:GrpcUrl"] = "http://localhost",
                     ["Modules:WorkflowBuilder:GrpcUrl"] = "http://localhost",
                 });
@@ -276,6 +290,7 @@ public sealed class ProvisioningE2EFixture : IAsyncLifetime
     public async Task DisposeAsync()
     {
         await _factory.DisposeAsync();
+        await _schemaRegistry.DisposeAsync();
         await Task.WhenAll(
             _postgres.DisposeAsync().AsTask(),
             _redis.DisposeAsync().AsTask(),

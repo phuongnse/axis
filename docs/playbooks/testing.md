@@ -102,14 +102,16 @@ When diagnosing CI failures in this area:
 
 **E2E provisioning test:** `TenantProvisioningEndToEndTests` (`[Trait("Category", "Slow")]`, collection `"Api-E2E"`) uses `ProvisioningE2EFixture` — **not** `ApiTestFixture`. The two fixtures serve different concerns and must remain separate:
 
-| Fixture | `IUnitOfWork` (Identity) | Purpose |
-|---------|--------------------------|---------|
-| `ApiTestFixture` | `NullUnitOfWork` (no events) | Endpoint tests — deterministic, no async pipeline |
-| `ProvisioningE2EFixture` | Real `IdentityUnitOfWork` | E2E pipeline test — events must fire |
+| Fixture | `IUnitOfWork` (Identity) | Kafka transport | Purpose |
+|---------|--------------------------|-----------------|---------|
+| `ApiTestFixture` | No-op (`NullUnitOfWork`) | `false` — events go `.Locally()` | Endpoint tests — deterministic, no async pipeline |
+| `ProvisioningE2EFixture` | Real `IdentityUnitOfWork` | `true` — real Kafka + in-process Schema Registry | E2E pipeline test — real transport exercised |
 
-`ApiTestFixture` replaces `IUnitOfWork` with a no-op so that endpoint tests can call `ProvisionTenantSchemasAsync` + `MarkOrganizationActiveAsync` directly without racing against an async pipeline. `ProvisioningE2EFixture` keeps the real `IdentityUnitOfWork` so that `verify-email` publishes `OrganizationVerifiedEvent` into Wolverine's local queue — which starts the multi-module provisioning chain. **If `IUnitOfWork` is replaced with a no-op in the E2E fixture, the event is never published and the test always times out.**
+`ApiTestFixture` sets `Kafka:UseEventTransport=false` and replaces `IUnitOfWork` with a no-op so endpoint tests can call `ProvisionTenantSchemasAsync` + `MarkOrganizationActiveAsync` directly without racing against an async pipeline. `ProvisioningE2EFixture` keeps the real `IdentityUnitOfWork` (so `verify-email` publishes `OrganizationVerifiedEvent` into Wolverine's outbox) and routes events through a real Kafka container. Avro serialization uses an `InProcessSchemaRegistryServer` — a minimal in-process HTTP server implementing the Confluent Schema Registry REST API — started before the `WebApplicationFactory` so its URL is available when Wolverine reads `SchemaRegistry:Url` at host-build time.
 
-In the `"Testing"` environment, `Program.cs` routes events locally (`.Locally()`, not Kafka topics) via `useKafkaEventTransport = false`. The pipeline exercises Wolverine's in-process local queue: `OrganizationVerifiedEvent` → 4 module `OrganizationVerifiedHandler`s → `TenantSchemaProvisioner` → `TenantModuleProvisionReportEvent` → `TenantModuleProvisionReportHandler` → org marked Active.
+**Why an in-process Schema Registry is correct here:** all Avro producers and consumers run in the same process (modulith architecture). A schema registered by the Identity module's outbox is immediately readable by the DataModeling module's consumer — no distributed consistency concern. **If `IUnitOfWork` is replaced with a no-op in the E2E fixture, `OrganizationVerifiedEvent` is never published and the test always times out.**
+
+The pipeline: `OrganizationVerifiedEvent` (Kafka topic) → 4 module `OrganizationVerifiedHandler`s → `TenantSchemaProvisioner` → `TenantModuleProvisionReportEvent` (Kafka topic) → `TenantModuleProvisionReportHandler` → org marked Active.
 
 Run in isolation locally: `dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj --filter "Category=Slow"`.
 

@@ -167,6 +167,11 @@ public sealed class ApiTestFixture : IAsyncLifetime
                     ["Redis:ConnectionString"] = _redis.GetConnectionString(),
                     ["Modules:FormBuilder:GrpcUrl"] = "http://localhost",
                     ["Modules:WorkflowBuilder:GrpcUrl"] = "http://localhost",
+                    // Endpoint tests do not exercise the Kafka transport layer — events go .Locally()
+                    // so assertions on request-path behaviour are not subject to consumer-group
+                    // assignment timing. ProvisioningE2EFixture keeps this absent (defaults true)
+                    // and uses a real Kafka container + in-process Schema Registry.
+                    ["Kafka:UseEventTransport"] = "false",
                 });
             });
 
