@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Axis.Api.Tests.Helpers;
 using Axis.Identity.Domain.Aggregates;
-using Axis.Identity.Domain.ValueObjects;
 using Axis.Identity.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -60,24 +59,27 @@ public sealed class TenantIsolationEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
+    public async Task GetModels_WhenOrganizationIsProvisioning_Returns403()
+    {
+        HttpClient client = await AuthHelper.CreateAdminClientWhileProvisioningAsync(fixture, "iso-prov");
+
+        HttpResponseMessage resp = await client.GetAsync("/api/models");
+
+        resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        string body = await resp.Content.ReadAsStringAsync();
+        body.Should().Contain("Workspace is still being set up");
+    }
+
+    [Fact]
     public async Task GetModels_WhenOrganizationIsArchived_Returns403()
     {
         HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "iso-archived");
-        Guid organizationId = await GetOrganizationIdForEmailAsync("adminiso-archived@test.com");
+        Guid organizationId = await fixture.ResolveOrganizationIdAsync("adminiso-archived@test.com");
         await SetOrganizationStatusAsync(organizationId, OrganizationStatus.Archived);
 
         HttpResponseMessage resp = await client.GetAsync("/api/models");
 
         resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-    }
-
-    private async Task<Guid> GetOrganizationIdForEmailAsync(string emailAddress)
-    {
-        Email email = Email.Create(emailAddress).Value!;
-        using IServiceScope scope = fixture.CreateScope();
-        IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        User user = await db.Users.AsNoTracking().SingleAsync(u => u.Email == email);
-        return user.OrganizationId;
     }
 
     private async Task SetOrganizationStatusAsync(Guid organizationId, OrganizationStatus status)
