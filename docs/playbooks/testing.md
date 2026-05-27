@@ -96,6 +96,8 @@ When diagnosing CI failures in this area:
 3. Check for timeout exceptions from helper-level provisioning waits (coupling issue).
 4. Fix setup determinism first, then verify event-pipeline behavior in its dedicated suite.
 
+**Per-tenant schema in tests:** use `TenantTestProvisioner.MigrateTenantSchemaAsync` (`tests/Shared/Axis.Testing`) so `CREATE SCHEMA IF NOT EXISTS` and `TenantSchemaProvisioner.MigrateWithFixedTenantAsync` stay aligned with production. Do not copy provisioning SQL into `ApiTestFixture`.
+
 ---
 
 ## Frontend testing

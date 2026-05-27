@@ -279,7 +279,6 @@ public sealed class ApiTestFixture : IAsyncLifetime
         }
 
         await EnsureModuleSchemasAsync(organizationId);
-        await EnsureDataModelingTablesAsync(organizationId);
 
         await using IdentityDbContext finalizeContext = new(
             new DbContextOptionsBuilder<IdentityDbContext>()
@@ -297,63 +296,22 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
     private async Task EnsureModuleSchemasAsync(Guid organizationId)
     {
-        string schema = $"tenant_{organizationId:N}";
-        await EnsureTenantSchemaExistsAsync(_dataModelingConnectionString, schema);
-        await PostgresModuleTestDatabase.MigrateAsync<DataModelingDbContext>(
+        await TenantTestProvisioner.MigrateTenantSchemaAsync<DataModelingDbContext>(
             _dataModelingConnectionString,
+            organizationId,
             opts => new DataModelingDbContext(opts, new FixedTenantContext(organizationId)));
-
-        await EnsureTenantSchemaExistsAsync(_workflowBuilderConnectionString, schema);
-        await PostgresModuleTestDatabase.MigrateAsync<WorkflowBuilderDbContext>(
+        await TenantTestProvisioner.MigrateTenantSchemaAsync<WorkflowBuilderDbContext>(
             _workflowBuilderConnectionString,
+            organizationId,
             opts => new WorkflowBuilderDbContext(opts, new FixedTenantContext(organizationId)));
-
-        await EnsureTenantSchemaExistsAsync(_formBuilderConnectionString, schema);
-        await PostgresModuleTestDatabase.MigrateAsync<FormBuilderDbContext>(
+        await TenantTestProvisioner.MigrateTenantSchemaAsync<FormBuilderDbContext>(
             _formBuilderConnectionString,
+            organizationId,
             opts => new FormBuilderDbContext(opts, new FixedTenantContext(organizationId)));
-
-        await EnsureTenantSchemaExistsAsync(_workflowEngineConnectionString, schema);
-        await PostgresModuleTestDatabase.MigrateAsync<WorkflowEngineDbContext>(
+        await TenantTestProvisioner.MigrateTenantSchemaAsync<WorkflowEngineDbContext>(
             _workflowEngineConnectionString,
+            organizationId,
             opts => new WorkflowEngineDbContext(opts, new FixedTenantContext(organizationId)));
-    }
-
-    private static async Task EnsureTenantSchemaExistsAsync(string connectionString, string schema)
-    {
-        await using NpgsqlConnection connection = new(connectionString);
-        await connection.OpenAsync();
-        await using NpgsqlCommand createSchema = connection.CreateCommand();
-        createSchema.CommandText = $"""CREATE SCHEMA IF NOT EXISTS "{schema}";""";
-        await createSchema.ExecuteNonQueryAsync();
-    }
-
-    private async Task EnsureDataModelingTablesAsync(Guid organizationId)
-    {
-        string schema = $"tenant_{organizationId:N}";
-        for (int attempt = 1; attempt <= 3; attempt++)
-        {
-            await using NpgsqlConnection connection = new(_dataModelingConnectionString);
-            await connection.OpenAsync();
-            await using NpgsqlCommand command = connection.CreateCommand();
-            command.CommandText =
-                """
-                SELECT EXISTS (
-                    SELECT 1
-                    FROM information_schema.tables
-                    WHERE table_schema = @schema
-                      AND table_name = 'data_records')
-                """;
-            command.Parameters.AddWithValue("schema", schema);
-            object? scalar = await command.ExecuteScalarAsync();
-            if (scalar is bool exists && exists)
-                return;
-
-            await EnsureModuleSchemasAsync(organizationId);
-        }
-
-        throw new InvalidOperationException(
-            $"Tenant schema '{schema}' is missing data_records table after repeated migration attempts.");
     }
 
     private static async Task SeedTestOpenIddictClientsAsync(IServiceProvider services)
