@@ -238,6 +238,28 @@ public sealed class ApiTestFixture : IAsyncLifetime
         {
             AllowAutoRedirect = false,
         });
+
+        await WaitForHealthyAsync();
+    }
+
+    // Polls /health/ready until the app is up. Ensures the HTTP pipeline and
+    // Wolverine background services have had at least one request cycle before
+    // any test fires an event into the messaging pipeline.
+    private async Task WaitForHealthyAsync()
+    {
+        DateTimeOffset deadline = DateTimeOffset.UtcNow.AddSeconds(30);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            try
+            {
+                HttpResponseMessage resp = await Client.GetAsync("/health/ready");
+                if (resp.IsSuccessStatusCode)
+                    return;
+            }
+            catch (Exception) { /* host not yet accepting connections */ }
+            await Task.Delay(TimeSpan.FromMilliseconds(300));
+        }
+        throw new InvalidOperationException("Test host did not become healthy within 30 seconds.");
     }
 
     public async Task DisposeAsync()
