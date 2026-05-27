@@ -11,4 +11,8 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Shared\Axis.Shared.Infrastructure\Axis.Shared.Infrastructure.csproj" />
+  </ItemGroup>
+
 </Project>
