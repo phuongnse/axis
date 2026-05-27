@@ -35,6 +35,8 @@ Feature work (Frontend feature UIs, E07 PageBuilder) tracks per-epic **Open work
 
 Full auth, user, role, invitation, and session management. OpenIddict 5.x OIDC server (Authorization Code + PKCE for SPA; Client Credentials for M2M). RBAC via custom permission policies. All Identity API endpoints covered by integration tests.
 
+> 📝 **Docs-first next scope:** E02 F06 Localization & Theming defines frontend ACs for EN/VI, light/dark/system mode, and rollout rules before implementation starts.
+
 > ✅ **Phase 2 complete (PR #93):** `Axis.Identity.Contracts` with `IdentityService.GetUserPermissions` gRPC + 5 Avro lifecycle event schemas (`OrganizationVerifiedEvent`, `UserDeactivatedEvent`, `UserReactivatedEvent`, `RoleAssignedEvent`, `RoleRemovedEvent`) published via Wolverine outbox → Kafka with CloudEvents envelope (ADR-019). Each of DataModeling/FormBuilder/WorkflowBuilder/WorkflowEngine subscribes to `OrganizationVerifiedEvent` and provisions its own tenant schema (central `TenantSchemaProvisioner` and `ProvisionTenantMessage` removed — extraction is now a redeploy per ADR-010). Gateway uses `AddGrpcClient<IdentityService.IdentityServiceClient>` with `Modules:Identity:GrpcUrl` config; JWKS-only validation rule documented in [patterns.md § Pattern 3](playbooks/patterns.md#-pattern-3-jwks-only-jwt-validation-in-consuming-modules).
 
 ## DataModeling — E03-data-modeling

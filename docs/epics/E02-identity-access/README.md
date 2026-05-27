@@ -27,6 +27,7 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 | [F03](./features/F03-role-management.md) | Role Management | Create/edit/delete roles within an organization |
 | [F04](./features/F04-permissions.md) | Permission System | Assign permissions to roles, enforce on API and UI |
 | [F05](./features/F05-password-security.md) | Password & Security | Password reset, change password, session management |
+| [F06](./features/F06-localization-and-theming.md) | Localization & Theming | EN/VI language switch, light/dark/system theme, and frontend UX consistency rules |
 
 ---
 
@@ -85,7 +86,7 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 | Area | Status | Detail |
 |------|--------|--------|
 | **Backend** | ⚠️ polish | [F05](./features/F05-password-security.md): reset/change-password rate limits, session list API wiring. [F04](./features/F04-permissions.md): `[RequirePermission]` / policy tests. [F02](./features/F02-user-management.md): block admin self-invite at API. |
-| **Frontend** | ⏳ | Settings, invitation accept, session management UI — see per-US callouts in [F01](./features/F01-authentication.md)–[F05](./features/F05-password-security.md). |
+| **Frontend** | ⏳ | Register, settings, invitation accept, session management UI, and localization/theming foundation — see per-US callouts in [F01](./features/F01-authentication.md)–[F06](./features/F06-localization-and-theming.md). |
 
 Core auth/OIDC/RBAC backend is ✅; use feature **Gaps vs spec** for the next US, not epic checkboxes.
 
