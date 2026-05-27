@@ -153,8 +153,8 @@ Self-service registration flow where a new organization signs up and is automati
 > | Domain | ✅ |
 > | Application | ✅ |
 > | Infrastructure | ✅ |
-> | API | ⚠️ |
-> | Frontend | ⚠️ |
+> | API | ✅ |
+> | Frontend | ⏳ |
 >
 > **Gaps vs spec:** provisioning wait UI (US-002) pending Frontend.
 >

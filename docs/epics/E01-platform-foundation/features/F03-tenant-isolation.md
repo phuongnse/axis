@@ -42,23 +42,18 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 > |-------|--------|
 > | Domain | N/A |
 > | Application | ✅ (`ITenantContext`) |
-> | Infrastructure | ⚠️ |
-> | API | ⚠️ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
 > | Frontend | N/A |
 >
 > **Done:**
 > - `TenantSchemaInterceptor` sets PostgreSQL `search_path` per connection for module `DbContext`s
 > - `TenantSchemaInterceptorTests` (two schemas, no cross-read). `HttpTenantContext` on `Axis.Api`
 > - `FixedTenantContext` in Wolverine provision handlers.
+> - cross-tenant API integration tests (`TenantIsolationEndpointTests` — DataModeling list/get by id)
+> - connection-pool safety documented in [patterns.md](../../../playbooks/patterns.md) (`search_path` set on every `ConnectionOpened`, including pooled reconnects).
 >
-> **Gaps vs spec:**
-> - no module integration test proving Tenant A records invisible to Tenant B end-to-end
-> - no explicit guard that tenant-scoped queries cannot target `public` for module data
-> - pool `search_path` reset not load-tested.
->
-> **Next:**
-> - add cross-tenant API integration test in one module (e.g. DataModeling)
-> - document connection-pool behavior in [patterns.md](../../../playbooks/patterns.md) if verified.
+> **Gaps vs spec:** none for backend US-008. Tenant-scoped data never lives in `public` by design (module tables only in `tenant_{orgId:N}`); no separate runtime guard beyond schema isolation.
 
 ---
 
@@ -93,21 +88,14 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 > |-------|--------|
 > | Domain | N/A |
 > | Application | ✅ |
-> | Infrastructure | ⚠️ |
-> | API | ⚠️ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
 > | Frontend | N/A |
 >
 > **Done:**
 > - `org_id` claim issued at login (`ConnectEndpoints`)
-> - handlers use `ITenantContext` / `ICurrentUser` — schema `tenant_{orgId:N}` derived in `HttpTenantContext` (no separate DB lookup).
+> - handlers use `ITenantContext` / `ICurrentUser` — schema `tenant_{orgId:N}` derived in `HttpTenantContext` (no separate DB lookup; Redis cache N/A — deterministic derivation satisfies the under-5 ms AC).
+> - `TenantOrganizationAccessMiddleware` returns HTTP 403 for missing, archived/deleted, or not-ready orgs on tenant module routes (`/api/models`, workflows, forms, etc.).
+> - background jobs use `FixedTenantContext` in provision/cancel handlers (see [patterns.md](../../../playbooks/patterns.md)).
 >
-> **Gaps vs spec:**
-> - no Redis cache for schema name (spec allows cache miss → DB
-> - MVP derives deterministically so cache is optional)
-> - deleted/suspended org → 403 on tenant routes not centrally enforced
-> - Wolverine tenant header propagation not documented in one place
-> - background jobs rely on `FixedTenantContext` in known handlers only.
->
-> **Next:**
-> - middleware or filter rejecting JWT for `OrganizationStatus` not Active/Provisioning-complete
-> - audit all Wolverine handlers for tenant context injection.
+> **Gaps vs spec:** none for backend US-009.

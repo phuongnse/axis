@@ -162,6 +162,13 @@ public sealed class Organization : AggregateRoot<Guid>
             or OrganizationStatus.ProvisioningFailed
             or OrganizationStatus.DeletionScheduled;
 
+    /// <summary>
+    /// Tenant-scoped module APIs (DataModeling, WorkflowBuilder, etc.) may run only when
+    /// the org workspace is ready or in the deletion grace period (E01 F03 US-008/009).
+    /// </summary>
+    public bool AllowsTenantDataAccess() =>
+        Status is OrganizationStatus.Active or OrganizationStatus.DeletionScheduled;
+
     private void EnsureCanManageSettings()
     {
         if (Status == OrganizationStatus.Deleted)

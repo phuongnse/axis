@@ -5,8 +5,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Axis.Identity.Domain.Aggregates;
-using Axis.Identity.Domain.ValueObjects;
 using Axis.Identity.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace Axis.Api.Tests.Helpers;
 
@@ -53,6 +53,8 @@ public static class AuthHelper
             "/api/auth/verify-email", new { token = verifyToken }, Json);
         if (verifyResp.StatusCode != HttpStatusCode.NoContent)
             throw new InvalidOperationException($"Email verification failed: {verifyResp.StatusCode}");
+
+        await WaitForOrganizationActiveAsync(fixture, email);
 
         // 3. Run the Authorization Code + PKCE flow on an independent client
         //    (so cookie jar is isolated from the shared fixture client)
@@ -153,6 +155,42 @@ public static class AuthHelper
 
         return accessToken
             ?? throw new InvalidOperationException("No access_token in token response.");
+    }
+
+    /// <summary>
+    /// Waits for Kafka-driven tenant provisioning to finish after email verification (E01 US-003).
+    /// </summary>
+    public static async Task WaitForOrganizationActiveAsync(
+        ApiTestFixture fixture,
+        string adminEmail,
+        TimeSpan? timeout = null)
+    {
+        TimeSpan wait = timeout ?? TimeSpan.FromSeconds(60);
+        DateTime deadline = DateTime.UtcNow.Add(wait);
+
+        while (DateTime.UtcNow < deadline)
+        {
+            using IServiceScope scope = fixture.CreateScope();
+            IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+            User? user = await db.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Email.Value == adminEmail);
+
+            if (user is null)
+                throw new InvalidOperationException($"User {adminEmail} was not found after registration.");
+
+            Organization? organization = await db.Organizations
+                .AsNoTracking()
+                .FirstOrDefaultAsync(o => o.Id == user.OrganizationId);
+
+            if (organization?.Status == OrganizationStatus.Active)
+                return;
+
+            await Task.Delay(TimeSpan.FromMilliseconds(200));
+        }
+
+        throw new TimeoutException(
+            $"Organization for {adminEmail} did not reach Active within {wait.TotalSeconds}s.");
     }
 
     // ── PKCE helpers ──────────────────────────────────────────────────────────

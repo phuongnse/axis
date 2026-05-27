@@ -521,6 +521,9 @@ _ = Task.Run(async () =>
 - **No-args EF Core constructor**: when an aggregate's only constructor takes params EF Core can't bind (e.g. `IEnumerable<string>`), add a private no-args constructor: `private MyAggregate() : base(default) { RequiredField = null!; }`. Initialize all non-nullable reference-type fields to silence CS8618 — EF Core will never use these sentinel values because it always materialises via the real constructor path.
 - **Migrations strategy** ([ADR-023](../TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)): every environment uses `Database.MigrateAsync()` — production, dev bootstrap, tenant provisioning, and Testcontainers fixtures. One EF migration chain per `DbContext`; never `EnsureCreated`/`EnsureCreatedAsync`.
 - **Identity uses the global `public` schema** — `IdentityDbContext` is a plain `DbContext` with no `TenantSchemaInterceptor`. All other modules use `AxisDbContext` with `TenantSchemaInterceptor`.
+- **Tenant schema on every connection** — `TenantSchemaInterceptor` sets `search_path` to `tenant_{orgId:N}, public` on every `ConnectionOpened` (including pooled reconnects), so a leased connection always targets the current request's tenant (E01 F03 US-008).
+- **Schema name resolution** — `HttpTenantContext` derives `tenant_{orgId:N}` from the JWT `org_id` claim (no DB/Redis lookup; immutable after provisioning). `TenantOrganizationAccessMiddleware` on `Axis.Api` returns HTTP 403 when the org is missing, archived/deleted, or still provisioning — tenant module routes only; Identity/settings routes are unchanged.
+- **Cross-tenant proof** — `tests/Api/Axis.Api.Tests/Tenancy/TenantIsolationEndpointTests.cs` (DataModeling list/get by id).
 
 ## Testing rules
 
