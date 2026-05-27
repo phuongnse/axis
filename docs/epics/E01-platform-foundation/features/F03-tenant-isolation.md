@@ -43,17 +43,16 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 > | Domain | N/A |
 > | Application | ✅ (`ITenantContext`) |
 > | Infrastructure | ✅ |
-> | API | ✅ |
+> | API | ⚠️ |
 > | Frontend | N/A |
 >
 > **Done:**
 > - `TenantSchemaInterceptor` sets PostgreSQL `search_path` per connection for module `DbContext`s
 > - `TenantSchemaInterceptorTests` (two schemas, no cross-read). `HttpTenantContext` on `Axis.Api`
 > - `FixedTenantContext` in Wolverine provision handlers.
-> - cross-tenant API integration tests (`TenantIsolationEndpointTests` — DataModeling list/get by id)
 > - connection-pool safety documented in [patterns.md](../../../playbooks/patterns.md) (`search_path` set on every `ConnectionOpened`, including pooled reconnects).
 >
-> **Gaps vs spec:** none for backend US-008. Tenant-scoped data never lives in `public` by design (module tables only in `tenant_{orgId:N}`); no separate runtime guard beyond schema isolation.
+> **Gaps vs spec:** cross-tenant API integration test coverage is pending rework for the API test fixture. Tenant-scoped data never lives in `public` by design (module tables only in `tenant_{orgId:N}`); no separate runtime guard beyond schema isolation.
 
 ---
 
