@@ -125,5 +125,4 @@ Provide a consistent user experience across locales (English and Vietnamese) and
 >
 > **Gaps vs spec:** feature not started.
 >
-> **Decisions:**
-> - Docs-first applies: establish this feature spec before implementation PRs.
+> **Decisions:** Docs-first applies: establish this feature spec before implementation PRs.
