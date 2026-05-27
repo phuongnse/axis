@@ -34,8 +34,8 @@ namespace Axis.Api.Tests.Helpers;
 /// Fixture for the end-to-end async-provisioning test suite.
 ///
 /// Deliberately different from <see cref="ApiTestFixture"/> in one critical way:
-/// <b>Identity's <c>IUnitOfWork</c> is NOT replaced with a null stub.</b>
-/// The real <c>IdentityUnitOfWork</c> collects domain events and publishes them via
+/// <b>Identity's <c>IUnitOfWork</c> is kept as the real <c>IdentityUnitOfWork</c>.</b>
+/// The real implementation collects domain events and publishes them via
 /// Wolverine's <c>IMessageBus</c>. Without it, <c>verify-email</c> would never emit
 /// <c>OrganizationVerifiedEvent</c> into the local message queue and the
 /// multi-module tenant-provisioning pipeline would never start.
@@ -211,11 +211,11 @@ public sealed class ProvisioningE2EFixture : IAsyncLifetime
                 // The real IdentityUnitOfWork must run so that verify-email collects the
                 // OrganizationVerified domain event and publishes OrganizationVerifiedEvent
                 // via Wolverine's IMessageBus — which starts the async provisioning pipeline
-                // that this test suite exercises. ApiTestFixture stubs it out to keep
-                // endpoint tests deterministic; this fixture does not.
+                // that this test suite exercises. ApiTestFixture uses a no-op replacement
+                // to keep endpoint tests deterministic; this fixture does not.
 
-                // Module UoWs for DataModeling / WorkflowBuilder / FormBuilder are stubbed
-                // because they suppress cross-module domain events from CRUD operations,
+                // Module UoWs for DataModeling / WorkflowBuilder / FormBuilder are replaced
+                // with no-ops: they suppress cross-module domain events from CRUD operations,
                 // and the provisioning handlers (OrganizationVerifiedHandler,
                 // TenantModuleProvisionAttempt) do not go through these UoWs at all.
                 services.RemoveAll<IDataModelingUnitOfWork>();

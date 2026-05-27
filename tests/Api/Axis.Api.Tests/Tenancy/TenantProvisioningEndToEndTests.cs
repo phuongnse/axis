@@ -15,8 +15,8 @@ namespace Axis.Api.Tests.Tenancy;
 /// the real <c>IdentityUnitOfWork</c> must run: it collects the <c>OrganizationVerified</c>
 /// domain event and publishes <c>OrganizationVerifiedEvent</c> into Wolverine, which
 /// triggers the multi-module provisioning pipeline under test.
-/// <see cref="ApiTestFixture"/> stubs <c>IUnitOfWork</c> to keep endpoint tests
-/// deterministic — that stub would prevent this test from ever completing.
+/// <see cref="ApiTestFixture"/> replaces <c>IUnitOfWork</c> with a no-op to keep endpoint
+/// tests deterministic — that no-op would prevent this test from ever completing.
 /// </summary>
 [Collection("Api-E2E")]
 [Trait("Category", "Slow")]

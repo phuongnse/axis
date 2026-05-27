@@ -107,7 +107,7 @@ When diagnosing CI failures in this area:
 | `ApiTestFixture` | `NullUnitOfWork` (no events) | Endpoint tests — deterministic, no async pipeline |
 | `ProvisioningE2EFixture` | Real `IdentityUnitOfWork` | E2E pipeline test — events must fire |
 
-`ApiTestFixture` stubs `IUnitOfWork` so that endpoint tests can call `ProvisionTenantSchemasAsync` + `MarkOrganizationActiveAsync` directly without racing against an async pipeline. `ProvisioningE2EFixture` keeps the real `IdentityUnitOfWork` so that `verify-email` publishes `OrganizationVerifiedEvent` into Wolverine's local queue — which starts the multi-module provisioning chain. **If `IUnitOfWork` is stubbed in the E2E fixture, the event is never published and the test always times out.**
+`ApiTestFixture` replaces `IUnitOfWork` with a no-op so that endpoint tests can call `ProvisionTenantSchemasAsync` + `MarkOrganizationActiveAsync` directly without racing against an async pipeline. `ProvisioningE2EFixture` keeps the real `IdentityUnitOfWork` so that `verify-email` publishes `OrganizationVerifiedEvent` into Wolverine's local queue — which starts the multi-module provisioning chain. **If `IUnitOfWork` is replaced with a no-op in the E2E fixture, the event is never published and the test always times out.**
 
 In the `"Testing"` environment, `Program.cs` routes events locally (`.Locally()`, not Kafka topics) via `useKafkaEventTransport = false`. The pipeline exercises Wolverine's in-process local queue: `OrganizationVerifiedEvent` → 4 module `OrganizationVerifiedHandler`s → `TenantSchemaProvisioner` → `TenantModuleProvisionReportEvent` → `TenantModuleProvisionReportHandler` → org marked Active.
 
