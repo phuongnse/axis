@@ -96,7 +96,7 @@ When diagnosing CI failures in this area:
 3. Check for timeout exceptions from helper-level provisioning waits (coupling issue).
 4. Fix setup determinism first, then verify event-pipeline behavior in its dedicated suite.
 
-**Per-tenant schema in tests:** use `TenantTestProvisioner.MigrateTenantSchemaAsync` (`tests/Shared/Axis.Testing`) so `CREATE SCHEMA IF NOT EXISTS` and `TenantSchemaProvisioner.MigrateWithFixedTenantAsync` stay aligned with production. Do not copy provisioning SQL into `ApiTestFixture`.
+**Per-tenant schema in tests:** use `TenantTestProvisioner.MigrateTenantSchemaAsync` (`tests/Shared/Axis.Testing`) so `CREATE SCHEMA IF NOT EXISTS` and `TenantSchemaProvisioner.MigrateWithFixedTenantAsync` stay aligned with production. Do not copy provisioning SQL into `ApiTestFixture`. See [agent-checklist.md § Gate 0](./agent-checklist.md#gate-0--ready-before-code) before editing shared auth/fixture helpers.
 
 **Auth helper split:** `ApiTestFixture.ProvisionTenantSchemasAsync` vs `MarkOrganizationActiveAsync` — call both from `CreateAdminClientAsync` for normal endpoint tests; use `AuthHelper.CreateAdminClientWhileProvisioningAsync` when the AC requires an org still in `Provisioning` (do not call `MarkOrganizationActiveAsync`).
 
