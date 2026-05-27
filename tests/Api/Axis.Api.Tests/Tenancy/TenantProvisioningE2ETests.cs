@@ -8,21 +8,21 @@ using FluentAssertions;
 namespace Axis.Api.Tests.Tenancy;
 
 /// <summary>
-/// End-to-end check that verify-email triggers async module provisioning via Wolverine's
-/// local message queue and tenant APIs work without deterministic fixture provisioning.
+/// E2E check that <c>verify-email</c> triggers async multi-module tenant provisioning via
+/// the real Kafka + Avro transport and that tenant APIs become accessible once the pipeline
+/// completes.
 ///
-/// Uses <see cref="ProvisioningE2EFixture"/> (not <see cref="ApiTestFixture"/>) because
-/// the real <c>IdentityUnitOfWork</c> must run: it collects the <c>OrganizationVerified</c>
-/// domain event and publishes <c>OrganizationVerifiedEvent</c> into Wolverine, which
-/// triggers the multi-module provisioning pipeline under test.
-/// <see cref="ApiTestFixture"/> replaces <c>IUnitOfWork</c> with a no-op to keep endpoint
-/// tests deterministic — that no-op would prevent this test from ever completing.
+/// Uses <see cref="KafkaTransportFixture"/> (not <see cref="ApiTestFixture"/>) because the
+/// real <c>IdentityUnitOfWork</c> must run so <c>verify-email</c> publishes
+/// <c>OrganizationVerifiedEvent</c> into Wolverine's outbox and routes it to Kafka.
+/// <see cref="ApiTestFixture"/> replaces <c>IUnitOfWork</c> with a no-op so endpoint tests
+/// remain deterministic — that no-op would prevent this pipeline from ever starting.
 /// </summary>
 [Collection("Api-E2E")]
 [Trait("Category", "Slow")]
-public sealed class TenantProvisioningEndToEndTests(ProvisioningE2EFixture fixture)
+public sealed class TenantProvisioningE2ETests(KafkaTransportFixture fixture)
 {
-    private static readonly JsonSerializerOptions Json = ProvisioningE2EFixture.JsonOptions;
+    private static readonly JsonSerializerOptions Json = KafkaTransportFixture.JsonOptions;
 
     [Fact]
     public async Task RegisterAndVerify_WhenEventPipelineCompletes_AllowsTenantApiAccess()

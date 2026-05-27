@@ -31,20 +31,24 @@ using IWorkflowBuilderUnitOfWork = Axis.WorkflowBuilder.Application.Services.IUn
 namespace Axis.Api.Tests.Helpers;
 
 /// <summary>
-/// Fixture for the end-to-end async-provisioning test suite.
+/// Fixture for tests that require the real Kafka + Avro transport layer — as opposed to
+/// <see cref="ApiTestFixture"/> which routes events <c>.Locally()</c> for determinism.
 ///
-/// Deliberately different from <see cref="ApiTestFixture"/> in one critical way:
-/// <b>Identity's <c>IUnitOfWork</c> is kept as the real <c>IdentityUnitOfWork</c>.</b>
-/// The real implementation collects domain events and publishes them via
-/// Wolverine's <c>IMessageBus</c>. Without it, <c>verify-email</c> would never emit
-/// <c>OrganizationVerifiedEvent</c> into the local message queue and the
-/// multi-module tenant-provisioning pipeline would never start.
+/// Key differences from <see cref="ApiTestFixture"/>:
+/// <list type="bullet">
+///   <item><b>Real Kafka transport</b> — <c>Kafka:UseEventTransport</c> defaults to
+///     <c>true</c>; events flow through a real Kafka container and Avro serialization
+///     uses an in-process <see cref="InProcessSchemaRegistryServer"/>.</item>
+///   <item><b>Real <c>IdentityUnitOfWork</c></b> — not replaced with a no-op, so
+///     <c>verify-email</c> collects the <c>OrganizationVerified</c> domain event and
+///     publishes <c>OrganizationVerifiedEvent</c> into Wolverine's outbox, starting the
+///     async provisioning pipeline.</item>
+/// </list>
 ///
-/// <see cref="ApiTestFixture"/> intentionally suppresses event publishing so that
-/// endpoint tests can provision schemas deterministically without racing against the
-/// async pipeline. The two fixtures serve different concerns and must remain separate.
+/// Reuse this fixture for any test that needs to verify event-driven, cross-module
+/// behaviour over the real Kafka + Avro transport.
 /// </summary>
-public sealed class ProvisioningE2EFixture : IAsyncLifetime
+public sealed class KafkaTransportFixture : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
         .WithImage("postgres:16-alpine")
@@ -372,4 +376,4 @@ public sealed class ProvisioningE2EFixture : IAsyncLifetime
 }
 
 [CollectionDefinition("Api-E2E")]
-public sealed class E2EApiTestCollection : ICollectionFixture<ProvisioningE2EFixture>;
+public sealed class ApiE2ETestCollection : ICollectionFixture<KafkaTransportFixture>;
