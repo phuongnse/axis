@@ -2,10 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 
-import {
-  type RegisterFormValues,
-  registerSchema,
-} from '@/features/auth/schemas/register-schema';
+import { type RegisterFormValues, registerSchema } from '@/features/auth/schemas/register-schema';
 import { ApiError, fetchApi } from '@/lib/api';
 
 interface RegisterRequest {
@@ -116,12 +113,7 @@ export function useRegister() {
           'admin_last_name',
           'fullName',
         );
-        const emailError = pickFirstError(
-          errorData.errors,
-          'AdminEmail',
-          'admin_email',
-          'email',
-        );
+        const emailError = pickFirstError(errorData.errors, 'AdminEmail', 'admin_email', 'email');
         const passwordError = pickFirstError(errorData.errors, 'Password', 'password');
         const passwordConfirmationError = pickFirstError(
           errorData.errors,

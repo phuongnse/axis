@@ -52,7 +52,9 @@ describe('RegisterPage', () => {
 
     expect(await screen.findByRole('heading', { name: /check your email/i })).toBeInTheDocument();
     expect(
-      screen.getByText('If an account exists for this email, you will receive a verification link shortly.'),
+      screen.getByText(
+        'If an account exists for this email, you will receive a verification link shortly.',
+      ),
     ).toBeInTheDocument();
   });
 
