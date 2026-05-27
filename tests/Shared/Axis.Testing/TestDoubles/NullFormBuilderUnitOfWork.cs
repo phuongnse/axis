@@ -1,7 +1,7 @@
 using Axis.FormBuilder.Application.Services;
 using Axis.FormBuilder.Infrastructure.Persistence;
 
-namespace Axis.Api.Tests.Helpers;
+namespace Axis.Testing.TestDoubles;
 
 internal sealed class NullFormBuilderUnitOfWork(FormBuilderDbContext context) : IUnitOfWork
 {

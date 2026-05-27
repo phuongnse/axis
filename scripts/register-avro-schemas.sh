@@ -43,6 +43,16 @@ FB_SCHEMA_DIR="$ROOT/src/Modules/FormBuilder/Axis.FormBuilder.Contracts/Schemas"
 
 register "$ID_SCHEMA_DIR/OrganizationVerifiedEvent.avsc" "axis.identity.organization-verified-value"
 register "$ID_SCHEMA_DIR/TenantModuleProvisionReportEvent.avsc" "axis.identity.tenant-module-provision-report-value"
+register "$ID_SCHEMA_DIR/UserDeactivatedEvent.avsc" "axis.identity.user-deactivated-value"
+register "$ID_SCHEMA_DIR/UserReactivatedEvent.avsc" "axis.identity.user-reactivated-value"
+register "$ID_SCHEMA_DIR/RoleAssignedEvent.avsc" "axis.identity.role-assigned-value"
+register "$ID_SCHEMA_DIR/RoleRemovedEvent.avsc" "axis.identity.role-removed-value"
+
+WE_SCHEMA_DIR="$ROOT/src/Modules/WorkflowEngine/Axis.WorkflowEngine.Contracts/Schemas"
+
 register "$FB_SCHEMA_DIR/FormDeletedEvent.avsc" "axis.formbuilder.form-deleted-value"
+register "$FB_SCHEMA_DIR/FormTaskSubmittedEvent.avsc" "axis.formbuilder.form-task-submitted-value"
+register "$FB_SCHEMA_DIR/FormTaskExpiredEvent.avsc" "axis.formbuilder.form-task-expired-value"
+register "$WE_SCHEMA_DIR/FormStepReachedEvent.avsc" "axis.workflowengine.form-step-reached-value"
 
 echo "register-avro-schemas: OK"

@@ -1,7 +1,7 @@
 using Axis.WorkflowBuilder.Application.Services;
 using Axis.WorkflowBuilder.Infrastructure.Persistence;
 
-namespace Axis.Api.Tests.Helpers;
+namespace Axis.Testing.TestDoubles;
 
 internal sealed class NullWorkflowBuilderUnitOfWork(WorkflowBuilderDbContext context) : IUnitOfWork
 {

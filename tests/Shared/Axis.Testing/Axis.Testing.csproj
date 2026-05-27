@@ -9,9 +9,18 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Testcontainers" />
+    <PackageReference Include="Testcontainers.Kafka" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Testcontainers.RabbitMq" />
+    <PackageReference Include="Testcontainers.Redis" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Modules\DataModeling\Axis.DataModeling.Infrastructure\Axis.DataModeling.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\FormBuilder\Axis.FormBuilder.Infrastructure\Axis.FormBuilder.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Identity\Axis.Identity.Infrastructure\Axis.Identity.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\WorkflowBuilder\Axis.WorkflowBuilder.Infrastructure\Axis.WorkflowBuilder.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\src\Shared\Axis.Shared.Infrastructure\Axis.Shared.Infrastructure.csproj" />
   </ItemGroup>
 

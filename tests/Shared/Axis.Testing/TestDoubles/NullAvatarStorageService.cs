@@ -1,8 +1,8 @@
 using Axis.Identity.Application.Services;
 
-namespace Axis.Api.Tests.Helpers;
+namespace Axis.Testing.TestDoubles;
 
-internal sealed class NullAvatarStorageService : IAvatarStorageService
+public sealed class NullAvatarStorageService : IAvatarStorageService
 {
     public Task<string> UploadAvatarAsync(Guid userId, byte[] data, string contentType, CancellationToken ct = default) =>
         Task.FromResult($"https://test.example.com/avatars/{userId}");

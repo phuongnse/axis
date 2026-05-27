@@ -152,7 +152,10 @@ try
             opts.UseRabbitMq(new Uri(rabbitMqConnectionString));
         }
 
-        bool useKafkaEventTransport = !builder.Environment.IsEnvironment("Testing");
+        // Kafka Avro transport when Schema Registry is configured (dev, CI Testcontainers, prod).
+        // Omit SchemaRegistry:Url only for hosts that intentionally use in-process .Locally() routing.
+        bool useKafkaEventTransport = !string.IsNullOrWhiteSpace(
+            builder.Configuration[WolverineKafkaAvroExtensions.SchemaRegistryUrlKey]);
         opts.UseAxisKafkaAvro(
             wolverineConfig,
             useKafkaEventTransport,

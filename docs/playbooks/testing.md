@@ -100,6 +100,19 @@ When diagnosing CI failures in this area:
 
 **Auth helper split:** `ApiTestFixture.ProvisionTenantSchemasAsync` vs `MarkOrganizationActiveAsync` — call both from `CreateAdminClientAsync` for normal endpoint tests; use `AuthHelper.CreateAdminClientWhileProvisioningAsync` when the AC requires an org still in `Provisioning` (do not call `MarkOrganizationActiveAsync`).
 
+### Kafka + Schema Registry in CI (ADR-019)
+
+API and messaging integration tests use **`MessagingTestInfrastructure`** (`tests/Shared/Axis.Testing/Messaging`): PostgreSQL, Redis, Kafka, Confluent Schema Registry, and RabbitMQ. Avro subjects are registered before the host starts (`AvroSchemaRegistryRegistrar` — keep in sync with `scripts/register-avro-schemas.sh`).
+
+**Transport selection:** `Program` enables Kafka Avro event transport when `SchemaRegistry:Url` is set — not when `ASPNETCORE_ENVIRONMENT=Testing`. Test fixtures must set `SchemaRegistry:Url` and `Kafka:Brokers` (env + in-memory config) so Wolverine publishes/consumes on real topics.
+
+| Fixture / project | Identity `IUnitOfWork` | Purpose |
+|---|---|---|
+| `ApiTestFixture` (`Axis.Api.Tests`) | `NullIdentityUnitOfWork` (no domain events) | Deterministic endpoint tests; sync tenant schema setup |
+| `MessagingApiHostFixture` (`Axis.Messaging.Integration.Tests`) | Real `IdentityUnitOfWork` | E2E: verify-email → Kafka → provisioning handlers |
+
+Do not disable the messaging E2E suite in CI to hide failures. If Kafka is slow, fix rebalance/timeouts (e.g. `KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0` on the test Kafka container) rather than falling back to `.Locally()`.
+
 ---
 
 ## Frontend testing

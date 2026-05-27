@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using Axis.Identity.Application.Services;
 
-namespace Axis.Api.Tests.Helpers;
+namespace Axis.Testing.TestDoubles;
 
 /// <summary>Records outbound email tokens for integration test assertions.</summary>
 public sealed class CapturingEmailSender : IEmailSender

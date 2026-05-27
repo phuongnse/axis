@@ -143,6 +143,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axis.FormBuilder.Contracts"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axis.DataModeling.Contracts", "src\Modules\DataModeling\Axis.DataModeling.Contracts\Axis.DataModeling.Contracts.csproj", "{9CBC2B7D-7A62-4CB1-B26E-557E3DEBAE73}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Messaging", "Messaging", "{00D96D59-54DC-4445-9A0F-872BD487E6F1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axis.Messaging.Integration.Tests", "tests\Messaging\Axis.Messaging.Integration.Tests\Axis.Messaging.Integration.Tests.csproj", "{FCE2DA39-8BF0-4851-921A-F59C35A536C6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -753,6 +757,18 @@ Global
 		{9CBC2B7D-7A62-4CB1-B26E-557E3DEBAE73}.Release|x64.Build.0 = Release|Any CPU
 		{9CBC2B7D-7A62-4CB1-B26E-557E3DEBAE73}.Release|x86.ActiveCfg = Release|Any CPU
 		{9CBC2B7D-7A62-4CB1-B26E-557E3DEBAE73}.Release|x86.Build.0 = Release|Any CPU
+		{FCE2DA39-8BF0-4851-921A-F59C35A536C6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FCE2DA39-8BF0-4851-921A-F59C35A536C6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FCE2DA39-8BF0-4851-921A-F59C35A536C6}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{FCE2DA39-8BF0-4851-921A-F59C35A536C6}.Debug|x64.Build.0 = Debug|Any CPU
+		{FCE2DA39-8BF0-4851-921A-F59C35A536C6}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{FCE2DA39-8BF0-4851-921A-F59C35A536C6}.Debug|x86.Build.0 = Debug|Any CPU
+		{FCE2DA39-8BF0-4851-921A-F59C35A536C6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FCE2DA39-8BF0-4851-921A-F59C35A536C6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FCE2DA39-8BF0-4851-921A-F59C35A536C6}.Release|x64.ActiveCfg = Release|Any CPU
+		{FCE2DA39-8BF0-4851-921A-F59C35A536C6}.Release|x64.Build.0 = Release|Any CPU
+		{FCE2DA39-8BF0-4851-921A-F59C35A536C6}.Release|x86.ActiveCfg = Release|Any CPU
+		{FCE2DA39-8BF0-4851-921A-F59C35A536C6}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -826,5 +842,7 @@ Global
 		{F0861A53-52CA-46E5-8247-A0103A6EBF0F} = {2FFA9F79-C702-4619-9829-8CA1EC414A70}
 		{A67E28FD-D0B5-4F2F-8A74-6E3C52C5AD08} = {C98B41B3-362C-4CC3-B22A-7C9DB21C8D19}
 		{9CBC2B7D-7A62-4CB1-B26E-557E3DEBAE73} = {4693C8F7-4B4A-4DCC-AEF7-9E31D0AA16D2}
+		{00D96D59-54DC-4445-9A0F-872BD487E6F1} = {490F0ECE-E9CA-4679-86C5-7B785F0B09D2}
+		{FCE2DA39-8BF0-4851-921A-F59C35A536C6} = {00D96D59-54DC-4445-9A0F-872BD487E6F1}
 	EndGlobalSection
 EndGlobal

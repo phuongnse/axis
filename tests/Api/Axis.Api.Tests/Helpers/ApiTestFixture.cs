@@ -10,6 +10,8 @@ using Axis.Identity.Infrastructure.Services;
 using Axis.Shared.Application.Tenancy;
 using Axis.Shared.Infrastructure.Tenancy;
 using Axis.Testing;
+using Axis.Testing.Messaging;
+using Axis.Testing.TestDoubles;
 using Axis.WorkflowBuilder.Contracts.Grpc;
 using Axis.WorkflowBuilder.Infrastructure.Persistence;
 using Axis.WorkflowEngine.Infrastructure.Persistence;
@@ -24,10 +26,6 @@ using Npgsql;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
 using StackExchange.Redis;
-using Testcontainers.Kafka;
-using Testcontainers.PostgreSql;
-using Testcontainers.RabbitMq;
-using Testcontainers.Redis;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 using IDataModelingUnitOfWork = Axis.DataModeling.Application.Services.IUnitOfWork;
 using IFormBuilderUnitOfWork = Axis.FormBuilder.Application.Services.IUnitOfWork;
@@ -37,21 +35,7 @@ namespace Axis.Api.Tests.Helpers;
 
 public sealed class ApiTestFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:16-alpine")
-        .Build();
-
-    private readonly RedisContainer _redis = new RedisBuilder()
-        .WithImage("redis:7-alpine")
-        .Build();
-
-    private readonly KafkaContainer _kafka = new KafkaBuilder()
-        .WithImage("confluentinc/cp-kafka:7.7.0")
-        .Build();
-
-    private readonly RabbitMqContainer _rabbitMq = new RabbitMqBuilder()
-        .WithImage("rabbitmq:3.13-management-alpine")
-        .Build();
+    private readonly MessagingTestInfrastructure _messaging = new();
 
     private string? _previousIdentityConnectionStringEnv;
     private string? _previousDataModelingConnectionStringEnv;
@@ -60,6 +44,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
     private string? _previousWorkflowEngineConnectionStringEnv;
     private string? _previousKafkaBrokersEnv;
     private string? _previousRabbitMqConnectionStringEnv;
+    private string? _previousSchemaRegistryUrlEnv;
 
     private WebApplicationFactory<Program> _factory = null!;
     private string _postgresAdminConnectionString = null!;
@@ -83,13 +68,9 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await Task.WhenAll(
-            _postgres.StartAsync(),
-            _redis.StartAsync(),
-            _kafka.StartAsync(),
-            _rabbitMq.StartAsync());
+        await _messaging.StartAsync();
 
-        _postgresAdminConnectionString = _postgres.GetConnectionString();
+        _postgresAdminConnectionString = _messaging.PostgresAdminConnectionString;
         _identityConnectionString =
             await PostgresModuleTestDatabase.CreateAsync(_postgresAdminConnectionString, "axis_identity_test");
         _dataModelingConnectionString =
@@ -110,14 +91,16 @@ public sealed class ApiTestFixture : IAsyncLifetime
             Environment.GetEnvironmentVariable("ConnectionStrings__WorkflowEngine");
         _previousKafkaBrokersEnv = Environment.GetEnvironmentVariable("Kafka__Brokers");
         _previousRabbitMqConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__RabbitMq");
+        _previousSchemaRegistryUrlEnv = Environment.GetEnvironmentVariable("SchemaRegistry__Url");
 
         Environment.SetEnvironmentVariable("ConnectionStrings__Identity", _identityConnectionString);
         Environment.SetEnvironmentVariable("ConnectionStrings__DataModeling", _dataModelingConnectionString);
         Environment.SetEnvironmentVariable("ConnectionStrings__WorkflowBuilder", _workflowBuilderConnectionString);
         Environment.SetEnvironmentVariable("ConnectionStrings__FormBuilder", _formBuilderConnectionString);
         Environment.SetEnvironmentVariable("ConnectionStrings__WorkflowEngine", _workflowEngineConnectionString);
-        Environment.SetEnvironmentVariable("Kafka__Brokers", _kafka.GetBootstrapAddress());
-        Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", _rabbitMq.GetConnectionString());
+        Environment.SetEnvironmentVariable("Kafka__Brokers", _messaging.KafkaBootstrapAddress);
+        Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", _messaging.RabbitMqConnectionString);
+        Environment.SetEnvironmentVariable("SchemaRegistry__Url", _messaging.SchemaRegistryUrl);
 
         DbContextOptions<IdentityDbContext> identityOptions = new DbContextOptionsBuilder<IdentityDbContext>()
             .UseNpgsql(_identityConnectionString)
@@ -161,7 +144,10 @@ public sealed class ApiTestFixture : IAsyncLifetime
                     ["ConnectionStrings:WorkflowBuilder"] = _workflowBuilderConnectionString,
                     ["ConnectionStrings:FormBuilder"] = _formBuilderConnectionString,
                     ["ConnectionStrings:WorkflowEngine"] = _workflowEngineConnectionString,
-                    ["Redis:ConnectionString"] = _redis.GetConnectionString(),
+                    ["Redis:ConnectionString"] = _messaging.RedisConnectionString,
+                    ["Kafka:Brokers"] = _messaging.KafkaBootstrapAddress,
+                    ["ConnectionStrings:RabbitMq"] = _messaging.RabbitMqConnectionString,
+                    ["SchemaRegistry:Url"] = _messaging.SchemaRegistryUrl,
                     ["Modules:FormBuilder:GrpcUrl"] = "http://localhost",
                     ["Modules:WorkflowBuilder:GrpcUrl"] = "http://localhost",
                 });
@@ -189,7 +175,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
                 services.RemoveAll<IConnectionMultiplexer>();
                 services.AddSingleton<IConnectionMultiplexer>(_ =>
-                    ConnectionMultiplexer.Connect(_redis.GetConnectionString()));
+                    ConnectionMultiplexer.Connect(_messaging.RedisConnectionString));
 
                 services.RemoveAll<IEmailSender>();
                 services.AddSingleton(_emailCapture);
@@ -201,7 +187,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
                 services.RemoveAll<IUnitOfWork>();
                 services.AddScoped<IUnitOfWork>(sp =>
-                    new NullUnitOfWork(sp.GetRequiredService<IdentityDbContext>()));
+                    new NullIdentityUnitOfWork(sp.GetRequiredService<IdentityDbContext>()));
 
                 services.RemoveAll<IDataModelingUnitOfWork>();
                 services.AddScoped<IDataModelingUnitOfWork>(sp =>
@@ -240,11 +226,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
     public async Task DisposeAsync()
     {
         await _factory.DisposeAsync();
-        await Task.WhenAll(
-            _postgres.DisposeAsync().AsTask(),
-            _redis.DisposeAsync().AsTask(),
-            _kafka.DisposeAsync().AsTask(),
-            _rabbitMq.DisposeAsync().AsTask());
+        await _messaging.DisposeAsync();
 
         Environment.SetEnvironmentVariable("ConnectionStrings__Identity", _previousIdentityConnectionStringEnv);
         Environment.SetEnvironmentVariable("ConnectionStrings__DataModeling", _previousDataModelingConnectionStringEnv);
@@ -253,6 +235,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("ConnectionStrings__WorkflowEngine", _previousWorkflowEngineConnectionStringEnv);
         Environment.SetEnvironmentVariable("Kafka__Brokers", _previousKafkaBrokersEnv);
         Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", _previousRabbitMqConnectionStringEnv);
+        Environment.SetEnvironmentVariable("SchemaRegistry__Url", _previousSchemaRegistryUrlEnv);
     }
 
     public IServiceScope CreateScope() => _factory.Services.CreateScope();
@@ -381,12 +364,6 @@ public sealed class ApiTestFixture : IAsyncLifetime
             });
         }
     }
-}
-
-internal sealed class PublicSchemaTenantContext : ITenantContext
-{
-    public Guid OrganizationId => Guid.Empty;
-    public string SchemaName => "public";
 }
 
 [CollectionDefinition("Api")]

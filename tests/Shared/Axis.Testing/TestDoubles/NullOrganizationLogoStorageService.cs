@@ -1,8 +1,8 @@
 using Axis.Identity.Application.Services;
 
-namespace Axis.Api.Tests.Helpers;
+namespace Axis.Testing.TestDoubles;
 
-internal sealed class NullOrganizationLogoStorageService : IOrganizationLogoStorageService
+public sealed class NullOrganizationLogoStorageService : IOrganizationLogoStorageService
 {
     public Task<string> UploadLogoAsync(Guid organizationId, byte[] data, string contentType, CancellationToken ct = default) =>
         Task.FromResult($"https://test.example.com/org-logos/{organizationId}");

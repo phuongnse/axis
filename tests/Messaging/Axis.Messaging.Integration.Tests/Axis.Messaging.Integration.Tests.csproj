@@ -19,7 +19,6 @@
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="Grpc.Net.ClientFactory" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
-    <PackageReference Include="Bogus" />
   </ItemGroup>
 
   <ItemGroup>
@@ -28,6 +27,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Axis.Api\Axis.Api.csproj" />
+    <ProjectReference Include="..\..\Api\Axis.Api.Tests\Axis.Api.Tests.csproj" />
     <ProjectReference Include="..\..\Shared\Axis.Testing\Axis.Testing.csproj" />
   </ItemGroup>
 
