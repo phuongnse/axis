@@ -13,7 +13,8 @@
 | [Product Vision](./PRODUCT_VISION.md) | Goals, target users, problem & solution |
 | [Tech Stack](./TECH_STACK.md) | Technology decisions and rationale |
 | [Architecture](./ARCHITECTURE.md) | System design, modules, data strategy |
-| [Epics](./epics/README.md) | All epics, features, and user stories — **[how agents find open work](./epics/README.md#how-agents-find-open-work)** · [US template](./epics/_template-feature-us.md) |
+| [Epics](./epics/README.md) | Epic/module index and implementation progress by area |
+| [Use cases](./use-cases/README.md) | User-facing behavior specs (flow + AC + wireframes + diagrams + implementation status) |
 | [Wireframes](./wireframes/) | Screen wireframes — Excalidraw source + SVG preview |
 
 ### Playbooks (how-to guides)

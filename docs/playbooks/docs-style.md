@@ -92,6 +92,22 @@ Rules:
 
 ---
 
+## Use case files (flow-first)
+
+Use case files should be self-contained and user-facing:
+
+1. Purpose / actor / trigger
+2. Main flow
+3. Alternate/error flows
+4. Acceptance criteria
+5. Wireframes table (mapped to this use case)
+6. Diagrams table (mapped to this use case; explicit N/A if not needed yet)
+7. Implementation status callout
+
+Avoid writing engineering process constraints as end-user use cases. Keep those in shared playbooks and gates (for example `frontend.md`, `agent-checklist.md`, `CLAUDE.md`).
+
+---
+
 ## When you add a new `.md` file
 
 1. Add the back-link header (per [`docs/README.md`](../README.md)): `> **Navigation**: [← parent.md](...)` so future readers can climb back up.

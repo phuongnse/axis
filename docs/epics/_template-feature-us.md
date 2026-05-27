@@ -59,4 +59,9 @@ One paragraph describing the feature.
 
 ---
 
-**Copy this file** when adding a new feature US block. Layout rules: [docs-style § Feature files](../playbooks/docs-style.md#feature-files--wireframes--implementation-status). Validate with `python3 scripts/normalize-feature-docs.py --check`.
+**Copy this file** when maintaining legacy feature-US docs under `docs/epics/*/features/`.
+
+For new flow-first documentation, prefer the use-case template:
+- [docs/use-cases/_template-use-case.md](../use-cases/_template-use-case.md)
+
+Layout rules: [docs-style § Feature files](../playbooks/docs-style.md#feature-files--wireframes--implementation-status). Validate with `python3 scripts/normalize-feature-docs.py --check`.
