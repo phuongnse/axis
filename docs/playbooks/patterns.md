@@ -531,6 +531,16 @@ _ = Task.Run(async () =>
 - **Never hardcode environment configurations**: connection strings, API URLs, Docker endpoints, secret keys must use environment variables, `appsettings.json`, or `.testcontainers.properties`.
 - **Pre-commit / CI**: `dotnet build` then `dotnet test` on the full solution (`Axis.sln`). Includes Testcontainers integration and API tests — Docker required locally.
 
+### Pattern — keep API isolation tests deterministic, test async provisioning separately
+
+Tenant data-isolation API tests and tenant-provisioning event-pipeline tests have different failure modes and should not share the same precondition mechanism.
+
+- **API isolation tests** (e.g., cross-tenant 404/403 behavior) should use deterministic setup: create/verify tenant schema readiness in fixture code and verify required tables exist before requests.
+- **Async provisioning tests** (Kafka/Wolverine coordinator paths) should validate retry/backoff/exhaustion/completion logic in dedicated messaging/infrastructure tests.
+- Avoid helper-level long polling for eventual consistency in shared auth/setup helpers; a single timing hiccup can fan out into dozens of unrelated API test failures and CI timeout/cancel behavior.
+
+Use this split whenever a feature combines "eventually consistent provisioning" with "synchronous API authorization/isolation checks."
+
 **Test isolation pattern** — two levels of isolation to understand:
 
 **Level 1 — between test classes (container-per-class):** Each test class gets its own Testcontainers instance via `IAsyncLifetime`. This guarantees no cross-class pollution.
