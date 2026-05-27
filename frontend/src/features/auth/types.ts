@@ -16,3 +16,13 @@ export interface RegisterValidationErrorData {
   message?: string;
   title?: string;
 }
+
+export interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+export interface LoginAttemptResult {
+  authorizeUrl: string;
+  location: string | null;
+}

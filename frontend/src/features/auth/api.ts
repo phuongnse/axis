@@ -1,7 +1,19 @@
 import { fetchApi } from '@/lib/api';
 import { useAuthStore } from './auth-store';
-import { CLIENT_ID, clearPkceSession, loadPkceSession, REDIRECT_URI } from './pkce';
-import type { RegisterOrganizationRequest, RegisterOrganizationResponse } from './types';
+import {
+  buildAuthorizeUrl,
+  CLIENT_ID,
+  clearPkceSession,
+  createPkceSession,
+  loadPkceSession,
+  REDIRECT_URI,
+} from './pkce';
+import type {
+  LoginAttemptResult,
+  LoginCredentials,
+  RegisterOrganizationRequest,
+  RegisterOrganizationResponse,
+} from './types';
 
 interface TokenResponse {
   access_token: string;
@@ -13,7 +25,7 @@ export function createRegisterIdempotencyKey(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
   }
-  return `register-${Date.now()}`;
+  return `register-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export function toAdminNameParts(fullName: string): { firstName: string; lastName: string } {
@@ -38,6 +50,55 @@ export async function registerOrganization(
     },
     body: JSON.stringify(payload),
   });
+}
+
+export class LoginRequestError extends Error {
+  status: number;
+  bodyText: string;
+
+  constructor(status: number, bodyText: string) {
+    super('Login request failed');
+    this.status = status;
+    this.bodyText = bodyText;
+    this.name = 'LoginRequestError';
+  }
+}
+
+export async function loginWithPassword(
+  credentials: LoginCredentials,
+): Promise<LoginAttemptResult> {
+  const pkce = createPkceSession();
+  const authorizeUrl = await buildAuthorizeUrl(pkce.state, pkce.verifier);
+  const body = new URLSearchParams({
+    email: credentials.email.trim(),
+    password: credentials.password,
+    return_url: `${window.location.origin}${authorizeUrl}`,
+  });
+
+  const response = await fetch('/connect/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+    credentials: 'include',
+    redirect: 'manual',
+  });
+
+  const isRedirect =
+    response.status === 302 ||
+    response.status === 303 ||
+    response.status === 307 ||
+    response.status === 308 ||
+    response.type === 'opaqueredirect';
+
+  if (!isRedirect && !response.ok) {
+    const bodyText = await response.text();
+    throw new LoginRequestError(response.status, bodyText);
+  }
+
+  return {
+    authorizeUrl,
+    location: response.headers.get('Location'),
+  };
 }
 
 export async function exchangeAuthorizationCode(code: string): Promise<string> {
