@@ -1,44 +1,21 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useMutation } from '@tanstack/react-query';
+import { useRef } from 'react';
+import { type FieldPath, type UseFormReturn, useForm } from 'react-hook-form';
 
+import {
+  createRegisterIdempotencyKey,
+  registerOrganization,
+  toAdminNameParts,
+} from '@/features/auth/api';
 import { type RegisterFormValues, registerSchema } from '@/features/auth/schemas/register-schema';
-import { ApiError, fetchApi } from '@/lib/api';
+import type { RegisterValidationErrorData } from '@/features/auth/types';
+import { ApiError } from '@/lib/api';
 
-interface RegisterRequest {
-  org_name: string;
-  admin_first_name: string;
-  admin_last_name: string;
-  admin_email: string;
-  password: string;
-  password_confirmation: string;
-}
+const DEFAULT_SUCCESS_MESSAGE =
+  'Registration successful. Please check your email to verify your account.';
 
-interface RegisterResponse {
-  message?: string;
-}
-
-interface ValidationErrorData {
-  errors?: Record<string, string[]>;
-}
-
-function toNameParts(fullName: string): { firstName: string; lastName: string } {
-  const parts = fullName
-    .trim()
-    .split(/\s+/)
-    .filter((part) => part.length > 0);
-  return {
-    firstName: parts[0] ?? '',
-    lastName: parts.slice(1).join(' '),
-  };
-}
-
-function createIdempotencyKey(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `register-${Date.now()}`;
-}
+const GENERIC_SUBMIT_ERROR = 'Something went wrong, please try again';
 
 function pickFirstError(
   errors: Record<string, string[]> | undefined,
@@ -52,10 +29,60 @@ function pickFirstError(
   return undefined;
 }
 
+function applyRegisterValidationErrors(
+  form: UseFormReturn<RegisterFormValues>,
+  errorData: RegisterValidationErrorData,
+): boolean {
+  let hasMappedFieldError = false;
+
+  const organizationNameError = pickFirstError(
+    errorData.errors,
+    'OrgName',
+    'org_name',
+    'organizationName',
+  );
+  const fullNameError = pickFirstError(
+    errorData.errors,
+    'AdminFirstName',
+    'admin_first_name',
+    'AdminLastName',
+    'admin_last_name',
+    'fullName',
+  );
+  const emailError = pickFirstError(errorData.errors, 'AdminEmail', 'admin_email', 'email');
+  const passwordError = pickFirstError(errorData.errors, 'Password', 'password');
+  const passwordConfirmationError = pickFirstError(
+    errorData.errors,
+    'PasswordConfirmation',
+    'password_confirmation',
+  );
+
+  const setFieldError = (field: FieldPath<RegisterFormValues>, message: string) => {
+    form.setError(field, { type: 'server', message });
+    hasMappedFieldError = true;
+  };
+
+  if (organizationNameError) {
+    setFieldError('organizationName', organizationNameError);
+  }
+  if (fullNameError) {
+    setFieldError('fullName', fullNameError);
+  }
+  if (emailError) {
+    setFieldError('email', emailError);
+  }
+  if (passwordError) {
+    setFieldError('password', passwordError);
+  }
+  if (passwordConfirmationError) {
+    setFieldError('passwordConfirmation', passwordConfirmationError);
+  }
+
+  return hasMappedFieldError;
+}
+
 export function useRegister() {
-  const [loading, setLoading] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const idempotencyKeyRef = useRef(createRegisterIdempotencyKey());
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -68,94 +95,64 @@ export function useRegister() {
     mode: 'onSubmit',
   });
 
-  async function submit(values: RegisterFormValues) {
-    setSubmitError(null);
-    setLoading(true);
-
-    try {
-      const names = toNameParts(values.fullName);
-      const payload: RegisterRequest = {
-        org_name: values.organizationName.trim(),
-        admin_first_name: names.firstName,
-        admin_last_name: names.lastName,
-        admin_email: values.email.trim(),
-        password: values.password,
-        password_confirmation: values.passwordConfirmation,
-      };
-
-      const response = await fetchApi<RegisterResponse>('/organizations', {
-        method: 'POST',
-        headers: {
-          'Idempotency-Key': createIdempotencyKey(),
+  const mutation = useMutation({
+    mutationFn: async (values: RegisterFormValues) => {
+      const names = toAdminNameParts(values.fullName);
+      return registerOrganization(
+        {
+          org_name: values.organizationName.trim(),
+          admin_first_name: names.firstName,
+          admin_last_name: names.lastName,
+          admin_email: values.email.trim(),
+          password: values.password,
+          password_confirmation: values.passwordConfirmation,
         },
-        body: JSON.stringify(payload),
-      });
-
-      setSuccessMessage(
-        response?.message ??
-          'Registration successful. Please check your email to verify your account.',
+        idempotencyKeyRef.current,
       );
+    },
+    onSuccess: () => {
       form.reset();
-    } catch (error: unknown) {
+    },
+    onError: (error: unknown) => {
       if (error instanceof ApiError && error.status < 500) {
-        const errorData = error.data as ValidationErrorData;
-        const organizationNameError = pickFirstError(
-          errorData.errors,
-          'OrgName',
-          'org_name',
-          'organizationName',
-        );
-        const fullNameError = pickFirstError(
-          errorData.errors,
-          'AdminFirstName',
-          'admin_first_name',
-          'AdminLastName',
-          'admin_last_name',
-          'fullName',
-        );
-        const emailError = pickFirstError(errorData.errors, 'AdminEmail', 'admin_email', 'email');
-        const passwordError = pickFirstError(errorData.errors, 'Password', 'password');
-        const passwordConfirmationError = pickFirstError(
-          errorData.errors,
-          'PasswordConfirmation',
-          'password_confirmation',
-        );
-
-        if (organizationNameError) {
-          form.setError('organizationName', { type: 'server', message: organizationNameError });
-        }
-        if (fullNameError) {
-          form.setError('fullName', { type: 'server', message: fullNameError });
-        }
-        if (emailError) {
-          form.setError('email', { type: 'server', message: emailError });
-        }
-        if (passwordError) {
-          form.setError('password', { type: 'server', message: passwordError });
-        }
-        if (passwordConfirmationError) {
-          form.setError('passwordConfirmation', {
+        const errorData = error.data as RegisterValidationErrorData;
+        const hasMappedFieldError = applyRegisterValidationErrors(form, errorData);
+        if (!hasMappedFieldError) {
+          form.setError('root', {
             type: 'server',
-            message: passwordConfirmationError,
+            message: errorData.message ?? errorData.title ?? GENERIC_SUBMIT_ERROR,
           });
         }
-      } else {
-        setSubmitError('Something went wrong, please try again');
+        return;
       }
-    } finally {
-      setLoading(false);
+
+      form.setError('root', { type: 'server', message: GENERIC_SUBMIT_ERROR });
+    },
+  });
+
+  async function submit(values: RegisterFormValues) {
+    form.clearErrors('root');
+    try {
+      await mutation.mutateAsync(values);
+    } catch {
+      // Field and submit errors are applied in mutation.onError.
     }
   }
 
   function resetFlow() {
-    setSuccessMessage(null);
-    setSubmitError(null);
+    idempotencyKeyRef.current = createRegisterIdempotencyKey();
+    mutation.reset();
+    form.clearErrors();
+    form.reset();
   }
+
+  const successMessage = mutation.isSuccess
+    ? (mutation.data?.message ?? DEFAULT_SUCCESS_MESSAGE)
+    : null;
 
   return {
     form,
-    loading,
-    submitError,
+    loading: mutation.isPending,
     successMessage,
     submit,
     resetFlow,

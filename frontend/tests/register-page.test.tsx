@@ -58,6 +58,35 @@ describe('RegisterPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('maps backend validation errors to inline field messages', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      statusText: 'Bad Request',
+      json: () =>
+        Promise.resolve({
+          errors: {
+            org_name: ['Organization name must be between 2 and 100 characters.'],
+          },
+        }),
+    } as unknown as Response);
+
+    await renderWithRouter(<RegisterPage />, { path: '/register' });
+
+    await user.type(screen.getByLabelText('Organization name'), 'Acme Corp');
+    await user.type(screen.getByLabelText('Full name'), 'Alex Brown');
+    await user.type(screen.getByLabelText('Email address'), 'alex@example.com');
+    await user.type(screen.getByLabelText('Password'), 'Passw0rd');
+    await user.type(screen.getByLabelText('Confirm password'), 'Passw0rd');
+    await user.click(screen.getByRole('button', { name: /create account/i }));
+
+    expect(
+      await screen.findByText('Organization name must be between 2 and 100 characters.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /create account/i })).toBeEnabled();
+  });
+
   it('shows generic server error when API returns 5xx', async () => {
     const user = userEvent.setup();
     vi.mocked(fetch).mockResolvedValueOnce({

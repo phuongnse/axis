@@ -7,12 +7,13 @@ import { AuthCard } from '@/features/auth/components/AuthCard';
 import { useRegister } from '@/features/auth/hooks/useRegister';
 
 export function RegisterPage() {
-  const { form, loading, submitError, successMessage, submit, resetFlow } = useRegister();
+  const { form, loading, successMessage, submit, resetFlow } = useRegister();
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = form;
+  const submitError = errors.root?.message;
 
   if (successMessage) {
     return (

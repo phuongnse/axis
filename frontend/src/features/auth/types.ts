@@ -1,0 +1,18 @@
+export interface RegisterOrganizationRequest {
+  org_name: string;
+  admin_first_name: string;
+  admin_last_name: string;
+  admin_email: string;
+  password: string;
+  password_confirmation: string;
+}
+
+export interface RegisterOrganizationResponse {
+  message?: string;
+}
+
+export interface RegisterValidationErrorData {
+  errors?: Record<string, string[]>;
+  message?: string;
+  title?: string;
+}

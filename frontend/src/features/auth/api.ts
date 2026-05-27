@@ -1,10 +1,43 @@
+import { fetchApi } from '@/lib/api';
 import { useAuthStore } from './auth-store';
 import { CLIENT_ID, clearPkceSession, loadPkceSession, REDIRECT_URI } from './pkce';
+import type { RegisterOrganizationRequest, RegisterOrganizationResponse } from './types';
 
 interface TokenResponse {
   access_token: string;
   token_type: string;
   expires_in: number;
+}
+
+export function createRegisterIdempotencyKey(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `register-${Date.now()}`;
+}
+
+export function toAdminNameParts(fullName: string): { firstName: string; lastName: string } {
+  const parts = fullName
+    .trim()
+    .split(/\s+/)
+    .filter((part) => part.length > 0);
+  return {
+    firstName: parts[0] ?? '',
+    lastName: parts.slice(1).join(' '),
+  };
+}
+
+export async function registerOrganization(
+  payload: RegisterOrganizationRequest,
+  idempotencyKey: string,
+): Promise<RegisterOrganizationResponse> {
+  return fetchApi<RegisterOrganizationResponse>('/organizations', {
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function exchangeAuthorizationCode(code: string): Promise<string> {
