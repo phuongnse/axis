@@ -20,6 +20,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Npgsql;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
 using StackExchange.Redis;
@@ -274,16 +275,28 @@ public sealed class ApiTestFixture : IAsyncLifetime
         {
             User user = await identityContext.Users
                 .SingleAsync(u => u.Email == email);
-            Organization organization = await identityContext.Organizations
-                .SingleAsync(o => o.Id == user.OrganizationId);
-
-            if (organization.Status == OrganizationStatus.Provisioning)
-                organization.CompleteProvisioning();
-
-            await identityContext.SaveChangesAsync();
-            organizationId = organization.Id;
+            organizationId = user.OrganizationId;
         }
 
+        await EnsureModuleSchemasAsync(organizationId);
+        await EnsureDataModelingTablesAsync(organizationId);
+
+        await using IdentityDbContext finalizeContext = new(
+            new DbContextOptionsBuilder<IdentityDbContext>()
+                .UseNpgsql(_identityConnectionString)
+                .UseOpenIddict()
+                .Options);
+        Organization organization = await finalizeContext.Organizations
+            .SingleAsync(o => o.Id == organizationId);
+        if (organization.Status == OrganizationStatus.Provisioning)
+        {
+            organization.CompleteProvisioning();
+            await finalizeContext.SaveChangesAsync();
+        }
+    }
+
+    private async Task EnsureModuleSchemasAsync(Guid organizationId)
+    {
         await PostgresModuleTestDatabase.MigrateAsync<DataModelingDbContext>(
             _dataModelingConnectionString,
             opts => new DataModelingDbContext(opts, new FixedTenantContext(organizationId)));
@@ -296,6 +309,27 @@ public sealed class ApiTestFixture : IAsyncLifetime
         await PostgresModuleTestDatabase.MigrateAsync<WorkflowEngineDbContext>(
             _workflowEngineConnectionString,
             opts => new WorkflowEngineDbContext(opts, new FixedTenantContext(organizationId)));
+    }
+
+    private async Task EnsureDataModelingTablesAsync(Guid organizationId)
+    {
+        string schema = $"tenant_{organizationId:N}";
+        for (int attempt = 1; attempt <= 3; attempt++)
+        {
+            await using NpgsqlConnection connection = new(_dataModelingConnectionString);
+            await connection.OpenAsync();
+            await using NpgsqlCommand command = connection.CreateCommand();
+            command.CommandText = "SELECT to_regclass(@tableName)";
+            command.Parameters.AddWithValue("tableName", $"\"{schema}\".data_records");
+            object? result = await command.ExecuteScalarAsync();
+            if (result is string)
+                return;
+
+            await EnsureModuleSchemasAsync(organizationId);
+        }
+
+        throw new InvalidOperationException(
+            $"Tenant schema '{schema}' is missing data_records table after repeated migration attempts.");
     }
 
     private static async Task SeedTestOpenIddictClientsAsync(IServiceProvider services)
