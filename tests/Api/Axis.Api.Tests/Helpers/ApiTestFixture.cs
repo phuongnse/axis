@@ -319,10 +319,10 @@ public sealed class ApiTestFixture : IAsyncLifetime
             await using NpgsqlConnection connection = new(_dataModelingConnectionString);
             await connection.OpenAsync();
             await using NpgsqlCommand command = connection.CreateCommand();
-            command.CommandText = "SELECT to_regclass(@tableName)";
+            command.CommandText = "SELECT to_regclass(@tableName)::text";
             command.Parameters.AddWithValue("tableName", $"\"{schema}\".data_records");
-            object? result = await command.ExecuteScalarAsync();
-            if (result is string)
+            string? result = (string?)await command.ExecuteScalarAsync();
+            if (!string.IsNullOrWhiteSpace(result))
                 return;
 
             await EnsureModuleSchemasAsync(organizationId);
