@@ -262,36 +262,54 @@ public sealed class ApiTestFixture : IAsyncLifetime
         AllowAutoRedirect = false,
     });
 
-    public async Task EnsureTenantProvisionedAsync(string adminEmail)
+    /// <summary>
+    /// Resolves the organization id for a registered admin email (Identity public schema).
+    /// </summary>
+    public async Task<Guid> ResolveOrganizationIdAsync(string adminEmail)
     {
         Email email = Email.Create(adminEmail).Value!;
 
-        Guid organizationId;
-        await using (IdentityDbContext identityContext = new(
-                         new DbContextOptionsBuilder<IdentityDbContext>()
-                             .UseNpgsql(_identityConnectionString)
-                             .UseOpenIddict()
-                             .Options))
-        {
-            User user = await identityContext.Users
-                .SingleAsync(u => u.Email == email);
-            organizationId = user.OrganizationId;
-        }
-
-        await EnsureModuleSchemasAsync(organizationId);
-
-        await using IdentityDbContext finalizeContext = new(
+        await using IdentityDbContext identityContext = new(
             new DbContextOptionsBuilder<IdentityDbContext>()
                 .UseNpgsql(_identityConnectionString)
                 .UseOpenIddict()
                 .Options);
-        Organization organization = await finalizeContext.Organizations
-            .SingleAsync(o => o.Id == organizationId);
+        User user = await identityContext.Users.SingleAsync(u => u.Email == email);
+        return user.OrganizationId;
+    }
+
+    /// <summary>
+    /// Creates tenant schemas and runs module migrations only (does not change org status).
+    /// </summary>
+    public Task ProvisionTenantSchemasAsync(Guid organizationId) =>
+        EnsureModuleSchemasAsync(organizationId);
+
+    /// <summary>
+    /// Marks the organization Active when still in Provisioning (test convenience; not the event pipeline).
+    /// </summary>
+    public async Task MarkOrganizationActiveAsync(Guid organizationId)
+    {
+        await using IdentityDbContext context = new(
+            new DbContextOptionsBuilder<IdentityDbContext>()
+                .UseNpgsql(_identityConnectionString)
+                .UseOpenIddict()
+                .Options);
+        Organization organization = await context.Organizations.SingleAsync(o => o.Id == organizationId);
         if (organization.Status == OrganizationStatus.Provisioning)
         {
             organization.CompleteProvisioning();
-            await finalizeContext.SaveChangesAsync();
+            await context.SaveChangesAsync();
         }
+    }
+
+    /// <summary>
+    /// Tenant schemas + Active org — default precondition for tenant module API tests.
+    /// </summary>
+    public async Task EnsureTenantProvisionedAsync(string adminEmail)
+    {
+        Guid organizationId = await ResolveOrganizationIdAsync(adminEmail);
+        await ProvisionTenantSchemasAsync(organizationId);
+        await MarkOrganizationActiveAsync(organizationId);
     }
 
     private async Task EnsureModuleSchemasAsync(Guid organizationId)

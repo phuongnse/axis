@@ -52,10 +52,58 @@ public static class AuthHelper
         if (verifyResp.StatusCode != HttpStatusCode.NoContent)
             throw new InvalidOperationException($"Email verification failed: {verifyResp.StatusCode}");
 
-        await fixture.EnsureTenantProvisionedAsync(email);
+        Guid organizationId = await fixture.ResolveOrganizationIdAsync(email);
+        await fixture.ProvisionTenantSchemasAsync(organizationId);
+        await fixture.MarkOrganizationActiveAsync(organizationId);
 
         // 3. Run the Authorization Code + PKCE flow on an independent client
         //    (so cookie jar is isolated from the shared fixture client)
+        HttpClient pkceClient = fixture.CreateNewClient();
+        string accessToken = await CompletePkceFlowAsync(pkceClient, email, "TestPass1");
+
+        HttpClient authedClient = fixture.CreateNewClient();
+        authedClient.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", accessToken);
+
+        return authedClient;
+    }
+
+    /// <summary>
+    /// Same as <see cref="CreateAdminClientAsync"/> but leaves the organization in
+    /// Provisioning status after tenant schemas are migrated.
+    /// Use for middleware tests (403 while workspace is being set up).
+    /// </summary>
+    public static async Task<HttpClient> CreateAdminClientWhileProvisioningAsync(
+        ApiTestFixture fixture,
+        string suffix)
+    {
+        string email = $"admin{suffix}@test.com";
+
+        HttpResponseMessage regResp = await fixture.Client.PostAsJsonAsync("/api/organizations", new
+        {
+            org_name = $"TestOrg{suffix}",
+            admin_first_name = "Test",
+            admin_last_name = "Admin",
+            admin_email = email,
+            password = "TestPass1",
+            password_confirmation = "TestPass1",
+        }, Json);
+
+        if (!regResp.IsSuccessStatusCode)
+            throw new InvalidOperationException($"Registration failed: {regResp.StatusCode}");
+
+        string verifyToken = fixture.EmailCapture.GetVerificationToken(email)
+            ?? throw new InvalidOperationException(
+                $"No verification token captured for {email}.");
+
+        HttpResponseMessage verifyResp = await fixture.Client.PostAsJsonAsync(
+            "/api/auth/verify-email", new { token = verifyToken }, Json);
+        if (verifyResp.StatusCode != HttpStatusCode.NoContent)
+            throw new InvalidOperationException($"Email verification failed: {verifyResp.StatusCode}");
+
+        Guid organizationId = await fixture.ResolveOrganizationIdAsync(email);
+        await fixture.ProvisionTenantSchemasAsync(organizationId);
+
         HttpClient pkceClient = fixture.CreateNewClient();
         string accessToken = await CompletePkceFlowAsync(pkceClient, email, "TestPass1");
 
