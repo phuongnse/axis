@@ -8,14 +8,21 @@ using FluentAssertions;
 namespace Axis.Api.Tests.Tenancy;
 
 /// <summary>
-/// End-to-end check that verify-email triggers async module provisioning (Kafka/RabbitMQ)
-/// and tenant APIs work without <see cref="ApiTestFixture.EnsureTenantProvisionedAsync"/>.
+/// End-to-end check that verify-email triggers async module provisioning via Wolverine's
+/// local message queue and tenant APIs work without deterministic fixture provisioning.
+///
+/// Uses <see cref="ProvisioningE2EFixture"/> (not <see cref="ApiTestFixture"/>) because
+/// the real <c>IdentityUnitOfWork</c> must run: it collects the <c>OrganizationVerified</c>
+/// domain event and publishes <c>OrganizationVerifiedEvent</c> into Wolverine, which
+/// triggers the multi-module provisioning pipeline under test.
+/// <see cref="ApiTestFixture"/> stubs <c>IUnitOfWork</c> to keep endpoint tests
+/// deterministic — that stub would prevent this test from ever completing.
 /// </summary>
-[Collection("Api")]
+[Collection("Api-E2E")]
 [Trait("Category", "Slow")]
-public sealed class TenantProvisioningEndToEndTests(ApiTestFixture fixture)
+public sealed class TenantProvisioningEndToEndTests(ProvisioningE2EFixture fixture)
 {
-    private static readonly JsonSerializerOptions Json = ApiTestFixture.JsonOptions;
+    private static readonly JsonSerializerOptions Json = ProvisioningE2EFixture.JsonOptions;
 
     [Fact]
     public async Task RegisterAndVerify_WhenEventPipelineCompletes_AllowsTenantApiAccess()
@@ -44,7 +51,7 @@ public sealed class TenantProvisioningEndToEndTests(ApiTestFixture fixture)
         verifyResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         bool ready = await PollUntilProvisioningReadyAsync(verifyToken, TimeSpan.FromSeconds(60));
-        ready.Should().BeTrue("event-driven tenant provisioning should complete in the API test host");
+        ready.Should().BeTrue("event-driven tenant provisioning should complete within the timeout");
 
         HttpClient pkceClient = fixture.CreateNewClient();
         string accessToken = await AuthHelper.CompletePkceFlowAsync(pkceClient, email, "TestPass1");

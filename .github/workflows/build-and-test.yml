@@ -11,6 +11,7 @@ concurrency:
 permissions:
   contents: read
   pull-requests: read   # dorny/paths-filter calls pulls.listFiles to detect changed paths
+  checks: write         # dorny/test-reporter posts test results as PR check annotations
 
 jobs:
   # Detects which scopes the PR actually touches so the heavy jobs below
@@ -111,11 +112,11 @@ jobs:
 
       - name: Test
         run: >
-          dotnet test --no-build --verbosity normal
+          dotnet test --no-build --verbosity minimal
           --logger "trx;LogFileName=test-results.trx"
           --results-directory ${{ github.workspace }}/TestResults
 
-      # Upload TRX even on failure so PR annotations + post-mortem work.
+      # Upload TRX even on failure so post-mortem and local re-runs work.
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -123,6 +124,17 @@ jobs:
           name: dotnet-test-results
           path: ${{ github.workspace }}/TestResults/**/*.trx
           retention-days: 14
+
+      # Annotate the PR with per-test pass/fail inline — makes failures visible
+      # without downloading the TRX artifact. Runs even on test failure.
+      - name: Annotate PR with test results (dorny/test-reporter)
+        if: always()
+        uses: dorny/test-reporter@dc3021de87dfb03b2f1c1e6ef1e074fc867b3a9c # v2.1.1
+        with:
+          name: .NET Test Results
+          path: ${{ github.workspace }}/TestResults/**/*.trx
+          reporter: dotnet-trx
+          fail-on-error: false
 
   frontend:
     name: Frontend — Type Check, Lint, and Test

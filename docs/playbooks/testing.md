@@ -100,7 +100,18 @@ When diagnosing CI failures in this area:
 
 **Auth helper split:** `ApiTestFixture.ProvisionTenantSchemasAsync` vs `MarkOrganizationActiveAsync` — call both from `CreateAdminClientAsync` for normal endpoint tests; use `AuthHelper.CreateAdminClientWhileProvisioningAsync` when the AC requires an org still in `Provisioning` (do not call `MarkOrganizationActiveAsync`).
 
-**E2E provisioning test:** `TenantProvisioningEndToEndTests` (`[Trait("Category", "Slow")]`) polls `/api/auth/provisioning-status` after verify-email and asserts tenant APIs work without deterministic fixture provisioning — the only coverage for the real Kafka/RabbitMQ/Wolverine pipeline. Runs in the standard CI job (30 s timeout). `ApiTestFixture` sets `KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0` on the broker so consumers are assigned partitions immediately on subscribe. Run in isolation locally: `dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj --filter "Category=Slow"`.
+**E2E provisioning test:** `TenantProvisioningEndToEndTests` (`[Trait("Category", "Slow")]`, collection `"Api-E2E"`) uses `ProvisioningE2EFixture` — **not** `ApiTestFixture`. The two fixtures serve different concerns and must remain separate:
+
+| Fixture | `IUnitOfWork` (Identity) | Purpose |
+|---------|--------------------------|---------|
+| `ApiTestFixture` | `NullUnitOfWork` (no events) | Endpoint tests — deterministic, no async pipeline |
+| `ProvisioningE2EFixture` | Real `IdentityUnitOfWork` | E2E pipeline test — events must fire |
+
+`ApiTestFixture` stubs `IUnitOfWork` so that endpoint tests can call `ProvisionTenantSchemasAsync` + `MarkOrganizationActiveAsync` directly without racing against an async pipeline. `ProvisioningE2EFixture` keeps the real `IdentityUnitOfWork` so that `verify-email` publishes `OrganizationVerifiedEvent` into Wolverine's local queue — which starts the multi-module provisioning chain. **If `IUnitOfWork` is stubbed in the E2E fixture, the event is never published and the test always times out.**
+
+In the `"Testing"` environment, `Program.cs` routes events locally (`.Locally()`, not Kafka topics) via `useKafkaEventTransport = false`. The pipeline exercises Wolverine's in-process local queue: `OrganizationVerifiedEvent` → 4 module `OrganizationVerifiedHandler`s → `TenantSchemaProvisioner` → `TenantModuleProvisionReportEvent` → `TenantModuleProvisionReportHandler` → org marked Active.
+
+Run in isolation locally: `dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj --filter "Category=Slow"`.
 
 ---
 
