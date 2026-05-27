@@ -360,7 +360,7 @@ When writing or editing any wireframe generator, verify against these values (fr
 3. Add the output path to the screen inventory table in this playbook
 4. Run `node docs/wireframes/generate-screens.mjs` — **verify output has no `NaN` positions** (element count must be > 0)
 5. Run `docs/scripts/generate-wireframes.ps1` to regenerate SVGs
-6. Add a `> **Wireframe**` callout to the relevant feature file
+6. Add a `> **Wireframe**` callout to the relevant use-case file
 
 **Pre-commit checks for screen wireframes:**
 - [ ] Element count > 0 for every generated file (NaN positions = 0 renderable elements)

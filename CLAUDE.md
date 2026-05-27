@@ -96,7 +96,7 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 ### Navigate (do not read this entire file each task)
 
 1. [`agent-checklist.md`](docs/playbooks/agent-checklist.md) — AC map, gates, epic map.
-2. `docs/epics/{module}/README.md` + `features/F0N-*.md` for the US.
+2. `docs/epics/{module}/README.md` + `docs/use-cases/{domain}/*.md` for the use case.
 3. [`docs/PROGRESS.md`](docs/PROGRESS.md) for layer status.
 4. Open [`process.md`](docs/playbooks/process.md) / [`patterns.md`](docs/playbooks/patterns.md) only when the checklist says so.
 

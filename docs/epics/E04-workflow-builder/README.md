@@ -18,18 +18,17 @@ The workflow builder is the heart of the platform. It is what differentiates Axi
 
 ---
 
-## Features
+## Use Cases
 
-| ID | Feature | Description |
+| Use case | Description |
 |---|---|---|
-| [F01](./features/F01-workflow-definition.md) | Workflow Definition Management | CRUD operations on workflow definitions |
-| [F02](./features/F02-visual-canvas.md) | Visual Workflow Canvas | Drag & drop canvas powered by React Flow |
-| [F03](./features/F03-step-types.md) | Step Type Configuration | Configure Form, HTTP Request, Condition, Script, Notification steps |
-| [F04](./features/F04-triggers.md) | Trigger Configuration | Manual, Schedule (cron), Webhook, Event triggers |
-| [F05](./features/F05-branching.md) | Branching & Conditional Logic | If/else conditions, switch, dynamic routing |
-| [F06](./features/F06-parallel-execution.md) | Parallel Step Execution | Fan-out and fan-in parallel step groups |
-| [F07](./features/F07-import-export.md) | Workflow Import / Export | Export workflow as JSON, import from JSON file |
-
+| [Workflow Definition Management](../../use-cases/workflow-builder/workflow-definition.md) | CRUD operations on workflow definitions |
+| [Visual Workflow Canvas](../../use-cases/workflow-builder/visual-canvas.md) | Drag & drop canvas powered by React Flow |
+| [Step Type Configuration](../../use-cases/workflow-builder/step-types.md) | Configure Form, HTTP Request, Condition, Script, Notification steps |
+| [Trigger Configuration](../../use-cases/workflow-builder/triggers.md) | Manual, Schedule (cron), Webhook, Event triggers |
+| [Branching & Conditional Logic](../../use-cases/workflow-builder/branching.md) | If/else conditions, switch, dynamic routing |
+| [Parallel Step Execution](../../use-cases/workflow-builder/parallel-execution.md) | Fan-out and fan-in parallel step groups |
+| [Workflow Import / Export](../../use-cases/workflow-builder/import-export.md) | Export workflow as JSON, import from JSON file |
 ---
 
 ## Diagrams
@@ -92,7 +91,7 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend** | ⚠️ mostly ✅ | CRUD/publish/import/export ✅; plan limits 402 ✅ (E01 F04). **Engine-owned:** triggers (cron/webhook/event), step execution, parallel/join — tracked in [E06](../E06-workflow-engine/README.md#open-work-agents). **API polish:** list filters (last execution date), import transactional rollback — [F07](./features/F07-import-export.md). |
+| **Backend** | ⚠️ mostly ✅ | CRUD/publish/import/export ✅; plan limits 402 ✅ (E01 F04). **Engine-owned:** triggers (cron/webhook/event), step execution, parallel/join — tracked in [E06](../E06-workflow-engine/README.md#open-work-agents). **API polish:** list filters (last execution date), import transactional rollback — [F07](../../use-cases/workflow-builder/import-export.md). |
 | **Frontend** | ⏳ | Visual canvas, step config panels, trigger UI — every F02–F07 US. |
 
 Do not re-implement plan limits here; update stale “pending E01 F04” lines if you see them in feature callouts.

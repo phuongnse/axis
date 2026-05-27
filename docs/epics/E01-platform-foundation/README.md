@@ -18,15 +18,14 @@ Without this foundation, nothing else works. Every feature in every other epic r
 
 ---
 
-## Features
+## Use Cases
 
-| ID | Feature | Description |
+| Use case | Description |
 |---|---|---|
-| [F01](./features/F01-tenant-registration.md) | Tenant Registration & Provisioning | Self-service sign-up, org creation, schema provisioning |
-| [F02](./features/F02-organization-management.md) | Organization Management | Edit org profile, settings, branding |
-| [F03](./features/F03-tenant-isolation.md) | Tenant Data Isolation | Schema-per-tenant enforcement, middleware, tenant resolution |
-| [F04](./features/F04-subscription-plans.md) | Subscription Plan Management | Plan tiers, feature gating, billing metadata |
-
+| [Tenant Registration & Provisioning](../../use-cases/platform-foundation/tenant-registration.md) | Self-service sign-up, org creation, schema provisioning |
+| [Organization Management](../../use-cases/platform-foundation/organization-management.md) | Edit org profile, settings, branding |
+| [Tenant Data Isolation](../../use-cases/platform-foundation/tenant-isolation.md) | Schema-per-tenant enforcement, middleware, tenant resolution |
+| [Subscription Plan Management](../../use-cases/platform-foundation/subscription-plans.md) | Plan tiers, feature gating, billing metadata |
 ---
 
 ## Diagrams
@@ -54,8 +53,8 @@ Without this foundation, nothing else works. Every feature in every other epic r
 | Tenant Registration (US-001–004 backend) | ✅ Done | US-001–004 backend complete. Frontend verify/provisioning/pricing ⏳ |
 | Subscription Plans (F04 US-010–012 backend) | ✅ Done | `GET /api/plans`, 402 limits (workflow / user / execution), Redis read-through counters, platform plan change. Frontend pricing UI ⏳. **Deferred:** atomic execution counter; fail-closed Redis. |
 | Tenant Provisioning (US-003 backend) | ✅ Done | Kafka-driven per-module provisioning, coordinator retries, `GET /api/auth/provisioning-status`. Frontend wait screen ⏳ |
-| Tenant isolation (F03 US-008–009 backend) | ✅ Done | `TenantSchemaInterceptor`, `TenantOrganizationAccessMiddleware`, and cross-tenant API integration tests — see [F03](./features/F03-tenant-isolation.md) |
-| Organization Management (F02 US-005–007 backend) | ✅ Done | Profile, settings + usage, scheduled deletion + hard-delete job ✅. Frontend settings UI ⏳ — see [F02](./features/F02-organization-management.md) |
+| Tenant isolation (F03 US-008–009 backend) | ✅ Done | `TenantSchemaInterceptor`, `TenantOrganizationAccessMiddleware`, and cross-tenant API integration tests — see [F03](../../use-cases/platform-foundation/tenant-isolation.md) |
+| Organization Management (F02 US-005–007 backend) | ✅ Done | Profile, settings + usage, scheduled deletion + hard-delete job ✅. Frontend settings UI ⏳ — see [F02](../../use-cases/platform-foundation/organization-management.md) |
 | Frontend | ⏳ Pending | Verify flow, provisioning wait, settings, pricing |
 
 ---
@@ -64,10 +63,10 @@ Without this foundation, nothing else works. Every feature in every other epic r
 
 | Priority | Item | Where |
 |----------|------|--------|
-| **Backend** | ✅ E01 backend US complete (F01–F04). Optional: F04 bulk workflow import when product needs US-011 bulk AC | [F04](./features/F04-subscription-plans.md) |
-| Frontend | F01 US-002 verify + provisioning wait + auto sign-in; F04 pricing page; all F02 settings wireframes | [F01](./features/F01-tenant-registration.md), [F04](./features/F04-subscription-plans.md) |
+| **Backend** | ✅ E01 backend US complete (F01–F04). Optional: F04 bulk workflow import when product needs US-011 bulk AC | [F04](../../use-cases/platform-foundation/subscription-plans.md) |
+| Frontend | F01 US-002 verify + provisioning wait + auto sign-in; F04 pricing page; all F02 settings wireframes | [F01](../../use-cases/platform-foundation/tenant-registration.md), [F04](../../use-cases/platform-foundation/subscription-plans.md) |
 
-Epic-level checkboxes above remain spec-only; status is in feature **Implementation status** callouts.
+Epic-level checkboxes above remain spec-only; status is in use-case **Implementation status** callouts.
 
 ---
 

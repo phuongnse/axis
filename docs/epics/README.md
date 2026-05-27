@@ -6,12 +6,12 @@
 
 ## How agents find open work
 
-**Do not use `- [ ]` checkboxes in feature files as progress** — they stay unchecked by convention (spec only). Use this order:
+**Do not use `- [ ]` checkboxes in use-case files as progress** — they stay unchecked by convention (spec only). Use this order:
 
 | Step | Source | What you learn |
 |------|--------|----------------|
 | 1 | This page → **Open work** on the epic README | Prioritized gaps for that epic (backend vs frontend called out) |
-| 2 | `docs/epics/{epic}/features/F0N-*.md` | Per–user-story `> **Implementation status**` + `Gaps vs spec` + `**Done:**` / `**Deferred:**` |
+| 2 | `docs/use-cases/{domain}/*.md` | Per-use-case ACs + `> **Implementation status**` + `Gaps vs spec` / `**Deferred:**` |
 | 3 | `docs/PROGRESS.md` | Module layer summary (Domain → Frontend); cross-cutting foundation phases |
 | 4 | `grep -rE "\\| Application \\| ⚠️\\|\\| Infrastructure \\| ⚠️\\|\\| API \\| ⚠️" docs/epics/` | US rows with partial backend layers ([agent-checklist](../playbooks/agent-checklist.md)) |
 
@@ -28,7 +28,7 @@
 
 When you ship code, update **US callout → epic README table → epic Open work → PROGRESS** in the same PR. Never mark ✅ while `**Gaps vs spec**` still lists backend work for that layer.
 
-**Feature file layout:** wireframes as a `## Wireframes` table; implementation status as a blockquote + layer table — see [docs-style § Feature files](../playbooks/docs-style.md#feature-files--wireframes--implementation-status). After bulk edits, run `python3 scripts/normalize-feature-docs.py --check` (or omit `--check` to rewrite).
+**Use-case file layout:** include Purpose/Actor/Trigger, flow sections, AC, wireframes table, diagrams table, and implementation status callout — see [docs-style § Use case files](../playbooks/docs-style.md#use-case-files-flow-first).
 
 **Full AC coverage (all cases, not happy path only):** [agent-checklist § AC coverage](../playbooks/agent-checklist.md#ac-coverage--avoid-happy-path-only) — Gate 0 AC map + TDD + `Gaps vs spec` on every PR.
 
@@ -36,7 +36,7 @@ When you ship code, update **US callout → epic README table → epic Open work
 
 ## All Epics
 
-| ID | Epic | Phase | Features |
+| ID | Epic | Phase | Use Cases |
 |---|---|---|---|
 | [E01](./E01-platform-foundation/README.md) | Platform Foundation | MVP | Tenant registration, org management, data isolation, subscription plans |
 | [E02](./E02-identity-access/README.md) | Identity & Access Management | MVP | Authentication, user management, roles, permissions |

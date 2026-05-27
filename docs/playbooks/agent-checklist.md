@@ -11,7 +11,7 @@ The paste-block templates below are for *your own* walk-through (agent reasoning
 ## Gate 0 — Ready (before code)
 
 - AC map: every row has layer + file/test — **no blank cells**
-- Read: epic README → feature file → same-module code
+- Read: epic README → use-case file → same-module code
 - Skim [`docs/WORKAROUNDS.md`](../WORKAROUNDS.md) for entries touching the same files/modules — known shortcuts may explain surprising code
 - Before API layer: `grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/epics/` — fix, defer with reason, or stop
 - End of PR: [process.md § PR wrap-up](process.md) — deferred lines, host wiring, callouts (no user reminder)
@@ -26,7 +26,7 @@ Docs touched: docs/epics/…
 
 ### AC coverage — avoid happy-path-only
 
-Feature files group ACs under **Happy path**, **Validation & errors**, **Edge cases**, and **Out of scope**. Agents must cover **every bullet in scope for the layer you are shipping**, not only the first block.
+Use-case files group ACs under **Happy path**, **Validation & errors**, **Edge cases**, and **Out of scope**. Agents must cover **every bullet in scope for the layer you are shipping**, not only the first block.
 
 **Before writing code (per US):**
 
@@ -49,7 +49,7 @@ Feature files group ACs under **Happy path**, **Validation & errors**, **Edge ca
 | Deferred? | `**Deferred (PR #N follow-up):**` names the **AC bullet** deferred, not a vague “later”. |
 | Out of scope? | Do not implement; do not mark ✅ as if done. |
 
-**Self-audit command** (after implementation, before push): re-read the US in the feature file and tick mentally each bullet against your AC map — same order as the spec (happy → validation → edge).
+**Self-audit command** (after implementation, before push): re-read the US in the use-case file and tick mentally each bullet against your AC map — same order as the spec (happy → validation → edge).
 
 ### Anti-pattern: `Gaps vs spec: none` after happy path only
 
@@ -67,7 +67,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 2. For each bullet: implemented + test, `N/A this PR — Frontend`, or named deferral.
 3. Only then set `Gaps vs spec: none for backend` (or list what remains).
 
-**Lesson (E01 F02):** A first pass shipped profile/settings/deletion APIs but missed Redis usage TTL (≤5 min), schedule rollback on queue failure, hard-delete purge, and form-task cancel — caught by spec review, not by “flow works.” See [F02 callouts](../epics/E01-platform-foundation/features/F02-organization-management.md) for what “done” looks like after self-audit.
+**Lesson (E01 F02):** A first pass shipped profile/settings/deletion APIs but missed Redis usage TTL (≤5 min), schedule rollback on queue failure, hard-delete purge, and form-task cancel — caught by spec review, not by “flow works.” See [F02 callouts](../epics/E01-platform-foundation/../../use-cases/platform-foundation/organization-management.md) for what “done” looks like after self-audit.
 
 ---
 
@@ -106,7 +106,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 | `src/` or `tests/` | `dotnet format --verify-no-changes` |
 | `frontend/` | `npm run ci` then `npm run test` |
 | `src/Axis.Api/Endpoints/` or API contract | Update + run `tests/Api/Axis.Api.Tests/` |
-| Any of the above + `docs/epics/` | `./scripts/check-doc-drift.sh` (bash) — also runs `normalize-feature-docs.py --check` and `check-local-dev-docs.py`, enforces no-new `TODO`/`FIXME`/`stub`, reviews new raw-SQL calls |
+| Any of the above + `docs/use-cases/` | `./scripts/check-doc-drift.sh` (bash) — also runs `check-use-case-docs.py --check` and `check-local-dev-docs.py`, enforces no-new `TODO`/`FIXME`/`stub`, reviews new raw-SQL calls |
 | `docker-compose.yml` | Update [local-dev.md](./local-dev.md) in same PR; `./scripts/check-doc-drift.sh` |
 
 ```text
@@ -130,7 +130,7 @@ Paste block format: header `Gate 2:` then one `-` line per row (Gate 3 uses the 
 Gate 2:
 - Library → TECH_STACK.md / not triggered
 - New pattern → patterns.md / not triggered
-- US layer callout → docs/epics/…/features/… (table layout per [docs-style § Feature files](./docs-style.md#feature-files--wireframes--implementation-status)) / not triggered
+- Use-case layer callout → docs/use-cases/{domain}/… (layout per [docs-style § Use case files](./docs-style.md#use-case-files-flow-first)) / not triggered
 - Epic README + PROGRESS → … / not triggered
 - Architecture rule → CLAUDE.md / not triggered
 - process.md workflow → … / not triggered
@@ -187,19 +187,19 @@ Gate 3:
 | ⚠️ | Started; list gaps in callout |
 | ⏳ | Not started |
 
-Never ✅ and "pending …" in the same callout. Checkboxes in feature files are spec-only — **do not** tick them.
+Never ✅ and "pending …" in the same callout. Checkboxes in use-case files are spec-only — **do not** tick them.
 
 ### Status updates (three levels — same PR)
 
 | Level | When | What to write |
 |-------|------|----------------|
-| **1 — US** | Any layer progress on a user story | `> **Implementation status**`, `Gaps vs spec`, optional `**Deferred (PR #N follow-up):**` in `docs/epics/…/features/F0N-….md` |
+| **1 — Use case** | Any layer progress on a use case | `> **Implementation status**`, `Gaps vs spec`, optional `**Deferred (PR #N follow-up):**` in `docs/use-cases/{domain}/*.md` |
 | **2 — Epic** | A layer is complete for the module | Epic `README.md` implementation table + **Open work (agents)** section (remove or reword items you closed) |
 | **3 — Platform** | Module-wide summary changed | `docs/PROGRESS.md` — layer status only |
 
 Updating only `PROGRESS.md` while changing `src/` without `docs/epics/` → drift fails. Epic README `| API | ⏳` after endpoints ship → drift fails.
 
-**Agents starting a task:** read [epics README § How agents find open work](../epics/README.md#how-agents-find-open-work) — checkboxes in feature files are not progress.
+**Agents starting a task:** read [epics README § How agents find open work](../epics/README.md#how-agents-find-open-work) — checkboxes in use-case files are not progress.
 
 **Chore/style PRs that touch module code:** drift still applies — add one small, accurate detail to the matching epic doc (a chunk size, a behavior nuance, a deferral note already true). Don't propose loosening the script, don't strand the format gunk waiting for a "real" PR, and don't invent fake content. The script's intent is *prompt the developer to look at docs*, not *require rewrite proportional to code change*.
 
@@ -211,7 +211,7 @@ Updating only `PROGRESS.md` while changing `src/` without `docs/epics/` → drif
 - No cross-module SQL / shared `DbContext` / `IMediator` for domain events
 - New `*Handler.cs` → `*HandlerTests.cs` (drift script)
 - Module code → `docs/epics/{module}/` in **same PR**
-- Frontend screen → wireframe + `> **Wireframe**` in feature file
+- Frontend screen → wireframe row in use-case `## Wireframes` table
 - No `.Skip()`, weakened tests, or ✅ when ACs are open
 - **Full solution only:** always `dotnet build` + `dotnet test` on `Axis.sln` (no solution filter)
 

@@ -4,7 +4,7 @@
 
 ## Linked spec
 
-<!-- Feature file path(s) or epic README this PR delivers, e.g. docs/epics/E06-workflow-engine/features/F01-execution-management.md -->
+<!-- Use-case file path(s) or epic README this PR delivers, e.g. docs/use-cases/workflow-engine/execution-management.md -->
 
 ## Requirements & rules followed
 

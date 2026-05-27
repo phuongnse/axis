@@ -18,15 +18,14 @@ Forms are the primary mechanism for human interaction within a workflow. Without
 
 ---
 
-## Features
+## Use Cases
 
-| ID | Feature | Description |
+| Use case | Description |
 |---|---|---|
-| [F01](./features/F01-form-definition.md) | Form Definition Management | Create, edit, delete form definitions |
-| [F02](./features/F02-form-fields.md) | Form Field Configuration & Validation | Add fields with types, labels, placeholders, validation rules |
-| [F03](./features/F03-workflow-integration.md) | Workflow Step Integration | Attach a form to a Form step in a workflow |
-| [F04](./features/F04-form-submission.md) | Form Submission Handling | Render form to assignee, capture submission, continue workflow |
-
+| [Form Definition Management](../../use-cases/form-builder/form-definition.md) | Create, edit, delete form definitions |
+| [Form Field Configuration & Validation](../../use-cases/form-builder/form-fields.md) | Add fields with types, labels, placeholders, validation rules |
+| [Workflow Step Integration](../../use-cases/form-builder/workflow-integration.md) | Attach a form to a Form step in a workflow |
+| [Form Submission Handling](../../use-cases/form-builder/form-submission.md) | Render form to assignee, capture submission, continue workflow |
 ---
 
 ## Diagrams
@@ -97,7 +96,7 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend** | ⚠️ | [F04](./features/F04-form-submission.md): notification on assign; expiry → execution failure (E06); role-based My Tasks aggregation. Token submit + My Tasks API ✅. |
+| **Backend** | ⚠️ | [F04](../../use-cases/form-builder/form-submission.md): notification on assign; expiry → execution failure (E06); role-based My Tasks aggregation. Token submit + My Tasks API ✅. |
 | **Frontend** | ⏳ | Form editor, field picker, standalone submit page, My Tasks — all F01–F04 US. |
 | **Cross-module** | E06 | Form step execution, context expressions, `FormStepReached` consumer path — coordinate with E06. **E01 F02 US-007:** `OrganizationFormTaskCanceller` cancels pending form tasks before org hard-delete (Identity-owned job). |
 

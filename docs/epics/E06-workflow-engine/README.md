@@ -18,16 +18,15 @@ A workflow builder without an execution engine is just a drawing tool. This epic
 
 ---
 
-## Features
+## Use Cases
 
-| ID | Feature | Description |
+| Use case | Description |
 |---|---|---|
-| [F01](./features/F01-execution-management.md) | Execution Management | Create, track, and terminate workflow executions |
-| [F02](./features/F02-step-handlers.md) | Step Execution Handlers | Dedicated handler per step type (Form, HTTP, Condition, Script, Notification) |
-| [F03](./features/F03-error-handling.md) | Error Handling & Notification | Detect failures, notify configured channels, mark execution as failed |
-| [F04](./features/F04-execution-history.md) | Execution History & Audit Log | Full history of executions, step results, and context data |
-| [F05](./features/F05-manual-retry.md) | Manual Retry | Resume a failed execution from the failed step |
-
+| [Execution Management](../../use-cases/workflow-engine/execution-management.md) | Create, track, and terminate workflow executions |
+| [Step Execution Handlers](../../use-cases/workflow-engine/step-handlers.md) | Dedicated handler per step type (Form, HTTP, Condition, Script, Notification) |
+| [Error Handling & Notification](../../use-cases/workflow-engine/error-handling.md) | Detect failures, notify configured channels, mark execution as failed |
+| [Execution History & Audit Log](../../use-cases/workflow-engine/execution-history.md) | Full history of executions, step results, and context data |
+| [Manual Retry](../../use-cases/workflow-engine/manual-retry.md) | Resume a failed execution from the failed step |
 ---
 
 ## Diagrams
@@ -103,8 +102,8 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend — high** | ⚠️ | [F01](./features/F01-execution-management.md): schedule/webhook/event triggers, stale-PENDING recovery. [F03](./features/F03-error-handling.md): notification dispatch, `GetExecution` error detail, channel config. [F02](./features/F02-step-handlers.md): real `IScriptExecutor` / `INotificationSender` (stubs today). |
-| **Backend — medium** | ⚠️ | [F04](./features/F04-execution-history.md): date/trigger filters, CSV export, role-scoped list. Cancel: abandon Wolverine jobs + cancel form tasks. **E01 F02 US-007:** `OrganizationExecutionCanceller` cancels Pending/Running executions before org hard-delete (`FixedTenantContext`). |
+| **Backend — high** | ⚠️ | [F01](../../use-cases/workflow-engine/execution-management.md): schedule/webhook/event triggers, stale-PENDING recovery. [F03](../../use-cases/workflow-engine/error-handling.md): notification dispatch, `GetExecution` error detail, channel config. [F02](../../use-cases/workflow-engine/step-handlers.md): real `IScriptExecutor` / `INotificationSender` (stubs today). |
+| **Backend — medium** | ⚠️ | [F04](../../use-cases/workflow-engine/execution-history.md): date/trigger filters, CSV export, role-scoped list. Cancel: abandon Wolverine jobs + cancel form tasks. **E01 F02 US-007:** `OrganizationExecutionCanceller` cancels Pending/Running executions before org hard-delete (`FixedTenantContext`). |
 | **Frontend** | ⏳ | Execution monitor, retry UI, SignalR live updates — all F01–F05 US. |
 
 Start here when E04 “pending E06” items block runtime behavior; feature callouts list exact US gaps.

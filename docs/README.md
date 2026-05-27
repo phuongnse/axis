@@ -70,7 +70,7 @@ All diagrams are Excalidraw (`.excalidraw` source + `.svg` preview). Regenerate 
 
 ## Wireframes
 
-Excalidraw wireframes live in `docs/epics/{E0N}/wireframes/`, co-located with each epic's features and diagrams. Shared screens (template, app-shell) remain in `docs/wireframes/`. Each feature file lists wireframes in a `## Wireframes` table (see [US template](./epics/_template-feature-us.md)).
+Excalidraw wireframes live in `docs/epics/{E0N}/wireframes/`, co-located with each epic's features and diagrams. Shared screens (template, app-shell) remain in `docs/wireframes/`. Each use-case file lists wireframes in a `## Wireframes` table (see [use-case template](./use-cases/_template-use-case.md)).
 
 | Screen | Source | Preview |
 |---|---|---|
@@ -84,11 +84,11 @@ When two docs disagree, the **owner** wins. Update the owner first; everything e
 
 | Topic | Owner |
 |---|---|
-| Feature US layout (wireframes + status tables) | [epics/_template-feature-us.md](./epics/_template-feature-us.md) + [playbooks/docs-style.md](./playbooks/docs-style.md#feature-files--wireframes--implementation-status) |
+| Use-case layout (flow + AC + artifacts + status) | [use-cases/_template-use-case.md](./use-cases/_template-use-case.md) + [playbooks/docs-style.md](./playbooks/docs-style.md#use-case-files-flow-first) |
 | Product scope, target users, MVP cut | [PRODUCT_VISION.md](./PRODUCT_VISION.md) |
 | Library versions and ADRs | [TECH_STACK.md](./TECH_STACK.md) |
 | Source tree and module boundaries | [../CLAUDE.md](../CLAUDE.md) |
-| Per-feature ACs and current gaps | `docs/epics/{module}/features/F0N-*.md` |
+| Per-use-case ACs and current gaps | `docs/use-cases/{domain}/*.md` |
 | Module-wide layer status | [PROGRESS.md](./PROGRESS.md) |
 | Daily agent workflow + gates | [playbooks/agent-checklist.md](./playbooks/agent-checklist.md) |
 | Local dev (compose, ports, URLs) | [playbooks/local-dev.md](./playbooks/local-dev.md) + [`docker-compose.yml`](../docker-compose.yml) |

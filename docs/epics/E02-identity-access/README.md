@@ -18,17 +18,16 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 
 ---
 
-## Features
+## Use Cases
 
-| ID | Feature | Description |
+| Use case | Description |
 |---|---|---|
-| [F01](./features/F01-authentication.md) | Authentication | Sign up, sign in, sign out, JWT + refresh tokens |
-| [F02](./features/F02-user-management.md) | User Management | Invite users, activate/deactivate, profile management |
-| [F03](./features/F03-role-management.md) | Role Management | Create/edit/delete roles within an organization |
-| [F04](./features/F04-permissions.md) | Permission System | Assign permissions to roles, enforce on API and UI |
-| [F05](./features/F05-password-security.md) | Password & Security | Password reset, change password, session management |
-| [F06](./features/F06-localization-and-theming.md) | Localization & Theming | EN/VI language switch, light/dark/system theme, and frontend UX consistency rules |
-
+| [Authentication](../../use-cases/identity-access/authentication.md) | Sign up, sign in, sign out, JWT + refresh tokens |
+| [User Management](../../use-cases/identity-access/user-management.md) | Invite users, activate/deactivate, profile management |
+| [Role Management](../../use-cases/identity-access/role-management.md) | Create/edit/delete roles within an organization |
+| [Permission System](../../use-cases/identity-access/permissions.md) | Assign permissions to roles, enforce on API and UI |
+| [Password & Security](../../use-cases/identity-access/password-security.md) | Password reset, change password, session management |
+| [Localization & Theming](../../use-cases/identity-access/localization-and-theming.md) | EN/VI language switch, light/dark/system theme, and frontend UX consistency rules |
 ---
 
 ## Diagrams
@@ -74,7 +73,7 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 **Key implementation decisions:**
 - Identity uses the global `public` PostgreSQL schema (not a tenant schema) — registration has no tenant context and email uniqueness is platform-wide.
 - Passwords are hashed with BCrypt (work factor 12) via `IPasswordHasher`. The hash is stored as a first-class property on `User` (`PasswordHash`), not a shadow property.
-- The 4 default system roles (Admin, Editor, Viewer, End User) and their full permission sets are seeded automatically by `RegisterOrganizationHandler` — see [F04](./features/F04-permissions.md) for the permission catalogue.
+- The 4 default system roles (Admin, Editor, Viewer, End User) and their full permission sets are seeded automatically by `RegisterOrganizationHandler` — see [F04](../../use-cases/identity-access/permissions.md) for the permission catalogue.
 - **OpenIddict implementation**: OpenIddict 5.x serves as the in-process OAuth2/OIDC authorization server (ADR-004). Authorization Code + PKCE for the SPA; Client Credentials for M2M. Refresh tokens are stored as opaque reference tokens in the OpenIddict `OpenIddictTokens` table and delivered via httpOnly cookie. Access token JTIs are blacklisted in Redis on sign-out. Ephemeral signing/encryption keys are used in development; production should use Azure Key Vault certificates.
 - **gRPC (dev):** manual `GetUserPermissions` checks — [patterns.md § gRPC dev verification](../../playbooks/patterns.md#dev--verify-getuserpermissions-with-grpcurl).
 - **Known gap (user deactivation)**: Revoking all refresh tokens is immediate, but existing access tokens remain valid up to 15 minutes. Full compliance would require a Redis user-level blacklist (not implemented in MVP).
@@ -85,8 +84,8 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend** | ⚠️ polish | [F05](./features/F05-password-security.md): reset/change-password rate limits, session list API wiring. [F04](./features/F04-permissions.md): `[RequirePermission]` / policy tests. [F02](./features/F02-user-management.md): block admin self-invite at API. |
-| **Frontend** | ⏳ | Register, settings, invitation accept, session management UI, and localization/theming foundation — see per-US callouts in [F01](./features/F01-authentication.md)–[F06](./features/F06-localization-and-theming.md). |
+| **Backend** | ⚠️ polish | [F05](../../use-cases/identity-access/password-security.md): reset/change-password rate limits, session list API wiring. [F04](../../use-cases/identity-access/permissions.md): `[RequirePermission]` / policy tests. [F02](../../use-cases/identity-access/user-management.md): block admin self-invite at API. |
+| **Frontend** | ⏳ | Register, settings, invitation accept, session management UI, and localization/theming foundation — see per-US callouts in [F01](../../use-cases/identity-access/authentication.md)–[F06](../../use-cases/identity-access/localization-and-theming.md). |
 
 Core auth/OIDC/RBAC backend is ✅; use feature **Gaps vs spec** for the next US, not epic checkboxes.
 

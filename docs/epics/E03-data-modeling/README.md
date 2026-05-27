@@ -18,15 +18,14 @@ Custom data modeling is the core differentiator of Axis. Without it, the platfor
 
 ---
 
-## Features
+## Use Cases
 
-| ID | Feature | Description |
+| Use case | Description |
 |---|---|---|
-| [F01](./features/F01-model-definition.md) | Model Definition | Create, edit, delete custom models within an org |
-| [F02](./features/F02-field-types.md) | Field Type System | Text, Number, Date, Boolean, Enum, Relation, File, JSON |
-| [F03](./features/F03-data-classes.md) | Data Class Management | Reusable nested object types used as field types |
-| [F04](./features/F04-data-records.md) | Data Record CRUD | Create, read, update, delete records against any model |
-
+| [Model Definition](../../use-cases/data-modeling/model-definition.md) | Create, edit, delete custom models within an org |
+| [Field Type System](../../use-cases/data-modeling/field-types.md) | Text, Number, Date, Boolean, Enum, Relation, File, JSON |
+| [Data Class Management](../../use-cases/data-modeling/data-classes.md) | Reusable nested object types used as field types |
+| [Data Record CRUD](../../use-cases/data-modeling/data-records.md) | Create, read, update, delete records against any model |
 ---
 
 ## Diagrams
@@ -99,10 +98,10 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend** | ⚠️ polish | HTTP 422/409 on records ([F04](./features/F04-data-records.md)); relation display-field resolution; model plan limits **not in F04** (spec mentions 402 — product decision). 30-day purge jobs deferred. |
+| **Backend** | ⚠️ polish | HTTP 422/409 on records ([F04](../../use-cases/data-modeling/data-records.md)); relation display-field resolution; model plan limits **not in F04** (spec mentions 402 — product decision). 30-day purge jobs deferred. |
 | **Frontend** | ⏳ | Model/record UI, filters, data-class sub-forms — all US callouts mark Frontend ⏳. |
 
-Module API is largely ✅; grep `API: ⏳` in [features/](./features/) only when adding endpoints.
+Module API is largely ✅; grep `API: ⏳` in linked use-case files only when adding endpoints.
 
 ---
 

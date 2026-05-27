@@ -56,26 +56,26 @@ check_epic_docs() {
   fi
 }
 
-check_epic_docs 'src/Axis\.Api/Endpoints/Execution' 'docs/epics/E06-workflow-engine' 'E06 WorkflowEngine API'
-check_epic_docs 'src/Modules/WorkflowEngine/' 'docs/epics/E06-workflow-engine' 'E06 WorkflowEngine module'
-check_epic_docs 'src/Axis\.Api/Endpoints/Model' 'docs/epics/E03-data-modeling' 'E03 DataModeling API'
-check_epic_docs 'src/Modules/DataModeling/' 'docs/epics/E03-data-modeling' 'E03 DataModeling module'
-check_epic_docs 'src/Axis\.Api/Endpoints/Workflow' 'docs/epics/E04-workflow-builder' 'E04 WorkflowBuilder API'
-check_epic_docs 'src/Modules/WorkflowBuilder/' 'docs/epics/E04-workflow-builder' 'E04 WorkflowBuilder module'
-check_epic_docs 'src/Axis\.Api/Endpoints/Form' 'docs/epics/E05-form-builder' 'E05 FormBuilder API'
-check_epic_docs 'src/Modules/FormBuilder/' 'docs/epics/E05-form-builder' 'E05 FormBuilder module'
-check_epic_docs 'src/Modules/.*/.*OrganizationVerifiedHandler' 'docs/epics/E01-platform-foundation' 'E01 tenant provisioning'
-check_epic_docs 'frontend/src/(features/auth|routes/|components/layout/AppShell)' 'docs/epics/E02-identity-access' 'E02 auth frontend'
+check_epic_docs 'src/Axis\.Api/Endpoints/Execution' 'docs/use-cases/workflow-engine' 'E06 WorkflowEngine API'
+check_epic_docs 'src/Modules/WorkflowEngine/' 'docs/use-cases/workflow-engine' 'E06 WorkflowEngine module'
+check_epic_docs 'src/Axis\.Api/Endpoints/Model' 'docs/use-cases/data-modeling' 'E03 DataModeling API'
+check_epic_docs 'src/Modules/DataModeling/' 'docs/use-cases/data-modeling' 'E03 DataModeling module'
+check_epic_docs 'src/Axis\.Api/Endpoints/Workflow' 'docs/use-cases/workflow-builder' 'E04 WorkflowBuilder API'
+check_epic_docs 'src/Modules/WorkflowBuilder/' 'docs/use-cases/workflow-builder' 'E04 WorkflowBuilder module'
+check_epic_docs 'src/Axis\.Api/Endpoints/Form' 'docs/use-cases/form-builder' 'E05 FormBuilder API'
+check_epic_docs 'src/Modules/FormBuilder/' 'docs/use-cases/form-builder' 'E05 FormBuilder module'
+check_epic_docs 'src/Modules/.*/.*OrganizationVerifiedHandler' 'docs/use-cases/platform-foundation' 'E01 tenant provisioning'
+check_epic_docs 'frontend/src/(features/auth|routes/|components/layout/AppShell)' 'docs/use-cases/identity-access' 'E02 auth frontend'
 
 if any_changed '^frontend/src/'; then
-  if ! docs_changed_under 'docs/epics/'; then
-    fail "frontend/src/ changed but no files under docs/epics/ in this PR"
+  if ! docs_changed_under 'docs/use-cases/'; then
+    fail "frontend/src/ changed but no files under docs/use-cases/ in this PR"
   fi
 fi
 
 if any_changed '^src/' && docs_changed_under 'docs/PROGRESS.md'; then
-  if ! echo "${CHANGED}" | grep -q '^docs/epics/'; then
-    fail "docs/PROGRESS.md updated but no docs/epics/ change while src/ changed"
+  if ! echo "${CHANGED}" | grep -q '^docs/use-cases/'; then
+    fail "docs/PROGRESS.md updated but no docs/use-cases/ change while src/ changed"
   fi
 fi
 
@@ -271,7 +271,7 @@ fi
 
 # Speculation guard: reference docs (ARCHITECTURE) must describe what exists,
 # not what is "planned" or "will be wired". Forward-looking status belongs in
-# docs/PROGRESS.md or an epic feature file — places readers know are
+# docs/PROGRESS.md or a use-case file — places readers know are
 # forward-looking. See docs/playbooks/docs-style.md § Anti-patterns.
 SPEC_PATTERN='Not yet|\bplanned\b|Will be|To be implemented|Coming soon|in the future'
 SPEC_TARGETS=(
@@ -281,7 +281,7 @@ for target in "${SPEC_TARGETS[@]}"; do
   [ -f "${target}" ] || continue
   if matches="$(grep -nE "${SPEC_PATTERN}" "${target}" 2>/dev/null)"; then
     while IFS= read -r line; do
-      fail "Speculation in reference doc — move to docs/PROGRESS.md or an epic feature file: ${target}:${line}"
+      fail "Speculation in reference doc — move to docs/PROGRESS.md or a use-case file: ${target}:${line}"
     done <<< "${matches}"
   fi
 done
@@ -303,23 +303,9 @@ done < <(
 
 "${ROOT}/scripts/check-buf-modules.sh" || ERR=1
 
-# Feature file layout: table wireframes + table implementation status (docs-style.md).
-python3 "${ROOT}/scripts/normalize-feature-docs.py" --check || ERR=1
+# Use-case layout validation (flow, AC, wireframes/diagrams, status).
+python3 "${ROOT}/scripts/check-use-case-docs.py" --check || ERR=1
 
-if any_changed '^docs/epics/.*/features/.*\.md$'; then
-  while IFS= read -r match; do
-    [ -z "${match}" ] && continue
-    fail "Deprecated single-line Implementation status — use table layout; run: python3 scripts/normalize-feature-docs.py (${match})"
-  done < <(
-    grep -rnE '^\> \*\*Implementation status\*\* — ' docs/epics/ 2>/dev/null || true
-  )
-  while IFS= read -r match; do
-    [ -z "${match}" ] && continue
-    fail "Deprecated inline Wireframe blockquote — use ## Wireframes table; run: python3 scripts/normalize-feature-docs.py (${match})"
-  done < <(
-    grep -rnE '^\> \*\*Wireframe\*\*:' docs/epics/ 2>/dev/null || true
-  )
-fi
 
 python3 "${ROOT}/scripts/check-local-dev-docs.py" --check || ERR=1
 

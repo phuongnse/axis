@@ -40,7 +40,7 @@ Repeat for every user story, in layer order: Domain → Application → Infrastr
 
 #### Step 1 — Read and align
 
-- Read the feature file ACs in full
+- Read the use-case file ACs in full
 - Check `docs/PROGRESS.md` for current layer status
 - Identify 2–3 key design decisions (aggregate boundaries, value objects, event names, query shape)
 - **Surface decisions to the user and confirm before writing any code** — see "Surface architectural decisions first" rule in `CLAUDE.md`
@@ -107,7 +107,7 @@ For every match: confirm the SQL only references tables owned by that match's ow
 
 #### Step 6 — Update docs (same PR)
 
-- Update feature file `> **Implementation status**` callout for this US
+- Update use-case file `> **Implementation status**` callout for this US
 - If all USes in the feature are complete for a layer: update Epic README status table
 - If the full layer is done for the module: update `docs/PROGRESS.md`
 - If a new pattern was established: add to `docs/playbooks/patterns.md`
@@ -134,9 +134,9 @@ Repeat for every screen / feature area. **Never skip the wireframe step** — it
 
 | Step | Action | Output |
 |---|---|---|
-| 1 | Read feature file ACs in full | Understand spec contract |
+| 1 | Read use-case file ACs in full | Understand spec contract |
 | 2 | Create Excalidraw wireframe + run `generate-wireframes.ps1` | `docs/wireframes/{screen-slug}.excalidraw` + `.svg` |
-| 3 | Add `> **Wireframe**` callout to feature file | Wireframe linked from spec |
+| 3 | Add `> **Wireframe**` callout to use-case file | Wireframe linked from spec |
 | 4 | Define types from backend contract | `features/{name}/types.ts` |
 | 5 | Define API functions + query key factory | `features/{name}/api.ts` |
 | 6 | Write tests first (TDD) — Vitest + Testing Library | Failing tests that define expected behaviour |
@@ -147,7 +147,7 @@ Repeat for every screen / feature area. **Never skip the wireframe step** — it
 
 **Step 10 — Update docs breakdown:**
 
-- Update feature file `> **Implementation status**` callout for this US
+- Update use-case file `> **Implementation status**` callout for this US
 - If all USes in the feature are complete for Frontend: update Epic README status table
 - If the full Frontend layer is done for the module: update `docs/PROGRESS.md`
 - If a new frontend pattern was established: add to `docs/playbooks/patterns.md`

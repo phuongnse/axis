@@ -18,11 +18,11 @@ Without a UI builder, users need a developer to display and interact with their 
 
 ---
 
-## Features
+## Use Cases
 
-> Feature files are not yet authored — E07 is Phase 2 and has not started. The rows below name the planned cuts; create `features/F0N-*.md` when the epic begins.
+> Use-case files are not yet authored — E07 is Phase 2 and has not started. The rows below name the planned cuts; create `use-cases/*.md` when the epic begins.
 
-| ID | Feature | Description |
+| Use case | Description |
 |---|---|---|
 | F01 | Page Management | Create, edit, delete, publish/unpublish pages |
 | F02 | Widget Library | Pre-built widgets: List, Grid, Form, Chart, Button, Text, Image |
@@ -65,7 +65,7 @@ Without a UI builder, users need a developer to display and interact with their 
 
 ## Open work (agents)
 
-**⏳ Phase 2 — not started.** No `src/Modules/PageBuilder`, no feature files under `docs/epics/E07-page-builder/features/`. Do not implement until MVP loop (E01–E06) gaps are closed unless explicitly scoped.
+**⏳ Phase 2 — not started.** No `src/Modules/PageBuilder`, no use-case files under `docs/use-cases/page-builder/`. Do not implement until MVP loop (E01–E06) gaps are closed unless explicitly scoped.
 
 ---
 
