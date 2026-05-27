@@ -14,6 +14,14 @@ The paste-block templates below are for *your own* walk-through (agent reasoning
 - Read: epic README → feature file → same-module code
 - Skim [`docs/WORKAROUNDS.md`](../WORKAROUNDS.md) for entries touching the same files/modules — known shortcuts may explain surprising code
 - Before API layer: `grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/epics/` — fix, defer with reason, or stop
+- **Before changing `ApiTestFixture`, `AuthHelper`, or shared API test provisioning:**
+  read [testing.md § ApiTestFixture](./testing.md#apitestfixture--module-database-isolation-adr-011--adr-023)
+  and [patterns.md § Tenant schema provisioning](./patterns.md#tenant-schema-provisioning-us-003).
+  **Stop and raise** if the change:
+  - duplicates `TenantSchemaProvisioner` steps
+  - couples all API tests to async Kafka provisioning
+  - patches CI with retries/workarounds instead of deterministic setup
+  Prefer `TenantTestProvisioner` in `Axis.Testing` over inline SQL/migrate copies.
 - End of PR: [process.md § PR wrap-up](process.md) — deferred lines, host wiring, callouts (no user reminder)
 
 ```markdown
