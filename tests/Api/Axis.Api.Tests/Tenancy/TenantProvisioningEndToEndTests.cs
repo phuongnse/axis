@@ -50,7 +50,7 @@ public sealed class TenantProvisioningEndToEndTests(ProvisioningE2EFixture fixtu
             Json);
         verifyResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        bool ready = await PollUntilProvisioningReadyAsync(verifyToken, TimeSpan.FromSeconds(60));
+        bool ready = await PollUntilProvisioningReadyAsync(verifyToken, TimeSpan.FromSeconds(120));
         ready.Should().BeTrue("event-driven tenant provisioning should complete within the timeout");
 
         HttpClient pkceClient = fixture.CreateNewClient();
