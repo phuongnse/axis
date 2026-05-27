@@ -1,5 +1,6 @@
 using Axis.Api.Infrastructure;
 using Axis.Identity.Application.Services;
+using Axis.Shared.Domain.Primitives;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Axis.Api.Middleware;
@@ -30,35 +31,22 @@ internal sealed class TenantOrganizationAccessMiddleware(
             return;
         }
 
-        TenantOrganizationAccessResult access =
-            await accessService.EvaluateAsync(organizationId, context.RequestAborted);
+        Result access = await accessService.EvaluateAsync(organizationId, context.RequestAborted);
 
-        if (access.Status == TenantOrganizationAccessStatus.Allowed)
+        if (access.IsSuccess)
         {
             await next(context);
             return;
         }
 
-        int statusCode = StatusCodes.Status403Forbidden;
-        string detail = access.Status switch
-        {
-            TenantOrganizationAccessStatus.OrganizationNotFound =>
-                "Organization is not available.",
-            TenantOrganizationAccessStatus.OrganizationSuspended =>
-                "Organization is not available.",
-            TenantOrganizationAccessStatus.OrganizationNotReady =>
-                "Workspace is still being set up. Try again shortly.",
-            _ => "Organization is not available.",
-        };
-
         ProblemDetails problem = new()
         {
-            Status = statusCode,
+            Status = StatusCodes.Status403Forbidden,
             Title = "Forbidden",
-            Detail = detail,
+            Detail = access.Error,
         };
 
-        context.Response.StatusCode = statusCode;
-        await context.Response.WriteAsJsonAsync(problem);
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await context.Response.WriteAsJsonAsync(problem, context.RequestAborted);
     }
 }

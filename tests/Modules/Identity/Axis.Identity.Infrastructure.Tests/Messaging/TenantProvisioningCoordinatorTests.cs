@@ -56,6 +56,12 @@ public sealed class TenantProvisioningCoordinatorTests
         row.Status.Should().Be(TenantModuleProvisioningStatus.Pending);
         row.AttemptCount.Should().Be(2);
         await _unitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        await _messageBus.Received(1).PublishAsync(
+            Arg.Is<RetryTenantModuleProvisionMessage>(message =>
+                message.OrganizationId == organization.Id
+                && message.Module == TenantModuleNames.DataModeling
+                && message.Attempt == 2),
+            Arg.Any<DeliveryOptions>());
         await _alert.DidNotReceive().AlertProvisioningFailedAsync(
             Arg.Any<Guid>(),
             Arg.Any<string>(),

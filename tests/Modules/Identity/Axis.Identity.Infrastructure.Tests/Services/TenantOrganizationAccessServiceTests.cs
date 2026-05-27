@@ -4,6 +4,7 @@ using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.Subscriptions;
 using Axis.Identity.Domain.ValueObjects;
 using Axis.Identity.Infrastructure.Services;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
 using NSubstitute.ReturnsExtensions;
@@ -30,44 +31,48 @@ public sealed class TenantOrganizationAccessServiceTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_WhenOrganizationNotFound_ReturnsNotFound()
+    public async Task EvaluateAsync_WhenOrganizationNotFound_ReturnsForbidden()
     {
         Guid organizationId = Guid.NewGuid();
         _organizationRepository.GetByIdAsync(organizationId, Arg.Any<CancellationToken>())
             .ReturnsNull();
 
-        TenantOrganizationAccessResult result = await CreateSut().EvaluateAsync(organizationId);
+        Result result = await CreateSut().EvaluateAsync(organizationId);
 
-        result.Status.Should().Be(TenantOrganizationAccessStatus.OrganizationNotFound);
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.Forbidden);
+        result.Error.Should().Be("Organization is not available.");
     }
 
     [Fact]
-    public async Task EvaluateAsync_WhenOrganizationIsActive_ReturnsAllowed()
+    public async Task EvaluateAsync_WhenOrganizationIsActive_ReturnsSuccess()
     {
         Organization organization = ActiveOrganization();
         _organizationRepository.GetByIdAsync(organization.Id, Arg.Any<CancellationToken>())
             .Returns(organization);
 
-        TenantOrganizationAccessResult result = await CreateSut().EvaluateAsync(organization.Id);
+        Result result = await CreateSut().EvaluateAsync(organization.Id);
 
-        result.Status.Should().Be(TenantOrganizationAccessStatus.Allowed);
+        result.IsSuccess.Should().BeTrue();
     }
 
     [Fact]
-    public async Task EvaluateAsync_WhenOrganizationIsArchived_ReturnsSuspended()
+    public async Task EvaluateAsync_WhenOrganizationIsArchived_ReturnsForbidden()
     {
         Organization organization = ActiveOrganization();
         organization.Archive();
         _organizationRepository.GetByIdAsync(organization.Id, Arg.Any<CancellationToken>())
             .Returns(organization);
 
-        TenantOrganizationAccessResult result = await CreateSut().EvaluateAsync(organization.Id);
+        Result result = await CreateSut().EvaluateAsync(organization.Id);
 
-        result.Status.Should().Be(TenantOrganizationAccessStatus.OrganizationSuspended);
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.Forbidden);
+        result.Error.Should().Be("Organization is not available.");
     }
 
     [Fact]
-    public async Task EvaluateAsync_WhenOrganizationIsProvisioning_ReturnsNotReady()
+    public async Task EvaluateAsync_WhenOrganizationIsProvisioning_ReturnsNotReadyMessage()
     {
         Organization organization = Organization.Create(
             "Acme",
@@ -78,8 +83,10 @@ public sealed class TenantOrganizationAccessServiceTests
         _organizationRepository.GetByIdAsync(organization.Id, Arg.Any<CancellationToken>())
             .Returns(organization);
 
-        TenantOrganizationAccessResult result = await CreateSut().EvaluateAsync(organization.Id);
+        Result result = await CreateSut().EvaluateAsync(organization.Id);
 
-        result.Status.Should().Be(TenantOrganizationAccessStatus.OrganizationNotReady);
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.Forbidden);
+        result.Error.Should().Be("Workspace is still being set up. Try again shortly.");
     }
 }
