@@ -77,6 +77,7 @@ public sealed class ProvisioningE2EFixture : IAsyncLifetime
     private string? _previousWorkflowEngineConnectionStringEnv;
     private string? _previousKafkaBrokersEnv;
     private string? _previousRabbitMqConnectionStringEnv;
+    private string? _previousSchemaRegistryUrlEnv;
 
     private WebApplicationFactory<Program> _factory = null!;
     private string _postgresAdminConnectionString = null!;
@@ -126,6 +127,7 @@ public sealed class ProvisioningE2EFixture : IAsyncLifetime
             Environment.GetEnvironmentVariable("ConnectionStrings__WorkflowEngine");
         _previousKafkaBrokersEnv = Environment.GetEnvironmentVariable("Kafka__Brokers");
         _previousRabbitMqConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__RabbitMq");
+        _previousSchemaRegistryUrlEnv = Environment.GetEnvironmentVariable("SchemaRegistry__Url");
 
         Environment.SetEnvironmentVariable("ConnectionStrings__Identity", _identityConnectionString);
         Environment.SetEnvironmentVariable("ConnectionStrings__DataModeling", _dataModelingConnectionString);
@@ -134,6 +136,10 @@ public sealed class ProvisioningE2EFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("ConnectionStrings__WorkflowEngine", _workflowEngineConnectionString);
         Environment.SetEnvironmentVariable("Kafka__Brokers", _kafka.GetBootstrapAddress());
         Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", _rabbitMq.GetConnectionString());
+        // SchemaRegistry:Url must reach wolverineConfig in Program.cs via env var (belt-and-suspenders
+        // alongside the in-memory config entry) because ConfigurationManager is populated from env vars
+        // at WebApplicationBuilder construction time, before ConfigureAppConfiguration callbacks run.
+        Environment.SetEnvironmentVariable("SchemaRegistry__Url", _schemaRegistry.BaseUrl);
 
         // Identity migrations (public schema only — tenant schemas are created by the provisioning pipeline)
         DbContextOptions<IdentityDbContext> identityOptions = new DbContextOptionsBuilder<IdentityDbContext>()
@@ -306,6 +312,7 @@ public sealed class ProvisioningE2EFixture : IAsyncLifetime
             _previousWorkflowEngineConnectionStringEnv);
         Environment.SetEnvironmentVariable("Kafka__Brokers", _previousKafkaBrokersEnv);
         Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", _previousRabbitMqConnectionStringEnv);
+        Environment.SetEnvironmentVariable("SchemaRegistry__Url", _previousSchemaRegistryUrlEnv);
     }
 
     public HttpClient CreateNewClient() => _factory.CreateClient(new WebApplicationFactoryClientOptions

@@ -511,9 +511,16 @@ try
 
     app.Run();
 }
+catch (HostAbortedException)
+{
+    // Normal host teardown (e.g. WebApplicationFactory disposing the test host). Do not log as fatal.
+}
 catch (Exception ex)
 {
     Log.Fatal(ex, "Application terminated unexpectedly");
+    // Re-throw so WebApplicationFactory (HostFactoryResolver) can surface the real build
+    // exception instead of the opaque "entry point exited without ever building an IHost."
+    throw;
 }
 finally
 {
