@@ -5,8 +5,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Axis.Identity.Domain.Aggregates;
-using Axis.Identity.Domain.ValueObjects;
-using Axis.Identity.Infrastructure.Persistence;
 
 namespace Axis.Api.Tests.Helpers;
 
@@ -53,6 +51,8 @@ public static class AuthHelper
             "/api/auth/verify-email", new { token = verifyToken }, Json);
         if (verifyResp.StatusCode != HttpStatusCode.NoContent)
             throw new InvalidOperationException($"Email verification failed: {verifyResp.StatusCode}");
+
+        await fixture.EnsureTenantProvisionedAsync(email);
 
         // 3. Run the Authorization Code + PKCE flow on an independent client
         //    (so cookie jar is isolated from the shared fixture client)

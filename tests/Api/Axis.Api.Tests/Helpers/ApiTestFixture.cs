@@ -3,9 +3,12 @@ using Axis.DataModeling.Infrastructure.Persistence;
 using Axis.FormBuilder.Contracts.Grpc;
 using Axis.FormBuilder.Infrastructure.Persistence;
 using Axis.Identity.Application.Services;
+using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Domain.ValueObjects;
 using Axis.Identity.Infrastructure.Persistence;
 using Axis.Identity.Infrastructure.Services;
 using Axis.Shared.Application.Tenancy;
+using Axis.Shared.Infrastructure.Tenancy;
 using Axis.Testing;
 using Axis.WorkflowBuilder.Contracts.Grpc;
 using Axis.WorkflowBuilder.Infrastructure.Persistence;
@@ -17,6 +20,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Npgsql;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
 using StackExchange.Redis;
@@ -211,9 +215,6 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.AddScoped<IFormBuilderUnitOfWork>(sp =>
                     new NullFormBuilderUnitOfWork(sp.GetRequiredService<FormBuilderDbContext>()));
 
-                services.RemoveAll<ITenantContext>();
-                services.AddScoped<ITenantContext>(_ => new PublicSchemaTenantContext());
-
                 services.PostConfigure<OpenIddictServerAspNetCoreOptions>(opts =>
                     opts.DisableTransportSecurityRequirement = true);
 
@@ -260,6 +261,100 @@ public sealed class ApiTestFixture : IAsyncLifetime
     {
         AllowAutoRedirect = false,
     });
+
+    public async Task EnsureTenantProvisionedAsync(string adminEmail)
+    {
+        Email email = Email.Create(adminEmail).Value!;
+
+        Guid organizationId;
+        await using (IdentityDbContext identityContext = new(
+                         new DbContextOptionsBuilder<IdentityDbContext>()
+                             .UseNpgsql(_identityConnectionString)
+                             .UseOpenIddict()
+                             .Options))
+        {
+            User user = await identityContext.Users
+                .SingleAsync(u => u.Email == email);
+            organizationId = user.OrganizationId;
+        }
+
+        await EnsureModuleSchemasAsync(organizationId);
+        await EnsureDataModelingTablesAsync(organizationId);
+
+        await using IdentityDbContext finalizeContext = new(
+            new DbContextOptionsBuilder<IdentityDbContext>()
+                .UseNpgsql(_identityConnectionString)
+                .UseOpenIddict()
+                .Options);
+        Organization organization = await finalizeContext.Organizations
+            .SingleAsync(o => o.Id == organizationId);
+        if (organization.Status == OrganizationStatus.Provisioning)
+        {
+            organization.CompleteProvisioning();
+            await finalizeContext.SaveChangesAsync();
+        }
+    }
+
+    private async Task EnsureModuleSchemasAsync(Guid organizationId)
+    {
+        string schema = $"tenant_{organizationId:N}";
+        await EnsureTenantSchemaExistsAsync(_dataModelingConnectionString, schema);
+        await PostgresModuleTestDatabase.MigrateAsync<DataModelingDbContext>(
+            _dataModelingConnectionString,
+            opts => new DataModelingDbContext(opts, new FixedTenantContext(organizationId)));
+
+        await EnsureTenantSchemaExistsAsync(_workflowBuilderConnectionString, schema);
+        await PostgresModuleTestDatabase.MigrateAsync<WorkflowBuilderDbContext>(
+            _workflowBuilderConnectionString,
+            opts => new WorkflowBuilderDbContext(opts, new FixedTenantContext(organizationId)));
+
+        await EnsureTenantSchemaExistsAsync(_formBuilderConnectionString, schema);
+        await PostgresModuleTestDatabase.MigrateAsync<FormBuilderDbContext>(
+            _formBuilderConnectionString,
+            opts => new FormBuilderDbContext(opts, new FixedTenantContext(organizationId)));
+
+        await EnsureTenantSchemaExistsAsync(_workflowEngineConnectionString, schema);
+        await PostgresModuleTestDatabase.MigrateAsync<WorkflowEngineDbContext>(
+            _workflowEngineConnectionString,
+            opts => new WorkflowEngineDbContext(opts, new FixedTenantContext(organizationId)));
+    }
+
+    private static async Task EnsureTenantSchemaExistsAsync(string connectionString, string schema)
+    {
+        await using NpgsqlConnection connection = new(connectionString);
+        await connection.OpenAsync();
+        await using NpgsqlCommand createSchema = connection.CreateCommand();
+        createSchema.CommandText = $"""CREATE SCHEMA IF NOT EXISTS "{schema}";""";
+        await createSchema.ExecuteNonQueryAsync();
+    }
+
+    private async Task EnsureDataModelingTablesAsync(Guid organizationId)
+    {
+        string schema = $"tenant_{organizationId:N}";
+        for (int attempt = 1; attempt <= 3; attempt++)
+        {
+            await using NpgsqlConnection connection = new(_dataModelingConnectionString);
+            await connection.OpenAsync();
+            await using NpgsqlCommand command = connection.CreateCommand();
+            command.CommandText =
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = @schema
+                      AND table_name = 'data_records')
+                """;
+            command.Parameters.AddWithValue("schema", schema);
+            object? scalar = await command.ExecuteScalarAsync();
+            if (scalar is bool exists && exists)
+                return;
+
+            await EnsureModuleSchemasAsync(organizationId);
+        }
+
+        throw new InvalidOperationException(
+            $"Tenant schema '{schema}' is missing data_records table after repeated migration attempts.");
+    }
 
     private static async Task SeedTestOpenIddictClientsAsync(IServiceProvider services)
     {

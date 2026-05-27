@@ -167,4 +167,45 @@ public class OrganizationTests
 
         org.Status.Should().Be(OrganizationStatus.ProvisioningFailed);
     }
+
+    [Theory]
+    [InlineData(OrganizationStatus.Active, true)]
+    [InlineData(OrganizationStatus.DeletionScheduled, true)]
+    [InlineData(OrganizationStatus.Provisioning, false)]
+    [InlineData(OrganizationStatus.ProvisioningFailed, false)]
+    [InlineData(OrganizationStatus.Deleted, false)]
+    [InlineData(OrganizationStatus.Archived, false)]
+    public void AllowsTenantDataAccess_WhenStatusVaries_MatchesPolicy(
+        OrganizationStatus status,
+        bool expected)
+    {
+        Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail, WellKnownSubscriptionPlans.FreeId);
+        org.BeginProvisioning();
+
+        switch (status)
+        {
+            case OrganizationStatus.Active:
+                org.CompleteProvisioning();
+                break;
+            case OrganizationStatus.DeletionScheduled:
+                org.CompleteProvisioning();
+                org.ScheduleDeletion(DateTime.UtcNow);
+                break;
+            case OrganizationStatus.Provisioning:
+                break;
+            case OrganizationStatus.ProvisioningFailed:
+                org.MarkProvisioningFailed();
+                break;
+            case OrganizationStatus.Deleted:
+                org.CompleteProvisioning();
+                org.MarkDeleted();
+                break;
+            case OrganizationStatus.Archived:
+                org.CompleteProvisioning();
+                org.Archive();
+                break;
+        }
+
+        org.AllowsTenantDataAccess().Should().Be(expected);
+    }
 }
