@@ -50,10 +50,12 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 > - `TenantSchemaInterceptor` sets PostgreSQL `search_path` per connection for module `DbContext`s
 > - `TenantSchemaInterceptorTests` (two schemas, no cross-read). `HttpTenantContext` on `Axis.Api`
 > - `FixedTenantContext` in Wolverine provision handlers.
-> - cross-tenant API integration tests (`TenantIsolationEndpointTests` — DataModeling list/get by id and archived-org 403)
+> - cross-tenant API integration tests (`TenantIsolationEndpointTests` — DataModeling list/get by id, archived-org 403, org-still-provisioning 403)
 > - connection-pool safety documented in [patterns.md](../../../playbooks/patterns.md) (`search_path` set on every `ConnectionOpened`, including pooled reconnects).
 >
-> **Gaps vs spec:** none for backend US-008. Tenant-scoped data never lives in `public` by design (module tables only in `tenant_{orgId:N}`); no separate runtime guard beyond schema isolation.
+> **Gaps vs spec:** backend happy path + validation for isolation and org-gate 403 covered. Tenant-scoped tables live only in `tenant_{orgId:N}` (no `public` tenant data by design).
+>
+> **Deferred (follow-up):** AC — concurrent two-tenant load test for `search_path` interference; AC — explicit runtime exception when tenant-scoped APIs target `public` (would be defense-in-depth only).
 
 ---
 
@@ -96,6 +98,10 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 > - `org_id` claim issued at login (`ConnectEndpoints`)
 > - handlers use `ITenantContext` / `ICurrentUser` — schema `tenant_{orgId:N}` derived in `HttpTenantContext` (no separate DB lookup; Redis cache N/A — deterministic derivation satisfies the under-5 ms AC).
 > - `TenantOrganizationAccessMiddleware` returns HTTP 403 for missing, archived/deleted, or not-ready orgs on tenant module routes (`/api/models`, workflows, forms, etc.).
+> - API test: `GetModels_WhenOrganizationIsProvisioning_Returns403` (uses `CreateAdminClientWhileProvisioningAsync` — schemas migrated, org still `Provisioning`).
+> - `ITenantOrganizationAccessService` uses `Result` + `ErrorCodes.Forbidden`; unit tests in `TenantOrganizationAccessServiceTests`.
 > - background jobs use `FixedTenantContext` in provision/cancel handlers (see [patterns.md](../../../playbooks/patterns.md)).
 >
-> **Gaps vs spec:** none for backend US-009.
+> **Gaps vs spec:** JWT missing `org_id` → 401 is enforced by OpenIddict/auth pipeline (not duplicated in tenant middleware). Unknown `org_id` → 403 covered at Application unit level; no dedicated API test yet (needs test JWT minting).
+>
+> **Deferred (follow-up):** AC — Redis-backed schema name cache (spec optional; deterministic `tenant_{orgId:N}` used). AC — API integration test for JWT with non-existent `org_id`.
