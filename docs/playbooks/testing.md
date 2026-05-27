@@ -102,16 +102,16 @@ When diagnosing CI failures in this area:
 
 **E2E provisioning test:** `TenantProvisioningE2ETests` (`[Trait("Category", "Slow")]`, collection `"Api-E2E"`) uses `KafkaTransportFixture` — **not** `ApiTestFixture`. The two fixtures serve different concerns and must remain separate:
 
-| Fixture | `IUnitOfWork` (Identity) | Kafka transport | Purpose |
-|---------|--------------------------|-----------------|---------|
-| `ApiTestFixture` | No-op (`NullUnitOfWork`) | `false` — events go `.Locally()` | Endpoint tests — deterministic, no async pipeline |
-| `KafkaTransportFixture` | Real `IdentityUnitOfWork` | `true` — real Kafka + in-process Schema Registry | E2E tests — real transport exercised |
+| Fixture | `IUnitOfWork` (Identity) | `Kafka:UseEventTransport` | Purpose |
+|---------|--------------------------|---------------------------|---------|
+| `ApiTestFixture` | No-op (`NullUnitOfWork`) | `false` | Endpoint tests — deterministic sync setup, no async pipeline |
+| `KafkaTransportFixture` | Real `IdentityUnitOfWork` | `false` (Wolverine `.Locally()`) | E2E — exercises verify-email → handlers → `is_ready` |
 
-`ApiTestFixture` sets `Kafka:UseEventTransport=false` and replaces `IUnitOfWork` with a no-op so endpoint tests can call `ProvisionTenantSchemasAsync` + `MarkOrganizationActiveAsync` directly without racing against an async pipeline. `KafkaTransportFixture` keeps the real `IdentityUnitOfWork` (so `verify-email` publishes `OrganizationVerifiedEvent` into Wolverine's outbox) and routes events through a real Kafka container. Avro serialization uses an `InProcessSchemaRegistryServer` — a minimal in-process HTTP server implementing the Confluent Schema Registry REST API — started before the `WebApplicationFactory` so its URL is available when Wolverine reads `SchemaRegistry:Url` at host-build time.
+Both fixtures set `Kafka:UseEventTransport=false` so cross-module `*Event` messages route in-process (modulith). The difference is whether Identity publishes domain events: **if `IUnitOfWork` is a no-op in the E2E fixture, `OrganizationVerifiedEvent` is never emitted and the test always times out.**
 
-**Why an in-process Schema Registry is correct here:** all Avro producers and consumers run in the same process (modulith architecture). A schema registered by the Identity module's outbox is immediately readable by the DataModeling module's consumer — no distributed consistency concern. **If `IUnitOfWork` is replaced with a no-op in the E2E fixture, `OrganizationVerifiedEvent` is never published and the test always times out.**
+The pipeline under test: `OrganizationVerifiedEvent` → four module `OrganizationVerifiedHandler`s → `TenantSchemaProvisioner` → `TenantModuleProvisionReportEvent` → `TenantModuleProvisionReportHandler` → organization `Active`.
 
-The pipeline: `OrganizationVerifiedEvent` (Kafka topic) → 4 module `OrganizationVerifiedHandler`s → `TenantSchemaProvisioner` → `TenantModuleProvisionReportEvent` (Kafka topic) → `TenantModuleProvisionReportHandler` → org marked Active.
+`TestAssemblyConfig.cs` disables xUnit collection parallelization so only one `WebApplicationFactory<Program>` builds at a time (Serilog / `HostFactoryResolver` races).
 
 Run in isolation locally: `dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj --filter "Category=Slow"`.
 

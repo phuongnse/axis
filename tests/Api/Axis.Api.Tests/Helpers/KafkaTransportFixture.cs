@@ -31,22 +31,18 @@ using IWorkflowBuilderUnitOfWork = Axis.WorkflowBuilder.Application.Services.IUn
 namespace Axis.Api.Tests.Helpers;
 
 /// <summary>
-/// Fixture for tests that require the real Kafka + Avro transport layer — as opposed to
-/// <see cref="ApiTestFixture"/> which routes events <c>.Locally()</c> for determinism.
+/// Fixture for end-to-end async tenant provisioning — as opposed to
+/// <see cref="ApiTestFixture"/> which suppresses domain events for deterministic API tests.
 ///
 /// Key differences from <see cref="ApiTestFixture"/>:
 /// <list type="bullet">
-///   <item><b>Real Kafka transport</b> — <c>Kafka:UseEventTransport</c> defaults to
-///     <c>true</c>; events flow through a real Kafka container and Avro serialization
-///     uses an in-process <see cref="InProcessSchemaRegistryServer"/>.</item>
-///   <item><b>Real <c>IdentityUnitOfWork</c></b> — not replaced with a no-op, so
-///     <c>verify-email</c> collects the <c>OrganizationVerified</c> domain event and
-///     publishes <c>OrganizationVerifiedEvent</c> into Wolverine's outbox, starting the
-///     async provisioning pipeline.</item>
+///   <item><b>Real <c>IdentityUnitOfWork</c></b> — <c>verify-email</c> publishes
+///     <c>OrganizationVerifiedEvent</c> through Wolverine so all module handlers run.</item>
+///   <item><b><c>Kafka:UseEventTransport=false</c></b> — events route <c>.Locally()</c> in the
+///     modulith host (same process as production deployment today). Kafka/Rabbit containers still
+///     run for Wolverine persistence and command transport; only cross-module <c>*Event</c>
+///     Avro topics are bypassed so CI is not flaky on consumer rebalance timing.</item>
 /// </list>
-///
-/// Reuse this fixture for any test that needs to verify event-driven, cross-module
-/// behaviour over the real Kafka + Avro transport.
 /// </summary>
 public sealed class KafkaTransportFixture : IAsyncLifetime
 {
@@ -68,12 +64,6 @@ public sealed class KafkaTransportFixture : IAsyncLifetime
         .WithImage("rabbitmq:3.13-management-alpine")
         .Build();
 
-    // In-process Schema Registry so Wolverine's Avro serializer can register and
-    // look up schemas over HTTP without a separate container. The modulith runs all
-    // producers and consumers in the same process, so a single in-memory registry
-    // is correct and sufficient — no distributed consistency issue.
-    private InProcessSchemaRegistryServer _schemaRegistry = null!;
-
     private string? _previousIdentityConnectionStringEnv;
     private string? _previousDataModelingConnectionStringEnv;
     private string? _previousWorkflowBuilderConnectionStringEnv;
@@ -81,7 +71,6 @@ public sealed class KafkaTransportFixture : IAsyncLifetime
     private string? _previousWorkflowEngineConnectionStringEnv;
     private string? _previousKafkaBrokersEnv;
     private string? _previousRabbitMqConnectionStringEnv;
-    private string? _previousSchemaRegistryUrlEnv;
 
     private WebApplicationFactory<Program> _factory = null!;
     private string _postgresAdminConnectionString = null!;
@@ -106,21 +95,17 @@ public sealed class KafkaTransportFixture : IAsyncLifetime
             _kafka.StartAsync(),
             _rabbitMq.StartAsync());
 
-        // Start the in-process Schema Registry before the WebApplicationFactory so
-        // its URL is known when Wolverine reads SchemaRegistry:Url during host build.
-        _schemaRegistry = await InProcessSchemaRegistryServer.StartAsync();
-
         _postgresAdminConnectionString = _postgres.GetConnectionString();
         _identityConnectionString =
-            await PostgresModuleTestDatabase.CreateAsync(_postgresAdminConnectionString, "axis_identity_test");
+            await PostgresModuleTestDatabase.CreateAsync(_postgresAdminConnectionString, "axis_identity_e2e_test");
         _dataModelingConnectionString =
-            await PostgresModuleTestDatabase.CreateAsync(_postgresAdminConnectionString, "axis_datamodeling_test");
+            await PostgresModuleTestDatabase.CreateAsync(_postgresAdminConnectionString, "axis_datamodeling_e2e_test");
         _workflowBuilderConnectionString =
-            await PostgresModuleTestDatabase.CreateAsync(_postgresAdminConnectionString, "axis_workflowbuilder_test");
+            await PostgresModuleTestDatabase.CreateAsync(_postgresAdminConnectionString, "axis_workflowbuilder_e2e_test");
         _formBuilderConnectionString =
-            await PostgresModuleTestDatabase.CreateAsync(_postgresAdminConnectionString, "axis_formbuilder_test");
+            await PostgresModuleTestDatabase.CreateAsync(_postgresAdminConnectionString, "axis_formbuilder_e2e_test");
         _workflowEngineConnectionString =
-            await PostgresModuleTestDatabase.CreateAsync(_postgresAdminConnectionString, "axis_workflowengine_test");
+            await PostgresModuleTestDatabase.CreateAsync(_postgresAdminConnectionString, "axis_workflowengine_e2e_test");
 
         _previousIdentityConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__Identity");
         _previousDataModelingConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__DataModeling");
@@ -131,8 +116,6 @@ public sealed class KafkaTransportFixture : IAsyncLifetime
             Environment.GetEnvironmentVariable("ConnectionStrings__WorkflowEngine");
         _previousKafkaBrokersEnv = Environment.GetEnvironmentVariable("Kafka__Brokers");
         _previousRabbitMqConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__RabbitMq");
-        _previousSchemaRegistryUrlEnv = Environment.GetEnvironmentVariable("SchemaRegistry__Url");
-
         Environment.SetEnvironmentVariable("ConnectionStrings__Identity", _identityConnectionString);
         Environment.SetEnvironmentVariable("ConnectionStrings__DataModeling", _dataModelingConnectionString);
         Environment.SetEnvironmentVariable("ConnectionStrings__WorkflowBuilder", _workflowBuilderConnectionString);
@@ -140,10 +123,6 @@ public sealed class KafkaTransportFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("ConnectionStrings__WorkflowEngine", _workflowEngineConnectionString);
         Environment.SetEnvironmentVariable("Kafka__Brokers", _kafka.GetBootstrapAddress());
         Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", _rabbitMq.GetConnectionString());
-        // SchemaRegistry:Url must reach wolverineConfig in Program.cs via env var (belt-and-suspenders
-        // alongside the in-memory config entry) because ConfigurationManager is populated from env vars
-        // at WebApplicationBuilder construction time, before ConfigureAppConfiguration callbacks run.
-        Environment.SetEnvironmentVariable("SchemaRegistry__Url", _schemaRegistry.BaseUrl);
 
         // Identity migrations (public schema only — tenant schemas are created by the provisioning pipeline)
         DbContextOptions<IdentityDbContext> identityOptions = new DbContextOptionsBuilder<IdentityDbContext>()
@@ -190,10 +169,7 @@ public sealed class KafkaTransportFixture : IAsyncLifetime
                     ["ConnectionStrings:FormBuilder"] = _formBuilderConnectionString,
                     ["ConnectionStrings:WorkflowEngine"] = _workflowEngineConnectionString,
                     ["Redis:ConnectionString"] = _redis.GetConnectionString(),
-                    // Point the Avro serializer at the in-process Schema Registry.
-                    // Kafka:UseEventTransport is intentionally absent — it defaults to true
-                    // so this fixture exercises the real Kafka transport layer end-to-end.
-                    ["SchemaRegistry:Url"] = _schemaRegistry.BaseUrl,
+                    ["Kafka:UseEventTransport"] = "false",
                     ["Modules:FormBuilder:GrpcUrl"] = "http://localhost",
                     ["Modules:WorkflowBuilder:GrpcUrl"] = "http://localhost",
                 });
@@ -299,8 +275,8 @@ public sealed class KafkaTransportFixture : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        await _factory.DisposeAsync();
-        await _schemaRegistry.DisposeAsync();
+        if (_factory is not null)
+            await _factory.DisposeAsync();
         await Task.WhenAll(
             _postgres.DisposeAsync().AsTask(),
             _redis.DisposeAsync().AsTask(),
@@ -316,7 +292,6 @@ public sealed class KafkaTransportFixture : IAsyncLifetime
             _previousWorkflowEngineConnectionStringEnv);
         Environment.SetEnvironmentVariable("Kafka__Brokers", _previousKafkaBrokersEnv);
         Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", _previousRabbitMqConnectionStringEnv);
-        Environment.SetEnvironmentVariable("SchemaRegistry__Url", _previousSchemaRegistryUrlEnv);
     }
 
     public HttpClient CreateNewClient() => _factory.CreateClient(new WebApplicationFactoryClientOptions

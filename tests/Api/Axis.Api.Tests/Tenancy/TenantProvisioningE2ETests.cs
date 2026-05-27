@@ -9,12 +9,11 @@ namespace Axis.Api.Tests.Tenancy;
 
 /// <summary>
 /// E2E check that <c>verify-email</c> triggers async multi-module tenant provisioning via
-/// the real Kafka + Avro transport and that tenant APIs become accessible once the pipeline
-/// completes.
+/// Wolverine handlers and that tenant APIs become accessible once the pipeline completes.
 ///
 /// Uses <see cref="KafkaTransportFixture"/> (not <see cref="ApiTestFixture"/>) because the
 /// real <c>IdentityUnitOfWork</c> must run so <c>verify-email</c> publishes
-/// <c>OrganizationVerifiedEvent</c> into Wolverine's outbox and routes it to Kafka.
+/// <c>OrganizationVerifiedEvent</c> and all module <c>OrganizationVerifiedHandler</c>s run.
 /// <see cref="ApiTestFixture"/> replaces <c>IUnitOfWork</c> with a no-op so endpoint tests
 /// remain deterministic — that no-op would prevent this pipeline from ever starting.
 /// </summary>
