@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Domain.ValueObjects;
 using Axis.Identity.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -167,6 +168,7 @@ public static class AuthHelper
     {
         TimeSpan wait = timeout ?? TimeSpan.FromSeconds(60);
         DateTime deadline = DateTime.UtcNow.Add(wait);
+        Email email = Email.Create(adminEmail).Value!;
 
         while (DateTime.UtcNow < deadline)
         {
@@ -174,7 +176,7 @@ public static class AuthHelper
             IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
             User? user = await db.Users
                 .AsNoTracking()
-                .FirstOrDefaultAsync(u => u.Email.Value == adminEmail);
+                .FirstOrDefaultAsync(u => u.Email == email);
 
             if (user is null)
                 throw new InvalidOperationException($"User {adminEmail} was not found after registration.");

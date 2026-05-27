@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Axis.Api.Tests.Helpers;
 using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Domain.ValueObjects;
 using Axis.Identity.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -70,11 +71,12 @@ public sealed class TenantIsolationEndpointTests(ApiTestFixture fixture)
         resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
-    private async Task<Guid> GetOrganizationIdForEmailAsync(string email)
+    private async Task<Guid> GetOrganizationIdForEmailAsync(string emailAddress)
     {
+        Email email = Email.Create(emailAddress).Value!;
         using IServiceScope scope = fixture.CreateScope();
         IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        User user = await db.Users.AsNoTracking().SingleAsync(u => u.Email.Value == email);
+        User user = await db.Users.AsNoTracking().SingleAsync(u => u.Email == email);
         return user.OrganizationId;
     }
 
