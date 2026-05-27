@@ -195,6 +195,10 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.RemoveAll<IOrganizationLogoStorageService>();
                 services.AddScoped<IOrganizationLogoStorageService, NullOrganizationLogoStorageService>();
 
+                services.RemoveAll<IUnitOfWork>();
+                services.AddScoped<IUnitOfWork>(sp =>
+                    new NullUnitOfWork(sp.GetRequiredService<IdentityDbContext>()));
+
                 services.RemoveAll<IDataModelingUnitOfWork>();
                 services.AddScoped<IDataModelingUnitOfWork>(sp =>
                     new NullDataModelingUnitOfWork(sp.GetRequiredService<DataModelingDbContext>()));
@@ -206,6 +210,9 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.RemoveAll<IFormBuilderUnitOfWork>();
                 services.AddScoped<IFormBuilderUnitOfWork>(sp =>
                     new NullFormBuilderUnitOfWork(sp.GetRequiredService<FormBuilderDbContext>()));
+
+                services.RemoveAll<ITenantContext>();
+                services.AddScoped<ITenantContext>(_ => new PublicSchemaTenantContext());
 
                 services.PostConfigure<OpenIddictServerAspNetCoreOptions>(opts =>
                     opts.DisableTransportSecurityRequirement = true);
