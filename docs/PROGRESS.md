@@ -77,7 +77,7 @@ Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoi
 
 **F02 organization management (backend):** ✅ US-005–007 — profile API, settings + usage, scheduled deletion with 30-day hard-delete job. Frontend ⏳.
 
-**F03 tenant isolation:** ⚠️ `TenantSchemaInterceptor` + `TenantOrganizationAccessMiddleware` (403 for missing/archived/not-ready orgs) shipped; cross-tenant API integration-test coverage pending fixture rework — see [E01 F03](./epics/E01-platform-foundation/features/F03-tenant-isolation.md).
+**F03 tenant isolation:** ✅ `TenantSchemaInterceptor`, `TenantOrganizationAccessMiddleware` (403 for missing/archived/not-ready orgs), cross-tenant API integration tests — see [E01 F03](./epics/E01-platform-foundation/features/F03-tenant-isolation.md).
 
 **Agents:** per-US truth in feature `Implementation status` callouts; epic [Open work](./epics/E01-platform-foundation/README.md#open-work-agents) lists next backend/frontend items.
 

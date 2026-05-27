@@ -52,6 +52,8 @@ public static class AuthHelper
         if (verifyResp.StatusCode != HttpStatusCode.NoContent)
             throw new InvalidOperationException($"Email verification failed: {verifyResp.StatusCode}");
 
+        await fixture.EnsureTenantProvisionedAsync(email);
+
         // 3. Run the Authorization Code + PKCE flow on an independent client
         //    (so cookie jar is isolated from the shared fixture client)
         HttpClient pkceClient = fixture.CreateNewClient();

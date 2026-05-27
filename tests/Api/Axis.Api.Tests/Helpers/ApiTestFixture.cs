@@ -3,9 +3,12 @@ using Axis.DataModeling.Infrastructure.Persistence;
 using Axis.FormBuilder.Contracts.Grpc;
 using Axis.FormBuilder.Infrastructure.Persistence;
 using Axis.Identity.Application.Services;
+using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Domain.ValueObjects;
 using Axis.Identity.Infrastructure.Persistence;
 using Axis.Identity.Infrastructure.Services;
 using Axis.Shared.Application.Tenancy;
+using Axis.Shared.Infrastructure.Tenancy;
 using Axis.Testing;
 using Axis.WorkflowBuilder.Contracts.Grpc;
 using Axis.WorkflowBuilder.Infrastructure.Persistence;
@@ -211,9 +214,6 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.AddScoped<IFormBuilderUnitOfWork>(sp =>
                     new NullFormBuilderUnitOfWork(sp.GetRequiredService<FormBuilderDbContext>()));
 
-                services.RemoveAll<ITenantContext>();
-                services.AddScoped<ITenantContext>(_ => new PublicSchemaTenantContext());
-
                 services.PostConfigure<OpenIddictServerAspNetCoreOptions>(opts =>
                     opts.DisableTransportSecurityRequirement = true);
 
@@ -260,6 +260,43 @@ public sealed class ApiTestFixture : IAsyncLifetime
     {
         AllowAutoRedirect = false,
     });
+
+    public async Task EnsureTenantProvisionedAsync(string adminEmail)
+    {
+        Email email = Email.Create(adminEmail).Value!;
+
+        Guid organizationId;
+        await using (IdentityDbContext identityContext = new(
+                         new DbContextOptionsBuilder<IdentityDbContext>()
+                             .UseNpgsql(_identityConnectionString)
+                             .UseOpenIddict()
+                             .Options))
+        {
+            User user = await identityContext.Users
+                .SingleAsync(u => u.Email == email);
+            Organization organization = await identityContext.Organizations
+                .SingleAsync(o => o.Id == user.OrganizationId);
+
+            if (organization.Status == OrganizationStatus.Provisioning)
+                organization.CompleteProvisioning();
+
+            await identityContext.SaveChangesAsync();
+            organizationId = organization.Id;
+        }
+
+        await PostgresModuleTestDatabase.MigrateAsync<DataModelingDbContext>(
+            _dataModelingConnectionString,
+            opts => new DataModelingDbContext(opts, new FixedTenantContext(organizationId)));
+        await PostgresModuleTestDatabase.MigrateAsync<WorkflowBuilderDbContext>(
+            _workflowBuilderConnectionString,
+            opts => new WorkflowBuilderDbContext(opts, new FixedTenantContext(organizationId)));
+        await PostgresModuleTestDatabase.MigrateAsync<FormBuilderDbContext>(
+            _formBuilderConnectionString,
+            opts => new FormBuilderDbContext(opts, new FixedTenantContext(organizationId)));
+        await PostgresModuleTestDatabase.MigrateAsync<WorkflowEngineDbContext>(
+            _workflowEngineConnectionString,
+            opts => new WorkflowEngineDbContext(opts, new FixedTenantContext(organizationId)));
+    }
 
     private static async Task SeedTestOpenIddictClientsAsync(IServiceProvider services)
     {
