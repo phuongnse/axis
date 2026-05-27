@@ -47,6 +47,9 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
     private readonly KafkaContainer _kafka = new KafkaBuilder()
         .WithImage("confluentinc/cp-kafka:7.7.0")
+        // Eliminates the 3-second initial consumer-group rebalance delay so Wolverine
+        // consumers are assigned partitions immediately on subscribe (test-only setting).
+        .WithEnvironment("KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS", "0")
         .Build();
 
     private readonly RabbitMqContainer _rabbitMq = new RabbitMqBuilder()

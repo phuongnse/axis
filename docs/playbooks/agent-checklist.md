@@ -21,7 +21,8 @@ The paste-block templates below are for *your own* walk-through (agent reasoning
   - duplicates `TenantSchemaProvisioner` steps
   - couples all API tests to async Kafka provisioning
   - patches CI with retries/workarounds instead of deterministic setup
-  Prefer `TenantTestProvisioner` in `Axis.Testing` over inline SQL/migrate copies.
+
+  Prefer `TenantTestProvisioner.MigrateTenantSchemaAsync` (`Axis.Testing`) over inline SQL/migrate copies.
 - End of PR: [process.md § PR wrap-up](process.md) — deferred lines, host wiring, callouts (no user reminder)
 
 ```markdown

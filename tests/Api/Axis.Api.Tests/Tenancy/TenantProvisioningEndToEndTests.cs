@@ -43,7 +43,7 @@ public sealed class TenantProvisioningEndToEndTests(ApiTestFixture fixture)
             Json);
         verifyResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        bool ready = await PollUntilProvisioningReadyAsync(verifyToken, TimeSpan.FromSeconds(90));
+        bool ready = await PollUntilProvisioningReadyAsync(verifyToken, TimeSpan.FromSeconds(30));
         ready.Should().BeTrue("event-driven tenant provisioning should complete in the API test host");
 
         HttpClient pkceClient = fixture.CreateNewClient();

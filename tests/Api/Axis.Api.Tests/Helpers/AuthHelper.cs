@@ -26,46 +26,10 @@ public static class AuthHelper
     /// </summary>
     public static async Task<HttpClient> CreateAdminClientAsync(ApiTestFixture fixture, string suffix)
     {
-        string email = $"admin{suffix}@test.com";
-
-        // 1. Register
-        HttpResponseMessage regResp = await fixture.Client.PostAsJsonAsync("/api/organizations", new
-        {
-            org_name = $"TestOrg{suffix}",
-            admin_first_name = "Test",
-            admin_last_name = "Admin",
-            admin_email = email,
-            password = "TestPass1",
-            password_confirmation = "TestPass1",
-        }, Json);
-
-        if (!regResp.IsSuccessStatusCode)
-            throw new InvalidOperationException($"Registration failed: {regResp.StatusCode}");
-
-        // 2. Verify email (opaque token from registration email)
-        string verifyToken = fixture.EmailCapture.GetVerificationToken(email)
-            ?? throw new InvalidOperationException(
-                $"No verification token captured for {email}.");
-
-        HttpResponseMessage verifyResp = await fixture.Client.PostAsJsonAsync(
-            "/api/auth/verify-email", new { token = verifyToken }, Json);
-        if (verifyResp.StatusCode != HttpStatusCode.NoContent)
-            throw new InvalidOperationException($"Email verification failed: {verifyResp.StatusCode}");
-
-        Guid organizationId = await fixture.ResolveOrganizationIdAsync(email);
+        (string email, Guid organizationId) = await RegisterAndVerifyAsync(fixture, suffix);
         await fixture.ProvisionTenantSchemasAsync(organizationId);
         await fixture.MarkOrganizationActiveAsync(organizationId);
-
-        // 3. Run the Authorization Code + PKCE flow on an independent client
-        //    (so cookie jar is isolated from the shared fixture client)
-        HttpClient pkceClient = fixture.CreateNewClient();
-        string accessToken = await CompletePkceFlowAsync(pkceClient, email, "TestPass1");
-
-        HttpClient authedClient = fixture.CreateNewClient();
-        authedClient.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", accessToken);
-
-        return authedClient;
+        return await BuildAuthedClientAsync(fixture, email);
     }
 
     /// <summary>
@@ -76,6 +40,14 @@ public static class AuthHelper
     public static async Task<HttpClient> CreateAdminClientWhileProvisioningAsync(
         ApiTestFixture fixture,
         string suffix)
+    {
+        (string email, Guid organizationId) = await RegisterAndVerifyAsync(fixture, suffix);
+        await fixture.ProvisionTenantSchemasAsync(organizationId);
+        return await BuildAuthedClientAsync(fixture, email);
+    }
+
+    private static async Task<(string email, Guid organizationId)> RegisterAndVerifyAsync(
+        ApiTestFixture fixture, string suffix)
     {
         string email = $"admin{suffix}@test.com";
 
@@ -102,15 +74,18 @@ public static class AuthHelper
             throw new InvalidOperationException($"Email verification failed: {verifyResp.StatusCode}");
 
         Guid organizationId = await fixture.ResolveOrganizationIdAsync(email);
-        await fixture.ProvisionTenantSchemasAsync(organizationId);
+        return (email, organizationId);
+    }
 
+    private static async Task<HttpClient> BuildAuthedClientAsync(ApiTestFixture fixture, string email)
+    {
+        // PKCE flow on an independent client so the cookie jar is isolated
         HttpClient pkceClient = fixture.CreateNewClient();
         string accessToken = await CompletePkceFlowAsync(pkceClient, email, "TestPass1");
 
         HttpClient authedClient = fixture.CreateNewClient();
         authedClient.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", accessToken);
-
         return authedClient;
     }
 

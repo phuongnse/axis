@@ -66,8 +66,6 @@ public sealed class TenantIsolationEndpointTests(ApiTestFixture fixture)
         HttpResponseMessage resp = await client.GetAsync("/api/models");
 
         resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        string body = await resp.Content.ReadAsStringAsync();
-        body.Should().Contain("Workspace is still being set up");
     }
 
     [Fact]

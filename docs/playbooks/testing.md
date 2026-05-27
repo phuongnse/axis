@@ -100,7 +100,7 @@ When diagnosing CI failures in this area:
 
 **Auth helper split:** `ApiTestFixture.ProvisionTenantSchemasAsync` vs `MarkOrganizationActiveAsync` — call both from `CreateAdminClientAsync` for normal endpoint tests; use `AuthHelper.CreateAdminClientWhileProvisioningAsync` when the AC requires an org still in `Provisioning` (do not call `MarkOrganizationActiveAsync`).
 
-**Slow E2E provisioning:** `TenantProvisioningEndToEndTests` (`[Trait("Category", "Slow")]`) polls `/api/auth/provisioning-status` after verify-email and asserts tenant APIs work without deterministic fixture provisioning. **CI excludes** `Category=Slow` (see `.github/workflows/build-and-test.yml`). Run locally when changing F01/F03 messaging: `dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj --filter "Category=Slow"`.
+**E2E provisioning test:** `TenantProvisioningEndToEndTests` (`[Trait("Category", "Slow")]`) polls `/api/auth/provisioning-status` after verify-email and asserts tenant APIs work without deterministic fixture provisioning — the only coverage for the real Kafka/RabbitMQ/Wolverine pipeline. Runs in the standard CI job (30 s timeout). `ApiTestFixture` sets `KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0` on the broker so consumers are assigned partitions immediately on subscribe. Run in isolation locally: `dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj --filter "Category=Slow"`.
 
 ---
 
