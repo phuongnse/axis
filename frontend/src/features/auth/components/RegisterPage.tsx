@@ -58,7 +58,6 @@ export function RegisterPage() {
           <Input
             id="organizationName"
             autoComplete="organization"
-            placeholder="O'Brien & Co."
             aria-invalid={errors.organizationName ? true : undefined}
             {...register('organizationName')}
           />
@@ -72,11 +71,12 @@ export function RegisterPage() {
           <Input
             id="fullName"
             autoComplete="name"
-            placeholder="Alex Brown"
             aria-invalid={errors.fullName ? true : undefined}
             {...register('fullName')}
           />
-          {errors.fullName ? <p className="text-xs text-destructive">{errors.fullName.message}</p> : null}
+          {errors.fullName ? (
+            <p className="text-xs text-destructive">{errors.fullName.message}</p>
+          ) : null}
         </div>
 
         <div className="space-y-1.5">
@@ -85,7 +85,6 @@ export function RegisterPage() {
             id="email"
             type="email"
             autoComplete="email"
-            placeholder="you@company.com"
             aria-invalid={errors.email ? true : undefined}
             {...register('email')}
           />
@@ -98,11 +97,12 @@ export function RegisterPage() {
             id="password"
             type="password"
             autoComplete="new-password"
-            placeholder="••••••••"
             aria-invalid={errors.password ? true : undefined}
             {...register('password')}
           />
-          {errors.password ? <p className="text-xs text-destructive">{errors.password.message}</p> : null}
+          {errors.password ? (
+            <p className="text-xs text-destructive">{errors.password.message}</p>
+          ) : null}
         </div>
 
         <div className="space-y-1.5">
@@ -111,7 +111,6 @@ export function RegisterPage() {
             id="passwordConfirmation"
             type="password"
             autoComplete="new-password"
-            placeholder="••••••••"
             aria-invalid={errors.passwordConfirmation ? true : undefined}
             {...register('passwordConfirmation')}
           />

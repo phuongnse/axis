@@ -68,7 +68,7 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 | Infrastructure | ✅ Done | `IdentityDbContext` (public schema), EF Core mappings, all repositories, `BCryptPasswordHasher` (work factor 12), `MailKitEmailSender`, `IdentityUnitOfWork` (maps domain events → Avro integration events on save), `PasswordResetTokenStore`, `SessionStoreService` (wraps `IOpenIddictTokenManager`), `OpenIddictSeeder`. `IdentityGrpcService` exposes `GetUserPermissions` ([ADR-014](../../TECH_STACK.md#adr-014-grpc-for-internal-sync-rpc-and-rest-openapi-for-external-api)). `IdentityEventMapper` translates 5 domain events to Avro records published via Wolverine outbox → Kafka (ADR-019). |
 | Contracts | ✅ Done | `Axis.Identity.Contracts` — `Protos/axis/identity/v1/identity_service.proto` (`GetUserPermissions`) + 5 Avro schemas (`OrganizationVerifiedEvent`, `UserDeactivatedEvent`, `UserReactivatedEvent`, `RoleAssignedEvent`, `RoleRemovedEvent`) with hand-written `ISpecificRecord` generated code + `IdentityKafkaTopics` + `IdentityEventExtensions` (typed GUID accessors). |
 | API | ✅ Done | OpenIddict 5.x OAuth2/OIDC server: `GET /connect/authorize` (PKCE), `POST /connect/login` (credential validation + session cookie), `POST /connect/token` (code exchange, refresh, client credentials). `POST /api/auth/signout` (revoke refresh token + JTI blacklist). Refresh token delivered as httpOnly `Secure SameSite=Strict` cookie via `ApplyRefreshTokenCookieHandler`; extracted from cookie on refresh via `ExtractRefreshTokenFromCookieHandler`. Permission-based authorization via `PermissionPolicyProvider` + `OpenIddictValidationAspNetCore`. JTI Redis blacklist. Integration-tested with WebApplicationFactory + Testcontainers (PKCE full-flow helpers in `AuthHelper`). |
-| Frontend | ⚠️ Partial | Login (PKCE), app shell, dashboard scaffold on PR #50; register/settings and multi-tab refresh pending |
+| Frontend | ⚠️ Partial | Login (PKCE), app shell, dashboard scaffold on PR #50; settings/invitation/session flows and multi-tab refresh still pending. E01 US-001 register page is shipped under Platform Foundation docs. |
 
 **Key implementation decisions:**
 - Identity uses the global `public` PostgreSQL schema (not a tenant schema) — registration has no tenant context and email uniqueness is platform-wide.
@@ -85,7 +85,7 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 | Area | Status | Detail |
 |------|--------|--------|
 | **Backend** | ⚠️ polish | [F05](./features/F05-password-security.md): reset/change-password rate limits, session list API wiring. [F04](./features/F04-permissions.md): `[RequirePermission]` / policy tests. [F02](./features/F02-user-management.md): block admin self-invite at API. |
-| **Frontend** | ⏳ | Register, settings, invitation accept, session management UI — see per-US callouts in [F01](./features/F01-authentication.md)–[F05](./features/F05-password-security.md). |
+| **Frontend** | ⏳ | Settings, invitation accept, session management UI — see per-US callouts in [F01](./features/F01-authentication.md)–[F05](./features/F05-password-security.md). |
 
 Core auth/OIDC/RBAC backend is ✅; use feature **Gaps vs spec** for the next US, not epic checkboxes.
 
