@@ -71,7 +71,7 @@ Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoi
 
 ## E01 — Platform Foundation
 
-**F01 tenant registration (backend):** ✅ register, verify (opaque tokens), resend limit, idempotency, Kafka provisioning coordinator, optional `subscriptionPlanId` on register.
+**F01 tenant registration:** ✅ backend complete + frontend US-001 register flow (inline validation, generic confirmation screen, 5xx retryable error message). Remaining frontend: verify/provisioning/pricing screens.
 
 **F04 subscription plans (backend):** ✅ `GET /api/plans`, platform plan change, 402 limits (workflows / users / executions), Redis counters. Frontend pricing UI ⏳. **Deferred:** atomic execution counter under concurrency; fail-closed when Redis unavailable; bulk multi-workflow import limit AC until bulk endpoint exists.
 

@@ -22,7 +22,10 @@ export async function renderWithRouter(
 ): Promise<RenderWithRouterResult> {
   const { path = '/', ...renderOptions } = options;
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
   });
 
   const rootRoute = createRootRoute({

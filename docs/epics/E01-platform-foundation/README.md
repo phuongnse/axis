@@ -56,7 +56,7 @@ Without this foundation, nothing else works. Every feature in every other epic r
 | Tenant Provisioning (US-003 backend) | ✅ Done | Kafka-driven per-module provisioning, coordinator retries, `GET /api/auth/provisioning-status`. Frontend wait screen ⏳ |
 | Tenant isolation (F03 US-008–009 backend) | ✅ Done | `TenantSchemaInterceptor`, `TenantOrganizationAccessMiddleware`, and cross-tenant API integration tests — see [F03](./features/F03-tenant-isolation.md) |
 | Organization Management (F02 US-005–007 backend) | ✅ Done | Profile, settings + usage, scheduled deletion + hard-delete job ✅. Frontend settings UI ⏳ — see [F02](./features/F02-organization-management.md) |
-| Frontend | ⏳ Pending | Registration, verify, provisioning, settings, pricing |
+| Frontend | ⏳ Pending | Verify flow, provisioning wait, settings, pricing |
 
 ---
 

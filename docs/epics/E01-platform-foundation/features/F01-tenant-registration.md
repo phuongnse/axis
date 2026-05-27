@@ -62,11 +62,9 @@ Self-service registration flow where a new organization signs up and is automati
 > | Application | ✅ |
 > | Infrastructure | ✅ |
 > | API | ✅ |
-> | Frontend | ⏳ |
+> | Frontend | ✅ |
 >
-> **Gaps vs spec:** none for backend US-001. `Idempotency-Key` header on `POST /api/organizations/` deduplicates rapid resubmits (Pending/Completed/Failed state).
->
-> **Deferred (PR #124 follow-up):** Frontend registration confirmation-screen behavior alignment for US-001.
+> **Gaps vs spec:** none. `Idempotency-Key` header on `POST /api/organizations/` deduplicates rapid resubmits (Pending/Completed/Failed state).
 >
 > **Decisions:**
 > - duplicate email returns silently without creating anything — matches "same confirmation screen" AC. `RegisterOrganizationCommandValidator` enforces: org name 2–100 chars, valid email, password min 8 chars + letter + number, confirmation match. Org slug auto-generated with uniqueness retry loop

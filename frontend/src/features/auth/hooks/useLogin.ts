@@ -1,8 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 
-import { buildAuthorizeUrl, createPkceSession } from '@/features/auth/pkce';
+import { LoginRequestError, loginWithPassword } from '@/features/auth/api';
 import { type LoginFormValues, loginSchema } from '@/features/auth/schemas/login-schema';
 
 export type LoginErrorKind = 'credentials' | 'unverified' | 'deactivated' | 'locked' | 'server';
@@ -34,69 +34,53 @@ function mapLoginFailure(status: number, bodyText: string): LoginError {
 }
 
 export function useLogin() {
-  const [loginError, setLoginError] = useState<LoginError | null>(null);
-  const [loading, setLoading] = useState(false);
-
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
     mode: 'onSubmit',
   });
 
-  async function submit(values: LoginFormValues) {
-    setLoginError(null);
-    setLoading(true);
-
-    try {
-      const pkce = createPkceSession();
-      const authorizeUrl = await buildAuthorizeUrl(pkce.state, pkce.verifier);
-      const body = new URLSearchParams({
-        email: values.email.trim(),
-        password: values.password,
-        return_url: `${window.location.origin}${authorizeUrl}`,
-      });
-
-      const response = await fetch('/connect/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body,
-        credentials: 'include',
-        redirect: 'manual',
-      });
-
-      const isRedirect =
-        response.status === 302 ||
-        response.status === 303 ||
-        response.status === 307 ||
-        response.status === 308 ||
-        response.type === 'opaqueredirect';
-
-      if (!isRedirect && !response.ok) {
-        const bodyText = await response.text();
-        const mapped = mapLoginFailure(response.status, bodyText);
-        setLoginError(mapped);
+  const mutation = useMutation({
+    mutationFn: loginWithPassword,
+    onSuccess: (result) => {
+      if (result.location) {
+        window.location.href = result.location.startsWith('http')
+          ? result.location
+          : `${window.location.origin}${result.location}`;
+        return;
+      }
+      window.location.href = result.authorizeUrl;
+    },
+    onError: (error: unknown) => {
+      if (error instanceof LoginRequestError) {
+        const mapped = mapLoginFailure(error.status, error.bodyText);
+        form.setError('root', { type: 'server', message: mapped.message });
         if (mapped.kind === 'server') {
           form.setValue('password', '');
         }
-        setLoading(false);
         return;
       }
 
-      const location = response.headers.get('Location');
-      if (location) {
-        window.location.href = location.startsWith('http')
-          ? location
-          : `${window.location.origin}${location}`;
-        return;
-      }
-
-      window.location.href = authorizeUrl;
-    } catch {
-      setLoginError({ kind: 'server', message: 'Something went wrong. Please try again.' });
+      form.setError('root', { type: 'server', message: 'Something went wrong. Please try again.' });
       form.setValue('password', '');
-      setLoading(false);
+    },
+  });
+
+  async function submit(values: LoginFormValues) {
+    form.clearErrors('root');
+    try {
+      await mutation.mutateAsync(values);
+    } catch {
+      // Errors are handled in mutation.onError.
     }
   }
 
-  return { form, loginError, loading, submit };
+  const loginError =
+    mutation.error instanceof LoginRequestError
+      ? mapLoginFailure(mutation.error.status, mutation.error.bodyText)
+      : form.formState.errors.root?.message
+        ? { kind: 'server', message: form.formState.errors.root.message }
+        : null;
+
+  return { form, loginError, loading: mutation.isPending, submit };
 }
