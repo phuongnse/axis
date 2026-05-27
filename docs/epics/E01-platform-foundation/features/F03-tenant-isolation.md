@@ -55,7 +55,9 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 >
 > **Gaps vs spec:** backend happy path + validation for isolation and org-gate 403 covered. Tenant-scoped tables live only in `tenant_{orgId:N}` (no `public` tenant data by design).
 >
-> **Deferred (follow-up):** AC — concurrent two-tenant load test for `search_path` interference; AC — explicit runtime exception when tenant-scoped APIs target `public` (would be defense-in-depth only).
+> **Deferred (follow-up):**
+> - AC — concurrent two-tenant load test for `search_path` interference
+> - AC — explicit runtime exception when tenant-scoped APIs target `public` (would be defense-in-depth only).
 
 ---
 
@@ -102,6 +104,10 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 > - `ITenantOrganizationAccessService` uses `Result` + `ErrorCodes.Forbidden`; unit tests in `TenantOrganizationAccessServiceTests`.
 > - background jobs use `FixedTenantContext` in provision/cancel handlers (see [patterns.md](../../../playbooks/patterns.md)).
 >
-> **Gaps vs spec:** JWT missing `org_id` → 401 is enforced by OpenIddict/auth pipeline (not duplicated in tenant middleware). Unknown `org_id` → 403 covered at Application unit level; no dedicated API test yet (needs test JWT minting).
+> **Gaps vs spec:**
+> - JWT missing `org_id` → 401 is enforced by OpenIddict/auth pipeline (not duplicated in tenant middleware). Unknown `org_id` → 403 covered at Application unit level
+> - no dedicated API test yet (needs test JWT minting).
 >
-> **Deferred (follow-up):** AC — Redis-backed schema name cache (spec optional; deterministic `tenant_{orgId:N}` used). AC — API integration test for JWT with non-existent `org_id`.
+> **Deferred (follow-up):**
+> - AC — Redis-backed schema name cache (spec optional
+> - deterministic `tenant_{orgId:N}` used). AC — API integration test for JWT with non-existent `org_id`.
