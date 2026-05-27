@@ -98,6 +98,8 @@ When diagnosing CI failures in this area:
 
 **Per-tenant schema in tests:** use `TenantTestProvisioner.MigrateTenantSchemaAsync` (`tests/Shared/Axis.Testing`) so `CREATE SCHEMA IF NOT EXISTS` and `TenantSchemaProvisioner.MigrateWithFixedTenantAsync` stay aligned with production. Do not copy provisioning SQL into `ApiTestFixture`.
 
+**Auth helper split:** `ApiTestFixture.ProvisionTenantSchemasAsync` vs `MarkOrganizationActiveAsync` — call both from `CreateAdminClientAsync` for normal endpoint tests; use `AuthHelper.CreateAdminClientWhileProvisioningAsync` when the AC requires an org still in `Provisioning` (do not call `MarkOrganizationActiveAsync`).
+
 ---
 
 ## Frontend testing
