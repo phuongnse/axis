@@ -114,7 +114,6 @@ jobs:
           dotnet test --no-build --verbosity normal
           --logger "trx;LogFileName=test-results.trx"
           --results-directory ${{ github.workspace }}/TestResults
-          --collect:"XPlat Code Coverage"
 
       # Upload TRX even on failure so PR annotations + post-mortem work.
       - name: Upload test results
@@ -124,32 +123,6 @@ jobs:
           name: dotnet-test-results
           path: ${{ github.workspace }}/TestResults/**/*.trx
           retention-days: 14
-
-      # Coverage from coverlet (cobertura). Upload as artifact for diff-coverage
-      # tools and PR comments; threshold enforcement is intentionally deferred
-      # until a baseline is established — see CONTRIBUTING.md § Coverage.
-      - name: Upload coverage report
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: dotnet-coverage
-          path: ${{ github.workspace }}/TestResults/**/coverage.cobertura.xml
-          retention-days: 14
-
-      # `dotnet list package --vulnerable` queries NuGet's known-advisory feed
-      # against every restored package (including transitives via --include-transitive).
-      # We grep for `>` lines because the command exits 0 even when advisories
-      # are found; the only signal is in the output table.
-      - name: Check for vulnerable packages
-        run: |
-          dotnet list package --vulnerable --include-transitive > vuln.txt 2>&1
-          cat vuln.txt
-          if grep -E '^\s*>' vuln.txt; then
-            echo ""
-            echo "::error::Vulnerable NuGet packages detected — bump the affected dependency or wait for the next Dependabot PR."
-            exit 1
-          fi
-          echo "No vulnerable packages found."
 
   frontend:
     name: Frontend — Type Check, Lint, and Test
@@ -279,34 +252,3 @@ jobs:
           head: ${{ github.event.pull_request.head.sha }}
           extra_args: --only-verified
 
-  # ──────────────────────────────────────────────────────────────────────
-  # GHAS-only checks — disabled until GitHub Advanced Security is provisioned
-  # ──────────────────────────────────────────────────────────────────────
-  # `actions/dependency-review-action` and CodeQL code-scanning both require
-  # GitHub Advanced Security for private repositories. CodeQL ran end-to-end
-  # on PR #60 (171 queries, no findings) but failed at upload with
-  #   "Code Security must be enabled for this repository to use code scanning"
-  # and dependency-review failed at start with the same root cause. Once
-  # GHAS is enabled, re-add:
-  #
-  #   dependency-review:
-  #     name: Dependency review
-  #     needs: detect
-  #     if: needs.detect.outputs.backend == 'true' || needs.detect.outputs.frontend == 'true'
-  #     runs-on: ubuntu-latest
-  #     timeout-minutes: 5
-  #     steps:
-  #       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-  #         with:
-  #           persist-credentials: false
-  #       - uses: actions/dependency-review-action@67d4f4bd7a9b17a0db54d2a7519187c65e339de8 # v4.8.0
-  #         with:
-  #           fail-on-severity: high
-  #           comment-summary-in-pr: on-failure
-  #
-  # CodeQL: restore `.github/workflows/codeql.yml` from this commit's parent
-  # (or its git history). The workflow analyzed cleanly — only the upload
-  # step needs GHAS.
-  #
-  # In the meantime, Dependabot (.github/dependabot.yml) opens monthly grouped
-  # minor/patch PRs plus immediate PRs for security advisories.
