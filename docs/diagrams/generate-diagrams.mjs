@@ -526,8 +526,8 @@ function moduleOverview() {
   els.push(...arrow({ x1: 610, y1: 235, x2: 610, y2: 286, color: C.arrow }));
   // Drop to WorkflowEngine through the gap between event badges.
   els.push(...arrow({ x1: 340, y1: 378, x2: 340, y2: 470, color: C.arrow }));
-  // FormBuilder consumes from messaging lanes (bent path, clear arrow direction).
-  els.push(...routedArrow({ waypoints: [[900, 346], [900, 270], [860, 270], [860, 235]], color: C.arrow }));
+  // FormBuilder consumes from messaging lanes via outer-right route (avoid overlay on lane blocks).
+  els.push(...routedArrow({ waypoints: [[935, 332], [965, 332], [965, 270], [860, 270], [860, 235]], color: C.arrow }));
   // WorkflowEngine (bottom y=550) → reads own local copy
   els.push(...arrow({ x1: 385, y1: 550, x2: 385, y2: 595, color: C.muted, dashed: true, label: "reads own copy" }));
 
