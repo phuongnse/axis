@@ -20,20 +20,38 @@ Without this foundation, nothing else works. Every feature in every other domain
 
 ## Use Cases
 
+### Registration & provisioning
+
 | Use case | Summary |
 |---|---|
-| [Automatic tenant provisioning](automatic-tenant-provisioning.md) | my organization's environment to be ready immediately after email verification so that I can start using the platform... |
-| [Automatic tenant scoping on every request](automatic-tenant-scoping-on-every-request.md) | every database query to be automatically scoped to the requesting tenant so that data isolation is enforced at the in... |
-| [Change organization plan (admin override)](change-organization-plan-admin-override.md) | manually change an organization's plan so that I can support early customers and testing without a billing integration. |
-| [Delete organization](delete-organization.md) | permanently delete my organization so that all our data is removed from the platform. |
-| [Enforce plan limits at the API](enforce-plan-limits-at-the-api.md) | API endpoints to enforce plan limits so that organizations cannot exceed their subscription without upgrading. |
-| [Register a new organization](register-a-new-organization.md) | register my organization on the Axis platform so that I can start building workflows for my team. |
-| [Select a subscription plan during registration](select-a-subscription-plan-during-registration.md) | choose a subscription plan during registration so that I know what features and limits I have access to. |
-| [Tenant resolution from JWT](tenant-resolution-from-jwt.md) | resolve the active tenant from the JWT on every request so that downstream code never needs to think about tenant ide... |
-| [Update organization profile](update-organization-profile.md) | update my organization's name and logo so that the platform reflects our brand. |
-| [Verify email and activate account](verify-email-and-activate-account.md) | verify my email address so that my account is activated and I can access the platform. |
-| [View available plans](view-available-plans.md) | compare available subscription plans so that I can choose the one that fits my needs. |
-| [View organization settings](view-organization-settings.md) | view all organization settings in one place so that I have full visibility into the configuration. |
+| [Automatic tenant provisioning](automatic-tenant-provisioning.md) | My organization's environment to be ready immediately after email verification so that I can start u |
+| [Register a new organization](register-a-new-organization.md) | Register my organization on the Axis platform so that I can start building workflows for my team. |
+| [Select a subscription plan during registration](select-a-subscription-plan-during-registration.md) | Choose a subscription plan during registration so that I know what features and limits I have access |
+| [Verify email and activate account](verify-email-and-activate-account.md) | Verify my email address so that my account is activated and I can access the platform. |
+
+### Subscription plans
+
+| Use case | Summary |
+|---|---|
+| [Change organization plan (admin override)](change-organization-plan-admin-override.md) | Manually change an organization's plan so that I can support early customers and testing without a b |
+| [Enforce plan limits at the API](enforce-plan-limits-at-the-api.md) | Enforce subscription plan limits at the API so that organizations cannot exceed their subscription w |
+| [View available plans](view-available-plans.md) | Compare available subscription plans so that I can choose the one that fits my needs. |
+
+### Organization settings
+
+| Use case | Summary |
+|---|---|
+| [Delete organization](delete-organization.md) | Permanently delete my organization so that all our data is removed from the platform. |
+| [Update organization profile](update-organization-profile.md) | Update my organization's name and logo so that the platform reflects our brand. |
+| [View organization settings](view-organization-settings.md) | View all organization settings in one place so that I have full visibility into the configuration. |
+
+### Tenant isolation
+
+| Use case | Summary |
+|---|---|
+| [Automatic tenant scoping on every request](automatic-tenant-scoping-on-every-request.md) | Every database query to be automatically scoped to the requesting tenant so that data isolation is e |
+| [Tenant resolution from JWT](tenant-resolution-from-jwt.md) | Resolve the active tenant from the JWT on every request so that downstream code never needs to think |
+
 
 
 ---

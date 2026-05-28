@@ -4,7 +4,7 @@
 
 ## Purpose
 
-select a form when configuring a Form step so that the right form is presented to the assignee during execution.
+Select a form when configuring a Form step so that the right form is presented to the assignee during execution.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ select a form when configuring a Form step so that the right form is presented t
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Forms are attached to Form steps in a workflow. The engine creates a Form Task and notifies the assignee when the step is reached.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Form step config panel shows a searchable dropdown of all forms in the org.
@@ -74,17 +60,12 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 >
 > **Decisions:** `GetFormPickerQuery` returns all forms for the org as a flat list (Id, Name, FieldCount) ordered by name — used by the API form-step picker dropdown. `IsReferencedByWorkflowAsync` query supports the reference check.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| forms | [source](./wireframes/forms.excalidraw) | [preview](./wireframes/forms.svg) |
-
-[← Back to Form Builder](./README.md)
-
----
+| form-editor | [source](./wireframes/form-editor.excalidraw) | [preview](./wireframes/form-editor.svg) |
+| workflow-editor | [source](../workflow-builder/wireframes/workflow-editor.excalidraw) | [preview](../workflow-builder/wireframes/workflow-editor.svg) |
 
 ## Diagrams
 

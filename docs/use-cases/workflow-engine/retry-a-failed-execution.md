@@ -4,7 +4,7 @@
 
 ## Purpose
 
-retry a failed execution from the point of failure so that I don't have to re-run steps that already succeeded.
+Retry a failed execution from the point of failure so that I don't have to re-run steps that already succeeded.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ retry a failed execution from the point of failure so that I don't have to re-ru
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 When a workflow execution fails at a step, users can manually retry from the failed step. Previously successful steps are not re-run; their outputs are carried forward from the original execution.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] "Retry" button appears on the execution detail page when status is `FAILED`.
@@ -79,17 +65,11 @@ When a workflow execution fails at a step, users can manually retry from the fai
 > - `CreateRetry()` produces a new `WorkflowExecution` with `RetryOfExecutionId` set
 > - context is copied from original at time of retry.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | execution-detail | [source](./wireframes/execution-detail.excalidraw) | [preview](./wireframes/execution-detail.svg) |
-
-[← Back to Workflow Engine](./README.md)
-
----
 
 ## Diagrams
 

@@ -4,7 +4,7 @@
 
 ## Purpose
 
-every API endpoint to enforce the required permission so that unauthorized actions are rejected at the server regardless of what the frontend shows.
+Every API endpoint to enforce the required permission so that unauthorized actions are rejected at the server regardless of what the frontend shows.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ every API endpoint to enforce the required permission so that unauthorized actio
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 A resource-based permission system where each permission grants the ability to perform a specific action on a resource type. Permissions are assigned to roles, roles are assigned to users.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Each endpoint is decorated with a policy attribute specifying the required permission(s).
@@ -77,17 +63,11 @@ A resource-based permission system where each permission grants the ability to p
 > - permissions are included as a flat array in JWT claims at sign-in time (union of all role permissions)
 > - checked via ASP.NET Core custom policy at API layer.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| settings-roles | [source](./wireframes/settings-roles.excalidraw) | [preview](./wireframes/settings-roles.svg) |
-
-[← Back to Identity & Access](./README.md)
-
----
+| login | [source](./wireframes/login.excalidraw) | [preview](./wireframes/login.svg) |
 
 ## Diagrams
 

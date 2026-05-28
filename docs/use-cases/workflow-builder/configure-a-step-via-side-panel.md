@@ -4,7 +4,7 @@
 
 ## Purpose
 
-click a step to open its configuration panel so that I can set it up without leaving the canvas.
+Click a step to open its configuration panel so that I can set it up without leaving the canvas.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ click a step to open its configuration panel so that I can set it up without lea
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 A node-based drag-and-drop canvas (powered by React Flow) where users design their workflow visually. Steps are nodes; transitions are directed edges.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Clicking any step node opens a slide-over configuration panel on the right side of the canvas.
@@ -75,17 +61,11 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 > - slide-over panel, inline error indicators, and auto-save pending Frontend
 > - step config stored as JSONB dict in `steps` column.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | workflow-editor | [source](./wireframes/workflow-editor.excalidraw) | [preview](./wireframes/workflow-editor.svg) |
-
-[← Back to Workflow Builder](./README.md)
-
----
 
 ## Diagrams
 

@@ -4,7 +4,7 @@
 
 ## Purpose
 
-filter and search records so that I can find the specific data I need quickly.
+Filter and search records so that I can find the specific data I need quickly.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ filter and search records so that I can find the specific data I need quickly.
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Users can create, read, update, and delete records against any model. Records are stored as JSONB in the tenant schema.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] A search bar performs a full-text search across all `Text` fields of the model.
@@ -83,17 +69,11 @@ Users can create, read, update, and delete records against any model. Records ar
 > - sort via `?sortBy=field&sortDir=asc|desc`
 > - unknown/unsafe field names in sort fall back to `created_at DESC`.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | records | [source](./wireframes/records.excalidraw) | [preview](./wireframes/records.svg) |
-
-[← Back to Data Modeling](./README.md)
-
----
 
 ## Diagrams
 

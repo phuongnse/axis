@@ -4,7 +4,7 @@
 
 ## Purpose
 
-publish a workflow so that it can be triggered and executed.
+Publish a workflow so that it can be triggered and executed.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ publish a workflow so that it can be triggered and executed.
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Users can create, view, edit, publish, archive, delete, and duplicate workflow definitions. A workflow definition is the blueprint the execution engine follows when triggered.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Clicking "Publish" validates the workflow, moves it to `Active` status, and activates all configured triggers (e.g., registers cron job, generates webhook URL).
@@ -74,17 +60,11 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 > - broken-step validation pending data-modeling/form-builder integration
 > - draft versioning on re-edit pending API design.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| workflows | [source](./wireframes/workflows.excalidraw) | [preview](./wireframes/workflows.svg) |
-
-[← Back to Workflow Builder](./README.md)
-
----
+| workflow-editor | [source](./wireframes/workflow-editor.excalidraw) | [preview](./wireframes/workflow-editor.svg) |
 
 ## Diagrams
 

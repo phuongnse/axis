@@ -4,7 +4,7 @@
 
 ## Purpose
 
-delete a form so that I can clean up unused forms.
+Delete a form so that I can clean up unused forms.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ delete a form so that I can clean up unused forms.
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Users can create, edit, and delete form definitions. A form is a reusable collection of fields that can be embedded in workflow Form steps or rendered on a Page Builder page.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Confirmation dialog requires typing the form name.
@@ -75,22 +61,11 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 >
 > **Decisions:** `IsReferencedByWorkflowAsync` uses raw SQL `workflow_definitions.steps @> [{...}]::jsonb` — cross-module table query within the same tenant schema.
 
-
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | forms | [source](./wireframes/forms.excalidraw) | [preview](./wireframes/forms.svg) |
-
-[← Back to Form Builder](./README.md)
-
----
 
 ## Diagrams
 

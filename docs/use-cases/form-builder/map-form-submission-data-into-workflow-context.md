@@ -4,7 +4,7 @@
 
 ## Purpose
 
-the data submitted in a form to be available to subsequent steps so that the rest of the process can use it.
+The data submitted in a form to be available to subsequent steps so that the rest of the process can use it.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ the data submitted in a form to be available to subsequent steps so that the res
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Forms are attached to Form steps in a workflow. The engine creates a Form Task and notifies the assignee when the step is reached.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] All submitted field values are stored in the execution context under the step's namespace automatically: `{{context.{step_id}.{field_key}}}`.
@@ -72,22 +58,11 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 >
 > **Gaps vs spec:** context variable population after submission and context variable picker pending workflow-engine.
 
-
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | forms | [source](./wireframes/forms.excalidraw) | [preview](./wireframes/forms.svg) |
-
-[← Back to Form Builder](./README.md)
-
----
 
 ## Diagrams
 

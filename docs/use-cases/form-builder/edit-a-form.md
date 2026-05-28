@@ -4,7 +4,7 @@
 
 ## Purpose
 
-edit an existing form so that I can update its fields as requirements change.
+Edit an existing form so that I can update its fields as requirements change.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ edit an existing form so that I can update its fields as requirements change.
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Users can create, edit, and delete form definitions. A form is a reusable collection of fields that can be embedded in workflow Form steps or rendered on a Page Builder page.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Form editor shows the field list on the left and a live preview on the right.
@@ -75,17 +61,11 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 > - `UpdateFormHandler` checks name uniqueness via `NameExistsAsync(name, orgId, excludeId)` before calling `form.Update()`
 > - TOCTOU race requires a unique DB index on `(name, org_id)` at Infrastructure layer.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| forms | [source](./wireframes/forms.excalidraw) | [preview](./wireframes/forms.svg) |
-
-[← Back to Form Builder](./README.md)
-
----
+| form-editor | [source](./wireframes/form-editor.excalidraw) | [preview](./wireframes/form-editor.svg) |
 
 ## Diagrams
 

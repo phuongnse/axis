@@ -4,7 +4,7 @@
 
 ## Purpose
 
-reset my password via email so that I can regain access to my account if I forget it.
+Reset my password via email so that I can regain access to my account if I forget it.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ reset my password via email so that I can regain access to my account if I forge
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Allow users to reset forgotten passwords, change their current password, and manage active sessions.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] "Forgot password?" link on the sign-in page opens a form to enter an email address.
@@ -84,19 +70,11 @@ Allow users to reset forgotten passwords, change their current password, and man
 > - stored as SHA-256 hash in `password_reset_tokens` table
 > - raw token sent by email. New request invalidates all prior tokens for the user. Token lifetime: 1 hour.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| settings-security | [source](./wireframes/settings-security.excalidraw) | [preview](./wireframes/settings-security.svg) |
 | forgot-password | [source](./wireframes/forgot-password.excalidraw) | [preview](./wireframes/forgot-password.svg) |
-| change-password | [source](./wireframes/change-password.excalidraw) | [preview](./wireframes/change-password.svg) |
-
-[← Back to Identity & Access](./README.md)
-
----
 
 ## Diagrams
 

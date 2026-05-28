@@ -4,7 +4,7 @@
 
 ## Purpose
 
-delete a model so that I can clean up unused data structures.
+Delete a model so that I can clean up unused data structures.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ delete a model so that I can clean up unused data structures.
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Users can create custom data models within their organization. A model defines the structure of a type of business object. All model metadata is stored in the tenant schema; actual records use a JSONB-backed storage strategy.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Deletion confirmation dialog requires typing the model name exactly (case-sensitive).
@@ -78,22 +64,11 @@ Users can create custom data models within their organization. A model defines t
 >
 > **Deferred (PR #N follow-up):** DataModeling relation fields on other models flagged broken when target model deleted. WorkflowBuilder `record.*` trigger broken flags shipped via `ModelDeletedHandler` (Kafka).
 
-
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | data-models | [source](./wireframes/data-models.excalidraw) | [preview](./wireframes/data-models.svg) |
-
-[← Back to Data Modeling](./README.md)
-
----
 
 ## Diagrams
 

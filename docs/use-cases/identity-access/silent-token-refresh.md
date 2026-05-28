@@ -4,7 +4,7 @@
 
 ## Purpose
 
-my session to stay active while I'm working so that I'm not interrupted by unexpected sign-out prompts.
+My session to stay active while I'm working so that I'm not interrupted by unexpected sign-out prompts.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ my session to stay active while I'm working so that I'm not interrupted by unexp
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tokens. Built on OpenIddict, fully self-hosted.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] At 80% of the access token's TTL (~12 minutes), the client automatically calls `POST /auth/refresh` using the refresh token cookie.
@@ -77,19 +63,11 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 > - OpenIddict handles token rotation natively. `ExtractRefreshTokenFromCookieHandler` reads the refresh token from the httpOnly cookie into the OpenIddict request. `POST /connect/token` with grant_type=refresh_token validates the opaque reference token, loads fresh user+permissions, rotates the refresh token, returns a new access token in the JSON body and a new refresh token cookie. Replay detection: reference tokens are single-use
 > - replaying revoked token returns `invalid_grant`.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | login | [source](./wireframes/login.excalidraw) | [preview](./wireframes/login.svg) |
-| login-unverified | [source](./wireframes/login-unverified.excalidraw) | [preview](./wireframes/login-unverified.svg) |
-| register | [source](./wireframes/register.excalidraw) | [preview](./wireframes/register.svg) |
-
-[← Back to Identity & Access](./README.md)
-
----
 
 ## Diagrams
 

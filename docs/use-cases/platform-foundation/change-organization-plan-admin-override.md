@@ -4,7 +4,7 @@
 
 ## Purpose
 
-manually change an organization's plan so that I can support early customers and testing without a billing integration.
+Manually change an organization's plan so that I can support early customers and testing without a billing integration.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ manually change an organization's plan so that I can support early customers and
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Define subscription plan tiers with feature limits and enforce those limits at the API level. Billing integration is out of scope for MVP — this feature covers plan definitions and enforcement logic only.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Platform Admin dashboard has a "Change plan" action per organization.
@@ -69,7 +55,7 @@ Define subscription plan tiers with feature limits and enforce those limits at t
 > | API | ✅ (backend AC) |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** [view-available-plans](view-available-plans.md) public pricing page UI, static fallback on load failure, "Current plan" badge (Frontend only). No multi-workflow bulk-import API yet — single-workflow import/duplicate enforce +1 before save (bulk workflow import acceptance criteria in [import-export](../workflow-builder/README.md) applies when bulk endpoint exists).
+> **Gaps vs spec:** [view-available-plans](view-available-plans.md) public pricing page UI, static fallback on load failure, "Current plan" badge (Frontend only). No multi-workflow bulk-import API yet — single-workflow import/duplicate enforce +1 before save (bulk workflow import acceptance criteria in [bulk export](../workflow-builder/bulk-export-all-workflows.md) applies when bulk endpoint exists).
 >
 > **Done (backend):**
 > - `GET /api/plans` with limits + `featureFlags` + `isAvailableForNewSignups`
@@ -87,20 +73,12 @@ Define subscription plan tiers with feature limits and enforce those limits at t
 >
 > **Decisions:** `featureFlags` derived from plan slug for MVP (no JSON column); `PlatformAdmin:UserIds` config for platform admin plan change.
 
-
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | pricing | [source](./wireframes/pricing.excalidraw) | [preview](./wireframes/pricing.svg) |
-
----
+| settings-org | [source](./wireframes/settings-org.excalidraw) | [preview](./wireframes/settings-org.svg) |
 
 ## Diagrams
 

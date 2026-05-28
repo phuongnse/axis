@@ -4,7 +4,7 @@
 
 ## Purpose
 
-pan and zoom the workflow canvas so that I can work comfortably with large workflows.
+Pan and zoom the workflow canvas so that I can work comfortably with large workflows.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ pan and zoom the workflow canvas so that I can work comfortably with large workf
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 A node-based drag-and-drop canvas (powered by React Flow) where users design their workflow visually. Steps are nodes; transitions are directed edges.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Scroll wheel zooms in/out centered on the cursor position.
@@ -69,17 +55,11 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 >
 > No backend domain or infrastructure work; canvas navigation is a pure client-side concern.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | workflow-editor | [source](./wireframes/workflow-editor.excalidraw) | [preview](./wireframes/workflow-editor.svg) |
-
-[← Back to Workflow Builder](./README.md)
-
----
 
 ## Diagrams
 

@@ -4,7 +4,7 @@
 
 ## Purpose
 
-see the execution history for a specific workflow so that I can monitor its performance and identify patterns.
+See the execution history for a specific workflow so that I can monitor its performance and identify patterns.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ see the execution history for a specific workflow so that I can monitor its perf
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Every workflow execution and each of its steps is recorded in full detail. Users can browse execution history, filter by status, and inspect the complete context and output of any past execution.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Execution history tab on the workflow detail page shows a paginated table: execution ID, status badge, trigger type icon, started at, completed at, duration, triggered by (user or "System").
@@ -75,17 +61,11 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 >
 > **Decisions:** `GetExecutionsByWorkflowHandler` and `GetAllExecutionsHandler` use `IExecutionRepository.GetPagedByWorkflowAsync`/`GetPagedAsync` — server-side pagination with `pageSize` clamped to 100. Status filter forwarded to repository. Date range filter and trigger type filter deferred to API layer query parameters.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | executions | [source](./wireframes/executions.excalidraw) | [preview](./wireframes/executions.svg) |
-
-[← Back to Workflow Engine](./README.md)
-
----
 
 ## Diagrams
 

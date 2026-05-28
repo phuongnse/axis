@@ -4,7 +4,7 @@
 
 ## Purpose
 
-create a custom role with specific permissions so that I can grant exactly the right level of access to a group of users.
+Create a custom role with specific permissions so that I can grant exactly the right level of access to a group of users.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ create a custom role with specific permissions so that I can grant exactly the r
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Organization admins can create custom roles, assign permissions to each role, and assign roles to users. Default system roles (Admin, Editor, Viewer) are provided out-of-the-box and cannot be deleted or modified.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Admin provides a role name and optional description, then selects permissions from a grouped list (grouped by module).
@@ -75,17 +61,11 @@ Organization admins can create custom roles, assign permissions to each role, an
 >
 > **Decisions:** `Role.CreateCustom(name, orgId, permissions[])` factory method; minimum 1 permission enforced in domain.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | settings-roles | [source](./wireframes/settings-roles.excalidraw) | [preview](./wireframes/settings-roles.svg) |
-
-[← Back to Identity & Access](./README.md)
-
----
 
 ## Diagrams
 

@@ -4,7 +4,7 @@
 
 ## Purpose
 
-see the live status of a running execution so that I know where it is in the process.
+See the live status of a running execution so that I know where it is in the process.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ see the live status of a running execution so that I know where it is in the pro
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 The engine manages the full lifecycle of a workflow execution — from creation through completion, failure, or cancellation. Each execution is a runtime instance of a workflow definition.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Execution detail page shows: status badge, total elapsed time (live counter for running executions), input payload, trigger type, and triggered by.
@@ -78,17 +64,12 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 >
 > **Decisions:** `GetExecutionHandler` delegates to `IExecutionRepository.GetWithStepsAsync`, which loads execution + steps in two queries (no EF navigation property — `ExecutionStep` is a separate aggregate).
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | executions | [source](./wireframes/executions.excalidraw) | [preview](./wireframes/executions.svg) |
-
-[← Back to Workflow Engine](./README.md)
-
----
+| execution-detail | [source](./wireframes/execution-detail.excalidraw) | [preview](./wireframes/execution-detail.svg) |
 
 ## Diagrams
 

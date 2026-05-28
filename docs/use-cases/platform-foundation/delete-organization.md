@@ -4,7 +4,7 @@
 
 ## Purpose
 
-permanently delete my organization so that all our data is removed from the platform.
+Permanently delete my organization so that all our data is removed from the platform.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ permanently delete my organization so that all our data is removed from the plat
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Allow organization admins to manage their organization's profile, settings, and basic configuration after initial setup.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Delete option is in the "Danger Zone" section at the bottom of the Settings page.
@@ -85,28 +71,13 @@ Allow organization admins to manage their organization's profile, settings, and 
 > - hard-delete cancels executions + pending form tasks, drops tenant schemas, deletes logo S3 object, purges Identity platform rows (users, roles, invitations, provisioning)
 > - login returns org-not-found when org row removed.
 
-
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| settings-org | [source](./wireframes/settings-org.excalidraw) | [preview](./wireframes/settings-org.svg) |
-| settings-org-upload-states | [source](./wireframes/settings-org-upload-states.excalidraw) | [preview](./wireframes/settings-org-upload-states.svg) |
-| settings-org-profile-states | [source](./wireframes/settings-org-profile-states.excalidraw) | [preview](./wireframes/settings-org-profile-states.svg) |
-| settings-org-usage-error | [source](./wireframes/settings-org-usage-error.excalidraw) | [preview](./wireframes/settings-org-usage-error.svg) |
-| settings-org-free-plan | [source](./wireframes/settings-org-free-plan.excalidraw) | [preview](./wireframes/settings-org-free-plan.svg) |
-| settings-org-access-denied | [source](./wireframes/settings-org-access-denied.excalidraw) | [preview](./wireframes/settings-org-access-denied.svg) |
-| settings-org-deletion-scheduled | [source](./wireframes/settings-org-deletion-scheduled.excalidraw) | [preview](./wireframes/settings-org-deletion-scheduled.svg) |
 | settings-org-delete-modal | [source](./wireframes/settings-org-delete-modal.excalidraw) | [preview](./wireframes/settings-org-delete-modal.svg) |
 | settings-org-delete-states | [source](./wireframes/settings-org-delete-states.excalidraw) | [preview](./wireframes/settings-org-delete-states.svg) |
-
----
+| settings-org-deletion-scheduled | [source](./wireframes/settings-org-deletion-scheduled.excalidraw) | [preview](./wireframes/settings-org-deletion-scheduled.svg) |
 
 ## Diagrams
 

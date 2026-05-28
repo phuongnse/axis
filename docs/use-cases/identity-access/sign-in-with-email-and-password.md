@@ -4,7 +4,7 @@
 
 ## Purpose
 
-sign in with my email and password so that I can access my organization's workspace.
+Sign in with my email and password so that I can access my organization's workspace.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ sign in with my email and password so that I can access my organization's worksp
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tokens. Built on OpenIddict, fully self-hosted.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Sign-in form accepts email and password.
@@ -87,19 +73,11 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 > - `/connect/authorize` issues the authorization code
 > - `/connect/token` exchanges it for access + refresh tokens. Refresh token stored as an opaque reference in DB (OpenIddict `OpenIddictTokens` table) and delivered as an httpOnly `Secure SameSite=Strict` cookie at `/connect` path via `ApplyRefreshTokenCookieHandler`.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | login | [source](./wireframes/login.excalidraw) | [preview](./wireframes/login.svg) |
-| login-unverified | [source](./wireframes/login-unverified.excalidraw) | [preview](./wireframes/login-unverified.svg) |
-| register | [source](./wireframes/register.excalidraw) | [preview](./wireframes/register.svg) |
-
-[← Back to Identity & Access](./README.md)
-
----
 
 ## Diagrams
 

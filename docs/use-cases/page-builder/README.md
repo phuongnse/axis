@@ -20,15 +20,10 @@ Without a UI builder, users need a developer to display and interact with their 
 
 ## Use Cases
 
-> Use-case files are not yet authored — page-builder is Phase 2 and has not started. The rows below name the planned cuts; create `use-cases/*.md` when this domain begins.
+| Use case | Summary |
+|---|---|
 
-| Use case | Description |
-|---|---|---|
-| page-management | Create, edit, delete, publish/unpublish pages |
-| widget-library | Pre-built widgets: List, Grid, Form, Chart, Button, Text, Image |
-| layout-builder | Compose pages by dragging widgets onto a canvas, resize and arrange |
-| data-binding | Bind widget data sources to models, records, and workflow outputs |
-| page-access-control | Control which roles can access each page |
+
 
 ---
 

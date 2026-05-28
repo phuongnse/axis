@@ -4,7 +4,7 @@
 
 ## Purpose
 
-see a list of all form tasks assigned to me so that I don't miss any pending actions.
+See a list of all form tasks assigned to me so that I don't miss any pending actions.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ see a list of all form tasks assigned to me so that I don't miss any pending act
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 When a workflow reaches a Form step, the engine creates a Form Task and notifies the assignee. The assignee opens a unique link, fills the form, and submits it. The engine then validates and continues the workflow.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] "My Tasks" page (accessible from the top navigation) lists all pending Form Tasks assigned to the current user.
@@ -76,17 +62,11 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 >
 > **Done:** `GetMyFormTasksQuery` + authenticated list endpoints. Role-assigned task aggregation (not only direct assignee), SignalR push, and "My Tasks" UI pending Frontend + workflow-engine.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | form-submission | [source](./wireframes/form-submission.excalidraw) | [preview](./wireframes/form-submission.svg) |
-
-[← Back to Form Builder](./README.md)
-
----
 
 ## Diagrams
 

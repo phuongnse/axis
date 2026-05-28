@@ -4,7 +4,7 @@
 
 ## Purpose
 
-edit an existing record so that I can update out-of-date information.
+Edit an existing record so that I can update out-of-date information.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ edit an existing record so that I can update out-of-date information.
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Users can create, read, update, and delete records against any model. Records are stored as JSONB in the tenant schema.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Edit form is pre-populated with the current values of all fields.
@@ -72,17 +58,11 @@ Users can create, read, update, and delete records against any model. Records ar
 >
 > **Gaps vs spec:** HTTP 409 optimistic concurrency (updated_at comparison) backend polish — see gaps below.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | records | [source](./wireframes/records.excalidraw) | [preview](./wireframes/records.svg) |
-
-[← Back to Data Modeling](./README.md)
-
----
 
 ## Diagrams
 

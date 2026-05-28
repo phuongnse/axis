@@ -16,13 +16,14 @@ Enforce subscription plan limits at the API so that organizations cannot exceed 
 
 ## Main flow
 
-1. Resolve org plan and cached usage counters.
-2. Compare against limits before allowing the operation.
-3. Return HTTP 402 with structured payload when over limit.
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- Redis unavailable → DB count fallback with warning log.
+- Validation failures and edge cases in Acceptance Criteria.
+
 
 ## Acceptance Criteria
 
@@ -72,3 +73,15 @@ Enforce subscription plan limits at the API so that organizations cannot exceed 
 > **Done (backend):** 402 on workflow/user/execution limits; Redis read-through + INCR/DECR; DB fallback; delete workflow decrements counter.
 >
 > **Deferred (PR #N follow-up):** execution counter race; fail-closed Redis for usage reads.
+
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| settings-org | [source](./wireframes/settings-org.excalidraw) | [preview](./wireframes/settings-org.svg) |
+
+## Diagrams
+
+| Diagram | Source | Preview |
+|---------|--------|---------|
+| N/A | N/A | N/A |

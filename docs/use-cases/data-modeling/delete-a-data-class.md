@@ -4,7 +4,7 @@
 
 ## Purpose
 
-_(One sentence about user value.)_
+_(One sentence about user value.)_.
 
 ## Primary actor
 
@@ -16,34 +16,21 @@ _(One sentence about user value.)_
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Data Classes are reusable, named object types composed of multiple fields. They are used as a field type within Models, allowing complex nested structures to be defined once and reused across many models.
 
----
-
 ## Acceptance Criteria
 
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
 **As an** Organization Member with `data_modeling:model:delete`, **I want to** delete a data class that is no longer needed.
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Confirmation dialog requires typing the data class name.
@@ -75,22 +62,11 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 >
 > **Decisions:** `IsReferencedByAnyModelAsync` uses raw SQL `fields @> {0}::jsonb` to query nested JSON without loading all models into memory.
 
-
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | data-classes | [source](./wireframes/data-classes.excalidraw) | [preview](./wireframes/data-classes.svg) |
-
-[← Back to Data Modeling](./README.md)
-
----
 
 ## Diagrams
 

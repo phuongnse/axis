@@ -4,7 +4,7 @@
 
 ## Purpose
 
-_(One sentence about user value.)_
+_(One sentence about user value.)_.
 
 ## Primary actor
 
@@ -16,28 +16,19 @@ _(One sentence about user value.)_
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Define user-facing localization and visual theme behavior for the SPA so each use case has explicit UI artifacts, flow behavior, acceptance criteria, and implementation status.
 
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
 
 **Purpose:** let users choose a comfortable visual theme with consistent contrast and persistence.  
 **Primary actor:** authenticated user.  
@@ -88,28 +79,14 @@ Define user-facing localization and visual theme behavior for the SPA so each us
 > - Theme mode uses class-based strategy (`light` / `dark`) with `system` resolution.
 > - Theme toggle must be available in authenticated shell and settings.
 
----
-
-## Implementation rules (reference)
-
-Use case behavior above is user-facing scope. Engineering rules remain in shared docs:
-- [Frontend playbook](../../playbooks/frontend.md)
-- [Agent checklist (Gate 0–3)](../../playbooks/agent-checklist.md)
-
 ## Wireframes
 
-| Use case | Screen | Excalidraw | Preview |
-|--------|--------|------------|---------|
-| switch-language | app-shell-language-selector | N/A (to be added) | N/A (to be added) |
-| switch-language | settings-language | N/A (to be added) | N/A (to be added) |
-| switch-visual-theme | app-shell-theme-selector | N/A (to be added) | N/A (to be added) |
-| switch-visual-theme | settings-theme | N/A (to be added) | N/A (to be added) |
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| login | [source](./wireframes/login.excalidraw) | [preview](./wireframes/login.svg) |
 
 ## Diagrams
 
-| Use case | Diagram | Source | Preview |
-|---------|---------|--------|---------|
-| switch-language | locale-resolution-flow | N/A (to be added) | N/A (to be added) |
-| switch-visual-theme | theme-resolution-flow | N/A (to be added) | N/A (to be added) |
-
----
+| Diagram | Source | Preview |
+|---------|--------|---------|
+| N/A | N/A | N/A |

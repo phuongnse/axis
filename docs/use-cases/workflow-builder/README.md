@@ -20,37 +20,70 @@ The workflow builder is the heart of the platform. It is what differentiates Axi
 
 ## Use Cases
 
+### Workflow definitions
+
 | Use case | Summary |
 |---|---|
-| [Access results from parallel branches](access-results-from-parallel-branches.md) | use the output of all parallel steps in subsequent steps so that I can combine results. |
-| [Add a multi-branch condition](add-a-multi-branch-condition.md) | add more than two branches from a Condition step so that I can handle multiple distinct cases. |
-| [Add a step to the canvas](add-a-step-to-the-canvas.md) | add a step to the workflow canvas so that I can build my process visually. |
-| [Add an if/else branch](add-an-if-else-branch.md) | route my workflow down different paths based on a condition so that different scenarios are handled appropriately. |
-| [Archive a workflow](archive-a-workflow.md) | archive a workflow so that it is disabled but its history is preserved. |
-| [Bulk export all workflows](bulk-export-all-workflows.md) | export all workflows as a ZIP archive so that I have a complete backup. |
-| [Configure a Condition step](configure-a-condition-step.md) | add a Condition step so that my workflow can take different paths based on data values. |
-| [Configure a Form step](configure-a-form-step.md) | configure a Form step with a specific form and assignee so that the right person receives the form during execution. |
-| [Configure a Manual trigger](configure-a-manual-trigger.md) | configure a Manual trigger so that authorized users can start the workflow on demand. |
-| [Configure a Notification step](configure-a-notification-step.md) | add a Notification step so that stakeholders are informed when a workflow reaches a certain point. |
-| [Configure a Schedule trigger](configure-a-schedule-trigger.md) | schedule a workflow so that it runs automatically at defined intervals. |
-| [Configure a Script step](configure-a-script-step.md) | write a small script step so that I can transform data that isn't possible with standard steps. |
-| [Configure a step via side panel](configure-a-step-via-side-panel.md) | click a step to open its configuration panel so that I can set it up without leaving the canvas. |
-| [Configure a Webhook trigger](configure-a-webhook-trigger.md) | configure a webhook trigger so that an external system can start my workflow by sending an HTTP request. |
-| [Configure an Event trigger](configure-an-event-trigger.md) | trigger a workflow automatically when a platform event occurs so that I don't need to start it manually. |
-| [Configure an HTTP Request step](configure-an-http-request-step.md) | configure an HTTP Request step so that my workflow can integrate with external services. |
-| [Configure fan-in (join) behavior](configure-fan-in-join-behavior.md) | configure how the workflow continues after parallel steps complete so that I can handle different completion scenarios. |
-| [Connect steps with transitions](connect-steps-with-transitions.md) | draw connections between steps so that the workflow knows the execution order. |
-| [Create a parallel step group](create-a-parallel-step-group.md) | configure multiple steps to run in parallel so that independent tasks don't block each other. |
-| [Create a workflow](create-a-workflow.md) | create a new workflow so that I can start designing an automated process. |
-| [Delete a Draft workflow](delete-a-draft-workflow.md) | delete a Draft workflow so that I can permanently remove workflows I no longer need without having to publish them fi... |
-| [Duplicate a workflow](duplicate-a-workflow.md) | duplicate an existing workflow so that I can use it as a starting point for a similar process. |
-| [Export a workflow as JSON](export-a-workflow-as-json.md) | export a workflow as a JSON file so that I can back it up or share it with another team. |
-| [Import a workflow from JSON](import-a-workflow-from-json.md) | import a workflow from a JSON file so that I can quickly set up a workflow that someone else designed. |
-| [Merge branches back to a single path](merge-branches-back-to-a-single-path.md) | diverged branches to merge back to a single step so that the workflow continues on a unified path after branching. |
-| [Navigate and zoom the canvas](navigate-and-zoom-the-canvas.md) | pan and zoom the workflow canvas so that I can work comfortably with large workflows. |
-| [Publish a workflow](publish-a-workflow.md) | publish a workflow so that it can be triggered and executed. |
-| [Undo and redo canvas actions](undo-and-redo-canvas-actions.md) | undo and redo changes on the canvas so that I can recover from mistakes easily. |
-| [View workflows list](view-workflows-list.md) | see all workflows so that I can find and manage them. |
+| [Archive a workflow](archive-a-workflow.md) | Archive a workflow so that it is disabled but its history is preserved. |
+| [Create a workflow](create-a-workflow.md) | Create a new workflow so that I can start designing an automated process. |
+| [Delete a Draft workflow](delete-a-draft-workflow.md) | Delete a Draft workflow so that I can permanently remove workflows I no longer need without having t |
+| [Duplicate a workflow](duplicate-a-workflow.md) | Duplicate an existing workflow so that I can use it as a starting point for a similar process. |
+| [Publish a workflow](publish-a-workflow.md) | Publish a workflow so that it can be triggered and executed. |
+| [View workflows list](view-workflows-list.md) | See all workflows so that I can find and manage them. |
+
+### Canvas
+
+| Use case | Summary |
+|---|---|
+| [Add a step to the canvas](add-a-step-to-the-canvas.md) | Add a step to the workflow canvas so that I can build my process visually. |
+| [Configure a step via side panel](configure-a-step-via-side-panel.md) | Click a step to open its configuration panel so that I can set it up without leaving the canvas. |
+| [Connect steps with transitions](connect-steps-with-transitions.md) | Draw connections between steps so that the workflow knows the execution order. |
+| [Navigate and zoom the canvas](navigate-and-zoom-the-canvas.md) | Pan and zoom the workflow canvas so that I can work comfortably with large workflows. |
+| [Undo and redo canvas actions](undo-and-redo-canvas-actions.md) | Undo and redo changes on the canvas so that I can recover from mistakes easily. |
+
+### Step types
+
+| Use case | Summary |
+|---|---|
+| [Configure a Condition step](configure-a-condition-step.md) | Add a Condition step so that my workflow can take different paths based on data values. |
+| [Configure a Form step](configure-a-form-step.md) | Configure a Form step with a specific form and assignee so that the right person receives the form d |
+| [Configure a Notification step](configure-a-notification-step.md) | Add a Notification step so that stakeholders are informed when a workflow reaches a certain point. |
+| [Configure a Script step](configure-a-script-step.md) | Write a small script step so that I can transform data that isn't possible with standard steps. |
+| [Configure an HTTP Request step](configure-an-http-request-step.md) | Configure an HTTP Request step so that my workflow can integrate with external services. |
+
+### Triggers
+
+| Use case | Summary |
+|---|---|
+| [Configure a Manual trigger](configure-a-manual-trigger.md) | Configure a Manual trigger so that authorized users can start the workflow on demand. |
+| [Configure a Schedule trigger](configure-a-schedule-trigger.md) | Schedule a workflow so that it runs automatically at defined intervals. |
+| [Configure a Webhook trigger](configure-a-webhook-trigger.md) | Configure a webhook trigger so that an external system can start my workflow by sending an HTTP requ |
+| [Configure an Event trigger](configure-an-event-trigger.md) | Trigger a workflow automatically when a platform event occurs so that I don't need to start it manua |
+
+### Branching
+
+| Use case | Summary |
+|---|---|
+| [Access results from parallel branches](access-results-from-parallel-branches.md) | Use the output of all parallel steps in subsequent steps so that I can combine results. |
+| [Add a multi-branch condition](add-a-multi-branch-condition.md) | Add more than two branches from a Condition step so that I can handle multiple distinct cases. |
+| [Add an if/else branch](add-an-if-else-branch.md) | Route my workflow down different paths based on a condition so that different scenarios are handled  |
+| [Merge branches back to a single path](merge-branches-back-to-a-single-path.md) | Diverged branches to merge back to a single step so that the workflow continues on a unified path af |
+
+### Parallel execution
+
+| Use case | Summary |
+|---|---|
+| [Configure fan-in (join) behavior](configure-fan-in-join-behavior.md) | Configure how the workflow continues after parallel steps complete so that I can handle different co |
+| [Create a parallel step group](create-a-parallel-step-group.md) | Configure multiple steps to run in parallel so that independent tasks don't block each other. |
+
+### Import & export
+
+| Use case | Summary |
+|---|---|
+| [Bulk export all workflows](bulk-export-all-workflows.md) | Export all workflows as a ZIP archive so that I have a complete backup. |
+| [Export a workflow as JSON](export-a-workflow-as-json.md) | Export a workflow as a JSON file so that I can back it up or share it with another team. |
+| [Import a workflow from JSON](import-a-workflow-from-json.md) | Import a workflow from a JSON file so that I can quickly set up a workflow that someone else designe |
+
 
 
 ---

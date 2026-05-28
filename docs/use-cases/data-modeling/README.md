@@ -20,25 +20,43 @@ Custom data modeling is the core differentiator of Axis. Without it, the platfor
 
 ## Use Cases
 
+### Models
+
 | Use case | Summary |
 |---|---|
-| [Add a field to a model](add-a-field-to-a-model.md) | add a field of any supported type to a model so that I can capture the data I need. |
-| [Bulk operations on records](bulk-operations-on-records.md) | select multiple records and perform bulk actions so that I can manage large datasets efficiently. |
-| [Configure field validation rules](configure-field-validation-rules.md) | configure validation rules on a field so that data quality is enforced at input time. |
-| [Create a data class](create-a-data-class.md) | create a data class so that I can define a reusable nested object structure. |
-| [Create a model](create-a-model.md) | create a new model so that I can start defining the data structure for my business objects. |
-| [Create a record](create-a-record.md) | create a new record for a model so that I can store business data. |
+| [Add a field to a model](add-a-field-to-a-model.md) | Add a field of any supported type to a model so that I can capture the data I need. |
+| [Create a model](create-a-model.md) | Create a new model so that I can start defining the data structure for my business objects. |
+| [Delete a model](delete-a-model.md) | Delete a model so that I can clean up unused data structures. |
+| [Edit a model](edit-a-model.md) | Edit an existing model so that I can add, remove, or rename fields as requirements evolve. |
+| [View all models](view-all-models.md) | See all models in my organization so that I can understand the data available to me. |
+
+### Data classes
+
+| Use case | Summary |
+|---|---|
+| [Create a data class](create-a-data-class.md) | Create a data class so that I can define a reusable nested object structure. |
 | [Delete a data class](delete-a-data-class.md) | Delete a data class |
-| [Delete a model](delete-a-model.md) | delete a model so that I can clean up unused data structures. |
-| [Delete a record](delete-a-record.md) | delete a record so that I can remove outdated or incorrect entries. |
-| [Edit a data class](edit-a-data-class.md) | edit a data class so that I can add or remove fields as requirements change. |
-| [Edit a model](edit-a-model.md) | edit an existing model so that I can add, remove, or rename fields as requirements evolve. |
-| [Edit a record](edit-a-record.md) | edit an existing record so that I can update out-of-date information. |
-| [Filter and search records](filter-and-search-records.md) | filter and search records so that I can find the specific data I need quickly. |
-| [Reorder fields](reorder-fields.md) | reorder fields in a model so that the display order matches our team's mental model. |
-| [Use a data class as a field in a model](use-a-data-class-as-a-field-in-a-model.md) | use a data class as a field type in a model so that I can embed structured nested objects without duplicating field d... |
-| [View all models](view-all-models.md) | see all models in my organization so that I can understand the data available to me. |
-| [View records list](view-records-list.md) | see all records for a model so that I can browse and find the data I need. |
+| [Edit a data class](edit-a-data-class.md) | Edit a data class so that I can add or remove fields as requirements change. |
+| [Use a data class as a field in a model](use-a-data-class-as-a-field-in-a-model.md) | Use a data class as a field type in a model so that I can embed structured nested objects without du |
+
+### Records
+
+| Use case | Summary |
+|---|---|
+| [Bulk operations on records](bulk-operations-on-records.md) | Select multiple records and perform bulk actions so that I can manage large datasets efficiently. |
+| [Create a record](create-a-record.md) | Create a new record for a model so that I can store business data. |
+| [Delete a record](delete-a-record.md) | Delete a record so that I can remove outdated or incorrect entries. |
+| [Edit a record](edit-a-record.md) | Edit an existing record so that I can update out-of-date information. |
+| [Filter and search records](filter-and-search-records.md) | Filter and search records so that I can find the specific data I need quickly. |
+| [View records list](view-records-list.md) | See all records for a model so that I can browse and find the data I need. |
+
+### Fields
+
+| Use case | Summary |
+|---|---|
+| [Configure field validation rules](configure-field-validation-rules.md) | Configure validation rules on a field so that data quality is enforced at input time. |
+| [Reorder fields](reorder-fields.md) | Reorder fields in a model so that the display order matches our team's mental model. |
+
 
 
 ---

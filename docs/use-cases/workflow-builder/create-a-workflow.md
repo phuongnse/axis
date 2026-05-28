@@ -4,7 +4,7 @@
 
 ## Purpose
 
-create a new workflow so that I can start designing an automated process.
+Create a new workflow so that I can start designing an automated process.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ create a new workflow so that I can start designing an automated process.
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Users can create, view, edit, publish, archive, delete, and duplicate workflow definitions. A workflow definition is the blueprint the execution engine follows when triggered.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Creation dialog collects: name (required), description (optional).
@@ -77,17 +63,11 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 > - new workflow initialised with Start + End nodes by domain factory
 > - all data stored in single `workflow_definitions` table.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | workflows | [source](./wireframes/workflows.excalidraw) | [preview](./wireframes/workflows.svg) |
-
-[← Back to Workflow Builder](./README.md)
-
----
 
 ## Diagrams
 

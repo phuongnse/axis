@@ -4,7 +4,7 @@
 
 ## Purpose
 
-invite a team member by email so that they can join the workspace and start collaborating.
+Invite a team member by email so that they can join the workspace and start collaborating.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ invite a team member by email so that they can join the workspace and start coll
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Organization admins can invite new members, manage their accounts, and deactivate users who should no longer have access.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Admin enters an email address and selects a role for the invited user, then clicks "Send invitation."
@@ -81,18 +67,11 @@ Organization admins can invite new members, manage their accounts, and deactivat
 >
 > **Decisions:** existing-member and pending-invitation checks throw `ValidationException` with specific messages matching AC wording.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | settings-users | [source](./wireframes/settings-users.excalidraw) | [preview](./wireframes/settings-users.svg) |
-| accept-invitation | [source](./wireframes/accept-invitation.excalidraw) | [preview](./wireframes/accept-invitation.svg) |
-
-[← Back to Identity & Access](./README.md)
-
----
 
 ## Diagrams
 

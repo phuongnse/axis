@@ -4,7 +4,7 @@
 
 ## Purpose
 
-reorder fields in a model so that the display order matches our team's mental model.
+Reorder fields in a model so that the display order matches our team's mental model.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ reorder fields in a model so that the display order matches our team's mental mo
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Each field in a model has a type that determines what data it stores, how it's validated, and how it's rendered in forms and lists. The type system is the foundation of the data modeling module.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Fields can be dragged up and down via a drag handle in the field editor.
@@ -71,22 +57,11 @@ Each field in a model has a type that determines what data it stores, how it's v
 >
 > **Gaps vs spec:** drag-drop reorder UX and immediate-save endpoint pending Frontend layer; `displayOrder` persisted in JSONB field list.
 
-
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | data-models | [source](./wireframes/data-models.excalidraw) | [preview](./wireframes/data-models.svg) |
-
-[← Back to Data Modeling](./README.md)
-
----
 
 ## Diagrams
 

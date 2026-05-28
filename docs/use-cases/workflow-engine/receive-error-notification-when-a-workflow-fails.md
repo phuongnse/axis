@@ -4,7 +4,7 @@
 
 ## Purpose
 
-be notified when a workflow execution fails so that I can investigate and take action.
+Be notified when a workflow execution fails so that I can investigate and take action.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ be notified when a workflow execution fails so that I can investigate and take a
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 When a step fails, the engine marks the execution as `FAILED`, records full error details, and notifies configured channels. The execution halts; users investigate and retry manually.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Error notification is sent via all configured channels (email, in-app, webhook) within 60 seconds of the failure.
@@ -75,17 +61,11 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 > - `ExecutionFailed` domain event raised but notification channels not wired
 > - email/in-app/webhook dispatch and rate-limiting pending Application layer + a future cross-cutting notification service (outside WorkflowEngine Infrastructure, which is complete).
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | execution-detail | [source](./wireframes/execution-detail.excalidraw) | [preview](./wireframes/execution-detail.svg) |
-
-[← Back to Workflow Engine](./README.md)
-
----
 
 ## Diagrams
 

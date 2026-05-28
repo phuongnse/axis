@@ -20,22 +20,44 @@ A workflow builder without an execution engine is just a drawing tool. This doma
 
 ## Use Cases
 
+### Execution lifecycle
+
 | Use case | Summary |
 |---|---|
-| [Cancel a running execution](cancel-a-running-execution.md) | cancel a running execution so that I can stop a process that is no longer needed. |
-| [Configure error notification channels per workflow](configure-error-notification-channels-per-workflow.md) | configure who gets notified when my workflow fails so that the right people are alerted. |
-| [Receive error notification when a workflow fails](receive-error-notification-when-a-workflow-fails.md) | be notified when a workflow execution fails so that I can investigate and take action. |
-| [Retry a failed execution](retry-a-failed-execution.md) | retry a failed execution from the point of failure so that I don't have to re-run steps that already succeeded. |
-| [Retry with modified input context](retry-with-modified-input-context.md) | modify the execution context before retrying so that I can fix data errors that caused the original failure. |
-| [Start a workflow execution](start-a-workflow-execution.md) | start a workflow execution so that the defined process begins running. |
-| [Step execution is isolated and resilient](step-execution-is-isolated-and-resilient.md) | Run each step handler in isolation so that a failure in one step does not crash the engine or affect other executions. |
-| [# Use Case Group — Step Execution Handlers](step-handlers.md) | # Use Case Group — Step Execution Handlers |
-| [Track execution status in real time](track-execution-status-in-real-time.md) | see the live status of a running execution so that I know where it is in the process. |
-| [View detailed error information](view-detailed-error-information.md) | see the full error details of a failed step so that I can understand what went wrong. |
-| [View execution detail and step timeline](view-execution-detail-and-step-timeline.md) | see the full detail of a specific execution so that I can understand exactly what happened at each step. |
-| [View execution history for a workflow](view-execution-history-for-a-workflow.md) | see the execution history for a specific workflow so that I can monitor its performance and identify patterns. |
-| [View org-wide execution history](view-org-wide-execution-history.md) | see all executions across all workflows so that I have a global overview of automation activity. |
-| [View retry history](view-retry-history.md) | see the retry history of a failed execution so that I can track how many times it has been retried. |
+| [Cancel a running execution](cancel-a-running-execution.md) | Cancel a running execution so that I can stop a process that is no longer needed. |
+| [Start a workflow execution](start-a-workflow-execution.md) | Start a workflow execution so that the defined process begins running. |
+| [Track execution status in real time](track-execution-status-in-real-time.md) | See the live status of a running execution so that I know where it is in the process. |
+
+### History & detail
+
+| Use case | Summary |
+|---|---|
+| [View detailed error information](view-detailed-error-information.md) | See the full error details of a failed step so that I can understand what went wrong. |
+| [View execution detail and step timeline](view-execution-detail-and-step-timeline.md) | See the full detail of a specific execution so that I can understand exactly what happened at each s |
+| [View execution history for a workflow](view-execution-history-for-a-workflow.md) | See the execution history for a specific workflow so that I can monitor its performance and identify |
+| [View org-wide execution history](view-org-wide-execution-history.md) | See all executions across all workflows so that I have a global overview of automation activity. |
+| [View retry history](view-retry-history.md) | See the retry history of a failed execution so that I can track how many times it has been retried. |
+
+### Errors & notifications
+
+| Use case | Summary |
+|---|---|
+| [Configure error notification channels per workflow](configure-error-notification-channels-per-workflow.md) | Configure who gets notified when my workflow fails so that the right people are alerted. |
+| [Receive error notification when a workflow fails](receive-error-notification-when-a-workflow-fails.md) | Be notified when a workflow execution fails so that I can investigate and take action. |
+
+### Retry
+
+| Use case | Summary |
+|---|---|
+| [Retry a failed execution](retry-a-failed-execution.md) | Retry a failed execution from the point of failure so that I don't have to re-run steps that already |
+| [Retry with modified input context](retry-with-modified-input-context.md) | Modify the execution context before retrying so that I can fix data errors that caused the original  |
+
+### Step handlers
+
+| Use case | Summary |
+|---|---|
+| [Step execution is isolated and resilient](step-execution-is-isolated-and-resilient.md) | Run each step handler in isolation so that a failure in one step does not crash the engine or affect |
+
 
 
 ---

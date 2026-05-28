@@ -4,7 +4,7 @@
 
 ## Purpose
 
-see the full error details of a failed step so that I can understand what went wrong.
+See the full error details of a failed step so that I can understand what went wrong.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ see the full error details of a failed step so that I can understand what went w
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 When a step fails, the engine marks the execution as `FAILED`, records full error details, and notifies configured channels. The execution halts; users investigate and retry manually.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Failed step in the execution timeline is highlighted in red with an error icon.
@@ -75,17 +61,11 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 > - `GetExecutionQuery` (returning step-level error details) not yet implemented
 > - error detail UI (stack trace, redacted fields) pending Frontend + API.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | execution-detail | [source](./wireframes/execution-detail.excalidraw) | [preview](./wireframes/execution-detail.svg) |
-
-[← Back to Workflow Engine](./README.md)
-
----
 
 ## Diagrams
 

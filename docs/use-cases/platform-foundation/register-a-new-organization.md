@@ -4,7 +4,7 @@
 
 ## Purpose
 
-register my organization on the Axis platform so that I can start building workflows for my team.
+Register my organization on the Axis platform so that I can start building workflows for my team.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ register my organization on the Axis platform so that I can start building workf
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Self-service registration flow where a new organization signs up and is automatically provisioned with an isolated database schema and a default admin account. No manual intervention from the Axis team is required.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Registration form collects: organization name, admin full name, admin email, password, and password confirmation.
@@ -83,8 +69,6 @@ Self-service registration flow where a new organization signs up and is automati
 > - duplicate email returns silently without creating anything — matches "same confirmation screen" AC. `RegisterOrganizationCommandValidator` enforces: org name 2–100 chars, valid email, password min 8 chars + letter + number, confirmation match. Org slug auto-generated with uniqueness retry loop
 > - BCrypt work factor 12. 4 default system roles seeded atomically in the same transaction.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
@@ -92,13 +76,6 @@ Self-service registration flow where a new organization signs up and is automati
 | register-org | [source](./wireframes/register-org.excalidraw) | [preview](./wireframes/register-org.svg) |
 | register-org-states | [source](./wireframes/register-org-states.excalidraw) | [preview](./wireframes/register-org-states.svg) |
 | email-confirmation | [source](./wireframes/email-confirmation.excalidraw) | [preview](./wireframes/email-confirmation.svg) |
-| verify-email | [source](./wireframes/verify-email.excalidraw) | [preview](./wireframes/verify-email.svg) |
-| verify-email-rate-limit | [source](./wireframes/verify-email-rate-limit.excalidraw) | [preview](./wireframes/verify-email-rate-limit.svg) |
-| login-unverified (email verification sign-in before verify) | [source](../identity-access/wireframes/login-unverified.excalidraw) | [preview](../identity-access/wireframes/login-unverified.svg) |
-| workspace-provisioning | [source](./wireframes/workspace-provisioning.excalidraw) | [preview](./wireframes/workspace-provisioning.svg) |
-| pricing | [source](./wireframes/pricing.excalidraw) | [preview](./wireframes/pricing.svg) |
-
----
 
 ## Diagrams
 

@@ -16,14 +16,13 @@ Run each step handler in isolation so that a failure in one step does not crash 
 
 ## Main flow
 
-1. Handler loads execution step in tenant context.
-2. Executes step logic inside an exception boundary.
-3. Reports `StepCompleted` or `StepFailed` back to the engine.
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- Re-delivery when step already terminal → no-op (idempotent).
-- Concurrent writers → `xmin` concurrency token; loser exits gracefully.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
@@ -77,3 +76,15 @@ Handler specifications (Form, HTTP, Condition, Script, Notification) remain docu
 > - `IScriptExecutor` and `INotificationSender` are stubs; real JS sandbox and notification dispatch deferred.
 >
 > **Decisions:** `ExecutionStep.IsTerminal` covers Completed/Failed/Cancelled. Concurrent-duplicate protection uses PostgreSQL `xmin` on owned `execution_steps` — no migration required. Running-guard approach rejected (see workflow-engine open work).
+
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| execution-detail | [source](./wireframes/execution-detail.excalidraw) | [preview](./wireframes/execution-detail.svg) |
+
+## Diagrams
+
+| Diagram | Source | Preview |
+|---------|--------|---------|
+| N/A | N/A | N/A |

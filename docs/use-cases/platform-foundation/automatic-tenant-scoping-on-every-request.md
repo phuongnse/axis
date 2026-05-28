@@ -4,7 +4,7 @@
 
 ## Purpose
 
-every database query to be automatically scoped to the requesting tenant so that data isolation is enforced at the infrastructure level and not left to developer discipline.
+Every database query to be automatically scoped to the requesting tenant so that data isolation is enforced at the infrastructure level and not left to developer discipline.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ every database query to be automatically scoped to the requesting tenant so that
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Infrastructure-level enforcement ensuring every database query is scoped to the authenticated tenant's schema. No tenant can access another tenant's data — not through the API, not through bugs, not through misconfiguration.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Every authenticated API request sets the PostgreSQL `search_path` to the tenant's schema before any query executes.
@@ -81,13 +67,11 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 >
 > **Gaps vs spec:** none for backend schema-per-tenant isolation. Tenant-scoped data never lives in `public` by design (module tables only in `tenant_{orgId:N}`); no separate runtime guard beyond schema isolation.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| N/A | N/A | N/A |
+| settings-org | [source](./wireframes/settings-org.excalidraw) | [preview](./wireframes/settings-org.svg) |
 
 ## Diagrams
 

@@ -4,7 +4,7 @@
 
 ## Purpose
 
-resolve the active tenant from the JWT on every request so that downstream code never needs to think about tenant identity.
+Resolve the active tenant from the JWT on every request so that downstream code never needs to think about tenant identity.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ resolve the active tenant from the JWT on every request so that downstream code 
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Infrastructure-level enforcement ensuring every database query is scoped to the authenticated tenant's schema. No tenant can access another tenant's data — not through the API, not through bugs, not through misconfiguration.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] JWT contains an `org_id` claim set at login time.
@@ -81,25 +67,11 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 >
 > **Gaps vs spec:** none for backend cross-tenant access prevention.
 
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| N/A | N/A | N/A |
-
-
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
+| settings-org | [source](./wireframes/settings-org.excalidraw) | [preview](./wireframes/settings-org.svg) |
 
 ## Diagrams
 

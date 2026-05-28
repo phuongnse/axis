@@ -4,7 +4,7 @@
 
 ## Purpose
 
-configure validation rules on a field so that data quality is enforced at input time.
+Configure validation rules on a field so that data quality is enforced at input time.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ configure validation rules on a field so that data quality is enforced at input 
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Each field in a model has a type that determines what data it stores, how it's validated, and how it's rendered in forms and lists. The type system is the foundation of the data modeling module.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Saving a field with validation rules persists them to the field's `config` JSONB column.
@@ -74,17 +60,11 @@ Each field in a model has a type that determines what data it stores, how it's v
 >
 > **Gaps vs spec:** server-side per-field validation on record create/update is in Application handlers but HTTP 422 structured errors backend polish — see gaps below.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | data-models | [source](./wireframes/data-models.excalidraw) | [preview](./wireframes/data-models.svg) |
-
-[← Back to Data Modeling](./README.md)
-
----
 
 ## Diagrams
 

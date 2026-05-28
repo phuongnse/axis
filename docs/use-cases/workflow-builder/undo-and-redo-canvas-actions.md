@@ -4,7 +4,7 @@
 
 ## Purpose
 
-undo and redo changes on the canvas so that I can recover from mistakes easily.
+Undo and redo changes on the canvas so that I can recover from mistakes easily.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ undo and redo changes on the canvas so that I can recover from mistakes easily.
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 A node-based drag-and-drop canvas (powered by React Flow) where users design their workflow visually. Steps are nodes; transitions are directed edges.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Ctrl+Z / Cmd+Z undoes the last canvas action (add step, delete step, move step, add/delete connection).
@@ -70,22 +56,11 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 >
 > Undo/redo is in-memory client state only; no server round-trip required.
 
-
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | workflow-editor | [source](./wireframes/workflow-editor.excalidraw) | [preview](./wireframes/workflow-editor.svg) |
-
-[← Back to Workflow Builder](./README.md)
-
----
 
 ## Diagrams
 

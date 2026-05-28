@@ -20,26 +20,49 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 
 ## Use Cases
 
+### Authentication
+
 | Use case | Summary |
 |---|---|
-| [Accept an invitation](accept-an-invitation.md) | accept my invitation and set up my account so that I can access the organization. |
-| [Assign a role to a user](assign-a-role-to-a-user.md) | assign a role to a user so that they get the appropriate permissions. |
-| [Change password while signed in](change-password-while-signed-in.md) | change my password while signed in so that I can keep my account secure. |
-| [Create a custom role](create-a-custom-role.md) | create a custom role with specific permissions so that I can grant exactly the right level of access to a group of us... |
-| [Deactivate a user](deactivate-a-user.md) | deactivate a user so that they can no longer access the workspace without deleting their history. |
-| [Edit a custom role](edit-a-custom-role.md) | edit an existing custom role so that I can adjust permissions as our needs change. |
-| [Invite a user to the organization](invite-a-user-to-the-organization.md) | invite a team member by email so that they can join the workspace and start collaborating. |
-| [Manage user profile](manage-user-profile.md) | update my profile information so that my name and contact details are current. |
-| [Permission enforcement in the frontend](permission-enforcement-in-the-frontend.md) | the UI to hide or disable features I don't have access to so that I'm not confused by actions that will fail. |
-| [Permission enforcement on the API](permission-enforcement-on-the-api.md) | every API endpoint to enforce the required permission so that unauthorized actions are rejected at the server regardl... |
-| [Reset forgotten password](reset-forgotten-password.md) | reset my password via email so that I can regain access to my account if I forget it. |
-| [Sign in with email and password](sign-in-with-email-and-password.md) | sign in with my email and password so that I can access my organization's workspace. |
-| [Sign out](sign-out.md) | sign out so that my session is terminated and no one else can use my account from this device. |
-| [Silent token refresh](silent-token-refresh.md) | my session to stay active while I'm working so that I'm not interrupted by unexpected sign-out prompts. |
+| [Change password while signed in](change-password-while-signed-in.md) | Change my password while signed in so that I can keep my account secure. |
+| [Reset forgotten password](reset-forgotten-password.md) | Reset my password via email so that I can regain access to my account if I forget it. |
+| [Sign in with email and password](sign-in-with-email-and-password.md) | Sign in with my email and password so that I can access my organization's workspace. |
+| [Sign out](sign-out.md) | Sign out so that my session is terminated and no one else can use my account from this device. |
+| [Silent token refresh](silent-token-refresh.md) | My session to stay active while I'm working so that I'm not interrupted by unexpected sign-out promp |
+
+### Users & invitations
+
+| Use case | Summary |
+|---|---|
+| [Accept an invitation](accept-an-invitation.md) | Accept my invitation and set up my account so that I can access the organization. |
+| [Assign a role to a user](assign-a-role-to-a-user.md) | Assign a role to a user so that they get the appropriate permissions. |
+| [Deactivate a user](deactivate-a-user.md) | Deactivate a user so that they can no longer access the workspace without deleting their history. |
+| [Invite a user to the organization](invite-a-user-to-the-organization.md) | Invite a team member by email so that they can join the workspace and start collaborating. |
+| [Manage user profile](manage-user-profile.md) | Update my profile information so that my name and contact details are current. |
+
+### Roles & permissions
+
+| Use case | Summary |
+|---|---|
+| [Create a custom role](create-a-custom-role.md) | Create a custom role with specific permissions so that I can grant exactly the right level of access |
+| [Edit a custom role](edit-a-custom-role.md) | Edit an existing custom role so that I can adjust permissions as our needs change. |
+| [Permission enforcement in the frontend](permission-enforcement-in-the-frontend.md) | The UI to hide or disable features I don't have access to so that I'm not confused by actions that w |
+| [Permission enforcement on the API](permission-enforcement-on-the-api.md) | Every API endpoint to enforce the required permission so that unauthorized actions are rejected at t |
+| [View and manage roles](view-and-manage-roles.md) | See all roles in my organization so that I can understand who has what level of access. |
+
+### Localization & theming
+
+| Use case | Summary |
+|---|---|
 | [Switch application language (English / Vietnamese)](switch-application-language-english-vietnamese.md) | Switch application language (English / Vietnamese) |
 | [Switch visual theme (light / dark / system)](switch-visual-theme-light-dark-system.md) | Switch visual theme (light / dark / system) |
-| [View and manage roles](view-and-manage-roles.md) | see all roles in my organization so that I can understand who has what level of access. |
-| [View and revoke active sessions](view-and-revoke-active-sessions.md) | see where I'm currently signed in so that I can revoke access from devices I no longer use. |
+
+### Other
+
+| Use case | Summary |
+|---|---|
+| [View and revoke active sessions](view-and-revoke-active-sessions.md) | See where I'm currently signed in so that I can revoke access from devices I no longer use. |
+
 
 
 ---

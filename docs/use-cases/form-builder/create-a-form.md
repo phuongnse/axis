@@ -4,7 +4,7 @@
 
 ## Purpose
 
-create a new form so that I can design a data collection interface.
+Create a new form so that I can design a data collection interface.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ create a new form so that I can design a data collection interface.
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Users can create, edit, and delete form definitions. A form is a reusable collection of fields that can be embedded in workflow Form steps or rendered on a Page Builder page.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Creation dialog collects: name (required), description (optional).
@@ -72,17 +58,11 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 >
 > **Decisions:** all form fields stored as JSONB via custom FormFieldConverter using FormFieldType as polymorphic discriminator.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | forms | [source](./wireframes/forms.excalidraw) | [preview](./wireframes/forms.svg) |
-
-[← Back to Form Builder](./README.md)
-
----
 
 ## Diagrams
 

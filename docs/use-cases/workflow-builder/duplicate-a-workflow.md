@@ -4,7 +4,7 @@
 
 ## Purpose
 
-duplicate an existing workflow so that I can use it as a starting point for a similar process.
+Duplicate an existing workflow so that I can use it as a starting point for a similar process.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ duplicate an existing workflow so that I can use it as a starting point for a si
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Users can create, view, edit, publish, archive, delete, and duplicate workflow definitions. A workflow definition is the blueprint the execution engine follows when triggered.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Duplicate creates a full copy of the workflow (steps, transitions, trigger config, step configs) in `Draft` status.
@@ -78,17 +64,11 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 > - Duplicate() deep-copies all steps with new IDs and remaps transitions atomically in domain logic
 > - handler resolves name collisions via "(2)", "(3)"… suffix loop up to 50, then Guid suffix.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | workflows | [source](./wireframes/workflows.excalidraw) | [preview](./wireframes/workflows.svg) |
-
-[← Back to Workflow Builder](./README.md)
-
----
 
 ## Diagrams
 

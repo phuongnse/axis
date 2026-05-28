@@ -4,7 +4,7 @@
 
 ## Purpose
 
-see all records for a model so that I can browse and find the data I need.
+See all records for a model so that I can browse and find the data I need.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ see all records for a model so that I can browse and find the data I need.
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Users can create, read, update, and delete records against any model. Records are stored as JSONB in the tenant schema.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Records list displays columns for the first 5 fields of the model (configurable by the user — see Out of scope).
@@ -75,17 +61,11 @@ Users can create, read, update, and delete records against any model. Records ar
 >
 > **Gaps vs spec:** Relation display-field resolution (showing target record's display_field value instead of raw UUID) backend polish — see gaps below.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | records | [source](./wireframes/records.excalidraw) | [preview](./wireframes/records.svg) |
-
-[← Back to Data Modeling](./README.md)
-
----
 
 ## Diagrams
 

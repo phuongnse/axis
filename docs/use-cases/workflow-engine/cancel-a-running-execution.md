@@ -4,7 +4,7 @@
 
 ## Purpose
 
-cancel a running execution so that I can stop a process that is no longer needed.
+Cancel a running execution so that I can stop a process that is no longer needed.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ cancel a running execution so that I can stop a process that is no longer needed
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 The engine manages the full lifecycle of a workflow execution — from creation through completion, failure, or cancellation. Each execution is a runtime instance of a workflow definition.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] "Cancel" button appears on the execution detail page when status is `RUNNING` or `WAITING`.
@@ -77,22 +63,11 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 >
 > **Decisions:** `Cancel()` domain guard rejects terminal statuses (`Completed`, `Failed`, `Cancelled`) with `InvalidOperationException`.
 
-
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| executions | [source](./wireframes/executions.excalidraw) | [preview](./wireframes/executions.svg) |
-
-[← Back to Workflow Engine](./README.md)
-
----
+| execution-detail | [source](./wireframes/execution-detail.excalidraw) | [preview](./wireframes/execution-detail.svg) |
 
 ## Diagrams
 

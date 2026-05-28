@@ -4,7 +4,7 @@
 
 ## Purpose
 
-delete a Draft workflow so that I can permanently remove workflows I no longer need without having to publish them first.
+Delete a Draft workflow so that I can permanently remove workflows I no longer need without having to publish them first.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ delete a Draft workflow so that I can permanently remove workflows I no longer n
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Users can create, view, edit, publish, archive, delete, and duplicate workflow definitions. A workflow definition is the blueprint the execution engine follows when triggered.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Deleting a Draft workflow removes it from the list permanently (soft-deleted; not recoverable via the UI).
@@ -67,22 +53,11 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 > | Frontend | ⏳ |
 >
 
-
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | workflows | [source](./wireframes/workflows.excalidraw) | [preview](./wireframes/workflows.svg) |
-
-[← Back to Workflow Builder](./README.md)
-
----
 
 ## Diagrams
 

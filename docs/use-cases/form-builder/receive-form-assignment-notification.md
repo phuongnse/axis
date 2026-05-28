@@ -4,7 +4,7 @@
 
 ## Purpose
 
-be notified when a form is waiting for my input so that I know I have an action to take.
+Be notified when a form is waiting for my input so that I know I have an action to take.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ be notified when a form is waiting for my input so that I know I have an action 
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 When a workflow reaches a Form step, the engine creates a Form Task and notifies the assignee. The assignee opens a unique link, fills the form, and submits it. The engine then validates and continues the workflow.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Assignee receives an email within 60 seconds of the Form Task being created, containing: workflow name, form name, due time (if timeout configured), and a direct link to the form.
@@ -84,17 +70,11 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 > - expiry enforced via `ExpiresAt` + `Expire()` domain method
 > - `Expire()` is non-idempotent by design — idempotency handled at the caller level.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | form-submission | [source](./wireframes/form-submission.excalidraw) | [preview](./wireframes/form-submission.svg) |
-
-[← Back to Form Builder](./README.md)
-
----
 
 ## Diagrams
 

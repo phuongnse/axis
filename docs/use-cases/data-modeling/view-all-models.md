@@ -4,7 +4,7 @@
 
 ## Purpose
 
-see all models in my organization so that I can understand the data available to me.
+See all models in my organization so that I can understand the data available to me.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ see all models in my organization so that I can understand the data available to
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Users can create custom data models within their organization. A model defines the structure of a type of business object. All model metadata is stored in the tenant schema; actual records use a JSONB-backed storage strategy.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Models list shows: icon, name, description (truncated), field count, record count, and last modified date.
@@ -74,17 +60,11 @@ Users can create custom data models within their organization. A model defines t
 > - record count column pending denormalized counter or API-layer aggregation
 > - field count is derived from Fields.Count at query time.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | data-models | [source](./wireframes/data-models.excalidraw) | [preview](./wireframes/data-models.svg) |
-
-[← Back to Data Modeling](./README.md)
-
----
 
 ## Diagrams
 

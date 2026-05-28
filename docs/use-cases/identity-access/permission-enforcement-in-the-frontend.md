@@ -4,7 +4,7 @@
 
 ## Purpose
 
-the UI to hide or disable features I don't have access to so that I'm not confused by actions that will fail.
+The UI to hide or disable features I don't have access to so that I'm not confused by actions that will fail.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ the UI to hide or disable features I don't have access to so that I'm not confus
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 A resource-based permission system where each permission grants the ability to perform a specific action on a resource type. Permissions are assigned to roles, roles are assigned to users.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] On sign-in, the client loads the current user's effective permissions and stores them in Zustand.
@@ -72,22 +58,11 @@ A resource-based permission system where each permission grants the ability to p
 >
 > **Gaps vs spec:** all ACs are frontend + API concerns — no Application-layer handler needed. Pending API layer for policy middleware and Frontend for UI hiding logic.
 
-
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| settings-roles | [source](./wireframes/settings-roles.excalidraw) | [preview](./wireframes/settings-roles.svg) |
-
-[← Back to Identity & Access](./README.md)
-
----
+| login | [source](./wireframes/login.excalidraw) | [preview](./wireframes/login.svg) |
 
 ## Diagrams
 

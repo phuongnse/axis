@@ -4,7 +4,7 @@
 
 ## Purpose
 
-create a new record for a model so that I can store business data.
+Create a new record for a model so that I can store business data.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ create a new record for a model so that I can store business data.
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Users can create, read, update, and delete records against any model. Records are stored as JSONB in the tenant schema.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Record form is auto-generated from the model's field definitions in the defined field order.
@@ -81,17 +67,11 @@ Users can create, read, update, and delete records against any model. Records ar
 >
 > **Decisions:** record data stored as `Dictionary<string, object?>` serialized to JSONB column `_data`.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | records | [source](./wireframes/records.excalidraw) | [preview](./wireframes/records.svg) |
-
-[← Back to Data Modeling](./README.md)
-
----
 
 ## Diagrams
 

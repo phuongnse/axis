@@ -16,13 +16,14 @@ Compare available subscription plans so that I can choose the one that fits my n
 
 ## Main flow
 
-1. Load active plans from `GET /api/plans`.
-2. Render comparison table with limits and feature flags.
-3. Highlight current plan when the user is signed in.
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- Plan API failure → static fallback with “Pricing may be outdated” notice.
+- Validation failures and edge cases in Acceptance Criteria.
+
 
 ## Acceptance Criteria
 
@@ -66,3 +67,15 @@ Compare available subscription plans so that I can choose the one that fits my n
 > **Gaps vs spec:** public pricing page UI, static fallback on load failure, "Current plan" badge (Frontend only).
 >
 > **Decisions:** retired plans hidden on public page; orgs on retired plans still resolve plan via API when signed in.
+
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| pricing | [source](./wireframes/pricing.excalidraw) | [preview](./wireframes/pricing.svg) |
+
+## Diagrams
+
+| Diagram | Source | Preview |
+|---------|--------|---------|
+| N/A | N/A | N/A |

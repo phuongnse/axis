@@ -4,7 +4,7 @@
 
 ## Purpose
 
-create a data class so that I can define a reusable nested object structure.
+Create a data class so that I can define a reusable nested object structure.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ create a data class so that I can define a reusable nested object structure.
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Data Classes are reusable, named object types composed of multiple fields. They are used as a field type within Models, allowing complex nested structures to be defined once and reused across many models.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Creation dialog collects: name (required) and description (optional).
@@ -73,17 +59,11 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 > - DataClass fields stored as JSONB using the same FieldDefinitionConverter as DataModel
 > - Relation/DataClass/File types blocked in domain by guard. DataClassDefinition reuses `FieldDefinition` directly — no separate DataClassField entity.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | data-classes | [source](./wireframes/data-classes.excalidraw) | [preview](./wireframes/data-classes.svg) |
-
-[← Back to Data Modeling](./README.md)
-
----
 
 ## Diagrams
 

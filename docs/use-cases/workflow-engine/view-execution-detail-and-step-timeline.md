@@ -4,7 +4,7 @@
 
 ## Purpose
 
-see the full detail of a specific execution so that I can understand exactly what happened at each step.
+See the full detail of a specific execution so that I can understand exactly what happened at each step.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ see the full detail of a specific execution so that I can understand exactly wha
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 Every workflow execution and each of its steps is recorded in full detail. Users can browse execution history, filter by status, and inspect the complete context and output of any past execution.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Execution detail page shows: execution ID, status, total duration, input payload, trigger info, and created at.
@@ -75,17 +61,11 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 >
 > **Done:** `GET /api/executions/{id}` returns execution + steps.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| executions | [source](./wireframes/executions.excalidraw) | [preview](./wireframes/executions.svg) |
-
-[← Back to Workflow Engine](./README.md)
-
----
+| execution-detail | [source](./wireframes/execution-detail.excalidraw) | [preview](./wireframes/execution-detail.svg) |
 
 ## Diagrams
 

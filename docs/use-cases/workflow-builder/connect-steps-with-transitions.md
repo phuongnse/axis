@@ -4,7 +4,7 @@
 
 ## Purpose
 
-draw connections between steps so that the workflow knows the execution order.
+Draw connections between steps so that the workflow knows the execution order.
 
 ## Primary actor
 
@@ -16,33 +16,19 @@ draw connections between steps so that the workflow knows the execution order.
 
 ## Main flow
 
-1. _(Happy path — align with acceptance criteria below.)_
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
 
 ## Alternate / error flows
 
-- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+- Validation failures and edge cases in Acceptance Criteria.
 
 ## Context
 
 A node-based drag-and-drop canvas (powered by React Flow) where users design their workflow visually. Steps are nodes; transitions are directed edges.
 
----
-
 ## Acceptance Criteria
-
-**Purpose:** _(to be detailed during migration)_
-**Primary actor:** _(to be detailed during migration)_
-**Trigger:** _(to be detailed during migration)_
-
-#### Main flow
-1. _(to be detailed during migration)_
-
-#### Alternate / error flows
-- _(to be detailed during migration)_
-
-
-
-**Acceptance Criteria:**
 
 *Happy path*
 - [ ] Hovering over a step node reveals output and input handles (small circles on the edges of the node).
@@ -75,17 +61,11 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 > - canvas edge drawing and cycle-block toast pending Frontend
 > - condition step label enforcement on connection pending Frontend.
 
----
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | workflow-editor | [source](./wireframes/workflow-editor.excalidraw) | [preview](./wireframes/workflow-editor.svg) |
-
-[← Back to Workflow Builder](./README.md)
-
----
 
 ## Diagrams
 
