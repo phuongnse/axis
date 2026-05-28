@@ -4,6 +4,11 @@
 
 `docs/diagrams/` holds system-level architecture diagrams.
 
+## Agent rule (required)
+
+When changing any file under `docs/diagrams/`, agents must run the checklist in
+[`REVIEW_CHECKLIST.md`](./REVIEW_CHECKLIST.md) before committing.
+
 ## Source of truth
 
 - Edit diagram source in `*.excalidraw` files.
@@ -28,6 +33,10 @@
      ```powershell
      .\docs\scripts\generate-diagrams.ps1
      ```
+
+3. Run review checklist:
+
+   - [`REVIEW_CHECKLIST.md`](./REVIEW_CHECKLIST.md)
 
 ## Current architecture assumptions in these diagrams
 

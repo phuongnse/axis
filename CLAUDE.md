@@ -78,6 +78,7 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 - Zero build warnings and zero test failures.
 - Docs in the same PR as code (see [agent-checklist](docs/playbooks/agent-checklist.md)).
 - No new TODO/FIXME/placeholder/stub code.
+- For `docs/diagrams/*` changes: run [`docs/diagrams/REVIEW_CHECKLIST.md`](docs/diagrams/REVIEW_CHECKLIST.md) before commit.
 
 **When blocked:** state blocker → cite constraint → 2–3 options → wait. Never self-unblock on P0.
 
@@ -187,7 +188,7 @@ Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, use-c
 
 **Per PR before merge:** PR description = Summary + Linked spec + Requirements only (no CI status, no commit list — Checks tab covers that). Run `./scripts/check-doc-drift.sh` before push when `src/`, `tests/`, or `docs/use-cases/` change — the script enforces use-case-docs same-PR, new-handler tests, the no-new `TODO`/`FIXME`/`stub` rule, and new raw-SQL call review (cross-module guard).
 
-Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` changes.
+Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` changes. For system diagrams, agents must pass [`docs/diagrams/REVIEW_CHECKLIST.md`](docs/diagrams/REVIEW_CHECKLIST.md) before commit.
 
 ---
 
@@ -206,6 +207,7 @@ Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` chan
 | [TECH_STACK.md](docs/TECH_STACK.md) | Libraries + ADRs |
 | [PROGRESS.md](docs/PROGRESS.md) | Module layer status |
 | [WORKAROUNDS.md](docs/WORKAROUNDS.md) | Intentional rule violations + cleanup triggers (**read when touching legacy or shipping a known shortcut**) |
+| [docs/diagrams/REVIEW_CHECKLIST.md](docs/diagrams/REVIEW_CHECKLIST.md) | **Required when changing system diagrams** |
 | [Architecture tests README](tests/Architecture/Axis.Architecture.Tests/README.md) | What's mechanically enforced + how to add a new rule |
 | [docs/use-cases/](docs/use-cases/README.md) | Features + ACs |
 
