@@ -18,6 +18,11 @@ dist/
 *.log
 logs/
 
+# Environment
+.env
+.env.*
+!.env.example
+
 # NCrunch
 *.ncrunchsolution
 *.ncrunchproject

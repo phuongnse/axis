@@ -10,6 +10,8 @@
 **/.ncrunch_*
 **/*.ncrunchsolution*
 **/*.user
+# Intentionally excluded for API runtime image context size.
+# If Dockerfile build stages later need these paths, revisit this block.
 docs
 tests
 frontend

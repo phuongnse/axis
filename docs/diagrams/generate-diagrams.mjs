@@ -6,8 +6,8 @@
  *
  * Platform architecture (docs/diagrams/):
  *   system-context  — who uses Axis, what external systems
- *   container       — what runs inside Axis, per-module databases, Wolverine
- *   module-overview — 6 modules + event-driven communication flows
+ *   container       — runtime containers, brokers, and per-module databases
+ *   module-overview — 6 modules + Kafka/RabbitMQ/gRPC communication flows
  *
  * Use-case-level (docs/use-cases/{domain}/{use-case}/):
  *   tenant-provisioning — org registration & async schema provisioning  (platform-foundation)
@@ -23,8 +23,8 @@ import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
-const architectureDir = join(__dir, "diagrams");
-const domainDir = (domain) => join(__dir, "..", domain, "diagrams");
+const architectureDir = __dir;
+const useCaseDir = (domain, useCase) => join(__dir, "..", "use-cases", domain, useCase);
 
 // ─── Excalidraw primitives ────────────────────────────────────────────────────
 
@@ -318,44 +318,50 @@ function systemContext() {
     if (sub) els.push(text({ x, y: y + 72, value: sub, size: 10, color: C.muted, anchor: "center" }));
   }
 
-  actor(105, 195, "Org Admin", "[builds workflows & forms]");
-  actor(105, 460, "End User", "[submits forms, views pages]");
+  actor(95, 130, "Platform Admin", "[operates platform]");
+  actor(95, 250, "Org Admin", "[builds workflows & forms]");
+  actor(95, 370, "Org Member", "[works in tenant apps]");
+  actor(95, 490, "End User", "[submits forms, views pages]");
 
   // Platform boundary
-  els.push(...rect({ x: 230, y: 65, w: 600, h: 650, bg: "#f0f9ff", stroke: C.sysBdr, label: "Axis Platform", labelSize: 14, labelBold: true, labelColor: C.sysBdr }));
+  els.push(...rect({ x: 230, y: 65, w: 600, h: 650, bg: "#f0f9ff", stroke: C.sysBdr }));
 
-  // Inside platform — col 1 (left)
-  els.push(...rect({ x: 268, y: 120, w: 240, h: 70, bg: C.sysBg, stroke: C.sysBdr, label: "Web Application", sub: "React 19 + TypeScript" }));
-  els.push(...rect({ x: 268, y: 250, w: 240, h: 70, bg: C.sysBg, stroke: C.sysBdr, label: "API Server", sub: "ASP.NET Core 8 · Modular Monolith" }));
-  els.push(...rect({ x: 268, y: 395, w: 240, h: 70, bg: C.infraBg, stroke: C.infraBdr, label: "PostgreSQL 16", sub: "Per-module databases" }));
-  els.push(...rect({ x: 268, y: 505, w: 240, h: 70, bg: C.infraBg, stroke: C.infraBdr, label: "Redis 7", sub: "Cache · Session" }));
+  // Inside platform (context-level only; no container internals)
+  els.push(...rect({ x: 300, y: 170, w: 250, h: 80, bg: C.sysBg, stroke: C.sysBdr, label: "Web Application (SPA)", sub: "Org admin/member + end-user UI" }));
+  els.push(...rect({ x: 300, y: 320, w: 250, h: 80, bg: C.sysBg, stroke: C.sysBdr, label: "Axis API Gateway", sub: "Auth + REST/OpenAPI + module orchestration" }));
+  els.push(...rect({ x: 300, y: 470, w: 250, h: 80, bg: C.sysBg, stroke: C.sysBdr, label: "Module Services", sub: "Identity · Data · Workflow · Forms · Engine · Pages" }));
 
-  // Inside platform — col 2 (right)
-  els.push(...rect({ x: 558, y: 250, w: 220, h: 70, bg: C.modBg, stroke: C.modBdr, label: "Wolverine", sub: "Event bus · Durable outbox" }));
-  els.push(...rect({ x: 558, y: 395, w: 220, h: 70, bg: C.infraBg, stroke: C.infraBdr, label: "AWS S3", sub: "File storage" }));
+  // External systems
+  els.push(...rect({ x: 890, y: 170, w: 180, h: 70, bg: C.extBg, stroke: C.extBdr, label: "Email Service", sub: "Verification + notifications" }));
+  els.push(...rect({ x: 890, y: 320, w: 180, h: 70, bg: C.extBg, stroke: C.extBdr, label: "External APIs", sub: "Workflow HTTP steps" }));
+  els.push(...rect({ x: 890, y: 470, w: 180, h: 70, bg: C.extBg, stroke: C.extBdr, label: "Webhook Targets", sub: "Outbound workflow events" }));
 
-  // External services
-  els.push(...rect({ x: 890, y: 200, w: 170, h: 70, bg: C.extBg, stroke: C.extBdr, label: "Email Service", sub: "SMTP / MailKit" }));
-  els.push(...rect({ x: 890, y: 395, w: 170, h: 70, bg: C.extBg, stroke: C.extBdr, label: "External APIs", sub: "HTTP Request steps" }));
+  // Actors → Axis (separate channels to reduce overlap)
+  els.push(...routedArrow({ waypoints: [[139, 152], [212, 152], [212, 350], [300, 350]] }));
+  els.push(...routedArrow({ waypoints: [[139, 272], [220, 272], [220, 200], [300, 200]] }));
+  els.push(...routedArrow({ waypoints: [[139, 392], [228, 392], [228, 215], [300, 215]] }));
+  els.push(...routedArrow({ waypoints: [[139, 512], [236, 512], [236, 230], [300, 230]] }));
 
-  // Org Admin → Web App
-  els.push(...routedArrow({ waypoints: [[149, 217], [248, 217], [248, 155], [268, 155]], label: "HTTPS" }));
-  // End User → API Server (direct)
-  els.push(...routedArrow({ waypoints: [[149, 482], [248, 482], [248, 285], [268, 285]], label: "HTTPS" }));
-  // Web App → API Server
-  els.push(...arrow({ x1: 388, y1: 190, x2: 388, y2: 250, label: "REST / WS" }));
-  // API Server → PostgreSQL (straight down)
-  els.push(...arrow({ x1: 388, y1: 320, x2: 388, y2: 395 }));
-  // API Server → Redis (route around left to avoid crossing PostgreSQL)
-  els.push(...routedArrow({ waypoints: [[268, 285], [248, 285], [248, 540], [268, 540]] }));
-  // API Server → Wolverine
-  els.push(...arrow({ x1: 508, y1: 285, x2: 558, y2: 285 }));
-  // Wolverine → S3 (straight down)
-  els.push(...arrow({ x1: 668, y1: 320, x2: 668, y2: 395 }));
-  // Wolverine → Email (right then up)
-  els.push(...routedArrow({ waypoints: [[778, 270], [840, 270], [840, 235], [890, 235]] }));
-  // Wolverine → External APIs (right then down)
-  els.push(...routedArrow({ waypoints: [[778, 305], [840, 305], [840, 430], [890, 430]] }));
+  // Internal Axis flow
+  els.push(...arrow({ x1: 425, y1: 250, x2: 425, y2: 320 }));
+  els.push(...arrow({ x1: 425, y1: 400, x2: 425, y2: 470 }));
+
+  // Axis → external systems
+  els.push(...arrow({ x1: 550, y1: 336, x2: 890, y2: 205 }));
+  els.push(...arrow({ x1: 550, y1: 360, x2: 890, y2: 355 }));
+  els.push(...arrow({ x1: 550, y1: 495, x2: 890, y2: 505 }));
+
+  // Legend
+  els.push(...rect({ x: 560, y: 590, w: 250, h: 108, bg: "#ffffff", stroke: C.border }));
+  els.push(text({ x: 685, y: 606, value: "Legend", size: 11, bold: true, anchor: "center" }));
+  els.push(...rect({ x: 575, y: 620, w: 14, h: 14, bg: C.sysBg, stroke: C.sysBdr }));
+  els.push(text({ x: 595, y: 627, value: "Axis internal system", size: 9, color: C.text }));
+  els.push(...rect({ x: 575, y: 640, w: 14, h: 14, bg: C.extBg, stroke: C.extBdr }));
+  els.push(text({ x: 595, y: 647, value: "External system", size: 9, color: C.text }));
+  els.push(...rect({ x: 575, y: 660, w: 14, h: 14, bg: "#e0f2fe", stroke: "#0284c7" }));
+  els.push(text({ x: 595, y: 667, value: "Actor", size: 9, color: C.text }));
+  els.push(...arrow({ x1: 575, y1: 685, x2: 605, y2: 685, color: C.arrow }));
+  els.push(text({ x: 610, y: 685, value: "Interaction", size: 9, color: C.text }));
 
   return excalidraw(els);
 }
@@ -369,8 +375,8 @@ function containerDiagram() {
   els.push(text({ x: 565, y: 25, value: "Axis Platform — Container Diagram", size: 18, bold: true, color: C.text, anchor: "center" }));
 
   // Platform boundary (right edge x=810)
-  els.push(...rect({ x: 50, y: 55, w: 760, h: 620, bg: "#f0f9ff", stroke: C.sysBdr }));
-  els.push(text({ x: 430, y: 80, value: "API Server — ASP.NET Core 8 Modular Monolith", size: 14, bold: true, color: C.sysBdr, anchor: "center" }));
+  els.push(...rect({ x: 50, y: 55, w: 760, h: 670, bg: "#f0f9ff", stroke: C.sysBdr }));
+  els.push(text({ x: 430, y: 80, value: "Axis.Api Gateway + Module Services (Modulith, strict boundaries)", size: 14, bold: true, color: C.sysBdr, anchor: "center" }));
 
   // Modules — row 1 (y=105) and row 2 (y=245), 65px gap between rows
   const MW = 165, MH = 75;
@@ -383,46 +389,89 @@ function containerDiagram() {
     { label: "PageBuilder",     x: 430, y: 245 },
   ];
   for (const m of modules) {
-    els.push(...rect({ x: m.x, y: m.y, w: MW, h: MH, bg: C.modBg, stroke: C.modBdr, label: m.label, labelSize: 12 }));
+    els.push(...rect({
+      x: m.x,
+      y: m.y,
+      w: MW,
+      h: MH,
+      bg: m.bg ?? C.modBg,
+      stroke: m.stroke ?? C.modBdr,
+      label: m.label,
+      sub: m.sub,
+      labelSize: 12,
+    }));
   }
 
-  // Wolverine event bus (55px gap below row 2 bottom at y=320)
-  els.push(...rect({ x: 70, y: 375, w: 550, h: 60, bg: C.evtBg, stroke: C.evtBdr,
-    label: "Wolverine — Event Bus + Durable Outbox (per-module)",
-    sub: "In-process · At-least-once delivery · Per-module outbox tables", labelSize: 12 }));
+  // Messaging and contract lanes (55px gap below row 2 bottom at y=320)
+  els.push(...rect({ x: 70, y: 360, w: 550, h: 42, bg: C.evtBg, stroke: C.evtBdr,
+    label: "Kafka + Schema Registry", sub: "Events/Snapshots · Avro + CloudEvents", labelSize: 12 }));
+  els.push(...rect({ x: 70, y: 408, w: 550, h: 42, bg: C.evtBg, stroke: C.evtBdr,
+    label: "RabbitMQ", sub: "Commands/Jobs/Saga steps", labelSize: 12 }));
+  els.push(...rect({ x: 70, y: 456, w: 550, h: 42, bg: C.sysBg, stroke: C.sysBdr,
+    label: "gRPC Contracts", sub: "Sync RPC escape hatch", labelSize: 12 }));
 
   // OpenIddict + SignalR
-  els.push(...rect({ x: 70,  y: 465, w: 250, h: 55, bg: C.sysBg, stroke: C.sysBdr,
+  els.push(...rect({ x: 70,  y: 505, w: 250, h: 55, bg: C.sysBg, stroke: C.sysBdr,
     label: "OpenIddict 5.x", sub: "OAuth2/OIDC · Auth Code + PKCE" }));
-  els.push(...rect({ x: 335, y: 465, w: 285, h: 55, bg: C.sysBg, stroke: C.sysBdr,
+  els.push(...rect({ x: 335, y: 505, w: 285, h: 55, bg: C.sysBg, stroke: C.sysBdr,
     label: "SignalR", sub: "Real-time execution status" }));
 
-  // Web Application band (bottom of platform)
-  els.push(...rect({ x: 50, y: 545, w: 760, h: 55, bg: C.sysBg, stroke: C.sysBdr,
+  // Web Application band (inset from platform border for readability)
+  els.push(...rect({ x: 70, y: 585, w: 720, h: 55, bg: C.sysBg, stroke: C.sysBdr,
     label: "Web Application",
     sub: "React 19 + TypeScript + Vite · shadcn/ui · React Flow · dnd-kit · TanStack Query · Zustand" }));
 
   // DB column (right side; arrows from platform right edge x=810 → DB left edge x=870, 60px each)
   const DBX = 870, DBW = 190, DBH = 55, DBGap = 10;
-  els.push(text({ x: DBX + DBW / 2, y: 65, value: "Per-Module Databases (PostgreSQL 16)", size: 12, bold: true, color: C.infraBdr, anchor: "center" }));
+  els.push(text({ x: DBX + DBW / 2, y: 65, value: "Per-Module Databases", size: 12, bold: true, color: C.infraBdr, anchor: "center" }));
 
   const dbs = [
-    { label: "axis_identity", sub: "public schema",         y: 100 },
-    { label: "axis_dm",       sub: "tenant schema per org", y: 100 + (DBH + DBGap) },
-    { label: "axis_wb",       sub: "wolverine outbox",      y: 100 + (DBH + DBGap) * 2 },
-    { label: "axis_we",       sub: "wolverine outbox",      y: 100 + (DBH + DBGap) * 3 },
-    { label: "axis_fb",       sub: "wolverine outbox",      y: 100 + (DBH + DBGap) * 4 },
+    { label: "Identity DB",        y: 100 },
+    { label: "DataModeling DB",    y: 100 + (DBH + DBGap) },
+    { label: "WorkflowBuilder DB", y: 100 + (DBH + DBGap) * 2 },
+    { label: "WorkflowEngine DB",  y: 100 + (DBH + DBGap) * 3 },
+    { label: "FormBuilder DB",     y: 100 + (DBH + DBGap) * 4 },
+    { label: "PageBuilder DB",     y: 100 + (DBH + DBGap) * 5 },
   ];
   for (const db of dbs) {
-    els.push(...rect({ x: DBX, y: db.y, w: DBW, h: DBH, bg: C.infraBg, stroke: C.infraBdr, label: db.label, sub: db.sub, labelSize: 11 }));
-    els.push(...arrow({ x1: 810, y1: db.y + DBH / 2, x2: DBX, y2: db.y + DBH / 2, color: C.infraBdr }));
+    els.push(...rect({ x: DBX, y: db.y, w: DBW, h: DBH, bg: C.infraBg, stroke: C.infraBdr, label: db.label, labelSize: 11 }));
+    els.push(...arrow({ x1: 810, y1: db.y + DBH / 2, x2: DBX, y2: db.y + DBH / 2, color: C.arrow }));
   }
 
-  // Other infrastructure (right side, below DB column)
-  els.push(...rect({ x: DBX, y: 460, w: DBW, h: DBH, bg: C.infraBg, stroke: C.infraBdr, label: "Redis 7",       sub: "Cache · Session · Schema name" }));
-  els.push(...rect({ x: DBX, y: 530, w: DBW, h: DBH, bg: C.extBg,  stroke: C.extBdr,  label: "AWS S3",        sub: "File storage" }));
-  els.push(...rect({ x: DBX, y: 600, w: DBW, h: DBH, bg: C.extBg,  stroke: C.extBdr,  label: "Email Service", sub: "SMTP · MailKit" }));
-  els.push(...arrow({ x1: 810, y1: 487, x2: DBX, y2: 487, color: C.arrow }));
+  // Other infrastructure (right side, below DB column) - distinct color from DB blocks
+  els.push(...rect({ x: DBX, y: 495, w: DBW, h: DBH, bg: C.sysBg, stroke: C.sysBdr, label: "Redis", sub: "Cache · Session" }));
+  els.push(...arrow({ x1: 810, y1: 522, x2: DBX, y2: 522, color: C.arrow }));
+
+  // Production operations containers (right side, straight arrows from platform edge)
+  els.push(...rect({ x: 870, y: 565, w: 220, h: 55, bg: C.sysBg, stroke: C.sysBdr,
+    label: "HashiCorp Vault", sub: "Secrets management" }));
+  els.push(...rect({ x: 870, y: 635, w: 220, h: 55, bg: C.sysBg, stroke: C.sysBdr,
+    label: "Grafana Tempo/Loki/Mimir", sub: "Tracing · Logs · Metrics" }));
+  els.push(...arrow({ x1: 810, y1: 592, x2: 870, y2: 592, color: C.arrow }));
+  els.push(...arrow({ x1: 810, y1: 662, x2: 870, y2: 662, color: C.arrow }));
+
+  // External managed services aligned with operations rows
+  els.push(...rect({ x: 1110, y: 565, w: 200, h: 55, bg: C.extBg, stroke: C.extBdr, label: "AWS S3", sub: "File storage" }));
+  els.push(...rect({ x: 1110, y: 635, w: 200, h: 55, bg: C.extBg, stroke: C.extBdr, label: "Email Service", sub: "SMTP · MailKit" }));
+  // External calls originate from the platform boundary and route clearly.
+  els.push(...routedArrow({ waypoints: [[810, 628], [1092, 628], [1092, 592], [1110, 592]], color: C.arrow }));
+  els.push(...routedArrow({ waypoints: [[810, 718], [1092, 718], [1092, 662], [1110, 662]], color: C.arrow }));
+
+  // Compact legend
+  els.push(...rect({ x: 628, y: 88, w: 176, h: 142, bg: "#ffffff", stroke: C.border }));
+  els.push(text({ x: 716, y: 102, value: "Legend", size: 10, bold: true, color: C.text, anchor: "center" }));
+  els.push(...rect({ x: 640, y: 114, w: 12, h: 12, bg: C.modBg, stroke: C.modBdr }));
+  els.push(text({ x: 658, y: 120, value: "Module service", size: 9, color: C.text }));
+  els.push(...rect({ x: 640, y: 132, w: 12, h: 12, bg: C.evtBg, stroke: C.evtBdr }));
+  els.push(text({ x: 658, y: 138, value: "Messaging lanes", size: 9, color: C.text }));
+  els.push(...rect({ x: 640, y: 150, w: 12, h: 12, bg: C.infraBg, stroke: C.infraBdr }));
+  els.push(text({ x: 658, y: 156, value: "Database", size: 9, color: C.text }));
+  els.push(...rect({ x: 640, y: 168, w: 12, h: 12, bg: C.sysBg, stroke: C.sysBdr }));
+  els.push(text({ x: 658, y: 174, value: "Platform ops", size: 9, color: C.text }));
+  els.push(...rect({ x: 640, y: 186, w: 12, h: 12, bg: C.extBg, stroke: C.extBdr }));
+  els.push(text({ x: 658, y: 192, value: "External service", size: 9, color: C.text }));
+  els.push(...arrow({ x1: 640, y1: 210, x2: 670, y2: 210, color: C.arrow }));
+  els.push(text({ x: 676, y: 210, value: "Connection", size: 9, color: C.text }));
 
   return excalidraw(els);
 }
@@ -433,65 +482,69 @@ function moduleOverview() {
   _id = 1;
   const els = [];
 
-  els.push(text({ x: 530, y: 25, value: "Axis — Module Communication (Event-Driven)", size: 18, bold: true, color: C.text, anchor: "center" }));
-  els.push(text({ x: 530, y: 50, value: "Modules are data-sovereign. Cross-module communication via Wolverine domain events only — no shared DB access.", size: 11, color: C.muted, anchor: "center" }));
+  els.push(text({ x: 530, y: 25, value: "Axis — Module Communication", size: 18, bold: true, color: C.text, anchor: "center" }));
+  els.push(text({ x: 530, y: 50, value: "Modules are data-sovereign. Cross-module via Kafka (events), RabbitMQ (commands/jobs/saga), gRPC (sync).", size: 11, color: C.muted, anchor: "center" }));
 
   // Shared Kernel spans all 4 row-1 modules (x=60 to x=935)
   els.push(...rect({ x: 60, y: 75, w: 875, h: 50, bg: "#e2e8f0", stroke: C.border,
-    label: "Shared Kernel  —  Domain Primitives · CQRS Abstractions · Multi-Tenancy · Event Bus", labelSize: 12 }));
+    label: "Shared Kernel  —  Domain Primitives · CQRS Abstractions · Multi-Tenancy Interfaces", labelSize: 12 }));
 
   function module(x, y, label, sub, color = { bg: C.modBg, stroke: C.modBdr }) {
     return rect({ x, y, w: 200, h: 80, bg: color.bg, stroke: color.stroke, label, sub, labelSize: 13, labelBold: true });
   }
 
   // Row 1 (y=155): 4 modules with 25px gaps
-  els.push(...module(60,  155, "Identity",        "Auth · Users · Roles · RBAC", { bg: "#ede9fe", stroke: "#7c3aed" }));
+  els.push(...module(60,  155, "Identity",        "Auth · Users · Roles · RBAC"));
   els.push(...module(285, 155, "DataModeling",    "Models · Records · Data Classes"));
   els.push(...module(510, 155, "WorkflowBuilder", "Definitions · Steps · Triggers"));
   els.push(...module(735, 155, "FormBuilder",     "Forms · Fields · Submissions"));
 
-  // Event bus between rows (y=295; 60px gap below row 1 bottom at y=235)
-  els.push(...rect({ x: 60, y: 295, w: 875, h: 35, bg: C.evtBg, stroke: C.evtBdr }));
-  els.push(text({ x: 497, y: 312, value: "Wolverine Domain Event Bus  (durable outbox per module DB — at-least-once delivery)", size: 11, color: "#92400e", anchor: "center" }));
+  // Communication lanes between rows
+  els.push(...rect({ x: 60, y: 286, w: 875, h: 28, bg: C.evtBg, stroke: C.evtBdr }));
+  els.push(text({ x: 497, y: 300, value: "Kafka + Schema Registry — Events/Snapshots", size: 11, color: "#92400e", anchor: "center" }));
+  els.push(...rect({ x: 60, y: 318, w: 875, h: 28, bg: C.evtBg, stroke: C.evtBdr }));
+  els.push(text({ x: 497, y: 332, value: "RabbitMQ — Commands/Jobs/Saga steps", size: 11, color: "#92400e", anchor: "center" }));
+  els.push(...rect({ x: 60, y: 350, w: 875, h: 28, bg: C.sysBg, stroke: C.sysBdr }));
+  els.push(text({ x: 497, y: 364, value: "gRPC Contracts — Sync RPC escape hatch", size: 11, color: C.muted, anchor: "center" }));
 
-  // Event badges (y=345; 15px gap below event bus bottom at y=330)
+  // Example event badges
   const events = [
-    { label: "WorkflowPublished",  x: 65 },
-    { label: "WorkflowArchived",   x: 220 },
-    { label: "WorkflowUnarchived", x: 380 },
-    { label: "FormCreated",        x: 545 },
-    { label: "FormTaskCreated",    x: 695 },
-    { label: "ExecutionStarted",   x: 830 },
+    { label: "WorkflowPublished",  x: 95 },
+    { label: "WorkflowArchived",   x: 240 },
+    { label: "WorkflowUnarchived", x: 385 },
+    { label: "FormCreated",        x: 530 },
+    { label: "FormTaskCreated",    x: 675 },
+    { label: "ExecutionStarted",   x: 820 },
   ];
   for (const e of events) {
-    els.push(...badge({ x: e.x, y: 345, label: e.label }));
+    els.push(...badge({ x: e.x, y: 386, label: e.label }));
   }
 
-  // Row 2 (y=415; 85px gap below event bus bottom at y=330, clear of badges)
-  els.push(...module(285, 415, "WorkflowEngine", "Executions · Step Handlers"));
-  els.push(...module(510, 415, "PageBuilder",    "Pages · Widgets · Bindings", { bg: "#fce7f3", stroke: "#be185d" }));
+  // Row 2
+  els.push(...module(285, 470, "WorkflowEngine", "Executions · Step Handlers"));
+  els.push(...module(510, 470, "PageBuilder",    "Pages · Widgets · Bindings"));
 
   // Arrows
-  // WorkflowBuilder (center x=610, bottom y=235) → event bus top (y=295)
-  els.push(...arrow({ x1: 610, y1: 235, x2: 610, y2: 295, color: C.evtBdr, label: "publishes" }));
-  // Event bus bottom (y=330) → WorkflowEngine top (center x=385, y=415)
-  els.push(...arrow({ x1: 385, y1: 330, x2: 385, y2: 415, color: C.evtBdr, label: "consumes" }));
-  // Event bus top (y=295) → FormBuilder bottom (center x=835, y=235) — FormBuilder is above the bus
-  els.push(...arrow({ x1: 835, y1: 295, x2: 835, y2: 235, color: C.evtBdr, label: "consumes" }));
-  // WorkflowEngine (bottom y=495) → reads own local copy
-  els.push(...arrow({ x1: 385, y1: 495, x2: 385, y2: 540, color: C.muted, dashed: true, label: "reads own copy" }));
+  // Cross-module connection examples (single connector style)
+  els.push(...arrow({ x1: 610, y1: 235, x2: 610, y2: 286, color: C.arrow, label: "publish (Kafka)" }));
+  // Drop to WorkflowEngine through badge gaps (avoid overlapping any badge/block).
+  els.push(...routedArrow({ waypoints: [[220, 378], [220, 448], [325, 448], [325, 470]], color: C.arrow, label: "consume event" }));
+  // FormBuilder consumes from messaging lanes via outer-right route (avoid overlay on lane blocks).
+  els.push(...routedArrow({ waypoints: [[935, 332], [965, 332], [965, 270], [860, 270], [860, 235]], color: C.arrow, label: "consume command (RabbitMQ)" }));
+  // WorkflowEngine (bottom y=550) → reads own local copy
+  els.push(...arrow({ x1: 385, y1: 550, x2: 385, y2: 595, color: C.muted, dashed: true, label: "reads own copy" }));
 
   // Legend
-  els.push(...rect({ x: 60, y: 560, w: 230, h: 105, bg: "transparent", stroke: C.border }));
-  els.push(text({ x: 175, y: 577, value: "Legend", size: 11, bold: true, anchor: "center" }));
-  els.push(...rect({ x: 75, y: 590, w: 16, h: 16, bg: C.modBg, stroke: C.modBdr }));
-  els.push(text({ x: 100, y: 598, value: "Module (owns its DB)", size: 10 }));
-  els.push(...rect({ x: 75, y: 614, w: 16, h: 16, bg: C.evtBg, stroke: C.evtBdr }));
-  els.push(text({ x: 100, y: 622, value: "Domain Event", size: 10 }));
-  els.push(...arrow({ x1: 75, y1: 638, x2: 107, y2: 638, color: C.evtBdr }));
-  els.push(text({ x: 112, y: 638, value: "Event-driven", size: 10 }));
-  els.push(...arrow({ x1: 75, y1: 653, x2: 107, y2: 653, color: C.muted, dashed: true }));
-  els.push(text({ x: 112, y: 653, value: "Local copy (denormalized)", size: 10 }));
+  els.push(...rect({ x: 650, y: 560, w: 285, h: 110, bg: "transparent", stroke: C.border }));
+  els.push(text({ x: 792, y: 577, value: "Legend", size: 11, bold: true, anchor: "center" }));
+  els.push(...rect({ x: 665, y: 590, w: 16, h: 16, bg: C.modBg, stroke: C.modBdr }));
+  els.push(text({ x: 690, y: 598, value: "Module (owns its DB)", size: 10 }));
+  els.push(...rect({ x: 665, y: 612, w: 16, h: 16, bg: C.evtBg, stroke: C.evtBdr }));
+  els.push(text({ x: 690, y: 620, value: "Kafka/RabbitMQ lanes", size: 10 }));
+  els.push(...arrow({ x1: 665, y1: 638, x2: 697, y2: 638, color: C.arrow }));
+  els.push(text({ x: 702, y: 638, value: "Connection", size: 10 }));
+  els.push(...arrow({ x1: 665, y1: 655, x2: 697, y2: 655, color: C.muted, dashed: true }));
+  els.push(text({ x: 702, y: 655, value: "Local copy (denormalized)", size: 10 }));
 
   return excalidraw(els);
 }
@@ -833,12 +886,12 @@ const diagrams = [
   { name: "container",            fn: containerDiagram,        dir: architectureDir },
   { name: "module-overview",      fn: moduleOverview,          dir: architectureDir },
   // Domain-level diagrams
-  { name: "tenant-provisioning",  fn: tenantProvisioningDiagram, dir: domainDir("platform-foundation") },
-  { name: "auth-flow",            fn: authFlowDiagram,           dir: domainDir("identity-access") },
-  { name: "data-model",           fn: dataModelDiagram,          dir: domainDir("data-modeling") },
-  { name: "workflow-model",       fn: workflowModelDiagram,      dir: domainDir("workflow-builder") },
-  { name: "form-model",           fn: formModelDiagram,          dir: domainDir("form-builder") },
-  { name: "execution-flow",       fn: executionFlowDiagram,      dir: domainDir("workflow-engine") },
+  { name: "tenant-provisioning",  fn: tenantProvisioningDiagram, dir: useCaseDir("platform-foundation", "provision-tenant") },
+  { name: "auth-flow",            fn: authFlowDiagram,           dir: useCaseDir("identity-access", "sign-in") },
+  { name: "data-model",           fn: dataModelDiagram,          dir: useCaseDir("data-modeling", "create-model") },
+  { name: "workflow-model",       fn: workflowModelDiagram,      dir: useCaseDir("workflow-builder", "create-workflow") },
+  { name: "form-model",           fn: formModelDiagram,          dir: useCaseDir("form-builder", "create-form") },
+  { name: "execution-flow",       fn: executionFlowDiagram,      dir: useCaseDir("workflow-engine", "start-execution") },
 ];
 
 for (const { name, fn, dir } of diagrams) {
