@@ -504,7 +504,7 @@ function moduleOverview() {
   els.push(...rect({ x: 60, y: 350, w: 875, h: 28, bg: C.sysBg, stroke: C.sysBdr }));
   els.push(text({ x: 497, y: 364, value: "gRPC Contracts — Sync RPC escape hatch", size: 11, color: C.muted, anchor: "center" }));
 
-  // Event badges
+  // Example event badges
   const events = [
     { label: "WorkflowPublished",  x: 65 },
     { label: "WorkflowArchived",   x: 220 },
@@ -519,28 +519,28 @@ function moduleOverview() {
 
   // Row 2
   els.push(...module(285, 470, "WorkflowEngine", "Executions · Step Handlers"));
-  els.push(...module(510, 470, "PageBuilder",    "Pages · Widgets · Bindings · Phase 2", { bg: "#fce7f3", stroke: "#be185d" }));
+  els.push(...module(510, 470, "PageBuilder",    "Pages · Widgets · Bindings"));
 
   // Arrows
-  // WorkflowBuilder publishes and WorkflowEngine/FormBuilder consume
-  els.push(...arrow({ x1: 610, y1: 235, x2: 610, y2: 286, color: C.evtBdr, label: "publishes events" }));
-  els.push(...arrow({ x1: 385, y1: 350, x2: 385, y2: 470, color: C.evtBdr, label: "consumes events" }));
-  els.push(...arrow({ x1: 835, y1: 286, x2: 835, y2: 235, color: C.evtBdr, label: "consumes events" }));
-  els.push(...arrow({ x1: 835, y1: 350, x2: 835, y2: 235, color: C.arrow, label: "consumes commands/jobs" }));
+  // Cross-module connection examples (single connector style)
+  els.push(...arrow({ x1: 610, y1: 235, x2: 610, y2: 286, color: C.arrow }));
+  els.push(...arrow({ x1: 385, y1: 350, x2: 385, y2: 470, color: C.arrow }));
+  els.push(...arrow({ x1: 835, y1: 286, x2: 835, y2: 235, color: C.arrow }));
+  els.push(...arrow({ x1: 835, y1: 350, x2: 835, y2: 235, color: C.arrow }));
   // WorkflowEngine (bottom y=550) → reads own local copy
   els.push(...arrow({ x1: 385, y1: 550, x2: 385, y2: 595, color: C.muted, dashed: true, label: "reads own copy" }));
 
   // Legend
-  els.push(...rect({ x: 60, y: 560, w: 230, h: 105, bg: "transparent", stroke: C.border }));
-  els.push(text({ x: 175, y: 577, value: "Legend", size: 11, bold: true, anchor: "center" }));
+  els.push(...rect({ x: 60, y: 560, w: 250, h: 110, bg: "transparent", stroke: C.border }));
+  els.push(text({ x: 185, y: 577, value: "Legend", size: 11, bold: true, anchor: "center" }));
   els.push(...rect({ x: 75, y: 590, w: 16, h: 16, bg: C.modBg, stroke: C.modBdr }));
   els.push(text({ x: 100, y: 598, value: "Module (owns its DB)", size: 10 }));
-  els.push(...rect({ x: 75, y: 614, w: 16, h: 16, bg: C.evtBg, stroke: C.evtBdr }));
-  els.push(text({ x: 100, y: 622, value: "Kafka/RabbitMQ lanes", size: 10 }));
-  els.push(...arrow({ x1: 75, y1: 638, x2: 107, y2: 638, color: C.evtBdr }));
-  els.push(text({ x: 112, y: 638, value: "Event-driven", size: 10 }));
-  els.push(...arrow({ x1: 75, y1: 653, x2: 107, y2: 653, color: C.muted, dashed: true }));
-  els.push(text({ x: 112, y: 653, value: "Local copy (denormalized)", size: 10 }));
+  els.push(...rect({ x: 75, y: 612, w: 16, h: 16, bg: C.evtBg, stroke: C.evtBdr }));
+  els.push(text({ x: 100, y: 620, value: "Kafka/RabbitMQ lanes", size: 10 }));
+  els.push(...arrow({ x1: 75, y1: 638, x2: 107, y2: 638, color: C.arrow }));
+  els.push(text({ x: 112, y: 638, value: "Connection", size: 10 }));
+  els.push(...arrow({ x1: 75, y1: 655, x2: 107, y2: 655, color: C.muted, dashed: true }));
+  els.push(text({ x: 112, y: 655, value: "Local copy (denormalized)", size: 10 }));
 
   return excalidraw(els);
 }
