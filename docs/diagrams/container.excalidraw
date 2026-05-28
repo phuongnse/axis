@@ -2353,7 +2353,7 @@
     {
       "id": "diag-71",
       "x": 810,
-      "y": 660,
+      "y": 628,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -2377,7 +2377,7 @@
       "locked": false,
       "type": "arrow",
       "width": 300,
-      "height": 68,
+      "height": 36,
       "points": [
         [
           0,
@@ -2389,11 +2389,11 @@
         ],
         [
           282,
-          -68
+          -36
         ],
         [
           300,
-          -68
+          -36
         ]
       ],
       "startArrowhead": null,
@@ -2402,7 +2402,7 @@
     {
       "id": "diag-72",
       "x": 810,
-      "y": 705,
+      "y": 718,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -2426,7 +2426,7 @@
       "locked": false,
       "type": "arrow",
       "width": 300,
-      "height": 43,
+      "height": 56,
       "points": [
         [
           0,
@@ -2438,11 +2438,11 @@
         ],
         [
           282,
-          -43
+          -56
         ],
         [
           300,
-          -43
+          -56
         ]
       ],
       "startArrowhead": null,
