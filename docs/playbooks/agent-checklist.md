@@ -66,11 +66,13 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 1. Re-read every in-scope `- [ ]` under the use case (all sections, not only *Happy path*).
 2. For each bullet: implemented + test, `N/A this PR — Frontend`, or named deferral.
 3. Only then set `Gaps vs spec: none for backend` (or list what remains).
-4. If the PR adds/changes **gRPC contracts or gRPC services**, include these path tests at minimum:
-   - valid request (happy path),
-   - invalid identifiers (`InvalidArgument`),
-   - unauthenticated/unauthorized access path,
-   - not-found or cross-tenant isolation behavior (no data leak).
+4. For **every implementation surface** touched in this PR (API endpoint, application handler, gRPC method, repository, background job, consumer), verify path coverage is explicit:
+   - valid request/flow (happy path),
+   - validation/constraint failure path,
+   - authz/authn or permission boundary where applicable,
+   - not-found and tenant/isolation boundary where applicable (no data leak),
+   - downstream dependency failure path where applicable (transport/storage/service unavailable).
+   If a path does not apply to that surface, mark it `N/A` in the AC map instead of skipping it silently.
 
 **Lesson (platform-foundation organization management):** A first pass shipped profile/settings/deletion APIs but missed Redis usage TTL (≤5 min), schedule rollback on queue failure, hard-delete purge, and form-task cancel — caught by spec review, not by “flow works.” See [organization-management callouts](../use-cases/platform-foundation/README.md) for what “done” looks like after self-audit.
 

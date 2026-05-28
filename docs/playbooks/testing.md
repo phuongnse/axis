@@ -42,6 +42,20 @@ When a repository has a unique constraint (e.g. `(organization_id, name)`), a te
 
 **Happy-path-only integration tests are not complete** — they must be expanded before the layer is marked ✅.
 
+### Required path coverage (all implementation types)
+
+This rule is generic, not repository-only: for every implementation touched in a PR (endpoint, command/query handler, gRPC service, consumer, scheduler/job), tests must cover all applicable paths instead of only the primary flow.
+
+| Path class | Minimum expectation |
+|---|---|
+| **Happy path** | Expected success result/output |
+| **Validation / constraints** | Invalid input or business constraint returns the expected failure |
+| **Auth / permissions** | Unauthenticated/forbidden paths for protected surfaces |
+| **Not found / isolation** | Unknown resource and wrong-tenant/no-data-leak behavior |
+| **Dependency failure** | Controlled failure when required downstream dependency is unavailable/fails |
+
+If a path class is not applicable to a specific surface, record it as explicit `N/A` in the AC map / status callout — never omit it implicitly.
+
 ### Pre-commit gate
 
 See [agent-checklist.md § Gate 1](./agent-checklist.md) and CLAUDE.md. When `src/` or `tests/` change:
