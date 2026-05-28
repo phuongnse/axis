@@ -529,7 +529,7 @@
     },
     {
       "id": "diag-17",
-      "x": 297.25,
+      "x": 264.25,
       "y": 288,
       "angle": 0,
       "strokeColor": "#64748b",
@@ -553,9 +553,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 181.50000000000003,
+      "width": 247.50000000000003,
       "height": 14,
-      "text": "ASP.NET Core 8 · Modular Monolith",
+      "text": "ASP.NET Core 8 · Modulith (strict boundaries)",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -760,10 +760,10 @@
     {
       "id": "diag-24",
       "x": 558,
-      "y": 250,
+      "y": 210,
       "angle": 0,
-      "strokeColor": "#16a34a",
-      "backgroundColor": "#dcfce7",
+      "strokeColor": "#ca8a04",
+      "backgroundColor": "#fef9c3",
       "fillStyle": "solid",
       "strokeWidth": 1.5,
       "strokeStyle": "solid",
@@ -785,12 +785,12 @@
       "locked": false,
       "type": "rectangle",
       "width": 220,
-      "height": 70
+      "height": 50
     },
     {
       "id": "diag-25",
-      "x": 635.825,
-      "y": 268.5,
+      "x": 585.775,
+      "y": 218.5,
       "angle": 0,
       "strokeColor": "#1e293b",
       "backgroundColor": "transparent",
@@ -813,9 +813,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 64.35000000000001,
+      "width": 164.45000000000002,
       "height": 18.2,
-      "text": "Wolverine",
+      "text": "Kafka + Schema Registry",
       "fontSize": 13,
       "fontFamily": 1,
       "textAlign": "center",
@@ -823,8 +823,8 @@
     },
     {
       "id": "diag-26",
-      "x": 596.5,
-      "y": 288,
+      "x": 566.25,
+      "y": 238,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -847,9 +847,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 143,
+      "width": 203.50000000000003,
       "height": 14,
-      "text": "Event bus · Durable outbox",
+      "text": "Events/Snapshots · Avro + CloudEvents",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -858,10 +858,10 @@
     {
       "id": "diag-27",
       "x": 558,
-      "y": 395,
+      "y": 270,
       "angle": 0,
-      "strokeColor": "#ea580c",
-      "backgroundColor": "#ffedd5",
+      "strokeColor": "#ca8a04",
+      "backgroundColor": "#fef9c3",
       "fillStyle": "solid",
       "strokeWidth": 1.5,
       "strokeStyle": "solid",
@@ -883,12 +883,12 @@
       "locked": false,
       "type": "rectangle",
       "width": 220,
-      "height": 70
+      "height": 50
     },
     {
       "id": "diag-28",
-      "x": 646.55,
-      "y": 413.5,
+      "x": 639.4,
+      "y": 278.5,
       "angle": 0,
       "strokeColor": "#1e293b",
       "backgroundColor": "transparent",
@@ -911,9 +911,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 42.900000000000006,
+      "width": 57.2,
       "height": 18.2,
-      "text": "AWS S3",
+      "text": "RabbitMQ",
       "fontSize": 13,
       "fontFamily": 1,
       "textAlign": "center",
@@ -921,8 +921,8 @@
     },
     {
       "id": "diag-29",
-      "x": 635,
-      "y": 433,
+      "x": 602,
+      "y": 298,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -945,9 +945,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 66,
+      "width": 132,
       "height": 14,
-      "text": "File storage",
+      "text": "Commands/Jobs/Saga steps",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -955,11 +955,11 @@
     },
     {
       "id": "diag-30",
-      "x": 890,
-      "y": 200,
+      "x": 558,
+      "y": 330,
       "angle": 0,
-      "strokeColor": "#9333ea",
-      "backgroundColor": "#f3e8ff",
+      "strokeColor": "#3b82f6",
+      "backgroundColor": "#dbeafe",
       "fillStyle": "solid",
       "strokeWidth": 1.5,
       "strokeStyle": "solid",
@@ -980,13 +980,13 @@
       "link": null,
       "locked": false,
       "type": "rectangle",
-      "width": 170,
-      "height": 70
+      "width": 220,
+      "height": 50
     },
     {
       "id": "diag-31",
-      "x": 928.525,
-      "y": 218.5,
+      "x": 617.95,
+      "y": 338.5,
       "angle": 0,
       "strokeColor": "#1e293b",
       "backgroundColor": "transparent",
@@ -1009,9 +1009,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 92.95,
+      "width": 100.10000000000001,
       "height": 18.2,
-      "text": "Email Service",
+      "text": "gRPC Contracts",
       "fontSize": 13,
       "fontFamily": 1,
       "textAlign": "center",
@@ -1019,8 +1019,8 @@
     },
     {
       "id": "diag-32",
-      "x": 936.5,
-      "y": 238,
+      "x": 610.25,
+      "y": 358,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1043,9 +1043,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 77,
+      "width": 115.50000000000001,
       "height": 14,
-      "text": "SMTP / MailKit",
+      "text": "Sync RPC escape hatch",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -1053,11 +1053,11 @@
     },
     {
       "id": "diag-33",
-      "x": 890,
+      "x": 558,
       "y": 395,
       "angle": 0,
-      "strokeColor": "#9333ea",
-      "backgroundColor": "#f3e8ff",
+      "strokeColor": "#ea580c",
+      "backgroundColor": "#ffedd5",
       "fillStyle": "solid",
       "strokeWidth": 1.5,
       "strokeStyle": "solid",
@@ -1078,12 +1078,12 @@
       "link": null,
       "locked": false,
       "type": "rectangle",
-      "width": 170,
+      "width": 220,
       "height": 70
     },
     {
       "id": "diag-34",
-      "x": 928.525,
+      "x": 646.55,
       "y": 413.5,
       "angle": 0,
       "strokeColor": "#1e293b",
@@ -1107,9 +1107,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 92.95,
+      "width": 42.900000000000006,
       "height": 18.2,
-      "text": "External APIs",
+      "text": "AWS S3",
       "fontSize": 13,
       "fontFamily": 1,
       "textAlign": "center",
@@ -1117,7 +1117,7 @@
     },
     {
       "id": "diag-35",
-      "x": 925.5,
+      "x": 635,
       "y": 433,
       "angle": 0,
       "strokeColor": "#64748b",
@@ -1141,6 +1141,202 @@
       "link": null,
       "locked": false,
       "type": "text",
+      "width": 66,
+      "height": 14,
+      "text": "File storage",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "id": "diag-36",
+      "x": 890,
+      "y": 200,
+      "angle": 0,
+      "strokeColor": "#9333ea",
+      "backgroundColor": "#f3e8ff",
+      "fillStyle": "solid",
+      "strokeWidth": 1.5,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 3,
+        "value": 6
+      },
+      "seed": 36,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "rectangle",
+      "width": 170,
+      "height": 70
+    },
+    {
+      "id": "diag-37",
+      "x": 928.525,
+      "y": 218.5,
+      "angle": 0,
+      "strokeColor": "#1e293b",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 37,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "text",
+      "width": 92.95,
+      "height": 18.2,
+      "text": "Email Service",
+      "fontSize": 13,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "id": "diag-38",
+      "x": 936.5,
+      "y": 238,
+      "angle": 0,
+      "strokeColor": "#64748b",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 38,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "text",
+      "width": 77,
+      "height": 14,
+      "text": "SMTP / MailKit",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "id": "diag-39",
+      "x": 890,
+      "y": 395,
+      "angle": 0,
+      "strokeColor": "#9333ea",
+      "backgroundColor": "#f3e8ff",
+      "fillStyle": "solid",
+      "strokeWidth": 1.5,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 3,
+        "value": 6
+      },
+      "seed": 39,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "rectangle",
+      "width": 170,
+      "height": 70
+    },
+    {
+      "id": "diag-40",
+      "x": 928.525,
+      "y": 413.5,
+      "angle": 0,
+      "strokeColor": "#1e293b",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 40,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "text",
+      "width": 92.95,
+      "height": 18.2,
+      "text": "External APIs",
+      "fontSize": 13,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "id": "diag-41",
+      "x": 925.5,
+      "y": 433,
+      "angle": 0,
+      "strokeColor": "#64748b",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 41,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "text",
       "width": 99.00000000000001,
       "height": 14,
       "text": "HTTP Request steps",
@@ -1150,7 +1346,7 @@
       "verticalAlign": "middle"
     },
     {
-      "id": "diag-36",
+      "id": "diag-42",
       "x": 149,
       "y": 217,
       "angle": 0,
@@ -1166,7 +1362,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 36,
+      "seed": 42,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1199,7 +1395,7 @@
       "endArrowhead": "arrow"
     },
     {
-      "id": "diag-37",
+      "id": "diag-43",
       "x": 228,
       "y": 136,
       "angle": 0,
@@ -1215,7 +1411,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 37,
+      "seed": 43,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1233,7 +1429,7 @@
       "verticalAlign": "middle"
     },
     {
-      "id": "diag-38",
+      "id": "diag-44",
       "x": 149,
       "y": 482,
       "angle": 0,
@@ -1249,7 +1445,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 38,
+      "seed": 44,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1282,7 +1478,7 @@
       "endArrowhead": "arrow"
     },
     {
-      "id": "diag-39",
+      "id": "diag-45",
       "x": 228,
       "y": 266,
       "angle": 0,
@@ -1298,7 +1494,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 39,
+      "seed": 45,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1316,7 +1512,7 @@
       "verticalAlign": "middle"
     },
     {
-      "id": "diag-40",
+      "id": "diag-46",
       "x": 388,
       "y": 190,
       "angle": 0,
@@ -1332,7 +1528,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 40,
+      "seed": 46,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1357,7 +1553,7 @@
       "endArrowhead": "arrow"
     },
     {
-      "id": "diag-41",
+      "id": "diag-47",
       "x": 363.25,
       "y": 201,
       "angle": 0,
@@ -1373,7 +1569,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 41,
+      "seed": 47,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1391,7 +1587,7 @@
       "verticalAlign": "middle"
     },
     {
-      "id": "diag-42",
+      "id": "diag-48",
       "x": 388,
       "y": 320,
       "angle": 0,
@@ -1407,7 +1603,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 42,
+      "seed": 48,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1432,7 +1628,7 @@
       "endArrowhead": "arrow"
     },
     {
-      "id": "diag-43",
+      "id": "diag-49",
       "x": 268,
       "y": 285,
       "angle": 0,
@@ -1448,7 +1644,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 43,
+      "seed": 49,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1481,7 +1677,48 @@
       "endArrowhead": "arrow"
     },
     {
-      "id": "diag-44",
+      "id": "diag-50",
+      "x": 508,
+      "y": 275,
+      "angle": 0,
+      "strokeColor": "#475569",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1.5,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 50,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "arrow",
+      "width": 50,
+      "height": 40,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          50,
+          -40
+        ]
+      ],
+      "startArrowhead": null,
+      "endArrowhead": "arrow"
+    },
+    {
+      "id": "diag-51",
       "x": 508,
       "y": 285,
       "angle": 0,
@@ -1497,7 +1734,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 44,
+      "seed": 51,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1507,7 +1744,7 @@
       "locked": false,
       "type": "arrow",
       "width": 50,
-      "height": 0,
+      "height": 10,
       "points": [
         [
           0,
@@ -1515,16 +1752,16 @@
         ],
         [
           50,
-          0
+          10
         ]
       ],
       "startArrowhead": null,
       "endArrowhead": "arrow"
     },
     {
-      "id": "diag-45",
-      "x": 668,
-      "y": 320,
+      "id": "diag-52",
+      "x": 508,
+      "y": 295,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1538,7 +1775,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 45,
+      "seed": 52,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1547,73 +1784,24 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 0,
-      "height": 75,
+      "width": 50,
+      "height": 60,
       "points": [
         [
           0,
           0
         ],
         [
-          0,
-          75
+          50,
+          60
         ]
       ],
       "startArrowhead": null,
       "endArrowhead": "arrow"
     },
     {
-      "id": "diag-46",
-      "x": 778,
-      "y": 270,
-      "angle": 0,
-      "strokeColor": "#475569",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1.5,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 46,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "arrow",
-      "width": 112,
-      "height": 35,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          62,
-          0
-        ],
-        [
-          62,
-          -35
-        ],
-        [
-          112,
-          -35
-        ]
-      ],
-      "startArrowhead": null,
-      "endArrowhead": "arrow"
-    },
-    {
-      "id": "diag-47",
-      "x": 778,
+      "id": "diag-53",
+      "x": 508,
       "y": 305,
       "angle": 0,
       "strokeColor": "#475569",
@@ -1628,7 +1816,56 @@
       "roundness": {
         "type": 2
       },
-      "seed": 47,
+      "seed": 53,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "arrow",
+      "width": 50,
+      "height": 125,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          32,
+          0
+        ],
+        [
+          32,
+          125
+        ],
+        [
+          50,
+          125
+        ]
+      ],
+      "startArrowhead": null,
+      "endArrowhead": "arrow"
+    },
+    {
+      "id": "diag-54",
+      "x": 778,
+      "y": 235,
+      "angle": 0,
+      "strokeColor": "#475569",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1.5,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 54,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1638,7 +1875,7 @@
       "locked": false,
       "type": "arrow",
       "width": 112,
-      "height": 125,
+      "height": 0,
       "points": [
         [
           0,
@@ -1650,11 +1887,60 @@
         ],
         [
           62,
-          125
+          0
         ],
         [
           112,
-          125
+          0
+        ]
+      ],
+      "startArrowhead": null,
+      "endArrowhead": "arrow"
+    },
+    {
+      "id": "diag-55",
+      "x": 778,
+      "y": 295,
+      "angle": 0,
+      "strokeColor": "#475569",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1.5,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 55,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "arrow",
+      "width": 112,
+      "height": 135,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          62,
+          0
+        ],
+        [
+          62,
+          135
+        ],
+        [
+          112,
+          135
         ]
       ],
       "startArrowhead": null,
