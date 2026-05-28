@@ -13,6 +13,9 @@ service FormModelReferenceService {
 }
 
 message CountActiveModelReferencesRequest {
+  reserved 2;
+  reserved "organization_id";
+
   string model_id = 1;
 }
 

@@ -1303,7 +1303,6 @@ message GetUserPermissionsResponse {
 }
 ```
 
-> **Status note:** `IdentityService` still accepts a legacy `organization_id` field on `GetUserPermissionsRequest`. Migration to JWT-derived tenant scoping is a follow-up; new gRPC services (`DataModelCatalogService`, `FormModelReferenceService`, `WorkflowFormReferenceService`) already follow the canonical pattern above.
 
 **Buf (repo-wide lint + breaking)** — register every new module proto root before merge:
 

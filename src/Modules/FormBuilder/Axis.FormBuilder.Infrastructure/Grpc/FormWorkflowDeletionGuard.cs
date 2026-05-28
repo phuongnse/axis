@@ -16,7 +16,6 @@ internal sealed class FormWorkflowDeletionGuard(
 
     public async Task<Result> ValidateCanDeleteAsync(
         Guid formId,
-        Guid organizationId,
         CancellationToken cancellationToken = default)
     {
         Metadata headers = BuildAuthorizationMetadata();

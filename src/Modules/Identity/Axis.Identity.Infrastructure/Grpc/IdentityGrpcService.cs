@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Axis.Identity.Application.Queries.GetUserPermissions;
 using Axis.Identity.Contracts.Grpc;
 using Axis.Shared.Domain.Primitives;
@@ -18,11 +19,7 @@ internal sealed class IdentityGrpcService(IMediator mediator) : IdentityService.
                 new Status(StatusCode.InvalidArgument, "user_id must be a valid GUID."));
         }
 
-        if (!Guid.TryParse(request.OrganizationId, out Guid organizationId))
-        {
-            throw new RpcException(
-                new Status(StatusCode.InvalidArgument, "organization_id must be a valid GUID."));
-        }
+        Guid organizationId = ResolveCallerOrganizationId(context);
 
         Result<GetUserPermissionsResult> result = await mediator.Send(
             new GetUserPermissionsQuery(userId, organizationId),
@@ -43,5 +40,17 @@ internal sealed class IdentityGrpcService(IMediator mediator) : IdentityService.
         GetUserPermissionsResponse response = new();
         response.Permissions.AddRange(result.Value.Permissions);
         return response;
+    }
+
+    private static Guid ResolveCallerOrganizationId(ServerCallContext context)
+    {
+        Claim? claim = context.GetHttpContext().User.FindFirst("org_id");
+        if (claim is null || !Guid.TryParse(claim.Value, out Guid organizationId))
+        {
+            throw new RpcException(
+                new Status(StatusCode.Unauthenticated, "Caller JWT is missing a valid org_id claim."));
+        }
+
+        return organizationId;
     }
 }

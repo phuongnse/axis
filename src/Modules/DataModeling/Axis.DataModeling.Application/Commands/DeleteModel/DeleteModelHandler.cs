@@ -19,7 +19,7 @@ public sealed class DeleteModelHandler(
             return Result.Failure(ErrorCodes.NotFound, "Model not found.");
 
         Result guardResult = await deletionGuard.ValidateCanDeleteAsync(
-            command.ModelId, command.OrganizationId, cancellationToken);
+            command.ModelId, cancellationToken);
         if (guardResult.IsFailure)
             return guardResult;
 

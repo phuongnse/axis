@@ -20,7 +20,7 @@ public class DeleteModelHandlerTests
 
     public DeleteModelHandlerTests()
     {
-        _deletionGuard.ValidateCanDeleteAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+        _deletionGuard.ValidateCanDeleteAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(Result.Success());
     }
 
@@ -71,7 +71,7 @@ public class DeleteModelHandlerTests
     {
         DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
-        _deletionGuard.ValidateCanDeleteAsync(model.Id, OrgId, Arg.Any<CancellationToken>())
+        _deletionGuard.ValidateCanDeleteAsync(model.Id, Arg.Any<CancellationToken>())
             .Returns(Result.Failure(ErrorCodes.Conflict, "This model is used by 2 form(s). Remove those references before deleting."));
 
         Result result = await CreateHandler().Handle(new DeleteModelCommand(model.Id, OrgId), CancellationToken.None);

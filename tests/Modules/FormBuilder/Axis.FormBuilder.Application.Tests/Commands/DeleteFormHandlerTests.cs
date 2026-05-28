@@ -25,7 +25,7 @@ public class DeleteFormHandlerTests
     {
         FormDefinition form = FormDefinition.Create("Employee Intake", null, OrgId, UserId);
         _formRepo.GetByIdAsync(form.Id, OrgId).Returns(form);
-        _formDeletionGuard.ValidateCanDeleteAsync(form.Id, OrgId, Arg.Any<CancellationToken>())
+        _formDeletionGuard.ValidateCanDeleteAsync(form.Id, Arg.Any<CancellationToken>())
             .Returns(Result.Success());
 
         Result result = await CreateHandler().Handle(new DeleteFormCommand(form.Id, OrgId), CancellationToken.None);
@@ -40,7 +40,7 @@ public class DeleteFormHandlerTests
     {
         FormDefinition form = FormDefinition.Create("Employee Intake", null, OrgId, UserId);
         _formRepo.GetByIdAsync(form.Id, OrgId).Returns(form);
-        _formDeletionGuard.ValidateCanDeleteAsync(form.Id, OrgId, Arg.Any<CancellationToken>())
+        _formDeletionGuard.ValidateCanDeleteAsync(form.Id, Arg.Any<CancellationToken>())
             .Returns(Result.Failure(ErrorCodes.BusinessRule,
                 "This form is referenced by one or more active workflow steps. Remove those references before deleting."));
 
