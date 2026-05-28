@@ -68,7 +68,7 @@ All diagrams are Excalidraw (`.excalidraw` source + `.svg` preview). Regenerate 
 
 ## Wireframes
 
-Excalidraw wireframes live in `docs/use-cases/{domain}/wireframes/`, co-located with each domain's use cases and diagrams. Shared screens (template, app-shell) remain in `docs/use-cases/_shared/wireframes/`. Each use case lives in `docs/use-cases/{domain}/{short-slug}/README.md` with a `## Wireframes` table (see [use-case template](./use-cases/_template/README.md)).
+Excalidraw wireframes live in `docs/use-cases/{domain}/wireframes/`, co-located with each domain's use cases and diagrams. Shared screens (template, app-shell) remain in `docs/use-cases/_shared/wireframes/`. Each use case lives in `docs/use-cases/{domain}/{short-slug}/README.md` with a `## Wireframes` table (see [use-case template](./use-cases/USE_CASE_TEMPLATE.md)).
 
 | Screen | Source | Preview |
 |---|---|---|
@@ -82,7 +82,7 @@ When two docs disagree, the **owner** wins. Update the owner first; everything e
 
 | Topic | Owner |
 |---|---|
-| Use-case layout (flow + AC + artifacts + status) | [use-cases/_template/README.md](./use-cases/_template/README.md) + [playbooks/docs-style.md](./playbooks/docs-style.md#use-case-files-wireframes--implementation-status) |
+| Use-case layout (flow + AC + artifacts + status) | [use-cases/USE_CASE_TEMPLATE.md](./use-cases/USE_CASE_TEMPLATE.md) + [playbooks/docs-style.md](./playbooks/docs-style.md#use-case-files-wireframes--implementation-status) |
 | Product scope, target users, MVP cut | [PRODUCT_VISION.md](./PRODUCT_VISION.md) |
 | Library versions and ADRs | [TECH_STACK.md](./TECH_STACK.md) |
 | Source tree and module boundaries | [../CLAUDE.md](../CLAUDE.md) |
