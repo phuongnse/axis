@@ -1,6 +1,6 @@
 /**
  * Axis UI Component Kit — _template.excalidraw
- * Run: node docs/shared-assets/wireframes/generate-template.mjs
+ * Run: node docs/wireframes/generate-template.mjs
  *
  * TOC — 37 sections
  * ─── Foundations ─────────────────── S01 Color Palette

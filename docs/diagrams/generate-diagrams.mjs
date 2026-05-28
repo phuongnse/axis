@@ -1,10 +1,10 @@
 /**
  * generate-diagrams.mjs
  * Generates Excalidraw JSON for all architecture diagrams.
- * Run:  node docs/architecture/generate-diagrams.mjs
+ * Run:  node docs/diagrams/generate-diagrams.mjs
  * Then: docs/scripts/generate-diagrams.ps1  (to produce .svg files)
  *
- * Platform architecture (docs/architecture/diagrams/):
+ * Platform architecture (docs/diagrams/):
  *   system-context  — who uses Axis, what external systems
  *   container       — what runs inside Axis, per-module databases, Wolverine
  *   module-overview — 6 modules + event-driven communication flows

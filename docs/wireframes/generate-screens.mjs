@@ -1,6 +1,6 @@
 /**
  * Axis Screen Wireframes — generate-screens.mjs
- * Run: node docs/shared-assets/wireframes/generate-screens.mjs
+ * Run: node docs/wireframes/generate-screens.mjs
  *
  * All visual components are sourced from generate-template.mjs builders.
  * Use component(buildXxx, x, y) to place template sections into screens.
@@ -92,7 +92,7 @@ function write(relativePath, elements) {
     const [domainFolder, ...rest] = relativePath.split('/');
     full = join(__dir, '..', 'use-cases', domainFolder, 'wireframes', ...rest);
   } else {
-    // Shared wireframe → docs/shared-assets/wireframes/{path}
+    // Shared wireframe → docs/wireframes/{path}
     full = join(__dir, relativePath);
   }
   mkdirSync(dirname(full), { recursive: true });

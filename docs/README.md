@@ -45,15 +45,15 @@
 
 ## Key Diagrams
 
-All diagrams are Excalidraw (`.excalidraw` source + `.svg` preview). Regenerate with `node docs/architecture/generate-diagrams.mjs` then `docs/scripts/generate-diagrams.ps1`.
+All diagrams are Excalidraw (`.excalidraw` source + `.svg` preview). Regenerate with `node docs/diagrams/generate-diagrams.mjs` then `docs/scripts/generate-diagrams.ps1`.
 
-**System-level** (`docs/architecture/diagrams/`):
+**System-level** (`docs/diagrams/`):
 
 | Diagram | Source | Preview |
 |---|---|---|
-| System Context | [system-context.excalidraw](./architecture/diagrams/system-context.excalidraw) | [system-context.svg](./architecture/diagrams/system-context.svg) |
-| Container Diagram | [container.excalidraw](./architecture/diagrams/container.excalidraw) | [container.svg](./architecture/diagrams/container.svg) |
-| Module Overview | [module-overview.excalidraw](./architecture/diagrams/module-overview.excalidraw) | [module-overview.svg](./architecture/diagrams/module-overview.svg) |
+| System Context | [system-context.excalidraw](./diagrams/system-context.excalidraw) | [system-context.svg](./diagrams/system-context.svg) |
+| Container Diagram | [container.excalidraw](./diagrams/container.excalidraw) | [container.svg](./diagrams/container.svg) |
+| Module Overview | [module-overview.excalidraw](./diagrams/module-overview.excalidraw) | [module-overview.svg](./diagrams/module-overview.svg) |
 
 **Use-case-level** (inside each `docs/use-cases/{domain}/{use-case}/` folder):
 
@@ -68,7 +68,7 @@ All diagrams are Excalidraw (`.excalidraw` source + `.svg` preview). Regenerate 
 
 ## Wireframes
 
-Excalidraw wireframes/diagrams live alongside each use case in `docs/use-cases/{domain}/{short-slug}/`. Shared kit screens (template, app-shell) remain in `docs/shared-assets/wireframes/`. Each use case uses a `## Wireframes` + `## Diagrams` table (see [use-case template](./use-cases/USE_CASE_TEMPLATE.md)).
+Excalidraw wireframes/diagrams live alongside each use case in `docs/use-cases/{domain}/{short-slug}/`. Shared kit screens (template, app-shell) remain in `docs/wireframes/`. Each use case uses a `## Wireframes` + `## Diagrams` table (see [use-case template](./use-cases/USE_CASE_TEMPLATE.md)).
 
 | Screen | Source | Preview |
 |---|---|---|

@@ -75,7 +75,7 @@ docs/use-cases/
         └── *.svg            # previews for this use case
 ```
 
-Shared UI kit wireframes: [`../shared-assets/wireframes/`](../shared-assets/wireframes/). Platform architecture diagrams: [`../architecture/diagrams/`](../architecture/diagrams/).
+Shared UI kit wireframes: [`../wireframes/`](../wireframes/). Platform architecture diagrams: [`../diagrams/`](../diagrams/).
 
 ---
 

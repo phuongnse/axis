@@ -29,7 +29,7 @@ Without a UI builder, users need a developer to display and interact with their 
 
 ## Diagrams
 
-> **Pending** — page-model diagram not yet created. Add `page-model` to `docs/architecture/diagrams/generate-diagrams.mjs` when this domain begins.
+> **Pending** — page-model diagram not yet created. Add `page-model` to `docs/diagrams/generate-diagrams.mjs` when this domain begins.
 
 ---
 
