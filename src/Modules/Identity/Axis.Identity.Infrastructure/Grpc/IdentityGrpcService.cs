@@ -13,13 +13,13 @@ internal sealed class IdentityGrpcService(IMediator mediator) : IdentityService.
         GetUserPermissionsRequest request,
         ServerCallContext context)
     {
+        Guid organizationId = ResolveCallerOrganizationId(context);
+
         if (!Guid.TryParse(request.UserId, out Guid userId))
         {
             throw new RpcException(
                 new Status(StatusCode.InvalidArgument, "user_id must be a valid GUID."));
         }
-
-        Guid organizationId = ResolveCallerOrganizationId(context);
 
         Result<GetUserPermissionsResult> result = await mediator.Send(
             new GetUserPermissionsQuery(userId, organizationId),

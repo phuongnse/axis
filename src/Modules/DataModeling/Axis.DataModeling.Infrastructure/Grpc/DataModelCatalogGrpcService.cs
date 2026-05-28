@@ -13,13 +13,13 @@ internal sealed class DataModelCatalogGrpcService(IDataModelRepository dataModel
         GetModelSummaryRequest request,
         ServerCallContext context)
     {
+        Guid organizationId = ResolveCallerOrganizationId(context);
+
         if (!Guid.TryParse(request.ModelId, out Guid modelId))
         {
             throw new RpcException(
                 new Status(StatusCode.InvalidArgument, "model_id must be a valid GUID."));
         }
-
-        Guid organizationId = ResolveCallerOrganizationId(context);
 
         DataModel? model = await dataModelRepository.GetByIdAsync(
             modelId,

@@ -12,10 +12,10 @@ internal sealed class WorkflowFormReferenceGrpcService(IWorkflowReferenceReposit
         CountBlockingFormReferencesRequest request,
         ServerCallContext context)
     {
+        Guid organizationId = ResolveCallerOrganizationId(context);
+
         if (!Guid.TryParse(request.FormId, out Guid formId))
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid form_id."));
-
-        Guid organizationId = ResolveCallerOrganizationId(context);
 
         int count = await references.CountBlockingFormReferencesAsync(
             formId,

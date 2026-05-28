@@ -12,13 +12,13 @@ internal sealed class FormModelReferenceGrpcService(IFormModelReferenceRepositor
         CountActiveModelReferencesRequest request,
         ServerCallContext context)
     {
+        Guid organizationId = ResolveCallerOrganizationId(context);
+
         if (!Guid.TryParse(request.ModelId, out Guid modelId))
         {
             throw new RpcException(
                 new Status(StatusCode.InvalidArgument, "model_id must be a valid GUID."));
         }
-
-        Guid organizationId = ResolveCallerOrganizationId(context);
 
         int count = await references.CountActiveReferencesToModelAsync(
             modelId, organizationId, context.CancellationToken);
