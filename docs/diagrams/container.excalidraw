@@ -2624,8 +2624,8 @@
     },
     {
       "id": "diag-79",
-      "x": 1090,
-      "y": 592,
+      "x": 810,
+      "y": 578,
       "angle": 0,
       "strokeColor": "#9333ea",
       "backgroundColor": "transparent",
@@ -2648,16 +2648,16 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 20,
-      "height": 0,
+      "width": 300,
+      "height": 14,
       "points": [
         [
           0,
           0
         ],
         [
-          20,
-          0
+          300,
+          14
         ]
       ],
       "startArrowhead": null,
@@ -2665,8 +2665,8 @@
     },
     {
       "id": "diag-80",
-      "x": 1067,
-      "y": 573,
+      "x": 927,
+      "y": 566,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2699,8 +2699,8 @@
     },
     {
       "id": "diag-81",
-      "x": 1090,
-      "y": 662,
+      "x": 810,
+      "y": 648,
       "angle": 0,
       "strokeColor": "#9333ea",
       "backgroundColor": "transparent",
@@ -2723,16 +2723,16 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 20,
-      "height": 0,
+      "width": 300,
+      "height": 14,
       "points": [
         [
           0,
           0
         ],
         [
-          20,
-          0
+          300,
+          14
         ]
       ],
       "startArrowhead": null,
@@ -2740,8 +2740,8 @@
     },
     {
       "id": "diag-82",
-      "x": 1064.25,
-      "y": 643,
+      "x": 924.25,
+      "y": 636,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -3163,40 +3163,6 @@
       "height": 12.6,
       "text": "Infra connection",
       "fontSize": 9,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
-    },
-    {
-      "id": "diag-95",
-      "x": 644.875,
-      "y": 199.75,
-      "angle": 0,
-      "strokeColor": "#64748b",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 95,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "text",
-      "width": 140.25,
-      "height": 11.899999999999999,
-      "text": "Straight arrows where possible",
-      "fontSize": 8.5,
       "fontFamily": 1,
       "textAlign": "center",
       "verticalAlign": "middle"

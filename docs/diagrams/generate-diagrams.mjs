@@ -450,8 +450,8 @@ function containerDiagram() {
   // External managed services moved to separate column
   els.push(...rect({ x: 1110, y: 565, w: 200, h: 55, bg: C.extBg, stroke: C.extBdr, label: "AWS S3", sub: "File storage" }));
   els.push(...rect({ x: 1110, y: 635, w: 200, h: 55, bg: C.extBg, stroke: C.extBdr, label: "Email Service", sub: "SMTP · MailKit" }));
-  els.push(...arrow({ x1: 1090, y1: 592, x2: 1110, y2: 592, color: C.extBdr, label: "file storage" }));
-  els.push(...arrow({ x1: 1090, y1: 662, x2: 1110, y2: 662, color: C.extBdr, label: "notifications" }));
+  els.push(...arrow({ x1: 810, y1: 578, x2: 1110, y2: 592, color: C.extBdr, label: "file storage" }));
+  els.push(...arrow({ x1: 810, y1: 648, x2: 1110, y2: 662, color: C.extBdr, label: "notifications" }));
 
   // Compact legend
   els.push(...rect({ x: 640, y: 94, w: 150, h: 112, bg: "#ffffff", stroke: C.border }));
@@ -466,7 +466,6 @@ function containerDiagram() {
   els.push(text({ x: 668, y: 178, value: "External service", size: 9, color: C.text }));
   els.push(...arrow({ x1: 650, y1: 190, x2: 680, y2: 190, color: C.infraBdr }));
   els.push(text({ x: 685, y: 190, value: "Infra connection", size: 9, color: C.text }));
-  els.push(text({ x: 715, y: 204, value: "Straight arrows where possible", size: 8.5, color: C.muted, anchor: "center" }));
 
   return excalidraw(els);
 }
