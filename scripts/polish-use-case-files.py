@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 USE_CASES = ROOT / "docs" / "use-cases"
-SKIP = {"README.md", "_template-use-case.md"}
+SKIP_DIRS = {"README.md", "_template", "_architecture", "_shared"}
 
 H1_RE = re.compile(r"^# Use case — (.+)$", re.MULTILINE)
 UC_HEADING_RE = re.compile(r"^### Use case — (.+)$", re.MULTILINE)
@@ -344,11 +344,14 @@ def polish_file(path: Path) -> bool:
 
 def main() -> int:
     changed = 0
-    for path in sorted(USE_CASES.glob("*/*.md")):
-        if path.name in SKIP:
+    for domain_dir in sorted(USE_CASES.iterdir()):
+        if not domain_dir.is_dir() or domain_dir.name.startswith("_"):
             continue
-        if polish_file(path):
-            changed += 1
+        for path in sorted(domain_dir.glob("*/README.md")):
+            if path.parent.name in SKIP_DIRS:
+                continue
+            if polish_file(path):
+                changed += 1
     print(f"Polished {changed} use-case files")
     return 0
 

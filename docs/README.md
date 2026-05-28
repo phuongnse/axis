@@ -68,7 +68,7 @@ All diagrams are Excalidraw (`.excalidraw` source + `.svg` preview). Regenerate 
 
 ## Wireframes
 
-Excalidraw wireframes live in `docs/use-cases/{domain}/wireframes/`, co-located with each domain's use cases and diagrams. Shared screens (template, app-shell) remain in `docs/use-cases/_shared/wireframes/`. Each use-case file lists wireframes in a `## Wireframes` table (see [use-case template](./use-cases/_template-use-case.md)).
+Excalidraw wireframes live in `docs/use-cases/{domain}/wireframes/`, co-located with each domain's use cases and diagrams. Shared screens (template, app-shell) remain in `docs/use-cases/_shared/wireframes/`. Each use case lives in `docs/use-cases/{domain}/{short-slug}/README.md` with a `## Wireframes` table (see [use-case template](./use-cases/_template/README.md)).
 
 | Screen | Source | Preview |
 |---|---|---|
@@ -82,11 +82,11 @@ When two docs disagree, the **owner** wins. Update the owner first; everything e
 
 | Topic | Owner |
 |---|---|
-| Use-case layout (flow + AC + artifacts + status) | [use-cases/_template-use-case.md](./use-cases/_template-use-case.md) + [playbooks/docs-style.md](./playbooks/docs-style.md#use-case-files-flow-first) |
+| Use-case layout (flow + AC + artifacts + status) | [use-cases/_template/README.md](./use-cases/_template/README.md) + [playbooks/docs-style.md](./playbooks/docs-style.md#use-case-files-wireframes--implementation-status) |
 | Product scope, target users, MVP cut | [PRODUCT_VISION.md](./PRODUCT_VISION.md) |
 | Library versions and ADRs | [TECH_STACK.md](./TECH_STACK.md) |
 | Source tree and module boundaries | [../CLAUDE.md](../CLAUDE.md) |
-| Per-use-case ACs and current gaps | `docs/use-cases/{domain}/*.md` |
+| Per-use-case ACs and current gaps | `docs/use-cases/{domain}/{short-slug}/README.md` |
 | Module-wide layer status | [PROGRESS.md](./PROGRESS.md) |
 | Daily agent workflow + gates | [playbooks/agent-checklist.md](./playbooks/agent-checklist.md) |
 | Local dev (compose, ports, URLs) | [playbooks/local-dev.md](./playbooks/local-dev.md) + [`docker-compose.yml`](../docker-compose.yml) |

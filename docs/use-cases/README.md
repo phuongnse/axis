@@ -66,17 +66,21 @@ Execution data → Build pages & widgets → End users
 ```text
 docs/use-cases/
 ├── README.md
-├── _template-use-case.md
+├── _template/
+│   └── README.md            # copy when adding a use case
 ├── _architecture/
 │   ├── generate-diagrams.mjs
-│   └── diagrams/          # platform-wide (system context, container, modules)
+│   └── diagrams/            # platform-wide (system context, container, modules)
 ├── _shared/
-│   └── wireframes/        # kit template, app-shell, generate-screens.mjs
+│   └── wireframes/          # kit template, app-shell, generate-screens.mjs
 └── <domain>/
-    ├── README.md          # domain index + open work
-    ├── wireframes/        # screen Excalidraw + SVG
-    ├── diagrams/          # domain technical diagrams
-    └── <use-case>.md
+    ├── README.md            # domain index + grouped use-case links
+    ├── wireframes/          # shared screens for this domain
+    ├── diagrams/            # domain technical diagrams
+    └── <short-slug>/        # one folder per use case (short, readable name)
+        ├── README.md        # spec (flow, AC, implementation status)
+        ├── wireframes/      # screens only for this use case (optional)
+        └── diagrams/        # use-case diagrams (optional)
 ```
 
 Shared UI kit wireframes: [`_shared/wireframes/`](./_shared/wireframes/). Platform architecture diagrams: [`_architecture/diagrams/`](./_architecture/diagrams/).

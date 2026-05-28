@@ -79,7 +79,7 @@ Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoi
 
 **Organization management (backend):** ✅ profile API, settings + usage, scheduled deletion with 30-day hard-delete job. Frontend ⏳.
 
-**Tenant isolation:** ✅ `TenantSchemaInterceptor`, `TenantOrganizationAccessMiddleware` (403 for missing/archived/not-ready orgs), cross-tenant API integration tests — see [tenant isolation](./use-cases/platform-foundation/automatic-tenant-scoping-on-every-request.md).
+**Tenant isolation:** ✅ `TenantSchemaInterceptor`, `TenantOrganizationAccessMiddleware` (403 for missing/archived/not-ready orgs), cross-tenant API integration tests — see [tenant isolation](./use-cases/platform-foundation/tenant-scope/).
 
 **Agents:** per-use-case truth in **Implementation status** callouts; domain [Open work](./use-cases/platform-foundation/README.md#open-work-agents) lists next backend/frontend items.
 

@@ -13,10 +13,22 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-USE_CASE_GLOB = "docs/use-cases/**/*.md"
-SKIP_FILES = {"README.md", "_template-use-case.md"}
+USE_CASES = ROOT / "docs" / "use-cases"
+SKIP_DIRS = {"_template", "_architecture", "_shared"}
 
 REQUIRED_HEADINGS = ["## Wireframes", "## Diagrams"]
+
+
+def iter_use_case_files() -> list[Path]:
+    files: list[Path] = []
+    for domain_dir in sorted(USE_CASES.iterdir()):
+        if not domain_dir.is_dir() or domain_dir.name.startswith("_"):
+            continue
+        for readme in sorted(domain_dir.glob("*/README.md")):
+            if readme.parent.name in SKIP_DIRS:
+                continue
+            files.append(readme)
+    return files
 
 
 def check_file(path: Path) -> list[str]:
@@ -31,16 +43,12 @@ def check_file(path: Path) -> list[str]:
         if heading not in text:
             issues.append(f"{rel}: missing required heading `{heading}`")
 
-    has_purpose = "## Purpose" in text or re.search(r"^\*\*Purpose:\*\*", text, re.MULTILINE)
-    has_actor = (
-        "## Primary actor" in text
-        or "## Actor" in text
-        or re.search(r"^\*\*Primary actor:\*\*", text, re.MULTILINE)
-    )
-    has_trigger = "## Trigger" in text or re.search(r"^\*\*Trigger:\*\*", text, re.MULTILINE)
-    has_main_flow = "## Main flow" in text or "#### Main flow" in text
-    has_alt_flow = "## Alternate / error flows" in text or "#### Alternate / error flows" in text
-    has_ac = "## Acceptance Criteria" in text or "**Acceptance Criteria:**" in text
+    has_purpose = "## Purpose" in text
+    has_actor = "## Primary actor" in text
+    has_trigger = "## Trigger" in text
+    has_main_flow = "## Main flow" in text
+    has_alt_flow = "## Alternate / error flows" in text
+    has_ac = "## Acceptance Criteria" in text
 
     if not has_purpose:
         issues.append(f"{rel}: missing purpose section")
@@ -73,9 +81,7 @@ def main() -> int:
     _ = parser.parse_args()
 
     issues: list[str] = []
-    for path in sorted(ROOT.glob(USE_CASE_GLOB)):
-        if path.name in SKIP_FILES:
-            continue
+    for path in iter_use_case_files():
         issues.extend(check_file(path))
 
     if issues:

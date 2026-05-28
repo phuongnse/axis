@@ -24,39 +24,39 @@ A workflow builder without an execution engine is just a drawing tool. This doma
 
 | Use case | Summary |
 |---|---|
-| [Cancel a running execution](cancel-a-running-execution.md) | Cancel a running execution so that I can stop a process that is no longer needed. |
-| [Start a workflow execution](start-a-workflow-execution.md) | Start a workflow execution so that the defined process begins running. |
-| [Track execution status in real time](track-execution-status-in-real-time.md) | See the live status of a running execution so that I know where it is in the process. |
+| [Cancel a running execution](cancel-execution/) | Cancel a running execution so that I can stop a process that is no longer needed. |
+| [Start a workflow execution](start-execution/) | Start a workflow execution so that the defined process begins running. |
+| [Track execution status in real time](track-execution/) | See the live status of a running execution so that I know where it is in the process. |
 
 ### History & detail
 
 | Use case | Summary |
 |---|---|
-| [View detailed error information](view-detailed-error-information.md) | See the full error details of a failed step so that I can understand what went wrong. |
-| [View execution detail and step timeline](view-execution-detail-and-step-timeline.md) | See the full detail of a specific execution so that I can understand exactly what happened at each s |
-| [View execution history for a workflow](view-execution-history-for-a-workflow.md) | See the execution history for a specific workflow so that I can monitor its performance and identify |
-| [View org-wide execution history](view-org-wide-execution-history.md) | See all executions across all workflows so that I have a global overview of automation activity. |
-| [View retry history](view-retry-history.md) | See the retry history of a failed execution so that I can track how many times it has been retried. |
+| [View execution detail and step timeline](execution-detail/) | See the full detail of a specific execution so that I can understand exactly what happened at each s |
+| [View org-wide execution history](org-execution-history/) | See all executions across all workflows so that I have a global overview of automation activity. |
+| [View execution history for a workflow](workflow-history/) | See the execution history for a specific workflow so that I can monitor its performance and identify |
 
 ### Errors & notifications
 
 | Use case | Summary |
 |---|---|
-| [Configure error notification channels per workflow](configure-error-notification-channels-per-workflow.md) | Configure who gets notified when my workflow fails so that the right people are alerted. |
-| [Receive error notification when a workflow fails](receive-error-notification-when-a-workflow-fails.md) | Be notified when a workflow execution fails so that I can investigate and take action. |
+| [Configure error notification channels per workflow](error-channels/) | Configure who gets notified when my workflow fails so that the right people are alerted. |
+| [View detailed error information](error-detail/) | See the full error details of a failed step so that I can understand what went wrong. |
+| [Receive error notification when a workflow fails](failure-notify/) | Be notified when a workflow execution fails so that I can investigate and take action. |
 
 ### Retry
 
 | Use case | Summary |
 |---|---|
-| [Retry a failed execution](retry-a-failed-execution.md) | Retry a failed execution from the point of failure so that I don't have to re-run steps that already |
-| [Retry with modified input context](retry-with-modified-input-context.md) | Modify the execution context before retrying so that I can fix data errors that caused the original  |
+| [Retry a failed execution](retry-execution/) | Retry a failed execution from the point of failure so that I don't have to re-run steps that already |
+| [View retry history](retry-history/) | See the retry history of a failed execution so that I can track how many times it has been retried. |
+| [Retry with modified input context](retry-with-context/) | Modify the execution context before retrying so that I can fix data errors that caused the original  |
 
 ### Step handlers
 
 | Use case | Summary |
 |---|---|
-| [Step execution is isolated and resilient](step-execution-is-isolated-and-resilient.md) | Run each step handler in isolation so that a failure in one step does not crash the engine or affect |
+| [Step execution is isolated and resilient](isolated-steps/) | Run each step handler in isolation so that a failure in one step does not crash the engine or affect |
 
 
 

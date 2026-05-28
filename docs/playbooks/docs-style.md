@@ -43,19 +43,22 @@ When you find yourself editing the same fact in two files, the architecture is w
 
 ## Use-case files — wireframes & implementation status
 
-Every `docs/use-cases/<domain>/<use-case-slug>.md` file uses these layouts so agents can scan status without parsing inline pipes.
+Every `docs/use-cases/<domain>/<short-slug>/README.md` file uses these layouts so agents can scan status without parsing inline pipes.
 
-### Wireframes (top of file, after title / back-link)
+### Wireframes (in each use-case folder)
 
 ```markdown
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| login | [source](../wireframes/login.excalidraw) | [preview](../wireframes/login.svg) |
+| login | [source](./wireframes/login.excalidraw) | [preview](./wireframes/login.svg) |
+| shared-editor | [source](../wireframes/workflow-editor.excalidraw) | [preview](../wireframes/workflow-editor.svg) |
 ```
 
-One row per screen. **One table per use-case file** — do not split wireframes into multiple `| Screen |` tables (merge registration vs provisioning screens into the same table). **Do not** stack multiple `> **Wireframe**:` blockquote lines — they are hard to read and drift from the table format.
+- Put screens **only used by this use case** under `<short-slug>/wireframes/`.
+- Reference **shared domain screens** with `../wireframes/` (do not copy duplicates).
+- One table per `README.md` — no blockquote wireframe stacks.
 
 ### Implementation status (after each US AC block)
 

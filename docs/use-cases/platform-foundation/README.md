@@ -24,33 +24,33 @@ Without this foundation, nothing else works. Every feature in every other domain
 
 | Use case | Summary |
 |---|---|
-| [Automatic tenant provisioning](automatic-tenant-provisioning.md) | My organization's environment to be ready immediately after email verification so that I can start u |
-| [Register a new organization](register-a-new-organization.md) | Register my organization on the Axis platform so that I can start building workflows for my team. |
-| [Select a subscription plan during registration](select-a-subscription-plan-during-registration.md) | Choose a subscription plan during registration so that I know what features and limits I have access |
-| [Verify email and activate account](verify-email-and-activate-account.md) | Verify my email address so that my account is activated and I can access the platform. |
+| [Select a subscription plan during registration](plan-at-signup/) | Choose a subscription plan during registration so that I know what features and limits I have access |
+| [Automatic tenant provisioning](provision-tenant/) | My organization's environment to be ready immediately after email verification so that I can start u |
+| [Register a new organization](register-org/) | Register my organization on the Axis platform so that I can start building workflows for my team. |
+| [Verify email and activate account](verify-email/) | Verify my email address so that my account is activated and I can access the platform. |
 
 ### Subscription plans
 
 | Use case | Summary |
 |---|---|
-| [Change organization plan (admin override)](change-organization-plan-admin-override.md) | Manually change an organization's plan so that I can support early customers and testing without a b |
-| [Enforce plan limits at the API](enforce-plan-limits-at-the-api.md) | Enforce subscription plan limits at the API so that organizations cannot exceed their subscription w |
-| [View available plans](view-available-plans.md) | Compare available subscription plans so that I can choose the one that fits my needs. |
+| [Change organization plan (admin override)](admin-change-plan/) | Manually change an organization's plan so that I can support early customers and testing without a b |
+| [Enforce plan limits at the API](enforce-limits/) | Enforce subscription plan limits at the API so that organizations cannot exceed their subscription w |
+| [View available plans](view-plans/) | Compare available subscription plans so that I can choose the one that fits my needs. |
 
 ### Organization settings
 
 | Use case | Summary |
 |---|---|
-| [Delete organization](delete-organization.md) | Permanently delete my organization so that all our data is removed from the platform. |
-| [Update organization profile](update-organization-profile.md) | Update my organization's name and logo so that the platform reflects our brand. |
-| [View organization settings](view-organization-settings.md) | View all organization settings in one place so that I have full visibility into the configuration. |
+| [Delete organization](delete-org/) | Permanently delete my organization so that all our data is removed from the platform. |
+| [Update organization profile](org-profile/) | Update my organization's name and logo so that the platform reflects our brand. |
+| [View organization settings](org-settings/) | View all organization settings in one place so that I have full visibility into the configuration. |
 
 ### Tenant isolation
 
 | Use case | Summary |
 |---|---|
-| [Automatic tenant scoping on every request](automatic-tenant-scoping-on-every-request.md) | Every database query to be automatically scoped to the requesting tenant so that data isolation is e |
-| [Tenant resolution from JWT](tenant-resolution-from-jwt.md) | Resolve the active tenant from the JWT on every request so that downstream code never needs to think |
+| [Tenant resolution from JWT](tenant-from-jwt/) | Resolve the active tenant from the JWT on every request so that downstream code never needs to think |
+| [Automatic tenant scoping on every request](tenant-scope/) | Every database query to be automatically scoped to the requesting tenant so that data isolation is e |
 
 
 
@@ -78,11 +78,11 @@ Without this foundation, nothing else works. Every feature in every other domain
 | Shared Domain | ✅ Done | `Entity`, `AggregateRoot`, `ValueObject`, `IDomainEvent`, `Result<T>` |
 | Shared Application | ✅ Done | `ICommand/IQuery`, `ICommandHandler/IQueryHandler`, `ValidationBehavior`, `ITenantContext` |
 | Shared Infrastructure | ✅ Done | `TenantSchemaInterceptor`, per-module `UnitOfWork` ([ADR-017](../../TECH_STACK.md#adr-017-axisshared-is-abstractions-only-no-shared-implementation)); **OpenTelemetry** host wiring on `Axis.Api` ([ADR-018](../../TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability), [patterns § OpenTelemetry](../../playbooks/patterns.md#opentelemetry-observability)) |
-| [Register org](register-a-new-organization.md) | ✅ Done | Self-service signup + verification email — backend complete. Frontend polish ⏳ |
-| [Tenant provisioning](automatic-tenant-provisioning.md) | ✅ Done | Kafka-driven per-module provisioning, coordinator retries, `GET /api/auth/provisioning-status`. Frontend wait screen ⏳ |
-| [Subscription plans](view-available-plans.md) | ✅ Done | `GET /api/plans`, pricing data, 402 limits — see [enforce limits](enforce-plan-limits-at-the-api.md). Frontend pricing UI ⏳ |
-| [Tenant isolation](automatic-tenant-scoping-on-every-request.md) | ✅ Done | `TenantSchemaInterceptor`, `TenantOrganizationAccessMiddleware`, cross-tenant API tests |
-| [Organization management](update-organization-profile.md) | ✅ Done | Profile, settings + usage, scheduled deletion + hard-delete job ✅. Frontend settings UI ⏳ |
+| [Register org](register-org/) | ✅ Done | Self-service signup + verification email — backend complete. Frontend polish ⏳ |
+| [Tenant provisioning](provision-tenant/) | ✅ Done | Kafka-driven per-module provisioning, coordinator retries, `GET /api/auth/provisioning-status`. Frontend wait screen ⏳ |
+| [Subscription plans](view-plans/) | ✅ Done | `GET /api/plans`, pricing data, 402 limits — see [enforce limits](enforce-limits/). Frontend pricing UI ⏳ |
+| [Tenant isolation](tenant-scope/) | ✅ Done | `TenantSchemaInterceptor`, `TenantOrganizationAccessMiddleware`, cross-tenant API tests |
+| [Organization management](org-profile/) | ✅ Done | Profile, settings + usage, scheduled deletion + hard-delete job ✅. Frontend settings UI ⏳ |
 | Frontend | ⏳ Pending | Verify flow, provisioning wait, settings, pricing |
 
 ---
@@ -91,8 +91,8 @@ Without this foundation, nothing else works. Every feature in every other domain
 
 | Priority | Item | Where |
 |----------|------|--------|
-| **Backend** | ✅ platform-foundation backend use cases complete. Optional: bulk workflow import when product needs [import-export](../workflow-builder/bulk-export-all-workflows.md) AC | [enforce-plan-limits-at-the-api.md](enforce-plan-limits-at-the-api.md) |
-| Frontend | [Verify email](verify-email-and-activate-account.md), [provisioning wait](automatic-tenant-provisioning.md), [pricing](view-available-plans.md), [org settings](view-organization-settings.md) wireframes | see **Use Cases** table below |
+| **Backend** | ✅ platform-foundation backend use cases complete. Optional: bulk workflow import when product needs [bulk export](../workflow-builder/bulk-export/) AC | [enforce-limits/](enforce-limits/) |
+| Frontend | [Verify email](verify-email/), [provisioning wait](provision-tenant/), [pricing](view-plans/), [org settings](org-settings/) wireframes | see **Use Cases** table below |
 
 Domain-level checkboxes above remain spec-only; status is in use-case **Implementation status** callouts.
 
