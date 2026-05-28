@@ -1,6 +1,6 @@
 using Axis.DataModeling.Application.Repositories;
-using Axis.DataModeling.Domain.Aggregates;
 using Axis.DataModeling.Contracts.Grpc;
+using Axis.DataModeling.Domain.Aggregates;
 using Grpc.Core;
 
 namespace Axis.DataModeling.Infrastructure.Grpc;
