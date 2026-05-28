@@ -420,32 +420,32 @@ function containerDiagram() {
 
   // DB column (right side; arrows from platform right edge x=810 → DB left edge x=870, 60px each)
   const DBX = 870, DBW = 190, DBH = 55, DBGap = 10;
-  els.push(text({ x: DBX + DBW / 2, y: 65, value: "Per-Module Databases (PostgreSQL 16)", size: 12, bold: true, color: C.infraBdr, anchor: "center" }));
+  els.push(text({ x: DBX + DBW / 2, y: 65, value: "Per-Module Databases", size: 12, bold: true, color: C.infraBdr, anchor: "center" }));
 
   const dbs = [
-    { label: "axis_identity", sub: "public schema",         y: 100 },
-    { label: "axis_datamodeling",    sub: "tenant schema per org", y: 100 + (DBH + DBGap) },
-    { label: "axis_workflowbuilder", sub: "wolverine schema",      y: 100 + (DBH + DBGap) * 2 },
-    { label: "axis_workflowengine",  sub: "wolverine schema",      y: 100 + (DBH + DBGap) * 3 },
-    { label: "axis_formbuilder",     sub: "wolverine schema",      y: 100 + (DBH + DBGap) * 4 },
-    { label: "axis_pagebuilder",     sub: "wolverine schema",      y: 100 + (DBH + DBGap) * 5 },
+    { label: "Identity DB",        y: 100 },
+    { label: "DataModeling DB",    y: 100 + (DBH + DBGap) },
+    { label: "WorkflowBuilder DB", y: 100 + (DBH + DBGap) * 2 },
+    { label: "WorkflowEngine DB",  y: 100 + (DBH + DBGap) * 3 },
+    { label: "FormBuilder DB",     y: 100 + (DBH + DBGap) * 4 },
+    { label: "PageBuilder DB",     y: 100 + (DBH + DBGap) * 5 },
   ];
   for (const db of dbs) {
-    els.push(...rect({ x: DBX, y: db.y, w: DBW, h: DBH, bg: C.infraBg, stroke: C.infraBdr, label: db.label, sub: db.sub, labelSize: 11 }));
+    els.push(...rect({ x: DBX, y: db.y, w: DBW, h: DBH, bg: C.infraBg, stroke: C.infraBdr, label: db.label, labelSize: 11 }));
     els.push(...arrow({ x1: 810, y1: db.y + DBH / 2, x2: DBX, y2: db.y + DBH / 2, color: C.infraBdr }));
   }
 
-  // Other infrastructure (right side, below DB column)
-  els.push(...rect({ x: DBX, y: 495, w: DBW, h: DBH, bg: C.infraBg, stroke: C.infraBdr, label: "Redis 7",       sub: "Cache · Session · Schema name" }));
-  els.push(...arrow({ x1: 810, y1: 522, x2: DBX, y2: 522, color: C.infraBdr }));
+  // Other infrastructure (right side, below DB column) - distinct color from DB blocks
+  els.push(...rect({ x: DBX, y: 495, w: DBW, h: DBH, bg: C.sysBg, stroke: C.sysBdr, label: "Redis", sub: "Cache · Session" }));
+  els.push(...arrow({ x1: 810, y1: 522, x2: DBX, y2: 522, color: C.sysBdr }));
 
   // Production operations containers (right side, straight arrows from platform edge)
-  els.push(...rect({ x: 870, y: 565, w: 220, h: 55, bg: C.infraBg, stroke: C.infraBdr,
+  els.push(...rect({ x: 870, y: 565, w: 220, h: 55, bg: C.sysBg, stroke: C.sysBdr,
     label: "HashiCorp Vault", sub: "Secrets management" }));
-  els.push(...rect({ x: 870, y: 635, w: 220, h: 55, bg: C.infraBg, stroke: C.infraBdr,
+  els.push(...rect({ x: 870, y: 635, w: 220, h: 55, bg: C.sysBg, stroke: C.sysBdr,
     label: "Grafana Tempo/Loki/Mimir", sub: "Tracing · Logs · Metrics" }));
-  els.push(...arrow({ x1: 810, y1: 592, x2: 870, y2: 592, color: C.infraBdr }));
-  els.push(...arrow({ x1: 810, y1: 662, x2: 870, y2: 662, color: C.infraBdr }));
+  els.push(...arrow({ x1: 810, y1: 592, x2: 870, y2: 592, color: C.sysBdr }));
+  els.push(...arrow({ x1: 810, y1: 662, x2: 870, y2: 662, color: C.sysBdr }));
 
   // External managed services aligned with operations rows
   els.push(...rect({ x: 1110, y: 565, w: 200, h: 55, bg: C.extBg, stroke: C.extBdr, label: "AWS S3", sub: "File storage" }));
@@ -462,11 +462,13 @@ function containerDiagram() {
   els.push(...rect({ x: 650, y: 136, w: 12, h: 12, bg: C.evtBg, stroke: C.evtBdr }));
   els.push(text({ x: 668, y: 142, value: "Messaging lanes", size: 9, color: C.text }));
   els.push(...rect({ x: 650, y: 154, w: 12, h: 12, bg: C.infraBg, stroke: C.infraBdr }));
-  els.push(text({ x: 668, y: 160, value: "Infrastructure", size: 9, color: C.text }));
+  els.push(text({ x: 668, y: 160, value: "Database", size: 9, color: C.text }));
   els.push(...rect({ x: 650, y: 172, w: 12, h: 12, bg: C.extBg, stroke: C.extBdr }));
   els.push(text({ x: 668, y: 178, value: "External service", size: 9, color: C.text }));
-  els.push(...arrow({ x1: 650, y1: 190, x2: 680, y2: 190, color: C.infraBdr }));
-  els.push(text({ x: 685, y: 190, value: "Infra connection", size: 9, color: C.text }));
+  els.push(...rect({ x: 740, y: 154, w: 12, h: 12, bg: C.sysBg, stroke: C.sysBdr }));
+  els.push(text({ x: 758, y: 160, value: "Platform ops", size: 9, color: C.text }));
+  els.push(...arrow({ x1: 650, y1: 190, x2: 680, y2: 190, color: C.sysBdr }));
+  els.push(text({ x: 685, y: 190, value: "Internal connection", size: 9, color: C.text }));
 
   return excalidraw(els);
 }
