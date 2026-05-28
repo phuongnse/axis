@@ -373,7 +373,7 @@ function containerDiagram() {
 
   // Platform boundary (right edge x=810)
   els.push(...rect({ x: 50, y: 55, w: 760, h: 620, bg: "#f0f9ff", stroke: C.sysBdr }));
-  els.push(text({ x: 430, y: 80, value: "API Server — ASP.NET Core 8 Modulith (strict boundaries)", size: 14, bold: true, color: C.sysBdr, anchor: "center" }));
+  els.push(text({ x: 430, y: 80, value: "Axis.Api Gateway + Module Services (Modulith, strict boundaries)", size: 14, bold: true, color: C.sysBdr, anchor: "center" }));
 
   // Modules — row 1 (y=105) and row 2 (y=245), 65px gap between rows
   const MW = 165, MH = 75;
@@ -413,8 +413,8 @@ function containerDiagram() {
   els.push(...rect({ x: 335, y: 505, w: 285, h: 55, bg: C.sysBg, stroke: C.sysBdr,
     label: "SignalR", sub: "Real-time execution status" }));
 
-  // Web Application band (bottom of platform)
-  els.push(...rect({ x: 50, y: 570, w: 760, h: 55, bg: C.sysBg, stroke: C.sysBdr,
+  // Web Application band (inset from platform border for readability)
+  els.push(...rect({ x: 70, y: 585, w: 720, h: 55, bg: C.sysBg, stroke: C.sysBdr,
     label: "Web Application",
     sub: "React 19 + TypeScript + Vite · shadcn/ui · React Flow · dnd-kit · TanStack Query · Zustand" }));
 
@@ -436,10 +436,18 @@ function containerDiagram() {
   }
 
   // Other infrastructure (right side, below DB column)
-  els.push(...rect({ x: DBX, y: 460, w: DBW, h: DBH, bg: C.infraBg, stroke: C.infraBdr, label: "Redis 7",       sub: "Cache · Session · Schema name" }));
-  els.push(...rect({ x: DBX, y: 530, w: DBW, h: DBH, bg: C.extBg,  stroke: C.extBdr,  label: "AWS S3",        sub: "File storage" }));
-  els.push(...rect({ x: DBX, y: 600, w: DBW, h: DBH, bg: C.extBg,  stroke: C.extBdr,  label: "Email Service", sub: "SMTP · MailKit" }));
-  els.push(...arrow({ x1: 810, y1: 487, x2: DBX, y2: 487, color: C.arrow }));
+  els.push(...rect({ x: DBX, y: 495, w: DBW, h: DBH, bg: C.infraBg, stroke: C.infraBdr, label: "Redis 7",       sub: "Cache · Session · Schema name" }));
+  els.push(...rect({ x: DBX, y: 565, w: DBW, h: DBH, bg: C.extBg,  stroke: C.extBdr,  label: "AWS S3",        sub: "File storage" }));
+  els.push(...rect({ x: DBX, y: 635, w: DBW, h: DBH, bg: C.extBg,  stroke: C.extBdr,  label: "Email Service", sub: "SMTP · MailKit" }));
+  els.push(...arrow({ x1: 810, y1: 522, x2: DBX, y2: 522, color: C.infraBdr }));
+
+  // Production operations containers (shown outside platform boundary)
+  els.push(...rect({ x: 1090, y: 495, w: 220, h: 55, bg: C.infraBg, stroke: C.infraBdr,
+    label: "HashiCorp Vault", sub: "Secrets management" }));
+  els.push(...rect({ x: 1090, y: 565, w: 220, h: 55, bg: C.infraBg, stroke: C.infraBdr,
+    label: "Grafana Tempo/Loki/Mimir", sub: "Tracing · Logs · Metrics" }));
+  els.push(...arrow({ x1: 1060, y1: 522, x2: 1090, y2: 522, color: C.infraBdr }));
+  els.push(...arrow({ x1: 1060, y1: 592, x2: 1090, y2: 592, color: C.infraBdr }));
 
   return excalidraw(els);
 }
