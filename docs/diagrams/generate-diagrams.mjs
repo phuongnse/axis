@@ -383,7 +383,7 @@ function containerDiagram() {
     { label: "WorkflowBuilder", x: 430, y: 105 },
     { label: "FormBuilder",     x: 70,  y: 245 },
     { label: "WorkflowEngine",  x: 250, y: 245 },
-    { label: "PageBuilder",     x: 430, y: 245, sub: "Phase 2 · not started", bg: "#fce7f3", stroke: "#be185d" },
+    { label: "PageBuilder",     x: 430, y: 245, bg: "#fce7f3", stroke: "#be185d" },
   ];
   for (const m of modules) {
     els.push(...rect({
@@ -428,7 +428,7 @@ function containerDiagram() {
     { label: "axis_workflowbuilder", sub: "wolverine schema",      y: 100 + (DBH + DBGap) * 2 },
     { label: "axis_workflowengine",  sub: "wolverine schema",      y: 100 + (DBH + DBGap) * 3 },
     { label: "axis_formbuilder",     sub: "wolverine schema",      y: 100 + (DBH + DBGap) * 4 },
-    { label: "axis_pagebuilder",     sub: "phase 2 planned",       y: 100 + (DBH + DBGap) * 5 },
+    { label: "axis_pagebuilder",     sub: "wolverine schema",      y: 100 + (DBH + DBGap) * 5 },
   ];
   for (const db of dbs) {
     els.push(...rect({ x: DBX, y: db.y, w: DBW, h: DBH, bg: C.infraBg, stroke: C.infraBdr, label: db.label, sub: db.sub, labelSize: 11 }));
