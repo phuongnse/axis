@@ -45,7 +45,7 @@ One sentence about user value.
 |--------|------------|---------|
 | <screen-slug> | `<screen>.excalidraw` | `<screen>.svg` |
 
-Assets live **flat** inside this use-case folder (`<screen>.excalidraw` next to `README.md`). Use real markdown links — `[source](./register-org.excalidraw)` — when filling in a real use case. Reference shared kit screens (e.g. `app-shell`) from `./././wireframes/` when needed. Use `N/A` rows when no wireframe applies.
+Assets live **flat** inside this use-case folder (`<screen>.excalidraw` next to `README.md`). Use real markdown links — `[source](./register-org.excalidraw)` — when filling in a real use case. Reference shared kit screens (e.g. `app-shell`) from `.../wireframes/` when needed. Use `N/A` rows when no wireframe applies.
 
 ## Diagrams
 

@@ -55,7 +55,7 @@ Define subscription plan tiers with feature limits and enforce those limits at t
 > | API | ✅ (backend AC) |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** [view-available-plans](./view-plans/) public pricing page UI, static fallback on load failure, "Current plan" badge (Frontend only). No multi-workflow bulk-import API yet — single-workflow import/duplicate enforce +1 before save (bulk workflow import acceptance criteria in [bulk export](././workflow-builder/bulk-export/) applies when bulk endpoint exists).
+> **Gaps vs spec:** [view-available-plans](../view-plans/) public pricing page UI, static fallback on load failure, "Current plan" badge (Frontend only). No multi-workflow bulk-import API yet — single-workflow import/duplicate enforce +1 before save (bulk workflow import acceptance criteria in [bulk export](../../workflow-builder/bulk-export/) applies when bulk endpoint exists).
 >
 > **Done (backend):**
 > - `GET /api/plans` with limits + `featureFlags` + `isAvailableForNewSignups`

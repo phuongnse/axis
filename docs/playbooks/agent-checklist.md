@@ -1,8 +1,8 @@
 # Agent checklist (one page)
 
-> **Navigation**: [← docs/README.md](./README.md) · [← CLAUDE.md](././CLAUDE.md)
+> **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
 
-**Daily workflow.** Walk Gates 0–3 **locally** while implementing; reflect outcomes in the [PR template](././.github/PULL_REQUEST_TEMPLATE.md) checkboxes. **PR description = Summary + Linked spec + Requirements only** — no Gate paste blocks, no commit list, no CI/Doc-drift status (GitHub Checks tab covers that).
+**Daily workflow.** Walk Gates 0–3 **locally** while implementing; reflect outcomes in the [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) checkboxes. **PR description = Summary + Linked spec + Requirements only** — no Gate paste blocks, no commit list, no CI/Doc-drift status (GitHub Checks tab covers that).
 
 The paste-block templates below are for *your own* walk-through (agent reasoning, scratchpad, or PR thread comment if asked) — not for the PR description.
 
@@ -12,7 +12,7 @@ The paste-block templates below are for *your own* walk-through (agent reasoning
 
 - AC map: every row has layer + file/test — **no blank cells**
 - Read: domain README → use-case file → same-module code
-- Skim [`docs/WORKAROUNDS.md`](./WORKAROUNDS.md) for entries touching the same files/modules — known shortcuts may explain surprising code
+- Skim [`docs/WORKAROUNDS.md`](../WORKAROUNDS.md) for entries touching the same files/modules — known shortcuts may explain surprising code
 - Before API layer: `grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/use-cases/` — fix, defer with reason, or stop
 - End of PR: [process.md § PR wrap-up](process.md) — deferred lines, host wiring, callouts (no user reminder)
 
@@ -82,7 +82,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
  - downstream dependency failure path where applicable (transport/storage/service unavailable).
  If a path does not apply to that surface, mark it `N/A` in the AC map instead of skipping it silently.
 
-**Lesson (platform-foundation organization management):** A first pass shipped profile/settings/deletion APIs but missed Redis usage TTL (≤5 min), schedule rollback on queue failure, hard-delete purge, and form-task cancel — caught by spec review, not by “flow works.” See [organization-management callouts](./use-cases/platform-foundation/README.md) for what “done” looks like after self-audit.
+**Lesson (platform-foundation organization management):** A first pass shipped profile/settings/deletion APIs but missed Redis usage TTL (≤5 min), schedule rollback on queue failure, hard-delete purge, and form-task cancel — caught by spec review, not by “flow works.” See [organization-management callouts](../use-cases/platform-foundation/README.md) for what “done” looks like after self-audit.
 
 ---
 
@@ -99,20 +99,20 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 **CI-only gates** (run automatically on PR, no local action required):
 
-- **Doc drift** — enforces same-PR docs, new-handler tests, no-new TODO/FIXME, new raw-SQL review, [WORKAROUND comment ↔ inventory sync](./WORKAROUNDS.md), [speculation guard](./docs-style.md#anti-patterns-dont-ship-these), `GetAwaiter().GetResult()` ban, hardcoded connection-string ban, `DateTime.Now` ban (use `UtcNow`), and a stale-terminology guard for the PR #142 migration (current pattern list lives in [`scripts/check-doc-drift.sh`](././scripts/check-doc-drift.sh) — search for `STALE_TERM_PATTERN`).
-- **Markdown link check** — `lychee` verifies internal links and `#anchors`. **Relative file/image targets** (`![alt](./asset.svg)`, `[text](./file.md)`) are double-checked by [`scripts/check-doc-link-targets.py`](././scripts/check-doc-link-targets.py) inside the drift script — catches the broken-image class lychee missed in PR #142.
-- **Use-case docs** — [`scripts/check-use-case-docs.py`](././scripts/check-use-case-docs.py) validates use-case file structure (required sections + tables + status callout), flags template placeholders (`_(One sentence.)_`, `_(Actor)_`, `_(What starts.)_`), flags self-links `[name](./README.md)` and truncated summary rows in domain READMEs, and counts use cases still on the stock Main flow.
+- **Doc drift** — enforces same-PR docs, new-handler tests, no-new TODO/FIXME, new raw-SQL review, [WORKAROUND comment ↔ inventory sync](../WORKAROUNDS.md), [speculation guard](./docs-style.md#anti-patterns-dont-ship-these), `GetAwaiter().GetResult()` ban, hardcoded connection-string ban, `DateTime.Now` ban (use `UtcNow`), and a stale-terminology guard for the PR #142 migration (current pattern list lives in [`scripts/check-doc-drift.sh`](../../scripts/check-doc-drift.sh) — search for `STALE_TERM_PATTERN`).
+- **Markdown link check** — `lychee` verifies internal links and `#anchors`. **Relative file/image targets** (`![alt](./asset.svg)`, `[text](./file.md)`) are double-checked by [`scripts/check-doc-link-targets.py`](../../scripts/check-doc-link-targets.py) inside the drift script — catches the broken-image class lychee missed in PR #142.
+- **Use-case docs** — [`scripts/check-use-case-docs.py`](../../scripts/check-use-case-docs.py) validates use-case file structure (required sections + tables + status callout), flags template placeholders (`_(One sentence.)_`, `_(Actor)_`, `_(What starts.)_`), flags self-links `[name](./README.md)` and truncated summary rows in domain READMEs, and counts use cases still on the stock Main flow.
 - **Secret scanning** — TruffleHog scans the full PR diff for committed secrets (API keys, passwords, tokens) and verifies each finding against the alleged service before reporting (`--only-verified` cuts false positives).
 - **Vulnerable packages** — `dotnet list package --vulnerable --include-transitive` fails on any known CVE in the dep tree (covers transitive packages too).
-- **Architecture fitness tests** run as part of `dotnet test` — failures there mean a CLAUDE.md P0/P1 rule got violated structurally. See [tests README](././tests/Architecture/Axis.Architecture.Tests/README.md).
+- **Architecture fitness tests** run as part of `dotnet test` — failures there mean a CLAUDE.md P0/P1 rule got violated structurally. See [tests README](../../tests/Architecture/Axis.Architecture.Tests/README.md).
 - **EF migrations** — only `dotnet ef migrations add` (no hand-written `.cs` / orphan `.Designer.cs`). Each `{Name}.cs` needs `{Name}.Designer.cs`. See [local-dev.md § EF Core migrations](./local-dev.md#ef-core-migrations-dotnet-ef).
-- **Local dev docs** — [`docker-compose.yml`](././docker-compose.yml) changes require [`docs/playbooks/local-dev.md`](./local-dev.md) in the same PR; CI runs [`scripts/check-local-dev-docs.py`](././scripts/check-local-dev-docs.py).
+- **Local dev docs** — [`docker-compose.yml`](../../docker-compose.yml) changes require [`docs/playbooks/local-dev.md`](./local-dev.md) in the same PR; CI runs [`scripts/check-local-dev-docs.py`](../../scripts/check-local-dev-docs.py).
 - **Async-safety analyzers** (`Microsoft.VisualStudio.Threading.Analyzers`) — type-aware checks at build time for sync-over-async (VSTHRD002), async-void (VSTHRD100), unobserved async results (VSTHRD110). Rule selection rationale in [patterns.md § Async patterns](./patterns.md#async-patterns).
-- **Coverage report** uploaded as artifact (`dotnet-coverage`). No threshold yet — see [CONTRIBUTING.md § Coverage](././CONTRIBUTING.md#coverage).
+- **Coverage report** uploaded as artifact (`dotnet-coverage`). No threshold yet — see [CONTRIBUTING.md § Coverage](../../CONTRIBUTING.md#coverage).
 
-**Adding new CI checks — verify GitHub plan support first.** Some GitHub-native security workflows require **GitHub Advanced Security (GHAS)** on private repos (a paid add-on). On `phuong-labs/axis` this includes `actions/dependency-review-action` and CodeQL code-scanning *upload* (analysis runs, only the SARIF upload fails). Verify GHAS provisioning before adding such checks; otherwise the PR will fail and need a follow-up to disable. Dependabot security updates work on any plan and cover the same threat model with a publish-time delay — use it as the baseline. The disabled-job comment in [`.github/workflows/build-and-test.yml`](././.github/workflows/build-and-test.yml) lists the specific jobs to restore when GHAS is provisioned.
+**Adding new CI checks — verify GitHub plan support first.** Some GitHub-native security workflows require **GitHub Advanced Security (GHAS)** on private repos (a paid add-on). On `phuong-labs/axis` this includes `actions/dependency-review-action` and CodeQL code-scanning *upload* (analysis runs, only the SARIF upload fails). Verify GHAS provisioning before adding such checks; otherwise the PR will fail and need a follow-up to disable. Dependabot security updates work on any plan and cover the same threat model with a publish-time delay — use it as the baseline. The disabled-job comment in [`.github/workflows/build-and-test.yml`](../../.github/workflows/build-and-test.yml) lists the specific jobs to restore when GHAS is provisioned.
 
-**Priority:** Gate **1** blocks commit (failing build/tests). Gate **2** keeps docs in the same PR — required before merge, not a substitute for Gate 1. The [PR template](././.github/PULL_REQUEST_TEMPLATE.md) lists Gate 1 before Gate 2.
+**Priority:** Gate **1** blocks commit (failing build/tests). Gate **2** keeps docs in the same PR — required before merge, not a substitute for Gate 1. The [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) lists Gate 1 before Gate 2.
 
 ### Gate 1 — verify before push (local = CI)
 
@@ -163,7 +163,7 @@ Gate 2:
 
 ### Review feedback (CodeRabbit / human)
 
-Apply **before** resolving review threads (no user reminder required). Bots are **signal**, not authority — validate against [patterns.md](./patterns.md) and [CLAUDE.md](././CLAUDE.md).
+Apply **before** resolving review threads (no user reminder required). Bots are **signal**, not authority — validate against [patterns.md](./patterns.md) and [CLAUDE.md](../../CLAUDE.md).
 
 Do **not** ship the first diff that only makes CI green or closes the thread. For each comment, ask:
 
@@ -215,7 +215,7 @@ Never ✅ and "pending …" in the same callout. Checkboxes in use-case files ar
 
 Updating only `PROGRESS.md` while changing `src/` without `docs/use-cases/` → drift fails. Domain README `| API | ⏳` after endpoints ship → drift fails.
 
-**Agents starting a task:** read [use cases README § How agents find open work](./use-cases/README.md#how-agents-find-open-work) — checkboxes in use-case files are not progress.
+**Agents starting a task:** read [use cases README § How agents find open work](../use-cases/README.md#how-agents-find-open-work) — checkboxes in use-case files are not progress.
 
 **Chore/style PRs that touch module code:** drift still applies — add one small, accurate detail to the matching domain doc (a chunk size, a behavior nuance, a deferral note already true). Don't propose loosening the script, don't strand the format gunk waiting for a "real" PR, and don't invent fake content. The script's intent is *prompt the developer to look at docs*, not *require rewrite proportional to code change*.
 

@@ -1,6 +1,6 @@
 # Patterns index
 
-> **Navigation**: [← docs/README.md](./README.md) · [← patterns.md](./patterns.md) · [← CLAUDE.md](././CLAUDE.md)
+> **Navigation**: [← docs/README.md](../README.md) · [← patterns.md](./patterns.md) · [← CLAUDE.md](../../CLAUDE.md)
 
 One-page map into [`patterns.md`](./patterns.md). Open only the section you need — do not read the full playbook.
 

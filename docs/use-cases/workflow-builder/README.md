@@ -1,6 +1,6 @@
 # Workflow Builder
 
-[← Back to Use Cases](./README.md)
+[← Back to Use Cases](../README.md)
 
 ---
 
@@ -128,7 +128,7 @@ The workflow builder is the heart of the platform. It is what differentiates Axi
 
 ## Code style
 
-Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced via [`.editorconfig`](./././.editorconfig). Run `dotnet format Axis.sln` before push ([CONTRIBUTING.md](./././CONTRIBUTING.md)).
+Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced via [`.editorconfig`](../../../.editorconfig). Run `dotnet format Axis.sln` before push ([CONTRIBUTING.md](../../../CONTRIBUTING.md)).
 
 ---
 
@@ -138,7 +138,7 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 |---|---|---|
 | Domain | ✅ Done | `WorkflowDefinition`, `Step`, `Trigger` aggregates; all step types and domain events; ConfigureStep method; AddTrigger duplicate-type guard |
 | Application | ✅ Done | All 15 handlers: CreateWorkflow, PublishWorkflow, ArchiveWorkflow, UnarchiveWorkflow, UpdateWorkflow, DuplicateWorkflow, AddStep, RemoveStep, ConfigureStep, AddTransition, RemoveTransition, AddTrigger, RemoveTrigger, ImportWorkflow, BulkExportWorkflows; GetWorkflows, GetWorkflow, ExportWorkflow queries |
-| Infrastructure | ✅ Done | WorkflowBuilderDbContext, EF Core configuration (WorkflowDefinition with steps/transitions/triggers as JSONB), WorkflowRepository, integration tests (Testcontainers). `workflow_form_references` + `workflow_model_references` read models with `IWorkflowReferenceSync`; `ModelDeletedHandler` + `FormDeletedHandler` (Kafka); `WorkflowFormReferenceService` gRPC (server derives `organization_id` from the caller's JWT `org_id` claim). Migration `AddWorkflowReferenceReadModels`. DbContext + UnitOfWork inlined per ADR-017. `OrganizationVerifiedHandler` provisions tenant schema via `TenantModuleProvisionAttempt` (reports `TenantModuleProvisionReportEvent` to Identity; retries via `RetryTenantModuleProvisionHandler` + shared `TenantSchemaProvisioner`, tenant provisioning use case). Avro lifecycle publish ([ADR-019](././TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). Publish blocked when broken refs; `GetWorkflow` returns `isBroken` on steps/triggers. |
+| Infrastructure | ✅ Done | WorkflowBuilderDbContext, EF Core configuration (WorkflowDefinition with steps/transitions/triggers as JSONB), WorkflowRepository, integration tests (Testcontainers). `workflow_form_references` + `workflow_model_references` read models with `IWorkflowReferenceSync`; `ModelDeletedHandler` + `FormDeletedHandler` (Kafka); `WorkflowFormReferenceService` gRPC (server derives `organization_id` from the caller's JWT `org_id` claim). Migration `AddWorkflowReferenceReadModels`. DbContext + UnitOfWork inlined per ADR-017. `OrganizationVerifiedHandler` provisions tenant schema via `TenantModuleProvisionAttempt` (reports `TenantModuleProvisionReportEvent` to Identity; retries via `RetryTenantModuleProvisionHandler` + shared `TenantSchemaProvisioner`, tenant provisioning use case). Avro lifecycle publish ([ADR-019](../../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). Publish blocked when broken refs; `GetWorkflow` returns `isBroken` on steps/triggers. |
 | API | ✅ Done | 18 endpoints: workflow CRUD + publish/archive/unarchive/duplicate, step/transition/trigger management, JSON export, JSON import, ZIP bulk export |
 | Frontend | ⏳ Pending | — |
 
@@ -148,7 +148,7 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend** | ⚠️ mostly ✅ | CRUD/publish/import/export ✅; plan limits 402 ✅ (platform-foundation subscription plans). **Engine-owned:** triggers (cron/webhook/event), step execution, parallel/join — tracked in [workflow-engine](./workflow-engine/README.md#open-work-agents). **API polish:** list filters (last execution date), import transactional rollback — [import-json](./import-json/), [export-json](./export-json/). |
+| **Backend** | ⚠️ mostly ✅ | CRUD/publish/import/export ✅; plan limits 402 ✅ (platform-foundation subscription plans). **Engine-owned:** triggers (cron/webhook/event), step execution, parallel/join — tracked in [workflow-engine](../workflow-engine/README.md#open-work-agents). **API polish:** list filters (last execution date), import transactional rollback — [import-json](./import-json/), [export-json](./export-json/). |
 | **Frontend** | ⏳ | Visual canvas, step config panels, trigger UI — every organization-management–import-export US. |
 
 Do not re-implement plan limits here; update stale “pending platform-foundation subscription plans” lines if you see them in feature callouts.
@@ -157,11 +157,11 @@ Do not re-implement plan limits here; update stale “pending platform-foundatio
 
 ## Dependencies
 
-- [Platform Foundation](./platform-foundation/README.md)
-- [Identity & Access](./identity-access/README.md)
-- [Data Modeling](./data-modeling/README.md)
-- [Form Builder](./form-builder/README.md) *(for Form step type)*
+- [Platform Foundation](../platform-foundation/README.md)
+- [Identity & Access](../identity-access/README.md)
+- [Data Modeling](../data-modeling/README.md)
+- [Form Builder](../form-builder/README.md) *(for Form step type)*
 
 ## Dependents
 
-- [Workflow Engine](./workflow-engine/README.md)
+- [Workflow Engine](../workflow-engine/README.md)

@@ -1,6 +1,6 @@
 # Development Process
 
-> **Navigation**: [← docs/README.md](./README.md) · [← CLAUDE.md](././CLAUDE.md)
+> **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
 
 > Step-by-step checklists for backend and frontend. Read this at the start of any new module or user story — before writing any code.
 

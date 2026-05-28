@@ -1,6 +1,6 @@
 # Technical Patterns
 
-> **Navigation**: [← docs/README.md](./README.md) · [← CLAUDE.md](././CLAUDE.md)
+> **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
 
 > **Start with [patterns-index.md](./patterns-index.md)** — one-page map to sections below. Open `patterns.md` only for the section you need. Skip both when the task is trivial.
 
@@ -474,15 +474,15 @@ await _context.WorkflowDefinitions
 
 **Rule:** Avoid raw SQL in tenant-aware contexts. When raw SQL is unavoidable (e.g. performance-critical bulk ops, cross-module reads), always prefix the table with the tenant schema from `ITenantContext.Schema` and add soft-delete filter manually. Document why raw SQL was needed with a comment.
 
-### Tenant schema provisioning ([tenant provisioning](./use-cases/platform-foundation/provision-tenant/))
+### Tenant schema provisioning ([tenant provisioning](../use-cases/platform-foundation/provision-tenant/))
 
 After email verification, every **tenant-scoped** module provisions its own PostgreSQL schema for the organization. Identity stays on `public` and only publishes the verification event — it never touches another module's DB.
 
-- **Ownership**: each tenant-scoped module's Infrastructure project owns an `OrganizationVerifiedHandler` (e.g. `Axis.DataModeling.Infrastructure.Messaging.OrganizationVerifiedHandler`) that subscribes to Identity's `OrganizationVerifiedEvent` Kafka topic. There is **no** central `ITenantSchemaProvisioner` — extraction of a module is a redeploy of its own handler ([ADR-010](./TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy)).
+- **Ownership**: each tenant-scoped module's Infrastructure project owns an `OrganizationVerifiedHandler` (e.g. `Axis.DataModeling.Infrastructure.Messaging.OrganizationVerifiedHandler`) that subscribes to Identity's `OrganizationVerifiedEvent` Kafka topic. There is **no** central `ITenantSchemaProvisioner` — extraction of a module is a redeploy of its own handler ([ADR-010](../TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy)).
 - **Schema name**: `tenant_{organizationId:N}` (no slug — org slug can change).
 - **Idempotency**: `CREATE SCHEMA IF NOT EXISTS` plus `Database.MigrateAsync()` per context; safe to call twice for the same org (Kafka delivers at-least-once).
 - **Tenant context during migrate**: each handler constructs a `FixedTenantContext(organizationId)` from `Axis.Shared.Infrastructure.Tenancy` so `TenantSchemaInterceptor` targets the new schema for the `MigrateAsync` call.
-- **Trigger**: `User.VerifyEmail()` raises an `OrganizationVerified` domain event; `IdentityUnitOfWork` maps it to `OrganizationVerifiedEvent` (Avro) and publishes via Wolverine outbox → Kafka ([ADR-019](./TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). Do **not** provision synchronously in the verify request handler.
+- **Trigger**: `User.VerifyEmail()` raises an `OrganizationVerified` domain event; `IdentityUnitOfWork` maps it to `OrganizationVerifiedEvent` (Avro) and publishes via Wolverine outbox → Kafka ([ADR-019](../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). Do **not** provision synchronously in the verify request handler.
 - **Schema + topic**: `Axis.Identity.Contracts/Schemas/OrganizationVerifiedEvent.avsc` + topic `axis.identity.organization-verified` (see `IdentityKafkaTopics`).
 
 ---
@@ -519,9 +519,9 @@ _ = Task.Run(async () =>
 
 - **Private backing fields** (`_roleIds`, `_permissions`): use `PrimitiveCollection<List<T>>(fieldName).HasField(fieldName).UsePropertyAccessMode(PropertyAccessMode.Field)` — the type parameter must be the *collection* type, not the element type.
 - **No-args EF Core constructor**: when an aggregate's only constructor takes params EF Core can't bind (e.g. `IEnumerable<string>`), add a private no-args constructor: `private MyAggregate() : base(default) { RequiredField = null!; }`. Initialize all non-nullable reference-type fields to silence CS8618 — EF Core will never use these sentinel values because it always materialises via the real constructor path.
-- **Migrations strategy** ([ADR-023](./TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)): every environment uses `Database.MigrateAsync()` — production, dev bootstrap, tenant provisioning, and Testcontainers fixtures. One EF migration chain per `DbContext`; never `EnsureCreated`/`EnsureCreatedAsync`.
+- **Migrations strategy** ([ADR-023](../TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)): every environment uses `Database.MigrateAsync()` — production, dev bootstrap, tenant provisioning, and Testcontainers fixtures. One EF migration chain per `DbContext`; never `EnsureCreated`/`EnsureCreatedAsync`.
 - **Identity uses the global `public` schema** — `IdentityDbContext` is a plain `DbContext` with no `TenantSchemaInterceptor`. All other modules use `AxisDbContext` with `TenantSchemaInterceptor`.
-- **Tenant schema on every connection** — `TenantSchemaInterceptor` sets `search_path` to `tenant_{orgId:N}, public` on every `ConnectionOpened` (including pooled reconnects), so a leased connection always targets the current request's tenant ([tenant isolation](./use-cases/platform-foundation/tenant-scope/) — schema-per-tenant).
+- **Tenant schema on every connection** — `TenantSchemaInterceptor` sets `search_path` to `tenant_{orgId:N}, public` on every `ConnectionOpened` (including pooled reconnects), so a leased connection always targets the current request's tenant ([tenant isolation](../use-cases/platform-foundation/tenant-scope/) — schema-per-tenant).
 - **Schema name resolution** — `HttpTenantContext` derives `tenant_{orgId:N}` from the JWT `org_id` claim (no DB/Redis lookup; immutable after provisioning). `TenantOrganizationAccessMiddleware` on `Axis.Api` returns HTTP 403 when the org is missing, archived/deleted, or still provisioning — tenant module routes only; Identity/settings routes are unchanged.
 - **Cross-tenant proof** — `tests/Api/Axis.Api.Tests/Tenancy/TenantIsolationEndpointTests.cs` (DataModeling list/get by id).
 
@@ -593,13 +593,13 @@ public class CreateWorkflowTests : IAsyncLifetime
 - **Never sync-over-async**: `.Result`, `.Wait()`, and `.GetAwaiter().GetResult()` on a `Task` inside an async call stack causes thread-pool deadlock under ASP.NET Core. Always `await`.
 - **Always propagate `CancellationToken`**: every `async` method signature must accept `CancellationToken cancellationToken` and pass it to every downstream call (EF Core, HttpClient, Redis). Use `CancellationToken.None` only at the outermost entry point (e.g. a Wolverine background job handler where the runtime owns the token).
 
-These rules are enforced at build time by **`Microsoft.VisualStudio.Threading.Analyzers`**, wired in [`Directory.Build.props`](././Directory.Build.props). The relevant diagnostics:
+These rules are enforced at build time by **`Microsoft.VisualStudio.Threading.Analyzers`**, wired in [`Directory.Build.props`](../../Directory.Build.props). The relevant diagnostics:
 
 - **VSTHRD002** — synchronously waiting on a Task may cause deadlocks. Catches `.Result` / `.Wait()` / `.GetAwaiter().GetResult()` with type information (no grep false positives from domain types named `Wait` / `Result`).
 - **VSTHRD100** — async void methods are unrecoverable; use `async Task` instead.
 - **VSTHRD110** — observe the return value of async methods (catches forgotten `await`).
 
-Two rules are intentionally disabled in [`.editorconfig`](././.editorconfig):
+Two rules are intentionally disabled in [`.editorconfig`](../../.editorconfig):
 
 - **VSTHRD200** (Async-suffix naming) clashes with MediatR/Wolverine handler discovery — those frameworks bind on the literal method name `Handle`, not `HandleAsync`.
 - **VSTHRD111** (`ConfigureAwait(bool)`) is a WPF/WinForms safeguard; modern ASP.NET Core does not install a `SynchronizationContext` so `.ConfigureAwait(false)` is no-op.
@@ -855,7 +855,7 @@ Every endpoint must be fully annotated — see CLAUDE.md API Layer section for r
 
 ### Host setup (ADR-012 — per-module `wolverine` schema)
 
-Each module owns a `wolverine` schema **inside its own PostgreSQL database** ([ADR-011](./TECH_STACK.md#adr-011-per-module-database-with-schema-per-tenant-inside), [ADR-012](./TECH_STACK.md#adr-012-per-module-wolverine-schema-in-the-modules-own-database)). There is **no** `ConnectionStrings:Wolverine` — persistence is wired from each module's connection string.
+Each module owns a `wolverine` schema **inside its own PostgreSQL database** ([ADR-011](../TECH_STACK.md#adr-011-per-module-database-with-schema-per-tenant-inside), [ADR-012](../TECH_STACK.md#adr-012-per-module-wolverine-schema-in-the-modules-own-database)). There is **no** `ConnectionStrings:Wolverine` — persistence is wired from each module's connection string.
 
 ```csharp
 // Axis.Api/Program.cs — excerpt
@@ -890,7 +890,7 @@ if (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Te
 
 - Never point two modules at one shared `wolverine` schema in a shared database — extraction breaks.
 - `AddResourceSetupOnStartup()` is for dev/Testing only; production applies Wolverine DDL per module DB in CI.
-- Cross-module messages use Kafka (`*Event`/`*Snapshot`) and RabbitMQ (`*Command`/`*Job`/`*SagaStep`) per [ADR-025](./TECH_STACK.md#adr-025-transport-selection-rule-by-message-name-suffix) — not a central Postgres Wolverine connection string.
+- Cross-module messages use Kafka (`*Event`/`*Snapshot`) and RabbitMQ (`*Command`/`*Job`/`*SagaStep`) per [ADR-025](../TECH_STACK.md#adr-025-transport-selection-rule-by-message-name-suffix) — not a central Postgres Wolverine connection string.
 
 ### Intra-module domain event handler
 
@@ -1094,7 +1094,7 @@ opts.ScheduleJob<ArchiveOldExecutionsCommand>(cron: "0 2 * * *"); // daily at 02
 
 ## OpenTelemetry observability
 
-**Principle:** Every host entrypoint emits traces, metrics, and structured logs via the OpenTelemetry SDK ([ADR-018](./TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability)). Backends are swappable (OTLP → Grafana Tempo/Loki/Mimir in production); application code never references vendor SDKs outside `Axis.Shared.Infrastructure`.
+**Principle:** Every host entrypoint emits traces, metrics, and structured logs via the OpenTelemetry SDK ([ADR-018](../TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability)). Backends are swappable (OTLP → Grafana Tempo/Loki/Mimir in production); application code never references vendor SDKs outside `Axis.Shared.Infrastructure`.
 
 ### Host wiring (modulith today, per-module tomorrow)
 
@@ -1147,13 +1147,13 @@ Grafana UI: `http://localhost:3001`. OTLP endpoint for host-run API: `http://loc
 - Do **not** register OpenTelemetry in individual module Infrastructure projects while the modulith hosts all modules — one `AddAxisOpenTelemetry` on `Axis.Api` (or each extracted module's entrypoint when Phase 2 lands).
 - Disable telemetry in integration tests via `OpenTelemetry:DisableInTesting` (default `true`) — no Testcontainers for Tempo required.
 - Skip instrumentation for `/health`, `/metrics`, and `/swagger` paths (configured in `OpenTelemetryServiceExtensions`).
-- **Deferred (Phase 2):** propagate trace context through Wolverine envelope headers and gRPC interceptors for cross-process module calls ([ADR-018](./TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability)).
+- **Deferred (Phase 2):** propagate trace context through Wolverine envelope headers and gRPC interceptors for cross-process module calls ([ADR-018](../TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability)).
 
 ---
 
 ## Cross-module communication pattern
 
-**Core rule: a module only queries its own database. Always. No exceptions.** This is the Share Nothing principle from [ADR-010](./TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy) — modules are data-sovereign so that extraction is a redeploy, not a refactor.
+**Core rule: a module only queries its own database. Always. No exceptions.** This is the Share Nothing principle from [ADR-010](../TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy) — modules are data-sovereign so that extraction is a redeploy, not a refactor.
 
 Cross-module needs are met by exactly two mechanisms:
 
@@ -1184,7 +1184,7 @@ public class SomethingHandler(IWorkflowQueryService workflowQueries) // ← B's 
 }
 ```
 
-This compiles and runs in the modulith, but the moment module B is extracted, the project reference disappears and `IWorkflowQueryService` is no longer reachable. Cross-module sync **must** go through gRPC (with a versioned `.proto` contract) — see [ADR-014](./TECH_STACK.md#adr-014-grpc-for-internal-sync-rpc-and-rest-openapi-for-external-api).
+This compiles and runs in the modulith, but the moment module B is extracted, the project reference disappears and `IWorkflowQueryService` is no longer reachable. Cross-module sync **must** go through gRPC (with a versioned `.proto` contract) — see [ADR-014](../TECH_STACK.md#adr-014-grpc-for-internal-sync-rpc-and-rest-openapi-for-external-api).
 
 ### ✅ Pattern 1: event-driven local read model (default)
 
@@ -1210,7 +1210,7 @@ src/Modules/WorkflowBuilder/Axis.WorkflowBuilder.Contracts/Schemas/FormStepAdded
 }
 ```
 
-The Avro file is registered with Confluent Schema Registry at build time. CI rejects breaking changes per [ADR-019](./TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope).
+The Avro file is registered with Confluent Schema Registry at build time. CI rejects breaking changes per [ADR-019](../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope).
 
 **Step 2 — Source module (WorkflowBuilder) raises the domain event and publishes it via the outbox:**
 
@@ -1307,7 +1307,7 @@ message GetUserPermissionsResponse {
 **Buf (repo-wide lint + breaking)** — register every new module proto root before merge:
 
 1. Place files under `src/Modules/{Module}/Axis.{Module}.Contracts/Protos/axis/{module}/v{n}/` with `package axis.{module}.v{n};` matching the directory (`PACKAGE_DIRECTORY_MATCH`).
-2. Add the `Protos` directory to `modules:` in [`buf.yaml`](././buf.yaml) at the repo root (copy an existing line).
+2. Add the `Protos` directory to `modules:` in [`buf.yaml`](../../buf.yaml) at the repo root (copy an existing line).
 3. Keep `Grpc.Tools` `<Protobuf Include=.>` in the `.csproj` — Buf does not replace codegen.
 4. Run `buf lint` locally (`buf` CLI) and `./scripts/check-buf-modules.sh` (also runs in CI **Doc drift**).
 5. **Changing `buf.yaml` breaking policy or removing a field?** Read [Buf breaking rules — what's actually configured (and the gotcha)](#buf-breaking-rules--whats-actually-configured-and-the-gotcha) first. The v2 category model splits deletion rules in a way that's easy to misread, and "buf passes locally" can mean "no rule fires" rather than "the relaxed rule passed".
@@ -1326,7 +1326,7 @@ Rule map (verify with `buf config ls-breaking-rules --version=v2`):
 | `FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED` | WIRE_JSON, WIRE | ✗ OFF in FILE/PACKAGE | Fails only if deleted field's **number** was not reserved |
 | `FIELD_NO_DELETE_UNLESS_NAME_RESERVED` | WIRE_JSON | ✗ OFF in FILE/PACKAGE | Fails only if deleted field's **name** was not reserved |
 
-The current repo policy ([`buf.yaml`](././buf.yaml)):
+The current repo policy ([`buf.yaml`](../../buf.yaml)):
 
 ```yaml
 breaking:
@@ -1374,7 +1374,7 @@ public sealed class PermissionGate(
 }
 ```
 
-The gRPC channel is configured via `Modules:Identity:GrpcUrl` in `src/Axis.Api/appsettings.json` (see [ADR-016](./TECH_STACK.md#adr-016-service-discovery-via-config-in-modulith-mode-and-k8s-dns-in-production)) — `http://localhost:5280` on the modulith host in development, module service DNS in production when extracted.
+The gRPC channel is configured via `Modules:Identity:GrpcUrl` in `src/Axis.Api/appsettings.json` (see [ADR-016](../TECH_STACK.md#adr-016-service-discovery-via-config-in-modulith-mode-and-k8s-dns-in-production)) — `http://localhost:5280` on the modulith host in development, module service DNS in production when extracted.
 
 **Step 3 — Server side: derive tenant from JWT, not the request payload**
 
@@ -1440,7 +1440,7 @@ Replace `<access_token>` and `<user-guid>` with values from your tenant — the 
 
 **Rule:** modules other than Identity validate JWTs **locally via Identity's JWKS endpoint** — never by calling `IdentityDbContext` or any Identity service. Asking Identity "is this user real?" on every request defeats the purpose of stateless JWT and re-introduces the coupling we removed.
 
-Why: Identity issues short-lived JWTs (15 minutes per [sign-in](./use-cases/identity-access/sign-in/)) signed with a key whose public half is published at `/.well-known/jwks.json` (OpenIddict default). Any module that receives a Bearer token can verify the signature, claims (`sub`, `org`, `permissions`), and expiry **without a network call to Identity for each request**. JWKS itself is cached locally by `Microsoft.AspNetCore.Authentication.JwtBearer`, so the network cost is once per key-rotation, not once per request.
+Why: Identity issues short-lived JWTs (15 minutes per [sign-in](../use-cases/identity-access/sign-in/)) signed with a key whose public half is published at `/.well-known/jwks.json` (OpenIddict default). Any module that receives a Bearer token can verify the signature, claims (`sub`, `org`, `permissions`), and expiry **without a network call to Identity for each request**. JWKS itself is cached locally by `Microsoft.AspNetCore.Authentication.JwtBearer`, so the network cost is once per key-rotation, not once per request.
 
 The escape hatch — when you need *fresh* permission state that the JWT's `permissions` claim cannot give you — is `IdentityService.GetUserPermissions` (gRPC), not a DB lookup.
 
@@ -1715,7 +1715,7 @@ gh pr create …
 
 ## Drift script regex constraints {#drift-regex-constraints}
 
-[`scripts/check-doc-drift.sh`](././scripts/check-doc-drift.sh) feeds its forbidden-pattern regexes into **GNU awk**. Awk's regex dialect differs from grep/PCRE/.NET in two ways that silently degrade patterns instead of erroring out — anyone adding a new check to the drift script must follow these conventions.
+[`scripts/check-doc-drift.sh`](../../scripts/check-doc-drift.sh) feeds its forbidden-pattern regexes into **GNU awk**. Awk's regex dialect differs from grep/PCRE/.NET in two ways that silently degrade patterns instead of erroring out — anyone adding a new check to the drift script must follow these conventions.
 
 ### Backslash escapes for punctuation are silently broken
 
@@ -1927,7 +1927,7 @@ docs/
 
 **One wireframe per screen.** Multiple use cases on the same screen reference the same wireframe file.
 
-**Linking from a use-case file** — fill the `## Wireframes` table at the bottom of the use case (see [USE_CASE_TEMPLATE.md](./use-cases/USE_CASE_TEMPLATE.md)). Use relative paths next to `README.md`:
+**Linking from a use-case file** — fill the `## Wireframes` table at the bottom of the use case (see [USE_CASE_TEMPLATE.md](../use-cases/USE_CASE_TEMPLATE.md)). Use relative paths next to `README.md`:
 
 ```markdown
 ## Wireframes
@@ -1937,7 +1937,7 @@ docs/
 | login | [source](./login.excalidraw) | [preview](./login.svg) |
 ```
 
-Reference shared kit screens from `./././wireframes/` (do not duplicate).
+Reference shared kit screens from `.../wireframes/` (do not duplicate).
 
 **Excalidraw settings** for consistent sketch aesthetic:
 - `roughness: 1` on all shapes

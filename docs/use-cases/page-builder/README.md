@@ -1,6 +1,6 @@
 # Page & UI Builder
 
-[← Back to Use Cases](./README.md)
+[← Back to Use Cases](../README.md)
 
 ---
 
@@ -66,11 +66,11 @@ Without a UI builder, users need a developer to display and interact with their 
 
 ## Dependencies
 
-- [Platform Foundation](./platform-foundation/README.md)
-- [Identity & Access](./identity-access/README.md)
-- [Data Modeling](./data-modeling/README.md)
-- [Form Builder](./form-builder/README.md)
-- [Workflow Engine](./workflow-engine/README.md)
+- [Platform Foundation](../platform-foundation/README.md)
+- [Identity & Access](../identity-access/README.md)
+- [Data Modeling](../data-modeling/README.md)
+- [Form Builder](../form-builder/README.md)
+- [Workflow Engine](../workflow-engine/README.md)
 
 ## Dependents
 

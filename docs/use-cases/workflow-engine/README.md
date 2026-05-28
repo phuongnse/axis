@@ -1,6 +1,6 @@
 # Workflow Execution Engine
 
-[← Back to Use Cases](./README.md)
+[← Back to Use Cases](../README.md)
 
 ---
 
@@ -114,7 +114,7 @@ Subsequent steps can reference context values using expressions like `{{context.
 
 ## Code style
 
-Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced via [`.editorconfig`](./././.editorconfig). Run `dotnet format Axis.sln` before push ([CONTRIBUTING.md](./././CONTRIBUTING.md)).
+Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced via [`.editorconfig`](../../../.editorconfig). Run `dotnet format Axis.sln` before push ([CONTRIBUTING.md](../../../CONTRIBUTING.md)).
 
 ---
 
@@ -124,7 +124,7 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 |---|---|---|
 | Domain | ✅ Done | `WorkflowExecution` aggregate + `ExecutionStep` entity; full execution state machine; `WorkflowSnapshot` local read model; domain events (ExecutionStarted, Completed, Failed, Cancelled, StepCompleted, StepFailed, FormStepReached) |
 | Application | ✅ Done | All commands/queries (StartExecution, Cancel, Retry, RetryWithContext, GetExecution, GetAllExecutions, GetExecutionsByWorkflow, GetRetryHistory); step handler messages and orchestrator (ExecuteNextStepHandler, StepCompletedHandler, StepFailedHandler, per-step handlers); ConditionEvaluator; IStepDispatcher / IHttpStepExecutor / IScriptExecutor / INotificationSender interfaces |
-| Infrastructure | ⚠️ Partial | Database `axis_workflowengine` ([ADR-011](././TECH_STACK.md#adr-011-per-module-database-with-schema-per-tenant-inside)); EF migrations through `AddWorkflowSnapshot` + snapshot sync migration; tests/fixtures use `MigrateAsync` ([ADR-023](././TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)). Repositories + step executors. `WorkflowEngineEventMapper` translates domain events to Avro at `SaveChangesAsync` and publishes via outbox → Kafka ([ADR-019](././TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). `FormTaskSubmittedHandler` + `FormTaskExpiredHandler` consume FormBuilder's `FormTaskSubmittedEvent` / `FormTaskExpiredEvent` from Kafka (Contracts only — no Domain reference). Workflow snapshot/active-status handlers consume `Axis.WorkflowBuilder.Contracts` Kafka events. `OrganizationVerifiedHandler` provisions tenant schema via `TenantModuleProvisionAttempt` (reports `TenantModuleProvisionReportEvent` to Identity; retries via `RetryTenantModuleProvisionHandler` + shared `TenantSchemaProvisioner`, tenant provisioning use case). **Deferred (PR follow-up — workflow-engine organization-management step handlers):** real `IScriptExecutor` and `INotificationSender` — currently stubs. |
+| Infrastructure | ⚠️ Partial | Database `axis_workflowengine` ([ADR-011](../../TECH_STACK.md#adr-011-per-module-database-with-schema-per-tenant-inside)); EF migrations through `AddWorkflowSnapshot` + snapshot sync migration; tests/fixtures use `MigrateAsync` ([ADR-023](../../TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)). Repositories + step executors. `WorkflowEngineEventMapper` translates domain events to Avro at `SaveChangesAsync` and publishes via outbox → Kafka ([ADR-019](../../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). `FormTaskSubmittedHandler` + `FormTaskExpiredHandler` consume FormBuilder's `FormTaskSubmittedEvent` / `FormTaskExpiredEvent` from Kafka (Contracts only — no Domain reference). Workflow snapshot/active-status handlers consume `Axis.WorkflowBuilder.Contracts` Kafka events. `OrganizationVerifiedHandler` provisions tenant schema via `TenantModuleProvisionAttempt` (reports `TenantModuleProvisionReportEvent` to Identity; retries via `RetryTenantModuleProvisionHandler` + shared `TenantSchemaProvisioner`, tenant provisioning use case). **Deferred (PR follow-up — workflow-engine organization-management step handlers):** real `IScriptExecutor` and `INotificationSender` — currently stubs. |
 | Contracts | ✅ Done | `Axis.WorkflowEngine.Contracts` — Avro schema `FormStepReachedEvent` (the cross-module event FormBuilder reacts to). Hand-written `ISpecificRecord` generated code + `WorkflowEngineKafkaTopics` + `WorkflowEngineEventExtensions` (typed GUID accessors). |
 | API | ✅ Done | `ExecutionEndpoints`: list, detail, start, cancel, retry, retry-with-context, retry history. Default-input shaping moved into `StartExecutionHandler`. Form task routes live under form-builder `FormTaskEndpoints` |
 | Frontend | ⏳ Pending | — |
@@ -136,7 +136,7 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 | Area | Status | Detail |
 |------|--------|--------|
 | **Backend — high** | ⚠️ | [start-execution](./start-execution/), [track-execution](./track-execution/): schedule/webhook/event triggers, stale-PENDING recovery. [error-detail](./error-detail/), [failure-notify](./failure-notify/), [error-channels](./error-channels/): notification dispatch, `GetExecution` error detail, channel config. [isolated-steps](./isolated-steps/): real `IScriptExecutor` / `INotificationSender` (stubs today). |
-| **Backend — medium** | ⚠️ | [workflow-history](./workflow-history/), [org-execution-history](./org-execution-history/): date/trigger filters, CSV export, role-scoped list. [cancel-execution](./cancel-execution/): abandon Wolverine jobs + cancel form tasks. **[delete-org](./platform-foundation/delete-org/):** `OrganizationExecutionCanceller` cancels Pending/Running executions before org hard-delete (`FixedTenantContext`). |
+| **Backend — medium** | ⚠️ | [workflow-history](./workflow-history/), [org-execution-history](./org-execution-history/): date/trigger filters, CSV export, role-scoped list. [cancel-execution](./cancel-execution/): abandon Wolverine jobs + cancel form tasks. **[delete-org](../platform-foundation/delete-org/):** `OrganizationExecutionCanceller` cancels Pending/Running executions before org hard-delete (`FixedTenantContext`). |
 | **Frontend** | ⏳ | Execution monitor, retry UI, SignalR live updates — see [start-execution](./start-execution/), [track-execution](./track-execution/), [retry-execution](./retry-execution/) callouts. |
 
 Start here when workflow-builder “pending workflow-engine” items block runtime behavior; feature callouts list exact use-case gaps.
@@ -145,11 +145,11 @@ Start here when workflow-builder “pending workflow-engine” items block runti
 
 ## Dependencies
 
-- [Platform Foundation](./platform-foundation/README.md)
-- [Identity & Access](./identity-access/README.md)
-- [Workflow Builder](./workflow-builder/README.md)
-- [Form Builder](./form-builder/README.md)
+- [Platform Foundation](../platform-foundation/README.md)
+- [Identity & Access](../identity-access/README.md)
+- [Workflow Builder](../workflow-builder/README.md)
+- [Form Builder](../form-builder/README.md)
 
 ## Dependents
 
-- [Page Builder](./page-builder/README.md) *(display execution data on pages)*
+- [Page Builder](../page-builder/README.md) *(display execution data on pages)*

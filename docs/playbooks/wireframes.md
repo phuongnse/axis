@@ -1,6 +1,6 @@
 # Wireframe Playbook — Component Kit & Screen Wireframes
 
-> **Navigation**: [← docs/README.md](./README.md) · [← CLAUDE.md](././CLAUDE.md)
+> **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
 
 This playbook covers everything needed to work with the wireframe generation system:
 `components.mjs` (shared library), `generate-template.mjs` (component kit), and `generate-screens.mjs` (screen wireframes).
@@ -364,7 +364,7 @@ When writing or editing any wireframe generator, verify against these values (fr
 3. Add the output path to the screen inventory table in this playbook
 4. Run `node docs/wireframes/generate-screens.mjs` — **verify output has no `NaN` positions** (element count must be > 0)
 5. Run `docs/scripts/generate-wireframes.ps1` to regenerate SVGs
-6. Add a row to the `## Wireframes` table in the relevant use-case file (per [USE_CASE_TEMPLATE.md](./use-cases/USE_CASE_TEMPLATE.md))
+6. Add a row to the `## Wireframes` table in the relevant use-case file (per [USE_CASE_TEMPLATE.md](../use-cases/USE_CASE_TEMPLATE.md))
 
 **Pre-commit checks for screen wireframes:**
 - [ ] Element count > 0 for every generated file (NaN positions = 0 renderable elements)

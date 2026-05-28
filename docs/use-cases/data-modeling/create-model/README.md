@@ -45,7 +45,7 @@ Users can create custom data models within their organization. A model defines t
 - [ ] Model creation is atomic: if any part of the creation fails (e.g., inserting system fields), the entire model is rolled back and nothing is left in a partial state.
 
 *Deferred capabilities*
-- Importing a model from another org or from a JSON file directly — covered in [workflow-builder import-export Import/Export](././workflow-builder/).
+- Importing a model from another org or from a JSON file directly — covered in [workflow-builder import-export Import/Export](../../workflow-builder/).
 
 > **Implementation status**
 >

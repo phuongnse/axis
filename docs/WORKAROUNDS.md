@@ -1,6 +1,6 @@
 # Architectural Workarounds Inventory
 
-> [← docs/README.md](README.md) · [← CLAUDE.md](./CLAUDE.md) · [← TECH_STACK.md](TECH_STACK.md)
+> [← docs/README.md](README.md) · [← CLAUDE.md](../CLAUDE.md) · [← TECH_STACK.md](TECH_STACK.md)
 
 ## Why this file exists
 

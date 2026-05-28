@@ -36,8 +36,7 @@ def transform(content: str) -> str:
     for pattern, repl in REPLACEMENTS:
         content = pattern.sub(repl, content)
     content = SECTION_RE.sub("*Deferred capabilities*", content)
-    # Cleanup awkward double periods / spaces
-    content = re.sub(r"\.\.+", ".", content)
+    # Cleanup awkward double periods / spaces (do NOT collapse `../` in relative paths)
     content = re.sub(r"  +", " ", content)
     content = re.sub(r" —\.", ".", content)
     return content
@@ -52,6 +51,7 @@ def main() -> None:
             path.write_text(updated, encoding="utf-8")
             changed.append(path)
     print(f"Updated {len(changed)} markdown files under docs/")
+    print("Run scripts/repair-doc-markdown-links.py after this script to fix any broken relative paths.")
 
 
 if __name__ == "__main__":

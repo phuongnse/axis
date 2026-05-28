@@ -1,6 +1,6 @@
 # Visual artifact checklist (agents)
 
-> **Navigation**: [← docs/README.md](./README.md) · [← CLAUDE.md](././CLAUDE.md)
+> **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
 
 Use this checklist **before every commit** that changes visual artifacts:
 

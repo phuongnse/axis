@@ -63,7 +63,7 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 > - `org_id` claim issued at login (`ConnectEndpoints`)
 > - handlers use `ITenantContext` / `ICurrentUser` — schema `tenant_{orgId:N}` derived in `HttpTenantContext` (no separate DB lookup; Redis cache N/A — deterministic derivation satisfies the under-5 ms AC).
 > - `TenantOrganizationAccessMiddleware` returns HTTP 403 for missing, archived/deleted, or not-ready orgs on tenant module routes (`/api/models`, workflows, forms, etc.).
-> - background jobs use `FixedTenantContext` in provision/cancel handlers (see [patterns.md](./././playbooks/patterns.md)).
+> - background jobs use `FixedTenantContext` in provision/cancel handlers (see [patterns.md](../../../playbooks/patterns.md)).
 >
 > **Gaps vs spec:** none for backend cross-tenant access prevention.
 

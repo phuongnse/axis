@@ -1,10 +1,10 @@
 # Local dev — `docker compose up`
 
-> **Navigation**: [← docs/README.md](./README.md) · [← CLAUDE.md](././CLAUDE.md)
+> **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
 
 The full dev stack runs from one `docker compose up -d`: **Postgres**, **Redis**, **MailDev**, **LocalStack**, **Kafka** (KRaft), **Schema Registry**, **RabbitMQ**, **Vault** (dev mode), the **.NET API**, and the **Vite SPA**. Backend hot-reloads via `dotnet watch`; frontend hot-reloads via Vite. Source is bind-mounted — edit on the host, containers pick up changes.
 
-**Canonical port list:** [`docker-compose.yml`](././docker-compose.yml) is the source of truth; this doc explains how to use it. CI runs [`scripts/check-local-dev-docs.py`](././scripts/check-local-dev-docs.py) to catch drift.
+**Canonical port list:** [`docker-compose.yml`](../../docker-compose.yml) is the source of truth; this doc explains how to use it. CI runs [`scripts/check-local-dev-docs.py`](../../scripts/check-local-dev-docs.py) to catch drift.
 
 ---
 
@@ -42,7 +42,7 @@ First boot:
 - **API** waits for Postgres, Redis, LocalStack, Kafka, Schema Registry, and RabbitMQ to be healthy, then runs `dotnet restore` and `dotnet watch run` — first restore ~1–2 min; NuGet cache lives in the `nuget_packages` volume.
 - **Web** runs `npm ci` then Vite — first install ~1 min; `node_modules` cache lives in `web_node_modules`.
 
-Add `--build` only after changing [`frontend/Dockerfile.dev`](././frontend/Dockerfile.dev) or the root [`Dockerfile`](././Dockerfile) (production image).
+Add `--build` only after changing [`frontend/Dockerfile.dev`](../../frontend/Dockerfile.dev) or the root [`Dockerfile`](../../Dockerfile) (production image).
 
 ---
 
@@ -56,22 +56,22 @@ Add `--build` only after changing [`frontend/Dockerfile.dev`](././frontend/Docke
 | API ready | <http://localhost:5280/health/ready> | Includes Postgres + Redis probes. |
 | Scalar / Swagger | <http://localhost:5280/scalar/v1> | OpenAPI explorer (Development / Staging only). |
 | MailDev UI | <http://localhost:1080> | Outbound email (SMTP `:1025`) lands here. |
-| Postgres | `localhost:5432` | User `axis` / password `axis_dev_pass`. Module DBs created on first cluster init via [`infra/postgres/init.d/`](././infra/postgres/init.d/): `axis_identity`, `axis_datamodeling`, `axis_workflowbuilder`, `axis_formbuilder`, `axis_workflowengine`, `axis_pagebuilder` (PageBuilder module not started yet — DB reserved). |
+| Postgres | `localhost:5432` | User `axis` / password `axis_dev_pass`. Module DBs created on first cluster init via [`infra/postgres/init.d/`](../../infra/postgres/init.d/): `axis_identity`, `axis_datamodeling`, `axis_workflowbuilder`, `axis_formbuilder`, `axis_workflowengine`, `axis_pagebuilder` (PageBuilder module not started yet — DB reserved). |
 | Redis | `localhost:6379` | No auth. |
 | LocalStack | <http://localhost:4566> | S3 only (avatars). |
-| Kafka (KRaft) | `localhost:29092` | Host listener for local `dotnet run`. Containers use `kafka:9092` on the compose network (not host-published). Carries `*Event` / `*Snapshot` ([ADR-025](./TECH_STACK.md#adr-025-transport-selection-rule-by-message-name-suffix)). |
-| Schema Registry | <http://localhost:8081> | `BACKWARD`-only compatibility ([ADR-019](./TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). |
+| Kafka (KRaft) | `localhost:29092` | Host listener for local `dotnet run`. Containers use `kafka:9092` on the compose network (not host-published). Carries `*Event` / `*Snapshot` ([ADR-025](../TECH_STACK.md#adr-025-transport-selection-rule-by-message-name-suffix)). |
+| Schema Registry | <http://localhost:8081> | `BACKWARD`-only compatibility ([ADR-019](../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). |
 | RabbitMQ | `localhost:5672` (AMQP) | Credentials `axis` / `axis_dev_pass`. |
-| RabbitMQ UI | <http://localhost:15672> | Management UI. Carries `*Command` / `*Job` / `*SagaStep` ([ADR-024](./TECH_STACK.md#adr-024-rabbitmq-for-commands-background-jobs-and-saga-orchestration)). |
-| Vault (dev) | <http://localhost:8200> | Root token `axis-dev-root-token`. **In-memory only** — secrets lost on restart ([ADR-022](./TECH_STACK.md#adr-022-secrets-management-via-hashicorp-vault-in-production)). |
+| RabbitMQ UI | <http://localhost:15672> | Management UI. Carries `*Command` / `*Job` / `*SagaStep` ([ADR-024](../TECH_STACK.md#adr-024-rabbitmq-for-commands-background-jobs-and-saga-orchestration)). |
+| Vault (dev) | <http://localhost:8200> | Root token `axis-dev-root-token`. **In-memory only** — secrets lost on restart ([ADR-022](../TECH_STACK.md#adr-022-secrets-management-via-hashicorp-vault-in-production)). |
 
-Wolverine **AutoProvision** creates Kafka topics and RabbitMQ exchanges/queues in Development ([`Program.cs`](././src/Axis.Api/Program.cs)).
+Wolverine **AutoProvision** creates Kafka topics and RabbitMQ exchanges/queues in Development ([`Program.cs`](../../src/Axis.Api/Program.cs)).
 
 ---
 
 ## Observability (optional)
 
-Grafana LGTM stack ([ADR-018](./TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability)):
+Grafana LGTM stack ([ADR-018](../TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability)):
 
 ```bash
 docker compose --profile observability up -d
@@ -169,9 +169,9 @@ docker compose down -v # drops postgres_data + nuget + node_modules volumes
 docker compose up -d
 ```
 
-On the next boot, **Development only**, `IdentityDbContext.Database.MigrateAsync()` runs at startup ([`Program.cs`](././src/Axis.Api/Program.cs)) before OpenIddict seeding.
+On the next boot, **Development only**, `IdentityDbContext.Database.MigrateAsync()` runs at startup ([`Program.cs`](../../src/Axis.Api/Program.cs)) before OpenIddict seeding.
 
-Per-tenant module schemas (`tenant_{org-id}`) are provisioned on demand by each module's `OrganizationVerifiedHandler` when Identity publishes `OrganizationVerifiedEvent` over Kafka (e.g. [`OrganizationVerifiedHandler`](././src/Modules/DataModeling/Axis.DataModeling.Infrastructure/Messaging/OrganizationVerifiedHandler.cs)). Only Identity's public schema migrates at API startup.
+Per-tenant module schemas (`tenant_{org-id}`) are provisioned on demand by each module's `OrganizationVerifiedHandler` when Identity publishes `OrganizationVerifiedEvent` over Kafka (e.g. [`OrganizationVerifiedHandler`](../../src/Modules/DataModeling/Axis.DataModeling.Infrastructure/Messaging/OrganizationVerifiedHandler.cs)). Only Identity's public schema migrates at API startup.
 
 Wipe Postgres only (keep npm/NuGet caches):
 
@@ -197,9 +197,9 @@ docker compose up -d
 
 | File | Role |
 |---|---|
-| [`docker-compose.yml`](././docker-compose.yml) | Service graph, env vars, volumes, healthchecks — **port source of truth** |
-| [`scripts/check-local-dev-docs.py`](././scripts/check-local-dev-docs.py) | CI/doc drift: verifies this file matches compose |
-| [`Dockerfile`](././Dockerfile) | Production API image (not used by default compose dev) |
-| [`frontend/Dockerfile.dev`](././frontend/Dockerfile.dev) | Node + Vite dev image |
-| [`frontend/vite.config.ts`](././frontend/vite.config.ts) | `VITE_API_PROXY_TARGET`, `VITE_USE_POLLING` |
-| [`src/Axis.Api/Program.cs`](././src/Axis.Api/Program.cs) | Dev Identity `MigrateAsync`, Wolverine AutoProvision, Scalar |
+| [`docker-compose.yml`](../../docker-compose.yml) | Service graph, env vars, volumes, healthchecks — **port source of truth** |
+| [`scripts/check-local-dev-docs.py`](../../scripts/check-local-dev-docs.py) | CI/doc drift: verifies this file matches compose |
+| [`Dockerfile`](../../Dockerfile) | Production API image (not used by default compose dev) |
+| [`frontend/Dockerfile.dev`](../../frontend/Dockerfile.dev) | Node + Vite dev image |
+| [`frontend/vite.config.ts`](../../frontend/vite.config.ts) | `VITE_API_PROXY_TARGET`, `VITE_USE_POLLING` |
+| [`src/Axis.Api/Program.cs`](../../src/Axis.Api/Program.cs) | Dev Identity `MigrateAsync`, Wolverine AutoProvision, Scalar |
