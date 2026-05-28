@@ -383,7 +383,7 @@ function containerDiagram() {
     { label: "WorkflowBuilder", x: 430, y: 105 },
     { label: "FormBuilder",     x: 70,  y: 245 },
     { label: "WorkflowEngine",  x: 250, y: 245 },
-    { label: "PageBuilder",     x: 430, y: 245, bg: "#fce7f3", stroke: "#be185d" },
+    { label: "PageBuilder",     x: 430, y: 245 },
   ];
   for (const m of modules) {
     els.push(...rect({
@@ -437,21 +437,24 @@ function containerDiagram() {
 
   // Other infrastructure (right side, below DB column)
   els.push(...rect({ x: DBX, y: 495, w: DBW, h: DBH, bg: C.infraBg, stroke: C.infraBdr, label: "Redis 7",       sub: "Cache · Session · Schema name" }));
-  els.push(...rect({ x: DBX, y: 565, w: DBW, h: DBH, bg: C.extBg, stroke: C.extBdr, label: "AWS S3",        sub: "File storage" }));
-  els.push(...rect({ x: DBX, y: 635, w: DBW, h: DBH, bg: C.extBg, stroke: C.extBdr, label: "Email Service", sub: "SMTP · MailKit" }));
   els.push(...arrow({ x1: 810, y1: 522, x2: DBX, y2: 522, color: C.infraBdr }));
 
-  // Production operations containers (shown outside platform boundary)
-  els.push(...rect({ x: 1090, y: 495, w: 220, h: 55, bg: C.infraBg, stroke: C.infraBdr,
+  // Production operations containers (right side, straight arrows from platform edge)
+  els.push(...rect({ x: 870, y: 565, w: 220, h: 55, bg: C.infraBg, stroke: C.infraBdr,
     label: "HashiCorp Vault", sub: "Secrets management" }));
-  els.push(...rect({ x: 1090, y: 565, w: 220, h: 55, bg: C.infraBg, stroke: C.infraBdr,
+  els.push(...rect({ x: 870, y: 635, w: 220, h: 55, bg: C.infraBg, stroke: C.infraBdr,
     label: "Grafana Tempo/Loki/Mimir", sub: "Tracing · Logs · Metrics" }));
-  // Routed arrows start at platform edge to avoid visual confusion with S3/Email boxes.
-  els.push(...routedArrow({ waypoints: [[810, 548], [1030, 548], [1030, 522], [1090, 522]], color: C.infraBdr, label: "secrets + config" }));
-  els.push(...routedArrow({ waypoints: [[810, 598], [1030, 598], [1030, 592], [1090, 592]], color: C.infraBdr, label: "telemetry export" }));
+  els.push(...arrow({ x1: 810, y1: 592, x2: 870, y2: 592, color: C.infraBdr, label: "secrets + config" }));
+  els.push(...arrow({ x1: 810, y1: 662, x2: 870, y2: 662, color: C.infraBdr, label: "telemetry export" }));
+
+  // External managed services moved to separate column
+  els.push(...rect({ x: 1110, y: 565, w: 200, h: 55, bg: C.extBg, stroke: C.extBdr, label: "AWS S3", sub: "File storage" }));
+  els.push(...rect({ x: 1110, y: 635, w: 200, h: 55, bg: C.extBg, stroke: C.extBdr, label: "Email Service", sub: "SMTP · MailKit" }));
+  els.push(...arrow({ x1: 1090, y1: 592, x2: 1110, y2: 592, color: C.extBdr, label: "file storage" }));
+  els.push(...arrow({ x1: 1090, y1: 662, x2: 1110, y2: 662, color: C.extBdr, label: "notifications" }));
 
   // Compact legend
-  els.push(...rect({ x: 640, y: 94, w: 150, h: 104, bg: "#ffffff", stroke: C.border }));
+  els.push(...rect({ x: 640, y: 94, w: 150, h: 112, bg: "#ffffff", stroke: C.border }));
   els.push(text({ x: 715, y: 108, value: "Legend", size: 10, bold: true, color: C.text, anchor: "center" }));
   els.push(...rect({ x: 650, y: 118, w: 12, h: 12, bg: C.modBg, stroke: C.modBdr }));
   els.push(text({ x: 668, y: 124, value: "Module service", size: 9, color: C.text }));
@@ -463,7 +466,7 @@ function containerDiagram() {
   els.push(text({ x: 668, y: 178, value: "External service", size: 9, color: C.text }));
   els.push(...arrow({ x1: 650, y1: 190, x2: 680, y2: 190, color: C.infraBdr }));
   els.push(text({ x: 685, y: 190, value: "Infra connection", size: 9, color: C.text }));
-  els.push(text({ x: 715, y: 204, value: "All arrows start at source", size: 8.5, color: C.muted, anchor: "center" }));
+  els.push(text({ x: 715, y: 204, value: "Straight arrows where possible", size: 8.5, color: C.muted, anchor: "center" }));
 
   return excalidraw(els);
 }
