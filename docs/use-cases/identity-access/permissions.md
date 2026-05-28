@@ -4,9 +4,9 @@
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| settings-roles | [source](../../epics/E02-identity-access/wireframes/settings-roles.excalidraw) | [preview](../../epics/E02-identity-access/wireframes/settings-roles.svg) |
+| settings-roles | [source](./wireframes/settings-roles.excalidraw) | [preview](./wireframes/settings-roles.svg) |
 
-[← Back to E02-identity-access](../../epics/E02-identity-access/README.md)
+[← Back to Identity & Access](./README.md)
 
 ---
 

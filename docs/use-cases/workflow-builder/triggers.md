@@ -38,9 +38,9 @@ _(to be detailed during migration)_
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| workflow-editor | [source](../../epics/E04-workflow-builder/wireframes/workflow-editor.excalidraw) | [preview](../../epics/E04-workflow-builder/wireframes/workflow-editor.svg) |
+| workflow-editor | [source](./wireframes/workflow-editor.excalidraw) | [preview](./wireframes/workflow-editor.svg) |
 
-[← Back to E04-workflow-builder](../../epics/E04-workflow-builder/README.md)
+[← Back to Workflow Builder](./README.md)
 
 ---
 
@@ -178,7 +178,7 @@ A workflow must have at least one trigger before it can be published. Triggers d
 **Acceptance Criteria:**
 
 *Happy path*
-- [ ] Event type dropdown lists all available platform events (see epic README for the full list).
+- [ ] Event type dropdown lists all available platform events (see domain README for the full list).
 - [ ] For `record.*` events: an additional model picker lets the user select which model the event applies to.
 - [ ] An optional filter condition (same expression builder as Condition step) lets the user restrict triggering to specific event payloads (e.g., "only trigger if `status == 'approved'`").
 - [ ] The event payload is available as workflow input variables matching the event's schema (documented per event type).

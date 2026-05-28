@@ -15,7 +15,7 @@ This playbook covers everything needed to work with the wireframe generation sys
 | `docs/wireframes/generate-template.mjs` | 34-section component kit — imports from `components.mjs`, exports all builders |
 | `docs/wireframes/generate-screens.mjs` | 27 screen wireframes — imports builders from the template, places them via `component()` |
 | `docs/wireframes/_template.excalidraw` | Generated output of `generate-template.mjs` |
-| `docs/epics/{E0N-*}/wireframes/*.excalidraw` | Generated outputs of `generate-screens.mjs` — co-located with each epic |
+| `docs/use-cases/{domain}/wireframes/*.excalidraw` | Generated outputs of `generate-screens.mjs` — co-located with each domain |
 
 **Regeneration commands:**
 
@@ -40,7 +40,7 @@ docs/scripts/generate-wireframes.ps1
 All generated wireframes must use deterministic seeds per screen (`setSeed(deterministicSeedForScreen(screenKey))` in `generate-screens.mjs` before each screen generator runs).
 
 - Why: Excalidraw roughness depends on seed; order-dependent global seeds cause unrelated files to churn when a new screen is inserted.
-- Guarantee: adding/changing one screen does not rewrite untouched screens in other epics.
+- Guarantee: adding/changing one screen does not rewrite untouched screens in other domains.
 - Implementation: keep `runScreen(screenKey, generator)` wrapper in `generate-screens.mjs` and call every `genXxx()` through it.
 - **Pre-commit check:** run `node docs/wireframes/generate-screens.mjs` twice; `git diff` must be empty after the second run (proves seeds are stable).
 

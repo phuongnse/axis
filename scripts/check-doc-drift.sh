@@ -217,10 +217,10 @@ done < <(
       '
 )
 
-check_readme_api 'src/Axis\.Api/Endpoints/Execution' 'docs/epics/E06-workflow-engine'
-check_readme_api 'src/Axis\.Api/Endpoints/Form' 'docs/epics/E05-form-builder'
-check_readme_api 'src/Axis\.Api/Endpoints/Model' 'docs/epics/E03-data-modeling'
-check_readme_api 'src/Axis\.Api/Endpoints/Workflow' 'docs/epics/E04-workflow-builder'
+check_readme_api 'src/Axis\.Api/Endpoints/Execution' 'docs/use-cases/workflow-engine'
+check_readme_api 'src/Axis\.Api/Endpoints/Form' 'docs/use-cases/form-builder'
+check_readme_api 'src/Axis\.Api/Endpoints/Model' 'docs/use-cases/data-modeling'
+check_readme_api 'src/Axis\.Api/Endpoints/Workflow' 'docs/use-cases/workflow-builder'
 
 # WORKAROUND comment ↔ inventory cross-check (docs/WORKAROUNDS.md).
 #   Each `// WORKAROUND: see docs/WORKAROUNDS.md#<slug>` comment in production

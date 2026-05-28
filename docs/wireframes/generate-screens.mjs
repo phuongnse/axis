@@ -87,10 +87,10 @@ function runScreen(screenKey, generator) {
 
 function write(relativePath, elements) {
   let full;
-  if (/^E0\d-/.test(relativePath)) {
-    // Epic wireframe → docs/epics/{epic}/wireframes/{screen}
-    const [epicFolder, ...rest] = relativePath.split('/');
-    full = join(__dir, '..', 'epics', epicFolder, 'wireframes', ...rest);
+  if (relativePath.includes('/')) {
+    // Domain wireframe → docs/use-cases/{domain}/wireframes/{screen}
+    const [domainFolder, ...rest] = relativePath.split('/');
+    full = join(__dir, '..', 'use-cases', domainFolder, 'wireframes', ...rest);
   } else {
     // Shared wireframe → docs/wireframes/{path}
     full = join(__dir, relativePath);
@@ -233,7 +233,7 @@ function genRegisterOrg() {
       { label: 'Confirm password',  placeholder: '••••••••' },
     ],
   }, 'Create organization', 'Already have an account? Sign in');
-  write('E01-platform-foundation/register-org.excalidraw', els);
+  write('platform-foundation/register-org.excalidraw', els);
 }
 
 /**
@@ -309,7 +309,7 @@ function genRegisterOrgStates() {
     els.push(text(`ros_${id}_sbtn_t`, x + 24, btnY + 10, btnW, 16, 'Create organization', 13, C.white, 'center'));
   });
 
-  write('E01-platform-foundation/register-org-states.excalidraw', els);
+  write('platform-foundation/register-org-states.excalidraw', els);
 }
 
 /**
@@ -345,7 +345,7 @@ function genEmailConfirmation() {
   els.push(hline('ec_fdiv',   cardX,      cardY + cardH - 32, cardW,      C.gray300));
   els.push(text('ec_footer',  cardX + 24, cardY + cardH - 22, cardW - 48, 16, 'Back to sign in', 12, C.primary, 'center'));
 
-  write('E01-platform-foundation/email-confirmation.excalidraw', els);
+  write('platform-foundation/email-confirmation.excalidraw', els);
 }
 
 /**
@@ -413,7 +413,7 @@ function genVerifyEmail() {
     }
   });
 
-  write('E01-platform-foundation/verify-email.excalidraw', els);
+  write('platform-foundation/verify-email.excalidraw', els);
 }
 
 function genVerifyEmailRateLimit() {
@@ -441,7 +441,7 @@ function genVerifyEmailRateLimit() {
   els.push(text('vrl_btn_t', cardX + AUTH_CARD_PAD, cardY + cardH - 30, 220, 16, 'Resend verification email', 13, C.gray300, 'center'));
   els.push(text('vrl_hint', cardX + 252, cardY + cardH - 26, 168, 16, 'Button disabled until timer ends', 10, C.gray500, 'center'));
 
-  write('E01-platform-foundation/verify-email-rate-limit.excalidraw', els);
+  write('platform-foundation/verify-email-rate-limit.excalidraw', els);
 }
 
 /**
@@ -514,7 +514,7 @@ function genWorkspaceProvisioning() {
   els.push(text('wp_r_supp', rX, stepsY + 4 * 40 + 8, rW, 14,
     'Contact support if the issue persists →', 11, C.primary, 'center'));
 
-  write('E01-platform-foundation/workspace-provisioning.excalidraw', els);
+  write('platform-foundation/workspace-provisioning.excalidraw', els);
 }
 
 /**
@@ -573,7 +573,7 @@ function genSettingsOrgDeleteModal() {
   els.push(text('sdm_del_t', delBtnX, mY + mH - 34, delW, 16, 'Delete organization', 13, C.gray300, 'center'));
   els.push(text('sdm_hint',  mX + 20, mY + mH - 36, 240,  14, 'Enabled when name matches exactly', 10, C.gray300));
 
-  write('E01-platform-foundation/settings-org-delete-modal.excalidraw', els);
+  write('platform-foundation/settings-org-delete-modal.excalidraw', els);
 }
 
 /**
@@ -639,7 +639,7 @@ function genSettingsOrgDeleteStates() {
     els.push(...btn(`sods_${id}_can`, mX + 20, delY, 'Cancel', 'ghost'));
   });
 
-  write('E01-platform-foundation/settings-org-delete-states.excalidraw', els);
+  write('platform-foundation/settings-org-delete-states.excalidraw', els);
 }
 
 /**
@@ -726,7 +726,7 @@ function genPricing() {
     els.push(text(`pr_${id}_cb_t`, px + 20, ctaBtnY + 10, ctaBtnW, 16, cta,     13,  tc2, 'center'));
   });
 
-  write('E01-platform-foundation/pricing.excalidraw', els);
+  write('platform-foundation/pricing.excalidraw', els);
 }
 
 /**
@@ -819,7 +819,7 @@ function genSettingsOrg() {
   const delBtnX  = cx + cw - (delLabel.length * 8 + 32);  // 996
   els.push(...btn('so_del', delBtnX, dboxY + 12, delLabel, 'danger'));
 
-  write('E01-platform-foundation/settings-org.excalidraw', els);
+  write('platform-foundation/settings-org.excalidraw', els);
 }
 
 function genSettingsOrgUploadStates() {
@@ -849,7 +849,7 @@ function genSettingsOrgUploadStates() {
     els.push(text(`sou_${s.id}_p`, x + 28, y + 151, cardW - 56, 16, i === 1 ? 'acme-logo.png' : 'Select a file…', 13, C.gray500));
   });
 
-  write('E01-platform-foundation/settings-org-upload-states.excalidraw', els);
+  write('platform-foundation/settings-org-upload-states.excalidraw', els);
 }
 
 /**
@@ -919,7 +919,7 @@ function genSettingsOrgProfileStates() {
     }
   });
 
-  write('E01-platform-foundation/settings-org-profile-states.excalidraw', els);
+  write('platform-foundation/settings-org-profile-states.excalidraw', els);
 }
 
 function genSettingsOrgUsageError() {
@@ -938,7 +938,7 @@ function genSettingsOrgUsageError() {
     els.push(...btn(`sue_r_${i}`, x + 12, mY + 60, 'Retry', 'ghost'));
   });
 
-  write('E01-platform-foundation/settings-org-usage-error.excalidraw', els);
+  write('platform-foundation/settings-org-usage-error.excalidraw', els);
 }
 
 /** US-006 edge case — free plan usage without denominator limits. */
@@ -966,7 +966,7 @@ function genSettingsOrgFreePlan() {
     els.push(text(`sofp_ms_${i}`, x + 12, mY + 54, mW - 24, 14, 'no limit configured', 11, C.gray300));
   });
 
-  write('E01-platform-foundation/settings-org-free-plan.excalidraw', els);
+  write('platform-foundation/settings-org-free-plan.excalidraw', els);
 }
 
 /** US-006 — non-admin receives 403 (redirect target shown as message). */
@@ -983,7 +983,7 @@ function genSettingsOrgAccessDenied() {
     'You need the Admin role to view organization settings.\nRedirecting to dashboard…', 13, C.gray700));
   els.push(...btn('soad_home', boxX + 24, boxY + 116, 'Go to dashboard', 'secondary'));
 
-  write('E01-platform-foundation/settings-org-access-denied.excalidraw', els);
+  write('platform-foundation/settings-org-access-denied.excalidraw', els);
 }
 
 function genSettingsOrgDeletionScheduled() {
@@ -1000,7 +1000,7 @@ function genSettingsOrgDeletionScheduled() {
   els.push(rect('sds_stub_card', cx, by + 150, cw, 170, C.gray300, C.white, 1, true));
   els.push(text('sds_stub_txt', cx + 20, by + 222, cw - 40, 16, 'Settings content continues below…', 12, C.gray500, 'center'));
 
-  write('E01-platform-foundation/settings-org-deletion-scheduled.excalidraw', els);
+  write('platform-foundation/settings-org-deletion-scheduled.excalidraw', els);
 }
 
 // ─── E02 Identity & Access — Auth screens (no sidebar) ───────────────────────
@@ -1014,7 +1014,7 @@ function genLogin() {
     ],
     extraLink: 'Forgot password?',
   }, 'Sign in', "Don't have an account? Sign up");
-  write('E02-identity-access/login.excalidraw', els);
+  write('identity-access/login.excalidraw', els);
 }
 
 /** US-002 (F01) / US-013 — unverified email blocks sign-in. */
@@ -1051,7 +1051,7 @@ function genLoginUnverified() {
   els.push(rect('lu_sbtn', cardX + 24, btnY, btnW, 36, C.gray300, C.gray100, 1, true));
   els.push(text('lu_sbtn_t', cardX + 24, btnY + 10, btnW, 16, 'Sign in', 13, C.gray300, 'center'));
 
-  write('E02-identity-access/login-unverified.excalidraw', els);
+  write('identity-access/login-unverified.excalidraw', els);
 }
 
 function genRegister() {
@@ -1064,7 +1064,7 @@ function genRegister() {
       { label: 'Password',      placeholder: '••••••••' },
     ],
   }, 'Create account', 'Already have an account? Sign in');
-  write('E02-identity-access/register.excalidraw', els);
+  write('identity-access/register.excalidraw', els);
 }
 
 function genForgotPassword() {
@@ -1075,7 +1075,7 @@ function genForgotPassword() {
       { label: 'Email address', placeholder: 'you@company.com' },
     ],
   }, 'Send reset link', 'Remember your password? Sign in');
-  write('E02-identity-access/forgot-password.excalidraw', els);
+  write('identity-access/forgot-password.excalidraw', els);
 }
 
 function genChangePassword() {
@@ -1087,7 +1087,7 @@ function genChangePassword() {
       { label: 'Confirm password', placeholder: '••••••••' },
     ],
   }, 'Set new password', 'Back to sign in');
-  write('E02-identity-access/change-password.excalidraw', els);
+  write('identity-access/change-password.excalidraw', els);
 }
 
 function genAcceptInvitation() {
@@ -1099,7 +1099,7 @@ function genAcceptInvitation() {
       { label: 'Choose a password', placeholder: '••••••••' },
     ],
   }, 'Accept Invitation', 'Already have an account? Sign in');
-  write('E02-identity-access/accept-invitation.excalidraw', els);
+  write('identity-access/accept-invitation.excalidraw', els);
 }
 
 // ─── E02 Identity & Access — Settings screens (with sidebar) ─────────────────
@@ -1151,7 +1151,7 @@ function genSettingsUsers() {
     }),
     text('su_foot', cx + 12, tblY + tblH + 4, 300, 18, 'Showing 1–4 of 12 users', 12, C.gray500),
   ];
-  write('E02-identity-access/settings-users.excalidraw', els);
+  write('identity-access/settings-users.excalidraw', els);
 }
 
 function genSettingsRoles() {
@@ -1168,7 +1168,7 @@ function genSettingsRoles() {
     // Permission matrix from S28 placed below the header
     ...matrixEls,
   ];
-  write('E02-identity-access/settings-roles.excalidraw', els);
+  write('identity-access/settings-roles.excalidraw', els);
 }
 
 function genSettingsSecurity() {
@@ -1202,7 +1202,7 @@ function genSettingsSecurity() {
 
     ...btn('ss_save', cx + cw - 140, cy + 430, 'Save Changes'),
   ];
-  write('E02-identity-access/settings-security.excalidraw', els);
+  write('identity-access/settings-security.excalidraw', els);
 }
 
 // ─── E03 Data Modeling ────────────────────────────────────────────────────────
@@ -1240,7 +1240,7 @@ function genDataModels() {
       ];
     }),
   ];
-  write('E03-data-modeling/data-models.excalidraw', els);
+  write('data-modeling/data-models.excalidraw', els);
 }
 
 function genDataClasses() {
@@ -1281,7 +1281,7 @@ function genDataClasses() {
       ];
     }),
   ];
-  write('E03-data-modeling/data-classes.excalidraw', els);
+  write('data-modeling/data-classes.excalidraw', els);
 }
 
 function genRecords() {
@@ -1329,7 +1329,7 @@ function genRecords() {
     }),
     text('rec_foot', cx + 12, tblY + tblH + 4, 300, 18, 'Showing 1–4 of 142 records', 12, C.gray500),
   ];
-  write('E03-data-modeling/records.excalidraw', els);
+  write('data-modeling/records.excalidraw', els);
 }
 
 // ─── E04 Workflow Builder ─────────────────────────────────────────────────────
@@ -1376,7 +1376,7 @@ function genWorkflows() {
       ];
     }),
   ];
-  write('E04-workflow-builder/workflows.excalidraw', els);
+  write('workflow-builder/workflows.excalidraw', els);
 }
 
 function genWorkflowEditor() {
@@ -1387,7 +1387,7 @@ function genWorkflowEditor() {
     ...appShell('we', W, H, NAV, navIdx, 'Workflow Editor — Order Processing'),
     ...component(buildWorkflowCanvas, cx, cy),
   ];
-  write('E04-workflow-builder/workflow-editor.excalidraw', els);
+  write('workflow-builder/workflow-editor.excalidraw', els);
 }
 
 // ─── E05 Form Builder ─────────────────────────────────────────────────────────
@@ -1429,7 +1429,7 @@ function genForms() {
       ];
     }),
   ];
-  write('E05-form-builder/forms.excalidraw', els);
+  write('form-builder/forms.excalidraw', els);
 }
 
 function genFormEditor() {
@@ -1500,7 +1500,7 @@ function genFormEditor() {
     text('fe_rp_v4',   fx + lW + cW + 22, fy + toolbarH + 242, 120, 14, 'Text',        12, C.gray700),
     text('fe_rp_arr',  fx + lW + cW + rW - 26, fy + toolbarH + 242, 14, 14, '▾', 10, C.gray700),
   ];
-  write('E05-form-builder/form-editor.excalidraw', els);
+  write('form-builder/form-editor.excalidraw', els);
 }
 
 function genFormSubmission() {
@@ -1514,7 +1514,7 @@ function genFormSubmission() {
     ...sideEls,
     // ss_title inside the panel header already reads 'Record Detail' — no extra labels needed
   ];
-  write('E05-form-builder/form-submission.excalidraw', els);
+  write('form-builder/form-submission.excalidraw', els);
 }
 
 // ─── E06 Workflow Engine ──────────────────────────────────────────────────────
@@ -1565,7 +1565,7 @@ function genExecutions() {
     }),
     text('ex_foot', cx + 12, tblY + tblH + 4, 300, 18, 'Showing 1–5 of 1,247 executions', 12, C.gray500),
   ];
-  write('E06-workflow-engine/executions.excalidraw', els);
+  write('workflow-engine/executions.excalidraw', els);
 }
 
 function genExecutionDetail() {
@@ -1603,7 +1603,7 @@ function genExecutionDetail() {
     text('ed_rh_r0', cx + 16, cy + 464,  580, 18, '#1 · Completed · 1 hr ago · Triggered by Alex Brown',    12, C.gray700),
     text('ed_rh_r1', cx + 16, cy + 496,  580, 18, '#0 (original) · Failed · 2 hr ago · Triggered by Schedule', 12, C.gray700),
   ];
-  write('E06-workflow-engine/execution-detail.excalidraw', els);
+  write('workflow-engine/execution-detail.excalidraw', els);
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────

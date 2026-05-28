@@ -1,6 +1,6 @@
 # Use Case Group — Tenant Data Isolation
 
-[← Back to E01-platform-foundation](../../epics/E01-platform-foundation/README.md)
+[← Back to Platform Foundation](./README.md)
 
 ---
 

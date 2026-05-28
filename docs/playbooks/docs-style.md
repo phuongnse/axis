@@ -34,7 +34,7 @@ When you find yourself editing the same fact in two files, the architecture is w
 |---|---|---|
 | Reference docs (`CLAUDE.md`, `ARCHITECTURE.md`, playbooks) | 300 lines | Split by topic, extract a sub-playbook, or move detail into an index + section pattern |
 | `patterns.md` | exempt | Use [`patterns-index.md`](./patterns-index.md) as the entry point; never read end-to-end |
-| Epic README | 200 lines | Move detail into per-use-case files |
+| Domain README | 200 lines | Move detail into per-use-case files |
 | Use-case file | no hard cap | Already scoped by AC list |
 
 `patterns.md` is the only intentional outlier — its size is mitigated by the lazy-load index pattern. Don't replicate that escape hatch elsewhere without the same mitigation.
@@ -43,7 +43,7 @@ When you find yourself editing the same fact in two files, the architecture is w
 
 ## Use-case files — wireframes & implementation status
 
-Every `docs/epics/*/use-cases/*.md` file uses these layouts so agents can scan status without parsing inline pipes.
+Every `docs/use-cases/*/use-cases/*.md` file uses these layouts so agents can scan status without parsing inline pipes.
 
 ### Wireframes (top of file, after title / back-link)
 

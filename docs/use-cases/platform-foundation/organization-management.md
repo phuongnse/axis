@@ -1,20 +1,20 @@
 # Use Case Group — Organization Management
 
-[← Back to E01-platform-foundation](../../epics/E01-platform-foundation/README.md)
+[← Back to Platform Foundation](./README.md)
 
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| settings-org | [source](../../epics/E01-platform-foundation/wireframes/settings-org.excalidraw) | [preview](../../epics/E01-platform-foundation/wireframes/settings-org.svg) |
-| settings-org-upload-states | [source](../../epics/E01-platform-foundation/wireframes/settings-org-upload-states.excalidraw) | [preview](../../epics/E01-platform-foundation/wireframes/settings-org-upload-states.svg) |
-| settings-org-profile-states | [source](../../epics/E01-platform-foundation/wireframes/settings-org-profile-states.excalidraw) | [preview](../../epics/E01-platform-foundation/wireframes/settings-org-profile-states.svg) |
-| settings-org-usage-error | [source](../../epics/E01-platform-foundation/wireframes/settings-org-usage-error.excalidraw) | [preview](../../epics/E01-platform-foundation/wireframes/settings-org-usage-error.svg) |
-| settings-org-free-plan | [source](../../epics/E01-platform-foundation/wireframes/settings-org-free-plan.excalidraw) | [preview](../../epics/E01-platform-foundation/wireframes/settings-org-free-plan.svg) |
-| settings-org-access-denied | [source](../../epics/E01-platform-foundation/wireframes/settings-org-access-denied.excalidraw) | [preview](../../epics/E01-platform-foundation/wireframes/settings-org-access-denied.svg) |
-| settings-org-deletion-scheduled | [source](../../epics/E01-platform-foundation/wireframes/settings-org-deletion-scheduled.excalidraw) | [preview](../../epics/E01-platform-foundation/wireframes/settings-org-deletion-scheduled.svg) |
-| settings-org-delete-modal | [source](../../epics/E01-platform-foundation/wireframes/settings-org-delete-modal.excalidraw) | [preview](../../epics/E01-platform-foundation/wireframes/settings-org-delete-modal.svg) |
-| settings-org-delete-states | [source](../../epics/E01-platform-foundation/wireframes/settings-org-delete-states.excalidraw) | [preview](../../epics/E01-platform-foundation/wireframes/settings-org-delete-states.svg) |
+| settings-org | [source](./wireframes/settings-org.excalidraw) | [preview](./wireframes/settings-org.svg) |
+| settings-org-upload-states | [source](./wireframes/settings-org-upload-states.excalidraw) | [preview](./wireframes/settings-org-upload-states.svg) |
+| settings-org-profile-states | [source](./wireframes/settings-org-profile-states.excalidraw) | [preview](./wireframes/settings-org-profile-states.svg) |
+| settings-org-usage-error | [source](./wireframes/settings-org-usage-error.excalidraw) | [preview](./wireframes/settings-org-usage-error.svg) |
+| settings-org-free-plan | [source](./wireframes/settings-org-free-plan.excalidraw) | [preview](./wireframes/settings-org-free-plan.svg) |
+| settings-org-access-denied | [source](./wireframes/settings-org-access-denied.excalidraw) | [preview](./wireframes/settings-org-access-denied.svg) |
+| settings-org-deletion-scheduled | [source](./wireframes/settings-org-deletion-scheduled.excalidraw) | [preview](./wireframes/settings-org-deletion-scheduled.svg) |
+| settings-org-delete-modal | [source](./wireframes/settings-org-delete-modal.excalidraw) | [preview](./wireframes/settings-org-delete-modal.svg) |
+| settings-org-delete-states | [source](./wireframes/settings-org-delete-states.excalidraw) | [preview](./wireframes/settings-org-delete-states.svg) |
 
 ---
 

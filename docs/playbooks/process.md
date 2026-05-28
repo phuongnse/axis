@@ -72,7 +72,7 @@ Repeat for every user story, in layer order: Domain → Application → Infrastr
 **Run this before starting Step 5 for any module.** Skipping it means carrying hidden debt into the API layer.
 
 ```
-grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/epics/
+grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/use-cases/
 ```
 
 For every `⚠️` found, decide explicitly:
@@ -108,7 +108,7 @@ For every match: confirm the SQL only references tables owned by that match's ow
 #### Step 6 — Update docs (same PR)
 
 - Update use-case file `> **Implementation status**` callout for this US
-- If all USes in the feature are complete for a layer: update Epic README status table
+- If all USes in the feature are complete for a layer: update Domain README status table
 - If the full layer is done for the module: update `docs/PROGRESS.md`
 - If a new pattern was established: add to `docs/playbooks/patterns.md`
 - If a library was added or changed: update `docs/TECH_STACK.md`
@@ -148,7 +148,7 @@ Repeat for every screen / feature area. **Never skip the wireframe step** — it
 **Step 10 — Update docs breakdown:**
 
 - Update use-case file `> **Implementation status**` callout for this US
-- If all USes in the feature are complete for Frontend: update Epic README status table
+- If all USes in the feature are complete for Frontend: update Domain README status table
 - If the full Frontend layer is done for the module: update `docs/PROGRESS.md`
 - If a new frontend pattern was established: add to `docs/playbooks/patterns.md`
 - If a library was added or changed: update `docs/TECH_STACK.md`

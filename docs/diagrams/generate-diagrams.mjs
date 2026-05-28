@@ -9,7 +9,7 @@
  *   container       — what runs inside Axis, per-module databases, Wolverine
  *   module-overview — 6 modules + event-driven communication flows
  *
- * Epic-level (docs/epics/E0{N}-name/diagrams/):
+ * Domain-level (docs/use-cases/{domain}/diagrams/):
  *   tenant-provisioning — org registration & async schema provisioning  (E01)
  *   auth-flow           — JWT + refresh token authentication flow         (E02)
  *   data-model          — DataModeling entity relationships               (E03)
@@ -23,7 +23,7 @@ import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
-const epicDir = (folder) => join(__dir, "..", "epics", folder, "diagrams");
+const domainDir = (domain) => join(__dir, "..", "use-cases", domain, "diagrams");
 
 // ─── Excalidraw primitives ────────────────────────────────────────────────────
 
@@ -831,13 +831,13 @@ const diagrams = [
   { name: "system-context",       fn: systemContext,           dir: __dir },
   { name: "container",            fn: containerDiagram,        dir: __dir },
   { name: "module-overview",      fn: moduleOverview,          dir: __dir },
-  // Epic-level diagrams
-  { name: "tenant-provisioning",  fn: tenantProvisioningDiagram, dir: epicDir("E01-platform-foundation") },
-  { name: "auth-flow",            fn: authFlowDiagram,           dir: epicDir("E02-identity-access") },
-  { name: "data-model",           fn: dataModelDiagram,          dir: epicDir("E03-data-modeling") },
-  { name: "workflow-model",       fn: workflowModelDiagram,      dir: epicDir("E04-workflow-builder") },
-  { name: "form-model",           fn: formModelDiagram,          dir: epicDir("E05-form-builder") },
-  { name: "execution-flow",       fn: executionFlowDiagram,      dir: epicDir("E06-workflow-engine") },
+  // Domain-level diagrams
+  { name: "tenant-provisioning",  fn: tenantProvisioningDiagram, dir: domainDir("platform-foundation") },
+  { name: "auth-flow",            fn: authFlowDiagram,           dir: domainDir("identity-access") },
+  { name: "data-model",           fn: dataModelDiagram,          dir: domainDir("data-modeling") },
+  { name: "workflow-model",       fn: workflowModelDiagram,      dir: domainDir("workflow-builder") },
+  { name: "form-model",           fn: formModelDiagram,          dir: domainDir("form-builder") },
+  { name: "execution-flow",       fn: executionFlowDiagram,      dir: domainDir("workflow-engine") },
 ];
 
 for (const { name, fn, dir } of diagrams) {

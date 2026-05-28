@@ -1,6 +1,6 @@
-# E03 — Data Modeling
+# Data Modeling
 
-[← Back to Epics](../README.md)
+[← Back to Use Cases](../README.md)
 
 ---
 
@@ -22,10 +22,10 @@ Custom data modeling is the core differentiator of Axis. Without it, the platfor
 
 | Use case | Description |
 |---|---|---|
-| [Model Definition](../../use-cases/data-modeling/model-definition.md) | Create, edit, delete custom models within an org |
-| [Field Type System](../../use-cases/data-modeling/field-types.md) | Text, Number, Date, Boolean, Enum, Relation, File, JSON |
-| [Data Class Management](../../use-cases/data-modeling/data-classes.md) | Reusable nested object types used as field types |
-| [Data Record CRUD](../../use-cases/data-modeling/data-records.md) | Create, read, update, delete records against any model |
+| [Model Definition](model-definition.md) | Create, edit, delete custom models within an org |
+| [Field Type System](field-types.md) | Text, Number, Date, Boolean, Enum, Relation, File, JSON |
+| [Data Class Management](data-classes.md) | Reusable nested object types used as field types |
+| [Data Record CRUD](data-records.md) | Create, read, update, delete records against any model |
 ---
 
 ## Diagrams
@@ -98,7 +98,7 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend** | ⚠️ polish | HTTP 422/409 on records ([F04](../../use-cases/data-modeling/data-records.md)); relation display-field resolution; model plan limits **not in F04** (spec mentions 402 — product decision). 30-day purge jobs deferred. |
+| **Backend** | ⚠️ polish | HTTP 422/409 on records ([F04](data-records.md)); relation display-field resolution; model plan limits **not in F04** (spec mentions 402 — product decision). 30-day purge jobs deferred. |
 | **Frontend** | ⏳ | Model/record UI, filters, data-class sub-forms — all US callouts mark Frontend ⏳. |
 
 Module API is largely ✅; grep `API: ⏳` in linked use-case files only when adding endpoints.
@@ -107,11 +107,11 @@ Module API is largely ✅; grep `API: ⏳` in linked use-case files only when ad
 
 ## Dependencies
 
-- [E01 — Platform Foundation](../E01-platform-foundation/README.md)
-- [E02 — Identity & Access Management](../E02-identity-access/README.md)
+- [E01 — Platform Foundation](../platform-foundation/README.md)
+- [E02 — Identity & Access Management](../identity-access/README.md)
 
 ## Dependents
 
-- [E04 — Workflow Builder](../E04-workflow-builder/README.md)
-- [E05 — Form Builder](../E05-form-builder/README.md)
-- [E07 — Page Builder](../E07-page-builder/README.md)
+- [E04 — Workflow Builder](../workflow-builder/README.md)
+- [E05 — Form Builder](../form-builder/README.md)
+- [E07 — Page Builder](../page-builder/README.md)

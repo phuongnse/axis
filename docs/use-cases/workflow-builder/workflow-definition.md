@@ -4,9 +4,9 @@
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| workflows | [source](../../epics/E04-workflow-builder/wireframes/workflows.excalidraw) | [preview](../../epics/E04-workflow-builder/wireframes/workflows.svg) |
+| workflows | [source](./wireframes/workflows.excalidraw) | [preview](./wireframes/workflows.svg) |
 
-[← Back to E04-workflow-builder](../../epics/E04-workflow-builder/README.md)
+[← Back to Workflow Builder](./README.md)
 
 ---
 

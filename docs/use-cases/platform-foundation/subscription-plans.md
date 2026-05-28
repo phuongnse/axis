@@ -1,12 +1,12 @@
 # Use Case Group — Subscription Plan Management
 
-[← Back to E01-platform-foundation](../../epics/E01-platform-foundation/README.md)
+[← Back to Platform Foundation](./README.md)
 
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| pricing | [source](../../epics/E01-platform-foundation/wireframes/pricing.excalidraw) | [preview](../../epics/E01-platform-foundation/wireframes/pricing.svg) |
+| pricing | [source](./wireframes/pricing.excalidraw) | [preview](./wireframes/pricing.svg) |
 
 ---
 

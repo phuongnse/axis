@@ -4,9 +4,9 @@
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| records | [source](../../epics/E03-data-modeling/wireframes/records.excalidraw) | [preview](../../epics/E03-data-modeling/wireframes/records.svg) |
+| records | [source](./wireframes/records.excalidraw) | [preview](./wireframes/records.svg) |
 
-[← Back to E03-data-modeling](../../epics/E03-data-modeling/README.md)
+[← Back to Data Modeling](./README.md)
 
 ---
 

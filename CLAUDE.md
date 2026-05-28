@@ -22,7 +22,7 @@ Multi-tenant low-code SaaS: custom data models, visual workflows, forms, and UI 
 
 ## Tech stack & architecture
 
-Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md). Module list and per-module responsibilities are owned by [`docs/epics/README.md`](docs/epics/README.md). Architectural shape (containers, multi-tenancy, auth) is owned by [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). This file owns only the **rules** — the things below that must hold no matter which library version is in `Directory.Packages.props`.
+Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md). Module list and per-module responsibilities are owned by [`docs/use-cases/README.md`](docs/use-cases/README.md). Architectural shape (containers, multi-tenancy, auth) is owned by [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). This file owns only the **rules** — the things below that must hold no matter which library version is in `Directory.Packages.props`.
 
 **Shared kernel:** `Axis.Shared.Domain`, `Axis.Shared.Application` — **abstractions only**, no shared implementation ([ADR-017](docs/TECH_STACK.md#adr-017-axisshared-is-abstractions-only-no-shared-implementation)). `Axis.Shared.Infrastructure` exists only for genuinely cross-cutting infrastructure (e.g. common JSON policy), never for per-module concerns like UnitOfWork or repository base classes.
 
@@ -61,7 +61,7 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 - Never bypass auth, skip an AC silently, or mark ✅ to avoid a hard gap.
 - Domain: zero external dependencies.
 - Never commit with failing Gate 1; docs and requirements satisfied before merge (agent-checklist + PR template).
-- When `src/`, `tests/`, or `docs/epics/` change: run `./scripts/check-doc-drift.sh` before push (bash — on Windows use Git Bash, not PowerShell); CI **Doc drift** must be green. Tick **Gate 2** in the PR template — do not paste drift-script output.
+- When `src/`, `tests/`, or `docs/use-cases/` change: run `./scripts/check-doc-drift.sh` before push (bash — on Windows use Git Bash, not PowerShell); CI **Doc drift** must be green. Tick **Gate 2** in the PR template — do not paste drift-script output.
 
 **P1 — confirm with user before deviating:**
 
@@ -87,7 +87,7 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 
 **Workarounds:** if you intentionally ship code that violates a P0/P1 rule (because the proper solution is blocked), record it in [`docs/WORKAROUNDS.md`](docs/WORKAROUNDS.md) **in the same PR** with a cleanup trigger. Add a `// WORKAROUND: see docs/WORKAROUNDS.md#<slug>` comment at the violation site. The drift script and the architecture fitness tests (`tests/Architecture/Axis.Architecture.Tests`) enforce both ends.
 
-**Work priority:** (1) gaps/bugs/failing tests (2) finish current layer (3) next layer in order. Before API work: `grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/epics/` — resolve or document deferrals ([process.md § 4.5](docs/playbooks/process.md)).
+**Work priority:** (1) gaps/bugs/failing tests (2) finish current layer (3) next layer in order. Before API work: `grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/use-cases/` — resolve or document deferrals ([process.md § 4.5](docs/playbooks/process.md)).
 
 ---
 
@@ -95,8 +95,8 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 
 ### Navigate (do not read this entire file each task)
 
-1. [`agent-checklist.md`](docs/playbooks/agent-checklist.md) — AC map, gates, epic map.
-2. `docs/epics/{module}/README.md` + `docs/use-cases/{domain}/*.md` for the use case.
+1. [`agent-checklist.md`](docs/playbooks/agent-checklist.md) — AC map, gates, domain map.
+2. `docs/use-cases/{domain}/README.md` + `docs/use-cases/{domain}/*.md` for the use case.
 3. [`docs/PROGRESS.md`](docs/PROGRESS.md) for layer status.
 4. Open [`process.md`](docs/playbooks/process.md) / [`patterns.md`](docs/playbooks/patterns.md) only when the checklist says so.
 
@@ -122,7 +122,7 @@ Skip for single-file fixes and doc-only edits.
 | `frontend/` | `npm run ci` then `npm run test` |
 | Both | All of the above |
 
-**Gate 2** — docs in same PR ([agent-checklist.md § Gate 2](docs/playbooks/agent-checklist.md)). **Doc drift** — run script before push when code/epics change; CI job must be green.
+**Gate 2** — docs in same PR ([agent-checklist.md § Gate 2](docs/playbooks/agent-checklist.md)). **Doc drift** — run script before push when code/use-cases change; CI job must be green.
 
 **Gate 3** — retrospective ([agent-checklist.md § Gate 3](docs/playbooks/agent-checklist.md)); update docs on any "yes".
 
@@ -135,7 +135,7 @@ Skip for single-file fixes and doc-only edits.
 
 ### New doc files
 
-Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, epics, features).
+Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, use-cases).
 
 ---
 
@@ -166,7 +166,7 @@ Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, epics
 
 - TanStack Query = server state; Zustand = client-only; loading/empty/error on fetches; RHF + Zod; lazy routes; no tokens in `localStorage`.
 
-**Wireframes:** `docs/epics/{epic}/wireframes/{slug}.excalidraw` + `.svg`; link in feature file; regenerate with `docs/scripts/generate-wireframes.ps1`. Kit rules: [`wireframes.md`](docs/playbooks/wireframes.md).
+**Wireframes:** `docs/use-cases/{domain}/wireframes/{slug}.excalidraw` + `.svg`; link in use-case file; regenerate with `docs/scripts/generate-wireframes.ps1`. Kit rules: [`wireframes.md`](docs/playbooks/wireframes.md).
 
 **Cross-cutting:** forward `CancellationToken`; audit fields in Application; soft-delete on tenant aggregates; Serilog without PII; rate limit auth endpoints; CORS before auth; `/health` + `/health/ready` anonymous.
 
@@ -183,9 +183,9 @@ Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, epics
 > Decisions: …
 ```
 
-**Per layer / module:** all US callouts updated; epic README table; [`PROGRESS.md`](docs/PROGRESS.md) (layer summary only — not per-class detail).
+**Per layer / module:** all use-case callouts updated; domain README table; [`PROGRESS.md`](docs/PROGRESS.md) (layer summary only — not per-class detail).
 
-**Per PR before merge:** PR description = Summary + Linked spec + Requirements only (no CI status, no commit list — Checks tab covers that). Run `./scripts/check-doc-drift.sh` before push when `src/`, `tests/`, or `docs/epics/` change — the script enforces epic-docs same-PR, new-handler tests, the no-new `TODO`/`FIXME`/`stub` rule, and new raw-SQL call review (cross-module guard).
+**Per PR before merge:** PR description = Summary + Linked spec + Requirements only (no CI status, no commit list — Checks tab covers that). Run `./scripts/check-doc-drift.sh` before push when `src/`, `tests/`, or `docs/use-cases/` change — the script enforces use-case-docs same-PR, new-handler tests, the no-new `TODO`/`FIXME`/`stub` rule, and new raw-SQL call review (cross-module guard).
 
 Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` changes.
 
@@ -207,7 +207,7 @@ Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` chan
 | [PROGRESS.md](docs/PROGRESS.md) | Module layer status |
 | [WORKAROUNDS.md](docs/WORKAROUNDS.md) | Intentional rule violations + cleanup triggers (**read when touching legacy or shipping a known shortcut**) |
 | [Architecture tests README](tests/Architecture/Axis.Architecture.Tests/README.md) | What's mechanically enforced + how to add a new rule |
-| [docs/epics/](docs/epics/README.md) | Features + ACs |
+| [docs/use-cases/](docs/use-cases/README.md) | Features + ACs |
 
 **Solution tree:**
 

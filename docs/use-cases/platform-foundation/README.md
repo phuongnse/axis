@@ -1,6 +1,6 @@
-# E01 — Platform Foundation
+# Platform Foundation
 
-[← Back to Epics](../README.md)
+[← Back to Use Cases](../README.md)
 
 ---
 
@@ -14,7 +14,7 @@ Without this foundation, nothing else works. Every feature in every other epic r
 
 ## Phase
 
-**MVP** — Must be completed first. All other epics depend on this.
+**MVP** — Must be completed first. All other domains depend on this.
 
 ---
 
@@ -22,10 +22,10 @@ Without this foundation, nothing else works. Every feature in every other epic r
 
 | Use case | Description |
 |---|---|---|
-| [Tenant Registration & Provisioning](../../use-cases/platform-foundation/tenant-registration.md) | Self-service sign-up, org creation, schema provisioning |
-| [Organization Management](../../use-cases/platform-foundation/organization-management.md) | Edit org profile, settings, branding |
-| [Tenant Data Isolation](../../use-cases/platform-foundation/tenant-isolation.md) | Schema-per-tenant enforcement, middleware, tenant resolution |
-| [Subscription Plan Management](../../use-cases/platform-foundation/subscription-plans.md) | Plan tiers, feature gating, billing metadata |
+| [Tenant Registration & Provisioning](tenant-registration.md) | Self-service sign-up, org creation, schema provisioning |
+| [Organization Management](organization-management.md) | Edit org profile, settings, branding |
+| [Tenant Data Isolation](tenant-isolation.md) | Schema-per-tenant enforcement, middleware, tenant resolution |
+| [Subscription Plan Management](subscription-plans.md) | Plan tiers, feature gating, billing metadata |
 ---
 
 ## Diagrams
@@ -53,8 +53,8 @@ Without this foundation, nothing else works. Every feature in every other epic r
 | Tenant Registration (US-001–004 backend) | ✅ Done | US-001–004 backend complete. Frontend verify/provisioning/pricing ⏳ |
 | Subscription Plans (F04 US-010–012 backend) | ✅ Done | `GET /api/plans`, 402 limits (workflow / user / execution), Redis read-through counters, platform plan change. Frontend pricing UI ⏳. **Deferred:** atomic execution counter; fail-closed Redis. |
 | Tenant Provisioning (US-003 backend) | ✅ Done | Kafka-driven per-module provisioning, coordinator retries, `GET /api/auth/provisioning-status`. Frontend wait screen ⏳ |
-| Tenant isolation (F03 US-008–009 backend) | ✅ Done | `TenantSchemaInterceptor`, `TenantOrganizationAccessMiddleware`, and cross-tenant API integration tests — see [F03](../../use-cases/platform-foundation/tenant-isolation.md) |
-| Organization Management (F02 US-005–007 backend) | ✅ Done | Profile, settings + usage, scheduled deletion + hard-delete job ✅. Frontend settings UI ⏳ — see [F02](../../use-cases/platform-foundation/organization-management.md) |
+| Tenant isolation (F03 US-008–009 backend) | ✅ Done | `TenantSchemaInterceptor`, `TenantOrganizationAccessMiddleware`, and cross-tenant API integration tests — see [F03](tenant-isolation.md) |
+| Organization Management (F02 US-005–007 backend) | ✅ Done | Profile, settings + usage, scheduled deletion + hard-delete job ✅. Frontend settings UI ⏳ — see [F02](organization-management.md) |
 | Frontend | ⏳ Pending | Verify flow, provisioning wait, settings, pricing |
 
 ---
@@ -63,8 +63,8 @@ Without this foundation, nothing else works. Every feature in every other epic r
 
 | Priority | Item | Where |
 |----------|------|--------|
-| **Backend** | ✅ E01 backend US complete (F01–F04). Optional: F04 bulk workflow import when product needs US-011 bulk AC | [F04](../../use-cases/platform-foundation/subscription-plans.md) |
-| Frontend | F01 US-002 verify + provisioning wait + auto sign-in; F04 pricing page; all F02 settings wireframes | [F01](../../use-cases/platform-foundation/tenant-registration.md), [F04](../../use-cases/platform-foundation/subscription-plans.md) |
+| **Backend** | ✅ E01 backend US complete (F01–F04). Optional: F04 bulk workflow import when product needs US-011 bulk AC | [F04](subscription-plans.md) |
+| Frontend | F01 US-002 verify + provisioning wait + auto sign-in; F04 pricing page; all F02 settings wireframes | [F01](tenant-registration.md), [F04](subscription-plans.md) |
 
 Epic-level checkboxes above remain spec-only; status is in use-case **Implementation status** callouts.
 
@@ -76,5 +76,5 @@ Epic-level checkboxes above remain spec-only; status is in use-case **Implementa
 
 ## Dependents
 
-- [E02 — Identity & Access Management](../E02-identity-access/README.md)
-- All other epics
+- [E02 — Identity & Access Management](../identity-access/README.md)
+- All other domains

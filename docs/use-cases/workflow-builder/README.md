@@ -1,6 +1,6 @@
-# E04 — Workflow Builder
+# Workflow Builder
 
-[← Back to Epics](../README.md)
+[← Back to Use Cases](../README.md)
 
 ---
 
@@ -22,13 +22,13 @@ The workflow builder is the heart of the platform. It is what differentiates Axi
 
 | Use case | Description |
 |---|---|---|
-| [Workflow Definition Management](../../use-cases/workflow-builder/workflow-definition.md) | CRUD operations on workflow definitions |
-| [Visual Workflow Canvas](../../use-cases/workflow-builder/visual-canvas.md) | Drag & drop canvas powered by React Flow |
-| [Step Type Configuration](../../use-cases/workflow-builder/step-types.md) | Configure Form, HTTP Request, Condition, Script, Notification steps |
-| [Trigger Configuration](../../use-cases/workflow-builder/triggers.md) | Manual, Schedule (cron), Webhook, Event triggers |
-| [Branching & Conditional Logic](../../use-cases/workflow-builder/branching.md) | If/else conditions, switch, dynamic routing |
-| [Parallel Step Execution](../../use-cases/workflow-builder/parallel-execution.md) | Fan-out and fan-in parallel step groups |
-| [Workflow Import / Export](../../use-cases/workflow-builder/import-export.md) | Export workflow as JSON, import from JSON file |
+| [Workflow Definition Management](workflow-definition.md) | CRUD operations on workflow definitions |
+| [Visual Workflow Canvas](visual-canvas.md) | Drag & drop canvas powered by React Flow |
+| [Step Type Configuration](step-types.md) | Configure Form, HTTP Request, Condition, Script, Notification steps |
+| [Trigger Configuration](triggers.md) | Manual, Schedule (cron), Webhook, Event triggers |
+| [Branching & Conditional Logic](branching.md) | If/else conditions, switch, dynamic routing |
+| [Parallel Step Execution](parallel-execution.md) | Fan-out and fan-in parallel step groups |
+| [Workflow Import / Export](import-export.md) | Export workflow as JSON, import from JSON file |
 ---
 
 ## Diagrams
@@ -91,7 +91,7 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend** | ⚠️ mostly ✅ | CRUD/publish/import/export ✅; plan limits 402 ✅ (E01 F04). **Engine-owned:** triggers (cron/webhook/event), step execution, parallel/join — tracked in [E06](../E06-workflow-engine/README.md#open-work-agents). **API polish:** list filters (last execution date), import transactional rollback — [F07](../../use-cases/workflow-builder/import-export.md). |
+| **Backend** | ⚠️ mostly ✅ | CRUD/publish/import/export ✅; plan limits 402 ✅ (E01 F04). **Engine-owned:** triggers (cron/webhook/event), step execution, parallel/join — tracked in [E06](../workflow-engine/README.md#open-work-agents). **API polish:** list filters (last execution date), import transactional rollback — [F07](import-export.md). |
 | **Frontend** | ⏳ | Visual canvas, step config panels, trigger UI — every F02–F07 US. |
 
 Do not re-implement plan limits here; update stale “pending E01 F04” lines if you see them in feature callouts.
@@ -100,11 +100,11 @@ Do not re-implement plan limits here; update stale “pending E01 F04” lines i
 
 ## Dependencies
 
-- [E01 — Platform Foundation](../E01-platform-foundation/README.md)
-- [E02 — Identity & Access Management](../E02-identity-access/README.md)
-- [E03 — Data Modeling](../E03-data-modeling/README.md)
-- [E05 — Form Builder](../E05-form-builder/README.md) *(for Form step type)*
+- [E01 — Platform Foundation](../platform-foundation/README.md)
+- [E02 — Identity & Access Management](../identity-access/README.md)
+- [E03 — Data Modeling](../data-modeling/README.md)
+- [E05 — Form Builder](../form-builder/README.md) *(for Form step type)*
 
 ## Dependents
 
-- [E06 — Workflow Execution Engine](../E06-workflow-engine/README.md)
+- [E06 — Workflow Execution Engine](../workflow-engine/README.md)

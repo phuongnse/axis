@@ -13,8 +13,7 @@
 | [Product Vision](./PRODUCT_VISION.md) | Goals, target users, problem & solution |
 | [Tech Stack](./TECH_STACK.md) | Technology decisions and rationale |
 | [Architecture](./ARCHITECTURE.md) | System design, modules, data strategy |
-| [Epics](./epics/README.md) | Epic/module index and implementation progress by area |
-| [Use cases](./use-cases/README.md) | User-facing behavior specs (flow + AC + wireframes + diagrams + implementation status) |
+| [Use cases](./use-cases/README.md) | Domain index, behavior specs (flow + AC + wireframes + diagrams), implementation progress |
 | [Wireframes](./wireframes/) | Screen wireframes — Excalidraw source + SVG preview |
 
 ### Playbooks (how-to guides)
@@ -31,17 +30,17 @@
 
 ---
 
-## Epics Overview
+## Domains overview
 
-| ID | Epic | Phase | Status |
-|---|---|---|---|
-| [E01](./epics/E01-platform-foundation/README.md) | Platform Foundation | MVP | 🚧 In Progress |
-| [E02](./epics/E02-identity-access/README.md) | Identity & Access Management | MVP | 🚧 In Progress |
-| [E03](./epics/E03-data-modeling/README.md) | Data Modeling | MVP | 🚧 In Progress |
-| [E04](./epics/E04-workflow-builder/README.md) | Workflow Builder | MVP | 🚧 In Progress |
-| [E05](./epics/E05-form-builder/README.md) | Form Builder | MVP | 🚧 In Progress |
-| [E06](./epics/E06-workflow-engine/README.md) | Workflow Execution Engine | MVP | 🚧 In Progress |
-| [E07](./epics/E07-page-builder/README.md) | Page & UI Builder | Phase 2 | ⏳ Planned |
+| Domain | Phase | Status |
+|---|---|---|
+| [platform-foundation](./use-cases/platform-foundation/README.md) | MVP | 🚧 In Progress |
+| [identity-access](./use-cases/identity-access/README.md) | MVP | 🚧 In Progress |
+| [data-modeling](./use-cases/data-modeling/README.md) | MVP | 🚧 In Progress |
+| [workflow-builder](./use-cases/workflow-builder/README.md) | MVP | 🚧 In Progress |
+| [form-builder](./use-cases/form-builder/README.md) | MVP | 🚧 In Progress |
+| [workflow-engine](./use-cases/workflow-engine/README.md) | MVP | 🚧 In Progress |
+| [page-builder](./use-cases/page-builder/README.md) | Phase 2 | ⏳ Planned |
 
 ---
 
@@ -57,24 +56,24 @@ All diagrams are Excalidraw (`.excalidraw` source + `.svg` preview). Regenerate 
 | Container Diagram | [container.excalidraw](./diagrams/container.excalidraw) | [container.svg](./diagrams/container.svg) |
 | Module Overview | [module-overview.excalidraw](./diagrams/module-overview.excalidraw) | [module-overview.svg](./diagrams/module-overview.svg) |
 
-**Epic-level** (in each `docs/epics/E0{N}-name/diagrams/`):
+**Domain-level** (in each `docs/use-cases/{domain}/diagrams/`):
 
 | Diagram | Source | Preview |
 |---|---|---|
-| Tenant Provisioning | [tenant-provisioning.excalidraw](./epics/E01-platform-foundation/diagrams/tenant-provisioning.excalidraw) | [tenant-provisioning.svg](./epics/E01-platform-foundation/diagrams/tenant-provisioning.svg) |
-| Auth Flow | [auth-flow.excalidraw](./epics/E02-identity-access/diagrams/auth-flow.excalidraw) | [auth-flow.svg](./epics/E02-identity-access/diagrams/auth-flow.svg) |
-| Data Model | [data-model.excalidraw](./epics/E03-data-modeling/diagrams/data-model.excalidraw) | [data-model.svg](./epics/E03-data-modeling/diagrams/data-model.svg) |
-| Workflow Model | [workflow-model.excalidraw](./epics/E04-workflow-builder/diagrams/workflow-model.excalidraw) | [workflow-model.svg](./epics/E04-workflow-builder/diagrams/workflow-model.svg) |
-| Form Model | [form-model.excalidraw](./epics/E05-form-builder/diagrams/form-model.excalidraw) | [form-model.svg](./epics/E05-form-builder/diagrams/form-model.svg) |
-| Execution Flow | [execution-flow.excalidraw](./epics/E06-workflow-engine/diagrams/execution-flow.excalidraw) | [execution-flow.svg](./epics/E06-workflow-engine/diagrams/execution-flow.svg) |
+| Tenant Provisioning | [tenant-provisioning.excalidraw](./use-cases/platform-foundation/diagrams/tenant-provisioning.excalidraw) | [tenant-provisioning.svg](./use-cases/platform-foundation/diagrams/tenant-provisioning.svg) |
+| Auth Flow | [auth-flow.excalidraw](./use-cases/identity-access/diagrams/auth-flow.excalidraw) | [auth-flow.svg](./use-cases/identity-access/diagrams/auth-flow.svg) |
+| Data Model | [data-model.excalidraw](./use-cases/data-modeling/diagrams/data-model.excalidraw) | [data-model.svg](./use-cases/data-modeling/diagrams/data-model.svg) |
+| Workflow Model | [workflow-model.excalidraw](./use-cases/workflow-builder/diagrams/workflow-model.excalidraw) | [workflow-model.svg](./use-cases/workflow-builder/diagrams/workflow-model.svg) |
+| Form Model | [form-model.excalidraw](./use-cases/form-builder/diagrams/form-model.excalidraw) | [form-model.svg](./use-cases/form-builder/diagrams/form-model.svg) |
+| Execution Flow | [execution-flow.excalidraw](./use-cases/workflow-engine/diagrams/execution-flow.excalidraw) | [execution-flow.svg](./use-cases/workflow-engine/diagrams/execution-flow.svg) |
 
 ## Wireframes
 
-Excalidraw wireframes live in `docs/epics/{E0N}/wireframes/`, co-located with each epic's features and diagrams. Shared screens (template, app-shell) remain in `docs/wireframes/`. Each use-case file lists wireframes in a `## Wireframes` table (see [use-case template](./use-cases/_template-use-case.md)).
+Excalidraw wireframes live in `docs/use-cases/{domain}/wireframes/`, co-located with each domain's use cases and diagrams. Shared screens (template, app-shell) remain in `docs/wireframes/`. Each use-case file lists wireframes in a `## Wireframes` table (see [use-case template](./use-cases/_template-use-case.md)).
 
 | Screen | Source | Preview |
 |---|---|---|
-| Login | [login.excalidraw](./epics/E02-identity-access/wireframes/login.excalidraw) | [login.svg](./epics/E02-identity-access/wireframes/login.svg) |
+| Login | [login.excalidraw](./use-cases/identity-access/wireframes/login.excalidraw) | [login.svg](./use-cases/identity-access/wireframes/login.svg) |
 
 ---
 

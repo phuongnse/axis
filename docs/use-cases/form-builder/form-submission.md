@@ -4,9 +4,9 @@
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| form-submission | [source](../../epics/E05-form-builder/wireframes/form-submission.excalidraw) | [preview](../../epics/E05-form-builder/wireframes/form-submission.svg) |
+| form-submission | [source](./wireframes/form-submission.excalidraw) | [preview](./wireframes/form-submission.svg) |
 
-[← Back to E05-form-builder](../../epics/E05-form-builder/README.md)
+[← Back to Form Builder](./README.md)
 
 ---
 

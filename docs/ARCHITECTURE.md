@@ -2,7 +2,7 @@
 
 [← Back to Docs Home](./README.md)
 
-> **Scope:** Architectural shape — what containers exist, how tenancy and auth work end-to-end, where the modules sit. **Not** the source of truth for: library versions ([TECH_STACK.md](./TECH_STACK.md)), source tree ([CLAUDE.md](../CLAUDE.md) § Solution tree), feature behaviour (`docs/epics/`), implementation rules (`docs/playbooks/`).
+> **Scope:** Architectural shape — what containers exist, how tenancy and auth work end-to-end, where the modules sit. **Not** the source of truth for: library versions ([TECH_STACK.md](./TECH_STACK.md)), source tree ([CLAUDE.md](../CLAUDE.md) § Solution tree), feature behaviour (`docs/use-cases/`), implementation rules (`docs/playbooks/`).
 >
 > If two docs would disagree, this one defers.
 
@@ -111,7 +111,7 @@ The **Identity** service is the only OAuth2/OIDC server. Other modules **never**
 - **Module-to-module token validation**: each module fetches Identity's `/.well-known/jwks.json` (cached, rotates per JWKS `kid`) and validates incoming JWTs locally. No round-trip to Identity for validation.
 - **Module-to-Identity sync lookup**: `IdentityService` gRPC contract in `Axis.Identity.Contracts` for cases like "fetch user profile" or "refresh permission set after a change". Used sparingly — most modules rely on JWT claims + local read models.
 
-Detailed flow, redirect URIs, and error states: [docs/epics/E02-identity-access/](./epics/E02-identity-access/README.md).
+Detailed flow, redirect URIs, and error states: [docs/use-cases/identity-access/](./use-cases/identity-access/README.md).
 
 ---
 
@@ -128,6 +128,6 @@ Detailed flow, redirect URIs, and error states: [docs/epics/E02-identity-access/
 
 ## Workflow Execution
 
-![Execution Flow](./epics/E06-workflow-engine/diagrams/execution-flow.svg)
+![Execution Flow](./use-cases/workflow-engine/diagrams/execution-flow.svg)
 
-Full execution model — step lifecycle, retry semantics, history, real-time push — lives under [docs/epics/E06-workflow-engine/](./epics/E06-workflow-engine/README.md).
+Full execution model — step lifecycle, retry semantics, history, real-time push — lives under [docs/use-cases/workflow-engine/](./use-cases/workflow-engine/README.md).

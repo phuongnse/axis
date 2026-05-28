@@ -17,7 +17,7 @@ Foundation phases (each a sequence of small PRs):
 | **Phase 3 — Per-module EF migrations** | ⚠️ in progress | Identity, DataModeling, FormBuilder, WorkflowBuilder, WorkflowEngine have migrations; tests use `MigrateAsync`. PageBuilder pending (module not started). |
 | **Phase 4 — Deployment readiness** | ⏳ pending | Per-module Dockerfile; `docker-compose.dev.yml` runs each module as a separate container; CI builds per-module artifacts; K8s manifests; per-module Vault policies. |
 
-Feature work (Frontend feature UIs, E07 PageBuilder) tracks per-epic **Open work** in [docs/epics/README.md](./epics/README.md#how-agents-find-open-work). Foundation phases 1–2 remain ⚠️ in places; E02–E06 backend APIs are largely shipped — agents should read US **Implementation status** callouts, not epic `- [ ]` checkboxes.
+Feature work (Frontend feature UIs, E07 PageBuilder) tracks per-domain **Open work** in [docs/use-cases/README.md](./use-cases/README.md#how-agents-find-open-work). Foundation phases 1–2 remain ⚠️ in places; E02–E06 backend APIs are largely shipped — agents should read US **Implementation status** callouts, not domain `- [ ]` checkboxes.
 
 ### Deferred decisions — surface when triggered
 
@@ -79,9 +79,9 @@ Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoi
 
 **F02 organization management (backend):** ✅ US-005–007 — profile API, settings + usage, scheduled deletion with 30-day hard-delete job. Frontend ⏳.
 
-**F03 tenant isolation:** ✅ `TenantSchemaInterceptor`, `TenantOrganizationAccessMiddleware` (403 for missing/archived/not-ready orgs), cross-tenant API integration tests — see [E01 F03](./epics/E01-platform-foundation/../../use-cases/platform-foundation/tenant-isolation.md).
+**F03 tenant isolation:** ✅ `TenantSchemaInterceptor`, `TenantOrganizationAccessMiddleware` (403 for missing/archived/not-ready orgs), cross-tenant API integration tests — see [E01 F03](./use-cases/platform-foundation/../../use-cases/platform-foundation/tenant-isolation.md).
 
-**Agents:** per-US truth in feature `Implementation status` callouts; epic [Open work](./epics/E01-platform-foundation/README.md#open-work-agents) lists next backend/frontend items.
+**Agents:** per-US truth in feature `Implementation status` callouts; epic [Open work](./use-cases/platform-foundation/README.md#open-work-agents) lists next backend/frontend items.
 
 ## Identity / E01 — tenant provisioning (cross-cutting)
 

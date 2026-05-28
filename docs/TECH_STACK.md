@@ -26,7 +26,7 @@
 | **OpenTelemetry SDK** | 1.x | Tracing + metrics + structured logs | Vendor-neutral; trace IDs propagated through Wolverine + gRPC interceptors ([ADR-018](#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability)). |
 | **Grafana Tempo / Loki / Mimir** | latest | Observability backend | Tempo for traces, Loki for logs, Mimir for metrics; Grafana UI on top. |
 | **HashiCorp Vault** | 1.x | Secrets management (production) | Per-module policies; Vault Agent sidecar for fetch + rotate ([ADR-022](#adr-022-secrets-management-via-hashicorp-vault-in-production)). |
-| **SignalR** | (built-in) | Real-time updates | Capability available in ASP.NET Core; no `*Hub.cs` currently registered in `src/`. Status: [PROGRESS.md](./PROGRESS.md), epic acceptance: [E06](./epics/E06-workflow-engine/README.md). |
+| **SignalR** | (built-in) | Real-time updates | Capability available in ASP.NET Core; no `*Hub.cs` currently registered in `src/`. Status: [PROGRESS.md](./PROGRESS.md), epic acceptance: [E06](./use-cases/workflow-engine/README.md). |
 | **FluentValidation** | 11.x | Input validation | Declarative, testable validation |
 | **Serilog** | 3.x | Structured logging | JSON logs, easy to ship to any log aggregator |
 | **Swashbuckle.AspNetCore** | 6.9.0 | OpenAPI metadata | `AddSwaggerGen` + `UseSwagger` generates the Swagger JSON document; wired with Bearer auth definition |
@@ -353,7 +353,7 @@
 
 - **Work-queue semantics are RabbitMQ's sweet spot.** Per-message ACK, requeue, dead-letter exchange, prefetch count, retry-with-backoff via TTL — these are first-class in RabbitMQ and require non-trivial workarounds in Kafka (retry topics, DLQ topics, manual offset commits, …).
 - **Latency is lower for synchronous-ish flows.** A `ProvisionTenantCommand` round-trip through RabbitMQ is milliseconds; the equivalent through Kafka with consumer poll cycles is meaningfully slower.
-- **Wolverine + RabbitMQ pairing is mature.** Saga state in Postgres + RabbitMQ for messages is the canonical Wolverine pattern; long-running orchestrators (e.g. tenant provisioning with retry/backoff/alert per [E01 US-003](epics/E01-platform-foundation/../../use-cases/platform-foundation/tenant-registration.md)) fit naturally.
+- **Wolverine + RabbitMQ pairing is mature.** Saga state in Postgres + RabbitMQ for messages is the canonical Wolverine pattern; long-running orchestrators (e.g. tenant provisioning with retry/backoff/alert per [E01 US-003](use-cases/platform-foundation/tenant-registration.md)) fit naturally.
 - **Ops cost is low.** Single-node RabbitMQ runs in a few hundred MB, clusters are well-understood, the management UI is excellent for debugging stuck queues.
 - **Replay semantics are absent — that's a feature.** A command consumed should NOT be replayable; the action's already been taken. RabbitMQ's "consume and forget" matches command semantics. Use Kafka when you want to replay.
 

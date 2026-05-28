@@ -1,8 +1,65 @@
 # Use Cases
 
-> **Navigation**: [← docs/README.md](../README.md)
+[← Back to Docs Home](../README.md)
 
-Use cases are the user-facing source of truth for behavior. Each use case should be self-contained: flow, AC, wireframes, diagrams, and implementation status are in one place.
+Use cases are the user-facing source of truth for behavior. Each domain groups related flows; every use-case file is self-contained (flow, AC, wireframes, diagrams, implementation status).
+
+---
+
+## How agents find open work
+
+**Do not use `- [ ]` checkboxes in use-case files as progress** — they stay unchecked by convention (spec only). Use this order:
+
+| Step | Source | What you learn |
+|------|--------|----------------|
+| 1 | Domain **Open work** in `docs/use-cases/{domain}/README.md` | Prioritized gaps (backend vs frontend) |
+| 2 | `docs/use-cases/{domain}/*.md` | Per-use-case ACs + `> **Implementation status**` + `Gaps vs spec` / `**Deferred:**` |
+| 3 | `docs/PROGRESS.md` | Module layer summary; cross-cutting foundation phases |
+| 4 | `grep -rE "\\| Application \\| ⚠️\\|\\| Infrastructure \\| ⚠️\\|\\| API \\| ⚠️" docs/use-cases/` | Use cases with partial backend layers ([agent-checklist](../playbooks/agent-checklist.md)) |
+
+**Symbols** (per layer on this use case, not the whole module):
+
+| Symbol | Meaning |
+|--------|---------|
+| ✅ | All in-scope backend AC for this layer are implemented (or Frontend-only when layer is Frontend). |
+| ⚠️ | Layer partially shipped — read `**Gaps vs spec**`. |
+| ⏳ | Layer not started for this use case. |
+| N/A | Layer does not apply. |
+
+When you ship code, update **use-case callout → domain README → PROGRESS** in the same PR. Never mark ✅ while `**Gaps vs spec**` still lists backend work for that layer.
+
+**Use-case file layout:** Purpose/Actor/Trigger, flow sections, AC, wireframes table, diagrams table, implementation status — see [docs-style § Use case files](../playbooks/docs-style.md#use-case-files-flow-first).
+
+---
+
+## Domains
+
+| Domain | Phase | Scope |
+|--------|-------|--------|
+| [platform-foundation](./platform-foundation/README.md) | MVP | Tenant registration, org management, isolation, subscription plans |
+| [identity-access](./identity-access/README.md) | MVP | Authentication, users, roles, permissions, security, i18n/theming |
+| [data-modeling](./data-modeling/README.md) | MVP | Models, field types, data classes, record CRUD |
+| [workflow-builder](./workflow-builder/README.md) | MVP | Canvas, steps, triggers, branching, parallel, import/export |
+| [form-builder](./form-builder/README.md) | MVP | Forms, fields, workflow integration, submissions |
+| [workflow-engine](./workflow-engine/README.md) | MVP | Execution, handlers, errors, history, retry |
+| [page-builder](./page-builder/README.md) | Phase 2 | Pages, widgets, drag & drop, data binding |
+
+---
+
+## MVP core loop
+
+```
+Platform setup → Identity & users → Model data
+    → Build workflows → Add forms → Execute & monitor
+```
+
+## Phase 2
+
+```
+Execution data → Build pages & widgets → End users
+```
+
+---
 
 ## Structure
 
@@ -11,18 +68,24 @@ docs/use-cases/
 ├── README.md
 ├── _template-use-case.md
 └── <domain>/
+    ├── README.md          # domain index + open work
+    ├── wireframes/        # Excalidraw + SVG for this domain
+    ├── diagrams/          # domain-level technical diagrams
     └── <use-case>.md
 ```
 
-## Rules
+Shared wireframes (template, app-shell) remain in [`docs/wireframes/`](../wireframes/).
 
-- No numeric IDs required.
-- Use stable slugs in file names (e.g. `switch-language.md`, `sign-in.md`).
-- Keep engineering quality gates in shared playbooks, not as end-user use cases.
-- Every use case must include:
-  - Purpose / actor / trigger
-  - Main flow + alternate/error flows
-  - Acceptance criteria
-  - Wireframes table
-  - Diagrams table (or explicit N/A)
-  - Implementation status callout
+---
+
+## Distributed-ready foundation (cross-domain)
+
+Platform-wide infrastructure tracked in [PROGRESS.md](../PROGRESS.md):
+
+| Phase | Status | Notes |
+|-------|--------|-------|
+| Phase 0 — ADRs & architecture | ✅ | ADR-010..023 |
+| Phase 1 — Infrastructure | ✅ | Per-module DBs, Kafka/RabbitMQ, OpenTelemetry, Avro pilot |
+| Phase 2 — Module boundaries | ⚠️ | Contracts + Kafka events; some gRPC/consumers deferred |
+
+Implementation patterns: [OpenTelemetry observability](../playbooks/patterns.md#opentelemetry-observability).

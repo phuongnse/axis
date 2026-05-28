@@ -4,10 +4,10 @@
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| settings-users | [source](../../epics/E02-identity-access/wireframes/settings-users.excalidraw) | [preview](../../epics/E02-identity-access/wireframes/settings-users.svg) |
-| accept-invitation | [source](../../epics/E02-identity-access/wireframes/accept-invitation.excalidraw) | [preview](../../epics/E02-identity-access/wireframes/accept-invitation.svg) |
+| settings-users | [source](./wireframes/settings-users.excalidraw) | [preview](./wireframes/settings-users.svg) |
+| accept-invitation | [source](./wireframes/accept-invitation.excalidraw) | [preview](./wireframes/accept-invitation.svg) |
 
-[← Back to E02-identity-access](../../epics/E02-identity-access/README.md)
+[← Back to Identity & Access](./README.md)
 
 ---
 

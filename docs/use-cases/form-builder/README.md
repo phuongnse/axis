@@ -1,6 +1,6 @@
-# E05 — Form Builder
+# Form Builder
 
-[← Back to Epics](../README.md)
+[← Back to Use Cases](../README.md)
 
 ---
 
@@ -22,10 +22,10 @@ Forms are the primary mechanism for human interaction within a workflow. Without
 
 | Use case | Description |
 |---|---|---|
-| [Form Definition Management](../../use-cases/form-builder/form-definition.md) | Create, edit, delete form definitions |
-| [Form Field Configuration & Validation](../../use-cases/form-builder/form-fields.md) | Add fields with types, labels, placeholders, validation rules |
-| [Workflow Step Integration](../../use-cases/form-builder/workflow-integration.md) | Attach a form to a Form step in a workflow |
-| [Form Submission Handling](../../use-cases/form-builder/form-submission.md) | Render form to assignee, capture submission, continue workflow |
+| [Form Definition Management](form-definition.md) | Create, edit, delete form definitions |
+| [Form Field Configuration & Validation](form-fields.md) | Add fields with types, labels, placeholders, validation rules |
+| [Workflow Step Integration](workflow-integration.md) | Attach a form to a Form step in a workflow |
+| [Form Submission Handling](form-submission.md) | Render form to assignee, capture submission, continue workflow |
 ---
 
 ## Diagrams
@@ -96,7 +96,7 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend** | ⚠️ | [F04](../../use-cases/form-builder/form-submission.md): notification on assign; expiry → execution failure (E06); role-based My Tasks aggregation. Token submit + My Tasks API ✅. |
+| **Backend** | ⚠️ | [F04](form-submission.md): notification on assign; expiry → execution failure (E06); role-based My Tasks aggregation. Token submit + My Tasks API ✅. |
 | **Frontend** | ⏳ | Form editor, field picker, standalone submit page, My Tasks — all F01–F04 US. |
 | **Cross-module** | E06 | Form step execution, context expressions, `FormStepReached` consumer path — coordinate with E06. **E01 F02 US-007:** `OrganizationFormTaskCanceller` cancels pending form tasks before org hard-delete (Identity-owned job). |
 
@@ -104,11 +104,11 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 
 ## Dependencies
 
-- [E01 — Platform Foundation](../E01-platform-foundation/README.md)
-- [E02 — Identity & Access Management](../E02-identity-access/README.md)
-- [E03 — Data Modeling](../E03-data-modeling/README.md) *(for Relation Picker fields)*
+- [E01 — Platform Foundation](../platform-foundation/README.md)
+- [E02 — Identity & Access Management](../identity-access/README.md)
+- [E03 — Data Modeling](../data-modeling/README.md) *(for Relation Picker fields)*
 
 ## Dependents
 
-- [E04 — Workflow Builder](../E04-workflow-builder/README.md) *(Form step type)*
-- [E06 — Workflow Execution Engine](../E06-workflow-engine/README.md)
+- [E04 — Workflow Builder](../workflow-builder/README.md) *(Form step type)*
+- [E06 — Workflow Execution Engine](../workflow-engine/README.md)

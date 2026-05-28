@@ -4,11 +4,11 @@
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| login | [source](../../epics/E02-identity-access/wireframes/login.excalidraw) | [preview](../../epics/E02-identity-access/wireframes/login.svg) |
-| login-unverified | [source](../../epics/E02-identity-access/wireframes/login-unverified.excalidraw) | [preview](../../epics/E02-identity-access/wireframes/login-unverified.svg) |
-| register | [source](../../epics/E02-identity-access/wireframes/register.excalidraw) | [preview](../../epics/E02-identity-access/wireframes/register.svg) |
+| login | [source](./wireframes/login.excalidraw) | [preview](./wireframes/login.svg) |
+| login-unverified | [source](./wireframes/login-unverified.excalidraw) | [preview](./wireframes/login-unverified.svg) |
+| register | [source](./wireframes/register.excalidraw) | [preview](./wireframes/register.svg) |
 
-[← Back to E02-identity-access](../../epics/E02-identity-access/README.md)
+[← Back to Identity & Access](./README.md)
 
 ---
 

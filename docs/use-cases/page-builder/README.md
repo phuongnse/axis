@@ -1,6 +1,6 @@
-# E07 — Page & UI Builder
+# Page & UI Builder
 
-[← Back to Epics](../README.md)
+[← Back to Use Cases](../README.md)
 
 ---
 
@@ -71,11 +71,11 @@ Without a UI builder, users need a developer to display and interact with their 
 
 ## Dependencies
 
-- [E01 — Platform Foundation](../E01-platform-foundation/README.md)
-- [E02 — Identity & Access Management](../E02-identity-access/README.md)
-- [E03 — Data Modeling](../E03-data-modeling/README.md)
-- [E05 — Form Builder](../E05-form-builder/README.md)
-- [E06 — Workflow Execution Engine](../E06-workflow-engine/README.md)
+- [E01 — Platform Foundation](../platform-foundation/README.md)
+- [E02 — Identity & Access Management](../identity-access/README.md)
+- [E03 — Data Modeling](../data-modeling/README.md)
+- [E05 — Form Builder](../form-builder/README.md)
+- [E06 — Workflow Execution Engine](../workflow-engine/README.md)
 
 ## Dependents
 

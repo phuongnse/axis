@@ -4,9 +4,9 @@
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| executions | [source](../../epics/E06-workflow-engine/wireframes/executions.excalidraw) | [preview](../../epics/E06-workflow-engine/wireframes/executions.svg) |
+| executions | [source](./wireframes/executions.excalidraw) | [preview](./wireframes/executions.svg) |
 
-[← Back to E06-workflow-engine](../../epics/E06-workflow-engine/README.md)
+[← Back to Workflow Engine](./README.md)
 
 ---
 

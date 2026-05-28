@@ -4,11 +4,11 @@
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| settings-security | [source](../../epics/E02-identity-access/wireframes/settings-security.excalidraw) | [preview](../../epics/E02-identity-access/wireframes/settings-security.svg) |
-| forgot-password | [source](../../epics/E02-identity-access/wireframes/forgot-password.excalidraw) | [preview](../../epics/E02-identity-access/wireframes/forgot-password.svg) |
-| change-password | [source](../../epics/E02-identity-access/wireframes/change-password.excalidraw) | [preview](../../epics/E02-identity-access/wireframes/change-password.svg) |
+| settings-security | [source](./wireframes/settings-security.excalidraw) | [preview](./wireframes/settings-security.svg) |
+| forgot-password | [source](./wireframes/forgot-password.excalidraw) | [preview](./wireframes/forgot-password.svg) |
+| change-password | [source](./wireframes/change-password.excalidraw) | [preview](./wireframes/change-password.svg) |
 
-[← Back to E02-identity-access](../../epics/E02-identity-access/README.md)
+[← Back to Identity & Access](./README.md)
 
 ---
 

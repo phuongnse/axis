@@ -4,9 +4,9 @@
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| data-classes | [source](../../epics/E03-data-modeling/wireframes/data-classes.excalidraw) | [preview](../../epics/E03-data-modeling/wireframes/data-classes.svg) |
+| data-classes | [source](./wireframes/data-classes.excalidraw) | [preview](./wireframes/data-classes.svg) |
 
-[← Back to E03-data-modeling](../../epics/E03-data-modeling/README.md)
+[← Back to Data Modeling](./README.md)
 
 ---
 

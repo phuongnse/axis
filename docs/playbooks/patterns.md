@@ -1357,7 +1357,7 @@ Replace `<access_token>`, `<user-guid>`, and `<org-guid>` with values from your 
 
 **Rule:** modules other than Identity validate JWTs **locally via Identity's JWKS endpoint** — never by calling `IdentityDbContext` or any Identity service. Asking Identity "is this user real?" on every request defeats the purpose of stateless JWT and re-introduces the coupling we removed.
 
-Why: Identity issues short-lived JWTs (15 minutes per [F01](../epics/E02-identity-access/../../use-cases/identity-access/authentication.md)) signed with a key whose public half is published at `/.well-known/jwks.json` (OpenIddict default). Any module that receives a Bearer token can verify the signature, claims (`sub`, `org`, `permissions`), and expiry **without a network call to Identity for each request**. JWKS itself is cached locally by `Microsoft.AspNetCore.Authentication.JwtBearer`, so the network cost is once per key-rotation, not once per request.
+Why: Identity issues short-lived JWTs (15 minutes per [F01](../use-cases/identity-access/../../use-cases/identity-access/authentication.md)) signed with a key whose public half is published at `/.well-known/jwks.json` (OpenIddict default). Any module that receives a Bearer token can verify the signature, claims (`sub`, `org`, `permissions`), and expiry **without a network call to Identity for each request**. JWKS itself is cached locally by `Microsoft.AspNetCore.Authentication.JwtBearer`, so the network cost is once per key-rotation, not once per request.
 
 The escape hatch — when you need *fresh* permission state that the JWT's `permissions` claim cannot give you — is `IdentityService.GetUserPermissions` (gRPC), not a DB lookup.
 
@@ -1836,7 +1836,7 @@ docs/wireframes/
 └── _shared/                    ← screens not belonging to a single module
 ```
 
-One subfolder per epic, mirroring `docs/epics/`. Shared screens (error pages, global settings) go in `_shared/`.
+One subfolder per epic, mirroring `docs/use-cases/`. Shared screens (error pages, global settings) go in `_shared/`.
 
 **Naming:** screen slug in kebab-case matching the primary route segment — `login`, `data-models`, `workflow-detail`.
 
@@ -1845,7 +1845,7 @@ One subfolder per epic, mirroring `docs/epics/`. Shared screens (error pages, gl
 **Linking from a use-case file** — add directly after the feature title, before the first user story:
 
 ```markdown
-> **Wireframe**: [docs/epics/E02-identity-access/wireframes/login.excalidraw](../../epics/E02-identity-access/wireframes/login.excalidraw) · [preview](../../epics/E02-identity-access/wireframes/login.svg)
+> **Wireframe**: [docs/use-cases/identity-access/wireframes/login.excalidraw](../../use-cases/identity-access/wireframes/login.excalidraw) · [preview](../../use-cases/identity-access/wireframes/login.svg)
 ```
 
 **Excalidraw settings** for consistent sketch aesthetic:

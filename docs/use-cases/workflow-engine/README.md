@@ -1,6 +1,6 @@
-# E06 — Workflow Execution Engine
+# Workflow Execution Engine
 
-[← Back to Epics](../README.md)
+[← Back to Use Cases](../README.md)
 
 ---
 
@@ -22,11 +22,11 @@ A workflow builder without an execution engine is just a drawing tool. This epic
 
 | Use case | Description |
 |---|---|---|
-| [Execution Management](../../use-cases/workflow-engine/execution-management.md) | Create, track, and terminate workflow executions |
-| [Step Execution Handlers](../../use-cases/workflow-engine/step-handlers.md) | Dedicated handler per step type (Form, HTTP, Condition, Script, Notification) |
-| [Error Handling & Notification](../../use-cases/workflow-engine/error-handling.md) | Detect failures, notify configured channels, mark execution as failed |
-| [Execution History & Audit Log](../../use-cases/workflow-engine/execution-history.md) | Full history of executions, step results, and context data |
-| [Manual Retry](../../use-cases/workflow-engine/manual-retry.md) | Resume a failed execution from the failed step |
+| [Execution Management](execution-management.md) | Create, track, and terminate workflow executions |
+| [Step Execution Handlers](step-handlers.md) | Dedicated handler per step type (Form, HTTP, Condition, Script, Notification) |
+| [Error Handling & Notification](error-handling.md) | Detect failures, notify configured channels, mark execution as failed |
+| [Execution History & Audit Log](execution-history.md) | Full history of executions, step results, and context data |
+| [Manual Retry](manual-retry.md) | Resume a failed execution from the failed step |
 ---
 
 ## Diagrams
@@ -102,8 +102,8 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend — high** | ⚠️ | [F01](../../use-cases/workflow-engine/execution-management.md): schedule/webhook/event triggers, stale-PENDING recovery. [F03](../../use-cases/workflow-engine/error-handling.md): notification dispatch, `GetExecution` error detail, channel config. [F02](../../use-cases/workflow-engine/step-handlers.md): real `IScriptExecutor` / `INotificationSender` (stubs today). |
-| **Backend — medium** | ⚠️ | [F04](../../use-cases/workflow-engine/execution-history.md): date/trigger filters, CSV export, role-scoped list. Cancel: abandon Wolverine jobs + cancel form tasks. **E01 F02 US-007:** `OrganizationExecutionCanceller` cancels Pending/Running executions before org hard-delete (`FixedTenantContext`). |
+| **Backend — high** | ⚠️ | [F01](execution-management.md): schedule/webhook/event triggers, stale-PENDING recovery. [F03](error-handling.md): notification dispatch, `GetExecution` error detail, channel config. [F02](step-handlers.md): real `IScriptExecutor` / `INotificationSender` (stubs today). |
+| **Backend — medium** | ⚠️ | [F04](execution-history.md): date/trigger filters, CSV export, role-scoped list. Cancel: abandon Wolverine jobs + cancel form tasks. **E01 F02 US-007:** `OrganizationExecutionCanceller` cancels Pending/Running executions before org hard-delete (`FixedTenantContext`). |
 | **Frontend** | ⏳ | Execution monitor, retry UI, SignalR live updates — all F01–F05 US. |
 
 Start here when E04 “pending E06” items block runtime behavior; feature callouts list exact US gaps.
@@ -112,11 +112,11 @@ Start here when E04 “pending E06” items block runtime behavior; feature call
 
 ## Dependencies
 
-- [E01 — Platform Foundation](../E01-platform-foundation/README.md)
-- [E02 — Identity & Access Management](../E02-identity-access/README.md)
-- [E04 — Workflow Builder](../E04-workflow-builder/README.md)
-- [E05 — Form Builder](../E05-form-builder/README.md)
+- [E01 — Platform Foundation](../platform-foundation/README.md)
+- [E02 — Identity & Access Management](../identity-access/README.md)
+- [E04 — Workflow Builder](../workflow-builder/README.md)
+- [E05 — Form Builder](../form-builder/README.md)
 
 ## Dependents
 
-- [E07 — Page Builder](../E07-page-builder/README.md) *(display execution data on pages)*
+- [E07 — Page Builder](../page-builder/README.md) *(display execution data on pages)*

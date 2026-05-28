@@ -1,19 +1,19 @@
 # Use Case Group — Tenant Registration & Provisioning
 
-[← Back to E01-platform-foundation](../../epics/E01-platform-foundation/README.md)
+[← Back to Platform Foundation](./README.md)
 
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| register-org | [source](../../epics/E01-platform-foundation/wireframes/register-org.excalidraw) | [preview](../../epics/E01-platform-foundation/wireframes/register-org.svg) |
-| register-org-states | [source](../../epics/E01-platform-foundation/wireframes/register-org-states.excalidraw) | [preview](../../epics/E01-platform-foundation/wireframes/register-org-states.svg) |
-| email-confirmation | [source](../../epics/E01-platform-foundation/wireframes/email-confirmation.excalidraw) | [preview](../../epics/E01-platform-foundation/wireframes/email-confirmation.svg) |
-| verify-email | [source](../../epics/E01-platform-foundation/wireframes/verify-email.excalidraw) | [preview](../../epics/E01-platform-foundation/wireframes/verify-email.svg) |
-| verify-email-rate-limit | [source](../../epics/E01-platform-foundation/wireframes/verify-email-rate-limit.excalidraw) | [preview](../../epics/E01-platform-foundation/wireframes/verify-email-rate-limit.svg) |
-| login-unverified (US-002 sign-in before verify) | [source](../../epics/E02-identity-access/wireframes/login-unverified.excalidraw) | [preview](../../epics/E02-identity-access/wireframes/login-unverified.svg) |
-| workspace-provisioning | [source](../../epics/E01-platform-foundation/wireframes/workspace-provisioning.excalidraw) | [preview](../../epics/E01-platform-foundation/wireframes/workspace-provisioning.svg) |
-| pricing | [source](../../epics/E01-platform-foundation/wireframes/pricing.excalidraw) | [preview](../../epics/E01-platform-foundation/wireframes/pricing.svg) |
+| register-org | [source](./wireframes/register-org.excalidraw) | [preview](./wireframes/register-org.svg) |
+| register-org-states | [source](./wireframes/register-org-states.excalidraw) | [preview](./wireframes/register-org-states.svg) |
+| email-confirmation | [source](./wireframes/email-confirmation.excalidraw) | [preview](./wireframes/email-confirmation.svg) |
+| verify-email | [source](./wireframes/verify-email.excalidraw) | [preview](./wireframes/verify-email.svg) |
+| verify-email-rate-limit | [source](./wireframes/verify-email-rate-limit.excalidraw) | [preview](./wireframes/verify-email-rate-limit.svg) |
+| login-unverified (US-002 sign-in before verify) | [source](../identity-access/wireframes/login-unverified.excalidraw) | [preview](../identity-access/wireframes/login-unverified.svg) |
+| workspace-provisioning | [source](./wireframes/workspace-provisioning.excalidraw) | [preview](./wireframes/workspace-provisioning.svg) |
+| pricing | [source](./wireframes/pricing.excalidraw) | [preview](./wireframes/pricing.svg) |
 
 ---
 
