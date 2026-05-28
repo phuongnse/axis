@@ -336,11 +336,12 @@ function systemContext() {
   els.push(...rect({ x: 890, y: 320, w: 180, h: 70, bg: C.extBg, stroke: C.extBdr, label: "External APIs", sub: "Workflow HTTP steps" }));
   els.push(...rect({ x: 890, y: 470, w: 180, h: 70, bg: C.extBg, stroke: C.extBdr, label: "Webhook Targets", sub: "Outbound workflow events" }));
 
-  // Actors → Axis
-  els.push(...routedArrow({ waypoints: [[139, 152], [260, 152], [260, 350], [300, 350]], label: "HTTPS" }));
-  els.push(...routedArrow({ waypoints: [[139, 272], [250, 272], [250, 210], [300, 210]], label: "HTTPS" }));
-  els.push(...routedArrow({ waypoints: [[139, 392], [250, 392], [250, 210], [300, 210]], label: "HTTPS" }));
-  els.push(...routedArrow({ waypoints: [[139, 512], [250, 512], [250, 210], [300, 210]], label: "HTTPS" }));
+  // Actors → Axis (single protocol note to avoid label collisions)
+  els.push(...routedArrow({ waypoints: [[139, 152], [260, 152], [260, 350], [300, 350]] }));
+  els.push(...routedArrow({ waypoints: [[139, 272], [250, 272], [250, 210], [300, 210]] }));
+  els.push(...routedArrow({ waypoints: [[139, 392], [250, 392], [250, 210], [300, 210]] }));
+  els.push(...routedArrow({ waypoints: [[139, 512], [250, 512], [250, 210], [300, 210]] }));
+  els.push(text({ x: 270, y: 332, value: "HTTPS", size: 10, color: C.muted, anchor: "center" }));
 
   // Internal Axis flow
   els.push(...arrow({ x1: 425, y1: 250, x2: 425, y2: 320 }));
@@ -350,6 +351,18 @@ function systemContext() {
   els.push(...arrow({ x1: 550, y1: 350, x2: 890, y2: 205 }));
   els.push(...arrow({ x1: 550, y1: 350, x2: 890, y2: 355 }));
   els.push(...arrow({ x1: 550, y1: 510, x2: 890, y2: 505 }));
+
+  // Legend
+  els.push(...rect({ x: 560, y: 590, w: 250, h: 108, bg: "#ffffff", stroke: C.border }));
+  els.push(text({ x: 685, y: 606, value: "Legend", size: 11, bold: true, anchor: "center" }));
+  els.push(...rect({ x: 575, y: 620, w: 14, h: 14, bg: C.sysBg, stroke: C.sysBdr }));
+  els.push(text({ x: 595, y: 627, value: "Axis internal system", size: 9, color: C.text }));
+  els.push(...rect({ x: 575, y: 640, w: 14, h: 14, bg: C.extBg, stroke: C.extBdr }));
+  els.push(text({ x: 595, y: 647, value: "External system", size: 9, color: C.text }));
+  els.push(...rect({ x: 575, y: 660, w: 14, h: 14, bg: "#e0f2fe", stroke: "#0284c7" }));
+  els.push(text({ x: 595, y: 667, value: "Actor", size: 9, color: C.text }));
+  els.push(...arrow({ x1: 575, y1: 685, x2: 605, y2: 685, color: C.arrow }));
+  els.push(text({ x: 610, y: 685, value: "Interaction", size: 9, color: C.text }));
 
   return excalidraw(els);
 }
