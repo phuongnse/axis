@@ -20,14 +20,28 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 
 ## Use Cases
 
-| Use case | Description |
-|---|---|---|
-| [Authentication](authentication.md) | Sign up, sign in, sign out, JWT + refresh tokens |
-| [User Management](user-management.md) | Invite users, activate/deactivate, profile management |
-| [Role Management](role-management.md) | Create/edit/delete roles within an organization |
-| [Permission System](permissions.md) | Assign permissions to roles, enforce on API and UI |
-| [Password & Security](password-security.md) | Password reset, change password, session management |
-| [Localization & Theming](localization-and-theming.md) | EN/VI language switch, light/dark/system theme, and frontend UX consistency rules |
+| Use case | Summary |
+|---|---|
+| [Accept an invitation](accept-an-invitation.md) | accept my invitation and set up my account so that I can access the organization. |
+| [Assign a role to a user](assign-a-role-to-a-user.md) | assign a role to a user so that they get the appropriate permissions. |
+| [Change password while signed in](change-password-while-signed-in.md) | change my password while signed in so that I can keep my account secure. |
+| [Create a custom role](create-a-custom-role.md) | create a custom role with specific permissions so that I can grant exactly the right level of access to a group of us... |
+| [Deactivate a user](deactivate-a-user.md) | deactivate a user so that they can no longer access the workspace without deleting their history. |
+| [Edit a custom role](edit-a-custom-role.md) | edit an existing custom role so that I can adjust permissions as our needs change. |
+| [Invite a user to the organization](invite-a-user-to-the-organization.md) | invite a team member by email so that they can join the workspace and start collaborating. |
+| [Manage user profile](manage-user-profile.md) | update my profile information so that my name and contact details are current. |
+| [Permission enforcement in the frontend](permission-enforcement-in-the-frontend.md) | the UI to hide or disable features I don't have access to so that I'm not confused by actions that will fail. |
+| [Permission enforcement on the API](permission-enforcement-on-the-api.md) | every API endpoint to enforce the required permission so that unauthorized actions are rejected at the server regardl... |
+| [Reset forgotten password](reset-forgotten-password.md) | reset my password via email so that I can regain access to my account if I forget it. |
+| [Sign in with email and password](sign-in-with-email-and-password.md) | sign in with my email and password so that I can access my organization's workspace. |
+| [Sign out](sign-out.md) | sign out so that my session is terminated and no one else can use my account from this device. |
+| [Silent token refresh](silent-token-refresh.md) | my session to stay active while I'm working so that I'm not interrupted by unexpected sign-out prompts. |
+| [Switch application language (English / Vietnamese)](switch-application-language-english-vietnamese.md) | Switch application language (English / Vietnamese) |
+| [Switch visual theme (light / dark / system)](switch-visual-theme-light-dark-system.md) | Switch visual theme (light / dark / system) |
+| [View and manage roles](view-and-manage-roles.md) | see all roles in my organization so that I can understand who has what level of access. |
+| [View and revoke active sessions](view-and-revoke-active-sessions.md) | see where I'm currently signed in so that I can revoke access from devices I no longer use. |
+
+
 ---
 
 ## Diagrams
@@ -73,7 +87,7 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 **Key implementation decisions:**
 - Identity uses the global `public` PostgreSQL schema (not a tenant schema) — registration has no tenant context and email uniqueness is platform-wide.
 - Passwords are hashed with BCrypt (work factor 12) via `IPasswordHasher`. The hash is stored as a first-class property on `User` (`PasswordHash`), not a shadow property.
-- The 4 default system roles (Admin, Editor, Viewer, End User) and their full permission sets are seeded automatically by `RegisterOrganizationHandler` — see [permissions](permissions.md) for the permission catalogue.
+- The 4 default system roles (Admin, Editor, Viewer, End User) and their full permission sets are seeded automatically by `RegisterOrganizationHandler` — see [permissions](./README.md) for the permission catalogue.
 - **OpenIddict implementation**: OpenIddict 5.x serves as the in-process OAuth2/OIDC authorization server (ADR-004). Authorization Code + PKCE for the SPA; Client Credentials for M2M. Refresh tokens are stored as opaque reference tokens in the OpenIddict `OpenIddictTokens` table and delivered via httpOnly cookie. Access token JTIs are blacklisted in Redis on sign-out. Ephemeral signing/encryption keys are used in development; production should use Azure Key Vault certificates.
 - **gRPC (dev):** manual `GetUserPermissions` checks — [patterns.md § gRPC dev verification](../../playbooks/patterns.md#dev--verify-getuserpermissions-with-grpcurl).
 - **Known gap (user deactivation)**: Revoking all refresh tokens is immediate, but existing access tokens remain valid up to 15 minutes. Full compliance would require a Redis user-level blacklist (not implemented in MVP).
@@ -84,8 +98,8 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend** | ⚠️ polish | [password-security](password-security.md): reset/change-password rate limits, session list API wiring. [permissions](permissions.md): `[RequirePermission]` / policy tests. [user-management](user-management.md): block admin self-invite at API. |
-| **Frontend** | ⏳ | Register, settings, invitation accept, session management UI, and localization/theming foundation — see per–use-case callouts in [authentication](authentication.md) through [localization-and-theming](localization-and-theming.md). |
+| **Backend** | ⚠️ polish | [password-security](./README.md): reset/change-password rate limits, session list API wiring. [permissions](./README.md): `[RequirePermission]` / policy tests. [user-management](./README.md): block admin self-invite at API. |
+| **Frontend** | ⏳ | Register, settings, invitation accept, session management UI, and localization/theming foundation — see per–use-case callouts in [authentication](./README.md) through [localization-and-theming](./README.md). |
 
 Core auth/OIDC/RBAC backend is ✅; use feature **Gaps vs spec** for the next use case, not domain-level checkboxes.
 

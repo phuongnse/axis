@@ -20,13 +20,24 @@ A workflow builder without an execution engine is just a drawing tool. This doma
 
 ## Use Cases
 
-| Use case | Description |
-|---|---|---|
-| [Execution Management](execution-management.md) | Create, track, and terminate workflow executions |
-| [Step Execution Handlers](step-handlers.md) | Dedicated handler per step type (Form, HTTP, Condition, Script, Notification) |
-| [Error Handling & Notification](error-handling.md) | Detect failures, notify configured channels, mark execution as failed |
-| [Execution History & Audit Log](execution-history.md) | Full history of executions, step results, and context data |
-| [Manual Retry](manual-retry.md) | Resume a failed execution from the failed step |
+| Use case | Summary |
+|---|---|
+| [Cancel a running execution](cancel-a-running-execution.md) | cancel a running execution so that I can stop a process that is no longer needed. |
+| [Configure error notification channels per workflow](configure-error-notification-channels-per-workflow.md) | configure who gets notified when my workflow fails so that the right people are alerted. |
+| [Receive error notification when a workflow fails](receive-error-notification-when-a-workflow-fails.md) | be notified when a workflow execution fails so that I can investigate and take action. |
+| [Retry a failed execution](retry-a-failed-execution.md) | retry a failed execution from the point of failure so that I don't have to re-run steps that already succeeded. |
+| [Retry with modified input context](retry-with-modified-input-context.md) | modify the execution context before retrying so that I can fix data errors that caused the original failure. |
+| [Start a workflow execution](start-a-workflow-execution.md) | start a workflow execution so that the defined process begins running. |
+| [Step execution is isolated and resilient](step-execution-is-isolated-and-resilient.md) | Run each step handler in isolation so that a failure in one step does not crash the engine or affect other executions. |
+| [# Use Case Group — Step Execution Handlers](step-handlers.md) | # Use Case Group — Step Execution Handlers |
+| [Track execution status in real time](track-execution-status-in-real-time.md) | see the live status of a running execution so that I know where it is in the process. |
+| [View detailed error information](view-detailed-error-information.md) | see the full error details of a failed step so that I can understand what went wrong. |
+| [View execution detail and step timeline](view-execution-detail-and-step-timeline.md) | see the full detail of a specific execution so that I can understand exactly what happened at each step. |
+| [View execution history for a workflow](view-execution-history-for-a-workflow.md) | see the execution history for a specific workflow so that I can monitor its performance and identify patterns. |
+| [View org-wide execution history](view-org-wide-execution-history.md) | see all executions across all workflows so that I have a global overview of automation activity. |
+| [View retry history](view-retry-history.md) | see the retry history of a failed execution so that I can track how many times it has been retried. |
+
+
 ---
 
 ## Diagrams
@@ -102,9 +113,9 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend — high** | ⚠️ | [execution-management](execution-management.md): schedule/webhook/event triggers, stale-PENDING recovery. [error-handling](error-handling.md): notification dispatch, `GetExecution` error detail, channel config. [step-handlers](step-handlers.md): real `IScriptExecutor` / `INotificationSender` (stubs today). |
-| **Backend — medium** | ⚠️ | [execution-history](execution-history.md): date/trigger filters, CSV export, role-scoped list. Cancel: abandon Wolverine jobs + cancel form tasks. **[Organization deletion](../platform-foundation/organization-management.md):** `OrganizationExecutionCanceller` cancels Pending/Running executions before org hard-delete (`FixedTenantContext`). |
-| **Frontend** | ⏳ | Execution monitor, retry UI, SignalR live updates — see [execution-management](execution-management.md) and related use-case callouts. |
+| **Backend — high** | ⚠️ | [execution-management](./README.md): schedule/webhook/event triggers, stale-PENDING recovery. [error-handling](./README.md): notification dispatch, `GetExecution` error detail, channel config. [step-handlers](step-handlers.md): real `IScriptExecutor` / `INotificationSender` (stubs today). |
+| **Backend — medium** | ⚠️ | [execution-history](./README.md): date/trigger filters, CSV export, role-scoped list. Cancel: abandon Wolverine jobs + cancel form tasks. **[Organization deletion](../platform-foundation/README.md):** `OrganizationExecutionCanceller` cancels Pending/Running executions before org hard-delete (`FixedTenantContext`). |
+| **Frontend** | ⏳ | Execution monitor, retry UI, SignalR live updates — see [execution-management](./README.md) and related use-case callouts. |
 
 Start here when workflow-builder “pending workflow-engine” items block runtime behavior; feature callouts list exact use-case gaps.
 

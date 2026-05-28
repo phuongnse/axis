@@ -1,0 +1,91 @@
+# Use case — Pre-populate form fields from execution context
+
+> **Navigation**: [← Form Builder](./README.md)
+
+## Purpose
+
+pre-populate form fields with values from the workflow context so that assignees don't re-enter data that's already known.
+
+## Primary actor
+
+- Organization Member
+
+## Trigger
+
+- User initiates: pre-populate form fields with values from the workflow context
+
+## Main flow
+
+1. _(Happy path — align with acceptance criteria below.)_
+
+## Alternate / error flows
+
+- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+
+## Context
+
+Forms are attached to Form steps in a workflow. The engine creates a Form Task and notifies the assignee when the step is reached.
+
+---
+
+## Acceptance Criteria
+
+**Purpose:** _(to be detailed during migration)_
+**Primary actor:** _(to be detailed during migration)_
+**Trigger:** _(to be detailed during migration)_
+
+#### Main flow
+1. _(to be detailed during migration)_
+
+#### Alternate / error flows
+- _(to be detailed during migration)_
+
+
+
+**Acceptance Criteria:**
+
+*Happy path*
+- [ ] Each field in the Form step config has an optional "Default value" input accepting static values or `{{context.step_id.field}}` expressions.
+- [ ] Expressions are validated for syntax at save time.
+- [ ] At execution time, resolved defaults are shown as pre-filled values in the form; the assignee can change them before submitting.
+
+*Validation & errors*
+- [ ] Invalid expression syntax (mismatched braces, invalid identifiers) shows: "Invalid expression: {expression}" at save time.
+- [ ] An expression that resolves to a value incompatible with the field type (e.g., text into a number field) is coerced if possible, or left empty with a warning in the execution log.
+
+*Edge cases*
+- [ ] An expression that references a context variable that does not exist at execution time (e.g., a step that was skipped) resolves to `null` and leaves the field empty — this is not an execution error.
+- [ ] A pre-populated required field that the assignee clears before submitting triggers the required validation error.
+
+*Out of scope*
+- Hiding fields from the assignee while keeping them pre-populated (hidden fields) — not in MVP.
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** context expression input UI and expression evaluation at execution time pending Frontend + workflow-engine.
+
+---
+
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| forms | [source](./wireframes/forms.excalidraw) | [preview](./wireframes/forms.svg) |
+
+[← Back to Form Builder](./README.md)
+
+---
+
+## Diagrams
+
+| Diagram | Source | Preview |
+|---------|--------|---------|
+| N/A | N/A | N/A |

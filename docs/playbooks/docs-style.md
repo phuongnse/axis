@@ -43,7 +43,7 @@ When you find yourself editing the same fact in two files, the architecture is w
 
 ## Use-case files — wireframes & implementation status
 
-Every `docs/use-cases/*/use-cases/*.md` file uses these layouts so agents can scan status without parsing inline pipes.
+Every `docs/use-cases/<domain>/<use-case-slug>.md` file uses these layouts so agents can scan status without parsing inline pipes.
 
 ### Wireframes (top of file, after title / back-link)
 

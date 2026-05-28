@@ -1,0 +1,92 @@
+# Use case — Reorder fields via drag-and-drop
+
+> **Navigation**: [← Form Builder](./README.md)
+
+## Purpose
+
+drag form fields to reorder them so that the form flows naturally.
+
+## Primary actor
+
+- Organization Member
+
+## Trigger
+
+- User initiates: drag form fields to reorder them
+
+## Main flow
+
+1. _(Happy path — align with acceptance criteria below.)_
+
+## Alternate / error flows
+
+- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+
+## Context
+
+Form fields define what data the form collects. Each field has a type, label, help text, and validation rules. Fields can be reordered and grouped into sections.
+
+---
+
+## Acceptance Criteria
+
+**Purpose:** _(to be detailed during migration)_
+**Primary actor:** _(to be detailed during migration)_
+**Trigger:** _(to be detailed during migration)_
+
+#### Main flow
+1. _(to be detailed during migration)_
+
+#### Alternate / error flows
+- _(to be detailed during migration)_
+
+
+
+**Acceptance Criteria:**
+
+*Happy path*
+- [ ] Each field in the editor has a drag handle (six-dot icon) on its left side.
+- [ ] Dragging a field up or down reorders it; the live preview updates in real time during the drag.
+- [ ] The new order is auto-saved immediately on drop.
+
+*Validation & errors*
+- [ ] If the reorder API call fails, the field snaps back to its original position and an error toast is shown.
+
+*Edge cases*
+- [ ] Section dividers can be reordered along with fields, maintaining their grouping relationship.
+- [ ] Reordering a field from one section into another section is supported.
+
+*Out of scope*
+- Multi-column form layouts — not in MVP (single-column only).
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** drag-handle UI and real-time preview reorder pending Frontend.
+>
+> **Decisions:** `ReorderFormFieldsHandler` catches `ArgumentException` from domain (IDs don't match all fields) and returns `ErrorCodes.BusinessRule`.
+
+---
+
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| form-editor | [source](./wireframes/form-editor.excalidraw) | [preview](./wireframes/form-editor.svg) |
+
+[← Back to Form Builder](./README.md)
+
+---
+
+## Diagrams
+
+| Diagram | Source | Preview |
+|---------|--------|---------|
+| N/A | N/A | N/A |

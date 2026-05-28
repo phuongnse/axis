@@ -35,7 +35,7 @@ Feature work (frontend feature UIs, page-builder) tracks per-domain **Open work*
 
 Full auth, user, role, invitation, and session management. OpenIddict 5.x OIDC server (Authorization Code + PKCE for SPA; Client Credentials for M2M). RBAC via custom permission policies. All Identity API endpoints covered by integration tests.
 
-> 📝 **Docs-first next scope:** [localization and theming](./use-cases/identity-access/localization-and-theming.md) — EN/VI, light/dark/system mode, rollout rules before implementation.
+> 📝 **Docs-first next scope:** [localization and theming](./use-cases/identity-access/README.md#use-cases) — EN/VI, light/dark/system mode, rollout rules before implementation.
 
 > ✅ **Phase 2 complete (PR #93):** `Axis.Identity.Contracts` with `IdentityService.GetUserPermissions` gRPC + 5 Avro lifecycle event schemas published via Wolverine outbox → Kafka with CloudEvents envelope (ADR-019). Each of DataModeling/FormBuilder/WorkflowBuilder/WorkflowEngine subscribes to `OrganizationVerifiedEvent` and provisions its own tenant schema (central `TenantSchemaProvisioner` and `ProvisionTenantMessage` removed — extraction is now a redeploy per ADR-010). Gateway uses `AddGrpcClient<IdentityService.IdentityServiceClient>` with `Modules:Identity:GrpcUrl` config; JWKS-only validation rule documented in [patterns.md § Pattern 3](playbooks/patterns.md#-pattern-3-jwks-only-jwt-validation-in-consuming-modules).
 
@@ -79,7 +79,7 @@ Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoi
 
 **Organization management (backend):** ✅ profile API, settings + usage, scheduled deletion with 30-day hard-delete job. Frontend ⏳.
 
-**Tenant isolation:** ✅ `TenantSchemaInterceptor`, `TenantOrganizationAccessMiddleware` (403 for missing/archived/not-ready orgs), cross-tenant API integration tests — see [tenant isolation](./use-cases/platform-foundation/tenant-isolation.md).
+**Tenant isolation:** ✅ `TenantSchemaInterceptor`, `TenantOrganizationAccessMiddleware` (403 for missing/archived/not-ready orgs), cross-tenant API integration tests — see [tenant isolation](./use-cases/platform-foundation/automatic-tenant-scoping-on-every-request.md).
 
 **Agents:** per-use-case truth in **Implementation status** callouts; domain [Open work](./use-cases/platform-foundation/README.md#open-work-agents) lists next backend/frontend items.
 

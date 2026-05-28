@@ -2,7 +2,7 @@
 
 [← Back to Docs Home](../README.md)
 
-Use cases are the user-facing source of truth for behavior. Each domain groups related flows; every use-case file is self-contained (flow, AC, wireframes, diagrams, implementation status).
+Use cases are the user-facing source of truth for behavior. **One markdown file = one use case** (flow, AC, wireframes, diagrams, implementation status). Domain `README.md` indexes all use cases in that area.
 
 ---
 

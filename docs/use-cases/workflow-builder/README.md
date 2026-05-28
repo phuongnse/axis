@@ -20,15 +20,39 @@ The workflow builder is the heart of the platform. It is what differentiates Axi
 
 ## Use Cases
 
-| Use case | Description |
-|---|---|---|
-| [Workflow Definition Management](workflow-definition.md) | CRUD operations on workflow definitions |
-| [Visual Workflow Canvas](visual-canvas.md) | Drag & drop canvas powered by React Flow |
-| [Step Type Configuration](step-types.md) | Configure Form, HTTP Request, Condition, Script, Notification steps |
-| [Trigger Configuration](triggers.md) | Manual, Schedule (cron), Webhook, Event triggers |
-| [Branching & Conditional Logic](branching.md) | If/else conditions, switch, dynamic routing |
-| [Parallel Step Execution](parallel-execution.md) | Fan-out and fan-in parallel step groups |
-| [Workflow Import / Export](import-export.md) | Export workflow as JSON, import from JSON file |
+| Use case | Summary |
+|---|---|
+| [Access results from parallel branches](access-results-from-parallel-branches.md) | use the output of all parallel steps in subsequent steps so that I can combine results. |
+| [Add a multi-branch condition](add-a-multi-branch-condition.md) | add more than two branches from a Condition step so that I can handle multiple distinct cases. |
+| [Add a step to the canvas](add-a-step-to-the-canvas.md) | add a step to the workflow canvas so that I can build my process visually. |
+| [Add an if/else branch](add-an-if-else-branch.md) | route my workflow down different paths based on a condition so that different scenarios are handled appropriately. |
+| [Archive a workflow](archive-a-workflow.md) | archive a workflow so that it is disabled but its history is preserved. |
+| [Bulk export all workflows](bulk-export-all-workflows.md) | export all workflows as a ZIP archive so that I have a complete backup. |
+| [Configure a Condition step](configure-a-condition-step.md) | add a Condition step so that my workflow can take different paths based on data values. |
+| [Configure a Form step](configure-a-form-step.md) | configure a Form step with a specific form and assignee so that the right person receives the form during execution. |
+| [Configure a Manual trigger](configure-a-manual-trigger.md) | configure a Manual trigger so that authorized users can start the workflow on demand. |
+| [Configure a Notification step](configure-a-notification-step.md) | add a Notification step so that stakeholders are informed when a workflow reaches a certain point. |
+| [Configure a Schedule trigger](configure-a-schedule-trigger.md) | schedule a workflow so that it runs automatically at defined intervals. |
+| [Configure a Script step](configure-a-script-step.md) | write a small script step so that I can transform data that isn't possible with standard steps. |
+| [Configure a step via side panel](configure-a-step-via-side-panel.md) | click a step to open its configuration panel so that I can set it up without leaving the canvas. |
+| [Configure a Webhook trigger](configure-a-webhook-trigger.md) | configure a webhook trigger so that an external system can start my workflow by sending an HTTP request. |
+| [Configure an Event trigger](configure-an-event-trigger.md) | trigger a workflow automatically when a platform event occurs so that I don't need to start it manually. |
+| [Configure an HTTP Request step](configure-an-http-request-step.md) | configure an HTTP Request step so that my workflow can integrate with external services. |
+| [Configure fan-in (join) behavior](configure-fan-in-join-behavior.md) | configure how the workflow continues after parallel steps complete so that I can handle different completion scenarios. |
+| [Connect steps with transitions](connect-steps-with-transitions.md) | draw connections between steps so that the workflow knows the execution order. |
+| [Create a parallel step group](create-a-parallel-step-group.md) | configure multiple steps to run in parallel so that independent tasks don't block each other. |
+| [Create a workflow](create-a-workflow.md) | create a new workflow so that I can start designing an automated process. |
+| [Delete a Draft workflow](delete-a-draft-workflow.md) | delete a Draft workflow so that I can permanently remove workflows I no longer need without having to publish them fi... |
+| [Duplicate a workflow](duplicate-a-workflow.md) | duplicate an existing workflow so that I can use it as a starting point for a similar process. |
+| [Export a workflow as JSON](export-a-workflow-as-json.md) | export a workflow as a JSON file so that I can back it up or share it with another team. |
+| [Import a workflow from JSON](import-a-workflow-from-json.md) | import a workflow from a JSON file so that I can quickly set up a workflow that someone else designed. |
+| [Merge branches back to a single path](merge-branches-back-to-a-single-path.md) | diverged branches to merge back to a single step so that the workflow continues on a unified path after branching. |
+| [Navigate and zoom the canvas](navigate-and-zoom-the-canvas.md) | pan and zoom the workflow canvas so that I can work comfortably with large workflows. |
+| [Publish a workflow](publish-a-workflow.md) | publish a workflow so that it can be triggered and executed. |
+| [Undo and redo canvas actions](undo-and-redo-canvas-actions.md) | undo and redo changes on the canvas so that I can recover from mistakes easily. |
+| [View workflows list](view-workflows-list.md) | see all workflows so that I can find and manage them. |
+
+
 ---
 
 ## Diagrams
@@ -91,7 +115,7 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend** | ⚠️ mostly ✅ | CRUD/publish/import/export ✅; plan limits 402 ✅ (platform-foundation subscription plans). **Engine-owned:** triggers (cron/webhook/event), step execution, parallel/join — tracked in [workflow-engine](../workflow-engine/README.md#open-work-agents). **API polish:** list filters (last execution date), import transactional rollback — [import-export](import-export.md). |
+| **Backend** | ⚠️ mostly ✅ | CRUD/publish/import/export ✅; plan limits 402 ✅ (platform-foundation subscription plans). **Engine-owned:** triggers (cron/webhook/event), step execution, parallel/join — tracked in [workflow-engine](../workflow-engine/README.md#open-work-agents). **API polish:** list filters (last execution date), import transactional rollback — [import-export](./README.md). |
 | **Frontend** | ⏳ | Visual canvas, step config panels, trigger UI — every organization-management–import-export US. |
 
 Do not re-implement plan limits here; update stale “pending platform-foundation subscription plans” lines if you see them in feature callouts.

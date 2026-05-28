@@ -67,7 +67,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 2. For each bullet: implemented + test, `N/A this PR — Frontend`, or named deferral.
 3. Only then set `Gaps vs spec: none for backend` (or list what remains).
 
-**Lesson (platform-foundation organization management):** A first pass shipped profile/settings/deletion APIs but missed Redis usage TTL (≤5 min), schedule rollback on queue failure, hard-delete purge, and form-task cancel — caught by spec review, not by “flow works.” See [organization-management callouts](../platform-foundation/organization-management.md) for what “done” looks like after self-audit.
+**Lesson (platform-foundation organization management):** A first pass shipped profile/settings/deletion APIs but missed Redis usage TTL (≤5 min), schedule rollback on queue failure, hard-delete purge, and form-task cancel — caught by spec review, not by “flow works.” See [organization-management callouts](../platform-foundation/README.md) for what “done” looks like after self-audit.
 
 ---
 

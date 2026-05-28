@@ -1,0 +1,99 @@
+# Use case — Retry with modified input context
+
+> **Navigation**: [← Workflow Engine](./README.md)
+
+## Purpose
+
+modify the execution context before retrying so that I can fix data errors that caused the original failure.
+
+## Primary actor
+
+- Organization Member with `execution:retry`
+
+## Trigger
+
+- User initiates: modify the execution context before retrying
+
+## Main flow
+
+1. _(Happy path — align with acceptance criteria below.)_
+
+## Alternate / error flows
+
+- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+
+## Context
+
+When a workflow execution fails at a step, users can manually retry from the failed step. Previously successful steps are not re-run; their outputs are carried forward from the original execution.
+
+---
+
+## Acceptance Criteria
+
+**Purpose:** _(to be detailed during migration)_
+**Primary actor:** _(to be detailed during migration)_
+**Trigger:** _(to be detailed during migration)_
+
+#### Main flow
+1. _(to be detailed during migration)_
+
+#### Alternate / error flows
+- _(to be detailed during migration)_
+
+
+
+**Acceptance Criteria:**
+
+*Happy path*
+- [ ] "Retry with modified context" option (secondary action next to Retry) opens a JSON editor pre-populated with the execution context at the point of failure.
+- [ ] The user edits the JSON and clicks "Start retry."
+- [ ] The retry uses the modified context starting from the failed step.
+- [ ] The execution history records that the retry used a modified context (a "Context modified by user" flag in the execution detail).
+
+*Validation & errors*
+- [ ] The context editor validates that the JSON is valid before the retry can be started; invalid JSON shows: "Context must be valid JSON."
+- [ ] Removing a context key that is required by the failed step is allowed — the retry may fail again with a different error, which is the user's responsibility.
+
+*Edge cases*
+- [ ] The modified context is not restricted to keys relevant to the failed step; the user can modify any key. The full modified context is used for all remaining steps.
+- [ ] A very large context (> 1 MB) may be slow to render in the JSON editor; the editor handles up to 5 MB.
+
+*Out of scope*
+- Structured field-by-field editing of context (showing fields by step/variable name) — not in MVP; raw JSON editor only.
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** `POST /api/executions/{id}/retry-with-context` ✅. JSON context editor UI and modified-context flag pending Frontend.
+>
+> **Decisions:** `CreateRetryWithModifiedContext` added to domain as private `CreateRetryCore` delegation — shares validation logic with `CreateRetry`.
+
+
+## Diagrams
+
+| Diagram | Source | Preview |
+|---------|--------|---------|
+| N/A | N/A | N/A |
+
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| execution-detail | [source](./wireframes/execution-detail.excalidraw) | [preview](./wireframes/execution-detail.svg) |
+
+[← Back to Workflow Engine](./README.md)
+
+---
+
+## Diagrams
+
+| Diagram | Source | Preview |
+|---------|--------|---------|
+| N/A | N/A | N/A |

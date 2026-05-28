@@ -474,7 +474,7 @@ await _context.WorkflowDefinitions
 
 **Rule:** Avoid raw SQL in tenant-aware contexts. When raw SQL is unavoidable (e.g. performance-critical bulk ops, cross-module reads), always prefix the table with the tenant schema from `ITenantContext.Schema` and add soft-delete filter manually. Document why raw SQL was needed with a comment.
 
-### Tenant schema provisioning ([tenant provisioning](tenant-registration.md))
+### Tenant schema provisioning ([tenant provisioning](./README.md))
 
 After email verification, every **tenant-scoped** module provisions its own PostgreSQL schema for the organization. Identity stays on `public` and only publishes the verification event — it never touches another module's DB.
 
@@ -521,7 +521,7 @@ _ = Task.Run(async () =>
 - **No-args EF Core constructor**: when an aggregate's only constructor takes params EF Core can't bind (e.g. `IEnumerable<string>`), add a private no-args constructor: `private MyAggregate() : base(default) { RequiredField = null!; }`. Initialize all non-nullable reference-type fields to silence CS8618 — EF Core will never use these sentinel values because it always materialises via the real constructor path.
 - **Migrations strategy** ([ADR-023](../TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)): every environment uses `Database.MigrateAsync()` — production, dev bootstrap, tenant provisioning, and Testcontainers fixtures. One EF migration chain per `DbContext`; never `EnsureCreated`/`EnsureCreatedAsync`.
 - **Identity uses the global `public` schema** — `IdentityDbContext` is a plain `DbContext` with no `TenantSchemaInterceptor`. All other modules use `AxisDbContext` with `TenantSchemaInterceptor`.
-- **Tenant schema on every connection** — `TenantSchemaInterceptor` sets `search_path` to `tenant_{orgId:N}, public` on every `ConnectionOpened` (including pooled reconnects), so a leased connection always targets the current request's tenant ([tenant isolation](../use-cases/platform-foundation/tenant-isolation.md) — schema-per-tenant).
+- **Tenant schema on every connection** — `TenantSchemaInterceptor` sets `search_path` to `tenant_{orgId:N}, public` on every `ConnectionOpened` (including pooled reconnects), so a leased connection always targets the current request's tenant ([tenant isolation](../use-cases/platform-foundation/automatic-tenant-scoping-on-every-request.md) — schema-per-tenant).
 - **Schema name resolution** — `HttpTenantContext` derives `tenant_{orgId:N}` from the JWT `org_id` claim (no DB/Redis lookup; immutable after provisioning). `TenantOrganizationAccessMiddleware` on `Axis.Api` returns HTTP 403 when the org is missing, archived/deleted, or still provisioning — tenant module routes only; Identity/settings routes are unchanged.
 - **Cross-tenant proof** — `tests/Api/Axis.Api.Tests/Tenancy/TenantIsolationEndpointTests.cs` (DataModeling list/get by id).
 
@@ -1357,7 +1357,7 @@ Replace `<access_token>`, `<user-guid>`, and `<org-guid>` with values from your 
 
 **Rule:** modules other than Identity validate JWTs **locally via Identity's JWKS endpoint** — never by calling `IdentityDbContext` or any Identity service. Asking Identity "is this user real?" on every request defeats the purpose of stateless JWT and re-introduces the coupling we removed.
 
-Why: Identity issues short-lived JWTs (15 minutes per [authentication](../use-cases/identity-access/authentication.md)) signed with a key whose public half is published at `/.well-known/jwks.json` (OpenIddict default). Any module that receives a Bearer token can verify the signature, claims (`sub`, `org`, `permissions`), and expiry **without a network call to Identity for each request**. JWKS itself is cached locally by `Microsoft.AspNetCore.Authentication.JwtBearer`, so the network cost is once per key-rotation, not once per request.
+Why: Identity issues short-lived JWTs (15 minutes per [sign-in](../use-cases/identity-access/sign-in-with-email-and-password.md)) signed with a key whose public half is published at `/.well-known/jwks.json` (OpenIddict default). Any module that receives a Bearer token can verify the signature, claims (`sub`, `org`, `permissions`), and expiry **without a network call to Identity for each request**. JWKS itself is cached locally by `Microsoft.AspNetCore.Authentication.JwtBearer`, so the network cost is once per key-rotation, not once per request.
 
 The escape hatch — when you need *fresh* permission state that the JWT's `permissions` claim cannot give you — is `IdentityService.GetUserPermissions` (gRPC), not a DB lookup.
 

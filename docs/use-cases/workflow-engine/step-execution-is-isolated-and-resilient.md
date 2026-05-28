@@ -1,0 +1,79 @@
+# Use case — Step execution is isolated and resilient
+
+> **Navigation**: [← Workflow Engine](./README.md)
+
+## Purpose
+
+Run each step handler in isolation so that a failure in one step does not crash the engine or affect other executions.
+
+## Primary actor
+
+- Platform operator / workflow engine
+
+## Trigger
+
+- Workflow engine dispatches a step execution message to a type-specific handler.
+
+## Main flow
+
+1. Handler loads execution step in tenant context.
+2. Executes step logic inside an exception boundary.
+3. Reports `StepCompleted` or `StepFailed` back to the engine.
+
+## Alternate / error flows
+
+- Re-delivery when step already terminal → no-op (idempotent).
+- Concurrent writers → `xmin` concurrency token; loser exits gracefully.
+
+## Context
+
+Handler specifications (Form, HTTP, Condition, Script, Notification) remain documented in the workflow-engine domain README under **Handler specifications** — this use case covers cross-cutting isolation, logging, and idempotency.
+
+## Acceptance Criteria
+
+*Happy path*
+- [ ] Each step handler runs as an independent Wolverine message handler with its own exception boundary.
+- [ ] A step handler completing successfully reports `StepCompleted(executionId, stepId, output)` back to the engine via a Wolverine message.
+- [ ] Step start time, end time, and duration are recorded for every step.
+
+*Validation & errors*
+- [ ] An unhandled exception in any step handler marks only that step as `Failed` — the engine and all other executions continue normally.
+- [ ] All step handler exceptions are logged with structured context: `{ tenantId, executionId, stepId, stepType, errorType, errorMessage, stackTrace }`.
+- [ ] A step handler that takes longer than 5 minutes (engine-level timeout, separate from step-level config) is forcibly killed and the step is marked Failed with: "Step execution exceeded the maximum allowed time."
+
+*Edge cases*
+- [ ] A step handler that loses its DB connection mid-execution retries the DB operation up to 3 times with exponential backoff before failing.
+- [ ] Wolverine's at-least-once delivery guarantee: if a step handler message is re-delivered (e.g., after a crash), the handler checks if the step is already in a terminal state (`COMPLETED`, `FAILED`, `CANCELLED`) and exits immediately (idempotent).
+- [ ] Two concurrent deliveries of the same step handler message (race condition): the second one detects the step is already `RUNNING` and exits; only one execution proceeds.
+
+*Out of scope*
+- Custom step types defined by users — not in MVP.
+
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| execution-detail | [source](./wireframes/execution-detail.excalidraw) | [preview](./wireframes/execution-detail.svg) |
+
+## Diagrams
+
+| Diagram | Source | Preview |
+|---------|--------|---------|
+| N/A | N/A | N/A |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ⚠️ |
+> | API | ⏳ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:**
+> - AC "concurrent delivery: second detects Running and exits" — concurrent-duplicate protection is implemented via `UseXminAsConcurrencyToken()` on `execution_steps` rows. The second concurrent writer receives a `DbUpdateConcurrencyException` (translated to `ConcurrencyException`), logs, and exits gracefully.
+> - Engine-level 5-minute step timeout not yet implemented.
+> - `IScriptExecutor` and `INotificationSender` are stubs; real JS sandbox and notification dispatch deferred.
+>
+> **Decisions:** `ExecutionStep.IsTerminal` covers Completed/Failed/Cancelled. Concurrent-duplicate protection uses PostgreSQL `xmin` on owned `execution_steps` — no migration required. Running-guard approach rejected (see workflow-engine open work).

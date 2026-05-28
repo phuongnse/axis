@@ -1,0 +1,99 @@
+# Use case — Manage user profile
+
+> **Navigation**: [← Identity Access](./README.md)
+
+## Purpose
+
+update my profile information so that my name and contact details are current.
+
+## Primary actor
+
+- user
+
+## Trigger
+
+- User initiates: update my profile information
+
+## Main flow
+
+1. _(Happy path — align with acceptance criteria below.)_
+
+## Alternate / error flows
+
+- See *Validation & errors* and *Edge cases* under Acceptance Criteria.
+
+## Context
+
+Organization admins can invite new members, manage their accounts, and deactivate users who should no longer have access.
+
+---
+
+## Acceptance Criteria
+
+**Purpose:** _(to be detailed during migration)_
+**Primary actor:** _(to be detailed during migration)_
+**Trigger:** _(to be detailed during migration)_
+
+#### Main flow
+1. _(to be detailed during migration)_
+
+#### Alternate / error flows
+- _(to be detailed during migration)_
+
+
+
+**Acceptance Criteria:**
+
+*Happy path*
+- [ ] User can update: full name and avatar image from the Profile settings page.
+- [ ] Changes are saved immediately and reflected throughout the UI (top nav, comments, assignments).
+
+*Validation & errors*
+- [ ] Full name: required, 2–100 characters.
+- [ ] Avatar: PNG or JPG only, max 1 MB. Shows an error before upload begins if type or size is invalid.
+- [ ] Attempting to change email redirects to a separate flow (email change requires re-verification — see password-security).
+
+*Edge cases*
+- [ ] Uploading a new avatar replaces the old one; the old file is deleted from storage.
+- [ ] If avatar upload fails mid-way, the old avatar remains unchanged and an error is shown.
+
+*Out of scope*
+- Public profile visibility — all profiles are private within the org in MVP.
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** email change flow (password-security) not started.
+>
+> **Decisions:** name update is a direct property mutation on `User` aggregate with a `UserProfileUpdatedEvent`. Avatar upload fully wired in `UpdateUserProfileHandler` — validates type (PNG/JPG only) and size (max 1 MB), uploads to S3, deletes old file on replacement.
+
+
+## Diagrams
+
+| Diagram | Source | Preview |
+|---------|--------|---------|
+| N/A | N/A | N/A |
+
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| settings-users | [source](./wireframes/settings-users.excalidraw) | [preview](./wireframes/settings-users.svg) |
+| accept-invitation | [source](./wireframes/accept-invitation.excalidraw) | [preview](./wireframes/accept-invitation.svg) |
+
+[← Back to Identity & Access](./README.md)
+
+---
+
+## Diagrams
+
+| Diagram | Source | Preview |
+|---------|--------|---------|
+| N/A | N/A | N/A |

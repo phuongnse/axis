@@ -20,12 +20,25 @@ Forms are the primary mechanism for human interaction within a workflow. Without
 
 ## Use Cases
 
-| Use case | Description |
-|---|---|---|
-| [Form Definition Management](form-definition.md) | Create, edit, delete form definitions |
-| [Form Field Configuration & Validation](form-fields.md) | Add fields with types, labels, placeholders, validation rules |
-| [Workflow Step Integration](workflow-integration.md) | Attach a form to a Form step in a workflow |
-| [Form Submission Handling](form-submission.md) | Render form to assignee, capture submission, continue workflow |
+| Use case | Summary |
+|---|---|
+| [Add a field to a form](add-a-field-to-a-form.md) | add a field to my form so that I can collect the data I need. |
+| [Add a section divider](add-a-section-divider.md) | group related fields under a section heading so that the form is easier to understand. |
+| [Configure validation rules on a field](configure-validation-rules-on-a-field.md) | set validation rules on each field so that users are guided to provide correct data. |
+| [Create a form](create-a-form.md) | create a new form so that I can design a data collection interface. |
+| [Delete a form](delete-a-form.md) | delete a form so that I can clean up unused forms. |
+| [Edit a form](edit-a-form.md) | edit an existing form so that I can update its fields as requirements change. |
+| [Handle form step timeout](handle-form-step-timeout.md) | configure a timeout on a Form step so that the workflow doesn't wait indefinitely. |
+| [Link a form to a workflow Form step](link-a-form-to-a-workflow-form-step.md) | select a form when configuring a Form step so that the right form is presented to the assignee during execution. |
+| [Map form submission data into workflow context](map-form-submission-data-into-workflow-context.md) | the data submitted in a form to be available to subsequent steps so that the rest of the process can use it. |
+| [Open and submit an assigned form](open-and-submit-an-assigned-form.md) | open the form link and submit my responses so that the workflow can continue. |
+| [Pre-populate form fields from execution context](pre-populate-form-fields-from-execution-context.md) | pre-populate form fields with values from the workflow context so that assignees don't re-enter data that's already k... |
+| [Receive form assignment notification](receive-form-assignment-notification.md) | be notified when a form is waiting for my input so that I know I have an action to take. |
+| [Reorder fields via drag-and-drop](reorder-fields-via-drag-and-drop.md) | drag form fields to reorder them so that the form flows naturally. |
+| [View all forms](view-all-forms.md) | see all forms in my organization so that I can find existing forms to reuse. |
+| [View pending form tasks](view-pending-form-tasks.md) | see a list of all form tasks assigned to me so that I don't miss any pending actions. |
+
+
 ---
 
 ## Diagrams
@@ -96,9 +109,9 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend** | ⚠️ | [form-submission](form-submission.md): notification on assign; expiry → execution failure (workflow-engine); role-based My Tasks aggregation. Token submit + My Tasks API ✅. |
+| **Backend** | ⚠️ | [form-submission](./README.md): notification on assign; expiry → execution failure (workflow-engine); role-based My Tasks aggregation. Token submit + My Tasks API ✅. |
 | **Frontend** | ⏳ | Form editor, field picker, standalone submit page, My Tasks — all tenant-registration–subscription-plans US. |
-| **Cross-module** | workflow-engine | Form step execution, context expressions, `FormStepReached` consumer path — coordinate with workflow-engine. **platform-foundation organization management [organization deletion](organization-management.md):** `OrganizationFormTaskCanceller` cancels pending form tasks before org hard-delete (Identity-owned job). |
+| **Cross-module** | workflow-engine | Form step execution, context expressions, `FormStepReached` consumer path — coordinate with workflow-engine. **platform-foundation organization management [organization deletion](./README.md):** `OrganizationFormTaskCanceller` cancels pending form tasks before org hard-delete (Identity-owned job). |
 
 ---
 
