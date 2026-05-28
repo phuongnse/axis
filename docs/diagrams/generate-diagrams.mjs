@@ -450,9 +450,9 @@ function containerDiagram() {
   // External managed services aligned with operations rows
   els.push(...rect({ x: 1110, y: 565, w: 200, h: 55, bg: C.extBg, stroke: C.extBdr, label: "AWS S3", sub: "File storage" }));
   els.push(...rect({ x: 1110, y: 635, w: 200, h: 55, bg: C.extBg, stroke: C.extBdr, label: "Email Service", sub: "SMTP · MailKit" }));
-  // Connections avoid crossing ops blocks while preserving clear source/target.
-  els.push(...routedArrow({ waypoints: [[810, 560], [1100, 560], [1100, 592], [1110, 592]], color: C.arrow }));
-  els.push(...routedArrow({ waypoints: [[810, 662], [845, 662], [845, 705], [1100, 705], [1100, 662], [1110, 662]], color: C.arrow }));
+  // Clear handoff from platform ops to external services.
+  els.push(...arrow({ x1: 1090, y1: 592, x2: 1110, y2: 592, color: C.arrow }));
+  els.push(...arrow({ x1: 1090, y1: 662, x2: 1110, y2: 662, color: C.arrow }));
 
   // Compact legend
   els.push(...rect({ x: 628, y: 88, w: 176, h: 142, bg: "#ffffff", stroke: C.border }));
