@@ -63,7 +63,7 @@ Organization admins can create custom roles, assign permissions to each role, an
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| settings-roles | [source](./wireframes/settings-roles.excalidraw) | [preview](./wireframes/settings-roles.svg) |
+| settings-roles | [source](./settings-roles.excalidraw) | [preview](./settings-roles.svg) |
 
 ## Diagrams
 

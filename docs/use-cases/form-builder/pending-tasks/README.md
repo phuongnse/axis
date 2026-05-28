@@ -66,7 +66,7 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| form-submission | [source](../wireframes/form-submission.excalidraw) | [preview](../wireframes/form-submission.svg) |
+| form-submission | [source](./form-submission.excalidraw) | [preview](./form-submission.svg) |
 
 ## Diagrams
 

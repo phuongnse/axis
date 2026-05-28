@@ -73,9 +73,9 @@ Self-service registration flow where a new organization signs up and is automati
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| register-org | [source](./wireframes/register-org.excalidraw) | [preview](./wireframes/register-org.svg) |
-| register-org-states | [source](./wireframes/register-org-states.excalidraw) | [preview](./wireframes/register-org-states.svg) |
-| email-confirmation | [source](./wireframes/email-confirmation.excalidraw) | [preview](./wireframes/email-confirmation.svg) |
+| register-org | [source](./register-org.excalidraw) | [preview](./register-org.svg) |
+| register-org-states | [source](./register-org-states.excalidraw) | [preview](./register-org-states.svg) |
+| email-confirmation | [source](./email-confirmation.excalidraw) | [preview](./email-confirmation.svg) |
 
 ## Diagrams
 

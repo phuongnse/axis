@@ -78,7 +78,7 @@ Enforce subscription plan limits at the API so that organizations cannot exceed 
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| settings-org | [source](../wireframes/settings-org.excalidraw) | [preview](../wireframes/settings-org.svg) |
+| settings-org | [source](./settings-org.excalidraw) | [preview](./settings-org.svg) |
 
 ## Diagrams
 

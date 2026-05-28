@@ -74,7 +74,7 @@ Allow users to reset forgotten passwords, change their current password, and man
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| forgot-password | [source](./wireframes/forgot-password.excalidraw) | [preview](./wireframes/forgot-password.svg) |
+| forgot-password | [source](./forgot-password.excalidraw) | [preview](./forgot-password.svg) |
 
 ## Diagrams
 

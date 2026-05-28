@@ -64,7 +64,7 @@ Each field in a model has a type that determines what data it stores, how it's v
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| data-models | [source](../wireframes/data-models.excalidraw) | [preview](../wireframes/data-models.svg) |
+| data-models | [source](./data-models.excalidraw) | [preview](./data-models.svg) |
 
 ## Diagrams
 

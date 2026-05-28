@@ -63,7 +63,7 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| executions | [source](../wireframes/executions.excalidraw) | [preview](../wireframes/executions.svg) |
+| executions | [source](./executions.excalidraw) | [preview](./executions.svg) |
 
 ## Diagrams
 

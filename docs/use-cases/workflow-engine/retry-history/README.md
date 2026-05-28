@@ -62,7 +62,7 @@ When a workflow execution fails at a step, users can manually retry from the fai
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| execution-detail | [source](../wireframes/execution-detail.excalidraw) | [preview](../wireframes/execution-detail.svg) |
+| execution-detail | [source](./execution-detail.excalidraw) | [preview](./execution-detail.svg) |
 
 ## Diagrams
 

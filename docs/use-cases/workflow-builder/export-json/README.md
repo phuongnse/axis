@@ -66,7 +66,7 @@ Workflow definitions can be exported as portable JSON files and imported into an
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| workflows | [source](../wireframes/workflows.excalidraw) | [preview](../wireframes/workflows.svg) |
+| workflows | [source](./workflows.excalidraw) | [preview](./workflows.svg) |
 
 ## Diagrams
 

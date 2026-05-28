@@ -68,8 +68,8 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| executions | [source](../wireframes/executions.excalidraw) | [preview](../wireframes/executions.svg) |
-| execution-detail | [source](../wireframes/execution-detail.excalidraw) | [preview](../wireframes/execution-detail.svg) |
+| executions | [source](./executions.excalidraw) | [preview](./executions.svg) |
+| execution-detail | [source](./execution-detail.excalidraw) | [preview](./execution-detail.svg) |
 
 ## Diagrams
 

@@ -64,8 +64,8 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| form-editor | [source](../wireframes/form-editor.excalidraw) | [preview](../wireframes/form-editor.svg) |
-| workflow-editor | [source](../../workflow-builder/wireframes/workflow-editor.excalidraw) | [preview](../../workflow-builder/wireframes/workflow-editor.svg) |
+| form-editor | [source](./form-editor.excalidraw) | [preview](./form-editor.svg) |
+| workflow-editor | [source](./workflow-editor.excalidraw) | [preview](./workflow-editor.svg) |
 
 ## Diagrams
 

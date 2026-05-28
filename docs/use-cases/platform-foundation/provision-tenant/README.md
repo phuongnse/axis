@@ -74,7 +74,7 @@ Self-service registration flow where a new organization signs up and is automati
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| workspace-provisioning | [source](./wireframes/workspace-provisioning.excalidraw) | [preview](./wireframes/workspace-provisioning.svg) |
+| workspace-provisioning | [source](./workspace-provisioning.excalidraw) | [preview](./workspace-provisioning.svg) |
 
 ## Diagrams
 

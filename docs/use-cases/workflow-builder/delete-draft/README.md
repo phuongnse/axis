@@ -57,7 +57,7 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| workflows | [source](../wireframes/workflows.excalidraw) | [preview](../wireframes/workflows.svg) |
+| workflows | [source](./workflows.excalidraw) | [preview](./workflows.svg) |
 
 ## Diagrams
 

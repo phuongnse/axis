@@ -79,8 +79,8 @@ docs/use-cases/
     ├── diagrams/            # domain technical diagrams
     └── <short-slug>/        # one folder per use case (short, readable name)
         ├── README.md        # spec (flow, AC, implementation status)
-        ├── wireframes/      # screens only for this use case (optional)
-        └── diagrams/        # use-case diagrams (optional)
+        ├── *.excalidraw     # wireframe/diagram sources for this use case
+        └── *.svg            # previews for this use case
 ```
 
 Shared UI kit wireframes: [`_shared/wireframes/`](./_shared/wireframes/). Platform architecture diagrams: [`_architecture/diagrams/`](./_architecture/diagrams/).

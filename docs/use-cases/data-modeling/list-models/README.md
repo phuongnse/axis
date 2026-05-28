@@ -64,7 +64,7 @@ Users can create custom data models within their organization. A model defines t
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| data-models | [source](../wireframes/data-models.excalidraw) | [preview](../wireframes/data-models.svg) |
+| data-models | [source](./data-models.excalidraw) | [preview](./data-models.svg) |
 
 ## Diagrams
 

@@ -68,7 +68,7 @@ Each step has a type that determines what it does when executed. Users configure
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| workflow-editor | [source](../wireframes/workflow-editor.excalidraw) | [preview](../wireframes/workflow-editor.svg) |
+| workflow-editor | [source](./workflow-editor.excalidraw) | [preview](./workflow-editor.svg) |
 
 ## Diagrams
 

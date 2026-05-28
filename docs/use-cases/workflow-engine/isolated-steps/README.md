@@ -52,7 +52,7 @@ Handler specifications (Form, HTTP, Condition, Script, Notification) remain docu
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| execution-detail | [source](../wireframes/execution-detail.excalidraw) | [preview](../wireframes/execution-detail.svg) |
+| execution-detail | [source](./execution-detail.excalidraw) | [preview](./execution-detail.svg) |
 
 ## Diagrams
 
@@ -81,7 +81,7 @@ Handler specifications (Form, HTTP, Condition, Script, Notification) remain docu
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| execution-detail | [source](../wireframes/execution-detail.excalidraw) | [preview](../wireframes/execution-detail.svg) |
+| execution-detail | [source](./execution-detail.excalidraw) | [preview](./execution-detail.svg) |
 
 ## Diagrams
 

@@ -68,9 +68,9 @@ Allow organization admins to manage their organization's profile, settings, and 
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| settings-org | [source](../wireframes/settings-org.excalidraw) | [preview](../wireframes/settings-org.svg) |
-| settings-org-profile-states | [source](./wireframes/settings-org-profile-states.excalidraw) | [preview](./wireframes/settings-org-profile-states.svg) |
-| settings-org-upload-states | [source](./wireframes/settings-org-upload-states.excalidraw) | [preview](./wireframes/settings-org-upload-states.svg) |
+| settings-org | [source](./settings-org.excalidraw) | [preview](./settings-org.svg) |
+| settings-org-profile-states | [source](./settings-org-profile-states.excalidraw) | [preview](./settings-org-profile-states.svg) |
+| settings-org-upload-states | [source](./settings-org-upload-states.excalidraw) | [preview](./settings-org-upload-states.svg) |
 
 ## Diagrams
 

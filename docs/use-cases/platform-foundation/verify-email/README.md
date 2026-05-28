@@ -74,9 +74,9 @@ Self-service registration flow where a new organization signs up and is automati
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| verify-email | [source](./wireframes/verify-email.excalidraw) | [preview](./wireframes/verify-email.svg) |
-| verify-email-rate-limit | [source](./wireframes/verify-email-rate-limit.excalidraw) | [preview](./wireframes/verify-email-rate-limit.svg) |
-| login-unverified | [source](../../identity-access/wireframes/login-unverified.excalidraw) | [preview](../../identity-access/wireframes/login-unverified.svg) |
+| verify-email | [source](./verify-email.excalidraw) | [preview](./verify-email.svg) |
+| verify-email-rate-limit | [source](./verify-email-rate-limit.excalidraw) | [preview](./verify-email-rate-limit.svg) |
+| login-unverified | [source](./login-unverified.excalidraw) | [preview](./login-unverified.svg) |
 
 ## Diagrams
 

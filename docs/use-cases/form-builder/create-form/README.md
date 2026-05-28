@@ -62,7 +62,7 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| forms | [source](../wireframes/forms.excalidraw) | [preview](../wireframes/forms.svg) |
+| forms | [source](./forms.excalidraw) | [preview](./forms.svg) |
 
 ## Diagrams
 

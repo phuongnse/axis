@@ -63,8 +63,8 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| data-classes | [source](../wireframes/data-classes.excalidraw) | [preview](../wireframes/data-classes.svg) |
-| data-models | [source](../wireframes/data-models.excalidraw) | [preview](../wireframes/data-models.svg) |
+| data-classes | [source](./data-classes.excalidraw) | [preview](./data-classes.svg) |
+| data-models | [source](./data-models.excalidraw) | [preview](./data-models.svg) |
 
 ## Diagrams
 
