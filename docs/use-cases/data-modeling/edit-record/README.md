@@ -56,7 +56,7 @@ Users can create, read, update, and delete records against any model. Records ar
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** HTTP 409 optimistic concurrency (updated_at comparison) backend polish — see gaps below.
+> **Gaps vs spec:** HTTP 409 optimistic concurrency (updated_at comparison) pending.
 
 ## Wireframes
 

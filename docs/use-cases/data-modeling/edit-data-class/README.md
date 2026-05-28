@@ -56,7 +56,7 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 >
 > **Gaps vs spec:**
 > - "models affected" warning on field delete pending API/Frontend layer
-> - auto-downgrade-to-optional for required fields on existing-record models backend polish — see gaps below.
+> - auto-downgrade-to-optional for required fields on existing-record models pending.
 
 ## Wireframes
 

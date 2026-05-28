@@ -26,7 +26,7 @@ The workflow builder is the heart of the platform. It is what differentiates Axi
 |---|---|
 | [Archive a workflow](archive-workflow/) | Archive a workflow so that it is disabled but its history is preserved. |
 | [Create a workflow](create-workflow/) | Create a new workflow so that I can start designing an automated process. |
-| [Delete a Draft workflow](delete-draft/) | Delete a Draft workflow so that I can permanently remove workflows I no longer need without having t |
+| [Delete a Draft workflow](delete-draft/) | Delete a Draft workflow so that I can permanently remove workflows I no longer need without having to publish them… |
 | [Duplicate a workflow](duplicate-workflow/) | Duplicate an existing workflow so that I can use it as a starting point for a similar process. |
 | [View workflows list](list-workflows/) | See all workflows so that I can find and manage them. |
 | [Publish a workflow](publish-workflow/) | Publish a workflow so that it can be triggered and executed. |
@@ -46,7 +46,7 @@ The workflow builder is the heart of the platform. It is what differentiates Axi
 | Use case | Summary |
 |---|---|
 | [Configure a Condition step](condition-step/) | Add a Condition step so that my workflow can take different paths based on data values. |
-| [Configure a Form step](form-step/) | Configure a Form step with a specific form and assignee so that the right person receives the form d |
+| [Configure a Form step](form-step/) | Configure a Form step with a specific form and assignee so that the right person receives the form during execution. |
 | [Configure an HTTP Request step](http-step/) | Configure an HTTP Request step so that my workflow can integrate with external services. |
 | [Configure a Notification step](notification-step/) | Add a Notification step so that stakeholders are informed when a workflow reaches a certain point. |
 | [Configure a Script step](script-step/) | Write a small script step so that I can transform data that isn't possible with standard steps. |
@@ -55,24 +55,24 @@ The workflow builder is the heart of the platform. It is what differentiates Axi
 
 | Use case | Summary |
 |---|---|
-| [Configure an Event trigger](event-trigger/) | Trigger a workflow automatically when a platform event occurs so that I don't need to start it manua |
+| [Configure an Event trigger](event-trigger/) | Trigger a workflow automatically when a platform event occurs so that I don't need to start it manually. |
 | [Configure a Manual trigger](manual-trigger/) | Configure a Manual trigger so that authorized users can start the workflow on demand. |
 | [Configure a Schedule trigger](schedule-trigger/) | Schedule a workflow so that it runs automatically at defined intervals. |
-| [Configure a Webhook trigger](webhook-trigger/) | Configure a webhook trigger so that an external system can start my workflow by sending an HTTP requ |
+| [Configure a Webhook trigger](webhook-trigger/) | Configure a webhook trigger so that an external system can start my workflow by sending an HTTP request. |
 
 ### Branching
 
 | Use case | Summary |
 |---|---|
-| [Add an if/else branch](if-else-branch/) | Route my workflow down different paths based on a condition so that different scenarios are handled  |
-| [Merge branches back to a single path](merge-branches/) | Diverged branches to merge back to a single step so that the workflow continues on a unified path af |
+| [Add an if/else branch](if-else-branch/) | Route my workflow down different paths based on a condition so that different scenarios are handled appropriately. |
+| [Merge branches back to a single path](merge-branches/) | Diverged branches to merge back to a single step so that the workflow continues on a unified path after branching. |
 | [Add a multi-branch condition](multi-branch/) | Add more than two branches from a Condition step so that I can handle multiple distinct cases. |
 
 ### Parallel execution
 
 | Use case | Summary |
 |---|---|
-| [Configure fan-in (join) behavior](fan-in-join/) | Configure how the workflow continues after parallel steps complete so that I can handle different co |
+| [Configure fan-in (join) behavior](fan-in-join/) | Configure how the workflow continues after parallel steps complete so that I can handle different completion scenarios. |
 | [Create a parallel step group](parallel-group/) | Configure multiple steps to run in parallel so that independent tasks don't block each other. |
 | [Access results from parallel branches](parallel-results/) | Use the output of all parallel steps in subsequent steps so that I can combine results. |
 
@@ -82,7 +82,7 @@ The workflow builder is the heart of the platform. It is what differentiates Axi
 |---|---|
 | [Bulk export all workflows](bulk-export/) | Export all workflows as a ZIP archive so that I have a complete backup. |
 | [Export a workflow as JSON](export-json/) | Export a workflow as a JSON file so that I can back it up or share it with another team. |
-| [Import a workflow from JSON](import-json/) | Import a workflow from a JSON file so that I can quickly set up a workflow that someone else designe |
+| [Import a workflow from JSON](import-json/) | Import a workflow from a JSON file so that I can quickly set up a workflow that someone else designed. |
 
 
 
@@ -148,7 +148,7 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend** | ⚠️ mostly ✅ | CRUD/publish/import/export ✅; plan limits 402 ✅ (platform-foundation subscription plans). **Engine-owned:** triggers (cron/webhook/event), step execution, parallel/join — tracked in [workflow-engine](../workflow-engine/README.md#open-work-agents). **API polish:** list filters (last execution date), import transactional rollback — [import-export](./README.md). |
+| **Backend** | ⚠️ mostly ✅ | CRUD/publish/import/export ✅; plan limits 402 ✅ (platform-foundation subscription plans). **Engine-owned:** triggers (cron/webhook/event), step execution, parallel/join — tracked in [workflow-engine](../workflow-engine/README.md#open-work-agents). **API polish:** list filters (last execution date), import transactional rollback — [import-json](./import-json/), [export-json](./export-json/). |
 | **Frontend** | ⏳ | Visual canvas, step config panels, trigger UI — every organization-management–import-export US. |
 
 Do not re-implement plan limits here; update stale “pending platform-foundation subscription plans” lines if you see them in feature callouts.

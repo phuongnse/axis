@@ -58,7 +58,7 @@ Each field in a model has a type that determines what data it stores, how it's v
 > | API | ⏳ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** server-side per-field validation on record create/update is in Application handlers but HTTP 422 structured errors backend polish — see gaps below.
+> **Gaps vs spec:** server-side per-field validation on record create/update is in Application handlers but HTTP 422 structured errors pending.
 
 ## Wireframes
 

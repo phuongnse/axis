@@ -78,14 +78,29 @@ GROUPS: dict[str, list[tuple[str, object]]] = {
 }
 
 
+SUMMARY_MAX = 120
+
+
+def _truncate_at_word(text: str, limit: int) -> str:
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    # Trim back to last whole-word boundary so we never split mid-token.
+    last_space = cut.rfind(" ")
+    if last_space > limit // 2:
+        cut = cut[:last_space]
+    return cut.rstrip(" ,.;:") + "…"
+
+
 def summary_for(readme: Path) -> str:
     text = readme.read_text(encoding="utf-8")
     title = text.splitlines()[0].removeprefix("# Use case — ").strip()
     short = readme.parent.name
     m = re.search(r"^## Purpose\n\n(.+)$", text, re.MULTILINE)
-    desc = (m.group(1).strip() if m else title)[:100]
+    desc = (m.group(1).strip() if m else title)
     if desc.startswith("_("):
         desc = title
+    desc = _truncate_at_word(desc, SUMMARY_MAX)
     return f"| [{title}]({short}/) | {desc} |"
 
 

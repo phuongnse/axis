@@ -4,25 +4,28 @@
 
 ## Purpose
 
-_(One sentence about user value.)_.
+Switch the application language between English and Vietnamese so that I can read and operate the app in my preferred language.
 
 ## Primary actor
 
-- _(Actor)_
+- Authenticated user
 
 ## Trigger
 
-- _(What starts the use case.)_
+- User opens the language selector in the header (or settings) and picks a language.
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. User opens the language selector.
+2. User selects `English` or `Vietnamese`.
+3. App updates visible UI text immediately without a full reload.
+4. App persists the selected locale and reuses it on next load.
 
 ## Alternate / error flows
 
-- Validation failures and edge cases in Acceptance Criteria.
+- Locale resource key missing in the chosen language → app falls back to English for that key.
+- Locale preference storage unavailable or corrupted → app defaults to English and remains usable.
+- User is filling a form while switching locale → form input values remain unchanged.
 
 ## Context
 

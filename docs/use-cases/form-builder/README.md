@@ -37,9 +37,9 @@ Forms are the primary mechanism for human interaction within a workflow. Without
 
 | Use case | Summary |
 |---|---|
-| [Link a form to a workflow Form step](link-form-step/) | Select a form when configuring a Form step so that the right form is presented to the assignee durin |
-| [Map form submission data into workflow context](map-submission-context/) | The data submitted in a form to be available to subsequent steps so that the rest of the process can |
-| [Pre-populate form fields from execution context](prepopulate-fields/) | Pre-populate form fields with values from the workflow context so that assignees don't re-enter data |
+| [Link a form to a workflow Form step](link-form-step/) | Select a form when configuring a Form step so that the right form is presented to the assignee during execution. |
+| [Map form submission data into workflow context](map-submission-context/) | The data submitted in a form to be available to subsequent steps so that the rest of the process can use it. |
+| [Pre-populate form fields from execution context](prepopulate-fields/) | Pre-populate form fields with values from the workflow context so that assignees don't re-enter data that's already… |
 
 ### Submission & tasks
 
@@ -122,9 +122,9 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend** | ⚠️ | [form-submission](./README.md): notification on assign; expiry → execution failure (workflow-engine); role-based My Tasks aggregation. Token submit + My Tasks API shipped. |
+| **Backend** | ⚠️ | [submit-assigned-form](./submit-assigned-form/), [assignment-notify](./assignment-notify/), [pending-tasks](./pending-tasks/): notification on assign; expiry → execution failure (workflow-engine); role-based My Tasks aggregation. Token submit + My Tasks API ✅. |
 | **Frontend** | ⏳ | Form editor, field picker, standalone submit page, My Tasks — all tenant-registration–subscription-plans US. |
-| **Cross-module** | workflow-engine | Form step execution, context expressions, `FormStepReached` consumer path — coordinate with workflow-engine. **platform-foundation organization management [organization deletion](./README.md):** `OrganizationFormTaskCanceller` cancels pending form tasks before org hard-delete (Identity-owned job). |
+| **Cross-module** | workflow-engine | Form step execution, context expressions, `FormStepReached` consumer path — coordinate with workflow-engine. **platform-foundation [delete-org](../platform-foundation/delete-org/):** `OrganizationFormTaskCanceller` cancels pending form tasks before org hard-delete (Identity-owned job). |
 
 ---
 

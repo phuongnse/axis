@@ -56,7 +56,7 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 >
 > **Gaps vs spec:**
 > - context namespacing by step ID and sibling-output blocking pending workflow-engine
-> - design-time duplicate output warning backend polish — see gaps below.
+> - design-time duplicate output warning pending.
 
 ## Wireframes
 

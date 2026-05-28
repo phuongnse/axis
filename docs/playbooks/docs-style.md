@@ -52,12 +52,13 @@ Every `docs/use-cases/<domain>/<short-slug>/README.md` file uses these layouts s
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| login | [source](./wireframes/login.excalidraw) | [preview](./wireframes/login.svg) |
-| shared-editor | [source](../wireframes/workflow-editor.excalidraw) | [preview](../wireframes/workflow-editor.svg) |
+| login | [source](./login.excalidraw) | [preview](./login.svg) |
+| shared-app-shell | [source](../../../wireframes/app-shell.excalidraw) | [preview](../../../wireframes/app-shell.svg) |
 ```
 
-- Put screens **only used by this use case** under `<short-slug>/wireframes/`.
-- Reference **shared domain screens** with `../wireframes/` (do not copy duplicates).
+- Put screens **only used by this use case** **flat** inside the use-case folder (next to `README.md`).
+- Reference **shared kit screens** (e.g. `app-shell`, `_template`) from `../../../wireframes/` — do not copy duplicates.
+- Use `N/A` rows when no wireframe applies.
 - One table per `README.md` — no blockquote wireframe stacks.
 
 ### Implementation status (after each US AC block)

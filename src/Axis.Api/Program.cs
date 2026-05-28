@@ -315,7 +315,7 @@ try
             opts.UseReferenceRefreshTokens();
 
             // Ephemeral keys for development. Production should use
-            // .AddEncryptionCertificate / .AddSigningCertificate from Azure Key Vault.
+            // .AddEncryptionCertificate() / .AddSigningCertificate() from Azure Key Vault.
             opts.AddEphemeralEncryptionKey()
                 .AddEphemeralSigningKey();
 

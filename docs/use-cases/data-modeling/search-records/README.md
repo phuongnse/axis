@@ -58,9 +58,11 @@ Users can create, read, update, and delete records against any model. Records ar
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:**
-> - filter-state URL persistence is a frontend concern (query params round-tripped via `?filter=field:op:value`)
-> - filter on a deleted field falls back gracefully (RecordFilter.TryParse validates field name format, unknown fields simply match no JSONB data). A filter on a deleted field currently returns 0 results rather than showing a warning toast — that warning is a frontend concern.
+> **Gaps vs spec:** none for backend on this use case — filter-state URL persistence and the deleted-field warning toast are frontend concerns.
+>
+> **Done:**
+> - Filter params are round-tripped via `?filter=field:op:value` query params (URL-shareable).
+> - `RecordFilter.TryParse` validates field name format; unknown fields simply match no JSONB data, so a filter on a deleted field returns 0 results (warning toast pending Frontend).
 >
 > **Decisions:**
 > - per-field filters encoded as repeated `?filter=field:op:value` query params (URL-shareable)

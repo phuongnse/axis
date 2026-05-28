@@ -110,7 +110,7 @@ internal sealed class ExecutionConfiguration : IEntityTypeConfiguration<Workflow
             // same step row raises DbUpdateConcurrencyException, translated to
             // ConcurrencyException by UnitOfWork. No migration needed — xmin is a built-in
             // PostgreSQL system column present on every row.
-            // UseXminAsConcurrencyToken is not defined for OwnedNavigationBuilder, so
+            // UseXminAsConcurrencyToken() is not defined for OwnedNavigationBuilder, so
             // the equivalent is configured manually here.
             stepBuilder.Property<uint>("xmin")
                 .HasColumnName("xmin")

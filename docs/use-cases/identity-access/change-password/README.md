@@ -58,7 +58,7 @@ Allow users to reset forgotten passwords, change their current password, and man
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** failed-attempt lockout for change-password form (3 attempts / 15 min) backend polish — see gaps below. Revoking other-device sessions after change backend polish — see gaps below (OpenIddict token revocation).
+> **Gaps vs spec:** failed-attempt lockout for change-password form (3 attempts / 15 min) pending. Revoking other-device sessions after change pending (OpenIddict token revocation).
 >
 > **Decisions:** notification email failure is swallowed at handler level and logged separately at Infrastructure — password change still succeeds per [password-security](../README.md) acceptance criteria.
 

@@ -81,7 +81,7 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 
 **When blocked:** state blocker → cite constraint → 2–3 options → wait. Never self-unblock on P0.
 
-**Source of truth (highest first):** feature file ACs → this file → playbooks → same-module code → agent guess (never invent IDs, events, endpoints, table names).
+**Source of truth (highest first):** use-case file ACs → this file → playbooks → same-module code → agent guess (never invent IDs, events, endpoints, table names).
 
 **Integrity:** legacy code ≠ authority if it conflicts with docs; surface conflicts. Verify with grep before claiming "done". Document deferrals in callouts (`**Deferred (PR #N follow-up):**`), not as ✅ — **proactively**, without waiting for the user to ask ([process.md § Deferred follow-up](docs/playbooks/process.md)).
 

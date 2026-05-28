@@ -37,7 +37,7 @@ Custom data modeling is the core differentiator of Axis. Without it, the platfor
 | Use case | Summary |
 |---|---|
 | [Create a data class](create-data-class/) | Create a data class so that I can define a reusable nested object structure. |
-| [Use a data class as a field in a model](data-class-field/) | Use a data class as a field type in a model so that I can embed structured nested objects without du |
+| [Use a data class as a field in a model](data-class-field/) | Use a data class as a field type in a model so that I can embed structured nested objects without duplicating field… |
 | [Delete a data class](delete-data-class/) | Delete a data class |
 | [Edit a data class](edit-data-class/) | Edit a data class so that I can add or remove fields as requirements change. |
 
@@ -126,7 +126,7 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend** | ⚠️ polish | HTTP 422/409 on records ([data-records](./README.md)); relation display-field resolution; model plan limits **not in subscription-plans** (spec mentions 402 — product decision). 30-day purge jobs deferred. |
+| **Backend** | ⚠️ polish | HTTP 422/409 on records ([create-record](./create-record/), [edit-record](./edit-record/)); relation display-field resolution; model plan limits **not in subscription-plans** (spec mentions 402 — product decision). 30-day purge jobs deferred. |
 | **Frontend** | ⏳ | Model/record UI, filters, data-class sub-forms — all US callouts mark Frontend ⏳. |
 
 Module API is largely ✅; grep `API: ⏳` in linked use-case files only when adding endpoints.

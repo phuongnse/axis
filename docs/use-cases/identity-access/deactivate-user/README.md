@@ -59,7 +59,7 @@ Organization admins can invite new members, manage their accounts, and deactivat
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** session revocation (refresh token revoke + access token blacklist) not implemented — auth infrastructure polish — see gaps below. Self-deactivation guard and 403 check require current user identity from JWT — backend polish — see gaps below. Deactivated-user sign-in message handled at auth layer (pending).
+> **Gaps vs spec:** session revocation (refresh token revoke + access token blacklist) not implemented — auth infrastructure polish pending. Self-deactivation guard and 403 check require current user identity from JWT — pending. Deactivated-user sign-in message handled at auth layer (pending).
 >
 > **Decisions:** "last admin" check queries `CountAdminsAsync` in the repository before deactivating — domain enforces via `ApplicationException` if violated.
 

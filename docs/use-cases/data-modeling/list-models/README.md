@@ -56,9 +56,9 @@ Users can create custom data models within their organization. A model defines t
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:**
-> - record count column pending denormalized counter or API-layer aggregation
-> - field count is derived from Fields.Count at query time.
+> **Gaps vs spec:** record count column pending denormalized counter or API-layer aggregation.
+>
+> **Done:** field count is derived from `Fields.Count` at query time.
 
 ## Wireframes
 

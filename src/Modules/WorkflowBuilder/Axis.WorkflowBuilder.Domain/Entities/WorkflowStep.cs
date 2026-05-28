@@ -40,7 +40,7 @@ public sealed class WorkflowStep : Entity<Guid>
     {
         if (Type != StepType.Form || Config is null) return null;
         if (!Config.TryGetValue("formId", out object? raw) || raw is null) return null;
-        // raw is JsonElement when read back from JSONB; JsonElement.ToString returns the unquoted string value.
+        // raw is JsonElement when read back from JSONB; JsonElement.ToString() returns the unquoted string value.
         if (!Guid.TryParse(raw.ToString(), out Guid id) || id == Guid.Empty)
             return null;
 

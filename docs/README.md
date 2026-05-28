@@ -72,7 +72,12 @@ Excalidraw wireframes/diagrams live alongside each use case in `docs/use-cases/{
 
 | Screen | Source | Preview |
 |---|---|---|
-| Login | N/A | N/A |
+| Register organization | [register-org.excalidraw](./use-cases/platform-foundation/register-org/register-org.excalidraw) | [register-org.svg](./use-cases/platform-foundation/register-org/register-org.svg) |
+| Verify email | [verify-email.excalidraw](./use-cases/platform-foundation/verify-email/verify-email.excalidraw) | [verify-email.svg](./use-cases/platform-foundation/verify-email/verify-email.svg) |
+| Pricing | [pricing.excalidraw](./use-cases/platform-foundation/view-plans/pricing.excalidraw) | [pricing.svg](./use-cases/platform-foundation/view-plans/pricing.svg) |
+| Change password | [change-password.excalidraw](./use-cases/identity-access/change-password/change-password.excalidraw) | [change-password.svg](./use-cases/identity-access/change-password/change-password.svg) |
+| Reset password | [forgot-password.excalidraw](./use-cases/identity-access/reset-password/forgot-password.excalidraw) | [forgot-password.svg](./use-cases/identity-access/reset-password/forgot-password.svg) |
+| Accept invitation | [accept-invitation.excalidraw](./use-cases/identity-access/accept-invite/accept-invitation.excalidraw) | [accept-invitation.svg](./use-cases/identity-access/accept-invite/accept-invitation.svg) |
 
 ---
 

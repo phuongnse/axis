@@ -1825,32 +1825,35 @@ npm run test    # vitest run — all tests must pass
 
 Wireframes use Excalidraw (`.excalidraw` JSON). Both files — source and SVG preview — are committed.
 
-**File location:**
-```
-docs/use-cases/
-├── docs/wireframes/       ← kit template, app-shell
-├── identity-access/wireframes/
-│   ├── login.excalidraw        ← source (JSON, diffable on GitHub)
-│   └── login.svg               ← rendered preview (vector, renders inline on GitHub)
-├── workflow-builder/wireframes/
-│   └── workflow-editor.excalidraw
-└── <domain>/<use-case>/
-    ├── README.md
-    ├── workflow-editor.excalidraw
-    └── workflow-editor.svg
-```
+**File location:** assets sit **flat** inside each use-case folder. The shared kit (`app-shell`, `_template`) stays under top-level `docs/wireframes/`.
 
-Shared kit screens live under `docs/wireframes/`; use-case-specific assets can live directly in `docs/use-cases/{domain}/{use-case}/`.
+```
+docs/
+├── wireframes/                          ← shared kit (app-shell, _template)
+│   ├── app-shell.excalidraw
+│   └── app-shell.svg
+└── use-cases/
+    └── <domain>/<use-case>/
+        ├── README.md
+        ├── <screen>.excalidraw          ← source (JSON, diffable)
+        └── <screen>.svg                 ← preview (vector, renders on GitHub)
+```
 
 **Naming:** screen slug in kebab-case matching the primary route segment — `login`, `data-models`, `workflow-detail`.
 
-**One wireframe per screen.** Multiple user stories on the same screen share one wireframe file.
+**One wireframe per screen.** Multiple use cases on the same screen reference the same wireframe file.
 
-**Linking from a use-case file** — add directly after the feature title, before the first user story:
+**Linking from a use-case file** — fill the `## Wireframes` table at the bottom of the use case (see [USE_CASE_TEMPLATE.md](../use-cases/USE_CASE_TEMPLATE.md)). Use relative paths next to `README.md`:
 
 ```markdown
-> **Wireframe**: [docs/use-cases/identity-access/sign-in/auth-flow.excalidraw](../../use-cases/identity-access/sign-in/auth-flow.excalidraw) · [preview](../../use-cases/identity-access/sign-in/auth-flow.svg)
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| login | [source](./login.excalidraw) | [preview](./login.svg) |
 ```
+
+Reference shared kit screens from `../../../wireframes/` (do not duplicate).
 
 **Excalidraw settings** for consistent sketch aesthetic:
 - `roughness: 1` on all shapes

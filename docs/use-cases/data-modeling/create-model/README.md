@@ -57,9 +57,9 @@ Users can create custom data models within their organization. A model defines t
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:**
-> - model plan-limit check (HTTP 402) pending billing layer (platform-foundation subscription plans)
-> - name format validation enforced in Application handler.
+> **Gaps vs spec:** model plan-limit check (HTTP 402) pending billing layer (platform-foundation subscription plans).
+>
+> **Done:** name format validation enforced in Application handler.
 >
 > **Decisions:** system fields (id, created_at, updated_at) injected by domain factory; atomicity guaranteed by UnitOfWork.
 

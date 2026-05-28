@@ -54,7 +54,7 @@ Organization admins can create custom roles, assign permissions to each role, an
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** member count per role requires a JOIN query — not implemented yet (query projection polish — see gaps below). UI badges and detail view are frontend concerns.
+> **Gaps vs spec:** member count per role requires a JOIN query — not implemented yet (query projection pending). UI badges and detail view are frontend concerns.
 
 ## Wireframes
 

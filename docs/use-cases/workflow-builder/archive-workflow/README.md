@@ -57,7 +57,7 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 >
 > **Gaps vs spec:**
 > - trigger deactivation on archive pending workflow-engine integration
-> - HTTP 422 on archived-workflow trigger backend polish — see gaps below.
+> - HTTP 422 on archived-workflow trigger pending.
 
 ## Wireframes
 

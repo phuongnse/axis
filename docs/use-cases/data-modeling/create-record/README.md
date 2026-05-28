@@ -61,7 +61,7 @@ Users can create, read, update, and delete records against any model. Records ar
 >
 > **Gaps vs spec:**
 > - File field pre-upload step pending file storage service
-> - Relation field existence check backend polish — see gaps below.
+> - Relation field existence check pending.
 >
 > Diagram pending: entity name `Record` → `DataRecord` in data-model diagram (`dataModelDiagram()` in `generate-diagrams.mjs`) — `Record` is a C# keyword and conflicts with the language reserved word.
 >

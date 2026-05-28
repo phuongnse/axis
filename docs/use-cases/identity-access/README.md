@@ -29,7 +29,7 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 | [View and revoke active sessions](sessions/) | See where I'm currently signed in so that I can revoke access from devices I no longer use. |
 | [Sign in with email and password](sign-in/) | Sign in with my email and password so that I can access my organization's workspace. |
 | [Sign out](sign-out/) | Sign out so that my session is terminated and no one else can use my account from this device. |
-| [Silent token refresh](token-refresh/) | My session to stay active while I'm working so that I'm not interrupted by unexpected sign-out promp |
+| [Silent token refresh](token-refresh/) | My session to stay active while I'm working so that I'm not interrupted by unexpected sign-out prompts. |
 
 ### Users & invitations
 
@@ -44,12 +44,12 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 
 | Use case | Summary |
 |---|---|
-| [Permission enforcement on the API](api-permissions/) | Every API endpoint to enforce the required permission so that unauthorized actions are rejected at t |
+| [Permission enforcement on the API](api-permissions/) | Every API endpoint to enforce the required permission so that unauthorized actions are rejected at the server… |
 | [Assign a role to a user](assign-role/) | Assign a role to a user so that they get the appropriate permissions. |
-| [Create a custom role](create-role/) | Create a custom role with specific permissions so that I can grant exactly the right level of access |
+| [Create a custom role](create-role/) | Create a custom role with specific permissions so that I can grant exactly the right level of access to a group of… |
 | [Edit a custom role](edit-role/) | Edit an existing custom role so that I can adjust permissions as our needs change. |
 | [View and manage roles](list-roles/) | See all roles in my organization so that I can understand who has what level of access. |
-| [Permission enforcement in the frontend](ui-permissions/) | The UI to hide or disable features I don't have access to so that I'm not confused by actions that w |
+| [Permission enforcement in the frontend](ui-permissions/) | The UI to hide or disable features I don't have access to so that I'm not confused by actions that will fail. |
 
 ### Localization & theming
 
@@ -105,7 +105,7 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 **Key implementation decisions:**
 - Identity uses the global `public` PostgreSQL schema (not a tenant schema) — registration has no tenant context and email uniqueness is platform-wide.
 - Passwords are hashed with BCrypt (work factor 12) via `IPasswordHasher`. The hash is stored as a first-class property on `User` (`PasswordHash`), not a shadow property.
-- The 4 default system roles (Admin, Editor, Viewer, End User) and their full permission sets are seeded automatically by `RegisterOrganizationHandler` — see [permissions](./README.md) for the permission catalogue.
+- The 4 default system roles (Admin, Editor, Viewer, End User) and their full permission sets are seeded automatically by `RegisterOrganizationHandler` — see [api-permissions](./api-permissions/) and [ui-permissions](./ui-permissions/) for the permission catalogue.
 - **OpenIddict implementation**: OpenIddict 5.x serves as the in-process OAuth2/OIDC authorization server (ADR-004). Authorization Code + PKCE for the SPA; Client Credentials for M2M. Refresh tokens are stored as opaque reference tokens in the OpenIddict `OpenIddictTokens` table and delivered via httpOnly cookie. Access token JTIs are blacklisted in Redis on sign-out. Ephemeral signing/encryption keys are used in development; production should use Azure Key Vault certificates.
 - **gRPC (dev):** manual `GetUserPermissions` checks — [patterns.md § gRPC dev verification](../../playbooks/patterns.md#dev--verify-getuserpermissions-with-grpcurl).
 - **Known gap (user deactivation)**: Revoking all refresh tokens is immediate, but existing access tokens remain valid up to 15 minutes. Full compliance would require a Redis user-level blacklist (not implemented in MVP).
@@ -116,8 +116,8 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend** | ⚠️ polish | [password-security](./README.md): reset/change-password rate limits, session list API wiring. [permissions](./README.md): `[RequirePermission]` policy tests. [user-management](./README.md): block admin self-invite at API. |
-| **Frontend** | ⏳ | Register, settings, invitation accept, session management UI, and localization/theming foundation — see per–use-case callouts in [authentication](./README.md) through [localization-and-theming](./README.md). |
+| **Backend** | ⚠️ polish | [reset-password](./reset-password/), [change-password](./change-password/), [sessions](./sessions/): rate limits, session list API wiring. [api-permissions](./api-permissions/): `[RequirePermission]` / policy tests. [invite-user](./invite-user/): block admin self-invite at API. |
+| **Frontend** | ⏳ | Register, settings, invitation accept, session management UI, and localization/theming foundation — see per–use-case callouts in [sign-in](./sign-in/), [accept-invite](./accept-invite/), [sessions](./sessions/), [language](./language/), [theme](./theme/). |
 
 Core auth/OIDC/RBAC backend is ✅; use feature **Gaps vs spec** for the next use case, not domain-level checkboxes.
 

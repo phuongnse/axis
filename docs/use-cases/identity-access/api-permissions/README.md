@@ -57,7 +57,7 @@ A resource-based permission system where each permission grants the ability to p
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** policy-based authorization middleware, `[RequirePermission]` attribute, and automated permission tests backend polish — see gaps below.
+> **Gaps vs spec:** policy-based authorization middleware, `[RequirePermission]` attribute, and automated permission tests pending.
 >
 > **Decisions:**
 > - permissions are included as a flat array in JWT claims at sign-in time (union of all role permissions)

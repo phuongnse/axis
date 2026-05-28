@@ -14,7 +14,7 @@ public static class WolverineKafkaAvroExtensions
 
     /// <summary>
     /// Registers Schema Registry client, CloudEvents envelope rules, and optional Kafka Avro transport.
-    /// When <paramref name="useKafkaTransport"/> is false (e.g. Testing), callers should route events with <c>.Locally</c>.
+    /// When <paramref name="useKafkaTransport"/> is false (e.g. Testing), callers should route events with <c>.Locally()</c>.
     /// </summary>
     public static WolverineOptions UseAxisKafkaAvro(
         this WolverineOptions opts,

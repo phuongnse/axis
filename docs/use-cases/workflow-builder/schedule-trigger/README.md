@@ -61,7 +61,7 @@ A workflow must have at least one trigger before it can be published. Triggers d
 >
 > **Gaps vs spec:**
 > - Wolverine cron job registration on publish and deregistration on archive pending workflow-engine
-> - cron expression validation (min 5-min interval, IANA timezone) backend polish — see gaps below.
+> - cron expression validation (min 5-min interval, IANA timezone) pending.
 
 ## Wireframes
 

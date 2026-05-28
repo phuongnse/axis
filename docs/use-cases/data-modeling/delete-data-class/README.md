@@ -4,15 +4,15 @@
 
 ## Purpose
 
-_(One sentence about user value.)_.
+Delete a data class that is no longer used by any model so that I can keep the type catalogue tidy.
 
 ## Primary actor
 
-- _(Actor)_
+- Organization member with `data_modeling:model:delete`
 
 ## Trigger
 
-- _(What starts the use case.)_
+- User initiates: delete a data class from the data class list or detail page.
 
 ## Main flow
 
@@ -56,9 +56,11 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:**
-> - HTTP 409 on delete-while-referenced enforced in Application handler
-> - reference check uses PostgreSQL JSONB `@>` containment query.
+> **Gaps vs spec:** none for backend on this use case.
+>
+> **Done:**
+> - HTTP 409 on delete-while-referenced enforced in Application handler.
+> - Reference check uses PostgreSQL JSONB `@>` containment query.
 >
 > **Decisions:** `IsReferencedByAnyModelAsync` uses raw SQL `fields @> {0}::jsonb` to query nested JSON without loading all models into memory.
 

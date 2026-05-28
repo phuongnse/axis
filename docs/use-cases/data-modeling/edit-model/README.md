@@ -59,7 +59,7 @@ Users can create custom data models within their organization. A model defines t
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:**
-> - HTTP 409 version-conflict check backend polish — see gaps below (updated_at comparison)
+> - HTTP 409 version-conflict check pending (updated_at comparison)
 > - active-workflow warning pending workflow-builder integration.
 
 ## Wireframes

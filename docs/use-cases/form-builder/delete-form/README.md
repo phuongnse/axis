@@ -55,9 +55,9 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:**
-> - HTTP 409 on delete-while-referenced enforced via `IsReferencedByWorkflowAsync` JSONB query across `workflow_definitions.steps`
-> - archived-workflow exception backend polish — see gaps below.
+> **Gaps vs spec:** archived-workflow exception pending.
+>
+> **Done:** HTTP 409 on delete-while-referenced enforced via `IsReferencedByWorkflowAsync` JSONB query across `workflow_definitions.steps`.
 >
 > **Decisions:** `IsReferencedByWorkflowAsync` uses raw SQL `workflow_definitions.steps @> [{...}]::jsonb` — cross-module table query within the same tenant schema.
 

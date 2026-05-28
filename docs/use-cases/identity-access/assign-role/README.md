@@ -56,7 +56,9 @@ Organization admins can create custom roles, assign permissions to each role, an
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** 403 check backend polish — see gaps below. "At least one role" guard and "last admin" guard both implemented in handler.
+> **Gaps vs spec:** 403 check pending.
+>
+> **Done:** "At least one role" guard and "last admin" guard both implemented in handler.
 >
 > **Decisions:** roles stored as `List<Guid>` (`_roleIds`) on `User` aggregate — effective permissions are the union of all assigned roles' permission lists, computed at token issuance time (pending auth layer).
 

@@ -61,7 +61,7 @@ Form fields define what data the form collects. Each field has a type, label, he
 > **Gaps vs spec:**
 > - no `UpdateFieldValidationCommand` handler — field validation config is part of `AddFieldToForm` (set on creation only)
 > - client-side validation (React Hook Form + Zod) pending Frontend
-> - HTTP 422 structured errors backend polish — see gaps below.
+> - HTTP 422 structured errors pending.
 
 ## Wireframes
 

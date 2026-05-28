@@ -56,7 +56,7 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:**
-> - status-tab filter and last-execution-date column backend polish — see gaps below
+> - status-tab filter and last-execution-date column pending
 > - execution date requires WorkflowEngine integration.
 
 ## Wireframes

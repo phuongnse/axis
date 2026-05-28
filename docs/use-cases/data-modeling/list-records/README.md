@@ -59,7 +59,7 @@ Users can create, read, update, and delete records against any model. Records ar
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** Relation display-field resolution (showing target record's display_field value instead of raw UUID) backend polish — see gaps below.
+> **Gaps vs spec:** Relation display-field resolution (showing target record's display_field value instead of raw UUID) pending.
 
 ## Wireframes
 

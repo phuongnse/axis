@@ -24,8 +24,8 @@ Without this foundation, nothing else works. Every feature in every other domain
 
 | Use case | Summary |
 |---|---|
-| [Select a subscription plan during registration](plan-at-signup/) | Choose a subscription plan during registration so that I know what features and limits I have access |
-| [Automatic tenant provisioning](provision-tenant/) | My organization's environment to be ready immediately after email verification so that I can start u |
+| [Select a subscription plan during registration](plan-at-signup/) | Choose a subscription plan during registration so that I know what features and limits I have access to. |
+| [Automatic tenant provisioning](provision-tenant/) | My organization's environment to be ready immediately after email verification so that I can start using the platform… |
 | [Register a new organization](register-org/) | Register my organization on the Axis platform so that I can start building workflows for my team. |
 | [Verify email and activate account](verify-email/) | Verify my email address so that my account is activated and I can access the platform. |
 
@@ -33,8 +33,8 @@ Without this foundation, nothing else works. Every feature in every other domain
 
 | Use case | Summary |
 |---|---|
-| [Change organization plan (admin override)](admin-change-plan/) | Manually change an organization's plan so that I can support early customers and testing without a b |
-| [Enforce plan limits at the API](enforce-limits/) | Enforce subscription plan limits at the API so that organizations cannot exceed their subscription w |
+| [Change organization plan (admin override)](admin-change-plan/) | Manually change an organization's plan so that I can support early customers and testing without a billing integration. |
+| [Enforce plan limits at the API](enforce-limits/) | Enforce subscription plan limits at the API so that organizations cannot exceed their subscription without upgrading. |
 | [View available plans](view-plans/) | Compare available subscription plans so that I can choose the one that fits my needs. |
 
 ### Organization settings
@@ -49,8 +49,8 @@ Without this foundation, nothing else works. Every feature in every other domain
 
 | Use case | Summary |
 |---|---|
-| [Tenant resolution from JWT](tenant-from-jwt/) | Resolve the active tenant from the JWT on every request so that downstream code never needs to think |
-| [Automatic tenant scoping on every request](tenant-scope/) | Every database query to be automatically scoped to the requesting tenant so that data isolation is e |
+| [Tenant resolution from JWT](tenant-from-jwt/) | Resolve the active tenant from the JWT on every request so that downstream code never needs to think about tenant… |
+| [Automatic tenant scoping on every request](tenant-scope/) | Every database query to be automatically scoped to the requesting tenant so that data isolation is enforced at the… |
 
 
 

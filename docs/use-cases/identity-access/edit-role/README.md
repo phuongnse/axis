@@ -57,7 +57,9 @@ Organization admins can create custom roles, assign permissions to each role, an
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** system role guard (cannot edit Admin/Editor/Viewer/End User) implemented in domain via `IsSystem` flag. 403 check backend polish — see gaps below.
+> **Gaps vs spec:** 403 check pending.
+>
+> **Done:** system role guard (cannot edit Admin/Editor/Viewer/End User) implemented in domain via `IsSystem` flag.
 
 ## Wireframes
 

@@ -63,7 +63,7 @@ Allow users to reset forgotten passwords, change their current password, and man
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** rate limiting (max 3 requests/hour) is an API/Infrastructure concern — backend polish — see gaps below. Auto sign-in after reset backend polish — see gaps below.
+> **Gaps vs spec:** rate limiting (max 3 requests/hour) is an API/Infrastructure concern — pending. Auto sign-in after reset pending.
 >
 > **Decisions:**
 > - reset token is a cryptographically random 32-byte value

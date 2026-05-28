@@ -4,25 +4,28 @@
 
 ## Purpose
 
-_(One sentence about user value.)_.
+Switch the visual theme between light, dark, and system so that I can choose a comfortable theme and preserve readable contrast.
 
 ## Primary actor
 
-- _(Actor)_
+- Authenticated user
 
 ## Trigger
 
-- _(What starts the use case.)_
+- User opens the theme selector in the header (or settings) and picks a mode.
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. User opens the theme selector.
+2. User selects `light`, `dark`, or `system`.
+3. App updates the active theme immediately without a full reload.
+4. App persists the selected mode and applies it on next load (resolving `system` from the OS preference).
 
 ## Alternate / error flows
 
-- Validation failures and edge cases in Acceptance Criteria.
+- Selected mode is `system` → app resolves the active theme from OS `prefers-color-scheme`.
+- Theme preference storage unavailable or corrupted → app defaults to `system`.
+- Theme changes during usage → app keeps the current route and in-progress interaction.
 
 ## Context
 

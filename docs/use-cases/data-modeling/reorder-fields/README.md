@@ -55,7 +55,9 @@ Each field in a model has a type that determines what data it stores, how it's v
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** drag-drop reorder UX and immediate-save endpoint pending Frontend layer; `displayOrder` persisted in JSONB field list.
+> **Gaps vs spec:** drag-drop reorder UX and immediate-save endpoint pending Frontend layer.
+>
+> **Done:** `displayOrder` persisted in JSONB field list at Application + Infrastructure.
 
 ## Wireframes
 

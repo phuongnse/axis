@@ -32,9 +32,9 @@ A workflow builder without an execution engine is just a drawing tool. This doma
 
 | Use case | Summary |
 |---|---|
-| [View execution detail and step timeline](execution-detail/) | See the full detail of a specific execution so that I can understand exactly what happened at each s |
+| [View execution detail and step timeline](execution-detail/) | See the full detail of a specific execution so that I can understand exactly what happened at each step. |
 | [View org-wide execution history](org-execution-history/) | See all executions across all workflows so that I have a global overview of automation activity. |
-| [View execution history for a workflow](workflow-history/) | See the execution history for a specific workflow so that I can monitor its performance and identify |
+| [View execution history for a workflow](workflow-history/) | See the execution history for a specific workflow so that I can monitor its performance and identify patterns. |
 
 ### Errors & notifications
 
@@ -48,15 +48,15 @@ A workflow builder without an execution engine is just a drawing tool. This doma
 
 | Use case | Summary |
 |---|---|
-| [Retry a failed execution](retry-execution/) | Retry a failed execution from the point of failure so that I don't have to re-run steps that already |
+| [Retry a failed execution](retry-execution/) | Retry a failed execution from the point of failure so that I don't have to re-run steps that already succeeded. |
 | [View retry history](retry-history/) | See the retry history of a failed execution so that I can track how many times it has been retried. |
-| [Retry with modified input context](retry-with-context/) | Modify the execution context before retrying so that I can fix data errors that caused the original  |
+| [Retry with modified input context](retry-with-context/) | Modify the execution context before retrying so that I can fix data errors that caused the original failure. |
 
 ### Step handlers
 
 | Use case | Summary |
 |---|---|
-| [Step execution is isolated and resilient](isolated-steps/) | Run each step handler in isolation so that a failure in one step does not crash the engine or affect |
+| [Step execution is isolated and resilient](isolated-steps/) | Run each step handler in isolation so that a failure in one step does not crash the engine or affect other executions. |
 
 
 
@@ -135,9 +135,9 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend — high** | ⚠️ | [execution-management](./README.md): schedule/webhook/event triggers, stale-PENDING recovery. [error-handling](./README.md): notification dispatch, `GetExecution` error detail, channel config. [isolated-steps](./isolated-steps/): real `IScriptExecutor` / `INotificationSender` (stubs today). |
-| **Backend — medium** | ⚠️ | [execution-history](./README.md): date/trigger filters, CSV export, role-scoped list. Cancel: abandon Wolverine jobs + cancel form tasks. **[Organization deletion](../platform-foundation/README.md):** `OrganizationExecutionCanceller` cancels Pending/Running executions before org hard-delete (`FixedTenantContext`). |
-| **Frontend** | ⏳ | Execution monitor, retry UI, SignalR live updates — see [execution-management](./README.md) and related use-case callouts. |
+| **Backend — high** | ⚠️ | [start-execution](./start-execution/), [track-execution](./track-execution/): schedule/webhook/event triggers, stale-PENDING recovery. [error-detail](./error-detail/), [failure-notify](./failure-notify/), [error-channels](./error-channels/): notification dispatch, `GetExecution` error detail, channel config. [isolated-steps](./isolated-steps/): real `IScriptExecutor` / `INotificationSender` (stubs today). |
+| **Backend — medium** | ⚠️ | [workflow-history](./workflow-history/), [org-execution-history](./org-execution-history/): date/trigger filters, CSV export, role-scoped list. [cancel-execution](./cancel-execution/): abandon Wolverine jobs + cancel form tasks. **[delete-org](../platform-foundation/delete-org/):** `OrganizationExecutionCanceller` cancels Pending/Running executions before org hard-delete (`FixedTenantContext`). |
+| **Frontend** | ⏳ | Execution monitor, retry UI, SignalR live updates — see [start-execution](./start-execution/), [track-execution](./track-execution/), [retry-execution](./retry-execution/) callouts. |
 
 Start here when workflow-builder “pending workflow-engine” items block runtime behavior; feature callouts list exact use-case gaps.
 
