@@ -84,7 +84,7 @@ Define user-facing localization and visual theme behavior for the SPA so each us
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| login | [source](./login.excalidraw) | [preview](./login.svg) |
+| N/A | N/A | N/A |
 
 ## Diagrams
 

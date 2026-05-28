@@ -67,7 +67,7 @@ A resource-based permission system where each permission grants the ability to p
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| login | [source](./login.excalidraw) | [preview](./login.svg) |
+| N/A | N/A | N/A |
 
 ## Diagrams
 

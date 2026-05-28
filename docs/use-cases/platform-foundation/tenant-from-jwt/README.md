@@ -71,7 +71,7 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| settings-org | [source](./settings-org.excalidraw) | [preview](./settings-org.svg) |
+| N/A | N/A | N/A |
 
 ## Diagrams
 
