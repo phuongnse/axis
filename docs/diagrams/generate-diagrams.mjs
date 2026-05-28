@@ -506,12 +506,12 @@ function moduleOverview() {
 
   // Example event badges
   const events = [
-    { label: "WorkflowPublished",  x: 65 },
-    { label: "WorkflowArchived",   x: 220 },
-    { label: "WorkflowUnarchived", x: 380 },
-    { label: "FormCreated",        x: 545 },
-    { label: "FormTaskCreated",    x: 695 },
-    { label: "ExecutionStarted",   x: 830 },
+    { label: "WorkflowPublished",  x: 95 },
+    { label: "WorkflowArchived",   x: 240 },
+    { label: "WorkflowUnarchived", x: 385 },
+    { label: "FormCreated",        x: 530 },
+    { label: "FormTaskCreated",    x: 675 },
+    { label: "ExecutionStarted",   x: 820 },
   ];
   for (const e of events) {
     els.push(...badge({ x: e.x, y: 386, label: e.label }));
@@ -524,24 +524,24 @@ function moduleOverview() {
   // Arrows
   // Cross-module connection examples (single connector style)
   els.push(...arrow({ x1: 610, y1: 235, x2: 610, y2: 286, color: C.arrow }));
-  // Route from lane edge to WorkflowEngine with no floating segment.
-  els.push(...routedArrow({ waypoints: [[320, 378], [320, 448], [340, 448], [340, 470]], color: C.arrow }));
+  // Route around badge row and drop into WorkflowEngine.
+  els.push(...routedArrow({ waypoints: [[260, 378], [260, 448], [340, 448], [340, 470]], color: C.arrow }));
   // FormBuilder consumes from messaging lanes via right-side routed path (no lane cut-through).
-  els.push(...routedArrow({ waypoints: [[935, 332], [955, 332], [955, 260], [860, 260], [860, 235]], color: C.arrow }));
+  els.push(...routedArrow({ waypoints: [[935, 332], [970, 332], [970, 230], [860, 230], [860, 235]], color: C.arrow }));
   // WorkflowEngine (bottom y=550) → reads own local copy
   els.push(...arrow({ x1: 385, y1: 550, x2: 385, y2: 595, color: C.muted, dashed: true, label: "reads own copy" }));
 
   // Legend
-  els.push(...rect({ x: 60, y: 560, w: 250, h: 110, bg: "transparent", stroke: C.border }));
-  els.push(text({ x: 185, y: 577, value: "Legend", size: 11, bold: true, anchor: "center" }));
-  els.push(...rect({ x: 75, y: 590, w: 16, h: 16, bg: C.modBg, stroke: C.modBdr }));
-  els.push(text({ x: 100, y: 598, value: "Module (owns its DB)", size: 10 }));
-  els.push(...rect({ x: 75, y: 612, w: 16, h: 16, bg: C.evtBg, stroke: C.evtBdr }));
-  els.push(text({ x: 100, y: 620, value: "Kafka/RabbitMQ lanes", size: 10 }));
-  els.push(...arrow({ x1: 75, y1: 638, x2: 107, y2: 638, color: C.arrow }));
-  els.push(text({ x: 112, y: 638, value: "Connection", size: 10 }));
-  els.push(...arrow({ x1: 75, y1: 655, x2: 107, y2: 655, color: C.muted, dashed: true }));
-  els.push(text({ x: 112, y: 655, value: "Local copy (denormalized)", size: 10 }));
+  els.push(...rect({ x: 650, y: 560, w: 285, h: 110, bg: "transparent", stroke: C.border }));
+  els.push(text({ x: 792, y: 577, value: "Legend", size: 11, bold: true, anchor: "center" }));
+  els.push(...rect({ x: 665, y: 590, w: 16, h: 16, bg: C.modBg, stroke: C.modBdr }));
+  els.push(text({ x: 690, y: 598, value: "Module (owns its DB)", size: 10 }));
+  els.push(...rect({ x: 665, y: 612, w: 16, h: 16, bg: C.evtBg, stroke: C.evtBdr }));
+  els.push(text({ x: 690, y: 620, value: "Kafka/RabbitMQ lanes", size: 10 }));
+  els.push(...arrow({ x1: 665, y1: 638, x2: 697, y2: 638, color: C.arrow }));
+  els.push(text({ x: 702, y: 638, value: "Connection", size: 10 }));
+  els.push(...arrow({ x1: 665, y1: 655, x2: 697, y2: 655, color: C.muted, dashed: true }));
+  els.push(text({ x: 702, y: 655, value: "Local copy (denormalized)", size: 10 }));
 
   return excalidraw(els);
 }
