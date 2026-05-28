@@ -58,7 +58,7 @@ Custom data modeling is the core differentiator of Axis. Without it, the platfor
 
 ## Diagrams
 
-![Data Model Structure](./diagrams/data-model.svg)
+![Data Model Structure](./create-model/data-model.svg)
 
 ---
 

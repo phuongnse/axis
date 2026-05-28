@@ -418,7 +418,7 @@ This is what makes `import { buildWorkflowCanvas } from './generate-template.mjs
 | `docs/use-cases/_shared/wireframes/` | `app-shell`, `_template` |
 | `docs/use-cases/platform-foundation/wireframes/` | `register-org`, `register-org-states`, `email-confirmation`, `verify-email`, `verify-email-rate-limit`, `workspace-provisioning`, `pricing`, `settings-org`, `settings-org-upload-states`, `settings-org-profile-states`, `settings-org-usage-error`, `settings-org-free-plan`, `settings-org-access-denied`, `settings-org-deletion-scheduled`, `settings-org-delete-modal`, `settings-org-delete-states` |
 | `docs/use-cases/identity-access/wireframes/` | `login`, `login-unverified`, `register`, `forgot-password`, `change-password`, `accept-invitation`, `settings-users`, `settings-roles`, `settings-security` |
-| `docs/use-cases/data-modeling/wireframes/` | `data-models`, `data-classes`, `records` |
+| `docs/use-cases/data-modeling/*/` | use-case-local assets (`data-models`, `data-classes`, `records`) |
 | `docs/use-cases/workflow-builder/wireframes/` | `workflows`, `workflow-editor` |
 | `docs/use-cases/form-builder/wireframes/` | `forms`, `form-editor`, `form-submission` |
 | `docs/use-cases/workflow-engine/wireframes/` | `executions`, `execution-detail` |

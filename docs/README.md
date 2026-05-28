@@ -61,7 +61,7 @@ All diagrams are Excalidraw (`.excalidraw` source + `.svg` preview). Regenerate 
 |---|---|---|
 | Tenant Provisioning | [tenant-provisioning.excalidraw](./use-cases/platform-foundation/diagrams/tenant-provisioning.excalidraw) | [tenant-provisioning.svg](./use-cases/platform-foundation/diagrams/tenant-provisioning.svg) |
 | Auth Flow | [auth-flow.excalidraw](./use-cases/identity-access/diagrams/auth-flow.excalidraw) | [auth-flow.svg](./use-cases/identity-access/diagrams/auth-flow.svg) |
-| Data Model | [data-model.excalidraw](./use-cases/data-modeling/diagrams/data-model.excalidraw) | [data-model.svg](./use-cases/data-modeling/diagrams/data-model.svg) |
+| Data Model | [data-model.excalidraw](./use-cases/data-modeling/create-model/data-model.excalidraw) | [data-model.svg](./use-cases/data-modeling/create-model/data-model.svg) |
 | Workflow Model | [workflow-model.excalidraw](./use-cases/workflow-builder/diagrams/workflow-model.excalidraw) | [workflow-model.svg](./use-cases/workflow-builder/diagrams/workflow-model.svg) |
 | Form Model | [form-model.excalidraw](./use-cases/form-builder/diagrams/form-model.excalidraw) | [form-model.svg](./use-cases/form-builder/diagrams/form-model.svg) |
 | Execution Flow | [execution-flow.excalidraw](./use-cases/workflow-engine/diagrams/execution-flow.excalidraw) | [execution-flow.svg](./use-cases/workflow-engine/diagrams/execution-flow.svg) |

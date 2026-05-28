@@ -1832,12 +1832,15 @@ docs/use-cases/
 ├── identity-access/wireframes/
 │   ├── login.excalidraw        ← source (JSON, diffable on GitHub)
 │   └── login.svg               ← rendered preview (vector, renders inline on GitHub)
-├── data-modeling/wireframes/
-│   └── ...
-└── <domain>/wireframes/        ← one folder per product domain
+├── workflow-builder/wireframes/
+│   └── workflow-editor.excalidraw
+└── <domain>/<use-case>/
+    ├── README.md
+    ├── workflow-editor.excalidraw
+    └── workflow-editor.svg
 ```
 
-Domain wireframes mirror `docs/use-cases/{domain}/`. Shared kit screens live under `_shared/wireframes/`.
+Shared kit screens live under `_shared/wireframes/`; use-case-specific assets can live directly in `docs/use-cases/{domain}/{use-case}/`.
 
 **Naming:** screen slug in kebab-case matching the primary route segment — `login`, `data-models`, `workflow-detail`.
 
