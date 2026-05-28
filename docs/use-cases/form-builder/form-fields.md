@@ -49,7 +49,7 @@ Form fields define what data the form collects. Each field has a type, label, he
 
 *Edge cases*
 - [ ] Field key auto-generation from a label of only special characters (e.g., "???") yields an empty key; user must enter one manually.
-- [ ] Adding a field to a form that is live in an active workflow notifies the user via the warning banner (see US-077) but does not block the action.
+- [ ] Adding a field to a form that is live in an active workflow notifies the user via the warning banner (see [live-workflow warning](form-definition.md)) but does not block the action.
 
 *Out of scope*
 - Conditional field visibility (show field only if another field has a certain value) — not in MVP.

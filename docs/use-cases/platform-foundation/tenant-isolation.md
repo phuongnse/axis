@@ -64,7 +64,7 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 > - cross-tenant API integration tests (`TenantIsolationEndpointTests` — DataModeling list/get by id and archived-org 403)
 > - connection-pool safety documented in [patterns.md](../../playbooks/patterns.md) (`search_path` set on every `ConnectionOpened`, including pooled reconnects).
 >
-> **Gaps vs spec:** none for backend US-008. Tenant-scoped data never lives in `public` by design (module tables only in `tenant_{orgId:N}`); no separate runtime guard beyond schema isolation.
+> **Gaps vs spec:** none for backend schema-per-tenant isolation. Tenant-scoped data never lives in `public` by design (module tables only in `tenant_{orgId:N}`); no separate runtime guard beyond schema isolation.
 
 ---
 
@@ -120,7 +120,7 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 > - `TenantOrganizationAccessMiddleware` returns HTTP 403 for missing, archived/deleted, or not-ready orgs on tenant module routes (`/api/models`, workflows, forms, etc.).
 > - background jobs use `FixedTenantContext` in provision/cancel handlers (see [patterns.md](../../playbooks/patterns.md)).
 >
-> **Gaps vs spec:** none for backend US-009.
+> **Gaps vs spec:** none for backend cross-tenant access prevention.
 
 
 ## Wireframes

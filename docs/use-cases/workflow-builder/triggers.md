@@ -50,7 +50,7 @@ A workflow must have at least one trigger before it can be published. Triggers d
 
 ---
 
-## US-062 — Configure a Manual trigger
+### Use case — Configure a Manual trigger
 
 **As an** Organization Member, **I want to** configure a Manual trigger **so that** authorized users can start the workflow on demand.
 
@@ -91,7 +91,7 @@ A workflow must have at least one trigger before it can be published. Triggers d
 
 ---
 
-## US-063 — Configure a Schedule trigger
+### Use case — Configure a Schedule trigger
 
 **As an** Organization Member, **I want to** schedule a workflow **so that** it runs automatically at defined intervals.
 
@@ -132,7 +132,7 @@ A workflow must have at least one trigger before it can be published. Triggers d
 
 ---
 
-## US-064 — Configure a Webhook trigger
+### Use case — Configure a Webhook trigger
 
 **As an** Organization Member, **I want to** configure a webhook trigger **so that** an external system can start my workflow by sending an HTTP request.
 
@@ -171,7 +171,7 @@ A workflow must have at least one trigger before it can be published. Triggers d
 
 ---
 
-## US-065 — Configure an Event trigger
+### Use case — Configure an Event trigger
 
 **As an** Organization Member, **I want to** trigger a workflow automatically when a platform event occurs **so that** I don't need to start it manually.
 

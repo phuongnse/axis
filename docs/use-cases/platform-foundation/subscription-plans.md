@@ -132,7 +132,7 @@ Define subscription plan tiers with feature limits and enforce those limits at t
 > | API | ✅ (backend AC) |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** US-010 pricing page UI, static fallback on load failure, "Current plan" badge (Frontend only). No multi-workflow bulk-import API yet — single-workflow import/duplicate enforce +1 before save (US-011 bulk AC applies when bulk endpoint exists).
+> **Gaps vs spec:** [subscription-plans](subscription-plans.md) public pricing page UI, static fallback on load failure, "Current plan" badge (Frontend only). No multi-workflow bulk-import API yet — single-workflow import/duplicate enforce +1 before save (bulk workflow import acceptance criteria in [import-export](../workflow-builder/import-export.md) applies when bulk endpoint exists).
 >
 > **Done (backend):**
 > - `GET /api/plans` with limits + `featureFlags` + `isAvailableForNewSignups`
@@ -148,7 +148,7 @@ Define subscription plan tiers with feature limits and enforce those limits at t
 > - atomic check-and-consume for monthly execution starts (race can briefly exceed cap under concurrency)
 > - fail-closed when usage counter/Redis unavailable (today logs warning and treats usage as 0).
 >
-> **Decisions:** `featureFlags` derived from plan slug for MVP (no JSON column); `PlatformAdmin:UserIds` config for US-012.
+> **Decisions:** `featureFlags` derived from plan slug for MVP (no JSON column); `PlatformAdmin:UserIds` config for platform admin plan change.
 
 
 ## Diagrams

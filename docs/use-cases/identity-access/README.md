@@ -73,7 +73,7 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 **Key implementation decisions:**
 - Identity uses the global `public` PostgreSQL schema (not a tenant schema) — registration has no tenant context and email uniqueness is platform-wide.
 - Passwords are hashed with BCrypt (work factor 12) via `IPasswordHasher`. The hash is stored as a first-class property on `User` (`PasswordHash`), not a shadow property.
-- The 4 default system roles (Admin, Editor, Viewer, End User) and their full permission sets are seeded automatically by `RegisterOrganizationHandler` — see [subscription-plans](permissions.md) for the permission catalogue.
+- The 4 default system roles (Admin, Editor, Viewer, End User) and their full permission sets are seeded automatically by `RegisterOrganizationHandler` — see [permissions](permissions.md) for the permission catalogue.
 - **OpenIddict implementation**: OpenIddict 5.x serves as the in-process OAuth2/OIDC authorization server (ADR-004). Authorization Code + PKCE for the SPA; Client Credentials for M2M. Refresh tokens are stored as opaque reference tokens in the OpenIddict `OpenIddictTokens` table and delivered via httpOnly cookie. Access token JTIs are blacklisted in Redis on sign-out. Ephemeral signing/encryption keys are used in development; production should use Azure Key Vault certificates.
 - **gRPC (dev):** manual `GetUserPermissions` checks — [patterns.md § gRPC dev verification](../../playbooks/patterns.md#dev--verify-getuserpermissions-with-grpcurl).
 - **Known gap (user deactivation)**: Revoking all refresh tokens is immediate, but existing access tokens remain valid up to 15 minutes. Full compliance would require a Redis user-level blacklist (not implemented in MVP).
@@ -84,10 +84,10 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend** | ⚠️ polish | [F05](password-security.md): reset/change-password rate limits, session list API wiring. [subscription-plans](permissions.md): `[RequirePermission]` / policy tests. [organization-management](user-management.md): block admin self-invite at API. |
-| **Frontend** | ⏳ | Register, settings, invitation accept, session management UI, and localization/theming foundation — see per-US callouts in [tenant-registration](authentication.md)–[F06](localization-and-theming.md). |
+| **Backend** | ⚠️ polish | [password-security](password-security.md): reset/change-password rate limits, session list API wiring. [permissions](permissions.md): `[RequirePermission]` / policy tests. [user-management](user-management.md): block admin self-invite at API. |
+| **Frontend** | ⏳ | Register, settings, invitation accept, session management UI, and localization/theming foundation — see per–use-case callouts in [authentication](authentication.md) through [localization-and-theming](localization-and-theming.md). |
 
-Core auth/OIDC/RBAC backend is ✅; use feature **Gaps vs spec** for the next US, not epic checkboxes.
+Core auth/OIDC/RBAC backend is ✅; use feature **Gaps vs spec** for the next use case, not domain-level checkboxes.
 
 ---
 

@@ -11,7 +11,7 @@
 | email-confirmation | [source](./wireframes/email-confirmation.excalidraw) | [preview](./wireframes/email-confirmation.svg) |
 | verify-email | [source](./wireframes/verify-email.excalidraw) | [preview](./wireframes/verify-email.svg) |
 | verify-email-rate-limit | [source](./wireframes/verify-email-rate-limit.excalidraw) | [preview](./wireframes/verify-email-rate-limit.svg) |
-| login-unverified (US-002 sign-in before verify) | [source](../identity-access/wireframes/login-unverified.excalidraw) | [preview](../identity-access/wireframes/login-unverified.svg) |
+| login-unverified (email verification sign-in before verify) | [source](../identity-access/wireframes/login-unverified.excalidraw) | [preview](../identity-access/wireframes/login-unverified.svg) |
 | workspace-provisioning | [source](./wireframes/workspace-provisioning.excalidraw) | [preview](./wireframes/workspace-provisioning.svg) |
 | pricing | [source](./wireframes/pricing.excalidraw) | [preview](./wireframes/pricing.svg) |
 
@@ -136,7 +136,7 @@ Self-service registration flow where a new organization signs up and is automati
 > - login returns "Please verify your email" when unverified
 > - `GET /api/auth/provisioning-status?token=` accepts the same link token after verify (including used tokens within TTL). IP-level `auth` limiter applies to `/connect/login` and Identity gRPC only — not on verify/resend (avoids starving integration tests).
 >
-> **Deferred (PR #125 follow-up):** Frontend verify-email flow, provisioning wait screen, and post-verify auto sign-in (US-002).
+> **Deferred (PR #125 follow-up):** Frontend verify-email flow, provisioning wait screen, and post-verify auto sign-in (email verification).
 >
 > **Decisions:** `ResendVerificationEmailCommand` silently succeeds for unknown/already-verified emails (no info leakage).
 
@@ -187,7 +187,7 @@ Self-service registration flow where a new organization signs up and is automati
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** provisioning wait UI (US-002) pending Frontend.
+> **Gaps vs spec:** provisioning wait UI (email verification) pending Frontend.
 >
 > **Done:**
 > - org enters `Provisioning` on verify

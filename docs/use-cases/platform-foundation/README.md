@@ -6,7 +6,7 @@
 
 ## Overview
 
-Establish the multi-tenant SaaS foundation that all other modules depend on. This epic covers tenant provisioning, organization lifecycle management, and the data isolation strategy that keeps each tenant's data completely separate.
+Establish the multi-tenant SaaS foundation that all other modules depend on. This domain covers tenant provisioning, organization lifecycle management, and the data isolation strategy that keeps each tenant's data completely separate.
 
 ## Business Value
 
@@ -50,11 +50,11 @@ Without this foundation, nothing else works. Every feature in every other domain
 | Shared Domain | ✅ Done | `Entity`, `AggregateRoot`, `ValueObject`, `IDomainEvent`, `Result<T>` |
 | Shared Application | ✅ Done | `ICommand/IQuery`, `ICommandHandler/IQueryHandler`, `ValidationBehavior`, `ITenantContext` |
 | Shared Infrastructure | ✅ Done | `TenantSchemaInterceptor`, per-module `UnitOfWork` ([ADR-017](../../TECH_STACK.md#adr-017-axisshared-is-abstractions-only-no-shared-implementation)); **OpenTelemetry** host wiring on `Axis.Api` ([ADR-018](../../TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability), [patterns § OpenTelemetry](../../playbooks/patterns.md#opentelemetry-observability)) |
-| Tenant Registration (US-001–004 backend) | ✅ Done | US-001–004 backend complete. Frontend verify/provisioning/pricing ⏳ |
-| Subscription Plans (subscription-plans US-010–012 backend) | ✅ Done | `GET /api/plans`, 402 limits (workflow / user / execution), Redis read-through counters, platform plan change. Frontend pricing UI ⏳. **Deferred:** atomic execution counter; fail-closed Redis. |
-| Tenant Provisioning (US-003 backend) | ✅ Done | Kafka-driven per-module provisioning, coordinator retries, `GET /api/auth/provisioning-status`. Frontend wait screen ⏳ |
-| Tenant isolation (tenant-isolation US-008–009 backend) | ✅ Done | `TenantSchemaInterceptor`, `TenantOrganizationAccessMiddleware`, and cross-tenant API integration tests — see [tenant-isolation](tenant-isolation.md) |
-| Organization Management (organization-management US-005–007 backend) | ✅ Done | Profile, settings + usage, scheduled deletion + hard-delete job ✅. Frontend settings UI ⏳ — see [organization-management](organization-management.md) |
+| [Tenant registration](tenant-registration.md) | ✅ Done | Register org, email verification, plan selection, provisioning — backend complete. Frontend verify/provisioning/pricing ⏳ |
+| [Subscription plans](subscription-plans.md) | ✅ Done | `GET /api/plans`, 402 limits (workflow / user / execution), Redis read-through counters, platform plan change. Frontend pricing UI ⏳. **Deferred:** atomic execution counter; fail-closed Redis. |
+| Tenant provisioning | ✅ Done | Kafka-driven per-module provisioning, coordinator retries, `GET /api/auth/provisioning-status`. Frontend wait screen ⏳ — see [tenant-registration](tenant-registration.md) |
+| [Tenant isolation](tenant-isolation.md) | ✅ Done | `TenantSchemaInterceptor`, `TenantOrganizationAccessMiddleware`, and cross-tenant API integration tests |
+| [Organization management](organization-management.md) | ✅ Done | Profile, settings + usage, scheduled deletion + hard-delete job ✅. Frontend settings UI ⏳ |
 | Frontend | ⏳ Pending | Verify flow, provisioning wait, settings, pricing |
 
 ---
@@ -63,8 +63,8 @@ Without this foundation, nothing else works. Every feature in every other domain
 
 | Priority | Item | Where |
 |----------|------|--------|
-| **Backend** | ✅ platform-foundation backend US complete (tenant-registration–subscription-plans). Optional: subscription-plans bulk workflow import when product needs US-011 bulk AC | [subscription-plans](subscription-plans.md) |
-| Frontend | tenant-registration US-002 verify + provisioning wait + auto sign-in; subscription-plans pricing page; all organization-management settings wireframes | [tenant-registration](tenant-registration.md), [subscription-plans](subscription-plans.md) |
+| **Backend** | ✅ platform-foundation backend use cases complete ([tenant-registration](tenant-registration.md) through [subscription-plans](subscription-plans.md)). Optional: bulk workflow import when product needs [import-export](../workflow-builder/import-export.md) bulk AC | [subscription-plans](subscription-plans.md) |
+| Frontend | [Tenant registration](tenant-registration.md) email verification, provisioning wait, auto sign-in; [subscription-plans](subscription-plans.md) pricing page; [organization-management](organization-management.md) settings wireframes | [tenant-registration](tenant-registration.md), [subscription-plans](subscription-plans.md) |
 
 Domain-level checkboxes above remain spec-only; status is in use-case **Implementation status** callouts.
 

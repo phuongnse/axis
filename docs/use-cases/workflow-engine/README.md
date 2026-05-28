@@ -10,7 +10,7 @@ The runtime engine that takes a workflow definition and executes it step-by-step
 
 ## Business Value
 
-A workflow builder without an execution engine is just a drawing tool. This epic is what makes workflows actually run and deliver value.
+A workflow builder without an execution engine is just a drawing tool. This domain is what makes workflows actually run and deliver value.
 
 ## Phase
 
@@ -102,11 +102,11 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend — high** | ⚠️ | [tenant-registration](execution-management.md): schedule/webhook/event triggers, stale-PENDING recovery. [tenant-isolation](error-handling.md): notification dispatch, `GetExecution` error detail, channel config. [organization-management](step-handlers.md): real `IScriptExecutor` / `INotificationSender` (stubs today). |
-| **Backend — medium** | ⚠️ | [subscription-plans](execution-history.md): date/trigger filters, CSV export, role-scoped list. Cancel: abandon Wolverine jobs + cancel form tasks. **platform-foundation organization management US-007:** `OrganizationExecutionCanceller` cancels Pending/Running executions before org hard-delete (`FixedTenantContext`). |
-| **Frontend** | ⏳ | Execution monitor, retry UI, SignalR live updates — all tenant-registration–F05 US. |
+| **Backend — high** | ⚠️ | [execution-management](execution-management.md): schedule/webhook/event triggers, stale-PENDING recovery. [error-handling](error-handling.md): notification dispatch, `GetExecution` error detail, channel config. [step-handlers](step-handlers.md): real `IScriptExecutor` / `INotificationSender` (stubs today). |
+| **Backend — medium** | ⚠️ | [execution-history](execution-history.md): date/trigger filters, CSV export, role-scoped list. Cancel: abandon Wolverine jobs + cancel form tasks. **[Organization deletion](../platform-foundation/organization-management.md):** `OrganizationExecutionCanceller` cancels Pending/Running executions before org hard-delete (`FixedTenantContext`). |
+| **Frontend** | ⏳ | Execution monitor, retry UI, SignalR live updates — see [execution-management](execution-management.md) and related use-case callouts. |
 
-Start here when workflow-builder “pending workflow-engine” items block runtime behavior; feature callouts list exact US gaps.
+Start here when workflow-builder “pending workflow-engine” items block runtime behavior; feature callouts list exact use-case gaps.
 
 ---
 

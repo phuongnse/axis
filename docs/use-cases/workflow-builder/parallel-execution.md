@@ -50,7 +50,7 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 
 ---
 
-## US-069 — Create a parallel step group
+### Use case — Create a parallel step group
 
 **As an** Organization Member, **I want to** configure multiple steps to run in parallel **so that** independent tasks don't block each other.
 
@@ -90,7 +90,7 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 
 ---
 
-## US-070 — Configure fan-in (join) behavior
+### Use case — Configure fan-in (join) behavior
 
 **As an** Organization Member, **I want to** configure how the workflow continues after parallel steps complete **so that** I can handle different completion scenarios.
 
@@ -127,7 +127,7 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 
 ---
 
-## US-071 — Access results from parallel branches
+### Use case — Access results from parallel branches
 
 **As an** Organization Member, **I want to** use the output of all parallel steps in subsequent steps **so that** I can combine results.
 

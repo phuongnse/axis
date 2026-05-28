@@ -141,7 +141,7 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 
 *Validation & errors*
 - [ ] Required config fields (e.g., form selection on a Form step) show an inline error indicator on the step node when missing, visible without opening the panel.
-- [ ] Steps with validation errors block workflow publishing (see US-049).
+- [ ] Steps with validation errors block workflow publishing (see [publish workflow](workflow-definition.md)).
 
 *Edge cases*
 - [ ] Switching between two steps while a panel is open closes the first and opens the second without losing changes.

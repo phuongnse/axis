@@ -216,7 +216,7 @@ Users can create custom data models within their organization. A model defines t
 >
 > **Gaps vs spec:**
 > - workflow reference check pending workflow-builder
-> - form Relation Picker refs blocked/flagged via FormBuilder `ModelDeletedEvent` consumer (US-033 partial)
+> - form Relation Picker refs blocked/flagged via FormBuilder `ModelDeletedEvent` consumer ([model deletion guard](model-definition.md) (partial))
 > - 30-day purge background job pending.
 >
 > **Deferred (PR #N follow-up):** DataModeling relation fields on other models flagged broken when target model deleted. WorkflowBuilder `record.*` trigger broken flags shipped via `ModelDeletedHandler` (Kafka).

@@ -24,11 +24,11 @@ Without a UI builder, users need a developer to display and interact with their 
 
 | Use case | Description |
 |---|---|---|
-| tenant-registration | Page Management | Create, edit, delete, publish/unpublish pages |
-| organization-management | Widget Library | Pre-built widgets: List, Grid, Form, Chart, Button, Text, Image |
-| tenant-isolation | Drag & Drop Layout Builder | Compose pages by dragging widgets onto a canvas, resize and arrange |
-| subscription-plans | Data Binding | Bind widget data sources to models, records, and workflow outputs |
-| F05 | Page Access Control | Control which roles can access each page |
+| page-management | Create, edit, delete, publish/unpublish pages |
+| widget-library | Pre-built widgets: List, Grid, Form, Chart, Button, Text, Image |
+| layout-builder | Compose pages by dragging widgets onto a canvas, resize and arrange |
+| data-binding | Bind widget data sources to models, records, and workflow outputs |
+| page-access-control | Control which roles can access each page |
 
 ---
 

@@ -50,7 +50,7 @@ Each step has a type that determines what it does when executed. Users configure
 
 ---
 
-## US-057 — Configure a Form step
+### Use case — Configure a Form step
 
 **As an** Organization Member, **I want to** configure a Form step with a specific form and assignee **so that** the right person receives the form during execution.
 
@@ -91,7 +91,7 @@ Each step has a type that determines what it does when executed. Users configure
 
 ---
 
-## US-058 — Configure an HTTP Request step
+### Use case — Configure an HTTP Request step
 
 **As an** Organization Member, **I want to** configure an HTTP Request step **so that** my workflow can integrate with external services.
 
@@ -133,7 +133,7 @@ Each step has a type that determines what it does when executed. Users configure
 
 ---
 
-## US-059 — Configure a Condition step
+### Use case — Configure a Condition step
 
 **As an** Organization Member, **I want to** add a Condition step **so that** my workflow can take different paths based on data values.
 
@@ -171,7 +171,7 @@ Each step has a type that determines what it does when executed. Users configure
 
 ---
 
-## US-060 — Configure a Script step
+### Use case — Configure a Script step
 
 **As an** Organization Member, **I want to** write a small script step **so that** I can transform data that isn't possible with standard steps.
 
@@ -211,7 +211,7 @@ Each step has a type that determines what it does when executed. Users configure
 
 ---
 
-## US-061 — Configure a Notification step
+### Use case — Configure a Notification step
 
 **As an** Organization Member, **I want to** add a Notification step **so that** stakeholders are informed when a workflow reaches a certain point.
 

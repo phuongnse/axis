@@ -166,7 +166,7 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 - [ ] Sign-out from one browser tab notifies other open tabs (via BroadcastChannel) to also clear their token and redirect.
 
 *Out of scope*
-- "Sign out of all devices" from this flow — covered in [F05 Password & Security](./password-security.md).
+- "Sign out of all devices" from this flow — covered in [[password-security](password-security.md) Password & Security](./password-security.md).
 
 > **Implementation status**
 >

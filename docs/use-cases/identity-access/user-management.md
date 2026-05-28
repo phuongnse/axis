@@ -202,7 +202,7 @@ Organization admins can invite new members, manage their accounts, and deactivat
 *Validation & errors*
 - [ ] Full name: required, 2–100 characters.
 - [ ] Avatar: PNG or JPG only, max 1 MB. Shows an error before upload begins if type or size is invalid.
-- [ ] Attempting to change email redirects to a separate flow (email change requires re-verification — see F05).
+- [ ] Attempting to change email redirects to a separate flow (email change requires re-verification — see password-security).
 
 *Edge cases*
 - [ ] Uploading a new avatar replaces the old one; the old file is deleted from storage.
@@ -221,7 +221,7 @@ Organization admins can invite new members, manage their accounts, and deactivat
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** email change flow (F05) not started.
+> **Gaps vs spec:** email change flow (password-security) not started.
 >
 > **Decisions:** name update is a direct property mutation on `User` aggregate with a `UserProfileUpdatedEvent`. Avatar upload fully wired in `UpdateUserProfileHandler` — validates type (PNG/JPG only) and size (max 1 MB), uploads to S3, deletes old file on replacement.
 

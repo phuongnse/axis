@@ -8,7 +8,7 @@
 
 - [Backend Process](#backend-process)
   - [New module setup](#new-module-setup-one-time-per-module)
-  - [Per-US workflow](#per-us-workflow)
+  - [Per use case workflow](#per-use-case-workflow)
 - [Frontend Process](#frontend-process)
   - [Phase 1 — Foundation](#phase-1--foundation-one-time)
   - [Phase 2 — Per-feature workflow](#phase-2--per-feature-workflow)
@@ -33,7 +33,7 @@ Complete in order when scaffolding a brand-new module:
 | 8 | Add test projects to `Axis.sln` |
 | 9 | Run `dotnet build` — zero errors before writing any domain code |
 
-### Per-US workflow
+### Per use case workflow
 
 Repeat for every user story, in layer order: Domain → Application → Infrastructure → API.
 **Never start the next layer until the current layer's tests are green.**

@@ -50,7 +50,7 @@ Workflows can take different execution paths based on data values using Conditio
 
 ---
 
-## US-066 — Add an if/else branch
+### Use case — Add an if/else branch
 
 **As an** Organization Member, **I want to** route my workflow down different paths based on a condition **so that** different scenarios are handled appropriately.
 
@@ -59,7 +59,7 @@ Workflows can take different execution paths based on data values using Conditio
 *Happy path*
 - [ ] Adding a Condition step creates it with two default outgoing handles: "If true" and "If false."
 - [ ] Each handle can be connected to different subsequent steps.
-- [ ] The expression builder (see US-059) is used to define the condition.
+- [ ] The expression builder (see [Condition step](step-types.md)) is used to define the condition.
 - [ ] Canvas edges show the branch label ("If true" / "If false") next to the arrow.
 
 *Validation & errors*
@@ -88,7 +88,7 @@ Workflows can take different execution paths based on data values using Conditio
 
 ---
 
-## US-067 — Add a multi-branch condition
+### Use case — Add a multi-branch condition
 
 **As an** Organization Member, **I want to** add more than two branches from a Condition step **so that** I can handle multiple distinct cases.
 
@@ -126,7 +126,7 @@ Workflows can take different execution paths based on data values using Conditio
 
 ---
 
-## US-068 — Merge branches back to a single path
+### Use case — Merge branches back to a single path
 
 **As an** Organization Member, **I want** diverged branches to merge back to a single step **so that** the workflow continues on a unified path after branching.
 
@@ -142,10 +142,10 @@ Workflows can take different execution paths based on data values using Conditio
 
 *Edge cases*
 - [ ] If both branches of an if/else reach the merge point (e.g., both run a Notification step then merge), the merge step executes exactly once (the second arrival is ignored). This is the expected behavior and is documented in the execution history.
-- [ ] This OR-merge behavior is distinct from the Parallel Group fan-in (AND-join) behavior described in F06.
+- [ ] This OR-merge behavior is distinct from the Parallel Group fan-in (AND-join) behavior described in [parallel execution](parallel-execution.md).
 
 *Out of scope*
-- Explicit merge/join nodes on the canvas — merging is implicit (any step with multiple incoming edges acts as a merge point). An explicit Join node is used only in Parallel Groups (F06).
+- Explicit merge/join nodes on the canvas — merging is implicit (any step with multiple incoming edges acts as a merge point). An explicit Join node is used only in Parallel Groups ([parallel execution](parallel-execution.md)).
 
 > **Implementation status**
 >

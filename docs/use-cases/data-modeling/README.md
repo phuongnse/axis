@@ -98,7 +98,7 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend** | ⚠️ polish | HTTP 422/409 on records ([subscription-plans](data-records.md)); relation display-field resolution; model plan limits **not in subscription-plans** (spec mentions 402 — product decision). 30-day purge jobs deferred. |
+| **Backend** | ⚠️ polish | HTTP 422/409 on records ([data-records](data-records.md)); relation display-field resolution; model plan limits **not in subscription-plans** (spec mentions 402 — product decision). 30-day purge jobs deferred. |
 | **Frontend** | ⏳ | Model/record UI, filters, data-class sub-forms — all US callouts mark Frontend ⏳. |
 
 Module API is largely ✅; grep `API: ⏳` in linked use-case files only when adding endpoints.

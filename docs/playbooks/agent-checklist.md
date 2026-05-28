@@ -18,7 +18,7 @@ The paste-block templates below are for *your own* walk-through (agent reasoning
 
 ```markdown
 ## Gate 0
-| AC / US | Layer | File / test |
+| AC / use case | Layer | File / test |
 |---------|-------|-------------|
 | …       | …     | …           |
 Docs touched: docs/use-cases/…
@@ -28,16 +28,16 @@ Docs touched: docs/use-cases/…
 
 Use-case files group ACs under **Happy path**, **Validation & errors**, **Edge cases**, and **Out of scope**. Agents must cover **every bullet in scope for the layer you are shipping**, not only the first block.
 
-**Before writing code (per US):**
+**Before writing code (per use case):**
 
-1. Copy **each** `- [ ]` line from the US into an AC map row (one row per bullet, or one row per bullet group only when a single test proves all of them).
+1. Copy **each** `- [ ]` line from the use case into an AC map row (one row per bullet, or one row per bullet group only when a single test proves all of them).
 2. Tag the row: `happy` | `validation` | `edge` | `out-of-scope` (skip implementation for `out-of-scope`; do not “forget” it — leave it in the map as N/A).
 3. Name the **test or handler** that will prove the row (`CreateWorkflow_WhenAtPlanLimit_Returns402`, integration test for wrong-tenant isolation, etc.). **No blank “File / test” cells** for in-scope rows.
 4. If a bullet is **Frontend-only** while you are on backend (or the reverse), mark the row `N/A this PR — Frontend` / `N/A this PR — API` so it is not silently dropped.
 
 **While implementing (TDD):**
 
-- [process.md § Per-US workflow](./process.md#per-us-workflow): Domain → Application → Infrastructure → API; tests green per layer before the next.
+- [process.md § Per use case workflow](./process.md#per-use-case-workflow): Domain → Application → Infrastructure → API; tests green per layer before the next.
 - [testing.md § Required test coverage](./testing.md#required-test-coverage-for-integration-tests): integration tests need happy path **and** not-found/isolation **and** constraint violations where applicable — not one happy test per handler.
 
 **Before opening / updating the PR:**
@@ -49,7 +49,7 @@ Use-case files group ACs under **Happy path**, **Validation & errors**, **Edge c
 | Deferred? | `**Deferred (PR #N follow-up):**` names the **AC bullet** deferred, not a vague “later”. |
 | Out of scope? | Do not implement; do not mark ✅ as if done. |
 
-**Self-audit command** (after implementation, before push): re-read the US in the use-case file and tick mentally each bullet against your AC map — same order as the spec (happy → validation → edge).
+**Self-audit command** (after implementation, before push): re-read the use case in the use-case file and tick mentally each bullet against your AC map — same order as the spec (happy → validation → edge).
 
 ### Anti-pattern: `Gaps vs spec: none` after happy path only
 
@@ -63,7 +63,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 **Before push checklist (backend feature PRs):**
 
-1. Re-read every in-scope `- [ ]` under the US (all sections, not only *Happy path*).
+1. Re-read every in-scope `- [ ]` under the use case (all sections, not only *Happy path*).
 2. For each bullet: implemented + test, `N/A this PR — Frontend`, or named deferral.
 3. Only then set `Gaps vs spec: none for backend` (or list what remains).
 

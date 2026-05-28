@@ -50,7 +50,7 @@ Workflow definitions can be exported as portable JSON files and imported into an
 
 ---
 
-## US-072 — Export a workflow as JSON
+### Use case — Export a workflow as JSON
 
 **As an** Organization Member with `workflow:definition:read`, **I want to** export a workflow as a JSON file **so that** I can back it up or share it with another team.
 
@@ -90,7 +90,7 @@ Workflow definitions can be exported as portable JSON files and imported into an
 
 ---
 
-## US-073 — Import a workflow from JSON
+### Use case — Import a workflow from JSON
 
 **As an** Organization Member with `workflow:definition:write`, **I want to** import a workflow from a JSON file **so that** I can quickly set up a workflow that someone else designed.
 
@@ -132,7 +132,7 @@ Workflow definitions can be exported as portable JSON files and imported into an
 
 ---
 
-## US-074 — Bulk export all workflows
+### Use case — Bulk export all workflows
 
 **As an** Organization Admin, **I want to** export all workflows as a ZIP archive **so that** I have a complete backup.
 

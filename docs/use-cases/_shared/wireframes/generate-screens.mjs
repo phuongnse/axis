@@ -162,7 +162,7 @@ function authCard(prefix, { title, subtitle = null, items = [], extraLink = null
   return els;
 }
 
-/** Auth form field with optional inline error (US-001 / US-005). */
+/** Auth form field with optional inline error (tenant-registration / organization profile). */
 function authFormField(prefix, cardX, y, cardW, label, value, errorMsg = null) {
   const x = cardX + 24;
   const innerW = cardW - 48;
@@ -217,7 +217,7 @@ function genAppShell() {
 // ─── platform-foundation Platform Foundation ─────────────────────────────────────────────────
 
 /**
- * Register-Org — US-001, US-004
+ * Register-Org — tenant-registration, plan selection
  * Standard auth card: 5 fields, plan selection shown in subtitle.
  * cardH = 136 (subtitle) + 5×72 (fields) + 4 + 36 + 12 + 32 = 580 → centered vertically.
  */
@@ -237,7 +237,7 @@ function genRegisterOrg() {
 }
 
 /**
- * Register-Org states — US-001 validation + 5xx (two panels, spec reference).
+ * Register-Org states — tenant-registration validation + 5xx (two panels, spec reference).
  */
 function genRegisterOrgStates() {
   const els = [];
@@ -313,7 +313,7 @@ function genRegisterOrgStates() {
 }
 
 /**
- * Email-Confirmation — US-001 success state, US-002 resend
+ * Email-Confirmation — registration success, email verification resend
  * Informational card (no form): compact icon, title, copy, resend link.
  */
 function genEmailConfirmation() {
@@ -338,7 +338,7 @@ function genEmailConfirmation() {
   els.push(text('ec_body1', ecX, ecBodyY, ecInnerW, 18, 'We sent a verification link to:', 13, C.gray700));
   els.push(text('ec_body2', ecX, ecBodyY + 22, ecInnerW, 18, 'alex@company.com', 13, semanticVariantColor('info')));
 
-  // Resend link (US-002)
+  // Resend link (email verification)
   els.push(text('ec_resend', ecX, ecBodyY + 52, ecInnerW, 16, "Didn't receive it?  Resend email →", 12, C.primary, 'center'));
 
   // Footer
@@ -349,7 +349,7 @@ function genEmailConfirmation() {
 }
 
 /**
- * Verify-Email — US-002 (all 4 outcome states)
+ * Verify-Email — email verification (all 4 outcome states)
  * 2×2 grid of state cards: success, expired, already-used, invalid.
  * Each card: 440×176. Grid centred at W=1200.
  */
@@ -445,7 +445,7 @@ function genVerifyEmailRateLimit() {
 }
 
 /**
- * Workspace-Provisioning — US-003 (2 states side by side)
+ * Workspace-Provisioning — tenant provisioning (2 states side by side)
  * Left:  In-progress — spinner + step 2 active.
  * Right: Failed (after 3 retries) — error icon + failed step + contact link.
  *
@@ -518,7 +518,7 @@ function genWorkspaceProvisioning() {
 }
 
 /**
- * Settings-Org Delete Modal — US-007
+ * Settings-Org Delete Modal — organization deletion
  * Settings-org page (dimmed) + confirmation modal centred.
  *
  * Modal: 480×280. Input to type org name. Delete button disabled (gray) until match.
@@ -577,7 +577,7 @@ function genSettingsOrgDeleteModal() {
 }
 
 /**
- * Delete modal states — US-007 enabled confirm + queue failure.
+ * Delete modal states — organization deletion enabled confirm + queue failure.
  */
 function genSettingsOrgDeleteStates() {
   const els = [];
@@ -643,7 +643,7 @@ function genSettingsOrgDeleteStates() {
 }
 
 /**
- * Pricing — US-004 (plan selection before registration), US-010 (public pricing page)
+ * Pricing — plan selection at registration, public pricing page
  * Public marketing page (no app shell). 3-column plan cards.
  * Signed-in users see "Current plan" badge on their active plan.
  */
@@ -730,7 +730,7 @@ function genPricing() {
 }
 
 /**
- * Settings-Org — US-005, US-006, US-007
+ * Settings-Org — profile, usage, organization deletion
  * App shell (Settings nav active). Three sections:
  *   1. Organization Profile — name, logo, timezone, language, creation date
  *   2. Usage — 3 metric cards (workflows, executions, users) + plan badge
@@ -853,7 +853,7 @@ function genSettingsOrgUploadStates() {
 }
 
 /**
- * Settings profile save states — US-005 inline validation, API error, success toast.
+ * Settings profile save states — profile settings inline validation, API error, success toast.
  */
 function genSettingsOrgProfileStates() {
   const els = [];
@@ -941,7 +941,7 @@ function genSettingsOrgUsageError() {
   write('platform-foundation/settings-org-usage-error.excalidraw', els);
 }
 
-/** US-006 edge case — free plan usage without denominator limits. */
+/** usage settings edge case — free plan usage without denominator limits. */
 function genSettingsOrgFreePlan() {
   const navIdx = 4;
   const els = [];
@@ -969,7 +969,7 @@ function genSettingsOrgFreePlan() {
   write('platform-foundation/settings-org-free-plan.excalidraw', els);
 }
 
-/** US-006 — non-admin receives 403 (redirect target shown as message). */
+/** usage settings — non-admin receives 403 (redirect target shown as message). */
 function genSettingsOrgAccessDenied() {
   const navIdx = 4;
   const els = [];
@@ -1017,7 +1017,7 @@ function genLogin() {
   write('identity-access/login.excalidraw', els);
 }
 
-/** US-002 (tenant-registration) / US-013 — unverified email blocks sign-in. */
+/** email verification (tenant-registration) / unverified sign-in — unverified email blocks sign-in. */
 function genLoginUnverified() {
   const cardW = 440;
   const cardH = 280;
