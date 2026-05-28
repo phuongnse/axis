@@ -2044,8 +2044,8 @@
       "x": 870,
       "y": 565,
       "angle": 0,
-      "strokeColor": "#ea580c",
-      "backgroundColor": "#ffedd5",
+      "strokeColor": "#9333ea",
+      "backgroundColor": "#f3e8ff",
       "fillStyle": "solid",
       "strokeWidth": 1.5,
       "strokeStyle": "solid",
@@ -2142,8 +2142,8 @@
       "x": 870,
       "y": 635,
       "angle": 0,
-      "strokeColor": "#ea580c",
-      "backgroundColor": "#ffedd5",
+      "strokeColor": "#9333ea",
+      "backgroundColor": "#f3e8ff",
       "fillStyle": "solid",
       "strokeWidth": 1.5,
       "strokeStyle": "solid",
@@ -2897,10 +2897,10 @@
     {
       "id": "diag-87",
       "x": 650,
-      "y": 176,
+      "y": 172,
       "angle": 0,
-      "strokeColor": "#ea580c",
-      "backgroundColor": "transparent",
+      "strokeColor": "#9333ea",
+      "backgroundColor": "#f3e8ff",
       "fillStyle": "solid",
       "strokeWidth": 1.5,
       "strokeStyle": "solid",
@@ -2909,7 +2909,8 @@
       "groupIds": [],
       "frameId": null,
       "roundness": {
-        "type": 2
+        "type": 3,
+        "value": 6
       },
       "seed": 87,
       "version": 1,
@@ -2919,26 +2920,14 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "type": "arrow",
-      "width": 30,
-      "height": 0,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          30,
-          0
-        ]
-      ],
-      "startArrowhead": null,
-      "endArrowhead": "arrow"
+      "type": "rectangle",
+      "width": 12,
+      "height": 12
     },
     {
       "id": "diag-88",
-      "x": 685,
-      "y": 171.5,
+      "x": 668,
+      "y": 173.5,
       "angle": 0,
       "strokeColor": "#1e293b",
       "backgroundColor": "transparent",
@@ -2963,7 +2952,7 @@
       "type": "text",
       "width": 79.2,
       "height": 12.6,
-      "text": "Infra connection",
+      "text": "External service",
       "fontSize": 9,
       "fontFamily": 1,
       "textAlign": "center",
@@ -2971,8 +2960,83 @@
     },
     {
       "id": "diag-89",
+      "x": 650,
+      "y": 190,
+      "angle": 0,
+      "strokeColor": "#ea580c",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1.5,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 89,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "arrow",
+      "width": 30,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          30,
+          0
+        ]
+      ],
+      "startArrowhead": null,
+      "endArrowhead": "arrow"
+    },
+    {
+      "id": "diag-90",
+      "x": 685,
+      "y": 185.5,
+      "angle": 0,
+      "strokeColor": "#1e293b",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 90,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "text",
+      "width": 79.2,
+      "height": 12.6,
+      "text": "Infra connection",
+      "fontSize": 9,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "id": "diag-91",
       "x": 654.225,
-      "y": 187.75,
+      "y": 199.75,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2986,7 +3050,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 89,
+      "seed": 91,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
