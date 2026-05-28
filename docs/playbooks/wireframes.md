@@ -5,6 +5,10 @@
 This playbook covers everything needed to work with the wireframe generation system:
 `components.mjs` (shared library), `generate-template.mjs` (component kit), and `generate-screens.mjs` (screen wireframes).
 
+> **Required with every wireframe/diagram edit:** run
+> [`visual-artifact-checklist.md`](./visual-artifact-checklist.md)
+> before commit.
+
 ---
 
 ## File map

@@ -6,8 +6,8 @@
 
 ## Agent rule (required)
 
-When changing any file under `docs/diagrams/`, agents must run the checklist in
-[`REVIEW_CHECKLIST.md`](./REVIEW_CHECKLIST.md) before committing.
+When changing any file under `docs/diagrams/`, agents must run the shared visual-artifact checklist:
+[`../playbooks/visual-artifact-checklist.md`](../playbooks/visual-artifact-checklist.md).
 
 ## Source of truth
 
@@ -36,7 +36,7 @@ When changing any file under `docs/diagrams/`, agents must run the checklist in
 
 3. Run review checklist:
 
-   - [`REVIEW_CHECKLIST.md`](./REVIEW_CHECKLIST.md)
+   - [`../playbooks/visual-artifact-checklist.md`](../playbooks/visual-artifact-checklist.md)
 
 ## Current architecture assumptions in these diagrams
 
