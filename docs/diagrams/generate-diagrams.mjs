@@ -437,8 +437,8 @@ function containerDiagram() {
 
   // Other infrastructure (right side, below DB column)
   els.push(...rect({ x: DBX, y: 495, w: DBW, h: DBH, bg: C.infraBg, stroke: C.infraBdr, label: "Redis 7",       sub: "Cache · Session · Schema name" }));
-  els.push(...rect({ x: DBX, y: 565, w: DBW, h: DBH, bg: C.extBg,  stroke: C.extBdr,  label: "AWS S3",        sub: "File storage" }));
-  els.push(...rect({ x: DBX, y: 635, w: DBW, h: DBH, bg: C.extBg,  stroke: C.extBdr,  label: "Email Service", sub: "SMTP · MailKit" }));
+  els.push(...rect({ x: DBX, y: 565, w: DBW, h: DBH, bg: C.infraBg, stroke: C.infraBdr, label: "AWS S3",        sub: "File storage" }));
+  els.push(...rect({ x: DBX, y: 635, w: DBW, h: DBH, bg: C.infraBg, stroke: C.infraBdr, label: "Email Service", sub: "SMTP · MailKit" }));
   els.push(...arrow({ x1: 810, y1: 522, x2: DBX, y2: 522, color: C.infraBdr }));
 
   // Production operations containers (shown outside platform boundary)
@@ -446,8 +446,22 @@ function containerDiagram() {
     label: "HashiCorp Vault", sub: "Secrets management" }));
   els.push(...rect({ x: 1090, y: 565, w: 220, h: 55, bg: C.infraBg, stroke: C.infraBdr,
     label: "Grafana Tempo/Loki/Mimir", sub: "Tracing · Logs · Metrics" }));
-  els.push(...arrow({ x1: 1060, y1: 522, x2: 1090, y2: 522, color: C.infraBdr }));
-  els.push(...arrow({ x1: 1060, y1: 592, x2: 1090, y2: 592, color: C.infraBdr }));
+  // Routed arrows start at platform edge to avoid visual confusion with S3/Email boxes.
+  els.push(...routedArrow({ waypoints: [[810, 548], [1030, 548], [1030, 522], [1090, 522]], color: C.infraBdr, label: "secrets + config" }));
+  els.push(...routedArrow({ waypoints: [[810, 598], [1030, 598], [1030, 592], [1090, 592]], color: C.infraBdr, label: "telemetry export" }));
+
+  // Compact legend
+  els.push(...rect({ x: 640, y: 94, w: 150, h: 104, bg: "#ffffff", stroke: C.border }));
+  els.push(text({ x: 715, y: 108, value: "Legend", size: 10, bold: true, color: C.text, anchor: "center" }));
+  els.push(...rect({ x: 650, y: 118, w: 12, h: 12, bg: C.modBg, stroke: C.modBdr }));
+  els.push(text({ x: 668, y: 124, value: "Module service", size: 9, color: C.text }));
+  els.push(...rect({ x: 650, y: 136, w: 12, h: 12, bg: C.evtBg, stroke: C.evtBdr }));
+  els.push(text({ x: 668, y: 142, value: "Messaging lanes", size: 9, color: C.text }));
+  els.push(...rect({ x: 650, y: 154, w: 12, h: 12, bg: C.infraBg, stroke: C.infraBdr }));
+  els.push(text({ x: 668, y: 160, value: "Infrastructure", size: 9, color: C.text }));
+  els.push(...arrow({ x1: 650, y1: 176, x2: 680, y2: 176, color: C.infraBdr }));
+  els.push(text({ x: 685, y: 176, value: "Infra connection", size: 9, color: C.text }));
+  els.push(text({ x: 715, y: 192, value: "All arrows start at source", size: 8.5, color: C.muted, anchor: "center" }));
 
   return excalidraw(els);
 }
