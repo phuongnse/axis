@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace Axis.WorkflowEngine.Infrastructure.Handlers;
 
 /// <summary>
-/// US-089: Fails the waiting form step and execution when a form task expires.
+/// Fails the waiting form step and execution when a form task expires.
 ///
 /// <para>
 /// Cross-module consumer: subscribes to the Avro <see cref="FormTaskExpiredEvent"/>

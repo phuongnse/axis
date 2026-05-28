@@ -132,7 +132,7 @@ export async function exchangeAuthorizationCode(code: string): Promise<string> {
   return data.access_token;
 }
 
-/** Best-effort server sign-out; callers must clear local session regardless of outcome (US-015). */
+/** Best-effort server sign-out; callers must clear local session regardless of outcome. */
 export async function signOut(): Promise<void> {
   try {
     await fetch('/api/auth/signout', { method: 'POST', credentials: 'include' });

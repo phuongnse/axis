@@ -1,6 +1,6 @@
 namespace Axis.Identity.Contracts;
 
-/// <summary>Cross-module tenant provisioning identifiers and retry payload (US-003).</summary>
+/// <summary>Cross-module tenant provisioning identifiers and retry payload.</summary>
 public static class TenantModuleNames
 {
     public const string DataModeling = "datamodeling";

@@ -6,7 +6,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Commands.UpdateDataClass;
 
-/// <summary>US-039: Validates name uniqueness (excluding self), then updates the data class.</summary>
+/// <summary>Validates name uniqueness (excluding self), then updates the data class.</summary>
 public sealed class UpdateDataClassHandler(
     IDataClassRepository dataClassRepo,
     IUnitOfWork uow)

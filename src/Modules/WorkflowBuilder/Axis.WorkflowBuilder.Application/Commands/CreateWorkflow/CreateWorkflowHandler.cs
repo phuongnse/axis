@@ -8,7 +8,7 @@ using Axis.WorkflowBuilder.Domain.Aggregates;
 
 namespace Axis.WorkflowBuilder.Application.Commands.CreateWorkflow;
 
-/// <summary>US-047: Validates name uniqueness, creates workflow with Start/End nodes.</summary>
+/// <summary>Validates name uniqueness, creates workflow with Start/End nodes.</summary>
 public sealed class CreateWorkflowHandler(
     IPlanLimitService planLimitService,
     IWorkflowRepository workflowRepo,

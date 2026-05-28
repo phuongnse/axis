@@ -13,7 +13,7 @@ using Microsoft.Extensions.Logging;
 namespace Axis.FormBuilder.Infrastructure.Handlers;
 
 /// <summary>
-/// Flags Relation Picker fields as broken when their target model is deleted (E03 US-033, E05).
+/// Flags Relation Picker fields as broken when their target model is deleted.
 /// </summary>
 internal sealed class ModelDeletedHandler(
     FormBuilderDbContext context,

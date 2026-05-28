@@ -6,7 +6,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Commands.DeleteDataClass;
 
-/// <summary>US-040: Blocks deletion if the data class is referenced by any model field (HTTP 409).</summary>
+/// <summary>Blocks deletion if the data class is referenced by any model field (HTTP 409).</summary>
 public sealed class DeleteDataClassHandler(
     IDataClassRepository dataClassRepo,
     IUnitOfWork uow)
@@ -18,7 +18,7 @@ public sealed class DeleteDataClassHandler(
         if (dc is null)
             return Result.Failure(ErrorCodes.NotFound, "Data class not found.");
 
-        // US-040: cannot delete while referenced by a model field
+        // cannot delete while referenced by a model field
         if (await dataClassRepo.IsReferencedByAnyModelAsync(command.DataClassId, cancellationToken))
             return Result.Failure(ErrorCodes.Conflict,
                 "This data class is still referenced by one or more model fields. Remove those fields first.");

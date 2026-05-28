@@ -101,7 +101,7 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
         RaiseDomainEvent(new ExecutionFailed(Id, OrganizationId, errorMessage));
     }
 
-    /// <summary>US-092: Cancels a Pending or Running execution.</summary>
+    /// <summary>Cancels a Pending or Running execution.</summary>
     public void Cancel()
     {
         if (TerminalStatuses.Contains(Status))
@@ -187,11 +187,11 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
         return step;
     }
 
-    /// <summary>US-100: Creates a retry execution linked to this failed execution.</summary>
+    /// <summary>Creates a retry execution linked to this failed execution.</summary>
     public WorkflowExecution CreateRetry(Guid? retriedByUserId)
         => CreateRetryCore(retriedByUserId, _context);
 
-    /// <summary>US-102: Creates a retry execution using a user-supplied modified context.</summary>
+    /// <summary>Creates a retry execution using a user-supplied modified context.</summary>
     public WorkflowExecution CreateRetryWithModifiedContext(
         Guid? retriedByUserId, IReadOnlyDictionary<string, object?> modifiedContext)
         => CreateRetryCore(retriedByUserId, modifiedContext);

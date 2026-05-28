@@ -5,7 +5,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Commands.UpdateField;
 
-/// <summary>US-032/034: Loads model and delegates field update to the aggregate.</summary>
+/// <summary>/034: Loads model and delegates field update to the aggregate.</summary>
 public sealed class UpdateFieldHandler(
     IDataModelRepository modelRepo,
     IUnitOfWork uow)

@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Axis.FormBuilder.Application.Handlers;
 
-/// <summary>US-089: Marks a pending form submission as expired (idempotent).</summary>
+/// <summary>Marks a pending form submission as expired (idempotent).</summary>
 public sealed class ExpireFormSubmissionHandler(
     IFormSubmissionRepository submissionRepo,
     IUnitOfWork uow,

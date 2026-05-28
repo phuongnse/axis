@@ -2,7 +2,7 @@ using Axis.Shared.Application.CQRS;
 
 namespace Axis.DataModeling.Application.Commands.UpdateModel;
 
-/// <summary>US-032: Update a model's name, description, icon, and color.</summary>
+/// <summary>Update a model's name, description, icon, and color.</summary>
 public sealed record UpdateModelCommand(
     Guid ModelId,
     Guid OrganizationId,

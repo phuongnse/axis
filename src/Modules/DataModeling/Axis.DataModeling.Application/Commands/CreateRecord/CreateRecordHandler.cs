@@ -6,7 +6,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Commands.CreateRecord;
 
-/// <summary>US-041/035: Validates model exists, validates field data, creates and persists the record.</summary>
+/// <summary>/035: Validates model exists, validates field data, creates and persists the record.</summary>
 public sealed class CreateRecordHandler(
     IDataModelRepository modelRepo,
     IDataRecordRepository recordRepo,

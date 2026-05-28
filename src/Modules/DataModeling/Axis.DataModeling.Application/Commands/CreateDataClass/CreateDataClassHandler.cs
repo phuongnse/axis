@@ -6,7 +6,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Commands.CreateDataClass;
 
-/// <summary>US-037: Validates uniqueness then creates the data class.</summary>
+/// <summary>Validates uniqueness then creates the data class.</summary>
 public sealed class CreateDataClassHandler(
     IDataClassRepository dataClassRepo,
     IUnitOfWork uow)

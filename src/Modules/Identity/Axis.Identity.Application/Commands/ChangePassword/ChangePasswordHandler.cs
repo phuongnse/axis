@@ -35,7 +35,7 @@ public sealed class ChangePasswordHandler(
         user.SetPasswordHash(hasher.Hash(command.NewPassword));
         await uow.SaveChangesAsync(cancellationToken);
 
-        // Notification failure must not roll back the password change (per US-028)
+        // Notification failure must not roll back the password change
         try
         {
             await emailSender.SendPasswordChangedNotificationAsync(

@@ -5,7 +5,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Queries.GetModel;
 
-/// <summary>US-031/032: Loads a model with its complete field list.</summary>
+/// <summary>/032: Loads a model with its complete field list.</summary>
 public sealed class GetModelHandler(IDataModelRepository modelRepo)
     : IQueryHandler<GetModelQuery, Result<ModelDetailDto>>
 {

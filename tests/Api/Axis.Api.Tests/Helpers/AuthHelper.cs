@@ -55,7 +55,7 @@ public static class AuthHelper
         await fixture.EnsureTenantProvisionedAsync(email);
 
         // 3. Run the Authorization Code + PKCE flow on an independent client
-        //    (so cookie jar is isolated from the shared fixture client)
+        // (so cookie jar is isolated from the shared fixture client)
         HttpClient pkceClient = fixture.CreateNewClient();
         string accessToken = await CompletePkceFlowAsync(pkceClient, email, "TestPass1");
 

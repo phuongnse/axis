@@ -6,7 +6,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Identity.Application.Commands.AcceptInvitation;
 
-/// <summary>US-018: Validates token, creates user, assigns role, marks invitation accepted.</summary>
+/// <summary>Validates token, creates user, assigns role, marks invitation accepted.</summary>
 public sealed class AcceptInvitationHandler(
     IInvitationRepository invitationRepo,
     IUserRepository userRepo,

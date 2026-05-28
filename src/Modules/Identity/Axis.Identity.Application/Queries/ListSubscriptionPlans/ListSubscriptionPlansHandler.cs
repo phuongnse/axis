@@ -23,7 +23,7 @@ public sealed class ListSubscriptionPlansHandler(
             currentPlanId = org?.SubscriptionPlanId;
         }
 
-        // US-010 edge: retired plans stay visible to orgs still on that plan.
+        // edge: retired plans stay visible to orgs still on that plan.
         if (currentPlanId is Guid planId && plans.All(p => p.Id != planId))
         {
             SubscriptionPlan? currentPlan = await planRepo.GetByIdAsync(planId, cancellationToken);

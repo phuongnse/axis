@@ -5,7 +5,7 @@ using Axis.Shared.Application.CQRS;
 
 namespace Axis.Identity.Application.Queries.GetRoles;
 
-/// <summary>US-021: Lists all roles for the org, including system roles, paginated.</summary>
+/// <summary>Lists all roles for the org, including system roles, paginated.</summary>
 public sealed class GetRolesHandler(IRoleRepository roleRepo)
     : IQueryHandler<GetRolesQuery, PagedResult<RoleDto>>
 {

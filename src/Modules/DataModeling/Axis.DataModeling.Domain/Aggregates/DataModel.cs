@@ -54,7 +54,7 @@ public sealed class DataModel : AggregateRoot<Guid>
         DataModel model = new(Guid.NewGuid(), name.Trim(), description?.Trim(), icon, color,
             organizationId, createdBy, now);
 
-        // Auto-generate system fields (US-030)
+        // Auto-generate system fields
         model._fields.Add(FieldDefinition.Create("id", "ID", FieldType.Text, true, 0, new TextFieldConfig(), isSystem: true));
         model._fields.Add(FieldDefinition.Create("created_at", "Created At", FieldType.Date, true, 1, new DateFieldConfig(IncludeTime: true), isSystem: true));
         model._fields.Add(FieldDefinition.Create("updated_at", "Updated At", FieldType.Date, true, 2, new DateFieldConfig(IncludeTime: true), isSystem: true));

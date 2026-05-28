@@ -4,7 +4,7 @@ using Axis.Shared.Application.CQRS;
 
 namespace Axis.DataModeling.Application.Queries.GetModels;
 
-/// <summary>US-031: Lists non-deleted models for the org, paginated.</summary>
+/// <summary>Lists non-deleted models for the org, paginated.</summary>
 public sealed class GetModelsHandler(IDataModelRepository modelRepo)
     : IQueryHandler<GetModelsQuery, PagedResult<ModelSummaryDto>>
 {

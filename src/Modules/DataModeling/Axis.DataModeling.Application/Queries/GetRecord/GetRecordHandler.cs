@@ -6,7 +6,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Queries.GetRecord;
 
-/// <summary>US-044: Returns a single record by ID; 404 if not found.</summary>
+/// <summary>Returns a single record by ID; 404 if not found.</summary>
 public sealed class GetRecordHandler(IDataRecordRepository recordRepo)
     : IQueryHandler<GetRecordQuery, Result<RecordDto>>
 {

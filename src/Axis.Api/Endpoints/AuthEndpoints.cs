@@ -39,7 +39,7 @@ public static class AuthEndpoints
         group.MapGet("/provisioning-status", GetProvisioningStatus)
             .AllowAnonymous()
             .WithName("GetProvisioningStatus")
-            .WithSummary("Poll tenant provisioning progress after email verification (US-003)")
+            .WithSummary("Poll tenant provisioning progress after email verification")
             .WithTags("Identity")
             .Produces<ProvisioningStatusDto>()
             .Produces(404);

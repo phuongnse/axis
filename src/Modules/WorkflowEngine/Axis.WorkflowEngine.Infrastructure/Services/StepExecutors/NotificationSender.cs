@@ -5,7 +5,7 @@ namespace Axis.WorkflowEngine.Infrastructure.Services.StepExecutors;
 
 /// <summary>
 /// Notification step sender. Dispatches email or webhook notifications.
-/// US-061: full email (MailKit) and webhook dispatch implementation is E06 scope;
+/// full email (MailKit) and webhook dispatch implementation is scope;
 /// currently logs a warning and returns a delivered status to allow execution to proceed.
 /// Never throws — delivery failures are captured in the return value.
 /// </summary>

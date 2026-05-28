@@ -4,7 +4,7 @@ option csharp_namespace = "Axis.WorkflowBuilder.Contracts.Grpc";
 
 package axis.workflowbuilder.v1;
 
-// Cross-module sync RPC (ADR-014). Used by FormBuilder to block form deletion (US-078).
+// Cross-module sync RPC (ADR-014). Used by FormBuilder to block form deletion.
 service WorkflowFormReferenceService {
   rpc CountBlockingFormReferences(CountBlockingFormReferencesRequest)
       returns (CountBlockingFormReferencesResponse);

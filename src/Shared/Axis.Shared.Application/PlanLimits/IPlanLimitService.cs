@@ -16,14 +16,14 @@ public interface IPlanLimitService
 
     Task RefreshCachedLimitsAsync(Guid organizationId, CancellationToken cancellationToken = default);
 
-    /// <summary>Adjusts Redis usage counters after a successful mutation (US-011 edge: decrement on delete).</summary>
+    /// <summary>Adjusts Redis usage counters after a successful mutation.</summary>
     Task RecordUsageDeltaAsync(
         Guid organizationId,
         PlanLimitResourceType resourceType,
         int delta,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Current usage vs plan limits for organization settings (US-006).</summary>
+    /// <summary>Current usage vs plan limits for organization settings.</summary>
     Task<PlanLimitUsageSnapshot?> GetUsageSnapshotAsync(
         Guid organizationId,
         CancellationToken cancellationToken = default);

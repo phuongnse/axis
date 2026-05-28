@@ -5,7 +5,7 @@ namespace Axis.WorkflowEngine.Infrastructure.Services.StepExecutors;
 
 /// <summary>
 /// JavaScript Script step executor. Executes sandboxed JS with access to context.
-/// US-060: full sandbox implementation (no network, no filesystem, no process) pending;
+/// full sandbox implementation (no network, no filesystem, no process) pending;
 /// currently returns an empty output to keep the execution moving.
 /// </summary>
 internal sealed class ScriptExecutor(ILogger<ScriptExecutor> logger) : IScriptExecutor
@@ -22,7 +22,7 @@ internal sealed class ScriptExecutor(ILogger<ScriptExecutor> logger) : IScriptEx
         if (string.IsNullOrWhiteSpace(script))
             throw new InvalidOperationException("Script body must not be empty.");
 
-        // Placeholder: full JS sandbox engine (e.g., Jint) implementation is E06 scope.
+        // Placeholder: full JS sandbox engine (e.g., Jint) implementation is scope.
         // Returning empty output allows the execution to continue and tests to verify step lifecycle.
         logger.LogWarning(
             "Script execution is not yet implemented — script body will not be evaluated. " +

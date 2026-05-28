@@ -14,7 +14,7 @@ public static class PlanEndpoints
         group.MapGet("/", ListPlans)
             .AllowAnonymous()
             .WithName("ListSubscriptionPlans")
-            .WithSummary("List subscription plans available for signup (US-010)")
+            .WithSummary("List subscription plans available for signup")
             .WithTags("Platform")
             .Produces<IReadOnlyList<SubscriptionPlanDto>>();
 

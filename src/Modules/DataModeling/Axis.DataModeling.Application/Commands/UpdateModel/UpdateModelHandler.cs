@@ -5,7 +5,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Commands.UpdateModel;
 
-/// <summary>US-032: Validates name uniqueness (excluding self), then updates the model.</summary>
+/// <summary>Validates name uniqueness (excluding self), then updates the model.</summary>
 public sealed class UpdateModelHandler(
     IDataModelRepository modelRepo,
     IUnitOfWork uow)

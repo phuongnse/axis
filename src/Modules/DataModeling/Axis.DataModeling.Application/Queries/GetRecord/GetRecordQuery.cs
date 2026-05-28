@@ -4,7 +4,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Queries.GetRecord;
 
-/// <summary>US-044: Returns a single record by ID.</summary>
+/// <summary>Returns a single record by ID.</summary>
 public sealed record GetRecordQuery(
     Guid RecordId,
     Guid ModelId,

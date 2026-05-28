@@ -76,7 +76,7 @@ public class AssignRoleToUserHandlerTests
             new AssignRoleToUserCommand(user.Id, OrgId, EditorRoleId, Action: RoleAction.Remove),
             CancellationToken.None);
 
-        // US-024: a user must always have at least one role
+        // a user must always have at least one role
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
         result.Error.Should().Contain("at least one role");
@@ -96,7 +96,7 @@ public class AssignRoleToUserHandlerTests
             new AssignRoleToUserCommand(user.Id, OrgId, AdminRoleId, Action: RoleAction.Remove),
             CancellationToken.None);
 
-        // US-024: last admin guard
+        // last admin guard
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
         result.Error.Should().Contain("last admin");

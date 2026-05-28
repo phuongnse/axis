@@ -8,7 +8,7 @@ namespace Axis.DataModeling.Domain.Aggregates;
 
 /// <summary>
 /// Reusable nested object type composed of multiple fields.
-/// DataClass fields cannot use Relation, DataClass, or File types (US-037).
+/// DataClass fields cannot use Relation, DataClass, or File types.
 /// </summary>
 public sealed class DataClass : AggregateRoot<Guid>
 {

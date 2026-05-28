@@ -6,7 +6,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.FormBuilder.Application.Commands.DeleteForm;
 
-/// <summary>US-078: Guards against referenced forms; soft-deletes if safe.</summary>
+/// <summary>Guards against referenced forms; soft-deletes if safe.</summary>
 public sealed class DeleteFormHandler(
     IFormRepository formRepo,
     IFormDeletionGuard formDeletionGuard,

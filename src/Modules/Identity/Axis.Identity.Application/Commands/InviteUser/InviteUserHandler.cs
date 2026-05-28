@@ -34,12 +34,12 @@ public sealed class InviteUserHandler(
 
         Email email = emailResult.Value;
 
-        // US-017: cannot invite existing member
+        // cannot invite existing member
         User? existingMember = await userRepo.GetByEmailAsync(email, command.OrganizationId, cancellationToken);
         if (existingMember is not null)
             return Result.Failure(ErrorCodes.Conflict, "This user is already a member.");
 
-        // US-017: cannot invite email with pending invitation
+        // cannot invite email with pending invitation
         Invitation? existingInvitation = await invitationRepo.GetPendingByEmailAsync(
             email, command.OrganizationId, cancellationToken);
         if (existingInvitation is not null)

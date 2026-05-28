@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Axis.Identity.Infrastructure.Services;
 
-/// <summary>Seeds catalog subscription plans on startup (US-010).</summary>
+/// <summary>Seeds catalog subscription plans on startup.</summary>
 public sealed class SubscriptionPlanSeeder(IServiceProvider services, ILogger<SubscriptionPlanSeeder> logger)
     : IHostedService
 {

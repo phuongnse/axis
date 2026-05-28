@@ -9,15 +9,15 @@ namespace Axis.Architecture.Tests;
 /// <para>
 /// Rules enforced:
 /// <list type="bullet">
-///   <item><b>Naming</b> — any static class that hosts a <c>Map*</c> extension method
-///         returning <c>IEndpointRouteBuilder</c> must be named <c>*Endpoints</c>.
-///         Without the suffix, `Program.cs` registration calls (`app.MapXxx()`)
-///         lose grep-ability.</item>
+/// <item><b>Naming</b> — any static class that hosts a <c>Map*</c> extension method
+/// returning <c>IEndpointRouteBuilder</c> must be named <c>*Endpoints</c>.
+/// Without the suffix, `Program.cs` registration calls (`app.MapXxx`)
+/// lose grep-ability.</item>
 /// </list>
 /// </para>
 ///
 /// <para>
-/// <b>Authorization presence</b> (every endpoint chains <c>.RequireAuthorization()</c>
+/// <b>Authorization presence</b> (every endpoint chains <c>.RequireAuthorization</c>
 /// unless deliberately anonymous) is NOT checked here — it requires walking
 /// the <c>EndpointDataSource</c> at runtime via a <c>WebApplicationFactory</c>.
 /// That check ships in PR #97 along with the DI registration scanner that

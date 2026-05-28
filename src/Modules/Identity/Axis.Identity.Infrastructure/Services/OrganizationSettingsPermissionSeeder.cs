@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Axis.Identity.Infrastructure.Services;
 
-/// <summary>Backfills F02 organization settings permissions onto existing system Admin roles.</summary>
+/// <summary>Backfills organization settings permissions onto existing system Admin roles.</summary>
 internal sealed class OrganizationSettingsPermissionSeeder(
     IServiceProvider serviceProvider,
     ILogger<OrganizationSettingsPermissionSeeder> logger) : IHostedService

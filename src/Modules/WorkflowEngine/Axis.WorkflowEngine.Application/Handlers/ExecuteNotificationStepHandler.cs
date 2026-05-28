@@ -9,7 +9,7 @@ namespace Axis.WorkflowEngine.Application.Handlers;
 
 /// <summary>
 /// Executes a Notification step via INotificationSender (fire-and-forget: completes
-/// regardless of delivery outcome). US-093: isolated; idempotency on re-delivery.
+/// regardless of delivery outcome). isolated; idempotency on re-delivery.
 /// </summary>
 public sealed class ExecuteNotificationStepHandler(
     IExecutionRepository execRepo,
@@ -51,7 +51,7 @@ public sealed class ExecuteNotificationStepHandler(
         IReadOnlyDictionary<string, object?> deliveryResult = await sender.SendAsync(
             message.StepConfig, message.Context, ct);
 
-        // Log a warning if delivery failed but still complete the step (configurable behavior is E06 F03 scope)
+        // Log a warning if delivery failed but still complete the step (configurable behavior is scope)
         if (deliveryResult.TryGetValue("status", out object? status)
             && "failed".Equals(status?.ToString(), StringComparison.OrdinalIgnoreCase))
         {

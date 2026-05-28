@@ -5,7 +5,7 @@ using Axis.WorkflowBuilder.Domain.Aggregates;
 
 namespace Axis.WorkflowBuilder.Application.Queries.GetWorkflows;
 
-/// <summary>US-048: Lists all workflow definitions for an org, ordered by last modified.</summary>
+/// <summary>Lists all workflow definitions for an org, ordered by last modified.</summary>
 public sealed class GetWorkflowsHandler(IWorkflowRepository workflowRepo)
     : IQueryHandler<GetWorkflowsQuery, PagedResult<WorkflowSummaryDto>>
 {

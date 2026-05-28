@@ -5,7 +5,7 @@ using Axis.WorkflowEngine.Domain.Enums;
 
 namespace Axis.WorkflowEngine.Application.Queries.GetExecutionsByWorkflow;
 
-/// <summary>US-097: Paginated execution history for a specific workflow.</summary>
+/// <summary>Paginated execution history for a specific workflow.</summary>
 public sealed record GetExecutionsByWorkflowQuery(
     Guid WorkflowDefinitionId,
     Guid OrganizationId,

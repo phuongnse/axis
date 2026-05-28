@@ -2,7 +2,7 @@ namespace Axis.Shared.Domain.Primitives;
 
 /// <summary>
 /// Well-known error codes used by Result.Failure to drive HTTP status mapping.
-/// Endpoints call result.ToProblemDetails() which switches on these codes.
+/// Endpoints call result.ToProblemDetails which switches on these codes.
 /// </summary>
 public static class ErrorCodes
 {
@@ -52,7 +52,7 @@ public class Result
 
     public PlanLimitFailureDetails? PlanLimitDetails => _planLimitDetails;
 
-    /// <summary>Well-known code from ErrorCodes — used by ToProblemDetails() to pick HTTP status.</summary>
+    /// <summary>Well-known code from ErrorCodes — used by ToProblemDetails to pick HTTP status.</summary>
     public string? ErrorCode => IsFailure
         ? _errorCode
         : throw new InvalidOperationException("A success result has no error.");

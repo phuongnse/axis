@@ -315,7 +315,7 @@ try
             opts.UseReferenceRefreshTokens();
 
             // Ephemeral keys for development. Production should use
-            // .AddEncryptionCertificate() / .AddSigningCertificate() from Azure Key Vault.
+            // .AddEncryptionCertificate / .AddSigningCertificate from Azure Key Vault.
             opts.AddEphemeralEncryptionKey()
                 .AddEphemeralSigningKey();
 
@@ -445,7 +445,7 @@ try
     WebApplication app = builder.Build();
 
     // ── Dev bootstrap: apply Identity migrations before OpenIddictSeeder runs.
-    //    Tenant module schemas are provisioned per-org by TenantSchemaProvisioner.
+    // Tenant module schemas are provisioned per-org by TenantSchemaProvisioner.
     if (app.Environment.IsDevelopment() && !EF.IsDesignTime)
     {
         using IServiceScope scope = app.Services.CreateScope();

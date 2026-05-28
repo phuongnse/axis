@@ -19,7 +19,7 @@ public sealed class ResendVerificationEmailHandler(
     public async Task<Result> Handle(ResendVerificationEmailCommand command, CancellationToken cancellationToken)
     {
         Result<Email> email = Email.Create(command.Email);
-        if (email.IsFailure) return Result.Success(); // no error leakage per US-002
+        if (email.IsFailure) return Result.Success(); // no error leakage
 
         User? user = await userRepo.FindByEmailGloballyAsync(email.Value, cancellationToken);
         if (user is null || user.IsEmailVerified) return Result.Success(); // silent — no info leakage

@@ -48,7 +48,7 @@ public class UpdateRoleHandlerTests
 
         Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
-        // US-023: system roles cannot be edited
+        // system roles cannot be edited
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
         result.Error.Should().Contain("system role");

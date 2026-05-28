@@ -7,7 +7,7 @@ using Axis.Shared.Domain.Primitives;
 namespace Axis.Identity.Application.Commands.AssignRoleToUser;
 
 /// <summary>
-/// US-024: Assigns or removes a role.
+/// Assigns or removes a role.
 /// Guards: role must exist in org; user must retain at least one role; last admin cannot be stripped of Admin role.
 /// </summary>
 public sealed class AssignRoleToUserHandler(
@@ -32,11 +32,11 @@ public sealed class AssignRoleToUserHandler(
         }
         else
         {
-            // US-024: a user must always have at least one role
+            // a user must always have at least one role
             if (user.RoleIds.Count <= 1 && user.RoleIds.Contains(command.RoleId))
                 return Result.Failure(ErrorCodes.BusinessRule, "User must have at least one role.");
 
-            // US-024: last admin guard — cannot remove admin role from the last admin
+            // last admin guard — cannot remove admin role from the last admin
             if (role.IsSystem && role.Name == "Admin")
             {
                 int adminCount = await userRepo.CountAdminsAsync(

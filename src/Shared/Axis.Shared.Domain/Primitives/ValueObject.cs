@@ -2,7 +2,7 @@ namespace Axis.Shared.Domain.Primitives;
 
 /// <summary>
 /// Base class for value objects. Equality is based on the components returned by
-/// GetEqualityComponents(), not on reference identity.
+/// GetEqualityComponents, not on reference identity.
 /// </summary>
 public abstract class ValueObject : IEquatable<ValueObject>
 {

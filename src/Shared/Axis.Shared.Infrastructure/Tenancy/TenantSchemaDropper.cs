@@ -3,7 +3,7 @@ using Npgsql;
 
 namespace Axis.Shared.Infrastructure.Tenancy;
 
-/// <summary>Drops a tenant schema in a module database (organization hard-delete, US-007).</summary>
+/// <summary>Drops a tenant schema in a module database.</summary>
 public static class TenantSchemaDropper
 {
     public static async Task DropAsync(

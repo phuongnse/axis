@@ -6,7 +6,7 @@ using Axis.WorkflowBuilder.Domain.Aggregates;
 
 namespace Axis.WorkflowBuilder.Application.Commands.PublishWorkflow;
 
-/// <summary>US-049: Loads the workflow and delegates publish logic to the aggregate.</summary>
+/// <summary>Loads the workflow and delegates publish logic to the aggregate.</summary>
 public sealed class PublishWorkflowHandler(
     IWorkflowRepository workflowRepo,
     IWorkflowReferenceSync referenceSync,

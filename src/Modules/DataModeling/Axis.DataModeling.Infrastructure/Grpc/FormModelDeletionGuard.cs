@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Http;
 
 namespace Axis.DataModeling.Infrastructure.Grpc;
 
-/// <summary>US-033: blocks model deletion when FormBuilder reports active Relation Picker refs (ADR-014 gRPC).</summary>
+/// <summary>blocks model deletion when FormBuilder reports active Relation Picker refs (ADR-014 gRPC).</summary>
 internal sealed class FormModelDeletionGuard(
     FormModelReferenceService.FormModelReferenceServiceClient formModelReferences,
     IHttpContextAccessor httpContextAccessor)

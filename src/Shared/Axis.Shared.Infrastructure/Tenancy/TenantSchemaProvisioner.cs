@@ -5,7 +5,7 @@ using Npgsql;
 namespace Axis.Shared.Infrastructure.Tenancy;
 
 /// <summary>
-/// Shared steps for per-module tenant schema provisioning (US-003). Each module supplies its own DbContext factory.
+/// Shared steps for per-module tenant schema provisioning. Each module supplies its own DbContext factory.
 /// </summary>
 public static class TenantSchemaProvisioner
 {

@@ -1,6 +1,6 @@
 namespace Axis.Identity.Application.Services;
 
-/// <summary>US-003: notifies the platform team when tenant provisioning is exhausted.</summary>
+/// <summary>notifies the platform team when tenant provisioning is exhausted.</summary>
 public interface IPlatformProvisioningAlert
 {
     Task AlertProvisioningFailedAsync(

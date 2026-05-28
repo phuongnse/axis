@@ -2,7 +2,7 @@ using Axis.Shared.Application.CQRS;
 
 namespace Axis.DataModeling.Application.Commands.ReorderFields;
 
-/// <summary>US-036: Reorder custom fields within a model by providing the desired field ID sequence.</summary>
+/// <summary>Reorder custom fields within a model by providing the desired field ID sequence.</summary>
 public sealed record ReorderFieldsCommand(
     Guid ModelId,
     Guid OrganizationId,

@@ -13,11 +13,11 @@ public sealed class CreateRoleHandler(
 {
     public async Task<Result<Guid>> Handle(CreateRoleCommand command, CancellationToken cancellationToken)
     {
-        // US-022: at least one permission required
+        // at least one permission required
         if (command.Permissions.Count == 0)
             return Result.Failure<Guid>(ErrorCodes.BusinessRule, "A role must have at least one permission.");
 
-        // US-022: unique name (case-insensitive) within org
+        // unique name (case-insensitive) within org
         if (await roleRepo.NameExistsAsync(command.Name, command.OrganizationId, null, cancellationToken))
             return Result.Failure<Guid>(ErrorCodes.Conflict, "A role with this name already exists.");
 

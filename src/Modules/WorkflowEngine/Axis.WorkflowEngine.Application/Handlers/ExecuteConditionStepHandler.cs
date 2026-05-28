@@ -15,7 +15,7 @@ namespace Axis.WorkflowEngine.Application.Handlers;
 /// 1. Determines the selected branch.
 /// 2. Skips all ExecutionSteps reachable only from non-selected branches.
 /// 3. Dispatches StepCompletedMessage so the execution can advance.
-/// US-066/067: multi-branch; first-match wins; default branch fallback.
+/// /067: multi-branch; first-match wins; default branch fallback.
 /// </summary>
 public sealed class ExecuteConditionStepHandler(
     IExecutionRepository execRepo,

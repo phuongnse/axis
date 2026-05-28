@@ -4,7 +4,7 @@ using Axis.Shared.Application.CQRS;
 
 namespace Axis.DataModeling.Application.Commands.AddFieldToDataClass;
 
-/// <summary>US-037/039: Add a field to a data class (Relation, DataClass, File types are blocked by domain).</summary>
+/// <summary>/039: Add a field to a data class (Relation, DataClass, File types are blocked by domain).</summary>
 public sealed record AddFieldToDataClassCommand(
     Guid DataClassId,
     Guid OrganizationId,

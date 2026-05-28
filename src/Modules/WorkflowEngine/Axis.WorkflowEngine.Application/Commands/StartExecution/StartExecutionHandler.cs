@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Axis.WorkflowEngine.Application.Commands.StartExecution;
 
-/// <summary>US-090: Validates workflow is active, creates Pending execution with all steps,
+/// <summary>Validates workflow is active, creates Pending execution with all steps,
 /// then dispatches ExecuteNextStepMessage so Wolverine picks up execution asynchronously.</summary>
 public sealed class StartExecutionHandler(
     IPlanLimitService planLimitService,
@@ -35,7 +35,7 @@ public sealed class StartExecutionHandler(
             return Result.Failure<Guid>(planCheck.ErrorCode!, planCheck.Error);
         }
 
-        // US-090: only Active workflows can be triggered
+        // only Active workflows can be triggered
         if (!await workflowReader.IsActiveAsync(command.WorkflowDefinitionId, command.OrganizationId, cancellationToken))
             return Result.Failure<Guid>(ErrorCodes.BusinessRule,
                 "This workflow cannot be triggered. Only active workflows can be executed.");

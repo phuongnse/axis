@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Axis.Identity.Infrastructure.Services;
 
-/// <summary>US-003: structured critical log until external alerting is wired.</summary>
+/// <summary>structured critical log until external alerting is wired.</summary>
 internal sealed class LoggingPlatformProvisioningAlert(ILogger<LoggingPlatformProvisioningAlert> logger)
     : IPlatformProvisioningAlert
 {

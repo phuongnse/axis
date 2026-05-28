@@ -9,9 +9,9 @@ namespace Axis.Api.Tests.Architecture;
 
 /// <summary>
 /// Runtime convention check: every route endpoint must declare authorization
-/// intent **explicitly** — either <c>.RequireAuthorization()</c> (or an
+/// intent **explicitly** — either <c>.RequireAuthorization</c> (or an
 /// <c>[Authorize]</c>-equivalent) so callers must authenticate, or
-/// <c>.AllowAnonymous()</c> (or <c>[AllowAnonymous]</c>) so the public access
+/// <c>.AllowAnonymous</c> (or <c>[AllowAnonymous]</c>) so the public access
 /// is intentional and visible in code review.
 ///
 /// <para>

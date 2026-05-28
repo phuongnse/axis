@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace Axis.WorkflowBuilder.Infrastructure.Handlers;
 
 /// <summary>
-/// Flags Event triggers that reference a deleted model (E03 US-033, E04 US-065).
+/// Flags Event triggers that reference a deleted model.
 /// </summary>
 internal sealed class ModelDeletedHandler(
     WorkflowBuilderDbContext context,

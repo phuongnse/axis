@@ -6,7 +6,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Queries.GetDataClass;
 
-/// <summary>US-039: Loads a data class with its complete field list.</summary>
+/// <summary>Loads a data class with its complete field list.</summary>
 public sealed class GetDataClassHandler(IDataClassRepository dataClassRepo)
     : IQueryHandler<GetDataClassQuery, Result<DataClassDetailDto>>
 {

@@ -283,7 +283,7 @@ public class ExecutionStepTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*cancel*");
     }
 
-    // ─── Idempotency (US-093 edge case) ──────────────────────────────────────
+    // ─── Idempotency ──────────────────────────────────────
 
     [Theory]
     [InlineData(StepExecutionStatus.Completed)]

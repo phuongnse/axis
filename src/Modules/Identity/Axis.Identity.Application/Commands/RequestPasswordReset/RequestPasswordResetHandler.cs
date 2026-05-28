@@ -19,12 +19,12 @@ public sealed class RequestPasswordResetHandler(
     public async Task<Result> Handle(RequestPasswordResetCommand command, CancellationToken cancellationToken)
     {
         Result<Email> email = Email.Create(command.Email);
-        if (email.IsFailure) return Result.Success(); // no leakage per US-027
+        if (email.IsFailure) return Result.Success(); // no leakage
 
         User? user = await userRepo.FindByEmailGloballyAsync(email.Value, cancellationToken);
         if (user is null) return Result.Success(); // same message regardless — no enumeration
 
-        // Invalidate any prior tokens before issuing a new one (per US-027 edge case)
+        // Invalidate any prior tokens before issuing a new one
         await tokenStore.InvalidateAllForUserAsync(user.Id, cancellationToken);
 
         (string rawToken, string tokenHash) = OpaqueTokenGenerator.Create();

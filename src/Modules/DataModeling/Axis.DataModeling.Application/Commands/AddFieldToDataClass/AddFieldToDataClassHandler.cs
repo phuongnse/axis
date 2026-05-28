@@ -7,7 +7,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Commands.AddFieldToDataClass;
 
-/// <summary>US-037/039: Loads the data class and delegates field creation to the aggregate.</summary>
+/// <summary>/039: Loads the data class and delegates field creation to the aggregate.</summary>
 public sealed class AddFieldToDataClassHandler(
     IDataClassRepository dataClassRepo,
     IUnitOfWork uow)
