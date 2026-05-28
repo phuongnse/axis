@@ -432,43 +432,43 @@ function containerDiagram() {
   ];
   for (const db of dbs) {
     els.push(...rect({ x: DBX, y: db.y, w: DBW, h: DBH, bg: C.infraBg, stroke: C.infraBdr, label: db.label, labelSize: 11 }));
-    els.push(...arrow({ x1: 810, y1: db.y + DBH / 2, x2: DBX, y2: db.y + DBH / 2, color: C.infraBdr }));
+    els.push(...arrow({ x1: 810, y1: db.y + DBH / 2, x2: DBX, y2: db.y + DBH / 2, color: C.arrow }));
   }
 
   // Other infrastructure (right side, below DB column) - distinct color from DB blocks
   els.push(...rect({ x: DBX, y: 495, w: DBW, h: DBH, bg: C.sysBg, stroke: C.sysBdr, label: "Redis", sub: "Cache · Session" }));
-  els.push(...arrow({ x1: 810, y1: 522, x2: DBX, y2: 522, color: C.sysBdr }));
+  els.push(...arrow({ x1: 810, y1: 522, x2: DBX, y2: 522, color: C.arrow }));
 
   // Production operations containers (right side, straight arrows from platform edge)
   els.push(...rect({ x: 870, y: 565, w: 220, h: 55, bg: C.sysBg, stroke: C.sysBdr,
     label: "HashiCorp Vault", sub: "Secrets management" }));
   els.push(...rect({ x: 870, y: 635, w: 220, h: 55, bg: C.sysBg, stroke: C.sysBdr,
     label: "Grafana Tempo/Loki/Mimir", sub: "Tracing · Logs · Metrics" }));
-  els.push(...arrow({ x1: 810, y1: 592, x2: 870, y2: 592, color: C.sysBdr }));
-  els.push(...arrow({ x1: 810, y1: 662, x2: 870, y2: 662, color: C.sysBdr }));
+  els.push(...arrow({ x1: 810, y1: 592, x2: 870, y2: 592, color: C.arrow }));
+  els.push(...arrow({ x1: 810, y1: 662, x2: 870, y2: 662, color: C.arrow }));
 
   // External managed services aligned with operations rows
   els.push(...rect({ x: 1110, y: 565, w: 200, h: 55, bg: C.extBg, stroke: C.extBdr, label: "AWS S3", sub: "File storage" }));
   els.push(...rect({ x: 1110, y: 635, w: 200, h: 55, bg: C.extBg, stroke: C.extBdr, label: "Email Service", sub: "SMTP · MailKit" }));
   // Connections avoid crossing ops blocks while preserving clear source/target.
-  els.push(...routedArrow({ waypoints: [[810, 560], [1100, 560], [1100, 592], [1110, 592]], color: C.extBdr }));
-  els.push(...routedArrow({ waypoints: [[810, 662], [845, 662], [845, 705], [1100, 705], [1100, 662], [1110, 662]], color: C.extBdr }));
+  els.push(...routedArrow({ waypoints: [[810, 560], [1100, 560], [1100, 592], [1110, 592]], color: C.arrow }));
+  els.push(...routedArrow({ waypoints: [[810, 662], [845, 662], [845, 705], [1100, 705], [1100, 662], [1110, 662]], color: C.arrow }));
 
   // Compact legend
-  els.push(...rect({ x: 640, y: 94, w: 150, h: 112, bg: "#ffffff", stroke: C.border }));
-  els.push(text({ x: 715, y: 108, value: "Legend", size: 10, bold: true, color: C.text, anchor: "center" }));
-  els.push(...rect({ x: 650, y: 118, w: 12, h: 12, bg: C.modBg, stroke: C.modBdr }));
-  els.push(text({ x: 668, y: 124, value: "Module service", size: 9, color: C.text }));
-  els.push(...rect({ x: 650, y: 136, w: 12, h: 12, bg: C.evtBg, stroke: C.evtBdr }));
-  els.push(text({ x: 668, y: 142, value: "Messaging lanes", size: 9, color: C.text }));
-  els.push(...rect({ x: 650, y: 154, w: 12, h: 12, bg: C.infraBg, stroke: C.infraBdr }));
-  els.push(text({ x: 668, y: 160, value: "Database", size: 9, color: C.text }));
-  els.push(...rect({ x: 650, y: 172, w: 12, h: 12, bg: C.extBg, stroke: C.extBdr }));
-  els.push(text({ x: 668, y: 178, value: "External service", size: 9, color: C.text }));
-  els.push(...rect({ x: 740, y: 154, w: 12, h: 12, bg: C.sysBg, stroke: C.sysBdr }));
-  els.push(text({ x: 758, y: 160, value: "Platform ops", size: 9, color: C.text }));
-  els.push(...arrow({ x1: 650, y1: 190, x2: 680, y2: 190, color: C.sysBdr }));
-  els.push(text({ x: 685, y: 190, value: "Internal connection", size: 9, color: C.text }));
+  els.push(...rect({ x: 628, y: 88, w: 176, h: 142, bg: "#ffffff", stroke: C.border }));
+  els.push(text({ x: 716, y: 102, value: "Legend", size: 10, bold: true, color: C.text, anchor: "center" }));
+  els.push(...rect({ x: 640, y: 114, w: 12, h: 12, bg: C.modBg, stroke: C.modBdr }));
+  els.push(text({ x: 658, y: 120, value: "Module service", size: 9, color: C.text }));
+  els.push(...rect({ x: 640, y: 132, w: 12, h: 12, bg: C.evtBg, stroke: C.evtBdr }));
+  els.push(text({ x: 658, y: 138, value: "Messaging lanes", size: 9, color: C.text }));
+  els.push(...rect({ x: 640, y: 150, w: 12, h: 12, bg: C.infraBg, stroke: C.infraBdr }));
+  els.push(text({ x: 658, y: 156, value: "Database", size: 9, color: C.text }));
+  els.push(...rect({ x: 640, y: 168, w: 12, h: 12, bg: C.sysBg, stroke: C.sysBdr }));
+  els.push(text({ x: 658, y: 174, value: "Platform ops", size: 9, color: C.text }));
+  els.push(...rect({ x: 640, y: 186, w: 12, h: 12, bg: C.extBg, stroke: C.extBdr }));
+  els.push(text({ x: 658, y: 192, value: "External service", size: 9, color: C.text }));
+  els.push(...arrow({ x1: 640, y1: 210, x2: 670, y2: 210, color: C.arrow }));
+  els.push(text({ x: 676, y: 210, value: "Connection", size: 9, color: C.text }));
 
   return excalidraw(els);
 }
