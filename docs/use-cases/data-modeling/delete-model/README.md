@@ -1,6 +1,6 @@
 # Use case — Delete a model
 
-> **Navigation**: [← Data Modeling](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Data Modeling](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -44,8 +44,8 @@ Users can create custom data models within their organization. A model defines t
 - [ ] Workflow steps and form fields that referenced the deleted model are flagged as "broken" in their respective editors after the model is deleted.
 - [ ] Relation fields in other models that point to the deleted model are also flagged as broken.
 
-*Out of scope*
-- Recovering a soft-deleted model — not in MVP.
+*Deferred capabilities*
+- Recovering a soft-deleted model.
 
 > **Implementation status**
 >

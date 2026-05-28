@@ -1,6 +1,6 @@
 # Technical Patterns
 
-> **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
+> **Navigation**: [← docs/README.md](./README.md) · [← CLAUDE.md](././CLAUDE.md)
 
 > **Start with [patterns-index.md](./patterns-index.md)** — one-page map to sections below. Open `patterns.md` only for the section you need. Skip both when the task is trivial.
 
@@ -77,9 +77,9 @@ Never throw `ValidationException` from a handler. Never return `Result` from inf
 // ❌ incomplete workaround — only fires when entity is already Modified.
 // If ONLY the JSONB field mutated, entity state is Unchanged → changes are LOST silently.
 foreach (var entry in ChangeTracker.Entries<MyAggregate>()
-    .Where(e => e.State == EntityState.Modified))
+ .Where(e => e.State == EntityState.Modified))
 {
-    entry.Property("_items").IsModified = true;
+ entry.Property("_items").IsModified = true;
 }
 ```
 
@@ -90,28 +90,28 @@ The example below uses `MyAggregate` / `ItemDto` as placeholders — substitute 
 ```csharp
 internal sealed class MyAggregateConfiguration : IEntityTypeConfiguration<MyAggregate>
 {
-    private static readonly ValueConverter<List<ItemDto>, string> ItemsConverter =
-        new(
-            items => JsonSerializer.Serialize(items, JsonOptions.Options),
-            json => JsonSerializer.Deserialize<List<ItemDto>>(json, JsonOptions.Options)
-                    ?? new List<ItemDto>());
+ private static readonly ValueConverter<List<ItemDto>, string> ItemsConverter =
+ new(
+ items => JsonSerializer.Serialize(items, JsonOptions.Options),
+ json => JsonSerializer.Deserialize<List<ItemDto>>(json, JsonOptions.Options)
+ ?? new List<ItemDto>());
 
-    private static readonly ValueComparer<List<ItemDto>> ItemsComparer =
-        new(
-            (l1, l2) => l1 != null && l2 != null && l1.SequenceEqual(l2),
-            l => l.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
-            l => l.ToList()); // deep copy — this is what makes the snapshot correct
+ private static readonly ValueComparer<List<ItemDto>> ItemsComparer =
+ new(
+ (l1, l2) => l1 != null && l2 != null && l1.SequenceEqual(l2),
+ l => l.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+ l => l.ToList()); // deep copy — this is what makes the snapshot correct
 
-    public void Configure(EntityTypeBuilder<MyAggregate> builder)
-    {
-        builder.Property<List<ItemDto>>("_items")
-            .HasField("_items")
-            .UsePropertyAccessMode(PropertyAccessMode.Field)
-            .HasColumnName("items")
-            .HasColumnType("jsonb")
-            .HasConversion(ItemsConverter, ItemsComparer) // ← always both together
-            .IsRequired();
-    }
+ public void Configure(EntityTypeBuilder<MyAggregate> builder)
+ {
+ builder.Property<List<ItemDto>>("_items")
+ .HasField("_items")
+ .UsePropertyAccessMode(PropertyAccessMode.Field)
+ .HasColumnName("items")
+ .HasColumnType("jsonb")
+ .HasConversion(ItemsConverter, ItemsComparer) // ← always both together
+ .IsRequired();
+ }
 }
 ```
 
@@ -131,14 +131,14 @@ With `ValueComparer`:
 ```csharp
 // ❌ wrong — entity is detached, SaveChanges does nothing
 WorkflowDefinition? wf = await _context.WorkflowDefinitions
-    .AsNoTracking()
-    .FirstOrDefaultAsync(w => w.Id == id, ct);
+ .AsNoTracking()
+ .FirstOrDefaultAsync(w => w.Id == id, ct);
 wf!.Publish();
 await _context.SaveChangesAsync(ct); // silent no-op
 
 // ✅ correct — tracking query for write paths
 WorkflowDefinition? wf = await _context.WorkflowDefinitions
-    .FirstOrDefaultAsync(w => w.Id == id, ct);
+ .FirstOrDefaultAsync(w => w.Id == id, ct);
 wf!.Publish();
 await _context.SaveChangesAsync(ct);
 ```
@@ -155,14 +155,14 @@ Calling `SaveChangesAsync` inside a repository method commits a partial transact
 // ❌ wrong — partial commit, breaks atomicity
 public async Task AddAsync(WorkflowDefinition wf, CancellationToken ct)
 {
-    await _context.WorkflowDefinitions.AddAsync(wf, ct);
-    await _context.SaveChangesAsync(ct); // ← never here
+ await _context.WorkflowDefinitions.AddAsync(wf, ct);
+ await _context.SaveChangesAsync(ct); // ← never here
 }
 
 // ✅ correct — only add to context; let the handler call UnitOfWork
 public async Task AddAsync(WorkflowDefinition wf, CancellationToken ct)
 {
-    await _context.WorkflowDefinitions.AddAsync(wf, ct);
+ await _context.WorkflowDefinitions.AddAsync(wf, ct);
 }
 // Handler calls: await _uow.SaveChangesAsync(ct) at the end
 ```
@@ -181,7 +181,7 @@ public IQueryable<WorkflowDefinition> GetAll() => _context.WorkflowDefinitions;
 
 // ✅ correct — all query logic stays in the repository
 public async Task<PagedResult<WorkflowSummaryDto>> GetPagedAsync(
-    int page, int pageSize, CancellationToken ct) { ... }
+ int page, int pageSize, CancellationToken ct) { . }
 ```
 
 **Rule:** Repository methods always return materialized types (`List<T>`, `T?`, `PagedResult<T>`). Never return `IQueryable<T>`.
@@ -196,19 +196,19 @@ Calling `SaveChangesAsync` inside a loop sends one SQL statement per iteration.
 // ❌ wrong — N database round trips
 foreach (WorkflowDefinition wf in workflows)
 {
-    wf.Archive();
-    await _context.SaveChangesAsync(ct);
+ wf.Archive();
+ await _context.SaveChangesAsync(ct);
 }
 
 // ✅ option A — one SaveChanges after all mutations (same transaction)
 foreach (WorkflowDefinition wf in workflows)
-    wf.Archive();
+ wf.Archive();
 await _uow.SaveChangesAsync(ct);
 
 // ✅ option B — bulk update without loading entities (large sets)
 await _context.WorkflowDefinitions
-    .Where(w => w.OrganizationId == orgId && w.Status == WorkflowStatus.Active)
-    .ExecuteUpdateAsync(s => s.SetProperty(w => w.Status, WorkflowStatus.Archived), ct);
+ .Where(w => w.OrganizationId == orgId && w.Status == WorkflowStatus.Active)
+ .ExecuteUpdateAsync(s => s.SetProperty(w => w.Status, WorkflowStatus.Archived), ct);
 ```
 
 **Rule:** Never call `SaveChangesAsync` inside a loop. For large bulk mutations, prefer `ExecuteUpdateAsync` / `ExecuteDeleteAsync`.
@@ -224,7 +224,7 @@ If a handler manipulates an aggregate's internals directly instead of calling a 
 ```csharp
 // ❌ wrong — handler knows too much, invariants unenforceable
 WorkflowDefinition wf = await _repo.GetByIdAsync(id, ct);
-wf.Status = WorkflowStatus.Published;   // public setter = no guard
+wf.Status = WorkflowStatus.Published; // public setter = no guard
 wf.UpdatedAt = DateTimeOffset.UtcNow;
 wf.PublishedAt = DateTimeOffset.UtcNow;
 await _uow.SaveChangesAsync(ct);
@@ -253,9 +253,9 @@ public IReadOnlyList<WorkflowStep> Steps => _steps.AsReadOnly();
 
 public void AddStep(WorkflowStep step)
 {
-    if (_steps.Count >= 50)
-        throw new InvalidOperationException("Workflow cannot exceed 50 steps.");
-    _steps.Add(step);
+ if (_steps.Count >= 50)
+ throw new InvalidOperationException("Workflow cannot exceed 50 steps.");
+ _steps.Add(step);
 }
 ```
 
@@ -296,26 +296,26 @@ If all three answers point to "entity", it is part of the parent's aggregate. Mo
 // ❌ wrong — ExecutionStep modeled as a separate aggregate root
 public sealed class ExecutionStep : AggregateRoot<Guid>
 {
-    public Guid ExecutionId { get; private set; } // FK back to owner — a red flag
-    public void Complete(output) { RaiseDomainEvent(new ExecutionStepCompleted(...)); } // events on child
+ public Guid ExecutionId { get; private set; } // FK back to owner — a red flag
+ public void Complete(output) { RaiseDomainEvent(new ExecutionStepCompleted(.)); } // events on child
 }
 
 // ✅ correct — ExecutionStep is an entity within WorkflowExecution's aggregate
 public sealed class ExecutionStep : Entity<Guid>
 {
-    public void Complete(output) { /* updates state only — no event raising */ }
+ public void Complete(output) { /* updates state only — no event raising */ }
 }
 
 public sealed class WorkflowExecution : AggregateRoot<Guid>
 {
-    private List<ExecutionStep> _steps = [];
-    public IReadOnlyList<ExecutionStep> Steps => _steps.AsReadOnly();
+ private List<ExecutionStep> _steps = [];
+ public IReadOnlyList<ExecutionStep> Steps => _steps.AsReadOnly();
 
-    public void CompleteStep(Guid stepId, IReadOnlyDictionary<string, object?> output)
-    {
-        GetStep(stepId).Complete(output);           // delegate state change to entity
-        RaiseDomainEvent(new ExecutionStepCompleted(Id, stepId, OrganizationId, output)); // event on root
-    }
+ public void CompleteStep(Guid stepId, IReadOnlyDictionary<string, object?> output)
+ {
+ GetStep(stepId).Complete(output); // delegate state change to entity
+ RaiseDomainEvent(new ExecutionStepCompleted(Id, stepId, OrganizationId, output)); // event on root
+ }
 }
 ```
 
@@ -360,33 +360,33 @@ The example below uses `WorkflowExecution`/`ExecutionStep` as concrete types —
 
 // 1. Tell EF to access the navigation via the backing field
 builder.Navigation(e => e.Steps)
-    .HasField("_steps")
-    .UsePropertyAccessMode(PropertyAccessMode.Field);
+ .HasField("_steps")
+ .UsePropertyAccessMode(PropertyAccessMode.Field);
 
 // 2. Configure owned entity in its own table
 builder.OwnsMany(e => e.Steps, stepBuilder =>
 {
-    stepBuilder.ToTable("execution_steps");
+ stepBuilder.ToTable("execution_steps");
 
-    // 3. Explicitly use the entity's FK property — prevents EF from generating a shadow WorkflowExecutionId column
-    stepBuilder.WithOwner().HasForeignKey(s => s.ExecutionId);
+ // 3. Explicitly use the entity's FK property — prevents EF from generating a shadow WorkflowExecutionId column
+ stepBuilder.WithOwner().HasForeignKey(s => s.ExecutionId);
 
-    stepBuilder.HasKey(s => s.Id);
-    stepBuilder.Property(s => s.Name).IsRequired().HasMaxLength(500);
-    // ... other properties
-    stepBuilder.HasIndex(s => new { s.ExecutionId, s.OrganizationId });
+ stepBuilder.HasKey(s => s.Id);
+ stepBuilder.Property(s => s.Name).IsRequired().HasMaxLength(500);
+ // . other properties
+ stepBuilder.HasIndex(s => new { s.ExecutionId, s.OrganizationId });
 });
 ```
 
 **Rules:**
 - `WithOwner().HasForeignKey(s => s.ExecutionId)` is mandatory — without it EF generates a shadow `{OwnerType}Id` column that duplicates `ExecutionId`
-- `Navigation(...).HasField("_steps").UsePropertyAccessMode(PropertyAccessMode.Field)` is required when the backing field name differs from the property or when the property type is `IReadOnlyList<T>` (not `ICollection<T>`)
+- `Navigation(.).HasField("_steps").UsePropertyAccessMode(PropertyAccessMode.Field)` is required when the backing field name differs from the property or when the property type is `IReadOnlyList<T>` (not `ICollection<T>`)
 - Remove the owned entity's `DbSet<T>` from the DbContext — it must NOT have a standalone DbSet
 - Remove any standalone `IEntityTypeConfiguration<ChildEntity>` — owned entity config lives entirely inside the owner's `OwnsMany` block
 - Owned entities do NOT need `HasQueryFilter` — deletion is handled by cascade from the owner
 - Owned entities do NOT need `DeletedAt` — they are hard-deleted when the owner is soft-deleted or removed
 - To load with steps: `context.WorkflowExecutions.Include(e => e.Steps)` — owned entities are NOT loaded by default
-- Adding a step goes through the aggregate root: `exec.AddStep(...)`, never `ctx.Steps.Add(new ExecutionStep(...))`
+- Adding a step goes through the aggregate root: `exec.AddStep(.)`, never `ctx.Steps.Add(new ExecutionStep(.))`
 
 ---
 
@@ -400,18 +400,18 @@ A singleton that captures a scoped service holds it for the application lifetime
 // ❌ wrong — ITenantContext is scoped; singleton captures it at startup
 public class MyCache(ITenantContext tenantContext) // singleton captures scoped
 {
-    public string GetKey() => $"cache:{tenantContext.Schema}"; // wrong tenant after first request
+ public string GetKey() => $"cache:{tenantContext.Schema}"; // wrong tenant after first request
 }
 
 // ✅ correct — inject IServiceScopeFactory and resolve per-operation
 public class MyCache(IServiceScopeFactory scopeFactory)
 {
-    public async Task<string> GetKeyAsync()
-    {
-        await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
-        ITenantContext tenant = scope.ServiceProvider.GetRequiredService<ITenantContext>();
-        return $"cache:{tenant.Schema}";
-    }
+ public async Task<string> GetKeyAsync()
+ {
+ await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
+ ITenantContext tenant = scope.ServiceProvider.GetRequiredService<ITenantContext>();
+ return $"cache:{tenant.Schema}";
+ }
 }
 ```
 
@@ -424,20 +424,20 @@ DI registrations run at startup. Any value captured at that point is frozen — 
 ```csharp
 // ❌ wrong — connection string frozen at startup; test container overrides are ignored
 public static IServiceCollection AddWorkflowBuilderInfrastructure(
-    this IServiceCollection services, string connectionString)
+ this IServiceCollection services, string connectionString)
 {
-    services.AddDbContext<WorkflowBuilderDbContext>(opts =>
-        opts.UseNpgsql(connectionString));
+ services.AddDbContext<WorkflowBuilderDbContext>(opts =>
+ opts.UseNpgsql(connectionString));
 }
 
 // ✅ correct — IConfiguration read inside the lambda, at DbContext resolution time.
 // Null guard ensures a missing connection string fails fast at startup, not on first request.
 public static IServiceCollection AddWorkflowBuilderInfrastructure(
-    this IServiceCollection services, IConfiguration configuration)
+ this IServiceCollection services, IConfiguration configuration)
 {
-    services.AddDbContext<WorkflowBuilderDbContext>(opts =>
-        opts.UseNpgsql(configuration.GetConnectionString("WorkflowBuilder")
-            ?? throw new InvalidOperationException("Missing connection string 'WorkflowBuilder'.")));
+ services.AddDbContext<WorkflowBuilderDbContext>(opts =>
+ opts.UseNpgsql(configuration.GetConnectionString("WorkflowBuilder")
+ ?? throw new InvalidOperationException("Missing connection string 'WorkflowBuilder'.")));
 }
 ```
 
@@ -454,35 +454,35 @@ EF Core global query filters (`HasQueryFilter`) automatically inject `WHERE tena
 ```csharp
 // ❌ wrong — returns rows from ALL tenants
 List<WorkflowDefinition> all = await _context.WorkflowDefinitions
-    .FromSqlRaw("SELECT * FROM workflow_definitions")
-    .ToListAsync(ct);
+ .FromSqlRaw("SELECT * FROM workflow_definitions")
+ .ToListAsync(ct);
 
 // ❌ wrong — deletes across ALL tenants
 await _context.Database.ExecuteSqlRawAsync(
-    "DELETE FROM workflow_definitions WHERE status = 'Archived'", ct);
+ "DELETE FROM workflow_definitions WHERE status = 'Archived'", ct);
 
 // ✅ correct — always add tenant filter explicitly for raw SQL
 string schema = _tenantContext.Schema;
 await _context.Database.ExecuteSqlRawAsync(
-    $"DELETE FROM {schema}.workflow_definitions WHERE status = 'Archived'", ct);
+ $"DELETE FROM {schema}.workflow_definitions WHERE status = 'Archived'", ct);
 
 // ✅ preferred — use LINQ so filters apply automatically
 await _context.WorkflowDefinitions
-    .Where(w => w.Status == WorkflowStatus.Archived)
-    .ExecuteDeleteAsync(ct);
+ .Where(w => w.Status == WorkflowStatus.Archived)
+ .ExecuteDeleteAsync(ct);
 ```
 
 **Rule:** Avoid raw SQL in tenant-aware contexts. When raw SQL is unavoidable (e.g. performance-critical bulk ops, cross-module reads), always prefix the table with the tenant schema from `ITenantContext.Schema` and add soft-delete filter manually. Document why raw SQL was needed with a comment.
 
-### Tenant schema provisioning ([tenant provisioning](../use-cases/platform-foundation/provision-tenant/))
+### Tenant schema provisioning ([tenant provisioning](./use-cases/platform-foundation/provision-tenant/))
 
 After email verification, every **tenant-scoped** module provisions its own PostgreSQL schema for the organization. Identity stays on `public` and only publishes the verification event — it never touches another module's DB.
 
-- **Ownership**: each tenant-scoped module's Infrastructure project owns an `OrganizationVerifiedHandler` (e.g. `Axis.DataModeling.Infrastructure.Messaging.OrganizationVerifiedHandler`) that subscribes to Identity's `OrganizationVerifiedEvent` Kafka topic. There is **no** central `ITenantSchemaProvisioner` — extraction of a module is a redeploy of its own handler ([ADR-010](../TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy)).
+- **Ownership**: each tenant-scoped module's Infrastructure project owns an `OrganizationVerifiedHandler` (e.g. `Axis.DataModeling.Infrastructure.Messaging.OrganizationVerifiedHandler`) that subscribes to Identity's `OrganizationVerifiedEvent` Kafka topic. There is **no** central `ITenantSchemaProvisioner` — extraction of a module is a redeploy of its own handler ([ADR-010](./TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy)).
 - **Schema name**: `tenant_{organizationId:N}` (no slug — org slug can change).
 - **Idempotency**: `CREATE SCHEMA IF NOT EXISTS` plus `Database.MigrateAsync()` per context; safe to call twice for the same org (Kafka delivers at-least-once).
 - **Tenant context during migrate**: each handler constructs a `FixedTenantContext(organizationId)` from `Axis.Shared.Infrastructure.Tenancy` so `TenantSchemaInterceptor` targets the new schema for the `MigrateAsync` call.
-- **Trigger**: `User.VerifyEmail()` raises an `OrganizationVerified` domain event; `IdentityUnitOfWork` maps it to `OrganizationVerifiedEvent` (Avro) and publishes via Wolverine outbox → Kafka ([ADR-019](../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). Do **not** provision synchronously in the verify request handler.
+- **Trigger**: `User.VerifyEmail()` raises an `OrganizationVerified` domain event; `IdentityUnitOfWork` maps it to `OrganizationVerifiedEvent` (Avro) and publishes via Wolverine outbox → Kafka ([ADR-019](./TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). Do **not** provision synchronously in the verify request handler.
 - **Schema + topic**: `Axis.Identity.Contracts/Schemas/OrganizationVerifiedEvent.avsc` + topic `axis.identity.organization-verified` (see `IdentityKafkaTopics`).
 
 ---
@@ -506,8 +506,8 @@ await _messageBus.SendAsync(new SendWelcomeEmailCommand(userId));
 // ✅ correct for truly one-off background work — log exceptions explicitly
 _ = Task.Run(async () =>
 {
-    try { await _emailSender.SendEmailAsync(to, subject, body, CancellationToken.None); }
-    catch (Exception ex) { _logger.LogError(ex, "Failed to send email to {To}", to); }
+ try { await _emailSender.SendEmailAsync(to, subject, body, CancellationToken.None); }
+ catch (Exception ex) { _logger.LogError(ex, "Failed to send email to {To}", to); }
 });
 ```
 
@@ -519,9 +519,9 @@ _ = Task.Run(async () =>
 
 - **Private backing fields** (`_roleIds`, `_permissions`): use `PrimitiveCollection<List<T>>(fieldName).HasField(fieldName).UsePropertyAccessMode(PropertyAccessMode.Field)` — the type parameter must be the *collection* type, not the element type.
 - **No-args EF Core constructor**: when an aggregate's only constructor takes params EF Core can't bind (e.g. `IEnumerable<string>`), add a private no-args constructor: `private MyAggregate() : base(default) { RequiredField = null!; }`. Initialize all non-nullable reference-type fields to silence CS8618 — EF Core will never use these sentinel values because it always materialises via the real constructor path.
-- **Migrations strategy** ([ADR-023](../TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)): every environment uses `Database.MigrateAsync()` — production, dev bootstrap, tenant provisioning, and Testcontainers fixtures. One EF migration chain per `DbContext`; never `EnsureCreated`/`EnsureCreatedAsync`.
+- **Migrations strategy** ([ADR-023](./TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)): every environment uses `Database.MigrateAsync()` — production, dev bootstrap, tenant provisioning, and Testcontainers fixtures. One EF migration chain per `DbContext`; never `EnsureCreated`/`EnsureCreatedAsync`.
 - **Identity uses the global `public` schema** — `IdentityDbContext` is a plain `DbContext` with no `TenantSchemaInterceptor`. All other modules use `AxisDbContext` with `TenantSchemaInterceptor`.
-- **Tenant schema on every connection** — `TenantSchemaInterceptor` sets `search_path` to `tenant_{orgId:N}, public` on every `ConnectionOpened` (including pooled reconnects), so a leased connection always targets the current request's tenant ([tenant isolation](../use-cases/platform-foundation/tenant-scope/) — schema-per-tenant).
+- **Tenant schema on every connection** — `TenantSchemaInterceptor` sets `search_path` to `tenant_{orgId:N}, public` on every `ConnectionOpened` (including pooled reconnects), so a leased connection always targets the current request's tenant ([tenant isolation](./use-cases/platform-foundation/tenant-scope/) — schema-per-tenant).
 - **Schema name resolution** — `HttpTenantContext` derives `tenant_{orgId:N}` from the JWT `org_id` claim (no DB/Redis lookup; immutable after provisioning). `TenantOrganizationAccessMiddleware` on `Axis.Api` returns HTTP 403 when the org is missing, archived/deleted, or still provisioning — tenant module routes only; Identity/settings routes are unchanged.
 - **Cross-tenant proof** — `tests/Api/Axis.Api.Tests/Tenancy/TenantIsolationEndpointTests.cs` (DataModeling list/get by id).
 
@@ -550,36 +550,36 @@ Use this split whenever a feature combines "eventually consistent provisioning" 
 ```csharp
 public class CreateWorkflowTests : IAsyncLifetime
 {
-    private PostgreSqlContainer _postgres = null!;
-    private WorkflowBuilderDbContext _context = null!;
+ private PostgreSqlContainer _postgres = null!;
+ private WorkflowBuilderDbContext _context = null!;
 
-    public async Task InitializeAsync()
-    {
-        _postgres = new PostgreSqlBuilder().Build();
-        await _postgres.StartAsync();
-        _context = DbContextFactory.Create(_postgres.GetConnectionString());
-        await _context.Database.EnsureCreatedAsync();
-    }
+ public async Task InitializeAsync()
+ {
+ _postgres = new PostgreSqlBuilder().Build();
+ await _postgres.StartAsync();
+ _context = DbContextFactory.Create(_postgres.GetConnectionString());
+ await _context.Database.EnsureCreatedAsync();
+ }
 
-    public async Task DisposeAsync()
-    {
-        await _context.DisposeAsync();
-        await _postgres.DisposeAsync();
-    }
+ public async Task DisposeAsync()
+ {
+ await _context.DisposeAsync();
+ await _postgres.DisposeAsync();
+ }
 
-    // Call at the start of each test method that needs a clean slate
-    private async Task ResetAsync()
-    {
-        await _context.Database.ExecuteSqlRawAsync(
-            "TRUNCATE TABLE workflow_definitions CASCADE");
-    }
+ // Call at the start of each test method that needs a clean slate
+ private async Task ResetAsync()
+ {
+ await _context.Database.ExecuteSqlRawAsync(
+ "TRUNCATE TABLE workflow_definitions CASCADE");
+ }
 
-    [Fact]
-    public async Task CreateWorkflow_WhenNameIsUnique_Succeeds()
-    {
-        await ResetAsync();
-        // ... arrange, act, assert
-    }
+ [Fact]
+ public async Task CreateWorkflow_WhenNameIsUnique_Succeeds()
+ {
+ await ResetAsync();
+ // . arrange, act, assert
+ }
 }
 ```
 
@@ -593,13 +593,13 @@ public class CreateWorkflowTests : IAsyncLifetime
 - **Never sync-over-async**: `.Result`, `.Wait()`, and `.GetAwaiter().GetResult()` on a `Task` inside an async call stack causes thread-pool deadlock under ASP.NET Core. Always `await`.
 - **Always propagate `CancellationToken`**: every `async` method signature must accept `CancellationToken cancellationToken` and pass it to every downstream call (EF Core, HttpClient, Redis). Use `CancellationToken.None` only at the outermost entry point (e.g. a Wolverine background job handler where the runtime owns the token).
 
-These rules are enforced at build time by **`Microsoft.VisualStudio.Threading.Analyzers`**, wired in [`Directory.Build.props`](../../Directory.Build.props). The relevant diagnostics:
+These rules are enforced at build time by **`Microsoft.VisualStudio.Threading.Analyzers`**, wired in [`Directory.Build.props`](././Directory.Build.props). The relevant diagnostics:
 
 - **VSTHRD002** — synchronously waiting on a Task may cause deadlocks. Catches `.Result` / `.Wait()` / `.GetAwaiter().GetResult()` with type information (no grep false positives from domain types named `Wait` / `Result`).
 - **VSTHRD100** — async void methods are unrecoverable; use `async Task` instead.
 - **VSTHRD110** — observe the return value of async methods (catches forgotten `await`).
 
-Two rules are intentionally disabled in [`.editorconfig`](../../.editorconfig):
+Two rules are intentionally disabled in [`.editorconfig`](././.editorconfig):
 
 - **VSTHRD200** (Async-suffix naming) clashes with MediatR/Wolverine handler discovery — those frameworks bind on the literal method name `Handle`, not `HandleAsync`.
 - **VSTHRD111** (`ConfigureAwait(bool)`) is a WPF/WinForms safeguard; modern ASP.NET Core does not install a `SynchronizationContext` so `.ConfigureAwait(false)` is no-op.
@@ -607,18 +607,18 @@ Two rules are intentionally disabled in [`.editorconfig`](../../.editorconfig):
 ```csharp
 // ✅ correct
 public async Task<Result<WorkflowDto>> Handle(
-    GetWorkflowQuery query,
-    CancellationToken cancellationToken)
+ GetWorkflowQuery query,
+ CancellationToken cancellationToken)
 {
-    WorkflowDefinition? wf = await _repository.GetByIdAsync(query.Id, cancellationToken);
-    ...
+ WorkflowDefinition? wf = await _repository.GetByIdAsync(query.Id, cancellationToken);
+ .
 }
 
 // ❌ wrong — deadlock risk + cancellation ignored
 public async Task<Result<WorkflowDto>> Handle(GetWorkflowQuery query, CancellationToken _)
 {
-    WorkflowDefinition? wf = _repository.GetByIdAsync(query.Id).Result;
-    ...
+ WorkflowDefinition? wf = _repository.GetByIdAsync(query.Id).Result;
+ .
 }
 ```
 
@@ -633,26 +633,26 @@ Lazy loading is **disabled** globally. Rules:
 ```csharp
 // ✅ correct — projection at the DB level
 public async Task<PagedResult<WorkflowSummaryDto>> GetPagedAsync(
-    int page, int pageSize, CancellationToken ct)
+ int page, int pageSize, CancellationToken ct)
 {
-    IQueryable<WorkflowDefinition> query = _context.WorkflowDefinitions
-        .AsNoTracking()
-        .Where(w => w.DeletedAt == null);
+ IQueryable<WorkflowDefinition> query = _context.WorkflowDefinitions
+ .AsNoTracking()
+ .Where(w => w.DeletedAt == null);
 
-    int total = await query.CountAsync(ct);
-    List<WorkflowSummaryDto> items = await query
-        .OrderByDescending(w => w.CreatedAt)
-        .Skip((page - 1) * pageSize)
-        .Take(pageSize)
-        .Select(w => new WorkflowSummaryDto(w.Id, w.Name, w.Status, w.CreatedAt))
-        .ToListAsync(ct);
+ int total = await query.CountAsync(ct);
+ List<WorkflowSummaryDto> items = await query
+ .OrderByDescending(w => w.CreatedAt)
+ .Skip((page - 1) * pageSize)
+ .Take(pageSize)
+ .Select(w => new WorkflowSummaryDto(w.Id, w.Name, w.Status, w.CreatedAt))
+ .ToListAsync(ct);
 
-    return new PagedResult<WorkflowSummaryDto>(items, total, page, pageSize);
+ return new PagedResult<WorkflowSummaryDto>(items, total, page, pageSize);
 }
 
 // ❌ wrong — loads all columns, maps in memory, potential N+1 if steps accessed
 List<WorkflowDefinition> all = await _context.WorkflowDefinitions.ToListAsync(ct);
-return all.Select(w => new WorkflowSummaryDto(...)).ToList();
+return all.Select(w => new WorkflowSummaryDto(.)).ToList();
 ```
 
 ## Response DTO convention
@@ -665,11 +665,11 @@ return all.Select(w => new WorkflowSummaryDto(...)).ToList();
 ```csharp
 // Application/Queries/GetWorkflow/WorkflowResponse.cs
 public record WorkflowResponse(
-    Guid Id,
-    string Name,
-    WorkflowStatus Status,
-    DateTimeOffset CreatedAt,
-    IReadOnlyList<StepDto> Steps);
+ Guid Id,
+ string Name,
+ WorkflowStatus Status,
+ DateTimeOffset CreatedAt,
+ IReadOnlyList<StepDto> Steps);
 
 public record StepDto(Guid Id, string Name, StepType Type);
 ```
@@ -680,27 +680,27 @@ public record StepDto(Guid Id, string Name, StepType Type);
 
 ```csharp
 public record PagedResult<T>(
-    IReadOnlyList<T> Items,
-    int TotalCount,
-    int Page,
-    int PageSize);
+ IReadOnlyList<T> Items,
+ int TotalCount,
+ int Page,
+ int PageSize);
 ```
 
 Endpoint wiring — always clamp `pageSize` to 100:
 
 ```csharp
 app.MapGet("/api/workflows", async (
-    int page = 1,
-    int pageSize = 20,
-    IMediator mediator,
-    CancellationToken ct) =>
+ int page = 1,
+ int pageSize = 20,
+ IMediator mediator,
+ CancellationToken ct) =>
 {
-    pageSize = Math.Min(pageSize, 100);
-    Result<PagedResult<WorkflowSummaryDto>> result =
-        await mediator.Send(new GetWorkflowsQuery(page, pageSize), ct);
-    return result.IsSuccess
-        ? Results.Ok(result.Value)
-        : result.ToProblemDetails();
+ pageSize = Math.Min(pageSize, 100);
+ Result<PagedResult<WorkflowSummaryDto>> result =
+ await mediator.Send(new GetWorkflowsQuery(page, pageSize), ct);
+ return result.IsSuccess
+ ? Results.Ok(result.Value)
+ : result.ToProblemDetails();
 })
 .WithName("GetWorkflows")
 .WithSummary("List workflow definitions for the current tenant")
@@ -713,9 +713,9 @@ app.MapGet("/api/workflows", async (
 ## Minimal API endpoint wiring
 
 - Each module exposes a `Map{ModuleName}Endpoints(IEndpointRouteBuilder)` extension method.
-- No logic in the mapping file — only `mediator.Send(...)` dispatch and minimal request mapping. Do not parse `HttpContext` claims, build default command payloads, or map enums in the endpoint — that belongs in Application. Inject `ICurrentUser` (`Axis.Shared.Application.Identity`) into handlers to resolve the caller; let handlers default optional payloads.
+- No logic in the mapping file — only `mediator.Send(.)` dispatch and minimal request mapping. Do not parse `HttpContext` claims, build default command payloads, or map enums in the endpoint — that belongs in Application. Inject `ICurrentUser` (`Axis.Shared.Application.Identity`) into handlers to resolve the caller; let handlers default optional payloads.
 - Use `MapGroup` to apply route prefixes and auth policies at group level.
-- JSON configuration via `ConfigureHttpJsonOptions`, never via `AddControllers().AddJsonOptions(...)`.
+- JSON configuration via `ConfigureHttpJsonOptions`, never via `AddControllers().AddJsonOptions(.)`.
 - **Required annotations on every endpoint**: `.WithName()`, `.WithSummary()`, `.WithTags()`, `.Produces<T>()`, `.ProducesProblem()` for each applicable status code (400, 401, 403, 404).
 
 ## Axis layering (SRP at a glance)
@@ -737,15 +737,15 @@ Long-form SOLID and Gang-of-Four catalogs are intentionally omitted here — the
 ## OpenAPI annotation reference
 
 ```csharp
-group.MapPost("/", async (...) => { ... })
-    .WithName("CreateWorkflow")
-    .WithSummary("Create a new workflow definition")
-    .WithTags("WorkflowBuilder")
-    .Produces<WorkflowResponse>(StatusCodes.Status201Created)
-    .ProducesProblem(StatusCodes.Status400BadRequest)
-    .ProducesProblem(StatusCodes.Status401Unauthorized)
-    .ProducesProblem(StatusCodes.Status409Conflict)
-    .RequireAuthorization();
+group.MapPost("/", async (.) => { . })
+ .WithName("CreateWorkflow")
+ .WithSummary("Create a new workflow definition")
+ .WithTags("WorkflowBuilder")
+ .Produces<WorkflowResponse>(StatusCodes.Status201Created)
+ .ProducesProblem(StatusCodes.Status400BadRequest)
+ .ProducesProblem(StatusCodes.Status401Unauthorized)
+ .ProducesProblem(StatusCodes.Status409Conflict)
+ .RequireAuthorization();
 ```
 
 ---
@@ -768,17 +768,17 @@ All `Result` failures from Command/Query handlers map to `ProblemDetails` (RFC 7
 
 ```csharp
 private static async Task<IResult> CreateWorkflow(
-    [FromBody] CreateWorkflowRequest request,
-    CurrentUser currentUser,
-    ISender mediator,
-    CancellationToken ct)
+ [FromBody] CreateWorkflowRequest request,
+ CurrentUser currentUser,
+ ISender mediator,
+ CancellationToken ct)
 {
-    Result<Guid> result = await mediator.Send(
-        new CreateWorkflowCommand(request.Name, request.Description, currentUser.OrgId, currentUser.UserId.ToString()), ct);
+ Result<Guid> result = await mediator.Send(
+ new CreateWorkflowCommand(request.Name, request.Description, currentUser.OrgId, currentUser.UserId.ToString()), ct);
 
-    return result.Match(
-        id  => Results.Created($"/api/workflows/{id}", new { id }),
-        err => err.ToProblemDetails());
+ return result.Match(
+ id => Results.Created($"/api/workflows/{id}", new { id }),
+ err => err.ToProblemDetails());
 }
 ```
 
@@ -788,10 +788,10 @@ private static async Task<IResult> CreateWorkflow(
 // Axis.Shared.Application/Extensions/ResultExtensions.cs
 public static IResult ToProblemDetails(this Error error) => error.Code switch
 {
-    "not_found"     => Results.Problem(error.Message, statusCode: 404),
-    "conflict"      => Results.Problem(error.Message, statusCode: 409),
-    "plan_limit"    => Results.Problem(error.Message, statusCode: 402),
-    _               => Results.Problem(error.Message, statusCode: 422),
+ "not_found" => Results.Problem(error.Message, statusCode: 404),
+ "conflict" => Results.Problem(error.Message, statusCode: 409),
+ "plan_limit" => Results.Problem(error.Message, statusCode: 402),
+ _ => Results.Problem(error.Message, statusCode: 422),
 };
 ```
 
@@ -815,35 +815,35 @@ Wire up in `Program.cs`:
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(opts =>
 {
-    opts.SwaggerDoc("v1", new OpenApiInfo { Title = "Axis API", Version = "v1" });
-    opts.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-    {
-        Type = SecuritySchemeType.Http,
-        Scheme = "bearer",
-        BearerFormat = "JWT",
-    });
-    opts.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" },
-            },
-            []
-        },
-    });
+ opts.SwaggerDoc("v1", new OpenApiInfo { Title = "Axis API", Version = "v1" });
+ opts.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+ {
+ Type = SecuritySchemeType.Http,
+ Scheme = "bearer",
+ BearerFormat = "JWT",
+ });
+ opts.AddSecurityRequirement(new OpenApiSecurityRequirement
+ {
+ {
+ new OpenApiSecurityScheme
+ {
+ Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" },
+ },
+ []
+ },
+ });
 });
 
 // After app.Build():
 if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
 {
-    app.UseSwagger();
-    app.MapScalarApiReference(options =>
-    {
-        options.WithOpenApiRoutePattern("/swagger/v1/swagger.json");
-        options.Title = "Axis API";
-        options.Theme = ScalarTheme.Moon;
-    });
+ app.UseSwagger();
+ app.MapScalarApiReference(options =>
+ {
+ options.WithOpenApiRoutePattern("/swagger/v1/swagger.json");
+ options.Title = "Axis API";
+ options.Theme = ScalarTheme.Moon;
+ });
 }
 ```
 
@@ -855,42 +855,42 @@ Every endpoint must be fully annotated — see CLAUDE.md API Layer section for r
 
 ### Host setup (ADR-012 — per-module `wolverine` schema)
 
-Each module owns a `wolverine` schema **inside its own PostgreSQL database** ([ADR-011](../TECH_STACK.md#adr-011-per-module-database-with-schema-per-tenant-inside), [ADR-012](../TECH_STACK.md#adr-012-per-module-wolverine-schema-in-the-modules-own-database)). There is **no** `ConnectionStrings:Wolverine` — persistence is wired from each module's connection string.
+Each module owns a `wolverine` schema **inside its own PostgreSQL database** ([ADR-011](./TECH_STACK.md#adr-011-per-module-database-with-schema-per-tenant-inside), [ADR-012](./TECH_STACK.md#adr-012-per-module-wolverine-schema-in-the-modules-own-database)). There is **no** `ConnectionStrings:Wolverine` — persistence is wired from each module's connection string.
 
 ```csharp
 // Axis.Api/Program.cs — excerpt
 builder.Host.UseWolverine(opts =>
 {
-    string identityConnectionString = configuration.GetConnectionString("Identity")!;
-    string dataModelingConnectionString = configuration.GetConnectionString("DataModeling")!;
-    // ... WorkflowBuilder, FormBuilder, WorkflowEngine ...
+ string identityConnectionString = configuration.GetConnectionString("Identity")!;
+ string dataModelingConnectionString = configuration.GetConnectionString("DataModeling")!;
+ // . WorkflowBuilder, FormBuilder, WorkflowEngine .
 
-    opts.Policies.AddMiddleware<HandlerLoggingMiddleware>();
-    opts.UseEntityFrameworkCoreTransactions();
+ opts.Policies.AddMiddleware<HandlerLoggingMiddleware>();
+ opts.UseEntityFrameworkCoreTransactions();
 
-    // Main store: node/agent coordination (Identity DB).
-    opts.PersistMessagesWithPostgresql(identityConnectionString, "wolverine");
+ // Main store: node/agent coordination (Identity DB).
+ opts.PersistMessagesWithPostgresql(identityConnectionString, "wolverine");
 
-    // Per-module ancillary outbox — enrolled per DbContext.
-    opts.PersistMessagesWithPostgresql(identityConnectionString, "wolverine", MessageStoreRole.Ancillary)
-        .Enroll<IdentityDbContext>();
-    opts.PersistMessagesWithPostgresql(dataModelingConnectionString, "wolverine", MessageStoreRole.Ancillary)
-        .Enroll<DataModelingDbContext>();
-    // ... Enroll WorkflowBuilderDbContext, FormBuilderDbContext, WorkflowEngineDbContext ...
+ // Per-module ancillary outbox — enrolled per DbContext.
+ opts.PersistMessagesWithPostgresql(identityConnectionString, "wolverine", MessageStoreRole.Ancillary)
+ .Enroll<IdentityDbContext>();
+ opts.PersistMessagesWithPostgresql(dataModelingConnectionString, "wolverine", MessageStoreRole.Ancillary)
+ .Enroll<DataModelingDbContext>();
+ // . Enroll WorkflowBuilderDbContext, FormBuilderDbContext, WorkflowEngineDbContext .
 
-    // Cross-module transports (ADR-013, ADR-024, ADR-025) — Kafka + RabbitMQ ...
+ // Cross-module transports (ADR-013, ADR-024, ADR-025) — Kafka + RabbitMQ .
 });
 
 // Dev + Testing: Wolverine creates each module's `wolverine` tables on startup.
 if (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing"))
-    builder.Services.AddResourceSetupOnStartup();
+ builder.Services.AddResourceSetupOnStartup();
 ```
 
 **Rules:**
 
 - Never point two modules at one shared `wolverine` schema in a shared database — extraction breaks.
 - `AddResourceSetupOnStartup()` is for dev/Testing only; production applies Wolverine DDL per module DB in CI.
-- Cross-module messages use Kafka (`*Event`/`*Snapshot`) and RabbitMQ (`*Command`/`*Job`/`*SagaStep`) per [ADR-025](../TECH_STACK.md#adr-025-transport-selection-rule-by-message-name-suffix) — not a central Postgres Wolverine connection string.
+- Cross-module messages use Kafka (`*Event`/`*Snapshot`) and RabbitMQ (`*Command`/`*Job`/`*SagaStep`) per [ADR-025](./TECH_STACK.md#adr-025-transport-selection-rule-by-message-name-suffix) — not a central Postgres Wolverine connection string.
 
 ### Intra-module domain event handler
 
@@ -900,13 +900,13 @@ Domain events raised by aggregates (`AddDomainEvent`) are collected in `UnitOfWo
 // WorkflowBuilder.Application/EventHandlers/WorkflowPublishedEventHandler.cs
 public sealed class WorkflowPublishedEventHandler
 {
-    // Wolverine resolves by convention — no registration needed.
-    // Method name: Handle or HandleAsync.
-    public async Task HandleAsync(WorkflowPublishedEvent @event, CancellationToken ct)
-    {
-        // Runs after the transaction that raised the event commits.
-        // Safe to read the fully-persisted aggregate here.
-    }
+ // Wolverine resolves by convention — no registration needed.
+ // Method name: Handle or HandleAsync.
+ public async Task HandleAsync(WorkflowPublishedEvent @event, CancellationToken ct)
+ {
+ // Runs after the transaction that raised the event commits.
+ // Safe to read the fully-persisted aggregate here.
+ }
 }
 ```
 
@@ -919,10 +919,10 @@ Same pattern — the handler lives in the Application layer of the **consuming**
 // Consumes WorkflowPublishedEvent raised by WorkflowBuilder — no direct module reference needed.
 public sealed class WorkflowPublishedEventHandler
 {
-    public async Task HandleAsync(WorkflowPublishedEvent @event, CancellationToken ct)
-    {
-        // Validate the published workflow is executable, pre-warm caches, etc.
-    }
+ public async Task HandleAsync(WorkflowPublishedEvent @event, CancellationToken ct)
+ {
+ // Validate the published workflow is executable, pre-warm caches, etc.
+ }
 }
 ```
 
@@ -935,10 +935,10 @@ await _messageBus.SendAsync(new SendWelcomeEmailCommand(userId));
 // Handler (Wolverine resolves by convention):
 public sealed class SendWelcomeEmailHandler(IEmailSender emailSender)
 {
-    public async Task HandleAsync(SendWelcomeEmailCommand cmd, CancellationToken ct)
-    {
-        await emailSender.SendAsync(cmd.UserId, ct);
-    }
+ public async Task HandleAsync(SendWelcomeEmailCommand cmd, CancellationToken ct)
+ {
+ await emailSender.SendAsync(cmd.UserId, ct);
+ }
 }
 ```
 
@@ -950,15 +950,15 @@ Wolverine delivers messages at least once. Step handlers guard against redeliver
 
 ```csharp
 // ✅ correct idempotency guard in typed step handlers (Http, Condition, Script, Notification)
-if (step.IsTerminal)   // Completed / Failed / Cancelled — already processed
+if (step.IsTerminal) // Completed / Failed / Cancelled — already processed
 {
-    return;
+ return;
 }
 
 // ⛔ wrong — Running is the normal first-delivery state for these handlers
 if (step.Status == StepExecutionStatus.Running)
 {
-    return;  // this would block every first delivery!
+ return; // this would block every first delivery!
 }
 ```
 
@@ -979,10 +979,10 @@ builder.UseXminAsConcurrencyToken();
 // On an owned entity (OwnedNavigationBuilder) — UseXminAsConcurrencyToken() is NOT available;
 // configure xmin manually instead:
 stepBuilder.Property<uint>("xmin")
-    .HasColumnName("xmin")
-    .HasColumnType("xid")
-    .ValueGeneratedOnAddOrUpdate()
-    .IsConcurrencyToken();
+ .HasColumnName("xmin")
+ .HasColumnType("xid")
+ .ValueGeneratedOnAddOrUpdate()
+ .IsConcurrencyToken();
 // "No migration needed — xmin is a PostgreSQL built-in system column present on every row."
 ```
 
@@ -996,7 +996,7 @@ No `uint RowVersion` field on the domain entity is required. EF Core adds `WHERE
 // Axis.Shared.Infrastructure/Persistence/UnitOfWork.cs
 catch (DbUpdateConcurrencyException ex)
 {
-    throw new ConcurrencyException(ex);
+ throw new ConcurrencyException(ex);
 }
 ```
 
@@ -1008,15 +1008,15 @@ catch (DbUpdateConcurrencyException ex)
 // ✅ In every handler that calls uow.SaveChangesAsync:
 try
 {
-    await uow.SaveChangesAsync(ct);
+ await uow.SaveChangesAsync(ct);
 }
 catch (ConcurrencyException)
 {
-    // Another Wolverine worker already committed this change.
-    // The winning instance will complete the step — exit gracefully.
-    logger.LogInformation(
-        "Concurrent delivery detected for step {StepId} — skipping", stepId);
-    return;
+ // Another Wolverine worker already committed this change.
+ // The winning instance will complete the step — exit gracefully.
+ logger.LogInformation(
+ "Concurrent delivery detected for step {StepId} — skipping", stepId);
+ return;
 }
 ```
 
@@ -1025,13 +1025,13 @@ catch (ConcurrencyException)
 - Every `uow.SaveChangesAsync` call on a concurrency-sensitive path must be wrapped.
 - Do not use a Running status guard as the concurrency boundary — that blocks normal first deliveries (see idempotency section above).
 - `UseXminAsConcurrencyToken()` is NOT available on `OwnedNavigationBuilder<TOwner, TDep>`. For owned entities configured with `OwnsMany`, configure xmin manually:
-  ```csharp
-  stepBuilder.Property<uint>("xmin")
-      .HasColumnName("xmin")
-      .HasColumnType("xid")
-      .ValueGeneratedOnAddOrUpdate()
-      .IsConcurrencyToken();
-  ```
+ ```csharp
+ stepBuilder.Property<uint>("xmin")
+ .HasColumnName("xmin")
+ .HasColumnType("xid")
+ .ValueGeneratedOnAddOrUpdate()
+ .IsConcurrencyToken();
+ ```
 
 ### Wolverine handler logging — two-layer rule
 
@@ -1044,9 +1044,9 @@ Handler logging has two mandatory layers that serve different purposes:
 ```csharp
 builder.Host.UseWolverine(opts =>
 {
-    opts.Policies.AddMiddleware<HandlerLoggingMiddleware>();
-    opts.UseEntityFrameworkCoreTransactions();
-    // ...
+ opts.Policies.AddMiddleware<HandlerLoggingMiddleware>();
+ opts.UseEntityFrameworkCoreTransactions();
+ // .
 });
 ```
 
@@ -1094,7 +1094,7 @@ opts.ScheduleJob<ArchiveOldExecutionsCommand>(cron: "0 2 * * *"); // daily at 02
 
 ## OpenTelemetry observability
 
-**Principle:** Every host entrypoint emits traces, metrics, and structured logs via the OpenTelemetry SDK ([ADR-018](../TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability)). Backends are swappable (OTLP → Grafana Tempo/Loki/Mimir in production); application code never references vendor SDKs outside `Axis.Shared.Infrastructure`.
+**Principle:** Every host entrypoint emits traces, metrics, and structured logs via the OpenTelemetry SDK ([ADR-018](./TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability)). Backends are swappable (OTLP → Grafana Tempo/Loki/Mimir in production); application code never references vendor SDKs outside `Axis.Shared.Infrastructure`.
 
 ### Host wiring (modulith today, per-module tomorrow)
 
@@ -1104,10 +1104,10 @@ Register once on the host builder, before module infrastructure:
 builder.AddAxisOpenTelemetry();
 
 builder.Host.UseSerilog((ctx, services, config) => config
-    .ReadFrom.Configuration(ctx.Configuration)
-    .ReadFrom.Services(services)
-    .Enrich.FromLogContext()
-    .Enrich.With<TraceContextSerilogEnricher>());
+ .ReadFrom.Configuration(ctx.Configuration)
+ .ReadFrom.Services(services)
+ .Enrich.FromLogContext()
+ .Enrich.With<TraceContextSerilogEnricher>());
 ```
 
 After `WebApplication` is built:
@@ -1147,13 +1147,13 @@ Grafana UI: `http://localhost:3001`. OTLP endpoint for host-run API: `http://loc
 - Do **not** register OpenTelemetry in individual module Infrastructure projects while the modulith hosts all modules — one `AddAxisOpenTelemetry` on `Axis.Api` (or each extracted module's entrypoint when Phase 2 lands).
 - Disable telemetry in integration tests via `OpenTelemetry:DisableInTesting` (default `true`) — no Testcontainers for Tempo required.
 - Skip instrumentation for `/health`, `/metrics`, and `/swagger` paths (configured in `OpenTelemetryServiceExtensions`).
-- **Deferred (Phase 2):** propagate trace context through Wolverine envelope headers and gRPC interceptors for cross-process module calls ([ADR-018](../TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability)).
+- **Deferred (Phase 2):** propagate trace context through Wolverine envelope headers and gRPC interceptors for cross-process module calls ([ADR-018](./TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability)).
 
 ---
 
 ## Cross-module communication pattern
 
-**Core rule: a module only queries its own database. Always. No exceptions.** This is the Share Nothing principle from [ADR-010](../TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy) — modules are data-sovereign so that extraction is a redeploy, not a refactor.
+**Core rule: a module only queries its own database. Always. No exceptions.** This is the Share Nothing principle from [ADR-010](./TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy) — modules are data-sovereign so that extraction is a redeploy, not a refactor.
 
 Cross-module needs are met by exactly two mechanisms:
 
@@ -1169,22 +1169,22 @@ Direct DbContext access, in-process method calls into another module's services,
 ```csharp
 // WRONG — module A querying a table owned by module B
 int count = await context.Database
-    .SqlQueryRaw<int>("SELECT COUNT(*) FROM workflow_definitions WHERE steps @> {0}::jsonb", ...)
-    .FirstAsync(ct);
+ .SqlQueryRaw<int>("SELECT COUNT(*) FROM workflow_definitions WHERE steps @> {0}::jsonb", .)
+ .FirstAsync(ct);
 ```
 
 ### ❌ Anti-pattern B: in-process call dressed as an interface
 
 ```csharp
 // WRONG — module A injecting module B's Application service
-public class SomethingHandler(IWorkflowQueryService workflowQueries)  // ← B's service
+public class SomethingHandler(IWorkflowQueryService workflowQueries) // ← B's service
 {
-    public async Task Handle(...)
-        => await workflowQueries.GetWorkflowAsync(...);   // ← in-process call, no contract
+ public async Task Handle(.)
+ => await workflowQueries.GetWorkflowAsync(.); // ← in-process call, no contract
 }
 ```
 
-This compiles and runs in the modulith, but the moment module B is extracted, the project reference disappears and `IWorkflowQueryService` is no longer reachable. Cross-module sync **must** go through gRPC (with a versioned `.proto` contract) — see [ADR-014](../TECH_STACK.md#adr-014-grpc-for-internal-sync-rpc-and-rest-openapi-for-external-api).
+This compiles and runs in the modulith, but the moment module B is extracted, the project reference disappears and `IWorkflowQueryService` is no longer reachable. Cross-module sync **must** go through gRPC (with a versioned `.proto` contract) — see [ADR-014](./TECH_STACK.md#adr-014-grpc-for-internal-sync-rpc-and-rest-openapi-for-external-api).
 
 ### ✅ Pattern 1: event-driven local read model (default)
 
@@ -1199,18 +1199,18 @@ Implemented for WorkflowBuilder lifecycle events in `Axis.WorkflowBuilder.Contra
 ```text
 src/Modules/WorkflowBuilder/Axis.WorkflowBuilder.Contracts/Schemas/FormStepAdded.avsc
 {
-  "type": "record",
-  "namespace": "axis.workflowbuilder",
-  "name": "FormStepAdded",
-  "fields": [
-    { "name": "workflowId", "type": { "type": "string", "logicalType": "uuid" } },
-    { "name": "stepId",     "type": { "type": "string", "logicalType": "uuid" } },
-    { "name": "formId",     "type": { "type": "string", "logicalType": "uuid" } }
-  ]
+ "type": "record",
+ "namespace": "axis.workflowbuilder",
+ "name": "FormStepAdded",
+ "fields": [
+ { "name": "workflowId", "type": { "type": "string", "logicalType": "uuid" } },
+ { "name": "stepId", "type": { "type": "string", "logicalType": "uuid" } },
+ { "name": "formId", "type": { "type": "string", "logicalType": "uuid" } }
+ ]
 }
 ```
 
-The Avro file is registered with Confluent Schema Registry at build time. CI rejects breaking changes per [ADR-019](../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope).
+The Avro file is registered with Confluent Schema Registry at build time. CI rejects breaking changes per [ADR-019](./TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope).
 
 **Step 2 — Source module (WorkflowBuilder) raises the domain event and publishes it via the outbox:**
 
@@ -1221,12 +1221,12 @@ RaiseDomainEvent(new FormStepAdded(Id, step.Id, formId));
 // WorkflowBuilder.Infrastructure — Wolverine handler maps domain event → Kafka envelope
 public sealed class FormStepAddedPublisher
 {
-    public async Task Handle(FormStepAdded evt, IMessageBus bus, CancellationToken ct)
-    {
-        // Wolverine routes to the configured Kafka topic; Avro+CloudEvents serialisation
-        // is handled by middleware so handlers stay free of transport concerns.
-        await bus.PublishAsync(evt);
-    }
+ public async Task Handle(FormStepAdded evt, IMessageBus bus, CancellationToken ct)
+ {
+ // Wolverine routes to the configured Kafka topic; Avro+CloudEvents serialisation
+ // is handled by middleware so handlers stay free of transport concerns.
+ await bus.PublishAsync(evt);
+ }
 }
 ```
 
@@ -1236,34 +1236,34 @@ public sealed class FormStepAddedPublisher
 // FormBuilder.Domain — local read model, owned by FormBuilder's DB
 public sealed class FormWorkflowReference
 {
-    public Guid FormId { get; init; }
-    public Guid WorkflowId { get; init; }
-    public Guid StepId { get; init; }
-    public Guid OrganizationId { get; init; }
+ public Guid FormId { get; init; }
+ public Guid WorkflowId { get; init; }
+ public Guid StepId { get; init; }
+ public Guid OrganizationId { get; init; }
 }
 
 // FormBuilder.Infrastructure — Wolverine handler reads from the Kafka inbox
 public sealed class FormStepAddedHandler(FormBuilderDbContext db)
 {
-    public async Task Handle(FormStepAdded evt, CancellationToken ct)
-    {
-        // Idempotent: Kafka delivers at-least-once; Wolverine inbox dedupes by envelope ID
-        // but defensive upsert at the read-model level is still good practice.
-        bool exists = await db.FormWorkflowReferences.AnyAsync(
-            r => r.FormId == evt.FormId
-              && r.WorkflowId == evt.WorkflowId
-              && r.StepId == evt.StepId, ct);
-        if (exists) return;
+ public async Task Handle(FormStepAdded evt, CancellationToken ct)
+ {
+ // Idempotent: Kafka delivers at-least-once; Wolverine inbox dedupes by envelope ID
+ // but defensive upsert at the read-model level is still good practice.
+ bool exists = await db.FormWorkflowReferences.AnyAsync(
+ r => r.FormId == evt.FormId
+ && r.WorkflowId == evt.WorkflowId
+ && r.StepId == evt.StepId, ct);
+ if (exists) return;
 
-        db.FormWorkflowReferences.Add(new FormWorkflowReference
-        {
-            FormId = evt.FormId,
-            WorkflowId = evt.WorkflowId,
-            StepId = evt.StepId,
-            OrganizationId = evt.OrganizationId,   // always denormalise tenant
-        });
-        await db.SaveChangesAsync(ct);
-    }
+ db.FormWorkflowReferences.Add(new FormWorkflowReference
+ {
+ FormId = evt.FormId,
+ WorkflowId = evt.WorkflowId,
+ StepId = evt.StepId,
+ OrganizationId = evt.OrganizationId, // always denormalise tenant
+ });
+ await db.SaveChangesAsync(ct);
+ }
 }
 ```
 
@@ -1272,8 +1272,8 @@ public sealed class FormStepAddedHandler(FormBuilderDbContext db)
 ```csharp
 // FormRepository.IsReferencedByWorkflowAsync — queries FormBuilder's own DB
 public async Task<bool> IsReferencedByWorkflowAsync(Guid formId, Guid orgId, CancellationToken ct = default)
-    => await context.FormWorkflowReferences.AnyAsync(
-           r => r.FormId == formId && r.OrganizationId == orgId, ct);
+ => await context.FormWorkflowReferences.AnyAsync(
+ r => r.FormId == formId && r.OrganizationId == orgId, ct);
 ```
 
 ### ✅ Pattern 2: gRPC sync call (escape hatch)
@@ -1291,15 +1291,15 @@ package axis.identity.v1;
 // JWT `org_id` claim, never from a request field. Callers forward the inbound
 // `authorization` header on every call. See Step 3 below.
 service IdentityService {
-    rpc GetUserPermissions(GetUserPermissionsRequest) returns (GetUserPermissionsResponse);
+ rpc GetUserPermissions(GetUserPermissionsRequest) returns (GetUserPermissionsResponse);
 }
 
 message GetUserPermissionsRequest {
-    string user_id = 1;
+ string user_id = 1;
 }
 
 message GetUserPermissionsResponse {
-    repeated string permissions = 1;
+ repeated string permissions = 1;
 }
 ```
 
@@ -1307,8 +1307,8 @@ message GetUserPermissionsResponse {
 **Buf (repo-wide lint + breaking)** — register every new module proto root before merge:
 
 1. Place files under `src/Modules/{Module}/Axis.{Module}.Contracts/Protos/axis/{module}/v{n}/` with `package axis.{module}.v{n};` matching the directory (`PACKAGE_DIRECTORY_MATCH`).
-2. Add the `Protos` directory to `modules:` in [`buf.yaml`](../../buf.yaml) at the repo root (copy an existing line).
-3. Keep `Grpc.Tools` `<Protobuf Include=...>` in the `.csproj` — Buf does not replace codegen.
+2. Add the `Protos` directory to `modules:` in [`buf.yaml`](././buf.yaml) at the repo root (copy an existing line).
+3. Keep `Grpc.Tools` `<Protobuf Include=.>` in the `.csproj` — Buf does not replace codegen.
 4. Run `buf lint` locally (`buf` CLI) and `./scripts/check-buf-modules.sh` (also runs in CI **Doc drift**).
 5. **Changing `buf.yaml` breaking policy or removing a field?** Read [Buf breaking rules — what's actually configured (and the gotcha)](#buf-breaking-rules--whats-actually-configured-and-the-gotcha) first. The v2 category model splits deletion rules in a way that's easy to misread, and "buf passes locally" can mean "no rule fires" rather than "the relaxed rule passed".
 
@@ -1326,16 +1326,16 @@ Rule map (verify with `buf config ls-breaking-rules --version=v2`):
 | `FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED` | WIRE_JSON, WIRE | ✗ OFF in FILE/PACKAGE | Fails only if deleted field's **number** was not reserved |
 | `FIELD_NO_DELETE_UNLESS_NAME_RESERVED` | WIRE_JSON | ✗ OFF in FILE/PACKAGE | Fails only if deleted field's **name** was not reserved |
 
-The current repo policy ([`buf.yaml`](../../buf.yaml)):
+The current repo policy ([`buf.yaml`](././buf.yaml)):
 
 ```yaml
 breaking:
-  use:
-    - FILE
-    - FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED  # explicit add — not in FILE
-    - FIELD_NO_DELETE_UNLESS_NAME_RESERVED    # explicit add — not in FILE
-  except:
-    - FIELD_NO_DELETE                          # drop strict variant
+ use:
+ - FILE
+ - FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED # explicit add — not in FILE
+ - FIELD_NO_DELETE_UNLESS_NAME_RESERVED # explicit add — not in FILE
+ except:
+ - FIELD_NO_DELETE # drop strict variant
 ```
 
 Result: a field may be removed **iff** the proto has `reserved <number>;` AND `reserved "<name>";` in the same message. Everything else FILE-strict still applies (no message deletion, no file renames, etc.).
@@ -1355,26 +1355,26 @@ The shortcut "if CI is green, the rule is doing its job" fails here because the 
 ```csharp
 // WorkflowEngine.Infrastructure — inject the Identity gRPC client
 public sealed class PermissionGate(
-    IdentityService.IdentityServiceClient identity,
-    IHttpContextAccessor httpContextAccessor)
+ IdentityService.IdentityServiceClient identity,
+ IHttpContextAccessor httpContextAccessor)
 {
-    public async Task<bool> CanExecuteAsync(Guid userId, string permission, CancellationToken ct)
-    {
-        Metadata headers = new();
-        string? authorization = httpContextAccessor.HttpContext?.Request.Headers.Authorization.ToString();
-        if (!string.IsNullOrWhiteSpace(authorization))
-            headers.Add("authorization", authorization);
+ public async Task<bool> CanExecuteAsync(Guid userId, string permission, CancellationToken ct)
+ {
+ Metadata headers = new();
+ string? authorization = httpContextAccessor.HttpContext?.Request.Headers.Authorization.ToString();
+ if (!string.IsNullOrWhiteSpace(authorization))
+ headers.Add("authorization", authorization);
 
-        GetUserPermissionsResponse resp = await identity.GetUserPermissionsAsync(
-            new GetUserPermissionsRequest { UserId = userId.ToString() },
-            headers: headers,
-            cancellationToken: ct);
-        return resp.Permissions.Contains(permission);
-    }
+ GetUserPermissionsResponse resp = await identity.GetUserPermissionsAsync(
+ new GetUserPermissionsRequest { UserId = userId.ToString() },
+ headers: headers,
+ cancellationToken: ct);
+ return resp.Permissions.Contains(permission);
+ }
 }
 ```
 
-The gRPC channel is configured via `Modules:Identity:GrpcUrl` in `src/Axis.Api/appsettings.json` (see [ADR-016](../TECH_STACK.md#adr-016-service-discovery-via-config-in-modulith-mode-and-k8s-dns-in-production)) — `http://localhost:5280` on the modulith host in development, module service DNS in production when extracted.
+The gRPC channel is configured via `Modules:Identity:GrpcUrl` in `src/Axis.Api/appsettings.json` (see [ADR-016](./TECH_STACK.md#adr-016-service-discovery-via-config-in-modulith-mode-and-k8s-dns-in-production)) — `http://localhost:5280` on the modulith host in development, module service DNS in production when extracted.
 
 **Step 3 — Server side: derive tenant from JWT, not the request payload**
 
@@ -1383,32 +1383,32 @@ The gRPC server **must** read `organization_id` from the caller's JWT `org_id` c
 ```csharp
 // src/Modules/DataModeling/Axis.DataModeling.Infrastructure/Grpc/DataModelCatalogGrpcService.cs
 internal sealed class DataModelCatalogGrpcService(IDataModelRepository repo)
-    : DataModelCatalogService.DataModelCatalogServiceBase
+ : DataModelCatalogService.DataModelCatalogServiceBase
 {
-    public override async Task<GetModelSummaryResponse> GetModelSummary(
-        GetModelSummaryRequest request, ServerCallContext context)
-    {
-        if (!Guid.TryParse(request.ModelId, out Guid modelId))
-            throw new RpcException(new Status(StatusCode.InvalidArgument, "model_id must be a valid GUID."));
+ public override async Task<GetModelSummaryResponse> GetModelSummary(
+ GetModelSummaryRequest request, ServerCallContext context)
+ {
+ if (!Guid.TryParse(request.ModelId, out Guid modelId))
+ throw new RpcException(new Status(StatusCode.InvalidArgument, "model_id must be a valid GUID."));
 
-        Guid organizationId = ResolveCallerOrganizationId(context);
+ Guid organizationId = ResolveCallerOrganizationId(context);
 
-        DataModel? model = await repo.GetByIdAsync(modelId, organizationId, context.CancellationToken);
-        return new GetModelSummaryResponse
-        {
-            Exists = model is not null,
-            ModelName = model?.Name ?? string.Empty,
-        };
-    }
+ DataModel? model = await repo.GetByIdAsync(modelId, organizationId, context.CancellationToken);
+ return new GetModelSummaryResponse
+ {
+ Exists = model is not null,
+ ModelName = model?.Name ?? string.Empty,
+ };
+ }
 
-    private static Guid ResolveCallerOrganizationId(ServerCallContext context)
-    {
-        Claim? claim = context.GetHttpContext().User.FindFirst("org_id");
-        if (claim is null || !Guid.TryParse(claim.Value, out Guid organizationId))
-            throw new RpcException(
-                new Status(StatusCode.Unauthenticated, "Caller JWT is missing a valid org_id claim."));
-        return organizationId;
-    }
+ private static Guid ResolveCallerOrganizationId(ServerCallContext context)
+ {
+ Claim? claim = context.GetHttpContext().User.FindFirst("org_id");
+ if (claim is null || !Guid.TryParse(claim.Value, out Guid organizationId))
+ throw new RpcException(
+ new Status(StatusCode.Unauthenticated, "Caller JWT is missing a valid org_id claim."));
+ return organizationId;
+ }
 }
 ```
 
@@ -1429,9 +1429,9 @@ Prerequisites:
 grpcurl -plaintext localhost:5280 list
 
 grpcurl -plaintext \
-  -H "authorization: Bearer <access_token>" \
-  -d '{"user_id":"<user-guid>"}' \
-  localhost:5280 axis.identity.v1.IdentityService/GetUserPermissions
+ -H "authorization: Bearer <access_token>" \
+ -d '{"user_id":"<user-guid>"}' \
+ localhost:5280 axis.identity.v1.IdentityService/GetUserPermissions
 ```
 
 Replace `<access_token>` and `<user-guid>` with values from your tenant — the server reads the tenant from the JWT's `org_id` claim, so no `organization_id` is sent in the payload. `Unauthenticated` / `PermissionDenied` means the token is missing, expired, or invalid — obtain a fresh token from `POST /connect/token` after PKCE login.
@@ -1440,7 +1440,7 @@ Replace `<access_token>` and `<user-guid>` with values from your tenant — the 
 
 **Rule:** modules other than Identity validate JWTs **locally via Identity's JWKS endpoint** — never by calling `IdentityDbContext` or any Identity service. Asking Identity "is this user real?" on every request defeats the purpose of stateless JWT and re-introduces the coupling we removed.
 
-Why: Identity issues short-lived JWTs (15 minutes per [sign-in](../use-cases/identity-access/sign-in/)) signed with a key whose public half is published at `/.well-known/jwks.json` (OpenIddict default). Any module that receives a Bearer token can verify the signature, claims (`sub`, `org`, `permissions`), and expiry **without a network call to Identity for each request**. JWKS itself is cached locally by `Microsoft.AspNetCore.Authentication.JwtBearer`, so the network cost is once per key-rotation, not once per request.
+Why: Identity issues short-lived JWTs (15 minutes per [sign-in](./use-cases/identity-access/sign-in/)) signed with a key whose public half is published at `/.well-known/jwks.json` (OpenIddict default). Any module that receives a Bearer token can verify the signature, claims (`sub`, `org`, `permissions`), and expiry **without a network call to Identity for each request**. JWKS itself is cached locally by `Microsoft.AspNetCore.Authentication.JwtBearer`, so the network cost is once per key-rotation, not once per request.
 
 The escape hatch — when you need *fresh* permission state that the JWT's `permissions` claim cannot give you — is `IdentityService.GetUserPermissions` (gRPC), not a DB lookup.
 
@@ -1451,23 +1451,23 @@ The escape hatch — when you need *fresh* permission state that the JWT's `perm
 ```csharp
 // DataModeling.Service Program.cs
 builder.Services
-    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(opts =>
-    {
-        opts.Authority = configuration["Identity:Authority"];   // e.g. https://identity.axis.internal
-        opts.Audience  = "axis_api";
-        opts.RequireHttpsMetadata = !env.IsDevelopment();
-        // JwtBearer auto-fetches /.well-known/openid-configuration → JWKS URL,
-        // caches keys, and rotates on signature failure. No call to Identity per request.
-        opts.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ClockSkew = TimeSpan.FromSeconds(30),
-        };
-    });
+ .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+ .AddJwtBearer(opts =>
+ {
+ opts.Authority = configuration["Identity:Authority"]; // e.g. https://identity.axis.internal
+ opts.Audience = "axis_api";
+ opts.RequireHttpsMetadata = !env.IsDevelopment();
+ // JwtBearer auto-fetches /.well-known/openid-configuration → JWKS URL,
+ // caches keys, and rotates on signature failure. No call to Identity per request.
+ opts.TokenValidationParameters = new TokenValidationParameters
+ {
+ ValidateIssuer = true,
+ ValidateAudience = true,
+ ValidateLifetime = true,
+ ValidateIssuerSigningKey = true,
+ ClockSkew = TimeSpan.FromSeconds(30),
+ };
+ });
 ```
 
 **Anti-pattern — DB lookup of Identity from another module:**
@@ -1475,7 +1475,7 @@ builder.Services
 ```csharp
 // WRONG — DataModeling reading Identity tables to authenticate
 public async Task<bool> IsActiveAsync(Guid userId)
-    => await _identityDb.Users.AnyAsync(u => u.Id == userId && u.Status == UserStatus.Active);
+ => await _identityDb.Users.AnyAsync(u => u.Id == userId && u.Status == UserStatus.Active);
 ```
 
 This violates the Share Nothing principle (cross-module DB query), forces every request to round-trip the Identity DB, and breaks the moment Identity is extracted (the project reference disappears). Use the JWT's `sub` + claims; for state newer than the token's TTL (e.g. immediate deactivation), consume `UserDeactivatedEvent` from Kafka and invalidate a local cache — never reach into Identity's DB.
@@ -1512,14 +1512,14 @@ All Command handlers must be safe to retry without producing duplicate side effe
 ```csharp
 public async Task<Result<Guid>> Handle(CreateWorkflowCommand cmd, CancellationToken ct)
 {
-    bool exists = await _repo.ExistsByNameAsync(cmd.Name, cmd.OrganizationId, ct);
-    if (exists)
-        return Result.Failure<Guid>(Error.Conflict($"A workflow named '{cmd.Name}' already exists."));
+ bool exists = await _repo.ExistsByNameAsync(cmd.Name, cmd.OrganizationId, ct);
+ if (exists)
+ return Result.Failure<Guid>(Error.Conflict($"A workflow named '{cmd.Name}' already exists."));
 
-    WorkflowDefinition wf = WorkflowDefinition.Create(cmd.Name, cmd.OrganizationId, cmd.CreatedByUserId);
-    await _repo.AddAsync(wf, ct);
-    await _uow.SaveChangesAsync(ct);
-    return Result.Success(wf.Id);
+ WorkflowDefinition wf = WorkflowDefinition.Create(cmd.Name, cmd.OrganizationId, cmd.CreatedByUserId);
+ await _repo.AddAsync(wf, ct);
+ await _uow.SaveChangesAsync(ct);
+ return Result.Success(wf.Id);
 }
 ```
 
@@ -1536,23 +1536,23 @@ The example below uses `WorkflowPublished`/`WorkflowActiveStatus` as concrete ty
 ```csharp
 public async Task Handle(WorkflowPublished @event, CancellationToken ct)
 {
-    WorkflowActiveStatus? existing = await context.WorkflowActiveStatuses
-        .FirstOrDefaultAsync(w => w.WorkflowId == @event.WorkflowId, ct);
+ WorkflowActiveStatus? existing = await context.WorkflowActiveStatuses
+ .FirstOrDefaultAsync(w => w.WorkflowId == @event.WorkflowId, ct);
 
-    if (existing is null)
-        context.WorkflowActiveStatuses.Add(
-            WorkflowActiveStatus.Activated(@event.WorkflowId, @event.OrganizationId));
-    else
-        existing.Reactivate();
+ if (existing is null)
+ context.WorkflowActiveStatuses.Add(
+ WorkflowActiveStatus.Activated(@event.WorkflowId, @event.OrganizationId));
+ else
+ existing.Reactivate();
 
-    try
-    {
-        await context.SaveChangesAsync(ct);
-    }
-    catch (DbUpdateException)
-    {
-        // Concurrent duplicate event delivery — row already inserted by a parallel invocation.
-    }
+ try
+ {
+ await context.SaveChangesAsync(ct);
+ }
+ catch (DbUpdateException)
+ {
+ // Concurrent duplicate event delivery — row already inserted by a parallel invocation.
+ }
 }
 ```
 
@@ -1560,15 +1560,15 @@ Use this pattern whenever a Wolverine handler does a check-before-insert and con
 
 **Migrations — idempotent raw SQL:**
 
-EF-scaffolded migrations are idempotent by default. When using `migrationBuilder.Sql(...)` for custom DDL or data migrations, always add an existence check:
+EF-scaffolded migrations are idempotent by default. When using `migrationBuilder.Sql(.)` for custom DDL or data migrations, always add an existence check:
 
 ```csharp
 migrationBuilder.Sql(@"
-    DO $$ BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'workflow_status') THEN
-            CREATE TYPE workflow_status AS ENUM ('Draft', 'Published', 'Archived');
-        END IF;
-    END $$;
+ DO $$ BEGIN
+ IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'workflow_status') THEN
+ CREATE TYPE workflow_status AS ENUM ('Draft', 'Published', 'Archived');
+ END IF;
+ END $$;
 ");
 ```
 
@@ -1583,7 +1583,7 @@ CLAUDE.md rule: **always use `using` directives — never write the namespace in
 **Wrong:**
 ```csharp
 string hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
-    System.Text.Encoding.UTF8.GetBytes(token)));
+ System.Text.Encoding.UTF8.GetBytes(token)));
 
 app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions { … });
 
@@ -1601,11 +1601,11 @@ string hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))
 **Detection command** — run this before committing; output must be empty:
 ```bash
 grep -rn --include="*.cs" \
-  -E "(System\.(Collections\.Generic|Linq|Threading|IO|Text|Net|Security)\.|Microsoft\.(AspNetCore|Extensions|EntityFrameworkCore)\.[A-Z])" \
-  src/ tests/ \
-  | grep -v "obj/" \
-  | grep -v "\.cs:.*using " \
-  | grep -v "^\s*//"
+ -E "(System\.(Collections\.Generic|Linq|Threading|IO|Text|Net|Security)\.|Microsoft\.(AspNetCore|Extensions|EntityFrameworkCore)\.[A-Z])" \
+ src/ tests/ \
+ | grep -v "obj/" \
+ | grep -v "\.cs:.*using " \
+ | grep -v "^\s*//"
 ```
 
 Common namespaces that agents forget to add as `using` directives:
@@ -1679,9 +1679,9 @@ string slug = name.ToLowerInvariant().Replace(' ', '-');
 // ✅ allowlist — only safe chars survive; handle collisions at the call site
 private static string ToSafeSlug(string name)
 {
-    string slug = name.ToLowerInvariant().Replace(' ', '-');
-    slug = new string(slug.Where(c => char.IsAsciiLetterOrDigit(c) || c == '-' || c == '_').ToArray());
-    return slug.Trim('-', '_');
+ string slug = name.ToLowerInvariant().Replace(' ', '-');
+ slug = new string(slug.Where(c => char.IsAsciiLetterOrDigit(c) || c == '-' || c == '_').ToArray());
+ return slug.Trim('-', '_');
 }
 ```
 
@@ -1690,11 +1690,11 @@ Collision handling in a bulk operation:
 Dictionary<string, int> seen = new(StringComparer.Ordinal);
 foreach (WorkflowExportDto dto in workflows)
 {
-    string baseSlug = ToSafeSlug(dto.Name);
-    seen.TryGetValue(baseSlug, out int count);
-    string entrySlug = count == 0 ? baseSlug : $"{baseSlug}_{count + 1}";
-    seen[baseSlug] = count + 1;
-    // use entrySlug as the ZIP entry name
+ string baseSlug = ToSafeSlug(dto.Name);
+ seen.TryGetValue(baseSlug, out int count);
+ string entrySlug = count == 0 ? baseSlug : $"{baseSlug}_{count + 1}";
+ seen[baseSlug] = count + 1;
+ // use entrySlug as the ZIP entry name
 }
 ```
 
@@ -1703,10 +1703,10 @@ foreach (WorkflowExportDto dto in workflows)
 Every change — including one-line fixes — goes through a branch + PR. Steps:
 
 ```bash
-git checkout -b chore/my-fix   # branch off current HEAD
+git checkout -b chore/my-fix # branch off current HEAD
 # make changes
 git add <files>
-git commit -m "chore: ..."
+git commit -m "chore: ."
 git push -u origin chore/my-fix
 gh pr create …
 ```
@@ -1715,7 +1715,7 @@ gh pr create …
 
 ## Drift script regex constraints {#drift-regex-constraints}
 
-[`scripts/check-doc-drift.sh`](../../scripts/check-doc-drift.sh) feeds its forbidden-pattern regexes into **GNU awk**. Awk's regex dialect differs from grep/PCRE/.NET in two ways that silently degrade patterns instead of erroring out — anyone adding a new check to the drift script must follow these conventions.
+[`scripts/check-doc-drift.sh`](././scripts/check-doc-drift.sh) feeds its forbidden-pattern regexes into **GNU awk**. Awk's regex dialect differs from grep/PCRE/.NET in two ways that silently degrade patterns instead of erroring out — anyone adding a new check to the drift script must follow these conventions.
 
 ### Backslash escapes for punctuation are silently broken
 
@@ -1761,14 +1761,14 @@ Every feature lives under `frontend/src/features/{feature-name}/`:
 
 ```text
 features/workflows/
-├── components/        # React components owned by this feature
-│   ├── WorkflowList.tsx
-│   └── WorkflowCard.tsx
-├── hooks/             # Custom hooks — mandatory use prefix
-│   └── useWorkflows.ts
-├── api.ts             # All queryFn / mutationFn for this feature
-├── types.ts           # Shared types for this feature
-└── index.ts           # Barrel export — public API of the feature
+├── components/ # React components owned by this feature
+│ ├── WorkflowList.tsx
+│ └── WorkflowCard.tsx
+├── hooks/ # Custom hooks — mandatory use prefix
+│ └── useWorkflows.ts
+├── api.ts # All queryFn / mutationFn for this feature
+├── types.ts # Shared types for this feature
+└── index.ts # Barrel export — public API of the feature
 ```
 
 - Component files: `PascalCase.tsx`. Hook files: `camelCase.ts` with mandatory `use` prefix.
@@ -1782,9 +1782,9 @@ features/workflows/
 ```ts
 // features/workflows/api.ts
 export const workflowKeys = {
-  all: ['workflows'] as const,
-  list: (filters: WorkflowFilters) => [...workflowKeys.all, 'list', filters] as const,
-  detail: (id: string) => [...workflowKeys.all, 'detail', id] as const,
+ all: ['workflows'] as const,
+ list: (filters: WorkflowFilters) => [.workflowKeys.all, 'list', filters] as const,
+ detail: (id: string) => [.workflowKeys.all, 'detail', id] as const,
 };
 ```
 
@@ -1793,15 +1793,15 @@ export const workflowKeys = {
 ```ts
 // features/workflows/api.ts
 export async function fetchWorkflows(filters: WorkflowFilters): Promise<PagedResult<WorkflowDto>> {
-  return fetchApi(`/api/workflows?page=${filters.page}&pageSize=${filters.pageSize}`);
+ return fetchApi(`/api/workflows?page=${filters.page}&pageSize=${filters.pageSize}`);
 }
 
 // features/workflows/hooks/useWorkflows.ts
 export function useWorkflows(filters: WorkflowFilters) {
-  return useQuery({
-    queryKey: workflowKeys.list(filters),
-    queryFn: () => fetchWorkflows(filters),
-  });
+ return useQuery({
+ queryKey: workflowKeys.list(filters),
+ queryFn: () => fetchWorkflows(filters),
+ });
 }
 ```
 
@@ -1816,12 +1816,12 @@ export function useWorkflows(filters: WorkflowFilters) {
 ```ts
 // ✅
 } catch (error: unknown) {
-  if (error instanceof ApiError) { ... }
+ if (error instanceof ApiError) { . }
 }
 
 // ❌
 } catch (error: any) {
-  if (error.status === 401) { ... }
+ if (error.status === 401) { . }
 }
 ```
 
@@ -1829,9 +1829,9 @@ export function useWorkflows(filters: WorkflowFilters) {
 
 ```ts
 vi.mocked(fetch).mockResolvedValueOnce({
-  ok: true,
-  status: 200,
-  text: () => Promise.resolve('{"id":"abc"}'),
+ ok: true,
+ status: 200,
+ text: () => Promise.resolve('{"id":"abc"}'),
 } as unknown as Response);
 ```
 
@@ -1849,9 +1849,9 @@ export const Route = createLazyFileRoute('/workflows/')({ component: WorkflowsPa
 ```ts
 // routes/__authenticated.tsx
 export const Route = createFileRoute('/_authenticated')({
-  beforeLoad: ({ context }) => {
-    if (!context.auth.isAuthenticated) throw redirect({ to: '/login' });
-  },
+ beforeLoad: ({ context }) => {
+ if (!context.auth.isAuthenticated) throw redirect({ to: '/login' });
+ },
 });
 ```
 
@@ -1864,13 +1864,13 @@ export const Route = createFileRoute('/_authenticated')({
 ```ts
 // ✅ Tests what the user sees
 it('should show error message when submission fails', async () => {
-  render(<CreateWorkflowForm />);
-  await userEvent.click(screen.getByRole('button', { name: /create/i }));
-  expect(await screen.findByText(/name is required/i)).toBeInTheDocument();
+ render(<CreateWorkflowForm />);
+ await userEvent.click(screen.getByRole('button', { name: /create/i }));
+ expect(await screen.findByText(/name is required/i)).toBeInTheDocument();
 });
 
 // ❌ Tests implementation detail
-it('should set isSubmitting to true', () => { ... });
+it('should set isSubmitting to true', () => { . });
 ```
 
 **Use `userEvent` over `fireEvent`** — simulates real browser event sequences:
@@ -1890,7 +1890,7 @@ try { await fetchApi('/fail'); } catch (e) { thrownError = e; }
 
 expect(thrownError).toBeInstanceOf(ApiError);
 if (thrownError instanceof ApiError) {
-  expect(thrownError.status).toBe(400);
+ expect(thrownError.status).toBe(400);
 }
 ```
 
@@ -1899,8 +1899,8 @@ if (thrownError instanceof ApiError) {
 Before every push involving `frontend/` changes:
 
 ```bash
-npm run ci      # tsc -b --noEmit && biome ci . — must be zero errors/warnings
-npm run test    # vitest run — all tests must pass
+npm run ci # tsc -b --noEmit && biome ci . — must be zero errors/warnings
+npm run test # vitest run — all tests must pass
 ```
 
 `npm run lint:fix` auto-fixes safe Biome issues. `npm run format` reformats all files.
@@ -1913,21 +1913,21 @@ Wireframes use Excalidraw (`.excalidraw` JSON). Both files — source and SVG pr
 
 ```
 docs/
-├── wireframes/                          ← shared kit (app-shell, _template)
-│   ├── app-shell.excalidraw
-│   └── app-shell.svg
+├── wireframes/ ← shared kit (app-shell, _template)
+│ ├── app-shell.excalidraw
+│ └── app-shell.svg
 └── use-cases/
-    └── <domain>/<use-case>/
-        ├── README.md
-        ├── <screen>.excalidraw          ← source (JSON, diffable)
-        └── <screen>.svg                 ← preview (vector, renders on GitHub)
+ └── <domain>/<use-case>/
+ ├── README.md
+ ├── <screen>.excalidraw ← source (JSON, diffable)
+ └── <screen>.svg ← preview (vector, renders on GitHub)
 ```
 
 **Naming:** screen slug in kebab-case matching the primary route segment — `login`, `data-models`, `workflow-detail`.
 
 **One wireframe per screen.** Multiple use cases on the same screen reference the same wireframe file.
 
-**Linking from a use-case file** — fill the `## Wireframes` table at the bottom of the use case (see [USE_CASE_TEMPLATE.md](../use-cases/USE_CASE_TEMPLATE.md)). Use relative paths next to `README.md`:
+**Linking from a use-case file** — fill the `## Wireframes` table at the bottom of the use case (see [USE_CASE_TEMPLATE.md](./use-cases/USE_CASE_TEMPLATE.md)). Use relative paths next to `README.md`:
 
 ```markdown
 ## Wireframes
@@ -1937,7 +1937,7 @@ docs/
 | login | [source](./login.excalidraw) | [preview](./login.svg) |
 ```
 
-Reference shared kit screens from `../../../wireframes/` (do not duplicate).
+Reference shared kit screens from `./././wireframes/` (do not duplicate).
 
 **Excalidraw settings** for consistent sketch aesthetic:
 - `roughness: 1` on all shapes

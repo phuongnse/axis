@@ -1,6 +1,6 @@
 # Use case — Silent token refresh
 
-> **Navigation**: [← Identity Access](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Identity Access](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -44,7 +44,7 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 - [ ] Multiple browser tabs open simultaneously: only one tab fires the refresh at a time (coordinated via a BroadcastChannel lock). All tabs share the new token.
 - [ ] A refresh token can only be used once (rotation). If the old refresh token is replayed (e.g., by an attacker who stole it), it is rejected and all sessions for that user are invalidated.
 
-*Out of scope*
+*Deferred capabilities*
 - Server-side session management (stateful sessions) — access is stateless JWT-based.
 
 > **Implementation status**

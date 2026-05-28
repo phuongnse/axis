@@ -1,6 +1,6 @@
 # Use case — Edit a custom role
 
-> **Navigation**: [← Identity Access](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Identity Access](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -44,8 +44,8 @@ Organization admins can create custom roles, assign permissions to each role, an
 - [ ] Removing a permission from a role affects all users currently holding that role simultaneously.
 - [ ] A user whose active session loses a permission they were relying on will receive HTTP 403 on their next request for that resource; the UI re-fetches their permissions and updates accordingly.
 
-*Out of scope*
-- Permission change notifications to affected users — not in MVP.
+*Deferred capabilities*
+- Permission change notifications to affected users.
 
 > **Implementation status**
 >

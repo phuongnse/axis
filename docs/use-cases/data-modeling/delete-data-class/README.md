@@ -1,6 +1,6 @@
 # Use case — Delete a data class
 
-> **Navigation**: [← Data Modeling](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Data Modeling](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -43,8 +43,8 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 *Edge cases*
 - [ ] Soft-deleted data classes are permanently purged after 30 days along with model soft-deletes.
 
-*Out of scope*
-- Merging two data classes into one — not in MVP.
+*Deferred capabilities*
+- Merging two data classes into one.
 
 > **Implementation status**
 >

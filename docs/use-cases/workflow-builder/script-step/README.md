@@ -1,6 +1,6 @@
 # Use case — Configure a Script step
 
-> **Navigation**: [← Workflow Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -46,9 +46,9 @@ Each step has a type that determines what it does when executed. Users configure
 - [ ] `context` is a read-only proxy; attempting to write to `context` directly (not `output`) has no effect and does not throw an error.
 - [ ] A script that runs within the timeout but produces no `output` writes is valid; context is unchanged.
 
-*Out of scope*
-- Importing external npm packages — not in MVP.
-- Python or other language scripts — JavaScript only in MVP.
+*Deferred capabilities*
+- Importing external npm packages.
+- Python or other language scripts — JavaScript only.
 
 > **Implementation status**
 >

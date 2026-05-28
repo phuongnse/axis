@@ -1,6 +1,6 @@
 # Use case — Permission enforcement on the API
 
-> **Navigation**: [← Identity Access](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Identity Access](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -44,8 +44,8 @@ A resource-based permission system where each permission grants the ability to p
 - [ ] Permission checks are evaluated from the JWT claims at request time; role changes that happened after the JWT was issued take effect only after token refresh.
 - [ ] All critical endpoints (write, delete, trigger) are covered by automated permission-enforcement tests in the test suite.
 
-*Out of scope*
-- Row-level security (e.g., "user can only edit their own records") — not in MVP; all permission checks are type-level.
+*Deferred capabilities*
+- Row-level security (e.g., "user can only edit their own records").; all permission checks are type-level.
 
 > **Implementation status**
 >

@@ -1,6 +1,6 @@
 # Use case — View workflows list
 
-> **Navigation**: [← Workflow Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -42,8 +42,8 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 *Edge cases*
 - [ ] A workflow with multiple trigger types shows the first trigger's icon and a "+N" badge.
 
-*Out of scope*
-- Workflow folders / tags — not in MVP.
+*Deferred capabilities*
+- Workflow folders / tags.
 
 > **Implementation status**
 >

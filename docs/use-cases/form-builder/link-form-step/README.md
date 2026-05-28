@@ -1,6 +1,6 @@
 # Use case — Link a form to a workflow Form step
 
-> **Navigation**: [← Form Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Form Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -43,8 +43,8 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 - [ ] A form that has 0 fields can be selected, but the canvas shows a warning: "The selected form has no fields."
 - [ ] The same form can be used in multiple Form steps within the same workflow (e.g., a multi-stage approval process using the same form at each stage).
 
-*Out of scope*
-- Creating a new form from within the workflow canvas (must go to Form Builder) — not in MVP.
+*Deferred capabilities*
+- Creating a new form from within the workflow canvas (must go to Form Builder).
 
 > **Implementation status**
 >

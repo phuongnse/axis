@@ -1,6 +1,6 @@
 # Use case — Retry with modified input context
 
-> **Navigation**: [← Workflow Engine](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Engine](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -44,8 +44,8 @@ When a workflow execution fails at a step, users can manually retry from the fai
 - [ ] The modified context is not restricted to keys relevant to the failed step; the user can modify any key. The full modified context is used for all remaining steps.
 - [ ] A very large context (> 1 MB) may be slow to render in the JSON editor; the editor handles up to 5 MB.
 
-*Out of scope*
-- Structured field-by-field editing of context (showing fields by step/variable name) — not in MVP; raw JSON editor only.
+*Deferred capabilities*
+- Structured field-by-field editing of context (showing fields by step/variable name).; raw JSON editor only.
 
 > **Implementation status**
 >

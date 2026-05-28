@@ -1,6 +1,6 @@
 # Axis Platform — Documentation
 
-> **Navigation**: [← CLAUDE.md](../CLAUDE.md)
+> **Navigation**: [← CLAUDE.md](./CLAUDE.md)
 
 > A low-code SaaS platform for building data-driven workflow applications.
 
@@ -32,15 +32,15 @@
 
 ## Domains overview
 
-| Domain | Phase | Status |
-|---|---|---|
-| [platform-foundation](./use-cases/platform-foundation/README.md) | MVP | 🚧 In Progress |
-| [identity-access](./use-cases/identity-access/README.md) | MVP | 🚧 In Progress |
-| [data-modeling](./use-cases/data-modeling/README.md) | MVP | 🚧 In Progress |
-| [workflow-builder](./use-cases/workflow-builder/README.md) | MVP | 🚧 In Progress |
-| [form-builder](./use-cases/form-builder/README.md) | MVP | 🚧 In Progress |
-| [workflow-engine](./use-cases/workflow-engine/README.md) | MVP | 🚧 In Progress |
-| [page-builder](./use-cases/page-builder/README.md) | Phase 2 | ⏳ Planned |
+| Domain | Status |
+|---|---|
+| [platform-foundation](./use-cases/platform-foundation/README.md) | 🚧 In Progress |
+| [identity-access](./use-cases/identity-access/README.md) | 🚧 In Progress |
+| [data-modeling](./use-cases/data-modeling/README.md) | 🚧 In Progress |
+| [workflow-builder](./use-cases/workflow-builder/README.md) | 🚧 In Progress |
+| [form-builder](./use-cases/form-builder/README.md) | 🚧 In Progress |
+| [workflow-engine](./use-cases/workflow-engine/README.md) | 🚧 In Progress |
+| [page-builder](./use-cases/page-builder/README.md) | ⏳ Not started |
 
 ---
 
@@ -89,11 +89,11 @@ When two docs disagree, the **owner** wins. Update the owner first; everything e
 | Topic | Owner |
 |---|---|
 | Use-case layout (flow + AC + artifacts + status) | [use-cases/USE_CASE_TEMPLATE.md](./use-cases/USE_CASE_TEMPLATE.md) + [playbooks/docs-style.md](./playbooks/docs-style.md#use-case-files--wireframes--implementation-status) |
-| Product scope, target users, MVP cut | [PRODUCT_VISION.md](./PRODUCT_VISION.md) |
+| Product scope, target users, production requirements | [PRODUCT_VISION.md](./PRODUCT_VISION.md) |
 | Library versions and ADRs | [TECH_STACK.md](./TECH_STACK.md) |
-| Source tree and module boundaries | [../CLAUDE.md](../CLAUDE.md) |
+| Source tree and module boundaries | [./CLAUDE.md](./CLAUDE.md) |
 | Per-use-case ACs and current gaps | `docs/use-cases/{domain}/{short-slug}/README.md` |
 | Module-wide layer status | [PROGRESS.md](./PROGRESS.md) |
 | Daily agent workflow + gates | [playbooks/agent-checklist.md](./playbooks/agent-checklist.md) |
-| Local dev (compose, ports, URLs) | [playbooks/local-dev.md](./playbooks/local-dev.md) + [`docker-compose.yml`](../docker-compose.yml) |
+| Local dev (compose, ports, URLs) | [playbooks/local-dev.md](./playbooks/local-dev.md) + [`docker-compose.yml`](./docker-compose.yml) |
 | Implementation patterns and pitfalls | [playbooks/patterns.md](./playbooks/patterns.md) (start at [patterns-index.md](./playbooks/patterns-index.md)) |

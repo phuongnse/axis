@@ -1,10 +1,10 @@
-# Use case — Sign in with email and password
+# Use case — Sign in to the workspace
 
-> **Navigation**: [← Identity Access](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Identity Access](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
-Sign in with my email and password so that I can access my organization's workspace.
+Sign in with email and password or an external identity provider (Microsoft, Google, GitHub) so that I can access my organization's workspace.
 
 ## Primary actor
 
@@ -31,9 +31,18 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] Sign-in form accepts email and password.
+- [ ] Sign-in screen offers: email + password, **Continue with Microsoft**, **Continue with Google**, and **Continue with GitHub**.
+- [ ] Email/password sign-in accepts email and password.
+- [ ] External provider sign-in uses OpenIddict/OIDC authorization code + PKCE (same session and token delivery as password sign-in).
 - [ ] On success, the client receives an access token (JWT, 15-min TTL) stored in memory and a refresh token (7-day TTL) stored in an `httpOnly`, `Secure`, `SameSite=Strict` cookie.
 - [ ] User is redirected to their workspace dashboard.
+
+*External identity providers*
+- [ ] **Microsoft:** supports work/school (Entra ID) and personal Microsoft accounts per tenant app registration configuration.
+- [ ] **Google:** OAuth 2.0 sign-in with Google account picker.
+- [ ] **GitHub:** OAuth sign-in with GitHub account.
+- [ ] First-time external sign-in for an unknown email on an existing org is rejected with a clear message; new org creation uses [register-org](../../platform-foundation/register-org/).
+- [ ] Linking external login to an existing password account (same verified email) is supported or explicitly blocked with guidance — product default: one user record per email, external login allowed when email matches a verified user.
 
 *Validation & errors*
 - [ ] Empty email or password: inline field errors, form does not submit.
@@ -49,9 +58,8 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 - [ ] Pasting credentials from a password manager works correctly (no interference with autocomplete).
 - [ ] Pressing Enter in the password field submits the form.
 
-*Out of scope*
-- SSO / social login (Google, GitHub) — not in MVP.
-- 2FA / MFA — not in MVP.
+*Deferred capabilities*
+- 2FA / MFA (TOTP or WebAuthn) for password and external-provider sessions.
 
 > **Implementation status**
 >
@@ -63,7 +71,7 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 > | API | ✅ |
 > | Frontend | ⚠️ |
 >
-> **Gaps vs spec:** Login page + PKCE flow + app shell/dashboard scaffold on PR #50 branch. BroadcastChannel multi-tab refresh, account lockout UI, and unverified-email screen polish pending.
+> **Gaps vs spec:** Login page + PKCE password flow + app shell/dashboard scaffold on PR #50 branch. Microsoft/Google/GitHub buttons and OIDC external-login wiring pending Identity + Frontend. BroadcastChannel multi-tab refresh, account lockout UI, and unverified-email screen polish pending.
 >
 > **Deferred (PR #50 follow-up):** none for this US.
 >

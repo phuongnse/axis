@@ -1,6 +1,6 @@
 # Use case — Create a model
 
-> **Navigation**: [← Data Modeling](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Data Modeling](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -44,8 +44,8 @@ Users can create custom data models within their organization. A model defines t
 - [ ] Creating a model with a name that matches a soft-deleted model is allowed (they are different models).
 - [ ] Model creation is atomic: if any part of the creation fails (e.g., inserting system fields), the entire model is rolled back and nothing is left in a partial state.
 
-*Out of scope*
-- Importing a model from another org or from a JSON file directly — covered in [workflow-builder import-export Import/Export](../../workflow-builder/).
+*Deferred capabilities*
+- Importing a model from another org or from a JSON file directly — covered in [workflow-builder import-export Import/Export](././workflow-builder/).
 
 > **Implementation status**
 >

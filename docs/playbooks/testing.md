@@ -1,6 +1,6 @@
 # Testing Playbook
 
-> **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
+> **Navigation**: [← docs/README.md](./README.md) · [← CLAUDE.md](././CLAUDE.md)
 
 > Full testing rules for .NET and frontend. The non-negotiable gates (TDD mandatory, pre-commit scope table) live in CLAUDE.md. This playbook covers isolation strategies, naming conventions, file layout, and mocking rules.
 
@@ -73,7 +73,7 @@ Any change affecting API response shape, status codes, or request contract must 
 
 **Every module that has its own `DbContext` must get its own isolated PostgreSQL database** in `ApiTestFixture` (e.g. `axis_identity_test`, `axis_datamodeling_test`). Never point two modules at the same database.
 
-**Why:** `EnsureCreatedAsync` skips schema creation when *any* user table already exists in the database. **Migrations do not have this heuristic** — use `MigrateAsync` everywhere ([ADR-023](../TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)).
+**Why:** `EnsureCreatedAsync` skips schema creation when *any* user table already exists in the database. **Migrations do not have this heuristic** — use `MigrateAsync` everywhere ([ADR-023](./TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)).
 
 **Pattern:** use `PostgresModuleTestDatabase` (`tests/Shared/Axis.Testing`) to create a database per module, set `ConnectionStrings__{Module}` environment variables **before** `WebApplicationFactory` (Wolverine reads them at host build), then `MigrateAsync` each context before starting the host:
 
@@ -82,13 +82,13 @@ string identityConn = await PostgresModuleTestDatabase.CreateAsync(adminConn, "a
 Environment.SetEnvironmentVariable("ConnectionStrings__Identity", identityConn);
 
 await using (IdentityDbContext ctx = new(/* UseOpenIddict() */))
-    await ctx.Database.MigrateAsync();
+ await ctx.Database.MigrateAsync();
 
 await PostgresModuleTestDatabase.MigrateAsync<DataModelingDbContext>(
-    dmConn, opts => new DataModelingDbContext(opts, tenantContext));
+ dmConn, opts => new DataModelingDbContext(opts, tenantContext));
 ```
 
-**Wolverine:** no separate `axis_wolverine_test` database. Per-module `wolverine` schemas are created by `AddResourceSetupOnStartup()` in each module's database when the test host starts ([ADR-012](../TECH_STACK.md#adr-012-per-module-wolverine-schema-in-the-modules-own-database)).
+**Wolverine:** no separate `axis_wolverine_test` database. Per-module `wolverine` schemas are created by `AddResourceSetupOnStartup()` in each module's database when the test host starts ([ADR-012](./TECH_STACK.md#adr-012-per-module-wolverine-schema-in-the-modules-own-database)).
 
 **Rule:** when adding a module to `ApiTestFixture`, add `CreateAsync` + env var + `MigrateAsync` — never `EnsureCreatedAsync`, never a shared Wolverine-only database.
 
@@ -97,7 +97,7 @@ await PostgresModuleTestDatabase.MigrateAsync<DataModelingDbContext>(
 Do not couple tenant-isolation API tests to asynchronous provisioning-event timing.
 
 - **Tenant isolation API tests (tenant-isolation)** should verify request-path behavior (`org_id` resolution, schema-scoped reads, 403/404 boundaries) with **deterministic fixture setup**. Provision tenant schemas synchronously in test setup and assert required tenant tables exist before making API calls.
-- **Async provisioning workflow tests ([tenant provisioning](../use-cases/platform-foundation/provision-tenant/))** should be a **separate test suite** that targets coordinator/handler behavior (retry scheduling, exhaustion alerts, completion transitions), not a precondition for every API test.
+- **Async provisioning workflow tests ([tenant provisioning](./use-cases/platform-foundation/provision-tenant/))** should be a **separate test suite** that targets coordinator/handler behavior (retry scheduling, exhaustion alerts, completion transitions), not a precondition for every API test.
 - Shared helpers (e.g., auth helpers used by many endpoint suites) must not wait on eventually-consistent background pipelines with long polling loops. That pattern can create CI-wide flakes/timeouts and hide the real failing concern.
 
 When diagnosing CI failures in this area:
@@ -114,7 +114,7 @@ When diagnosing CI failures in this area:
 ### Runner and structure
 
 - Vitest + `@testing-library/react`. Run with `npm run test` (or `npx vitest`) inside `frontend/`.
-- `describe('ComponentOrHookName', () => { it('should ...', ...) })` — `describe` groups by subject, `it` sentences describe expected behaviour.
+- `describe('ComponentOrHookName', () => { it('should .', .) })` — `describe` groups by subject, `it` sentences describe expected behaviour.
 
 ### File location
 

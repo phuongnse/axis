@@ -1,6 +1,6 @@
 # Use case — Export a workflow as JSON
 
-> **Navigation**: [← Workflow Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -42,9 +42,9 @@ Workflow definitions can be exported as portable JSON files and imported into an
 - [ ] Exporting a workflow with broken references (e.g., a form that was deleted) still succeeds; the broken reference is exported as-is with a `"broken": true` flag, and a warning is shown to the user.
 - [ ] A very large workflow (50+ steps) may take up to 5 seconds to generate; the UI shows a loading state.
 
-*Out of scope*
+*Deferred capabilities*
 - Exporting execution history — definitions only.
-- Exporting to formats other than JSON (YAML, BPMN) — not in MVP.
+- Exporting to formats other than JSON (YAML, BPMN).
 
 > **Implementation status**
 >

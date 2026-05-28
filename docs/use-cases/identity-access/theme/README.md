@@ -1,6 +1,6 @@
 # Use case — Switch visual theme (light / dark / system)
 
-> **Navigation**: [← Identity Access](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Identity Access](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -33,8 +33,8 @@ Define user-facing localization and visual theme behavior for the SPA so each us
 
 ## Acceptance Criteria
 
-**Purpose:** let users choose a comfortable visual theme with consistent contrast and persistence.  
-**Primary actor:** authenticated user.  
+**Purpose:** let users choose a comfortable visual theme with consistent contrast and persistence. 
+**Primary actor:** authenticated user. 
 **Trigger:** user changes theme mode in header/settings selector.
 
 #### Main flow
@@ -63,7 +63,7 @@ Define user-facing localization and visual theme behavior for the SPA so each us
 - [ ] Theme switch does not break contrast for critical feedback states (error/warning/success).
 - [ ] Theme preference applies before first meaningful paint to avoid visible flash on load.
 
-*Out of scope*
+*Deferred capabilities*
 - Custom theme palette editor.
 
 > **Implementation status**

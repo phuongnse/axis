@@ -1,6 +1,6 @@
 # Use case — Change organization plan (admin override)
 
-> **Navigation**: [← Platform Foundation](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Platform Foundation](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -26,7 +26,7 @@ Manually change an organization's plan so that I can support early customers and
 
 ## Context
 
-Define subscription plan tiers with feature limits and enforce those limits at the API level. Billing integration is out of scope for MVP — this feature covers plan definitions and enforcement logic only.
+Define subscription plan tiers with feature limits and enforce those limits at the API level. Payment processing is a separate billing-integration initiative — this feature covers plan definitions and enforcement logic.
 
 ## Acceptance Criteria
 
@@ -42,8 +42,8 @@ Define subscription plan tiers with feature limits and enforce those limits at t
 *Edge cases*
 - [ ] Plan change is logged in the platform audit log with: who changed, from what plan, to what plan, and at what time.
 
-*Out of scope*
-- Org-initiated plan upgrade — Phase 2 (requires billing integration).
+*Deferred capabilities*
+- Org-initiated plan upgrade — deferred until billing integration ships.
 
 > **Implementation status**
 >
@@ -55,7 +55,7 @@ Define subscription plan tiers with feature limits and enforce those limits at t
 > | API | ✅ (backend AC) |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** [view-available-plans](../view-plans/) public pricing page UI, static fallback on load failure, "Current plan" badge (Frontend only). No multi-workflow bulk-import API yet — single-workflow import/duplicate enforce +1 before save (bulk workflow import acceptance criteria in [bulk export](../../workflow-builder/bulk-export/) applies when bulk endpoint exists).
+> **Gaps vs spec:** [view-available-plans](./view-plans/) public pricing page UI, static fallback on load failure, "Current plan" badge (Frontend only). No multi-workflow bulk-import API yet — single-workflow import/duplicate enforce +1 before save (bulk workflow import acceptance criteria in [bulk export](././workflow-builder/bulk-export/) applies when bulk endpoint exists).
 >
 > **Done (backend):**
 > - `GET /api/plans` with limits + `featureFlags` + `isAvailableForNewSignups`
@@ -71,7 +71,7 @@ Define subscription plan tiers with feature limits and enforce those limits at t
 > - atomic check-and-consume for monthly execution starts (race can briefly exceed cap under concurrency)
 > - fail-closed when usage counter/Redis unavailable (today logs warning and treats usage as 0).
 >
-> **Decisions:** `featureFlags` derived from plan slug for MVP (no JSON column); `PlatformAdmin:UserIds` config for platform admin plan change.
+> **Decisions:** `featureFlags` derived from plan slug for production (no JSON column); `PlatformAdmin:UserIds` config for platform admin plan change.
 
 ## Wireframes
 

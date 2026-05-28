@@ -1,6 +1,6 @@
 # Use case — Change password while signed in
 
-> **Navigation**: [← Identity Access](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Identity Access](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -45,8 +45,8 @@ Allow users to reset forgotten passwords, change their current password, and man
 - [ ] If the confirmation email fails to send, the password change still succeeds and is logged; the email failure is logged separately.
 - [ ] Changing password while another tab has the change-password form open: the other tab's form submission will fail with "Current password is incorrect" (since the password was already changed).
 
-*Out of scope*
-- Password history check (cannot reuse last N passwords) — not in MVP.
+*Deferred capabilities*
+- Password history check (cannot reuse last N passwords).
 
 > **Implementation status**
 >
@@ -60,7 +60,7 @@ Allow users to reset forgotten passwords, change their current password, and man
 >
 > **Gaps vs spec:** failed-attempt lockout for change-password form (3 attempts / 15 min) pending. Revoking other-device sessions after change pending (OpenIddict token revocation).
 >
-> **Decisions:** notification email failure is swallowed at handler level and logged separately at Infrastructure — password change still succeeds per [password-security](../README.md) acceptance criteria.
+> **Decisions:** notification email failure is swallowed at handler level and logged separately at Infrastructure — password change still succeeds per [password-security](./README.md) acceptance criteria.
 
 ## Wireframes
 

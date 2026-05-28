@@ -1,6 +1,6 @@
 # Use case — Configure a Schedule trigger
 
-> **Navigation**: [← Workflow Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -46,8 +46,8 @@ A workflow must have at least one trigger before it can be published. Triggers d
 - [ ] If `max_concurrent_runs > 1`, all concurrent executions proceed independently.
 - [ ] Changing the cron expression of an active workflow updates the schedule immediately without archiving and re-publishing.
 
-*Out of scope*
-- Date-specific one-time scheduling (e.g., "run once on 2026-12-25") — not in MVP.
+*Deferred capabilities*
+- Date-specific one-time scheduling (e.g., "run once on 2026-12-25").
 
 > **Implementation status**
 >

@@ -2,7 +2,7 @@
 
 [← Back to Docs Home](./README.md)
 
-> **Scope:** Architectural shape — what containers exist, how tenancy and auth work end-to-end, where the modules sit. **Not** the source of truth for: library versions ([TECH_STACK.md](./TECH_STACK.md)), source tree ([CLAUDE.md](../CLAUDE.md) § Solution tree), feature behaviour (`docs/use-cases/`), implementation rules (`docs/playbooks/`).
+> **Scope:** Architectural shape — what containers exist, how tenancy and auth work end-to-end, where the modules sit. **Not** the source of truth for: library versions ([TECH_STACK.md](./TECH_STACK.md)), source tree ([CLAUDE.md](./CLAUDE.md) § Solution tree), feature behaviour (`docs/use-cases/`), implementation rules (`docs/playbooks/`).
 >
 > If two docs would disagree, this one defers.
 
@@ -31,7 +31,7 @@ Axis runs as a **modulith with strict service boundaries** — each module is a 
 | **WorkflowBuilder service** | Workflow definitions, steps, transitions, triggers. |
 | **WorkflowEngine service** | Execution lifecycle, step runtime, saga orchestrator. |
 | **FormBuilder service** | Form definitions, form-task submissions. |
-| **PageBuilder service** | Visual page builder (Phase 2). |
+| **PageBuilder service** | Visual page builder (module not started — see [PROGRESS.md](./PROGRESS.md)). |
 | **Per-module PostgreSQL** | One database per module (`axis_identity`, `axis_datamodeling`, …). Schema-per-tenant inside each ([ADR-011](./TECH_STACK.md#adr-011-per-module-database-with-schema-per-tenant-inside)). Per-module Wolverine outbox schema lives alongside ([ADR-012](./TECH_STACK.md#adr-012-per-module-wolverine-schema-in-the-modules-own-database)). |
 | **Apache Kafka + Schema Registry** | Cross-module **event** transport + event-sourced aggregate log. Topics partitioned by `organizationId`. Avro payloads with CloudEvents envelopes ([ADR-013](./TECH_STACK.md#adr-013-apache-kafka-for-cross-module-domain-events-and-event-sourced-aggregates), [ADR-019](./TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). |
 | **RabbitMQ** | Cross-module **command + job + saga** transport. Work-queue semantics (ACK, requeue, DLX, prefetch). Per-message routing rule in [ADR-025](./TECH_STACK.md#adr-025-transport-selection-rule-by-message-name-suffix). |
@@ -48,7 +48,7 @@ Concrete versions in [TECH_STACK.md](./TECH_STACK.md).
 
 ![Module Overview](./diagrams/module-overview.svg)
 
-Each module *is* a service contract — modulith mode collocates them as in-process targets, but the contract surface is identical to the extracted form. Source tree and project naming live in [CLAUDE.md § Solution tree](../CLAUDE.md#docs-index).
+Each module *is* a service contract — modulith mode collocates them as in-process targets, but the contract surface is identical to the extracted form. Source tree and project naming live in [CLAUDE.md § Solution tree](./CLAUDE.md#docs-index).
 
 ### Per-module layer convention
 
@@ -73,7 +73,7 @@ Each module *is* a service contract — modulith mode collocates them as in-proc
 
 Per-message transport selection follows the suffix convention in [ADR-025](./TECH_STACK.md#adr-025-transport-selection-rule-by-message-name-suffix): `*Command`/`*Job`/`*SagaStep` → RabbitMQ, `*Event`/`*Snapshot` → Kafka.
 
-Forbidden: shared `DbContext`, direct C# method calls into another module's Application services, cross-module SQL, in-process `IMediator` for cross-module dispatch. The drift script and CI enforce these — see [CLAUDE.md § Service boundaries](../CLAUDE.md) and [playbooks/patterns.md § Cross-module communication](./playbooks/patterns.md#cross-module-communication-pattern).
+Forbidden: shared `DbContext`, direct C# method calls into another module's Application services, cross-module SQL, in-process `IMediator` for cross-module dispatch. The drift script and CI enforce these — see [CLAUDE.md § Service boundaries](./CLAUDE.md) and [playbooks/patterns.md § Cross-module communication](./playbooks/patterns.md#cross-module-communication-pattern).
 
 ---
 
@@ -83,17 +83,17 @@ Each module owns its own PostgreSQL database. Tenant isolation inside a module i
 
 ```text
 axis_identity DB
-└── public schema                # organizations, users, roles, subscriptions, openiddict tables
+└── public schema # organizations, users, roles, subscriptions, openiddict tables
 
 axis_datamodeling DB
-├── public schema                # module config, cross-tenant indexes
-├── wolverine schema             # per-module envelope tables (outbox/inbox/scheduled/dead-letters)
-└── tenant_{orgId:N} schemas     # models, fields, records (per tenant)
+├── public schema # module config, cross-tenant indexes
+├── wolverine schema # per-module envelope tables (outbox/inbox/scheduled/dead-letters)
+└── tenant_{orgId:N} schemas # models, fields, records (per tenant)
 
-axis_workflowbuilder DB           ← same shape
-axis_workflowengine DB            ← same shape
-axis_formbuilder DB               ← same shape
-axis_pagebuilder DB               ← same shape (Phase 2)
+axis_workflowbuilder DB ← same shape
+axis_workflowengine DB ← same shape
+axis_formbuilder DB ← same shape
+axis_pagebuilder DB ← same shape (when PageBuilder module ships)
 ```
 
 **Tenant resolution:** every external request carries a JWT with an `org_id` claim. The gateway extracts it and propagates via gRPC metadata (sync calls) and CloudEvents `tenantid` extension (events). Each module restores it into a scoped `ITenantContext`. EF Core sets the per-connection `search_path` to the tenant schema via `TenantSchemaInterceptor`.

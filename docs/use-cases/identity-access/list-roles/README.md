@@ -1,6 +1,6 @@
 # Use case — View and manage roles
 
-> **Navigation**: [← Identity Access](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Identity Access](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -41,8 +41,8 @@ Organization admins can create custom roles, assign permissions to each role, an
 *Edge cases*
 - [ ] If an org has no custom roles yet, the list shows only the 4 default system roles with a prompt to create a custom role.
 
-*Out of scope*
-- Role hierarchy / role inheritance — not in MVP (flat role model only).
+*Deferred capabilities*
+- Role hierarchy / role inheritance. (flat role model only).
 
 > **Implementation status**
 >

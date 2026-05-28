@@ -1,6 +1,6 @@
 # Use case — Add an if/else branch
 
-> **Navigation**: [← Workflow Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -43,8 +43,8 @@ Workflows can take different execution paths based on data values using Conditio
 - [ ] Both branches of an if/else can converge back to the same downstream step (diamond pattern). The downstream step executes once, whichever branch reaches it first.
 - [ ] A Condition step's expression can reference output from any preceding step in the workflow, not only the immediately previous step.
 
-*Out of scope*
-- Loop-back branching (sending execution back to an earlier step) — cycles are blocked in MVP.
+*Deferred capabilities*
+- Loop-back branching (sending execution back to an earlier step) — cycles are blocked.
 
 > **Implementation status**
 >

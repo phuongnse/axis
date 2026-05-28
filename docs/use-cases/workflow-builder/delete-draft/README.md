@@ -1,6 +1,6 @@
 # Use case — Delete a Draft workflow
 
-> **Navigation**: [← Workflow Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -38,9 +38,9 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 - [ ] Only `Draft` workflows can be deleted. Attempting to delete an `Active` or `Archived` workflow returns HTTP 422: "Only draft workflows can be deleted."
 - [ ] Attempting to delete a workflow that does not exist returns HTTP 404.
 
-*Out of scope*
-- Hard delete / permanent purge — not in MVP.
-- Bulk delete — not in MVP.
+*Deferred capabilities*
+- Hard delete / permanent purge.
+- Bulk delete.
 
 > **Implementation status**
 >

@@ -1,6 +1,6 @@
 # Use case — View retry history
 
-> **Navigation**: [← Workflow Engine](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Engine](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -40,11 +40,11 @@ When a workflow execution fails at a step, users can manually retry from the fai
 - [ ] If the retry history fails to load, it shows an error state in the section (not a full page error).
 
 *Edge cases*
-- [ ] A retry that was itself retried creates a chain: Original → Retry 1 → Retry 2 → ... All are shown in the retry history of the original execution.
+- [ ] A retry that was itself retried creates a chain: Original → Retry 1 → Retry 2 → . All are shown in the retry history of the original execution.
 - [ ] There is no maximum retry count imposed by the platform; the user can retry as many times as needed.
 
-*Out of scope*
-- Comparing two retry attempts side-by-side — not in MVP.
+*Deferred capabilities*
+- Comparing two retry attempts side-by-side.
 
 > **Implementation status**
 >

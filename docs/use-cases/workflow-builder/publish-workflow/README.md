@@ -1,6 +1,6 @@
 # Use case — Publish a workflow
 
-> **Navigation**: [← Workflow Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -42,8 +42,8 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 - [ ] An already-published (Active) workflow can be edited — edits create a new Draft version. The current active version continues running until the new version is published.
 - [ ] Publishing a new version archives the previous version's definition snapshot for execution history traceability.
 
-*Out of scope*
-- Approval workflow for publishing (e.g., requiring a second admin to approve) — not in MVP.
+*Deferred capabilities*
+- Approval workflow for publishing (e.g., requiring a second admin to approve).
 
 > **Implementation status**
 >

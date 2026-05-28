@@ -1,6 +1,6 @@
 # Identity & Access Management
 
-[← Back to Use Cases](../README.md)
+[← Back to Use Cases](./README.md)
 
 ---
 
@@ -14,7 +14,7 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 
 ## Phase
 
-**MVP**
+**Production**
 
 ---
 
@@ -27,7 +27,7 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 | [Change password while signed in](change-password/) | Change my password while signed in so that I can keep my account secure. |
 | [Reset forgotten password](reset-password/) | Reset my password via email so that I can regain access to my account if I forget it. |
 | [View and revoke active sessions](sessions/) | See where I'm currently signed in so that I can revoke access from devices I no longer use. |
-| [Sign in with email and password](sign-in/) | Sign in with my email and password so that I can access my organization's workspace. |
+| [Sign in to the workspace](sign-in/) | Sign in with email/password or Microsoft, Google, or GitHub. |
 | [Sign out](sign-out/) | Sign out so that my session is terminated and no one else can use my account from this device. |
 | [Silent token refresh](token-refresh/) | My session to stay active while I'm working so that I'm not interrupted by unexpected sign-out prompts. |
 
@@ -97,7 +97,7 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 |---|---|---|
 | Domain | ✅ Done | `Organization`, `User`, `Role`, `Invitation` aggregates; `Email`, `OrganizationSlug` value objects; all domain events |
 | Application | ✅ Done | `RegisterOrganization`, `InviteUser`, `AcceptInvitation`, `DeactivateUser`, `AssignRoleToUser`, `CreateRole`, `UpdateRole`, `UpdateUserProfile`; `AuthenticateUser`, `VerifyEmail`, `ResendVerificationEmail`, `RequestPasswordReset`, `ResetPassword`, `ChangePassword`, `RevokeSession`; `GetRoles`, `GetUserSessions` queries |
-| Infrastructure | ✅ Done | `IdentityDbContext` (public schema), EF Core mappings, all repositories, `BCryptPasswordHasher` (work factor 12), `MailKitEmailSender`, `IdentityUnitOfWork` (maps domain events → Avro integration events on save), `PasswordResetTokenStore`, `SessionStoreService` (wraps `IOpenIddictTokenManager`), `OpenIddictSeeder`. `IdentityGrpcService` exposes `GetUserPermissions` ([ADR-014](../../TECH_STACK.md#adr-014-grpc-for-internal-sync-rpc-and-rest-openapi-for-external-api)). `IdentityEventMapper` translates 5 domain events to Avro records published via Wolverine outbox → Kafka (ADR-019). |
+| Infrastructure | ✅ Done | `IdentityDbContext` (public schema), EF Core mappings, all repositories, `BCryptPasswordHasher` (work factor 12), `MailKitEmailSender`, `IdentityUnitOfWork` (maps domain events → Avro integration events on save), `PasswordResetTokenStore`, `SessionStoreService` (wraps `IOpenIddictTokenManager`), `OpenIddictSeeder`. `IdentityGrpcService` exposes `GetUserPermissions` ([ADR-014](././TECH_STACK.md#adr-014-grpc-for-internal-sync-rpc-and-rest-openapi-for-external-api)). `IdentityEventMapper` translates 5 domain events to Avro records published via Wolverine outbox → Kafka (ADR-019). |
 | Contracts | ✅ Done | `Axis.Identity.Contracts` — `Protos/axis/identity/v1/identity_service.proto` (`GetUserPermissions`) + 5 Avro schemas (`OrganizationVerifiedEvent`, `UserDeactivatedEvent`, `UserReactivatedEvent`, `RoleAssignedEvent`, `RoleRemovedEvent`) with hand-written `ISpecificRecord` generated code + `IdentityKafkaTopics` + `IdentityEventExtensions` (typed GUID accessors). |
 | API | ✅ Done | OpenIddict 5.x OAuth2/OIDC server: `GET /connect/authorize` (PKCE), `POST /connect/login` (credential validation + session cookie), `POST /connect/token` (code exchange, refresh, client credentials). `POST /api/auth/signout` (revoke refresh token + JTI blacklist). Refresh token delivered as httpOnly `Secure SameSite=Strict` cookie via `ApplyRefreshTokenCookieHandler`; extracted from cookie on refresh via `ExtractRefreshTokenFromCookieHandler`. Permission-based authorization via `PermissionPolicyProvider` + `OpenIddictValidationAspNetCore`. JTI Redis blacklist. Integration-tested with WebApplicationFactory + Testcontainers (PKCE full-flow helpers in `AuthHelper`). |
 | Frontend | ⚠️ Partial | Login (PKCE), app shell, dashboard scaffold on PR #50; settings/invitation/session flows and multi-tab refresh still pending. tenant registration use case register page is shipped under Platform Foundation docs. |
@@ -107,8 +107,8 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 - Passwords are hashed with BCrypt (work factor 12) via `IPasswordHasher`. The hash is stored as a first-class property on `User` (`PasswordHash`), not a shadow property.
 - The 4 default system roles (Admin, Editor, Viewer, End User) and their full permission sets are seeded automatically by `RegisterOrganizationHandler` — see [api-permissions](./api-permissions/) and [ui-permissions](./ui-permissions/) for the permission catalogue.
 - **OpenIddict implementation**: OpenIddict 5.x serves as the in-process OAuth2/OIDC authorization server (ADR-004). Authorization Code + PKCE for the SPA; Client Credentials for M2M. Refresh tokens are stored as opaque reference tokens in the OpenIddict `OpenIddictTokens` table and delivered via httpOnly cookie. Access token JTIs are blacklisted in Redis on sign-out. Ephemeral signing/encryption keys are used in development; production should use Azure Key Vault certificates.
-- **gRPC (dev):** manual `GetUserPermissions` checks — [patterns.md § gRPC dev verification](../../playbooks/patterns.md#dev--verify-getuserpermissions-with-grpcurl).
-- **Known gap (user deactivation)**: Revoking all refresh tokens is immediate, but existing access tokens remain valid up to 15 minutes. Full compliance would require a Redis user-level blacklist (not implemented in MVP).
+- **gRPC (dev):** manual `GetUserPermissions` checks — [patterns.md § gRPC dev verification](././playbooks/patterns.md#dev--verify-getuserpermissions-with-grpcurl).
+- **Known gap (user deactivation)**: Revoking all refresh tokens is immediate, but existing access tokens remain valid up to 15 minutes. Full compliance would require a Redis user-level blacklist (not implemented).
 
 ---
 
@@ -116,8 +116,8 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend** | ⚠️ polish | [reset-password](./reset-password/), [change-password](./change-password/), [sessions](./sessions/): rate limits, session list API wiring. [api-permissions](./api-permissions/): `[RequirePermission]` / policy tests. [invite-user](./invite-user/): block admin self-invite at API. |
-| **Frontend** | ⏳ | Register, settings, invitation accept, session management UI, and localization/theming foundation — see per–use-case callouts in [sign-in](./sign-in/), [accept-invite](./accept-invite/), [sessions](./sessions/), [language](./language/), [theme](./theme/). |
+| **Backend** | ⚠️ polish | **External auth (ADR-027):** Microsoft, Google, GitHub OIDC for sign-in and registration. [reset-password](./reset-password/), [change-password](./change-password/), [sessions](./sessions/): rate limits, session list API wiring. [api-permissions](./api-permissions/): `[RequirePermission]` / policy tests. [invite-user](./invite-user/): block admin self-invite at API. |
+| **Frontend** | ⏳ | Register (Terms, slug, external providers), sign-in provider buttons, settings, invitation accept, session management UI, localization/theming — see [sign-in](./sign-in/), [register-org](../platform-foundation/register-org/), [accept-invite](./accept-invite/), [sessions](./sessions/), [language](./language/), [theme](./theme/). |
 
 Core auth/OIDC/RBAC backend is ✅; use feature **Gaps vs spec** for the next use case, not domain-level checkboxes.
 
@@ -125,9 +125,9 @@ Core auth/OIDC/RBAC backend is ✅; use feature **Gaps vs spec** for the next us
 
 ## Dependencies
 
-- [Platform Foundation](../platform-foundation/README.md)
+- [Platform Foundation](./platform-foundation/README.md)
 
 ## Dependents
 
-- [Data Modeling](../data-modeling/README.md)
+- [Data Modeling](./data-modeling/README.md)
 - All other domains

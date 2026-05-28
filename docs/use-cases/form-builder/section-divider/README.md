@@ -1,6 +1,6 @@
 # Use case — Add a section divider
 
-> **Navigation**: [← Form Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Form Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -42,8 +42,8 @@ Form fields define what data the form collects. Each field has a type, label, he
 - [ ] A form can have sections with no fields between them (empty section) — allowed but shows a warning in the preview: "This section has no fields."
 - [ ] Deleting a section header does not delete the fields below it; they move up to the previous section (or become ungrouped if they were in the first section).
 
-*Out of scope*
-- Collapsible sections — not in MVP.
+*Deferred capabilities*
+- Collapsible sections.
 
 > **Implementation status**
 >

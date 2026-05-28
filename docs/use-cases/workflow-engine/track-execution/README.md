@@ -1,6 +1,6 @@
 # Use case — Track execution status in real time
 
-> **Navigation**: [← Workflow Engine](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Engine](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -45,8 +45,8 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 - [ ] A Form step in WAITING status shows the assignee name and a "Waiting for: {assignee}" label.
 - [ ] Very long executions (running for hours): the elapsed time counter and timeline remain accurate; no frontend timeout occurs.
 
-*Out of scope*
-- Real-time execution graph overlay on the workflow canvas — not in MVP (timeline list only).
+*Deferred capabilities*
+- Real-time execution graph overlay on the workflow canvas. (timeline list only).
 
 > **Implementation status**
 >

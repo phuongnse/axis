@@ -1,6 +1,6 @@
 # Use case — Configure fan-in (join) behavior
 
-> **Navigation**: [← Workflow Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -32,8 +32,8 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 
 *Happy path*
 - [ ] The Parallel Group config panel has a "Join type" selector:
-  - **Wait for all (AND)** — default; continues when all branches complete.
-  - **Wait for first (OR)** — continues when any one branch completes; remaining branches are cancelled.
+ - **Wait for all (AND)** — default; continues when all branches complete.
+ - **Wait for first (OR)** — continues when any one branch completes; remaining branches are cancelled.
 - [ ] The selected join type is shown as a label on the group's output handle on the canvas.
 
 *Validation & errors*
@@ -44,8 +44,8 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 - [ ] With OR join, a branch that is still running when the group completes receives a cancellation signal. Long-running operations (e.g., HTTP requests) are given a 5-second grace period before being forcibly terminated.
 - [ ] Changing the join type after the workflow is published requires creating a new version.
 
-*Out of scope*
-- "Wait for N of M" join type (e.g., wait for 2 out of 3 branches) — not in MVP.
+*Deferred capabilities*
+- "Wait for N of M" join type (e.g., wait for 2 out of 3 branches).
 
 > **Implementation status**
 >

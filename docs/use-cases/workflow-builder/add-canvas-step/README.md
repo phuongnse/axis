@@ -1,6 +1,6 @@
 # Use case — Add a step to the canvas
 
-> **Navigation**: [← Workflow Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -44,8 +44,8 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 - [ ] Dropping two steps at nearly the same position offsets the second one automatically to prevent overlap.
 - [ ] Workflow definitions are auto-saved to the server after every change with a 1-second debounce, so the user never needs to manually save canvas layout changes.
 
-*Out of scope*
-- Copy-paste of steps — not in MVP.
+*Deferred capabilities*
+- Copy-paste of steps.
 
 > **Implementation status**
 >

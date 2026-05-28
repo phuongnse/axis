@@ -1,14 +1,14 @@
 # Docs style
 
-> **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
+> **Navigation**: [← docs/README.md](./README.md) · [← CLAUDE.md](././CLAUDE.md)
 
-Short anti-pattern checklist for everything under `docs/`. Read once; come back when adding a new file. Most of these are enforced by [`scripts/check-doc-drift.sh`](../../scripts/check-doc-drift.sh) and the **Markdown link check** CI job — the doctrine here exists so the rules feel justified, not arbitrary.
+Short anti-pattern checklist for everything under `docs/`. Read once; come back when adding a new file. Most of these are enforced by [`scripts/check-doc-drift.sh`](././scripts/check-doc-drift.sh) and the **Markdown link check** CI job — the doctrine here exists so the rules feel justified, not arbitrary.
 
 ---
 
 ## Single owner per topic
 
-Every fact — a version, a file path, a command, a step list — has **one** owner. Every other doc that needs it **links**, never repeats. The current ownership table lives in [`docs/README.md` § Single source of truth](../README.md#single-source-of-truth-per-topic).
+Every fact — a version, a file path, a command, a step list — has **one** owner. Every other doc that needs it **links**, never repeats. The current ownership table lives in [`docs/README.md` § Single source of truth](./README.md#single-source-of-truth-per-topic).
 
 When you find yourself editing the same fact in two files, the architecture is wrong: collapse to one owner + N pointers.
 
@@ -20,7 +20,7 @@ When you find yourself editing the same fact in two files, the architecture is w
 |---|---|---|
 | **Speculation in reference docs** ("Not yet implemented", "planned design", "Will be wired") | Reads as reference, is actually guesswork; the real design will diverge | Put forward-looking content in `docs/PROGRESS.md` (current status) or a domain use-case file (spec). Enforced for `docs/ARCHITECTURE.md` by the drift script. |
 | **Duplicating versions / paths / commands** across docs | Both copies drift; readers don't know which is canonical | Link to the owner doc (see ownership table) |
-| **Duplicating compose ports / service URLs** | Playbooks drift from `docker-compose.yml` | Owner: [local-dev.md](./local-dev.md) + compose file; enforced by [`check-local-dev-docs.py`](../../scripts/check-local-dev-docs.py) |
+| **Duplicating compose ports / service URLs** | Playbooks drift from `docker-compose.yml` | Owner: [local-dev.md](./local-dev.md) + compose file; enforced by [`check-local-dev-docs.py`](././scripts/check-local-dev-docs.py) |
 | **Aspirational metrics** in engineering docs (e.g. "50 customers in 6 months") | Nobody measures or tests against them; they age into embarrassment | Keep in pitch deck / `PRODUCT_VISION.md` if anywhere; do not pollute technical reference |
 | **Empty "TODO: fill later" sections** | Look authoritative, contain nothing, lie to readers | Delete the section. Add it when there's content to add. |
 | **"Process about process"** docs > 100 lines | Nobody reads them; the rules don't get followed | Embed the rule into the **drift script** or a **template**. Doctrine without enforcement is decoration. |
@@ -53,11 +53,11 @@ Every `docs/use-cases/<domain>/<short-slug>/README.md` file uses these layouts s
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | login | [source](./login.excalidraw) | [preview](./login.svg) |
-| shared-app-shell | [source](../../../wireframes/app-shell.excalidraw) | [preview](../../../wireframes/app-shell.svg) |
+| shared-app-shell | [source](./././wireframes/app-shell.excalidraw) | [preview](./././wireframes/app-shell.svg) |
 ```
 
 - Put screens **only used by this use case** **flat** inside the use-case folder (next to `README.md`).
-- Reference **shared kit screens** (e.g. `app-shell`, `_template`) from `../../../wireframes/` — do not copy duplicates.
+- Reference **shared kit screens** (e.g. `app-shell`, `_template`) from `./././wireframes/` — do not copy duplicates.
 - Use `N/A` rows when no wireframe applies.
 - One table per `README.md` — no blockquote wireframe stacks.
 
@@ -114,7 +114,7 @@ Avoid writing engineering process constraints as end-user use cases. Keep those 
 
 ## When you add a new `.md` file
 
-1. Add the back-link header (per [`docs/README.md`](../README.md)): `> **Navigation**: [← parent.md](...)` so future readers can climb back up.
+1. Add the back-link header (per [`docs/README.md`](./README.md)): `> **Navigation**: [← parent.md](.)` so future readers can climb back up.
 2. Add a row to the relevant table in `docs/README.md` (playbooks / diagrams / wireframes).
 3. If it owns a topic, add it to the **Single source of truth** table.
 4. If the topic could be enforced mechanically, add a rule to `scripts/check-doc-drift.sh` — that is what makes the convention survive.

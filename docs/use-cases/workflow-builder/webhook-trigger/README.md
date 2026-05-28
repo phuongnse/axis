@@ -1,6 +1,6 @@
 # Use case — Configure a Webhook trigger
 
-> **Navigation**: [← Workflow Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -45,9 +45,9 @@ A workflow must have at least one trigger before it can be published. Triggers d
 - [ ] A payload mapping that references a JSON path not present in the incoming payload sets that input variable to `null` (not an error).
 - [ ] Large webhook payloads (> 1 MB) are rejected with HTTP 413: "Payload too large. Maximum size is 1 MB."
 
-*Out of scope*
-- GET webhook triggers — POST only in MVP.
-- Event-type filtering on a single webhook URL (multiple workflows sharing one URL) — not in MVP.
+*Deferred capabilities*
+- GET webhook triggers — POST only.
+- Event-type filtering on a single webhook URL (multiple workflows sharing one URL).
 
 > **Implementation status**
 >

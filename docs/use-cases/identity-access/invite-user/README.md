@@ -1,6 +1,6 @@
 # Use case — Invite a user to the organization
 
-> **Navigation**: [← Identity Access](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Identity Access](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -48,8 +48,8 @@ Organization admins can invite new members, manage their accounts, and deactivat
 - [ ] The user limit check is performed at invitation time, not at acceptance time. If the org is at its user limit, the invitation is blocked with an upgrade prompt.
 - [ ] An admin cannot invite themselves (their own email address).
 
-*Out of scope*
-- Bulk invitation via CSV upload — not in MVP.
+*Deferred capabilities*
+- Bulk invitation via CSV upload.
 
 > **Implementation status**
 >

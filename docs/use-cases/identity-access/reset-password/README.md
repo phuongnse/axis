@@ -1,6 +1,6 @@
 # Use case — Reset forgotten password
 
-> **Navigation**: [← Identity Access](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Identity Access](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -50,8 +50,8 @@ Allow users to reset forgotten passwords, change their current password, and man
 - [ ] Requesting a second reset link before the first expires invalidates the first link.
 - [ ] A user resets their password while still signed in on another device: that device's session is invalidated.
 
-*Out of scope*
-- Security questions as a backup reset method — not in MVP.
+*Deferred capabilities*
+- Security questions as a backup reset method.
 
 > **Implementation status**
 >

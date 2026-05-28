@@ -1,6 +1,6 @@
 # Use case — Start a workflow execution
 
-> **Navigation**: [← Workflow Engine](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Engine](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -45,8 +45,8 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 - [ ] If the engine crashes between creating the Execution record (PENDING) and starting the first step, a recovery job detects stale PENDING executions (older than 60 seconds) and retries or marks them as Failed.
 - [ ] A workflow triggered multiple times in rapid succession creates independent executions; there is no implicit deduplication except for Schedule triggers (see max_concurrent_runs).
 
-*Out of scope*
-- Triggering a specific version of a workflow (other than the current active version) — not in MVP.
+*Deferred capabilities*
+- Triggering a specific version of a workflow (other than the current active version).
 
 > **Implementation status**
 >

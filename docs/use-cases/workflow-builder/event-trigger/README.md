@@ -1,6 +1,6 @@
 # Use case — Configure an Event trigger
 
-> **Navigation**: [← Workflow Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -46,9 +46,9 @@ A workflow must have at least one trigger before it can be published. Triggers d
 - [ ] An event that triggers a workflow which itself emits another event (e.g., `execution.completed`) does not create an infinite loop — Wolverine enforces a max event chain depth of 10.
 - [ ] `execution.completed` event for a workflow does not re-trigger itself (self-triggering is blocked at the platform level).
 
-*Out of scope*
-- Custom platform events defined by users — not in MVP.
-- Listening to events from external systems (without going through a Webhook trigger) — not in MVP.
+*Deferred capabilities*
+- Custom platform events defined by users.
+- Listening to events from external systems (without going through a Webhook trigger).
 
 > **Implementation status**
 >

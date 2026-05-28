@@ -1,6 +1,6 @@
 # Use case — View and revoke active sessions
 
-> **Navigation**: [← Identity Access](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Identity Access](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -45,8 +45,8 @@ Allow users to reset forgotten passwords, change their current password, and man
 - [ ] IP geolocation may be unavailable for some IPs; in that case location shows "Unknown."
 - [ ] The current session cannot be revoked from this page (use Sign Out instead); the Revoke button is replaced with "Current session."
 
-*Out of scope*
-- Per-session device naming by the user — not in MVP.
+*Deferred capabilities*
+- Per-session device naming by the user.
 
 > **Implementation status**
 >

@@ -1,6 +1,6 @@
 # Use Cases
 
-[← Back to Docs Home](../README.md)
+[← Back to Docs Home](./README.md)
 
 Use cases are the user-facing source of truth for behavior. **One markdown file = one use case** (flow, AC, wireframes, diagrams, implementation status). Domain `README.md` indexes all use cases in that area.
 
@@ -28,35 +28,31 @@ Use cases are the user-facing source of truth for behavior. **One markdown file 
 
 When you ship code, update **use-case callout → domain README → PROGRESS** in the same PR. Never mark ✅ while `**Gaps vs spec**` still lists backend work for that layer.
 
+**Deferred capabilities** sections list product-scope features not yet implemented — they are **not** excluded from the platform. Do not treat them as permanent “out of scope.”
+
 **Use-case file layout:** Purpose/Actor/Trigger, flow sections, AC, wireframes table, diagrams table, implementation status — see [docs-style § Use case files](../playbooks/docs-style.md#use-case-files-flow-first).
 
 ---
 
 ## Domains
 
-| Domain | Phase | Scope |
-|--------|-------|--------|
-| [platform-foundation](./platform-foundation/README.md) | MVP | Tenant registration, org management, isolation, subscription plans |
-| [identity-access](./identity-access/README.md) | MVP | Authentication, users, roles, permissions, security, i18n/theming |
-| [data-modeling](./data-modeling/README.md) | MVP | Models, field types, data classes, record CRUD |
-| [workflow-builder](./workflow-builder/README.md) | MVP | Canvas, steps, triggers, branching, parallel, import/export |
-| [form-builder](./form-builder/README.md) | MVP | Forms, fields, workflow integration, submissions |
-| [workflow-engine](./workflow-engine/README.md) | MVP | Execution, handlers, errors, history, retry |
-| [page-builder](./page-builder/README.md) | Phase 2 | Pages, widgets, drag & drop, data binding |
+| Domain | Scope |
+|--------|--------|
+| [platform-foundation](./platform-foundation/README.md) | Tenant registration, org management, isolation, subscription plans |
+| [identity-access](./identity-access/README.md) | Authentication (password + external providers), users, roles, permissions, security, i18n/theming |
+| [data-modeling](./data-modeling/README.md) | Models, field types, data classes, record CRUD |
+| [workflow-builder](./workflow-builder/README.md) | Canvas, steps, triggers, branching, parallel, import/export |
+| [form-builder](./form-builder/README.md) | Forms, fields, workflow integration, submissions |
+| [workflow-engine](./workflow-engine/README.md) | Execution, handlers, errors, history, retry |
+| [page-builder](./page-builder/README.md) | Pages, widgets, drag & drop, data binding |
 
 ---
 
-## MVP core loop
+## Platform core loop
 
-```
+```text
 Platform setup → Identity & users → Model data
-    → Build workflows → Add forms → Execute & monitor
-```
-
-## Phase 2
-
-```
-Execution data → Build pages & widgets → End users
+    → Build workflows → Add forms → Execute & monitor → Pages for end users
 ```
 
 ---

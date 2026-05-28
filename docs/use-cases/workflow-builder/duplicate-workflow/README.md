@@ -1,6 +1,6 @@
 # Use case — Duplicate a workflow
 
-> **Navigation**: [← Workflow Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -43,7 +43,7 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 - [ ] Duplicating a workflow does not copy its execution history.
 - [ ] Webhook URLs are NOT copied; the duplicate generates a new unique webhook URL when published.
 
-*Out of scope*
+*Deferred capabilities*
 - Cross-org workflow duplication (copy to another org) — handled by Import/Export in import-export.
 
 > **Implementation status**

@@ -1,6 +1,6 @@
 # Use case — Create a workflow
 
-> **Navigation**: [← Workflow Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -42,8 +42,8 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 *Edge cases*
 - [ ] Creating a workflow and immediately navigating away without adding any steps: the empty workflow is saved in Draft status and can be returned to later.
 
-*Out of scope*
-- Workflow templates / starter library — not in MVP.
+*Deferred capabilities*
+- Workflow templates / starter library.
 
 > **Implementation status**
 >

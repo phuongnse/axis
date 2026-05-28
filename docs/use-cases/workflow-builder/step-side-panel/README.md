@@ -1,6 +1,6 @@
 # Use case — Configure a step via side panel
 
-> **Navigation**: [← Workflow Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -44,8 +44,8 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 - [ ] Switching between two steps while a panel is open closes the first and opens the second without losing changes.
 - [ ] The canvas remains fully interactive (pan, zoom, add steps) while a configuration panel is open.
 
-*Out of scope*
-- Full-screen step config modal — the panel-based UI is the only config surface in MVP.
+*Deferred capabilities*
+- Full-screen step config modal — the panel-based UI is the only config surface.
 
 > **Implementation status**
 >

@@ -1,6 +1,6 @@
 # Use case — Create a record
 
-> **Navigation**: [← Data Modeling](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Data Modeling](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -46,8 +46,8 @@ Users can create, read, update, and delete records against any model. Records ar
 - [ ] A record with a `File` field attaches files via a pre-upload step; the file reference is stored in the record, not the file content itself.
 - [ ] Concurrent creation of two records with unique-field constraints (if any) uses DB-level unique indexes to prevent duplicates.
 
-*Out of scope*
-- Record templates (pre-filled forms) — not in MVP.
+*Deferred capabilities*
+- Record templates (pre-filled forms).
 
 > **Implementation status**
 >

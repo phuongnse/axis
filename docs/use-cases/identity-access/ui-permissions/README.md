@@ -1,6 +1,6 @@
 # Use case — Permission enforcement in the frontend
 
-> **Navigation**: [← Identity Access](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Identity Access](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -43,8 +43,8 @@ A resource-based permission system where each permission grants the ability to p
 - [ ] Frontend permission checks are never treated as the security boundary — the API always re-validates. The UI hiding is UX only.
 - [ ] If a user's permissions change mid-session (role edited by admin), the UI reflects the change on the next token refresh (within 15 min) or on the next page navigation that fetches fresh permissions.
 
-*Out of scope*
-- Per-record UI permissions (e.g., hiding individual table rows) — not in MVP.
+*Deferred capabilities*
+- Per-record UI permissions (e.g., hiding individual table rows).
 
 > **Implementation status**
 >

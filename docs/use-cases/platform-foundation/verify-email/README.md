@@ -1,6 +1,6 @@
 # Use case — Verify email and activate account
 
-> **Navigation**: [← Platform Foundation](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Platform Foundation](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -45,8 +45,8 @@ Self-service registration flow where a new organization signs up and is automati
 - [ ] If the user tries to sign in before verifying, they see "Please verify your email first" with a resend option.
 - [ ] Verification link works regardless of which browser or device it is opened on.
 
-*Out of scope*
-- Automatic re-send after X minutes — not in MVP.
+*Deferred capabilities*
+- Automatic re-send after X minutes.
 
 > **Implementation status**
 >

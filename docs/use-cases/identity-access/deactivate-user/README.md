@@ -1,6 +1,6 @@
 # Use case — Deactivate a user
 
-> **Navigation**: [← Identity Access](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Identity Access](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -46,8 +46,8 @@ Organization admins can invite new members, manage their accounts, and deactivat
 - [ ] A deactivated user who tries to sign in sees: "Your account has been deactivated. Contact your organization admin."
 - [ ] A deactivated user with pending form tasks: those tasks are marked "Assignee deactivated" and the admin is notified.
 
-*Out of scope*
-- Transferring ownership of content from a deactivated user — not in MVP.
+*Deferred capabilities*
+- Transferring ownership of content from a deactivated user.
 
 > **Implementation status**
 >

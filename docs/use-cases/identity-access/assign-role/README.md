@@ -1,6 +1,6 @@
 # Use case — Assign a role to a user
 
-> **Navigation**: [← Identity Access](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Identity Access](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -43,8 +43,8 @@ Organization admins can create custom roles, assign permissions to each role, an
 - [ ] If the affected user is currently online, they see a subtle "Your permissions have been updated" banner on their next API response that includes a 403 or on next navigation.
 - [ ] A user can hold multiple roles simultaneously; their effective permissions are the union of all role permissions.
 
-*Out of scope*
-- Time-limited role assignments (e.g., "grant admin for 24 hours") — not in MVP.
+*Deferred capabilities*
+- Time-limited role assignments (e.g., "grant admin for 24 hours").
 
 > **Implementation status**
 >

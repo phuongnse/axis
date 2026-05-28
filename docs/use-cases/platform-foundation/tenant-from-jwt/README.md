@@ -1,6 +1,6 @@
 # Use case — Tenant resolution from JWT
 
-> **Navigation**: [← Platform Foundation](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Platform Foundation](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -46,8 +46,8 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 - [ ] Schema name is cached immutably — it never changes after provisioning, so cache invalidation is not a concern.
 - [ ] Wolverine background jobs carry tenant context as a message header, resolved before the handler executes.
 
-*Out of scope*
-- API key authentication (alternative to JWT) — not in MVP.
+*Deferred capabilities*
+- API key authentication (alternative to JWT).
 
 > **Implementation status**
 >
@@ -63,7 +63,7 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 > - `org_id` claim issued at login (`ConnectEndpoints`)
 > - handlers use `ITenantContext` / `ICurrentUser` — schema `tenant_{orgId:N}` derived in `HttpTenantContext` (no separate DB lookup; Redis cache N/A — deterministic derivation satisfies the under-5 ms AC).
 > - `TenantOrganizationAccessMiddleware` returns HTTP 403 for missing, archived/deleted, or not-ready orgs on tenant module routes (`/api/models`, workflows, forms, etc.).
-> - background jobs use `FixedTenantContext` in provision/cancel handlers (see [patterns.md](../../../playbooks/patterns.md)).
+> - background jobs use `FixedTenantContext` in provision/cancel handlers (see [patterns.md](./././playbooks/patterns.md)).
 >
 > **Gaps vs spec:** none for backend cross-tenant access prevention.
 

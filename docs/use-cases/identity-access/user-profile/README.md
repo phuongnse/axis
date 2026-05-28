@@ -1,6 +1,6 @@
 # Use case — Manage user profile
 
-> **Navigation**: [← Identity Access](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Identity Access](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -43,8 +43,8 @@ Organization admins can invite new members, manage their accounts, and deactivat
 - [ ] Uploading a new avatar replaces the old one; the old file is deleted from storage.
 - [ ] If avatar upload fails mid-way, the old avatar remains unchanged and an error is shown.
 
-*Out of scope*
-- Public profile visibility — all profiles are private within the org in MVP.
+*Deferred capabilities*
+- Public profile visibility — all profiles are private within the org.
 
 > **Implementation status**
 >

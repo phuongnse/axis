@@ -1,6 +1,6 @@
 # Use case — Switch application language (English / Vietnamese)
 
-> **Navigation**: [← Identity Access](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Identity Access](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -33,8 +33,8 @@ Define user-facing localization and visual theme behavior for the SPA so each us
 
 ## Acceptance Criteria
 
-**Purpose:** let users read and operate the app in their preferred language.  
-**Primary actor:** authenticated user.  
+**Purpose:** let users read and operate the app in their preferred language. 
+**Primary actor:** authenticated user. 
 **Trigger:** user changes language in header/settings selector.
 
 #### Main flow
@@ -63,7 +63,7 @@ Define user-facing localization and visual theme behavior for the SPA so each us
 - [ ] Switching language does not clear form input values or reset in-progress user actions.
 - [ ] Right after sign-in, the app uses the previously selected locale.
 
-*Out of scope*
+*Deferred capabilities*
 - Runtime machine translation.
 - Additional locales beyond `en` and `vi`.
 

@@ -1,6 +1,6 @@
 # Use case — Configure a Notification step
 
-> **Navigation**: [← Workflow Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -33,7 +33,7 @@ Each step has a type that determines what it does when executed. Users configure
 *Happy path*
 - [ ] Channel options: Email or Webhook.
 - [ ] Email config: recipient(s) (comma-separated emails or context expressions), subject, and body (rich text with `{{expression}}` placeholders).
-- [ ] Webhook config: URL (supports expressions), HTTP method (POST only in MVP), and an optional JSON payload template.
+- [ ] Webhook config: URL (supports expressions), HTTP method (POST only), and an optional JSON payload template.
 - [ ] The step does not pause execution; the workflow continues immediately after the notification is dispatched (fire-and-forget).
 
 *Validation & errors*
@@ -46,9 +46,9 @@ Each step has a type that determines what it does when executed. Users configure
 - [ ] A webhook notification that times out (> 10s) or returns non-2xx follows the same configurable behavior.
 - [ ] Expression placeholders that resolve to `null` or undefined are rendered as an empty string in the notification body.
 
-*Out of scope*
-- SMS, Slack, or Teams notification channels — not in MVP.
-- Notification templates shared across workflows — not in MVP.
+*Deferred capabilities*
+- SMS, Slack, or Teams notification channels.
+- Notification templates shared across workflows.
 
 > **Implementation status**
 >

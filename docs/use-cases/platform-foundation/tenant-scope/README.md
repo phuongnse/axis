@@ -1,6 +1,6 @@
 # Use case — Automatic tenant scoping on every request
 
-> **Navigation**: [← Platform Foundation](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Platform Foundation](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -45,8 +45,8 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 - [ ] A connection returned to the pool has its `search_path` reset to a neutral value before reuse.
 - [ ] Background jobs (Wolverine handlers) that operate on behalf of a tenant correctly inject tenant context without an HTTP request present.
 
-*Out of scope*
-- Cross-tenant data sharing features — not in MVP.
+*Deferred capabilities*
+- Cross-tenant data sharing features.
 
 > **Implementation status**
 >
@@ -63,7 +63,7 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 > - `TenantSchemaInterceptorTests` (two schemas, no cross-read). `HttpTenantContext` on `Axis.Api`
 > - `FixedTenantContext` in Wolverine provision handlers.
 > - cross-tenant API integration tests (`TenantIsolationEndpointTests` — DataModeling list/get by id and archived-org 403)
-> - connection-pool safety documented in [patterns.md](../../../playbooks/patterns.md) (`search_path` set on every `ConnectionOpened`, including pooled reconnects).
+> - connection-pool safety documented in [patterns.md](./././playbooks/patterns.md) (`search_path` set on every `ConnectionOpened`, including pooled reconnects).
 >
 > **Gaps vs spec:** none for backend schema-per-tenant isolation. Tenant-scoped data never lives in `public` by design (module tables only in `tenant_{orgId:N}`); no separate runtime guard beyond schema isolation.
 

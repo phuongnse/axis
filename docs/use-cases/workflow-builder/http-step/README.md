@@ -1,6 +1,6 @@
 # Use case — Configure an HTTP Request step
 
-> **Navigation**: [← Workflow Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -46,9 +46,9 @@ Each step has a type that determines what it does when executed. Users configure
 - [ ] Response body larger than 1 MB is truncated with a warning at execution time; the truncated value is stored in context.
 - [ ] Redirect responses (3xx): the client follows up to 5 redirects by default; configurable.
 
-*Out of scope*
-- GraphQL or gRPC step types — not in MVP.
-- Response streaming — not in MVP.
+*Deferred capabilities*
+- GraphQL or gRPC step types.
+- Response streaming.
 
 > **Implementation status**
 >

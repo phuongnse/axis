@@ -1,6 +1,6 @@
 # Use case — Receive error notification when a workflow fails
 
-> **Navigation**: [← Workflow Engine](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Engine](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -36,15 +36,15 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 - [ ] In-app notification appears in the bell icon and persists until dismissed.
 
 *Validation & errors*
-- [ ] If the email notification itself fails to deliver, the failure is logged but does not create a cascading error (no retry for notification delivery in MVP).
+- [ ] If the email notification itself fails to deliver, the failure is logged but does not create a cascading error (no retry for notification delivery).
 - [ ] If no notification channels are configured for the workflow, the failure notification is sent to all org Admins by default as a safety net.
 
 *Edge cases*
 - [ ] A workflow with multiple parallel branches: if one branch fails (AND join), a single failure notification is sent for the overall execution, not one per failed branch.
 - [ ] If the same workflow fails repeatedly in a short period (e.g., schedule trigger firing every 5 minutes and always failing), notifications are rate-limited to 1 per 15 minutes per workflow per channel to avoid notification flooding.
 
-*Out of scope*
-- PagerDuty / OpsGenie / Slack integration for error notifications — not in MVP.
+*Deferred capabilities*
+- PagerDuty / OpsGenie / Slack integration for error notifications.
 
 > **Implementation status**
 >

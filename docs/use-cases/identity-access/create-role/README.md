@@ -1,6 +1,6 @@
 # Use case — Create a custom role
 
-> **Navigation**: [← Identity Access](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Identity Access](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -44,8 +44,8 @@ Organization admins can create custom roles, assign permissions to each role, an
 - [ ] Creating two roles with names that differ only in case (e.g., "Manager" and "manager") is blocked.
 - [ ] The permissions list is complete and does not require a page reload to reflect newly added platform permissions.
 
-*Out of scope*
-- Copying permissions from an existing role as a starting point — not in MVP (user selects permissions manually).
+*Deferred capabilities*
+- Copying permissions from an existing role as a starting point. (user selects permissions manually).
 
 > **Implementation status**
 >

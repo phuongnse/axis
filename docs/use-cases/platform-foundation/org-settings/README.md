@@ -1,6 +1,6 @@
 # Use case — View organization settings
 
-> **Navigation**: [← Platform Foundation](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Platform Foundation](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -41,7 +41,7 @@ Allow organization admins to manage their organization's profile, settings, and 
 *Edge cases*
 - [ ] If the org is on the free plan with no limits configured, usage shows actual counts without a denominator (e.g., "12 workflows").
 
-*Out of scope*
+*Deferred capabilities*
 - Editing all settings inline on this page — this page is read-only for stats; editing is in sub-sections.
 
 > **Implementation status**

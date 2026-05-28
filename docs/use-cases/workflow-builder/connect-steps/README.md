@@ -1,6 +1,6 @@
 # Use case — Connect steps with transitions
 
-> **Navigation**: [← Workflow Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -44,8 +44,8 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 - [ ] A step can have multiple outgoing transitions (branching) and multiple incoming transitions (merge).
 - [ ] The Start node has no input handle. The End node has no output handle. Attempting to connect these in the wrong direction is blocked.
 
-*Out of scope*
-- Animated transitions showing flow direction — not in MVP (static arrows only).
+*Deferred capabilities*
+- Animated transitions showing flow direction. (static arrows only).
 
 > **Implementation status**
 >

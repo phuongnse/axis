@@ -1,6 +1,6 @@
 # Use case — Create a form
 
-> **Navigation**: [← Form Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Form Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -41,8 +41,8 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 *Edge cases*
 - [ ] Creating a form and immediately navigating away without adding fields: the empty form is saved and visible in the forms list.
 
-*Out of scope*
-- Form templates / starter library — not in MVP.
+*Deferred capabilities*
+- Form templates / starter library.
 
 > **Implementation status**
 >

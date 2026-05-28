@@ -1,6 +1,6 @@
 # Use case — Configure field validation rules
 
-> **Navigation**: [← Data Modeling](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Data Modeling](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -45,8 +45,8 @@ Each field in a model has a type that determines what data it stores, how it's v
 - [ ] Tightening a validation rule on a field with existing records that would now violate it: the rule change is allowed, but existing records are not retroactively invalidated (rules only apply on create/update).
 - [ ] A required field with a default value: the default is applied automatically on record creation if the field is not provided by the caller.
 
-*Out of scope*
-- Cross-field validation (e.g., "end_date must be after start_date") — not in MVP.
+*Deferred capabilities*
+- Cross-field validation (e.g., "end_date must be after start_date").
 
 > **Implementation status**
 >

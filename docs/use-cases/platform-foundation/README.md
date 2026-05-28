@@ -1,6 +1,6 @@
 # Platform Foundation
 
-[← Back to Use Cases](../README.md)
+[← Back to Use Cases](./README.md)
 
 ---
 
@@ -14,7 +14,7 @@ Without this foundation, nothing else works. Every feature in every other domain
 
 ## Phase
 
-**MVP** — Must be completed first. All other domains depend on this.
+**Production** — Must be completed first. All other domains depend on this.
 
 ---
 
@@ -77,7 +77,7 @@ Without this foundation, nothing else works. Every feature in every other domain
 |---|---|---|
 | Shared Domain | ✅ Done | `Entity`, `AggregateRoot`, `ValueObject`, `IDomainEvent`, `Result<T>` |
 | Shared Application | ✅ Done | `ICommand/IQuery`, `ICommandHandler/IQueryHandler`, `ValidationBehavior`, `ITenantContext` |
-| Shared Infrastructure | ✅ Done | `TenantSchemaInterceptor`, per-module `UnitOfWork` ([ADR-017](../../TECH_STACK.md#adr-017-axisshared-is-abstractions-only-no-shared-implementation)); **OpenTelemetry** host wiring on `Axis.Api` ([ADR-018](../../TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability), [patterns § OpenTelemetry](../../playbooks/patterns.md#opentelemetry-observability)) |
+| Shared Infrastructure | ✅ Done | `TenantSchemaInterceptor`, per-module `UnitOfWork` ([ADR-017](././TECH_STACK.md#adr-017-axisshared-is-abstractions-only-no-shared-implementation)); **OpenTelemetry** host wiring on `Axis.Api` ([ADR-018](././TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability), [patterns § OpenTelemetry](././playbooks/patterns.md#opentelemetry-observability)) |
 | [Register org](register-org/) | ✅ Done | Self-service signup + verification email — backend complete. Frontend polish ⏳ |
 | [Tenant provisioning](provision-tenant/) | ✅ Done | Kafka-driven per-module provisioning, coordinator retries, `GET /api/auth/provisioning-status`. Frontend wait screen ⏳ |
 | [Subscription plans](view-plans/) | ✅ Done | `GET /api/plans`, pricing data, 402 limits — see [enforce limits](enforce-limits/). Frontend pricing UI ⏳ |
@@ -91,7 +91,7 @@ Without this foundation, nothing else works. Every feature in every other domain
 
 | Priority | Item | Where |
 |----------|------|--------|
-| **Backend** | ✅ platform-foundation backend use cases complete. Optional: bulk workflow import when product needs [bulk export](../workflow-builder/bulk-export/) AC | [enforce-limits/](enforce-limits/) |
+| **Backend** | ✅ platform-foundation backend use cases complete. Optional: bulk workflow import when product needs [bulk export](./workflow-builder/bulk-export/) AC | [enforce-limits/](enforce-limits/) |
 | Frontend | [Verify email](verify-email/), [provisioning wait](provision-tenant/), [pricing](view-plans/), [org settings](org-settings/) wireframes | see **Use Cases** table below |
 
 Domain-level checkboxes above remain spec-only; status is in use-case **Implementation status** callouts.
@@ -104,5 +104,5 @@ Domain-level checkboxes above remain spec-only; status is in use-case **Implemen
 
 ## Dependents
 
-- [Identity & Access](../identity-access/README.md)
+- [Identity & Access](./identity-access/README.md)
 - All other domains

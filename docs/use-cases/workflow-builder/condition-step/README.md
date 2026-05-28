@@ -1,6 +1,6 @@
 # Use case — Configure a Condition step
 
-> **Navigation**: [← Workflow Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -45,8 +45,8 @@ Each step has a type that determines what it does when executed. Users configure
 - [ ] Branch order matters: branches are evaluated top-to-bottom; the first match wins. The canvas side panel shows branches in their evaluation order with drag-to-reorder.
 - [ ] A Condition step with only a Default branch (no other conditions) is valid but the canvas shows a warning: "All inputs will follow the default branch."
 
-*Out of scope*
-- Raw expression editing (writing code directly) — the visual builder is the only interface in MVP.
+*Deferred capabilities*
+- Raw expression editing (writing code directly) — the visual builder is the only interface.
 
 > **Implementation status**
 >

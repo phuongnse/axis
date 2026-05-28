@@ -1,6 +1,6 @@
 # Use case — Filter and search records
 
-> **Navigation**: [← Data Modeling](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Data Modeling](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -44,9 +44,9 @@ Users can create, read, update, and delete records against any model. Records ar
 - [ ] Filters and sort state are preserved in the URL so the user can share or bookmark a filtered view.
 - [ ] A filter on a deleted field gracefully falls back (filter is removed with a warning toast).
 
-*Out of scope*
-- OR-logic between filters — not in MVP.
-- Saved filters — not in MVP.
+*Deferred capabilities*
+- OR-logic between filters.
+- Saved filters.
 
 > **Implementation status**
 >

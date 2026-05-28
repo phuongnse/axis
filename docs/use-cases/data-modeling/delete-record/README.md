@@ -1,6 +1,6 @@
 # Use case — Delete a record
 
-> **Navigation**: [← Data Modeling](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Data Modeling](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -43,8 +43,8 @@ Users can create, read, update, and delete records against any model. Records ar
 - [ ] Soft-deleted records are permanently purged after 30 days.
 - [ ] A soft-deleted record is not returned by list or search queries.
 
-*Out of scope*
-- Restoring a soft-deleted record — not in MVP.
+*Deferred capabilities*
+- Restoring a soft-deleted record.
 
 > **Implementation status**
 >

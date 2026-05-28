@@ -1,6 +1,6 @@
 # Use case — Use a data class as a field in a model
 
-> **Navigation**: [← Data Modeling](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Data Modeling](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -44,7 +44,7 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 - [ ] A data class can be used as a field in multiple models simultaneously.
 - [ ] Editing the data class definition (adding/removing fields) is reflected immediately in all models that use it, including the form rendering for those models.
 
-*Out of scope*
+*Deferred capabilities*
 - A field referencing a data class from another org — tenant-isolated, not possible.
 
 > **Implementation status**

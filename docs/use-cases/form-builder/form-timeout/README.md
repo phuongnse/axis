@@ -1,6 +1,6 @@
 # Use case — Handle form step timeout
 
-> **Navigation**: [← Form Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Form Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -44,8 +44,8 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 - [ ] Expiry jobs are idempotent: if the job fires more than once (at-least-once delivery), the second invocation detects the task is already expired and exits gracefully.
 - [ ] If the workflow is cancelled while a Form Task is pending, the task is marked `Cancelled` and the expiry job is cancelled. The form link shows: "This workflow has been cancelled."
 
-*Out of scope*
-- Sending a reminder notification before timeout expires — not in MVP.
+*Deferred capabilities*
+- Sending a reminder notification before timeout expires.
 
 > **Implementation status**
 >

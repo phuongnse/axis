@@ -1,6 +1,6 @@
 # Use case — Bulk export all workflows
 
-> **Navigation**: [← Workflow Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -41,8 +41,8 @@ Workflow definitions can be exported as portable JSON files and imported into an
 *Edge cases*
 - [ ] An org with 0 workflows: export downloads an empty ZIP with a README.txt explaining the format.
 
-*Out of scope*
-- Scheduled automatic backups — not in MVP.
+*Deferred capabilities*
+- Scheduled automatic backups.
 
 > **Implementation status**
 >

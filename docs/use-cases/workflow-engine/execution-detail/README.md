@@ -1,6 +1,6 @@
 # Use case — View execution detail and step timeline
 
-> **Navigation**: [← Workflow Engine](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Engine](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -44,8 +44,8 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 - [ ] A step in `WAITING` status (Form step pending) shows "Waiting for: {assignee}" with a timestamp of when it was assigned.
 - [ ] Context snapshots are immutable after being recorded — they reflect the exact state at that point in time, regardless of subsequent context changes.
 
-*Out of scope*
-- Replaying or simulating an execution from any point with a different context — not in MVP.
+*Deferred capabilities*
+- Replaying or simulating an execution from any point with a different context.
 
 > **Implementation status**
 >

@@ -1,6 +1,6 @@
 # Data Modeling
 
-[← Back to Use Cases](../README.md)
+[← Back to Use Cases](./README.md)
 
 ---
 
@@ -14,7 +14,7 @@ Custom data modeling is the core differentiator of Axis. Without it, the platfor
 
 ## Phase
 
-**MVP**
+**Production**
 
 ---
 
@@ -106,7 +106,7 @@ A concrete instance of a Model. Records are stored in the tenant's schema using 
 
 ## Code style
 
-Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced via [`.editorconfig`](../../../.editorconfig). Run `dotnet format Axis.sln` before push ([CONTRIBUTING.md](../../../CONTRIBUTING.md)).
+Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced via [`.editorconfig`](./././.editorconfig). Run `dotnet format Axis.sln` before push ([CONTRIBUTING.md](./././CONTRIBUTING.md)).
 
 ---
 
@@ -116,7 +116,7 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 |---|---|---|
 | Domain | ✅ Done | `DataModel`, `Field`, `DataRecord` aggregates; all field types and domain events |
 | Application | ✅ Done | All command/query handlers; `RecordFieldValidator`; `BulkDeleteRecordsHandler`; `ExportRecordsCsvHandler` |
-| Infrastructure | ✅ Done | EF Core mappings, repositories, JSONB field converters; `GetPagedAsync` with filter/sort; `BulkDeleteAsync`; `GetAllForExportAsync`. Database `axis_datamodeling` with initial migration `InitialCreate` ([ADR-011](../../TECH_STACK.md#adr-011-per-module-database-with-schema-per-tenant-inside), [ADR-023](../../TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)). DbContext + UnitOfWork inlined per ADR-017. `OrganizationVerifiedHandler` provisions tenant schema via `TenantModuleProvisionAttempt` (reports `TenantModuleProvisionReportEvent` to Identity; retries via `RetryTenantModuleProvisionHandler` + shared `TenantSchemaProvisioner`, tenant provisioning use case). `Axis.DataModeling.Contracts` + `DataModelingEventMapper` publish 9 Avro lifecycle/field events via Wolverine outbox → Kafka ([ADR-019](../../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope), [ADR-025](../../TECH_STACK.md#adr-025-transport-selection-rule-by-message-name-suffix)) (PR #101). `DataModelCatalogService` gRPC exposes model summary lookup for cross-module consumers (ADR-014 boundary contract); the server derives `organization_id` from the caller's JWT `org_id` claim so tenant isolation is structural rather than caller-trusted. **Done:** `ModelDeletedHandler` in FormBuilder + WorkflowBuilder. **Deferred (PR #101 follow-up):** Kafka consumer in WorkflowBuilder for field delete refs. |
+| Infrastructure | ✅ Done | EF Core mappings, repositories, JSONB field converters; `GetPagedAsync` with filter/sort; `BulkDeleteAsync`; `GetAllForExportAsync`. Database `axis_datamodeling` with initial migration `InitialCreate` ([ADR-011](././TECH_STACK.md#adr-011-per-module-database-with-schema-per-tenant-inside), [ADR-023](././TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)). DbContext + UnitOfWork inlined per ADR-017. `OrganizationVerifiedHandler` provisions tenant schema via `TenantModuleProvisionAttempt` (reports `TenantModuleProvisionReportEvent` to Identity; retries via `RetryTenantModuleProvisionHandler` + shared `TenantSchemaProvisioner`, tenant provisioning use case). `Axis.DataModeling.Contracts` + `DataModelingEventMapper` publish 9 Avro lifecycle/field events via Wolverine outbox → Kafka ([ADR-019](././TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope), [ADR-025](././TECH_STACK.md#adr-025-transport-selection-rule-by-message-name-suffix)) (PR #101). `DataModelCatalogService` gRPC exposes model summary lookup for cross-module consumers (ADR-014 boundary contract); the server derives `organization_id` from the caller's JWT `org_id` claim so tenant isolation is structural rather than caller-trusted. **Done:** `ModelDeletedHandler` in FormBuilder + WorkflowBuilder. **Deferred (PR #101 follow-up):** Kafka consumer in WorkflowBuilder for field delete refs. |
 | API | ✅ Done | 7 record endpoints (CRUD + bulk-delete + CSV export); filter/sort params; HTTP 422 `ValidationProblemDetails` on create/update |
 | Frontend | ⏳ Pending | — |
 
@@ -135,11 +135,11 @@ Module API is largely ✅; grep `API: ⏳` in linked use-case files only when ad
 
 ## Dependencies
 
-- [Platform Foundation](../platform-foundation/README.md)
-- [Identity & Access](../identity-access/README.md)
+- [Platform Foundation](./platform-foundation/README.md)
+- [Identity & Access](./identity-access/README.md)
 
 ## Dependents
 
-- [Workflow Builder](../workflow-builder/README.md)
-- [Form Builder](../form-builder/README.md)
-- [Page Builder](../page-builder/README.md)
+- [Workflow Builder](./workflow-builder/README.md)
+- [Form Builder](./form-builder/README.md)
+- [Page Builder](./page-builder/README.md)

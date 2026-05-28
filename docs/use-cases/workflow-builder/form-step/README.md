@@ -1,6 +1,6 @@
 # Use case — Configure a Form step
 
-> **Navigation**: [← Workflow Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -46,8 +46,8 @@ Each step has a type that determines what it does when executed. Users configure
 - [ ] If the assignee resolves to a deactivated user at execution time, the engine falls back to notifying all Admins and logs a warning.
 - [ ] A timeout of 0 hours is invalid and blocked.
 
-*Out of scope*
-- Multiple assignees on a single Form step (assign to all and wait for the first response) — not in MVP.
+*Deferred capabilities*
+- Multiple assignees on a single Form step (assign to all and wait for the first response).
 
 > **Implementation status**
 >

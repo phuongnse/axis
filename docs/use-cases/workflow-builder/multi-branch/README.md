@@ -1,6 +1,6 @@
 # Use case — Add a multi-branch condition
 
-> **Navigation**: [← Workflow Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -45,8 +45,8 @@ Workflows can take different execution paths based on data values using Conditio
 - [ ] If no branch matches and there is no Default branch, the step fails at execution time with: "No condition branch matched and no default branch is configured."
 - [ ] A Condition step with 10 or more branches still renders correctly on the canvas, with the config panel scrollable.
 
-*Out of scope*
-- Regex-based branch matching — not in MVP.
+*Deferred capabilities*
+- Regex-based branch matching.
 
 > **Implementation status**
 >

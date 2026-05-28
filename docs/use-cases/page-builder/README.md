@@ -1,6 +1,6 @@
 # Page & UI Builder
 
-[← Back to Use Cases](../README.md)
+[← Back to Use Cases](./README.md)
 
 ---
 
@@ -14,7 +14,7 @@ Without a UI builder, users need a developer to display and interact with their 
 
 ## Phase
 
-**Phase 2** — Depends on a stable data-modeling, workflow-builder, form-builder, workflow-engine first.
+**Production** — Same product scope as other domains; implementation follows [PROGRESS.md](../../PROGRESS.md) once the module is started.
 
 ---
 
@@ -60,17 +60,17 @@ Without a UI builder, users need a developer to display and interact with their 
 
 ## Open work (agents)
 
-**⏳ Phase 2 — not started.** No `src/Modules/PageBuilder`, no use-case files under `docs/use-cases/page-builder/`. Do not implement until MVP loop (platform-foundation–workflow-engine) gaps are closed unless explicitly scoped.
+**⏳ Not started.** No `src/Modules/PageBuilder` yet; add per-use-case specs under `docs/use-cases/page-builder/` before implementation. Prioritize alongside other domain **Open work** — not gated behind a reduced product phase.
 
 ---
 
 ## Dependencies
 
-- [Platform Foundation](../platform-foundation/README.md)
-- [Identity & Access](../identity-access/README.md)
-- [Data Modeling](../data-modeling/README.md)
-- [Form Builder](../form-builder/README.md)
-- [Workflow Engine](../workflow-engine/README.md)
+- [Platform Foundation](./platform-foundation/README.md)
+- [Identity & Access](./identity-access/README.md)
+- [Data Modeling](./data-modeling/README.md)
+- [Form Builder](./form-builder/README.md)
+- [Workflow Engine](./workflow-engine/README.md)
 
 ## Dependents
 

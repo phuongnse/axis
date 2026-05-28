@@ -1,6 +1,6 @@
 # Use case — View execution history for a workflow
 
-> **Navigation**: [← Workflow Engine](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Workflow Engine](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -44,8 +44,8 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 - [ ] A workflow with thousands of executions: pagination is server-side (25 per page); the total count is shown (e.g., "1,247 executions").
 - [ ] Executions that are currently `RUNNING` appear at the top of the list regardless of sort order, with a live elapsed time counter.
 
-*Out of scope*
-- Execution analytics dashboard (charts, trends) — not in MVP.
+*Deferred capabilities*
+- Execution analytics dashboard (charts, trends).
 
 > **Implementation status**
 >

@@ -1,6 +1,6 @@
 # Use case — Update organization profile
 
-> **Navigation**: [← Platform Foundation](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Platform Foundation](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -46,9 +46,9 @@ Allow organization admins to manage their organization's profile, settings, and 
 - [ ] Uploading a logo while on a slow connection shows an upload progress indicator; navigating away during upload shows a "Changes in progress" warning.
 - [ ] Organization name change does not affect the internal schema name (slug), which is immutable after provisioning.
 
-*Out of scope*
-- Custom domain / vanity URL — not in MVP.
-- White-label theming (custom colors, fonts) — not in MVP.
+*Deferred capabilities*
+- Custom domain / vanity URL.
+- White-label theming (custom colors, fonts).
 
 > **Implementation status**
 >

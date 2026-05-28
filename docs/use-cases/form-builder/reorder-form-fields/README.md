@@ -1,6 +1,6 @@
 # Use case — Reorder fields via drag-and-drop
 
-> **Navigation**: [← Form Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Form Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -42,8 +42,8 @@ Form fields define what data the form collects. Each field has a type, label, he
 - [ ] Section dividers can be reordered along with fields, maintaining their grouping relationship.
 - [ ] Reordering a field from one section into another section is supported.
 
-*Out of scope*
-- Multi-column form layouts — not in MVP (single-column only).
+*Deferred capabilities*
+- Multi-column form layouts. (single-column only).
 
 > **Implementation status**
 >

@@ -1,6 +1,6 @@
 # Use case — Sign out
 
-> **Navigation**: [← Identity Access](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Identity Access](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -44,7 +44,7 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 - [ ] Using the old access token after sign-out returns HTTP 401 (blacklist check).
 - [ ] Sign-out from one browser tab notifies other open tabs (via BroadcastChannel) to also clear their token and redirect.
 
-*Out of scope*
+*Deferred capabilities*
 - "Sign out of all devices" from this flow — covered in [[password-security](./README.md) Password & Security](./password-security.md).
 
 > **Implementation status**

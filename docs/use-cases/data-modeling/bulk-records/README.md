@@ -1,6 +1,6 @@
 # Use case — Bulk operations on records
 
-> **Navigation**: [← Data Modeling](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Data Modeling](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -43,8 +43,8 @@ Users can create, read, update, and delete records against any model. Records ar
 - [ ] "Select all" selects only the current page (25 records), not all records in the model. A "Select all {N} records" option extends the selection across all pages.
 - [ ] Bulk export of more than 5,000 records is processed asynchronously; the user receives a download link via email or in-app notification when ready.
 
-*Out of scope*
-- Bulk edit (updating multiple records at once) — not in MVP.
+*Deferred capabilities*
+- Bulk edit (updating multiple records at once).
 
 > **Implementation status**
 >
@@ -61,7 +61,7 @@ Users can create, read, update, and delete records against any model. Records ar
 > - current sync CSV export has no size limit (streams in 500-record chunks). "Select all N records across all pages" for bulk delete is a frontend concern.
 >
 > **Decisions:**
-> - bulk delete via `POST /api/models/{id}/records/bulk-delete` with `{ "ids": [...] }` body
+> - bulk delete via `POST /api/models/{id}/records/bulk-delete` with `{ "ids": [.] }` body
 > - CSV export via `GET /api/models/{id}/records/export` (same filter/sort params as list)
 > - field names for export header taken from model's FieldDefinition labels
 > - CSV uses RFC 4180 escaping.

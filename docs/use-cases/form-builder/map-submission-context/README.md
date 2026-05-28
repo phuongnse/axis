@@ -1,6 +1,6 @@
 # Use case — Map form submission data into workflow context
 
-> **Navigation**: [← Form Builder](../README.md) · [Use cases index](../README.md#use-cases)
+> **Navigation**: [← Form Builder](./README.md) · [Use cases index](./README.md#use-cases)
 
 ## Purpose
 
@@ -39,12 +39,12 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 - [ ] There are no errors to handle here at design time — mapping is automatic. At execution time, if a form submission is missing an expected field (e.g., optional field not filled), the context value is `null`.
 
 *Edge cases*
-- [ ] File Upload fields in forms: the context value is a file reference object `{ "id": "...", "name": "...", "url": "..." }`, not the raw file content.
+- [ ] File Upload fields in forms: the context value is a file reference object `{ "id": ".", "name": ".", "url": "." }`, not the raw file content.
 - [ ] Multi-select and multi-relation fields store their values as arrays in context.
 - [ ] If a Form step is skipped (e.g., because an OR-join condition was met before this branch ran), its context namespace is not present in the context (not `null`, entirely absent).
 
-*Out of scope*
-- Saving form submission data directly to a Data Model record automatically — not in MVP (a subsequent Script or HTTP step can do this).
+*Deferred capabilities*
+- Saving form submission data directly to a Data Model record automatically. (a subsequent Script or HTTP step can do this).
 
 > **Implementation status**
 >
