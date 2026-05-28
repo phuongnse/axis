@@ -7,6 +7,7 @@
 version: v2
 modules:
   - path: src/Modules/Identity/Axis.Identity.Contracts/Protos
+  - path: src/Modules/DataModeling/Axis.DataModeling.Contracts/Protos
   - path: src/Modules/FormBuilder/Axis.FormBuilder.Contracts/Protos
   - path: src/Modules/WorkflowBuilder/Axis.WorkflowBuilder.Contracts/Protos
 lint:
