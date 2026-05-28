@@ -1849,7 +1849,7 @@ Shared kit screens live under `_shared/wireframes/`; use-case-specific assets ca
 **Linking from a use-case file** — add directly after the feature title, before the first user story:
 
 ```markdown
-> **Wireframe**: [docs/use-cases/identity-access/wireframes/login.excalidraw](../../use-cases/identity-access/wireframes/login.excalidraw) · [preview](../../use-cases/identity-access/wireframes/login.svg)
+> **Wireframe**: [docs/use-cases/identity-access/sign-in/login.excalidraw](../../use-cases/identity-access/sign-in/login.excalidraw) · [preview](../../use-cases/identity-access/sign-in/login.svg)
 ```
 
 **Excalidraw settings** for consistent sketch aesthetic:

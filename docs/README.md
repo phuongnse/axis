@@ -59,12 +59,12 @@ All diagrams are Excalidraw (`.excalidraw` source + `.svg` preview). Regenerate 
 
 | Diagram | Source | Preview |
 |---|---|---|
-| Tenant Provisioning | [tenant-provisioning.excalidraw](./use-cases/platform-foundation/diagrams/tenant-provisioning.excalidraw) | [tenant-provisioning.svg](./use-cases/platform-foundation/diagrams/tenant-provisioning.svg) |
-| Auth Flow | [auth-flow.excalidraw](./use-cases/identity-access/diagrams/auth-flow.excalidraw) | [auth-flow.svg](./use-cases/identity-access/diagrams/auth-flow.svg) |
+| Tenant Provisioning | [tenant-provisioning.excalidraw](./use-cases/platform-foundation/provision-tenant/tenant-provisioning.excalidraw) | [tenant-provisioning.svg](./use-cases/platform-foundation/provision-tenant/tenant-provisioning.svg) |
+| Auth Flow | [auth-flow.excalidraw](./use-cases/identity-access/sign-in/auth-flow.excalidraw) | [auth-flow.svg](./use-cases/identity-access/sign-in/auth-flow.svg) |
 | Data Model | [data-model.excalidraw](./use-cases/data-modeling/create-model/data-model.excalidraw) | [data-model.svg](./use-cases/data-modeling/create-model/data-model.svg) |
-| Workflow Model | [workflow-model.excalidraw](./use-cases/workflow-builder/diagrams/workflow-model.excalidraw) | [workflow-model.svg](./use-cases/workflow-builder/diagrams/workflow-model.svg) |
-| Form Model | [form-model.excalidraw](./use-cases/form-builder/diagrams/form-model.excalidraw) | [form-model.svg](./use-cases/form-builder/diagrams/form-model.svg) |
-| Execution Flow | [execution-flow.excalidraw](./use-cases/workflow-engine/diagrams/execution-flow.excalidraw) | [execution-flow.svg](./use-cases/workflow-engine/diagrams/execution-flow.svg) |
+| Workflow Model | [workflow-model.excalidraw](./use-cases/workflow-builder/create-workflow/workflow-model.excalidraw) | [workflow-model.svg](./use-cases/workflow-builder/create-workflow/workflow-model.svg) |
+| Form Model | [form-model.excalidraw](./use-cases/form-builder/create-form/form-model.excalidraw) | [form-model.svg](./use-cases/form-builder/create-form/form-model.svg) |
+| Execution Flow | [execution-flow.excalidraw](./use-cases/workflow-engine/start-execution/execution-flow.excalidraw) | [execution-flow.svg](./use-cases/workflow-engine/start-execution/execution-flow.svg) |
 
 ## Wireframes
 
@@ -72,7 +72,7 @@ Excalidraw wireframes live in `docs/use-cases/{domain}/wireframes/`, co-located 
 
 | Screen | Source | Preview |
 |---|---|---|
-| Login | [login.excalidraw](./use-cases/identity-access/wireframes/login.excalidraw) | [login.svg](./use-cases/identity-access/wireframes/login.svg) |
+| Login | [login.excalidraw](./use-cases/identity-access/sign-in/login.excalidraw) | [login.svg](./use-cases/identity-access/sign-in/login.svg) |
 
 ---
 

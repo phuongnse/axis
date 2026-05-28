@@ -128,6 +128,6 @@ Detailed flow, redirect URIs, and error states: [docs/use-cases/identity-access/
 
 ## Workflow Execution
 
-![Execution Flow](./use-cases/workflow-engine/diagrams/execution-flow.svg)
+![Execution Flow](./use-cases/workflow-engine/start-execution/execution-flow.svg)
 
 Full execution model — step lifecycle, retry semantics, history, real-time push — lives under [docs/use-cases/workflow-engine/](./use-cases/workflow-engine/README.md).
