@@ -1,6 +1,6 @@
 # Use case — Sign in to the workspace
 
-> **Navigation**: [← Identity Access](./README.md) · [Use cases index](./README.md#use-cases)
+> **Navigation**: [← Identity Access](../README.md) · [Use cases index](../README.md#use-cases)
 
 ## Purpose
 

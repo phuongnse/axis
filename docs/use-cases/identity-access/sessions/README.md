@@ -1,6 +1,6 @@
 # Use case — View and revoke active sessions
 
-> **Navigation**: [← Identity Access](./README.md) · [Use cases index](./README.md#use-cases)
+> **Navigation**: [← Identity Access](../README.md) · [Use cases index](../README.md#use-cases)
 
 ## Purpose
 

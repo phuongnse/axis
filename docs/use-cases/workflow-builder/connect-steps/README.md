@@ -1,6 +1,6 @@
 # Use case — Connect steps with transitions
 
-> **Navigation**: [← Workflow Builder](./README.md) · [Use cases index](./README.md#use-cases)
+> **Navigation**: [← Workflow Builder](../README.md) · [Use cases index](../README.md#use-cases)
 
 ## Purpose
 

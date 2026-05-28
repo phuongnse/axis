@@ -1,6 +1,6 @@
 # Use case — Receive error notification when a workflow fails
 
-> **Navigation**: [← Workflow Engine](./README.md) · [Use cases index](./README.md#use-cases)
+> **Navigation**: [← Workflow Engine](../README.md) · [Use cases index](../README.md#use-cases)
 
 ## Purpose
 

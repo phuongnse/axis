@@ -1,6 +1,6 @@
 # Use case — Undo and redo canvas actions
 
-> **Navigation**: [← Workflow Builder](./README.md) · [Use cases index](./README.md#use-cases)
+> **Navigation**: [← Workflow Builder](../README.md) · [Use cases index](../README.md#use-cases)
 
 ## Purpose
 

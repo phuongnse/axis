@@ -1,6 +1,6 @@
 # Use case — Create a record
 
-> **Navigation**: [← Data Modeling](./README.md) · [Use cases index](./README.md#use-cases)
+> **Navigation**: [← Data Modeling](../README.md) · [Use cases index](../README.md#use-cases)
 
 ## Purpose
 

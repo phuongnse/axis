@@ -1,6 +1,6 @@
 # Use case — Change password while signed in
 
-> **Navigation**: [← Identity Access](./README.md) · [Use cases index](./README.md#use-cases)
+> **Navigation**: [← Identity Access](../README.md) · [Use cases index](../README.md#use-cases)
 
 ## Purpose
 

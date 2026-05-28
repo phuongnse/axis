@@ -1,6 +1,6 @@
 # Use case — Use a data class as a field in a model
 
-> **Navigation**: [← Data Modeling](./README.md) · [Use cases index](./README.md#use-cases)
+> **Navigation**: [← Data Modeling](../README.md) · [Use cases index](../README.md#use-cases)
 
 ## Purpose
 

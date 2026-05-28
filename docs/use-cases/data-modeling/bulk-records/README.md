@@ -1,6 +1,6 @@
 # Use case — Bulk operations on records
 
-> **Navigation**: [← Data Modeling](./README.md) · [Use cases index](./README.md#use-cases)
+> **Navigation**: [← Data Modeling](../README.md) · [Use cases index](../README.md#use-cases)
 
 ## Purpose
 

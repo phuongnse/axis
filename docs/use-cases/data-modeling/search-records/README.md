@@ -1,6 +1,6 @@
 # Use case — Filter and search records
 
-> **Navigation**: [← Data Modeling](./README.md) · [Use cases index](./README.md#use-cases)
+> **Navigation**: [← Data Modeling](../README.md) · [Use cases index](../README.md#use-cases)
 
 ## Purpose
 

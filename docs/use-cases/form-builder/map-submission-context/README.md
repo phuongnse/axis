@@ -1,6 +1,6 @@
 # Use case — Map form submission data into workflow context
 
-> **Navigation**: [← Form Builder](./README.md) · [Use cases index](./README.md#use-cases)
+> **Navigation**: [← Form Builder](../README.md) · [Use cases index](../README.md#use-cases)
 
 ## Purpose
 

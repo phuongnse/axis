@@ -1,6 +1,6 @@
 # Use case — View and manage roles
 
-> **Navigation**: [← Identity Access](./README.md) · [Use cases index](./README.md#use-cases)
+> **Navigation**: [← Identity Access](../README.md) · [Use cases index](../README.md#use-cases)
 
 ## Purpose
 

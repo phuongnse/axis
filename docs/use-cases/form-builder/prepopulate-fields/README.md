@@ -1,6 +1,6 @@
 # Use case — Pre-populate form fields from execution context
 
-> **Navigation**: [← Form Builder](./README.md) · [Use cases index](./README.md#use-cases)
+> **Navigation**: [← Form Builder](../README.md) · [Use cases index](../README.md#use-cases)
 
 ## Purpose
 

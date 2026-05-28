@@ -1,6 +1,6 @@
 # Use case — Delete organization
 
-> **Navigation**: [← Platform Foundation](./README.md) · [Use cases index](./README.md#use-cases)
+> **Navigation**: [← Platform Foundation](../README.md) · [Use cases index](../README.md#use-cases)
 
 ## Purpose
 

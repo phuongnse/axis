@@ -1,6 +1,6 @@
 # Use case — Export a workflow as JSON
 
-> **Navigation**: [← Workflow Builder](./README.md) · [Use cases index](./README.md#use-cases)
+> **Navigation**: [← Workflow Builder](../README.md) · [Use cases index](../README.md#use-cases)
 
 ## Purpose
 

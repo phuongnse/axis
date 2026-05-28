@@ -1,6 +1,6 @@
 # Use case — Track execution status in real time
 
-> **Navigation**: [← Workflow Engine](./README.md) · [Use cases index](./README.md#use-cases)
+> **Navigation**: [← Workflow Engine](../README.md) · [Use cases index](../README.md#use-cases)
 
 ## Purpose
 

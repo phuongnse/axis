@@ -1,6 +1,6 @@
 # Use case — View execution history for a workflow
 
-> **Navigation**: [← Workflow Engine](./README.md) · [Use cases index](./README.md#use-cases)
+> **Navigation**: [← Workflow Engine](../README.md) · [Use cases index](../README.md#use-cases)
 
 ## Purpose
 

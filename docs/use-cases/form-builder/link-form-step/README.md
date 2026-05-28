@@ -1,6 +1,6 @@
 # Use case — Link a form to a workflow Form step
 
-> **Navigation**: [← Form Builder](./README.md) · [Use cases index](./README.md#use-cases)
+> **Navigation**: [← Form Builder](../README.md) · [Use cases index](../README.md#use-cases)
 
 ## Purpose
 
