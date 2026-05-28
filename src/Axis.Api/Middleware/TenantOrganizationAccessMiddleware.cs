@@ -7,7 +7,7 @@ namespace Axis.Api.Middleware;
 
 /// <summary>
 /// Rejects tenant-scoped API calls when the JWT <c>org_id</c> references a missing,
-/// suspended, or not-yet-ready organization (E01 F03 US-009).
+/// suspended, or not-yet-ready organization.
 /// </summary>
 internal sealed class TenantOrganizationAccessMiddleware(
     RequestDelegate next,

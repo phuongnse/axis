@@ -1,7 +1,7 @@
 namespace Axis.Api.Infrastructure;
 
 /// <summary>
-/// Routes that use per-tenant PostgreSQL schemas (E01 F03 US-008).
+/// Routes that use per-tenant PostgreSQL schemas.
 /// </summary>
 internal static class TenantDataApiPaths
 {

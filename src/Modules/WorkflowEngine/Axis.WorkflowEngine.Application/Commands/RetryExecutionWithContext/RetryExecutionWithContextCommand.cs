@@ -2,7 +2,7 @@ using Axis.Shared.Application.CQRS;
 
 namespace Axis.WorkflowEngine.Application.Commands.RetryExecutionWithContext;
 
-/// <summary>US-102: Retry a failed execution using a user-supplied modified context.</summary>
+/// <summary>Retry a failed execution using a user-supplied modified context.</summary>
 public sealed record RetryExecutionWithContextCommand(
     Guid ExecutionId,
     Guid OrganizationId,

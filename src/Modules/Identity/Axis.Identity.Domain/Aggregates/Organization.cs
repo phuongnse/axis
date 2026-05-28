@@ -164,7 +164,7 @@ public sealed class Organization : AggregateRoot<Guid>
 
     /// <summary>
     /// Tenant-scoped module APIs (DataModeling, WorkflowBuilder, etc.) may run only when
-    /// the org workspace is ready or in the deletion grace period (E01 F03 US-008/009).
+    /// the org workspace is ready or in the deletion grace period.
     /// </summary>
     public bool AllowsTenantDataAccess() =>
         Status is OrganizationStatus.Active or OrganizationStatus.DeletionScheduled;

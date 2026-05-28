@@ -7,7 +7,7 @@ using Axis.FormBuilder.Domain.ValueObjects;
 namespace Axis.FormBuilder.Application.Services;
 
 /// <summary>
-/// Validates submitted form data against form field definitions (US-087).
+/// Validates submitted form data against form field definitions.
 /// </summary>
 public static class FormSubmissionFieldValidator
 {

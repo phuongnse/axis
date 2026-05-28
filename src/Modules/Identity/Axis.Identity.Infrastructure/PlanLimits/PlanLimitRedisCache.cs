@@ -5,7 +5,7 @@ namespace Axis.Identity.Infrastructure.PlanLimits;
 
 public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
 {
-    /// <summary>US-006: usage stats on settings page must be at most this stale.</summary>
+    /// <summary>usage stats on settings page must be at most this stale.</summary>
     public static readonly TimeSpan UsageStatsMaxStaleness = TimeSpan.FromMinutes(5);
 
     private const string DecrementFloorZeroScript =
@@ -103,7 +103,7 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
         }
         catch (RedisException)
         {
-            // Best-effort cache bust after plan change (US-012).
+            // Best-effort cache bust after plan change.
         }
     }
 

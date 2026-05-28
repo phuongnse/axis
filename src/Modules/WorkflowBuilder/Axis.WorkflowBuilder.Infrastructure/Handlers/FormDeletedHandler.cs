@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace Axis.WorkflowBuilder.Infrastructure.Handlers;
 
 /// <summary>
-/// Flags Form steps that reference a deleted form (E05 US-078, E04 F03).
+/// Flags Form steps that reference a deleted form.
 /// </summary>
 internal sealed class FormDeletedHandler(
     WorkflowBuilderDbContext context,

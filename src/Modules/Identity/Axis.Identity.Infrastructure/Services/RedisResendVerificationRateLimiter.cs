@@ -6,7 +6,7 @@ using StackExchange.Redis;
 
 namespace Axis.Identity.Infrastructure.Services;
 
-/// <summary>US-002: per-email resend cap with atomic INCR+EXPIRE (Lua; no PII in key).</summary>
+/// <summary>per-email resend cap with atomic INCR+EXPIRE (Lua; no PII in key).</summary>
 internal sealed class RedisResendVerificationRateLimiter(IConnectionMultiplexer redis) : IResendVerificationRateLimiter
 {
     private const int MaxResendsPerHour = 3;

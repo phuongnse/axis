@@ -11,13 +11,13 @@ namespace Axis.Architecture.Tests;
 /// <para>
 /// Rules enforced:
 /// <list type="bullet">
-///   <item>No public mutable setters — state changes go through behavior methods,
-///         not property assignment. (Init-only setters are allowed; EF Core
-///         needs <c>private set;</c> or <c>init;</c> for materialisation.)</item>
-///   <item>Aggregates expose at least one public/internal factory method (a
-///         <c>Create</c> static or equivalent). The check is best-effort: it
-///         flags aggregates whose only public constructor is parameterless,
-///         which usually means a missing factory.</item>
+/// <item>No public mutable setters — state changes go through behavior methods,
+/// not property assignment. (Init-only setters are allowed; EF Core
+/// needs <c>private set;</c> or <c>init;</c> for materialisation.)</item>
+/// <item>Aggregates expose at least one public/internal factory method (a
+/// <c>Create</c> static or equivalent). The check is best-effort: it
+/// flags aggregates whose only public constructor is parameterless,
+/// which usually means a missing factory.</item>
 /// </list>
 /// </para>
 /// </summary>

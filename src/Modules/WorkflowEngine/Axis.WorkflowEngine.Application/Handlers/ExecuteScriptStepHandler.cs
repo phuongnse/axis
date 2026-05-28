@@ -9,7 +9,7 @@ namespace Axis.WorkflowEngine.Application.Handlers;
 
 /// <summary>
 /// Executes a Script step via IScriptExecutor (sandboxed JavaScript).
-/// US-093: isolated exception boundary; idempotency on re-delivery.
+/// isolated exception boundary; idempotency on re-delivery.
 /// </summary>
 public sealed class ExecuteScriptStepHandler(
     IExecutionRepository execRepo,

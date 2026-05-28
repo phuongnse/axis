@@ -18,7 +18,7 @@ When you find yourself editing the same fact in two files, the architecture is w
 
 | Anti-pattern | Why it rots | Do instead |
 |---|---|---|
-| **Speculation in reference docs** ("Not yet implemented", "planned design", "Will be wired") | Reads as reference, is actually guesswork; the real design will diverge | Put forward-looking content in `docs/PROGRESS.md` (current status) or an epic feature file (spec). Enforced for `docs/ARCHITECTURE.md` by the drift script. |
+| **Speculation in reference docs** ("Not yet implemented", "planned design", "Will be wired") | Reads as reference, is actually guesswork; the real design will diverge | Put forward-looking content in `docs/PROGRESS.md` (current status) or a domain use-case file (spec). Enforced for `docs/ARCHITECTURE.md` by the drift script. |
 | **Duplicating versions / paths / commands** across docs | Both copies drift; readers don't know which is canonical | Link to the owner doc (see ownership table) |
 | **Duplicating compose ports / service URLs** | Playbooks drift from `docker-compose.yml` | Owner: [local-dev.md](./local-dev.md) + compose file; enforced by [`check-local-dev-docs.py`](../../scripts/check-local-dev-docs.py) |
 | **Aspirational metrics** in engineering docs (e.g. "50 customers in 6 months") | Nobody measures or tests against them; they age into embarrassment | Keep in pitch deck / `PRODUCT_VISION.md` if anywhere; do not pollute technical reference |
@@ -34,28 +34,32 @@ When you find yourself editing the same fact in two files, the architecture is w
 |---|---|---|
 | Reference docs (`CLAUDE.md`, `ARCHITECTURE.md`, playbooks) | 300 lines | Split by topic, extract a sub-playbook, or move detail into an index + section pattern |
 | `patterns.md` | exempt | Use [`patterns-index.md`](./patterns-index.md) as the entry point; never read end-to-end |
-| Epic README | 200 lines | Move detail into per-feature files |
-| Feature file | no hard cap | Already scoped by AC list |
+| Domain README | 200 lines | Move detail into per-use-case files |
+| Use-case file | no hard cap | Already scoped by AC list |
 
 `patterns.md` is the only intentional outlier — its size is mitigated by the lazy-load index pattern. Don't replicate that escape hatch elsewhere without the same mitigation.
 
 ---
 
-## Feature files — wireframes & implementation status
+## Use-case files — wireframes & implementation status
 
-Every `docs/epics/*/features/F0N-*.md` file uses these layouts so agents can scan status without parsing inline pipes.
+Every `docs/use-cases/<domain>/<short-slug>/README.md` file uses these layouts so agents can scan status without parsing inline pipes.
 
-### Wireframes (top of file, after title / back-link)
+### Wireframes (in each use-case folder)
 
 ```markdown
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| login | [source](../wireframes/login.excalidraw) | [preview](../wireframes/login.svg) |
+| login | [source](./login.excalidraw) | [preview](./login.svg) |
+| shared-app-shell | [source](../../../wireframes/app-shell.excalidraw) | [preview](../../../wireframes/app-shell.svg) |
 ```
 
-One row per screen. **One table per feature file** — do not split wireframes into multiple `| Screen |` tables (merge registration vs provisioning screens into the same table). **Do not** stack multiple `> **Wireframe**:` blockquote lines — they are hard to read and drift from the table format.
+- Put screens **only used by this use case** **flat** inside the use-case folder (next to `README.md`).
+- Reference **shared kit screens** (e.g. `app-shell`, `_template`) from `../../../wireframes/` — do not copy duplicates.
+- Use `N/A` rows when no wireframe applies.
+- One table per `README.md` — no blockquote wireframe stacks.
 
 ### Implementation status (after each US AC block)
 
@@ -88,7 +92,23 @@ Rules:
 - **`Gaps vs spec`** lists remaining AC bullets; never write `pending API layer` when endpoints already exist — say what is missing (`403 test`, `date filter query param`, etc.).
 - **`API ✅`** on a US means in-scope REST/OpenAPI AC for that story are shipped; Frontend-only gaps do not downgrade API to ⚠️.
 
-**Bulk normalize:** `python3 scripts/normalize-feature-docs.py` (add `--check` for CI — also run via `check-doc-drift.sh`).
+**Bulk validate:** `python3 scripts/check-use-case-docs.py --check` (also run via `check-doc-drift.sh`).
+
+---
+
+## Use case files (flow-first)
+
+Use case files should be self-contained and user-facing:
+
+1. Purpose / actor / trigger
+2. Main flow
+3. Alternate/error flows
+4. Acceptance criteria
+5. Wireframes table (mapped to this use case)
+6. Diagrams table (mapped to this use case; explicit N/A if not needed yet)
+7. Implementation status callout
+
+Avoid writing engineering process constraints as end-user use cases. Keep those in shared playbooks and gates (for example `frontend.md`, `agent-checklist.md`, `CLAUDE.md`).
 
 ---
 

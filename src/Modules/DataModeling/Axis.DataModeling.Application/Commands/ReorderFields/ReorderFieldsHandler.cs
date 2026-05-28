@@ -5,7 +5,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Commands.ReorderFields;
 
-/// <summary>US-036: Loads model and delegates field reordering to the aggregate.</summary>
+/// <summary>Loads model and delegates field reordering to the aggregate.</summary>
 public sealed class ReorderFieldsHandler(
     IDataModelRepository modelRepo,
     IUnitOfWork uow)

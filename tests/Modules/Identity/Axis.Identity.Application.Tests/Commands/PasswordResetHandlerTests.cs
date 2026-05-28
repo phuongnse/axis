@@ -52,7 +52,7 @@ public class RequestPasswordResetHandlerTests
     [Fact]
     public async Task RequestPasswordReset_WhenEmailIsUnknown_DoesNothingWithoutErrorLeakage()
     {
-        // Per US-027: same message regardless of whether email exists
+        // same message regardless of whether email exists
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).ReturnsNull();
 
         Func<Task> act = async () => await CreateHandler().Handle(

@@ -10,18 +10,18 @@
  *
  * Screens generated:
  *   app-shell (root)
- *   E01: register-org, email-confirmation, verify-email,
+ *   platform-foundation: register-org, email-confirmation, verify-email,
  *        verify-email-rate-limit, workspace-provisioning, pricing, settings-org,
  *        settings-org-upload-states, settings-org-profile-states, settings-org-usage-error,
  *        settings-org-free-plan, settings-org-access-denied,
  *        settings-org-deletion-scheduled, settings-org-delete-modal, settings-org-delete-states,
  *        register-org-states
- *   E02: login, register, forgot-password, change-password,
+ *   identity-access: login, register, forgot-password, change-password,
  *        settings-users, settings-roles, settings-security, accept-invitation
- *   E03: data-models, data-classes, records
- *   E04: workflows, workflow-editor
- *   E05: forms, form-editor, form-submission
- *   E06: executions, execution-detail
+ *   data-modeling: data-models, data-classes, records
+ *   workflow-builder: workflows, workflow-editor
+ *   form-builder: forms, form-editor, form-submission
+ *   workflow-engine: executions, execution-detail
  */
 
 import { buildStatsCards } from './generate-template.mjs';
@@ -64,7 +64,7 @@ const cw = W - CX - PAD * 2;  // 930 — usable content width
 // Standard app nav labels
 const NAV = ['Data Models', 'Workflows', 'Forms', 'Executions', 'Settings'];
 
-// E01 auth outcome cards — shared shell + headline rhythm
+// platform-foundation auth outcome cards — shared shell + headline rhythm
 const AUTH_CARD_PAD = 20;
 const AUTH_SHELL_H = 36;       // mini logo + divider
 const AUTH_HEADLINE_H = 34;    // icon row + short underline
@@ -87,10 +87,10 @@ function runScreen(screenKey, generator) {
 
 function write(relativePath, elements) {
   let full;
-  if (/^E0\d-/.test(relativePath)) {
-    // Epic wireframe → docs/epics/{epic}/wireframes/{screen}
-    const [epicFolder, ...rest] = relativePath.split('/');
-    full = join(__dir, '..', 'epics', epicFolder, 'wireframes', ...rest);
+  if (relativePath.includes('/')) {
+    // Use-case wireframe → docs/use-cases/{domain}/{use-case}/{screen}
+    const [domainFolder, ...rest] = relativePath.split('/');
+    full = join(__dir, '..', 'use-cases', domainFolder, 'wireframes', ...rest);
   } else {
     // Shared wireframe → docs/wireframes/{path}
     full = join(__dir, relativePath);
@@ -162,7 +162,7 @@ function authCard(prefix, { title, subtitle = null, items = [], extraLink = null
   return els;
 }
 
-/** Auth form field with optional inline error (US-001 / US-005). */
+/** Auth form field with optional inline error (tenant-registration / organization profile). */
 function authFormField(prefix, cardX, y, cardW, label, value, errorMsg = null) {
   const x = cardX + 24;
   const innerW = cardW - 48;
@@ -214,10 +214,10 @@ function genAppShell() {
   write('app-shell.excalidraw', els);
 }
 
-// ─── E01 Platform Foundation ─────────────────────────────────────────────────
+// ─── platform-foundation Platform Foundation ─────────────────────────────────────────────────
 
 /**
- * Register-Org — US-001, US-004
+ * Register-Org — tenant-registration, plan selection
  * Standard auth card: 5 fields, plan selection shown in subtitle.
  * cardH = 136 (subtitle) + 5×72 (fields) + 4 + 36 + 12 + 32 = 580 → centered vertically.
  */
@@ -233,11 +233,11 @@ function genRegisterOrg() {
       { label: 'Confirm password',  placeholder: '••••••••' },
     ],
   }, 'Create organization', 'Already have an account? Sign in');
-  write('E01-platform-foundation/register-org.excalidraw', els);
+  write('platform-foundation/register-org.excalidraw', els);
 }
 
 /**
- * Register-Org states — US-001 validation + 5xx (two panels, spec reference).
+ * Register-Org states — tenant-registration validation + 5xx (two panels, spec reference).
  */
 function genRegisterOrgStates() {
   const els = [];
@@ -309,11 +309,11 @@ function genRegisterOrgStates() {
     els.push(text(`ros_${id}_sbtn_t`, x + 24, btnY + 10, btnW, 16, 'Create organization', 13, C.white, 'center'));
   });
 
-  write('E01-platform-foundation/register-org-states.excalidraw', els);
+  write('platform-foundation/register-org-states.excalidraw', els);
 }
 
 /**
- * Email-Confirmation — US-001 success state, US-002 resend
+ * Email-Confirmation — registration success, email verification resend
  * Informational card (no form): compact icon, title, copy, resend link.
  */
 function genEmailConfirmation() {
@@ -338,18 +338,18 @@ function genEmailConfirmation() {
   els.push(text('ec_body1', ecX, ecBodyY, ecInnerW, 18, 'We sent a verification link to:', 13, C.gray700));
   els.push(text('ec_body2', ecX, ecBodyY + 22, ecInnerW, 18, 'alex@company.com', 13, semanticVariantColor('info')));
 
-  // Resend link (US-002)
+  // Resend link (email verification)
   els.push(text('ec_resend', ecX, ecBodyY + 52, ecInnerW, 16, "Didn't receive it?  Resend email →", 12, C.primary, 'center'));
 
   // Footer
   els.push(hline('ec_fdiv',   cardX,      cardY + cardH - 32, cardW,      C.gray300));
   els.push(text('ec_footer',  cardX + 24, cardY + cardH - 22, cardW - 48, 16, 'Back to sign in', 12, C.primary, 'center'));
 
-  write('E01-platform-foundation/email-confirmation.excalidraw', els);
+  write('platform-foundation/email-confirmation.excalidraw', els);
 }
 
 /**
- * Verify-Email — US-002 (all 4 outcome states)
+ * Verify-Email — email verification (all 4 outcome states)
  * 2×2 grid of state cards: success, expired, already-used, invalid.
  * Each card: 440×176. Grid centred at W=1200.
  */
@@ -413,7 +413,7 @@ function genVerifyEmail() {
     }
   });
 
-  write('E01-platform-foundation/verify-email.excalidraw', els);
+  write('platform-foundation/verify-email.excalidraw', els);
 }
 
 function genVerifyEmailRateLimit() {
@@ -441,11 +441,11 @@ function genVerifyEmailRateLimit() {
   els.push(text('vrl_btn_t', cardX + AUTH_CARD_PAD, cardY + cardH - 30, 220, 16, 'Resend verification email', 13, C.gray300, 'center'));
   els.push(text('vrl_hint', cardX + 252, cardY + cardH - 26, 168, 16, 'Button disabled until timer ends', 10, C.gray500, 'center'));
 
-  write('E01-platform-foundation/verify-email-rate-limit.excalidraw', els);
+  write('platform-foundation/verify-email-rate-limit.excalidraw', els);
 }
 
 /**
- * Workspace-Provisioning — US-003 (2 states side by side)
+ * Workspace-Provisioning — tenant provisioning (2 states side by side)
  * Left:  In-progress — spinner + step 2 active.
  * Right: Failed (after 3 retries) — error icon + failed step + contact link.
  *
@@ -514,11 +514,11 @@ function genWorkspaceProvisioning() {
   els.push(text('wp_r_supp', rX, stepsY + 4 * 40 + 8, rW, 14,
     'Contact support if the issue persists →', 11, C.primary, 'center'));
 
-  write('E01-platform-foundation/workspace-provisioning.excalidraw', els);
+  write('platform-foundation/workspace-provisioning.excalidraw', els);
 }
 
 /**
- * Settings-Org Delete Modal — US-007
+ * Settings-Org Delete Modal — organization deletion
  * Settings-org page (dimmed) + confirmation modal centred.
  *
  * Modal: 480×280. Input to type org name. Delete button disabled (gray) until match.
@@ -573,11 +573,11 @@ function genSettingsOrgDeleteModal() {
   els.push(text('sdm_del_t', delBtnX, mY + mH - 34, delW, 16, 'Delete organization', 13, C.gray300, 'center'));
   els.push(text('sdm_hint',  mX + 20, mY + mH - 36, 240,  14, 'Enabled when name matches exactly', 10, C.gray300));
 
-  write('E01-platform-foundation/settings-org-delete-modal.excalidraw', els);
+  write('platform-foundation/settings-org-delete-modal.excalidraw', els);
 }
 
 /**
- * Delete modal states — US-007 enabled confirm + queue failure.
+ * Delete modal states — organization deletion enabled confirm + queue failure.
  */
 function genSettingsOrgDeleteStates() {
   const els = [];
@@ -639,11 +639,11 @@ function genSettingsOrgDeleteStates() {
     els.push(...btn(`sods_${id}_can`, mX + 20, delY, 'Cancel', 'ghost'));
   });
 
-  write('E01-platform-foundation/settings-org-delete-states.excalidraw', els);
+  write('platform-foundation/settings-org-delete-states.excalidraw', els);
 }
 
 /**
- * Pricing — US-004 (plan selection before registration), US-010 (public pricing page)
+ * Pricing — plan selection at registration, public pricing page
  * Public marketing page (no app shell). 3-column plan cards.
  * Signed-in users see "Current plan" badge on their active plan.
  */
@@ -726,11 +726,11 @@ function genPricing() {
     els.push(text(`pr_${id}_cb_t`, px + 20, ctaBtnY + 10, ctaBtnW, 16, cta,     13,  tc2, 'center'));
   });
 
-  write('E01-platform-foundation/pricing.excalidraw', els);
+  write('platform-foundation/pricing.excalidraw', els);
 }
 
 /**
- * Settings-Org — US-005, US-006, US-007
+ * Settings-Org — profile, usage, organization deletion
  * App shell (Settings nav active). Three sections:
  *   1. Organization Profile — name, logo, timezone, language, creation date
  *   2. Usage — 3 metric cards (workflows, executions, users) + plan badge
@@ -819,7 +819,7 @@ function genSettingsOrg() {
   const delBtnX  = cx + cw - (delLabel.length * 8 + 32);  // 996
   els.push(...btn('so_del', delBtnX, dboxY + 12, delLabel, 'danger'));
 
-  write('E01-platform-foundation/settings-org.excalidraw', els);
+  write('platform-foundation/settings-org.excalidraw', els);
 }
 
 function genSettingsOrgUploadStates() {
@@ -849,11 +849,11 @@ function genSettingsOrgUploadStates() {
     els.push(text(`sou_${s.id}_p`, x + 28, y + 151, cardW - 56, 16, i === 1 ? 'acme-logo.png' : 'Select a file…', 13, C.gray500));
   });
 
-  write('E01-platform-foundation/settings-org-upload-states.excalidraw', els);
+  write('platform-foundation/settings-org-upload-states.excalidraw', els);
 }
 
 /**
- * Settings profile save states — US-005 inline validation, API error, success toast.
+ * Settings profile save states — profile settings inline validation, API error, success toast.
  */
 function genSettingsOrgProfileStates() {
   const els = [];
@@ -919,7 +919,7 @@ function genSettingsOrgProfileStates() {
     }
   });
 
-  write('E01-platform-foundation/settings-org-profile-states.excalidraw', els);
+  write('platform-foundation/settings-org-profile-states.excalidraw', els);
 }
 
 function genSettingsOrgUsageError() {
@@ -938,10 +938,10 @@ function genSettingsOrgUsageError() {
     els.push(...btn(`sue_r_${i}`, x + 12, mY + 60, 'Retry', 'ghost'));
   });
 
-  write('E01-platform-foundation/settings-org-usage-error.excalidraw', els);
+  write('platform-foundation/settings-org-usage-error.excalidraw', els);
 }
 
-/** US-006 edge case — free plan usage without denominator limits. */
+/** usage settings edge case — free plan usage without denominator limits. */
 function genSettingsOrgFreePlan() {
   const navIdx = 4;
   const els = [];
@@ -966,10 +966,10 @@ function genSettingsOrgFreePlan() {
     els.push(text(`sofp_ms_${i}`, x + 12, mY + 54, mW - 24, 14, 'no limit configured', 11, C.gray300));
   });
 
-  write('E01-platform-foundation/settings-org-free-plan.excalidraw', els);
+  write('platform-foundation/settings-org-free-plan.excalidraw', els);
 }
 
-/** US-006 — non-admin receives 403 (redirect target shown as message). */
+/** usage settings — non-admin receives 403 (redirect target shown as message). */
 function genSettingsOrgAccessDenied() {
   const navIdx = 4;
   const els = [];
@@ -983,7 +983,7 @@ function genSettingsOrgAccessDenied() {
     'You need the Admin role to view organization settings.\nRedirecting to dashboard…', 13, C.gray700));
   els.push(...btn('soad_home', boxX + 24, boxY + 116, 'Go to dashboard', 'secondary'));
 
-  write('E01-platform-foundation/settings-org-access-denied.excalidraw', els);
+  write('platform-foundation/settings-org-access-denied.excalidraw', els);
 }
 
 function genSettingsOrgDeletionScheduled() {
@@ -1000,10 +1000,10 @@ function genSettingsOrgDeletionScheduled() {
   els.push(rect('sds_stub_card', cx, by + 150, cw, 170, C.gray300, C.white, 1, true));
   els.push(text('sds_stub_txt', cx + 20, by + 222, cw - 40, 16, 'Settings content continues below…', 12, C.gray500, 'center'));
 
-  write('E01-platform-foundation/settings-org-deletion-scheduled.excalidraw', els);
+  write('platform-foundation/settings-org-deletion-scheduled.excalidraw', els);
 }
 
-// ─── E02 Identity & Access — Auth screens (no sidebar) ───────────────────────
+// ─── identity-access Identity & Access — Auth screens (no sidebar) ───────────────────────
 
 function genLogin() {
   const els = authCard('li', {
@@ -1014,10 +1014,10 @@ function genLogin() {
     ],
     extraLink: 'Forgot password?',
   }, 'Sign in', "Don't have an account? Sign up");
-  write('E02-identity-access/login.excalidraw', els);
+  write('identity-access/login.excalidraw', els);
 }
 
-/** US-002 (F01) / US-013 — unverified email blocks sign-in. */
+/** email verification (tenant-registration) / unverified sign-in — unverified email blocks sign-in. */
 function genLoginUnverified() {
   const cardW = 440;
   const cardH = 280;
@@ -1051,7 +1051,7 @@ function genLoginUnverified() {
   els.push(rect('lu_sbtn', cardX + 24, btnY, btnW, 36, C.gray300, C.gray100, 1, true));
   els.push(text('lu_sbtn_t', cardX + 24, btnY + 10, btnW, 16, 'Sign in', 13, C.gray300, 'center'));
 
-  write('E02-identity-access/login-unverified.excalidraw', els);
+  write('identity-access/login-unverified.excalidraw', els);
 }
 
 function genRegister() {
@@ -1064,7 +1064,7 @@ function genRegister() {
       { label: 'Password',      placeholder: '••••••••' },
     ],
   }, 'Create account', 'Already have an account? Sign in');
-  write('E02-identity-access/register.excalidraw', els);
+  write('identity-access/register.excalidraw', els);
 }
 
 function genForgotPassword() {
@@ -1075,7 +1075,7 @@ function genForgotPassword() {
       { label: 'Email address', placeholder: 'you@company.com' },
     ],
   }, 'Send reset link', 'Remember your password? Sign in');
-  write('E02-identity-access/forgot-password.excalidraw', els);
+  write('identity-access/forgot-password.excalidraw', els);
 }
 
 function genChangePassword() {
@@ -1087,7 +1087,7 @@ function genChangePassword() {
       { label: 'Confirm password', placeholder: '••••••••' },
     ],
   }, 'Set new password', 'Back to sign in');
-  write('E02-identity-access/change-password.excalidraw', els);
+  write('identity-access/change-password.excalidraw', els);
 }
 
 function genAcceptInvitation() {
@@ -1099,10 +1099,10 @@ function genAcceptInvitation() {
       { label: 'Choose a password', placeholder: '••••••••' },
     ],
   }, 'Accept Invitation', 'Already have an account? Sign in');
-  write('E02-identity-access/accept-invitation.excalidraw', els);
+  write('identity-access/accept-invitation.excalidraw', els);
 }
 
-// ─── E02 Identity & Access — Settings screens (with sidebar) ─────────────────
+// ─── identity-access Identity & Access — Settings screens (with sidebar) ─────────────────
 
 function genSettingsUsers() {
   const navIdx = 4;
@@ -1151,7 +1151,7 @@ function genSettingsUsers() {
     }),
     text('su_foot', cx + 12, tblY + tblH + 4, 300, 18, 'Showing 1–4 of 12 users', 12, C.gray500),
   ];
-  write('E02-identity-access/settings-users.excalidraw', els);
+  write('identity-access/settings-users.excalidraw', els);
 }
 
 function genSettingsRoles() {
@@ -1168,7 +1168,7 @@ function genSettingsRoles() {
     // Permission matrix from S28 placed below the header
     ...matrixEls,
   ];
-  write('E02-identity-access/settings-roles.excalidraw', els);
+  write('identity-access/settings-roles.excalidraw', els);
 }
 
 function genSettingsSecurity() {
@@ -1202,10 +1202,10 @@ function genSettingsSecurity() {
 
     ...btn('ss_save', cx + cw - 140, cy + 430, 'Save Changes'),
   ];
-  write('E02-identity-access/settings-security.excalidraw', els);
+  write('identity-access/settings-security.excalidraw', els);
 }
 
-// ─── E03 Data Modeling ────────────────────────────────────────────────────────
+// ─── data-modeling Data Modeling ────────────────────────────────────────────────────────
 
 function genDataModels() {
   const navIdx = 0;
@@ -1240,7 +1240,7 @@ function genDataModels() {
       ];
     }),
   ];
-  write('E03-data-modeling/data-models.excalidraw', els);
+  write('data-modeling/data-models.excalidraw', els);
 }
 
 function genDataClasses() {
@@ -1281,7 +1281,7 @@ function genDataClasses() {
       ];
     }),
   ];
-  write('E03-data-modeling/data-classes.excalidraw', els);
+  write('data-modeling/data-classes.excalidraw', els);
 }
 
 function genRecords() {
@@ -1329,10 +1329,10 @@ function genRecords() {
     }),
     text('rec_foot', cx + 12, tblY + tblH + 4, 300, 18, 'Showing 1–4 of 142 records', 12, C.gray500),
   ];
-  write('E03-data-modeling/records.excalidraw', els);
+  write('data-modeling/records.excalidraw', els);
 }
 
-// ─── E04 Workflow Builder ─────────────────────────────────────────────────────
+// ─── workflow-builder Workflow Builder ─────────────────────────────────────────────────────
 
 function genWorkflows() {
   const navIdx = 1;
@@ -1376,7 +1376,7 @@ function genWorkflows() {
       ];
     }),
   ];
-  write('E04-workflow-builder/workflows.excalidraw', els);
+  write('workflow-builder/workflows.excalidraw', els);
 }
 
 function genWorkflowEditor() {
@@ -1387,10 +1387,10 @@ function genWorkflowEditor() {
     ...appShell('we', W, H, NAV, navIdx, 'Workflow Editor — Order Processing'),
     ...component(buildWorkflowCanvas, cx, cy),
   ];
-  write('E04-workflow-builder/workflow-editor.excalidraw', els);
+  write('workflow-builder/workflow-editor.excalidraw', els);
 }
 
-// ─── E05 Form Builder ─────────────────────────────────────────────────────────
+// ─── form-builder Form Builder ─────────────────────────────────────────────────────────
 
 function genForms() {
   const navIdx = 2;
@@ -1429,7 +1429,7 @@ function genForms() {
       ];
     }),
   ];
-  write('E05-form-builder/forms.excalidraw', els);
+  write('form-builder/forms.excalidraw', els);
 }
 
 function genFormEditor() {
@@ -1500,7 +1500,7 @@ function genFormEditor() {
     text('fe_rp_v4',   fx + lW + cW + 22, fy + toolbarH + 242, 120, 14, 'Text',        12, C.gray700),
     text('fe_rp_arr',  fx + lW + cW + rW - 26, fy + toolbarH + 242, 14, 14, '▾', 10, C.gray700),
   ];
-  write('E05-form-builder/form-editor.excalidraw', els);
+  write('form-builder/form-editor.excalidraw', els);
 }
 
 function genFormSubmission() {
@@ -1514,10 +1514,10 @@ function genFormSubmission() {
     ...sideEls,
     // ss_title inside the panel header already reads 'Record Detail' — no extra labels needed
   ];
-  write('E05-form-builder/form-submission.excalidraw', els);
+  write('form-builder/form-submission.excalidraw', els);
 }
 
-// ─── E06 Workflow Engine ──────────────────────────────────────────────────────
+// ─── workflow-engine Workflow Engine ──────────────────────────────────────────────────────
 
 function genExecutions() {
   const navIdx = 3;
@@ -1565,7 +1565,7 @@ function genExecutions() {
     }),
     text('ex_foot', cx + 12, tblY + tblH + 4, 300, 18, 'Showing 1–5 of 1,247 executions', 12, C.gray500),
   ];
-  write('E06-workflow-engine/executions.excalidraw', els);
+  write('workflow-engine/executions.excalidraw', els);
 }
 
 function genExecutionDetail() {
@@ -1603,7 +1603,7 @@ function genExecutionDetail() {
     text('ed_rh_r0', cx + 16, cy + 464,  580, 18, '#1 · Completed · 1 hr ago · Triggered by Alex Brown',    12, C.gray700),
     text('ed_rh_r1', cx + 16, cy + 496,  580, 18, '#0 (original) · Failed · 2 hr ago · Triggered by Schedule', 12, C.gray700),
   ];
-  write('E06-workflow-engine/execution-detail.excalidraw', els);
+  write('workflow-engine/execution-detail.excalidraw', els);
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -1611,53 +1611,53 @@ function genExecutionDetail() {
 // Shared
 runScreen('app-shell', genAppShell);
 
-// E01 — Platform Foundation
-runScreen('E01/register-org', genRegisterOrg);
-runScreen('E01/register-org-states', genRegisterOrgStates);
-runScreen('E01/email-confirmation', genEmailConfirmation);
-runScreen('E01/verify-email', genVerifyEmail);
-runScreen('E01/verify-email-rate-limit', genVerifyEmailRateLimit);
-runScreen('E01/workspace-provisioning', genWorkspaceProvisioning);
-runScreen('E01/pricing', genPricing);
-runScreen('E01/settings-org', genSettingsOrg);
-runScreen('E01/settings-org-upload-states', genSettingsOrgUploadStates);
-runScreen('E01/settings-org-profile-states', genSettingsOrgProfileStates);
-runScreen('E01/settings-org-usage-error', genSettingsOrgUsageError);
-runScreen('E01/settings-org-free-plan', genSettingsOrgFreePlan);
-runScreen('E01/settings-org-access-denied', genSettingsOrgAccessDenied);
-runScreen('E01/settings-org-deletion-scheduled', genSettingsOrgDeletionScheduled);
-runScreen('E01/settings-org-delete-modal', genSettingsOrgDeleteModal);
-runScreen('E01/settings-org-delete-states', genSettingsOrgDeleteStates);
+// platform-foundation — Platform Foundation
+runScreen('platform-foundation/register-org', genRegisterOrg);
+runScreen('platform-foundation/register-org-states', genRegisterOrgStates);
+runScreen('platform-foundation/email-confirmation', genEmailConfirmation);
+runScreen('platform-foundation/verify-email', genVerifyEmail);
+runScreen('platform-foundation/verify-email-rate-limit', genVerifyEmailRateLimit);
+runScreen('platform-foundation/workspace-provisioning', genWorkspaceProvisioning);
+runScreen('platform-foundation/pricing', genPricing);
+runScreen('platform-foundation/settings-org', genSettingsOrg);
+runScreen('platform-foundation/settings-org-upload-states', genSettingsOrgUploadStates);
+runScreen('platform-foundation/settings-org-profile-states', genSettingsOrgProfileStates);
+runScreen('platform-foundation/settings-org-usage-error', genSettingsOrgUsageError);
+runScreen('platform-foundation/settings-org-free-plan', genSettingsOrgFreePlan);
+runScreen('platform-foundation/settings-org-access-denied', genSettingsOrgAccessDenied);
+runScreen('platform-foundation/settings-org-deletion-scheduled', genSettingsOrgDeletionScheduled);
+runScreen('platform-foundation/settings-org-delete-modal', genSettingsOrgDeleteModal);
+runScreen('platform-foundation/settings-org-delete-states', genSettingsOrgDeleteStates);
 
-// E02 — auth screens (no sidebar)
-runScreen('E02/login', genLogin);
-runScreen('E02/login-unverified', genLoginUnverified);
-runScreen('E02/register', genRegister);
-runScreen('E02/forgot-password', genForgotPassword);
-runScreen('E02/change-password', genChangePassword);
-runScreen('E02/accept-invitation', genAcceptInvitation);
+// identity-access — auth screens (no sidebar)
+runScreen('identity-access/login', genLogin);
+runScreen('identity-access/login-unverified', genLoginUnverified);
+runScreen('identity-access/register', genRegister);
+runScreen('identity-access/forgot-password', genForgotPassword);
+runScreen('identity-access/change-password', genChangePassword);
+runScreen('identity-access/accept-invitation', genAcceptInvitation);
 
-// E02 — settings screens (with sidebar)
-runScreen('E02/settings-users', genSettingsUsers);
-runScreen('E02/settings-roles', genSettingsRoles);
-runScreen('E02/settings-security', genSettingsSecurity);
+// identity-access — settings screens (with sidebar)
+runScreen('identity-access/settings-users', genSettingsUsers);
+runScreen('identity-access/settings-roles', genSettingsRoles);
+runScreen('identity-access/settings-security', genSettingsSecurity);
 
-// E03
-runScreen('E03/data-models', genDataModels);
-runScreen('E03/data-classes', genDataClasses);
-runScreen('E03/records', genRecords);
+// data-modeling
+runScreen('data-modeling/data-models', genDataModels);
+runScreen('data-modeling/data-classes', genDataClasses);
+runScreen('data-modeling/records', genRecords);
 
-// E04
-runScreen('E04/workflows', genWorkflows);
-runScreen('E04/workflow-editor', genWorkflowEditor);
+// workflow-builder
+runScreen('workflow-builder/workflows', genWorkflows);
+runScreen('workflow-builder/workflow-editor', genWorkflowEditor);
 
-// E05
-runScreen('E05/forms', genForms);
-runScreen('E05/form-editor', genFormEditor);
-runScreen('E05/form-submission', genFormSubmission);
+// form-builder
+runScreen('form-builder/forms', genForms);
+runScreen('form-builder/form-editor', genFormEditor);
+runScreen('form-builder/form-submission', genFormSubmission);
 
-// E06
-runScreen('E06/executions', genExecutions);
-runScreen('E06/execution-detail', genExecutionDetail);
+// workflow-engine
+runScreen('workflow-engine/executions', genExecutions);
+runScreen('workflow-engine/execution-detail', genExecutionDetail);
 
 console.log('\n✅  All screen wireframes generated.');

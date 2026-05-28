@@ -9,10 +9,10 @@ namespace Axis.Architecture.Tests;
 /// <para>
 /// Rules enforced:
 /// <list type="bullet">
-///   <item><b>Naming</b> — any static class that hosts a <c>Map*</c> extension method
-///         returning <c>IEndpointRouteBuilder</c> must be named <c>*Endpoints</c>.
-///         Without the suffix, `Program.cs` registration calls (`app.MapXxx()`)
-///         lose grep-ability.</item>
+/// <item><b>Naming</b> — any static class that hosts a <c>Map*</c> extension method
+/// returning <c>IEndpointRouteBuilder</c> must be named <c>*Endpoints</c>.
+/// Without the suffix, `Program.cs` registration calls (`app.MapXxx()`)
+/// lose grep-ability.</item>
 /// </list>
 /// </para>
 ///

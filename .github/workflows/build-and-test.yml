@@ -57,7 +57,7 @@ jobs:
             doc-drift-scope:
               - 'src/**'
               - 'tests/**'
-              - 'docs/epics/**'
+              - 'docs/use-cases/**'
               - 'docs/PROGRESS.md'
               - 'scripts/check-doc-drift.sh'
               - 'scripts/check-local-dev-docs.py'

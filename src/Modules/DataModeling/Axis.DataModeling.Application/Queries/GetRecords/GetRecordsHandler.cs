@@ -5,7 +5,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Queries.GetRecords;
 
-/// <summary>US-042/043: Returns a paginated page of records; validates model exists first.</summary>
+/// <summary>/043: Returns a paginated page of records; validates model exists first.</summary>
 public sealed class GetRecordsHandler(
     IDataModelRepository modelRepo,
     IDataRecordRepository recordRepo)

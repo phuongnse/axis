@@ -9,7 +9,7 @@ namespace Axis.WorkflowEngine.Application.Handlers;
 
 /// <summary>
 /// Executes an HTTP Request step via IHttpStepExecutor.
-/// US-093: isolated exception boundary; idempotency on re-delivery; structured logging.
+/// isolated exception boundary; idempotency on re-delivery; structured logging.
 /// </summary>
 public sealed class ExecuteHttpStepHandler(
     IExecutionRepository execRepo,
@@ -37,7 +37,7 @@ public sealed class ExecuteHttpStepHandler(
             return;
         }
 
-        // US-093: at-least-once re-delivery — if step already completed/failed/cancelled, skip.
+        // at-least-once re-delivery — if step already completed/failed/cancelled, skip.
         // ExecuteNextStepHandler always starts the step (Running) before dispatching this message,
         // so the Running guard would block all normal executions. IsTerminal is the correct
         // idempotency boundary: concurrent duplicate delivery is a known at-least-once limitation.

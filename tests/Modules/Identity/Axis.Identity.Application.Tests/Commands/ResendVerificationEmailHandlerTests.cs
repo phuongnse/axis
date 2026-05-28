@@ -51,7 +51,7 @@ public class ResendVerificationEmailHandlerTests
     [Fact]
     public async Task ResendVerificationEmail_WhenEmailNotFound_DoesNothingWithoutErrorLeakage()
     {
-        // Per US-002: same behavior regardless of whether email exists
+        // same behavior regardless of whether email exists
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).ReturnsNull();
 
         Func<Task> act = async () => await CreateHandler().Handle(

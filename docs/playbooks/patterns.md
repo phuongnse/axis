@@ -474,7 +474,7 @@ await _context.WorkflowDefinitions
 
 **Rule:** Avoid raw SQL in tenant-aware contexts. When raw SQL is unavoidable (e.g. performance-critical bulk ops, cross-module reads), always prefix the table with the tenant schema from `ITenantContext.Schema` and add soft-delete filter manually. Document why raw SQL was needed with a comment.
 
-### Tenant schema provisioning (US-003)
+### Tenant schema provisioning ([tenant provisioning](../use-cases/platform-foundation/provision-tenant/))
 
 After email verification, every **tenant-scoped** module provisions its own PostgreSQL schema for the organization. Identity stays on `public` and only publishes the verification event — it never touches another module's DB.
 
@@ -521,7 +521,7 @@ _ = Task.Run(async () =>
 - **No-args EF Core constructor**: when an aggregate's only constructor takes params EF Core can't bind (e.g. `IEnumerable<string>`), add a private no-args constructor: `private MyAggregate() : base(default) { RequiredField = null!; }`. Initialize all non-nullable reference-type fields to silence CS8618 — EF Core will never use these sentinel values because it always materialises via the real constructor path.
 - **Migrations strategy** ([ADR-023](../TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)): every environment uses `Database.MigrateAsync()` — production, dev bootstrap, tenant provisioning, and Testcontainers fixtures. One EF migration chain per `DbContext`; never `EnsureCreated`/`EnsureCreatedAsync`.
 - **Identity uses the global `public` schema** — `IdentityDbContext` is a plain `DbContext` with no `TenantSchemaInterceptor`. All other modules use `AxisDbContext` with `TenantSchemaInterceptor`.
-- **Tenant schema on every connection** — `TenantSchemaInterceptor` sets `search_path` to `tenant_{orgId:N}, public` on every `ConnectionOpened` (including pooled reconnects), so a leased connection always targets the current request's tenant (E01 F03 US-008).
+- **Tenant schema on every connection** — `TenantSchemaInterceptor` sets `search_path` to `tenant_{orgId:N}, public` on every `ConnectionOpened` (including pooled reconnects), so a leased connection always targets the current request's tenant ([tenant isolation](../use-cases/platform-foundation/tenant-scope/) — schema-per-tenant).
 - **Schema name resolution** — `HttpTenantContext` derives `tenant_{orgId:N}` from the JWT `org_id` claim (no DB/Redis lookup; immutable after provisioning). `TenantOrganizationAccessMiddleware` on `Axis.Api` returns HTTP 403 when the org is missing, archived/deleted, or still provisioning — tenant module routes only; Identity/settings routes are unchanged.
 - **Cross-tenant proof** — `tests/Api/Axis.Api.Tests/Tenancy/TenantIsolationEndpointTests.cs` (DataModeling list/get by id).
 
@@ -1357,7 +1357,7 @@ Replace `<access_token>`, `<user-guid>`, and `<org-guid>` with values from your 
 
 **Rule:** modules other than Identity validate JWTs **locally via Identity's JWKS endpoint** — never by calling `IdentityDbContext` or any Identity service. Asking Identity "is this user real?" on every request defeats the purpose of stateless JWT and re-introduces the coupling we removed.
 
-Why: Identity issues short-lived JWTs (15 minutes per [F01](../epics/E02-identity-access/features/F01-authentication.md)) signed with a key whose public half is published at `/.well-known/jwks.json` (OpenIddict default). Any module that receives a Bearer token can verify the signature, claims (`sub`, `org`, `permissions`), and expiry **without a network call to Identity for each request**. JWKS itself is cached locally by `Microsoft.AspNetCore.Authentication.JwtBearer`, so the network cost is once per key-rotation, not once per request.
+Why: Identity issues short-lived JWTs (15 minutes per [sign-in](../use-cases/identity-access/sign-in/)) signed with a key whose public half is published at `/.well-known/jwks.json` (OpenIddict default). Any module that receives a Bearer token can verify the signature, claims (`sub`, `org`, `permissions`), and expiry **without a network call to Identity for each request**. JWKS itself is cached locally by `Microsoft.AspNetCore.Authentication.JwtBearer`, so the network cost is once per key-rotation, not once per request.
 
 The escape hatch — when you need *fresh* permission state that the JWT's `permissions` claim cannot give you — is `IdentityService.GetUserPermissions` (gRPC), not a DB lookup.
 
@@ -1825,28 +1825,35 @@ npm run test    # vitest run — all tests must pass
 
 Wireframes use Excalidraw (`.excalidraw` JSON). Both files — source and SVG preview — are committed.
 
-**File location:**
-```
-docs/wireframes/
-├── E02-identity-access/
-│   ├── login.excalidraw        ← source (JSON, diffable on GitHub)
-│   └── login.svg               ← rendered preview (vector, renders inline on GitHub)
-├── E03-data-modeling/
-│   └── ...
-└── _shared/                    ← screens not belonging to a single module
-```
+**File location:** assets sit **flat** inside each use-case folder. The shared kit (`app-shell`, `_template`) stays under top-level `docs/wireframes/`.
 
-One subfolder per epic, mirroring `docs/epics/`. Shared screens (error pages, global settings) go in `_shared/`.
+```
+docs/
+├── wireframes/                          ← shared kit (app-shell, _template)
+│   ├── app-shell.excalidraw
+│   └── app-shell.svg
+└── use-cases/
+    └── <domain>/<use-case>/
+        ├── README.md
+        ├── <screen>.excalidraw          ← source (JSON, diffable)
+        └── <screen>.svg                 ← preview (vector, renders on GitHub)
+```
 
 **Naming:** screen slug in kebab-case matching the primary route segment — `login`, `data-models`, `workflow-detail`.
 
-**One wireframe per screen.** Multiple user stories on the same screen share one wireframe file.
+**One wireframe per screen.** Multiple use cases on the same screen reference the same wireframe file.
 
-**Linking from a feature file** — add directly after the feature title, before the first user story:
+**Linking from a use-case file** — fill the `## Wireframes` table at the bottom of the use case (see [USE_CASE_TEMPLATE.md](../use-cases/USE_CASE_TEMPLATE.md)). Use relative paths next to `README.md`:
 
 ```markdown
-> **Wireframe**: [docs/epics/E02-identity-access/wireframes/login.excalidraw](../../epics/E02-identity-access/wireframes/login.excalidraw) · [preview](../../epics/E02-identity-access/wireframes/login.svg)
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| login | [source](./login.excalidraw) | [preview](./login.svg) |
 ```
+
+Reference shared kit screens from `../../../wireframes/` (do not duplicate).
 
 **Excalidraw settings** for consistent sketch aesthetic:
 - `roughness: 1` on all shapes
@@ -1860,4 +1867,4 @@ One subfolder per epic, mirroring `docs/epics/`. Shared screens (error pages, gl
 
 **Pitfall:** committing only `.excalidraw` without `.svg` means the wireframe is invisible on GitHub without the VS Code extension. Always run the script and commit both.
 
-**Pitfall:** editing `generate-screens.mjs` without per-screen seeds causes dozens of unrelated epic wireframes to change in the same PR — always verify the second-run diff is empty.
+**Pitfall:** editing `generate-screens.mjs` without per-screen seeds causes dozens of unrelated domain wireframes to change in the same PR — always verify the second-run diff is empty.

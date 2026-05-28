@@ -4,7 +4,7 @@ using Axis.Shared.Application.CQRS;
 
 namespace Axis.FormBuilder.Application.Queries.GetFormPicker;
 
-/// <summary>US-083: Returns all forms for the org as a flat list for use in workflow form-step pickers.</summary>
+/// <summary>Returns all forms for the org as a flat list for use in workflow form-step pickers.</summary>
 public sealed class GetFormPickerHandler(IFormRepository formRepo)
     : IQueryHandler<GetFormPickerQuery, IReadOnlyList<GetFormPickerDto>>
 {

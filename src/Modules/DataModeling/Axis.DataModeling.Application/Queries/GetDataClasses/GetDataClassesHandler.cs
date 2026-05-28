@@ -5,7 +5,7 @@ using Axis.Shared.Application.CQRS;
 
 namespace Axis.DataModeling.Application.Queries.GetDataClasses;
 
-/// <summary>US-037: Lists non-deleted data classes for the org, paginated.</summary>
+/// <summary>Lists non-deleted data classes for the org, paginated.</summary>
 public sealed class GetDataClassesHandler(IDataClassRepository dataClassRepo)
     : IQueryHandler<GetDataClassesQuery, PagedResult<DataClassSummaryDto>>
 {

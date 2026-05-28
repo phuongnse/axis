@@ -5,7 +5,7 @@ using Axis.WorkflowEngine.Domain.Enums;
 
 namespace Axis.WorkflowEngine.Application.Queries.GetAllExecutions;
 
-/// <summary>US-099: Org-wide paginated execution list.</summary>
+/// <summary>Org-wide paginated execution list.</summary>
 public sealed record GetAllExecutionsQuery(
     Guid OrganizationId,
     int Page = 1,

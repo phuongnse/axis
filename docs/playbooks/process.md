@@ -8,7 +8,7 @@
 
 - [Backend Process](#backend-process)
   - [New module setup](#new-module-setup-one-time-per-module)
-  - [Per-US workflow](#per-us-workflow)
+  - [Per use case workflow](#per-use-case-workflow)
 - [Frontend Process](#frontend-process)
   - [Phase 1 — Foundation](#phase-1--foundation-one-time)
   - [Phase 2 — Per-feature workflow](#phase-2--per-feature-workflow)
@@ -33,14 +33,14 @@ Complete in order when scaffolding a brand-new module:
 | 8 | Add test projects to `Axis.sln` |
 | 9 | Run `dotnet build` — zero errors before writing any domain code |
 
-### Per-US workflow
+### Per use case workflow
 
 Repeat for every user story, in layer order: Domain → Application → Infrastructure → API.
 **Never start the next layer until the current layer's tests are green.**
 
 #### Step 1 — Read and align
 
-- Read the feature file ACs in full
+- Read the use-case file ACs in full
 - Check `docs/PROGRESS.md` for current layer status
 - Identify 2–3 key design decisions (aggregate boundaries, value objects, event names, query shape)
 - **Surface decisions to the user and confirm before writing any code** — see "Surface architectural decisions first" rule in `CLAUDE.md`
@@ -72,7 +72,7 @@ Repeat for every user story, in layer order: Domain → Application → Infrastr
 **Run this before starting Step 5 for any module.** Skipping it means carrying hidden debt into the API layer.
 
 ```
-grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/epics/
+grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/use-cases/
 ```
 
 For every `⚠️` found, decide explicitly:
@@ -80,7 +80,7 @@ For every `⚠️` found, decide explicitly:
 | Verdict | Action |
 |---|---|
 | Actually done, docs stale | Update callout to ✅ |
-| Deferred — depends on a later module (e.g. E06) | `Gaps vs spec` with `pending E0X` and/or `**Deferred (...):**` per agent-checklist deferred-callout rules (`**Deferred (PR #N follow-up):**`) |
+| Deferred — depends on a later module (e.g. workflow-engine) | `Gaps vs spec` with `pending E0X` and/or `**Deferred (...):**` per agent-checklist deferred-callout rules (`**Deferred (PR #N follow-up):**`) |
 | Genuine miss | Fix it before proceeding |
 
 Also check cross-module Application dependencies: list every query or command the upcoming API layer will call from *other* modules' Application layers. If any are missing, add them now.
@@ -107,8 +107,8 @@ For every match: confirm the SQL only references tables owned by that match's ow
 
 #### Step 6 — Update docs (same PR)
 
-- Update feature file `> **Implementation status**` callout for this US
-- If all USes in the feature are complete for a layer: update Epic README status table
+- Update use-case file `> **Implementation status**` callout for this US
+- If all USes in the feature are complete for a layer: update Domain README status table
 - If the full layer is done for the module: update `docs/PROGRESS.md`
 - If a new pattern was established: add to `docs/playbooks/patterns.md`
 - If a library was added or changed: update `docs/TECH_STACK.md`
@@ -134,9 +134,9 @@ Repeat for every screen / feature area. **Never skip the wireframe step** — it
 
 | Step | Action | Output |
 |---|---|---|
-| 1 | Read feature file ACs in full | Understand spec contract |
-| 2 | Create Excalidraw wireframe + run `generate-wireframes.ps1` | `docs/wireframes/{screen-slug}.excalidraw` + `.svg` |
-| 3 | Add `> **Wireframe**` callout to feature file | Wireframe linked from spec |
+| 1 | Read use-case file ACs in full | Understand spec contract |
+| 2 | Create Excalidraw wireframe + run `generate-wireframes.ps1` | `docs/use-cases/{domain}/{slug}/{screen}.excalidraw` + `.svg` (shared kit only: `docs/wireframes/`) |
+| 3 | Add row to the use-case `## Wireframes` table | Wireframe linked from spec |
 | 4 | Define types from backend contract | `features/{name}/types.ts` |
 | 5 | Define API functions + query key factory | `features/{name}/api.ts` |
 | 6 | Write tests first (TDD) — Vitest + Testing Library | Failing tests that define expected behaviour |
@@ -147,8 +147,8 @@ Repeat for every screen / feature area. **Never skip the wireframe step** — it
 
 **Step 10 — Update docs breakdown:**
 
-- Update feature file `> **Implementation status**` callout for this US
-- If all USes in the feature are complete for Frontend: update Epic README status table
+- Update use-case file `> **Implementation status**` callout for this US
+- If all USes in the feature are complete for Frontend: update Domain README status table
 - If the full Frontend layer is done for the module: update `docs/PROGRESS.md`
 - If a new frontend pattern was established: add to `docs/playbooks/patterns.md`
 - If a library was added or changed: update `docs/TECH_STACK.md`

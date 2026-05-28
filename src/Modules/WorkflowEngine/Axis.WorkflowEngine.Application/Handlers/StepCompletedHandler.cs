@@ -10,7 +10,7 @@ namespace Axis.WorkflowEngine.Application.Handlers;
 /// <summary>
 /// Handles step completion: marks the step as Completed, merges output into context,
 /// persists, then dispatches ExecuteNextStepMessage to advance the execution.
-/// US-093: idempotency on re-delivery.
+/// idempotency on re-delivery.
 /// </summary>
 public sealed class StepCompletedHandler(
     IExecutionRepository execRepo,

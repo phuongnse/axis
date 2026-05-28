@@ -13,8 +13,7 @@
 | [Product Vision](./PRODUCT_VISION.md) | Goals, target users, problem & solution |
 | [Tech Stack](./TECH_STACK.md) | Technology decisions and rationale |
 | [Architecture](./ARCHITECTURE.md) | System design, modules, data strategy |
-| [Epics](./epics/README.md) | All epics, features, and user stories — **[how agents find open work](./epics/README.md#how-agents-find-open-work)** · [US template](./epics/_template-feature-us.md) |
-| [Wireframes](./wireframes/) | Screen wireframes — Excalidraw source + SVG preview |
+| [Use cases](./use-cases/README.md) | Product specs: domains, use cases, wireframes, diagrams, implementation progress |
 
 ### Playbooks (how-to guides)
 
@@ -30,17 +29,17 @@
 
 ---
 
-## Epics Overview
+## Domains overview
 
-| ID | Epic | Phase | Status |
-|---|---|---|---|
-| [E01](./epics/E01-platform-foundation/README.md) | Platform Foundation | MVP | 🚧 In Progress |
-| [E02](./epics/E02-identity-access/README.md) | Identity & Access Management | MVP | 🚧 In Progress |
-| [E03](./epics/E03-data-modeling/README.md) | Data Modeling | MVP | 🚧 In Progress |
-| [E04](./epics/E04-workflow-builder/README.md) | Workflow Builder | MVP | 🚧 In Progress |
-| [E05](./epics/E05-form-builder/README.md) | Form Builder | MVP | 🚧 In Progress |
-| [E06](./epics/E06-workflow-engine/README.md) | Workflow Execution Engine | MVP | 🚧 In Progress |
-| [E07](./epics/E07-page-builder/README.md) | Page & UI Builder | Phase 2 | ⏳ Planned |
+| Domain | Phase | Status |
+|---|---|---|
+| [platform-foundation](./use-cases/platform-foundation/README.md) | MVP | 🚧 In Progress |
+| [identity-access](./use-cases/identity-access/README.md) | MVP | 🚧 In Progress |
+| [data-modeling](./use-cases/data-modeling/README.md) | MVP | 🚧 In Progress |
+| [workflow-builder](./use-cases/workflow-builder/README.md) | MVP | 🚧 In Progress |
+| [form-builder](./use-cases/form-builder/README.md) | MVP | 🚧 In Progress |
+| [workflow-engine](./use-cases/workflow-engine/README.md) | MVP | 🚧 In Progress |
+| [page-builder](./use-cases/page-builder/README.md) | Phase 2 | ⏳ Planned |
 
 ---
 
@@ -56,24 +55,29 @@ All diagrams are Excalidraw (`.excalidraw` source + `.svg` preview). Regenerate 
 | Container Diagram | [container.excalidraw](./diagrams/container.excalidraw) | [container.svg](./diagrams/container.svg) |
 | Module Overview | [module-overview.excalidraw](./diagrams/module-overview.excalidraw) | [module-overview.svg](./diagrams/module-overview.svg) |
 
-**Epic-level** (in each `docs/epics/E0{N}-name/diagrams/`):
+**Use-case-level** (inside each `docs/use-cases/{domain}/{use-case}/` folder):
 
 | Diagram | Source | Preview |
 |---|---|---|
-| Tenant Provisioning | [tenant-provisioning.excalidraw](./epics/E01-platform-foundation/diagrams/tenant-provisioning.excalidraw) | [tenant-provisioning.svg](./epics/E01-platform-foundation/diagrams/tenant-provisioning.svg) |
-| Auth Flow | [auth-flow.excalidraw](./epics/E02-identity-access/diagrams/auth-flow.excalidraw) | [auth-flow.svg](./epics/E02-identity-access/diagrams/auth-flow.svg) |
-| Data Model | [data-model.excalidraw](./epics/E03-data-modeling/diagrams/data-model.excalidraw) | [data-model.svg](./epics/E03-data-modeling/diagrams/data-model.svg) |
-| Workflow Model | [workflow-model.excalidraw](./epics/E04-workflow-builder/diagrams/workflow-model.excalidraw) | [workflow-model.svg](./epics/E04-workflow-builder/diagrams/workflow-model.svg) |
-| Form Model | [form-model.excalidraw](./epics/E05-form-builder/diagrams/form-model.excalidraw) | [form-model.svg](./epics/E05-form-builder/diagrams/form-model.svg) |
-| Execution Flow | [execution-flow.excalidraw](./epics/E06-workflow-engine/diagrams/execution-flow.excalidraw) | [execution-flow.svg](./epics/E06-workflow-engine/diagrams/execution-flow.svg) |
+| Tenant Provisioning | [tenant-provisioning.excalidraw](./use-cases/platform-foundation/provision-tenant/tenant-provisioning.excalidraw) | [tenant-provisioning.svg](./use-cases/platform-foundation/provision-tenant/tenant-provisioning.svg) |
+| Auth Flow | [auth-flow.excalidraw](./use-cases/identity-access/sign-in/auth-flow.excalidraw) | [auth-flow.svg](./use-cases/identity-access/sign-in/auth-flow.svg) |
+| Data Model | [data-model.excalidraw](./use-cases/data-modeling/create-model/data-model.excalidraw) | [data-model.svg](./use-cases/data-modeling/create-model/data-model.svg) |
+| Workflow Model | [workflow-model.excalidraw](./use-cases/workflow-builder/create-workflow/workflow-model.excalidraw) | [workflow-model.svg](./use-cases/workflow-builder/create-workflow/workflow-model.svg) |
+| Form Model | [form-model.excalidraw](./use-cases/form-builder/create-form/form-model.excalidraw) | [form-model.svg](./use-cases/form-builder/create-form/form-model.svg) |
+| Execution Flow | [execution-flow.excalidraw](./use-cases/workflow-engine/start-execution/execution-flow.excalidraw) | [execution-flow.svg](./use-cases/workflow-engine/start-execution/execution-flow.svg) |
 
 ## Wireframes
 
-Excalidraw wireframes live in `docs/epics/{E0N}/wireframes/`, co-located with each epic's features and diagrams. Shared screens (template, app-shell) remain in `docs/wireframes/`. Each feature file lists wireframes in a `## Wireframes` table (see [US template](./epics/_template-feature-us.md)).
+Excalidraw wireframes/diagrams live alongside each use case in `docs/use-cases/{domain}/{short-slug}/`. Shared kit screens (template, app-shell) remain in `docs/wireframes/`. Each use case uses a `## Wireframes` + `## Diagrams` table (see [use-case template](./use-cases/USE_CASE_TEMPLATE.md)).
 
 | Screen | Source | Preview |
 |---|---|---|
-| Login | [login.excalidraw](./epics/E02-identity-access/wireframes/login.excalidraw) | [login.svg](./epics/E02-identity-access/wireframes/login.svg) |
+| Register organization | [register-org.excalidraw](./use-cases/platform-foundation/register-org/register-org.excalidraw) | [register-org.svg](./use-cases/platform-foundation/register-org/register-org.svg) |
+| Verify email | [verify-email.excalidraw](./use-cases/platform-foundation/verify-email/verify-email.excalidraw) | [verify-email.svg](./use-cases/platform-foundation/verify-email/verify-email.svg) |
+| Pricing | [pricing.excalidraw](./use-cases/platform-foundation/view-plans/pricing.excalidraw) | [pricing.svg](./use-cases/platform-foundation/view-plans/pricing.svg) |
+| Change password | [change-password.excalidraw](./use-cases/identity-access/change-password/change-password.excalidraw) | [change-password.svg](./use-cases/identity-access/change-password/change-password.svg) |
+| Reset password | [forgot-password.excalidraw](./use-cases/identity-access/reset-password/forgot-password.excalidraw) | [forgot-password.svg](./use-cases/identity-access/reset-password/forgot-password.svg) |
+| Accept invitation | [accept-invitation.excalidraw](./use-cases/identity-access/accept-invite/accept-invitation.excalidraw) | [accept-invitation.svg](./use-cases/identity-access/accept-invite/accept-invitation.svg) |
 
 ---
 
@@ -83,11 +87,11 @@ When two docs disagree, the **owner** wins. Update the owner first; everything e
 
 | Topic | Owner |
 |---|---|
-| Feature US layout (wireframes + status tables) | [epics/_template-feature-us.md](./epics/_template-feature-us.md) + [playbooks/docs-style.md](./playbooks/docs-style.md#feature-files--wireframes--implementation-status) |
+| Use-case layout (flow + AC + artifacts + status) | [use-cases/USE_CASE_TEMPLATE.md](./use-cases/USE_CASE_TEMPLATE.md) + [playbooks/docs-style.md](./playbooks/docs-style.md#use-case-files--wireframes--implementation-status) |
 | Product scope, target users, MVP cut | [PRODUCT_VISION.md](./PRODUCT_VISION.md) |
 | Library versions and ADRs | [TECH_STACK.md](./TECH_STACK.md) |
 | Source tree and module boundaries | [../CLAUDE.md](../CLAUDE.md) |
-| Per-feature ACs and current gaps | `docs/epics/{module}/features/F0N-*.md` |
+| Per-use-case ACs and current gaps | `docs/use-cases/{domain}/{short-slug}/README.md` |
 | Module-wide layer status | [PROGRESS.md](./PROGRESS.md) |
 | Daily agent workflow + gates | [playbooks/agent-checklist.md](./playbooks/agent-checklist.md) |
 | Local dev (compose, ports, URLs) | [playbooks/local-dev.md](./playbooks/local-dev.md) + [`docker-compose.yml`](../docker-compose.yml) |

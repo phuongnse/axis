@@ -9,7 +9,7 @@ namespace Axis.WorkflowEngine.Application.Handlers;
 
 /// <summary>
 /// Handles step failure: marks the step as Failed, then fails the entire execution.
-/// US-093: idempotency on re-delivery; structured error logging.
+/// idempotency on re-delivery; structured error logging.
 /// </summary>
 public sealed class StepFailedHandler(
     IExecutionRepository execRepo,

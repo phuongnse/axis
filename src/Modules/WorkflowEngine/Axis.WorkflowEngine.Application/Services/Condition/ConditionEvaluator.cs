@@ -16,7 +16,7 @@ public static class ConditionEvaluator
     /// </summary>
     /// <param name="branches">
     /// Ordered list of branch configs. Each branch has:
-    ///   <c>label</c> (string), <c>expression</c> (object, null for default), <c>isDefault</c> (bool).
+    /// <c>label</c> (string), <c>expression</c> (object, null for default), <c>isDefault</c> (bool).
     /// </param>
     public static string? EvaluateBranches(
         IReadOnlyList<IReadOnlyDictionary<string, object?>> branches,

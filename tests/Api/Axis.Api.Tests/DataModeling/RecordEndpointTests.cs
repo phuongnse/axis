@@ -135,7 +135,7 @@ public class RecordEndpointTests(ApiTestFixture fixture)
         getResp.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    // Search (US-043)
+    // Search
 
     [Fact]
     public async Task GetRecords_WhenSearchTermProvided_FiltersResults()

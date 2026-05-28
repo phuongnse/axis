@@ -2,7 +2,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Identity.Domain.Provisioning;
 
-/// <summary>Tracks per-module tenant schema provisioning for an organization (US-003).</summary>
+/// <summary>Tracks per-module tenant schema provisioning for an organization.</summary>
 public sealed class TenantModuleProvisioning : Entity<(Guid OrganizationId, string Module)>
 {
     public Guid OrganizationId { get; private set; }

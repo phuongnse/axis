@@ -15,7 +15,7 @@ This playbook covers everything needed to work with the wireframe generation sys
 | `docs/wireframes/generate-template.mjs` | 34-section component kit — imports from `components.mjs`, exports all builders |
 | `docs/wireframes/generate-screens.mjs` | 27 screen wireframes — imports builders from the template, places them via `component()` |
 | `docs/wireframes/_template.excalidraw` | Generated output of `generate-template.mjs` |
-| `docs/epics/{E0N-*}/wireframes/*.excalidraw` | Generated outputs of `generate-screens.mjs` — co-located with each epic |
+| `docs/use-cases/{domain}/{use-case}/*.excalidraw` | Generated outputs of `generate-screens.mjs` — co-located with each use case |
 
 **Regeneration commands:**
 
@@ -40,11 +40,11 @@ docs/scripts/generate-wireframes.ps1
 All generated wireframes must use deterministic seeds per screen (`setSeed(deterministicSeedForScreen(screenKey))` in `generate-screens.mjs` before each screen generator runs).
 
 - Why: Excalidraw roughness depends on seed; order-dependent global seeds cause unrelated files to churn when a new screen is inserted.
-- Guarantee: adding/changing one screen does not rewrite untouched screens in other epics.
+- Guarantee: adding/changing one screen does not rewrite untouched screens in other domains.
 - Implementation: keep `runScreen(screenKey, generator)` wrapper in `generate-screens.mjs` and call every `genXxx()` through it.
 - **Pre-commit check:** run `node docs/wireframes/generate-screens.mjs` twice; `git diff` must be empty after the second run (proves seeds are stable).
 
-### Auth outcome cards — `stateHeadline` (E01 email flows)
+### Auth outcome cards — `stateHeadline` (platform-foundation email flows)
 
 Use one layout for informational / error states (`email-confirmation`, `verify-email` grid cards, `verify-email-rate-limit`):
 
@@ -360,7 +360,7 @@ When writing or editing any wireframe generator, verify against these values (fr
 3. Add the output path to the screen inventory table in this playbook
 4. Run `node docs/wireframes/generate-screens.mjs` — **verify output has no `NaN` positions** (element count must be > 0)
 5. Run `docs/scripts/generate-wireframes.ps1` to regenerate SVGs
-6. Add a `> **Wireframe**` callout to the relevant feature file
+6. Add a row to the `## Wireframes` table in the relevant use-case file (per [USE_CASE_TEMPLATE.md](../use-cases/USE_CASE_TEMPLATE.md))
 
 **Pre-commit checks for screen wireframes:**
 - [ ] Element count > 0 for every generated file (NaN positions = 0 renderable elements)
@@ -413,15 +413,10 @@ This is what makes `import { buildWorkflowCanvas } from './generate-template.mjs
 
 ## Screen inventory
 
-| Module | Files |
+| Domain path | Files |
 |---|---|
-| `docs/wireframes/` (root) | `app-shell` |
-| `E01-platform-foundation/wireframes/` | `register-org`, `register-org-states`, `email-confirmation`, `verify-email`, `verify-email-rate-limit`, `workspace-provisioning`, `pricing`, `settings-org`, `settings-org-upload-states`, `settings-org-profile-states`, `settings-org-usage-error`, `settings-org-free-plan`, `settings-org-access-denied`, `settings-org-deletion-scheduled`, `settings-org-delete-modal`, `settings-org-delete-states` |
-| `E02-identity-access/wireframes/` | `login`, `login-unverified`, `register`, `forgot-password`, `change-password`, `accept-invitation`, `settings-users`, `settings-roles`, `settings-security` |
-| `E03-data-modeling/wireframes/` | `data-models`, `data-classes`, `records` |
-| `E04-workflow-builder/wireframes/` | `workflows`, `workflow-editor` |
-| `E05-form-builder/wireframes/` | `forms`, `form-editor`, `form-submission` |
-| `E06-workflow-engine/wireframes/` | `executions`, `execution-detail` |
+| `docs/wireframes/` | `app-shell`, `_template` |
+| `docs/use-cases/<domain>/<use-case>/` | use-case-local assets (`*.excalidraw`, `*.svg`) |
 
 ---
 

@@ -5,7 +5,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Commands.BulkDeleteRecords;
 
-/// <summary>US-046: Validates the model exists and delegates the bulk soft-delete to the repository.</summary>
+/// <summary>Validates the model exists and delegates the bulk soft-delete to the repository.</summary>
 public sealed class BulkDeleteRecordsHandler(
     IDataModelRepository modelRepo,
     IDataRecordRepository recordRepo)

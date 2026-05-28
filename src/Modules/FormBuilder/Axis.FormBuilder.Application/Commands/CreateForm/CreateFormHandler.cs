@@ -7,7 +7,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.FormBuilder.Application.Commands.CreateForm;
 
-/// <summary>US-075: Validates name uniqueness, creates the form.</summary>
+/// <summary>Validates name uniqueness, creates the form.</summary>
 public sealed class CreateFormHandler(
     IFormRepository formRepo,
     IUnitOfWork uow)

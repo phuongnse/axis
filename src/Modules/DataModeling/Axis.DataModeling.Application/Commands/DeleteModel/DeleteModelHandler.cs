@@ -5,7 +5,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Commands.DeleteModel;
 
-/// <summary>US-033: Validates model exists, then soft-deletes it.</summary>
+/// <summary>Validates model exists, then soft-deletes it.</summary>
 public sealed class DeleteModelHandler(
     IDataModelRepository modelRepo,
     IModelDeletionGuard deletionGuard,

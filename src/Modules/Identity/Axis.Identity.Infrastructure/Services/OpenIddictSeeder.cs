@@ -7,8 +7,8 @@ namespace Axis.Identity.Infrastructure.Services;
 
 /// <summary>
 /// Seeds the two built-in OAuth2 clients on startup:
-///   axis_spa   — Authorization Code + PKCE (for the React SPA)
-///   axis_m2m   — Client Credentials (for external system integrations)
+/// axis_spa — Authorization Code + PKCE (for the React SPA)
+/// axis_m2m — Client Credentials (for external system integrations)
 /// Idempotent: skips creation if the client already exists.
 /// </summary>
 public sealed class OpenIddictSeeder(IServiceProvider services) : IHostedService

@@ -6,7 +6,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Commands.CreateModel;
 
-/// <summary>US-030: Validates name uniqueness, creates model with system fields.</summary>
+/// <summary>Validates name uniqueness, creates model with system fields.</summary>
 public sealed class CreateModelHandler(
     IDataModelRepository modelRepo,
     IUnitOfWork uow)

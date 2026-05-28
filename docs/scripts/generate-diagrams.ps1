@@ -1,6 +1,6 @@
 # generate-diagrams.ps1
 # Regenerates all SVG images from .excalidraw source files using Kroki.io.
-# Recursively scans docs/diagrams/ and docs/epics/*/diagrams/ for .excalidraw files.
+# Recursively scans docs/diagrams/ and docs/use-cases/*/* for .excalidraw diagram sources.
 #
 # Usage:                  .\docs\scripts\generate-diagrams.ps1
 # Usage (single file):    .\docs\scripts\generate-diagrams.ps1 -Filter "auth-flow"
@@ -35,16 +35,17 @@ function Export-ExcalidrawToSvg {
 
 $docsRoot = Split-Path $PSScriptRoot -Parent
 
-# Collect all .excalidraw files from docs/diagrams/ and docs/epics/*/diagrams/
-$searchPaths = @(
-    "$docsRoot\diagrams",
-    "$docsRoot\epics\E01-platform-foundation\diagrams",
-    "$docsRoot\epics\E02-identity-access\diagrams",
-    "$docsRoot\epics\E03-data-modeling\diagrams",
-    "$docsRoot\epics\E04-workflow-builder\diagrams",
-    "$docsRoot\epics\E05-form-builder\diagrams",
-    "$docsRoot\epics\E06-workflow-engine\diagrams"
-)
+# Collect all .excalidraw files from docs/diagrams/ and docs/use-cases/*/* (use-case folders)
+$searchPaths = @("$docsRoot\architecture\diagrams")
+$useCasesRoot = Join-Path $docsRoot "use-cases"
+if (Test-Path $useCasesRoot) {
+    $searchPaths += Get-ChildItem -Path $useCasesRoot -Directory |
+        Where-Object { $_.Name -notlike "_*" } |
+        ForEach-Object {
+            Get-ChildItem -Path $_.FullName -Directory |
+                ForEach-Object { $_.FullName }
+        }
+}
 
 $files = foreach ($dir in $searchPaths) {
     if (Test-Path $dir) {
@@ -57,14 +58,14 @@ if ($Filter) {
 }
 
 Write-Host ""
-Write-Host "Generating $($files.Count) SVG(s) from .excalidraw via Kroki.io..." -ForegroundColor Cyan
+Write-Host "Generating $($files.Count) diagram(s) via Kroki.io..." -ForegroundColor Cyan
 Write-Host ""
 
-foreach ($f in $files) {
-    $svgPath = [System.IO.Path]::ChangeExtension($f.FullName, ".svg")
-    Export-ExcalidrawToSvg -SourcePath $f.FullName -SvgPath $svgPath
+foreach ($file in $files) {
+    $svgPath = [System.IO.Path]::ChangeExtension($file.FullName, ".svg")
+    Export-ExcalidrawToSvg -SourcePath $file.FullName -SvgPath $svgPath
     Start-Sleep -Milliseconds 300
 }
 
 Write-Host ""
-Write-Host "Done. Commit both .excalidraw and .svg files." -ForegroundColor Cyan
+Write-Host "Done." -ForegroundColor Cyan

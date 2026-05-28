@@ -13,7 +13,7 @@ namespace Axis.WorkflowEngine.Application.Handlers;
 /// Handles Form steps: suspends the execution step in WAITING state and raises
 /// FormStepReached so FormBuilder can create the task.
 /// The step is resumed when FormBuilder raises FormTaskSubmitted (handled by FormTaskSubmittedHandler).
-/// US-057: Form ID, assignee, timeout from config.
+/// Form ID, assignee, timeout from config.
 /// </summary>
 public sealed class ExecuteFormStepHandler(
     IExecutionRepository execRepo,

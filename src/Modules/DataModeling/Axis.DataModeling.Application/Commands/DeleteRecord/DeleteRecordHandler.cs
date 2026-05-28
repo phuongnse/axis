@@ -6,7 +6,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Commands.DeleteRecord;
 
-/// <summary>US-045: Soft-deletes a record; returns 404 if already gone.</summary>
+/// <summary>Soft-deletes a record; returns 404 if already gone.</summary>
 public sealed class DeleteRecordHandler(
     IDataRecordRepository recordRepo,
     IUnitOfWork uow)

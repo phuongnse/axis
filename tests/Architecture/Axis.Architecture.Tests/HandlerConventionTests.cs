@@ -11,11 +11,11 @@ namespace Axis.Architecture.Tests;
 /// <para>
 /// Rules enforced:
 /// <list type="bullet">
-///   <item>Handlers must accept <c>CancellationToken</c> as the last parameter of
-///         <c>Handle</c> — required so cancellations propagate from the HTTP
-///         pipeline / Wolverine pipeline through to EF and HTTP/gRPC calls.</item>
-///   <item>Handler classes must be <c>sealed</c> — handlers are leaf types;
-///         inheritance is never the right tool for composing them.</item>
+/// <item>Handlers must accept <c>CancellationToken</c> as the last parameter of
+/// <c>Handle</c> — required so cancellations propagate from the HTTP
+/// pipeline / Wolverine pipeline through to EF and HTTP/gRPC calls.</item>
+/// <item>Handler classes must be <c>sealed</c> — handlers are leaf types;
+/// inheritance is never the right tool for composing them.</item>
 /// </list>
 /// </para>
 /// </summary>

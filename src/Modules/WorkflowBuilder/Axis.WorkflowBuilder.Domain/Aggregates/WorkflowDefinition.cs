@@ -47,7 +47,7 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
         DateTimeOffset now = DateTimeOffset.UtcNow;
         WorkflowDefinition wf = new(Guid.NewGuid(), name.Trim(), description?.Trim(), organizationId, createdBy, now);
 
-        // US-047: new workflow starts with a Start and End node
+        // new workflow starts with a Start and End node
         wf._steps.Add(WorkflowStep.Create("Start", StepType.Start, null));
         wf._steps.Add(WorkflowStep.Create("End", StepType.End, null));
 
@@ -144,7 +144,7 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
         }
     }
 
-    /// <summary>US-049: Validates and transitions to Active status.</summary>
+    /// <summary>Validates and transitions to Active status.</summary>
     public void Publish()
     {
         if (Status == WorkflowStatus.Active)
@@ -170,7 +170,7 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
             ExtractTransitionSnapshots()));
     }
 
-    /// <summary>US-050: Deactivates the workflow; running executions complete but no new ones start.</summary>
+    /// <summary>Deactivates the workflow; running executions complete but no new ones start.</summary>
     public void Archive()
     {
         if (Status == WorkflowStatus.Draft)
@@ -184,7 +184,7 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
         RaiseDomainEvent(new WorkflowArchived(Id, OrganizationId));
     }
 
-    /// <summary>US-052: Soft-deletes a draft workflow.</summary>
+    /// <summary>Soft-deletes a draft workflow.</summary>
     public void Delete()
     {
         if (Status != WorkflowStatus.Draft)
@@ -194,7 +194,7 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 
-    /// <summary>US-050: Restores an archived workflow to Active.</summary>
+    /// <summary>Restores an archived workflow to Active.</summary>
     public void Unarchive()
     {
         if (Status != WorkflowStatus.Archived)
@@ -205,7 +205,7 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
         RaiseDomainEvent(new WorkflowUnarchived(Id, OrganizationId, ExtractFormIds()));
     }
 
-    /// <summary>US-051: Creates a full copy as a new Draft. Webhook URLs are NOT copied.</summary>
+    /// <summary>Creates a full copy as a new Draft. Webhook URLs are NOT copied.</summary>
     public WorkflowDefinition Duplicate()
     {
         WorkflowDefinition copy = Create($"Copy of {Name}", Description, OrganizationId, CreatedBy);

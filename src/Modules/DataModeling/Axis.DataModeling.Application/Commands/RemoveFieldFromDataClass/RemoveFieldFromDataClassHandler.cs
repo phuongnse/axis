@@ -6,7 +6,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Commands.RemoveFieldFromDataClass;
 
-/// <summary>US-039: Loads the data class and removes the specified field.</summary>
+/// <summary>Loads the data class and removes the specified field.</summary>
 public sealed class RemoveFieldFromDataClassHandler(
     IDataClassRepository dataClassRepo,
     IUnitOfWork uow)

@@ -6,7 +6,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Commands.UpdateRecord;
 
-/// <summary>US-044/035: Loads the record, validates field data, replaces its data, and saves.</summary>
+/// <summary>/035: Loads the record, validates field data, replaces its data, and saves.</summary>
 public sealed class UpdateRecordHandler(
     IDataModelRepository modelRepo,
     IDataRecordRepository recordRepo,

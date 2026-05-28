@@ -6,7 +6,7 @@ using Axis.WorkflowEngine.Domain.Aggregates;
 
 namespace Axis.WorkflowEngine.Application.Commands.RetryExecution;
 
-/// <summary>US-100: Loads a failed execution and creates a linked retry execution.</summary>
+/// <summary>Loads a failed execution and creates a linked retry execution.</summary>
 public sealed class RetryExecutionHandler(
     IExecutionRepository execRepo,
     IUnitOfWork uow)

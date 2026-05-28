@@ -7,7 +7,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Queries.ExportRecordsCsv;
 
-/// <summary>US-046: Streams records through the repository and builds a CSV string with proper escaping.</summary>
+/// <summary>Streams records through the repository and builds a CSV string with proper escaping.</summary>
 public sealed class ExportRecordsCsvHandler(
     IDataModelRepository modelRepo,
     IDataRecordRepository recordRepo)

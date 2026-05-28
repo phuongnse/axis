@@ -11,7 +11,7 @@ public interface IDataRecordRepository
 
     /// <summary>
     /// Returns a paginated page of records with optional full-text search,
-    /// per-field filters, and sort (US-042/043).
+    /// per-field filters, and sort.
     /// </summary>
     Task<(IReadOnlyList<DataRecord> Records, int TotalCount)> GetPagedAsync(
         Guid modelId,

@@ -7,7 +7,7 @@ namespace Axis.WorkflowEngine.Infrastructure.Services.StepExecutors;
 /// <summary>
 /// HTTP Request step executor. Reads method/url/headers/body/auth/timeout from stepConfig,
 /// interpolates context expressions, and executes the outbound HTTP call.
-/// US-058: full implementation pending E06 API layer; currently returns a structured stub response.
+/// Returns a structured response payload for downstream context mapping.
 /// </summary>
 internal sealed class HttpStepExecutor(
     IHttpClientFactory httpClientFactory,
@@ -65,7 +65,7 @@ internal sealed class HttpStepExecutor(
         HttpResponseMessage response = await client.SendAsync(request, ct);
         string responseBody = await response.Content.ReadAsStringAsync(ct);
 
-        // Truncate large response bodies (US-058)
+        // Truncate large response bodies
         const int MaxBodyBytes = 1_048_576;
         if (System.Text.Encoding.UTF8.GetByteCount(responseBody) > MaxBodyBytes)
         {

@@ -93,7 +93,7 @@ public class RegisterOrganizationHandlerTests
     [Fact]
     public async Task RegisterOrganization_WhenEmailAlreadyExists_ReturnsSuccessWithoutCreatingAnything()
     {
-        // Per US-001: no information leakage — same response whether email exists or not
+        // no information leakage — same response whether email exists or not
         _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>()).Returns(true);
 
         Func<Task<Shared.Domain.Primitives.Result>> act = async () => await CreateHandler().Handle(ValidCommand(), CancellationToken.None);

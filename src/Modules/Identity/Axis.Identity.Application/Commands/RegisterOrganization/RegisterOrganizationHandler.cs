@@ -22,7 +22,7 @@ public sealed class RegisterOrganizationHandler(
     : ICommandHandler<RegisterOrganizationCommand>
 {
     private static readonly TimeSpan VerificationTokenLifetime = TimeSpan.FromHours(24);
-    // Permission catalogue — matches F04 docs
+    // Permission catalogue
     private static readonly string[] AdminPermissions =
     [
         "data_modeling:model:read", "data_modeling:model:write", "data_modeling:model:delete",

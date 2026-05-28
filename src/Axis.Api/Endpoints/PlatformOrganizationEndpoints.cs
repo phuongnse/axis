@@ -16,7 +16,7 @@ public static class PlatformOrganizationEndpoints
 
         group.MapPut("/{organizationId:guid}/plan", ChangePlan)
             .WithName("ChangeOrganizationPlan")
-            .WithSummary("Platform admin: change an organization's subscription plan (US-012)")
+            .WithSummary("Platform admin: change an organization's subscription plan")
             .WithTags("Platform")
             .Produces<object>()
             .ProducesProblem(401)

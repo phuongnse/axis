@@ -15,7 +15,7 @@ public sealed class DeactivateUserHandler(
 {
     public async Task<Result> Handle(DeactivateUserCommand command, CancellationToken cancellationToken)
     {
-        // US-019: cannot deactivate yourself
+        // cannot deactivate yourself
         if (command.UserId == command.RequesterId)
             return Result.Failure(ErrorCodes.BusinessRule, "You cannot deactivate yourself.");
 
@@ -29,7 +29,7 @@ public sealed class DeactivateUserHandler(
 
         Guid adminRoleId = adminRole.Id;
 
-        // US-019: cannot deactivate last admin
+        // cannot deactivate last admin
         int adminCount = await userRepo.CountAdminsAsync(
             command.OrganizationId, adminRoleId, cancellationToken);
         if (adminCount <= 1 && user.RoleIds.Contains(adminRoleId))

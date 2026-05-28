@@ -1,6 +1,6 @@
 namespace Axis.Identity.Domain.Subscriptions;
 
-/// <summary>Platform catalog plan with usage limits (US-010 / US-011).</summary>
+/// <summary>Platform catalog plan with usage limits.</summary>
 public sealed class SubscriptionPlan
 {
     public Guid Id { get; private init; }

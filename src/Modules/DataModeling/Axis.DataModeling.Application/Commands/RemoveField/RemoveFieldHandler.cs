@@ -5,7 +5,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.DataModeling.Application.Commands.RemoveField;
 
-/// <summary>US-032/034: Loads model and delegates field removal to the aggregate.</summary>
+/// <summary>/034: Loads model and delegates field removal to the aggregate.</summary>
 public sealed class RemoveFieldHandler(
     IDataModelRepository modelRepo,
     IUnitOfWork uow)

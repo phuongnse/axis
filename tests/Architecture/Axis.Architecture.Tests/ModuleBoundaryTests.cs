@@ -7,9 +7,9 @@ namespace Axis.Architecture.Tests;
 /// <summary>
 /// Enforces CLAUDE.md P0 rules:
 /// <list type="bullet">
-///   <item>No project reference from <c>Axis.{ModuleA}.*</c> to <c>Axis.{ModuleB}.*</c>
-///         except to <c>Axis.{ModuleB}.Contracts</c>.</item>
-///   <item>No in-process method call into another module's Application or Infrastructure.</item>
+/// <item>No project reference from <c>Axis.{ModuleA}.*</c> to <c>Axis.{ModuleB}.*</c>
+/// except to <c>Axis.{ModuleB}.Contracts</c>.</item>
+/// <item>No in-process method call into another module's Application or Infrastructure.</item>
 /// </list>
 /// This is the architectural lock that makes "extraction is a redeploy" true ([ADR-010](../../docs/TECH_STACK.md)).
 /// </summary>

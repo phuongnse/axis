@@ -57,7 +57,7 @@ public static class OrganizationEndpoints
             request.SubscriptionPlanId,
             idempotencyKey), ct);
 
-        // Per US-001: always return the same success screen — no email-existence leakage
+        // always return the same success screen — no email-existence leakage
         return Results.Ok(new
         {
             message = "Registration successful. Please check your email to verify your account.",

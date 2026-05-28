@@ -6,7 +6,7 @@ using Axis.WorkflowEngine.Domain.Aggregates;
 
 namespace Axis.WorkflowEngine.Application.Commands.CancelExecution;
 
-/// <summary>US-092: Loads the execution and delegates cancellation to the aggregate.</summary>
+/// <summary>Loads the execution and delegates cancellation to the aggregate.</summary>
 public sealed class CancelExecutionHandler(
     IExecutionRepository execRepo,
     IUnitOfWork uow)

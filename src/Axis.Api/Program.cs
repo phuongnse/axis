@@ -445,7 +445,7 @@ try
     WebApplication app = builder.Build();
 
     // ── Dev bootstrap: apply Identity migrations before OpenIddictSeeder runs.
-    //    Tenant module schemas are provisioned per-org by TenantSchemaProvisioner.
+    // Tenant module schemas are provisioned per-org by TenantSchemaProvisioner.
     if (app.Environment.IsDevelopment() && !EF.IsDesignTime)
     {
         using IServiceScope scope = app.Services.CreateScope();

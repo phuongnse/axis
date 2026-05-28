@@ -1,0 +1,80 @@
+# Use case — Invite a user to the organization
+
+> **Navigation**: [← Identity Access](../README.md) · [Use cases index](../README.md#use-cases)
+
+## Purpose
+
+Invite a team member by email so that they can join the workspace and start collaborating.
+
+## Primary actor
+
+- Organization Admin
+
+## Trigger
+
+- User initiates: invite a team member by email
+
+## Main flow
+
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
+
+## Alternate / error flows
+
+- Validation failures and edge cases in Acceptance Criteria.
+
+## Context
+
+Organization admins can invite new members, manage their accounts, and deactivate users who should no longer have access.
+
+## Acceptance Criteria
+
+*Happy path*
+- [ ] Admin enters an email address and selects a role for the invited user, then clicks "Send invitation."
+- [ ] An invitation email is sent with a unique accept link valid for 48 hours.
+- [ ] The new user appears in the Users list with status "Pending."
+- [ ] Admin can see the invitation sent date and can cancel or resend it.
+
+*Validation & errors*
+- [ ] Email must be a valid email format; invalid format shows an inline error before submission.
+- [ ] Inviting an email already belonging to an active member of the org returns: "This user is already a member."
+- [ ] Inviting an email that has a pending invitation returns: "An invitation has already been sent to this address." with an option to resend.
+- [ ] Role selection is required; submitting without selecting a role shows an inline error.
+- [ ] If the email service fails to deliver the invitation, the pending invitation is still created and the admin is shown: "Invitation created, but the email could not be sent. Please resend manually."
+
+*Edge cases*
+- [ ] Inviting the same email address after cancelling a previous invitation creates a new invitation (old link is invalidated).
+- [ ] The user limit check is performed at invitation time, not at acceptance time. If the org is at its user limit, the invitation is blocked with an upgrade prompt.
+- [ ] An admin cannot invite themselves (their own email address).
+
+*Out of scope*
+- Bulk invitation via CSV upload — not in MVP.
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** Admin self-invite check not implemented (compare invite email to `ICurrentUser` email).
+>
+> **Done:** HTTP 402 when user plan limit reached (`InviteUserHandler`, platform-foundation subscription plans).
+>
+> **Decisions:** existing-member and pending-invitation checks throw `ValidationException` with specific messages matching AC wording.
+
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| N/A | N/A | N/A |
+
+## Diagrams
+
+| Diagram | Source | Preview |
+|---------|--------|---------|
+| N/A | N/A | N/A |

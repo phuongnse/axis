@@ -4,7 +4,7 @@ using Axis.Shared.Application.CQRS;
 
 namespace Axis.DataModeling.Application.Commands.AddField;
 
-/// <summary>US-034: Add a field of any supported type to a model.</summary>
+/// <summary>Add a field of any supported type to a model.</summary>
 public sealed record AddFieldCommand(
     Guid ModelId,
     Guid OrganizationId,

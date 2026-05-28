@@ -274,7 +274,7 @@ export function semanticVariantBorder(variant = 'info') {
 
 /**
  * Canonical state headline — icon + colored title on one row, short semantic underline.
- * Use on all E01 auth outcome cards for a consistent layout (no circular badges).
+ * Use on all platform-foundation auth outcome cards for a consistent layout (no circular badges).
  */
 export function stateHeadline(prefix, x, y, w, icon, variant, title, titleFontSize = 14) {
   const tc = semanticVariantColor(variant);

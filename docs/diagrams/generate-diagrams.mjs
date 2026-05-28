@@ -4,18 +4,18 @@
  * Run:  node docs/diagrams/generate-diagrams.mjs
  * Then: docs/scripts/generate-diagrams.ps1  (to produce .svg files)
  *
- * Top-level (docs/diagrams/):
+ * Platform architecture (docs/diagrams/):
  *   system-context  — who uses Axis, what external systems
  *   container       — what runs inside Axis, per-module databases, Wolverine
  *   module-overview — 6 modules + event-driven communication flows
  *
- * Epic-level (docs/epics/E0{N}-name/diagrams/):
- *   tenant-provisioning — org registration & async schema provisioning  (E01)
- *   auth-flow           — JWT + refresh token authentication flow         (E02)
- *   data-model          — DataModeling entity relationships               (E03)
- *   workflow-model      — WorkflowBuilder entity relationships            (E04)
- *   form-model          — FormBuilder entity relationships                (E05)
- *   execution-flow      — WorkflowEngine step execution loop             (E06)
+ * Use-case-level (docs/use-cases/{domain}/{use-case}/):
+ *   tenant-provisioning — org registration & async schema provisioning  (platform-foundation)
+ *   auth-flow           — JWT + refresh token authentication flow         (identity-access)
+ *   data-model          — DataModeling entity relationships               (data-modeling)
+ *   workflow-model      — WorkflowBuilder entity relationships            (workflow-builder)
+ *   form-model          — FormBuilder entity relationships                (form-builder)
+ *   execution-flow      — WorkflowEngine step execution loop             (workflow-engine)
  */
 
 import { writeFileSync, mkdirSync } from "fs";
@@ -23,7 +23,8 @@ import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
-const epicDir = (folder) => join(__dir, "..", "epics", folder, "diagrams");
+const architectureDir = join(__dir, "diagrams");
+const domainDir = (domain) => join(__dir, "..", domain, "diagrams");
 
 // ─── Excalidraw primitives ────────────────────────────────────────────────────
 
@@ -539,7 +540,7 @@ function seqBuild({ title, participants, gap = 165, messages, sections = [], not
   return excalidraw(els);
 }
 
-// ─── E01 — Tenant Provisioning ───────────────────────────────────────────────
+// ─── platform-foundation — Tenant Provisioning ───────────────────────────────────────────────
 
 function tenantProvisioningDiagram() {
   _id = 1;
@@ -585,7 +586,7 @@ function tenantProvisioningDiagram() {
   });
 }
 
-// ─── E02 — Auth Flow ─────────────────────────────────────────────────────────
+// ─── identity-access — Auth Flow ─────────────────────────────────────────────────────────
 
 function authFlowDiagram() {
   _id = 1;
@@ -629,7 +630,7 @@ function authFlowDiagram() {
   });
 }
 
-// ─── E06 — Execution Flow ─────────────────────────────────────────────────────
+// ─── workflow-engine — Execution Flow ─────────────────────────────────────────────────────
 
 function executionFlowDiagram() {
   _id = 1;
@@ -684,7 +685,7 @@ function entityRelArrow(a, b, label, opts = {}) {
   return arrow({ x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, label, dashed });
 }
 
-// ─── E03 — Data Model ────────────────────────────────────────────────────────
+// ─── data-modeling — Data Model ────────────────────────────────────────────────────────
 
 function dataModelDiagram() {
   _id = 1;
@@ -727,7 +728,7 @@ function dataModelDiagram() {
   return excalidraw(els);
 }
 
-// ─── E04 — Workflow Model ────────────────────────────────────────────────────
+// ─── workflow-builder — Workflow Model ────────────────────────────────────────────────────
 
 function workflowModelDiagram() {
   _id = 1;
@@ -782,7 +783,7 @@ function workflowModelDiagram() {
   return excalidraw(els);
 }
 
-// ─── E05 — Form Model ────────────────────────────────────────────────────────
+// ─── form-builder — Form Model ────────────────────────────────────────────────────────
 
 function formModelDiagram() {
   _id = 1;
@@ -828,16 +829,16 @@ function formModelDiagram() {
 
 const diagrams = [
   // Top-level architecture diagrams
-  { name: "system-context",       fn: systemContext,           dir: __dir },
-  { name: "container",            fn: containerDiagram,        dir: __dir },
-  { name: "module-overview",      fn: moduleOverview,          dir: __dir },
-  // Epic-level diagrams
-  { name: "tenant-provisioning",  fn: tenantProvisioningDiagram, dir: epicDir("E01-platform-foundation") },
-  { name: "auth-flow",            fn: authFlowDiagram,           dir: epicDir("E02-identity-access") },
-  { name: "data-model",           fn: dataModelDiagram,          dir: epicDir("E03-data-modeling") },
-  { name: "workflow-model",       fn: workflowModelDiagram,      dir: epicDir("E04-workflow-builder") },
-  { name: "form-model",           fn: formModelDiagram,          dir: epicDir("E05-form-builder") },
-  { name: "execution-flow",       fn: executionFlowDiagram,      dir: epicDir("E06-workflow-engine") },
+  { name: "system-context",       fn: systemContext,           dir: architectureDir },
+  { name: "container",            fn: containerDiagram,        dir: architectureDir },
+  { name: "module-overview",      fn: moduleOverview,          dir: architectureDir },
+  // Domain-level diagrams
+  { name: "tenant-provisioning",  fn: tenantProvisioningDiagram, dir: domainDir("platform-foundation") },
+  { name: "auth-flow",            fn: authFlowDiagram,           dir: domainDir("identity-access") },
+  { name: "data-model",           fn: dataModelDiagram,          dir: domainDir("data-modeling") },
+  { name: "workflow-model",       fn: workflowModelDiagram,      dir: domainDir("workflow-builder") },
+  { name: "form-model",           fn: formModelDiagram,          dir: domainDir("form-builder") },
+  { name: "execution-flow",       fn: executionFlowDiagram,      dir: domainDir("workflow-engine") },
 ];
 
 for (const { name, fn, dir } of diagrams) {

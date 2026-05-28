@@ -11,8 +11,8 @@ using Wolverine;
 namespace Axis.FormBuilder.Infrastructure.Handlers;
 
 /// <summary>
-/// Creates a FormSubmission task when the workflow engine reaches a Form step (US-086).
-/// Schedules expiry when a timeout is configured (US-089).
+/// Creates a FormSubmission task when the workflow engine reaches a Form step.
+/// Schedules expiry when a timeout is configured.
 ///
 /// <para>
 /// Cross-module consumer: subscribes to the Avro <see cref="FormStepReachedEvent"/>

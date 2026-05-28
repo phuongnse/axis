@@ -13,7 +13,7 @@ namespace Axis.WorkflowEngine.Application.Handlers;
 /// Orchestrates step progression within an execution.
 /// Finds the next Pending step, transitions the execution to Running (if needed),
 /// then dispatches the appropriate step-type handler message.
-/// US-093: step isolation — each step type is its own handler.
+/// step isolation — each step type is its own handler.
 /// </summary>
 public sealed class ExecuteNextStepHandler(
     IExecutionRepository execRepo,

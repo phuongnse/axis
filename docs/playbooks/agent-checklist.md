@@ -11,33 +11,33 @@ The paste-block templates below are for *your own* walk-through (agent reasoning
 ## Gate 0 — Ready (before code)
 
 - AC map: every row has layer + file/test — **no blank cells**
-- Read: epic README → feature file → same-module code
+- Read: domain README → use-case file → same-module code
 - Skim [`docs/WORKAROUNDS.md`](../WORKAROUNDS.md) for entries touching the same files/modules — known shortcuts may explain surprising code
-- Before API layer: `grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/epics/` — fix, defer with reason, or stop
+- Before API layer: `grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/use-cases/` — fix, defer with reason, or stop
 - End of PR: [process.md § PR wrap-up](process.md) — deferred lines, host wiring, callouts (no user reminder)
 
 ```markdown
 ## Gate 0
-| AC / US | Layer | File / test |
+| AC / use case | Layer | File / test |
 |---------|-------|-------------|
 | …       | …     | …           |
-Docs touched: docs/epics/…
+Docs touched: docs/use-cases/…
 ```
 
 ### AC coverage — avoid happy-path-only
 
-Feature files group ACs under **Happy path**, **Validation & errors**, **Edge cases**, and **Out of scope**. Agents must cover **every bullet in scope for the layer you are shipping**, not only the first block.
+Use-case files group ACs under **Happy path**, **Validation & errors**, **Edge cases**, and **Out of scope**. Agents must cover **every bullet in scope for the layer you are shipping**, not only the first block.
 
-**Before writing code (per US):**
+**Before writing code (per use case):**
 
-1. Copy **each** `- [ ]` line from the US into an AC map row (one row per bullet, or one row per bullet group only when a single test proves all of them).
+1. Copy **each** `- [ ]` line from the use case into an AC map row (one row per bullet, or one row per bullet group only when a single test proves all of them).
 2. Tag the row: `happy` | `validation` | `edge` | `out-of-scope` (skip implementation for `out-of-scope`; do not “forget” it — leave it in the map as N/A).
 3. Name the **test or handler** that will prove the row (`CreateWorkflow_WhenAtPlanLimit_Returns402`, integration test for wrong-tenant isolation, etc.). **No blank “File / test” cells** for in-scope rows.
 4. If a bullet is **Frontend-only** while you are on backend (or the reverse), mark the row `N/A this PR — Frontend` / `N/A this PR — API` so it is not silently dropped.
 
 **While implementing (TDD):**
 
-- [process.md § Per-US workflow](./process.md#per-us-workflow): Domain → Application → Infrastructure → API; tests green per layer before the next.
+- [process.md § Per use case workflow](./process.md#per-use-case-workflow): Domain → Application → Infrastructure → API; tests green per layer before the next.
 - [testing.md § Required test coverage](./testing.md#required-test-coverage-for-integration-tests): integration tests need happy path **and** not-found/isolation **and** constraint violations where applicable — not one happy test per handler.
 
 **Before opening / updating the PR:**
@@ -49,7 +49,7 @@ Feature files group ACs under **Happy path**, **Validation & errors**, **Edge ca
 | Deferred? | `**Deferred (PR #N follow-up):**` names the **AC bullet** deferred, not a vague “later”. |
 | Out of scope? | Do not implement; do not mark ✅ as if done. |
 
-**Self-audit command** (after implementation, before push): re-read the US in the feature file and tick mentally each bullet against your AC map — same order as the spec (happy → validation → edge).
+**Self-audit command** (after implementation, before push): re-read the use case in the use-case file and tick mentally each bullet against your AC map — same order as the spec (happy → validation → edge).
 
 ### Anti-pattern: `Gaps vs spec: none` after happy path only
 
@@ -63,17 +63,17 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 **Before push checklist (backend feature PRs):**
 
-1. Re-read every in-scope `- [ ]` under the US (all sections, not only *Happy path*).
+1. Re-read every in-scope `- [ ]` under the use case (all sections, not only *Happy path*).
 2. For each bullet: implemented + test, `N/A this PR — Frontend`, or named deferral.
 3. Only then set `Gaps vs spec: none for backend` (or list what remains).
 
-**Lesson (E01 F02):** A first pass shipped profile/settings/deletion APIs but missed Redis usage TTL (≤5 min), schedule rollback on queue failure, hard-delete purge, and form-task cancel — caught by spec review, not by “flow works.” See [F02 callouts](../epics/E01-platform-foundation/features/F02-organization-management.md) for what “done” looks like after self-audit.
+**Lesson (platform-foundation organization management):** A first pass shipped profile/settings/deletion APIs but missed Redis usage TTL (≤5 min), schedule rollback on queue failure, hard-delete purge, and form-task cancel — caught by spec review, not by “flow works.” See [organization-management callouts](../use-cases/platform-foundation/README.md) for what “done” looks like after self-audit.
 
 ---
 
 ## Gates (every PR)
 
-**Doc drift:** when `src/`, `tests/`, or `docs/epics/` change — run `./scripts/check-doc-drift.sh` **before push** (P0; bash — use Git Bash on Windows); CI job **Doc drift** must be green. When `docker-compose.yml` changes, update [local-dev.md](./local-dev.md) in the same PR (`check-local-dev-docs.py` runs inside the drift script). Script output is not a PR artefact — walk Gate 2 rows below mentally and tick the Gate 2 checkbox.
+**Doc drift:** when `src/`, `tests/`, or `docs/use-cases/` change — run `./scripts/check-doc-drift.sh` **before push** (P0; bash — use Git Bash on Windows); CI job **Doc drift** must be green. When `docker-compose.yml` changes, update [local-dev.md](./local-dev.md) in the same PR (`check-local-dev-docs.py` runs inside the drift script). Script output is not a PR artefact — walk Gate 2 rows below mentally and tick the Gate 2 checkbox.
 
 | Gate | Action |
 |------|--------|
@@ -84,8 +84,9 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 **CI-only gates** (run automatically on PR, no local action required):
 
-- **Doc drift** — enforces same-PR docs, new-handler tests, no-new TODO/FIXME, new raw-SQL review, [WORKAROUND comment ↔ inventory sync](../WORKAROUNDS.md), [speculation guard](./docs-style.md#anti-patterns-dont-ship-these), `GetAwaiter().GetResult()` ban, hardcoded connection-string ban, `DateTime.Now` ban (use `UtcNow`).
-- **Markdown link check** — `lychee` verifies internal links and `#anchors`.
+- **Doc drift** — enforces same-PR docs, new-handler tests, no-new TODO/FIXME, new raw-SQL review, [WORKAROUND comment ↔ inventory sync](../WORKAROUNDS.md), [speculation guard](./docs-style.md#anti-patterns-dont-ship-these), `GetAwaiter().GetResult()` ban, hardcoded connection-string ban, `DateTime.Now` ban (use `UtcNow`), and a stale-terminology guard for the PR #142 migration (current pattern list lives in [`scripts/check-doc-drift.sh`](../../scripts/check-doc-drift.sh) — search for `STALE_TERM_PATTERN`).
+- **Markdown link check** — `lychee` verifies internal links and `#anchors`. **Relative file/image targets** (`![alt](./asset.svg)`, `[text](./file.md)`) are double-checked by [`scripts/check-doc-link-targets.py`](../../scripts/check-doc-link-targets.py) inside the drift script — catches the broken-image class lychee missed in PR #142.
+- **Use-case docs** — [`scripts/check-use-case-docs.py`](../../scripts/check-use-case-docs.py) validates use-case file structure (required sections + tables + status callout), flags template placeholders (`_(One sentence...)_`, `_(Actor)_`, `_(What starts...)_`), flags self-links `[name](./README.md)` and truncated summary rows in domain READMEs, and counts use cases still on the stock Main flow.
 - **Secret scanning** — TruffleHog scans the full PR diff for committed secrets (API keys, passwords, tokens) and verifies each finding against the alleged service before reporting (`--only-verified` cuts false positives).
 - **Vulnerable packages** — `dotnet list package --vulnerable --include-transitive` fails on any known CVE in the dep tree (covers transitive packages too).
 - **Architecture fitness tests** run as part of `dotnet test` — failures there mean a CLAUDE.md P0/P1 rule got violated structurally. See [tests README](../../tests/Architecture/Axis.Architecture.Tests/README.md).
@@ -106,7 +107,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 | `src/` or `tests/` | `dotnet format --verify-no-changes` |
 | `frontend/` | `npm run ci` then `npm run test` |
 | `src/Axis.Api/Endpoints/` or API contract | Update + run `tests/Api/Axis.Api.Tests/` |
-| Any of the above + `docs/epics/` | `./scripts/check-doc-drift.sh` (bash) — also runs `normalize-feature-docs.py --check` and `check-local-dev-docs.py`, enforces no-new `TODO`/`FIXME`/`stub`, reviews new raw-SQL calls |
+| Any of the above + `docs/use-cases/` | `./scripts/check-doc-drift.sh` (bash) — also runs `check-use-case-docs.py --check` and `check-local-dev-docs.py`, enforces no-new `TODO`/`FIXME`/`stub`, reviews new raw-SQL calls |
 | `docker-compose.yml` | Update [local-dev.md](./local-dev.md) in same PR; `./scripts/check-doc-drift.sh` |
 
 ```text
@@ -130,8 +131,8 @@ Paste block format: header `Gate 2:` then one `-` line per row (Gate 3 uses the 
 Gate 2:
 - Library → TECH_STACK.md / not triggered
 - New pattern → patterns.md / not triggered
-- US layer callout → docs/epics/…/features/… (table layout per [docs-style § Feature files](./docs-style.md#feature-files--wireframes--implementation-status)) / not triggered
-- Epic README + PROGRESS → … / not triggered
+- Use-case layer callout → docs/use-cases/{domain}/… (layout per [docs-style § Use case files](./docs-style.md#use-case-files-flow-first)) / not triggered
+- Domain README + PROGRESS → … / not triggered
 - Architecture rule → CLAUDE.md / not triggered
 - process.md workflow → … / not triggered
 - Project structure → CLAUDE.md § Solution tree + process.md / not triggered
@@ -187,21 +188,21 @@ Gate 3:
 | ⚠️ | Started; list gaps in callout |
 | ⏳ | Not started |
 
-Never ✅ and "pending …" in the same callout. Checkboxes in feature files are spec-only — **do not** tick them.
+Never ✅ and "pending …" in the same callout. Checkboxes in use-case files are spec-only — **do not** tick them.
 
 ### Status updates (three levels — same PR)
 
 | Level | When | What to write |
 |-------|------|----------------|
-| **1 — US** | Any layer progress on a user story | `> **Implementation status**`, `Gaps vs spec`, optional `**Deferred (PR #N follow-up):**` in `docs/epics/…/features/F0N-….md` |
-| **2 — Epic** | A layer is complete for the module | Epic `README.md` implementation table + **Open work (agents)** section (remove or reword items you closed) |
+| **1 — Use case** | Any layer progress on a use case | `> **Implementation status**`, `Gaps vs spec`, optional `**Deferred (PR #N follow-up):**` in `docs/use-cases/{domain}/*.md` |
+| **2 — Domain** | A layer is complete for the module | Domain `README.md` implementation table + **Open work (agents)** section (remove or reword items you closed) |
 | **3 — Platform** | Module-wide summary changed | `docs/PROGRESS.md` — layer status only |
 
-Updating only `PROGRESS.md` while changing `src/` without `docs/epics/` → drift fails. Epic README `| API | ⏳` after endpoints ship → drift fails.
+Updating only `PROGRESS.md` while changing `src/` without `docs/use-cases/` → drift fails. Domain README `| API | ⏳` after endpoints ship → drift fails.
 
-**Agents starting a task:** read [epics README § How agents find open work](../epics/README.md#how-agents-find-open-work) — checkboxes in feature files are not progress.
+**Agents starting a task:** read [use cases README § How agents find open work](../use-cases/README.md#how-agents-find-open-work) — checkboxes in use-case files are not progress.
 
-**Chore/style PRs that touch module code:** drift still applies — add one small, accurate detail to the matching epic doc (a chunk size, a behavior nuance, a deferral note already true). Don't propose loosening the script, don't strand the format gunk waiting for a "real" PR, and don't invent fake content. The script's intent is *prompt the developer to look at docs*, not *require rewrite proportional to code change*.
+**Chore/style PRs that touch module code:** drift still applies — add one small, accurate detail to the matching domain doc (a chunk size, a behavior nuance, a deferral note already true). Don't propose loosening the script, don't strand the format gunk waiting for a "real" PR, and don't invent fake content. The script's intent is *prompt the developer to look at docs*, not *require rewrite proportional to code change*.
 
 ---
 
@@ -210,23 +211,23 @@ Updating only `PROGRESS.md` while changing `src/` without `docs/epics/` → drif
 - Spec → code, never the reverse
 - No cross-module SQL / shared `DbContext` / `IMediator` for domain events
 - New `*Handler.cs` → `*HandlerTests.cs` (drift script)
-- Module code → `docs/epics/{module}/` in **same PR**
-- Frontend screen → wireframe + `> **Wireframe**` in feature file
+- Module code → `docs/use-cases/{module}/` in **same PR**
+- Frontend screen → wireframe row in use-case `## Wireframes` table
 - No `.Skip()`, weakened tests, or ✅ when ACs are open
 - **Full solution only:** always `dotnet build` + `dotnet test` on `Axis.sln` (no solution filter)
 
 ---
 
-## Epic map (code → docs)
+## Domain map (code → docs)
 
 | Code touch | Docs folder |
 |------------|-------------|
-| `Endpoints/Execution*`, WorkflowEngine module | `docs/epics/E06-workflow-engine/` |
-| `Endpoints/Form*`, FormBuilder | `docs/epics/E05-form-builder/` |
-| `Endpoints/Workflow*`, WorkflowBuilder | `docs/epics/E04-workflow-builder/` |
-| `Endpoints/Model*`, DataModeling | `docs/epics/E03-data-modeling/` |
-| Identity, `Connect*`, auth UI | `docs/epics/E02-identity-access/` |
-| `TenantSchema*`, org registration | `docs/epics/E01-platform-foundation/` |
+| `Endpoints/Execution*`, WorkflowEngine module | `docs/use-cases/workflow-engine/` |
+| `Endpoints/Form*`, FormBuilder | `docs/use-cases/form-builder/` |
+| `Endpoints/Workflow*`, WorkflowBuilder | `docs/use-cases/workflow-builder/` |
+| `Endpoints/Model*`, DataModeling | `docs/use-cases/data-modeling/` |
+| Identity, `Connect*`, auth UI | `docs/use-cases/identity-access/` |
+| `TenantSchema*`, org registration | `docs/use-cases/platform-foundation/` |
 
 ---
 

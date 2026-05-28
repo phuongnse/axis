@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Http;
 
 namespace Axis.FormBuilder.Infrastructure.Grpc;
 
-/// <summary>US-078: blocks form deletion when WorkflowBuilder reports draft/active step refs (ADR-014 gRPC).</summary>
+/// <summary>blocks form deletion when WorkflowBuilder reports draft/active step refs (ADR-014 gRPC).</summary>
 internal sealed class FormWorkflowDeletionGuard(
     WorkflowFormReferenceService.WorkflowFormReferenceServiceClient workflowReferences,
     IHttpContextAccessor httpContextAccessor)
