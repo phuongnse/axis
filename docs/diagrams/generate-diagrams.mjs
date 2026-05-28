@@ -491,7 +491,7 @@ function moduleOverview() {
   }
 
   // Row 1 (y=155): 4 modules with 25px gaps
-  els.push(...module(60,  155, "Identity",        "Auth · Users · Roles · RBAC", { bg: "#ede9fe", stroke: "#7c3aed" }));
+  els.push(...module(60,  155, "Identity",        "Auth · Users · Roles · RBAC"));
   els.push(...module(285, 155, "DataModeling",    "Models · Records · Data Classes"));
   els.push(...module(510, 155, "WorkflowBuilder", "Definitions · Steps · Triggers"));
   els.push(...module(735, 155, "FormBuilder",     "Forms · Fields · Submissions"));
@@ -524,9 +524,10 @@ function moduleOverview() {
   // Arrows
   // Cross-module connection examples (single connector style)
   els.push(...arrow({ x1: 610, y1: 235, x2: 610, y2: 286, color: C.arrow }));
-  els.push(...arrow({ x1: 385, y1: 350, x2: 385, y2: 470, color: C.arrow }));
-  els.push(...arrow({ x1: 835, y1: 286, x2: 835, y2: 235, color: C.arrow }));
-  els.push(...arrow({ x1: 835, y1: 350, x2: 835, y2: 235, color: C.arrow }));
+  // Route around lane/badge center to keep labels readable.
+  els.push(...routedArrow({ waypoints: [[360, 364], [360, 452], [385, 452], [385, 470]], color: C.arrow }));
+  // Single consumer connection to FormBuilder (remove overlapping duplicate).
+  els.push(...arrow({ x1: 860, y1: 350, x2: 860, y2: 235, color: C.arrow }));
   // WorkflowEngine (bottom y=550) → reads own local copy
   els.push(...arrow({ x1: 385, y1: 550, x2: 385, y2: 595, color: C.muted, dashed: true, label: "reads own copy" }));
 
