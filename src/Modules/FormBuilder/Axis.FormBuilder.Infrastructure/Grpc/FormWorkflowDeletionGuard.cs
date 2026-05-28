@@ -16,7 +16,6 @@ internal sealed class FormWorkflowDeletionGuard(
 
     public async Task<Result> ValidateCanDeleteAsync(
         Guid formId,
-        Guid organizationId,
         CancellationToken cancellationToken = default)
     {
         Metadata headers = BuildAuthorizationMetadata();
@@ -28,7 +27,6 @@ internal sealed class FormWorkflowDeletionGuard(
                 new CountBlockingFormReferencesRequest
                 {
                     FormId = formId.ToString(),
-                    OrganizationId = organizationId.ToString(),
                 },
                 headers: headers,
                 deadline: DateTime.UtcNow.Add(RpcDeadline),

@@ -5,14 +5,18 @@ option csharp_namespace = "Axis.FormBuilder.Contracts.Grpc";
 package axis.formbuilder.v1;
 
 // Cross-module sync RPC (ADR-014). Used by DataModeling to block model deletion.
+// Tenant scoping: server derives organization_id from the caller's JWT `org_id` claim;
+// callers MUST forward the inbound `authorization` header on every call.
 service FormModelReferenceService {
   rpc CountActiveModelReferences(CountActiveModelReferencesRequest)
       returns (CountActiveModelReferencesResponse);
 }
 
 message CountActiveModelReferencesRequest {
+  reserved 2;
+  reserved "organization_id";
+
   string model_id = 1;
-  string organization_id = 2;
 }
 
 message CountActiveModelReferencesResponse {

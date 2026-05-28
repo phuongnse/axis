@@ -28,12 +28,20 @@ Docs touched: docs/use-cases/…
 
 Use-case files group ACs under **Happy path**, **Validation & errors**, **Edge cases**, and **Out of scope**. Agents must cover **every bullet in scope for the layer you are shipping**, not only the first block.
 
+**Ownership note (single source):** This file is the source of truth for AC/path coverage expectations. Other playbooks should link here instead of re-stating these rules.
+
 **Before writing code (per use case):**
 
 1. Copy **each** `- [ ]` line from the use case into an AC map row (one row per bullet, or one row per bullet group only when a single test proves all of them).
 2. Tag the row: `happy` | `validation` | `edge` | `out-of-scope` (skip implementation for `out-of-scope`; do not “forget” it — leave it in the map as N/A).
 3. Name the **test or handler** that will prove the row (`CreateWorkflow_WhenAtPlanLimit_Returns402`, integration test for wrong-tenant isolation, etc.). **No blank “File / test” cells** for in-scope rows.
 4. If a bullet is **Frontend-only** while you are on backend (or the reverse), mark the row `N/A this PR — Frontend` / `N/A this PR — API` so it is not silently dropped.
+
+**Path coverage matrix template** (fill once per touched implementation surface):
+
+| Surface (endpoint/handler/repo/job/consumer) | Happy | Validation/Constraint | Auth/Permission | Not-found/Isolation | Dependency-failure | Notes |
+|---|---|---|---|---|---|---|
+| `...` | `test: ...` | `test: ...` | `test: ...` / `N/A` | `test: ...` / `N/A` | `test: ...` / `N/A` | deferral if any |
 
 **While implementing (TDD):**
 
@@ -66,6 +74,13 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 1. Re-read every in-scope `- [ ]` under the use case (all sections, not only *Happy path*).
 2. For each bullet: implemented + test, `N/A this PR — Frontend`, or named deferral.
 3. Only then set `Gaps vs spec: none for backend` (or list what remains).
+4. For **every implementation surface** touched in this PR (API endpoint, application handler, gRPC method, repository, background job, consumer), verify path coverage is explicit:
+   - valid request/flow (happy path),
+   - validation/constraint failure path,
+   - authz/authn or permission boundary where applicable,
+   - not-found and tenant/isolation boundary where applicable (no data leak),
+   - downstream dependency failure path where applicable (transport/storage/service unavailable).
+   If a path does not apply to that surface, mark it `N/A` in the AC map instead of skipping it silently.
 
 **Lesson (platform-foundation organization management):** A first pass shipped profile/settings/deletion APIs but missed Redis usage TTL (≤5 min), schedule rollback on queue failure, hard-delete purge, and form-task cancel — caught by spec review, not by “flow works.” See [organization-management callouts](../use-cases/platform-foundation/README.md) for what “done” looks like after self-audit.
 

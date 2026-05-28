@@ -4,6 +4,7 @@ using Axis.DataModeling.Infrastructure.Grpc;
 using Axis.DataModeling.Infrastructure.Persistence;
 using Axis.DataModeling.Infrastructure.Repositories;
 using Axis.FormBuilder.Contracts.Grpc;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -36,6 +37,15 @@ public static class DataModelingInfrastructureExtensions
             opts.Address = new Uri(formBuilderGrpcUrl);
         });
 
+        services.AddGrpc();
+
         return services;
+    }
+
+    public static WebApplication MapDataModelingGrpc(this WebApplication app)
+    {
+        app.MapGrpcService<DataModelCatalogGrpcService>()
+            .RequireAuthorization();
+        return app;
     }
 }

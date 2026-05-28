@@ -1287,13 +1287,15 @@ Used only when a local read model is insufficient. Example: a workflow step need
 syntax = "proto3";
 package axis.identity.v1;
 
+// Tenant scoping: the server MUST derive organization_id from the caller's
+// JWT `org_id` claim, never from a request field. Callers forward the inbound
+// `authorization` header on every call. See Step 3 below.
 service IdentityService {
     rpc GetUserPermissions(GetUserPermissionsRequest) returns (GetUserPermissionsResponse);
 }
 
 message GetUserPermissionsRequest {
     string user_id = 1;
-    string organization_id = 2;
 }
 
 message GetUserPermissionsResponse {
@@ -1301,35 +1303,116 @@ message GetUserPermissionsResponse {
 }
 ```
 
+
 **Buf (repo-wide lint + breaking)** — register every new module proto root before merge:
 
 1. Place files under `src/Modules/{Module}/Axis.{Module}.Contracts/Protos/axis/{module}/v{n}/` with `package axis.{module}.v{n};` matching the directory (`PACKAGE_DIRECTORY_MATCH`).
 2. Add the `Protos` directory to `modules:` in [`buf.yaml`](../../buf.yaml) at the repo root (copy an existing line).
 3. Keep `Grpc.Tools` `<Protobuf Include=...>` in the `.csproj` — Buf does not replace codegen.
 4. Run `buf lint` locally (`buf` CLI) and `./scripts/check-buf-modules.sh` (also runs in CI **Doc drift**).
+5. **Changing `buf.yaml` breaking policy or removing a field?** Read [Buf breaking rules — what's actually configured (and the gotcha)](#buf-breaking-rules--whats-actually-configured-and-the-gotcha) first. The v2 category model splits deletion rules in a way that's easy to misread, and "buf passes locally" can mean "no rule fires" rather than "the relaxed rule passed".
 
 CI runs `buf lint` and `buf breaking` against `main` when `.proto` or `buf.yaml` changes.
+
+#### Buf breaking rules — what's actually configured (and the gotcha)
+
+Field-deletion enforcement in `buf.yaml` is **non-obvious** because the buf v2 category model splits deletion rules across categories in a way that's easy to misread. The bug we hit in PR #145: dropping `FIELD_NO_DELETE` alone leaves *zero* enforcement on field removal — the "reserved variant" is not implicit in FILE/PACKAGE.
+
+Rule map (verify with `buf config ls-breaking-rules --version=v2`):
+
+| Rule | Categories | Default | What it does |
+|---|---|---|---|
+| `FIELD_NO_DELETE` | FILE, PACKAGE | ✓ ON | Fails on **any** field deletion |
+| `FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED` | WIRE_JSON, WIRE | ✗ OFF in FILE/PACKAGE | Fails only if deleted field's **number** was not reserved |
+| `FIELD_NO_DELETE_UNLESS_NAME_RESERVED` | WIRE_JSON | ✗ OFF in FILE/PACKAGE | Fails only if deleted field's **name** was not reserved |
+
+The current repo policy ([`buf.yaml`](../../buf.yaml)):
+
+```yaml
+breaking:
+  use:
+    - FILE
+    - FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED  # explicit add — not in FILE
+    - FIELD_NO_DELETE_UNLESS_NAME_RESERVED    # explicit add — not in FILE
+  except:
+    - FIELD_NO_DELETE                          # drop strict variant
+```
+
+Result: a field may be removed **iff** the proto has `reserved <number>;` AND `reserved "<name>";` in the same message. Everything else FILE-strict still applies (no message deletion, no file renames, etc.).
+
+##### Lesson for future agents — verify, don't guess
+
+When changing `buf.yaml` to allow a previously-forbidden change:
+
+1. **Run `buf config ls-breaking-rules --version=v2`** to see exactly which rules a category contains. Don't infer from category names — `PACKAGE` does *not* relax `FIELD_NO_DELETE`; the relaxed variant lives in `WIRE_JSON`/`WIRE` and is OFF by default.
+2. **Test the negative case before declaring the fix works.** Delete a `reserved` line locally, run `buf breaking`, and confirm it now fails. If it passes, you didn't fix it — you disabled enforcement. *"Buf passes" ≠ "rule fires correctly"*. The PR #145 first attempt (`use: PACKAGE`) and second attempt (`FILE except FIELD_NO_DELETE` alone) both "passed local buf" but enforced nothing.
+3. **Reserved fields alone are hygiene only.** Without an enforced rule, `reserved` is documentation — it tells humans not to reuse the number, but buf won't fail anyone who forgets.
+
+The shortcut "if CI is green, the rule is doing its job" fails here because the absence of an error proves the absence of a check, not the presence of a working check. Always force the rule to fire on a counterexample before trusting it.
 
 **Step 2 — Consuming module gets a generated client via project reference (modulith) or NuGet (extracted):**
 
 ```csharp
 // WorkflowEngine.Infrastructure — inject the Identity gRPC client
-public sealed class PermissionGate(IdentityService.IdentityServiceClient identity)
+public sealed class PermissionGate(
+    IdentityService.IdentityServiceClient identity,
+    IHttpContextAccessor httpContextAccessor)
 {
-    public async Task<bool> CanExecuteAsync(Guid userId, Guid orgId, string permission, CancellationToken ct)
+    public async Task<bool> CanExecuteAsync(Guid userId, string permission, CancellationToken ct)
     {
+        Metadata headers = new();
+        string? authorization = httpContextAccessor.HttpContext?.Request.Headers.Authorization.ToString();
+        if (!string.IsNullOrWhiteSpace(authorization))
+            headers.Add("authorization", authorization);
+
         GetUserPermissionsResponse resp = await identity.GetUserPermissionsAsync(
-            new GetUserPermissionsRequest
-            {
-                UserId = userId.ToString(),
-                OrganizationId = orgId.ToString(),
-            }, cancellationToken: ct);
+            new GetUserPermissionsRequest { UserId = userId.ToString() },
+            headers: headers,
+            cancellationToken: ct);
         return resp.Permissions.Contains(permission);
     }
 }
 ```
 
 The gRPC channel is configured via `Modules:Identity:GrpcUrl` in `src/Axis.Api/appsettings.json` (see [ADR-016](../TECH_STACK.md#adr-016-service-discovery-via-config-in-modulith-mode-and-k8s-dns-in-production)) — `http://localhost:5280` on the modulith host in development, module service DNS in production when extracted.
+
+**Step 3 — Server side: derive tenant from JWT, not the request payload**
+
+The gRPC server **must** read `organization_id` from the caller's JWT `org_id` claim, never from the request payload. Trusting an `organization_id` field would let a caller authenticated as tenant A query tenant B's data by passing tenant B's id — every service-to-service hop would then need its own cross-tenant guard. JWT-derived scoping makes the guarantee structural.
+
+```csharp
+// src/Modules/DataModeling/Axis.DataModeling.Infrastructure/Grpc/DataModelCatalogGrpcService.cs
+internal sealed class DataModelCatalogGrpcService(IDataModelRepository repo)
+    : DataModelCatalogService.DataModelCatalogServiceBase
+{
+    public override async Task<GetModelSummaryResponse> GetModelSummary(
+        GetModelSummaryRequest request, ServerCallContext context)
+    {
+        if (!Guid.TryParse(request.ModelId, out Guid modelId))
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "model_id must be a valid GUID."));
+
+        Guid organizationId = ResolveCallerOrganizationId(context);
+
+        DataModel? model = await repo.GetByIdAsync(modelId, organizationId, context.CancellationToken);
+        return new GetModelSummaryResponse
+        {
+            Exists = model is not null,
+            ModelName = model?.Name ?? string.Empty,
+        };
+    }
+
+    private static Guid ResolveCallerOrganizationId(ServerCallContext context)
+    {
+        Claim? claim = context.GetHttpContext().User.FindFirst("org_id");
+        if (claim is null || !Guid.TryParse(claim.Value, out Guid organizationId))
+            throw new RpcException(
+                new Status(StatusCode.Unauthenticated, "Caller JWT is missing a valid org_id claim."));
+        return organizationId;
+    }
+}
+```
+
+The server is mapped with `.RequireAuthorization()` so JwtBearer middleware runs first; the call reaches this method only when the JWT is valid. Caller-side gRPC clients (`FormModelDeletionGuard`, `FormWorkflowDeletionGuard`) forward the inbound `authorization` header via `Metadata` so the JWT travels with every cross-module call.
 
 ### Dev — verify GetUserPermissions with grpcurl
 
@@ -1347,11 +1430,11 @@ grpcurl -plaintext localhost:5280 list
 
 grpcurl -plaintext \
   -H "authorization: Bearer <access_token>" \
-  -d '{"user_id":"<user-guid>","organization_id":"<org-guid>"}' \
+  -d '{"user_id":"<user-guid>"}' \
   localhost:5280 axis.identity.v1.IdentityService/GetUserPermissions
 ```
 
-Replace `<access_token>`, `<user-guid>`, and `<org-guid>` with values from your tenant. `Unauthenticated` / `PermissionDenied` means the token is missing, expired, or invalid — obtain a fresh token from `POST /connect/token` after PKCE login.
+Replace `<access_token>` and `<user-guid>` with values from your tenant — the server reads the tenant from the JWT's `org_id` claim, so no `organization_id` is sent in the payload. `Unauthenticated` / `PermissionDenied` means the token is missing, expired, or invalid — obtain a fresh token from `POST /connect/token` after PKCE login.
 
 ### ✅ Pattern 3: JWKS-only JWT validation in consuming modules
 
@@ -1408,6 +1491,7 @@ This violates the Share Nothing principle (cross-module DB query), forces every 
 - **Cross-module handlers must filter by `OrganizationId`** in addition to entity foreign keys. Tenant isolation is always explicit.
 - Sync RPC (gRPC) is the escape hatch only. If you reach for it more than once or twice per module, you probably need another local read model instead.
 - **JWT validation is JWKS-only.** Consuming modules verify JWTs against Identity's JWKS endpoint locally; never call `IdentityDbContext` or any Identity service per request just to authenticate a user.
+- **Cross-module gRPC services derive `organization_id` from the caller's JWT `org_id` claim**, never from a request field. The proto must not declare an `organization_id` input; the server reads `ServerCallContext.GetHttpContext().User.FindFirst("org_id")` and throws `Unauthenticated` when the claim is absent.
 
 ### Pre-commit violation sweep
 

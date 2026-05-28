@@ -42,6 +42,17 @@ When a repository has a unique constraint (e.g. `(organization_id, name)`), a te
 
 **Happy-path-only integration tests are not complete** — they must be expanded before the layer is marked ✅.
 
+### Required path coverage (all implementation types)
+
+Generic AC/path coverage requirements are owned by
+[`agent-checklist.md` § AC coverage — avoid happy-path-only](./agent-checklist.md#ac-coverage--avoid-happy-path-only)
+to keep one source of truth.
+
+Testing playbook responsibility here is implementation technique:
+- choose the right test level for each path (unit vs integration),
+- keep path assertions deterministic (no timing-race assertions),
+- keep behavior assertions explicit enough to map back to the AC row.
+
 ### Pre-commit gate
 
 See [agent-checklist.md § Gate 1](./agent-checklist.md) and CLAUDE.md. When `src/` or `tests/` change:

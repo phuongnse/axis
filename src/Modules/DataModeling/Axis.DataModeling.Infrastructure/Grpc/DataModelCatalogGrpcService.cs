@@ -1,15 +1,16 @@
 using System.Security.Claims;
-using Axis.FormBuilder.Application.Repositories;
-using Axis.FormBuilder.Contracts.Grpc;
+using Axis.DataModeling.Application.Repositories;
+using Axis.DataModeling.Contracts.Grpc;
+using Axis.DataModeling.Domain.Aggregates;
 using Grpc.Core;
 
-namespace Axis.FormBuilder.Infrastructure.Grpc;
+namespace Axis.DataModeling.Infrastructure.Grpc;
 
-internal sealed class FormModelReferenceGrpcService(IFormModelReferenceRepository references)
-    : FormModelReferenceService.FormModelReferenceServiceBase
+internal sealed class DataModelCatalogGrpcService(IDataModelRepository dataModelRepository)
+    : DataModelCatalogService.DataModelCatalogServiceBase
 {
-    public override async Task<CountActiveModelReferencesResponse> CountActiveModelReferences(
-        CountActiveModelReferencesRequest request,
+    public override async Task<GetModelSummaryResponse> GetModelSummary(
+        GetModelSummaryRequest request,
         ServerCallContext context)
     {
         Guid organizationId = ResolveCallerOrganizationId(context);
@@ -20,10 +21,16 @@ internal sealed class FormModelReferenceGrpcService(IFormModelReferenceRepositor
                 new Status(StatusCode.InvalidArgument, "model_id must be a valid GUID."));
         }
 
-        int count = await references.CountActiveReferencesToModelAsync(
-            modelId, organizationId, context.CancellationToken);
+        DataModel? model = await dataModelRepository.GetByIdAsync(
+            modelId,
+            organizationId,
+            context.CancellationToken);
 
-        return new CountActiveModelReferencesResponse { ActiveReferenceCount = count };
+        return new GetModelSummaryResponse
+        {
+            Exists = model is not null,
+            ModelName = model?.Name ?? string.Empty,
+        };
     }
 
     private static Guid ResolveCallerOrganizationId(ServerCallContext context)

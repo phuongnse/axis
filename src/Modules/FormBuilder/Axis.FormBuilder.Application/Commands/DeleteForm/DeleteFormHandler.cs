@@ -20,7 +20,7 @@ public sealed class DeleteFormHandler(
             return Result.Failure(ErrorCodes.NotFound, "Form not found.");
 
         Result guardResult = await formDeletionGuard.ValidateCanDeleteAsync(
-            command.FormId, command.OrganizationId, cancellationToken);
+            command.FormId, cancellationToken);
         if (guardResult.IsFailure)
             return guardResult;
 

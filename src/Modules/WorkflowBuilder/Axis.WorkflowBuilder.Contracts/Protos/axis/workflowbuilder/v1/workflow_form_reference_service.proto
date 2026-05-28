@@ -5,14 +5,18 @@ option csharp_namespace = "Axis.WorkflowBuilder.Contracts.Grpc";
 package axis.workflowbuilder.v1;
 
 // Cross-module sync RPC (ADR-014). Used by FormBuilder to block form deletion.
+// Tenant scoping: server derives organization_id from the caller's JWT `org_id` claim;
+// callers MUST forward the inbound `authorization` header on every call.
 service WorkflowFormReferenceService {
   rpc CountBlockingFormReferences(CountBlockingFormReferencesRequest)
       returns (CountBlockingFormReferencesResponse);
 }
 
 message CountBlockingFormReferencesRequest {
+  reserved 2;
+  reserved "organization_id";
+
   string form_id = 1;
-  string organization_id = 2;
 }
 
 message CountBlockingFormReferencesResponse {

@@ -28,6 +28,7 @@ One-page map into [`patterns.md`](./patterns.md). Open only the section you need
 | Domain events / Wolverine handlers | [Wolverine patterns](./patterns.md#wolverine-patterns) |
 | Traces / metrics / structured logs | [OpenTelemetry observability](./patterns.md#opentelemetry-observability) |
 | Data owned by another module | [Cross-module data pattern](./patterns.md#cross-module-communication-pattern) · [gRPC dev (grpcurl)](./patterns.md#dev--verify-getuserpermissions-with-grpcurl) |
+| Editing `buf.yaml` / removing a proto field | [Buf breaking rules — what's actually configured (and the gotcha)](./patterns.md#buf-breaking-rules--whats-actually-configured-and-the-gotcha) |
 | Idempotent command / migration | [Command idempotency](./patterns.md#command-idempotency-pattern) |
 | Pre-commit hygiene grep | [Code hygiene checklist](./patterns.md#code-hygiene-checklist) |
 | React / TanStack Query screen | [Frontend Patterns](./patterns.md#frontend-patterns) · [frontend.md](./frontend.md) |
@@ -64,6 +65,7 @@ One-page map into [`patterns.md`](./patterns.md). Open only the section you need
 | 22 | [Wolverine](./patterns.md#wolverine-patterns) |
 | 23 | [OpenTelemetry](./patterns.md#opentelemetry-observability) |
 | 24 | [Cross-module data](./patterns.md#cross-module-communication-pattern) |
+| 24a | [Buf breaking rules + counterexample lesson](./patterns.md#buf-breaking-rules--whats-actually-configured-and-the-gotcha) |
 | 25 | [Command idempotency](./patterns.md#command-idempotency-pattern) |
 | 26 | [Code hygiene](./patterns.md#code-hygiene-checklist) |
 | 27 | [Frontend patterns](./patterns.md#frontend-patterns) |
