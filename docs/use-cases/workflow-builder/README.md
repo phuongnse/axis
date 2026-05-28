@@ -90,7 +90,7 @@ The workflow builder is the heart of the platform. It is what differentiates Axi
 
 ## Diagrams
 
-![Workflow Data Model](./diagrams/workflow-model.svg)
+![Workflow Data Model](./create-workflow/workflow-model.svg)
 
 ---
 

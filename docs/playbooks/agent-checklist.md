@@ -67,7 +67,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 2. For each bullet: implemented + test, `N/A this PR — Frontend`, or named deferral.
 3. Only then set `Gaps vs spec: none for backend` (or list what remains).
 
-**Lesson (platform-foundation organization management):** A first pass shipped profile/settings/deletion APIs but missed Redis usage TTL (≤5 min), schedule rollback on queue failure, hard-delete purge, and form-task cancel — caught by spec review, not by “flow works.” See [organization-management callouts](../platform-foundation/README.md) for what “done” looks like after self-audit.
+**Lesson (platform-foundation organization management):** A first pass shipped profile/settings/deletion APIs but missed Redis usage TTL (≤5 min), schedule rollback on queue failure, hard-delete purge, and form-task cancel — caught by spec review, not by “flow works.” See [organization-management callouts](../use-cases/platform-foundation/README.md) for what “done” looks like after self-audit.
 
 ---
 
@@ -199,7 +199,7 @@ Never ✅ and "pending …" in the same callout. Checkboxes in use-case files ar
 
 Updating only `PROGRESS.md` while changing `src/` without `docs/use-cases/` → drift fails. Domain README `| API | ⏳` after endpoints ship → drift fails.
 
-**Agents starting a task:** read [use cases README § How agents find open work](../README.md#how-agents-find-open-work) — checkboxes in use-case files are not progress.
+**Agents starting a task:** read [use cases README § How agents find open work](../use-cases/README.md#how-agents-find-open-work) — checkboxes in use-case files are not progress.
 
 **Chore/style PRs that touch module code:** drift still applies — add one small, accurate detail to the matching domain doc (a chunk size, a behavior nuance, a deferral note already true). Don't propose loosening the script, don't strand the format gunk waiting for a "real" PR, and don't invent fake content. The script's intent is *prompt the developer to look at docs*, not *require rewrite proportional to code change*.
 

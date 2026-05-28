@@ -72,7 +72,7 @@ Excalidraw wireframes/diagrams live alongside each use case in `docs/use-cases/{
 
 | Screen | Source | Preview |
 |---|---|---|
-| Login | [login.excalidraw](./use-cases/identity-access/sign-in/login.excalidraw) | [login.svg](./use-cases/identity-access/sign-in/login.svg) |
+| Login | N/A | N/A |
 
 ---
 
@@ -82,7 +82,7 @@ When two docs disagree, the **owner** wins. Update the owner first; everything e
 
 | Topic | Owner |
 |---|---|
-| Use-case layout (flow + AC + artifacts + status) | [use-cases/USE_CASE_TEMPLATE.md](./use-cases/USE_CASE_TEMPLATE.md) + [playbooks/docs-style.md](./playbooks/docs-style.md#use-case-files-wireframes--implementation-status) |
+| Use-case layout (flow + AC + artifacts + status) | [use-cases/USE_CASE_TEMPLATE.md](./use-cases/USE_CASE_TEMPLATE.md) + [playbooks/docs-style.md](./playbooks/docs-style.md#use-case-files--wireframes--implementation-status) |
 | Product scope, target users, MVP cut | [PRODUCT_VISION.md](./PRODUCT_VISION.md) |
 | Library versions and ADRs | [TECH_STACK.md](./TECH_STACK.md) |
 | Source tree and module boundaries | [../CLAUDE.md](../CLAUDE.md) |

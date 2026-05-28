@@ -7,7 +7,7 @@ namespace Axis.WorkflowEngine.Infrastructure.Services.StepExecutors;
 /// <summary>
 /// HTTP Request step executor. Reads method/url/headers/body/auth/timeout from stepConfig,
 /// interpolates context expressions, and executes the outbound HTTP call.
-/// full implementation pending API layer; currently returns a structured stub response.
+/// Temporary implementation that returns a structured placeholder response.
 /// </summary>
 internal sealed class HttpStepExecutor(
     IHttpClientFactory httpClientFactory,

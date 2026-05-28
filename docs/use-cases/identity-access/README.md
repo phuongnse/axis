@@ -64,7 +64,7 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 
 ## Diagrams
 
-![Auth Flow](./diagrams/auth-flow.svg)
+![Auth Flow](./sign-in/auth-flow.svg)
 
 ---
 

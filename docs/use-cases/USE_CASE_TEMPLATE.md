@@ -43,13 +43,13 @@ One sentence about user value.
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| <screen-slug> | [source](./wireframes/<screen>.excalidraw) | [preview](./wireframes/<screen>.svg) |
+| <screen-slug> | `<screen>.excalidraw` | `<screen>.svg` |
 
 ## Diagrams
 
 | Diagram | Source | Preview |
 |---------|--------|---------|
-| <diagram-slug> | [source](./diagrams/<diagram>.excalidraw) | [preview](./diagrams/<diagram>.svg) |
+| <diagram-slug> | `<diagram>.excalidraw` | `<diagram>.svg` |
 
 > **Implementation status**
 >

@@ -56,7 +56,7 @@ Forms are the primary mechanism for human interaction within a workflow. Without
 
 ## Diagrams
 
-![Form Model](./diagrams/form-model.svg)
+![Form Model](./create-form/form-model.svg)
 
 ---
 

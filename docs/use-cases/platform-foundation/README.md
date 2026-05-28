@@ -58,7 +58,7 @@ Without this foundation, nothing else works. Every feature in every other domain
 
 ## Diagrams
 
-![Tenant Provisioning Flow](./diagrams/tenant-provisioning.svg)
+![Tenant Provisioning Flow](./provision-tenant/tenant-provisioning.svg)
 
 ---
 

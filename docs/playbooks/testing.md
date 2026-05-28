@@ -86,7 +86,7 @@ await PostgresModuleTestDatabase.MigrateAsync<DataModelingDbContext>(
 Do not couple tenant-isolation API tests to asynchronous provisioning-event timing.
 
 - **Tenant isolation API tests (tenant-isolation)** should verify request-path behavior (`org_id` resolution, schema-scoped reads, 403/404 boundaries) with **deterministic fixture setup**. Provision tenant schemas synchronously in test setup and assert required tenant tables exist before making API calls.
-- **Async provisioning workflow tests ([tenant provisioning](./README.md))** should be a **separate test suite** that targets coordinator/handler behavior (retry scheduling, exhaustion alerts, completion transitions), not a precondition for every API test.
+- **Async provisioning workflow tests ([tenant provisioning](../use-cases/platform-foundation/provision-tenant/))** should be a **separate test suite** that targets coordinator/handler behavior (retry scheduling, exhaustion alerts, completion transitions), not a precondition for every API test.
 - Shared helpers (e.g., auth helpers used by many endpoint suites) must not wait on eventually-consistent background pipelines with long polling loops. That pattern can create CI-wide flakes/timeouts and hide the real failing concern.
 
 When diagnosing CI failures in this area:

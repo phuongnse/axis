@@ -474,7 +474,7 @@ await _context.WorkflowDefinitions
 
 **Rule:** Avoid raw SQL in tenant-aware contexts. When raw SQL is unavoidable (e.g. performance-critical bulk ops, cross-module reads), always prefix the table with the tenant schema from `ITenantContext.Schema` and add soft-delete filter manually. Document why raw SQL was needed with a comment.
 
-### Tenant schema provisioning ([tenant provisioning](./README.md))
+### Tenant schema provisioning ([tenant provisioning](../use-cases/platform-foundation/provision-tenant/))
 
 After email verification, every **tenant-scoped** module provisions its own PostgreSQL schema for the organization. Identity stays on `public` and only publishes the verification event — it never touches another module's DB.
 
@@ -1849,7 +1849,7 @@ Shared kit screens live under `docs/wireframes/`; use-case-specific assets can l
 **Linking from a use-case file** — add directly after the feature title, before the first user story:
 
 ```markdown
-> **Wireframe**: [docs/use-cases/identity-access/sign-in/login.excalidraw](../../use-cases/identity-access/sign-in/login.excalidraw) · [preview](../../use-cases/identity-access/sign-in/login.svg)
+> **Wireframe**: [docs/use-cases/identity-access/sign-in/auth-flow.excalidraw](../../use-cases/identity-access/sign-in/auth-flow.excalidraw) · [preview](../../use-cases/identity-access/sign-in/auth-flow.svg)
 ```
 
 **Excalidraw settings** for consistent sketch aesthetic:

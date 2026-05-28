@@ -64,7 +64,7 @@ A workflow builder without an execution engine is just a drawing tool. This doma
 
 ## Diagrams
 
-![Execution Flow](./diagrams/execution-flow.svg)
+![Execution Flow](./start-execution/execution-flow.svg)
 
 ---
 
@@ -135,7 +135,7 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend — high** | ⚠️ | [execution-management](./README.md): schedule/webhook/event triggers, stale-PENDING recovery. [error-handling](./README.md): notification dispatch, `GetExecution` error detail, channel config. [step-handlers](step-handlers.md): real `IScriptExecutor` / `INotificationSender` (stubs today). |
+| **Backend — high** | ⚠️ | [execution-management](./README.md): schedule/webhook/event triggers, stale-PENDING recovery. [error-handling](./README.md): notification dispatch, `GetExecution` error detail, channel config. [isolated-steps](./isolated-steps/): real `IScriptExecutor` / `INotificationSender` (stubs today). |
 | **Backend — medium** | ⚠️ | [execution-history](./README.md): date/trigger filters, CSV export, role-scoped list. Cancel: abandon Wolverine jobs + cancel form tasks. **[Organization deletion](../platform-foundation/README.md):** `OrganizationExecutionCanceller` cancels Pending/Running executions before org hard-delete (`FixedTenantContext`). |
 | **Frontend** | ⏳ | Execution monitor, retry UI, SignalR live updates — see [execution-management](./README.md) and related use-case callouts. |
 
