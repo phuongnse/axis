@@ -524,10 +524,10 @@ function moduleOverview() {
   // Arrows
   // Cross-module connection examples (single connector style)
   els.push(...arrow({ x1: 610, y1: 235, x2: 610, y2: 286, color: C.arrow }));
-  // Route around lane/badge center to keep labels readable.
-  els.push(...routedArrow({ waypoints: [[360, 364], [360, 452], [385, 452], [385, 470]], color: C.arrow }));
-  // Single consumer connection to FormBuilder (remove overlapping duplicate).
-  els.push(...arrow({ x1: 860, y1: 350, x2: 860, y2: 235, color: C.arrow }));
+  // Route from lane edge to WorkflowEngine with no floating segment.
+  els.push(...routedArrow({ waypoints: [[320, 378], [320, 448], [340, 448], [340, 470]], color: C.arrow }));
+  // FormBuilder consumes from messaging lanes via right-side routed path (no lane cut-through).
+  els.push(...routedArrow({ waypoints: [[935, 332], [955, 332], [955, 260], [860, 260], [860, 235]], color: C.arrow }));
   // WorkflowEngine (bottom y=550) → reads own local copy
   els.push(...arrow({ x1: 385, y1: 550, x2: 385, y2: 595, color: C.muted, dashed: true, label: "reads own copy" }));
 
