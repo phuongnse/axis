@@ -324,7 +324,7 @@ function systemContext() {
   actor(95, 490, "End User", "[submits forms, views pages]");
 
   // Platform boundary
-  els.push(...rect({ x: 230, y: 65, w: 600, h: 650, bg: "#f0f9ff", stroke: C.sysBdr, label: "Axis Platform", labelSize: 14, labelBold: true, labelColor: C.sysBdr }));
+  els.push(...rect({ x: 230, y: 65, w: 600, h: 650, bg: "#f0f9ff", stroke: C.sysBdr }));
 
   // Inside platform (context-level only; no container internals)
   els.push(...rect({ x: 300, y: 170, w: 250, h: 80, bg: C.sysBg, stroke: C.sysBdr, label: "Web Application (SPA)", sub: "Org admin/member + end-user UI" }));
