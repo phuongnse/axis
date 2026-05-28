@@ -122,7 +122,7 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend** | ⚠️ | [form-submission](./README.md): notification on assign; expiry → execution failure (workflow-engine); role-based My Tasks aggregation. Token submit + My Tasks API ✅. |
+| **Backend** | ⚠️ | [form-submission](./README.md): notification on assign; expiry → execution failure (workflow-engine); role-based My Tasks aggregation. Token submit + My Tasks API shipped. |
 | **Frontend** | ⏳ | Form editor, field picker, standalone submit page, My Tasks — all tenant-registration–subscription-plans US. |
 | **Cross-module** | workflow-engine | Form step execution, context expressions, `FormStepReached` consumer path — coordinate with workflow-engine. **platform-foundation organization management [organization deletion](./README.md):** `OrganizationFormTaskCanceller` cancels pending form tasks before org hard-delete (Identity-owned job). |
 

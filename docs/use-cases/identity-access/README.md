@@ -116,7 +116,7 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend** | ⚠️ polish | [password-security](./README.md): reset/change-password rate limits, session list API wiring. [permissions](./README.md): `[RequirePermission]` / policy tests. [user-management](./README.md): block admin self-invite at API. |
+| **Backend** | ⚠️ polish | [password-security](./README.md): reset/change-password rate limits, session list API wiring. [permissions](./README.md): `[RequirePermission]` policy tests. [user-management](./README.md): block admin self-invite at API. |
 | **Frontend** | ⏳ | Register, settings, invitation accept, session management UI, and localization/theming foundation — see per–use-case callouts in [authentication](./README.md) through [localization-and-theming](./README.md). |
 
 Core auth/OIDC/RBAC backend is ✅; use feature **Gaps vs spec** for the next use case, not domain-level checkboxes.
