@@ -17,9 +17,11 @@ lint:
     # RPC request/response types follow {Rpc}Request / {Rpc}Response in .proto files.
     - RPC_REQUEST_RESPONSE_UNIQUE
 breaking:
-  # PACKAGE allows field deletion when the field number + name are reserved.
-  # FILE would forbid deletion outright; we want the reserved-number escape
-  # hatch because pre-MVP refactors (e.g. tenant-scoping moved into JWT) do
-  # remove fields with no external consumers yet.
   use:
-    - PACKAGE
+    - FILE
+  except:
+    # FILE category bundles both FIELD_NO_DELETE (strict) and
+    # FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED. We drop the strict variant so a
+    # pre-MVP refactor can remove a field provided the number + name are
+    # reserved in the new schema; the relaxed rule still enforces that.
+    - FIELD_NO_DELETE
