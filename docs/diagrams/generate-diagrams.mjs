@@ -329,28 +329,27 @@ function systemContext() {
   // Inside platform (context-level only; no container internals)
   els.push(...rect({ x: 300, y: 170, w: 250, h: 80, bg: C.sysBg, stroke: C.sysBdr, label: "Web Application (SPA)", sub: "Org admin/member + end-user UI" }));
   els.push(...rect({ x: 300, y: 320, w: 250, h: 80, bg: C.sysBg, stroke: C.sysBdr, label: "Axis API Gateway", sub: "Auth + REST/OpenAPI + module orchestration" }));
-  els.push(...rect({ x: 300, y: 470, w: 250, h: 80, bg: C.sysBg, stroke: C.sysBdr, label: "Module Services", sub: "Identity · Data · Workflow · Form · Engine · Page" }));
+  els.push(...rect({ x: 300, y: 470, w: 250, h: 80, bg: C.sysBg, stroke: C.sysBdr, label: "Module Services", sub: "Identity · Data · Workflow · Forms · Engine · Pages" }));
 
   // External systems
   els.push(...rect({ x: 890, y: 170, w: 180, h: 70, bg: C.extBg, stroke: C.extBdr, label: "Email Service", sub: "Verification + notifications" }));
   els.push(...rect({ x: 890, y: 320, w: 180, h: 70, bg: C.extBg, stroke: C.extBdr, label: "External APIs", sub: "Workflow HTTP steps" }));
   els.push(...rect({ x: 890, y: 470, w: 180, h: 70, bg: C.extBg, stroke: C.extBdr, label: "Webhook Targets", sub: "Outbound workflow events" }));
 
-  // Actors → Axis (single protocol note to avoid label collisions)
-  els.push(...routedArrow({ waypoints: [[139, 152], [260, 152], [260, 350], [300, 350]] }));
-  els.push(...routedArrow({ waypoints: [[139, 272], [250, 272], [250, 210], [300, 210]] }));
-  els.push(...routedArrow({ waypoints: [[139, 392], [250, 392], [250, 210], [300, 210]] }));
-  els.push(...routedArrow({ waypoints: [[139, 512], [250, 512], [250, 210], [300, 210]] }));
-  els.push(text({ x: 270, y: 332, value: "HTTPS", size: 10, color: C.muted, anchor: "center" }));
+  // Actors → Axis (separate channels to reduce overlap)
+  els.push(...routedArrow({ waypoints: [[139, 152], [212, 152], [212, 350], [300, 350]] }));
+  els.push(...routedArrow({ waypoints: [[139, 272], [220, 272], [220, 200], [300, 200]] }));
+  els.push(...routedArrow({ waypoints: [[139, 392], [228, 392], [228, 215], [300, 215]] }));
+  els.push(...routedArrow({ waypoints: [[139, 512], [236, 512], [236, 230], [300, 230]] }));
 
   // Internal Axis flow
   els.push(...arrow({ x1: 425, y1: 250, x2: 425, y2: 320 }));
   els.push(...arrow({ x1: 425, y1: 400, x2: 425, y2: 470 }));
 
   // Axis → external systems
-  els.push(...arrow({ x1: 550, y1: 350, x2: 890, y2: 205 }));
-  els.push(...arrow({ x1: 550, y1: 350, x2: 890, y2: 355 }));
-  els.push(...arrow({ x1: 550, y1: 510, x2: 890, y2: 505 }));
+  els.push(...arrow({ x1: 550, y1: 336, x2: 890, y2: 205 }));
+  els.push(...arrow({ x1: 550, y1: 360, x2: 890, y2: 355 }));
+  els.push(...arrow({ x1: 550, y1: 495, x2: 890, y2: 505 }));
 
   // Legend
   els.push(...rect({ x: 560, y: 590, w: 250, h: 108, bg: "#ffffff", stroke: C.border }));
