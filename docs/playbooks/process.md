@@ -80,7 +80,7 @@ For every `⚠️` found, decide explicitly:
 | Verdict | Action |
 |---|---|
 | Actually done, docs stale | Update callout to ✅ |
-| Deferred — depends on a later module (e.g. E06) | `Gaps vs spec` with `pending E0X` and/or `**Deferred (...):**` per agent-checklist deferred-callout rules (`**Deferred (PR #N follow-up):**`) |
+| Deferred — depends on a later module (e.g. workflow-engine) | `Gaps vs spec` with `pending E0X` and/or `**Deferred (...):**` per agent-checklist deferred-callout rules (`**Deferred (PR #N follow-up):**`) |
 | Genuine miss | Fix it before proceeding |
 
 Also check cross-module Application dependencies: list every query or command the upcoming API layer will call from *other* modules' Application layers. If any are missing, add them now.
@@ -135,7 +135,7 @@ Repeat for every screen / feature area. **Never skip the wireframe step** — it
 | Step | Action | Output |
 |---|---|---|
 | 1 | Read use-case file ACs in full | Understand spec contract |
-| 2 | Create Excalidraw wireframe + run `generate-wireframes.ps1` | `docs/wireframes/{screen-slug}.excalidraw` + `.svg` |
+| 2 | Create Excalidraw wireframe + run `generate-wireframes.ps1` | `docs/use-cases/_shared/wireframes/{screen-slug}.excalidraw` + `.svg` |
 | 3 | Add `> **Wireframe**` callout to use-case file | Wireframe linked from spec |
 | 4 | Define types from backend contract | `features/{name}/types.ts` |
 | 5 | Define API functions + query key factory | `features/{name}/api.ts` |

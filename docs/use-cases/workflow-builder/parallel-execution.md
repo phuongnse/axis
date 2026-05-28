@@ -123,7 +123,7 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** AND/OR join execution, branch cancellation, and grace period pending E06.
+> **Gaps vs spec:** AND/OR join execution, branch cancellation, and grace period pending workflow-engine.
 
 ---
 
@@ -158,7 +158,7 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:**
-> - context namespacing by step ID and sibling-output blocking pending E06
+> - context namespacing by step ID and sibling-output blocking pending workflow-engine
 > - design-time duplicate output warning backend polish — see gaps below.
 
 

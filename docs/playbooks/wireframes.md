@@ -11,21 +11,21 @@ This playbook covers everything needed to work with the wireframe generation sys
 
 | File | Purpose |
 |---|---|
-| `docs/wireframes/components.mjs` | **Single source of truth** — primitives, colors, layout constants, helpers |
-| `docs/wireframes/generate-template.mjs` | 34-section component kit — imports from `components.mjs`, exports all builders |
-| `docs/wireframes/generate-screens.mjs` | 27 screen wireframes — imports builders from the template, places them via `component()` |
-| `docs/wireframes/_template.excalidraw` | Generated output of `generate-template.mjs` |
+| `docs/use-cases/_shared/wireframes/components.mjs` | **Single source of truth** — primitives, colors, layout constants, helpers |
+| `docs/use-cases/_shared/wireframes/generate-template.mjs` | 34-section component kit — imports from `components.mjs`, exports all builders |
+| `docs/use-cases/_shared/wireframes/generate-screens.mjs` | 27 screen wireframes — imports builders from the template, places them via `component()` |
+| `docs/use-cases/_shared/wireframes/_template.excalidraw` | Generated output of `generate-template.mjs` |
 | `docs/use-cases/{domain}/wireframes/*.excalidraw` | Generated outputs of `generate-screens.mjs` — co-located with each domain |
 
 **Regeneration commands:**
 
 ```powershell
 # Regenerate the component kit
-node docs/wireframes/generate-template.mjs
+node docs/use-cases/_shared/wireframes/generate-template.mjs
 docs/scripts/generate-wireframes.ps1 -Filter _template
 
 # Regenerate all screen wireframes
-node docs/wireframes/generate-screens.mjs
+node docs/use-cases/_shared/wireframes/generate-screens.mjs
 docs/scripts/generate-wireframes.ps1
 ```
 
@@ -42,9 +42,9 @@ All generated wireframes must use deterministic seeds per screen (`setSeed(deter
 - Why: Excalidraw roughness depends on seed; order-dependent global seeds cause unrelated files to churn when a new screen is inserted.
 - Guarantee: adding/changing one screen does not rewrite untouched screens in other domains.
 - Implementation: keep `runScreen(screenKey, generator)` wrapper in `generate-screens.mjs` and call every `genXxx()` through it.
-- **Pre-commit check:** run `node docs/wireframes/generate-screens.mjs` twice; `git diff` must be empty after the second run (proves seeds are stable).
+- **Pre-commit check:** run `node docs/use-cases/_shared/wireframes/generate-screens.mjs` twice; `git diff` must be empty after the second run (proves seeds are stable).
 
-### Auth outcome cards — `stateHeadline` (E01 email flows)
+### Auth outcome cards — `stateHeadline` (platform-foundation email flows)
 
 Use one layout for informational / error states (`email-confirmation`, `verify-email` grid cards, `verify-email-rate-limit`):
 
@@ -358,7 +358,7 @@ When writing or editing any wireframe generator, verify against these values (fr
    - **All y-positions must use the spacing formulas** in the "Spacing formulas" section above — never guess offsets
 2. Call `genXxx()` in the main section at the bottom of the file
 3. Add the output path to the screen inventory table in this playbook
-4. Run `node docs/wireframes/generate-screens.mjs` — **verify output has no `NaN` positions** (element count must be > 0)
+4. Run `node docs/use-cases/_shared/wireframes/generate-screens.mjs` — **verify output has no `NaN` positions** (element count must be > 0)
 5. Run `docs/scripts/generate-wireframes.ps1` to regenerate SVGs
 6. Add a `> **Wireframe**` callout to the relevant use-case file
 
@@ -413,15 +413,15 @@ This is what makes `import { buildWorkflowCanvas } from './generate-template.mjs
 
 ## Screen inventory
 
-| Module | Files |
+| Domain path | Files |
 |---|---|
-| `docs/wireframes/` (root) | `app-shell` |
-| `E01-platform-foundation/wireframes/` | `register-org`, `register-org-states`, `email-confirmation`, `verify-email`, `verify-email-rate-limit`, `workspace-provisioning`, `pricing`, `settings-org`, `settings-org-upload-states`, `settings-org-profile-states`, `settings-org-usage-error`, `settings-org-free-plan`, `settings-org-access-denied`, `settings-org-deletion-scheduled`, `settings-org-delete-modal`, `settings-org-delete-states` |
-| `E02-identity-access/wireframes/` | `login`, `login-unverified`, `register`, `forgot-password`, `change-password`, `accept-invitation`, `settings-users`, `settings-roles`, `settings-security` |
-| `E03-data-modeling/wireframes/` | `data-models`, `data-classes`, `records` |
-| `E04-workflow-builder/wireframes/` | `workflows`, `workflow-editor` |
-| `E05-form-builder/wireframes/` | `forms`, `form-editor`, `form-submission` |
-| `E06-workflow-engine/wireframes/` | `executions`, `execution-detail` |
+| `docs/use-cases/_shared/wireframes/` | `app-shell`, `_template` |
+| `docs/use-cases/platform-foundation/wireframes/` | `register-org`, `register-org-states`, `email-confirmation`, `verify-email`, `verify-email-rate-limit`, `workspace-provisioning`, `pricing`, `settings-org`, `settings-org-upload-states`, `settings-org-profile-states`, `settings-org-usage-error`, `settings-org-free-plan`, `settings-org-access-denied`, `settings-org-deletion-scheduled`, `settings-org-delete-modal`, `settings-org-delete-states` |
+| `docs/use-cases/identity-access/wireframes/` | `login`, `login-unverified`, `register`, `forgot-password`, `change-password`, `accept-invitation`, `settings-users`, `settings-roles`, `settings-security` |
+| `docs/use-cases/data-modeling/wireframes/` | `data-models`, `data-classes`, `records` |
+| `docs/use-cases/workflow-builder/wireframes/` | `workflows`, `workflow-editor` |
+| `docs/use-cases/form-builder/wireframes/` | `forms`, `form-editor`, `form-submission` |
+| `docs/use-cases/workflow-engine/wireframes/` | `executions`, `execution-detail` |
 
 ---
 

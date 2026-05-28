@@ -83,7 +83,7 @@ Workflow definitions can be exported as portable JSON files and imported into an
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:**
-> - broken-reference `"broken": true` flag pending E03/E05 integration
+> - broken-reference `"broken": true` flag pending data-modeling/form-builder integration
 > - export notice and broken-reference warning UI pending Frontend.
 >
 > **Decisions:** credential scrubbing in `ExportWorkflowHandler` — keys matching token/api_key/apikey/secret/password/authorization/auth_token/hmac_secret/client_secret/private_key/bearer/access_token/refresh_token replaced with `[REDACTED]` (OrdinalIgnoreCase).

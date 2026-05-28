@@ -62,7 +62,7 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 >
 > **Gaps vs spec:** canvas/list UI only (backend).
 >
-> **Done:** HTTP 402 on create when workflow plan limit reached (`CreateWorkflowHandler` + E01 F04).
+> **Done:** HTTP 402 on create when workflow plan limit reached (`CreateWorkflowHandler` + platform-foundation subscription plans).
 >
 > **Decisions:**
 > - new workflow initialised with Start + End nodes by domain factory
@@ -161,8 +161,8 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:**
-> - cron job registration and webhook URL generation pending WorkflowEngine integration (E06)
-> - broken-step validation pending E03/E05 integration
+> - cron job registration and webhook URL generation pending WorkflowEngine integration (workflow-engine)
+> - broken-step validation pending data-modeling/form-builder integration
 > - draft versioning on re-edit pending API design.
 
 ---
@@ -210,7 +210,7 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:**
-> - trigger deactivation on archive pending E06 integration
+> - trigger deactivation on archive pending workflow-engine integration
 > - HTTP 422 on archived-workflow trigger backend polish — see gaps below.
 
 ---
@@ -246,7 +246,7 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 - [ ] Webhook URLs are NOT copied; the duplicate generates a new unique webhook URL when published.
 
 *Out of scope*
-- Cross-org workflow duplication (copy to another org) — handled by Import/Export in F07.
+- Cross-org workflow duplication (copy to another org) — handled by Import/Export in import-export.
 
 > **Implementation status**
 >
@@ -258,7 +258,7 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** webhook URL generation for duplicate pending E06.
+> **Gaps vs spec:** webhook URL generation for duplicate pending workflow-engine.
 >
 > **Done:** HTTP 402 on duplicate when at workflow limit (`DuplicateWorkflowHandler`).
 >

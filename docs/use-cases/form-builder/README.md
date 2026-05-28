@@ -62,7 +62,7 @@ Workflow reaches Form step
 
 ---
 
-## Acceptance Criteria (Epic Level)
+## Acceptance Criteria (domain)
 
 - [ ] Users can create a form with at least 5 different field types.
 - [ ] Each field can have required validation, min/max length, and custom error messages.
@@ -84,8 +84,8 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 | Layer | Status | Notes |
 |---|---|---|
 | Domain | ✅ Done | `FormDefinition`, `FormField`, `FormSubmission` aggregates; field types and form-task domain events |
-| Application | ⚠️ Partial | Form definition CRUD + fields; F04: `SubmitFormByToken`, `GetFormTaskByToken`, `GetMyFormTasks`, `ExpireFormSubmissionHandler`. Notifications and role-based assignee resolution pending |
-| Infrastructure | ✅ Done | `form_model_references` read model + `ModelDeletedHandler` (DataModeling Kafka) flags broken Relation Picker fields; delete-model guard via `IFormModelReferenceRepository`. Delete-form guard: `FormWorkflowDeletionGuard` calls WorkflowBuilder gRPC `CountBlockingFormReferences`; `FormDeletedEvent` Avro published on delete for WorkflowBuilder `FormDeletedHandler`. Database `axis_formbuilder` ([ADR-011](../../TECH_STACK.md#adr-011-per-module-database-with-schema-per-tenant-inside)); EF `InitialCreate` migration (regenerated via `dotnet ef`); tests/fixtures use `MigrateAsync` ([ADR-023](../../TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)). `FormSubmission` + expiry scheduling via Wolverine. DbContext + UnitOfWork inlined per ADR-017. `FormBuilderEventMapper` translates domain events to Avro at `SaveChangesAsync` and publishes via outbox → Kafka ([ADR-019](../../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). `OrganizationVerifiedHandler` provisions tenant schema via `TenantModuleProvisionAttempt` (reports `TenantModuleProvisionReportEvent` to Identity; retries via `RetryTenantModuleProvisionHandler` + shared `TenantSchemaProvisioner`, E01 US-003). `FormStepReachedHandler` consumes WorkflowEngine's `FormStepReachedEvent` from Kafka (Contracts only — no Domain reference). Consumes WorkflowBuilder lifecycle events from `Axis.WorkflowBuilder.Contracts`. |
+| Application | ⚠️ Partial | Form definition CRUD + fields; subscription-plans: `SubmitFormByToken`, `GetFormTaskByToken`, `GetMyFormTasks`, `ExpireFormSubmissionHandler`. Notifications and role-based assignee resolution pending |
+| Infrastructure | ✅ Done | `form_model_references` read model + `ModelDeletedHandler` (DataModeling Kafka) flags broken Relation Picker fields; delete-model guard via `IFormModelReferenceRepository`. Delete-form guard: `FormWorkflowDeletionGuard` calls WorkflowBuilder gRPC `CountBlockingFormReferences`; `FormDeletedEvent` Avro published on delete for WorkflowBuilder `FormDeletedHandler`. Database `axis_formbuilder` ([ADR-011](../../TECH_STACK.md#adr-011-per-module-database-with-schema-per-tenant-inside)); EF `InitialCreate` migration (regenerated via `dotnet ef`); tests/fixtures use `MigrateAsync` ([ADR-023](../../TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)). `FormSubmission` + expiry scheduling via Wolverine. DbContext + UnitOfWork inlined per ADR-017. `FormBuilderEventMapper` translates domain events to Avro at `SaveChangesAsync` and publishes via outbox → Kafka ([ADR-019](../../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). `OrganizationVerifiedHandler` provisions tenant schema via `TenantModuleProvisionAttempt` (reports `TenantModuleProvisionReportEvent` to Identity; retries via `RetryTenantModuleProvisionHandler` + shared `TenantSchemaProvisioner`, tenant provisioning use case). `FormStepReachedHandler` consumes WorkflowEngine's `FormStepReachedEvent` from Kafka (Contracts only — no Domain reference). Consumes WorkflowBuilder lifecycle events from `Axis.WorkflowBuilder.Contracts`. |
 | Contracts | ✅ Done | `Axis.FormBuilder.Contracts` — Avro schemas `FormTaskSubmittedEvent` + `FormTaskExpiredEvent` (the form-task lifecycle events WorkflowEngine reacts to). Hand-written `ISpecificRecord` generated code + `FormBuilderKafkaTopics` + `FormBuilderEventExtensions` (typed GUID accessors + `SubmittedData()` JSON round-trip helper since Avro lacks a native any-type). |
 | API | ✅ Done | `FormEndpoints` (definitions) + `FormTaskEndpoints` (token submit, my tasks). `submittedBy` resolved via `ICurrentUser` in Application |
 | Frontend | ⏳ Pending | — |
@@ -96,19 +96,19 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend** | ⚠️ | [F04](form-submission.md): notification on assign; expiry → execution failure (E06); role-based My Tasks aggregation. Token submit + My Tasks API ✅. |
-| **Frontend** | ⏳ | Form editor, field picker, standalone submit page, My Tasks — all F01–F04 US. |
-| **Cross-module** | E06 | Form step execution, context expressions, `FormStepReached` consumer path — coordinate with E06. **E01 F02 US-007:** `OrganizationFormTaskCanceller` cancels pending form tasks before org hard-delete (Identity-owned job). |
+| **Backend** | ⚠️ | [subscription-plans](form-submission.md): notification on assign; expiry → execution failure (workflow-engine); role-based My Tasks aggregation. Token submit + My Tasks API ✅. |
+| **Frontend** | ⏳ | Form editor, field picker, standalone submit page, My Tasks — all tenant-registration–subscription-plans US. |
+| **Cross-module** | workflow-engine | Form step execution, context expressions, `FormStepReached` consumer path — coordinate with workflow-engine. **platform-foundation organization management US-007:** `OrganizationFormTaskCanceller` cancels pending form tasks before org hard-delete (Identity-owned job). |
 
 ---
 
 ## Dependencies
 
-- [E01 — Platform Foundation](../platform-foundation/README.md)
-- [E02 — Identity & Access Management](../identity-access/README.md)
-- [E03 — Data Modeling](../data-modeling/README.md) *(for Relation Picker fields)*
+- [Platform Foundation](../platform-foundation/README.md)
+- [Identity & Access](../identity-access/README.md)
+- [Data Modeling](../data-modeling/README.md) *(for Relation Picker fields)*
 
 ## Dependents
 
-- [E04 — Workflow Builder](../workflow-builder/README.md) *(Form step type)*
-- [E06 — Workflow Execution Engine](../workflow-engine/README.md)
+- [Workflow Builder](../workflow-builder/README.md) *(Form step type)*
+- [Workflow Engine](../workflow-engine/README.md)

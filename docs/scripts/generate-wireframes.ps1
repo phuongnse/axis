@@ -31,12 +31,12 @@ function Export-ExcalidrawToSvg {
 }
 
 $docsRoot      = Split-Path $PSScriptRoot -Parent
-$wireframesRoot = Join-Path $docsRoot "wireframes"
+$sharedWireframesRoot = Join-Path $docsRoot "use-cases\_shared\wireframes"
 $useCasesRoot   = Join-Path $docsRoot "use-cases"
 
-# Collect from docs/wireframes/ (shared + template) and docs/use-cases/*/wireframes/
+# Collect from docs/use-cases/_shared/wireframes/ and docs/use-cases/*/wireframes/
 $wireframes = @()
-$wireframes += Get-ChildItem -Path $wireframesRoot -Filter "*.excalidraw" -Recurse
+$wireframes += Get-ChildItem -Path $sharedWireframesRoot -Filter "*.excalidraw" -Recurse
 $wireframes += Get-ChildItem -Path $useCasesRoot -Filter "*.excalidraw" -Recurse |
     Where-Object { $_.DirectoryName -match '[\\/]wireframes$' }
 $wireframes = $wireframes | ForEach-Object {

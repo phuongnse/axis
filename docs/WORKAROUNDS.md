@@ -50,7 +50,7 @@ When the cleanup trigger fires and you remove the workaround:
 - **Location**: `path/to/file.cs` (or `Axis.Foo.Infrastructure.SomeClass`)
 - **Violates**: CLAUDE.md P0 — quote the specific rule, or "ADR-NNN", or "F0N spec line"
 - **Why it exists**: 1-3 sentences. What's the blocker?
-- **Cleanup trigger**: specific event — "when PR for E04 Contracts lands", "when Kafka schema registry is provisioned in prod", "when feature flag X is removed"
+- **Cleanup trigger**: specific event — "when PR for workflow-builder Contracts lands", "when Kafka schema registry is provisioned in prod", "when feature flag X is removed"
 - **Owner**: GitHub handle (optional, but helpful)
 - **Added**: PR #N (link)
 ```
@@ -63,6 +63,6 @@ When the cleanup trigger fires and you remove the workaround:
 
 - **Location**: `src/Modules/Identity/Axis.Identity.Infrastructure/Messaging/OrganizationHardDeleteHandler.cs`
 - **Violates**: CLAUDE.md P0 — cross-module work must use Kafka events or RabbitMQ commands, not in-process calls into another module's infrastructure
-- **Why it exists**: F02 US-007 hard-delete must cancel Workflow Engine executions and Form Builder pending tasks before dropping tenant schemas. Modulith composition registers `IOrganizationExecutionCanceller` and `IOrganizationFormTaskCanceller` at `Axis.Api` startup; Identity invokes them synchronously inside the scheduled `OrganizationHardDeleteJob` handler. RabbitMQ command contracts and outbox handlers are not yet defined for these two steps.
+- **Why it exists**: organization-management US-007 hard-delete must cancel Workflow Engine executions and Form Builder pending tasks before dropping tenant schemas. Modulith composition registers `IOrganizationExecutionCanceller` and `IOrganizationFormTaskCanceller` at `Axis.Api` startup; Identity invokes them synchronously inside the scheduled `OrganizationHardDeleteJob` handler. RabbitMQ command contracts and outbox handlers are not yet defined for these two steps.
 - **Cleanup trigger**: When Workflow Engine and Form Builder expose versioned `*Command` handlers for org-scoped cancellation (ADR-024/025) and module extraction wiring no longer shares a process, replace direct canceller calls with Wolverine `IMessageBus` publish and remove the shared canceller interfaces from the hard-delete path.
 - **Added**: PR #127

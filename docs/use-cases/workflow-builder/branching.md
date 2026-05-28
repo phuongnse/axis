@@ -82,7 +82,7 @@ Workflows can take different execution paths based on data values using Conditio
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** canvas branch label rendering pending Frontend; branch evaluation at execution time pending E06.
+> **Gaps vs spec:** canvas branch label rendering pending Frontend; branch evaluation at execution time pending workflow-engine.
 >
 > **Decisions:** cycle detection implemented in domain (DFS reachability check in AddTransition). `Transition` is a value object (only `fromStepId`, `toStepId`, `condition` — no identity or ordering fields).
 
@@ -157,7 +157,7 @@ Workflows can take different execution paths based on data values using Conditio
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** OR-merge deduplication (execute-once on first arrival) is an execution engine concern — pending E06.
+> **Gaps vs spec:** OR-merge deduplication (execute-once on first arrival) is an execution engine concern — pending workflow-engine.
 
 
 ## Diagrams

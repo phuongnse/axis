@@ -10,7 +10,7 @@
 
 ## System Context
 
-![System Context](./diagrams/system-context.svg)
+![System Context](./use-cases/_architecture/diagrams/system-context.svg)
 
 The Axis platform serves four actor types: **Platform Admins** (Axis team), **Organization Admins**, **Organization Members**, and **End Users**. External systems include an email service for notifications, external APIs called by workflow HTTP steps, and webhook targets that receive workflow events.
 
@@ -18,7 +18,7 @@ The Axis platform serves four actor types: **Platform Admins** (Axis team), **Or
 
 ## Containers
 
-![Container Diagram](./diagrams/container.svg)
+![Container Diagram](./use-cases/_architecture/diagrams/container.svg)
 
 Axis runs as a **modulith with strict service boundaries** — each module is a deployable service contract; modulith packaging is the deployment shape today, K8s services tomorrow. See [TECH_STACK.md § ADR-010](./TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy).
 
@@ -46,7 +46,7 @@ Concrete versions in [TECH_STACK.md](./TECH_STACK.md).
 
 ## Module = Service: layering and contract surface
 
-![Module Overview](./diagrams/module-overview.svg)
+![Module Overview](./use-cases/_architecture/diagrams/module-overview.svg)
 
 Each module *is* a service contract — modulith mode collocates them as in-process targets, but the contract surface is identical to the extracted form. Source tree and project naming live in [CLAUDE.md § Solution tree](../CLAUDE.md#docs-index).
 

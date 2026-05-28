@@ -63,7 +63,7 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 > | API | ⏳ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** trigger HTTP endpoint, schedule/webhook/event trigger handlers, stale-PENDING recovery job pending API + E06 engine.
+> **Gaps vs spec:** trigger HTTP endpoint, schedule/webhook/event trigger handlers, stale-PENDING recovery job pending API + workflow-engine engine.
 >
 > **Decisions:** `WorkflowExecution.Create` sets status `Pending`; `Start()` transitions to `Running` — engine calls both in sequence.
 

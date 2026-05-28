@@ -64,7 +64,7 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 >
 > **Gaps vs spec:**
 > - No notification dispatch on assign
-> - email/in-app notification pending E06 + notification infrastructure
+> - email/in-app notification pending workflow-engine + notification infrastructure
 > - role member resolution pending Identity integration.
 >
 > **Done:** `FormSubmission` aggregate + `FormStepReachedHandler` creates pending submission with access token.
@@ -177,7 +177,7 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 >
 > **Gaps vs spec:** 
 >
-> **Done:** `GetMyFormTasksQuery` + authenticated list endpoints. Role-assigned task aggregation (not only direct assignee), SignalR push, and "My Tasks" UI pending Frontend + E06.
+> **Done:** `GetMyFormTasksQuery` + authenticated list endpoints. Role-assigned task aggregation (not only direct assignee), SignalR push, and "My Tasks" UI pending Frontend + workflow-engine.
 
 ---
 
@@ -229,7 +229,7 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 >
 > **Done:**
 > - `ExpireFormSubmissionMessage` scheduled from `FormStepReachedHandler`
-> - `ExpireFormSubmissionHandler` marks submission expired. Workflow execution → `Failed` + error notification on expiry pending E06 coordination.
+> - `ExpireFormSubmissionHandler` marks submission expired. Workflow execution → `Failed` + error notification on expiry pending workflow-engine coordination.
 
 
 ## Diagrams

@@ -166,7 +166,7 @@ Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, use-c
 
 - TanStack Query = server state; Zustand = client-only; loading/empty/error on fetches; RHF + Zod; lazy routes; no tokens in `localStorage`.
 
-**Wireframes:** `docs/use-cases/{domain}/wireframes/{slug}.excalidraw` + `.svg`; link in use-case file; regenerate with `docs/scripts/generate-wireframes.ps1`. Kit rules: [`wireframes.md`](docs/playbooks/wireframes.md).
+**Wireframes:** domain screens under `docs/use-cases/{domain}/wireframes/`; shared kit under `docs/use-cases/_shared/wireframes/`. Link rows in each use-case file; regenerate with `docs/scripts/generate-wireframes.ps1`. Kit rules: [`wireframes.md`](docs/playbooks/wireframes.md).
 
 **Cross-cutting:** forward `CancellationToken`; audit fields in Application; soft-delete on tenant aggregates; Serilog without PII; rate limit auth endpoints; CORS before auth; `/health` + `/health/ready` anonymous.
 

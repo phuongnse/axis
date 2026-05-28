@@ -157,7 +157,7 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** live-workflow warning banner (informational) and definition snapshot for in-progress tasks pending API + E06.
+> **Gaps vs spec:** live-workflow warning banner (informational) and definition snapshot for in-progress tasks pending API + workflow-engine.
 >
 > **Decisions:**
 > - `UpdateFormHandler` checks name uniqueness via `NameExistsAsync(name, orgId, excludeId)` before calling `form.Update()`

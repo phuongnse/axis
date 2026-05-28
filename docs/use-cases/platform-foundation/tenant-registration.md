@@ -233,7 +233,7 @@ Self-service registration flow where a new organization signs up and is automati
 
 *Out of scope*
 - Credit card collection and payment processing — Phase 2.
-- Plan upgrade/downgrade self-service — covered in F04.
+- Plan upgrade/downgrade self-service — covered in subscription-plans.
 
 > **Implementation status**
 >
@@ -249,7 +249,7 @@ Self-service registration flow where a new organization signs up and is automati
 > - pricing comparison table and workspace header plan name pending Frontend. **Done (backend):** `POST /api/organizations/` accepts optional `subscriptionPlanId`
 > - invalid/unavailable plan ids fall back to Free
 > - org stores `subscription_plan_id`
-> - F04 enforces limits (402) after provisioning.
+> - subscription-plans enforces limits (402) after provisioning.
 >
 > **Decisions:** MVP paid plan selection has no billing flag column yet — treat as normal plan assignment until billing Phase 2.
 

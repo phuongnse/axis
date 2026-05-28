@@ -13,8 +13,7 @@
 | [Product Vision](./PRODUCT_VISION.md) | Goals, target users, problem & solution |
 | [Tech Stack](./TECH_STACK.md) | Technology decisions and rationale |
 | [Architecture](./ARCHITECTURE.md) | System design, modules, data strategy |
-| [Use cases](./use-cases/README.md) | Domain index, behavior specs (flow + AC + wireframes + diagrams), implementation progress |
-| [Wireframes](./wireframes/) | Screen wireframes — Excalidraw source + SVG preview |
+| [Use cases](./use-cases/README.md) | Product specs: domains, use cases, wireframes, diagrams, implementation progress |
 
 ### Playbooks (how-to guides)
 
@@ -46,15 +45,15 @@
 
 ## Key Diagrams
 
-All diagrams are Excalidraw (`.excalidraw` source + `.svg` preview). Regenerate with `node docs/diagrams/generate-diagrams.mjs` then `docs/scripts/generate-diagrams.ps1`.
+All diagrams are Excalidraw (`.excalidraw` source + `.svg` preview). Regenerate with `node docs/use-cases/_architecture/generate-diagrams.mjs` then `docs/scripts/generate-diagrams.ps1`.
 
-**System-level** (`docs/diagrams/`):
+**System-level** (`docs/use-cases/_architecture/diagrams/`):
 
 | Diagram | Source | Preview |
 |---|---|---|
-| System Context | [system-context.excalidraw](./diagrams/system-context.excalidraw) | [system-context.svg](./diagrams/system-context.svg) |
-| Container Diagram | [container.excalidraw](./diagrams/container.excalidraw) | [container.svg](./diagrams/container.svg) |
-| Module Overview | [module-overview.excalidraw](./diagrams/module-overview.excalidraw) | [module-overview.svg](./diagrams/module-overview.svg) |
+| System Context | [system-context.excalidraw](./use-cases/_architecture/diagrams/system-context.excalidraw) | [system-context.svg](./use-cases/_architecture/diagrams/system-context.svg) |
+| Container Diagram | [container.excalidraw](./use-cases/_architecture/diagrams/container.excalidraw) | [container.svg](./use-cases/_architecture/diagrams/container.svg) |
+| Module Overview | [module-overview.excalidraw](./use-cases/_architecture/diagrams/module-overview.excalidraw) | [module-overview.svg](./use-cases/_architecture/diagrams/module-overview.svg) |
 
 **Domain-level** (in each `docs/use-cases/{domain}/diagrams/`):
 
@@ -69,7 +68,7 @@ All diagrams are Excalidraw (`.excalidraw` source + `.svg` preview). Regenerate 
 
 ## Wireframes
 
-Excalidraw wireframes live in `docs/use-cases/{domain}/wireframes/`, co-located with each domain's use cases and diagrams. Shared screens (template, app-shell) remain in `docs/wireframes/`. Each use-case file lists wireframes in a `## Wireframes` table (see [use-case template](./use-cases/_template-use-case.md)).
+Excalidraw wireframes live in `docs/use-cases/{domain}/wireframes/`, co-located with each domain's use cases and diagrams. Shared screens (template, app-shell) remain in `docs/use-cases/_shared/wireframes/`. Each use-case file lists wireframes in a `## Wireframes` table (see [use-case template](./use-cases/_template-use-case.md)).
 
 | Screen | Source | Preview |
 |---|---|---|

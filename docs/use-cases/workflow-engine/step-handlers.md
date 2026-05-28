@@ -119,7 +119,7 @@ Each step type has a dedicated handler that executes it in isolation. Handlers r
 >
 > **Gaps vs spec:**
 > - AC "concurrent delivery: second detects Running and exits" — spec wording updated in decision below; concurrent-duplicate protection is implemented via `UseXminAsConcurrencyToken()` on `execution_steps` rows. The second concurrent writer receives a `DbUpdateConcurrencyException` (translated to `ConcurrencyException`), logs, and exits gracefully. The "Running guard" approach was deliberately rejected — see Decisions.
-> - Engine-level 5-minute step timeout not yet implemented (E06 F03 scope).
+> - Engine-level 5-minute step timeout not yet implemented (workflow-engine tenant-isolation scope).
 > - `IScriptExecutor` and `INotificationSender` are stubs returning empty/success; real JS sandbox engine and email/webhook dispatch are deferred.
 >
 > **Decisions:**

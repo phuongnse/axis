@@ -50,7 +50,7 @@ Users can create custom data models within their organization. A model defines t
 - [ ] Model creation is atomic: if any part of the creation fails (e.g., inserting system fields), the entire model is rolled back and nothing is left in a partial state.
 
 *Out of scope*
-- Importing a model from another org or from a JSON file directly — covered in [E04 F07 Import/Export](../../E04-workflow-builder/../../use-cases/workflow-builder/import-export.md).
+- Importing a model from another org or from a JSON file directly — covered in [workflow-builder import-export Import/Export](../workflow-builder/import-export.md).
 
 > **Implementation status**
 >
@@ -63,7 +63,7 @@ Users can create custom data models within their organization. A model defines t
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:**
-> - model plan-limit check (HTTP 402) pending billing layer (E01 F04)
+> - model plan-limit check (HTTP 402) pending billing layer (platform-foundation subscription plans)
 > - name format validation enforced in Application handler.
 >
 > **Decisions:** system fields (id, created_at, updated_at) injected by domain factory; atomicity guaranteed by UnitOfWork.
@@ -166,7 +166,7 @@ Users can create custom data models within their organization. A model defines t
 >
 > **Gaps vs spec:**
 > - HTTP 409 version-conflict check backend polish — see gaps below (updated_at comparison)
-> - active-workflow warning pending E04 integration.
+> - active-workflow warning pending workflow-builder integration.
 
 ---
 
@@ -215,7 +215,7 @@ Users can create custom data models within their organization. A model defines t
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:**
-> - workflow reference check pending E04
+> - workflow reference check pending workflow-builder
 > - form Relation Picker refs blocked/flagged via FormBuilder `ModelDeletedEvent` consumer (US-033 partial)
 > - 30-day purge background job pending.
 >

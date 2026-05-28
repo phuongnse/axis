@@ -85,7 +85,7 @@ Each step has a type that determines what it does when executed. Users configure
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** form picker UI, assignee expression evaluation, and timeout enforcement pending Frontend + E06.
+> **Gaps vs spec:** form picker UI, assignee expression evaluation, and timeout enforcement pending Frontend + workflow-engine.
 >
 > **Decisions:** step config (formId, assignee, timeout) stored as JSONB dict in `steps` column. `StepType` enum includes `Start` and `End` values.
 
@@ -128,7 +128,7 @@ Each step has a type that determines what it does when executed. Users configure
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:**
-> - HTTP execution and Test request button pending E06 + Frontend
+> - HTTP execution and Test request button pending workflow-engine + Frontend
 > - credential storage redaction is enforced at export (keys matching token/api_key/secret/password/authorization/etc. replaced with `[REDACTED]` in `ExportWorkflowHandler`).
 
 ---
@@ -167,7 +167,7 @@ Each step has a type that determines what it does when executed. Users configure
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** expression builder UI and branch evaluation pending Frontend + E06; condition branches stored in step config JSONB.
+> **Gaps vs spec:** expression builder UI and branch evaluation pending Frontend + workflow-engine; condition branches stored in step config JSONB.
 
 ---
 
@@ -207,7 +207,7 @@ Each step has a type that determines what it does when executed. Users configure
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** JS sandbox execution, timeout enforcement, and "Run test" button pending E06 + Frontend.
+> **Gaps vs spec:** JS sandbox execution, timeout enforcement, and "Run test" button pending workflow-engine + Frontend.
 
 ---
 
@@ -247,7 +247,7 @@ Each step has a type that determines what it does when executed. Users configure
 > | API | ⚠️ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** email/webhook dispatch pending E06; configurable fail-on-error toggle not yet implemented in API layer.
+> **Gaps vs spec:** email/webhook dispatch pending workflow-engine; configurable fail-on-error toggle not yet implemented in API layer.
 
 
 ## Diagrams

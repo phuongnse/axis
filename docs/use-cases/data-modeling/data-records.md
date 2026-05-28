@@ -272,7 +272,7 @@ Users can create, read, update, and delete records against any model. Records ar
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** Relation broken-reference warning pending E04 integration; 30-day purge pending background job scheduler.
+> **Gaps vs spec:** Relation broken-reference warning pending workflow-builder integration; 30-day purge pending background job scheduler.
 
 ---
 

@@ -14,27 +14,27 @@ Without a UI builder, users need a developer to display and interact with their 
 
 ## Phase
 
-**Phase 2** — Depends on a stable E03, E04, E05, E06 first.
+**Phase 2** — Depends on a stable data-modeling, workflow-builder, form-builder, workflow-engine first.
 
 ---
 
 ## Use Cases
 
-> Use-case files are not yet authored — E07 is Phase 2 and has not started. The rows below name the planned cuts; create `use-cases/*.md` when the epic begins.
+> Use-case files are not yet authored — page-builder is Phase 2 and has not started. The rows below name the planned cuts; create `use-cases/*.md` when this domain begins.
 
 | Use case | Description |
 |---|---|---|
-| F01 | Page Management | Create, edit, delete, publish/unpublish pages |
-| F02 | Widget Library | Pre-built widgets: List, Grid, Form, Chart, Button, Text, Image |
-| F03 | Drag & Drop Layout Builder | Compose pages by dragging widgets onto a canvas, resize and arrange |
-| F04 | Data Binding | Bind widget data sources to models, records, and workflow outputs |
+| tenant-registration | Page Management | Create, edit, delete, publish/unpublish pages |
+| organization-management | Widget Library | Pre-built widgets: List, Grid, Form, Chart, Button, Text, Image |
+| tenant-isolation | Drag & Drop Layout Builder | Compose pages by dragging widgets onto a canvas, resize and arrange |
+| subscription-plans | Data Binding | Bind widget data sources to models, records, and workflow outputs |
 | F05 | Page Access Control | Control which roles can access each page |
 
 ---
 
 ## Diagrams
 
-> **Pending** — page-model diagram not yet created. Add `page-model` to `docs/diagrams/generate-diagrams.mjs` when this epic begins.
+> **Pending** — page-model diagram not yet created. Add `page-model` to `docs/use-cases/_architecture/diagrams/generate-diagrams.mjs` when this domain begins.
 
 ---
 
@@ -52,7 +52,7 @@ Without a UI builder, users need a developer to display and interact with their 
 
 ---
 
-## Acceptance Criteria (Epic Level)
+## Acceptance Criteria (domain)
 
 - [ ] Users can create a page and add at least 3 different widget types.
 - [ ] A Grid widget bound to a model displays live records with sorting and pagination.
@@ -65,17 +65,17 @@ Without a UI builder, users need a developer to display and interact with their 
 
 ## Open work (agents)
 
-**⏳ Phase 2 — not started.** No `src/Modules/PageBuilder`, no use-case files under `docs/use-cases/page-builder/`. Do not implement until MVP loop (E01–E06) gaps are closed unless explicitly scoped.
+**⏳ Phase 2 — not started.** No `src/Modules/PageBuilder`, no use-case files under `docs/use-cases/page-builder/`. Do not implement until MVP loop (platform-foundation–workflow-engine) gaps are closed unless explicitly scoped.
 
 ---
 
 ## Dependencies
 
-- [E01 — Platform Foundation](../platform-foundation/README.md)
-- [E02 — Identity & Access Management](../identity-access/README.md)
-- [E03 — Data Modeling](../data-modeling/README.md)
-- [E05 — Form Builder](../form-builder/README.md)
-- [E06 — Workflow Execution Engine](../workflow-engine/README.md)
+- [Platform Foundation](../platform-foundation/README.md)
+- [Identity & Access](../identity-access/README.md)
+- [Data Modeling](../data-modeling/README.md)
+- [Form Builder](../form-builder/README.md)
+- [Workflow Engine](../workflow-engine/README.md)
 
 ## Dependents
 

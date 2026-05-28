@@ -1,6 +1,6 @@
 /**
  * Axis Screen Wireframes — generate-screens.mjs
- * Run: node docs/wireframes/generate-screens.mjs
+ * Run: node docs/use-cases/_shared/wireframes/generate-screens.mjs
  *
  * All visual components are sourced from generate-template.mjs builders.
  * Use component(buildXxx, x, y) to place template sections into screens.
@@ -10,18 +10,18 @@
  *
  * Screens generated:
  *   app-shell (root)
- *   E01: register-org, email-confirmation, verify-email,
+ *   platform-foundation: register-org, email-confirmation, verify-email,
  *        verify-email-rate-limit, workspace-provisioning, pricing, settings-org,
  *        settings-org-upload-states, settings-org-profile-states, settings-org-usage-error,
  *        settings-org-free-plan, settings-org-access-denied,
  *        settings-org-deletion-scheduled, settings-org-delete-modal, settings-org-delete-states,
  *        register-org-states
- *   E02: login, register, forgot-password, change-password,
+ *   identity-access: login, register, forgot-password, change-password,
  *        settings-users, settings-roles, settings-security, accept-invitation
- *   E03: data-models, data-classes, records
- *   E04: workflows, workflow-editor
- *   E05: forms, form-editor, form-submission
- *   E06: executions, execution-detail
+ *   data-modeling: data-models, data-classes, records
+ *   workflow-builder: workflows, workflow-editor
+ *   form-builder: forms, form-editor, form-submission
+ *   workflow-engine: executions, execution-detail
  */
 
 import { buildStatsCards } from './generate-template.mjs';
@@ -64,7 +64,7 @@ const cw = W - CX - PAD * 2;  // 930 — usable content width
 // Standard app nav labels
 const NAV = ['Data Models', 'Workflows', 'Forms', 'Executions', 'Settings'];
 
-// E01 auth outcome cards — shared shell + headline rhythm
+// platform-foundation auth outcome cards — shared shell + headline rhythm
 const AUTH_CARD_PAD = 20;
 const AUTH_SHELL_H = 36;       // mini logo + divider
 const AUTH_HEADLINE_H = 34;    // icon row + short underline
@@ -92,7 +92,7 @@ function write(relativePath, elements) {
     const [domainFolder, ...rest] = relativePath.split('/');
     full = join(__dir, '..', 'use-cases', domainFolder, 'wireframes', ...rest);
   } else {
-    // Shared wireframe → docs/wireframes/{path}
+    // Shared wireframe → docs/use-cases/_shared/wireframes/{path}
     full = join(__dir, relativePath);
   }
   mkdirSync(dirname(full), { recursive: true });
@@ -214,7 +214,7 @@ function genAppShell() {
   write('app-shell.excalidraw', els);
 }
 
-// ─── E01 Platform Foundation ─────────────────────────────────────────────────
+// ─── platform-foundation Platform Foundation ─────────────────────────────────────────────────
 
 /**
  * Register-Org — US-001, US-004
@@ -1003,7 +1003,7 @@ function genSettingsOrgDeletionScheduled() {
   write('platform-foundation/settings-org-deletion-scheduled.excalidraw', els);
 }
 
-// ─── E02 Identity & Access — Auth screens (no sidebar) ───────────────────────
+// ─── identity-access Identity & Access — Auth screens (no sidebar) ───────────────────────
 
 function genLogin() {
   const els = authCard('li', {
@@ -1017,7 +1017,7 @@ function genLogin() {
   write('identity-access/login.excalidraw', els);
 }
 
-/** US-002 (F01) / US-013 — unverified email blocks sign-in. */
+/** US-002 (tenant-registration) / US-013 — unverified email blocks sign-in. */
 function genLoginUnverified() {
   const cardW = 440;
   const cardH = 280;
@@ -1102,7 +1102,7 @@ function genAcceptInvitation() {
   write('identity-access/accept-invitation.excalidraw', els);
 }
 
-// ─── E02 Identity & Access — Settings screens (with sidebar) ─────────────────
+// ─── identity-access Identity & Access — Settings screens (with sidebar) ─────────────────
 
 function genSettingsUsers() {
   const navIdx = 4;
@@ -1205,7 +1205,7 @@ function genSettingsSecurity() {
   write('identity-access/settings-security.excalidraw', els);
 }
 
-// ─── E03 Data Modeling ────────────────────────────────────────────────────────
+// ─── data-modeling Data Modeling ────────────────────────────────────────────────────────
 
 function genDataModels() {
   const navIdx = 0;
@@ -1332,7 +1332,7 @@ function genRecords() {
   write('data-modeling/records.excalidraw', els);
 }
 
-// ─── E04 Workflow Builder ─────────────────────────────────────────────────────
+// ─── workflow-builder Workflow Builder ─────────────────────────────────────────────────────
 
 function genWorkflows() {
   const navIdx = 1;
@@ -1390,7 +1390,7 @@ function genWorkflowEditor() {
   write('workflow-builder/workflow-editor.excalidraw', els);
 }
 
-// ─── E05 Form Builder ─────────────────────────────────────────────────────────
+// ─── form-builder Form Builder ─────────────────────────────────────────────────────────
 
 function genForms() {
   const navIdx = 2;
@@ -1517,7 +1517,7 @@ function genFormSubmission() {
   write('form-builder/form-submission.excalidraw', els);
 }
 
-// ─── E06 Workflow Engine ──────────────────────────────────────────────────────
+// ─── workflow-engine Workflow Engine ──────────────────────────────────────────────────────
 
 function genExecutions() {
   const navIdx = 3;
@@ -1611,53 +1611,53 @@ function genExecutionDetail() {
 // Shared
 runScreen('app-shell', genAppShell);
 
-// E01 — Platform Foundation
-runScreen('E01/register-org', genRegisterOrg);
-runScreen('E01/register-org-states', genRegisterOrgStates);
-runScreen('E01/email-confirmation', genEmailConfirmation);
-runScreen('E01/verify-email', genVerifyEmail);
-runScreen('E01/verify-email-rate-limit', genVerifyEmailRateLimit);
-runScreen('E01/workspace-provisioning', genWorkspaceProvisioning);
-runScreen('E01/pricing', genPricing);
-runScreen('E01/settings-org', genSettingsOrg);
-runScreen('E01/settings-org-upload-states', genSettingsOrgUploadStates);
-runScreen('E01/settings-org-profile-states', genSettingsOrgProfileStates);
-runScreen('E01/settings-org-usage-error', genSettingsOrgUsageError);
-runScreen('E01/settings-org-free-plan', genSettingsOrgFreePlan);
-runScreen('E01/settings-org-access-denied', genSettingsOrgAccessDenied);
-runScreen('E01/settings-org-deletion-scheduled', genSettingsOrgDeletionScheduled);
-runScreen('E01/settings-org-delete-modal', genSettingsOrgDeleteModal);
-runScreen('E01/settings-org-delete-states', genSettingsOrgDeleteStates);
+// platform-foundation — Platform Foundation
+runScreen('platform-foundation/register-org', genRegisterOrg);
+runScreen('platform-foundation/register-org-states', genRegisterOrgStates);
+runScreen('platform-foundation/email-confirmation', genEmailConfirmation);
+runScreen('platform-foundation/verify-email', genVerifyEmail);
+runScreen('platform-foundation/verify-email-rate-limit', genVerifyEmailRateLimit);
+runScreen('platform-foundation/workspace-provisioning', genWorkspaceProvisioning);
+runScreen('platform-foundation/pricing', genPricing);
+runScreen('platform-foundation/settings-org', genSettingsOrg);
+runScreen('platform-foundation/settings-org-upload-states', genSettingsOrgUploadStates);
+runScreen('platform-foundation/settings-org-profile-states', genSettingsOrgProfileStates);
+runScreen('platform-foundation/settings-org-usage-error', genSettingsOrgUsageError);
+runScreen('platform-foundation/settings-org-free-plan', genSettingsOrgFreePlan);
+runScreen('platform-foundation/settings-org-access-denied', genSettingsOrgAccessDenied);
+runScreen('platform-foundation/settings-org-deletion-scheduled', genSettingsOrgDeletionScheduled);
+runScreen('platform-foundation/settings-org-delete-modal', genSettingsOrgDeleteModal);
+runScreen('platform-foundation/settings-org-delete-states', genSettingsOrgDeleteStates);
 
-// E02 — auth screens (no sidebar)
-runScreen('E02/login', genLogin);
-runScreen('E02/login-unverified', genLoginUnverified);
-runScreen('E02/register', genRegister);
-runScreen('E02/forgot-password', genForgotPassword);
-runScreen('E02/change-password', genChangePassword);
-runScreen('E02/accept-invitation', genAcceptInvitation);
+// identity-access — auth screens (no sidebar)
+runScreen('identity-access/login', genLogin);
+runScreen('identity-access/login-unverified', genLoginUnverified);
+runScreen('identity-access/register', genRegister);
+runScreen('identity-access/forgot-password', genForgotPassword);
+runScreen('identity-access/change-password', genChangePassword);
+runScreen('identity-access/accept-invitation', genAcceptInvitation);
 
-// E02 — settings screens (with sidebar)
-runScreen('E02/settings-users', genSettingsUsers);
-runScreen('E02/settings-roles', genSettingsRoles);
-runScreen('E02/settings-security', genSettingsSecurity);
+// identity-access — settings screens (with sidebar)
+runScreen('identity-access/settings-users', genSettingsUsers);
+runScreen('identity-access/settings-roles', genSettingsRoles);
+runScreen('identity-access/settings-security', genSettingsSecurity);
 
-// E03
-runScreen('E03/data-models', genDataModels);
-runScreen('E03/data-classes', genDataClasses);
-runScreen('E03/records', genRecords);
+// data-modeling
+runScreen('data-modeling/data-models', genDataModels);
+runScreen('data-modeling/data-classes', genDataClasses);
+runScreen('data-modeling/records', genRecords);
 
-// E04
-runScreen('E04/workflows', genWorkflows);
-runScreen('E04/workflow-editor', genWorkflowEditor);
+// workflow-builder
+runScreen('workflow-builder/workflows', genWorkflows);
+runScreen('workflow-builder/workflow-editor', genWorkflowEditor);
 
-// E05
-runScreen('E05/forms', genForms);
-runScreen('E05/form-editor', genFormEditor);
-runScreen('E05/form-submission', genFormSubmission);
+// form-builder
+runScreen('form-builder/forms', genForms);
+runScreen('form-builder/form-editor', genFormEditor);
+runScreen('form-builder/form-submission', genFormSubmission);
 
-// E06
-runScreen('E06/executions', genExecutions);
-runScreen('E06/execution-detail', genExecutionDetail);
+// workflow-engine
+runScreen('workflow-engine/executions', genExecutions);
+runScreen('workflow-engine/execution-detail', genExecutionDetail);
 
 console.log('\n✅  All screen wireframes generated.');

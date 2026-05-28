@@ -71,7 +71,7 @@ A workflow must have at least one trigger before it can be published. Triggers d
 - [ ] Triggering the same workflow many times in quick succession creates independent executions (no deduplication for manual triggers).
 
 *Out of scope*
-- Triggering with pre-filled input from a page button (Page Builder) — not in MVP for this epic; covered in E07.
+- Triggering with pre-filled input from a page button (Page Builder) — not in MVP for this domain; covered in page-builder.
 
 > **Implementation status**
 >
@@ -83,7 +83,7 @@ A workflow must have at least one trigger before it can be published. Triggers d
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** input variable prompt dialog and `POST /workflows/{id}/executions` endpoint pending API + E06.
+> **Gaps vs spec:** input variable prompt dialog and `POST /workflows/{id}/executions` endpoint pending API + workflow-engine.
 >
 > **Decisions:**
 > - trigger config (input variable definitions) stored as JSONB in `triggers` column
@@ -127,7 +127,7 @@ A workflow must have at least one trigger before it can be published. Triggers d
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:**
-> - Wolverine cron job registration on publish and deregistration on archive pending E06
+> - Wolverine cron job registration on publish and deregistration on archive pending workflow-engine
 > - cron expression validation (min 5-min interval, IANA timezone) backend polish — see gaps below.
 
 ---
@@ -167,7 +167,7 @@ A workflow must have at least one trigger before it can be published. Triggers d
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** unique webhook URL generation, HMAC verification, and payload mapping pending E06 + API layer.
+> **Gaps vs spec:** unique webhook URL generation, HMAC verification, and payload mapping pending workflow-engine + API layer.
 
 ---
 
@@ -208,7 +208,7 @@ A workflow must have at least one trigger before it can be published. Triggers d
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:**
-> - Wolverine event subscription wiring and filter expression evaluation pending E06
+> - Wolverine event subscription wiring and filter expression evaluation pending workflow-engine
 > - event type registry and model-picker UI pending API + Frontend.
 
 

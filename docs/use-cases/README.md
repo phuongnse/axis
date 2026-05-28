@@ -67,14 +67,19 @@ Execution data → Build pages & widgets → End users
 docs/use-cases/
 ├── README.md
 ├── _template-use-case.md
+├── _architecture/
+│   ├── generate-diagrams.mjs
+│   └── diagrams/          # platform-wide (system context, container, modules)
+├── _shared/
+│   └── wireframes/        # kit template, app-shell, generate-screens.mjs
 └── <domain>/
     ├── README.md          # domain index + open work
-    ├── wireframes/        # Excalidraw + SVG for this domain
-    ├── diagrams/          # domain-level technical diagrams
+    ├── wireframes/        # screen Excalidraw + SVG
+    ├── diagrams/          # domain technical diagrams
     └── <use-case>.md
 ```
 
-Shared wireframes (template, app-shell) remain in [`docs/wireframes/`](../wireframes/).
+Shared UI kit wireframes: [`_shared/wireframes/`](./_shared/wireframes/). Platform architecture diagrams: [`_architecture/diagrams/`](./_architecture/diagrams/).
 
 ---
 

@@ -110,7 +110,7 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** context expression input UI and expression evaluation at execution time pending Frontend + E06.
+> **Gaps vs spec:** context expression input UI and expression evaluation at execution time pending Frontend + workflow-engine.
 
 ---
 
@@ -157,7 +157,7 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** context variable population after submission and context variable picker pending E06.
+> **Gaps vs spec:** context variable population after submission and context variable picker pending workflow-engine.
 
 
 ## Diagrams
