@@ -444,14 +444,14 @@ function containerDiagram() {
     label: "HashiCorp Vault", sub: "Secrets management" }));
   els.push(...rect({ x: 870, y: 635, w: 220, h: 55, bg: C.infraBg, stroke: C.infraBdr,
     label: "Grafana Tempo/Loki/Mimir", sub: "Tracing · Logs · Metrics" }));
-  els.push(...arrow({ x1: 810, y1: 592, x2: 870, y2: 592, color: C.infraBdr, label: "secrets + config" }));
-  els.push(...arrow({ x1: 810, y1: 662, x2: 870, y2: 662, color: C.infraBdr, label: "telemetry export" }));
+  els.push(...arrow({ x1: 810, y1: 592, x2: 870, y2: 592, color: C.infraBdr }));
+  els.push(...arrow({ x1: 810, y1: 662, x2: 870, y2: 662, color: C.infraBdr }));
 
   // External managed services moved to separate column
   els.push(...rect({ x: 1110, y: 565, w: 200, h: 55, bg: C.extBg, stroke: C.extBdr, label: "AWS S3", sub: "File storage" }));
   els.push(...rect({ x: 1110, y: 635, w: 200, h: 55, bg: C.extBg, stroke: C.extBdr, label: "Email Service", sub: "SMTP · MailKit" }));
-  els.push(...arrow({ x1: 810, y1: 578, x2: 1110, y2: 592, color: C.extBdr, label: "file storage" }));
-  els.push(...arrow({ x1: 810, y1: 648, x2: 1110, y2: 662, color: C.extBdr, label: "notifications" }));
+  els.push(...routedArrow({ waypoints: [[810, 548], [1100, 548], [1100, 592], [1110, 592]], color: C.extBdr }));
+  els.push(...routedArrow({ waypoints: [[810, 708], [1100, 708], [1100, 662], [1110, 662]], color: C.extBdr }));
 
   // Compact legend
   els.push(...rect({ x: 640, y: 94, w: 150, h: 112, bg: "#ffffff", stroke: C.border }));
