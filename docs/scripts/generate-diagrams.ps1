@@ -36,7 +36,7 @@ function Export-ExcalidrawToSvg {
 $docsRoot = Split-Path $PSScriptRoot -Parent
 
 # Collect all .excalidraw files from docs/diagrams/ and docs/use-cases/*/* (use-case folders)
-$searchPaths = @("$docsRoot\architecture\diagrams")
+$searchPaths = @("$docsRoot\diagrams")
 $useCasesRoot = Join-Path $docsRoot "use-cases"
 if (Test-Path $useCasesRoot) {
     $searchPaths += Get-ChildItem -Path $useCasesRoot -Directory |

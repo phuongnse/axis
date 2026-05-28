@@ -1342,6 +1342,40 @@
     },
     {
       "id": "diag-42",
+      "x": 568.75,
+      "y": 241.5,
+      "angle": 0,
+      "strokeColor": "#64748b",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 42,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "text",
+      "width": 82.5,
+      "height": 14,
+      "text": "publish (Kafka)",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "id": "diag-43",
       "x": 220,
       "y": 378,
       "angle": 0,
@@ -1357,7 +1391,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 42,
+      "seed": 43,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1390,7 +1424,41 @@
       "endArrowhead": "arrow"
     },
     {
-      "id": "diag-43",
+      "id": "diag-44",
+      "x": 289.25,
+      "y": 429,
+      "angle": 0,
+      "strokeColor": "#64748b",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 44,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "text",
+      "width": 71.5,
+      "height": 14,
+      "text": "consume event",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "id": "diag-45",
       "x": 935,
       "y": 332,
       "angle": 0,
@@ -1406,7 +1474,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 43,
+      "seed": 45,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1443,7 +1511,41 @@
       "endArrowhead": "arrow"
     },
     {
-      "id": "diag-44",
+      "id": "diag-46",
+      "x": 893.5,
+      "y": 251,
+      "angle": 0,
+      "strokeColor": "#64748b",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 46,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "text",
+      "width": 143,
+      "height": 14,
+      "text": "consume command (RabbitMQ)",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "id": "diag-47",
       "x": 385,
       "y": 550,
       "angle": 0,
@@ -1459,7 +1561,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 44,
+      "seed": 47,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1484,7 +1586,7 @@
       "endArrowhead": "arrow"
     },
     {
-      "id": "diag-45",
+      "id": "diag-48",
       "x": 346.5,
       "y": 553.5,
       "angle": 0,
@@ -1500,7 +1602,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 45,
+      "seed": 48,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1518,7 +1620,7 @@
       "verticalAlign": "middle"
     },
     {
-      "id": "diag-46",
+      "id": "diag-49",
       "x": 650,
       "y": 560,
       "angle": 0,
@@ -1535,7 +1637,7 @@
         "type": 3,
         "value": 6
       },
-      "seed": 46,
+      "seed": 49,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1548,7 +1650,7 @@
       "height": 110
     },
     {
-      "id": "diag-47",
+      "id": "diag-50",
       "x": 772,
       "y": 571.5,
       "angle": 0,
@@ -1564,7 +1666,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 47,
+      "seed": 50,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1582,7 +1684,7 @@
       "verticalAlign": "middle"
     },
     {
-      "id": "diag-48",
+      "id": "diag-51",
       "x": 665,
       "y": 590,
       "angle": 0,
@@ -1599,7 +1701,7 @@
         "type": 3,
         "value": 6
       },
-      "seed": 48,
+      "seed": 51,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1612,7 +1714,7 @@
       "height": 16
     },
     {
-      "id": "diag-49",
+      "id": "diag-52",
       "x": 690,
       "y": 593,
       "angle": 0,
@@ -1628,7 +1730,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 49,
+      "seed": 52,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1646,7 +1748,7 @@
       "verticalAlign": "middle"
     },
     {
-      "id": "diag-50",
+      "id": "diag-53",
       "x": 665,
       "y": 612,
       "angle": 0,
@@ -1663,7 +1765,7 @@
         "type": 3,
         "value": 6
       },
-      "seed": 50,
+      "seed": 53,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1676,7 +1778,7 @@
       "height": 16
     },
     {
-      "id": "diag-51",
+      "id": "diag-54",
       "x": 690,
       "y": 615,
       "angle": 0,
@@ -1692,7 +1794,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 51,
+      "seed": 54,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1710,7 +1812,7 @@
       "verticalAlign": "middle"
     },
     {
-      "id": "diag-52",
+      "id": "diag-55",
       "x": 665,
       "y": 638,
       "angle": 0,
@@ -1726,7 +1828,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 52,
+      "seed": 55,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1751,7 +1853,7 @@
       "endArrowhead": "arrow"
     },
     {
-      "id": "diag-53",
+      "id": "diag-56",
       "x": 702,
       "y": 633,
       "angle": 0,
@@ -1767,7 +1869,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 53,
+      "seed": 56,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1785,7 +1887,7 @@
       "verticalAlign": "middle"
     },
     {
-      "id": "diag-54",
+      "id": "diag-57",
       "x": 665,
       "y": 655,
       "angle": 0,
@@ -1801,7 +1903,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 54,
+      "seed": 57,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1826,7 +1928,7 @@
       "endArrowhead": "arrow"
     },
     {
-      "id": "diag-55",
+      "id": "diag-58",
       "x": 702,
       "y": 650,
       "angle": 0,
@@ -1842,7 +1944,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 55,
+      "seed": 58,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
