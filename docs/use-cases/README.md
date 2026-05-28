@@ -81,12 +81,5 @@ Shared UI kit wireframes: [`../wireframes/`](../wireframes/). Platform architect
 
 ## Distributed-ready foundation (cross-domain)
 
-Platform-wide infrastructure tracked in [PROGRESS.md](../PROGRESS.md):
-
-| Phase | Status | Notes |
-|-------|--------|-------|
-| Phase 0 — ADRs & architecture | ✅ | ADR-010..023 |
-| Phase 1 — Infrastructure | ✅ | Per-module DBs, Kafka/RabbitMQ, OpenTelemetry, Avro pilot |
-| Phase 2 — Module boundaries | ⚠️ | Contracts + Kafka events; some gRPC/consumers deferred |
-
-Implementation patterns: [OpenTelemetry observability](../playbooks/patterns.md#opentelemetry-observability).
+Distributed foundation status is tracked in [PROGRESS.md](../PROGRESS.md) (phases + cross-domain rollout notes).
+Use this page for feature/use-case navigation; use [PROGRESS.md](../PROGRESS.md) for platform phase details.
