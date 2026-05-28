@@ -13,5 +13,7 @@
 docs
 tests
 frontend
+# Intentionally excluded for API runtime image context size.
+# If Dockerfile build stages later need these paths, revisit this block.
 **/TestResults
 **/coverage
