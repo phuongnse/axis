@@ -77,10 +77,10 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| login | [source](./login.excalidraw) | [preview](./login.svg) |
+| N/A | N/A | N/A |
 
 ## Diagrams
 
 | Diagram | Source | Preview |
 |---------|--------|---------|
-| N/A | N/A | N/A |
+| auth-flow | [source](./auth-flow.excalidraw) | [preview](./auth-flow.svg) |

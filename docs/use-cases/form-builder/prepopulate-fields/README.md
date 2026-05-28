@@ -62,7 +62,7 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| forms | [source](./forms.excalidraw) | [preview](./forms.svg) |
+| N/A | N/A | N/A |
 
 ## Diagrams
 

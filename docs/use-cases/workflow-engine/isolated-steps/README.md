@@ -52,7 +52,7 @@ Handler specifications (Form, HTTP, Condition, Script, Notification) remain docu
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| execution-detail | [source](./execution-detail.excalidraw) | [preview](./execution-detail.svg) |
+| N/A | N/A | N/A |
 
 ## Diagrams
 

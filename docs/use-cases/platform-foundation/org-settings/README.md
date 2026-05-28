@@ -64,7 +64,6 @@ Allow organization admins to manage their organization's profile, settings, and 
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| settings-org | [source](./settings-org.excalidraw) | [preview](./settings-org.svg) |
 | settings-org-usage-error | [source](./settings-org-usage-error.excalidraw) | [preview](./settings-org-usage-error.svg) |
 | settings-org-free-plan | [source](./settings-org-free-plan.excalidraw) | [preview](./settings-org-free-plan.svg) |
 | settings-org-access-denied | [source](./settings-org-access-denied.excalidraw) | [preview](./settings-org-access-denied.svg) |

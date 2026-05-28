@@ -70,7 +70,7 @@ Allow users to reset forgotten passwords, change their current password, and man
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| settings-security | [source](./settings-security.excalidraw) | [preview](./settings-security.svg) |
+| N/A | N/A | N/A |
 
 ## Diagrams
 

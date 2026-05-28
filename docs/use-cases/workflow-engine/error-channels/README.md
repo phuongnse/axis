@@ -66,7 +66,7 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| workflow-editor | [source](./workflow-editor.excalidraw) | [preview](./workflow-editor.svg) |
+| N/A | N/A | N/A |
 
 ## Diagrams
 

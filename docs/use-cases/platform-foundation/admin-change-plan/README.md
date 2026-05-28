@@ -77,8 +77,7 @@ Define subscription plan tiers with feature limits and enforce those limits at t
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| pricing | [source](./pricing.excalidraw) | [preview](./pricing.svg) |
-| settings-org | [source](./settings-org.excalidraw) | [preview](./settings-org.svg) |
+| N/A | N/A | N/A |
 
 ## Diagrams
 

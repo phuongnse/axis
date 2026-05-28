@@ -77,7 +77,6 @@ Allow organization admins to manage their organization's profile, settings, and 
 |--------|------------|---------|
 | settings-org-delete-modal | [source](./settings-org-delete-modal.excalidraw) | [preview](./settings-org-delete-modal.svg) |
 | settings-org-delete-states | [source](./settings-org-delete-states.excalidraw) | [preview](./settings-org-delete-states.svg) |
-| settings-org-deletion-scheduled | [source](./settings-org-deletion-scheduled.excalidraw) | [preview](./settings-org-deletion-scheduled.svg) |
 
 ## Diagrams
 

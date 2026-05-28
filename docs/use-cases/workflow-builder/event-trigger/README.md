@@ -68,7 +68,7 @@ A workflow must have at least one trigger before it can be published. Triggers d
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| workflow-editor | [source](./workflow-editor.excalidraw) | [preview](./workflow-editor.svg) |
+| N/A | N/A | N/A |
 
 ## Diagrams
 

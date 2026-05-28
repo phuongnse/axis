@@ -62,7 +62,7 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| workflow-editor | [source](./workflow-editor.excalidraw) | [preview](./workflow-editor.svg) |
+| N/A | N/A | N/A |
 
 ## Diagrams
 

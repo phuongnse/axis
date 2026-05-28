@@ -62,7 +62,7 @@ Users can create, read, update, and delete records against any model. Records ar
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| records | [source](./records.excalidraw) | [preview](./records.svg) |
+| N/A | N/A | N/A |
 
 ## Diagrams
 

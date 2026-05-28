@@ -67,7 +67,7 @@ Organization admins can invite new members, manage their accounts, and deactivat
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| settings-users | [source](./settings-users.excalidraw) | [preview](./settings-users.svg) |
+| N/A | N/A | N/A |
 
 ## Diagrams
 

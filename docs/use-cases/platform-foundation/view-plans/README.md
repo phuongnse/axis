@@ -46,7 +46,7 @@ Compare available subscription plans so that I can choose the one that fits my n
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| pricing | [source](./pricing.excalidraw) | [preview](./pricing.svg) |
+| N/A | N/A | N/A |
 
 ## Diagrams
 

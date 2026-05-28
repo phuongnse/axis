@@ -69,7 +69,7 @@ Self-service registration flow where a new organization signs up and is automati
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| pricing | [source](./pricing.excalidraw) | [preview](./pricing.svg) |
+| N/A | N/A | N/A |
 
 ## Diagrams
 

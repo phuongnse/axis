@@ -80,4 +80,4 @@ Self-service registration flow where a new organization signs up and is automati
 
 | Diagram | Source | Preview |
 |---------|--------|---------|
-| N/A | N/A | N/A |
+| tenant-provisioning | [source](./tenant-provisioning.excalidraw) | [preview](./tenant-provisioning.svg) |

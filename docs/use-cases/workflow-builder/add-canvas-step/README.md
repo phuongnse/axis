@@ -63,7 +63,7 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| workflow-editor | [source](./workflow-editor.excalidraw) | [preview](./workflow-editor.svg) |
+| N/A | N/A | N/A |
 
 ## Diagrams
 

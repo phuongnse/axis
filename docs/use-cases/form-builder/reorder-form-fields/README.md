@@ -63,7 +63,7 @@ Form fields define what data the form collects. Each field has a type, label, he
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| form-editor | [source](./form-editor.excalidraw) | [preview](./form-editor.svg) |
+| N/A | N/A | N/A |
 
 ## Diagrams
 

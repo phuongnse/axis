@@ -65,7 +65,7 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| execution-detail | [source](./execution-detail.excalidraw) | [preview](./execution-detail.svg) |
+| N/A | N/A | N/A |
 
 ## Diagrams
 
