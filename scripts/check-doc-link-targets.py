@@ -40,6 +40,13 @@ SCAN_FILES_AT_ROOT = ["CLAUDE.md", "CONTRIBUTING.md", "README.md"]
 # Matches both `[text](target)` and `![alt](target)`.
 LINK_RE = re.compile(r"!?\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
 
+# Inline-code spans `like this` — content inside is illustrative, not a real
+# link. Used to strip those before LINK_RE runs.
+INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
+
+# Fenced code block opener/closer (``` or ~~~, optionally with a language).
+FENCE_RE = re.compile(r"^(?:\s{0,3})(```+|~~~+)")
+
 ABSOLUTE_SCHEMES = ("http://", "https://", "mailto:", "ftp://", "tel:")
 
 
@@ -80,6 +87,37 @@ def resolve_target(source: Path, target: str) -> Path:
     return candidate
 
 
+def _strip_code(text: str) -> str:
+    """Blank out fenced code blocks and inline backtick spans.
+
+    Replacement preserves line breaks (so error line numbers stay accurate)
+    but removes the content lychee/this script would otherwise try to
+    resolve. Without this, illustrative examples like
+    ``[text](./file.md)`` inside backticks would false-positive.
+    """
+    out_lines: list[str] = []
+    in_fence = False
+    fence_marker: str | None = None
+    for line in text.splitlines():
+        fence_match = FENCE_RE.match(line)
+        if fence_match:
+            marker = fence_match.group(1)
+            if not in_fence:
+                in_fence = True
+                fence_marker = marker[:3]  # ``` or ~~~
+            elif fence_marker and line.lstrip().startswith(fence_marker):
+                in_fence = False
+                fence_marker = None
+            out_lines.append("")  # drop fence content + the fence line itself
+            continue
+        if in_fence:
+            out_lines.append("")
+            continue
+        # Drop inline backtick spans on this line.
+        out_lines.append(INLINE_CODE_RE.sub("", line))
+    return "\n".join(out_lines)
+
+
 def check_file(path: Path) -> list[str]:
     issues: list[str] = []
     try:
@@ -88,14 +126,15 @@ def check_file(path: Path) -> list[str]:
         return [f"{path.relative_to(ROOT)}: cannot decode as UTF-8"]
 
     rel = path.relative_to(ROOT)
+    scanned = _strip_code(text)
 
-    for match in LINK_RE.finditer(text):
+    for match in LINK_RE.finditer(scanned):
         target = match.group(1).strip()
         if is_skipped_target(target):
             continue
         resolved = resolve_target(path, target)
         if not resolved.exists():
-            line_no = text.count("\n", 0, match.start()) + 1
+            line_no = scanned.count("\n", 0, match.start()) + 1
             issues.append(
                 f"{rel}:{line_no}: broken link/image — target does not exist: {target}"
             )
