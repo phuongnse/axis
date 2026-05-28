@@ -524,8 +524,8 @@ function moduleOverview() {
   // Arrows
   // Cross-module connection examples (single connector style)
   els.push(...arrow({ x1: 610, y1: 235, x2: 610, y2: 286, color: C.arrow }));
-  // Route around badge row and drop into WorkflowEngine.
-  els.push(...routedArrow({ waypoints: [[260, 378], [260, 448], [340, 448], [340, 470]], color: C.arrow }));
+  // Drop to WorkflowEngine through the gap between event badges.
+  els.push(...arrow({ x1: 340, y1: 378, x2: 340, y2: 470, color: C.arrow }));
   // FormBuilder consumes from messaging lanes via right-side routed path (no lane cut-through).
   els.push(...routedArrow({ waypoints: [[935, 332], [970, 332], [970, 230], [860, 230], [860, 235]], color: C.arrow }));
   // WorkflowEngine (bottom y=550) → reads own local copy
