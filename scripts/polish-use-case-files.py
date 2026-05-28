@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 USE_CASES = ROOT / "docs" / "use-cases"
-SKIP_DIRS = {"README.md", "_template", "_architecture", "_shared"}
+SKIP_DIRS = set()
 
 H1_RE = re.compile(r"^# Use case — (.+)$", re.MULTILINE)
 UC_HEADING_RE = re.compile(r"^### Use case — (.+)$", re.MULTILINE)

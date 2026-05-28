@@ -1,15 +1,15 @@
 /**
  * generate-diagrams.mjs
  * Generates Excalidraw JSON for all architecture diagrams.
- * Run:  node docs/use-cases/_architecture/generate-diagrams.mjs
+ * Run:  node docs/architecture/generate-diagrams.mjs
  * Then: docs/scripts/generate-diagrams.ps1  (to produce .svg files)
  *
- * Platform architecture (docs/use-cases/_architecture/diagrams/):
+ * Platform architecture (docs/architecture/diagrams/):
  *   system-context  — who uses Axis, what external systems
  *   container       — what runs inside Axis, per-module databases, Wolverine
  *   module-overview — 6 modules + event-driven communication flows
  *
- * Domain-level (docs/use-cases/{domain}/diagrams/):
+ * Use-case-level (docs/use-cases/{domain}/{use-case}/):
  *   tenant-provisioning — org registration & async schema provisioning  (platform-foundation)
  *   auth-flow           — JWT + refresh token authentication flow         (identity-access)
  *   data-model          — DataModeling entity relationships               (data-modeling)

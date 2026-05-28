@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 USE_CASES = ROOT / "docs" / "use-cases"
-SKIP_DIRS = {"_template", "_architecture", "_shared"}
+SKIP_DIRS = set()
 
 # domain -> list of (section title, predicate on short folder name)
 GROUPS: dict[str, list[tuple[str, object]]] = {

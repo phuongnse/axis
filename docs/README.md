@@ -45,17 +45,17 @@
 
 ## Key Diagrams
 
-All diagrams are Excalidraw (`.excalidraw` source + `.svg` preview). Regenerate with `node docs/use-cases/_architecture/generate-diagrams.mjs` then `docs/scripts/generate-diagrams.ps1`.
+All diagrams are Excalidraw (`.excalidraw` source + `.svg` preview). Regenerate with `node docs/architecture/generate-diagrams.mjs` then `docs/scripts/generate-diagrams.ps1`.
 
-**System-level** (`docs/use-cases/_architecture/diagrams/`):
+**System-level** (`docs/architecture/diagrams/`):
 
 | Diagram | Source | Preview |
 |---|---|---|
-| System Context | [system-context.excalidraw](./use-cases/_architecture/diagrams/system-context.excalidraw) | [system-context.svg](./use-cases/_architecture/diagrams/system-context.svg) |
-| Container Diagram | [container.excalidraw](./use-cases/_architecture/diagrams/container.excalidraw) | [container.svg](./use-cases/_architecture/diagrams/container.svg) |
-| Module Overview | [module-overview.excalidraw](./use-cases/_architecture/diagrams/module-overview.excalidraw) | [module-overview.svg](./use-cases/_architecture/diagrams/module-overview.svg) |
+| System Context | [system-context.excalidraw](./architecture/diagrams/system-context.excalidraw) | [system-context.svg](./architecture/diagrams/system-context.svg) |
+| Container Diagram | [container.excalidraw](./architecture/diagrams/container.excalidraw) | [container.svg](./architecture/diagrams/container.svg) |
+| Module Overview | [module-overview.excalidraw](./architecture/diagrams/module-overview.excalidraw) | [module-overview.svg](./architecture/diagrams/module-overview.svg) |
 
-**Domain-level** (in each `docs/use-cases/{domain}/diagrams/`):
+**Use-case-level** (inside each `docs/use-cases/{domain}/{use-case}/` folder):
 
 | Diagram | Source | Preview |
 |---|---|---|
@@ -68,7 +68,7 @@ All diagrams are Excalidraw (`.excalidraw` source + `.svg` preview). Regenerate 
 
 ## Wireframes
 
-Excalidraw wireframes live in `docs/use-cases/{domain}/wireframes/`, co-located with each domain's use cases and diagrams. Shared screens (template, app-shell) remain in `docs/use-cases/_shared/wireframes/`. Each use case lives in `docs/use-cases/{domain}/{short-slug}/README.md` with a `## Wireframes` table (see [use-case template](./use-cases/USE_CASE_TEMPLATE.md)).
+Excalidraw wireframes/diagrams live alongside each use case in `docs/use-cases/{domain}/{short-slug}/`. Shared kit screens (template, app-shell) remain in `docs/shared-assets/wireframes/`. Each use case uses a `## Wireframes` + `## Diagrams` table (see [use-case template](./use-cases/USE_CASE_TEMPLATE.md)).
 
 | Screen | Source | Preview |
 |---|---|---|

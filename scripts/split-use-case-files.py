@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 USE_CASES = ROOT / "docs" / "use-cases"
-SKIP_DIRS = {"_template", "_architecture", "_shared"}
+SKIP_DIRS = set()
 USE_CASE_HEADING = re.compile(r"^### Use case — (.+)$", re.MULTILINE)
 STORY_RE = re.compile(
     r"\*\*As an?\*\*\s+([^,]+),\s+\*\*I want(?:\s+to)?\*\*\s+(.+?)\s+\*\*so that\*\*\s+(.+?)\.\s*$",

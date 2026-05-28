@@ -184,7 +184,7 @@ def process_markdown(path: Path) -> bool:
 
 
 def process_generate_screens() -> bool:
-    path = DOCS / "use-cases/_shared/wireframes/generate-screens.mjs"
+    path = ROOT / "docs/shared-assets/wireframes/generate-screens.mjs"
     original = path.read_text(encoding="utf-8")
     updated = apply_replacements(original, GENERATE_SCREENS_REPLACEMENTS)
     if updated != original:
@@ -200,7 +200,7 @@ def main() -> int:
             if process_markdown(path) if path.suffix == ".md" else False:
                 changed.append(str(path.relative_to(ROOT)))
     if process_generate_screens():
-        changed.append("docs/use-cases/_shared/wireframes/generate-screens.mjs")
+        changed.append("docs/shared-assets/wireframes/generate-screens.mjs")
     # Playbooks outside docs tree
     for rel in ("docs/playbooks/patterns.md", "docs/playbooks/testing.md", "docs/playbooks/agent-checklist.md", "docs/WORKAROUNDS.md"):
         p = ROOT / rel

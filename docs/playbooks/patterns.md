@@ -1828,7 +1828,7 @@ Wireframes use Excalidraw (`.excalidraw` JSON). Both files — source and SVG pr
 **File location:**
 ```
 docs/use-cases/
-├── _shared/wireframes/         ← kit template, app-shell
+├── docs/shared-assets/wireframes/       ← kit template, app-shell
 ├── identity-access/wireframes/
 │   ├── login.excalidraw        ← source (JSON, diffable on GitHub)
 │   └── login.svg               ← rendered preview (vector, renders inline on GitHub)
@@ -1840,7 +1840,7 @@ docs/use-cases/
     └── workflow-editor.svg
 ```
 
-Shared kit screens live under `_shared/wireframes/`; use-case-specific assets can live directly in `docs/use-cases/{domain}/{use-case}/`.
+Shared kit screens live under `docs/shared-assets/wireframes/`; use-case-specific assets can live directly in `docs/use-cases/{domain}/{use-case}/`.
 
 **Naming:** screen slug in kebab-case matching the primary route segment — `login`, `data-models`, `workflow-detail`.
 
