@@ -44,17 +44,14 @@ When a repository has a unique constraint (e.g. `(organization_id, name)`), a te
 
 ### Required path coverage (all implementation types)
 
-This rule is generic, not repository-only: for every implementation touched in a PR (endpoint, command/query handler, gRPC service, consumer, scheduler/job), tests must cover all applicable paths instead of only the primary flow.
+Generic AC/path coverage requirements are owned by
+[`agent-checklist.md` § AC coverage — avoid happy-path-only](./agent-checklist.md#ac-coverage--avoid-happy-path-only)
+to keep one source of truth.
 
-| Path class | Minimum expectation |
-|---|---|
-| **Happy path** | Expected success result/output |
-| **Validation / constraints** | Invalid input or business constraint returns the expected failure |
-| **Auth / permissions** | Unauthenticated/forbidden paths for protected surfaces |
-| **Not found / isolation** | Unknown resource and wrong-tenant/no-data-leak behavior |
-| **Dependency failure** | Controlled failure when required downstream dependency is unavailable/fails |
-
-If a path class is not applicable to a specific surface, record it as explicit `N/A` in the AC map / status callout — never omit it implicitly.
+Testing playbook responsibility here is implementation technique:
+- choose the right test level for each path (unit vs integration),
+- keep path assertions deterministic (no timing-race assertions),
+- keep behavior assertions explicit enough to map back to the AC row.
 
 ### Pre-commit gate
 
