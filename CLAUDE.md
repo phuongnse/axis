@@ -113,15 +113,12 @@ Skip for single-file fixes and doc-only edits.
 
 ### Gates
 
-**Gate 0** — AC map (no blank cells); gap sweep before API. Template: [agent-checklist.md § Gate 0](docs/playbooks/agent-checklist.md).
+**Gate 0/1 ownership:** detailed AC-map/path-coverage requirements and the full Gate 1 command matrix are owned by
+[agent-checklist.md](docs/playbooks/agent-checklist.md) (single source).
+This file keeps policy-level requirements only:
 
-**Gate 1** — scope-based (local = CI; full `Axis.sln`, no solution filter):
-
-| Changed | Commands |
-|---------|----------|
-| `src/` or `tests/` | `dotnet build` → `dotnet test` (includes [architecture fitness](tests/Architecture/Axis.Architecture.Tests/README.md)) → `dotnet format --verify-no-changes` |
-| `frontend/` | `npm run ci` then `npm run test` |
-| Both | All of the above |
+- **Gate 0 policy:** no blank AC map rows for in-scope bullets; no happy-path-only completion claims.
+- **Gate 1 policy:** local verification must mirror CI scope (full `Axis.sln` for .NET, no solution filter).
 
 **Gate 2** — docs in same PR ([agent-checklist.md § Gate 2](docs/playbooks/agent-checklist.md)). **Doc drift** — run script before push when code/use-cases change; CI job must be green.
 
