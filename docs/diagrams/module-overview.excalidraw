@@ -1383,8 +1383,8 @@
     },
     {
       "id": "diag-43",
-      "x": 935,
-      "y": 332,
+      "x": 910,
+      "y": 346,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1407,28 +1407,16 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 110,
-      "height": 102,
+      "width": 0,
+      "height": 111,
       "points": [
         [
           0,
           0
         ],
         [
-          35,
-          0
-        ],
-        [
-          35,
-          -102
-        ],
-        [
-          -75,
-          -102
-        ],
-        [
-          -75,
-          -97
+          0,
+          -111
         ]
       ],
       "startArrowhead": null,
