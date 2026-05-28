@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Axis.DataModeling.Contracts.Grpc;
 using Axis.DataModeling.Infrastructure.Persistence;
 using Axis.FormBuilder.Contracts.Grpc;
 using Axis.FormBuilder.Infrastructure.Persistence;
@@ -162,6 +163,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
                     ["ConnectionStrings:FormBuilder"] = _formBuilderConnectionString,
                     ["ConnectionStrings:WorkflowEngine"] = _workflowEngineConnectionString,
                     ["Redis:ConnectionString"] = _redis.GetConnectionString(),
+                    ["Modules:DataModeling:GrpcUrl"] = "http://localhost",
                     ["Modules:FormBuilder:GrpcUrl"] = "http://localhost",
                     ["Modules:WorkflowBuilder:GrpcUrl"] = "http://localhost",
                 });
@@ -171,6 +173,12 @@ public sealed class ApiTestFixture : IAsyncLifetime
             {
                 services.RemoveAll<FormModelReferenceService.FormModelReferenceServiceClient>();
                 services.AddGrpcClient<FormModelReferenceService.FormModelReferenceServiceClient>(options =>
+                {
+                    options.Address = new Uri("http://localhost");
+                })
+                .ConfigurePrimaryHttpMessageHandler(() => grpcTestServerHandler.Value);
+                services.RemoveAll<DataModelCatalogService.DataModelCatalogServiceClient>();
+                services.AddGrpcClient<DataModelCatalogService.DataModelCatalogServiceClient>(options =>
                 {
                     options.Address = new Uri("http://localhost");
                 })

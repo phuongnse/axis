@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package axis.datamodeling.v1;
+
+option csharp_namespace = "Axis.DataModeling.Contracts.Grpc";
+
+service DataModelCatalogService {
+  rpc GetModelSummary(GetModelSummaryRequest) returns (GetModelSummaryResponse);
+}
+
+message GetModelSummaryRequest {
+  string model_id = 1;
+  string organization_id = 2;
+}
+
+message GetModelSummaryResponse {
+  bool exists = 1;
+  string model_name = 2;
+}

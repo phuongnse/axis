@@ -503,6 +503,7 @@ try
     app.MapFormTaskEndpoints();
 
     app.MapIdentityGrpc();
+    app.MapDataModelingGrpc();
     app.MapFormBuilderGrpc();
     app.MapWorkflowBuilderGrpc();
 

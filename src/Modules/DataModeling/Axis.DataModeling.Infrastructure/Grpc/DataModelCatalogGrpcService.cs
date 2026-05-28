@@ -1,0 +1,38 @@
+using Axis.DataModeling.Application.Repositories;
+using Axis.DataModeling.Domain.Aggregates;
+using Axis.DataModeling.Contracts.Grpc;
+using Grpc.Core;
+
+namespace Axis.DataModeling.Infrastructure.Grpc;
+
+internal sealed class DataModelCatalogGrpcService(IDataModelRepository dataModelRepository)
+    : DataModelCatalogService.DataModelCatalogServiceBase
+{
+    public override async Task<GetModelSummaryResponse> GetModelSummary(
+        GetModelSummaryRequest request,
+        ServerCallContext context)
+    {
+        if (!Guid.TryParse(request.ModelId, out Guid modelId))
+        {
+            throw new RpcException(
+                new Status(StatusCode.InvalidArgument, "model_id must be a valid GUID."));
+        }
+
+        if (!Guid.TryParse(request.OrganizationId, out Guid organizationId))
+        {
+            throw new RpcException(
+                new Status(StatusCode.InvalidArgument, "organization_id must be a valid GUID."));
+        }
+
+        DataModel? model = await dataModelRepository.GetByIdAsync(
+            modelId,
+            organizationId,
+            context.CancellationToken);
+
+        return new GetModelSummaryResponse
+        {
+            Exists = model is not null,
+            ModelName = model?.Name ?? string.Empty,
+        };
+    }
+}

@@ -9,6 +9,16 @@
 
   <ItemGroup>
     <PackageReference Include="Apache.Avro" />
+    <PackageReference Include="Google.Protobuf" />
+    <PackageReference Include="Grpc.AspNetCore" />
+    <PackageReference Include="Grpc.Tools">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Protobuf Include="Protos\axis\datamodeling\v1\data_model_catalog_service.proto" GrpcServices="Both" />
   </ItemGroup>
 
   <ItemGroup>
