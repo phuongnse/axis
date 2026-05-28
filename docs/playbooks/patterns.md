@@ -1310,8 +1310,45 @@ message GetUserPermissionsResponse {
 2. Add the `Protos` directory to `modules:` in [`buf.yaml`](../../buf.yaml) at the repo root (copy an existing line).
 3. Keep `Grpc.Tools` `<Protobuf Include=...>` in the `.csproj` — Buf does not replace codegen.
 4. Run `buf lint` locally (`buf` CLI) and `./scripts/check-buf-modules.sh` (also runs in CI **Doc drift**).
+5. **Changing `buf.yaml` breaking policy or removing a field?** Read [Buf breaking rules — what's actually configured (and the gotcha)](#buf-breaking-rules--whats-actually-configured-and-the-gotcha) first. The v2 category model splits deletion rules in a way that's easy to misread, and "buf passes locally" can mean "no rule fires" rather than "the relaxed rule passed".
 
 CI runs `buf lint` and `buf breaking` against `main` when `.proto` or `buf.yaml` changes.
+
+#### Buf breaking rules — what's actually configured (and the gotcha)
+
+Field-deletion enforcement in `buf.yaml` is **non-obvious** because the buf v2 category model splits deletion rules across categories in a way that's easy to misread. The bug we hit in PR #145: dropping `FIELD_NO_DELETE` alone leaves *zero* enforcement on field removal — the "reserved variant" is not implicit in FILE/PACKAGE.
+
+Rule map (verify with `buf config ls-breaking-rules --version=v2`):
+
+| Rule | Categories | Default | What it does |
+|---|---|---|---|
+| `FIELD_NO_DELETE` | FILE, PACKAGE | ✓ ON | Fails on **any** field deletion |
+| `FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED` | WIRE_JSON, WIRE | ✗ OFF in FILE/PACKAGE | Fails only if deleted field's **number** was not reserved |
+| `FIELD_NO_DELETE_UNLESS_NAME_RESERVED` | WIRE_JSON | ✗ OFF in FILE/PACKAGE | Fails only if deleted field's **name** was not reserved |
+
+The current repo policy ([`buf.yaml`](../../buf.yaml)):
+
+```yaml
+breaking:
+  use:
+    - FILE
+    - FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED  # explicit add — not in FILE
+    - FIELD_NO_DELETE_UNLESS_NAME_RESERVED    # explicit add — not in FILE
+  except:
+    - FIELD_NO_DELETE                          # drop strict variant
+```
+
+Result: a field may be removed **iff** the proto has `reserved <number>;` AND `reserved "<name>";` in the same message. Everything else FILE-strict still applies (no message deletion, no file renames, etc.).
+
+##### Lesson for future agents — verify, don't guess
+
+When changing `buf.yaml` to allow a previously-forbidden change:
+
+1. **Run `buf config ls-breaking-rules --version=v2`** to see exactly which rules a category contains. Don't infer from category names — `PACKAGE` does *not* relax `FIELD_NO_DELETE`; the relaxed variant lives in `WIRE_JSON`/`WIRE` and is OFF by default.
+2. **Test the negative case before declaring the fix works.** Delete a `reserved` line locally, run `buf breaking`, and confirm it now fails. If it passes, you didn't fix it — you disabled enforcement. *"Buf passes" ≠ "rule fires correctly"*. The PR #145 first attempt (`use: PACKAGE`) and second attempt (`FILE except FIELD_NO_DELETE` alone) both "passed local buf" but enforced nothing.
+3. **Reserved fields alone are hygiene only.** Without an enforced rule, `reserved` is documentation — it tells humans not to reuse the number, but buf won't fail anyone who forgets.
+
+The shortcut "if CI is green, the rule is doing its job" fails here because the absence of an error proves the absence of a check, not the presence of a working check. Always force the rule to fire on a counterexample before trusting it.
 
 **Step 2 — Consuming module gets a generated client via project reference (modulith) or NuGet (extracted):**
 
