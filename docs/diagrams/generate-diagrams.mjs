@@ -318,47 +318,38 @@ function systemContext() {
     if (sub) els.push(text({ x, y: y + 72, value: sub, size: 10, color: C.muted, anchor: "center" }));
   }
 
-  actor(105, 195, "Org Admin", "[builds workflows & forms]");
-  actor(105, 460, "End User", "[submits forms, views pages]");
+  actor(95, 130, "Platform Admin", "[operates platform]");
+  actor(95, 250, "Org Admin", "[builds workflows & forms]");
+  actor(95, 370, "Org Member", "[works in tenant apps]");
+  actor(95, 490, "End User", "[submits forms, views pages]");
 
   // Platform boundary
   els.push(...rect({ x: 230, y: 65, w: 600, h: 650, bg: "#f0f9ff", stroke: C.sysBdr, label: "Axis Platform", labelSize: 14, labelBold: true, labelColor: C.sysBdr }));
 
-  // Inside platform — col 1 (left)
-  els.push(...rect({ x: 268, y: 120, w: 240, h: 70, bg: C.sysBg, stroke: C.sysBdr, label: "Web Application", sub: "React 19 + TypeScript" }));
-  els.push(...rect({ x: 268, y: 250, w: 240, h: 70, bg: C.sysBg, stroke: C.sysBdr, label: "API Server", sub: "ASP.NET Core 8 · Modulith (strict boundaries)" }));
-  els.push(...rect({ x: 268, y: 395, w: 240, h: 70, bg: C.infraBg, stroke: C.infraBdr, label: "PostgreSQL 16", sub: "Per-module databases" }));
-  els.push(...rect({ x: 268, y: 505, w: 240, h: 70, bg: C.infraBg, stroke: C.infraBdr, label: "Redis 7", sub: "Cache · Session" }));
+  // Inside platform (context-level only; no container internals)
+  els.push(...rect({ x: 300, y: 170, w: 250, h: 80, bg: C.sysBg, stroke: C.sysBdr, label: "Web Application (SPA)", sub: "Org admin/member + end-user UI" }));
+  els.push(...rect({ x: 300, y: 320, w: 250, h: 80, bg: C.sysBg, stroke: C.sysBdr, label: "Axis API Gateway", sub: "Auth + REST/OpenAPI + module orchestration" }));
+  els.push(...rect({ x: 300, y: 470, w: 250, h: 80, bg: C.sysBg, stroke: C.sysBdr, label: "Module Services", sub: "Identity · Data · Workflow · Form · Engine · Page" }));
 
-  // Inside platform — col 2 (right)
-  els.push(...rect({ x: 558, y: 210, w: 220, h: 50, bg: C.evtBg, stroke: C.evtBdr, label: "Kafka + Schema Registry", sub: "Events/Snapshots · Avro + CloudEvents" }));
-  els.push(...rect({ x: 558, y: 270, w: 220, h: 50, bg: C.evtBg, stroke: C.evtBdr, label: "RabbitMQ", sub: "Commands/Jobs/Saga steps" }));
-  els.push(...rect({ x: 558, y: 330, w: 220, h: 50, bg: C.sysBg, stroke: C.sysBdr, label: "gRPC Contracts", sub: "Sync RPC escape hatch" }));
-  els.push(...rect({ x: 558, y: 395, w: 220, h: 70, bg: C.infraBg, stroke: C.infraBdr, label: "AWS S3", sub: "File storage" }));
+  // External systems
+  els.push(...rect({ x: 890, y: 170, w: 180, h: 70, bg: C.extBg, stroke: C.extBdr, label: "Email Service", sub: "Verification + notifications" }));
+  els.push(...rect({ x: 890, y: 320, w: 180, h: 70, bg: C.extBg, stroke: C.extBdr, label: "External APIs", sub: "Workflow HTTP steps" }));
+  els.push(...rect({ x: 890, y: 470, w: 180, h: 70, bg: C.extBg, stroke: C.extBdr, label: "Webhook Targets", sub: "Outbound workflow events" }));
 
-  // External services
-  els.push(...rect({ x: 890, y: 200, w: 170, h: 70, bg: C.extBg, stroke: C.extBdr, label: "Email Service", sub: "SMTP / MailKit" }));
-  els.push(...rect({ x: 890, y: 395, w: 170, h: 70, bg: C.extBg, stroke: C.extBdr, label: "External APIs", sub: "HTTP Request steps" }));
+  // Actors → Axis
+  els.push(...routedArrow({ waypoints: [[139, 152], [260, 152], [260, 350], [300, 350]], label: "HTTPS" }));
+  els.push(...routedArrow({ waypoints: [[139, 272], [250, 272], [250, 210], [300, 210]], label: "HTTPS" }));
+  els.push(...routedArrow({ waypoints: [[139, 392], [250, 392], [250, 210], [300, 210]], label: "HTTPS" }));
+  els.push(...routedArrow({ waypoints: [[139, 512], [250, 512], [250, 210], [300, 210]], label: "HTTPS" }));
 
-  // Org Admin → Web App
-  els.push(...routedArrow({ waypoints: [[149, 217], [248, 217], [248, 155], [268, 155]], label: "HTTPS" }));
-  // End User → API Server (direct)
-  els.push(...routedArrow({ waypoints: [[149, 482], [248, 482], [248, 285], [268, 285]], label: "HTTPS" }));
-  // Web App → API Server
-  els.push(...arrow({ x1: 388, y1: 190, x2: 388, y2: 250, label: "REST / WS" }));
-  // API Server → PostgreSQL (straight down)
-  els.push(...arrow({ x1: 388, y1: 320, x2: 388, y2: 395 }));
-  // API Server → Redis (route around left to avoid crossing PostgreSQL)
-  els.push(...routedArrow({ waypoints: [[268, 285], [248, 285], [248, 540], [268, 540]] }));
-  // API Server → messaging / contracts
-  els.push(...arrow({ x1: 508, y1: 275, x2: 558, y2: 235 }));
-  els.push(...arrow({ x1: 508, y1: 285, x2: 558, y2: 295 }));
-  els.push(...arrow({ x1: 508, y1: 295, x2: 558, y2: 355 }));
-  // API Server → S3 (via app integration)
-  els.push(...routedArrow({ waypoints: [[508, 305], [540, 305], [540, 430], [558, 430]] }));
-  // Messaging / handlers → Email + External APIs
-  els.push(...routedArrow({ waypoints: [[778, 235], [840, 235], [840, 235], [890, 235]] }));
-  els.push(...routedArrow({ waypoints: [[778, 295], [840, 295], [840, 430], [890, 430]] }));
+  // Internal Axis flow
+  els.push(...arrow({ x1: 425, y1: 250, x2: 425, y2: 320 }));
+  els.push(...arrow({ x1: 425, y1: 400, x2: 425, y2: 470 }));
+
+  // Axis → external systems
+  els.push(...arrow({ x1: 550, y1: 350, x2: 890, y2: 205 }));
+  els.push(...arrow({ x1: 550, y1: 350, x2: 890, y2: 355 }));
+  els.push(...arrow({ x1: 550, y1: 510, x2: 890, y2: 505 }));
 
   return excalidraw(els);
 }
