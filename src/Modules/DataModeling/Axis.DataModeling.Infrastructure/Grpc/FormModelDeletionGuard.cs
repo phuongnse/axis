@@ -26,7 +26,6 @@ internal sealed class FormModelDeletionGuard(
                 new CountActiveModelReferencesRequest
                 {
                     ModelId = modelId.ToString(),
-                    OrganizationId = organizationId.ToString(),
                 },
                 headers: headers,
                 cancellationToken: cancellationToken);

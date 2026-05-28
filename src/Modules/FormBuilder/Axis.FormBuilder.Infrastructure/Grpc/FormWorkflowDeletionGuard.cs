@@ -28,7 +28,6 @@ internal sealed class FormWorkflowDeletionGuard(
                 new CountBlockingFormReferencesRequest
                 {
                     FormId = formId.ToString(),
-                    OrganizationId = organizationId.ToString(),
                 },
                 headers: headers,
                 deadline: DateTime.UtcNow.Add(RpcDeadline),

@@ -1287,19 +1287,23 @@ Used only when a local read model is insufficient. Example: a workflow step need
 syntax = "proto3";
 package axis.identity.v1;
 
+// Tenant scoping: the server MUST derive organization_id from the caller's
+// JWT `org_id` claim, never from a request field. Callers forward the inbound
+// `authorization` header on every call. See Step 3 below.
 service IdentityService {
     rpc GetUserPermissions(GetUserPermissionsRequest) returns (GetUserPermissionsResponse);
 }
 
 message GetUserPermissionsRequest {
     string user_id = 1;
-    string organization_id = 2;
 }
 
 message GetUserPermissionsResponse {
     repeated string permissions = 1;
 }
 ```
+
+> **Status note:** `IdentityService` still accepts a legacy `organization_id` field on `GetUserPermissionsRequest`. Migration to JWT-derived tenant scoping is a follow-up; new gRPC services (`DataModelCatalogService`, `FormModelReferenceService`, `WorkflowFormReferenceService`) already follow the canonical pattern above.
 
 **Buf (repo-wide lint + breaking)** — register every new module proto root before merge:
 
@@ -1314,22 +1318,65 @@ CI runs `buf lint` and `buf breaking` against `main` when `.proto` or `buf.yaml`
 
 ```csharp
 // WorkflowEngine.Infrastructure — inject the Identity gRPC client
-public sealed class PermissionGate(IdentityService.IdentityServiceClient identity)
+public sealed class PermissionGate(
+    IdentityService.IdentityServiceClient identity,
+    IHttpContextAccessor httpContextAccessor)
 {
-    public async Task<bool> CanExecuteAsync(Guid userId, Guid orgId, string permission, CancellationToken ct)
+    public async Task<bool> CanExecuteAsync(Guid userId, string permission, CancellationToken ct)
     {
+        Metadata headers = new();
+        string? authorization = httpContextAccessor.HttpContext?.Request.Headers.Authorization.ToString();
+        if (!string.IsNullOrWhiteSpace(authorization))
+            headers.Add("authorization", authorization);
+
         GetUserPermissionsResponse resp = await identity.GetUserPermissionsAsync(
-            new GetUserPermissionsRequest
-            {
-                UserId = userId.ToString(),
-                OrganizationId = orgId.ToString(),
-            }, cancellationToken: ct);
+            new GetUserPermissionsRequest { UserId = userId.ToString() },
+            headers: headers,
+            cancellationToken: ct);
         return resp.Permissions.Contains(permission);
     }
 }
 ```
 
 The gRPC channel is configured via `Modules:Identity:GrpcUrl` in `src/Axis.Api/appsettings.json` (see [ADR-016](../TECH_STACK.md#adr-016-service-discovery-via-config-in-modulith-mode-and-k8s-dns-in-production)) — `http://localhost:5280` on the modulith host in development, module service DNS in production when extracted.
+
+**Step 3 — Server side: derive tenant from JWT, not the request payload**
+
+The gRPC server **must** read `organization_id` from the caller's JWT `org_id` claim, never from the request payload. Trusting an `organization_id` field would let a caller authenticated as tenant A query tenant B's data by passing tenant B's id — every service-to-service hop would then need its own cross-tenant guard. JWT-derived scoping makes the guarantee structural.
+
+```csharp
+// src/Modules/DataModeling/Axis.DataModeling.Infrastructure/Grpc/DataModelCatalogGrpcService.cs
+internal sealed class DataModelCatalogGrpcService(IDataModelRepository repo)
+    : DataModelCatalogService.DataModelCatalogServiceBase
+{
+    public override async Task<GetModelSummaryResponse> GetModelSummary(
+        GetModelSummaryRequest request, ServerCallContext context)
+    {
+        if (!Guid.TryParse(request.ModelId, out Guid modelId))
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "model_id must be a valid GUID."));
+
+        Guid organizationId = ResolveCallerOrganizationId(context);
+
+        DataModel? model = await repo.GetByIdAsync(modelId, organizationId, context.CancellationToken);
+        return new GetModelSummaryResponse
+        {
+            Exists = model is not null,
+            ModelName = model?.Name ?? string.Empty,
+        };
+    }
+
+    private static Guid ResolveCallerOrganizationId(ServerCallContext context)
+    {
+        Claim? claim = context.GetHttpContext().User.FindFirst("org_id");
+        if (claim is null || !Guid.TryParse(claim.Value, out Guid organizationId))
+            throw new RpcException(
+                new Status(StatusCode.Unauthenticated, "Caller JWT is missing a valid org_id claim."));
+        return organizationId;
+    }
+}
+```
+
+The server is mapped with `.RequireAuthorization()` so JwtBearer middleware runs first; the call reaches this method only when the JWT is valid. Caller-side gRPC clients (`FormModelDeletionGuard`, `FormWorkflowDeletionGuard`) forward the inbound `authorization` header via `Metadata` so the JWT travels with every cross-module call.
 
 ### Dev — verify GetUserPermissions with grpcurl
 
@@ -1347,11 +1394,11 @@ grpcurl -plaintext localhost:5280 list
 
 grpcurl -plaintext \
   -H "authorization: Bearer <access_token>" \
-  -d '{"user_id":"<user-guid>","organization_id":"<org-guid>"}' \
+  -d '{"user_id":"<user-guid>"}' \
   localhost:5280 axis.identity.v1.IdentityService/GetUserPermissions
 ```
 
-Replace `<access_token>`, `<user-guid>`, and `<org-guid>` with values from your tenant. `Unauthenticated` / `PermissionDenied` means the token is missing, expired, or invalid — obtain a fresh token from `POST /connect/token` after PKCE login.
+Replace `<access_token>` and `<user-guid>` with values from your tenant — the server reads the tenant from the JWT's `org_id` claim, so no `organization_id` is sent in the payload. `Unauthenticated` / `PermissionDenied` means the token is missing, expired, or invalid — obtain a fresh token from `POST /connect/token` after PKCE login.
 
 ### ✅ Pattern 3: JWKS-only JWT validation in consuming modules
 
@@ -1408,6 +1455,7 @@ This violates the Share Nothing principle (cross-module DB query), forces every 
 - **Cross-module handlers must filter by `OrganizationId`** in addition to entity foreign keys. Tenant isolation is always explicit.
 - Sync RPC (gRPC) is the escape hatch only. If you reach for it more than once or twice per module, you probably need another local read model instead.
 - **JWT validation is JWKS-only.** Consuming modules verify JWTs against Identity's JWKS endpoint locally; never call `IdentityDbContext` or any Identity service per request just to authenticate a user.
+- **Cross-module gRPC services derive `organization_id` from the caller's JWT `org_id` claim**, never from a request field. The proto must not declare an `organization_id` input; the server reads `ServerCallContext.GetHttpContext().User.FindFirst("org_id")` and throws `Unauthenticated` when the claim is absent.
 
 ### Pre-commit violation sweep
 

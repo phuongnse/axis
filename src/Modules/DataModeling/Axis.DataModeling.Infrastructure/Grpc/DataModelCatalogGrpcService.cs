@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Axis.DataModeling.Application.Repositories;
 using Axis.DataModeling.Contracts.Grpc;
 using Axis.DataModeling.Domain.Aggregates;
@@ -18,11 +19,7 @@ internal sealed class DataModelCatalogGrpcService(IDataModelRepository dataModel
                 new Status(StatusCode.InvalidArgument, "model_id must be a valid GUID."));
         }
 
-        if (!Guid.TryParse(request.OrganizationId, out Guid organizationId))
-        {
-            throw new RpcException(
-                new Status(StatusCode.InvalidArgument, "organization_id must be a valid GUID."));
-        }
+        Guid organizationId = ResolveCallerOrganizationId(context);
 
         DataModel? model = await dataModelRepository.GetByIdAsync(
             modelId,
@@ -34,5 +31,17 @@ internal sealed class DataModelCatalogGrpcService(IDataModelRepository dataModel
             Exists = model is not null,
             ModelName = model?.Name ?? string.Empty,
         };
+    }
+
+    private static Guid ResolveCallerOrganizationId(ServerCallContext context)
+    {
+        Claim? claim = context.GetHttpContext().User.FindFirst("org_id");
+        if (claim is null || !Guid.TryParse(claim.Value, out Guid organizationId))
+        {
+            throw new RpcException(
+                new Status(StatusCode.Unauthenticated, "Caller JWT is missing a valid org_id claim."));
+        }
+
+        return organizationId;
     }
 }

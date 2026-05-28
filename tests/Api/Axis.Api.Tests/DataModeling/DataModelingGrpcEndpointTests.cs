@@ -17,8 +17,7 @@ public sealed class DataModelingGrpcEndpointTests(ApiTestFixture fixture)
     public async Task GetModelSummary_WhenModelExists_ReturnsExistsAndModelName()
     {
         HttpClient apiClient = await AuthHelper.CreateAdminClientAsync(fixture, "grpcdm1");
-        string accessToken = apiClient.DefaultRequestHeaders.Authorization?.Parameter
-            ?? throw new InvalidOperationException("Missing bearer token on authenticated client.");
+        string accessToken = GetBearerToken(apiClient);
 
         HttpResponseMessage createResponse = await apiClient.PostAsJsonAsync("/api/models", new
         {
@@ -33,143 +32,66 @@ public sealed class DataModelingGrpcEndpointTests(ApiTestFixture fixture)
         string modelId = createBody.GetProperty("id").GetString()
             ?? throw new InvalidOperationException("Create model response did not contain id.");
 
-        HttpResponseMessage meResponse = await apiClient.GetAsync("/api/users/me");
-        meResponse.EnsureSuccessStatusCode();
-        JsonElement meBody = await meResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
-        string organizationId = meBody.GetProperty("org_id").GetString()
-            ?? throw new InvalidOperationException("Users/me response did not contain org_id.");
-
-        using IServiceScope scope = fixture.CreateScope();
-        DataModelCatalogService.DataModelCatalogServiceClient grpcClient =
-            scope.ServiceProvider.GetRequiredService<DataModelCatalogService.DataModelCatalogServiceClient>();
-
-        Metadata headers = new()
+        DataModelCatalogService.DataModelCatalogServiceClient grpcClient = ResolveGrpcClient(out IServiceScope scope);
+        using (scope)
         {
-            { "authorization", $"Bearer {accessToken}" },
-        };
+            GetModelSummaryResponse response = await grpcClient.GetModelSummaryAsync(
+                new GetModelSummaryRequest { ModelId = modelId },
+                headers: BuildAuthHeaders(accessToken)).ResponseAsync;
 
-        GetModelSummaryResponse response = await grpcClient.GetModelSummaryAsync(
-            new GetModelSummaryRequest
-            {
-                ModelId = modelId,
-                OrganizationId = organizationId,
-            },
-            headers: headers).ResponseAsync;
-
-        response.Exists.Should().BeTrue();
-        response.ModelName.Should().Be("Grpc Orders");
+            response.Exists.Should().BeTrue();
+            response.ModelName.Should().Be("Grpc Orders");
+        }
     }
 
     [Fact]
     public async Task GetModelSummary_WhenModelIdIsInvalid_ReturnsInvalidArgument()
     {
         HttpClient apiClient = await AuthHelper.CreateAdminClientAsync(fixture, "grpcdm2");
-        string accessToken = apiClient.DefaultRequestHeaders.Authorization?.Parameter
-            ?? throw new InvalidOperationException("Missing bearer token on authenticated client.");
+        string accessToken = GetBearerToken(apiClient);
 
-        HttpResponseMessage meResponse = await apiClient.GetAsync("/api/users/me");
-        meResponse.EnsureSuccessStatusCode();
-        JsonElement meBody = await meResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
-        string organizationId = meBody.GetProperty("org_id").GetString()
-            ?? throw new InvalidOperationException("Users/me response did not contain org_id.");
-
-        using IServiceScope scope = fixture.CreateScope();
-        DataModelCatalogService.DataModelCatalogServiceClient grpcClient =
-            scope.ServiceProvider.GetRequiredService<DataModelCatalogService.DataModelCatalogServiceClient>();
-
-        Metadata headers = new()
+        DataModelCatalogService.DataModelCatalogServiceClient grpcClient = ResolveGrpcClient(out IServiceScope scope);
+        using (scope)
         {
-            { "authorization", $"Bearer {accessToken}" },
-        };
+            Func<Task> act = async () => await grpcClient.GetModelSummaryAsync(
+                new GetModelSummaryRequest { ModelId = "not-a-guid" },
+                headers: BuildAuthHeaders(accessToken)).ResponseAsync;
 
-        Func<Task> act = async () => await grpcClient.GetModelSummaryAsync(
-            new GetModelSummaryRequest
-            {
-                ModelId = "not-a-guid",
-                OrganizationId = organizationId,
-            },
-            headers: headers).ResponseAsync;
-
-        RpcException exception = await Assert.ThrowsAsync<RpcException>(act);
-        exception.StatusCode.Should().Be(StatusCode.InvalidArgument);
-    }
-
-    [Fact]
-    public async Task GetModelSummary_WhenOrganizationIdIsInvalid_ReturnsInvalidArgument()
-    {
-        HttpClient apiClient = await AuthHelper.CreateAdminClientAsync(fixture, "grpcdm3");
-        string accessToken = apiClient.DefaultRequestHeaders.Authorization?.Parameter
-            ?? throw new InvalidOperationException("Missing bearer token on authenticated client.");
-
-        using IServiceScope scope = fixture.CreateScope();
-        DataModelCatalogService.DataModelCatalogServiceClient grpcClient =
-            scope.ServiceProvider.GetRequiredService<DataModelCatalogService.DataModelCatalogServiceClient>();
-
-        Metadata headers = new()
-        {
-            { "authorization", $"Bearer {accessToken}" },
-        };
-
-        Func<Task> act = async () => await grpcClient.GetModelSummaryAsync(
-            new GetModelSummaryRequest
-            {
-                ModelId = Guid.NewGuid().ToString(),
-                OrganizationId = "not-a-guid",
-            },
-            headers: headers).ResponseAsync;
-
-        RpcException exception = await Assert.ThrowsAsync<RpcException>(act);
-        exception.StatusCode.Should().Be(StatusCode.InvalidArgument);
+            RpcException exception = await Assert.ThrowsAsync<RpcException>(act);
+            exception.StatusCode.Should().Be(StatusCode.InvalidArgument);
+        }
     }
 
     [Fact]
     public async Task GetModelSummary_WhenModelDoesNotExist_ReturnsExistsFalse()
     {
         HttpClient apiClient = await AuthHelper.CreateAdminClientAsync(fixture, "grpcdm4");
-        string accessToken = apiClient.DefaultRequestHeaders.Authorization?.Parameter
-            ?? throw new InvalidOperationException("Missing bearer token on authenticated client.");
-        string organizationId = await GetOrganizationIdAsync(apiClient);
+        string accessToken = GetBearerToken(apiClient);
 
-        using IServiceScope scope = fixture.CreateScope();
-        DataModelCatalogService.DataModelCatalogServiceClient grpcClient =
-            scope.ServiceProvider.GetRequiredService<DataModelCatalogService.DataModelCatalogServiceClient>();
-
-        Metadata headers = new()
+        DataModelCatalogService.DataModelCatalogServiceClient grpcClient = ResolveGrpcClient(out IServiceScope scope);
+        using (scope)
         {
-            { "authorization", $"Bearer {accessToken}" },
-        };
+            GetModelSummaryResponse response = await grpcClient.GetModelSummaryAsync(
+                new GetModelSummaryRequest { ModelId = Guid.NewGuid().ToString() },
+                headers: BuildAuthHeaders(accessToken)).ResponseAsync;
 
-        GetModelSummaryResponse response = await grpcClient.GetModelSummaryAsync(
-            new GetModelSummaryRequest
-            {
-                ModelId = Guid.NewGuid().ToString(),
-                OrganizationId = organizationId,
-            },
-            headers: headers).ResponseAsync;
-
-        response.Exists.Should().BeFalse();
-        response.ModelName.Should().BeEmpty();
+            response.Exists.Should().BeFalse();
+            response.ModelName.Should().BeEmpty();
+        }
     }
 
     [Fact]
     public async Task GetModelSummary_WhenUnauthenticated_ReturnsUnauthenticated()
     {
-        HttpClient apiClient = await AuthHelper.CreateAdminClientAsync(fixture, "grpcdm5");
-        string organizationId = await GetOrganizationIdAsync(apiClient);
+        DataModelCatalogService.DataModelCatalogServiceClient grpcClient = ResolveGrpcClient(out IServiceScope scope);
+        using (scope)
+        {
+            Func<Task> act = async () => await grpcClient.GetModelSummaryAsync(
+                new GetModelSummaryRequest { ModelId = Guid.NewGuid().ToString() }).ResponseAsync;
 
-        using IServiceScope scope = fixture.CreateScope();
-        DataModelCatalogService.DataModelCatalogServiceClient grpcClient =
-            scope.ServiceProvider.GetRequiredService<DataModelCatalogService.DataModelCatalogServiceClient>();
-
-        Func<Task> act = async () => await grpcClient.GetModelSummaryAsync(
-            new GetModelSummaryRequest
-            {
-                ModelId = Guid.NewGuid().ToString(),
-                OrganizationId = organizationId,
-            }).ResponseAsync;
-
-        RpcException exception = await Assert.ThrowsAsync<RpcException>(act);
-        exception.StatusCode.Should().Be(StatusCode.Unauthenticated);
+            RpcException exception = await Assert.ThrowsAsync<RpcException>(act);
+            exception.StatusCode.Should().Be(StatusCode.Unauthenticated);
+        }
     }
 
     [Fact]
@@ -177,10 +99,7 @@ public sealed class DataModelingGrpcEndpointTests(ApiTestFixture fixture)
     {
         HttpClient tenantAClient = await AuthHelper.CreateAdminClientAsync(fixture, "grpcdm6a");
         HttpClient tenantBClient = await AuthHelper.CreateAdminClientAsync(fixture, "grpcdm6b");
-
-        string tenantAToken = tenantAClient.DefaultRequestHeaders.Authorization?.Parameter
-            ?? throw new InvalidOperationException("Missing bearer token for tenant A.");
-        string tenantBOrganizationId = await GetOrganizationIdAsync(tenantBClient);
+        string tenantBToken = GetBearerToken(tenantBClient);
 
         HttpResponseMessage createResponse = await tenantAClient.PostAsJsonAsync("/api/models", new
         {
@@ -191,36 +110,35 @@ public sealed class DataModelingGrpcEndpointTests(ApiTestFixture fixture)
         }, Json);
         createResponse.EnsureSuccessStatusCode();
         JsonElement createBody = await createResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
-        string modelId = createBody.GetProperty("id").GetString()
+        string tenantAModelId = createBody.GetProperty("id").GetString()
             ?? throw new InvalidOperationException("Create model response did not contain id.");
 
-        using IServiceScope scope = fixture.CreateScope();
-        DataModelCatalogService.DataModelCatalogServiceClient grpcClient =
-            scope.ServiceProvider.GetRequiredService<DataModelCatalogService.DataModelCatalogServiceClient>();
-
-        Metadata headers = new()
+        DataModelCatalogService.DataModelCatalogServiceClient grpcClient = ResolveGrpcClient(out IServiceScope scope);
+        using (scope)
         {
-            { "authorization", $"Bearer {tenantAToken}" },
-        };
+            GetModelSummaryResponse response = await grpcClient.GetModelSummaryAsync(
+                new GetModelSummaryRequest { ModelId = tenantAModelId },
+                headers: BuildAuthHeaders(tenantBToken)).ResponseAsync;
 
-        GetModelSummaryResponse response = await grpcClient.GetModelSummaryAsync(
-            new GetModelSummaryRequest
-            {
-                ModelId = modelId,
-                OrganizationId = tenantBOrganizationId,
-            },
-            headers: headers).ResponseAsync;
-
-        response.Exists.Should().BeFalse();
-        response.ModelName.Should().BeEmpty();
+            response.Exists.Should().BeFalse();
+            response.ModelName.Should().BeEmpty();
+        }
     }
 
-    private static async Task<string> GetOrganizationIdAsync(HttpClient client)
+    private DataModelCatalogService.DataModelCatalogServiceClient ResolveGrpcClient(out IServiceScope scope)
     {
-        HttpResponseMessage meResponse = await client.GetAsync("/api/users/me");
-        meResponse.EnsureSuccessStatusCode();
-        JsonElement meBody = await meResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
-        return meBody.GetProperty("org_id").GetString()
-            ?? throw new InvalidOperationException("Users/me response did not contain org_id.");
+        scope = fixture.CreateScope();
+        return scope.ServiceProvider.GetRequiredService<DataModelCatalogService.DataModelCatalogServiceClient>();
+    }
+
+    private static string GetBearerToken(HttpClient client)
+    {
+        return client.DefaultRequestHeaders.Authorization?.Parameter
+            ?? throw new InvalidOperationException("Missing bearer token on authenticated client.");
+    }
+
+    private static Metadata BuildAuthHeaders(string accessToken)
+    {
+        return new Metadata { { "authorization", $"Bearer {accessToken}" } };
     }
 }
