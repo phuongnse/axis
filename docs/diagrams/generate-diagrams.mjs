@@ -372,7 +372,7 @@ function containerDiagram() {
   els.push(text({ x: 565, y: 25, value: "Axis Platform — Container Diagram", size: 18, bold: true, color: C.text, anchor: "center" }));
 
   // Platform boundary (right edge x=810)
-  els.push(...rect({ x: 50, y: 55, w: 760, h: 700, bg: "#f0f9ff", stroke: C.sysBdr }));
+  els.push(...rect({ x: 50, y: 55, w: 760, h: 670, bg: "#f0f9ff", stroke: C.sysBdr }));
   els.push(text({ x: 430, y: 80, value: "Axis.Api Gateway + Module Services (Modulith, strict boundaries)", size: 14, bold: true, color: C.sysBdr, anchor: "center" }));
 
   // Modules — row 1 (y=105) and row 2 (y=245), 65px gap between rows
@@ -451,8 +451,8 @@ function containerDiagram() {
   els.push(...rect({ x: 1110, y: 565, w: 200, h: 55, bg: C.extBg, stroke: C.extBdr, label: "AWS S3", sub: "File storage" }));
   els.push(...rect({ x: 1110, y: 635, w: 200, h: 55, bg: C.extBg, stroke: C.extBdr, label: "Email Service", sub: "SMTP · MailKit" }));
   // External calls originate from the platform boundary and route clearly.
-  els.push(...routedArrow({ waypoints: [[810, 620], [1092, 620], [1092, 592], [1110, 592]], color: C.arrow }));
-  els.push(...routedArrow({ waypoints: [[810, 700], [1092, 700], [1092, 662], [1110, 662]], color: C.arrow }));
+  els.push(...routedArrow({ waypoints: [[810, 660], [1092, 660], [1092, 592], [1110, 592]], color: C.arrow }));
+  els.push(...routedArrow({ waypoints: [[810, 705], [1092, 705], [1092, 662], [1110, 662]], color: C.arrow }));
 
   // Compact legend
   els.push(...rect({ x: 628, y: 88, w: 176, h: 142, bg: "#ffffff", stroke: C.border }));
