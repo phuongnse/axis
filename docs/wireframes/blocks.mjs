@@ -164,9 +164,40 @@ export function buildAuthSubmitButton(prefix, cardX, y, cardW, label) {
 
 // ─── Auth form field blocks ────────────────────────────────────────────────────
 
+export const PASSWORD_CRITERIA_ROW_H = 15;
+export const PASSWORD_CRITERIA_GAP = 8;
+
+/** Default checklist (happy path — all rules satisfied while typing). */
+export const PASSWORD_CRITERIA_MET = [
+  { label: 'At least 8 characters', met: true },
+  { label: 'Contains a letter', met: true },
+  { label: 'Contains a number', met: true },
+  { label: 'Contains a special character', met: true },
+];
+
+/** Checklist with some rules still unmet (validation / weak password states). */
+export const PASSWORD_CRITERIA_PARTIAL = [
+  { label: 'At least 8 characters', met: false },
+  { label: 'Contains a letter', met: true },
+  { label: 'Contains a number', met: false },
+  { label: 'Contains a special character', met: false },
+];
+
+export function passwordCriteriaBlock(prefix, x, y, innerW, criteria) {
+  const els = [];
+  criteria.forEach((row, i) => {
+    const ry = y + i * PASSWORD_CRITERIA_ROW_H;
+    const mark = row.met ? '✓' : '○';
+    const color = row.met ? C.success : C.gray500;
+    els.push(text(`${prefix}_pc_m${i}`, x, ry, 14, PASSWORD_CRITERIA_ROW_H, mark, 10, color));
+    els.push(text(`${prefix}_pc_t${i}`, x + 18, ry, innerW - 18, PASSWORD_CRITERIA_ROW_H, row.label, 10, color));
+  });
+  return { els, blockH: criteria.length * PASSWORD_CRITERIA_ROW_H };
+}
+
 export function authFormField(
   prefix, cardX, y, cardW, label, value, errorMsg = null, required = false, helpText = null,
-  isPassword = null) {
+  isPassword = null, passwordCriteria = null) {
   const x = cardX + AUTH_CARD_PAD_X;
   const innerW = cardW - AUTH_CARD_PAD_X * 2;
   const password = isPassword ?? isPasswordLabel(label);
@@ -180,11 +211,19 @@ export function authFormField(
   if (password) {
     els.push(...passwordRevealToggle(`${prefix}_pw`, x, inputY, innerW));
   }
-  const errY = inputY + 44;
-  if (errorMsg) {
-    els.push(text(`${prefix}_err`, x, errY, innerW, 14, errorMsg, 11, C.danger));
+  let afterInputY = inputY + 40;
+  if (passwordCriteria) {
+    const criteria = Array.isArray(passwordCriteria) ? passwordCriteria : PASSWORD_CRITERIA_MET;
+    const critY = afterInputY + PASSWORD_CRITERIA_GAP;
+    const { els: critEls, blockH: critH } = passwordCriteriaBlock(`${prefix}_pc`, x, critY, innerW, criteria);
+    els.push(...critEls);
+    afterInputY = critY + critH;
   }
-  const blockH = (errorMsg ? errY + 16 : inputY + 48) - y + AUTH_FIELD_STACK_GAP;
+  if (errorMsg) {
+    els.push(text(`${prefix}_err`, x, afterInputY + 4, innerW, 14, errorMsg, 11, C.danger));
+    afterInputY += 18;
+  }
+  const blockH = afterInputY - y + AUTH_FIELD_STACK_GAP;
   return { els, blockH };
 }
 
@@ -324,7 +363,7 @@ export const REGISTER_ORG_ENTRY_FIELDS = [
     value: '••••••••',
     err: null,
     required: true,
-    helpText: 'At least 8 characters with a letter and a number.',
+    passwordCriteria: PASSWORD_CRITERIA_MET,
   },
   {
     kind: 'password',
@@ -353,9 +392,10 @@ export function paintRegisterOrgEntryFields(els, idPrefix, cardX, y, cardW, fiel
       return;
     }
     const password = f.kind === 'password' || (f.kind === 'input' && isPasswordLabel(f.label));
+    const criteria = f.passwordCriteria ?? (f.label === 'Password' ? PASSWORD_CRITERIA_MET : null);
     const { els: fieldEls, blockH } = authFormField(
       `${idPrefix}_f${i}`, cardX, fy, cardW, f.label, f.value, f.err ?? null, f.required !== false, f.helpText ?? null,
-      password);
+      password, criteria);
     els.push(...fieldEls);
     fy += blockH;
   });

@@ -69,6 +69,7 @@ import {
   authCard,
   mergeExcalidrawFiles,
   REGISTER_ORG_ENTRY_FIELDS,
+  PASSWORD_CRITERIA_PARTIAL,
   paintRegisterOrgEntryFields,
   paintRegisterOrgCompleteFields,
 } from './blocks.mjs';
@@ -452,7 +453,14 @@ function genRegisterOrgStates() {
       { kind: 'slug' },
       { kind: 'input', label: 'Admin full name', value: 'Alex Brown', err: null, required: true },
       { kind: 'input', label: 'Email address', value: 'not-an-email', err: 'Enter a valid email address.', required: true },
-      { kind: 'input', label: 'Password', value: '••••••••', err: 'Must be at least 8 characters with a letter and a number.', required: true },
+      {
+        kind: 'password',
+        label: 'Password',
+        value: '•••',
+        err: 'Must be at least 8 characters with a letter and a number.',
+        required: true,
+        passwordCriteria: PASSWORD_CRITERIA_PARTIAL,
+      },
       { kind: 'input', label: 'Confirm password', value: '••••••••', err: 'Passwords do not match.', required: true },
     ],
     terms: { checked: true },

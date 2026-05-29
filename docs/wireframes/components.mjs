@@ -302,15 +302,11 @@ export function isPasswordLabel(label) {
   return /password/i.test(label);
 }
 
-/** Eye icon control (wireframe — show/hide password). */
+/** Eye icon only (no button circle) — show/hide password affordance. */
 export function passwordRevealToggle(prefix, inputX, inputY, inputW) {
-  const btn = PASSWORD_TOGGLE_BTN;
-  const bx = inputX + inputW - btn - 6;
-  const by = inputY + 6;
-  const cx = bx + btn / 2;
-  const cy = by + btn / 2;
+  const cx = inputX + inputW - 20;
+  const cy = inputY + 20;
   return [
-    ellipse(`${prefix}_pw_tgl`, bx, by, btn, btn, C.gray300, C.gray50, 1),
     ellipse(`${prefix}_pw_eye`, cx - 7, cy - 3, 14, 9, C.gray500, 'transparent', 1.25),
     ellipse(`${prefix}_pw_pupil`, cx - 2.5, cy - 1.5, 5, 5, C.gray500, C.gray500, 0),
   ];
