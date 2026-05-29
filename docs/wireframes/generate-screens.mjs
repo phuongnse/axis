@@ -55,14 +55,15 @@ import {
   AUTH_HEADER_H_SUBTITLE,
   AUTH_CARD_FOOTER_ZONE,
   placeAuthExternalSignIn,
+  buildAuthCardBrandBar,
   buildAuthCardHeader,
   buildAuthCardFooter,
   buildAuthSubmitButton,
-  authFormField,
-  authReadOnlyValueField,
-  authSlugPreviewField,
   authTermsRow,
   authCard,
+  REGISTER_ORG_ENTRY_FIELDS,
+  paintRegisterOrgEntryFields,
+  paintRegisterOrgCompleteFields,
 } from './blocks.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -97,6 +98,10 @@ function deterministicSeedForScreen(screenKey) {
 }
 
 function runScreen(screenKey, generator) {
+  const filter = process.env.SCREEN_FILTER ?? '';
+  if (filter && !screenKey.includes(filter)) {
+    return;
+  }
   setSeed(deterministicSeedForScreen(screenKey));
   generator();
 }
@@ -262,26 +267,7 @@ function genRegisterOrg() {
   contentEls.push(...placeAuthExternalSignIn(cardX + AUTH_CARD_PAD_X, y));
   y += AUTH_EXTERNAL_SIGN_IN_BLOCK_H;
 
-  const fields = [
-    { kind: 'input', label: 'Organization name', value: 'Acme Corp', required: true },
-    { kind: 'slug' },
-    { kind: 'input', label: 'Admin full name', value: 'Alex Brown', required: true },
-    { kind: 'input', label: 'Email address', value: 'you@company.com', required: true },
-    { kind: 'input', label: 'Password', value: '••••••••', required: true },
-    { kind: 'input', label: 'Confirm password', value: '••••••••', required: true },
-  ];
-  fields.forEach((f, i) => {
-    if (f.kind === 'slug') {
-      const { els: slugEls, blockH } = authSlugPreviewField(`ro_slug`, cardX, y, cardW);
-      contentEls.push(...slugEls);
-      y += blockH;
-      return;
-    }
-    const { els: fieldEls, blockH } = authFormField(
-      `ro_f${i}`, cardX, y, cardW, f.label, f.value, null, f.required === true);
-    contentEls.push(...fieldEls);
-    y += blockH;
-  });
+  y = paintRegisterOrgEntryFields(contentEls, 'ro', cardX, y, cardW, REGISTER_ORG_ENTRY_FIELDS);
 
   const { els: termsEls, blockH: termsH } = authTermsRow('ro_terms', cardX, y, cardW, { checked: true });
   contentEls.push(...termsEls);
@@ -307,58 +293,28 @@ function genRegisterOrgComplete() {
   const cardW = AUTH_CARD_W;
   const cardX = Math.round((W - cardW) / 2);
   const cardY = 40;
-  const headerH = 136; // logo + title + provider subtitle
-  const footerZone = 44;
+  const headerH = AUTH_HEADER_H_SUBTITLE;
+  const footerZone = AUTH_CARD_FOOTER_ZONE;
   const els = [];
 
   els.push(rect('roc_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
 
-  let y = cardY + headerH;
   const contentEls = [];
+  contentEls.push(...buildAuthCardHeader(
+    'roc', cardX, cardY, cardW, 'Finish setting up your organization', 'Signed in with Microsoft'));
 
-  contentEls.push(text('roc_logo', cardX, cardY + 16, cardW, 28, '⬡  Axis', 18, C.primary, 'center'));
-  contentEls.push(hline('roc_hdiv', cardX, cardY + 60, cardW, C.gray300));
-  contentEls.push(text('roc_title', cardX + 24, cardY + 76, cardW - 48, 24,
-    'Finish setting up your organization', 17, C.gray900));
-  contentEls.push(text('roc_sub', cardX + 24, cardY + 104, cardW - 48, 18,
-    'Signed in with Microsoft', 13, C.gray700));
+  let y = cardY + headerH;
+  y = paintRegisterOrgCompleteFields(contentEls, 'roc', cardX, y, cardW);
+  y += 14;
 
-  const { els: emailEls, blockH: emailH } = authReadOnlyValueField(
-    'roc_email', cardX, y, cardW, 'Email address', 'alex@company.com');
-  contentEls.push(...emailEls);
-  y += emailH;
-
-  const { els: nameEls, blockH: nameH } = authFormField(
-    'roc_name', cardX, y, cardW, 'Admin full name', 'Alex Brown', null, true);
-  contentEls.push(...nameEls);
-  y += nameH;
-
-  const { els: orgEls, blockH: orgH } = authFormField(
-    'roc_org', cardX, y, cardW, 'Organization name', 'Acme Corp', null, true);
-  contentEls.push(...orgEls);
-  y += orgH;
-
-  const { els: slugEls, blockH: slugH } = authSlugPreviewField('roc_slug', cardX, y, cardW);
-  contentEls.push(...slugEls);
-  y += slugH;
-
-  const { els: termsEls, blockH: termsH } = authTermsRow('roc_terms', cardX, y, cardW, { checked: true });
-  contentEls.push(...termsEls);
-  y += termsH + 14;
-
-  const btnW = cardW - 48;
-  contentEls.push(rect('roc_sbtn', cardX + 24, y, btnW, 36, C.accentDark, C.accent, 2, true));
-  contentEls.push(text('roc_sbtn_t', cardX + 24, y + 10, btnW, 16, 'Create organization', 13, C.white, 'center'));
+  contentEls.push(...buildAuthSubmitButton('roc', cardX, y, cardW, 'Create organization'));
   y += 36 + 16;
 
   const cardH = y - cardY + footerZone;
-  const footerY = cardY + cardH - 32;
 
   els.push(rect('roc_card', cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
   els.push(...contentEls);
-  els.push(hline('roc_fdiv', cardX, footerY, cardW, C.gray300));
-  els.push(text('roc_footer', cardX + 24, footerY + 10, cardW - 48, 16,
-    '← Back to registration', 12, C.primary, 'center'));
+  els.push(...buildAuthCardFooter('roc', cardX, cardY, cardW, cardH, '← Back to registration'));
 
   write('platform-foundation/register-org-complete.excalidraw', els);
 }
@@ -380,39 +336,19 @@ function genRegisterOrgCompleteStates() {
 
   const drawPanel = ({ id, x, lbl, orgErr, terms }) => {
     const cardY = y0 + 28;
-    els.push(text(`rocs_${id}_lbl`, x, y0, panelW, 16, lbl, 12, C.danger));
-    els.push(rect(`rocs_${id}_card`, x, cardY, panelW, panelH, C.gray300, C.white, 2, true));
-    els.push(text(`rocs_${id}_logo`, x, cardY + 16, panelW, 28, '⬡  Axis', 18, C.primary, 'center'));
-    els.push(hline(`rocs_${id}_hdiv`, x, cardY + 60, panelW, C.gray300));
-    els.push(text(`rocs_${id}_title`, x + 24, cardY + 76, panelW - 48, 22,
-      'Finish setting up your organization', 16, C.gray900));
-    els.push(text(`rocs_${id}_sub`, x + 24, cardY + 102, panelW - 48, 16,
-      'Signed in with Google', 12, C.gray700));
-
-    let fy = cardY + 128;
-    const { els: em, blockH: eh } = authReadOnlyValueField(
-      `rocs_${id}_em`, x, fy, panelW, 'Email address', 'alex@company.com');
-    els.push(...em);
-    fy += eh;
-    const { els: nm, blockH: nh } = authFormField(
-      `rocs_${id}_nm`, x, fy, panelW, 'Admin full name', 'Alex Brown', null, true);
-    els.push(...nm);
-    fy += nh;
-    const { els: oe, blockH: oh } = authFormField(
-      `rocs_${id}_org`, x, fy, panelW, 'Organization name', orgErr ? 'A' : 'Acme Corp', orgErr, true);
-    els.push(...oe);
-    fy += oh;
-    const { els: sl, blockH: sh } = authSlugPreviewField(`rocs_${id}_slug`, x, fy, panelW);
-    els.push(...sl);
-    fy += sh;
-    const { els: te, blockH: th } = authTermsRow(`rocs_${id}_terms`, x, fy, panelW, terms);
-    els.push(...te);
-    fy += th + 8;
+    const prefix = `rocs_${id}`;
+    els.push(text(`${prefix}_lbl`, x, y0, panelW, 16, lbl, 12, C.danger));
+    els.push(rect(`${prefix}_card`, x, cardY, panelW, panelH, C.gray300, C.white, 2, true));
+    els.push(...buildAuthCardHeader(
+      prefix, x, cardY, panelW, 'Finish setting up your organization', 'Signed in with Google'));
 
     const btnY = cardY + panelH - 68;
-    const btnW = panelW - 48;
-    els.push(rect(`rocs_${id}_sbtn`, x + 24, btnY, btnW, 36, C.accentDark, C.accent, 2, true));
-    els.push(text(`rocs_${id}_sbtn_t`, x + 24, btnY + 10, btnW, 16, 'Create organization', 13, C.white, 'center'));
+    paintRegisterOrgCompleteFields(els, prefix, x, cardY + AUTH_HEADER_H_SUBTITLE, panelW, {
+      orgName: orgErr ? 'A' : 'Acme Corp',
+      orgErr,
+      terms,
+    });
+    els.push(...buildAuthSubmitButton(prefix, x, btnY, panelW, 'Create organization'));
   };
 
   drawPanel({
@@ -436,52 +372,38 @@ function genRegisterOrgCompleteStates() {
 /** Draw one register-org error-state panel (shared by states screens). */
 function registerOrgStatePanel(els, { id, x, y0, panelW, panelH, lbl, lblColor, serverBanner, fields, terms }) {
   const cardY = y0 + 28;
-  els.push(text(`ros_${id}_lbl`, x, y0, panelW, 16, lbl, 12, lblColor));
-  els.push(rect(`ros_${id}_card`, x, cardY, panelW, panelH, C.gray300, C.white, 2, true));
-  els.push(text(`ros_${id}_logo`, x, cardY + 16, panelW, 28, '⬡  Axis', 18, C.primary, 'center'));
-  els.push(hline(`ros_${id}_hdiv`, x, cardY + 60, panelW, C.gray300));
-  els.push(text(`ros_${id}_title`, x + 24, cardY + 76, panelW - 48, 24, 'Create your organization', 17, C.gray900));
+  const prefix = `ros_${id}`;
+  els.push(text(`${prefix}_lbl`, x, y0, panelW, 16, lbl, 12, lblColor));
+  els.push(rect(`${prefix}_card`, x, cardY, panelW, panelH, C.gray300, C.white, 2, true));
+  els.push(...buildAuthCardHeader(prefix, x, cardY, panelW, 'Create your organization'));
 
-  let fy = cardY + 100;
+  let fy = cardY + AUTH_HEADER_H;
   if (serverBanner) {
-    els.push(rect(`ros_${id}_ban`, x + 24, fy, panelW - 48, 40, C.dangerBorder, C.dangerBg, 1, true));
-    els.push(text(`ros_${id}_ban_t`, x + 36, fy + 12, panelW - 72, 16, serverBanner, 12, C.danger));
+    els.push(rect(`${prefix}_ban`, x + AUTH_CARD_PAD_X, fy, panelW - AUTH_CARD_PAD_X * 2, 40, C.dangerBorder, C.dangerBg, 1, true));
+    els.push(text(`${prefix}_ban_t`, x + AUTH_CARD_PAD_X + 12, fy + 12, panelW - AUTH_CARD_PAD_X * 2 - 24, 16, serverBanner, 12, C.danger));
     fy += 52;
   }
 
-  fields.forEach((f, i) => {
-    if (f.kind === 'slug') {
-      const { els: slugEls, blockH } = authSlugPreviewField(`ros_${id}_slug`, x, fy, panelW, f.err);
-      els.push(...slugEls);
-      fy += blockH;
-      return;
-    }
-    const { els: fe, blockH } = authFormField(
-      `ros_${id}_f${i}`, x, fy, panelW, f.label, f.value, f.err, f.required !== false);
-    els.push(...fe);
-    fy += blockH;
-  });
+  fy = paintRegisterOrgEntryFields(els, prefix, x, fy, panelW, fields);
 
   if (terms) {
-    const { els: te, blockH: termsBlockH } = authTermsRow(`ros_${id}_terms`, x, fy, panelW, terms);
+    const { els: te, blockH: termsBlockH } = authTermsRow(`${prefix}_terms`, x, fy, panelW, terms);
     els.push(...te);
     fy += termsBlockH + 8;
   }
 
   const btnY = cardY + panelH - 68;
-  const btnW = panelW - 48;
-  els.push(rect(`ros_${id}_sbtn`, x + 24, btnY, btnW, 36, C.accentDark, C.accent, 2, true));
-  els.push(text(`ros_${id}_sbtn_t`, x + 24, btnY + 10, btnW, 16, 'Create organization', 13, C.white, 'center'));
+  els.push(...buildAuthSubmitButton(prefix, x, btnY, panelW, 'Create organization'));
 }
 
-const REGISTER_ORG_STATE_FIELDS = [
-  { kind: 'input', label: 'Organization name', value: "O'Brien & Co.", err: null, required: true },
-  { kind: 'slug', err: null },
-  { kind: 'input', label: 'Admin full name', value: 'Alex Brown', err: null, required: true },
-  { kind: 'input', label: 'Email address', value: 'alex@company.com', err: null, required: true },
-  { kind: 'input', label: 'Password', value: '••••••••', err: null, required: true },
-  { kind: 'input', label: 'Confirm password', value: '••••••••', err: null, required: true },
-];
+const REGISTER_ORG_STATE_FIELDS = REGISTER_ORG_ENTRY_FIELDS.map((f) => ({
+  ...f,
+  value: f.kind === 'input' && f.label === 'Organization name'
+    ? "O'Brien & Co."
+    : f.kind === 'input' && f.label === 'Email address'
+      ? 'alex@company.com'
+      : f.value,
+}));
 
 /**
  * Register-Org states — inline validation, terms required, server error (5xx).
@@ -566,17 +488,17 @@ function genRegisterOrgProviderStates() {
 
   panels.forEach(({ id, x, lbl, msg, variant }) => {
     const icon = variant === 'warning' ? '⚠' : '✕';
-    els.push(text(`rops_${id}_lbl`, x, 48, panelW, 16, lbl, 12, C.danger));
-    els.push(rect(`rops_${id}_card`, x, cardY, panelW, panelH, C.gray300, C.white, 2, true));
-    els.push(text(`rops_${id}_logo`, x, cardY + 16, panelW, 28, '⬡  Axis', 18, C.primary, 'center'));
-    els.push(hline(`rops_${id}_hdiv`, x, cardY + 60, panelW, C.gray300));
-    const ix = x + AUTH_CARD_PAD;
-    const innerW = panelW - AUTH_CARD_PAD * 2;
+    const prefix = `rops_${id}`;
+    els.push(text(`${prefix}_lbl`, x, 48, panelW, 16, lbl, 12, C.danger));
+    els.push(rect(`${prefix}_card`, x, cardY, panelW, panelH, C.gray300, C.white, 2, true));
+    els.push(...buildAuthCardBrandBar(prefix, x, cardY, panelW));
+    const ix = x + AUTH_CARD_PAD_X;
+    const innerW = panelW - AUTH_CARD_PAD_X * 2;
     const headY = cardY + 76;
-    els.push(...stateHeadline(`rops_${id}`, ix, headY, innerW, icon, variant, 'Registration could not continue', 14));
+    els.push(...stateHeadline(prefix, ix, headY, innerW, icon, variant, 'Registration could not continue', 14));
     const bodyY = headY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
-    els.push(text(`rops_${id}_body`, ix, bodyY, innerW, 36, msg, 13, C.gray700));
-    els.push(text(`rops_${id}_link`, ix, bodyY + 48, innerW, 16, 'Back to registration →', 12, C.primary, 'center'));
+    els.push(text(`${prefix}_body`, ix, bodyY, innerW, 36, msg, 13, C.gray700));
+    els.push(text(`${prefix}_link`, ix, bodyY + 48, innerW, 16, 'Back to registration →', 12, C.primary, 'center'));
   });
 
   write('platform-foundation/register-org-provider-states.excalidraw', els);
@@ -596,12 +518,10 @@ function genEmailConfirmation() {
   els.push(rect('ec_bg',   0,     0,     W,     H,     C.gray300, C.gray100, 1, false));
   els.push(rect('ec_card', cardX, cardY, cardW, cardH, C.gray300, C.white,   2, true));
 
-  // Logo row
-  els.push(text('ec_logo',  cardX,      cardY + 16,  cardW,      28, '⬡  Axis',            18, C.primary, 'center'));
-  els.push(hline('ec_hdiv', cardX,      cardY + 60,  cardW,          C.gray300));
+  els.push(...buildAuthCardBrandBar('ec', cardX, cardY, cardW));
 
-  const ecInnerW = cardW - AUTH_CARD_PAD * 2;
-  const ecX = cardX + AUTH_CARD_PAD;
+  const ecInnerW = cardW - AUTH_CARD_PAD_X * 2;
+  const ecX = cardX + AUTH_CARD_PAD_X;
   const ecHeadY = cardY + 68;
   els.push(...stateHeadline('ec', ecX, ecHeadY, ecInnerW, '✉', 'info', 'Check your email', 16));
   const ecBodyY = ecHeadY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
@@ -611,9 +531,7 @@ function genEmailConfirmation() {
 
   els.push(text('ec_resend', ecX, ecBodyY + 44, ecInnerW, 16, "Didn't receive it?  Resend email →", 12, C.primary, 'center'));
 
-  // Footer
-  els.push(hline('ec_fdiv',   cardX,      cardY + cardH - 32, cardW,      C.gray300));
-  els.push(text('ec_footer',  cardX + 24, cardY + cardH - 22, cardW - 48, 16, 'Back to sign in', 12, C.primary, 'center'));
+  els.push(...buildAuthCardFooter('ec', cardX, cardY, cardW, cardH, 'Back to sign in'));
 
   write('platform-foundation/email-confirmation.excalidraw', els);
 }

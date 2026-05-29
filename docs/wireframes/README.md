@@ -30,6 +30,10 @@ node docs/wireframes/generate-template.mjs
 node docs/wireframes/generate-screens.mjs
 node docs/wireframes/generate-screens.mjs   # second run — diff must be empty
 
+# Optional: one use-case folder only (e.g. register-org + email-confirmation)
+SCREEN_FILTER=register-org node docs/wireframes/generate-screens.mjs
+SCREEN_FILTER=email-confirmation node docs/wireframes/generate-screens.mjs
+
 # 4. SVG previews for changed .excalidraw
 docs/scripts/generate-wireframes.ps1 -Filter register-org   # example
 ```
@@ -49,6 +53,8 @@ docs/scripts/generate-wireframes.ps1 -Filter register-org   # example
 | `placeAuthExternalSignIn` | register-org (and any auth screen with SSO) |
 | `buildAuthCardHeader` / `buildAuthCardFooter` / `buildAuthSubmitButton` | Custom auth cards (register-org composite) |
 | `authFormField`, `authReadOnlyValueField`, `authSlugPreviewField`, `authTermsRow` | register-org, states screens |
+| `paintRegisterOrgEntryFields`, `paintRegisterOrgCompleteFields` | register-org happy path + `*-states` panels |
+| `buildAuthCardBrandBar` | email-confirmation, provider error cards |
 | `authCard` | login, register, forgot/change password, accept invite |
 
 Constants: `AUTH_CARD_W`, `AUTH_EXTERNAL_SIGN_IN_BLOCK_H`, `AUTH_HEADER_H`, … — import from `blocks.mjs`, do not hardcode `440` on screens.

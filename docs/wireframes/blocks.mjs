@@ -67,6 +67,14 @@ export function placeAuthExternalSignIn(cardInnerLeftX, y) {
 
 // ─── Auth card chrome ──────────────────────────────────────────────────────────
 
+/** Logo row + divider only (informational / error cards without a form title). */
+export function buildAuthCardBrandBar(prefix, cardX, cardY, cardW) {
+  return [
+    text(`${prefix}_logo`, cardX, cardY + 16, cardW, 28, '⬡  Axis', 18, C.primary, 'center'),
+    hline(`${prefix}_hdiv`, cardX, cardY + 60, cardW, C.gray300),
+  ];
+}
+
 export function buildAuthCardHeader(prefix, cardX, cardY, cardW, title, subtitle = null) {
   const els = [
     text(`${prefix}_logo`, cardX, cardY + 16, cardW, 28, '⬡  Axis', 18, C.primary, 'center'),
@@ -196,6 +204,71 @@ export function authCard(screenW, screenH, prefix, { title, subtitle = null, ite
   els.push(...buildAuthCardFooter(prefix, cardX, cardY, cardW, cardH, footerText));
 
   return els;
+}
+
+/** Default register-org entry fields (email/password path). */
+export const REGISTER_ORG_ENTRY_FIELDS = [
+  { kind: 'input', label: 'Organization name', value: 'Acme Corp', err: null, required: true },
+  { kind: 'slug', err: null },
+  { kind: 'input', label: 'Admin full name', value: 'Alex Brown', err: null, required: true },
+  { kind: 'input', label: 'Email address', value: 'you@company.com', err: null, required: true },
+  { kind: 'input', label: 'Password', value: '••••••••', err: null, required: true },
+  { kind: 'input', label: 'Confirm password', value: '••••••••', err: null, required: true },
+];
+
+/**
+ * Paint register-org entry fields; returns y after last field block.
+ * @param {object[]} fields — like REGISTER_ORG_ENTRY_FIELDS
+ */
+export function paintRegisterOrgEntryFields(els, idPrefix, cardX, y, cardW, fields) {
+  let fy = y;
+  fields.forEach((f, i) => {
+    if (f.kind === 'slug') {
+      const { els: slugEls, blockH } = authSlugPreviewField(`${idPrefix}_slug`, cardX, fy, cardW, f.err ?? null);
+      els.push(...slugEls);
+      fy += blockH;
+      return;
+    }
+    const { els: fieldEls, blockH } = authFormField(
+      `${idPrefix}_f${i}`, cardX, fy, cardW, f.label, f.value, f.err ?? null, f.required !== false);
+    els.push(...fieldEls);
+    fy += blockH;
+  });
+  return fy;
+}
+
+/**
+ * Post-OAuth register-org complete fields; returns y after terms row.
+ */
+export function paintRegisterOrgCompleteFields(els, idPrefix, cardX, y, cardW, {
+  orgName = 'Acme Corp',
+  orgErr = null,
+  terms = { checked: true },
+} = {}) {
+  let fy = y;
+  const { els: emailEls, blockH: emailH } = authReadOnlyValueField(
+    `${idPrefix}_email`, cardX, fy, cardW, 'Email address', 'alex@company.com');
+  els.push(...emailEls);
+  fy += emailH;
+
+  const { els: nameEls, blockH: nameH } = authFormField(
+    `${idPrefix}_name`, cardX, fy, cardW, 'Admin full name', 'Alex Brown', null, true);
+  els.push(...nameEls);
+  fy += nameH;
+
+  const { els: orgEls, blockH: orgH } = authFormField(
+    `${idPrefix}_org`, cardX, fy, cardW, 'Organization name', orgName, orgErr, true);
+  els.push(...orgEls);
+  fy += orgH;
+
+  const { els: slugEls, blockH: slugH } = authSlugPreviewField(`${idPrefix}_slug`, cardX, fy, cardW);
+  els.push(...slugEls);
+  fy += slugH;
+
+  const { els: termsEls, blockH: termsH } = authTermsRow(`${idPrefix}_terms`, cardX, fy, cardW, terms);
+  els.push(...termsEls);
+  fy += termsH;
+  return fy;
 }
 
 /** Kit catalog slice: external sign-in + sample field + terms (S39). Authored at x=50. */
