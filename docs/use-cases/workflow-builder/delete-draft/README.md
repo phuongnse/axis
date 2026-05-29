@@ -52,6 +52,9 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
+> **Gaps vs spec:** soft-delete only; restore-from-archive UI pending Frontend.
+>
+> **Deferred (PR #146 follow-up):** Hard delete / permanent purge; bulk delete.
 
 ## Wireframes
 

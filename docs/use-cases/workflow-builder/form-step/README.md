@@ -61,6 +61,8 @@ Each step has a type that determines what it does when executed. Users configure
 >
 > **Gaps vs spec:** form picker UI, assignee expression evaluation, and timeout enforcement pending Frontend + workflow-engine.
 >
+> **Deferred (PR #146 follow-up):** Multiple assignees on one Form step (assign to all, first response wins).
+>
 > **Decisions:** step config (formId, assignee, timeout) stored as JSONB dict in `steps` column. `StepType` enum includes `Start` and `End` values.
 
 ## Wireframes

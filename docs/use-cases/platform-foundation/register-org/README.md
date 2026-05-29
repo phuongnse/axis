@@ -73,6 +73,8 @@ Self-service registration flow where a new organization signs up and is automati
 >
 > **Gaps vs spec:** Email/password registration is complete — `Idempotency-Key` header on `POST /api/organizations/` deduplicates rapid resubmits (Pending/Completed/Failed state), slug auto-generated with uniqueness retry. **Not yet implemented:** Terms of Service / Privacy Policy acceptance (recording accepted version on the account) and external-provider sign-up (Microsoft/Google/GitHub, ADR-027) — no provider registration in OpenIddict, no provider buttons on the registration page.
 >
+> **Deferred (PR #146 follow-up):** CAPTCHA/bot protection on the registration form.
+>
 > **Decisions:**
 > - duplicate email returns silently without creating anything — matches "same confirmation screen" AC. `RegisterOrganizationCommandValidator` enforces: org name 2–100 chars, valid email, password min 8 chars + letter + number, confirmation match. Org slug auto-generated with uniqueness retry loop
 > - BCrypt work factor 12. 4 default system roles seeded atomically in the same transaction.

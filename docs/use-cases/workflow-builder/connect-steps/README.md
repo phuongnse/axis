@@ -60,6 +60,8 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 > **Gaps vs spec:**
 > - canvas edge drawing and cycle-block toast pending Frontend
 > - condition step label enforcement on connection pending Frontend.
+>
+> **Deferred (PR #146 follow-up):** Animated transitions showing flow direction — static arrows only.
 
 ## Wireframes
 
