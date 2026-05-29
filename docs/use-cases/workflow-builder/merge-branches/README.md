@@ -42,7 +42,7 @@ Workflows can take different execution paths based on data values using Conditio
 - [ ] If both branches of an if/else reach the merge point (e.g., both run a Notification step then merge), the merge step executes exactly once (the second arrival is ignored). This is the expected behavior and is documented in the execution history.
 - [ ] This OR-merge behavior is distinct from the Parallel Group fan-in (AND-join) behavior described in [parallel execution](./README.md).
 
-*Deferred capabilities*
+*Out of scope*
 - Explicit merge/join nodes on the canvas — merging is implicit (any step with multiple incoming edges acts as a merge point). An explicit Join node is used only in Parallel Groups ([parallel execution](./README.md)).
 
 > **Implementation status**

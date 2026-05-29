@@ -44,7 +44,7 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 - [ ] Condition step failure: shows the expression that was evaluated and why it failed (e.g., "Cannot compare null to string").
 - [ ] Sensitive values (auth tokens, API keys) are never shown in error details — they are replaced with `[REDACTED]`.
 
-*Deferred capabilities*
+*Out of scope*
 - Sharing a link to a specific error detail view with another user.
 
 > **Implementation status**

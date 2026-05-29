@@ -46,7 +46,7 @@ Organization admins can invite new members, manage their accounts, and deactivat
 - [ ] A deactivated user who tries to sign in sees: "Your account has been deactivated. Contact your organization admin."
 - [ ] A deactivated user with pending form tasks: those tasks are marked "Assignee deactivated" and the admin is notified.
 
-*Deferred capabilities*
+*Out of scope*
 - Transferring ownership of content from a deactivated user.
 
 > **Implementation status**

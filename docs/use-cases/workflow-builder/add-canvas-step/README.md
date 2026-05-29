@@ -44,7 +44,7 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 - [ ] Dropping two steps at nearly the same position offsets the second one automatically to prevent overlap.
 - [ ] Workflow definitions are auto-saved to the server after every change with a 1-second debounce, so the user never needs to manually save canvas layout changes.
 
-*Deferred capabilities*
+*Out of scope*
 - Copy-paste of steps.
 
 > **Implementation status**

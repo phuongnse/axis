@@ -43,9 +43,9 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 - [ ] If the assignee is a role, all members of that role receive the notification. The form is completed by the first user to submit it; subsequent attempts by other role members are rejected as duplicate.
 - [ ] If the assignee is a deactivated user, the step fails immediately (see [Form step](./README.md) deactivated-assignee edge case).
 
-*Deferred capabilities*
+*Out of scope*
 - Push notifications (mobile).
-- Escalation notifications if the form is not submitted after X hours. (timeout causes failure, not escalation).
+- Escalation notifications if the form is not submitted after X hours — timeout causes failure, not escalation.
 
 > **Implementation status**
 >

@@ -41,8 +41,8 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 - [ ] With OR join, branches that did not complete (were cancelled) have `null` values in the context under their step IDs.
 - [ ] If two parallel branches write to the same output variable name (via Script steps), the value from whichever branch completes last wins. A design-time warning is shown when this is detected.
 
-*Deferred capabilities*
-- Merging/reducing outputs from parallel branches with built-in aggregation functions.; use a Script step after the group for custom aggregation.
+*Out of scope*
+- Merging/reducing outputs from parallel branches with built-in aggregation functions — use a Script step after the group for custom aggregation.
 
 > **Implementation status**
 >

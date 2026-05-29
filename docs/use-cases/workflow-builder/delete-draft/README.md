@@ -38,7 +38,7 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 - [ ] Only `Draft` workflows can be deleted. Attempting to delete an `Active` or `Archived` workflow returns HTTP 422: "Only draft workflows can be deleted."
 - [ ] Attempting to delete a workflow that does not exist returns HTTP 404.
 
-*Deferred capabilities*
+*Out of scope*
 - Hard delete / permanent purge.
 - Bulk delete.
 

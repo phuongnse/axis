@@ -42,7 +42,7 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 *Edge cases*
 - [ ] Admins see all org executions. Editors and Viewers see only executions they triggered or were assigned to (form tasks). The API enforces this scope.
 
-*Deferred capabilities*
+*Out of scope*
 - Platform-wide execution monitoring across all tenants (Platform Admin view).
 
 > **Implementation status**

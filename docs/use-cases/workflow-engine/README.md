@@ -12,9 +12,9 @@ The runtime engine that takes a workflow definition and executes it step-by-step
 
 A workflow builder without an execution engine is just a drawing tool. This domain is what makes workflows actually run and deliver value.
 
-## Phase
+## Scope
 
-**Production**
+**Production scope** — in the full product scope; no separate MVP/Phase cut.
 
 ---
 
@@ -72,17 +72,17 @@ A workflow builder without an execution engine is just a drawing tool. This doma
 
 ```
 PENDING → RUNNING → COMPLETED
- ↘ FAILED
- ↘ CANCELLED
+                 ↘ FAILED
+                 ↘ CANCELLED
 ```
 
 ## Step States
 
 ```
 PENDING → RUNNING → COMPLETED
- ↘ FAILED
- ↘ SKIPPED (conditional branch not taken)
- ↘ WAITING (Form step — waiting for human input)
+                 ↘ FAILED
+                 ↘ SKIPPED   (conditional branch not taken)
+                 ↘ WAITING   (Form step — waiting for human input)
 ```
 
 ---

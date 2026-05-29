@@ -43,7 +43,7 @@ Users can create custom data models within their organization. A model defines t
 - [ ] If the org has no models yet, the list shows an empty state with a "Create your first model" CTA.
 - [ ] Record count may be slightly behind real-time (cached with 1-minute TTL) to avoid expensive COUNT queries on every list load.
 
-*Deferred capabilities*
+*Out of scope*
 - Folders or categories for organizing models.
 
 > **Implementation status**

@@ -45,8 +45,8 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 - [ ] A Form step in WAITING status shows the assignee name and a "Waiting for: {assignee}" label.
 - [ ] Very long executions (running for hours): the elapsed time counter and timeline remain accurate; no frontend timeout occurs.
 
-*Deferred capabilities*
-- Real-time execution graph overlay on the workflow canvas. (timeline list only).
+*Out of scope*
+- Real-time execution graph overlay on the workflow canvas — timeline list only.
 
 > **Implementation status**
 >

@@ -1,6 +1,6 @@
 # Use Cases
 
-[← Back to Docs Home](./README.md)
+[← Back to Docs Home](../README.md)
 
 Use cases are the user-facing source of truth for behavior. **One markdown file = one use case** (flow, AC, wireframes, diagrams, implementation status). Domain `README.md` indexes all use cases in that area.
 
@@ -28,8 +28,6 @@ Use cases are the user-facing source of truth for behavior. **One markdown file 
 
 When you ship code, update **use-case callout → domain README → PROGRESS** in the same PR. Never mark ✅ while `**Gaps vs spec**` still lists backend work for that layer.
 
-**Deferred capabilities** sections list product-scope features not yet implemented — they are **not** excluded from the platform. Do not treat them as permanent “out of scope.”
-
 **Use-case file layout:** Purpose/Actor/Trigger, flow sections, AC, wireframes table, diagrams table, implementation status — see [docs-style § Use case files](../playbooks/docs-style.md#use-case-files-flow-first).
 
 ---
@@ -39,20 +37,22 @@ When you ship code, update **use-case callout → domain README → PROGRESS** i
 | Domain | Scope |
 |--------|--------|
 | [platform-foundation](./platform-foundation/README.md) | Tenant registration, org management, isolation, subscription plans |
-| [identity-access](./identity-access/README.md) | Authentication (password + external providers), users, roles, permissions, security, i18n/theming |
+| [identity-access](./identity-access/README.md) | Authentication, users, roles, permissions, security, i18n/theming |
 | [data-modeling](./data-modeling/README.md) | Models, field types, data classes, record CRUD |
 | [workflow-builder](./workflow-builder/README.md) | Canvas, steps, triggers, branching, parallel, import/export |
 | [form-builder](./form-builder/README.md) | Forms, fields, workflow integration, submissions |
 | [workflow-engine](./workflow-engine/README.md) | Execution, handlers, errors, history, retry |
 | [page-builder](./page-builder/README.md) | Pages, widgets, drag & drop, data binding |
 
+All domains are in the production scope ([PRODUCT_VISION § Production platform scope](../PRODUCT_VISION.md#production-platform-scope)). Capabilities a use case does not ship are tracked under its `*Out of scope*` AC group and `> **Implementation status**` callout — backlog within the same scope, not a separate phase cut.
+
 ---
 
 ## Platform core loop
 
-```text
-Platform setup → Identity & users → Model data
-    → Build workflows → Add forms → Execute & monitor → Pages for end users
+```
+Platform setup → Identity & users → Model data → Build workflows
+    → Add forms → Execute & monitor → Build pages & widgets → End users
 ```
 
 ---

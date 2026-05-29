@@ -12,11 +12,11 @@ Every feature lives under `frontend/src/features/{feature-name}/`:
 
 ```text
 features/{feature-name}/
-├── components/ # React components belonging to this feature
-├── hooks/ # custom hooks (useXxx.ts)
-├── api.ts # all query/mutation functions for this feature
-├── types.ts # shared types for this feature
-└── index.ts # barrel export — public API of the feature
+├── components/     # React components belonging to this feature
+├── hooks/          # custom hooks (useXxx.ts)
+├── api.ts          # all query/mutation functions for this feature
+├── types.ts        # shared types for this feature
+└── index.ts        # barrel export — public API of the feature
 ```
 
 - Component files: `PascalCase.tsx`. Hook files: `camelCase.ts` with mandatory `use` prefix (`useWorkflows.ts`).
@@ -42,9 +42,9 @@ features/{feature-name}/
 
 ```ts
 export const workflowKeys = {
- all: ['workflows'] as const,
- list: (filters: WorkflowFilters) => [.workflowKeys.all, 'list', filters] as const,
- detail: (id: string) => [.workflowKeys.all, 'detail', id] as const,
+  all: ['workflows'] as const,
+  list: (filters: WorkflowFilters) => [...workflowKeys.all, 'list', filters] as const,
+  detail: (id: string) => [...workflowKeys.all, 'detail', id] as const,
 }
 ```
 

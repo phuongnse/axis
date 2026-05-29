@@ -42,7 +42,7 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 - [ ] An archived workflow can be unarchived (restored to Active) by any admin.
 - [ ] Execution history for an archived workflow is still fully accessible.
 
-*Deferred capabilities*
+*Out of scope*
 - Automatic archiving after N days of inactivity.
 
 > **Implementation status**

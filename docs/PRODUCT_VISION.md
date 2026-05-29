@@ -57,7 +57,7 @@ Axis provides a unified platform where non-technical users can:
 
 ## Production platform scope
 
-Axis targets **production readiness** across all product domains. There is no separate “MVP” or “Phase 2” product cut — every capability listed in use-case specs is in scope unless it is explicitly marked **Deferred capabilities** with a tracked implementation gap.
+Axis targets **production readiness** across all product domains. There is no separate "MVP" or "Phase 2" product cut — every capability listed in use-case specs is in scope. Capabilities a use case has not built yet are tracked as gaps in its `> **Implementation status**` callout (or listed under its `*Out of scope*` AC group), not cut from the product.
 
 **Core user journey:**
 
@@ -93,3 +93,4 @@ These remain outside the product unless a future ADR explicitly adds them:
 
 - Built-in payment processing (billing integration is a separate initiative; plan assignment and limits are in scope today).
 - Axis-operated mobile native apps (responsive web SPA is the client).
+

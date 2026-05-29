@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Sign in with email and password or an external identity provider (Microsoft, Google, GitHub) so that I can access my organization's workspace.
+Sign in with my email and password — or with Microsoft, Google, or GitHub — so that I can access my organization's workspace.
 
 ## Primary actor
 
@@ -31,18 +31,9 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] Sign-in screen offers: email + password, **Continue with Microsoft**, **Continue with Google**, and **Continue with GitHub**.
-- [ ] Email/password sign-in accepts email and password.
-- [ ] External provider sign-in uses OpenIddict/OIDC authorization code + PKCE (same session and token delivery as password sign-in).
+- [ ] Sign-in form accepts email and password.
 - [ ] On success, the client receives an access token (JWT, 15-min TTL) stored in memory and a refresh token (7-day TTL) stored in an `httpOnly`, `Secure`, `SameSite=Strict` cookie.
 - [ ] User is redirected to their workspace dashboard.
-
-*External identity providers*
-- [ ] **Microsoft:** supports work/school (Entra ID) and personal Microsoft accounts per tenant app registration configuration.
-- [ ] **Google:** OAuth 2.0 sign-in with Google account picker.
-- [ ] **GitHub:** OAuth sign-in with GitHub account.
-- [ ] First-time external sign-in for an unknown email on an existing org is rejected with a clear message; new org creation uses [register-org](../../platform-foundation/register-org/).
-- [ ] Linking external login to an existing password account (same verified email) is supported or explicitly blocked with guidance — product default: one user record per email, external login allowed when email matches a verified user.
 
 *Validation & errors*
 - [ ] Empty email or password: inline field errors, form does not submit.
@@ -52,28 +43,35 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 - [ ] Signing in to a deactivated account: "Your account has been deactivated. Contact your organization admin."
 - [ ] Server error (5xx): "Something went wrong. Please try again." — the password field is cleared, email retained.
 
+*External identity providers*
+- [ ] Sign-in page offers **Microsoft**, **Google**, and **GitHub** buttons alongside the email/password form ([ADR-027](../../../TECH_STACK.md#adr-027-external-identity-providers-for-sign-in-and-registration)).
+- [ ] Selecting a provider runs the OAuth2 Authorization Code + PKCE flow through OpenIddict; on return, Axis mints its own access + refresh tokens (the external token is never exposed to the client).
+- [ ] A provider login whose verified email matches an existing user attaches to that account rather than creating a duplicate (account linking by verified email).
+- [ ] A provider login with no matching account and no pending invitation is rejected with "No account found. Ask your organization admin for an invitation." (provider sign-up happens only through the register-org flow).
+- [ ] If the provider returns no verified email, sign-in is rejected with "Your <provider> account has no verified email; use email and password instead."
+- [ ] A disabled provider (not configured for this deployment) is not shown.
+
 *Edge cases*
 - [ ] Signing in on a new browser while already signed in on another does not invalidate the existing session.
 - [ ] Email lookup is case-insensitive (`User@Example.com` matches `user@example.com`).
 - [ ] Pasting credentials from a password manager works correctly (no interference with autocomplete).
 - [ ] Pressing Enter in the password field submits the form.
 
-*Deferred capabilities*
-- 2FA / MFA (TOTP or WebAuthn) for password and external-provider sessions.
+*Out of scope*
+- 2FA / MFA (TOTP or WebAuthn).
+- Enterprise SSO federation (SAML, SCIM provisioning, per-tenant IdP) — separate initiative, see [ADR-027](../../../TECH_STACK.md#adr-027-external-identity-providers-for-sign-in-and-registration).
 
 > **Implementation status**
 >
 > | Layer | Status |
 > |-------|--------|
 > | Domain | ✅ |
-> | Application | ✅ |
-> | Infrastructure | ✅ |
-> | API | ✅ |
+> | Application | ⚠️ |
+> | Infrastructure | ⚠️ |
+> | API | ⚠️ |
 > | Frontend | ⚠️ |
 >
-> **Gaps vs spec:** Login page + PKCE password flow + app shell/dashboard scaffold on PR #50 branch. Microsoft/Google/GitHub buttons and OIDC external-login wiring pending Identity + Frontend. BroadcastChannel multi-tab refresh, account lockout UI, and unverified-email screen polish pending.
->
-> **Deferred (PR #50 follow-up):** none for this US.
+> **Gaps vs spec:** Email/password sign-in (login page + PKCE flow + app shell/dashboard scaffold) on PR #50 branch. **External identity providers (Microsoft/Google/GitHub, ADR-027) are spec'd but not yet implemented** — no provider registration in OpenIddict, no account-linking handler, no provider buttons on the sign-in page. BroadcastChannel multi-tab refresh, account lockout UI, and unverified-email screen polish also pending.
 >
 > **Decisions:**
 > - OpenIddict 5.x serves as the in-process OAuth2/OIDC server. `AuthenticateUserCommand` validates credentials

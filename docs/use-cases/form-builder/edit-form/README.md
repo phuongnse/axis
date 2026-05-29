@@ -42,8 +42,8 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 - [ ] Form tasks that are already in-progress (status: PENDING or WAITING) when the form is edited: they use the form definition as it was when the task was created (definition is snapshotted at task creation time).
 - [ ] Conflict resolution: if two users edit the same form simultaneously, last save wins on a per-field basis. No conflict detection is required for form field ordering changes.
 
-*Deferred capabilities*
-- Form versioning (publishing a new "version" of a form).; edits are live immediately.
+*Out of scope*
+- Form versioning (publishing a new "version" of a form) — edits are live immediately.
 
 > **Implementation status**
 >

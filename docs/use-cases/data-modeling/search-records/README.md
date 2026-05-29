@@ -44,7 +44,7 @@ Users can create, read, update, and delete records against any model. Records ar
 - [ ] Filters and sort state are preserved in the URL so the user can share or bookmark a filtered view.
 - [ ] A filter on a deleted field gracefully falls back (filter is removed with a warning toast).
 
-*Deferred capabilities*
+*Out of scope*
 - OR-logic between filters.
 - Saved filters.
 

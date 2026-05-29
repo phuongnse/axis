@@ -42,7 +42,7 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 - [ ] A form can be deleted if it is only referenced by Archived workflows (since archived workflows cannot be triggered).
 - [ ] Soft-deleted forms are permanently purged after 30 days.
 
-*Deferred capabilities*
+*Out of scope*
 - Recovering a soft-deleted form.
 
 > **Implementation status**
@@ -59,7 +59,7 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 >
 > **Done:** HTTP 409 on delete-while-referenced enforced via `IsReferencedByWorkflowAsync` JSONB query across `workflow_definitions.steps`.
 >
-> **Decisions:** `IsReferencedByWorkflowAsync` uses raw SQL `workflow_definitions.steps @> [{.}]::jsonb` — cross-module table query within the same tenant schema.
+> **Decisions:** `IsReferencedByWorkflowAsync` uses raw SQL `workflow_definitions.steps @> [{...}]::jsonb` — cross-module table query within the same tenant schema.
 
 ## Wireframes
 

@@ -20,7 +20,7 @@ The paste-block templates below are for *your own* walk-through (agent reasoning
 ## Gate 0
 | AC / use case | Layer | File / test |
 |---------|-------|-------------|
-| … | … | … |
+| …       | …     | …           |
 Docs touched: docs/use-cases/…
 ```
 
@@ -41,7 +41,7 @@ Use-case files group ACs under **Happy path**, **Validation & errors**, **Edge c
 
 | Surface (endpoint/handler/repo/job/consumer) | Happy | Validation/Constraint | Auth/Permission | Not-found/Isolation | Dependency-failure | Notes |
 |---|---|---|---|---|---|---|
-| `.` | `test: .` | `test: .` | `test: .` / `N/A` | `test: .` / `N/A` | `test: .` / `N/A` | deferral if any |
+| `...` | `test: ...` | `test: ...` | `test: ...` / `N/A` | `test: ...` / `N/A` | `test: ...` / `N/A` | deferral if any |
 
 **While implementing (TDD):**
 
@@ -75,12 +75,12 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 2. For each bullet: implemented + test, `N/A this PR — Frontend`, or named deferral.
 3. Only then set `Gaps vs spec: none for backend` (or list what remains).
 4. For **every implementation surface** touched in this PR (API endpoint, application handler, gRPC method, repository, background job, consumer), verify path coverage is explicit:
- - valid request/flow (happy path),
- - validation/constraint failure path,
- - authz/authn or permission boundary where applicable,
- - not-found and tenant/isolation boundary where applicable (no data leak),
- - downstream dependency failure path where applicable (transport/storage/service unavailable).
- If a path does not apply to that surface, mark it `N/A` in the AC map instead of skipping it silently.
+   - valid request/flow (happy path),
+   - validation/constraint failure path,
+   - authz/authn or permission boundary where applicable,
+   - not-found and tenant/isolation boundary where applicable (no data leak),
+   - downstream dependency failure path where applicable (transport/storage/service unavailable).
+   If a path does not apply to that surface, mark it `N/A` in the AC map instead of skipping it silently.
 
 **Lesson (platform-foundation organization management):** A first pass shipped profile/settings/deletion APIs but missed Redis usage TTL (≤5 min), schedule rollback on queue failure, hard-delete purge, and form-task cancel — caught by spec review, not by “flow works.” See [organization-management callouts](../use-cases/platform-foundation/README.md) for what “done” looks like after self-audit.
 
@@ -101,7 +101,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 - **Doc drift** — enforces same-PR docs, new-handler tests, no-new TODO/FIXME, new raw-SQL review, [WORKAROUND comment ↔ inventory sync](../WORKAROUNDS.md), [speculation guard](./docs-style.md#anti-patterns-dont-ship-these), `GetAwaiter().GetResult()` ban, hardcoded connection-string ban, `DateTime.Now` ban (use `UtcNow`), and a stale-terminology guard for the PR #142 migration (current pattern list lives in [`scripts/check-doc-drift.sh`](../../scripts/check-doc-drift.sh) — search for `STALE_TERM_PATTERN`).
 - **Markdown link check** — `lychee` verifies internal links and `#anchors`. **Relative file/image targets** (`![alt](./asset.svg)`, `[text](./file.md)`) are double-checked by [`scripts/check-doc-link-targets.py`](../../scripts/check-doc-link-targets.py) inside the drift script — catches the broken-image class lychee missed in PR #142.
-- **Use-case docs** — [`scripts/check-use-case-docs.py`](../../scripts/check-use-case-docs.py) validates use-case file structure (required sections + tables + status callout), flags template placeholders (`_(One sentence.)_`, `_(Actor)_`, `_(What starts.)_`), flags self-links `[name](./README.md)` and truncated summary rows in domain READMEs, and counts use cases still on the stock Main flow.
+- **Use-case docs** — [`scripts/check-use-case-docs.py`](../../scripts/check-use-case-docs.py) validates use-case file structure (required sections + tables + status callout), flags template placeholders (`_(One sentence...)_`, `_(Actor)_`, `_(What starts...)_`), flags self-links `[name](./README.md)` and truncated summary rows in domain READMEs, and counts use cases still on the stock Main flow.
 - **Secret scanning** — TruffleHog scans the full PR diff for committed secrets (API keys, passwords, tokens) and verifies each finding against the alleged service before reporting (`--only-verified` cuts false positives).
 - **Vulnerable packages** — `dotnet list package --vulnerable --include-transitive` fails on any known CVE in the dep tree (covers transitive packages too).
 - **Architecture fitness tests** run as part of `dotnet test` — failures there mean a CLAUDE.md P0/P1 rule got violated structurally. See [tests README](../../tests/Architecture/Axis.Architecture.Tests/README.md).
@@ -159,7 +159,7 @@ Gate 2:
 - Host wiring (`*Endpoints.cs` / `Program.cs`) → `Map*Endpoints` sweep in process.md / not triggered
 ```
 
-**Deferred follow-ups (mandatory when leaving work open):** do not wait for the user. Any skipped review item, thin-endpoint refactor, or partial layer needs a named `**Deferred (.):**` line — full rules in [process.md § Deferred follow-up](process.md). Remove the line when fixed.
+**Deferred follow-ups (mandatory when leaving work open):** do not wait for the user. Any skipped review item, thin-endpoint refactor, or partial layer needs a named `**Deferred (...):**` line — full rules in [process.md § Deferred follow-up](process.md). Remove the line when fixed.
 
 ### Review feedback (CodeRabbit / human)
 
@@ -169,7 +169,7 @@ Do **not** ship the first diff that only makes CI green or closes the thread. Fo
 
 1. **Is this already best practice** for this codebase (patterns, layer boundaries, siblings in the same module)?
 2. **Can I improve or enhance** beyond what the reviewer suggested (clearer ownership, fewer round-trips, one transaction boundary, consistent error handling)?
-3. If a better design is feasible but skipped, is that a deliberate **minimal diff** (user asked) or should it be **`**Deferred (.):**`**?
+3. If a better design is feasible but skipped, is that a deliberate **minimal diff** (user asked) or should it be **`**Deferred (...):**`**?
 
 **Default:** prefer the design you would defend in review. **Exception:** user explicitly requests the smallest change — say so in the PR Summary.
 

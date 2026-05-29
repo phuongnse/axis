@@ -12,9 +12,9 @@ Provide secure authentication and a flexible role-based access control (RBAC) sy
 
 Security and access control are non-negotiable for a SaaS product. Organizations need confidence that their users see only what they should see.
 
-## Phase
+## Scope
 
-**Production**
+**Production scope** — in the full product scope; no separate MVP/Phase cut.
 
 ---
 
@@ -27,7 +27,7 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 | [Change password while signed in](change-password/) | Change my password while signed in so that I can keep my account secure. |
 | [Reset forgotten password](reset-password/) | Reset my password via email so that I can regain access to my account if I forget it. |
 | [View and revoke active sessions](sessions/) | See where I'm currently signed in so that I can revoke access from devices I no longer use. |
-| [Sign in to the workspace](sign-in/) | Sign in with email/password or Microsoft, Google, or GitHub. |
+| [Sign in with email and password](sign-in/) | Sign in with my email and password so that I can access my organization's workspace. |
 | [Sign out](sign-out/) | Sign out so that my session is terminated and no one else can use my account from this device. |
 | [Silent token refresh](token-refresh/) | My session to stay active while I'm working so that I'm not interrupted by unexpected sign-out prompts. |
 
@@ -116,8 +116,8 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 
 | Area | Status | Detail |
 |------|--------|--------|
-| **Backend** | ⚠️ polish | **External auth (ADR-027):** Microsoft, Google, GitHub OIDC for sign-in and registration. [reset-password](./reset-password/), [change-password](./change-password/), [sessions](./sessions/): rate limits, session list API wiring. [api-permissions](./api-permissions/): `[RequirePermission]` / policy tests. [invite-user](./invite-user/): block admin self-invite at API. |
-| **Frontend** | ⏳ | Register (Terms, slug, external providers), sign-in provider buttons, settings, invitation accept, session management UI, localization/theming — see [sign-in](./sign-in/), [register-org](../platform-foundation/register-org/), [accept-invite](./accept-invite/), [sessions](./sessions/), [language](./language/), [theme](./theme/). |
+| **Backend** | ⚠️ polish | [reset-password](./reset-password/), [change-password](./change-password/), [sessions](./sessions/): rate limits, session list API wiring. [api-permissions](./api-permissions/): `[RequirePermission]` / policy tests. [invite-user](./invite-user/): block admin self-invite at API. |
+| **Frontend** | ⏳ | Register, settings, invitation accept, session management UI, and localization/theming foundation — see per–use-case callouts in [sign-in](./sign-in/), [accept-invite](./accept-invite/), [sessions](./sessions/), [language](./language/), [theme](./theme/). |
 
 Core auth/OIDC/RBAC backend is ✅; use feature **Gaps vs spec** for the next use case, not domain-level checkboxes.
 

@@ -82,10 +82,10 @@ string identityConn = await PostgresModuleTestDatabase.CreateAsync(adminConn, "a
 Environment.SetEnvironmentVariable("ConnectionStrings__Identity", identityConn);
 
 await using (IdentityDbContext ctx = new(/* UseOpenIddict() */))
- await ctx.Database.MigrateAsync();
+    await ctx.Database.MigrateAsync();
 
 await PostgresModuleTestDatabase.MigrateAsync<DataModelingDbContext>(
- dmConn, opts => new DataModelingDbContext(opts, tenantContext));
+    dmConn, opts => new DataModelingDbContext(opts, tenantContext));
 ```
 
 **Wolverine:** no separate `axis_wolverine_test` database. Per-module `wolverine` schemas are created by `AddResourceSetupOnStartup()` in each module's database when the test host starts ([ADR-012](../TECH_STACK.md#adr-012-per-module-wolverine-schema-in-the-modules-own-database)).
@@ -114,7 +114,7 @@ When diagnosing CI failures in this area:
 ### Runner and structure
 
 - Vitest + `@testing-library/react`. Run with `npm run test` (or `npx vitest`) inside `frontend/`.
-- `describe('ComponentOrHookName', () => { it('should .', .) })` — `describe` groups by subject, `it` sentences describe expected behaviour.
+- `describe('ComponentOrHookName', () => { it('should ...', ...) })` — `describe` groups by subject, `it` sentences describe expected behaviour.
 
 ### File location
 

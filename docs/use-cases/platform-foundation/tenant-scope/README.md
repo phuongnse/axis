@@ -45,7 +45,7 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 - [ ] A connection returned to the pool has its `search_path` reset to a neutral value before reuse.
 - [ ] Background jobs (Wolverine handlers) that operate on behalf of a tenant correctly inject tenant context without an HTTP request present.
 
-*Deferred capabilities*
+*Out of scope*
 - Cross-tenant data sharing features.
 
 > **Implementation status**

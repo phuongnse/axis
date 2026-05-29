@@ -46,7 +46,7 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 - [ ] Schema name is cached immutably — it never changes after provisioning, so cache invalidation is not a concern.
 - [ ] Wolverine background jobs carry tenant context as a message header, resolved before the handler executes.
 
-*Deferred capabilities*
+*Out of scope*
 - API key authentication (alternative to JWT).
 
 > **Implementation status**

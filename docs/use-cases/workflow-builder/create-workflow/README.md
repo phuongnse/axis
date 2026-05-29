@@ -42,7 +42,7 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 *Edge cases*
 - [ ] Creating a workflow and immediately navigating away without adding any steps: the empty workflow is saved in Draft status and can be returned to later.
 
-*Deferred capabilities*
+*Out of scope*
 - Workflow templates / starter library.
 
 > **Implementation status**

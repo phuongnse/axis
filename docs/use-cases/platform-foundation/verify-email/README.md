@@ -45,7 +45,7 @@ Self-service registration flow where a new organization signs up and is automati
 - [ ] If the user tries to sign in before verifying, they see "Please verify your email first" with a resend option.
 - [ ] Verification link works regardless of which browser or device it is opened on.
 
-*Deferred capabilities*
+*Out of scope*
 - Automatic re-send after X minutes.
 
 > **Implementation status**

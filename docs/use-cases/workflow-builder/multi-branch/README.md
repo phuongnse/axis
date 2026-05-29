@@ -45,7 +45,7 @@ Workflows can take different execution paths based on data values using Conditio
 - [ ] If no branch matches and there is no Default branch, the step fails at execution time with: "No condition branch matched and no default branch is configured."
 - [ ] A Condition step with 10 or more branches still renders correctly on the canvas, with the config panel scrollable.
 
-*Deferred capabilities*
+*Out of scope*
 - Regex-based branch matching.
 
 > **Implementation status**

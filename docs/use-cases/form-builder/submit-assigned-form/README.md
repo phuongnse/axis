@@ -48,7 +48,7 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 - [ ] File Upload fields on the standalone form page: files are uploaded directly to object storage via a pre-signed URL; the form does not need to send the file through the API server.
 - [ ] If the assignee opens the form in two browser tabs and submits from one, the other tab shows "already submitted" on the next interaction.
 
-*Deferred capabilities*
+*Out of scope*
 - Saving a draft of the form and resuming later.
 - The assignee being able to add comments or annotations to the form submission.
 

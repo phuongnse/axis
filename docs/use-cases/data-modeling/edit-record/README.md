@@ -43,7 +43,7 @@ Users can create, read, update, and delete records against any model. Records ar
 - [ ] Optimistic concurrency: if the record's `updated_at` has changed since the edit form was opened, the API returns HTTP 409: "This record was modified by someone else. Please refresh and reapply your changes."
 - [ ] Editing a record changes only the specified fields; fields not included in the PATCH body retain their existing values.
 
-*Deferred capabilities*
+*Out of scope*
 - Edit history / audit trail per record.
 
 > **Implementation status**

@@ -42,7 +42,7 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 - [ ] An already-published (Active) workflow can be edited — edits create a new Draft version. The current active version continues running until the new version is published.
 - [ ] Publishing a new version archives the previous version's definition snapshot for execution history traceability.
 
-*Deferred capabilities*
+*Out of scope*
 - Approval workflow for publishing (e.g., requiring a second admin to approve).
 
 > **Implementation status**

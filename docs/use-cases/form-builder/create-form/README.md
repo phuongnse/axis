@@ -41,7 +41,7 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 *Edge cases*
 - [ ] Creating a form and immediately navigating away without adding fields: the empty form is saved and visible in the forms list.
 
-*Deferred capabilities*
+*Out of scope*
 - Form templates / starter library.
 
 > **Implementation status**

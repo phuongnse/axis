@@ -32,7 +32,7 @@ Enforce subscription plan limits at the API so that organizations cannot exceed 
 - [ ] Plan limit checks complete in under 10 ms (Redis-cached counters).
 
 *Validation & errors*
-- [ ] Creating a workflow beyond the plan's workflow limit returns HTTP 402 with body: `{ "error": "plan_limit_exceeded", "limit_type": "workflows", "current": N, "max": M, "upgrade_url": "." }`.
+- [ ] Creating a workflow beyond the plan's workflow limit returns HTTP 402 with body: `{ "error": "plan_limit_exceeded", "limit_type": "workflows", "current": N, "max": M, "upgrade_url": "..." }`.
 - [ ] Triggering an execution when the monthly execution limit is reached returns HTTP 402 with `limit_type: "executions_per_month"`.
 - [ ] Inviting a user beyond the user limit returns HTTP 402 with `limit_type: "users"`.
 - [ ] The HTTP 402 response always includes a human-readable `message` field in addition to the machine-readable `error` field.
@@ -43,7 +43,7 @@ Enforce subscription plan limits at the API so that organizations cannot exceed 
 - [ ] Bulk operations (e.g., importing 5 workflows) check the limit against the total before beginning any creation; partial success is not allowed.
 - [ ] Deleting a workflow decrements the workflow counter immediately.
 
-*Deferred capabilities*
+*Out of scope*
 - Soft limits with grace period (allowing some overage before blocking).
 
 ## Wireframes

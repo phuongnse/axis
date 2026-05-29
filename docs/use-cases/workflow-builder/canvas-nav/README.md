@@ -43,7 +43,7 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 - [ ] A workflow with only a Start and End node: "Fit to view" centers those two nodes with reasonable padding.
 - [ ] Mini-map can be collapsed to avoid obscuring the canvas for users who don't need it.
 
-*Deferred capabilities*
+*Out of scope*
 - Touch/gesture controls for tablet use.
 
 > **Implementation status**

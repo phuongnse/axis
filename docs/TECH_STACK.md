@@ -167,9 +167,9 @@
 
 - **Per-module DB is the prerequisite for [ADR-010](#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy).** A module cannot be extracted without its data; if data is shared, extraction means manual table-by-table copy + dual-write transition periods. Separate databases make extraction a connection-string change.
 - **Schema-per-tenant kept inside each module.** Three multitenancy models were evaluated:
- - **Database-per-tenant:** strongest isolation but explodes operations (`N modules × M tenants` databases). Rejected for cost at production scale, can be revisited per-module if a large tenant needs it.
- - **Row-level with Postgres RLS:** scales best with many small tenants but requires RLS discipline on every query and complicates per-tenant backups. Rejected because Axis prefers strong-isolation defaults.
- - **Schema-per-tenant inside the module DB:** preserves existing `tenant_{orgId:N}` shape, isolates tenants strongly, and extracts cleanly. **Chosen.**
+  - **Database-per-tenant:** strongest isolation but explodes operations (`N modules × M tenants` databases). Rejected for cost at production scale, can be revisited per-module if a large tenant needs it.
+  - **Row-level with Postgres RLS:** scales best with many small tenants but requires RLS discipline on every query and complicates per-tenant backups. Rejected because Axis prefers strong-isolation defaults.
+  - **Schema-per-tenant inside the module DB:** preserves existing `tenant_{orgId:N}` shape, isolates tenants strongly, and extracts cleanly. **Chosen.**
 - **`public` schema in each module DB** holds module-level metadata (e.g. cross-tenant indexes, configuration). Identity's `public` is special: it owns organizations, users, and roles — the registry that all other modules reference via JWT claims, never via SQL.
 - **Connection-string convention.** `appsettings.json` carries a connection string per module (`ConnectionStrings:Identity`, `ConnectionStrings:DataModeling`, …) pointing to its database. In the modulith mode all these strings may point to the same Postgres host; in extracted mode they point to per-module hosts.
 
@@ -398,8 +398,13 @@
 - Suffix-less message names (just `ProvisionTenant`) — ambiguous routing; pre-commit hook should reject.
 
 ### ADR-027: External identity providers for sign-in and registration
-**Decision:** Interactive sign-in and self-service registration must support **Microsoft** (Entra ID / Microsoft account), **Google**, and **GitHub**, in addition to email/password. Implement via OpenIddict external authentication (OIDC/OAuth 2.0) with Authorization Code + PKCE for the SPA — same token delivery as password sign-in (`httpOnly` refresh cookie + in-memory access token).
-**Reason:** Production SaaS expectation for teams and developers; reduces password-only friction; aligns with [PRODUCT_VISION.md](./PRODUCT_VISION.md) and [sign-in](./use-cases/identity-access/sign-in/README.md) / [register-org](./use-cases/platform-foundation/register-org/README.md) acceptance criteria.
-**Configuration:** Client IDs/secrets per provider via environment/Vault ([ADR-022](./TECH_STACK.md#adr-022-secrets-management-via-hashicorp-vault-in-production)); no secrets in `VITE_*`. Redirect URIs registered per environment.
-**Registration:** External auth on register-org creates the org + admin user when net-new; duplicate-email behavior matches password registration (no information leakage). Terms of Service and Privacy Policy acceptance still required before org creation completes.
-**Rejected:** Delegating the entire auth UI to a third-party hosted page without returning to the Axis SPA (breaks PKCE and session cookie policy).
+
+**Decision:** Support **Microsoft** (Entra ID / Microsoft account), **Google**, and **GitHub** as external sign-in providers alongside email/password. They are wired into the OpenIddict server (ADR-004) via the ASP.NET Core external-authentication handlers; OpenIddict remains the only token issuer — external providers authenticate the user, Axis still mints its own access/refresh tokens.
+
+**Reason:** Production scope requires low-friction sign-up and sign-in. Organizations expect to onboard with the corporate or developer identity they already have, and password-only auth raises abandonment at registration. Routing all three through OpenIddict keeps a single token format, a single JWKS, and one RBAC mapping regardless of how the user authenticated.
+
+**Configuration:** per-provider `client_id` / `client_secret` stored in HashiCorp Vault in production ([ADR-022](#adr-022-secrets-management-via-hashicorp-vault-in-production)) and `.env` in development. Redirect URIs are registered per environment. A provider can be disabled per deployment without code changes.
+
+**Registration:** an external sign-in either creates a new organization (the register-org flow) or signs into an existing one. Accounts are linked to an existing Axis user by **verified email** — a provider login whose email matches a verified local account attaches to it rather than creating a duplicate.
+
+**Rejected:** full enterprise SSO federation (SAML, SCIM provisioning, per-tenant IdP) is deferred — it is a separate initiative driven by enterprise-tenant demand, not part of the baseline production scope.

@@ -42,7 +42,7 @@ Form fields define what data the form collects. Each field has a type, label, he
 - [ ] A form can have sections with no fields between them (empty section) — allowed but shows a warning in the preview: "This section has no fields."
 - [ ] Deleting a section header does not delete the fields below it; they move up to the previous section (or become ungrouped if they were in the first section).
 
-*Deferred capabilities*
+*Out of scope*
 - Collapsible sections.
 
 > **Implementation status**

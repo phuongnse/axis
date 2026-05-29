@@ -44,7 +44,7 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 - [ ] A workflow with thousands of executions: pagination is server-side (25 per page); the total count is shown (e.g., "1,247 executions").
 - [ ] Executions that are currently `RUNNING` appear at the top of the list regardless of sort order, with a live elapsed time counter.
 
-*Deferred capabilities*
+*Out of scope*
 - Execution analytics dashboard (charts, trends).
 
 > **Implementation status**

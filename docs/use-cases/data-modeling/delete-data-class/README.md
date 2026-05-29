@@ -43,7 +43,7 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 *Edge cases*
 - [ ] Soft-deleted data classes are permanently purged after 30 days along with model soft-deletes.
 
-*Deferred capabilities*
+*Out of scope*
 - Merging two data classes into one.
 
 > **Implementation status**

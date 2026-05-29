@@ -42,7 +42,7 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 *Edge cases*
 - [ ] "Used in N workflow(s)" count includes both Draft and Active workflows, as both can reference forms.
 
-*Deferred capabilities*
+*Out of scope*
 - Folders/categories for organizing forms.
 
 > **Implementation status**
@@ -59,7 +59,7 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 > - "Used in N workflow(s)" count pending cross-module query — not supported at Application layer without inter-module dependency
 > - deferred to API/Frontend aggregation.
 >
-> **Decisions:** `GetFormsHandler` paginates in-memory (GetAllAsync + LINQ Skip/Take). This is an accepted trade-off for production: adding a `GetPagedAsync` repository method would push sorting/paging logic into Infrastructure without additional correctness benefit at this scale. `Page` and `PageSize` are clamped to ≥ 1 and ≤ 100 in the handler.
+> **Decisions:** `GetFormsHandler` paginates in-memory (GetAllAsync + LINQ Skip/Take). This is an accepted trade-off at this scale: adding a `GetPagedAsync` repository method would push sorting/paging logic into Infrastructure without additional correctness benefit at this scale. `Page` and `PageSize` are clamped to ≥ 1 and ≤ 100 in the handler.
 
 ## Wireframes
 

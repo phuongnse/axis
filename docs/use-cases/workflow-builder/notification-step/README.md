@@ -46,7 +46,7 @@ Each step has a type that determines what it does when executed. Users configure
 - [ ] A webhook notification that times out (> 10s) or returns non-2xx follows the same configurable behavior.
 - [ ] Expression placeholders that resolve to `null` or undefined are rendered as an empty string in the notification body.
 
-*Deferred capabilities*
+*Out of scope*
 - SMS, Slack, or Teams notification channels.
 - Notification templates shared across workflows.
 

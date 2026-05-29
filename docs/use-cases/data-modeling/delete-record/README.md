@@ -43,7 +43,7 @@ Users can create, read, update, and delete records against any model. Records ar
 - [ ] Soft-deleted records are permanently purged after 30 days.
 - [ ] A soft-deleted record is not returned by list or search queries.
 
-*Deferred capabilities*
+*Out of scope*
 - Restoring a soft-deleted record.
 
 > **Implementation status**

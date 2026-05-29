@@ -48,7 +48,7 @@ Each field in a model has a type that determines what data it stores, how it's v
 - [ ] Field name auto-generation from a label with only special characters (e.g., "!!!") results in an empty name; the user is required to enter one manually.
 - [ ] Adding a field with `allow_multiple: true` on a Relation field stores values as a JSON array in the record.
 
-*Deferred capabilities*
+*Out of scope*
 - Computed / formula fields (e.g., "full_name = first_name + last_name").
 
 > **Implementation status**

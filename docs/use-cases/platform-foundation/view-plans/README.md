@@ -38,8 +38,8 @@ Compare available subscription plans so that I can choose the one that fits my n
 *Edge cases*
 - [ ] A plan that has been retired (no longer available for new signups) is not shown on the public pricing page but remains visible to existing orgs still on that plan.
 
-*Deferred capabilities*
-- Monthly vs annual billing toggle — deferred until billing integration ships.
+*Out of scope*
+- Monthly vs annual billing toggle — part of the separate billing initiative.
 - Per-seat pricing.
 
 ## Wireframes

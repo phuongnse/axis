@@ -42,8 +42,8 @@ Form fields define what data the form collects. Each field has a type, label, he
 - [ ] Section dividers can be reordered along with fields, maintaining their grouping relationship.
 - [ ] Reordering a field from one section into another section is supported.
 
-*Deferred capabilities*
-- Multi-column form layouts. (single-column only).
+*Out of scope*
+- Multi-column form layouts — single-column only.
 
 > **Implementation status**
 >

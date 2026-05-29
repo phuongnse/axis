@@ -43,8 +43,8 @@ Self-service registration flow where a new organization signs up and is automati
 *Edge cases*
 - [ ] If a paid plan is selected (before billing integration), it is treated as trial with a flag for the Axis team to follow up.
 
-*Deferred capabilities*
-- Credit card collection and payment processing — deferred until billing integration ships.
+*Out of scope*
+- Credit card collection and payment processing — part of the separate billing initiative.
 - Plan upgrade/downgrade self-service — covered in subscription-plans.
 
 > **Implementation status**
@@ -63,7 +63,7 @@ Self-service registration flow where a new organization signs up and is automati
 > - org stores `subscription_plan_id`
 > - subscription-plans enforces limits (402) after provisioning.
 >
-> **Decisions:** Paid plan selection has no billing flag column yet — treat as normal plan assignment until billing integration ships.
+> **Decisions:** paid plan selection has no billing flag column yet — treat as normal plan assignment until the billing initiative lands.
 
 ## Wireframes
 

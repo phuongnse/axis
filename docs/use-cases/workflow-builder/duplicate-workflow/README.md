@@ -43,7 +43,7 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 - [ ] Duplicating a workflow does not copy its execution history.
 - [ ] Webhook URLs are NOT copied; the duplicate generates a new unique webhook URL when published.
 
-*Deferred capabilities*
+*Out of scope*
 - Cross-org workflow duplication (copy to another org) — handled by Import/Export in import-export.
 
 > **Implementation status**

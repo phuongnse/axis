@@ -43,7 +43,7 @@ A resource-based permission system where each permission grants the ability to p
 - [ ] Frontend permission checks are never treated as the security boundary — the API always re-validates. The UI hiding is UX only.
 - [ ] If a user's permissions change mid-session (role edited by admin), the UI reflects the change on the next token refresh (within 15 min) or on the next page navigation that fetches fresh permissions.
 
-*Deferred capabilities*
+*Out of scope*
 - Per-record UI permissions (e.g., hiding individual table rows).
 
 > **Implementation status**

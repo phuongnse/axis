@@ -47,7 +47,7 @@ Allow organization admins to manage their organization's profile, settings, and 
 - [ ] An org with active running workflow executions at deletion time: running executions are cancelled before schema deletion begins.
 - [ ] Attempting to sign in to a deleted org returns "This organization no longer exists."
 
-*Deferred capabilities*
+*Out of scope*
 - Data export before deletion — available separately as a future feature.
 - Immediate hard delete without grace period — the 30-day window is non-negotiable.
 

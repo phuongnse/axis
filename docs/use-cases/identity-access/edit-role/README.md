@@ -44,7 +44,7 @@ Organization admins can create custom roles, assign permissions to each role, an
 - [ ] Removing a permission from a role affects all users currently holding that role simultaneously.
 - [ ] A user whose active session loses a permission they were relying on will receive HTTP 403 on their next request for that resource; the UI re-fetches their permissions and updates accordingly.
 
-*Deferred capabilities*
+*Out of scope*
 - Permission change notifications to affected users.
 
 > **Implementation status**

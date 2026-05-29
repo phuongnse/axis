@@ -12,9 +12,9 @@ Establish the multi-tenant SaaS foundation that all other modules depend on. Thi
 
 Without this foundation, nothing else works. Every feature in every other domain runs on top of the multi-tenancy infrastructure built here.
 
-## Phase
+## Scope
 
-**Production** — Must be completed first. All other domains depend on this.
+**Production scope** — foundational; all other domains depend on this, so it lands first in implementation order.
 
 ---
 

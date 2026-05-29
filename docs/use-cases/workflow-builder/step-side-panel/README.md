@@ -44,7 +44,7 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 - [ ] Switching between two steps while a panel is open closes the first and opens the second without losing changes.
 - [ ] The canvas remains fully interactive (pan, zoom, add steps) while a configuration panel is open.
 
-*Deferred capabilities*
+*Out of scope*
 - Full-screen step config modal — the panel-based UI is the only config surface.
 
 > **Implementation status**

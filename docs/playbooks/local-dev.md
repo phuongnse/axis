@@ -11,13 +11,13 @@ The full dev stack runs from one `docker compose up -d`: **Postgres**, **Redis**
 ## Prerequisites
 
 - **Docker** — Docker Engine + Compose v2.
- - **Linux / macOS:** run commands from the repo root.
- - **Windows:** Docker inside WSL2 (Ubuntu/Debian). Use `wsl -- bash -lc "cd /path/to/axis && …"` for the examples below, or open a WSL shell and `cd` there.
+  - **Linux / macOS:** run commands from the repo root.
+  - **Windows:** Docker inside WSL2 (Ubuntu/Debian). Use `wsl -- bash -lc "cd /path/to/axis && …"` for the examples below, or open a WSL shell and `cd` there.
 - Host ports free (default compose bindings):
 
- `3000`, `5280`, `5432`, `6379`, `1025`, `1080`, `4566`, `29092`, `8081`, `5672`, `15672`, `8200`
+  `3000`, `5280`, `5432`, `6379`, `1025`, `1080`, `4566`, `29092`, `8081`, `5672`, `15672`, `8200`
 
- Optional observability profile also uses `3001`, `4317`, `4318` — see [Observability (optional)](#observability-optional).
+  Optional observability profile also uses `3001`, `4317`, `4318` — see [Observability (optional)](#observability-optional).
 - Do not run a host-side `dotnet build` against `src/` while the API container is up (they fight over `bin/obj`).
 
 ---
@@ -152,8 +152,8 @@ Regenerate from repo root (Identity example):
 
 ```bash
 dotnet ef migrations add InitialCreate \
- --project src/Modules/Identity/Axis.Identity.Infrastructure/Axis.Identity.Infrastructure.csproj \
- --startup-project src/Modules/Identity/Axis.Identity.Infrastructure/Axis.Identity.Infrastructure.csproj
+  --project src/Modules/Identity/Axis.Identity.Infrastructure/Axis.Identity.Infrastructure.csproj \
+  --startup-project src/Modules/Identity/Axis.Identity.Infrastructure/Axis.Identity.Infrastructure.csproj
 ```
 
 Each migration ships **both** `{timestamp}_{Name}.cs` and `{timestamp}_{Name}.Designer.cs`. Tenant modules use `*DbContextFactory` + `DesignTimePublicSchemaTenantContext` (`public` schema at design time).
@@ -165,7 +165,7 @@ Each migration ships **both** `{timestamp}_{Name}.cs` and `{timestamp}_{Name}.De
 When migrations or seed data are broken:
 
 ```bash
-docker compose down -v # drops postgres_data + nuget + node_modules volumes
+docker compose down -v   # drops postgres_data + nuget + node_modules volumes
 docker compose up -d
 ```
 

@@ -7,11 +7,11 @@
 ## Contents
 
 - [Backend Process](#backend-process)
- - [New module setup](#new-module-setup-one-time-per-module)
- - [Per use case workflow](#per-use-case-workflow)
+  - [New module setup](#new-module-setup-one-time-per-module)
+  - [Per use case workflow](#per-use-case-workflow)
 - [Frontend Process](#frontend-process)
- - [Phase 1 — Foundation](#phase-1--foundation-one-time)
- - [Phase 2 — Per-feature workflow](#phase-2--per-feature-workflow)
+  - [Phase 1 — Foundation](#phase-1--foundation-one-time)
+  - [Phase 2 — Per-feature workflow](#phase-2--per-feature-workflow)
 
 ---
 
@@ -80,7 +80,7 @@ For every `⚠️` found, decide explicitly:
 | Verdict | Action |
 |---|---|
 | Actually done, docs stale | Update callout to ✅ |
-| Deferred — depends on a later module (e.g. workflow-engine) | `Gaps vs spec` with `pending E0X` and/or `**Deferred (.):**` per agent-checklist deferred-callout rules (`**Deferred (PR #N follow-up):**`) |
+| Deferred — depends on a later module (e.g. workflow-engine) | `Gaps vs spec` with `pending E0X` and/or `**Deferred (...):**` per agent-checklist deferred-callout rules (`**Deferred (PR #N follow-up):**`) |
 | Genuine miss | Fix it before proceeding |
 
 Also check cross-module Application dependencies: list every query or command the upcoming API layer will call from *other* modules' Application layers. If any are missing, add them now.
@@ -101,7 +101,7 @@ For every match: confirm the SQL only references tables owned by that match's ow
 
 1. Add Minimal API endpoint in `src/Axis.Api/Endpoints/{Module}Endpoints.cs` with full OpenAPI annotations (`.WithName`, `.WithSummary`, `.WithTags`, `.Produces<T>`, `.ProducesProblem`)
 2. Every endpoint calls `.RequireAuthorization()` unless explicitly public
-3. Mapping: `mediator.Send(.)` → `Result` → `result.ToProblemDetails()` — no logic in endpoint
+3. Mapping: `mediator.Send(...)` → `Result` → `result.ToProblemDetails()` — no logic in endpoint
 4. Add / update integration tests under `tests/Api/Axis.Api.Tests/`
 5. Run `dotnet test` (full `Axis.sln`) — must be **zero errors, zero warnings**
 

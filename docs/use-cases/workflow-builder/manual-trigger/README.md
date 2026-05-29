@@ -44,8 +44,8 @@ A workflow must have at least one trigger before it can be published. Triggers d
 - [ ] A workflow with a Manual trigger and no input variables shows a simple "Run" confirmation dialog, not an input form.
 - [ ] Triggering the same workflow many times in quick succession creates independent executions (no deduplication for manual triggers).
 
-*Deferred capabilities*
-- Triggering with pre-filled input from a page button (Page Builder). for this domain; covered in page-builder.
+*Out of scope*
+- Triggering with pre-filled input from a page button (Page Builder) — covered in page-builder.
 
 > **Implementation status**
 >

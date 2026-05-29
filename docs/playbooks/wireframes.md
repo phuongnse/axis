@@ -80,30 +80,30 @@ Shared spacing constants in `generate-screens.mjs`: `AUTH_CARD_PAD`, `AUTH_SHELL
 ```js
 import { fileURLToPath } from 'url';
 import {
- nextSeed, BASE,
- rect, ellipse, text, hline, vline, arrow, sectionHeader,
- C,
- writeExcalidraw,
+  nextSeed, BASE,
+  rect, ellipse, text, hline, vline, arrow, sectionHeader,
+  C,
+  writeExcalidraw,
 } from './components.mjs';
 ```
 
 **`generate-screens.mjs`:**
 ```js
 import {
- C, SB, HDR, CX, CY,
- rect, ellipse, text, hline, vline, arrow,
- btn, inputField, selectField, badge, searchBar, pageHeader,
- appShell, component, translate, writeExcalidraw,
+  C, SB, HDR, CX, CY,
+  rect, ellipse, text, hline, vline, arrow,
+  btn, inputField, selectField, badge, searchBar, pageHeader,
+  appShell, component, translate, writeExcalidraw,
 } from './components.mjs';
 
 import {
- buildWorkflowCanvas,
- buildBuilderLayout,
- buildExecutionTimeline,
- buildModal,
- buildSideSheet,
- buildTable,
- // .add more as needed
+  buildWorkflowCanvas,
+  buildBuilderLayout,
+  buildExecutionTimeline,
+  buildModal,
+  buildSideSheet,
+  buildTable,
+  // ...add more as needed
 } from './generate-template.mjs';
 ```
 
@@ -159,8 +159,8 @@ const sideEls = component(buildSideSheet, cx + 520, cy);
 
 **Standard values:**
 ```js
-const W = 1200;
-const H = 700;
+const W   = 1200;
+const H   = 700;
 const NAV = ['Data Models', 'Workflows', 'Forms', 'Executions', 'Settings'];
 ```
 
@@ -170,7 +170,7 @@ const NAV = ['Data Models', 'Workflows', 'Forms', 'Executions', 'Settings'];
 
 **Dimensions guaranteed to match S18:**
 - Sidebar: `230×H`, `C.white` bg
-- Logo area: `230×60`, `C.gray50` bg, `'⬡ Axis'` 18px `C.primary` at `(30, 18)`
+- Logo area: `230×60`, `C.gray50` bg, `'⬡  Axis'` 18px `C.primary` at `(30, 18)`
 - Nav items: `214×36`, `8px` x-inset, starting `y = 72`, spaced `44px`
 - Active item: `C.infoBg` bg + `C.infoBorder` stroke + 3px left accent bar + `C.primary` text
 - Header: from `x=230`, `h=60`, `C.white` bg
@@ -224,13 +224,13 @@ Height: **40px**. Renders input + `⌕` icon + `'Search…'` placeholder.
 All authenticated screens use these values. **Never change W or H without re-verifying every screen.**
 
 ```js
-const W = 1200; // total screen width — must be ≥ 1150 (cx=250 + template content=900)
-const H = 700; // total screen height
-const PAD = 20; // content area padding
+const W   = 1200;  // total screen width — must be ≥ 1150 (cx=250 + template content=900)
+const H   = 700;   // total screen height
+const PAD = 20;    // content area padding
 
-const cx = CX + PAD; // 250 — first content element x (after sidebar + padding)
-const cy = CY + PAD; // 80 — first content element y (after header + padding)
-const cw = W - CX - PAD * 2; // 930 — usable content width
+const cx  = CX + PAD;          // 250 — first content element x (after sidebar + padding)
+const cy  = CY + PAD;          // 80  — first content element y (after header + padding)
+const cw  = W - CX - PAD * 2;  // 930 — usable content width
 ```
 
 ---
@@ -242,8 +242,8 @@ These formulas are the source of truth for all layout math in `generate-screens.
 ### Table layout
 
 ```text
-tblY = cy + 56 // standard: toolbar(40px) + gap(16px)
-tblY = cy + 82 // with breadcrumb: breadcrumb(18) + gap(8) + toolbar(40) + gap(16)
+tblY = cy + 56    // standard: toolbar(40px) + gap(16px)
+tblY = cy + 82    // with breadcrumb: breadcrumb(18) + gap(8) + toolbar(40) + gap(16)
 tblH = H - tblY - PAD
 ```
 
@@ -271,16 +271,16 @@ labelY = controlY + (controlH - 16) / 2
 
 | Control type | controlH | labelY formula | Example |
 |---|---|---|---|
-| `inputField` | 40px | `controlY + 12` | `text('lbl', cx, y+12, .); inputField('inp', cx+320, y, .)` |
-| Toggle (`rect` h=24) | 24px | `controlY + 4` | `text('lbl', cx, y+4, .); rect('tog', cx+320, y, 44, 24, .)` |
-| Checkbox (`rect` h=20) | 20px | `controlY + 2` | `text('lbl', cx, y+2, .); rect('chk', cx+320, y, 20, 20, .)` |
+| `inputField` | 40px | `controlY + 12` | `text('lbl', cx, y+12, ...); inputField('inp', cx+320, y, ...)` |
+| Toggle (`rect` h=24) | 24px | `controlY + 4` | `text('lbl', cx, y+4, ...);  rect('tog', cx+320, y, 44, 24, ...)` |
+| Checkbox (`rect` h=20) | 20px | `controlY + 2` | `text('lbl', cx, y+2, ...);  rect('chk', cx+320, y, 20, 20, ...)` |
 
 ### Section header spacing (settings screens)
 
 ```text
-title at ySection (h=22, fontSize=16)
-divider at ySection + 26 (title h=22 + gap 4)
-first row at ySection + 44 (divider + gap 18)
+title   at  ySection          (h=22, fontSize=16)
+divider at  ySection + 26     (title h=22 + gap 4)
+first row at ySection + 44    (divider + gap 18)
 ```
 
 Subsequent sections start after the last control of the previous section, plus a **32px** inter-section gap.
@@ -308,15 +308,15 @@ authCard(prefix, { title, subtitle?, items, extraLink? }, submitLabel, footerTex
 **Card geometry (auto-calculated — do not override):**
 
 ```text
-cardW = 440
-headerH = subtitle ? 136 : 112 // space from card top to first field
-fieldH = items.length × 72 // 72px per field: label(16) + gap(2) + input(40) + gap(14)
-cardH = headerH + fieldH + (extraLink ? 22 : 4) + 36 + 12 + 32
-cardX = Math.round((W - cardW) / 2)
-cardY = Math.round((H - cardH) / 2)
+cardW   = 440
+headerH = subtitle ? 136 : 112    // space from card top to first field
+fieldH  = items.length × 72       // 72px per field: label(16) + gap(2) + input(40) + gap(14)
+cardH   = headerH + fieldH + (extraLink ? 22 : 4) + 36 + 12 + 32
+cardX   = Math.round((W - cardW) / 2)
+cardY   = Math.round((H - cardH) / 2)
 ```
 
-**Logo rule**: always `text(id, cardX, cardY+16, cardW, 28, '⬡ Axis', 18, C.primary, 'center')` — bounding box must span full `cardW` so `'center'` alignment works correctly. Never use a narrower bounding box.
+**Logo rule**: always `text(id, cardX, cardY+16, cardW, 28, '⬡  Axis', 18, C.primary, 'center')` — bounding box must span full `cardW` so `'center'` alignment works correctly. Never use a narrower bounding box.
 
 ---
 
@@ -330,7 +330,7 @@ When writing or editing any wireframe generator, verify against these values (fr
 | Header height | `HDR` | **60px** | S18 |
 | Sidebar bg | — | `C.white` | S18 |
 | Logo area height | — | **60px**, `C.gray50` bg | S18 |
-| Logo text | — | `'⬡ Axis'` 18px `C.primary` | S18 |
+| Logo text | — | `'⬡  Axis'` 18px `C.primary` | S18 |
 | Nav item | w×h | **214×36px** | S18 |
 | Nav item (active) | bg/stroke | `C.infoBg` / `C.infoBorder` + 3px left bar | S18 |
 | Nav item (active) text | color | `C.primary` (not white) | S18 |
@@ -354,12 +354,12 @@ When writing or editing any wireframe generator, verify against these values (fr
 ## Adding a new screen
 
 1. Add a `genXxx()` function in `generate-screens.mjs`:
- - **Authenticated screen**: start with `appShell(prefix, W, H, NAV, activeIdx, pageTitle)`
- - **Auth screen** (login, register, etc.): use `authCard()` — never build the card by hand
- - Use `component(buildXxx, cx, cy)` for any element that matches a template section
- - Use `btn`, `inputField`, `badge`, etc. from `components.mjs` for individual controls
- - Use raw `rect`, `text`, etc. only for layout with no template equivalent
- - **All y-positions must use the spacing formulas** in the "Spacing formulas" section above — never guess offsets
+   - **Authenticated screen**: start with `appShell(prefix, W, H, NAV, activeIdx, pageTitle)`
+   - **Auth screen** (login, register, etc.): use `authCard()` — never build the card by hand
+   - Use `component(buildXxx, cx, cy)` for any element that matches a template section
+   - Use `btn`, `inputField`, `badge`, etc. from `components.mjs` for individual controls
+   - Use raw `rect`, `text`, etc. only for layout with no template equivalent
+   - **All y-positions must use the spacing formulas** in the "Spacing formulas" section above — never guess offsets
 2. Call `genXxx()` in the main section at the bottom of the file
 3. Add the output path to the screen inventory table in this playbook
 4. Run `node docs/wireframes/generate-screens.mjs` — **verify output has no `NaN` positions** (element count must be > 0)
@@ -379,21 +379,21 @@ When writing or editing any wireframe generator, verify against these values (fr
 
 ```js
 export function buildXxx(y0) {
- const els = [.sectionHeader(N, 'Section Label', y0)];
- const yC = y0 + 48; // use +68 if section has sub-labels at y0+46
+  const els = [...sectionHeader(N, 'Section Label', y0)];
+  const yC = y0 + 48;  // use +68 if section has sub-labels at y0+46
 
- // sub-labels (only when section has distinct columns):
- els.push(text('xxx_col1_lbl', 50, y0 + 46, 120, 14, 'Col 1', 11, C.gray500));
+  // sub-labels (only when section has distinct columns):
+  els.push(text('xxx_col1_lbl', 50,  y0 + 46, 120, 14, 'Col 1', 11, C.gray500));
 
- // elements.
- return els;
+  // elements...
+  return els;
 }
 ```
 
 **Rules:**
 - `yC` offset: `y0 + 48` (no sub-labels) or `y0 + 68` (with sub-labels). Never mix.
 - Element ID prefix: unique 3–6 char snake_case per section. Never reuse a prefix — Excalidraw silently deduplicates IDs.
-- Section number `N` in `sectionHeader(N, .)` must match visual order. Renumber all subsequent sections when inserting in the middle.
+- Section number `N` in `sectionHeader(N, ...)` must match visual order. Renumber all subsequent sections when inserting in the middle.
 - Add `export` keyword — all builders must be exported so `generate-screens.mjs` can import them.
 - Add the builder to the compose array inside the `isMain` guard at the bottom, in grouped order with `// S{NN}` comments.
 - Update the TOC comment at the top of the file and the section count.
@@ -407,7 +407,7 @@ The compose + write block is wrapped so the file can be imported as a module wit
 
 ```js
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
- // compose all sections and write _template.excalidraw
+  // compose all sections and write _template.excalidraw
 }
 ```
 

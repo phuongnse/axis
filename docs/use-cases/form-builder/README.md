@@ -12,9 +12,9 @@ Enable users to design interactive forms that can be embedded as steps within wo
 
 Forms are the primary mechanism for human interaction within a workflow. Without forms, workflows can only be fully automated — with forms, they can support approval processes, data entry, and human-in-the-loop automation.
 
-## Phase
+## Scope
 
-**Production**
+**Production scope** — in the full product scope; no separate MVP/Phase cut.
 
 ---
 
@@ -79,11 +79,11 @@ Forms are the primary mechanism for human interaction within a workflow. Without
 
 ```
 Workflow reaches Form step
- → Assignee receives notification
- → Assignee opens form URL
- → Submits form
- → Submission stored
- → Workflow continues with form data in context
+    → Assignee receives notification
+        → Assignee opens form URL
+            → Submits form
+                → Submission stored
+                    → Workflow continues with form data in context
 ```
 
 ---

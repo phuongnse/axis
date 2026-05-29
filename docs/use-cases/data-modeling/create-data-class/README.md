@@ -42,7 +42,7 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 *Edge cases*
 - [ ] Creating a data class with the same name as a model is allowed (they occupy different namespaces).
 
-*Deferred capabilities*
+*Out of scope*
 - Nested data classes (data class within a data class) — depth limited to 1.
 
 > **Implementation status**

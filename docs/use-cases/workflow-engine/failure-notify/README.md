@@ -43,7 +43,7 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 - [ ] A workflow with multiple parallel branches: if one branch fails (AND join), a single failure notification is sent for the overall execution, not one per failed branch.
 - [ ] If the same workflow fails repeatedly in a short period (e.g., schedule trigger firing every 5 minutes and always failing), notifications are rate-limited to 1 per 15 minutes per workflow per channel to avoid notification flooding.
 
-*Deferred capabilities*
+*Out of scope*
 - PagerDuty / OpsGenie / Slack integration for error notifications.
 
 > **Implementation status**

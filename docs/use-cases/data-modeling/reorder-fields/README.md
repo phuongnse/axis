@@ -42,7 +42,7 @@ Each field in a model has a type that determines what data it stores, how it's v
 - [ ] System fields (`id`, `created_at`, `updated_at`) are always pinned to the end and cannot be reordered.
 - [ ] Two users reordering fields simultaneously: last write wins; no conflict detection required for ordering.
 
-*Deferred capabilities*
+*Out of scope*
 - Hiding fields from the default list view per user.
 
 > **Implementation status**

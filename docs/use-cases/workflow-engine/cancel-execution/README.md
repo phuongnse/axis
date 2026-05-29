@@ -46,8 +46,8 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 - [ ] Completed steps in a cancelled execution retain their outputs in the execution history.
 - [ ] A concurrent cancel request (two users clicking Cancel at the same time) is handled idempotently: only one cancellation takes effect.
 
-*Deferred capabilities*
-- Pausing an execution and resuming it. (cancel only).
+*Out of scope*
+- Pausing an execution and resuming it — cancel only.
 
 > **Implementation status**
 >

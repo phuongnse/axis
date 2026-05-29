@@ -45,7 +45,7 @@ Users can create custom data models within their organization. A model defines t
 - [ ] Two admins editing the same model simultaneously: last save wins. The first admin's changes are not silently overwritten without notice — on save, if the server detects a version conflict (via `updated_at` comparison), it returns HTTP 409 with: "This model was modified by someone else. Please refresh and reapply your changes."
 - [ ] Renaming a field does not lose existing data; the underlying storage key is the field's immutable `id`, not its name.
 
-*Deferred capabilities*
+*Out of scope*
 - Undo history for field changes.
 
 > **Implementation status**

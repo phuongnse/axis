@@ -46,7 +46,7 @@ Each step has a type that determines what it does when executed. Users configure
 - [ ] If the assignee resolves to a deactivated user at execution time, the engine falls back to notifying all Admins and logs a warning.
 - [ ] A timeout of 0 hours is invalid and blocked.
 
-*Deferred capabilities*
+*Out of scope*
 - Multiple assignees on a single Form step (assign to all and wait for the first response).
 
 > **Implementation status**

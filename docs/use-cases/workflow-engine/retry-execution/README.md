@@ -46,7 +46,7 @@ When a workflow execution fails at a step, users can manually retry from the fai
 - [ ] Retrying a workflow where the failed step referenced a form that has since been deleted: the retry fails immediately at that step with "Referenced form no longer exists."
 - [ ] Multiple concurrent retries of the same execution are prevented: the Retry button is disabled while a retry is already in progress.
 
-*Deferred capabilities*
+*Out of scope*
 - Automatic retry (without user action).
 
 > **Implementation status**

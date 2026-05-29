@@ -45,7 +45,7 @@ Handler specifications (Form, HTTP, Condition, Script, Notification) remain docu
 - [ ] Wolverine's at-least-once delivery guarantee: if a step handler message is re-delivered (e.g., after a crash), the handler checks if the step is already in a terminal state (`COMPLETED`, `FAILED`, `CANCELLED`) and exits immediately (idempotent).
 - [ ] Two concurrent deliveries of the same step handler message (race condition): the second one detects the step is already `RUNNING` and exits; only one execution proceeds.
 
-*Deferred capabilities*
+*Out of scope*
 - Custom step types defined by users.
 
 ## Wireframes

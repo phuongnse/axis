@@ -42,7 +42,7 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 *Edge cases*
 - [ ] A workflow with multiple trigger types shows the first trigger's icon and a "+N" badge.
 
-*Deferred capabilities*
+*Out of scope*
 - Workflow folders / tags.
 
 > **Implementation status**

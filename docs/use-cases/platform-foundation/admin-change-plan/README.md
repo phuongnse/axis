@@ -26,7 +26,7 @@ Manually change an organization's plan so that I can support early customers and
 
 ## Context
 
-Define subscription plan tiers with feature limits and enforce those limits at the API level. Payment processing is a separate billing-integration initiative — this feature covers plan definitions and enforcement logic.
+Define subscription plan tiers with feature limits and enforce those limits at the API level. Billing integration is a separate initiative ([PRODUCT_VISION § Non-goals](../../../PRODUCT_VISION.md#non-goals-platform)) — this feature covers plan definitions and enforcement logic only.
 
 ## Acceptance Criteria
 
@@ -42,8 +42,8 @@ Define subscription plan tiers with feature limits and enforce those limits at t
 *Edge cases*
 - [ ] Plan change is logged in the platform audit log with: who changed, from what plan, to what plan, and at what time.
 
-*Deferred capabilities*
-- Org-initiated plan upgrade — deferred until billing integration ships.
+*Out of scope*
+- Org-initiated plan upgrade — part of the separate billing initiative (requires billing integration).
 
 > **Implementation status**
 >
@@ -71,7 +71,7 @@ Define subscription plan tiers with feature limits and enforce those limits at t
 > - atomic check-and-consume for monthly execution starts (race can briefly exceed cap under concurrency)
 > - fail-closed when usage counter/Redis unavailable (today logs warning and treats usage as 0).
 >
-> **Decisions:** `featureFlags` derived from plan slug for production (no JSON column); `PlatformAdmin:UserIds` config for platform admin plan change.
+> **Decisions:** `featureFlags` derived from plan slug (no JSON column); `PlatformAdmin:UserIds` config for platform admin plan change.
 
 ## Wireframes
 

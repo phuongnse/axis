@@ -45,7 +45,7 @@ Allow users to reset forgotten passwords, change their current password, and man
 - [ ] IP geolocation may be unavailable for some IPs; in that case location shows "Unknown."
 - [ ] The current session cannot be revoked from this page (use Sign Out instead); the Revoke button is replaced with "Current session."
 
-*Deferred capabilities*
+*Out of scope*
 - Per-session device naming by the user.
 
 > **Implementation status**

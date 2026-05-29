@@ -45,7 +45,7 @@ Users can create, read, update, and delete records against any model. Records ar
 - [ ] A model with 0 fields (misconfigured) shows a warning in the list: "This model has no fields. Add fields to the model definition first."
 - [ ] Relation field columns display the target record's `display_field` value, not the raw UUID. If the target record was deleted, it shows "[Deleted record]".
 
-*Deferred capabilities*
+*Out of scope*
 - Saved views / custom column configurations.
 - Inline editing in the list.
 

@@ -83,17 +83,17 @@ Each module owns its own PostgreSQL database. Tenant isolation inside a module i
 
 ```text
 axis_identity DB
-└── public schema # organizations, users, roles, subscriptions, openiddict tables
+└── public schema                # organizations, users, roles, subscriptions, openiddict tables
 
 axis_datamodeling DB
-├── public schema # module config, cross-tenant indexes
-├── wolverine schema # per-module envelope tables (outbox/inbox/scheduled/dead-letters)
-└── tenant_{orgId:N} schemas # models, fields, records (per tenant)
+├── public schema                # module config, cross-tenant indexes
+├── wolverine schema             # per-module envelope tables (outbox/inbox/scheduled/dead-letters)
+└── tenant_{orgId:N} schemas     # models, fields, records (per tenant)
 
-axis_workflowbuilder DB ← same shape
-axis_workflowengine DB ← same shape
-axis_formbuilder DB ← same shape
-axis_pagebuilder DB ← same shape (when PageBuilder module ships)
+axis_workflowbuilder DB           ← same shape
+axis_workflowengine DB            ← same shape
+axis_formbuilder DB               ← same shape
+axis_pagebuilder DB               ← same shape (when PageBuilder module ships)
 ```
 
 **Tenant resolution:** every external request carries a JWT with an `org_id` claim. The gateway extracts it and propagates via gRPC metadata (sync calls) and CloudEvents `tenantid` extension (events). Each module restores it into a scoped `ITenantContext`. EF Core sets the per-connection `search_path` to the tenant schema via `TenantSchemaInterceptor`.

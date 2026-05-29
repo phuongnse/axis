@@ -46,7 +46,7 @@ Each step has a type that determines what it does when executed. Users configure
 - [ ] `context` is a read-only proxy; attempting to write to `context` directly (not `output`) has no effect and does not throw an error.
 - [ ] A script that runs within the timeout but produces no `output` writes is valid; context is unchanged.
 
-*Deferred capabilities*
+*Out of scope*
 - Importing external npm packages.
 - Python or other language scripts — JavaScript only.
 

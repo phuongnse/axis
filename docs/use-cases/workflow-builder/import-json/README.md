@@ -47,7 +47,7 @@ Workflow definitions can be exported as portable JSON files and imported into an
 - [ ] Importing a workflow that references a model that doesn't exist in the target org: the model definition is created (fields only, no records). If a model with the same name exists, user is prompted to map to it or create new.
 - [ ] Import is transactional: if any part fails mid-import, no partial data is left behind.
 
-*Deferred capabilities*
+*Out of scope*
 - Automatic periodic export/backup.
 
 > **Implementation status**

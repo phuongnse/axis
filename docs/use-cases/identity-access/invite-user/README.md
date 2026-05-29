@@ -48,7 +48,7 @@ Organization admins can invite new members, manage their accounts, and deactivat
 - [ ] The user limit check is performed at invitation time, not at acceptance time. If the org is at its user limit, the invitation is blocked with an upgrade prompt.
 - [ ] An admin cannot invite themselves (their own email address).
 
-*Deferred capabilities*
+*Out of scope*
 - Bulk invitation via CSV upload.
 
 > **Implementation status**

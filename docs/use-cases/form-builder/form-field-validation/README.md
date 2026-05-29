@@ -45,7 +45,7 @@ Form fields define what data the form collects. Each field has a type, label, he
 - [ ] A required field with a default value expression (pre-population from context): if the expression resolves to a non-null value, the required validation passes even if the user doesn't interact with the field.
 - [ ] Changing a validation rule (e.g., tightening max length) on a form that has existing submissions: the change only affects future submissions; existing submissions are not retroactively validated.
 
-*Deferred capabilities*
+*Out of scope*
 - Cross-field validation (e.g., "end date must be after start date").
 
 > **Implementation status**

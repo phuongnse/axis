@@ -44,7 +44,7 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 - [ ] A task that was submitted by another role member (and thus no longer pending) disappears from the user's "My Tasks" within 60 seconds (polling or SignalR push).
 - [ ] Expired tasks (timed out) appear in a separate "Expired" tab, not in Pending.
 
-*Deferred capabilities*
+*Out of scope*
 - Delegating a task to another user.
 - Bulk task completion.
 

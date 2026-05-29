@@ -57,7 +57,7 @@ Every `docs/use-cases/<domain>/<short-slug>/README.md` file uses these layouts s
 ```
 
 - Put screens **only used by this use case** **flat** inside the use-case folder (next to `README.md`).
-- Reference **shared kit screens** (e.g. `app-shell`, `_template`) from `.../wireframes/` — do not copy duplicates.
+- Reference **shared kit screens** (e.g. `app-shell`, `_template`) from `../../../wireframes/` — do not copy duplicates.
 - Use `N/A` rows when no wireframe applies.
 - One table per `README.md` — no blockquote wireframe stacks.
 
@@ -114,7 +114,7 @@ Avoid writing engineering process constraints as end-user use cases. Keep those 
 
 ## When you add a new `.md` file
 
-1. Add the back-link header (per [`docs/README.md`](../README.md)): `> **Navigation**: [← parent.md](.)` so future readers can climb back up.
+1. Add the back-link header (per [`docs/README.md`](../README.md)): `> **Navigation**: [← parent.md](...)` so future readers can climb back up.
 2. Add a row to the relevant table in `docs/README.md` (playbooks / diagrams / wireframes).
 3. If it owns a topic, add it to the **Single source of truth** table.
 4. If the topic could be enforced mechanically, add a rule to `scripts/check-doc-drift.sh` — that is what makes the convention survive.

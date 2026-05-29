@@ -41,7 +41,7 @@ Workflow definitions can be exported as portable JSON files and imported into an
 *Edge cases*
 - [ ] An org with 0 workflows: export downloads an empty ZIP with a README.txt explaining the format.
 
-*Deferred capabilities*
+*Out of scope*
 - Scheduled automatic backups.
 
 > **Implementation status**

@@ -45,7 +45,7 @@ Self-service registration flow where a new organization signs up and is automati
 - [ ] Provisioning is idempotent: running it twice for the same org does not create duplicate schemas or tables.
 - [ ] If the org schema already exists (partial previous run), the migration runner detects this and continues from where it left off.
 
-*Deferred capabilities*
+*Out of scope*
 - Custom schema naming chosen by the user — schema names are auto-generated.
 
 > **Implementation status**
@@ -66,7 +66,7 @@ Self-service registration flow where a new organization signs up and is automati
 > - critical log alert when exhausted
 > - `GET /api/auth/provisioning-status?token=` for polling.
 >
-> **Deferred (PR #N follow-up):** external paging integration for platform alerts (critical log is the initial signal).
+> **Deferred (PR #N follow-up):** external paging integration for platform alerts (critical log is the current signal).
 >
 > **Decisions:** provisioning is fully event-driven over Kafka per [ADR-019](../../../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope) — no central provisioner. The verify endpoint stays fast, the provisioning failure mode is decoupled from email verification, and each module owns its own schema lifecycle (satisfies ADR-010 "extraction is a redeploy"). Tenant schema name is derived from `Organization.Id` as `tenant_{orgId:N}` (32-char hex, no dashes) — stable across the lifetime of the org and safe as a Postgres identifier.
 

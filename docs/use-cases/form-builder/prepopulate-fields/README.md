@@ -43,7 +43,7 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 - [ ] An expression that references a context variable that does not exist at execution time (e.g., a step that was skipped) resolves to `null` and leaves the field empty — this is not an execution error.
 - [ ] A pre-populated required field that the assignee clears before submitting triggers the required validation error.
 
-*Deferred capabilities*
+*Out of scope*
 - Hiding fields from the assignee while keeping them pre-populated (hidden fields).
 
 > **Implementation status**
