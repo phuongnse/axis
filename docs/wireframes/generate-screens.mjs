@@ -12,7 +12,7 @@
  *   app-shell (root)
  *   platform-foundation: register-org, register-org-complete, register-org-complete-states,
  *        register-org-states, register-org-provider-states,
- *        email-confirmation, verify-email, verify-email-rate-limit, workspace-provisioning,
+ *        email-confirmation, verify-email, verify-email-states, workspace-provisioning,
  *        pricing, settings-org, settings-org-upload-states, settings-org-profile-states,
  *        settings-org-usage-error, settings-org-free-plan, settings-org-access-denied,
  *        settings-org-deletion-scheduled, settings-org-delete-modal, settings-org-delete-states
@@ -139,8 +139,8 @@ const SCREEN_USE_CASE_OVERRIDES = {
     'platform-foundation/register-org/email-confirmation-states.excalidraw',
   'platform-foundation/verify-email.excalidraw':
     'platform-foundation/register-org/verify-email.excalidraw',
-  'platform-foundation/verify-email-rate-limit.excalidraw':
-    'platform-foundation/register-org/verify-email-rate-limit.excalidraw',
+  'platform-foundation/verify-email-states.excalidraw':
+    'platform-foundation/register-org/verify-email-states.excalidraw',
   'platform-foundation/workspace-provisioning.excalidraw':
     'platform-foundation/register-org/workspace-provisioning.excalidraw',
   'platform-foundation/pricing.excalidraw':
@@ -779,99 +779,221 @@ function genEmailConfirmationStates() {
 }
 
 /**
- * Verify-Email — email verification (all 4 outcome states)
- * 2×2 grid of state cards: success, expired, already-used, invalid.
- * Each card: 440×176. Grid centred at W=1200.
+ * Measure verify-email outcome card height (brand bar + headline + body + optional CTA/footer).
+ */
+function measureVerifyEmailOutcomeCardH(body, { hasCta = false, accentLine = false } = {}) {
+  const headY = 68;
+  const bodyBlock = wrappedTextBlock('m', 0, 0, AUTH_INNER_W, body, 13, C.gray700, 0.78);
+  let cy = headY + AUTH_HEADLINE_H + AUTH_BODY_GAP + bodyBlock.blockH + 12;
+  if (accentLine) {
+    cy += 22;
+  }
+  if (hasCta) {
+    cy += 48;
+  }
+  return cy + AUTH_CARD_FOOTER_ZONE;
+}
+
+/**
+ * Paint verify-email outcome card (shared by happy path + error state panels).
+ * @param {{ variant: string, icon: string, title: string, body: string, cta?: { label: string, variant?: string, disabled?: boolean }, accentLine?: string, footer?: object }} opts
+ */
+function paintVerifyEmailOutcomeCard(els, opts, wireAcc) {
+  const {
+    prefix,
+    cardX,
+    cardY,
+    cardW,
+    cardH,
+    variant,
+    icon,
+    title,
+    body,
+    cta = null,
+    accentLine = null,
+    footer = null,
+  } = opts;
+
+  const brand = buildAuthCardBrandBar(prefix, cardX, cardY, cardW);
+  els.push(...brand.els);
+  wireAcc.files = mergeExcalidrawFiles(wireAcc.files, brand.files);
+
+  const ix = cardX + AUTH_CARD_PAD_X;
+  const headY = cardY + 68;
+  els.push(...stateHeadline(prefix, ix, headY, AUTH_INNER_W, icon, variant, title, 16));
+
+  let cy = headY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
+  const bodyBlock = wrappedTextBlock(`${prefix}_body`, ix, cy, AUTH_INNER_W, body, 13, C.gray700, 0.78);
+  els.push(...bodyBlock.els);
+  cy += bodyBlock.blockH + 12;
+
+  if (accentLine) {
+    els.push(text(`${prefix}_accent`, ix, cy, AUTH_INNER_W, 18, accentLine, 13, semanticVariantColor(variant === 'warning' ? 'warning' : 'info')));
+    cy += 22;
+  }
+
+  if (cta) {
+    const btnY = cy;
+    if (cta.disabled) {
+      els.push(rect(`${prefix}_cta`, ix, btnY, 220, 36, C.gray300, C.gray100, 1, true));
+      els.push(text(`${prefix}_cta_t`, ix, btnY + 10, 220, 16, cta.label, 13, C.gray300, 'center'));
+    } else {
+      els.push(...btn(`${prefix}_cta`, ix, btnY, cta.label, cta.variant ?? 'secondary'));
+    }
+    cy += 48;
+  }
+
+  if (footer) {
+    els.push(...buildAuthCardFooter(prefix, cardX, cardY, cardW, cardH, footer));
+  }
+}
+
+/**
+ * Verify-Email — happy path after POST /api/auth/verify-email succeeds (brief, then redirect).
  */
 function genVerifyEmail() {
-  const els   = [];
   const cardW = AUTH_CARD_W;
-  const cardH = 176;
-  const gapX  = 60;
-  const gapY  = 36;   // row gap; first 20px reserved for state label above card
-  const col1X = Math.round((W - (cardW * 2 + gapX)) / 2);  // 130
+  const wireAcc = { files: {} };
+  const body = 'Your account is ready. Signing you in…';
+  const cardH = measureVerifyEmailOutcomeCardH(body);
+  const cardX = Math.round((W - cardW) / 2);
+  const cardY = Math.round((H - cardH) / 2);
+  const screenH = authScreenCanvasHeight(cardY, cardH, H);
+  const els = [];
+
+  els.push(rect('ve_bg', 0, 0, W, screenH, C.gray300, C.gray100, 1, false));
+  els.push(rect('ve_card', cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
+  paintVerifyEmailOutcomeCard(els, {
+    prefix: 've',
+    cardX,
+    cardY,
+    cardW,
+    cardH,
+    variant: 'success',
+    icon: '✓',
+    title: 'Email verified!',
+    body,
+  }, wireAcc);
+
+  write('platform-foundation/verify-email.excalidraw', els, wireAcc.files);
+}
+
+/**
+ * Verify-Email — link-click error / edge states (reference board; runtime shows one card).
+ * 2×2: expired, already used, invalid, resend rate limit (429 from this page).
+ */
+function genVerifyEmailStates() {
+  const els = [];
+  const wireAcc = { files: {} };
+  const cardW = AUTH_CARD_W;
+  const gapX = 60;
+  const gapY = 36;
+  const col1X = Math.round((W - (cardW * 2 + gapX)) / 2);
   const col2X = col1X + cardW + gapX;
   const row1Y = 100;
-  const row2Y = row1Y + cardH + gapY;
-
-  els.push(rect('ve_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
-  els.push(text('ve_pg', 0, 48, W, 20, 'Email Verification — States', 13, C.gray500, 'center'));
-
-  const states = [
+  const panels = [
     {
-      id: 've_ok',   x: col1X, y: row1Y,
-      stateLbl: '✓  Success',       lblColor: C.success, variant: 'success', icon: '✓',
-      title: 'Email verified!',
-      body:  'Your account is ready. Signing you in…',
-      btnLabel: null, btnVariant: null,
-    },
-    {
-      id: 've_exp',  x: col2X, y: row1Y,
-      stateLbl: 'Expired link',     lblColor: C.warning, variant: 'warning', icon: '⏱',
+      id: 'ves_exp',
+      x: col1X,
+      y: row1Y,
+      stateLbl: 'Expired link',
+      lblColor: C.warning,
+      variant: 'warning',
+      icon: '⏱',
       title: 'Verification link expired',
-      body:  'This link was valid for 24 hours.',
-      btnLabel: 'Resend verification email', btnVariant: 'secondary',
+      body: 'This link was valid for 24 hours.',
+      cta: { label: 'Resend verification email', variant: 'secondary' },
     },
     {
-      id: 've_used', x: col1X, y: row2Y,
-      stateLbl: 'Already verified', lblColor: C.gray500, variant: 'neutral', icon: '✓',
+      id: 'ves_used',
+      x: col2X,
+      y: row1Y,
+      stateLbl: 'Already verified',
+      lblColor: C.gray500,
+      variant: 'neutral',
+      icon: '✓',
       title: 'Already verified',
-      body:  'This link has already been used. Please sign in.',
-      btnLabel: 'Sign in', btnVariant: 'ghost',
+      body: 'This link has already been used. Please sign in.',
+      cta: { label: 'Sign in', variant: 'ghost' },
     },
     {
-      id: 've_inv',  x: col2X, y: row2Y,
-      stateLbl: 'Invalid token',    lblColor: C.danger, variant: 'danger', icon: '✕',
+      id: 'ves_inv',
+      x: col1X,
+      stateLbl: 'Invalid token',
+      lblColor: C.danger,
+      variant: 'danger',
+      icon: '✕',
       title: 'Invalid verification link',
-      body:  'This link is invalid or has been tampered with.',
-      btnLabel: null, btnVariant: null,
+      body: 'This link is invalid or has been tampered with.',
+    },
+    {
+      id: 'ves_rl',
+      x: col2X,
+      stateLbl: 'Resend rate limit (429)',
+      lblColor: C.warning,
+      variant: 'warning',
+      icon: '⏳',
+      title: 'Please wait before requesting another email.',
+      body: 'You reached the resend limit (3 requests per hour).',
+      accentLine: 'Try again in 37 minutes.',
+      cta: { label: 'Resend verification email', disabled: true },
     },
   ];
 
-  states.forEach(({ id, x, y, stateLbl, lblColor, variant, icon, title, body, btnLabel, btnVariant }) => {
-    els.push(text(`${id}_lbl`,   x,      y - 20,  cardW,      16, stateLbl, 12, lblColor));
-    els.push(rect(`${id}_card`,  x,      y,       cardW,      cardH, C.gray300, C.white, 2, true));
-    els.push(text(`${id}_logo`,  x,      y + 12,  cardW,      18, '⬡  Axis', 12, C.primary, 'center'));
-    els.push(hline(`${id}_hdiv`, x, y + 34, cardW, C.gray300));
-    const ix = x + AUTH_CARD_PAD;
-    const innerW = cardW - AUTH_CARD_PAD * 2;
-    const headY = y + 38;
-    els.push(...stateHeadline(`${id}`, ix, headY, innerW, icon, variant, title, 14));
-    els.push(text(`${id}_body`, ix, headY + AUTH_HEADLINE_H + AUTH_BODY_GAP, innerW, 36, body, 12, C.gray700));
-    if (btnLabel) {
-      els.push(...btn(`${id}_cta`, ix, y + cardH - 40, btnLabel, btnVariant));
-    }
+  const row1CardH = Math.max(
+    measureVerifyEmailOutcomeCardH(panels[0].body, { hasCta: true }),
+    measureVerifyEmailOutcomeCardH(panels[1].body, { hasCta: true }),
+  );
+  const row2Y = row1Y + row1CardH + gapY;
+  panels[0].y = row1Y;
+  panels[1].y = row1Y;
+  panels[2].y = row2Y;
+  panels[3].y = row2Y;
+  const row2CardH = Math.max(
+    measureVerifyEmailOutcomeCardH(panels[2].body),
+    measureVerifyEmailOutcomeCardH(panels[3].body, { hasCta: true, accentLine: true }),
+  );
+  const canvasH = row2Y + row2CardH + 48;
+
+  els.push(rect('ves_bg', 0, 0, W, canvasH, C.gray300, C.gray100, 1, false));
+  els.push(text('ves_pg', 0, 48, W, 20, 'Verify email link — outcome states', 13, C.gray500, 'center'));
+
+  panels.forEach((panel) => {
+    const {
+      id,
+      x,
+      y,
+      stateLbl,
+      lblColor,
+      variant,
+      icon,
+      title,
+      body,
+      cta,
+      accentLine,
+    } = panel;
+    const cardH = measureVerifyEmailOutcomeCardH(body, {
+      hasCta: Boolean(cta),
+      accentLine: Boolean(accentLine),
+    });
+    els.push(text(`${id}_lbl`, x, y - 20, cardW, 16, stateLbl, 12, lblColor));
+    els.push(rect(`${id}_card`, x, y, cardW, cardH, C.gray300, C.white, 2, true));
+    paintVerifyEmailOutcomeCard(els, {
+      prefix: id,
+      cardX: x,
+      cardY: y,
+      cardW,
+      cardH,
+      variant,
+      icon,
+      title,
+      body,
+      cta,
+      accentLine,
+    }, wireAcc);
   });
 
-  write('platform-foundation/verify-email.excalidraw', els);
-}
-
-function genVerifyEmailRateLimit() {
-  const cardW = AUTH_CARD_W;
-  const cardH = 228;
-  const cardX = Math.round((W - cardW) / 2);
-  const cardY = Math.round((H - cardH) / 2);
-  const els = [];
-
-  els.push(rect('vrl_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
-  els.push(text('vrl_lbl', 0, 76, W, 18, 'Resend rate limit state', 12, C.warning, 'center'));
-  els.push(rect('vrl_card', cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
-  els.push(text('vrl_logo', cardX, cardY + 12, cardW, 18, '⬡  Axis', 12, C.primary, 'center'));
-  els.push(hline('vrl_hdiv', cardX, cardY + 34, cardW, C.gray300));
-
-  const vrlX = cardX + AUTH_CARD_PAD;
-  const vrlInnerW = cardW - AUTH_CARD_PAD * 2;
-  const vrlHeadY = cardY + 38;
-  els.push(...stateHeadline('vrl', vrlX, vrlHeadY, vrlInnerW, '⏳', 'warning', 'Please wait before requesting another email.', 14));
-  const vrlBodyY = vrlHeadY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
-  els.push(text('vrl_body', vrlX, vrlBodyY, vrlInnerW, 32, 'You reached the resend limit (3 requests per hour).', 12, C.gray700));
-  els.push(text('vrl_cnt', vrlX, vrlBodyY + 34, vrlInnerW, 18, 'Try again in 37 minutes.', 13, semanticVariantColor('warning')));
-
-  els.push(rect('vrl_btn', cardX + AUTH_CARD_PAD, cardY + cardH - 40, 220, 36, C.gray300, C.gray100, 1, true));
-  els.push(text('vrl_btn_t', cardX + AUTH_CARD_PAD, cardY + cardH - 30, 220, 16, 'Resend verification email', 13, C.gray300, 'center'));
-  els.push(text('vrl_hint', cardX + 252, cardY + cardH - 26, 168, 16, 'Button disabled until timer ends', 10, C.gray500, 'center'));
-
-  write('platform-foundation/verify-email-rate-limit.excalidraw', els);
+  write('platform-foundation/verify-email-states.excalidraw', els, wireAcc.files);
 }
 
 /**
@@ -2057,7 +2179,7 @@ runScreen('platform-foundation/register-org-provider-states', genRegisterOrgProv
 runScreen('platform-foundation/email-confirmation', genEmailConfirmation);
 runScreen('platform-foundation/email-confirmation-states', genEmailConfirmationStates);
 runScreen('platform-foundation/verify-email', genVerifyEmail);
-runScreen('platform-foundation/verify-email-rate-limit', genVerifyEmailRateLimit);
+runScreen('platform-foundation/verify-email-states', genVerifyEmailStates);
 runScreen('platform-foundation/workspace-provisioning', genWorkspaceProvisioning);
 runScreen('platform-foundation/pricing', genPricing);
 runScreen('platform-foundation/settings-org', genSettingsOrg);

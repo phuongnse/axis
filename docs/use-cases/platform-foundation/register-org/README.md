@@ -68,7 +68,7 @@ Self-service registration flow where a new organization signs up and is automati
 - [ ] Verification link is valid for 24 hours; an expired link shows a clear message with a **Resend verification email** button.
 - [ ] An already-used link shows "This link has already been used. Please sign in."
 - [ ] A tampered or invalid token shows "Invalid verification link."
-- [ ] Resend is rate-limited: max 3 requests per email per hour; further attempts show "Please wait before requesting another email" (see `verify-email-rate-limit` wireframe).
+- [ ] Resend is rate-limited: max 3 requests per email per hour; further attempts show "Please wait before requesting another email" (see `verify-email-states` — rate limit panel; same 429 pattern as `email-confirmation-states`).
 - [ ] If the user tries to sign in before verifying, they see "Please verify your email first" with a resend option ([sign-in](../../identity-access/sign-in/) owns the login-page AC; backend returns the same message).
 - [ ] The verification link works from any browser or device.
 
@@ -117,7 +117,7 @@ Canonical order for this use case. **The wireframes table below uses the same ro
 | 2a | `register-org-complete` | **SSO only** — after OAuth; collect org name, slug, Terms (email read-only) |
 | 2b | `register-org` *(same screen as step 1)* | **Email/password** — submit on the entry form (skips 2a; no extra wireframe) |
 | 3 | `email-confirmation` | After org create succeeds (either branch) |
-| 4 | `verify-email` | User opens the link from the inbox (success, expired, used, invalid — 2×2 state board) |
+| 4 | `verify-email` | User opens the inbox link — **one** centered card (success, then redirect to step 5) |
 | 5 | `workspace-provisioning` | After successful verify — poll until tenant ready, then workspace / dashboard |
 
 Step **2b** is a path, not a separate UI file — only **2a** adds `register-org-complete.excalidraw`. The wireframes table lists files; step **2b** is called out on the `register-org` row below.
@@ -130,7 +130,7 @@ Step **2b** is a path, not a separate UI file — only **2a** adds `register-org
 | `register-org-states` | Validation or 5xx on the entry form |
 | `register-org-complete-states` | Validation or Terms not accepted on completion form |
 | `email-confirmation-states` | Resend from confirmation screen: in-flight, success (204), rate limit (429) |
-| `verify-email-rate-limit` | Resend cap (3/hour) from verify landing or shared resend flows |
+| `verify-email-states` | Link-click errors: expired, already used, invalid, resend cap (429) — reference board (runtime shows one card) |
 
 ```mermaid
 %%{init: {'theme':'dark','themeVariables':{'background':'#0d1117','mainBkg':'#0d1117','primaryColor':'#161b22','primaryBorderColor':'#388bfd','primaryTextColor':'#e6edf3','secondaryColor':'#21262d','secondaryBorderColor':'#388bfd','secondaryTextColor':'#e6edf3','tertiaryColor':'#161b22','tertiaryTextColor':'#e6edf3','lineColor':'#58a6ff','textColor':'#e6edf3','nodeBorder':'#388bfd','clusterBkg':'#161b22','clusterBorder':'#388bfd','titleColor':'#e6edf3','edgeLabelBackground':'#161b22','actorBkg':'#161b22','actorBorder':'#388bfd','actorTextColor':'#e6edf3','signalColor':'#58a6ff','labelBoxBkgColor':'#161b22','labelBoxBorderColor':'#388bfd','noteBkgColor':'#161b22','noteBorderColor':'#388bfd','noteTextColor':'#c9d1d9','activationBkgColor':'#30363d'}}}%%
@@ -143,7 +143,7 @@ flowchart TD
   errComplete["register-org-complete-states"]
   errProvider["register-org-provider-states"]
   errResend["email-confirmation-states"]
-  errVerifyRl["verify-email-rate-limit"]
+  errVerify["verify-email-states"]
 
   entry -->|"2b · submit (email/password)"| confirm
   entry -->|SSO| complete
@@ -154,7 +154,7 @@ flowchart TD
   complete -.-> errComplete
   entry -.->|SSO error| errProvider
   confirm -.->|Resend email| errResend
-  verify -.->|Resend cap| errVerifyRl
+  verify -.->|Expired / invalid / 429| errVerify
 ```
 
 ## Legal links & footer links (UX)
@@ -175,17 +175,17 @@ Record **accepted ToS/Privacy version** on the account at org create (AC above);
 
 ## Wireframes
 
-Ten screens in this folder (five happy-path / journey steps, five state boards). Table order follows [Screen flow](#screen-flow). Under [Diagrams](#diagrams): journey (`register-org-journey`), dev checklist (`register-org-cases`), async provisioning (`tenant-provisioning`).
+Ten screens in this folder (five happy-path journey steps, five `*-states` reference boards). Table order follows [Screen flow](#screen-flow). **Runtime:** steps 1–5 each show **one** UI; `*-states` files are multi-panel specs for implementers (same pattern as `email-confirmation` + `email-confirmation-states`). Diagrams: [`register-org-journey`](#register-org-journey), [`register-org-cases`](#register-org-cases), [`tenant-provisioning`](#tenant-provisioning).
 
 | # | Screen | Role | Excalidraw | Preview |
 |---|--------|------|------------|---------|
 | 1 · 2b | register-org | Happy path — entry (1); email/password submit (2b) | [source](./register-org.excalidraw) | [preview](./register-org.svg) |
 | 2a | register-org-complete | Happy path — post-OAuth completion | [source](./register-org-complete.excalidraw) | [preview](./register-org-complete.svg) |
 | 3 | email-confirmation | Happy path — after create (resend link idle) | [source](./email-confirmation.excalidraw) | [preview](./email-confirmation.svg) |
-| 4 | verify-email | Happy path / outcomes — link click (2×2 grid) | [source](./verify-email.excalidraw) | [preview](./verify-email.svg) |
+| 4 | verify-email | Happy path — link verified, signing in | [source](./verify-email.excalidraw) | [preview](./verify-email.svg) |
 | 5 | workspace-provisioning | Happy path — poll provisioning status | [source](./workspace-provisioning.excalidraw) | [preview](./workspace-provisioning.svg) |
 | — | email-confirmation-states | Resend from step 3 — in-flight, 204, 429 | [source](./email-confirmation-states.excalidraw) | [preview](./email-confirmation-states.svg) |
-| — | verify-email-rate-limit | Resend cap — 3/hour | [source](./verify-email-rate-limit.excalidraw) | [preview](./verify-email-rate-limit.svg) |
+| — | verify-email-states | Step 4 errors — expired, used, invalid, 429 | [source](./verify-email-states.excalidraw) | [preview](./verify-email-states.svg) |
 | — | register-org-provider-states | Error — SSO before completion | [source](./register-org-provider-states.excalidraw) | [preview](./register-org-provider-states.svg) |
 | — | register-org-states | Error — entry form validation / 5xx | [source](./register-org-states.excalidraw) | [preview](./register-org-states.svg) |
 | — | register-org-complete-states | Error — completion form validation / Terms | [source](./register-org-complete-states.excalidraw) | [preview](./register-org-complete-states.svg) |
@@ -355,7 +355,7 @@ sequenceDiagram
     API-->>Web: Already used → Sign in
     API-->>Web: Invalid / tampered → verify-email invalid panel
     Web->>API: POST /api/auth/resend-verification (from landing)
-    API-->>Web: 429 → verify-email-rate-limit
+    API-->>Web: 429 → verify-email-states (rate limit panel)
   end
 ```
 
