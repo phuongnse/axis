@@ -499,7 +499,7 @@ function genRegisterOrgProviderStates() {
   const els = [];
   let wireFiles = {};
   const panelW = 520;
-  const panelH = 300;
+  const panelH = 272;
   const gap = 40;
   const startX = Math.round((W - (panelW * 2 + gap)) / 2);
   const cardY = 72;
@@ -512,19 +512,23 @@ function genRegisterOrgProviderStates() {
       id: 'dup',
       x: startX,
       lbl: 'Provider email already registered',
-      msg: 'An account with this email already exists. Sign in instead.',
       variant: 'warning',
+      bodySegments: [
+        { text: 'An account with this email already exists. ', color: C.gray700 },
+        { text: 'Sign in instead', color: C.primary, link: true },
+        { text: ' →', color: C.primary, link: true },
+      ],
     },
     {
       id: 'noemail',
       x: startX + panelW + gap,
       lbl: 'Provider returned no verified email',
-      msg: 'Your GitHub account has no verified email; use email and password instead.',
       variant: 'danger',
+      bodyText: 'Your GitHub account has no verified email; use email and password instead.',
     },
   ];
 
-  panels.forEach(({ id, x, lbl, msg, variant }) => {
+  panels.forEach(({ id, x, lbl, variant, bodySegments, bodyText }) => {
     const icon = variant === 'warning' ? '⚠' : '✕';
     const prefix = `rops_${id}`;
     els.push(text(`${prefix}_lbl`, x, 48, panelW, 16, lbl, 12, C.danger));
@@ -537,8 +541,12 @@ function genRegisterOrgProviderStates() {
     const headY = cardY + 76;
     els.push(...stateHeadline(prefix, ix, headY, innerW, icon, variant, 'Registration could not continue', 14));
     const bodyY = headY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
-    els.push(text(`${prefix}_body`, ix, bodyY, innerW, 36, msg, 13, C.gray700));
-    els.push(text(`${prefix}_link`, ix, bodyY + 48, innerW, 16, 'Back to registration →', 12, C.primary, 'center'));
+    if (bodySegments) {
+      els.push(...buildAuthCardInlineRow(prefix, x, panelW, bodyY, bodySegments));
+    } else {
+      els.push(...wrappedTextBlock(`${prefix}_body`, ix, bodyY, innerW, bodyText, 13, C.gray700, 0.78).els);
+    }
+    els.push(...buildAuthCardBackFooter(prefix, x, cardY, panelW, panelH, 'Back to registration'));
   });
 
   write('platform-foundation/register-org-provider-states.excalidraw', els, wireFiles);
