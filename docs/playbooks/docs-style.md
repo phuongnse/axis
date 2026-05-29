@@ -183,7 +183,7 @@ Avoid writing engineering process constraints as end-user use cases. Keep those 
 ## When you add a new `.md` file
 
 1. Add the back-link header (per [`docs/README.md`](../README.md)): `> **Navigation**: [← parent.md](...)` so future readers can climb back up.
-2. Add a row to the relevant table in `docs/README.md` (playbooks / diagrams / wireframes).
+2. If it belongs in the docs hub: add a playbook row, a [Key Diagrams](../README.md#key-diagrams) index link, or a [Wireframes](../README.md#wireframes) domain pointer — **not** a per-screen wireframe file row (those stay in the owning use-case `## Wireframes` only).
 3. If it owns a topic, add it to the **Single source of truth** table.
 4. If the topic could be enforced mechanically, add a rule to `scripts/check-doc-drift.sh` — that is what makes the convention survive.
 

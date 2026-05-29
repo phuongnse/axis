@@ -167,16 +167,22 @@ flowchart TB
 
 ## Wireframes
 
-Excalidraw wireframes live alongside each use case in `docs/use-cases/{domain}/{short-slug}/`. Shared app shell only: `docs/wireframes/app-shell`. Kit source is `.mjs` (`blocks.mjs`, `generate-template.mjs`). Each use case uses `## Wireframes` (Excalidraw) and `## Diagrams` (Mermaid in README) — see [use-case template](./use-cases/USE_CASE_TEMPLATE.md).
+**UI screens** are Excalidraw (`.excalidraw` + `.svg` preview), not Mermaid. The **full list** for each feature lives only in that use case’s `README.md` under `## Wireframes` — do not treat this hub as a complete file catalog.
 
-| Screen | Source | Preview |
-|---|---|---|
-| Register organization | [register-org.excalidraw](./use-cases/platform-foundation/register-org/register-org.excalidraw) | [register-org.svg](./use-cases/platform-foundation/register-org/register-org.svg) |
-| Verify email | [verify-email.excalidraw](./use-cases/platform-foundation/verify-email/verify-email.excalidraw) | [verify-email.svg](./use-cases/platform-foundation/verify-email/verify-email.svg) |
-| Pricing | [pricing.excalidraw](./use-cases/platform-foundation/view-plans/pricing.excalidraw) | [pricing.svg](./use-cases/platform-foundation/view-plans/pricing.svg) |
-| Change password | [change-password.excalidraw](./use-cases/identity-access/change-password/change-password.excalidraw) | [change-password.svg](./use-cases/identity-access/change-password/change-password.svg) |
-| Reset password | [forgot-password.excalidraw](./use-cases/identity-access/reset-password/forgot-password.excalidraw) | [forgot-password.svg](./use-cases/identity-access/reset-password/forgot-password.svg) |
-| Accept invitation | [accept-invitation.excalidraw](./use-cases/identity-access/accept-invite/accept-invitation.excalidraw) | [accept-invitation.svg](./use-cases/identity-access/accept-invite/accept-invitation.svg) |
+| What | Where |
+|------|--------|
+| Browse by domain | [use-cases](./use-cases/README.md) → domain `README.md` → use-case `README.md` → `## Wireframes` |
+| Shared app shell | [wireframes/app-shell](./wireframes/app-shell.excalidraw) (kit under [wireframes/](./wireframes/), generators in [wireframes.md](./playbooks/wireframes.md)) |
+| Use-case layout rules | [USE_CASE_TEMPLATE](./use-cases/USE_CASE_TEMPLATE.md) · [docs-style § Wireframes](./playbooks/docs-style.md#wireframes-content-rules) |
+
+**Good starting points** (examples of the full table + screen-flow pattern — not an exhaustive list):
+
+| Use case | Why open this |
+|----------|----------------|
+| [register-org § Wireframes](./use-cases/platform-foundation/register-org/README.md#wireframes) | Multi-screen happy path, error `*-states`, links to Mermaid diagrams |
+| [verify-email § Wireframes](./use-cases/platform-foundation/verify-email/README.md#wireframes) | Smaller flow with a related error/rate-limit screen |
+
+Regenerate screen `.svg` after `.excalidraw` changes: `node docs/wireframes/generate-screens.mjs` and Kroki (see [wireframes.md](./playbooks/wireframes.md)).
 
 ---
 
@@ -195,3 +201,4 @@ When two docs disagree, the **owner** wins. Update the owner first; everything e
 | Daily agent workflow + gates | [playbooks/agent-checklist.md](./playbooks/agent-checklist.md) |
 | Local dev (compose, ports, URLs) | [playbooks/local-dev.md](./playbooks/local-dev.md) + [`docker-compose.yml`](../docker-compose.yml) |
 | Implementation patterns and pitfalls | [playbooks/patterns.md](./playbooks/patterns.md) (start at [patterns-index.md](./playbooks/patterns-index.md)) |
+| UI wireframes (per screen / use case) | `docs/use-cases/{domain}/{use-case}/README.md` → `## Wireframes` ([hub § Wireframes](./README.md#wireframes) for navigation only) |
