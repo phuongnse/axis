@@ -32,21 +32,7 @@ STALE_MARKERS = [
     ("EnsureCreated", "Identity bootstrap uses MigrateAsync — remove EnsureCreated references"),
 ]
 
-REQUIRED_SERVICE_NAMES = [
-    "postgres",
-    "redis",
-    "maildev",
-    "localstack",
-    "kafka",
-    "schema-registry",
-    "rabbitmq",
-    "vault",
-    "api",
-    "web",
-]
-
-
-def parse_compose() -> tuple[dict[str, list[int]], set[str]]:
+def parse_compose() -> tuple[dict[str, list[int]], set[str], list[str]]:
     text = COMPOSE_FILE.read_text(encoding="utf-8")
     services: dict[str, list[int]] = {}
     optional_services: set[str] = set()
@@ -65,7 +51,8 @@ def parse_compose() -> tuple[dict[str, list[int]], set[str]]:
         if ports:
             services[name] = ports
 
-    return services, optional_services
+    service_names = sorted(services.keys())
+    return services, optional_services, service_names
 
 
 def mandatory_host_ports(services: dict[str, list[int]], optional: set[str]) -> set[int]:
@@ -88,7 +75,7 @@ def check_local_dev_doc() -> list[str]:
         errors.append(f"Missing {LOCAL_DEV_FILE.relative_to(ROOT)}")
         return errors
 
-    services, optional = parse_compose()
+    services, optional, service_names = parse_compose()
     doc = LOCAL_DEV_FILE.read_text(encoding="utf-8")
 
     doc_lower = doc.lower()
@@ -100,7 +87,7 @@ def check_local_dev_doc() -> list[str]:
                 f"(published by docker-compose.yml)"
             )
 
-    for service_name in REQUIRED_SERVICE_NAMES:
+    for service_name in service_names:
         if service_name not in doc_lower:
             errors.append(
                 f"local-dev.md missing service name '{service_name}' "

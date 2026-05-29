@@ -99,7 +99,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 **CI-only gates** (run automatically on PR, no local action required):
 
-- **Doc drift** — enforces same-PR docs, new-handler tests, no-new TODO/FIXME, new raw-SQL review, [WORKAROUND comment ↔ inventory sync](../WORKAROUNDS.md), [speculation guard](./docs-style.md#anti-patterns-dont-ship-these), `GetAwaiter().GetResult()` ban, hardcoded connection-string ban, `DateTime.Now` ban (use `UtcNow`), and a stale-terminology guard (current pattern list lives in [`scripts/check-doc-drift.sh`](../../scripts/check-doc-drift.sh) — search for `STALE_TERM_PATTERN`).
+- **Doc drift** — enforces same-PR docs, new-handler tests, no-new TODO/FIXME, new raw-SQL review, [WORKAROUND comment ↔ inventory sync](../WORKAROUNDS.md), [speculation guard](./docs-style.md#anti-patterns-dont-ship-these), `GetAwaiter().GetResult()` ban, hardcoded connection-string ban, `DateTime.Now` ban (use `UtcNow`), and a stale-terminology guard (current pattern list lives in [`scripts/check-doc-drift.sh`](../../scripts/check-doc-drift.sh) — search for `STALE_TERM_PATTERN`). **Module/API → use-case domain** — [`doc_drift_domains.py`](../../scripts/doc_drift_domains.py) + [`axis_repo.py`](../../scripts/axis_repo.py). **Layout drift** in the same job: [`sync_buf_yaml.py --check`](../../scripts/sync_buf_yaml.py), [`check_kafka_wiring.py`](../../scripts/check_kafka_wiring.py), [`regenerate-domain-readme-index.py --check`](../../scripts/regenerate-domain-readme-index.py).
 - **Markdown link check** — `lychee` verifies internal links and `#anchors`. **Relative file/image targets** (`![alt](./asset.svg)`, `[text](./file.md)`) are double-checked by [`scripts/check-doc-link-targets.py`](../../scripts/check-doc-link-targets.py) inside the drift script — catches the broken-image class lychee misses.
 - **Code-fence integrity** — [`scripts/check-doc-code-fences.py`](../../scripts/check-doc-code-fences.py) (inside the drift script) flags code-block lines with collapsed indentation (a lone leading space). Catches the bulk-find-replace corruption class that lychee, prettier, and the structural checks all let through.
 - **Use-case docs** — [`scripts/check-use-case-docs.py`](../../scripts/check-use-case-docs.py) validates use-case file structure (required sections + tables + status callout), flags template placeholders (`_(One sentence...)_`, `_(Actor)_`, `_(What starts...)_`), flags self-links `[name](./README.md)` and truncated summary rows in domain READMEs, and counts use cases still on the stock Main flow.
@@ -158,6 +158,7 @@ Gate 2:
 - Library rename → grep docs/ + src comments / not triggered
 - Deferred follow-up → `**Deferred (PR #N follow-up):**` on affected US + PROGRESS if cross-cutting / not triggered
 - Host wiring (`*Endpoints.cs` / `Program.cs`) → `Map*Endpoints` sweep in process.md / not triggered
+- Repo layout (module, event, proto, domain README) → [repo-layout-discovery.md](./repo-layout-discovery.md) checklists A–E / not triggered
 ```
 
 **Deferred follow-ups (mandatory when leaving work open):** do not wait for the user. Any skipped review item, thin-endpoint refactor, or partial layer needs a named `**Deferred (...):**` line — full rules in [process.md § Deferred follow-up](process.md). Remove the line when fixed.
@@ -236,14 +237,14 @@ Updating only `PROGRESS.md` while changing `src/` without `docs/use-cases/` → 
 
 ## Domain map (code → docs)
 
-| Code touch | Docs folder |
-|------------|-------------|
-| `Endpoints/Execution*`, WorkflowEngine module | `docs/use-cases/workflow-engine/` |
-| `Endpoints/Form*`, FormBuilder | `docs/use-cases/form-builder/` |
-| `Endpoints/Workflow*`, WorkflowBuilder | `docs/use-cases/workflow-builder/` |
-| `Endpoints/Model*`, DataModeling | `docs/use-cases/data-modeling/` |
-| Identity, `Connect*`, auth UI | `docs/use-cases/identity-access/` |
-| `TenantSchema*`, org registration | `docs/use-cases/platform-foundation/` |
+**Full rules + agent checklists:** [repo-layout-discovery.md](./repo-layout-discovery.md) (auto vs manual tables, commands, checklists A–E).
+
+**Summary:** [`doc_drift_domains.py`](../../scripts/doc_drift_domains.py) maps `src/Modules/*` and `*Endpoints.cs` → `docs/use-cases/{slug}/`. New module → create domain folder (or `MODULE_DOMAIN_SLUG_OVERRIDES` in [`axis_repo.py`](../../scripts/axis_repo.py) for `Identity` → `identity-access`). Cross-cutting only in `EXTRA_CODE_TO_DOC_RULES`.
+
+| Manual exception | Docs folder |
+|------------------|-------------|
+| `OrganizationVerifiedHandler` in any module | `docs/use-cases/platform-foundation/` |
+| `frontend/src/features/auth`, `routes/`, `AppShell` | `docs/use-cases/identity-access/` |
 
 ---
 
@@ -252,6 +253,7 @@ Updating only `PROGRESS.md` while changing `src/` without `docs/use-cases/` → 
 | Need | File |
 |------|------|
 | Layer order, TDD, gap sweep, deferred docs, PR wrap-up | [process.md](./process.md) |
+| New module / event / proto / domain README — what to update & how CI checks | [repo-layout-discovery.md](./repo-layout-discovery.md) |
 | Find the right patterns section | [patterns-index.md](./patterns-index.md) |
 | EF, API, Wolverine, tenancy | [patterns.md](./patterns.md) |
 | React, Query, a11y | [frontend.md](./frontend.md) |

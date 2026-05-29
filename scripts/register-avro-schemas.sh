@@ -23,7 +23,6 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SCHEMA_REGISTRY_URL="${SCHEMA_REGISTRY_URL:-http://localhost:8081}"
 DRY_RUN="${DRY_RUN:-}"
 
-# FormTaskSubmitted -> form-task-submitted
 camel_to_kebab() {
   sed -E 's/([a-z0-9])([A-Z])/\1-\2/g' <<<"$1" | tr '[:upper:]' '[:lower:]'
 }
@@ -46,7 +45,7 @@ count=0
 while IFS= read -r file; do
   # Path: src/Modules/<Module>/Axis.<Module>.Contracts/Schemas/<Name>Event.avsc
   module="$(sed -E 's#.*/src/Modules/([^/]+)/.*#\1#' <<<"$file" | tr '[:upper:]' '[:lower:]')"
-  name="$(basename "$file" .avsc)"          # FormTaskSubmittedEvent
+  name="$(basename "$file" .avsc)"
   topic="axis.${module}.$(camel_to_kebab "${name%Event}")"
   register "$file" "${topic}-value"
   count=$((count + 1))

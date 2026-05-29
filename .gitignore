@@ -45,3 +45,4 @@ nCrunchTemp_*.csproj
 .DS_Store
 Thumbs.db
 .aider*
+__pycache__/
