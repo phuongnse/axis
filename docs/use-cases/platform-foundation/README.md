@@ -26,7 +26,7 @@ Without this foundation, nothing else works. Every feature in every other domain
 |---|---|
 | [Select a subscription plan during registration](plan-at-signup/) | Choose a subscription plan during registration so that I know what features and limits I have access to. |
 | [Automatic tenant provisioning](provision-tenant/) | My organization's environment to be ready immediately after email verification so that I can start using the platform… |
-| [Register a new organization](register-org/) | Register my organization on the Axis platform so that I can start building workflows for my team. |
+| [Register a new organization](register-org/) | Register my organization on the Axis platform — with email/password or a Microsoft, Google, or GitHub account — so that… |
 | [Verify email and activate account](verify-email/) | Verify my email address so that my account is activated and I can access the platform. |
 
 ### Subscription plans

@@ -27,7 +27,7 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 | [Change password while signed in](change-password/) | Change my password while signed in so that I can keep my account secure. |
 | [Reset forgotten password](reset-password/) | Reset my password via email so that I can regain access to my account if I forget it. |
 | [View and revoke active sessions](sessions/) | See where I'm currently signed in so that I can revoke access from devices I no longer use. |
-| [Sign in with email and password](sign-in/) | Sign in with my email and password so that I can access my organization's workspace. |
+| [Sign in to the workspace](sign-in/) | Sign in with my email and password — or with Microsoft, Google, or GitHub — so that I can access my organization's… |
 | [Sign out](sign-out/) | Sign out so that my session is terminated and no one else can use my account from this device. |
 | [Silent token refresh](token-refresh/) | My session to stay active while I'm working so that I'm not interrupted by unexpected sign-out prompts. |
 
@@ -55,8 +55,8 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 
 | Use case | Summary |
 |---|---|
-| [Switch application language (English / Vietnamese)](language/) | Switch application language (English / Vietnamese) |
-| [Switch visual theme (light / dark / system)](theme/) | Switch visual theme (light / dark / system) |
+| [Switch application language (English / Vietnamese)](language/) | Switch the application language between English and Vietnamese so that I can read and operate the app in my preferred… |
+| [Switch visual theme (light / dark / system)](theme/) | Switch the visual theme between light, dark, and system so that I can choose a comfortable theme and preserve readable… |
 
 
 
