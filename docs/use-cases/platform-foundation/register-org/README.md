@@ -133,7 +133,7 @@ Documented for wireframes and future frontend; **not implemented** in the app ye
 | **Terms of Service** / **Privacy Policy** | Primary inline links with **underline** in the agree sentence | Open the legal document in a **new browser tab** (public URLs TBD, e.g. `/legal/terms`, `/legal/privacy`). Does not submit the form or clear fields. |
 | Card footer (e.g. **Sign in**) | `buildAuthCardFooter` — gray lead-in + underlined **primary link** | Navigates to the target auth route (e.g. sign-in page). Same link styling as Terms/Privacy. |
 | **Resend email** (`email-confirmation`) | `buildAuthCardCenteredInlineRow` — gray lead + underlined **Resend email →** | `POST /api/auth/resend-verification` with email from registration context. Stay on screen; see `email-confirmation-states` for UI feedback. |
-| **Back** (`email-confirmation`) | `buildAuthCardBackFooter` — chevron icon + **Back to sign in** (centered control) | Returns to sign-in. |
+| **Go to sign in** (`email-confirmation`) | `buildAuthCardFooter` — **Already verified?** + underlined **Go to sign in** + forward arrow on the **right** (`forwardArrow: true`) | Navigates to sign-in (user came from registration, not “back”). |
 
 **Resend UI (wireframe):** idle on `email-confirmation`; after click → **Sending…** (link disabled) → **204** success banner + disabled resend, or **429** warning banner (same copy rhythm as `verify-email-rate-limit`). API always returns **204** when under cap, even if email unknown (no leakage).
 

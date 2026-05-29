@@ -571,7 +571,7 @@ function paintEmailConfirmationCard(els, opts, wireAcc) {
   const ecHeadY = cardY + 68;
   els.push(...stateHeadline(prefix, ecX, ecHeadY, ecInnerW, '✉', 'info', 'Check your email', 16));
 
-  let cy = cardY + ecHeadY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
+  let cy = ecHeadY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
   const body1 = wrappedTextBlock(`${prefix}_body1`, ecX, cy, ecInnerW, EMAIL_CONFIRMATION_BODY, 13, C.gray700, 0.78);
   els.push(...body1.els);
   cy += body1.blockH + 8;
@@ -604,7 +604,11 @@ function paintEmailConfirmationCard(els, opts, wireAcc) {
           { text: 'Resend email →', color: C.primary, link: true },
         ];
   els.push(...buildAuthCardCenteredInlineRow(`${prefix}_resend`, cardX, cardW, cy, resendSegments));
-  els.push(...buildAuthCardBackFooter(prefix, cardX, cardY, cardW, cardH, 'Back to sign in'));
+  els.push(...buildAuthCardFooter(prefix, cardX, cardY, cardW, cardH, {
+    lead: 'Already verified?',
+    link: 'Go to sign in',
+    forwardArrow: true,
+  }));
 }
 
 function measureEmailConfirmationCardH(noticeBlockH = 0, hasNotice = false) {

@@ -153,26 +153,31 @@ export function buildAuthCardHeader(prefix, cardX, cardY, cardW, title, subtitle
 
 /**
  * Auth card footer: gray lead-in + primary link (centered), or whole line as link.
- * @param {string | { lead?: string, link: string }} footer
+ * @param {string | { lead?: string, link: string, forwardArrow?: boolean }} footer
+ *   `forwardArrow` — draw a forward chevron to the right of the link (not a back arrow).
  */
 export function buildAuthCardFooter(prefix, cardX, cardY, cardW, cardH, footer) {
   const footerY = cardY + cardH - 32;
   const lineY = footerY + 10;
   const lineH = 16;
   const fontSize = 12;
+  const forwardArrow = typeof footer === 'object' && footer.forwardArrow === true;
   const segments = typeof footer === 'string'
     ? [{ text: footer, color: C.primary, link: true }]
     : [
         ...(footer.lead ? [{ text: footer.lead, color: C.gray700 }] : []),
         { text: footer.link, color: C.primary, link: true },
       ];
-  const totalW = inlineTextRowWidth(segments, fontSize);
+  const textW = inlineTextRowWidth(segments, fontSize);
+  const arrowSlot = forwardArrow ? 12 : 0;
+  const totalW = textW + arrowSlot;
   const startX = cardX + Math.round((cardW - totalW) / 2);
   const { els: rowEls } = inlineTextRow(`${prefix}_footer`, startX, lineY, lineH, fontSize, segments);
-  return [
-    hline(`${prefix}_fdiv`, cardX, footerY, cardW, C.gray300),
-    ...rowEls,
-  ];
+  const row = [hline(`${prefix}_fdiv`, cardX, footerY, cardW, C.gray300), ...rowEls];
+  if (forwardArrow) {
+    row.push(arrow(`${prefix}_fwd`, startX + textW + 2, lineY + 5, 8, 0, C.primary, 1.5));
+  }
+  return row;
 }
 
 /** Centered inline row inside auth card (e.g. resend link with gray lead-in). */
