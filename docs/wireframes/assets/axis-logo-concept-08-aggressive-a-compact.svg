@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 160" fill="none" role="img" aria-label="Axis concept: stylized A compact">
+  <title>Axis - aggressive A compact</title>
+  <defs>
+    <linearGradient id="a8c-fill" x1="18" y1="18" x2="122" y2="152" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#BE2548" />
+      <stop offset="1" stop-color="#861428" />
+    </linearGradient>
+  </defs>
+  <g fill="url(#a8c-fill)" stroke="#6E1022" stroke-linejoin="round" stroke-width="3">
+    <path
+      d="M 64 38 L 112 24 L 100 150 L 72 148 L 80 84 L 70 74 L 88 58 L 86 62 L 78 78 Z"
+    />
+    <path d="M 22 150 L 42 28 L 58 34 L 45 90 L 34 92 Z" />
+    <path d="M 26 102 L 32 150 L 50 146 L 41 104 Z" />
+    <path d="M 4 94 C 12 86 24 84 36 86 L 54 80 L 118 36 L 126 40 L 78 68 L 22 86 L 8 90 Z" />
+  </g>
+  <path stroke="#FFFFFF" stroke-linecap="square" stroke-width="4" d="M 28 100 L 52 38" />
+</svg>

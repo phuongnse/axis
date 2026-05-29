@@ -15,6 +15,8 @@ Open files in the IDE preview or drop into Figma. **Canonical product mark:** [`
 | [`axis-logo-concept-05-facet-hex.svg`](axis-logo-concept-05-facet-hex.svg) | Three-color hex facets + cross |
 | [`axis-logo-concept-06-brackets.svg`](axis-logo-concept-06-brackets.svg) | `{ · · · }` low-code blocks |
 | [`axis-logo-concept-07-saga.svg`](axis-logo-concept-07-saga.svg) | Staggered steps + flow arrows |
+| [`axis-logo-concept-08-aggressive-a.svg`](axis-logo-concept-08-aggressive-a.svg) | **Stylized A** (maroon, white rim, lightning bar) — user reference |
+| [`axis-logo-concept-08-aggressive-a-compact.svg`](axis-logo-concept-08-aggressive-a-compact.svg) | Same A, fewer layers (small preview) |
 | [`axis-logo-mark-orbit-legacy.svg`](axis-logo-mark-orbit-legacy.svg) | Earlier alt (orbit), mark-only |
 | [`axis-logo-mark-facet-legacy.svg`](axis-logo-mark-facet-legacy.svg) | Earlier alt (facet), mark-only |
 | [`axis-logo-alt-orbit.svg`](axis-logo-alt-orbit.svg) | Legacy export with wordmark (128×36) |
