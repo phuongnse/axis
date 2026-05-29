@@ -21,15 +21,10 @@ export function AuthCard({ title, children, footer, banner }: AuthCardProps) {
       >
         <div className="px-6 pt-5 pb-4 border-b border-border">
           <div className="flex items-center justify-center gap-1.5">
-            <img
-              src={axisLogo}
-              alt=""
-              aria-hidden
-              className="h-9 w-9 shrink-0"
-              width={36}
-              height={36}
-            />
-            <span className="text-lg font-semibold tracking-tight text-foreground">Axis</span>
+            <img src={axisLogo} alt="Axis" className="h-9 w-9 shrink-0" width={36} height={36} />
+            <span aria-hidden className="text-lg font-semibold tracking-tight text-foreground">
+              Axis
+            </span>
           </div>
         </div>
         <div className="px-6 py-6 space-y-5">
