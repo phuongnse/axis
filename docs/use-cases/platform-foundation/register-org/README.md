@@ -136,6 +136,7 @@ flowchart TD
   entry -->|SSO| complete
   complete --> confirm
   confirm -->|Open inbox link| verify
+  verify -->|Activated| provision["5 · workspace / dashboard"]
   entry -.-> errEntry
   complete -.-> errComplete
   entry -.->|SSO error| errProvider
@@ -161,7 +162,7 @@ Record **accepted ToS/Privacy version** on the account at org create (AC above);
 
 ## Wireframes
 
-Nine screens in this folder (four happy-path / journey steps, five state boards). Table order follows [Screen flow](#screen-flow). Sequences: [Diagrams](#diagrams).
+Nine screens in this folder (four happy-path / journey steps, five state boards). Table order follows [Screen flow](#screen-flow). Under [Diagrams](#diagrams): one end-to-end journey sequence (`register-org-journey`) and one dev checklist (`register-org-cases`).
 
 | # | Screen | Role | Excalidraw | Preview |
 |---|--------|------|------------|---------|
@@ -177,9 +178,11 @@ Nine screens in this folder (four happy-path / journey steps, five state boards)
 
 ## Diagrams
 
-### register-org-flow
+Read **`register-org-journey`** once for the full happy path (sign-up → inbox → verify → workspace). Use **`register-org-cases`** when implementing error/state wireframes. Async module provisioning is not drawn here — see **Related** below.
 
-Email/password and external-provider registration (happy paths + provider pre-checks).
+### register-org-journey
+
+End-to-end registration happy path (email/password or SSO). Error branches and SSO rejections are in `register-org-cases`.
 
 ```mermaid
 %%{init: {'theme':'dark','themeVariables':{'background':'#0d1117','mainBkg':'#0d1117','primaryColor':'#161b22','primaryBorderColor':'#388bfd','primaryTextColor':'#e6edf3','secondaryColor':'#21262d','secondaryBorderColor':'#388bfd','secondaryTextColor':'#e6edf3','tertiaryColor':'#161b22','tertiaryTextColor':'#e6edf3','lineColor':'#58a6ff','textColor':'#e6edf3','nodeBorder':'#388bfd','clusterBkg':'#161b22','clusterBorder':'#388bfd','titleColor':'#e6edf3','edgeLabelBackground':'#161b22','actorBkg':'#161b22','actorBorder':'#388bfd','actorTextColor':'#e6edf3','signalColor':'#58a6ff','labelBoxBkgColor':'#161b22','labelBoxBorderColor':'#388bfd','noteBkgColor':'#161b22','noteBorderColor':'#388bfd','noteTextColor':'#c9d1d9','activationBkgColor':'#30363d'}}}%%
@@ -191,48 +194,63 @@ sequenceDiagram
   participant Email as Email Service
   participant IdP as IdP (MS/Google/GitHub)
 
-  Admin->>Web: Open registration page
-  Web-->>Admin: SSO icons + email/password form
-
   rect rgb(22, 35, 58)
-    Note over Admin,Email: Email / password path
-    Admin->>Web: Accept Terms + submit (Idempotency-Key)
-    Web->>API: POST /api/organizations/
-    API->>API: Generate slug, hash password, record ToS
-    API->>Email: Send verification email (if new)
-    API-->>Web: 202 → confirmation screen
+    Note over Admin,IdP: 1–2 · Sign up (register-org / register-org-complete)
+    Admin->>Web: Open registration page
+    alt Email / password (2b on register-org)
+      Admin->>Web: Accept Terms + submit (Idempotency-Key)
+      Web->>API: POST /api/organizations/
+      API->>API: Slug, hash password, seed roles
+    else SSO (2a register-org-complete)
+      Admin->>Web: Microsoft / Google / GitHub
+      Web->>IdP: OAuth2 Auth Code + PKCE
+      IdP-->>Web: Verified email + display name
+      Web->>API: Pre-check claims
+      Web-->>Admin: register-org-complete
+      Admin->>Web: Org name, slug, Terms + submit
+      Web->>API: POST /api/organizations/ + link external login
+    end
+    API->>Email: Send verification email (if new account)
+    API-->>Web: 202 Accepted
+    Web-->>Admin: 3 · email-confirmation
   end
 
   rect rgb(22, 35, 58)
-    Note over Admin,IdP: External provider (OAuth only)
-    Admin->>Web: Choose Microsoft / Google / GitHub
-    Web->>IdP: OAuth2 Auth Code + PKCE
-    IdP-->>Web: Verified email + display name
-    Web->>API: Validate claims (verified email required)
-    alt No verified email
-      API-->>Web: Reject: no verified email
-    else Duplicate email
-      API-->>Web: Reject: duplicate email → Sign in
-    else OK
-      API-->>Web: Open register-org-complete
+    Note over Admin,Email: 3 · Inbox wait (optional resend)
+    opt Resend from confirmation
+      Admin->>Web: Resend email
+      Web->>API: POST /api/auth/resend-verification
+      API-->>Web: 204 (or 429 at cap)
+    end
+    Admin->>Email: Open verification link (any device)
+  end
+
+  rect rgb(22, 35, 58)
+    Note over Admin,API: 4 · verify-email
+    Email-->>Web: Deep link with token
+    Web->>API: POST /api/auth/verify-email
+    API->>API: Activate user, org → Provisioning, publish events
+    API-->>Web: 200 OK
+    Web-->>Admin: Email verified (auto sign-in when Frontend ships)
+  end
+
+  rect rgb(22, 35, 58)
+    Note over Admin,Web: 5 · Workspace or provisioning wait
+    alt Tenant ready
+      Web-->>Admin: Workspace / dashboard
+    else Schema still provisioning
+      Web->>API: GET /api/auth/provisioning-status?token=
+      API-->>Web: Module progress
+      Web-->>Admin: workspace-provisioning screen
     end
   end
 
-  rect rgb(22, 35, 58)
-    Note over Admin,Email: Post-OAuth completion screen
-    Web-->>Admin: register-org-complete (name, slug, Terms)
-    Admin->>Web: Submit completion (Idempotency-Key)
-    Web->>API: POST org + link external login
-    API->>Email: Send verification email (if new)
-    API-->>Web: 202 → confirmation screen
-  end
-
-  Note over Admin,API: Org name is collected on register-org-complete. Duplicate password email still returns the same confirmation screen.
+  Note over API,Email: Duplicate email on POST /api/organizations/ still returns 202 + same confirmation screen (no leakage). Kafka/module provisioning detail → provision-tenant.
 ```
 
 ### register-org-cases
 
-Dev checklist — API outcomes mapped to wireframe states.
+Dev checklist — API outcomes mapped to wireframe `*-states` boards (not the journey happy path).
 
 ```mermaid
 %%{init: {'theme':'dark','themeVariables':{'background':'#0d1117','mainBkg':'#0d1117','primaryColor':'#161b22','primaryBorderColor':'#388bfd','primaryTextColor':'#e6edf3','secondaryColor':'#21262d','secondaryBorderColor':'#388bfd','secondaryTextColor':'#e6edf3','tertiaryColor':'#161b22','tertiaryTextColor':'#e6edf3','lineColor':'#58a6ff','textColor':'#e6edf3','nodeBorder':'#388bfd','clusterBkg':'#161b22','clusterBorder':'#388bfd','titleColor':'#e6edf3','edgeLabelBackground':'#161b22','actorBkg':'#161b22','actorBorder':'#388bfd','actorTextColor':'#e6edf3','signalColor':'#58a6ff','labelBoxBkgColor':'#161b22','labelBoxBorderColor':'#388bfd','noteBkgColor':'#161b22','noteBorderColor':'#388bfd','noteTextColor':'#c9d1d9','activationBkgColor':'#30363d'}}}%%
@@ -269,10 +287,22 @@ sequenceDiagram
   end
 
   rect rgb(22, 35, 58)
-    Note over Admin,API: Shared confirmation outcome
+    Note over Admin,API: email-confirmation + resend
     API-->>Web: 202 confirmation screen
-    Web-->>Admin: email-confirmation + resend (204 / 429)
+    Web-->>Admin: email-confirmation-states (204 / 429)
+  end
+
+  rect rgb(22, 35, 58)
+    Note over Admin,API: verify-email link outcomes
+    Admin->>Web: Open verification link
+    Web->>API: POST /api/auth/verify-email
+    API-->>Web: 200 → verify-email success panel
+    API-->>Web: Expired token → Resend CTA
+    API-->>Web: Already used → Sign in
+    API-->>Web: Invalid / tampered → verify-email invalid panel
+    Web->>API: POST /api/auth/resend-verification (from landing)
+    API-->>Web: 429 → verify-email-rate-limit
   end
 ```
 
-**Related:** tenant schema provisioning after verify — [provision-tenant](../provision-tenant/) ([tenant provisioning sequence](../provision-tenant/README.md#tenant-provisioning)). The former standalone **verify-email** use-case folder was merged here (same registration journey; API remains `POST /api/auth/verify-email`).
+**Related (next use case):** after verify, tenant schemas provision asynchronously — [provision-tenant](../provision-tenant/) ([tenant provisioning](../provision-tenant/README.md#tenant-provisioning)). API: `POST /api/auth/verify-email`, `GET /api/auth/provisioning-status`.

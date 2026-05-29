@@ -89,10 +89,10 @@ Assets live **flat** inside this use-case folder. Reference shared kit screens f
 
 ## Diagrams
 
-Mermaid blocks in this README (sequence, flowchart, or `erDiagram`). One `### <diagram-slug>` heading per diagram.
+Mermaid blocks in this README (sequence, flowchart, or `erDiagram`). One `### <diagram-slug>` heading per diagram. Multi-screen journeys: prefer **one** `<slug>-journey` sequence + **optional** `<slug>-cases` for error wireframes ([docs-style § Diagrams](../playbooks/docs-style.md#diagrams-content-rules)).
 
 ```markdown
-### `<diagram-slug>`
+### `<slug>-journey`
 
 \`\`\`mermaid
 sequenceDiagram

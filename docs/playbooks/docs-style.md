@@ -113,6 +113,10 @@ Sequence/architecture drawings are under [Diagrams](#diagrams).
 ### `## Diagrams` (content rules)
 
 - **Mermaid only** in this README (`sequenceDiagram`, `flowchart`, `erDiagram`, …) — one `### <diagram-slug>` section per diagram. First line inside each fence: `MERMAID_INIT` from [`mermaid-theme.mjs`](../diagrams/mermaid-theme.mjs) ([playbook](./mermaid.md)).
+- **Standard set (multi-screen user journeys):**
+  - **One** `### <slug>-journey` `sequenceDiagram` — actor happy path from first screen through the use-case outcome (use `rect rgb(22, 35, 58)` phase bands; keep SSO/error branches minimal — details belong in `*-cases`).
+  - **Zero or one** `### <slug>-cases` `sequenceDiagram` — dev/QA map of API responses to `*-states` wireframes. Skip when there are few error screens.
+  - **Do not** add a second happy-path sequence (e.g. avoid both `*-flow` and `*-journey` for the same story).
 - Platform-wide architecture diagrams live in [docs/README.md § Key Diagrams](../README.md#key-diagrams), not duplicated here.
 - **Related use cases:** one short prose line after the diagrams — `**Related (next use case):** …` with a link to the other use-case `## Diagrams` anchor. Do not paste another use case’s Mermaid here.
 - Omit `## Diagrams` when this use case has no local diagram.
