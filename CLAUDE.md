@@ -164,7 +164,7 @@ Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, use-c
 
 - TanStack Query = server state; Zustand = client-only; loading/empty/error on fetches; RHF + Zod; lazy routes; no tokens in `localStorage`.
 
-**Wireframes:** use-case assets under `docs/use-cases/{domain}/{use-case}/`; shared kit under `docs/wireframes/`. Link rows in each use-case file; regenerate with `docs/scripts/generate-wireframes.ps1`. Kit rules: [`wireframes.md`](docs/playbooks/wireframes.md).
+**Wireframes:** use-case assets under `docs/use-cases/{domain}/{use-case}/`; kit source in `docs/wireframes/*.mjs` (shared shell: `app-shell` only). Regenerate with `node docs/wireframes/generate-screens.mjs` + `docs/scripts/generate-wireframes.ps1`. **Agents:** [`wireframes/README.md` § Agent contract](docs/wireframes/README.md#agent-contract), [`wireframes.md`](docs/playbooks/wireframes.md).
 
 **Cross-cutting:** forward `CancellationToken`; audit fields in Application; soft-delete on tenant aggregates; Serilog without PII; rate limit auth endpoints; CORS before auth; `/health` + `/health/ready` anonymous.
 
