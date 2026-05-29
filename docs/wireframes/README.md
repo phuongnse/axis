@@ -62,7 +62,8 @@ docs/scripts/generate-wireframes.ps1 -Filter register-org
 | `placeAuthExternalSignIn` | register-org, any auth screen with SSO |
 | `buildAuthCardHeader` / `buildAuthCardFooter` / `buildAuthSubmitButton` | Composite auth cards |
 | `buildAuthCardBrandBar` | Informational cards (email-confirmation, provider errors) |
-| `authFormField`, `authReadOnlyValueField`, `authSlugPreviewField`, `authTermsRow` | register-org, states |
+| `fieldLabelBlock` (`components.mjs`) | Label + optional `?` + help text line |
+| `authFormField`, `authReadOnlyValueField`, `authSlugPreviewField`, `authTermsRow` | register-org, states (`helpText` param) |
 | `paintRegisterOrgEntryFields`, `paintRegisterOrgCompleteFields` | register-org + `*-states` |
 | `authCard` | login, register, forgot/change password, accept invite |
 

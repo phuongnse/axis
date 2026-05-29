@@ -234,6 +234,12 @@ export function btn(prefix, x, y, label, variant = 'primary') {
 /** Gap between label text and required * (px) — same on every field. */
 export const REQUIRED_MARKER_GAP = 10;
 
+/** Help affordance on label row (? in circle). */
+export const HELP_ICON_SIZE = 16;
+export const FIELD_LABEL_H = 16;
+export const FIELD_HELP_TEXT_H = 14;
+export const FIELD_LABEL_HELP_GAP = 2;
+
 /** Pixel width of label copy at 11px — positions the required * after the last glyph. */
 export function labelTextWidth(str, fontSize = 11) {
   const scale = fontSize / 11;
@@ -251,12 +257,34 @@ export function labelTextWidth(str, fontSize = 11) {
  * Use on every user-editable field label in screen wireframes.
  */
 export function fieldLabel(prefix, x, y, label, { required = false, color = C.gray500 } = {}) {
+  return fieldLabelBlock(prefix, x, y, 400, label, { required, color }).els;
+}
+
+/**
+ * Label row + optional help (? icon) + help text line.
+ * Returns label block height and input top offset for stacking fields.
+ */
+export function fieldLabelBlock(prefix, x, y, innerW, label, {
+  required = false,
+  helpText = null,
+  color = C.gray500,
+} = {}) {
   const labelW = Math.max(8, labelTextWidth(label, 11));
-  const els = [text(`${prefix}_fl`, x, y, labelW, 16, label, 11, color)];
+  const els = [text(`${prefix}_fl`, x, y, labelW, FIELD_LABEL_H, label, 11, color)];
   if (required) {
-    els.push(text(`${prefix}_req`, x + labelW + REQUIRED_MARKER_GAP, y, 8, 16, '*', 11, C.danger));
+    els.push(text(`${prefix}_req`, x + labelW + REQUIRED_MARKER_GAP, y, 8, FIELD_LABEL_H, '*', 11, C.danger));
   }
-  return els;
+  let labelBlockH = FIELD_LABEL_H;
+  if (helpText) {
+    const iconX = x + innerW - HELP_ICON_SIZE;
+    els.push(ellipse(`${prefix}_help_ic`, iconX, y, HELP_ICON_SIZE, HELP_ICON_SIZE, C.gray300, C.gray100, 1));
+    els.push(text(`${prefix}_help_q`, iconX, y + 1, HELP_ICON_SIZE, 14, '?', 10, C.gray500, 'center'));
+    const helpY = y + FIELD_LABEL_H + FIELD_LABEL_HELP_GAP;
+    els.push(text(`${prefix}_help`, x, helpY, innerW, FIELD_HELP_TEXT_H, helpText, 10, C.gray500));
+    labelBlockH = FIELD_LABEL_H + FIELD_LABEL_HELP_GAP + FIELD_HELP_TEXT_H;
+  }
+  const inputY = y + labelBlockH + FIELD_LABEL_HELP_GAP;
+  return { els, labelBlockH, inputY };
 }
 
 /** Text input. h=40, placeholder at y+11, 13px gray500. */

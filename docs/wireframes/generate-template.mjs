@@ -47,7 +47,7 @@
 import {
   nextSeed, BASE,
   rect, ellipse, text, hline, vline, arrow, sectionHeader,
-  C, fieldLabel, REQUIRED_MARKER_GAP,
+  C, fieldLabel, fieldLabelBlock, REQUIRED_MARKER_GAP,
 } from './components.mjs';
 
 // ─── Section builders ─────────────────────────────────────────────────────────
@@ -137,9 +137,13 @@ export function buildFormControls(y0) {
   // ── Col 1: Text input states (x=50) ──
   els.push(text('inp_req_note', 50, yC, 320, 14,
     `Required labels — * is ${REQUIRED_MARKER_GAP}px after label (C.danger)`, 10, C.gray500));
-  els.push(...fieldLabel('inp_req', 50, yC + 18, 'Organization name', { required: true }));
-  els.push(rect('inp_req_demo', 50, yC + 36, 280, 40, C.gray300, C.white, 1, true));
-  els.push(text('inp_req_ph', 62, yC + 47, 250, 18, 'Acme Corp', 13, C.gray500));
+  const inpHelpDemo = fieldLabelBlock('inp_help', 50, yC + 18, 280, 'Organization name', {
+    required: true,
+    helpText: '2–100 characters. Help text sits under the label; ? is the tooltip affordance.',
+  });
+  els.push(...inpHelpDemo.els);
+  els.push(rect('inp_req_demo', 50, inpHelpDemo.inputY, 280, 40, C.gray300, C.white, 1, true));
+  els.push(text('inp_req_ph', 62, inpHelpDemo.inputY + 11, 250, 18, 'Acme Corp', 13, C.gray500));
 
   const statesY = yC + 90;
   const inputStates = [

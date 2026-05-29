@@ -196,7 +196,11 @@ Width auto-sized: `label.length × 8 + 32`. Height: **36px**. Text at `y+10`, 13
 
 ### `fieldLabel(prefix, x, y, label, { required?, color? })`
 
-Form label row (11px, default `C.gray500`). When `required: true`, appends a red `*` in `C.danger` after the label with a fixed `REQUIRED_MARKER_GAP` (10px) from `components.mjs` — same offset on every field. **Change the gap in `components.mjs` only**, then regen affected screens. Use on every required field — including `authFormField` / `authCard` in `blocks.mjs`.
+Form label row (11px, default `C.gray500`). When `required: true`, appends a red `*` in `C.danger` after the label with a fixed `REQUIRED_MARKER_GAP` (10px) from `components.mjs` — same offset on every field. **Change the gap in `components.mjs` only**, then regen affected screens.
+
+### `fieldLabelBlock(prefix, x, y, innerW, label, { required?, helpText?, color? })`
+
+Label row + optional **help affordance**: `?` in a 16px circle (top-right of the field column) and a **help text** line (10px, `C.gray500`) under the label, before the control. Returns `{ els, labelBlockH, inputY }` for stacking inputs. Prefer `authFormField(…, helpText)` on auth screens rather than composing by hand.
 
 ### `inputField(prefix, x, y, w, placeholder?)`
 

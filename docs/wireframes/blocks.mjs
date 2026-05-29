@@ -10,7 +10,7 @@ import {
   rect,
   text,
   hline,
-  fieldLabel,
+  fieldLabelBlock,
   inputField,
   componentContent,
 } from './components.mjs';
@@ -24,7 +24,10 @@ export const AUTH_PROVIDER_BTN_SIZE = 44;
 export const AUTH_PROVIDER_GAP = 20;
 /** Icon row + gap + “or” divider — use after placeAuthExternalSignIn(). */
 export const AUTH_EXTERNAL_SIGN_IN_BLOCK_H = AUTH_PROVIDER_BTN_SIZE + 12 + 28;
+/** Default field block without help text (label + input + spacing). */
 export const AUTH_FIELD_BLOCK_H = 72;
+/** Field block when label includes help text line. */
+export const AUTH_FIELD_BLOCK_H_HELP = 88;
 export const AUTH_HEADER_H = 112;
 export const AUTH_HEADER_H_SUBTITLE = 136;
 export const AUTH_CARD_FOOTER_ZONE = 44;
@@ -105,46 +108,56 @@ export function buildAuthSubmitButton(prefix, cardX, y, cardW, label) {
 
 // ─── Auth form field blocks ────────────────────────────────────────────────────
 
-export function authFormField(prefix, cardX, y, cardW, label, value, errorMsg = null, required = false) {
+export function authFormField(
+  prefix, cardX, y, cardW, label, value, errorMsg = null, required = false, helpText = null) {
   const x = cardX + AUTH_CARD_PAD_X;
   const innerW = cardW - AUTH_CARD_PAD_X * 2;
-  const blockH = errorMsg ? 86 : AUTH_FIELD_BLOCK_H;
+  const { els: labelEls, inputY } = fieldLabelBlock(prefix, x, y, innerW, label, { required, helpText });
   const els = [
-    ...fieldLabel(prefix, x, y, label, { required }),
-    rect(`${prefix}_inp`, x, y + 18, innerW, 40, errorMsg ? C.dangerBorder : C.gray300, C.white, 1, true),
-    text(`${prefix}_val`, x + 12, y + 29, innerW - 24, 18, value, 13, C.gray900),
+    ...labelEls,
+    rect(`${prefix}_inp`, x, inputY, innerW, 40, errorMsg ? C.dangerBorder : C.gray300, C.white, 1, true),
+    text(`${prefix}_val`, x + 12, inputY + 11, innerW - 24, 18, value, 13, C.gray900),
   ];
+  const errY = inputY + 44;
   if (errorMsg) {
-    els.push(text(`${prefix}_err`, x, y + 62, innerW, 14, errorMsg, 11, C.danger));
+    els.push(text(`${prefix}_err`, x, errY, innerW, 14, errorMsg, 11, C.danger));
   }
+  const blockH = (errorMsg ? errY + 16 : inputY + 48) - y;
   return { els, blockH };
 }
 
-export function authReadOnlyValueField(prefix, cardX, y, cardW, label, value, required = false) {
+export function authReadOnlyValueField(
+  prefix, cardX, y, cardW, label, value, required = false, helpText = null) {
   const x = cardX + AUTH_CARD_PAD_X;
   const innerW = cardW - AUTH_CARD_PAD_X * 2;
-  const blockH = AUTH_FIELD_BLOCK_H;
+  const { els: labelEls, inputY } = fieldLabelBlock(prefix, x, y, innerW, label, { required, helpText });
   const els = [
-    ...fieldLabel(prefix, x, y, label, { required }),
-    rect(`${prefix}_inp`, x, y + 18, innerW, 40, C.gray300, C.gray50, 1, true),
-    text(`${prefix}_val`, x + 12, y + 29, innerW - 24, 18, value, 13, C.gray700),
+    ...labelEls,
+    rect(`${prefix}_inp`, x, inputY, innerW, 40, C.gray300, C.gray50, 1, true),
+    text(`${prefix}_val`, x + 12, inputY + 11, innerW - 24, 18, value, 13, C.gray700),
   ];
+  const blockH = inputY + 48 - y;
   return { els, blockH };
 }
 
-export function authSlugPreviewField(prefix, cardX, y, cardW, errorMsg = null, required = false) {
+export function authSlugPreviewField(
+  prefix, cardX, y, cardW, errorMsg = null, required = false, helpText = null) {
   const x = cardX + AUTH_CARD_PAD_X;
   const innerW = cardW - AUTH_CARD_PAD_X * 2;
-  const blockH = errorMsg ? 100 : 86;
+  const slugHelp = helpText ?? 'Unique URL path; auto-generated from organization name.';
+  const { els: labelEls, inputY } = fieldLabelBlock(
+    prefix, x, y, innerW, 'Organization URL slug', { required, helpText: slugHelp });
+  const previewY = inputY + 44;
   const els = [
-    ...fieldLabel(prefix, x, y, 'Organization URL slug', { required }),
-    rect(`${prefix}_inp`, x, y + 18, innerW, 40, errorMsg ? C.dangerBorder : C.gray300, C.gray50, 1, true),
-    text(`${prefix}_val`, x + 12, y + 29, innerW - 24, 18, 'acme-corp', 13, C.gray700),
-    text(`${prefix}_hint`, x, y + 62, innerW, 14, 'Auto-generated from organization name', 10, C.gray500),
+    ...labelEls,
+    rect(`${prefix}_inp`, x, inputY, innerW, 40, errorMsg ? C.dangerBorder : C.gray300, C.gray50, 1, true),
+    text(`${prefix}_val`, x + 12, inputY + 11, innerW - 24, 18, 'acme-corp', 13, C.gray700),
+    text(`${prefix}_hint`, x, previewY, innerW, 14, 'Preview: axis.app/acme-corp', 10, C.gray500),
   ];
   if (errorMsg) {
-    els.push(text(`${prefix}_err`, x, y + 78, innerW, 14, errorMsg, 11, C.danger));
+    els.push(text(`${prefix}_err`, x, previewY + 16, innerW, 14, errorMsg, 11, C.danger));
   }
+  const blockH = (errorMsg ? previewY + 30 : previewY + 14) - y;
   return { els, blockH };
 }
 
@@ -176,7 +189,10 @@ export function authTermsRow(prefix, cardX, y, cardW, { checked = true, errorMsg
 export function authCard(screenW, screenH, prefix, { title, subtitle = null, items = [], extraLink = null }, submitLabel, footerText) {
   const cardW = AUTH_CARD_W;
   const headerH = subtitle ? AUTH_HEADER_H_SUBTITLE : AUTH_HEADER_H;
-  const fieldH = items.length * AUTH_FIELD_BLOCK_H;
+  let fieldH = 0;
+  items.forEach((item) => {
+    fieldH += item.helpText ? AUTH_FIELD_BLOCK_H_HELP : AUTH_FIELD_BLOCK_H;
+  });
   const cardH = headerH + fieldH + (extraLink ? 22 : 4) + 36 + 12 + AUTH_CARD_FOOTER_ZONE;
   const cardX = Math.round((screenW - cardW) / 2);
   const cardY = Math.round((screenH - cardH) / 2);
@@ -187,13 +203,17 @@ export function authCard(screenW, screenH, prefix, { title, subtitle = null, ite
   els.push(...buildAuthCardHeader(prefix, cardX, cardY, cardW, title, subtitle));
 
   const fieldStartY = cardY + headerH;
-  items.forEach(({ label, placeholder, required = false }, i) => {
-    const y = fieldStartY + i * AUTH_FIELD_BLOCK_H;
-    els.push(...fieldLabel(`${prefix}_fl_${i}`, cardX + AUTH_CARD_PAD_X, y, label, { required }));
-    els.push(...inputField(`${prefix}_fi_${i}`, cardX + AUTH_CARD_PAD_X, y + 18, cardW - AUTH_CARD_PAD_X * 2, placeholder));
+  let fy = fieldStartY;
+  items.forEach(({ label, placeholder, required = false, helpText = null }, i) => {
+    const x = cardX + AUTH_CARD_PAD_X;
+    const innerW = cardW - AUTH_CARD_PAD_X * 2;
+    const { els: labelEls, inputY } = fieldLabelBlock(`${prefix}_fl_${i}`, x, fy, innerW, label, { required, helpText });
+    els.push(...labelEls);
+    els.push(...inputField(`${prefix}_fi_${i}`, x, inputY, innerW, placeholder));
+    fy += helpText ? AUTH_FIELD_BLOCK_H_HELP : AUTH_FIELD_BLOCK_H;
   });
 
-  const afterFieldsY = fieldStartY + fieldH;
+  const afterFieldsY = fy;
   if (extraLink) {
     els.push(text(`${prefix}_xl`, cardX + AUTH_CARD_PAD_X, afterFieldsY + 6, cardW - 48, 16, extraLink, 12, C.primary, 'right'));
   }
@@ -207,13 +227,50 @@ export function authCard(screenW, screenH, prefix, { title, subtitle = null, ite
 
 /** Default register-org entry fields (email/password path). */
 export const REGISTER_ORG_ENTRY_FIELDS = [
-  { kind: 'input', label: 'Organization name', value: 'Acme Corp', err: null, required: true },
+  {
+    kind: 'input',
+    label: 'Organization name',
+    value: 'Acme Corp',
+    err: null,
+    required: true,
+    helpText: '2–100 characters. Shown on invoices and in your workspace.',
+  },
   { kind: 'slug', err: null },
-  { kind: 'input', label: 'Admin full name', value: 'Alex Brown', err: null, required: true },
-  { kind: 'input', label: 'Email address', value: 'you@company.com', err: null, required: true },
-  { kind: 'input', label: 'Password', value: '••••••••', err: null, required: true },
-  { kind: 'input', label: 'Confirm password', value: '••••••••', err: null, required: true },
+  {
+    kind: 'input',
+    label: 'Admin full name',
+    value: 'Alex Brown',
+    err: null,
+    required: true,
+    helpText: 'Your name as the organization administrator.',
+  },
+  {
+    kind: 'input',
+    label: 'Email address',
+    value: 'you@company.com',
+    err: null,
+    required: true,
+    helpText: 'We send a verification link to this address.',
+  },
+  {
+    kind: 'input',
+    label: 'Password',
+    value: '••••••••',
+    err: null,
+    required: true,
+    helpText: 'At least 8 characters with a letter and a number.',
+  },
+  {
+    kind: 'input',
+    label: 'Confirm password',
+    value: '••••••••',
+    err: null,
+    required: true,
+    helpText: 'Must match the password above.',
+  },
 ];
+
+export const REGISTER_ORG_ORG_NAME_HELP = '2–100 characters. Shown on invoices and in your workspace.';
 
 /**
  * Paint register-org entry fields; returns y after last field block.
@@ -223,13 +280,14 @@ export function paintRegisterOrgEntryFields(els, idPrefix, cardX, y, cardW, fiel
   let fy = y;
   fields.forEach((f, i) => {
     if (f.kind === 'slug') {
-      const { els: slugEls, blockH } = authSlugPreviewField(`${idPrefix}_slug`, cardX, fy, cardW, f.err ?? null);
+      const { els: slugEls, blockH } = authSlugPreviewField(
+        `${idPrefix}_slug`, cardX, fy, cardW, f.err ?? null, true, f.helpText ?? null);
       els.push(...slugEls);
       fy += blockH;
       return;
     }
     const { els: fieldEls, blockH } = authFormField(
-      `${idPrefix}_f${i}`, cardX, fy, cardW, f.label, f.value, f.err ?? null, f.required !== false);
+      `${idPrefix}_f${i}`, cardX, fy, cardW, f.label, f.value, f.err ?? null, f.required !== false, f.helpText ?? null);
     els.push(...fieldEls);
     fy += blockH;
   });
@@ -246,17 +304,19 @@ export function paintRegisterOrgCompleteFields(els, idPrefix, cardX, y, cardW, {
 } = {}) {
   let fy = y;
   const { els: emailEls, blockH: emailH } = authReadOnlyValueField(
-    `${idPrefix}_email`, cardX, fy, cardW, 'Email address', 'alex@company.com');
+    `${idPrefix}_email`, cardX, fy, cardW, 'Email address', 'alex@company.com', false,
+    'From your sign-in provider; cannot be changed here.');
   els.push(...emailEls);
   fy += emailH;
 
   const { els: nameEls, blockH: nameH } = authFormField(
-    `${idPrefix}_name`, cardX, fy, cardW, 'Admin full name', 'Alex Brown', null, true);
+    `${idPrefix}_name`, cardX, fy, cardW, 'Admin full name', 'Alex Brown', null, true,
+    'Pre-filled from your provider; you may edit it.');
   els.push(...nameEls);
   fy += nameH;
 
   const { els: orgEls, blockH: orgH } = authFormField(
-    `${idPrefix}_org`, cardX, fy, cardW, 'Organization name', orgName, orgErr, true);
+    `${idPrefix}_org`, cardX, fy, cardW, 'Organization name', orgName, orgErr, true, REGISTER_ORG_ORG_NAME_HELP);
   els.push(...orgEls);
   fy += orgH;
 
