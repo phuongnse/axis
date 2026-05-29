@@ -1,10 +1,30 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" fill="none" role="img" aria-label="Axis">
   <title>Axis</title>
-  <!-- Tri-node mark: three nodes, no connectors -->
-  <circle cx="18" cy="11" r="3.75" fill="#F0B35C" stroke="#E8952E" stroke-width="0.55" />
-  <circle cx="10.5" cy="24" r="3.75" fill="#5ECF9A" stroke="#3DB87A" stroke-width="0.55" />
-  <circle cx="25.5" cy="24" r="3.75" fill="#5EB8F0" stroke="#2EA8E8" stroke-width="0.55" />
-  <circle cx="18" cy="11" r="1.2" fill="#FFFBF5" />
-  <circle cx="10.5" cy="24" r="1.2" fill="#F2FCF7" />
-  <circle cx="25.5" cy="24" r="1.2" fill="#F0F9FF" />
+  <defs>
+    <linearGradient id="axis-bond" x1="18" y1="12" x2="18" y2="23" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F5C26A" stop-opacity="0.42" />
+      <stop offset="0.5" stop-color="#7ADFA8" stop-opacity="0.28" />
+      <stop offset="1" stop-color="#7EC8F5" stop-opacity="0.36" />
+    </linearGradient>
+    <radialGradient id="axis-glow" cx="18" cy="18.5" r="11" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.55" />
+      <stop offset="1" stop-color="#7EC8F5" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <!-- Soft bond (no hard connector lines) -->
+  <path
+    fill="url(#axis-bond)"
+    d="M 18 12.5 L 11.25 22.75 L 24.75 22.75 Z"
+  />
+  <circle cx="18" cy="18.5" r="6.5" fill="url(#axis-glow)" />
+  <circle cx="18" cy="12.5" r="5.25" fill="#F0B35C" fill-opacity="0.22" />
+  <circle cx="11.25" cy="22.75" r="5.25" fill="#5ECF9A" fill-opacity="0.2" />
+  <circle cx="24.75" cy="22.75" r="5.25" fill="#5EB8F0" fill-opacity="0.2" />
+  <!-- Nodes -->
+  <circle cx="18" cy="12.5" r="3.65" fill="#F0B35C" stroke="#E8952E" stroke-width="0.55" />
+  <circle cx="11.25" cy="22.75" r="3.65" fill="#5ECF9A" stroke="#3DB87A" stroke-width="0.55" />
+  <circle cx="24.75" cy="22.75" r="3.65" fill="#5EB8F0" stroke="#2EA8E8" stroke-width="0.55" />
+  <circle cx="18" cy="12.5" r="1.15" fill="#FFFBF5" />
+  <circle cx="11.25" cy="22.75" r="1.15" fill="#F2FCF7" />
+  <circle cx="24.75" cy="22.75" r="1.15" fill="#F0F9FF" />
 </svg>
