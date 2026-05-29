@@ -66,6 +66,7 @@ Use-case **sequence / entity** diagrams live in each use-case `README.md` under 
 External actors and the Axis platform boundary. Detail: [ARCHITECTURE.md § System Context](./ARCHITECTURE.md#system-context).
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'background':'#f8fafc','mainBkg':'#f8fafc','primaryColor':'#dbeafe','primaryBorderColor':'#3b82f6','primaryTextColor':'#1e293b','secondaryColor':'#f0f9ff','tertiaryColor':'#f8fafc','lineColor':'#475569','clusterBkg':'#f0f9ff','edgeLabelBackground':'#f8fafc','actorBkg':'#dbeafe','actorBorder':'#3b82f6','actorTextColor':'#1e293b','signalColor':'#475569','labelBoxBkgColor':'#f0f9ff','noteBkgColor':'#f0f9ff'}}}%%
 flowchart LR
   PA[Platform Admin]
   OA[Org Admin]
@@ -96,6 +97,7 @@ flowchart LR
 Runtime containers in **layers** (top → bottom). Each module owns one PostgreSQL database; messaging is one shared layer below the module row. Detail: [ARCHITECTURE.md § Containers](./ARCHITECTURE.md#containers) (table + ADRs).
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'background':'#f8fafc','mainBkg':'#f8fafc','primaryColor':'#dbeafe','primaryBorderColor':'#3b82f6','primaryTextColor':'#1e293b','secondaryColor':'#f0f9ff','tertiaryColor':'#f8fafc','lineColor':'#475569','clusterBkg':'#f0f9ff','edgeLabelBackground':'#f8fafc','actorBkg':'#dbeafe','actorBorder':'#3b82f6','actorTextColor':'#1e293b','signalColor':'#475569','labelBoxBkgColor':'#f0f9ff','noteBkgColor':'#f0f9ff'}}}%%
 flowchart TB
   SPA["Web Application<br/><small>React SPA · TanStack Query</small>"]
 
@@ -144,6 +146,7 @@ flowchart TB
 Cross-module communication (Kafka events, RabbitMQ commands, gRPC escape hatch). Detail: [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'background':'#f8fafc','mainBkg':'#f8fafc','primaryColor':'#dbeafe','primaryBorderColor':'#3b82f6','primaryTextColor':'#1e293b','secondaryColor':'#f0f9ff','tertiaryColor':'#f8fafc','lineColor':'#475569','clusterBkg':'#f0f9ff','edgeLabelBackground':'#f8fafc','actorBkg':'#dbeafe','actorBorder':'#3b82f6','actorTextColor':'#1e293b','signalColor':'#475569','labelBoxBkgColor':'#f0f9ff','noteBkgColor':'#f0f9ff'}}}%%
 flowchart TB
   SK[Shared Kernel — primitives & abstractions]
 

@@ -160,7 +160,7 @@ Seven screens in this folder (three happy-path, four state boards). Table order 
 Email/password and external-provider registration (happy paths + provider pre-checks).
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme':'base','themeVariables':{'background':'#f8fafc','mainBkg':'#f8fafc','actorBkg':'#dbeafe','actorBorder':'#3b82f6','actorTextColor':'#1e293b','signalColor':'#475569','labelBoxBkgColor':'#f0f9ff','labelBoxBorderColor':'#3b82f6','noteBkgColor':'#f0f9ff','noteBorderColor':'#94a3b8','noteTextColor':'#334155','activationBkgColor':'#e2e8f0','secondaryColor':'#f0f9ff','lineColor':'#475569'}}}%%
 sequenceDiagram
   actor Admin as New Admin
   participant Web as Web App
@@ -171,7 +171,7 @@ sequenceDiagram
   Admin->>Web: Open registration page
   Web-->>Admin: SSO icons + email/password form
 
-  rect rgb(248, 250, 252)
+  rect rgb(240, 249, 255)
     Note over Admin,Email: Email / password path
     Admin->>Web: Accept Terms + submit (Idempotency-Key)
     Web->>API: POST /api/organizations/
@@ -180,7 +180,7 @@ sequenceDiagram
     API-->>Web: 202 → confirmation screen
   end
 
-  rect rgb(248, 250, 252)
+  rect rgb(240, 249, 255)
     Note over Admin,IdP: External provider (OAuth only)
     Admin->>Web: Choose Microsoft / Google / GitHub
     Web->>IdP: OAuth2 Auth Code + PKCE
@@ -195,7 +195,7 @@ sequenceDiagram
     end
   end
 
-  rect rgb(248, 250, 252)
+  rect rgb(240, 249, 255)
     Note over Admin,Email: Post-OAuth completion screen
     Web-->>Admin: register-org-complete (name, slug, Terms)
     Admin->>Web: Submit completion (Idempotency-Key)
@@ -212,13 +212,13 @@ sequenceDiagram
 Dev checklist — API outcomes mapped to wireframe states.
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme':'base','themeVariables':{'background':'#f8fafc','mainBkg':'#f8fafc','actorBkg':'#dbeafe','actorBorder':'#3b82f6','actorTextColor':'#1e293b','signalColor':'#475569','labelBoxBkgColor':'#f0f9ff','labelBoxBorderColor':'#3b82f6','noteBkgColor':'#f0f9ff','noteBorderColor':'#94a3b8','noteTextColor':'#334155','activationBkgColor':'#e2e8f0','secondaryColor':'#f0f9ff','lineColor':'#475569'}}}%%
 sequenceDiagram
   actor Admin as New Admin
   participant Web as Web App
   participant API as Axis API
 
-  rect rgb(248, 250, 252)
+  rect rgb(240, 249, 255)
     Note over Admin,API: Email/password submission
     Admin->>Web: Submit register-org (+ Terms, Idempotency-Key)
     Web->>API: POST /api/organizations/
@@ -227,7 +227,7 @@ sequenceDiagram
     API-->>Web: 202 confirmation (new or duplicate email)
   end
 
-  rect rgb(248, 250, 252)
+  rect rgb(240, 249, 255)
     Note over Admin,API: Provider callback pre-check
     Admin->>Web: Provider OAuth callback completes
     Web->>API: Validate claims (verified email, uniqueness)
@@ -236,7 +236,7 @@ sequenceDiagram
     API-->>Web: Open register-org-complete
   end
 
-  rect rgb(248, 250, 252)
+  rect rgb(240, 249, 255)
     Note over Admin,API: Post-OAuth completion submit
     Admin->>Web: Submit complete form (name, slug, Terms)
     Web->>API: POST completion (link external login)
@@ -244,7 +244,7 @@ sequenceDiagram
     API-->>Web: 5xx banner, re-enable submit
   end
 
-  rect rgb(248, 250, 252)
+  rect rgb(240, 249, 255)
     Note over Admin,API: Shared confirmation outcome
     API-->>Web: 202 confirmation screen
     Web-->>Admin: email-confirmation + resend (204 / 429)
