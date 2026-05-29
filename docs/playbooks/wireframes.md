@@ -17,7 +17,7 @@ When you touch `docs/wireframes/**` or use-case `*.excalidraw`:
 - [ ] Label/help/input spacing changed only in `fieldLabelBlock` (`components.mjs`); field stack gap only in `AUTH_FIELD_STACK_GAP` (`blocks.mjs`).
 - [ ] No new hardcoded px for auth layout (`6`, `8`, `12`, `440`, …).
 - [ ] SSO via `placeAuthExternalSignIn()` — not `component()` on headerless blocks.
-- [ ] Auth brand: `buildAxisLogo` / `buildAuthCardHeader` — not `⬡  Axis` text; pass `files` to `write()`.
+- [ ] Auth brand: `buildAxisLogo` / `buildAuthCardHeader` (mark + "Axis" wordmark); pass `files` to `write()`.
 - [ ] `node docs/wireframes/generate-screens.mjs` twice → empty `git diff` on second run.
 - [ ] Regenerated `.svg` for changed screens; [visual-artifact-checklist](./visual-artifact-checklist.md) satisfied.
 - [ ] Use-case `README.md` wireframes table / screen flow updated if screens added or renamed.

@@ -19,8 +19,11 @@ export function AuthCard({ title, children, footer, banner }: AuthCardProps) {
           'flex flex-col overflow-hidden',
         )}
       >
-        <div className="px-6 pt-5 pb-4 text-center border-b border-border">
-          <img src={axisLogo} alt="Axis" className="mx-auto h-8 w-8" width={32} height={32} />
+        <div className="px-6 pt-5 pb-4 border-b border-border">
+          <div className="flex items-center justify-center gap-2.5" aria-label="Axis">
+            <img src={axisLogo} alt="" className="h-8 w-8 shrink-0" width={32} height={32} />
+            <span className="text-lg font-semibold tracking-tight text-foreground">Axis</span>
+          </div>
         </div>
         <div className="px-6 py-6 space-y-5">
           <h1 className="text-[17px] font-semibold text-foreground">{title}</h1>
