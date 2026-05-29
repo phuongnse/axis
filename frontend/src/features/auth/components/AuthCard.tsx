@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import axisLogo from '@/assets/axis-logo.svg';
 import { cn } from '@/lib/utils';
 
 interface AuthCardProps {
@@ -19,7 +20,7 @@ export function AuthCard({ title, children, footer, banner }: AuthCardProps) {
         )}
       >
         <div className="px-6 pt-5 pb-4 text-center border-b border-border">
-          <p className="text-lg font-medium text-primary tracking-tight">⬡ Axis</p>
+          <img src={axisLogo} alt="Axis" className="mx-auto h-7 w-auto" width={96} height={28} />
         </div>
         <div className="px-6 py-6 space-y-5">
           <h1 className="text-[17px] font-semibold text-foreground">{title}</h1>

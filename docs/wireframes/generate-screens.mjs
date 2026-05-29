@@ -58,13 +58,16 @@ import {
   AUTH_SUBMIT_AFTER_GAP,
   measureAuthCardHeight,
   authScreenCanvasHeight,
+  buildAxisLogo,
   placeAuthExternalSignIn,
   buildAuthCardBrandBar,
   buildAuthCardHeader,
   buildAuthCardFooter,
   buildAuthSubmitButton,
+  authFormField,
   authTermsRow,
   authCard,
+  mergeExcalidrawFiles,
   REGISTER_ORG_ENTRY_FIELDS,
   paintRegisterOrgEntryFields,
   paintRegisterOrgCompleteFields,
@@ -198,7 +201,7 @@ function resolveUseCaseWireframePath(relativePath) {
   return relativePath;
 }
 
-function write(relativePath, elements) {
+function write(relativePath, elements, files = {}) {
   const resolved = resolveUseCaseWireframePath(relativePath);
   const parts = resolved.split('/');
   let full;
@@ -208,8 +211,10 @@ function write(relativePath, elements) {
     full = join(__dir, '..', 'use-cases', ...parts);
   }
   mkdirSync(dirname(full), { recursive: true });
-  writeExcalidraw(full, elements);
-  console.log(`✓  ${resolved}  (${elements.length} elements)`);
+  writeExcalidraw(full, elements, files);
+  const fileCount = Object.keys(files).length;
+  const filesNote = fileCount > 0 ? `, ${fileCount} embedded file(s)` : '';
+  console.log(`✓  ${resolved}  (${elements.length} elements${filesNote})`);
 }
 
 // ─── App shell (shared layout reference) ─────────────────────────────────────
@@ -260,11 +265,14 @@ function genRegisterOrg() {
   const cardY = 16;
   const headerH = AUTH_HEADER_H;
   const els = [];
+  let wireFiles = {};
 
   let y = cardY + headerH;
   const contentEls = [];
 
-  contentEls.push(...buildAuthCardHeader('ro', cardX, cardY, cardW, 'Create your organization'));
+  const header = buildAuthCardHeader('ro', cardX, cardY, cardW, 'Create your organization');
+  contentEls.push(...header.els);
+  wireFiles = mergeExcalidrawFiles(wireFiles, header.files);
   contentEls.push(...placeAuthExternalSignIn(cardX + AUTH_CARD_PAD_X, y));
   y += AUTH_EXTERNAL_SIGN_IN_BLOCK_H + AUTH_FIELD_STACK_GAP;
 
@@ -285,7 +293,7 @@ function genRegisterOrg() {
   els.push(...contentEls);
   els.push(...buildAuthCardFooter('ro', cardX, cardY, cardW, cardH, 'Already have an account? Sign in'));
 
-  write('platform-foundation/register-org.excalidraw', els);
+  write('platform-foundation/register-org.excalidraw', els, wireFiles);
 }
 
 /**
@@ -300,8 +308,11 @@ function genRegisterOrgComplete() {
   const els = [];
 
   const contentEls = [];
-  contentEls.push(...buildAuthCardHeader(
-    'roc', cardX, cardY, cardW, 'Finish setting up your organization', 'Signed in with Microsoft'));
+  let wireFiles = {};
+  const rocHeader = buildAuthCardHeader(
+    'roc', cardX, cardY, cardW, 'Finish setting up your organization', 'Signed in with Microsoft');
+  contentEls.push(...rocHeader.els);
+  wireFiles = mergeExcalidrawFiles(wireFiles, rocHeader.files);
 
   let y = cardY + headerH;
   y = paintRegisterOrgCompleteFields(contentEls, 'roc', cardX, y, cardW);
@@ -318,7 +329,7 @@ function genRegisterOrgComplete() {
   els.push(...contentEls);
   els.push(...buildAuthCardFooter('roc', cardX, cardY, cardW, cardH, '← Back to registration'));
 
-  write('platform-foundation/register-org-complete.excalidraw', els);
+  write('platform-foundation/register-org-complete.excalidraw', els, wireFiles);
 }
 
 /**
@@ -326,6 +337,7 @@ function genRegisterOrgComplete() {
  */
 function genRegisterOrgCompleteStates() {
   const els = [];
+  let wireFiles = {};
   const panelW = 520;
   const panelH = 520;
   const gap = 40;
@@ -341,8 +353,10 @@ function genRegisterOrgCompleteStates() {
     const prefix = `rocs_${id}`;
     els.push(text(`${prefix}_lbl`, x, y0, panelW, 16, lbl, 12, C.danger));
     els.push(rect(`${prefix}_card`, x, cardY, panelW, panelH, C.gray300, C.white, 2, true));
-    els.push(...buildAuthCardHeader(
-      prefix, x, cardY, panelW, 'Finish setting up your organization', 'Signed in with Google'));
+    const panelHeader = buildAuthCardHeader(
+      prefix, x, cardY, panelW, 'Finish setting up your organization', 'Signed in with Google');
+    els.push(...panelHeader.els);
+    wireFiles = mergeExcalidrawFiles(wireFiles, panelHeader.files);
 
     const btnY = cardY + panelH - 68;
     paintRegisterOrgCompleteFields(els, prefix, x, cardY + AUTH_HEADER_H_SUBTITLE, panelW, {
@@ -368,16 +382,17 @@ function genRegisterOrgCompleteStates() {
     terms: { checked: false, errorMsg: 'You must accept the Terms of Service and Privacy Policy.' },
   });
 
-  write('platform-foundation/register-org-complete-states.excalidraw', els);
+  write('platform-foundation/register-org-complete-states.excalidraw', els, wireFiles);
 }
 
-/** Draw one register-org error-state panel (shared by states screens). */
+/** Draw one register-org error-state panel (shared by states screens). Returns embedded logo files. */
 function registerOrgStatePanel(els, { id, x, y0, panelW, panelH, lbl, lblColor, serverBanner, fields, terms }) {
   const cardY = y0 + 28;
   const prefix = `ros_${id}`;
   els.push(text(`${prefix}_lbl`, x, y0, panelW, 16, lbl, 12, lblColor));
   els.push(rect(`${prefix}_card`, x, cardY, panelW, panelH, C.gray300, C.white, 2, true));
-  els.push(...buildAuthCardHeader(prefix, x, cardY, panelW, 'Create your organization'));
+  const panelHeader = buildAuthCardHeader(prefix, x, cardY, panelW, 'Create your organization');
+  els.push(...panelHeader.els);
 
   let fy = cardY + AUTH_HEADER_H;
   if (serverBanner) {
@@ -396,6 +411,7 @@ function registerOrgStatePanel(els, { id, x, y0, panelW, panelH, lbl, lblColor, 
 
   const btnY = cardY + panelH - 68;
   els.push(...buildAuthSubmitButton(prefix, x, btnY, panelW, 'Create organization'));
+  return panelHeader.files;
 }
 
 const REGISTER_ORG_STATE_FIELDS = REGISTER_ORG_ENTRY_FIELDS.map((f) => ({
@@ -412,6 +428,7 @@ const REGISTER_ORG_STATE_FIELDS = REGISTER_ORG_ENTRY_FIELDS.map((f) => ({
  */
 function genRegisterOrgStates() {
   const els = [];
+  let wireFiles = {};
   const panelW = 520;
   const panelH = 640;
   const gap = 40;
@@ -421,7 +438,7 @@ function genRegisterOrgStates() {
   els.push(rect('ros_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
   els.push(text('ros_pg', 0, 16, W, 20, 'Registration form — validation & server errors', 13, C.gray500, 'center'));
 
-  registerOrgStatePanel(els, {
+  wireFiles = mergeExcalidrawFiles(wireFiles, registerOrgStatePanel(els, {
     id: 'val',
     x: startX,
     y0,
@@ -439,9 +456,9 @@ function genRegisterOrgStates() {
       { kind: 'input', label: 'Confirm password', value: '••••••••', err: 'Passwords do not match.', required: true },
     ],
     terms: { checked: true },
-  });
+  }));
 
-  registerOrgStatePanel(els, {
+  wireFiles = mergeExcalidrawFiles(wireFiles, registerOrgStatePanel(els, {
     id: 'srv',
     x: startX + panelW + gap,
     y0,
@@ -452,9 +469,9 @@ function genRegisterOrgStates() {
     serverBanner: 'Something went wrong, please try again.',
     fields: REGISTER_ORG_STATE_FIELDS,
     terms: { checked: true },
-  });
+  }));
 
-  write('platform-foundation/register-org-states.excalidraw', els);
+  write('platform-foundation/register-org-states.excalidraw', els, wireFiles);
 }
 
 /**
@@ -462,6 +479,7 @@ function genRegisterOrgStates() {
  */
 function genRegisterOrgProviderStates() {
   const els = [];
+  let wireFiles = {};
   const panelW = 520;
   const panelH = 300;
   const gap = 40;
@@ -493,7 +511,9 @@ function genRegisterOrgProviderStates() {
     const prefix = `rops_${id}`;
     els.push(text(`${prefix}_lbl`, x, 48, panelW, 16, lbl, 12, C.danger));
     els.push(rect(`${prefix}_card`, x, cardY, panelW, panelH, C.gray300, C.white, 2, true));
-    els.push(...buildAuthCardBrandBar(prefix, x, cardY, panelW));
+    const brand = buildAuthCardBrandBar(prefix, x, cardY, panelW);
+    els.push(...brand.els);
+    wireFiles = mergeExcalidrawFiles(wireFiles, brand.files);
     const ix = x + AUTH_CARD_PAD_X;
     const innerW = panelW - AUTH_CARD_PAD_X * 2;
     const headY = cardY + 76;
@@ -503,7 +523,7 @@ function genRegisterOrgProviderStates() {
     els.push(text(`${prefix}_link`, ix, bodyY + 48, innerW, 16, 'Back to registration →', 12, C.primary, 'center'));
   });
 
-  write('platform-foundation/register-org-provider-states.excalidraw', els);
+  write('platform-foundation/register-org-provider-states.excalidraw', els, wireFiles);
 }
 
 /**
@@ -520,7 +540,9 @@ function genEmailConfirmation() {
   els.push(rect('ec_bg',   0,     0,     W,     H,     C.gray300, C.gray100, 1, false));
   els.push(rect('ec_card', cardX, cardY, cardW, cardH, C.gray300, C.white,   2, true));
 
-  els.push(...buildAuthCardBrandBar('ec', cardX, cardY, cardW));
+  const ecBrand = buildAuthCardBrandBar('ec', cardX, cardY, cardW);
+  els.push(...ecBrand.els);
+  const wireFiles = ecBrand.files;
 
   const ecInnerW = cardW - AUTH_CARD_PAD_X * 2;
   const ecX = cardX + AUTH_CARD_PAD_X;
@@ -535,7 +557,7 @@ function genEmailConfirmation() {
 
   els.push(...buildAuthCardFooter('ec', cardX, cardY, cardW, cardH, 'Back to sign in'));
 
-  write('platform-foundation/email-confirmation.excalidraw', els);
+  write('platform-foundation/email-confirmation.excalidraw', els, wireFiles);
 }
 
 /**
@@ -1200,7 +1222,7 @@ function genSettingsOrgDeletionScheduled() {
 // ─── identity-access Identity & Access — Auth screens (no sidebar) ───────────────────────
 
 function genLogin() {
-  const els = authCard(W, H, 'li', {
+  const { els, files } = authCard(W, H, 'li', {
     title: 'Sign in to Axis',
     items: [
       { label: 'Email address', placeholder: 'you@company.com', required: true },
@@ -1208,7 +1230,7 @@ function genLogin() {
     ],
     extraLink: 'Forgot password?',
   }, 'Sign in', "Don't have an account? Sign up");
-  write('identity-access/login.excalidraw', els);
+  write('identity-access/login.excalidraw', els, files);
 }
 
 /** email verification (tenant-registration) / unverified sign-in — unverified email blocks sign-in. */
@@ -1220,7 +1242,9 @@ function genLoginUnverified() {
   const els = [];
   els.push(rect('lu_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
   els.push(rect('lu_card', cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
-  els.push(text('lu_logo', cardX, cardY + 16, cardW, 28, '⬡  Axis', 18, C.primary, 'center'));
+  const luBrand = buildAxisLogo('lu', cardX, cardY + 16, cardW, 'auth');
+  els.push(...luBrand.els);
+  const wireFiles = luBrand.files;
   els.push(hline('lu_hdiv', cardX, cardY + 60, cardW, C.gray300));
   els.push(text('lu_title', cardX + 24, cardY + 76, cardW - 48, 24, 'Sign in to Axis', 17, C.gray900));
 
@@ -1246,11 +1270,11 @@ function genLoginUnverified() {
   els.push(rect('lu_sbtn', cardX + 24, btnY, btnW, 36, C.gray300, C.gray100, 1, true));
   els.push(text('lu_sbtn_t', cardX + 24, btnY + 10, btnW, 16, 'Sign in', 13, C.gray300, 'center'));
 
-  write('identity-access/login-unverified.excalidraw', els);
+  write('identity-access/login-unverified.excalidraw', els, wireFiles);
 }
 
 function genRegister() {
-  const els = authCard(W, H, 'reg', {
+  const { els, files } = authCard(W, H, 'reg', {
     title: 'Create your account',
     subtitle: null,
     items: [
@@ -1259,22 +1283,22 @@ function genRegister() {
       { label: 'Password',      placeholder: '••••••••', required: true },
     ],
   }, 'Create account', 'Already have an account? Sign in');
-  write('identity-access/register.excalidraw', els);
+  write('identity-access/register.excalidraw', els, files);
 }
 
 function genForgotPassword() {
-  const els = authCard(W, H, 'fp', {
+  const { els, files } = authCard(W, H, 'fp', {
     title: 'Reset your password',
     subtitle: 'Enter your email and we will send you a reset link.',
     items: [
       { label: 'Email address', placeholder: 'you@company.com', required: true },
     ],
   }, 'Send reset link', 'Remember your password? Sign in');
-  write('identity-access/forgot-password.excalidraw', els);
+  write('identity-access/forgot-password.excalidraw', els, files);
 }
 
 function genChangePassword() {
-  const els = authCard(W, H, 'cp', {
+  const { els, files } = authCard(W, H, 'cp', {
     title: 'Choose a new password',
     subtitle: null,
     items: [
@@ -1282,11 +1306,11 @@ function genChangePassword() {
       { label: 'Confirm password', placeholder: '••••••••', required: true },
     ],
   }, 'Set new password', 'Back to sign in');
-  write('identity-access/change-password.excalidraw', els);
+  write('identity-access/change-password.excalidraw', els, files);
 }
 
 function genAcceptInvitation() {
-  const els = authCard(W, H, 'ai', {
+  const { els, files } = authCard(W, H, 'ai', {
     title: 'You have been invited',
     subtitle: 'Join Acme Corp on Axis',
     items: [
@@ -1294,7 +1318,7 @@ function genAcceptInvitation() {
       { label: 'Choose a password', placeholder: '••••••••', required: true },
     ],
   }, 'Accept Invitation', 'Already have an account? Sign in');
-  write('identity-access/accept-invitation.excalidraw', els);
+  write('identity-access/accept-invitation.excalidraw', els, files);
 }
 
 // ─── identity-access Identity & Access — Settings screens (with sidebar) ─────────────────

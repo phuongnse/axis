@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 32" fill="none" role="img" aria-label="Axis">
+  <title>Axis</title>
+  <path fill="#667A6E" stroke="#4F5F57" stroke-width="1.25" d="M16 3 29.5 10.75v11.5L16 29.75 2.5 22.25v-11.5L16 3Z"/>
+  <path stroke="#F4F3EF" stroke-linecap="round" stroke-width="1.5" d="M16 11v10M11.5 13.5 20.5 18.5M20.5 13.5 11.5 18.5"/>
+  <text x="38" y="22" fill="#4F5F57" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="18" font-weight="600" letter-spacing="-0.02em">Axis</text>
+</svg>

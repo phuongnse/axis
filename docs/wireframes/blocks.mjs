@@ -15,6 +15,15 @@ import {
   componentContent,
 } from './components.mjs';
 
+import { buildAxisLogo, mergeExcalidrawFiles } from './logo.mjs';
+
+export {
+  buildAxisLogo,
+  AXIS_LOGO_SVG_PATH,
+  axisLogoExcalidrawFiles,
+  mergeExcalidrawFiles,
+} from './logo.mjs';
+
 // ─── Auth layout constants ─────────────────────────────────────────────────────
 
 export const AUTH_CARD_W = 440;
@@ -105,22 +114,27 @@ export function placeAuthExternalSignIn(cardInnerLeftX, y) {
 
 /** Logo row + divider only (informational / error cards without a form title). */
 export function buildAuthCardBrandBar(prefix, cardX, cardY, cardW) {
-  return [
-    text(`${prefix}_logo`, cardX, cardY + 16, cardW, 28, '⬡  Axis', 18, C.primary, 'center'),
-    hline(`${prefix}_hdiv`, cardX, cardY + 60, cardW, C.gray300),
-  ];
+  const logo = buildAxisLogo(prefix, cardX, cardY + 16, cardW, 'auth');
+  return {
+    els: [
+      ...logo.els,
+      hline(`${prefix}_hdiv`, cardX, cardY + 60, cardW, C.gray300),
+    ],
+    files: logo.files,
+  };
 }
 
 export function buildAuthCardHeader(prefix, cardX, cardY, cardW, title, subtitle = null) {
+  const logo = buildAxisLogo(prefix, cardX, cardY + 16, cardW, 'auth');
   const els = [
-    text(`${prefix}_logo`, cardX, cardY + 16, cardW, 28, '⬡  Axis', 18, C.primary, 'center'),
+    ...logo.els,
     hline(`${prefix}_hdiv`, cardX, cardY + 60, cardW, C.gray300),
     text(`${prefix}_title`, cardX + AUTH_CARD_PAD_X, cardY + 76, cardW - 48, 24, title, 17, C.gray900),
   ];
   if (subtitle) {
     els.push(text(`${prefix}_sub`, cardX + AUTH_CARD_PAD_X, cardY + 104, cardW - 48, 18, subtitle, 13, C.gray700));
   }
-  return els;
+  return { els, files: logo.files };
 }
 
 export function buildAuthCardFooter(prefix, cardX, cardY, cardW, cardH, footerText) {
@@ -232,9 +246,12 @@ export function authCard(screenW, screenH, prefix, { title, subtitle = null, ite
   const cardY = Math.round((screenH - cardH) / 2);
   const els = [];
 
+  const header = buildAuthCardHeader(prefix, cardX, cardY, cardW, title, subtitle);
+  const files = { ...header.files };
+
   els.push(rect(`${prefix}_bg`, 0, 0, screenW, screenH, C.gray300, C.gray100, 1, false));
   els.push(rect(`${prefix}_card`, cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
-  els.push(...buildAuthCardHeader(prefix, cardX, cardY, cardW, title, subtitle));
+  els.push(...header.els);
 
   const fieldStartY = cardY + headerH;
   let fy = fieldStartY;
@@ -256,7 +273,7 @@ export function authCard(screenW, screenH, prefix, { title, subtitle = null, ite
   els.push(...buildAuthSubmitButton(prefix, cardX, btnY, cardW, submitLabel));
   els.push(...buildAuthCardFooter(prefix, cardX, cardY, cardW, cardH, footerText));
 
-  return els;
+  return { els, files };
 }
 
 /** Default register-org entry fields (email/password path). */

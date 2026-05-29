@@ -129,14 +129,14 @@ export function componentContent(builderFn, targetX, targetY, contentDy = 48) {
 
 // ─── File writer ──────────────────────────────────────────────────────────────
 
-export function writeExcalidraw(filePath, elements) {
+export function writeExcalidraw(filePath, elements, files = {}) {
   const output = JSON.stringify({
     type: 'excalidraw',
     version: 2,
     source: 'https://excalidraw.com',
     elements,
     appState: { gridSize: 8, viewBackgroundColor: '#ffffff' },
-    files: {},
+    files,
   });
   writeFileSync(filePath, output, 'utf-8');
 }
