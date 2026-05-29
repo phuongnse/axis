@@ -381,7 +381,7 @@ function buildRegisterOrgCompleteStatePanel({ id, x, y0, panelW, lbl, orgErr, te
   return {
     files: panelHeader.files,
     lbl: { id: `${prefix}_lbl`, x, y: y0, panelW, text: lbl, color: C.danger },
-    card: { id: `${prefix}_card`, x, cardY, panelW, cardH },
+    card: { id: `${prefix}_card`, x, y: cardY, panelW, cardH },
     contentEls,
   };
 }
@@ -463,7 +463,7 @@ function buildRegisterOrgStatePanel({ id, x, y0, panelW, lbl, lblColor, serverBa
   return {
     files: panelHeader.files,
     lbl: { id: `${prefix}_lbl`, x, y: y0, panelW, text: lbl, color: lblColor },
-    card: { id: `${prefix}_card`, x, cardY, panelW, cardH },
+    card: { id: `${prefix}_card`, x, y: cardY, panelW, cardH },
     contentEls,
   };
 }
