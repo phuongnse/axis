@@ -45,7 +45,48 @@ When you find yourself editing the same fact in two files, the architecture is w
 
 Every `docs/use-cases/<domain>/<short-slug>/README.md` file uses these layouts so agents can scan status without parsing inline pipes.
 
-### Wireframes (in each use-case folder)
+**Canonical example (multi-screen + diagrams):** [platform-foundation/register-org/README.md](../use-cases/platform-foundation/register-org/README.md). Copy that structure when refreshing older use cases.
+
+### Section order (after AC, before implementation status)
+
+```text
+## Screen flow      ← when rules below apply
+## Wireframes
+## Diagrams
+> **Implementation status**
+```
+
+### When to add `## Screen flow`
+
+Add **`## Screen flow`** when **any** of these is true:
+
+- More than **three** wireframe screens in the use-case folder (including `*-states` / error variants), or
+- The happy path has **branches** (e.g. SSO vs email/password), or
+- Error screens are easy to confuse with sequential steps.
+
+Skip `## Screen flow` when there are **zero or one** local screen wireframes (a single `## Wireframes` table row is enough).
+
+### `## Screen flow` (content rules)
+
+1. One sentence: row order in `## Wireframes` matches this section.
+2. **Happy path** table: `| Step | Screen | When |` — use `1`, `2a`, `2b`, `3` for branches; screen slug in backticks.
+3. **Error / reference** table (separate): screens that are **not** sequential steps — when to open each (validation, 5xx, provider errors).
+4. Optional **mermaid** `flowchart` — solid edges = happy path, dotted = error/reference (keep labels = screen slugs).
+
+Do **not** duplicate Excalidraw links here; links live only in `## Wireframes`.
+
+### `## Wireframes` (content rules)
+
+- Assets live **flat** in the use-case folder (`<screen>.excalidraw` + `.svg` next to `README.md`).
+- Reference **shared kit** screens from `../../../wireframes/` (e.g. `app-shell`) — do not copy files into the use-case folder.
+- One table per README — no blockquote wireframe stacks.
+- Opening line (when `## Screen flow` exists): state how many screens, that order matches Screen flow, and that **sequence/architecture** drawings are under `## Diagrams`.
+- **Inventory:** every `*.excalidraw` **UI screen** in this folder must have a row. Include error/reference variants (`*-states`). Use `N/A` only when the use case truly has no wireframes.
+- **Columns:** minimum `| Screen | Excalidraw | Preview |`. When `## Screen flow` exists, use `| # | Screen | Role | Excalidraw | Preview |` — `#` matches flow steps (`1`, `2a`, `—` for non-step error screens); `Role` = short happy-path / error label.
+- **Row order:** happy-path screens first (same order as Screen flow), then error/reference screens (same order as the error table in Screen flow).
+- **Do not** list diagrams here (e.g. `*-flow`, `tenant-provisioning`, entity models) — those are not UI screens.
+
+Minimal table (few screens, no Screen flow):
 
 ```markdown
 ## Wireframes
@@ -53,16 +94,40 @@ Every `docs/use-cases/<domain>/<short-slug>/README.md` file uses these layouts s
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | login | [source](./login.excalidraw) | [preview](./login.svg) |
-| shared-app-shell | [source](../../../wireframes/app-shell.excalidraw) | [preview](../../../wireframes/app-shell.svg) |
 ```
 
-- Put screens **only used by this use case** **flat** inside the use-case folder (next to `README.md`).
-- Reference **shared kit screens** (e.g. `app-shell`, `_template`) from `../../../wireframes/` — do not copy duplicates.
-- Use `N/A` rows when no wireframe applies.
-- One table per `README.md` — no blockquote wireframe stacks.
-- When a use case has **more than three screens** (including error/reference variants), add a **`## Screen flow`** section **above** `## Wireframes`: numbered happy-path steps, a short table for error/reference screens, and an optional mermaid diagram. **Row order in `## Wireframes` must match** happy path first, then error screens in the order listed in Screen flow.
-- **`## Wireframes`** lists every `*.excalidraw` **screen** in the use-case folder (use `#` / `Role` columns when helpful). Do not omit error/reference variants. **Do not** list sequence/architecture diagrams here — those belong under `## Diagrams`.
-- **`## Diagrams`** lists only diagrams **stored in this use-case folder**. Link related diagrams owned by another use case in prose (`**Related:** …`) — do not copy another use case’s diagram row into this table (avoids two owners for the same file).
+Full table (see [register-org](../use-cases/platform-foundation/register-org/README.md#wireframes)):
+
+```markdown
+## Wireframes
+
+All UI assets in this folder (N screens). Row order matches [Screen flow](#screen-flow) above.
+Sequence/architecture drawings are under [Diagrams](#diagrams).
+
+| # | Screen | Role | Excalidraw | Preview |
+|---|--------|------|------------|---------|
+| 1 | … | Happy path — … | [source](./….excalidraw) | [preview](./….svg) |
+| — | …-states | Error — … | [source](./….excalidraw) | [preview](./….svg) |
+```
+
+### `## Diagrams` (content rules)
+
+- List only `*.excalidraw` **diagrams stored in this use-case folder** (sequence, entity, architecture).
+- Standard table: `| Diagram | Source | Preview |` with `[source](./…)` / `[preview](./…)`.
+- **Related use cases:** if the flow continues in another use case, add one prose line after the table — `**Related (next use case):** …` with a markdown link to that use case and diagram file. **Never** add another use case’s diagram as a row in this table (one file, one owning README).
+- Use `| N/A | N/A | N/A |` when no local diagram exists (omit the Related line).
+
+### Adopting this layout on existing use cases
+
+When touching an older use case that only has a flat wireframes table:
+
+1. Count `*.excalidraw` in the folder — split **screens** vs **diagrams** by naming and AC (screens = UI; diagrams = `*-flow`, `*-model`, etc.).
+2. Add or refresh `## Screen flow` if the when-to-add rules apply.
+3. Expand `## Wireframes` so **every screen file** has a row; add `#` / `Role` if helpful.
+4. Move cross-use-case diagram rows out of `## Diagrams` into `**Related:**` prose.
+5. Regenerate `.svg` if `.excalidraw` changed; run [`visual-artifact-checklist.md`](./visual-artifact-checklist.md).
+
+No need to bulk-edit all use cases in one PR — update the use case you are already changing, and align siblings in the same domain when obvious.
 
 ### Implementation status (after each US AC block)
 

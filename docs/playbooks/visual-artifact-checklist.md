@@ -40,3 +40,10 @@ Use this checklist **before every commit** that changes visual artifacts:
 3. Review generated results at 100% zoom with this checklist.
 4. Commit only after all checks pass.
 
+## 5) Use-case `README.md` sync (when `docs/use-cases/**` changes)
+
+- [ ] Every **screen** `.excalidraw` in the use-case folder has a row in `## Wireframes` (error `*-states` included).
+- [ ] No **diagram** `.excalidraw` (e.g. `*-flow`, `*-model`) listed under `## Wireframes` — only under `## Diagrams`.
+- [ ] `## Diagrams` rows are **only** files in this folder; other use cases linked in `**Related:**` prose, not duplicated in the table.
+- [ ] When >3 screens or branched flow: `## Screen flow` present and **row order** matches wireframes table ([docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--wireframes--implementation-status), example [register-org](../use-cases/platform-foundation/register-org/README.md)).
+

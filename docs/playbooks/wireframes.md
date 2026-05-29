@@ -364,7 +364,7 @@ When writing or editing any wireframe generator, verify against these values (fr
 3. Add the output path to the screen inventory table in this playbook
 4. Run `node docs/wireframes/generate-screens.mjs` — **verify output has no `NaN` positions** (element count must be > 0)
 5. Run `docs/scripts/generate-wireframes.ps1` to regenerate SVGs
-6. Add a row to the `## Wireframes` table in the relevant use-case file (per [USE_CASE_TEMPLATE.md](../use-cases/USE_CASE_TEMPLATE.md))
+6. Update the use-case `README.md`: add a `## Wireframes` row (and `## Screen flow` when >3 screens) per [docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--wireframes--implementation-status) — see [register-org](../use-cases/platform-foundation/register-org/README.md) for the full layout
 
 **Pre-commit checks for screen wireframes:**
 - [ ] Element count > 0 for every generated file (NaN positions = 0 renderable elements)

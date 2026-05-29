@@ -147,7 +147,8 @@ Paste block format: header `Gate 2:` then one `-` line per row (Gate 3 uses the 
 Gate 2:
 - Library → TECH_STACK.md / not triggered
 - New pattern → patterns.md / not triggered
-- Use-case layer callout → docs/use-cases/{domain}/… (layout per [docs-style § Use case files](./docs-style.md#use-case-files-flow-first)) / not triggered
+- Use-case layer callout → docs/use-cases/{domain}/… (layout per [docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--wireframes--implementation-status); multi-screen example [register-org](../use-cases/platform-foundation/register-org/README.md)) / not triggered
+- Use-case wireframes/diagrams README → Screen flow + full wireframes inventory + Diagrams owned in-folder only ([docs-style](./docs-style.md#use-case-files--wireframes--implementation-status)) / not triggered
 - Domain README + PROGRESS → … / not triggered
 - Architecture rule → CLAUDE.md / not triggered
 - process.md workflow → … / not triggered
@@ -229,7 +230,8 @@ Updating only `PROGRESS.md` while changing `src/` without `docs/use-cases/` → 
 - No cross-module SQL / shared `DbContext` / `IMediator` for domain events
 - New `*Handler.cs` → `*HandlerTests.cs` (drift script)
 - Module code → `docs/use-cases/{module}/` in **same PR**
-- Frontend screen → wireframe row in use-case `## Wireframes` table
+- Frontend screen → wireframe row in use-case `## Wireframes` table (every `*.excalidraw` **screen** in the folder; use `## Screen flow` + `#`/`Role` columns when >3 screens — [docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--wireframes--implementation-status), example [register-org](../use-cases/platform-foundation/register-org/README.md))
+- Use-case diagram → row only if the `.excalidraw` lives **in that use-case folder**; link other use cases in `**Related:**` prose, not in `## Diagrams` table
 - No `.Skip()`, weakened tests, or ✅ when ACs are open
 - **Full solution only:** always `dotnet build` + `dotnet test` on `Axis.sln` (no solution filter)
 
