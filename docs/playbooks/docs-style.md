@@ -118,7 +118,8 @@ Sequence/architecture drawings are under [Diagrams](#diagrams).
   - **Zero or one** `### <slug>-cases` `sequenceDiagram` — dev/QA map of API responses to `*-states` wireframes. Skip when there are few error screens.
   - **Do not** add a second happy-path sequence (e.g. avoid both `*-flow` and `*-journey` for the same story).
 - Platform-wide architecture diagrams live in [docs/README.md § Key Diagrams](../README.md#key-diagrams), not duplicated here.
-- **Related use cases:** one short prose line after the diagrams — `**Related (next use case):** …` with a link to the other use-case `## Diagrams` anchor. Do not paste another use case’s Mermaid here.
+- **Related use cases:** prefer **one use-case folder** for a single actor journey (e.g. register → verify → provisioning wait). Add extra `###` diagram sections (`tenant-provisioning`, …) instead of a second README. Link out only when the story is truly a different actor/domain. Do not paste another use case’s Mermaid in a separate folder if it is the same journey.
+- After diagrams, optional **APIs** or **Related** line — anchors within the same README (`#tenant-provisioning`), not duplicate folders.
 - Omit `## Diagrams` when this use case has no local diagram.
 
 ### Adopting this layout on existing use cases

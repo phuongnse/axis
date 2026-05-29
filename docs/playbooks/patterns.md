@@ -474,7 +474,7 @@ await _context.WorkflowDefinitions
 
 **Rule:** Avoid raw SQL in tenant-aware contexts. When raw SQL is unavoidable (e.g. performance-critical bulk ops, cross-module reads), always prefix the table with the tenant schema from `ITenantContext.Schema` and add soft-delete filter manually. Document why raw SQL was needed with a comment.
 
-### Tenant schema provisioning ([tenant provisioning](../use-cases/platform-foundation/provision-tenant/))
+### Tenant schema provisioning ([register-org § tenant-provisioning](../use-cases/platform-foundation/register-org/README.md#tenant-provisioning))
 
 After email verification, every **tenant-scoped** module provisions its own PostgreSQL schema for the organization. Identity stays on `public` and only publishes the verification event — it never touches another module's DB.
 

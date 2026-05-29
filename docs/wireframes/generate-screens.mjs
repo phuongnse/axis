@@ -142,7 +142,7 @@ const SCREEN_USE_CASE_OVERRIDES = {
   'platform-foundation/verify-email-rate-limit.excalidraw':
     'platform-foundation/register-org/verify-email-rate-limit.excalidraw',
   'platform-foundation/workspace-provisioning.excalidraw':
-    'platform-foundation/provision-tenant/workspace-provisioning.excalidraw',
+    'platform-foundation/register-org/workspace-provisioning.excalidraw',
   'platform-foundation/pricing.excalidraw':
     'platform-foundation/view-plans/pricing.excalidraw',
   'platform-foundation/settings-org.excalidraw':

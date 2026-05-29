@@ -54,7 +54,7 @@ Use-case **sequence / entity** diagrams live in each use-case `README.md` under 
 
 | Diagram | Owner |
 |---|---|
-| Tenant provisioning | [provision-tenant § Diagrams](./use-cases/platform-foundation/provision-tenant/README.md#diagrams) |
+| Registration journey | [register-org § Diagrams](./use-cases/platform-foundation/register-org/README.md#diagrams) |
 | Register organization (flow + cases) | [register-org § Diagrams](./use-cases/platform-foundation/register-org/README.md#diagrams) |
 | Auth flow | [sign-in § Diagrams](./use-cases/identity-access/sign-in/README.md#diagrams) |
 | Data model | [create-model § Diagrams](./use-cases/data-modeling/create-model/README.md#diagrams) |
@@ -187,7 +187,7 @@ Screen wireframes use Excalidraw (`.excalidraw` + `.svg`). Each use case lists i
 | Use case | Why open this |
 |----------|----------------|
 | [register-org § Wireframes](./use-cases/platform-foundation/register-org/README.md#wireframes) | Multi-screen happy path, error `*-states`, links to Mermaid diagrams |
-| [register-org § verify-email screens](./use-cases/platform-foundation/register-org/README.md#wireframes) | Link-click outcomes (`verify-email`) and resend cap (`verify-email-rate-limit`) |
+| [register-org § Wireframes](./use-cases/platform-foundation/register-org/README.md#wireframes) | Full journey incl. verify link + `workspace-provisioning` |
 
 Regenerate screen `.svg` after `.excalidraw` changes: `node docs/wireframes/generate-screens.mjs` and Kroki (see [wireframes.md](./playbooks/wireframes.md)).
 

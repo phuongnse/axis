@@ -20,8 +20,8 @@ SKIP_DIRS = set()
 # domain -> list of (section title, predicate on short folder name)
 GROUPS: dict[str, list[tuple[str, object]]] = {
     "platform-foundation": [
-        ("Registration & provisioning", lambda s: s in {
-            "register-org", "provision-tenant", "plan-at-signup",
+        ("Registration", lambda s: s in {
+            "register-org", "plan-at-signup",
         }),
         ("Subscription plans", lambda s: s in {"view-plans", "enforce-limits", "admin-change-plan"}),
         ("Organization settings", lambda s: s in {"org-profile", "org-settings", "delete-org"}),

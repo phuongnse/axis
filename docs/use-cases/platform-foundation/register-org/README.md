@@ -72,9 +72,21 @@ Self-service registration flow where a new organization signs up and is automati
 - [ ] If the user tries to sign in before verifying, they see "Please verify your email first" with a resend option ([sign-in](../../identity-access/sign-in/) owns the login-page AC; backend returns the same message).
 - [ ] The verification link works from any browser or device.
 
+*Tenant provisioning (after email verification)*
+- [ ] A dedicated PostgreSQL schema is created per module within 10 seconds of email verification (event-driven; see `tenant-provisioning` diagram).
+- [ ] All base tables are migrated into each module's tenant schema automatically.
+- [ ] The registering user is assigned the Admin role within the org when provisioning completes.
+- [ ] Once provisioning completes, the workspace dashboard is fully functional.
+- [ ] If provisioning fails (e.g., DB timeout), the error is logged with full context and a retry is scheduled automatically (up to 3 retries, exponential backoff).
+- [ ] If provisioning fails after all retries, a platform alert is triggered for the Axis team to investigate.
+- [ ] The user is not stuck: the UI shows `workspace-provisioning` ("Setting up your workspace…") and polls `GET /api/auth/provisioning-status?token=` every 5 seconds.
+- [ ] Provisioning is idempotent: running it twice for the same org does not create duplicate schemas or tables.
+- [ ] If a tenant schema already exists (partial previous run), the migration runner continues from where it left off.
+
 *Out of scope*
 - CAPTCHA / bot protection on the registration form.
 - Automatic re-send of verification email after X minutes (no timer-based resend).
+- Custom schema naming chosen by the user — schema names are auto-generated (`tenant_{organizationId:N}`).
 
 > **Implementation status**
 >
@@ -86,13 +98,14 @@ Self-service registration flow where a new organization signs up and is automati
 > | API | ⚠️ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** **Registration:** email/password path is largely complete (`Idempotency-Key` on `POST /api/organizations/`, slug uniqueness retry). **Not yet:** Terms of Service / Privacy Policy acceptance (record accepted version), external-provider sign-up (ADR-027), **register-org-complete** screen, CAPTCHA (see *Out of scope*). **Email verification (backend ✅):** opaque one-time tokens in `email_verification_tokens` (SHA-256 at rest, 24h TTL), resend rate limit 3/email/hour (`IResendVerificationRateLimiter`, HTTP 429), login blocks unverified users, `GET /api/auth/provisioning-status?token=` after verify. **Frontend ⏳:** confirmation + link-click screens, post-verify auto sign-in, provisioning wait (**Deferred — PR #125 follow-up**).
+> **Gaps vs spec:** **Registration:** email/password path is largely complete (`Idempotency-Key` on `POST /api/organizations/`, slug uniqueness retry). **Not yet:** Terms of Service / Privacy Policy acceptance (record accepted version), external-provider sign-up (ADR-027), **register-org-complete** screen, CAPTCHA (see *Out of scope*). **Email verification (backend ✅):** opaque one-time tokens in `email_verification_tokens` (SHA-256 at rest, 24h TTL), resend rate limit 3/email/hour (`IResendVerificationRateLimiter`, HTTP 429), login blocks unverified users. **Tenant provisioning (backend ✅):** org enters `Provisioning` on verify, `OrganizationVerifiedEvent` → per-module `TenantModuleProvisionReportEvent`, Identity coordinator retries (3×, exponential backoff), critical log on exhaustion, `GET /api/auth/provisioning-status?token=` for polling. **Frontend ⏳:** full registration journey screens incl. `workspace-provisioning` (**Deferred — PR #125 follow-up**).
 >
 > **Decisions:**
 > - duplicate email returns silently without creating anything — matches "same confirmation screen" AC. `RegisterOrganizationCommandValidator` enforces: org name 2–100 chars, valid email, password min 8 chars + letter + number, confirmation match. Org slug auto-generated with uniqueness retry loop
 > - BCrypt work factor 12. 4 default system roles seeded atomically in the same transaction.
 > - **External providers:** industry-standard **post-OAuth completion** — IdPs supply identity only (email + display name); organization name is always collected on `register-org-complete` before the org is created. Short-lived server session holds the external login between OAuth callback and completion submit.
 > - **Resend / verify:** `ResendVerificationEmailCommand` silently succeeds for unknown or already-verified emails (no information leakage). IP-level `auth` rate limiter applies to `/connect/login` and Identity gRPC only — not on verify/resend (keeps integration tests stable).
+> - **Provisioning:** event-driven over Kafka per [ADR-019](../../../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope) — no central provisioner; verify endpoint stays fast; each module owns its schema lifecycle ([ADR-010](../../../TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy)).
 
 ## Screen flow
 
@@ -105,7 +118,7 @@ Canonical order for this use case. **The wireframes table below uses the same ro
 | 2b | `register-org` *(same screen as step 1)* | **Email/password** — submit on the entry form (skips 2a; no extra wireframe) |
 | 3 | `email-confirmation` | After org create succeeds (either branch) |
 | 4 | `verify-email` | User opens the link from the inbox (success, expired, used, invalid — 2×2 state board) |
-| 5 | workspace / provisioning | After successful verify — workspace or [provision-tenant](../provision-tenant/) wait |
+| 5 | `workspace-provisioning` | After successful verify — poll until tenant ready, then workspace / dashboard |
 
 Step **2b** is a path, not a separate UI file — only **2a** adds `register-org-complete.excalidraw`. The wireframes table lists files; step **2b** is called out on the `register-org` row below.
 
@@ -136,7 +149,7 @@ flowchart TD
   entry -->|SSO| complete
   complete --> confirm
   confirm -->|Open inbox link| verify
-  verify -->|Activated| provision["5 · workspace / dashboard"]
+  verify -->|Activated| provision["5 · workspace-provisioning"]
   entry -.-> errEntry
   complete -.-> errComplete
   entry -.->|SSO error| errProvider
@@ -162,7 +175,7 @@ Record **accepted ToS/Privacy version** on the account at org create (AC above);
 
 ## Wireframes
 
-Nine screens in this folder (four happy-path / journey steps, five state boards). Table order follows [Screen flow](#screen-flow). Under [Diagrams](#diagrams): one end-to-end journey sequence (`register-org-journey`) and one dev checklist (`register-org-cases`).
+Ten screens in this folder (five happy-path / journey steps, five state boards). Table order follows [Screen flow](#screen-flow). Under [Diagrams](#diagrams): journey (`register-org-journey`), dev checklist (`register-org-cases`), async provisioning (`tenant-provisioning`).
 
 | # | Screen | Role | Excalidraw | Preview |
 |---|--------|------|------------|---------|
@@ -170,6 +183,7 @@ Nine screens in this folder (four happy-path / journey steps, five state boards)
 | 2a | register-org-complete | Happy path — post-OAuth completion | [source](./register-org-complete.excalidraw) | [preview](./register-org-complete.svg) |
 | 3 | email-confirmation | Happy path — after create (resend link idle) | [source](./email-confirmation.excalidraw) | [preview](./email-confirmation.svg) |
 | 4 | verify-email | Happy path / outcomes — link click (2×2 grid) | [source](./verify-email.excalidraw) | [preview](./verify-email.svg) |
+| 5 | workspace-provisioning | Happy path — poll provisioning status | [source](./workspace-provisioning.excalidraw) | [preview](./workspace-provisioning.svg) |
 | — | email-confirmation-states | Resend from step 3 — in-flight, 204, 429 | [source](./email-confirmation-states.excalidraw) | [preview](./email-confirmation-states.svg) |
 | — | verify-email-rate-limit | Resend cap — 3/hour | [source](./verify-email-rate-limit.excalidraw) | [preview](./verify-email-rate-limit.svg) |
 | — | register-org-provider-states | Error — SSO before completion | [source](./register-org-provider-states.excalidraw) | [preview](./register-org-provider-states.svg) |
@@ -178,7 +192,7 @@ Nine screens in this folder (four happy-path / journey steps, five state boards)
 
 ## Diagrams
 
-Read **`register-org-journey`** once for the full happy path (sign-up → inbox → verify → workspace). Use **`register-org-cases`** when implementing error/state wireframes. Async module provisioning is not drawn here — see **Related** below.
+Read **`register-org-journey`** once for the full happy path (sign-up → inbox → verify → workspace). Use **`register-org-cases`** when implementing error/state wireframes. **`tenant-provisioning`** is the async/Kafka view (implementers); it continues where the journey ends at verify.
 
 ### register-org-journey
 
@@ -245,7 +259,47 @@ sequenceDiagram
     end
   end
 
-  Note over API,Email: Duplicate email on POST /api/organizations/ still returns 202 + same confirmation screen (no leakage). Kafka/module provisioning detail → provision-tenant.
+  Note over API,Email: Duplicate email on POST /api/organizations/ still returns 202 + same confirmation screen (no leakage). Async provisioning → tenant-provisioning below.
+```
+
+### tenant-provisioning
+
+Async multi-module tenant setup after `POST /api/auth/verify-email` (not a separate use case — same registration journey as `register-org-journey` step 5).
+
+```mermaid
+%%{init: {'theme':'dark','themeVariables':{'background':'#0d1117','mainBkg':'#0d1117','primaryColor':'#161b22','primaryBorderColor':'#388bfd','primaryTextColor':'#e6edf3','secondaryColor':'#21262d','secondaryBorderColor':'#388bfd','secondaryTextColor':'#e6edf3','tertiaryColor':'#161b22','tertiaryTextColor':'#e6edf3','lineColor':'#58a6ff','textColor':'#e6edf3','nodeBorder':'#388bfd','clusterBkg':'#161b22','clusterBorder':'#388bfd','titleColor':'#e6edf3','edgeLabelBackground':'#161b22','actorBkg':'#161b22','actorBorder':'#388bfd','actorTextColor':'#e6edf3','signalColor':'#58a6ff','labelBoxBkgColor':'#161b22','labelBoxBorderColor':'#388bfd','noteBkgColor':'#161b22','noteBorderColor':'#388bfd','noteTextColor':'#c9d1d9','activationBkgColor':'#30363d'}}}%%
+
+sequenceDiagram
+  participant API as Identity API
+  participant Kafka
+  participant Mod as Module provisioners
+  participant Coord as Identity coordinator
+  participant Web as Web App
+
+  Note over API,Kafka: Triggered when verify-email succeeds (register-org-journey § 4)
+  API->>API: Org → Provisioning, seed tenant_module_provisions
+  API->>Kafka: OrganizationVerifiedEvent
+
+  rect rgb(22, 35, 58)
+    Note over Kafka,Mod: Per-module schema tenant_{orgId:N}
+    Kafka->>Mod: Provision handler (each module DB)
+    Mod->>Mod: CREATE SCHEMA + EF migrations
+    Mod->>Kafka: TenantModuleProvisionReportEvent
+    Kafka->>Coord: Aggregate module reports
+    Coord->>Coord: Retry failures (3×, exponential backoff)
+    alt All modules succeeded
+      Coord->>API: Mark org ACTIVE, assign Admin role
+    else Retries exhausted
+      Coord->>Coord: Critical log (platform alert)
+    end
+  end
+
+  rect rgb(22, 35, 58)
+    Note over Web,API: workspace-provisioning UI
+    Web->>API: GET /api/auth/provisioning-status?token=
+    API-->>Web: Per-module progress (poll ~5s)
+    Web-->>Web: Redirect to dashboard when ACTIVE
+  end
 ```
 
 ### register-org-cases
@@ -305,4 +359,4 @@ sequenceDiagram
   end
 ```
 
-**Related (next use case):** after verify, tenant schemas provision asynchronously — [provision-tenant](../provision-tenant/) ([tenant provisioning](../provision-tenant/README.md#tenant-provisioning)). API: `POST /api/auth/verify-email`, `GET /api/auth/provisioning-status`.
+**APIs (registration journey):** `POST /api/organizations/`, `POST /api/auth/resend-verification`, `POST /api/auth/verify-email`, `GET /api/auth/provisioning-status`. The former standalone **verify-email** and **provision-tenant** use-case folders were merged into this README.
