@@ -222,7 +222,10 @@ export function btn(prefix, x, y, label, variant = 'primary') {
   ];
 }
 
-/** Pixel width of label copy at 11px — keeps required * tight to the last glyph. */
+/** Gap between label text and required * (px) — same on every field. */
+export const REQUIRED_MARKER_GAP = 5;
+
+/** Pixel width of label copy at 11px — positions the required * after the last glyph. */
 export function labelTextWidth(str, fontSize = 11) {
   const scale = fontSize / 11;
   let w = 0;
@@ -242,7 +245,7 @@ export function fieldLabel(prefix, x, y, label, { required = false, color = C.gr
   const labelW = Math.max(8, labelTextWidth(label, 11));
   const els = [text(`${prefix}_fl`, x, y, labelW, 16, label, 11, color)];
   if (required) {
-    els.push(text(`${prefix}_req`, x + labelW + 2, y, 8, 16, '*', 11, C.danger));
+    els.push(text(`${prefix}_req`, x + labelW + REQUIRED_MARKER_GAP, y, 8, 16, '*', 11, C.danger));
   }
   return els;
 }
