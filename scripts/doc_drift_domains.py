@@ -23,19 +23,18 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-MODULES_DIR = ROOT / "src" / "Modules"
-ENDPOINTS_DIR = ROOT / "src" / "Axis.Api" / "Endpoints"
-USE_CASES_DIR = ROOT / "docs" / "use-cases"
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
 
-# Module folder name → docs/use-cases slug when kebab-case(Module) is not the folder name.
-MODULE_TO_DOMAIN_SLUG: dict[str, str] = {
-    "Identity": "identity-access",
-}
-
-APPLICATION_IMPORT_RE = re.compile(
-    r"^using\s+Axis\.([A-Za-z0-9]+)\.Application\b",
-    re.MULTILINE,
+from axis_repo import (
+    ENDPOINTS_DIR,
+    MODULES_DIR,
+    ROOT,
+    USE_CASES_DIR,
+    iter_module_names,
+    module_to_domain_slug,
+    primary_application_module,
 )
 
 # Cross-cutting paths: (code regex, doc prefix under repo root, label).
@@ -62,39 +61,6 @@ class DomainDriftRule:
     code_patterns: list[str] = field(default_factory=list)
 
 
-def pascal_to_kebab(name: str) -> str:
-    return re.sub(r"([a-z0-9])([A-Z])", r"\1-\2", name).lower()
-
-
-def module_to_domain_slug(module_name: str) -> str:
-    slug = MODULE_TO_DOMAIN_SLUG.get(module_name, pascal_to_kebab(module_name))
-    domain_dir = USE_CASES_DIR / slug
-    if not domain_dir.is_dir():
-        raise ValueError(
-            f"module {module_name!r} maps to docs/use-cases/{slug} but that folder is missing"
-        )
-    return slug
-
-
-def list_module_names() -> list[str]:
-    return sorted(
-        p.name
-        for p in MODULES_DIR.iterdir()
-        if p.is_dir() and not p.name.startswith(".")
-    )
-
-
-def primary_application_module(endpoint_file: Path) -> str:
-    text = endpoint_file.read_text(encoding="utf-8")
-    modules = APPLICATION_IMPORT_RE.findall(text)
-    for module in modules:
-        if module != "Shared":
-            return module
-    raise ValueError(
-        f"{endpoint_file.relative_to(ROOT)}: no Axis.{{Module}}.Application import found"
-    )
-
-
 def discover_rules() -> list[DomainDriftRule]:
     """Build merged rules (one per doc_prefix) from modules, endpoints, and extras."""
     by_doc: dict[str, DomainDriftRule] = {}
@@ -107,7 +73,7 @@ def discover_rules() -> list[DomainDriftRule]:
         if pattern not in rule.code_patterns:
             rule.code_patterns.append(pattern)
 
-    for module in list_module_names():
+    for module in iter_module_names():
         domain = module_to_domain_slug(module)
         doc_prefix = f"docs/use-cases/{domain}"
         add_pattern(
@@ -137,7 +103,7 @@ def validate_discovery() -> list[str]:
     """Fail fast when the tree and mapping table are out of sync."""
     issues: list[str] = []
 
-    for module in list_module_names():
+    for module in iter_module_names():
         try:
             module_to_domain_slug(module)
         except ValueError as exc:
@@ -256,7 +222,7 @@ def main() -> int:
 
     if args.validate:
         print(
-            f"doc-drift-domains: OK ({len(list_module_names())} modules, "
+            f"doc-drift-domains: OK ({len(iter_module_names())} modules, "
             f"{len(list(ENDPOINTS_DIR.glob('*Endpoints.cs')))} endpoint groups, "
             f"{len(rules)} doc rules)"
         )

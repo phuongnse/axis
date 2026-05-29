@@ -55,8 +55,8 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 
 | Use case | Summary |
 |---|---|
-| [Switch application language (English / Vietnamese)](language/) | Switch application language (English / Vietnamese) |
-| [Switch visual theme (light / dark / system)](theme/) | Switch visual theme (light / dark / system) |
+| [Switch application language (English / Vietnamese)](language/) | Switch the application language between English and Vietnamese so that I can read and operate the app in my preferred… |
+| [Switch visual theme (light / dark / system)](theme/) | Switch the visual theme between light, dark, and system so that I can choose a comfortable theme and preserve readable… |
 
 
 

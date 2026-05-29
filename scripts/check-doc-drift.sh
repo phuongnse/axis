@@ -299,6 +299,12 @@ python3 "${ROOT}/scripts/check-doc-link-targets.py" --check || ERR=1
 
 python3 "${ROOT}/scripts/check-local-dev-docs.py" --check || ERR=1
 
+# Repo-layout discovery guards (scripts/axis_repo.py). Fail when generated
+# indexes or config lists drift from the tree — run the fix command in each script's output.
+python3 "${ROOT}/scripts/sync_buf_yaml.py" --check || ERR=1
+python3 "${ROOT}/scripts/check_kafka_wiring.py" --check || ERR=1
+python3 "${ROOT}/scripts/regenerate-domain-readme-index.py" --check || ERR=1
+
 if any_changed '^docker-compose\.yml$'; then
   if ! docs_changed_under 'docs/playbooks/local-dev.md'; then
     fail "docker-compose.yml changed but docs/playbooks/local-dev.md not updated in this PR"

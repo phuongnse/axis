@@ -1,22 +1,34 @@
 #!/usr/bin/env bash
-# Registers module Avro schemas with Confluent Schema Registry (ADR-019).
-# Usage: SCHEMA_REGISTRY_URL=http://localhost:8081 ./scripts/register-avro-schemas.sh
+# Registers every module Avro event schema with Confluent Schema Registry (ADR-019).
+#
+# Self-maintaining: discovers schemas by globbing src/Modules/**/Schemas/*Event.avsc
+# and derives the subject the same way Confluent's default TopicNameStrategy does —
+# "<topic>-value", where <topic> is "axis.<module>.<kebab-cased event name without
+# the Event suffix>" (mirrors the *KafkaTopics.cs constants). Adding a new
+# *Event.avsc under a module's Contracts/Schemas needs no edit here.
+#
+# Nested record schemas (*Record.avsc) are payload sub-types, not top-level Kafka
+# values — they get no subject of their own and are intentionally skipped.
+#
+# Usage:
+#   SCHEMA_REGISTRY_URL=http://localhost:8081 ./scripts/register-avro-schemas.sh
+#   DRY_RUN=1 ./scripts/register-avro-schemas.sh   # print subjects, no HTTP calls
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SCHEMA_REGISTRY_URL="${SCHEMA_REGISTRY_URL:-http://localhost:8081}"
-WB_SCHEMA_DIR="$ROOT/src/Modules/WorkflowBuilder/Axis.WorkflowBuilder.Contracts/Schemas"
-DM_SCHEMA_DIR="$ROOT/src/Modules/DataModeling/Axis.DataModeling.Contracts/Schemas"
-ID_SCHEMA_DIR="$ROOT/src/Modules/Identity/Axis.Identity.Contracts/Schemas"
+DRY_RUN="${DRY_RUN:-}"
+
+camel_to_kebab() {
+  sed -E 's/([a-z0-9])([A-Z])/\1-\2/g' <<<"$1" | tr '[:upper:]' '[:lower:]'
+}
 
 register() {
-  local file="$1"
-  local subject="$2"
-  if [[ ! -f "$file" ]]; then
-    echo "ERROR: schema file not found: $file (subject: $subject, registry: $SCHEMA_REGISTRY_URL)" >&2
-    exit 1
+  local file="$1" subject="$2" schema
+  if [[ -n "$DRY_RUN" ]]; then
+    echo "would register $subject  <-  ${file#"$ROOT/"}"
+    return
   fi
-  local schema
   schema="$(tr -d '\n' <"$file" | sed 's/"/\\"/g')"
   curl -fsS -X POST \
     -H "Content-Type: application/vnd.schemaregistry.v1+json" \
@@ -25,24 +37,13 @@ register() {
   echo "registered $subject"
 }
 
-register "$WB_SCHEMA_DIR/WorkflowPublishedEvent.avsc" "axis.workflowbuilder.workflow-published-value"
-register "$WB_SCHEMA_DIR/WorkflowArchivedEvent.avsc" "axis.workflowbuilder.workflow-archived-value"
-register "$WB_SCHEMA_DIR/WorkflowUnarchivedEvent.avsc" "axis.workflowbuilder.workflow-unarchived-value"
+count=0
+while IFS= read -r file; do
+  module="$(sed -E 's#.*/src/Modules/([^/]+)/.*#\1#' <<<"$file" | tr '[:upper:]' '[:lower:]')"
+  name="$(basename "$file" .avsc)"
+  topic="axis.${module}.$(camel_to_kebab "${name%Event}")"
+  register "$file" "${topic}-value"
+  count=$((count + 1))
+done < <(find "$ROOT/src/Modules" -path '*/Schemas/*Event.avsc' | sort)
 
-register "$DM_SCHEMA_DIR/ModelCreatedEvent.avsc" "axis.datamodeling.model-created-value"
-register "$DM_SCHEMA_DIR/ModelDeletedEvent.avsc" "axis.datamodeling.model-deleted-value"
-register "$DM_SCHEMA_DIR/DataClassCreatedEvent.avsc" "axis.datamodeling.data-class-created-value"
-register "$DM_SCHEMA_DIR/DataClassDeletedEvent.avsc" "axis.datamodeling.data-class-deleted-value"
-register "$DM_SCHEMA_DIR/DataRecordCreatedEvent.avsc" "axis.datamodeling.data-record-created-value"
-register "$DM_SCHEMA_DIR/DataRecordDeletedEvent.avsc" "axis.datamodeling.data-record-deleted-value"
-register "$DM_SCHEMA_DIR/FieldAddedEvent.avsc" "axis.datamodeling.field-added-value"
-register "$DM_SCHEMA_DIR/FieldUpdatedEvent.avsc" "axis.datamodeling.field-updated-value"
-register "$DM_SCHEMA_DIR/FieldRemovedEvent.avsc" "axis.datamodeling.field-removed-value"
-
-FB_SCHEMA_DIR="$ROOT/src/Modules/FormBuilder/Axis.FormBuilder.Contracts/Schemas"
-
-register "$ID_SCHEMA_DIR/OrganizationVerifiedEvent.avsc" "axis.identity.organization-verified-value"
-register "$ID_SCHEMA_DIR/TenantModuleProvisionReportEvent.avsc" "axis.identity.tenant-module-provision-report-value"
-register "$FB_SCHEMA_DIR/FormDeletedEvent.avsc" "axis.formbuilder.form-deleted-value"
-
-echo "register-avro-schemas: OK"
+echo "register-avro-schemas: OK ($count schemas)"

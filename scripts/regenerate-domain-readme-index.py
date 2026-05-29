@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
-"""Regenerate domain README Use Cases section with topical groupings."""
+"""Regenerate domain README Use Cases section with topical groupings.
+
+Usage:
+  python3 scripts/regenerate-domain-readme-index.py          # rewrite domain READMEs
+  python3 scripts/regenerate-domain-readme-index.py --check  # CI: fail if tables drift
+"""
 
 from __future__ import annotations
 
+import argparse
 import re
 import sys
 from pathlib import Path
@@ -142,31 +148,84 @@ def build_table(domain: str, readmes: list[Path]) -> str:
     return "\n".join(parts) + "\n"
 
 
-def regenerate(domain_dir: Path) -> None:
+USE_CASES_SECTION_RE = re.compile(
+    r"## Use Cases\n\n.*?(?=\n---\n|\n## (?!Use Cases)[A-Z]|\Z)",
+    re.DOTALL,
+)
+
+
+def expected_use_cases_section(domain_dir: Path) -> str | None:
     readme = domain_dir / "README.md"
     if not readme.exists():
-        return
+        return None
     readmes = list_use_cases(domain_dir)
     table = build_table(domain_dir.name, readmes)
+    return f"## Use Cases\n\n{table}\n"
+
+
+def apply_use_cases_section(readme: Path, expected: str) -> None:
     text = readme.read_text(encoding="utf-8")
-    text = re.sub(
-        r"## Use Cases\n\n.*?(?=\n---\n|\n## (?!Use Cases)[A-Z]|\Z)",
-        f"## Use Cases\n\n{table}\n",
-        text,
-        count=1,
-        flags=re.DOTALL,
-    )
+    text = USE_CASES_SECTION_RE.sub(expected, text, count=1)
     readme.write_text(text, encoding="utf-8")
 
 
+def check_domain(domain_dir: Path) -> list[str]:
+    readme = domain_dir / "README.md"
+    expected = expected_use_cases_section(domain_dir)
+    if expected is None:
+        return []
+    text = readme.read_text(encoding="utf-8")
+    match = USE_CASES_SECTION_RE.search(text)
+    actual = match.group(0) if match else ""
+    if actual != expected:
+        rel = readme.relative_to(ROOT)
+        return [
+            f"{rel}: ## Use Cases table out of date — run "
+            f"python3 scripts/regenerate-domain-readme-index.py"
+        ]
+    return []
+
+
+def regenerate(domain_dir: Path) -> None:
+    expected = expected_use_cases_section(domain_dir)
+    if expected is None:
+        return
+    apply_use_cases_section(domain_dir / "README.md", expected)
+
+
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="fail when domain README Use Cases tables are out of date",
+    )
+    args = parser.parse_args()
+
+    issues: list[str] = []
+    updated = 0
     for domain_dir in sorted(USE_CASES.iterdir()):
         if not domain_dir.is_dir() or domain_dir.name.startswith("_"):
             continue
         if domain_dir.name == "page-builder":
             continue
-        regenerate(domain_dir)
-        print(f"updated {domain_dir.name}/README.md")
+        if args.check:
+            issues.extend(check_domain(domain_dir))
+        else:
+            regenerate(domain_dir)
+            print(f"updated {domain_dir.name}/README.md")
+            updated += 1
+
+    if args.check:
+        if issues:
+            print("regenerate-domain-readme-index: FAIL", file=sys.stderr)
+            for issue in issues:
+                print(f"  - {issue}", file=sys.stderr)
+            return 1
+        print("regenerate-domain-readme-index: OK")
+        return 0
+
+    print(f"regenerate-domain-readme-index: updated {updated} domain README(s)")
     return 0
 
 
