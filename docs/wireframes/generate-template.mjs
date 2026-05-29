@@ -1813,10 +1813,10 @@ export function buildDualListbox(y0) {
   return els;
 }
 
-/** Microsoft / Google / GitHub icon buttons + “or” divider (ADR-027). Canonical source for register-org SSO row. */
-export function buildAuthExternalSignIn(y0) {
-  const els = [...sectionHeader(38, 'Auth External Sign-In (ADR-027)', y0)];
-  const yC = y0 + 48;
+/**
+ * SSO icon row + “or” divider only (x=50). Used by screens via component() — no kit caption.
+ */
+export function buildAuthExternalSignInBlock(yC) {
   const innerW = AUTH_INNER_W;
   const btnSize = AUTH_PROVIDER_BTN_SIZE;
   const gap = AUTH_PROVIDER_GAP;
@@ -1827,9 +1827,7 @@ export function buildAuthExternalSignIn(y0) {
     ['ext_go', 'G', '#dc2626', '#fef2f2'],
     ['ext_gh', '⎇', '#1f2937', '#f3f4f6'],
   ];
-
-  els.push(text('ext_note', 50, yC - 16, 400, 14,
-    'Microsoft · Google · GitHub — icon row + “or” divider', 10, C.gray500));
+  const els = [];
 
   providers.forEach(([id, icon, stroke, bg], i) => {
     const bx = startX + i * (btnSize + gap);
@@ -1843,6 +1841,16 @@ export function buildAuthExternalSignIn(y0) {
   els.push(text('ext_or_t', mid - 20, yOr, 40, 16, 'or', 11, C.gray500, 'center'));
   els.push(hline('ext_or_r', mid + 28, yOr + 10, innerW / 2 - 28, C.gray300));
 
+  return els;
+}
+
+/** S38 kit section — includes caption for _template only. */
+export function buildAuthExternalSignIn(y0) {
+  const els = [...sectionHeader(38, 'Auth External Sign-In (ADR-027)', y0)];
+  const yC = y0 + 48;
+  els.push(text('ext_note', 50, yC - 16, 400, 14,
+    'Microsoft · Google · GitHub + “or” divider (ADR-027)', 10, C.gray500));
+  els.push(...buildAuthExternalSignInBlock(yC));
   return els;
 }
 

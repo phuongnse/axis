@@ -222,15 +222,27 @@ export function btn(prefix, x, y, label, variant = 'primary') {
   ];
 }
 
+/** Pixel width of label copy at 11px — keeps required * tight to the last glyph. */
+export function labelTextWidth(str, fontSize = 11) {
+  const scale = fontSize / 11;
+  let w = 0;
+  for (const ch of str) {
+    if (ch === ' ') w += 3.2 * scale;
+    else if (ch >= 'A' && ch <= 'Z') w += 6.4 * scale;
+    else w += 5.5 * scale;
+  }
+  return Math.ceil(w);
+}
+
 /**
  * Form field label with optional required marker (* in C.danger).
  * Use on every user-editable field label in screen wireframes.
  */
 export function fieldLabel(prefix, x, y, label, { required = false, color = C.gray500 } = {}) {
-  const labelW = Math.max(24, Math.ceil(label.length * 6.8));
+  const labelW = Math.max(8, labelTextWidth(label, 11));
   const els = [text(`${prefix}_fl`, x, y, labelW, 16, label, 11, color)];
   if (required) {
-    els.push(text(`${prefix}_req`, x + labelW + 2, y, 10, 16, '*', 11, C.danger));
+    els.push(text(`${prefix}_req`, x + labelW + 2, y, 8, 16, '*', 11, C.danger));
   }
   return els;
 }

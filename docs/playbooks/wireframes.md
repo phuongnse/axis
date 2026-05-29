@@ -325,9 +325,9 @@ cardY   = Math.round((H - cardH) / 2)
 **External sign-in (ADR-027):** never draw Microsoft / Google / GitHub icon buttons or the `or` divider by hand. Place the kit block from S38:
 
 ```js
-import { buildAuthExternalSignIn, AUTH_EXTERNAL_SIGN_IN_BLOCK_H } from './generate-template.mjs';
+import { buildAuthExternalSignInBlock, AUTH_EXTERNAL_SIGN_IN_BLOCK_H } from './generate-template.mjs';
 
-contentEls.push(...component(buildAuthExternalSignIn, cardX + 24, y, 48));
+contentEls.push(...component((y0) => buildAuthExternalSignInBlock(y0 + 48), cardX + 24, y, 48));
 y += AUTH_EXTERNAL_SIGN_IN_BLOCK_H;
 ```
 
