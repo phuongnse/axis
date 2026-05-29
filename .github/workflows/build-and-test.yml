@@ -57,9 +57,15 @@ jobs:
             doc-drift-scope:
               - 'src/**'
               - 'tests/**'
-              - 'docs/use-cases/**'
-              - 'docs/PROGRESS.md'
+              # All docs, not just use-cases: the umbrella's full-tree checks
+              # (link targets, use-case structure, code-fence integrity) must
+              # run on playbook/reference edits too — that is where the PR #146
+              # bulk-find-replace corruption landed undetected.
+              - 'docs/**'
               - 'scripts/check-doc-drift.sh'
+              - 'scripts/check-doc-link-targets.py'
+              - 'scripts/check-doc-code-fences.py'
+              - 'scripts/check-use-case-docs.py'
               - 'scripts/check-local-dev-docs.py'
               - 'scripts/check-buf-modules.sh'
               - 'buf.yaml'

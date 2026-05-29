@@ -329,6 +329,11 @@ python3 "${ROOT}/scripts/check-use-case-docs.py" --check || ERR=1
 # Catches the broken `![alt](./missing.svg)` class lychee missed in PR #142.
 python3 "${ROOT}/scripts/check-doc-link-targets.py" --check || ERR=1
 
+# Code-fence indentation integrity. Catches the collapsed-indentation class a
+# bulk find-replace introduced in PR #146 — invisible to lychee, prettier, and
+# the structural doc checks (see the script header).
+python3 "${ROOT}/scripts/check-doc-code-fences.py" --check || ERR=1
+
 
 python3 "${ROOT}/scripts/check-local-dev-docs.py" --check || ERR=1
 
