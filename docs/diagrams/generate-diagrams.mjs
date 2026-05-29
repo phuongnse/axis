@@ -159,7 +159,7 @@ function arrow({ x1, y1, x2, y2, label, color = C.arrow, dashed = false }) {
   if (label) {
     const mx = (x1 + x2) / 2;
     const my = (y1 + y2) / 2;
-    els.push(text({ x: mx, y: my - 14, value: label, size: 10, color: C.muted, anchor: "center" }));
+    els.push(text({ x: mx, y: my - 18, value: label, size: 10, color: C.muted, anchor: "center" }));
   }
   return els;
 }
@@ -189,9 +189,62 @@ function routedArrow({ waypoints, label, color = C.arrow, dashed = false }) {
   const els = [el];
   if (label) {
     const mid = waypoints[Math.floor(waypoints.length / 2)];
-    els.push(text({ x: mid[0], y: mid[1] - 14, value: label, size: 10, color: C.muted, anchor: "center" }));
+    els.push(text({ x: mid[0], y: mid[1] - 18, value: label, size: 10, color: C.muted, anchor: "center" }));
   }
   return els;
+}
+
+/** Word-wrap note copy to fit inside sequence-diagram callout boxes. */
+function wrapNoteLines(str, maxWidth, fontSize = 10) {
+  const lines = [];
+  for (const paragraph of str.split("\n")) {
+    const words = paragraph.split(/\s+/).filter(Boolean);
+    let line = "";
+    for (const word of words) {
+      const candidate = line ? `${line} ${word}` : word;
+      if (estimateWidth(candidate, fontSize) <= maxWidth) {
+        line = candidate;
+        continue;
+      }
+      if (line) {
+        lines.push(line);
+      }
+      line = word;
+      while (estimateWidth(line, fontSize) > maxWidth && line.length > 1) {
+        let cut = line.length;
+        while (cut > 1 && estimateWidth(line.slice(0, cut), fontSize) > maxWidth) {
+          cut--;
+        }
+        lines.push(line.slice(0, cut));
+        line = line.slice(cut);
+      }
+    }
+    if (line) {
+      lines.push(line);
+    }
+  }
+  return lines;
+}
+
+/** Yellow callout with wrapped lines (avoids single-line overflow). */
+function seqNoteBox({ x, y, w, label, labelSize = 10, padX = 14, padY = 12, lineHeight = 16 }) {
+  const innerW = w - padX * 2;
+  const lines = wrapNoteLines(label, innerW * 0.92, labelSize);
+  const h = padY * 2 + lines.length * lineHeight;
+  const els = [
+    ...rect({ x, y, w, h, bg: C.evtBg, stroke: C.evtBdr }),
+  ];
+  lines.forEach((line, i) => {
+    els.push(text({
+      x: x + w / 2,
+      y: y + padY + i * lineHeight + lineHeight / 2,
+      value: line,
+      size: labelSize,
+      color: C.text,
+      anchor: "center",
+    }));
+  });
+  return { els, h };
 }
 
 function badge({ x, y, label }) {
@@ -556,11 +609,23 @@ function seqBuild({ title, participants, gap = 165, messages, sections = [], not
   const els = [];
   const BOX_W = 125, BOX_H = 42, BOX_Y = 48;
   const LIFE_TOP = BOX_Y + BOX_H;
-  const LIFE_BOT = messages.reduce((max, m) => Math.max(max, m.y), 0) + 50;
 
   // Compute cx first — CANVAS_W depends on it
   const ps = participants.map((p, i) => ({ ...p, cx: 60 + i * gap }));
   const CANVAS_W = ps[ps.length - 1].cx + BOX_W / 2 + 30;
+
+  const noteLayouts = notes.map((n) => {
+    const w = n.w || CANVAS_W - 40;
+    const innerW = w - 28;
+    const lines = wrapNoteLines(n.label, innerW * 0.92, n.labelSize || 10);
+    const h = 24 + lines.length * 16;
+    return { ...n, w, h };
+  });
+  const notesBottom = noteLayouts.reduce((max, n) => Math.max(max, n.y + n.h), 0);
+  const LIFE_BOT = Math.max(
+    messages.reduce((max, m) => Math.max(max, m.y), 0) + 56,
+    notesBottom + 24,
+  );
 
   // Title
   els.push(text({ x: CANVAS_W / 2, y: 20, value: title, size: 15, bold: true, color: C.text, anchor: "center" }));
@@ -604,10 +669,22 @@ function seqBuild({ title, participants, gap = 165, messages, sections = [], not
     }
   }
 
-  // Notes (info boxes at bottom)
-  for (const n of notes) {
-    els.push(...rect({ x: n.x, y: n.y, w: n.w || 400, h: n.h || 32, bg: C.evtBg, stroke: C.evtBdr, label: n.label, labelSize: 10 }));
+  // Notes (wrapped callouts at bottom)
+  for (const n of noteLayouts) {
+    const { els: noteEls } = seqNoteBox({
+      x: n.x,
+      y: n.y,
+      w: n.w,
+      label: n.label,
+      labelSize: n.labelSize || 10,
+    });
+    els.push(...noteEls);
   }
+
+  // Canvas background sized to full diagram (prevents clipped export)
+  els.unshift(
+    ...rect({ x: 0, y: 0, w: CANVAS_W, h: LIFE_BOT + 32, bg: C.bg, stroke: C.bg }),
+  );
 
   return excalidraw(els);
 }
@@ -627,41 +704,39 @@ function registerOrgFlowDiagram() {
       { label: "IdP", sub: "(MS/Google/GitHub)", external: true },
     ],
     sections: [
-      { y: 260, label: "Email / password path" },
-      { y: 460, label: "External provider (OAuth only)" },
-      { y: 660, label: "Post-OAuth completion screen" },
+      { y: 288, label: "Email / password path" },
+      { y: 532, label: "External provider (OAuth only)" },
+      { y: 768, label: "Post-OAuth completion screen" },
     ],
     messages: [
       { from: 0, to: 1, y: 140, label: "Open registration page" },
-      { from: 1, to: 0, y: 176, label: "Show SSO icons + email/password form", dashed: true },
+      { from: 1, to: 0, y: 192, label: "Show SSO icons + email/password form", dashed: true },
 
-      { from: 0, to: 1, y: 296, label: "Accept Terms + submit form (Idempotency-Key)" },
-      { from: 1, to: 2, y: 340, label: "POST /api/organizations/" },
-      { from: 2, to: 2, y: 384, label: "Generate slug, hash password, record ToS" },
-      { from: 2, to: 3, y: 424, label: "Send verification email (if new)" },
-      { from: 2, to: 1, y: 448, label: "202 → confirmation screen", dashed: true },
+      { from: 0, to: 1, y: 312, label: "Accept Terms + submit form (Idempotency-Key)" },
+      { from: 1, to: 2, y: 360, label: "POST /api/organizations/" },
+      { from: 2, to: 2, y: 408, label: "Generate slug, hash password, record ToS" },
+      { from: 2, to: 3, y: 456, label: "Send verification email (if new)" },
+      { from: 2, to: 1, y: 504, label: "202 → confirmation screen", dashed: true },
 
-      { from: 0, to: 1, y: 488, label: "Choose Microsoft / Google / GitHub" },
-      { from: 1, to: 4, y: 532, label: "OAuth2 Auth Code + PKCE" },
-      { from: 4, to: 1, y: 576, label: "Verified email + display name", dashed: true },
-      { from: 1, to: 2, y: 620, label: "Validate provider claims (verified email required)" },
-      { from: 2, to: 1, y: 644, label: "Reject: no verified email", dashed: true },
-      { from: 2, to: 1, y: 668, label: "Reject: email already registered (Sign in instead)", dashed: true },
+      { from: 0, to: 1, y: 556, label: "Choose Microsoft / Google / GitHub" },
+      { from: 1, to: 4, y: 604, label: "OAuth2 Auth Code + PKCE" },
+      { from: 4, to: 1, y: 652, label: "Verified email + display name", dashed: true },
+      { from: 1, to: 2, y: 700, label: "Validate provider claims (verified email required)" },
+      { from: 2, to: 1, y: 748, label: "Reject: no verified email", dashed: true },
+      { from: 2, to: 1, y: 796, label: "Reject: email already registered (Sign in instead)", dashed: true },
 
-      { from: 2, to: 1, y: 692, label: "Open register-org-complete", dashed: true },
-      { from: 1, to: 0, y: 716, label: "register-org-complete (org name, slug, Terms)", dashed: true },
-      { from: 0, to: 1, y: 760, label: "Submit completion (Idempotency-Key)" },
-      { from: 1, to: 2, y: 804, label: "POST org + link external login" },
-      { from: 2, to: 3, y: 848, label: "Send verification email (if new)" },
-      { from: 2, to: 1, y: 888, label: "202 → confirmation screen", dashed: true },
+      { from: 2, to: 1, y: 844, label: "Open register-org-complete", dashed: true },
+      { from: 1, to: 0, y: 892, label: "register-org-complete (org name, slug, Terms)", dashed: true },
+      { from: 0, to: 1, y: 940, label: "Submit completion (Idempotency-Key)" },
+      { from: 1, to: 2, y: 988, label: "POST org + link external login" },
+      { from: 2, to: 3, y: 1036, label: "Send verification email (if new)" },
+      { from: 2, to: 1, y: 1084, label: "202 → confirmation screen", dashed: true },
     ],
     notes: [
       {
         x: 20,
-        y: 930,
-        w: 720,
-        h: 44,
-        label: "IdP never supplies organization name. Provider path must have verified email; duplicate/no-verified-email are rejected before completion. Password duplicate email still returns the same confirmation screen.",
+        y: 1140,
+        label: "IdP never supplies organization name.\nProvider path requires verified email; reject duplicate / no-verified-email before completion.\nPassword duplicate email still returns the same confirmation screen.",
       },
     ],
   });
@@ -678,38 +753,36 @@ function registerOrgCasesDiagram() {
       { label: "Axis API" },
     ],
     sections: [
-      { y: 140, label: "Email/password submission" },
-      { y: 340, label: "Provider callback pre-check" },
-      { y: 580, label: "Post-OAuth completion submit" },
-      { y: 800, label: "Shared confirmation outcome" },
+      { y: 164, label: "Email/password submission" },
+      { y: 404, label: "Provider callback pre-check" },
+      { y: 668, label: "Post-OAuth completion submit" },
+      { y: 900, label: "Shared confirmation outcome" },
     ],
     messages: [
-      { from: 0, to: 1, y: 168, label: "Submit register-org form (Idempotency-Key + Terms checked)" },
-      { from: 1, to: 2, y: 216, label: "POST /api/organizations/" },
-      { from: 2, to: 1, y: 264, label: "400 validation errors (inline field errors)", dashed: true },
-      { from: 2, to: 1, y: 296, label: "5xx generic banner + re-enable submit", dashed: true },
-      { from: 2, to: 1, y: 328, label: "202 confirmation (new OR duplicate email)", dashed: true },
+      { from: 0, to: 1, y: 188, label: "Submit register-org form (Idempotency-Key + Terms checked)" },
+      { from: 1, to: 2, y: 236, label: "POST /api/organizations/" },
+      { from: 2, to: 1, y: 284, label: "400 validation errors (inline field errors)", dashed: true },
+      { from: 2, to: 1, y: 332, label: "5xx generic banner + re-enable submit", dashed: true },
+      { from: 2, to: 1, y: 380, label: "202 confirmation (new OR duplicate email)", dashed: true },
 
-      { from: 0, to: 1, y: 376, label: "Complete provider OAuth callback" },
-      { from: 1, to: 2, y: 424, label: "Validate provider claims (verified email + uniqueness)" },
-      { from: 2, to: 1, y: 472, label: "Reject: no verified email → provider error screen", dashed: true },
-      { from: 2, to: 1, y: 504, label: "Reject: duplicate email → Sign in instead", dashed: true },
-      { from: 2, to: 1, y: 536, label: "Open register-org-complete", dashed: true },
+      { from: 0, to: 1, y: 428, label: "Complete provider OAuth callback" },
+      { from: 1, to: 2, y: 476, label: "Validate provider claims (verified email + uniqueness)" },
+      { from: 2, to: 1, y: 524, label: "Reject: no verified email → provider error screen", dashed: true },
+      { from: 2, to: 1, y: 572, label: "Reject: duplicate email → Sign in instead", dashed: true },
+      { from: 2, to: 1, y: 620, label: "Open register-org-complete", dashed: true },
 
-      { from: 0, to: 1, y: 620, label: "Submit register-org-complete (org name + slug + Terms)" },
-      { from: 1, to: 2, y: 668, label: "POST completion (link external login, idempotent)" },
-      { from: 2, to: 1, y: 716, label: "400 org name/terms errors (inline)", dashed: true },
-      { from: 2, to: 1, y: 748, label: "5xx generic banner + re-enable submit", dashed: true },
+      { from: 0, to: 1, y: 692, label: "Submit register-org-complete (org name + slug + Terms)" },
+      { from: 1, to: 2, y: 740, label: "POST completion (link external login, idempotent)" },
+      { from: 2, to: 1, y: 788, label: "400 org name/terms errors (inline)", dashed: true },
+      { from: 2, to: 1, y: 836, label: "5xx generic banner + re-enable submit", dashed: true },
 
-      { from: 2, to: 1, y: 836, label: "202 confirmation screen", dashed: true },
-      { from: 1, to: 0, y: 884, label: "email-confirmation + resend states (204/429)", dashed: true },
+      { from: 2, to: 1, y: 924, label: "202 confirmation screen", dashed: true },
+      { from: 1, to: 0, y: 972, label: "email-confirmation + resend states (204/429)", dashed: true },
     ],
     notes: [
       {
         x: 20,
-        y: 928,
-        w: 600,
-        h: 30,
+        y: 1030,
         label: "Use this as implementation checklist: each dashed outcome maps to an explicit wireframe state.",
       },
     ],

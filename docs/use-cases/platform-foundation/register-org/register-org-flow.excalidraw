@@ -4,6 +4,36 @@
   "source": "generated",
   "elements": [
     {
+      "id": "diag-68",
+      "x": 0,
+      "y": 0,
+      "angle": 0,
+      "strokeColor": "#f8fafc",
+      "backgroundColor": "#f8fafc",
+      "fillStyle": "solid",
+      "strokeWidth": 1.5,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 3,
+        "value": 6
+      },
+      "seed": 68,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "rectangle",
+      "width": 852.5,
+      "height": 1268
+    },
+    {
       "id": "diag-1",
       "x": 182.87499999999997,
       "y": 12.5,
@@ -128,7 +158,7 @@
       "locked": false,
       "type": "arrow",
       "width": 0,
-      "height": 848,
+      "height": 1146,
       "points": [
         [
           0,
@@ -136,7 +166,7 @@
         ],
         [
           0,
-          848
+          1146
         ]
       ],
       "startArrowhead": null,
@@ -233,7 +263,7 @@
       "locked": false,
       "type": "arrow",
       "width": 0,
-      "height": 848,
+      "height": 1146,
       "points": [
         [
           0,
@@ -241,7 +271,7 @@
         ],
         [
           0,
-          848
+          1146
         ]
       ],
       "startArrowhead": null,
@@ -372,7 +402,7 @@
       "locked": false,
       "type": "arrow",
       "width": 0,
-      "height": 848,
+      "height": 1146,
       "points": [
         [
           0,
@@ -380,7 +410,7 @@
         ],
         [
           0,
-          848
+          1146
         ]
       ],
       "startArrowhead": null,
@@ -511,7 +541,7 @@
       "locked": false,
       "type": "arrow",
       "width": 0,
-      "height": 848,
+      "height": 1146,
       "points": [
         [
           0,
@@ -519,7 +549,7 @@
         ],
         [
           0,
-          848
+          1146
         ]
       ],
       "startArrowhead": null,
@@ -650,7 +680,7 @@
       "locked": false,
       "type": "arrow",
       "width": 0,
-      "height": 848,
+      "height": 1146,
       "points": [
         [
           0,
@@ -658,7 +688,7 @@
         ],
         [
           0,
-          848
+          1146
         ]
       ],
       "startArrowhead": null,
@@ -667,7 +697,7 @@
     {
       "id": "diag-20",
       "x": 20,
-      "y": 260,
+      "y": 288,
       "angle": 0,
       "strokeColor": "#94a3b8",
       "backgroundColor": "transparent",
@@ -708,7 +738,7 @@
     {
       "id": "diag-21",
       "x": 352,
-      "y": 267,
+      "y": 295,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -742,7 +772,7 @@
     {
       "id": "diag-22",
       "x": 20,
-      "y": 460,
+      "y": 532,
       "angle": 0,
       "strokeColor": "#94a3b8",
       "backgroundColor": "transparent",
@@ -783,7 +813,7 @@
     {
       "id": "diag-23",
       "x": 327.25,
-      "y": 467,
+      "y": 539,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -817,7 +847,7 @@
     {
       "id": "diag-24",
       "x": 20,
-      "y": 660,
+      "y": 768,
       "angle": 0,
       "strokeColor": "#94a3b8",
       "backgroundColor": "transparent",
@@ -858,7 +888,7 @@
     {
       "id": "diag-25",
       "x": 332.75,
-      "y": 667,
+      "y": 775,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -933,7 +963,7 @@
     {
       "id": "diag-27",
       "x": 87,
-      "y": 121,
+      "y": 117,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -967,7 +997,7 @@
     {
       "id": "diag-28",
       "x": 235,
-      "y": 176,
+      "y": 192,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1008,7 +1038,7 @@
     {
       "id": "diag-29",
       "x": 48.499999999999986,
-      "y": 157,
+      "y": 169,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1042,7 +1072,7 @@
     {
       "id": "diag-30",
       "x": 60,
-      "y": 296,
+      "y": 312,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1083,7 +1113,7 @@
     {
       "id": "diag-31",
       "x": 26.499999999999986,
-      "y": 277,
+      "y": 289,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1117,7 +1147,7 @@
     {
       "id": "diag-32",
       "x": 235,
-      "y": 340,
+      "y": 360,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1158,7 +1188,7 @@
     {
       "id": "diag-33",
       "x": 256.5,
-      "y": 321,
+      "y": 337,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1192,7 +1222,7 @@
     {
       "id": "diag-34",
       "x": 410,
-      "y": 384,
+      "y": 408,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1241,7 +1271,7 @@
     {
       "id": "diag-35",
       "x": 340,
-      "y": 387,
+      "y": 407,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1275,7 +1305,7 @@
     {
       "id": "diag-36",
       "x": 410,
-      "y": 424,
+      "y": 456,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1316,7 +1346,7 @@
     {
       "id": "diag-37",
       "x": 409.5,
-      "y": 405,
+      "y": 433,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1350,7 +1380,7 @@
     {
       "id": "diag-38",
       "x": 410,
-      "y": 448,
+      "y": 504,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1391,7 +1421,7 @@
     {
       "id": "diag-39",
       "x": 253.75,
-      "y": 429,
+      "y": 481,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1425,7 +1455,7 @@
     {
       "id": "diag-40",
       "x": 60,
-      "y": 488,
+      "y": 556,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1466,7 +1496,7 @@
     {
       "id": "diag-41",
       "x": 53.999999999999986,
-      "y": 469,
+      "y": 533,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1500,7 +1530,7 @@
     {
       "id": "diag-42",
       "x": 235,
-      "y": 532,
+      "y": 604,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1541,7 +1571,7 @@
     {
       "id": "diag-43",
       "x": 434.25,
-      "y": 513,
+      "y": 581,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1575,7 +1605,7 @@
     {
       "id": "diag-44",
       "x": 760,
-      "y": 576,
+      "y": 652,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1616,7 +1646,7 @@
     {
       "id": "diag-45",
       "x": 417.75,
-      "y": 557,
+      "y": 629,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1650,7 +1680,7 @@
     {
       "id": "diag-46",
       "x": 235,
-      "y": 620,
+      "y": 700,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1691,7 +1721,7 @@
     {
       "id": "diag-47",
       "x": 185,
-      "y": 601,
+      "y": 677,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1725,7 +1755,7 @@
     {
       "id": "diag-48",
       "x": 410,
-      "y": 644,
+      "y": 748,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1766,7 +1796,7 @@
     {
       "id": "diag-49",
       "x": 253.75,
-      "y": 625,
+      "y": 725,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1800,7 +1830,7 @@
     {
       "id": "diag-50",
       "x": 410,
-      "y": 668,
+      "y": 796,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1841,7 +1871,7 @@
     {
       "id": "diag-51",
       "x": 185,
-      "y": 649,
+      "y": 773,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1875,7 +1905,7 @@
     {
       "id": "diag-52",
       "x": 410,
-      "y": 692,
+      "y": 844,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1916,7 +1946,7 @@
     {
       "id": "diag-53",
       "x": 251,
-      "y": 673,
+      "y": 821,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1950,7 +1980,7 @@
     {
       "id": "diag-54",
       "x": 235,
-      "y": 716,
+      "y": 892,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1991,7 +2021,7 @@
     {
       "id": "diag-55",
       "x": 23.749999999999986,
-      "y": 697,
+      "y": 869,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2025,7 +2055,7 @@
     {
       "id": "diag-56",
       "x": 60,
-      "y": 760,
+      "y": 940,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -2066,7 +2096,7 @@
     {
       "id": "diag-57",
       "x": 51.249999999999986,
-      "y": 741,
+      "y": 917,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2100,7 +2130,7 @@
     {
       "id": "diag-58",
       "x": 235,
-      "y": 804,
+      "y": 988,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -2141,7 +2171,7 @@
     {
       "id": "diag-59",
       "x": 240,
-      "y": 785,
+      "y": 965,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2175,7 +2205,7 @@
     {
       "id": "diag-60",
       "x": 410,
-      "y": 848,
+      "y": 1036,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -2216,7 +2246,7 @@
     {
       "id": "diag-61",
       "x": 409.5,
-      "y": 829,
+      "y": 1013,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2250,7 +2280,7 @@
     {
       "id": "diag-62",
       "x": 410,
-      "y": 888,
+      "y": 1084,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -2291,7 +2321,7 @@
     {
       "id": "diag-63",
       "x": 253.75,
-      "y": 869,
+      "y": 1061,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2325,7 +2355,7 @@
     {
       "id": "diag-64",
       "x": 20,
-      "y": 930,
+      "y": 1140,
       "angle": 0,
       "strokeColor": "#ca8a04",
       "backgroundColor": "#fef9c3",
@@ -2349,13 +2379,13 @@
       "link": null,
       "locked": false,
       "type": "rectangle",
-      "width": 720,
-      "height": 44
+      "width": 812.5,
+      "height": 72
     },
     {
       "id": "diag-65",
-      "x": -186.5,
-      "y": 947,
+      "x": 324.5,
+      "y": 1155,
       "angle": 0,
       "strokeColor": "#1e293b",
       "backgroundColor": "transparent",
@@ -2378,9 +2408,77 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 1133,
+      "width": 203.50000000000003,
       "height": 14,
-      "text": "IdP never supplies organization name. Provider path must have verified email; duplicate/no-verified-email are rejected before completion. Password duplicate email still returns the same confirmation screen.",
+      "text": "IdP never supplies organization name.",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "id": "diag-66",
+      "x": 167.75,
+      "y": 1171,
+      "angle": 0,
+      "strokeColor": "#1e293b",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 66,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "text",
+      "width": 517,
+      "height": 14,
+      "text": "Provider path requires verified email; reject duplicate / no-verified-email before completion.",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "id": "diag-67",
+      "x": 239.24999999999997,
+      "y": 1187,
+      "angle": 0,
+      "strokeColor": "#1e293b",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 67,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "text",
+      "width": 374.00000000000006,
+      "height": 14,
+      "text": "Password duplicate email still returns the same confirmation screen.",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
