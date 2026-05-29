@@ -13,20 +13,20 @@ const __dir = dirname(fileURLToPath(import.meta.url));
 /** Canonical logo asset (commit changes here; sync frontend copy when mark changes). */
 export const AXIS_LOGO_SVG_PATH = join(__dir, 'assets', 'axis-logo.svg');
 
-export const AXIS_MARK_AUTH_W = 32;
-export const AXIS_MARK_AUTH_H = 32;
-export const AXIS_MARK_COMPACT_W = 24;
-export const AXIS_MARK_COMPACT_H = 24;
+export const AXIS_MARK_AUTH_W = 36;
+export const AXIS_MARK_AUTH_H = 36;
+export const AXIS_MARK_COMPACT_W = 26;
+export const AXIS_MARK_COMPACT_H = 26;
 
-export const AXIS_WORD_GAP = 10;
-export const AXIS_WORD_AUTH_W = 42;
-export const AXIS_WORD_COMPACT_W = 34;
+export const AXIS_WORD_GAP = 6;
+export const AXIS_WORD_AUTH_W = 40;
+export const AXIS_WORD_COMPACT_W = 32;
 
 /** Auth lockup: mark + word (viewBox mark 36x36). */
 export const AXIS_LOGO_AUTH_W = AXIS_MARK_AUTH_W + AXIS_WORD_GAP + AXIS_WORD_AUTH_W;
 export const AXIS_LOGO_AUTH_H = AXIS_MARK_AUTH_H;
 
-export const AXIS_LOGO_COMPACT_W = AXIS_MARK_COMPACT_W + 8 + AXIS_WORD_COMPACT_W;
+export const AXIS_LOGO_COMPACT_W = AXIS_MARK_COMPACT_W + AXIS_WORD_GAP + AXIS_WORD_COMPACT_W;
 export const AXIS_LOGO_COMPACT_H = AXIS_MARK_COMPACT_H;
 
 const LOGO_FILE_ID = 'axis_brand_logo_svg';
@@ -91,7 +91,7 @@ export function imageElement(id, fileId, x, y, w, h) {
 export function buildAxisLogo(prefix, slotX, y, slotW, variant = 'auth') {
   const markW = variant === 'compact' ? AXIS_MARK_COMPACT_W : AXIS_MARK_AUTH_W;
   const markH = variant === 'compact' ? AXIS_MARK_COMPACT_H : AXIS_MARK_AUTH_H;
-  const wordGap = variant === 'compact' ? 8 : AXIS_WORD_GAP;
+  const wordGap = AXIS_WORD_GAP;
   const wordW = variant === 'compact' ? AXIS_WORD_COMPACT_W : AXIS_WORD_AUTH_W;
   const lockupW = markW + wordGap + wordW;
   const lockupH = markH;
