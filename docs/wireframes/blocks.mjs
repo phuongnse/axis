@@ -171,6 +171,35 @@ export function buildAuthCardFooter(prefix, cardX, cardY, cardW, cardH, footer) 
   ];
 }
 
+/**
+ * Centered inline row inside auth card (e.g. resend link with gray lead-in).
+ */
+export function buildAuthCardCenteredInlineRow(prefix, cardX, cardW, y, segments, fontSize = 12) {
+  const innerX = cardX + AUTH_CARD_PAD_X;
+  const innerW = cardW - AUTH_CARD_PAD_X * 2;
+  const lineH = 16;
+  const totalW = inlineTextRowWidth(segments, fontSize);
+  const startX = innerX + Math.round((innerW - totalW) / 2);
+  const { els } = inlineTextRow(`${prefix}_inline`, startX, y, lineH, fontSize, segments);
+  return els;
+}
+
+/** Footer back navigation — left-aligned primary link with ← icon. */
+export function buildAuthCardBackFooter(prefix, cardX, cardY, cardW, cardH, linkLabel) {
+  const footerY = cardY + cardH - 32;
+  const lineY = footerY + 10;
+  const lineH = 16;
+  const fontSize = 12;
+  const label = linkLabel.startsWith('←') ? linkLabel : `← ${linkLabel}`;
+  const segments = [{ text: label, color: C.primary, link: true }];
+  const startX = cardX + AUTH_CARD_PAD_X;
+  const { els: rowEls } = inlineTextRow(`${prefix}_footer`, startX, lineY, lineH, fontSize, segments);
+  return [
+    hline(`${prefix}_fdiv`, cardX, footerY, cardW, C.gray300),
+    ...rowEls,
+  ];
+}
+
 /** Primary submit button inside auth card (full inner width). */
 export function buildAuthSubmitButton(prefix, cardX, y, cardW, label) {
   const btnW = cardW - AUTH_CARD_PAD_X * 2;

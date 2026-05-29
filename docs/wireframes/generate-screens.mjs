@@ -63,6 +63,8 @@ import {
   buildAuthCardBrandBar,
   buildAuthCardHeader,
   buildAuthCardFooter,
+  buildAuthCardBackFooter,
+  buildAuthCardCenteredInlineRow,
   buildAuthSubmitButton,
   authFormField,
   authTermsRow,
@@ -543,7 +545,7 @@ function genRegisterOrgProviderStates() {
  */
 function genEmailConfirmation() {
   const cardW = AUTH_CARD_W;
-  const cardH = 252;
+  const cardH = 268;
   const cardX = Math.round((W - cardW) / 2);
   const cardY = Math.round((H - cardH) / 2);
   const els   = [];
@@ -560,13 +562,21 @@ function genEmailConfirmation() {
   const ecHeadY = cardY + 68;
   els.push(...stateHeadline('ec', ecX, ecHeadY, ecInnerW, '✉', 'info', 'Check your email', 16));
   const ecBodyY = ecHeadY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
-  els.push(text('ec_body1', ecX, ecBodyY, ecInnerW, 36,
-    'If an account exists for this email, you will receive a verification link shortly. Check your inbox.',
+  const bodyLineH = 18;
+  els.push(text('ec_body1', ecX, ecBodyY, ecInnerW, bodyLineH,
+    'If an account exists for this email, you will receive a verification link shortly.',
+    13, C.gray700));
+  els.push(text('ec_body2', ecX, ecBodyY + bodyLineH + 4, ecInnerW, bodyLineH,
+    'Check your inbox.',
     13, C.gray700));
 
-  els.push(text('ec_resend', ecX, ecBodyY + 44, ecInnerW, 16, "Didn't receive it?  Resend email →", 12, C.primary, 'center'));
+  const resendY = ecBodyY + bodyLineH * 2 + 16;
+  els.push(...buildAuthCardCenteredInlineRow('ec_resend', cardX, cardW, resendY, [
+    { text: "Didn't receive it?", color: C.gray700 },
+    { text: 'Resend email →', color: C.primary, link: true },
+  ]));
 
-  els.push(...buildAuthCardFooter('ec', cardX, cardY, cardW, cardH, 'Back to sign in'));
+  els.push(...buildAuthCardBackFooter('ec', cardX, cardY, cardW, cardH, 'Back to sign in'));
 
   write('platform-foundation/email-confirmation.excalidraw', els, wireFiles);
 }
