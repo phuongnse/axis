@@ -12,12 +12,6 @@ Provide a visual drag-and-drop canvas where users can design workflows composed 
 
 The workflow builder is the heart of the platform. It is what differentiates Axis from a simple CRUD data tool.
 
-## Scope
-
-**Production scope** — in the full product scope; no separate MVP/Phase cut.
-
----
-
 ## Use Cases
 
 ### Workflow definitions

@@ -12,12 +12,6 @@ Provide secure authentication and a flexible role-based access control (RBAC) sy
 
 Security and access control are non-negotiable for a SaaS product. Organizations need confidence that their users see only what they should see.
 
-## Scope
-
-**Production scope** — in the full product scope; no separate MVP/Phase cut.
-
----
-
 ## Use Cases
 
 ### Authentication
