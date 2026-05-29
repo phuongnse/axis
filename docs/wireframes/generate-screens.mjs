@@ -946,9 +946,11 @@ function genSettingsOrgDeleteModal() {
   els.push(text('sdm_body', mX + 20, mY + 68, mW - 40, 52,
     'This action is permanent and cannot be undone.\nAll data will be deleted after a 30-day grace period.', 13, C.gray700));
 
-  // Confirm input
-  els.push(text('sdm_inp_l', mX + 20, mY + 130, mW - 40, 16, "Type 'Acme Corp' to confirm (case-sensitive):", 12, C.gray500));
-  els.push(...inputField('sdm_inp', mX + 20, mY + 150, mW - 40, 'Acme Corp'));
+  // Confirm input (required — must match org name exactly)
+  els.push(...fieldLabel('sdm_inp_l', mX + 20, mY + 130, 'Organization name', { required: true }));
+  els.push(text('sdm_inp_hint', mX + 20, mY + 146, mW - 40, 14,
+    "Type 'Acme Corp' to confirm (case-sensitive)", 10, C.gray500));
+  els.push(...inputField('sdm_inp', mX + 20, mY + 162, mW - 40, 'Acme Corp'));
 
   // Footer
   els.push(hline('sdm_fdiv', mX, mY + mH - 56, mW, C.gray300));
@@ -1019,8 +1021,10 @@ function genSettingsOrgDeleteStates() {
       els.push(text(`sods_${id}_ban_t`, mX + 32, mCardY + 72, mW - 64, 16, err, 12, C.danger));
     }
     const inpY = err ? mCardY + 108 : mCardY + 68;
-    els.push(text(`sods_${id}_il`, mX + 20, inpY, mW - 40, 16, "Type 'Acme Corp' to confirm (case-sensitive):", 12, C.gray500));
-    els.push(...inputField(`sods_${id}_in`, mX + 20, inpY + 20, mW - 40, inp));
+    els.push(...fieldLabel(`sods_${id}_il`, mX + 20, inpY, 'Organization name', { required: true }));
+    els.push(text(`sods_${id}_ih`, mX + 20, inpY + 16, mW - 40, 14,
+      "Type 'Acme Corp' to confirm (case-sensitive)", 10, C.gray500));
+    els.push(...inputField(`sods_${id}_in`, mX + 20, inpY + 32, mW - 40, inp));
     const delY = mCardY + mH - 48;
     if (delEnabled) {
       els.push(...btn(`sods_${id}_del`, mX + mW - 20 - 184, delY, 'Delete organization', 'danger'));
@@ -1149,15 +1153,15 @@ function genSettingsOrg() {
   els.push(text('so_lgic',  cx,      profY + 24, 80,  32, '⬡',           20, C.primary, 'center'));
   els.push(text('so_lglnk', cx + 4,  profY + 62, 72,  14, 'Change logo', 10, C.primary, 'center'));
 
-  // Organization name
-  els.push(text('so_nm_l', cx + 96, profY + 12, 300, 16, 'Organization name', 11, C.gray500));
+  // Organization name (required); timezone / language optional
+  els.push(...fieldLabel('so_nm_l', cx + 96, profY + 12, 'Organization name', { required: true }));
   els.push(...inputField('so_nm', cx + 96, profY + 30, 500, 'Acme Corp'));
 
   // Timezone + Language (row 2 — starts at profY+88 = 212)
   const row2Y = profY + 88;
-  els.push(text('so_tz_l',   cx + 96,       row2Y,      240, 16, 'Timezone',    11, C.gray500));
-  els.push(...selectField('so_tz',   cx + 96,       row2Y + 18, 280, 'UTC+0 · London'));
-  els.push(text('so_ln_l',   cx + 96 + 296, row2Y,      180, 16, 'Language',    11, C.gray500));
+  els.push(...fieldLabel('so_tz_l', cx + 96, row2Y, 'Timezone'));
+  els.push(...selectField('so_tz', cx + 96, row2Y + 18, 280, 'UTC+0 · London'));
+  els.push(...fieldLabel('so_ln_l', cx + 96 + 296, row2Y, 'Language'));
   els.push(...selectField('so_lang', cx + 96 + 296, row2Y + 18, 200, 'English (US)'));
 
   // Created date meta (row2 bottom = row2Y+58 = 270; meta 8px below)
@@ -1297,7 +1301,7 @@ function genSettingsOrgProfileStates() {
     els.push(text(`sops_${s.id}_h`, x + 16, y + 16, cardW - 32, 20, s.title, 14, C.gray900));
     els.push(rect(`sops_${s.id}_a`, x + 16, y + 44, cardW - 32, 48, s.stroke, s.bg, 1, true));
     els.push(text(`sops_${s.id}_m`, x + 26, y + 58, cardW - 52, 32, s.msg, 12, s.msgColor));
-    els.push(text(`sops_${s.id}_nl`, x + 16, y + 108, cardW - 32, 16, 'Organization name', 11, C.gray500));
+    els.push(...fieldLabel(`sops_${s.id}_nl`, x + 16, y + 108, 'Organization name', { required: true }));
     const inpStroke = s.fieldErr ? C.dangerBorder : C.gray300;
     els.push(rect(`sops_${s.id}_inp`, x + 16, y + 126, cardW - 32, 40, inpStroke, C.white, 1, true));
     els.push(text(`sops_${s.id}_v`, x + 28, y + 137, cardW - 56, 18, 'Acme Corp', 13, C.gray900));
@@ -1426,10 +1430,11 @@ function genLoginUnverified() {
   const innerW = cardW - AUTH_CARD_PAD * 2;
   let fy = cardY + 112;
   [
-    { label: 'Email address', value: 'alex@company.com' },
-    { label: 'Password', value: '••••••••' },
+    { label: 'Email address', value: 'alex@company.com', required: true },
+    { label: 'Password', value: '••••••••', required: true },
   ].forEach((f, i) => {
-    const { els: fe, blockH } = authFormField(`lu_f${i}`, cardX, fy, cardW, f.label, f.value);
+    const { els: fe, blockH } = authFormField(
+      `lu_f${i}`, cardX, fy, cardW, f.label, f.value, null, f.required === true);
     els.push(...fe);
     fy += blockH;
   });
@@ -1862,15 +1867,15 @@ function genFormEditor() {
     rect('fe_form_hdr', fx + lW + 20, fy + toolbarH + 14, cW - 40, 40, C.gray300, C.white, 1, true),
     text('fe_form_title', fx + lW + 36, fy + toolbarH + 26, 200, 18, 'Contact Form', 14, C.gray900),
     // Full Name (selected — primary border, matching S04 focus state)
-    text('fe_fn_lbl', fx + lW + 20, fy + toolbarH + 66, 160, 14, 'Full Name *', 11, C.gray500),
+    ...fieldLabel('fe_fn_lbl', fx + lW + 20, fy + toolbarH + 66, 'Full name', { required: true }),
     rect('fe_fn_inp', fx + lW + 20, fy + toolbarH + 82, cW - 40, 40, C.primary, C.infoBg, 2, true),
     text('fe_fn_ph',  fx + lW + 32, fy + toolbarH + 93, 200, 18, 'Enter your name…', 13, C.gray500),
-    // Email
-    text('fe_em_lbl', fx + lW + 20, fy + toolbarH + 134, 160, 14, 'Email Address *', 11, C.gray500),
+    // Email (required)
+    ...fieldLabel('fe_em_lbl', fx + lW + 20, fy + toolbarH + 134, 'Email address', { required: true }),
     rect('fe_em_inp', fx + lW + 20, fy + toolbarH + 150, cW - 40, 40, C.gray300, C.white, 1, true),
     text('fe_em_ph',  fx + lW + 32, fy + toolbarH + 161, 200, 18, 'you@company.com', 13, C.gray300),
-    // Message
-    text('fe_msg_lbl', fx + lW + 20, fy + toolbarH + 202, 160, 14, 'Message', 11, C.gray500),
+    // Message (optional)
+    ...fieldLabel('fe_msg_lbl', fx + lW + 20, fy + toolbarH + 202, 'Message'),
     rect('fe_msg_inp', fx + lW + 20, fy + toolbarH + 218, cW - 40, 64, C.gray300, C.white, 1, true),
     text('fe_msg_ph',  fx + lW + 32, fy + toolbarH + 229, 200, 18, 'Your message…', 13, C.gray300),
 
