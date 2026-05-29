@@ -61,6 +61,8 @@ Every `docs/use-cases/<domain>/<short-slug>/README.md` file uses these layouts s
 - Use `N/A` rows when no wireframe applies.
 - One table per `README.md` — no blockquote wireframe stacks.
 - When a use case has **more than three screens** (including error/reference variants), add a **`## Screen flow`** section **above** `## Wireframes`: numbered happy-path steps, a short table for error/reference screens, and an optional mermaid diagram. **Row order in `## Wireframes` must match** happy path first, then error screens in the order listed in Screen flow.
+- **`## Wireframes`** lists every `*.excalidraw` **screen** in the use-case folder (use `#` / `Role` columns when helpful). Do not omit error/reference variants. **Do not** list sequence/architecture diagrams here — those belong under `## Diagrams`.
+- **`## Diagrams`** lists only diagrams **stored in this use-case folder**. Link related diagrams owned by another use case in prose (`**Related:** …`) — do not copy another use case’s diagram row into this table (avoids two owners for the same file).
 
 ### Implementation status (after each US AC block)
 

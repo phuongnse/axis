@@ -122,18 +122,21 @@ flowchart TD
 
 ## Wireframes
 
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| register-org | [source](./register-org.excalidraw) | [preview](./register-org.svg) |
-| register-org-complete | [source](./register-org-complete.excalidraw) | [preview](./register-org-complete.svg) |
-| email-confirmation | [source](./email-confirmation.excalidraw) | [preview](./email-confirmation.svg) |
-| register-org-provider-states | [source](./register-org-provider-states.excalidraw) | [preview](./register-org-provider-states.svg) |
-| register-org-states | [source](./register-org-states.excalidraw) | [preview](./register-org-states.svg) |
-| register-org-complete-states | [source](./register-org-complete-states.excalidraw) | [preview](./register-org-complete-states.svg) |
+All UI assets in this folder (six screens). Row order matches [Screen flow](#screen-flow) above. Sequence/architecture drawings are under [Diagrams](#diagrams), not listed here.
+
+| # | Screen | Role | Excalidraw | Preview |
+|---|--------|------|------------|---------|
+| 1 | register-org | Happy path — entry | [source](./register-org.excalidraw) | [preview](./register-org.svg) |
+| 2a | register-org-complete | Happy path — post-OAuth completion | [source](./register-org-complete.excalidraw) | [preview](./register-org-complete.svg) |
+| 3 | email-confirmation | Happy path — after create | [source](./email-confirmation.excalidraw) | [preview](./email-confirmation.svg) |
+| — | register-org-provider-states | Error — SSO before completion | [source](./register-org-provider-states.excalidraw) | [preview](./register-org-provider-states.svg) |
+| — | register-org-states | Error — entry form validation / 5xx | [source](./register-org-states.excalidraw) | [preview](./register-org-states.svg) |
+| — | register-org-complete-states | Error — completion form validation / Terms | [source](./register-org-complete-states.excalidraw) | [preview](./register-org-complete-states.svg) |
 
 ## Diagrams
 
 | Diagram | Source | Preview |
 |---------|--------|---------|
 | register-org-flow | [source](./register-org-flow.excalidraw) | [preview](./register-org-flow.svg) |
-| tenant-provisioning | [source](../provision-tenant/tenant-provisioning.excalidraw) | [preview](../provision-tenant/tenant-provisioning.svg) |
+
+**Related (next use case):** after the user verifies their email, schema provisioning is specified in [provision-tenant](../provision-tenant/) — diagram [`tenant-provisioning`](../provision-tenant/tenant-provisioning.excalidraw), not duplicated here.
