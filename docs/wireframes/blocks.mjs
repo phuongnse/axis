@@ -10,10 +10,14 @@ import {
   rect,
   text,
   hline,
+  arrow,
   fieldLabelBlock,
   inputField,
   inlineTextRow,
   inlineTextRowWidth,
+  labelTextWidth,
+  wrappedTextBlock,
+  semanticVariantColor,
   isPasswordLabel,
   PASSWORD_INPUT_PAD_RIGHT,
   passwordRevealToggle,
@@ -167,6 +171,72 @@ export function buildAuthCardFooter(prefix, cardX, cardY, cardW, cardH, footer) 
   const { els: rowEls } = inlineTextRow(`${prefix}_footer`, startX, lineY, lineH, fontSize, segments);
   return [
     hline(`${prefix}_fdiv`, cardX, footerY, cardW, C.gray300),
+    ...rowEls,
+  ];
+}
+
+/** Centered inline row inside auth card (e.g. resend link with gray lead-in). */
+export function buildAuthCardCenteredInlineRow(prefix, cardX, cardW, y, segments, fontSize = 12) {
+  const innerX = cardX + AUTH_CARD_PAD_X;
+  const innerW = cardW - AUTH_CARD_PAD_X * 2;
+  const lineH = 16;
+  const totalW = inlineTextRowWidth(segments, fontSize);
+  const startX = innerX + Math.round((innerW - totalW) / 2);
+  const { els } = inlineTextRow(`${prefix}_inline`, startX, y, lineH, fontSize, segments);
+  return els;
+}
+
+/** Bordered notice inside auth card (success / warning / info). */
+export function authNoticeBanner(prefix, x, y, innerW, { title, body }, variant = 'info') {
+  const stroke =
+    variant === 'success' ? C.successBorder :
+      variant === 'warning' ? C.warningBorder :
+        variant === 'danger' ? C.dangerBorder :
+          C.infoBorder;
+  const bg =
+    variant === 'success' ? C.successBg :
+      variant === 'warning' ? C.warningBg :
+        variant === 'danger' ? C.dangerBg :
+          C.infoBg;
+  const titleColor = semanticVariantColor(variant);
+  const pad = 12;
+  const content = [];
+  let innerH = pad;
+
+  if (title) {
+    content.push(text(`${prefix}_nbt`, x + pad, y + innerH, innerW - pad * 2, 18, title, 13, titleColor));
+    innerH += 20;
+  }
+  if (body) {
+    const wrapped = wrappedTextBlock(`${prefix}_nbb`, x + pad, y + innerH, innerW - pad * 2, body, 12, C.gray700, 0.85);
+    content.push(...wrapped.els);
+    innerH += wrapped.blockH + 4;
+  }
+  innerH += pad;
+  return {
+    els: [rect(`${prefix}_nb`, x, y, innerW, innerH, stroke, bg, 1, true), ...content],
+    blockH: innerH,
+  };
+}
+
+/** Centered footer: chevron icon + underlined link (icon separate from label text). */
+export function buildAuthCardBackFooter(prefix, cardX, cardY, cardW, cardH, linkLabel) {
+  const footerY = cardY + cardH - 32;
+  const lineY = footerY + 10;
+  const lineH = 16;
+  const fontSize = 12;
+  const label = linkLabel.replace(/^←\s*/, '').trim();
+  const iconSlot = 14;
+  const iconGap = 6;
+  const textW = Math.ceil(labelTextWidth(label, fontSize) + 8);
+  const totalW = iconSlot + iconGap + textW;
+  const startX = cardX + Math.round((cardW - totalW) / 2);
+  const textX = startX + iconSlot + iconGap;
+  const segments = [{ text: label, color: C.primary, link: true }];
+  const { els: rowEls } = inlineTextRow(`${prefix}_footer`, textX, lineY, lineH, fontSize, segments);
+  return [
+    hline(`${prefix}_fdiv`, cardX, footerY, cardW, C.gray300),
+    arrow(`${prefix}_back_ic`, startX + 10, lineY + 5, -8, 0, C.primary, 1.5),
     ...rowEls,
   ];
 }

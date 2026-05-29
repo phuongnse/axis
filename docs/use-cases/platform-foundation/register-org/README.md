@@ -102,6 +102,7 @@ Step **2b** is a path, not a separate UI file — only **2a** adds `register-org
 | `register-org-provider-states` | SSO rejected before completion (duplicate email, no verified email) |
 | `register-org-states` | Validation or 5xx on the entry form |
 | `register-org-complete-states` | Validation or Terms not accepted on completion form |
+| `email-confirmation-states` | Resend verification: in-flight, success (204), rate limit (429) |
 
 ```mermaid
 flowchart TD
@@ -111,6 +112,7 @@ flowchart TD
   errEntry["register-org-states"]
   errComplete["register-org-complete-states"]
   errProvider["register-org-provider-states"]
+  errResend["email-confirmation-states"]
 
   entry -->|"2b · submit (email/password)"| confirm
   entry -->|SSO| complete
@@ -118,6 +120,7 @@ flowchart TD
   entry -.-> errEntry
   complete -.-> errComplete
   entry -.->|SSO error| errProvider
+  confirm -.->|Resend email| errResend
 ```
 
 ## Legal links & footer links (UX)
@@ -129,18 +132,23 @@ Documented for wireframes and future frontend; **not implemented** in the app ye
 | Terms checkbox | `authTermsRow` in `blocks.mjs` | Required before submit — **no `*`** on the row; inline error if unchecked (see `register-org-complete-states`). |
 | **Terms of Service** / **Privacy Policy** | Primary inline links with **underline** in the agree sentence | Open the legal document in a **new browser tab** (public URLs TBD, e.g. `/legal/terms`, `/legal/privacy`). Does not submit the form or clear fields. |
 | Card footer (e.g. **Sign in**) | `buildAuthCardFooter` — gray lead-in + underlined **primary link** | Navigates to the target auth route (e.g. sign-in page). Same link styling as Terms/Privacy. |
+| **Resend email** (`email-confirmation`) | `buildAuthCardCenteredInlineRow` — gray lead + underlined **Resend email →** | `POST /api/auth/resend-verification` with email from registration context. Stay on screen; see `email-confirmation-states` for UI feedback. |
+| **Back** (`email-confirmation`) | `buildAuthCardBackFooter` — chevron icon + **Back to sign in** (centered control) | Returns to sign-in. |
+
+**Resend UI (wireframe):** idle on `email-confirmation`; after click → **Sending…** (link disabled) → **204** success banner + disabled resend, or **429** warning banner (same copy rhythm as `verify-email-rate-limit`). API always returns **204** when under cap, even if email unknown (no leakage).
 
 Record **accepted ToS/Privacy version** on the account at org create (AC above); legal page content and versioning are out of scope for this wireframe pass.
 
 ## Wireframes
 
-All UI assets in this folder (six screens). Row order matches [Screen flow](#screen-flow) above. Sequence/architecture drawings are under [Diagrams](#diagrams), not listed here.
+All UI assets in this folder (three happy-path screens + four reference state boards). Row order matches [Screen flow](#screen-flow) above. Sequence/architecture drawings are under [Diagrams](#diagrams), not listed here.
 
 | # | Screen | Role | Excalidraw | Preview |
 |---|--------|------|------------|---------|
 | 1 · 2b | register-org | Happy path — entry (1); email/password submit (2b) | [source](./register-org.excalidraw) | [preview](./register-org.svg) |
 | 2a | register-org-complete | Happy path — post-OAuth completion | [source](./register-org-complete.excalidraw) | [preview](./register-org-complete.svg) |
-| 3 | email-confirmation | Happy path — after create | [source](./email-confirmation.excalidraw) | [preview](./email-confirmation.svg) |
+| 3 | email-confirmation | Happy path — after create (resend link idle) | [source](./email-confirmation.excalidraw) | [preview](./email-confirmation.svg) |
+| — | email-confirmation-states | Resend — in-flight, 204, 429 | [source](./email-confirmation-states.excalidraw) | [preview](./email-confirmation-states.svg) |
 | — | register-org-provider-states | Error — SSO before completion | [source](./register-org-provider-states.excalidraw) | [preview](./register-org-provider-states.svg) |
 | — | register-org-states | Error — entry form validation / 5xx | [source](./register-org-states.excalidraw) | [preview](./register-org-states.svg) |
 | — | register-org-complete-states | Error — completion form validation / Terms | [source](./register-org-complete-states.excalidraw) | [preview](./register-org-complete-states.svg) |

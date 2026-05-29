@@ -292,6 +292,43 @@ export function labelTextWidth(str, fontSize = 11) {
   return Math.ceil(w);
 }
 
+/** Word-wrap for wireframe copy — Excalidraw does not auto-wrap from box width alone. */
+export function wrapTextLines(str, maxWidth, fontSize) {
+  const words = str.split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = '';
+  for (const word of words) {
+    const candidate = line ? `${line} ${word}` : word;
+    if (labelTextWidth(candidate, fontSize) <= maxWidth) {
+      line = candidate;
+    } else {
+      if (line) {
+        lines.push(line);
+      }
+      line = word;
+    }
+  }
+  if (line) {
+    lines.push(line);
+  }
+  return lines;
+}
+
+/**
+ * Body copy as one text element per line (safe in Kroki/Excalidraw).
+ * @param {number} [widthScale] — shrink wrap width (Virgil renders wider than estimates).
+ */
+export function wrappedTextBlock(prefix, x, y, boxWidth, str, fontSize, color, widthScale = 0.82) {
+  const maxWidth = Math.floor(boxWidth * widthScale);
+  const lineH = Math.ceil(fontSize * 1.35);
+  const lines = wrapTextLines(str, maxWidth, fontSize);
+  const els = lines.map((line, i) => {
+    const w = Math.min(boxWidth, Math.ceil(labelTextWidth(line, fontSize) + 10));
+    return text(`${prefix}_l${i}`, x, y + i * lineH, w, lineH, line, fontSize, color);
+  });
+  return { els, blockH: lines.length * lineH };
+}
+
 /**
  * Form field label with optional required marker (* in C.danger).
  * Use on every user-editable field label in screen wireframes.
