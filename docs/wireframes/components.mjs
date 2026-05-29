@@ -236,7 +236,7 @@ export const REQUIRED_MARKER_GAP = 10;
 
 /** Help row: small ? icon then help copy (icon before text). */
 export const HELP_ICON_SIZE = 12;
-export const HELP_TEXT_ICON_GAP = 6;
+export const HELP_TEXT_ICON_GAP = 10;
 export const FIELD_LABEL_H = 16;
 export const FIELD_HELP_TEXT_H = 14;
 export const FIELD_LABEL_HELP_GAP = 2;
