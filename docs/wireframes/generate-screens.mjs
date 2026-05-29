@@ -10,7 +10,8 @@
  *
  * Screens generated:
  *   app-shell (root)
- *   platform-foundation: register-org, register-org-states, register-org-provider-states,
+ *   platform-foundation: register-org, register-org-complete, register-org-complete-states,
+ *        register-org-states, register-org-provider-states,
  *        email-confirmation, verify-email, verify-email-rate-limit, workspace-provisioning,
  *        pricing, settings-org, settings-org-upload-states, settings-org-profile-states,
  *        settings-org-usage-error, settings-org-free-plan, settings-org-access-denied,
@@ -90,6 +91,10 @@ const SCREEN_USE_CASE_OVERRIDES = {
     'platform-foundation/register-org/register-org.excalidraw',
   'platform-foundation/register-org-states.excalidraw':
     'platform-foundation/register-org/register-org-states.excalidraw',
+  'platform-foundation/register-org-complete.excalidraw':
+    'platform-foundation/register-org/register-org-complete.excalidraw',
+  'platform-foundation/register-org-complete-states.excalidraw':
+    'platform-foundation/register-org/register-org-complete-states.excalidraw',
   'platform-foundation/register-org-provider-states.excalidraw':
     'platform-foundation/register-org/register-org-provider-states.excalidraw',
   'platform-foundation/email-confirmation.excalidraw':
@@ -255,6 +260,19 @@ function authFormField(prefix, cardX, y, cardW, label, value, errorMsg = null) {
   if (errorMsg) {
     els.push(text(`${prefix}_err`, x, y + 62, innerW, 14, errorMsg, 11, C.danger));
   }
+  return { els, blockH };
+}
+
+/** Read-only value (e.g. email from external provider). */
+function authReadOnlyValueField(prefix, cardX, y, cardW, label, value) {
+  const x = cardX + 24;
+  const innerW = cardW - 48;
+  const blockH = 72;
+  const els = [
+    text(`${prefix}_fl`, x, y, innerW, 16, label, 11, C.gray500),
+    rect(`${prefix}_inp`, x, y + 18, innerW, 40, C.gray300, C.gray50, 1, true),
+    text(`${prefix}_val`, x + 12, y + 29, innerW - 24, 18, value, 13, C.gray700),
+  ];
   return { els, blockH };
 }
 
@@ -435,6 +453,139 @@ function genRegisterOrg() {
     'Already have an account? Sign in', 12, C.primary, 'center'));
 
   write('platform-foundation/register-org.excalidraw', els);
+}
+
+/**
+ * Register-Org complete — post-OAuth step (ADR-027). Org name + Terms collected here;
+ * email read-only from provider; admin name pre-filled and editable.
+ */
+function genRegisterOrgComplete() {
+  const cardW = 440;
+  const cardX = Math.round((W - cardW) / 2);
+  const cardY = 40;
+  const headerH = 136; // logo + title + provider subtitle
+  const footerZone = 44;
+  const els = [];
+
+  els.push(rect('roc_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
+
+  let y = cardY + headerH;
+  const contentEls = [];
+
+  contentEls.push(text('roc_logo', cardX, cardY + 16, cardW, 28, '⬡  Axis', 18, C.primary, 'center'));
+  contentEls.push(hline('roc_hdiv', cardX, cardY + 60, cardW, C.gray300));
+  contentEls.push(text('roc_title', cardX + 24, cardY + 76, cardW - 48, 24,
+    'Finish setting up your organization', 17, C.gray900));
+  contentEls.push(text('roc_sub', cardX + 24, cardY + 104, cardW - 48, 18,
+    'Signed in with Microsoft', 13, C.gray700));
+
+  const { els: emailEls, blockH: emailH } = authReadOnlyValueField(
+    'roc_email', cardX, y, cardW, 'Email address', 'alex@company.com');
+  contentEls.push(...emailEls);
+  y += emailH;
+
+  const { els: nameEls, blockH: nameH } = authFormField(
+    'roc_name', cardX, y, cardW, 'Admin full name', 'Alex Brown');
+  contentEls.push(...nameEls);
+  y += nameH;
+
+  contentEls.push(text('roc_org_fl', cardX + 24, y, cardW - 48, 16, 'Organization name', 11, C.gray500));
+  contentEls.push(...inputField('roc_org_fi', cardX + 24, y + 18, cardW - 48, 'Acme Corp'));
+  y += 72;
+
+  const { els: slugEls, blockH: slugH } = authSlugPreviewField('roc_slug', cardX, y, cardW);
+  contentEls.push(...slugEls);
+  y += slugH;
+
+  const { els: termsEls, blockH: termsH } = authTermsRow('roc_terms', cardX, y, cardW, { checked: true });
+  contentEls.push(...termsEls);
+  y += termsH + 14;
+
+  const btnW = cardW - 48;
+  contentEls.push(rect('roc_sbtn', cardX + 24, y, btnW, 36, C.accentDark, C.accent, 2, true));
+  contentEls.push(text('roc_sbtn_t', cardX + 24, y + 10, btnW, 16, 'Create organization', 13, C.white, 'center'));
+  y += 36 + 16;
+
+  const cardH = y - cardY + footerZone;
+  const footerY = cardY + cardH - 32;
+
+  els.push(rect('roc_card', cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
+  els.push(...contentEls);
+  els.push(hline('roc_fdiv', cardX, footerY, cardW, C.gray300));
+  els.push(text('roc_footer', cardX + 24, footerY + 10, cardW - 48, 16,
+    '← Back to registration', 12, C.primary, 'center'));
+
+  write('platform-foundation/register-org-complete.excalidraw', els);
+}
+
+/**
+ * Register-Org complete — validation states (org name, terms) after external sign-in.
+ */
+function genRegisterOrgCompleteStates() {
+  const els = [];
+  const panelW = 520;
+  const panelH = 520;
+  const gap = 40;
+  const startX = Math.round((W - (panelW * 2 + gap)) / 2);
+  const y0 = 48;
+
+  els.push(rect('rocs_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
+  els.push(text('rocs_pg', 0, 16, W, 20,
+    'Post-OAuth completion — validation', 13, C.gray500, 'center'));
+
+  const drawPanel = ({ id, x, lbl, orgErr, terms }) => {
+    const cardY = y0 + 28;
+    els.push(text(`rocs_${id}_lbl`, x, y0, panelW, 16, lbl, 12, C.danger));
+    els.push(rect(`rocs_${id}_card`, x, cardY, panelW, panelH, C.gray300, C.white, 2, true));
+    els.push(text(`rocs_${id}_logo`, x, cardY + 16, panelW, 28, '⬡  Axis', 18, C.primary, 'center'));
+    els.push(hline(`rocs_${id}_hdiv`, x, cardY + 60, panelW, C.gray300));
+    els.push(text(`rocs_${id}_title`, x + 24, cardY + 76, panelW - 48, 22,
+      'Finish setting up your organization', 16, C.gray900));
+    els.push(text(`rocs_${id}_sub`, x + 24, cardY + 102, panelW - 48, 16,
+      'Signed in with Google', 12, C.gray700));
+
+    let fy = cardY + 128;
+    const { els: em, blockH: eh } = authReadOnlyValueField(
+      `rocs_${id}_em`, x, fy, panelW, 'Email address', 'alex@company.com');
+    els.push(...em);
+    fy += eh;
+    const { els: nm, blockH: nh } = authFormField(
+      `rocs_${id}_nm`, x, fy, panelW, 'Admin full name', 'Alex Brown');
+    els.push(...nm);
+    fy += nh;
+    const { els: oe, blockH: oh } = authFormField(
+      `rocs_${id}_org`, x, fy, panelW, 'Organization name', orgErr ? 'A' : 'Acme Corp', orgErr);
+    els.push(...oe);
+    fy += oh;
+    const { els: sl, blockH: sh } = authSlugPreviewField(`rocs_${id}_slug`, x, fy, panelW);
+    els.push(...sl);
+    fy += sh;
+    const { els: te, blockH: th } = authTermsRow(`rocs_${id}_terms`, x, fy, panelW, terms);
+    els.push(...te);
+    fy += th + 8;
+
+    const btnY = cardY + panelH - 68;
+    const btnW = panelW - 48;
+    els.push(rect(`rocs_${id}_sbtn`, x + 24, btnY, btnW, 36, C.accentDark, C.accent, 2, true));
+    els.push(text(`rocs_${id}_sbtn_t`, x + 24, btnY + 10, btnW, 16, 'Create organization', 13, C.white, 'center'));
+  };
+
+  drawPanel({
+    id: 'val',
+    x: startX,
+    lbl: 'Organization name validation',
+    orgErr: 'Must be between 2 and 100 characters.',
+    terms: { checked: true },
+  });
+  drawPanel({
+    id: 'terms',
+    x: startX + panelW + gap,
+    lbl: 'Terms not accepted',
+    orgErr: null,
+    terms: { checked: false, errorMsg: 'You must accept the Terms of Service and Privacy Policy.' },
+  });
+
+  write('platform-foundation/register-org-complete-states.excalidraw', els);
 }
 
 /** Draw one register-org error-state panel (shared by states screens). */
@@ -1886,6 +2037,8 @@ runScreen('app-shell', genAppShell);
 
 // platform-foundation — Platform Foundation
 runScreen('platform-foundation/register-org', genRegisterOrg);
+runScreen('platform-foundation/register-org-complete', genRegisterOrgComplete);
+runScreen('platform-foundation/register-org-complete-states', genRegisterOrgCompleteStates);
 runScreen('platform-foundation/register-org-states', genRegisterOrgStates);
 runScreen('platform-foundation/register-org-provider-states', genRegisterOrgProviderStates);
 runScreen('platform-foundation/email-confirmation', genEmailConfirmation);
