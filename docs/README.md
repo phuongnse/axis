@@ -27,6 +27,7 @@
 | [Frontend](./playbooks/frontend.md) | TanStack Query patterns, TypeScript discipline, routing, component design |
 | [Wireframe kit](./playbooks/wireframes.md) | Screen generators, kit sections; **agents:** [spacing & blocks contract](./wireframes/README.md#agent-contract) |
 | [Visual artifact checklist](./playbooks/visual-artifact-checklist.md) | Required review checklist for diagrams/wireframes/use-case visuals before commit |
+| [Mermaid theme](./playbooks/mermaid.md) | One `%%{init}%%` for every diagram in `docs/` |
 | [Docs style](./playbooks/docs-style.md) | Anti-patterns for `.md` files — single-owner rule, size budgets, when to create vs absorb |
 
 ---
@@ -47,7 +48,7 @@
 
 ## Key Diagrams
 
-Platform **architecture** diagrams live here as **Mermaid** (renders on GitHub and in editors with Mermaid support). **UI wireframes** stay Excalidraw — see [Wireframes](#wireframes) below.
+Platform **architecture** diagrams live here as **Mermaid** (one shared [dark theme](./playbooks/mermaid.md) via `docs/diagrams/mermaid-theme.mjs`). **UI wireframes** stay Excalidraw — see [Wireframes](#wireframes) below.
 
 Use-case **sequence / entity** diagrams live in each use-case `README.md` under `## Diagrams` (also Mermaid). Index:
 
@@ -66,7 +67,8 @@ Use-case **sequence / entity** diagrams live in each use-case `README.md` under 
 External actors and the Axis platform boundary. Detail: [ARCHITECTURE.md § System Context](./ARCHITECTURE.md#system-context).
 
 ```mermaid
-%%{init: {'theme':'base','themeVariables':{'background':'#f8fafc','mainBkg':'#f8fafc','primaryColor':'#dbeafe','primaryBorderColor':'#3b82f6','primaryTextColor':'#1e293b','secondaryColor':'#f0f9ff','tertiaryColor':'#f8fafc','lineColor':'#475569','clusterBkg':'#f0f9ff','edgeLabelBackground':'#f8fafc','actorBkg':'#dbeafe','actorBorder':'#3b82f6','actorTextColor':'#1e293b','signalColor':'#475569','labelBoxBkgColor':'#f0f9ff','noteBkgColor':'#f0f9ff'}}}%%
+%%{init: {'theme':'dark','themeVariables':{'background':'#0d1117','mainBkg':'#0d1117','primaryColor':'#161b22','primaryBorderColor':'#388bfd','primaryTextColor':'#e6edf3','secondaryColor':'#21262d','secondaryBorderColor':'#388bfd','secondaryTextColor':'#e6edf3','tertiaryColor':'#161b22','tertiaryTextColor':'#e6edf3','lineColor':'#58a6ff','textColor':'#e6edf3','nodeBorder':'#388bfd','clusterBkg':'#161b22','clusterBorder':'#388bfd','titleColor':'#e6edf3','edgeLabelBackground':'#161b22','actorBkg':'#161b22','actorBorder':'#388bfd','actorTextColor':'#e6edf3','signalColor':'#58a6ff','labelBoxBkgColor':'#161b22','labelBoxBorderColor':'#388bfd','noteBkgColor':'#161b22','noteBorderColor':'#388bfd','noteTextColor':'#c9d1d9','activationBkgColor':'#30363d'}}}%%
+
 flowchart LR
   PA[Platform Admin]
   OA[Org Admin]
@@ -97,7 +99,8 @@ flowchart LR
 Runtime containers in **layers** (top → bottom). Each module owns one PostgreSQL database; messaging is one shared layer below the module row. Detail: [ARCHITECTURE.md § Containers](./ARCHITECTURE.md#containers) (table + ADRs).
 
 ```mermaid
-%%{init: {'theme':'base','themeVariables':{'background':'#f8fafc','mainBkg':'#f8fafc','primaryColor':'#dbeafe','primaryBorderColor':'#3b82f6','primaryTextColor':'#1e293b','secondaryColor':'#f0f9ff','tertiaryColor':'#f8fafc','lineColor':'#475569','clusterBkg':'#f0f9ff','edgeLabelBackground':'#f8fafc','actorBkg':'#dbeafe','actorBorder':'#3b82f6','actorTextColor':'#1e293b','signalColor':'#475569','labelBoxBkgColor':'#f0f9ff','noteBkgColor':'#f0f9ff'}}}%%
+%%{init: {'theme':'dark','themeVariables':{'background':'#0d1117','mainBkg':'#0d1117','primaryColor':'#161b22','primaryBorderColor':'#388bfd','primaryTextColor':'#e6edf3','secondaryColor':'#21262d','secondaryBorderColor':'#388bfd','secondaryTextColor':'#e6edf3','tertiaryColor':'#161b22','tertiaryTextColor':'#e6edf3','lineColor':'#58a6ff','textColor':'#e6edf3','nodeBorder':'#388bfd','clusterBkg':'#161b22','clusterBorder':'#388bfd','titleColor':'#e6edf3','edgeLabelBackground':'#161b22','actorBkg':'#161b22','actorBorder':'#388bfd','actorTextColor':'#e6edf3','signalColor':'#58a6ff','labelBoxBkgColor':'#161b22','labelBoxBorderColor':'#388bfd','noteBkgColor':'#161b22','noteBorderColor':'#388bfd','noteTextColor':'#c9d1d9','activationBkgColor':'#30363d'}}}%%
+
 flowchart TB
   SPA["Web Application<br/><small>React SPA · TanStack Query</small>"]
 
@@ -146,7 +149,8 @@ flowchart TB
 Cross-module communication (Kafka events, RabbitMQ commands, gRPC escape hatch). Detail: [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ```mermaid
-%%{init: {'theme':'base','themeVariables':{'background':'#f8fafc','mainBkg':'#f8fafc','primaryColor':'#dbeafe','primaryBorderColor':'#3b82f6','primaryTextColor':'#1e293b','secondaryColor':'#f0f9ff','tertiaryColor':'#f8fafc','lineColor':'#475569','clusterBkg':'#f0f9ff','edgeLabelBackground':'#f8fafc','actorBkg':'#dbeafe','actorBorder':'#3b82f6','actorTextColor':'#1e293b','signalColor':'#475569','labelBoxBkgColor':'#f0f9ff','noteBkgColor':'#f0f9ff'}}}%%
+%%{init: {'theme':'dark','themeVariables':{'background':'#0d1117','mainBkg':'#0d1117','primaryColor':'#161b22','primaryBorderColor':'#388bfd','primaryTextColor':'#e6edf3','secondaryColor':'#21262d','secondaryBorderColor':'#388bfd','secondaryTextColor':'#e6edf3','tertiaryColor':'#161b22','tertiaryTextColor':'#e6edf3','lineColor':'#58a6ff','textColor':'#e6edf3','nodeBorder':'#388bfd','clusterBkg':'#161b22','clusterBorder':'#388bfd','titleColor':'#e6edf3','edgeLabelBackground':'#161b22','actorBkg':'#161b22','actorBorder':'#388bfd','actorTextColor':'#e6edf3','signalColor':'#58a6ff','labelBoxBkgColor':'#161b22','labelBoxBorderColor':'#388bfd','noteBkgColor':'#161b22','noteBorderColor':'#388bfd','noteTextColor':'#c9d1d9','activationBkgColor':'#30363d'}}}%%
+
 flowchart TB
   SK[Shared Kernel — primitives & abstractions]
 

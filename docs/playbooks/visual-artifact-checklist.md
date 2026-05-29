@@ -40,9 +40,10 @@ Use this checklist **before every commit** that changes visual artifacts:
 
 **Diagrams (Mermaid in Markdown):**
 
-1. Edit the Mermaid block in `docs/README.md` or the owning use-case `README.md`.
-2. Preview on GitHub or in the IDE Mermaid renderer; check labels and `alt`/`rect` sections read clearly.
-3. Commit `.md` only — no `.excalidraw` / `.svg` for sequence or entity diagrams.
+1. Edit diagram content in `docs/README.md` or the owning use-case `README.md`.
+2. Theme colors: only in [`docs/diagrams/mermaid-theme.mjs`](../diagrams/mermaid-theme.mjs) — run `node docs/scripts/sync-mermaid-theme.mjs` after changing `MERMAID_INIT`.
+3. Preview on GitHub or in the IDE; see [mermaid.md](./mermaid.md).
+4. Commit `.md` only — no `.excalidraw` / `.svg` for sequence or entity diagrams.
 
 ## 5) Use-case `README.md` sync (when `docs/use-cases/**` changes)
 

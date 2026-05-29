@@ -112,7 +112,7 @@ Sequence/architecture drawings are under [Diagrams](#diagrams).
 
 ### `## Diagrams` (content rules)
 
-- **Mermaid only** in this README (`sequenceDiagram`, `flowchart`, `erDiagram`, …) — one `### <diagram-slug>` section per diagram.
+- **Mermaid only** in this README (`sequenceDiagram`, `flowchart`, `erDiagram`, …) — one `### <diagram-slug>` section per diagram. First line inside each fence: `MERMAID_INIT` from [`mermaid-theme.mjs`](../diagrams/mermaid-theme.mjs) ([playbook](./mermaid.md)).
 - Platform-wide architecture diagrams live in [docs/README.md § Key Diagrams](../README.md#key-diagrams), not duplicated here.
 - **Related use cases:** one short prose line after the diagrams — `**Related (next use case):** …` with a link to the other use-case `## Diagrams` anchor. Do not paste another use case’s Mermaid here.
 - Omit `## Diagrams` when this use case has no local diagram.

@@ -105,6 +105,7 @@ Step **2b** is a path, not a separate UI file — only **2a** adds `register-org
 | `email-confirmation-states` | Resend verification: in-flight, success (204), rate limit (429) |
 
 ```mermaid
+%%{init: {'theme':'dark','themeVariables':{'background':'#0d1117','mainBkg':'#0d1117','primaryColor':'#161b22','primaryBorderColor':'#388bfd','primaryTextColor':'#e6edf3','secondaryColor':'#21262d','secondaryBorderColor':'#388bfd','secondaryTextColor':'#e6edf3','tertiaryColor':'#161b22','tertiaryTextColor':'#e6edf3','lineColor':'#58a6ff','textColor':'#e6edf3','nodeBorder':'#388bfd','clusterBkg':'#161b22','clusterBorder':'#388bfd','titleColor':'#e6edf3','edgeLabelBackground':'#161b22','actorBkg':'#161b22','actorBorder':'#388bfd','actorTextColor':'#e6edf3','signalColor':'#58a6ff','labelBoxBkgColor':'#161b22','labelBoxBorderColor':'#388bfd','noteBkgColor':'#161b22','noteBorderColor':'#388bfd','noteTextColor':'#c9d1d9','activationBkgColor':'#30363d'}}}%%
 flowchart TD
   entry["1 · register-org"]
   complete["2a · register-org-complete"]
@@ -160,7 +161,8 @@ Seven screens in this folder (three happy-path, four state boards). Table order 
 Email/password and external-provider registration (happy paths + provider pre-checks).
 
 ```mermaid
-%%{init: {'theme':'base','themeVariables':{'background':'#f8fafc','mainBkg':'#f8fafc','actorBkg':'#dbeafe','actorBorder':'#3b82f6','actorTextColor':'#1e293b','signalColor':'#475569','labelBoxBkgColor':'#f0f9ff','labelBoxBorderColor':'#3b82f6','noteBkgColor':'#f0f9ff','noteBorderColor':'#94a3b8','noteTextColor':'#334155','activationBkgColor':'#e2e8f0','secondaryColor':'#f0f9ff','lineColor':'#475569'}}}%%
+%%{init: {'theme':'dark','themeVariables':{'background':'#0d1117','mainBkg':'#0d1117','primaryColor':'#161b22','primaryBorderColor':'#388bfd','primaryTextColor':'#e6edf3','secondaryColor':'#21262d','secondaryBorderColor':'#388bfd','secondaryTextColor':'#e6edf3','tertiaryColor':'#161b22','tertiaryTextColor':'#e6edf3','lineColor':'#58a6ff','textColor':'#e6edf3','nodeBorder':'#388bfd','clusterBkg':'#161b22','clusterBorder':'#388bfd','titleColor':'#e6edf3','edgeLabelBackground':'#161b22','actorBkg':'#161b22','actorBorder':'#388bfd','actorTextColor':'#e6edf3','signalColor':'#58a6ff','labelBoxBkgColor':'#161b22','labelBoxBorderColor':'#388bfd','noteBkgColor':'#161b22','noteBorderColor':'#388bfd','noteTextColor':'#c9d1d9','activationBkgColor':'#30363d'}}}%%
+
 sequenceDiagram
   actor Admin as New Admin
   participant Web as Web App
@@ -171,7 +173,7 @@ sequenceDiagram
   Admin->>Web: Open registration page
   Web-->>Admin: SSO icons + email/password form
 
-  rect rgb(240, 249, 255)
+  rect rgb(22, 35, 58)
     Note over Admin,Email: Email / password path
     Admin->>Web: Accept Terms + submit (Idempotency-Key)
     Web->>API: POST /api/organizations/
@@ -180,7 +182,7 @@ sequenceDiagram
     API-->>Web: 202 → confirmation screen
   end
 
-  rect rgb(240, 249, 255)
+  rect rgb(22, 35, 58)
     Note over Admin,IdP: External provider (OAuth only)
     Admin->>Web: Choose Microsoft / Google / GitHub
     Web->>IdP: OAuth2 Auth Code + PKCE
@@ -195,7 +197,7 @@ sequenceDiagram
     end
   end
 
-  rect rgb(240, 249, 255)
+  rect rgb(22, 35, 58)
     Note over Admin,Email: Post-OAuth completion screen
     Web-->>Admin: register-org-complete (name, slug, Terms)
     Admin->>Web: Submit completion (Idempotency-Key)
@@ -212,13 +214,14 @@ sequenceDiagram
 Dev checklist — API outcomes mapped to wireframe states.
 
 ```mermaid
-%%{init: {'theme':'base','themeVariables':{'background':'#f8fafc','mainBkg':'#f8fafc','actorBkg':'#dbeafe','actorBorder':'#3b82f6','actorTextColor':'#1e293b','signalColor':'#475569','labelBoxBkgColor':'#f0f9ff','labelBoxBorderColor':'#3b82f6','noteBkgColor':'#f0f9ff','noteBorderColor':'#94a3b8','noteTextColor':'#334155','activationBkgColor':'#e2e8f0','secondaryColor':'#f0f9ff','lineColor':'#475569'}}}%%
+%%{init: {'theme':'dark','themeVariables':{'background':'#0d1117','mainBkg':'#0d1117','primaryColor':'#161b22','primaryBorderColor':'#388bfd','primaryTextColor':'#e6edf3','secondaryColor':'#21262d','secondaryBorderColor':'#388bfd','secondaryTextColor':'#e6edf3','tertiaryColor':'#161b22','tertiaryTextColor':'#e6edf3','lineColor':'#58a6ff','textColor':'#e6edf3','nodeBorder':'#388bfd','clusterBkg':'#161b22','clusterBorder':'#388bfd','titleColor':'#e6edf3','edgeLabelBackground':'#161b22','actorBkg':'#161b22','actorBorder':'#388bfd','actorTextColor':'#e6edf3','signalColor':'#58a6ff','labelBoxBkgColor':'#161b22','labelBoxBorderColor':'#388bfd','noteBkgColor':'#161b22','noteBorderColor':'#388bfd','noteTextColor':'#c9d1d9','activationBkgColor':'#30363d'}}}%%
+
 sequenceDiagram
   actor Admin as New Admin
   participant Web as Web App
   participant API as Axis API
 
-  rect rgb(240, 249, 255)
+  rect rgb(22, 35, 58)
     Note over Admin,API: Email/password submission
     Admin->>Web: Submit register-org (+ Terms, Idempotency-Key)
     Web->>API: POST /api/organizations/
@@ -227,7 +230,7 @@ sequenceDiagram
     API-->>Web: 202 confirmation (new or duplicate email)
   end
 
-  rect rgb(240, 249, 255)
+  rect rgb(22, 35, 58)
     Note over Admin,API: Provider callback pre-check
     Admin->>Web: Provider OAuth callback completes
     Web->>API: Validate claims (verified email, uniqueness)
@@ -236,7 +239,7 @@ sequenceDiagram
     API-->>Web: Open register-org-complete
   end
 
-  rect rgb(240, 249, 255)
+  rect rgb(22, 35, 58)
     Note over Admin,API: Post-OAuth completion submit
     Admin->>Web: Submit complete form (name, slug, Terms)
     Web->>API: POST completion (link external login)
@@ -244,7 +247,7 @@ sequenceDiagram
     API-->>Web: 5xx banner, re-enable submit
   end
 
-  rect rgb(240, 249, 255)
+  rect rgb(22, 35, 58)
     Note over Admin,API: Shared confirmation outcome
     API-->>Web: 202 confirmation screen
     Web-->>Admin: email-confirmation + resend (204 / 429)
