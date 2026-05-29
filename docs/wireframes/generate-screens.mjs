@@ -45,6 +45,8 @@ import {
   buildSideSheet,
   buildTable,
   buildPermissionMatrix,
+  buildAuthExternalSignIn,
+  AUTH_EXTERNAL_SIGN_IN_BLOCK_H,
 } from './generate-template.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -315,39 +317,6 @@ function authTermsRow(prefix, cardX, y, cardW, { checked = true, errorMsg = null
   return { els, blockH };
 }
 
-/** Compact SSO icon row — three providers, centered (ADR-027). */
-function authProviderIconRow(prefix, cardX, y, cardW) {
-  const innerX = cardX + 24;
-  const innerW = cardW - 48;
-  const btnSize = 44;
-  const gap = 20;
-  const rowW = btnSize * 3 + gap * 2;
-  const startX = innerX + Math.round((innerW - rowW) / 2);
-  const providers = [
-    { icon: '⊞', stroke: '#2563eb', bg: '#eff6ff' },
-    { icon: 'G', stroke: '#dc2626', bg: '#fef2f2' },
-    { icon: '⎇', stroke: '#1f2937', bg: '#f3f4f6' },
-  ];
-  const els = [];
-  providers.forEach((p, i) => {
-    const bx = startX + i * (btnSize + gap);
-    els.push(rect(`${prefix}_p${i}`, bx, y, btnSize, btnSize, p.stroke, p.bg, 1, true));
-    els.push(text(`${prefix}_p${i}_ic`, bx, y + 11, btnSize, 22, p.icon, 18, p.stroke, 'center'));
-  });
-  return { els, height: btnSize + 12 };
-}
-
-function authOrDivider(prefix, cardX, cardW, y) {
-  const innerX = cardX + 24;
-  const innerW = cardW - 48;
-  const mid = cardX + cardW / 2;
-  return [
-    hline(`${prefix}_or_l`, innerX, y + 10, innerW / 2 - 28, C.gray300),
-    text(`${prefix}_or_t`, mid - 20, y, 40, 16, 'or', 11, C.gray500, 'center'),
-    hline(`${prefix}_or_r`, mid + 28, y + 10, innerW / 2 - 28, C.gray300),
-  ];
-}
-
 // ─── App shell (shared layout reference) ─────────────────────────────────────
 
 function genAppShell() {
@@ -395,7 +364,6 @@ function genRegisterOrg() {
   const cardX = Math.round((W - cardW) / 2);
   const cardY = 16;
   const headerH = 112;
-  const orH = 28;
   const footerZone = 44;
   const els = [];
 
@@ -408,11 +376,8 @@ function genRegisterOrg() {
   contentEls.push(hline('ro_hdiv', cardX, cardY + 60, cardW, C.gray300));
   contentEls.push(text('ro_title', cardX + 24, cardY + 76, cardW - 48, 24, 'Create your organization', 17, C.gray900));
 
-  const { els: ssoEls, height: ssoH } = authProviderIconRow('ro', cardX, y, cardW);
-  contentEls.push(...ssoEls);
-  y += ssoH;
-  contentEls.push(...authOrDivider('ro', cardX, cardW, y));
-  y += orH;
+  contentEls.push(...component(buildAuthExternalSignIn, cardX + 24, y, 48));
+  y += AUTH_EXTERNAL_SIGN_IN_BLOCK_H;
 
   const fields = [
     { kind: 'input', label: 'Organization name', value: 'Acme Corp', required: true },

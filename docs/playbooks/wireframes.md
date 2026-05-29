@@ -16,7 +16,7 @@ This playbook covers everything needed to work with the wireframe generation sys
 | File | Purpose |
 |---|---|
 | `docs/wireframes/components.mjs` | **Single source of truth** — primitives, colors, layout constants, helpers |
-| `docs/wireframes/generate-template.mjs` | 34-section component kit — imports from `components.mjs`, exports all builders |
+| `docs/wireframes/generate-template.mjs` | 38-section component kit — imports from `components.mjs`, exports all builders |
 | `docs/wireframes/generate-screens.mjs` | 27 screen wireframes — imports builders from the template, places them via `component()` |
 | `docs/wireframes/_template.excalidraw` | Generated output of `generate-template.mjs` |
 | `docs/use-cases/{domain}/{use-case}/*.excalidraw` | Generated outputs of `generate-screens.mjs` — co-located with each use case |
@@ -322,6 +322,17 @@ cardY   = Math.round((H - cardH) / 2)
 
 **Logo rule**: always `text(id, cardX, cardY+16, cardW, 28, '⬡  Axis', 18, C.primary, 'center')` — bounding box must span full `cardW` so `'center'` alignment works correctly. Never use a narrower bounding box.
 
+**External sign-in (ADR-027):** never draw Microsoft / Google / GitHub icon buttons or the `or` divider by hand. Place the kit block from S38:
+
+```js
+import { buildAuthExternalSignIn, AUTH_EXTERNAL_SIGN_IN_BLOCK_H } from './generate-template.mjs';
+
+contentEls.push(...component(buildAuthExternalSignIn, cardX + 24, y, 48));
+y += AUTH_EXTERNAL_SIGN_IN_BLOCK_H;
+```
+
+Icons, colors, and spacing are owned by `buildAuthExternalSignIn` in `generate-template.mjs` only.
+
 ---
 
 ## Component dimensions — canonical reference
@@ -435,9 +446,9 @@ This is what makes `import { buildWorkflowCanvas } from './generate-template.mjs
 | Group | Sections |
 |---|---|
 | Foundations | S01–S03 |
-| Input & Forms | S04–S08 |
+| Input & Forms | S04–S08, S38 (auth external sign-in) |
 | Data Display | S09–S14 |
 | Navigation & Layout | S15–S18 |
 | Feedback & Overlays | S19–S24 |
 | Interaction Patterns | S25–S29 |
-| Axis App Patterns | S30–S37 |
+| Axis App Patterns | S30–S37 (S38 listed under Input & Forms — registration auth) |
