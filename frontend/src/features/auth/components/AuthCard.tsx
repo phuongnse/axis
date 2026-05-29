@@ -20,7 +20,7 @@ export function AuthCard({ title, children, footer, banner }: AuthCardProps) {
         )}
       >
         <div className="px-6 pt-5 pb-4 text-center border-b border-border">
-          <img src={axisLogo} alt="Axis" className="mx-auto h-7 w-auto" width={96} height={28} />
+          <img src={axisLogo} alt="Axis" className="mx-auto h-8 w-8" width={32} height={32} />
         </div>
         <div className="px-6 py-6 space-y-5">
           <h1 className="text-[17px] font-semibold text-foreground">{title}</h1>
