@@ -13,7 +13,7 @@ import {
   fieldLabelBlock,
   inputField,
   inlineTextRow,
-  labelTextWidth,
+  inlineTextRowWidth,
   isPasswordLabel,
   PASSWORD_INPUT_PAD_RIGHT,
   passwordRevealToggle,
@@ -157,12 +157,12 @@ export function buildAuthCardFooter(prefix, cardX, cardY, cardW, cardH, footer) 
   const lineH = 16;
   const fontSize = 12;
   const segments = typeof footer === 'string'
-    ? [{ text: footer, color: C.primary }]
+    ? [{ text: footer, color: C.primary, link: true }]
     : [
         ...(footer.lead ? [{ text: footer.lead, color: C.gray700 }] : []),
-        { text: footer.link, color: C.primary },
+        { text: footer.link, color: C.primary, link: true },
       ];
-  const totalW = segments.reduce((sum, { text: str }) => sum + labelTextWidth(str, fontSize) + 2, 0);
+  const totalW = inlineTextRowWidth(segments, fontSize);
   const startX = cardX + Math.round((cardW - totalW) / 2);
   const { els: rowEls } = inlineTextRow(`${prefix}_footer`, startX, lineY, lineH, fontSize, segments);
   return [
@@ -291,9 +291,9 @@ export function authTermsRow(prefix, cardX, y, cardW, { checked = true, errorMsg
   const blockH = errorMsg ? 50 : 28;
   const { els: rowEls } = inlineTextRow(`${prefix}_terms`, textX, textY, lineH, fontSize, [
     { text: 'I agree to the ', color: C.gray700 },
-    { text: 'Terms of Service', color: C.primary },
+    { text: 'Terms of Service', color: C.primary, link: true },
     { text: ' and ', color: C.gray700 },
-    { text: 'Privacy Policy', color: C.primary },
+    { text: 'Privacy Policy', color: C.primary, link: true },
   ]);
   const els = [
     rect(`${prefix}_chk`, x, y, chkSize, chkSize, checked ? C.primary : C.dangerBorder, C.white, 1, true),

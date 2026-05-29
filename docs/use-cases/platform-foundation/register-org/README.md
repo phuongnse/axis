@@ -129,8 +129,8 @@ Documented for wireframes and future frontend; **not implemented** in the app ye
 | Control | Wireframe | Intended behavior |
 |---------|-----------|-------------------|
 | Terms checkbox | `authTermsRow` in `blocks.mjs` | Required before submit — **no `*`** on the row; inline error if unchecked (see `register-org-complete-states`). |
-| **Terms of Service** / **Privacy Policy** | Primary-colored inline links in the agree sentence | Open the legal document in a **new browser tab** (public URLs TBD, e.g. `/legal/terms`, `/legal/privacy`). Does not submit the form or clear fields. |
-| Card footer (e.g. **Sign in**) | `buildAuthCardFooter` — gray lead-in + **primary link** | Navigates to the target auth route (e.g. sign-in page). Same link styling as Terms/Privacy. |
+| **Terms of Service** / **Privacy Policy** | Primary inline links with **underline** in the agree sentence | Open the legal document in a **new browser tab** (public URLs TBD, e.g. `/legal/terms`, `/legal/privacy`). Does not submit the form or clear fields. |
+| Card footer (e.g. **Sign in**) | `buildAuthCardFooter` — gray lead-in + underlined **primary link** | Navigates to the target auth route (e.g. sign-in page). Same link styling as Terms/Privacy. |
 
 Record **accepted ToS/Privacy version** on the account at org create (AC above); legal page content and versioning are out of scope for this wireframe pass.
 

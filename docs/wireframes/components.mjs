@@ -244,15 +244,39 @@ export const FIELD_LABEL_TO_HELP_GAP = 6;
 /** Gap between label (or help row) and the control below. */
 export const FIELD_HELP_TO_INPUT_GAP = 8;
 
-/** Pixel width of label copy at 11px — positions the required * after the last glyph. */
-/** Place inline text segments on one row; returns elements and total width. */
+/** Gap between inline phrases (px). */
+export const INLINE_TEXT_SEGMENT_GAP = 5;
+
+/** Total width of an inline text row (for centering). */
+export function inlineTextRowWidth(segments, fontSize) {
+  let w = 0;
+  segments.forEach((seg, i) => {
+    w += Math.ceil(labelTextWidth(seg.text, fontSize) + 6);
+    if (i < segments.length - 1) {
+      w += INLINE_TEXT_SEGMENT_GAP;
+    }
+  });
+  return w;
+}
+
+/**
+ * Inline text on one row; optional underline per segment (`link: true`).
+ * Uses generous per-segment width so Excalidraw does not kern glyphs together.
+ */
 export function inlineTextRow(prefix, startX, y, lineH, fontSize, segments) {
   const els = [];
   let cx = startX;
-  segments.forEach(({ text: str, color }, i) => {
-    const w = Math.max(8, labelTextWidth(str, fontSize) + 2);
-    els.push(text(`${prefix}_t${i}`, cx, y, w, lineH, str, fontSize, color));
-    cx += w;
+  segments.forEach(({ text: str, color, link = false }, i) => {
+    const textW = Math.ceil(labelTextWidth(str, fontSize) + 6);
+    els.push(text(`${prefix}_t${i}`, cx, y, textW, lineH, str, fontSize, color));
+    if (link) {
+      const ulY = y + lineH - 1;
+      els.push(hline(`${prefix}_ul${i}`, cx + 1, ulY, textW - 2, color, 1));
+    }
+    cx += textW;
+    if (i < segments.length - 1) {
+      cx += INLINE_TEXT_SEGMENT_GAP;
+    }
   });
   return { els, width: cx - startX };
 }
