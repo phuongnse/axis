@@ -1,17 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" fill="none" role="img" aria-label="Axis">
   <title>Axis</title>
-  <!-- Tri-node network mark (no wordmark) — light strokes, open layout -->
-  <path
-    stroke="#C58B55"
-    stroke-opacity="0.72"
-    stroke-linecap="round"
-    stroke-width="1.25"
-    d="M18 12 11.5 23.5M18 12 24.5 23.5M11.5 23.5 24.5 23.5"
-  />
-  <circle cx="18" cy="11" r="3.5" fill="#D4A06A" stroke="#C58B55" stroke-width="0.5" />
-  <circle cx="10.5" cy="24" r="3.5" fill="#8A9E93" stroke="#667A6E" stroke-width="0.5" />
-  <circle cx="25.5" cy="24" r="3.5" fill="#72A8CC" stroke="#5B9EC9" stroke-width="0.5" />
-  <circle cx="18" cy="11" r="1.15" fill="#FFFCF8" />
-  <circle cx="10.5" cy="24" r="1.15" fill="#F7F6F2" />
-  <circle cx="25.5" cy="24" r="1.15" fill="#F1F6F9" />
+  <!-- Tri-node mark: three nodes, no connectors -->
+  <circle cx="18" cy="11" r="3.75" fill="#F0B35C" stroke="#E8952E" stroke-width="0.55" />
+  <circle cx="10.5" cy="24" r="3.75" fill="#5ECF9A" stroke="#3DB87A" stroke-width="0.55" />
+  <circle cx="25.5" cy="24" r="3.75" fill="#5EB8F0" stroke="#2EA8E8" stroke-width="0.55" />
+  <circle cx="18" cy="11" r="1.2" fill="#FFFBF5" />
+  <circle cx="10.5" cy="24" r="1.2" fill="#F2FCF7" />
+  <circle cx="25.5" cy="24" r="1.2" fill="#F0F9FF" />
 </svg>

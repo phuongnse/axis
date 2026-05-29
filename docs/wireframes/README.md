@@ -16,7 +16,7 @@
 | `blocks.mjs` | **Auth & form blocks** (SSO row, fields, terms, `authCard`, register-org painters) — **edit here first** for auth UI |
 | `generate-template.mjs` | Kit section builders **S01–S37** (table, modal, workflow canvas, …) — import-only, no CLI output |
 | `generate-screens.mjs` | Screen generators → `docs/use-cases/{domain}/{use-case}/*.excalidraw` |
-| `assets/axis-logo.svg` | **Canonical brand mark** (tri-node network, no wordmark) |
+| `assets/axis-logo.svg` | **Canonical brand mark** (three nodes, no wordmark) |
 | `logo.mjs` | `buildAxisLogo()` — embeds SVG in Excalidraw via `files` |
 | `app-shell.excalidraw` + `.svg` | Shared app chrome (only committed artifact besides source `.mjs` here) |
 
@@ -158,7 +158,7 @@ S04 in `generate-template.mjs` demonstrates `fieldLabelBlock` with `helpText` �
 ## Brand logo (`buildAxisLogo`)
 
 - **Not** the `⬡  Axis` text placeholder — use `buildAxisLogo(prefix, slotX, y, slotW)` from `logo.mjs` (re-exported in `blocks.mjs`).
-- Source file: [`assets/axis-logo.svg`](assets/axis-logo.svg) (default: **tri-node network** mark only). **Concept gallery:** [`assets/README.md`](assets/README.md) (`axis-logo-concept-01` … `07`). Legacy wordmark exports: [`axis-logo-alt-facet.svg`](assets/axis-logo-alt-facet.svg), [`axis-logo-alt-orbit.svg`](assets/axis-logo-alt-orbit.svg). Sync [`frontend/src/assets/axis-logo.svg`](../../frontend/src/assets/axis-logo.svg) when the canonical mark changes.
+- Source file: [`assets/axis-logo.svg`](assets/axis-logo.svg) — three colored nodes (amber / green / blue), no connector lines. Sync [`frontend/src/assets/axis-logo.svg`](../../frontend/src/assets/axis-logo.svg) when the mark changes.
 - Wired in: `buildAuthCardHeader`, `buildAuthCardBrandBar`, `authCard`.
 - `writeExcalidraw(..., elements, files)` must receive merged `files` from any screen that embeds the logo (`mergeExcalidrawFiles` in `generate-screens.mjs`).
 - Open `.excalidraw` in Excalidraw to see the SVG. Kroki SVG preview may not render embedded images — check the source file in app if preview looks empty.

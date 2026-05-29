@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" fill="none" role="img" aria-label="Axis concept: block brackets">
-  <title>Axis  -  block brackets</title>
-  <path stroke="#667A6E" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 11c-2.5 2-3.5 4.5-3.5 7s1 5 3.5 7M26 11c2.5 2 3.5 4.5 3.5 7s-1 5-3.5 7" />
-  <circle cx="14" cy="18" r="2.35" fill="#D4A06A" stroke="#C58B55" stroke-width="0.45" />
-  <circle cx="18" cy="18" r="2.35" fill="#8A9E93" stroke="#667A6E" stroke-width="0.45" />
-  <circle cx="22" cy="18" r="2.35" fill="#72A8CC" stroke="#5B9EC9" stroke-width="0.45" />
-  <path stroke="#C58B55" stroke-linecap="round" stroke-opacity="0.65" stroke-width="0.9" d="M16.35 18h3.3" />
-</svg>

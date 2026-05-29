@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 36" fill="none" role="img" aria-label="Axis">
-  <title>Axis  -  facet hex (alt)</title>
-  <!-- Alt A: three-color hex facets -->
-  <path fill="#667A6E" d="M18 4 30 11v14L18 32 6 25V11L18 4Z"/>
-  <path fill="#C58B55" d="M18 4 30 11 18 18 6 11 18 4Z"/>
-  <path fill="#5B9EC9" d="M18 18 30 11v14L18 32V18Z"/>
-  <path stroke="#F4F3EF" stroke-linecap="round" stroke-width="1.5" d="M18 12v8M13 15.5 23 20.5M23 15.5 13 20.5"/>
-  <text x="44" y="24" fill="#4F5F57" font-family="system-ui, sans-serif" font-size="19" font-weight="700">Axis</text>
-</svg>
