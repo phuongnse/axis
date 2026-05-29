@@ -144,10 +144,11 @@ function seqMessageLabelEls({ x1, y1, x2, y2, label, labelBelow = false, size = 
   const span = Math.abs(x2 - x1);
   const maxWidth = Math.max(span - 20, 140);
   const lines = wrapNoteLines(label, maxWidth, size);
-  const lineH = 15;
+  const lineH = 16;
   const blockH = lines.length * lineH;
+  const pad = 24;
   const els = [];
-  const topY = labelBelow ? my + 18 : my - 18 - blockH;
+  const topY = labelBelow ? my + pad : my - pad - blockH;
   lines.forEach((line, i) => {
     const w = estimateWidth(line, size);
     els.push({
@@ -744,6 +745,7 @@ function seqBuild({ title, participants, gap = 165, messages, sections = [], not
 function registerOrgFlowDiagram() {
   _id = 1;
   const step = 66;
+  const retStep = 84;
   const phaseGap = 52;
   const afterDiv = 30;
 
@@ -751,8 +753,14 @@ function registerOrgFlowDiagram() {
   const emailEnd = emailStart + step * 4;
   const oauthDiv = emailEnd + phaseGap;
   const oauthStart = oauthDiv + afterDiv;
-  const oauthEnd = oauthStart + step * 6;
-  const completeDiv = oauthEnd + phaseGap;
+  const oChoose = oauthStart;
+  const oPkce = oChoose + step;
+  const oVerified = oPkce + step;
+  const oValidate = oVerified + 78;
+  const oRejectNoEmail = oValidate + retStep;
+  const oRejectDup = oRejectNoEmail + retStep;
+  const oOpenComplete = oRejectDup + retStep;
+  const completeDiv = oOpenComplete + phaseGap;
   const completeStart = completeDiv + afterDiv;
   const completeEnd = completeStart + step * 4;
 
@@ -781,13 +789,13 @@ function registerOrgFlowDiagram() {
       { from: 2, to: 3, y: emailStart + step * 3, label: "Send verification email (if new)" },
       { from: 2, to: 1, y: emailEnd, label: "202 → confirmation screen", dashed: true, labelBelow: true },
 
-      { from: 0, to: 1, y: oauthStart, label: "Choose Microsoft / Google / GitHub" },
-      { from: 1, to: 4, y: oauthStart + step, label: "OAuth2 Auth Code + PKCE" },
-      { from: 4, to: 1, y: oauthStart + step * 2, label: "Verified email + display name", dashed: true, labelBelow: true },
-      { from: 1, to: 2, y: oauthStart + step * 3, label: "Validate claims (verified email required)" },
-      { from: 2, to: 1, y: oauthStart + step * 4, label: "Reject: no verified email", dashed: true, labelBelow: false },
-      { from: 2, to: 1, y: oauthStart + step * 5, label: "Reject: duplicate email → Sign in", dashed: true, labelBelow: true },
-      { from: 2, to: 1, y: oauthEnd, label: "Open register-org-complete", dashed: true, labelBelow: false },
+      { from: 0, to: 1, y: oChoose, label: "Choose Microsoft / Google / GitHub" },
+      { from: 1, to: 4, y: oPkce, label: "OAuth2 Auth Code + PKCE" },
+      { from: 4, to: 1, y: oVerified, label: "Verified email + display name", dashed: true, labelBelow: true },
+      { from: 1, to: 2, y: oValidate, label: "Validate claims (verified email required)", labelBelow: false },
+      { from: 2, to: 1, y: oRejectNoEmail, label: "Reject: no verified email", dashed: true, labelBelow: false },
+      { from: 2, to: 1, y: oRejectDup, label: "Reject: duplicate email → Sign in", dashed: true, labelBelow: true },
+      { from: 2, to: 1, y: oOpenComplete, label: "Open register-org-complete", dashed: true, labelBelow: true },
 
       { from: 1, to: 0, y: completeStart, label: "Show register-org-complete (name, slug, Terms)", dashed: true, labelBelow: true },
       { from: 0, to: 1, y: completeStart + step, label: "Submit completion (Idempotency-Key)" },
@@ -808,6 +816,7 @@ function registerOrgFlowDiagram() {
 function registerOrgCasesDiagram() {
   _id = 1;
   const step = 66;
+  const retStep = 84;
   const phaseGap = 52;
   const afterDiv = 30;
 
@@ -815,7 +824,11 @@ function registerOrgCasesDiagram() {
   const emailEnd = emailStart + step * 4;
   const providerDiv = emailEnd + phaseGap;
   const providerStart = providerDiv + afterDiv;
-  const providerEnd = providerStart + step * 4;
+  const pCallback = providerStart;
+  const pValidate = pCallback + step;
+  const pRejectNoEmail = pValidate + retStep;
+  const pRejectDup = pRejectNoEmail + retStep;
+  const providerEnd = pRejectDup + retStep;
   const completeDiv = providerEnd + phaseGap;
   const completeStart = completeDiv + afterDiv;
   const completeEnd = completeStart + step * 3;
@@ -843,11 +856,11 @@ function registerOrgCasesDiagram() {
       { from: 2, to: 1, y: emailStart + step * 3, label: "5xx generic banner, re-enable submit", dashed: true, labelBelow: true },
       { from: 2, to: 1, y: emailEnd, label: "202 confirmation (new or duplicate email)", dashed: true, labelBelow: false },
 
-      { from: 0, to: 1, y: providerStart, label: "Provider OAuth callback completes" },
-      { from: 1, to: 2, y: providerStart + step, label: "Validate claims (verified email, uniqueness)" },
-      { from: 2, to: 1, y: providerStart + step * 2, label: "Reject: no verified email → provider error", dashed: true, labelBelow: false },
-      { from: 2, to: 1, y: providerStart + step * 3, label: "Reject: duplicate email → Sign in", dashed: true, labelBelow: true },
-      { from: 2, to: 1, y: providerEnd, label: "Open register-org-complete", dashed: true, labelBelow: false },
+      { from: 0, to: 1, y: pCallback, label: "Provider OAuth callback completes" },
+      { from: 1, to: 2, y: pValidate, label: "Validate claims (verified email, uniqueness)", labelBelow: false },
+      { from: 2, to: 1, y: pRejectNoEmail, label: "Reject: no verified email → provider error", dashed: true, labelBelow: false },
+      { from: 2, to: 1, y: pRejectDup, label: "Reject: duplicate email → Sign in", dashed: true, labelBelow: true },
+      { from: 2, to: 1, y: providerEnd, label: "Open register-org-complete", dashed: true, labelBelow: true },
 
       { from: 0, to: 1, y: completeStart, label: "Submit complete form (org name, slug, Terms)" },
       { from: 1, to: 2, y: completeStart + step, label: "POST completion (link external login)" },

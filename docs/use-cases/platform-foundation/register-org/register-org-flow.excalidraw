@@ -31,7 +31,7 @@
       "locked": false,
       "type": "rectangle",
       "width": 852.5,
-      "height": 1568
+      "height": 1634
     },
     {
       "id": "diag-1",
@@ -158,7 +158,7 @@
       "locked": false,
       "type": "arrow",
       "width": 0,
-      "height": 1446,
+      "height": 1512,
       "points": [
         [
           0,
@@ -166,7 +166,7 @@
         ],
         [
           0,
-          1446
+          1512
         ]
       ],
       "startArrowhead": null,
@@ -263,7 +263,7 @@
       "locked": false,
       "type": "arrow",
       "width": 0,
-      "height": 1446,
+      "height": 1512,
       "points": [
         [
           0,
@@ -271,7 +271,7 @@
         ],
         [
           0,
-          1446
+          1512
         ]
       ],
       "startArrowhead": null,
@@ -402,7 +402,7 @@
       "locked": false,
       "type": "arrow",
       "width": 0,
-      "height": 1446,
+      "height": 1512,
       "points": [
         [
           0,
@@ -410,7 +410,7 @@
         ],
         [
           0,
-          1446
+          1512
         ]
       ],
       "startArrowhead": null,
@@ -541,7 +541,7 @@
       "locked": false,
       "type": "arrow",
       "width": 0,
-      "height": 1446,
+      "height": 1512,
       "points": [
         [
           0,
@@ -549,7 +549,7 @@
         ],
         [
           0,
-          1446
+          1512
         ]
       ],
       "startArrowhead": null,
@@ -680,7 +680,7 @@
       "locked": false,
       "type": "arrow",
       "width": 0,
-      "height": 1446,
+      "height": 1512,
       "points": [
         [
           0,
@@ -688,7 +688,7 @@
         ],
         [
           0,
-          1446
+          1512
         ]
       ],
       "startArrowhead": null,
@@ -847,7 +847,7 @@
     {
       "id": "diag-24",
       "x": 20,
-      "y": 1094,
+      "y": 1160,
       "angle": 0,
       "strokeColor": "#94a3b8",
       "backgroundColor": "transparent",
@@ -888,7 +888,7 @@
     {
       "id": "diag-25",
       "x": 320.85,
-      "y": 1103,
+      "y": 1169,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -963,7 +963,7 @@
     {
       "id": "diag-27",
       "x": 79.3,
-      "y": 97.5,
+      "y": 91,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -987,7 +987,7 @@
       "locked": false,
       "type": "text",
       "width": 136.4,
-      "height": 15,
+      "height": 16,
       "text": "Open registration page",
       "fontSize": 10,
       "fontFamily": 1,
@@ -1038,7 +1038,7 @@
     {
       "id": "diag-29",
       "x": 97.9,
-      "y": 148.5,
+      "y": 141,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1062,7 +1062,7 @@
       "locked": false,
       "type": "text",
       "width": 99.2,
-      "height": 15,
+      "height": 16,
       "text": "Show SSO icons +",
       "fontSize": 10,
       "fontFamily": 1,
@@ -1072,7 +1072,7 @@
     {
       "id": "diag-30",
       "x": 88.6,
-      "y": 163.5,
+      "y": 157,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1096,7 +1096,7 @@
       "locked": false,
       "type": "text",
       "width": 117.8,
-      "height": 15,
+      "height": 16,
       "text": "email/password form",
       "fontSize": 10,
       "fontFamily": 1,
@@ -1147,7 +1147,7 @@
     {
       "id": "diag-32",
       "x": 82.4,
-      "y": 320.5,
+      "y": 327,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1171,7 +1171,7 @@
       "locked": false,
       "type": "text",
       "width": 130.2,
-      "height": 15,
+      "height": 16,
       "text": "Accept Terms + submit",
       "fontSize": 10,
       "fontFamily": 1,
@@ -1181,7 +1181,7 @@
     {
       "id": "diag-33",
       "x": 94.8,
-      "y": 335.5,
+      "y": 343,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1205,7 +1205,7 @@
       "locked": false,
       "type": "text",
       "width": 105.4,
-      "height": 15,
+      "height": 16,
       "text": "(Idempotency-Key)",
       "fontSize": 10,
       "fontFamily": 1,
@@ -1256,7 +1256,7 @@
     {
       "id": "diag-35",
       "x": 248.1,
-      "y": 335.5,
+      "y": 329,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1280,7 +1280,7 @@
       "locked": false,
       "type": "text",
       "width": 148.8,
-      "height": 15,
+      "height": 16,
       "text": "POST /api/organizations/",
       "fontSize": 10,
       "fontFamily": 1,
@@ -1339,7 +1339,7 @@
     {
       "id": "diag-37",
       "x": 391.1,
-      "y": 397.5,
+      "y": 390,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1363,7 +1363,7 @@
       "locked": false,
       "type": "text",
       "width": 117.8,
-      "height": 15,
+      "height": 16,
       "text": "Generate slug, hash",
       "fontSize": 10,
       "fontFamily": 1,
@@ -1373,7 +1373,7 @@
     {
       "id": "diag-38",
       "x": 388,
-      "y": 412.5,
+      "y": 406,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1397,7 +1397,7 @@
       "locked": false,
       "type": "text",
       "width": 124,
-      "height": 15,
+      "height": 16,
       "text": "password, record ToS",
       "fontSize": 10,
       "fontFamily": 1,
@@ -1448,7 +1448,7 @@
     {
       "id": "diag-40",
       "x": 426.2,
-      "y": 452.5,
+      "y": 445,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1472,7 +1472,7 @@
       "locked": false,
       "type": "text",
       "width": 142.6,
-      "height": 15,
+      "height": 16,
       "text": "Send verification email",
       "fontSize": 10,
       "fontFamily": 1,
@@ -1482,7 +1482,7 @@
     {
       "id": "diag-41",
       "x": 472.7,
-      "y": 467.5,
+      "y": 461,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1506,7 +1506,7 @@
       "locked": false,
       "type": "text",
       "width": 49.6,
-      "height": 15,
+      "height": 16,
       "text": "(if new)",
       "fontSize": 10,
       "fontFamily": 1,
@@ -1557,7 +1557,7 @@
     {
       "id": "diag-43",
       "x": 245,
-      "y": 584.5,
+      "y": 591,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1581,7 +1581,7 @@
       "locked": false,
       "type": "text",
       "width": 155,
-      "height": 15,
+      "height": 16,
       "text": "202 → confirmation screen",
       "fontSize": 10,
       "fontFamily": 1,
@@ -1632,7 +1632,7 @@
     {
       "id": "diag-45",
       "x": 70,
-      "y": 600.5,
+      "y": 593,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1656,7 +1656,7 @@
       "locked": false,
       "type": "text",
       "width": 155,
-      "height": 15,
+      "height": 16,
       "text": "Choose Microsoft / Google",
       "fontSize": 10,
       "fontFamily": 1,
@@ -1666,7 +1666,7 @@
     {
       "id": "diag-46",
       "x": 122.7,
-      "y": 615.5,
+      "y": 609,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1690,7 +1690,7 @@
       "locked": false,
       "type": "text",
       "width": 49.6,
-      "height": 15,
+      "height": 16,
       "text": "/ GitHub",
       "fontSize": 10,
       "fontFamily": 1,
@@ -1741,7 +1741,7 @@
     {
       "id": "diag-48",
       "x": 426.2,
-      "y": 681.5,
+      "y": 675,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1765,7 +1765,7 @@
       "locked": false,
       "type": "text",
       "width": 142.6,
-      "height": 15,
+      "height": 16,
       "text": "OAuth2 Auth Code + PKCE",
       "fontSize": 10,
       "fontFamily": 1,
@@ -1816,7 +1816,7 @@
     {
       "id": "diag-50",
       "x": 407.6,
-      "y": 798.5,
+      "y": 805,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1840,7 +1840,7 @@
       "locked": false,
       "type": "text",
       "width": 179.8,
-      "height": 15,
+      "height": 16,
       "text": "Verified email + display name",
       "fontSize": 10,
       "fontFamily": 1,
@@ -1850,7 +1850,7 @@
     {
       "id": "diag-51",
       "x": 235,
-      "y": 844,
+      "y": 856,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1891,7 +1891,7 @@
     {
       "id": "diag-52",
       "x": 245,
-      "y": 864.5,
+      "y": 803,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1915,7 +1915,7 @@
       "locked": false,
       "type": "text",
       "width": 155,
-      "height": 15,
+      "height": 16,
       "text": "Validate claims (verified",
       "fontSize": 10,
       "fontFamily": 1,
@@ -1925,7 +1925,7 @@
     {
       "id": "diag-53",
       "x": 276,
-      "y": 879.5,
+      "y": 819,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1949,7 +1949,7 @@
       "locked": false,
       "type": "text",
       "width": 93,
-      "height": 15,
+      "height": 16,
       "text": "email required)",
       "fontSize": 10,
       "fontFamily": 1,
@@ -1959,7 +1959,7 @@
     {
       "id": "diag-54",
       "x": 410,
-      "y": 910,
+      "y": 940,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -2000,7 +2000,7 @@
     {
       "id": "diag-55",
       "x": 245,
-      "y": 879.5,
+      "y": 903,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2024,7 +2024,7 @@
       "locked": false,
       "type": "text",
       "width": 155,
-      "height": 15,
+      "height": 16,
       "text": "Reject: no verified email",
       "fontSize": 10,
       "fontFamily": 1,
@@ -2034,7 +2034,7 @@
     {
       "id": "diag-56",
       "x": 410,
-      "y": 976,
+      "y": 1024,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -2075,7 +2075,7 @@
     {
       "id": "diag-57",
       "x": 245,
-      "y": 996.5,
+      "y": 1051,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2099,7 +2099,7 @@
       "locked": false,
       "type": "text",
       "width": 155,
-      "height": 15,
+      "height": 16,
       "text": "Reject: duplicate email →",
       "fontSize": 10,
       "fontFamily": 1,
@@ -2109,7 +2109,7 @@
     {
       "id": "diag-58",
       "x": 298.5,
-      "y": 1011.5,
+      "y": 1067,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2133,7 +2133,7 @@
       "locked": false,
       "type": "text",
       "width": 48,
-      "height": 15,
+      "height": 16,
       "text": "Sign in",
       "fontSize": 10,
       "fontFamily": 1,
@@ -2143,7 +2143,7 @@
     {
       "id": "diag-59",
       "x": 410,
-      "y": 1042,
+      "y": 1108,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -2184,7 +2184,7 @@
     {
       "id": "diag-60",
       "x": 298.5,
-      "y": 996.5,
+      "y": 1135,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2208,7 +2208,7 @@
       "locked": false,
       "type": "text",
       "width": 48,
-      "height": 15,
+      "height": 16,
       "text": "Open",
       "fontSize": 10,
       "fontFamily": 1,
@@ -2218,7 +2218,7 @@
     {
       "id": "diag-61",
       "x": 257.4,
-      "y": 1011.5,
+      "y": 1151,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2242,7 +2242,7 @@
       "locked": false,
       "type": "text",
       "width": 130.2,
-      "height": 15,
+      "height": 16,
       "text": "register-org-complete",
       "fontSize": 10,
       "fontFamily": 1,
@@ -2252,7 +2252,7 @@
     {
       "id": "diag-62",
       "x": 235,
-      "y": 1124,
+      "y": 1190,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -2293,7 +2293,7 @@
     {
       "id": "diag-63",
       "x": 123.5,
-      "y": 1144.5,
+      "y": 1217,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2317,7 +2317,7 @@
       "locked": false,
       "type": "text",
       "width": 48,
-      "height": 15,
+      "height": 16,
       "text": "Show",
       "fontSize": 10,
       "fontFamily": 1,
@@ -2327,7 +2327,7 @@
     {
       "id": "diag-64",
       "x": 82.4,
-      "y": 1159.5,
+      "y": 1233,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2351,7 +2351,7 @@
       "locked": false,
       "type": "text",
       "width": 130.2,
-      "height": 15,
+      "height": 16,
       "text": "register-org-complete",
       "fontSize": 10,
       "fontFamily": 1,
@@ -2361,7 +2361,7 @@
     {
       "id": "diag-65",
       "x": 88.6,
-      "y": 1174.5,
+      "y": 1249,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2385,7 +2385,7 @@
       "locked": false,
       "type": "text",
       "width": 117.8,
-      "height": 15,
+      "height": 16,
       "text": "(name, slug, Terms)",
       "fontSize": 10,
       "fontFamily": 1,
@@ -2395,7 +2395,7 @@
     {
       "id": "diag-66",
       "x": 60,
-      "y": 1190,
+      "y": 1256,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -2436,7 +2436,7 @@
     {
       "id": "diag-67",
       "x": 94.8,
-      "y": 1210.5,
+      "y": 1283,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2460,7 +2460,7 @@
       "locked": false,
       "type": "text",
       "width": 105.4,
-      "height": 15,
+      "height": 16,
       "text": "Submit completion",
       "fontSize": 10,
       "fontFamily": 1,
@@ -2470,7 +2470,7 @@
     {
       "id": "diag-68",
       "x": 94.8,
-      "y": 1225.5,
+      "y": 1299,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2494,7 +2494,7 @@
       "locked": false,
       "type": "text",
       "width": 105.4,
-      "height": 15,
+      "height": 16,
       "text": "(Idempotency-Key)",
       "fontSize": 10,
       "fontFamily": 1,
@@ -2504,7 +2504,7 @@
     {
       "id": "diag-69",
       "x": 235,
-      "y": 1256,
+      "y": 1322,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -2545,7 +2545,7 @@
     {
       "id": "diag-70",
       "x": 248.1,
-      "y": 1210.5,
+      "y": 1349,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2569,7 +2569,7 @@
       "locked": false,
       "type": "text",
       "width": 148.8,
-      "height": 15,
+      "height": 16,
       "text": "POST org + link external",
       "fontSize": 10,
       "fontFamily": 1,
@@ -2579,7 +2579,7 @@
     {
       "id": "diag-71",
       "x": 298.5,
-      "y": 1225.5,
+      "y": 1365,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2603,7 +2603,7 @@
       "locked": false,
       "type": "text",
       "width": 48,
-      "height": 15,
+      "height": 16,
       "text": "login",
       "fontSize": 10,
       "fontFamily": 1,
@@ -2613,7 +2613,7 @@
     {
       "id": "diag-72",
       "x": 410,
-      "y": 1322,
+      "y": 1388,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -2654,7 +2654,7 @@
     {
       "id": "diag-73",
       "x": 426.2,
-      "y": 1342.5,
+      "y": 1415,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2678,7 +2678,7 @@
       "locked": false,
       "type": "text",
       "width": 142.6,
-      "height": 15,
+      "height": 16,
       "text": "Send verification email",
       "fontSize": 10,
       "fontFamily": 1,
@@ -2688,7 +2688,7 @@
     {
       "id": "diag-74",
       "x": 472.7,
-      "y": 1357.5,
+      "y": 1431,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2712,7 +2712,7 @@
       "locked": false,
       "type": "text",
       "width": 49.6,
-      "height": 15,
+      "height": 16,
       "text": "(if new)",
       "fontSize": 10,
       "fontFamily": 1,
@@ -2722,7 +2722,7 @@
     {
       "id": "diag-75",
       "x": 410,
-      "y": 1388,
+      "y": 1454,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -2763,7 +2763,7 @@
     {
       "id": "diag-76",
       "x": 245,
-      "y": 1408.5,
+      "y": 1481,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2787,7 +2787,7 @@
       "locked": false,
       "type": "text",
       "width": 155,
-      "height": 15,
+      "height": 16,
       "text": "202 → confirmation screen",
       "fontSize": 10,
       "fontFamily": 1,
@@ -2797,7 +2797,7 @@
     {
       "id": "diag-77",
       "x": 20,
-      "y": 1440,
+      "y": 1506,
       "angle": 0,
       "strokeColor": "#ca8a04",
       "backgroundColor": "#fef9c3",
@@ -2827,7 +2827,7 @@
     {
       "id": "diag-78",
       "x": 311.55,
-      "y": 1455,
+      "y": 1521,
       "angle": 0,
       "strokeColor": "#1e293b",
       "backgroundColor": "transparent",
@@ -2861,7 +2861,7 @@
     {
       "id": "diag-79",
       "x": 134.85000000000002,
-      "y": 1471,
+      "y": 1537,
       "angle": 0,
       "strokeColor": "#1e293b",
       "backgroundColor": "transparent",
@@ -2895,7 +2895,7 @@
     {
       "id": "diag-80",
       "x": 215.45,
-      "y": 1487,
+      "y": 1553,
       "angle": 0,
       "strokeColor": "#1e293b",
       "backgroundColor": "transparent",
