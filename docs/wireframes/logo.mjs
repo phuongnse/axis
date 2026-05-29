@@ -13,8 +13,8 @@ const __dir = dirname(fileURLToPath(import.meta.url));
 /** Canonical logo asset (commit changes here; sync frontend copy when mark changes). */
 export const AXIS_LOGO_SVG_PATH = join(__dir, 'assets', 'axis-logo.svg');
 
-/** Auth card header: full mark + wordmark. */
-export const AXIS_LOGO_AUTH_W = 96;
+/** Auth card header: full mark + wordmark (viewBox 128×36). */
+export const AXIS_LOGO_AUTH_W = 102;
 export const AXIS_LOGO_AUTH_H = 28;
 
 /** Compact mark for sidebars / small slots. */
