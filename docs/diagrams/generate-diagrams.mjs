@@ -579,11 +579,29 @@ function seqBuild({ title, participants, gap = 165, messages, sections = [], not
     els.push(text({ x: CANVAS_W / 2, y: s.y + 12, value: `== ${s.label} ==`, size: 10, bold: true, color: C.muted, anchor: "center" }));
   }
 
-  // Messages
+  // Messages (self-calls render as a loop to the right — zero-length arrows are invisible)
+  const SELF_LOOP_OUTSET = 40;
+  const SELF_LOOP_DEPTH = 22;
   for (const m of messages) {
     const from = ps[m.from];
     const to = ps[m.to];
-    els.push(...arrow({ x1: from.cx, y1: m.y, x2: to.cx, y2: m.y, label: m.label, dashed: m.dashed }));
+    if (m.from === m.to) {
+      const loopX = from.cx + SELF_LOOP_OUTSET;
+      els.push(
+        ...routedArrow({
+          waypoints: [
+            [from.cx, m.y],
+            [loopX, m.y],
+            [loopX, m.y + SELF_LOOP_DEPTH],
+            [from.cx, m.y + SELF_LOOP_DEPTH],
+          ],
+          label: m.label,
+          dashed: m.dashed,
+        }),
+      );
+    } else {
+      els.push(...arrow({ x1: from.cx, y1: m.y, x2: to.cx, y2: m.y, label: m.label, dashed: m.dashed }));
+    }
   }
 
   // Notes (info boxes at bottom)

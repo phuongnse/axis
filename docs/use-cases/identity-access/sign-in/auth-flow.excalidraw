@@ -1440,16 +1440,24 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 0,
-      "height": 0,
+      "width": 40,
+      "height": 22,
       "points": [
         [
           0,
           0
         ],
         [
-          0,
+          40,
           0
+        ],
+        [
+          40,
+          22
+        ],
+        [
+          0,
+          22
         ]
       ],
       "startArrowhead": null,
@@ -1457,8 +1465,8 @@
     },
     {
       "id": "diag-41",
-      "x": 341.25,
-      "y": 409,
+      "x": 381.25,
+      "y": 431,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
