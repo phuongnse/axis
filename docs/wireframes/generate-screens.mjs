@@ -50,6 +50,7 @@ import {
 import {
   AUTH_CARD_W,
   AUTH_CARD_PAD_X,
+  AUTH_INNER_W,
   AUTH_EXTERNAL_SIGN_IN_BLOCK_H,
   AUTH_HEADER_H,
   AUTH_HEADER_H_SUBTITLE,
@@ -65,6 +66,7 @@ import {
   buildAuthCardFooter,
   buildAuthCardBackFooter,
   buildAuthCardCenteredInlineRow,
+  authNoticeBanner,
   buildAuthSubmitButton,
   authFormField,
   authTermsRow,
@@ -132,6 +134,8 @@ const SCREEN_USE_CASE_OVERRIDES = {
     'platform-foundation/register-org/register-org-provider-states.excalidraw',
   'platform-foundation/email-confirmation.excalidraw':
     'platform-foundation/register-org/email-confirmation.excalidraw',
+  'platform-foundation/email-confirmation-states.excalidraw':
+    'platform-foundation/register-org/email-confirmation-states.excalidraw',
   'platform-foundation/workspace-provisioning.excalidraw':
     'platform-foundation/provision-tenant/workspace-provisioning.excalidraw',
   'platform-foundation/pricing.excalidraw':
@@ -539,55 +543,176 @@ function genRegisterOrgProviderStates() {
   write('platform-foundation/register-org-provider-states.excalidraw', els, wireFiles);
 }
 
+const EMAIL_CONFIRMATION_BODY =
+  'If an account exists for this email, you will receive a verification link shortly.';
+
 /**
- * Email-Confirmation — registration success, email verification resend
- * Informational card (no form): compact icon, title, copy, resend link.
+ * Paint email-confirmation card body (shared by happy path + resend state panels).
+ * @param {{ notice?: { title: string, body?: string, variant?: string }, resend?: { disabled?: boolean, sending?: boolean } }} opts
+ */
+function paintEmailConfirmationCard(els, opts, wireAcc) {
+  const {
+    prefix,
+    cardX,
+    cardY,
+    cardW,
+    cardH,
+    notice = null,
+    resend = {},
+  } = opts;
+  const { disabled: resendDisabled = false, sending: resendSending = false } = resend;
+
+  const brand = buildAuthCardBrandBar(prefix, cardX, cardY, cardW);
+  els.push(...brand.els);
+  wireAcc.files = mergeExcalidrawFiles(wireAcc.files, brand.files);
+
+  const ecInnerW = cardW - AUTH_CARD_PAD_X * 2;
+  const ecX = cardX + AUTH_CARD_PAD_X;
+  const ecHeadY = cardY + 68;
+  els.push(...stateHeadline(prefix, ecX, ecHeadY, ecInnerW, '✉', 'info', 'Check your email', 16));
+
+  let cy = cardY + ecHeadY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
+  const body1 = wrappedTextBlock(`${prefix}_body1`, ecX, cy, ecInnerW, EMAIL_CONFIRMATION_BODY, 13, C.gray700, 0.78);
+  els.push(...body1.els);
+  cy += body1.blockH + 8;
+  const body2 = wrappedTextBlock(`${prefix}_body2`, ecX, cy, ecInnerW, 'Check your inbox.', 13, C.gray700, 0.78);
+  els.push(...body2.els);
+  cy += body2.blockH + 12;
+
+  if (notice) {
+    const banner = authNoticeBanner(
+      `${prefix}_notice`,
+      ecX,
+      cy,
+      ecInnerW,
+      { title: notice.title, body: notice.body },
+      notice.variant ?? 'info',
+    );
+    els.push(...banner.els);
+    cy += banner.blockH + 12;
+  }
+
+  const resendSegments = resendSending
+    ? [{ text: 'Sending…', color: C.gray500 }]
+    : resendDisabled
+      ? [
+          { text: "Didn't receive it?", color: C.gray700 },
+          { text: 'Resend email →', color: C.gray300 },
+        ]
+      : [
+          { text: "Didn't receive it?", color: C.gray700 },
+          { text: 'Resend email →', color: C.primary, link: true },
+        ];
+  els.push(...buildAuthCardCenteredInlineRow(`${prefix}_resend`, cardX, cardW, cy, resendSegments));
+  els.push(...buildAuthCardBackFooter(prefix, cardX, cardY, cardW, cardH, 'Back to sign in'));
+}
+
+function measureEmailConfirmationCardH(noticeBlockH = 0, hasNotice = false) {
+  const ecHeadY = 68;
+  const ecBodyY = ecHeadY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
+  const body1Size = wrappedTextBlock('m', 0, 0, AUTH_INNER_W, EMAIL_CONFIRMATION_BODY, 13, C.gray700, 0.78);
+  const body2Size = wrappedTextBlock('m', 0, 0, AUTH_INNER_W, 'Check your inbox.', 13, C.gray700, 0.78);
+  const resendY = ecBodyY + body1Size.blockH + 8 + body2Size.blockH + 12 + (hasNotice ? noticeBlockH + 12 : 0) + 16;
+  return resendY + 24 + AUTH_CARD_FOOTER_ZONE;
+}
+
+/**
+ * Email-Confirmation — registration success (step 3); resend link idle.
  */
 function genEmailConfirmation() {
   const cardW = AUTH_CARD_W;
+  const cardH = measureEmailConfirmationCardH();
   const cardX = Math.round((W - cardW) / 2);
-  const ecInnerW = cardW - AUTH_CARD_PAD_X * 2;
-  const ecX = cardX + AUTH_CARD_PAD_X;
-  const ecHeadY = 68;
-  const ecBodyY = ecHeadY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
-  const bodyCopy =
-    'If an account exists for this email, you will receive a verification link shortly.';
-  const body1Size = wrappedTextBlock('ec_body1', 0, 0, ecInnerW, bodyCopy, 13, C.gray700, 0.78);
-  const body2Size = wrappedTextBlock('ec_body2', 0, 0, ecInnerW, 'Check your inbox.', 13, C.gray700, 0.78);
-  const resendY = ecBodyY + body1Size.blockH + 8 + body2Size.blockH + 14;
-  const cardH = resendY + 24 + AUTH_CARD_FOOTER_ZONE;
   const cardY = Math.round((H - cardH) / 2);
   const screenH = authScreenCanvasHeight(cardY, cardH, H);
   const els = [];
+  const wireAcc = { files: {} };
 
   els.push(rect('ec_bg', 0, 0, W, screenH, C.gray300, C.gray100, 1, false));
   els.push(rect('ec_card', cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
+  paintEmailConfirmationCard(els, {
+    prefix: 'ec',
+    cardX,
+    cardY,
+    cardW,
+    cardH,
+  }, wireAcc);
 
-  const ecBrand = buildAuthCardBrandBar('ec', cardX, cardY, cardW);
-  els.push(...ecBrand.els);
-  const wireFiles = ecBrand.files;
+  write('platform-foundation/email-confirmation.excalidraw', els, wireAcc.files);
+}
 
-  els.push(...stateHeadline('ec', ecX, cardY + ecHeadY, ecInnerW, '✉', 'info', 'Check your email', 16));
-  const body1 = wrappedTextBlock('ec_body1', ecX, cardY + ecBodyY, ecInnerW, bodyCopy, 13, C.gray700, 0.78);
-  els.push(...body1.els);
-  const body2 = wrappedTextBlock(
-    'ec_body2',
-    ecX,
-    cardY + ecBodyY + body1.blockH + 8,
-    ecInnerW,
-    'Check your inbox.',
-    13,
-    C.gray700,
-    0.78,
-  );
-  els.push(...body2.els);
-  els.push(...buildAuthCardCenteredInlineRow('ec_resend', cardX, cardW, cardY + resendY, [
-    { text: "Didn't receive it?", color: C.gray700 },
-    { text: 'Resend email →', color: C.primary, link: true },
-  ]));
-  els.push(...buildAuthCardBackFooter('ec', cardX, cardY, cardW, cardH, 'Back to sign in'));
+/**
+ * Email-Confirmation — resend interaction states (204, in-flight, 429).
+ */
+function genEmailConfirmationStates() {
+  const els = [];
+  const wireAcc = { files: {} };
+  const panelW = AUTH_CARD_W;
+  const panelH = 332;
+  const gap = 40;
+  const startX = Math.round((W - (panelW * 2 + gap)) / 2);
+  const y0 = 40;
 
-  write('platform-foundation/email-confirmation.excalidraw', els, wireFiles);
+  const canvasH = y0 + 28 + panelH + 44 + panelH + 48;
+  els.push(rect('ecs_bg', 0, 0, W, canvasH, C.gray300, C.gray100, 1, false));
+  els.push(text('ecs_pg', 0, 16, W, 20, 'Email confirmation — resend interactions', 13, C.gray500, 'center'));
+
+  const panels = [
+    {
+      id: 'ecs_sent',
+      x: startX,
+      lbl: 'After resend succeeds (204)',
+      lblColor: C.success,
+      notice: {
+        variant: 'success',
+        title: 'Verification email sent',
+        body: 'If an account exists for this email, check your inbox for a new link.',
+      },
+      resend: { disabled: true },
+    },
+    {
+      id: 'ecs_rl',
+      x: startX + panelW + gap,
+      lbl: 'Rate limited (429)',
+      lblColor: C.warning,
+      notice: {
+        variant: 'warning',
+        title: 'Please wait before requesting another email.',
+        body: 'You reached the resend limit (3 per hour). Try again in 37 minutes.',
+      },
+      resend: { disabled: true },
+    },
+    {
+      id: 'ecs_req',
+      x: Math.round((W - panelW) / 2),
+      lbl: 'While resend request is in flight',
+      lblColor: C.primary,
+      notice: {
+        variant: 'info',
+        title: 'Sending…',
+        body: 'Stay on this screen; the link is disabled until the request completes.',
+      },
+      resend: { sending: true },
+    },
+  ];
+
+  panels.forEach(({ id, x, lbl, lblColor, notice, resend }, index) => {
+    const cardY = index < 2 ? y0 + 28 : y0 + 28 + panelH + 44;
+    const labelY = index < 2 ? y0 : y0 + panelH + 44;
+    els.push(text(`${id}_lbl`, x, labelY, panelW, 16, lbl, 12, lblColor));
+    els.push(rect(`${id}_card`, x, cardY, panelW, panelH, C.gray300, C.white, 2, true));
+    paintEmailConfirmationCard(els, {
+      prefix: id,
+      cardX: x,
+      cardY,
+      cardW: panelW,
+      cardH: panelH,
+      notice,
+      resend,
+    }, wireAcc);
+  });
+
+  write('platform-foundation/email-confirmation-states.excalidraw', els, wireAcc.files);
 }
 
 /**
@@ -1867,6 +1992,7 @@ runScreen('platform-foundation/register-org-complete-states', genRegisterOrgComp
 runScreen('platform-foundation/register-org-states', genRegisterOrgStates);
 runScreen('platform-foundation/register-org-provider-states', genRegisterOrgProviderStates);
 runScreen('platform-foundation/email-confirmation', genEmailConfirmation);
+runScreen('platform-foundation/email-confirmation-states', genEmailConfirmationStates);
 runScreen('platform-foundation/verify-email', genVerifyEmail);
 runScreen('platform-foundation/verify-email-rate-limit', genVerifyEmailRateLimit);
 runScreen('platform-foundation/workspace-provisioning', genWorkspaceProvisioning);

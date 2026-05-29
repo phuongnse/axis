@@ -315,8 +315,8 @@ export function wrapTextLines(str, maxWidth, fontSize) {
 }
 
 /**
- * Multi-line body copy as separate text elements (one line each — safe in Kroki/Excalidraw).
- * @param {number} [widthScale] — shrink wrap width (Virgil renders wider than labelTextWidth).
+ * Body copy as one text element per line (safe in Kroki/Excalidraw).
+ * @param {number} [widthScale] — shrink wrap width (Virgil renders wider than estimates).
  */
 export function wrappedTextBlock(prefix, x, y, boxWidth, str, fontSize, color, widthScale = 0.82) {
   const maxWidth = Math.floor(boxWidth * widthScale);
