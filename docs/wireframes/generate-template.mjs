@@ -47,7 +47,7 @@ import { fileURLToPath } from 'url';
 import {
   nextSeed, BASE,
   rect, ellipse, text, hline, vline, arrow, sectionHeader,
-  C, fieldLabel,
+  C, fieldLabel, REQUIRED_MARKER_GAP,
   writeExcalidraw,
 } from './components.mjs';
 
@@ -143,7 +143,8 @@ export function buildFormControls(y0) {
   const yC = y0 + 48;
 
   // ── Col 1: Text input states (x=50) ──
-  els.push(text('inp_req_note', 50, yC, 200, 14, 'Required labels (* = C.danger)', 10, C.gray500));
+  els.push(text('inp_req_note', 50, yC, 320, 14,
+    `Required labels — * is ${REQUIRED_MARKER_GAP}px after label (C.danger)`, 10, C.gray500));
   els.push(...fieldLabel('inp_req', 50, yC + 18, 'Organization name', { required: true }));
   els.push(rect('inp_req_demo', 50, yC + 36, 280, 40, C.gray300, C.white, 1, true));
   els.push(text('inp_req_ph', 62, yC + 47, 250, 18, 'Acme Corp', 13, C.gray500));

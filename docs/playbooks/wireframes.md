@@ -194,7 +194,7 @@ Width auto-sized: `label.length × 8 + 32`. Height: **36px**. Text at `y+10`, 13
 
 ### `fieldLabel(prefix, x, y, label, { required?, color? })`
 
-Form label row (11px, default `C.gray500`). When `required: true`, appends a red `*` in `C.danger` after the label with a fixed `REQUIRED_MARKER_GAP` (5px) from `components.mjs` — same offset on every field. Use for every user-editable required field — including auth screens (`authCard`, `authFormField`) and S04 demos in `_template`.
+Form label row (11px, default `C.gray500`). When `required: true`, appends a red `*` in `C.danger` after the label with a fixed `REQUIRED_MARKER_GAP` (10px) from `components.mjs` — same offset on every field. **Change the gap in `components.mjs` only**, then run `generate-template.mjs` before `generate-screens.mjs` so S04 `_template` and screens stay in sync. Use for every user-editable required field — including auth screens (`authCard`, `authFormField`) and S04 demos in `_template`.
 
 ### `inputField(prefix, x, y, w, placeholder?)`
 

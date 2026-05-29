@@ -223,7 +223,7 @@ export function btn(prefix, x, y, label, variant = 'primary') {
 }
 
 /** Gap between label text and required * (px) — same on every field. */
-export const REQUIRED_MARKER_GAP = 5;
+export const REQUIRED_MARKER_GAP = 10;
 
 /** Pixel width of label copy at 11px — positions the required * after the last glyph. */
 export function labelTextWidth(str, fontSize = 11) {
