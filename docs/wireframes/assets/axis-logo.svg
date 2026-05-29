@@ -6,16 +6,12 @@
       <stop offset="0.5" stop-color="#7ADFA8" stop-opacity="0.28" />
       <stop offset="1" stop-color="#7EC8F5" stop-opacity="0.36" />
     </linearGradient>
-    <filter id="axis-node-halo" x="-80%" y="-80%" width="260%" height="260%">
-      <feGaussianBlur stdDeviation="1.15" />
-    </filter>
   </defs>
   <path fill="url(#axis-bond)" d="M 18 12.5 L 11.25 22.75 L 24.75 22.75 Z" />
-  <g filter="url(#axis-node-halo)" opacity="0.38">
-    <circle cx="18" cy="12.5" r="3.65" fill="#F0B35C" />
-    <circle cx="11.25" cy="22.75" r="3.65" fill="#5ECF9A" />
-    <circle cx="24.75" cy="22.75" r="3.65" fill="#5EB8F0" />
-  </g>
+  <!-- Soft halos behind nodes (same centers; solid nodes stay r=3.65 on top) -->
+  <circle cx="18" cy="12.5" r="5" fill="#F0B35C" fill-opacity="0.3" />
+  <circle cx="11.25" cy="22.75" r="5" fill="#5ECF9A" fill-opacity="0.28" />
+  <circle cx="24.75" cy="22.75" r="5" fill="#5EB8F0" fill-opacity="0.28" />
   <circle cx="18" cy="12.5" r="3.65" fill="#F0B35C" stroke="#E8952E" stroke-width="0.55" />
   <circle cx="11.25" cy="22.75" r="3.65" fill="#5ECF9A" stroke="#3DB87A" stroke-width="0.55" />
   <circle cx="24.75" cy="22.75" r="3.65" fill="#5EB8F0" stroke="#2EA8E8" stroke-width="0.55" />
