@@ -346,83 +346,126 @@ function genRegisterOrgComplete() {
 /**
  * Register-Org complete — validation states (org name, terms) after external sign-in.
  */
+/** Dual-panel auth states: measure content, align card heights, paint back-to-front. */
+function flushDualAuthStatePanels(els, panels) {
+  const maxCardH = Math.max(...panels.map((p) => p.card.cardH));
+  for (const p of panels) {
+    els.push(text(p.lbl.id, p.lbl.x, p.lbl.y, p.lbl.panelW, 16, p.lbl.text, 12, p.lbl.color));
+    els.push(rect(p.card.id, p.card.x, p.card.y, p.card.panelW, maxCardH, C.gray300, C.white, 2, true));
+    els.push(...p.contentEls);
+  }
+  return maxCardH;
+}
+
+function buildRegisterOrgCompleteStatePanel({ id, x, y0, panelW, lbl, orgErr, terms }) {
+  const cardY = y0 + 28;
+  const prefix = `rocs_${id}`;
+  const contentEls = [];
+
+  const panelHeader = buildAuthCardHeader(
+    prefix, x, cardY, panelW, 'Finish setting up your organization', 'Signed in with Google');
+  contentEls.push(...panelHeader.els);
+
+  let fy = cardY + AUTH_HEADER_H_SUBTITLE;
+  fy = paintRegisterOrgCompleteFields(contentEls, prefix, x, fy, panelW, {
+    orgName: orgErr ? 'A' : 'Acme Corp',
+    orgErr,
+    terms,
+  });
+  fy += AUTH_FIELD_STACK_GAP;
+  contentEls.push(...buildAuthSubmitButton(prefix, x, fy, panelW, 'Create organization'));
+  fy += 36 + AUTH_SUBMIT_AFTER_GAP;
+
+  const cardH = measureAuthCardHeight(cardY, fy, contentEls);
+
+  return {
+    files: panelHeader.files,
+    lbl: { id: `${prefix}_lbl`, x, y: y0, panelW, text: lbl, color: C.danger },
+    card: { id: `${prefix}_card`, x, cardY, panelW, cardH },
+    contentEls,
+  };
+}
+
 function genRegisterOrgCompleteStates() {
   const els = [];
   let wireFiles = {};
   const panelW = 520;
-  const panelH = 520;
   const gap = 40;
   const startX = Math.round((W - (panelW * 2 + gap)) / 2);
   const y0 = 48;
+  const cardY = y0 + 28;
 
-  els.push(rect('rocs_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
+  const panels = [
+    buildRegisterOrgCompleteStatePanel({
+      id: 'val',
+      x: startX,
+      y0,
+      panelW,
+      lbl: 'Organization name validation',
+      orgErr: 'Must be between 2 and 100 characters.',
+      terms: { checked: true },
+    }),
+    buildRegisterOrgCompleteStatePanel({
+      id: 'terms',
+      x: startX + panelW + gap,
+      y0,
+      panelW,
+      lbl: 'Terms not accepted',
+      orgErr: null,
+      terms: { checked: false, errorMsg: 'You must accept the Terms of Service and Privacy Policy.' },
+    }),
+  ];
+
+  const maxCardH = Math.max(...panels.map((p) => p.card.cardH));
+  const screenH = authScreenCanvasHeight(cardY, maxCardH, H);
+
+  els.push(rect('rocs_bg', 0, 0, W, screenH, C.gray300, C.gray100, 1, false));
   els.push(text('rocs_pg', 0, 16, W, 20,
     'Post-OAuth completion — validation', 13, C.gray500, 'center'));
-
-  const drawPanel = ({ id, x, lbl, orgErr, terms }) => {
-    const cardY = y0 + 28;
-    const prefix = `rocs_${id}`;
-    els.push(text(`${prefix}_lbl`, x, y0, panelW, 16, lbl, 12, C.danger));
-    els.push(rect(`${prefix}_card`, x, cardY, panelW, panelH, C.gray300, C.white, 2, true));
-    const panelHeader = buildAuthCardHeader(
-      prefix, x, cardY, panelW, 'Finish setting up your organization', 'Signed in with Google');
-    els.push(...panelHeader.els);
-    wireFiles = mergeExcalidrawFiles(wireFiles, panelHeader.files);
-
-    const btnY = cardY + panelH - 68;
-    paintRegisterOrgCompleteFields(els, prefix, x, cardY + AUTH_HEADER_H_SUBTITLE, panelW, {
-      orgName: orgErr ? 'A' : 'Acme Corp',
-      orgErr,
-      terms,
-    });
-    els.push(...buildAuthSubmitButton(prefix, x, btnY, panelW, 'Create organization'));
-  };
-
-  drawPanel({
-    id: 'val',
-    x: startX,
-    lbl: 'Organization name validation',
-    orgErr: 'Must be between 2 and 100 characters.',
-    terms: { checked: true },
-  });
-  drawPanel({
-    id: 'terms',
-    x: startX + panelW + gap,
-    lbl: 'Terms not accepted',
-    orgErr: null,
-    terms: { checked: false, errorMsg: 'You must accept the Terms of Service and Privacy Policy.' },
-  });
+  flushDualAuthStatePanels(els, panels);
+  for (const p of panels) {
+    wireFiles = mergeExcalidrawFiles(wireFiles, p.files);
+  }
 
   write('platform-foundation/register-org-complete-states.excalidraw', els, wireFiles);
 }
 
-/** Draw one register-org error-state panel (shared by states screens). Returns embedded logo files. */
-function registerOrgStatePanel(els, { id, x, y0, panelW, panelH, lbl, lblColor, serverBanner, fields, terms }) {
+function buildRegisterOrgStatePanel({ id, x, y0, panelW, lbl, lblColor, serverBanner, fields, terms }) {
   const cardY = y0 + 28;
   const prefix = `ros_${id}`;
-  els.push(text(`${prefix}_lbl`, x, y0, panelW, 16, lbl, 12, lblColor));
-  els.push(rect(`${prefix}_card`, x, cardY, panelW, panelH, C.gray300, C.white, 2, true));
+  const contentEls = [];
+
   const panelHeader = buildAuthCardHeader(prefix, x, cardY, panelW, 'Create your organization');
-  els.push(...panelHeader.els);
+  contentEls.push(...panelHeader.els);
 
   let fy = cardY + AUTH_HEADER_H;
   if (serverBanner) {
-    els.push(rect(`${prefix}_ban`, x + AUTH_CARD_PAD_X, fy, panelW - AUTH_CARD_PAD_X * 2, 40, C.dangerBorder, C.dangerBg, 1, true));
-    els.push(text(`${prefix}_ban_t`, x + AUTH_CARD_PAD_X + 12, fy + 12, panelW - AUTH_CARD_PAD_X * 2 - 24, 16, serverBanner, 12, C.danger));
+    contentEls.push(
+      rect(`${prefix}_ban`, x + AUTH_CARD_PAD_X, fy, panelW - AUTH_CARD_PAD_X * 2, 40, C.dangerBorder, C.dangerBg, 1, true),
+      text(`${prefix}_ban_t`, x + AUTH_CARD_PAD_X + 12, fy + 12, panelW - AUTH_CARD_PAD_X * 2 - 24, 16, serverBanner, 12, C.danger),
+    );
     fy += 52;
   }
 
-  fy = paintRegisterOrgEntryFields(els, prefix, x, fy, panelW, fields);
+  fy = paintRegisterOrgEntryFields(contentEls, prefix, x, fy, panelW, fields);
 
   if (terms) {
     const { els: te, blockH: termsBlockH } = authTermsRow(`${prefix}_terms`, x, fy, panelW, terms);
-    els.push(...te);
+    contentEls.push(...te);
     fy += termsBlockH + AUTH_FIELD_STACK_GAP;
   }
 
-  const btnY = cardY + panelH - 68;
-  els.push(...buildAuthSubmitButton(prefix, x, btnY, panelW, 'Create organization'));
-  return panelHeader.files;
+  contentEls.push(...buildAuthSubmitButton(prefix, x, fy, panelW, 'Create organization'));
+  fy += 36 + AUTH_SUBMIT_AFTER_GAP;
+
+  const cardH = measureAuthCardHeight(cardY, fy, contentEls);
+
+  return {
+    files: panelHeader.files,
+    lbl: { id: `${prefix}_lbl`, x, y: y0, panelW, text: lbl, color: lblColor },
+    card: { id: `${prefix}_card`, x, cardY, panelW, cardH },
+    contentEls,
+  };
 }
 
 const REGISTER_ORG_STATE_FIELDS = REGISTER_ORG_ENTRY_FIELDS.map((f) => ({
@@ -441,53 +484,59 @@ function genRegisterOrgStates() {
   const els = [];
   let wireFiles = {};
   const panelW = 520;
-  const panelH = 640;
   const gap = 40;
   const startX = Math.round((W - (panelW * 2 + gap)) / 2);
   const y0 = 40;
+  const cardY = y0 + 28;
 
-  els.push(rect('ros_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
+  const panels = [
+    buildRegisterOrgStatePanel({
+      id: 'val',
+      x: startX,
+      y0,
+      panelW,
+      lbl: 'Inline validation (field-level)',
+      lblColor: C.danger,
+      serverBanner: null,
+      fields: [
+        { kind: 'input', label: 'Organization name', value: 'A', err: 'Must be between 2 and 100 characters.', required: true },
+        { kind: 'slug' },
+        { kind: 'input', label: 'Admin full name', value: 'Alex Brown', err: null, required: true },
+        { kind: 'input', label: 'Email address', value: 'not-an-email', err: 'Enter a valid email address.', required: true },
+        {
+          kind: 'password',
+          label: 'Password',
+          value: '•••',
+          err: 'Must be at least 8 characters with a letter and a number.',
+          required: true,
+          passwordCriteria: PASSWORD_CRITERIA_PARTIAL,
+        },
+        { kind: 'input', label: 'Confirm password', value: '••••••••', err: 'Passwords do not match.', required: true },
+      ],
+      terms: { checked: true },
+    }),
+    buildRegisterOrgStatePanel({
+      id: 'srv',
+      x: startX + panelW + gap,
+      y0,
+      panelW,
+      lbl: 'Server error (5xx)',
+      lblColor: C.danger,
+      serverBanner: 'Something went wrong, please try again.',
+      fields: REGISTER_ORG_STATE_FIELDS,
+      terms: { checked: true },
+    }),
+  ];
+
+  const maxCardH = Math.max(...panels.map((p) => p.card.cardH));
+  const screenH = authScreenCanvasHeight(cardY, maxCardH, 920);
+
+  els.push(rect('ros_bg', 0, 0, W, screenH, C.gray300, C.gray100, 1, false));
   els.push(text('ros_pg', 0, 16, W, 20, 'Registration form — validation & server errors', 13, C.gray500, 'center'));
-
-  wireFiles = mergeExcalidrawFiles(wireFiles, registerOrgStatePanel(els, {
-    id: 'val',
-    x: startX,
-    y0,
-    panelW,
-    panelH,
-    lbl: 'Inline validation (field-level)',
-    lblColor: C.danger,
-    serverBanner: null,
-    fields: [
-      { kind: 'input', label: 'Organization name', value: 'A', err: 'Must be between 2 and 100 characters.', required: true },
-      { kind: 'slug' },
-      { kind: 'input', label: 'Admin full name', value: 'Alex Brown', err: null, required: true },
-      { kind: 'input', label: 'Email address', value: 'not-an-email', err: 'Enter a valid email address.', required: true },
-      {
-        kind: 'password',
-        label: 'Password',
-        value: '•••',
-        err: 'Must be at least 8 characters with a letter and a number.',
-        required: true,
-        passwordCriteria: PASSWORD_CRITERIA_PARTIAL,
-      },
-      { kind: 'input', label: 'Confirm password', value: '••••••••', err: 'Passwords do not match.', required: true },
-    ],
-    terms: { checked: true },
-  }));
-
-  wireFiles = mergeExcalidrawFiles(wireFiles, registerOrgStatePanel(els, {
-    id: 'srv',
-    x: startX + panelW + gap,
-    y0,
-    panelW,
-    panelH,
-    lbl: 'Server error (5xx)',
-    lblColor: C.danger,
-    serverBanner: 'Something went wrong, please try again.',
-    fields: REGISTER_ORG_STATE_FIELDS,
-    terms: { checked: true },
-  }));
+  flushDualAuthStatePanels(els, panels);
+  for (const p of panels) {
+    wireFiles = mergeExcalidrawFiles(wireFiles, p.files);
+  }
 
   write('platform-foundation/register-org-states.excalidraw', els, wireFiles);
 }
