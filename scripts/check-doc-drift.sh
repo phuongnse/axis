@@ -22,10 +22,6 @@ else
 fi
 
 CHANGED="$(git diff --name-only "${RANGE}" 2>/dev/null || true)"
-if [ -z "${CHANGED}" ]; then
-  echo "check-doc-drift: no diff in ${RANGE} — skip"
-  exit 0
-fi
 
 ERR=0
 fail() {
@@ -41,31 +37,18 @@ docs_changed_under() {
   echo "${CHANGED}" | grep -q "^$1"
 }
 
-check_domain_docs() {
-  local code_pattern="$1"
-  local doc_prefix="$2"
-  local label="$3"
-  if any_changed "${code_pattern}"; then
-    # Dependabot sometimes adds PackageReference lines in .csproj only; that is not
-    # a feature change and must not require domain docs (see PR #104).
-    if echo "${CHANGED}" | grep -E "${code_pattern}" | grep -Ev '\.csproj$' | grep -q .; then
-      if ! docs_changed_under "${doc_prefix}"; then
-        fail "${label}: code changed but no files under ${doc_prefix}/ in this PR"
-      fi
-    fi
-  fi
-}
+# Module + API endpoint → use-case domain rules are discovered from the tree
+# (see scripts/doc_drift_domains.py). Only cross-cutting paths stay in EXTRA_* there.
+python3 "${ROOT}/scripts/doc_drift_domains.py" --validate || ERR=1
 
-check_domain_docs 'src/Axis\.Api/Endpoints/Execution' 'docs/use-cases/workflow-engine' 'workflow-engine API'
-check_domain_docs 'src/Modules/WorkflowEngine/' 'docs/use-cases/workflow-engine' 'workflow-engine module'
-check_domain_docs 'src/Axis\.Api/Endpoints/Model' 'docs/use-cases/data-modeling' 'data-modeling API'
-check_domain_docs 'src/Modules/DataModeling/' 'docs/use-cases/data-modeling' 'data-modeling module'
-check_domain_docs 'src/Axis\.Api/Endpoints/Workflow' 'docs/use-cases/workflow-builder' 'workflow-builder API'
-check_domain_docs 'src/Modules/WorkflowBuilder/' 'docs/use-cases/workflow-builder' 'workflow-builder module'
-check_domain_docs 'src/Axis\.Api/Endpoints/Form' 'docs/use-cases/form-builder' 'form-builder API'
-check_domain_docs 'src/Modules/FormBuilder/' 'docs/use-cases/form-builder' 'form-builder module'
-check_domain_docs 'src/Modules/.*/.*OrganizationVerifiedHandler' 'docs/use-cases/platform-foundation' 'platform-foundation tenant provisioning'
-check_domain_docs 'frontend/src/(features/auth|routes/|components/layout/AppShell)' 'docs/use-cases/identity-access' 'identity-access auth frontend'
+if [ -z "${CHANGED}" ]; then
+  if [ "${ERR}" -eq 0 ]; then
+    echo "check-doc-drift: no diff in ${RANGE} — skip"
+  fi
+  exit "${ERR}"
+fi
+
+echo "${CHANGED}" | python3 "${ROOT}/scripts/doc_drift_domains.py" --check || ERR=1
 
 if any_changed '^frontend/src/'; then
   if ! docs_changed_under 'docs/use-cases/'; then
@@ -188,17 +171,6 @@ done < <(
   '
 )
 
-check_readme_api() {
-  local code_pattern="$1"
-  local epic_dir="$2"
-  local readme="${ROOT}/${epic_dir}/README.md"
-  if any_changed "${code_pattern}" && [ -f "${readme}" ]; then
-    if grep -qE '\| API \| ⏳' "${readme}"; then
-      fail "${epic_dir}/README.md still '| API | ⏳' — set ⚠️ or ✅"
-    fi
-  fi
-}
-
 # P2 hygiene: no new TODO / FIXME / NotImplementedException / placeholder / stub
 # in production or test code. Scans *added* lines only — existing markers don't
 # break unrelated PRs. Run from any shell (CI or local Git Bash on Windows).
@@ -216,11 +188,6 @@ done < <(
         /^\+[^+]/ && $0 ~ pat { print file ": " substr($0, 2) }
       '
 )
-
-check_readme_api 'src/Axis\.Api/Endpoints/Execution' 'docs/use-cases/workflow-engine'
-check_readme_api 'src/Axis\.Api/Endpoints/Form' 'docs/use-cases/form-builder'
-check_readme_api 'src/Axis\.Api/Endpoints/Model' 'docs/use-cases/data-modeling'
-check_readme_api 'src/Axis\.Api/Endpoints/Workflow' 'docs/use-cases/workflow-builder'
 
 # WORKAROUND comment ↔ inventory cross-check (docs/WORKAROUNDS.md).
 #   Each `// WORKAROUND: see docs/WORKAROUNDS.md#<slug>` comment in production
