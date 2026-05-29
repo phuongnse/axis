@@ -974,27 +974,30 @@ function genVerifyEmailStates() {
  */
 function genWorkspaceProvisioning() {
   const els = [];
+  const wireAcc = { files: {} };
 
   els.push(rect('wp_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
 
-  // Shared header row
-  els.push(text('wp_logo',    0, 24, W, 28, '⬡  Axis',                  18, C.primary, 'center'));
-  els.push(text('wp_heading', 0, 60, W, 18, 'Workspace Setup — States', 12, C.gray500, 'center'));
-  els.push(vline('wp_div', W / 2, 86, H - 86, C.gray300));
+  const wpBrand = buildAxisLogo('wp', 0, 20, W, 'auth');
+  els.push(...wpBrand.els);
+  wireAcc.files = mergeExcalidrawFiles(wireAcc.files, wpBrand.files);
+  els.push(hline('wp_hdiv', 0, 60, W, C.gray300));
+  els.push(text('wp_heading', 0, 68, W, 18, 'Workspace setup — states', 12, C.gray500, 'center'));
+  els.push(vline('wp_div', W / 2, 90, H - 90, C.gray300));
 
   // ── Left: In-progress ────────────────────────────────────────────────────────
   const lX    = 40;
   const lW    = W / 2 - 80;  // 520
   const lMidX = W / 4;        // 300
 
-  els.push(text('wp_l_lbl', lX, 90, lW, 16, '↻  In progress', 12, C.primary));
-  els.push(ellipse('wp_l_spin',   lMidX - 28, 116, 56, 56, C.infoBorder, C.infoBg, 2));
-  els.push(text('wp_l_spin_t',    lMidX - 28, 131, 56, 26, '↻', 18, C.primary, 'center'));
-  els.push(text('wp_l_title', lX, 190, lW, 26, 'Setting up your workspace…', 18, C.gray900, 'center'));
-  els.push(text('wp_l_org',   lX, 222, lW, 18, 'For Acme Corp',              13, C.accent,  'center'));
-  els.push(text('wp_l_sub',   lX, 246, lW, 14, "Don't close this tab.",      11, C.gray500, 'center'));
+  els.push(text('wp_l_lbl', lX, 98, lW, 16, '↻  In progress', 12, C.primary));
+  els.push(ellipse('wp_l_spin',   lMidX - 28, 124, 56, 56, C.infoBorder, C.infoBg, 2));
+  els.push(text('wp_l_spin_t',    lMidX - 28, 139, 56, 26, '↻', 18, C.primary, 'center'));
+  els.push(text('wp_l_title', lX, 198, lW, 26, 'Setting up your workspace…', 18, C.gray900, 'center'));
+  els.push(text('wp_l_org',   lX, 230, lW, 18, 'For Acme Corp',              13, C.accent,  'center'));
+  els.push(text('wp_l_sub',   lX, 254, lW, 14, "Don't close this tab.",      11, C.gray500, 'center'));
 
-  const stepsY  = 278;
+  const stepsY  = 286;
   const lStepsX = lMidX - 160;  // 140
   [
     { icon: '✓', label: 'Email verified',          c: C.success },
@@ -1014,11 +1017,11 @@ function genWorkspaceProvisioning() {
   const rW    = W / 2 - 80;    // 520
   const rMidX = (W * 3) / 4;   // 900
 
-  els.push(text('wp_r_lbl', rX, 90, rW, 16, '✕  Failed (after 3 retries)', 12, C.danger));
-  els.push(ellipse('wp_r_err',   rMidX - 28, 116, 56, 56, C.dangerBorder, C.dangerBg, 2));
-  els.push(text('wp_r_err_t',    rMidX - 28, 131, 56, 26, '✕', 18, C.danger, 'center'));
-  els.push(text('wp_r_title', rX, 190, rW, 26, 'Setup failed',                                        18, C.gray900, 'center'));
-  els.push(text('wp_r_body',  rX, 222, rW, 36, 'Provisioning failed after 3 attempts.\nOur team has been notified.', 12, C.gray700, 'center'));
+  els.push(text('wp_r_lbl', rX, 98, rW, 16, '✕  Failed (after 3 retries)', 12, C.danger));
+  els.push(ellipse('wp_r_err',   rMidX - 28, 124, 56, 56, C.dangerBorder, C.dangerBg, 2));
+  els.push(text('wp_r_err_t',    rMidX - 28, 139, 56, 26, '✕', 18, C.danger, 'center'));
+  els.push(text('wp_r_title', rX, 198, rW, 26, 'Setup failed',                                        18, C.gray900, 'center'));
+  els.push(text('wp_r_body',  rX, 230, rW, 36, 'Provisioning failed after 3 attempts.\nOur team has been notified.', 12, C.gray700, 'center'));
 
   const rStepsX = rMidX - 160;  // 740
   [
@@ -1034,7 +1037,7 @@ function genWorkspaceProvisioning() {
   els.push(text('wp_r_supp', rX, stepsY + 4 * 40 + 8, rW, 14,
     'Contact support if the issue persists →', 11, C.primary, 'center'));
 
-  write('platform-foundation/workspace-provisioning.excalidraw', els);
+  write('platform-foundation/workspace-provisioning.excalidraw', els, wireAcc.files);
 }
 
 /**
