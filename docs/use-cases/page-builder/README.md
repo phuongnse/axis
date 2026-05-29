@@ -12,9 +12,9 @@ A drag-and-drop UI builder that allows users to compose pages from pre-built wid
 
 Without a UI builder, users need a developer to display and interact with their data. With it, business users can build complete applications end-to-end.
 
-## Scope
+## Implementation order
 
-**Production scope** — depends on a stable data-modeling, workflow-builder, form-builder, workflow-engine, so it lands later in implementation order (not a separate product phase).
+Ship after data modeling, workflow builder, form builder, and workflow engine.
 
 ---
 
