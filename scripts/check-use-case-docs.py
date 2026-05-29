@@ -114,7 +114,7 @@ def count_template_main_flow(files: list[Path]) -> int:
 
 # Row in a domain README that references `./README.md` from inside that same
 # README is a self-link — it resolves to the current page and conveys
-# nothing. PR #142 shipped ~10 of these.
+# nothing.
 SELF_LINK_RE = re.compile(r"\]\(\./README\.md(?:#[^)]*)?\)")
 
 # Suspected truncation in a `| ... | summary |` row: the summary cell ends

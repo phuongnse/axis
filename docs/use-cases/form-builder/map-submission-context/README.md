@@ -44,7 +44,7 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 - [ ] If a Form step is skipped (e.g., because an OR-join condition was met before this branch ran), its context namespace is not present in the context (not `null`, entirely absent).
 
 *Out of scope*
-- Saving form submission data directly to a Data Model record automatically — not in MVP (a subsequent Script or HTTP step can do this).
+- Saving form submission data directly to a Data Model record automatically — a subsequent Script or HTTP step can do this.
 
 > **Implementation status**
 >

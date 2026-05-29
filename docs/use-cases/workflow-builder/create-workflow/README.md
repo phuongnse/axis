@@ -43,7 +43,7 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 - [ ] Creating a workflow and immediately navigating away without adding any steps: the empty workflow is saved in Draft status and can be returned to later.
 
 *Out of scope*
-- Workflow templates / starter library — not in MVP.
+- Workflow templates / starter library.
 
 > **Implementation status**
 >
@@ -56,6 +56,8 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** canvas/list UI only (backend).
+>
+> **Deferred (PR #146 follow-up):** Workflow templates / starter library.
 >
 > **Done:** HTTP 402 on create when workflow plan limit reached (`CreateWorkflowHandler` + platform-foundation subscription plans).
 >

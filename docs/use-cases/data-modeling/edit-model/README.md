@@ -46,7 +46,7 @@ Users can create custom data models within their organization. A model defines t
 - [ ] Renaming a field does not lose existing data; the underlying storage key is the field's immutable `id`, not its name.
 
 *Out of scope*
-- Undo history for field changes — not in MVP.
+- Undo history for field changes.
 
 > **Implementation status**
 >

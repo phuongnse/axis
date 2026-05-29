@@ -33,7 +33,7 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 *Happy path*
 - [ ] Creation dialog collects: name (required) and description (optional).
 - [ ] After creation, the data class opens in the field editor where the user adds fields.
-- [ ] Data class fields use the same field type system as model fields, excluding `Relation`, `DataClass`, and `File` types (to prevent deep nesting and circular references in MVP).
+- [ ] Data class fields use the same field type system as model fields, excluding `Relation`, `DataClass`, and `File` types (to prevent deep nesting and circular references).
 
 *Validation & errors*
 - [ ] Name: required, 2–100 characters, unique within the org (case-insensitive). Duplicate shows: "A data class named '{name}' already exists."
@@ -43,7 +43,7 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 - [ ] Creating a data class with the same name as a model is allowed (they occupy different namespaces).
 
 *Out of scope*
-- Nested data classes (data class within a data class) — depth limited to 1 in MVP.
+- Nested data classes (data class within a data class) — depth limited to 1.
 
 > **Implementation status**
 >

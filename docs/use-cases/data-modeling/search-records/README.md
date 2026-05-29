@@ -45,8 +45,8 @@ Users can create, read, update, and delete records against any model. Records ar
 - [ ] A filter on a deleted field gracefully falls back (filter is removed with a warning toast).
 
 *Out of scope*
-- OR-logic between filters — not in MVP.
-- Saved filters — not in MVP.
+- OR-logic between filters.
+- Saved filters.
 
 > **Implementation status**
 >

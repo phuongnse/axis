@@ -12,9 +12,9 @@ Provide secure authentication and a flexible role-based access control (RBAC) sy
 
 Security and access control are non-negotiable for a SaaS product. Organizations need confidence that their users see only what they should see.
 
-## Phase
+## Scope
 
-**MVP**
+**Production scope** — in the full product scope; no separate MVP/Phase cut.
 
 ---
 
@@ -27,7 +27,7 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 | [Change password while signed in](change-password/) | Change my password while signed in so that I can keep my account secure. |
 | [Reset forgotten password](reset-password/) | Reset my password via email so that I can regain access to my account if I forget it. |
 | [View and revoke active sessions](sessions/) | See where I'm currently signed in so that I can revoke access from devices I no longer use. |
-| [Sign in with email and password](sign-in/) | Sign in with my email and password so that I can access my organization's workspace. |
+| [Sign in to the workspace](sign-in/) | Sign in with my email and password — or with Microsoft, Google, or GitHub — so that I can access my organization's… |
 | [Sign out](sign-out/) | Sign out so that my session is terminated and no one else can use my account from this device. |
 | [Silent token refresh](token-refresh/) | My session to stay active while I'm working so that I'm not interrupted by unexpected sign-out prompts. |
 
@@ -108,7 +108,7 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 - The 4 default system roles (Admin, Editor, Viewer, End User) and their full permission sets are seeded automatically by `RegisterOrganizationHandler` — see [api-permissions](./api-permissions/) and [ui-permissions](./ui-permissions/) for the permission catalogue.
 - **OpenIddict implementation**: OpenIddict 5.x serves as the in-process OAuth2/OIDC authorization server (ADR-004). Authorization Code + PKCE for the SPA; Client Credentials for M2M. Refresh tokens are stored as opaque reference tokens in the OpenIddict `OpenIddictTokens` table and delivered via httpOnly cookie. Access token JTIs are blacklisted in Redis on sign-out. Ephemeral signing/encryption keys are used in development; production should use Azure Key Vault certificates.
 - **gRPC (dev):** manual `GetUserPermissions` checks — [patterns.md § gRPC dev verification](../../playbooks/patterns.md#dev--verify-getuserpermissions-with-grpcurl).
-- **Known gap (user deactivation)**: Revoking all refresh tokens is immediate, but existing access tokens remain valid up to 15 minutes. Full compliance would require a Redis user-level blacklist (not implemented in MVP).
+- **Known gap (user deactivation)**: Revoking all refresh tokens is immediate, but existing access tokens remain valid up to 15 minutes. Full compliance would require a Redis user-level blacklist (not implemented).
 
 ---
 

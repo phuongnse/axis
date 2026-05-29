@@ -47,7 +47,7 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 - [ ] A concurrent cancel request (two users clicking Cancel at the same time) is handled idempotently: only one cancellation takes effect.
 
 *Out of scope*
-- Pausing an execution and resuming it — not in MVP (cancel only).
+- Pausing an execution and resuming it — cancel only.
 
 > **Implementation status**
 >

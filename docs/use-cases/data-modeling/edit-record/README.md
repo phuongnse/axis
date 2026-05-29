@@ -44,7 +44,7 @@ Users can create, read, update, and delete records against any model. Records ar
 - [ ] Editing a record changes only the specified fields; fields not included in the PATCH body retain their existing values.
 
 *Out of scope*
-- Edit history / audit trail per record — not in MVP.
+- Edit history / audit trail per record.
 
 > **Implementation status**
 >

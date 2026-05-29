@@ -44,8 +44,8 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 - [ ] If the assignee is a deactivated user, the step fails immediately (see [Form step](./README.md) deactivated-assignee edge case).
 
 *Out of scope*
-- Push notifications (mobile) — not in MVP.
-- Escalation notifications if the form is not submitted after X hours — not in MVP (timeout causes failure, not escalation).
+- Push notifications (mobile).
+- Escalation notifications if the form is not submitted after X hours — timeout causes failure, not escalation.
 
 > **Implementation status**
 >

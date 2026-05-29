@@ -45,7 +45,7 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 - [ ] Workflow definitions are auto-saved to the server after every change with a 1-second debounce, so the user never needs to manually save canvas layout changes.
 
 *Out of scope*
-- Copy-paste of steps — not in MVP.
+- Copy-paste of steps.
 
 > **Implementation status**
 >

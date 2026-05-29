@@ -44,7 +44,7 @@ Users can create, read, update, and delete records against any model. Records ar
 - [ ] A soft-deleted record is not returned by list or search queries.
 
 *Out of scope*
-- Restoring a soft-deleted record — not in MVP.
+- Restoring a soft-deleted record.
 
 > **Implementation status**
 >

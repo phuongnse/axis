@@ -39,8 +39,8 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 - [ ] Attempting to delete a workflow that does not exist returns HTTP 404.
 
 *Out of scope*
-- Hard delete / permanent purge — not in MVP.
-- Bulk delete — not in MVP.
+- Hard delete / permanent purge.
+- Bulk delete.
 
 > **Implementation status**
 >
@@ -52,6 +52,9 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
+> **Gaps vs spec:** soft-delete only; restore-from-archive UI pending Frontend.
+>
+> **Deferred (PR #146 follow-up):** Hard delete / permanent purge; bulk delete.
 
 ## Wireframes
 

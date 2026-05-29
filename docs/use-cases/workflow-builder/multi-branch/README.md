@@ -46,7 +46,7 @@ Workflows can take different execution paths based on data values using Conditio
 - [ ] A Condition step with 10 or more branches still renders correctly on the canvas, with the config panel scrollable.
 
 *Out of scope*
-- Regex-based branch matching — not in MVP.
+- Regex-based branch matching.
 
 > **Implementation status**
 >

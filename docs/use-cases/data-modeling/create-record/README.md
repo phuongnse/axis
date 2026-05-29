@@ -47,7 +47,7 @@ Users can create, read, update, and delete records against any model. Records ar
 - [ ] Concurrent creation of two records with unique-field constraints (if any) uses DB-level unique indexes to prevent duplicates.
 
 *Out of scope*
-- Record templates (pre-filled forms) — not in MVP.
+- Record templates (pre-filled forms).
 
 > **Implementation status**
 >

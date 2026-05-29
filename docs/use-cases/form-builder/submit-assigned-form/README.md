@@ -49,8 +49,8 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 - [ ] If the assignee opens the form in two browser tabs and submits from one, the other tab shows "already submitted" on the next interaction.
 
 *Out of scope*
-- Saving a draft of the form and resuming later — not in MVP.
-- The assignee being able to add comments or annotations to the form submission — not in MVP.
+- Saving a draft of the form and resuming later.
+- The assignee being able to add comments or annotations to the form submission.
 
 > **Implementation status**
 >

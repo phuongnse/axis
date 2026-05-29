@@ -47,7 +47,7 @@ A workflow must have at least one trigger before it can be published. Triggers d
 - [ ] Changing the cron expression of an active workflow updates the schedule immediately without archiving and re-publishing.
 
 *Out of scope*
-- Date-specific one-time scheduling (e.g., "run once on 2026-12-25") — not in MVP.
+- Date-specific one-time scheduling (e.g., "run once on 2026-12-25").
 
 > **Implementation status**
 >

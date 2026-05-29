@@ -10,6 +10,10 @@
 # Nested record schemas (*Record.avsc) are payload sub-types, not top-level Kafka
 # values — they get no subject of their own and are intentionally skipped.
 #
+# The running app auto-registers schemas on first publish, so this is a pre-seed
+# convenience (fresh local registry, or validating compatibility before any
+# producer runs) — not required for normal operation.
+#
 # Usage:
 #   SCHEMA_REGISTRY_URL=http://localhost:8081 ./scripts/register-avro-schemas.sh
 #   DRY_RUN=1 ./scripts/register-avro-schemas.sh   # print subjects, no HTTP calls
@@ -39,6 +43,7 @@ register() {
 
 count=0
 while IFS= read -r file; do
+  # Path: src/Modules/<Module>/Axis.<Module>.Contracts/Schemas/<Name>Event.avsc
   module="$(sed -E 's#.*/src/Modules/([^/]+)/.*#\1#' <<<"$file" | tr '[:upper:]' '[:lower:]')"
   name="$(basename "$file" .avsc)"
   topic="axis.${module}.$(camel_to_kebab "${name%Event}")"

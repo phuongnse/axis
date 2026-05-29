@@ -42,11 +42,11 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 - [ ] Steps outside the Parallel Group cannot be connected to steps inside it (bypassing the group boundary is not allowed).
 
 *Edge cases*
-- [ ] Nested Parallel Groups (a Parallel Group inside another Parallel Group) are not supported in MVP; the canvas blocks this configuration.
+- [ ] Nested Parallel Groups (a Parallel Group inside another Parallel Group) are not supported; the canvas blocks this configuration.
 - [ ] A Form step inside a Parallel Group is valid; the group waits for all form submissions before completing (with AND join).
 
 *Out of scope*
-- Dynamic parallelism (creating N parallel branches based on a list of records at runtime) — not in MVP.
+- Dynamic parallelism (creating N parallel branches based on a list of records at runtime).
 
 > **Implementation status**
 >
@@ -60,7 +60,7 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 >
 > **Gaps vs spec:**
 > - canvas container node rendering and step nesting UI pending Frontend
-> - parallel group represented via step config in existing JSONB storage. `ParallelGroup` and `JoinType` are Phase 2 — shown as planned (dashed) in diagram.
+> - parallel group represented via step config in existing JSONB storage. `ParallelGroup` and `JoinType` are not yet implemented — shown as planned (dashed) in diagram.
 
 ## Wireframes
 

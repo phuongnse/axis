@@ -812,7 +812,7 @@ function workflowModelDiagram() {
   const trans = entityBox({ x: 790, y: 60, name: "Transition", isValueObject: true,
     attrs: ["+fromStepId: UUID", "+toStepId: UUID", "+condition: string"] });
 
-  // ParallelGroup and JoinType are planned (Phase 2) — dashed border
+  // ParallelGroup and JoinType are planned (not yet implemented) — dashed border
   const pg = entityBox({ x: 790, y: 340, name: "ParallelGroup", planned: true, headerBg: C.sysBg, stroke: C.sysBdr,
     attrs: ["+id: UUID", "+workflowId: UUID", "+name: string", "+joinType: JoinType"] });
 

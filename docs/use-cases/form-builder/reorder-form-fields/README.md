@@ -43,7 +43,7 @@ Form fields define what data the form collects. Each field has a type, label, he
 - [ ] Reordering a field from one section into another section is supported.
 
 *Out of scope*
-- Multi-column form layouts — not in MVP (single-column only).
+- Multi-column form layouts — single-column only.
 
 > **Implementation status**
 >

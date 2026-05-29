@@ -44,7 +44,7 @@ Enforce subscription plan limits at the API so that organizations cannot exceed 
 - [ ] Deleting a workflow decrements the workflow counter immediately.
 
 *Out of scope*
-- Soft limits with grace period (allowing some overage before blocking) — not in MVP.
+- Soft limits with grace period (allowing some overage before blocking).
 
 ## Wireframes
 

@@ -47,7 +47,7 @@ When a workflow execution fails at a step, users can manually retry from the fai
 - [ ] Multiple concurrent retries of the same execution are prevented: the Retry button is disabled while a retry is already in progress.
 
 *Out of scope*
-- Automatic retry (without user action) — not in MVP.
+- Automatic retry (without user action).
 
 > **Implementation status**
 >

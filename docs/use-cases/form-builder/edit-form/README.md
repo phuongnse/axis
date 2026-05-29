@@ -43,7 +43,7 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 - [ ] Conflict resolution: if two users edit the same form simultaneously, last save wins on a per-field basis. No conflict detection is required for form field ordering changes.
 
 *Out of scope*
-- Form versioning (publishing a new "version" of a form) — not in MVP; edits are live immediately.
+- Form versioning (publishing a new "version" of a form) — edits are live immediately.
 
 > **Implementation status**
 >

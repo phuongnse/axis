@@ -43,7 +43,7 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 - [ ] Execution history for an archived workflow is still fully accessible.
 
 *Out of scope*
-- Automatic archiving after N days of inactivity — not in MVP.
+- Automatic archiving after N days of inactivity.
 
 > **Implementation status**
 >

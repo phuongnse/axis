@@ -46,7 +46,7 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 - [ ] Background jobs (Wolverine handlers) that operate on behalf of a tenant correctly inject tenant context without an HTTP request present.
 
 *Out of scope*
-- Cross-tenant data sharing features — not in MVP.
+- Cross-tenant data sharing features.
 
 > **Implementation status**
 >

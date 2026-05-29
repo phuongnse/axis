@@ -12,9 +12,9 @@ A drag-and-drop UI builder that allows users to compose pages from pre-built wid
 
 Without a UI builder, users need a developer to display and interact with their data. With it, business users can build complete applications end-to-end.
 
-## Phase
+## Scope
 
-**Phase 2** — Depends on a stable data-modeling, workflow-builder, form-builder, workflow-engine first.
+**Production scope** — depends on a stable data-modeling, workflow-builder, form-builder, workflow-engine, so it lands later in implementation order (not a separate product phase).
 
 ---
 
@@ -60,7 +60,7 @@ Without a UI builder, users need a developer to display and interact with their 
 
 ## Open work (agents)
 
-**⏳ Phase 2 — not started.** No `src/Modules/PageBuilder`, no use-case files under `docs/use-cases/page-builder/`. Do not implement until MVP loop (platform-foundation–workflow-engine) gaps are closed unless explicitly scoped.
+**⏳ Not started.** No `src/Modules/PageBuilder`, no use-case files under `docs/use-cases/page-builder/`. Do not implement until the core loop (platform-foundation–workflow-engine) gaps are closed unless explicitly scoped.
 
 ---
 

@@ -47,7 +47,7 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 - [ ] Wolverine background jobs carry tenant context as a message header, resolved before the handler executes.
 
 *Out of scope*
-- API key authentication (alternative to JWT) — not in MVP.
+- API key authentication (alternative to JWT).
 
 > **Implementation status**
 >

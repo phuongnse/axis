@@ -43,7 +43,7 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 - [ ] Publishing a new version archives the previous version's definition snapshot for execution history traceability.
 
 *Out of scope*
-- Approval workflow for publishing (e.g., requiring a second admin to approve) — not in MVP.
+- Approval workflow for publishing (e.g., requiring a second admin to approve).
 
 > **Implementation status**
 >

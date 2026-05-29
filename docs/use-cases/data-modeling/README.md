@@ -12,9 +12,9 @@ Allow users to define their own data structures — Models (like database tables
 
 Custom data modeling is the core differentiator of Axis. Without it, the platform is just another workflow tool with a fixed data structure. With it, users can model any business domain.
 
-## Phase
+## Scope
 
-**MVP**
+**Production scope** — in the full product scope; no separate MVP/Phase cut.
 
 ---
 

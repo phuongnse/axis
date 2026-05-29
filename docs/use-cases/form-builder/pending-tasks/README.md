@@ -45,8 +45,8 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 - [ ] Expired tasks (timed out) appear in a separate "Expired" tab, not in Pending.
 
 *Out of scope*
-- Delegating a task to another user — not in MVP.
-- Bulk task completion — not in MVP.
+- Delegating a task to another user.
+- Bulk task completion.
 
 > **Implementation status**
 >

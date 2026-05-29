@@ -44,7 +44,7 @@ Workflow definitions can be exported as portable JSON files and imported into an
 
 *Out of scope*
 - Exporting execution history — definitions only.
-- Exporting to formats other than JSON (YAML, BPMN) — not in MVP.
+- Exporting to formats other than JSON (YAML, BPMN).
 
 > **Implementation status**
 >
@@ -59,6 +59,8 @@ Workflow definitions can be exported as portable JSON files and imported into an
 > **Gaps vs spec:**
 > - broken-reference `"broken": true` flag pending data-modeling/form-builder integration
 > - export notice and broken-reference warning UI pending Frontend.
+>
+> **Deferred (PR #146 follow-up):** Exporting execution history (definitions only today); export formats other than JSON (YAML, BPMN).
 >
 > **Decisions:** credential scrubbing in `ExportWorkflowHandler` — keys matching token/api_key/apikey/secret/password/authorization/auth_token/hmac_secret/client_secret/private_key/bearer/access_token/refresh_token replaced with `[REDACTED]` (OrdinalIgnoreCase).
 

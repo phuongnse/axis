@@ -47,7 +47,7 @@ Each step has a type that determines what it does when executed. Users configure
 - [ ] A timeout of 0 hours is invalid and blocked.
 
 *Out of scope*
-- Multiple assignees on a single Form step (assign to all and wait for the first response) — not in MVP.
+- Multiple assignees on a single Form step (assign to all and wait for the first response).
 
 > **Implementation status**
 >
@@ -60,6 +60,8 @@ Each step has a type that determines what it does when executed. Users configure
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** form picker UI, assignee expression evaluation, and timeout enforcement pending Frontend + workflow-engine.
+>
+> **Deferred (PR #146 follow-up):** Multiple assignees on one Form step (assign to all, first response wins).
 >
 > **Decisions:** step config (formId, assignee, timeout) stored as JSONB dict in `steps` column. `StepType` enum includes `Start` and `End` values.
 

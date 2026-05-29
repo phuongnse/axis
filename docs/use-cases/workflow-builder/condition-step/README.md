@@ -46,7 +46,7 @@ Each step has a type that determines what it does when executed. Users configure
 - [ ] A Condition step with only a Default branch (no other conditions) is valid but the canvas shows a warning: "All inputs will follow the default branch."
 
 *Out of scope*
-- Raw expression editing (writing code directly) — the visual builder is the only interface in MVP.
+- Raw expression editing (writing code directly) — the visual builder is the only interface.
 
 > **Implementation status**
 >
@@ -59,6 +59,8 @@ Each step has a type that determines what it does when executed. Users configure
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** expression builder UI and branch evaluation pending Frontend + workflow-engine; condition branches stored in step config JSONB.
+>
+> **Deferred (PR #146 follow-up):** Raw expression editing (code-only interface) — visual builder only.
 
 ## Wireframes
 

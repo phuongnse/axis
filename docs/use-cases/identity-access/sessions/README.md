@@ -46,7 +46,7 @@ Allow users to reset forgotten passwords, change their current password, and man
 - [ ] The current session cannot be revoked from this page (use Sign Out instead); the Revoke button is replaced with "Current session."
 
 *Out of scope*
-- Per-session device naming by the user — not in MVP.
+- Per-session device naming by the user.
 
 > **Implementation status**
 >

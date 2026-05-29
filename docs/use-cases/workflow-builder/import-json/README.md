@@ -48,7 +48,7 @@ Workflow definitions can be exported as portable JSON files and imported into an
 - [ ] Import is transactional: if any part fails mid-import, no partial data is left behind.
 
 *Out of scope*
-- Automatic periodic export/backup — not in MVP.
+- Automatic periodic export/backup.
 
 > **Implementation status**
 >

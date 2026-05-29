@@ -39,8 +39,8 @@ Compare available subscription plans so that I can choose the one that fits my n
 - [ ] A plan that has been retired (no longer available for new signups) is not shown on the public pricing page but remains visible to existing orgs still on that plan.
 
 *Out of scope*
-- Monthly vs annual billing toggle — Phase 2.
-- Per-seat pricing — not in MVP.
+- Monthly vs annual billing toggle — part of the separate billing initiative.
+- Per-seat pricing.
 
 ## Wireframes
 

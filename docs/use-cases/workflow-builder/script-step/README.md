@@ -47,8 +47,8 @@ Each step has a type that determines what it does when executed. Users configure
 - [ ] A script that runs within the timeout but produces no `output` writes is valid; context is unchanged.
 
 *Out of scope*
-- Importing external npm packages — not in MVP.
-- Python or other language scripts — JavaScript only in MVP.
+- Importing external npm packages.
+- Python or other language scripts — JavaScript only.
 
 > **Implementation status**
 >

@@ -44,7 +44,7 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 - [ ] A pre-populated required field that the assignee clears before submitting triggers the required validation error.
 
 *Out of scope*
-- Hiding fields from the assignee while keeping them pre-populated (hidden fields) — not in MVP.
+- Hiding fields from the assignee while keeping them pre-populated (hidden fields).
 
 > **Implementation status**
 >

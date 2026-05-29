@@ -46,7 +46,7 @@ Allow users to reset forgotten passwords, change their current password, and man
 - [ ] Changing password while another tab has the change-password form open: the other tab's form submission will fail with "Current password is incorrect" (since the password was already changed).
 
 *Out of scope*
-- Password history check (cannot reuse last N passwords) — not in MVP.
+- Password history check (cannot reuse last N passwords).
 
 > **Implementation status**
 >

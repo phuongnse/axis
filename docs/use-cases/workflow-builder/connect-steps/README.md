@@ -45,7 +45,7 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 - [ ] The Start node has no input handle. The End node has no output handle. Attempting to connect these in the wrong direction is blocked.
 
 *Out of scope*
-- Animated transitions showing flow direction — not in MVP (static arrows only).
+- Animated transitions showing flow direction — static arrows only.
 
 > **Implementation status**
 >
@@ -60,6 +60,8 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 > **Gaps vs spec:**
 > - canvas edge drawing and cycle-block toast pending Frontend
 > - condition step label enforcement on connection pending Frontend.
+>
+> **Deferred (PR #146 follow-up):** Animated transitions showing flow direction — static arrows only.
 
 ## Wireframes
 
