@@ -172,6 +172,19 @@ Documented for wireframes and future frontend; **not implemented** in the app ye
 
 Record **accepted ToS/Privacy version** on the account at org create (AC above); legal page content and versioning are out of scope for this wireframe pass.
 
+## Workspace-provisioning UI (step 4)
+
+Maps to *Tenant provisioning* ACs and [`tenant-provisioning`](#tenant-provisioning). **Runtime:** one checklist driven by `GET /api/auth/provisioning-status?token=` (poll every 5 seconds). The wireframe is a **reference board** (in progress | module failed).
+
+| Checklist row | Spec source |
+|---------------|-------------|
+| **Data modeling**, **Workflow builder**, **Form builder**, **Workflow engine** | Per-module PostgreSQL schema + EF migrations ([ARCHITECTURE.md](../../../ARCHITECTURE.md) tenant-scoped services; Page Builder excluded — not started) |
+| Subcopy *Schema + migrations* | AC: schema created per module + base tables migrated |
+| **Assigning admin role** | AC: registering user gets Admin role when provisioning completes |
+| **Opening workspace** | AC: redirect to functional workspace / dashboard when org is ACTIVE |
+
+**Not shown on this screen:** email verification (prior step — redirect here on verify 200). **Failure:** one module stuck failed after retries → failed panel; platform alert per AC.
+
 ## Wireframes
 
 Nine screens in this folder (four happy-path UI steps, five `*-states` reference boards). Table order follows [Screen flow](#screen-flow). **Verify on success:** no wireframe — redirect to `workspace-provisioning`. **Verify on error:** one card from `verify-email-states`. Diagrams: [`register-org-journey`](#register-org-journey), [`register-org-cases`](#register-org-cases), [`tenant-provisioning`](#tenant-provisioning).
@@ -181,7 +194,7 @@ Nine screens in this folder (four happy-path UI steps, five `*-states` reference
 | 1 · 2b | register-org | Happy path — entry (1); email/password submit (2b) | [source](./register-org.excalidraw) | [preview](./register-org.svg) |
 | 2a | register-org-complete | Happy path — post-OAuth completion | [source](./register-org-complete.excalidraw) | [preview](./register-org-complete.svg) |
 | 3 | email-confirmation | Happy path — after create (resend link idle) | [source](./email-confirmation.excalidraw) | [preview](./email-confirmation.svg) |
-| 4 | workspace-provisioning | Happy path — after verify API succeeds | [source](./workspace-provisioning.excalidraw) | [preview](./workspace-provisioning.svg) |
+| 4 | workspace-provisioning | Poll UI — per-module checklist + final steps (reference: in progress \| failed) | [source](./workspace-provisioning.excalidraw) | [preview](./workspace-provisioning.svg) |
 | — | email-confirmation-states | Resend from step 3 — in-flight, 204, 429 | [source](./email-confirmation-states.excalidraw) | [preview](./email-confirmation-states.svg) |
 | — | verify-email-states | Verify link errors — expired, used, invalid, 429 | [source](./verify-email-states.excalidraw) | [preview](./verify-email-states.svg) |
 | — | register-org-provider-states | Error — SSO before completion | [source](./register-org-provider-states.excalidraw) | [preview](./register-org-provider-states.svg) |
