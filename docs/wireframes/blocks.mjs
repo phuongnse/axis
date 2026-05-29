@@ -12,6 +12,8 @@ import {
   hline,
   fieldLabelBlock,
   inputField,
+  inlineTextRow,
+  labelTextWidth,
   isPasswordLabel,
   PASSWORD_INPUT_PAD_RIGHT,
   passwordRevealToggle,
@@ -145,11 +147,27 @@ export function buildAuthCardHeader(prefix, cardX, cardY, cardW, title, subtitle
   return { els, files: logo.files };
 }
 
-export function buildAuthCardFooter(prefix, cardX, cardY, cardW, cardH, footerText) {
+/**
+ * Auth card footer: gray lead-in + primary link (centered), or whole line as link.
+ * @param {string | { lead?: string, link: string }} footer
+ */
+export function buildAuthCardFooter(prefix, cardX, cardY, cardW, cardH, footer) {
   const footerY = cardY + cardH - 32;
+  const lineY = footerY + 10;
+  const lineH = 16;
+  const fontSize = 12;
+  const segments = typeof footer === 'string'
+    ? [{ text: footer, color: C.primary }]
+    : [
+        ...(footer.lead ? [{ text: footer.lead, color: C.gray700 }] : []),
+        { text: footer.link, color: C.primary },
+      ];
+  const totalW = segments.reduce((sum, { text: str }) => sum + labelTextWidth(str, fontSize) + 2, 0);
+  const startX = cardX + Math.round((cardW - totalW) / 2);
+  const { els: rowEls } = inlineTextRow(`${prefix}_footer`, startX, lineY, lineH, fontSize, segments);
   return [
     hline(`${prefix}_fdiv`, cardX, footerY, cardW, C.gray300),
-    text(`${prefix}_footer`, cardX + AUTH_CARD_PAD_X, footerY + 10, cardW - 48, 16, footerText, 12, C.primary, 'center'),
+    ...rowEls,
   ];
 }
 
@@ -267,12 +285,19 @@ export function authTermsRow(prefix, cardX, y, cardW, { checked = true, errorMsg
   const innerW = cardW - AUTH_CARD_PAD_X * 2;
   const chkSize = 18;
   const lineH = 16;
+  const fontSize = 11;
   const textY = y + Math.round((chkSize - lineH) / 2);
+  const textX = x + chkSize + 8;
   const blockH = errorMsg ? 50 : 28;
+  const { els: rowEls } = inlineTextRow(`${prefix}_terms`, textX, textY, lineH, fontSize, [
+    { text: 'I agree to the ', color: C.gray700 },
+    { text: 'Terms of Service', color: C.primary },
+    { text: ' and ', color: C.gray700 },
+    { text: 'Privacy Policy', color: C.primary },
+  ]);
   const els = [
     rect(`${prefix}_chk`, x, y, chkSize, chkSize, checked ? C.primary : C.dangerBorder, C.white, 1, true),
-    text(`${prefix}_txt`, x + chkSize + 8, textY, innerW - chkSize - 8, lineH,
-      'I agree to the Terms of Service and Privacy Policy →', 11, C.gray700),
+    ...rowEls,
   ];
   if (checked) {
     els.push(text(`${prefix}_mark`, x + 4, y + 4, chkSize - 8, 12, '✓', 11, C.primary, 'center'));

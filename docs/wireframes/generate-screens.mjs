@@ -292,7 +292,10 @@ function genRegisterOrg() {
   els.push(rect('ro_bg', 0, 0, W, screenH, C.gray300, C.gray100, 1, false));
   els.push(rect('ro_card', cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
   els.push(...contentEls);
-  els.push(...buildAuthCardFooter('ro', cardX, cardY, cardW, cardH, 'Already have an account? Sign in'));
+  els.push(...buildAuthCardFooter('ro', cardX, cardY, cardW, cardH, {
+    lead: 'Already have an account? ',
+    link: 'Sign in',
+  }));
 
   write('platform-foundation/register-org.excalidraw', els, wireFiles);
 }
@@ -1237,7 +1240,7 @@ function genLogin() {
       { label: 'Password',      placeholder: '••••••••', required: true },
     ],
     extraLink: 'Forgot password?',
-  }, 'Sign in', "Don't have an account? Sign up");
+  }, 'Sign in', { lead: "Don't have an account? ", link: 'Sign up' });
   write('identity-access/login.excalidraw', els, files);
 }
 
@@ -1290,7 +1293,7 @@ function genRegister() {
       { label: 'Email address', placeholder: 'you@company.com', required: true },
       { label: 'Password',      placeholder: '••••••••', required: true },
     ],
-  }, 'Create account', 'Already have an account? Sign in');
+  }, 'Create account', { lead: 'Already have an account? ', link: 'Sign in' });
   write('identity-access/register.excalidraw', els, files);
 }
 
@@ -1301,7 +1304,7 @@ function genForgotPassword() {
     items: [
       { label: 'Email address', placeholder: 'you@company.com', required: true },
     ],
-  }, 'Send reset link', 'Remember your password? Sign in');
+  }, 'Send reset link', { lead: 'Remember your password? ', link: 'Sign in' });
   write('identity-access/forgot-password.excalidraw', els, files);
 }
 
@@ -1313,7 +1316,7 @@ function genChangePassword() {
       { label: 'New password',     placeholder: '••••••••', required: true },
       { label: 'Confirm password', placeholder: '••••••••', required: true },
     ],
-  }, 'Set new password', 'Back to sign in');
+  }, 'Set new password', { link: 'Back to sign in' });
   write('identity-access/change-password.excalidraw', els, files);
 }
 
@@ -1325,7 +1328,7 @@ function genAcceptInvitation() {
       { label: 'Organization',      placeholder: 'Acme Corp', required: false },
       { label: 'Choose a password', placeholder: '••••••••', required: true },
     ],
-  }, 'Accept Invitation', 'Already have an account? Sign in');
+  }, 'Accept Invitation', { lead: 'Already have an account? ', link: 'Sign in' });
   write('identity-access/accept-invitation.excalidraw', els, files);
 }
 

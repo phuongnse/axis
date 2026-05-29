@@ -245,6 +245,18 @@ export const FIELD_LABEL_TO_HELP_GAP = 6;
 export const FIELD_HELP_TO_INPUT_GAP = 8;
 
 /** Pixel width of label copy at 11px — positions the required * after the last glyph. */
+/** Place inline text segments on one row; returns elements and total width. */
+export function inlineTextRow(prefix, startX, y, lineH, fontSize, segments) {
+  const els = [];
+  let cx = startX;
+  segments.forEach(({ text: str, color }, i) => {
+    const w = Math.max(8, labelTextWidth(str, fontSize) + 2);
+    els.push(text(`${prefix}_t${i}`, cx, y, w, lineH, str, fontSize, color));
+    cx += w;
+  });
+  return { els, width: cx - startX };
+}
+
 export function labelTextWidth(str, fontSize = 11) {
   const scale = fontSize / 11;
   let w = 0;
