@@ -260,4 +260,4 @@ Updating only `PROGRESS.md` while changing `src/` without `docs/use-cases/` → 
 | EF, API, Wolverine, tenancy | [patterns.md](./patterns.md) |
 | React, Query, a11y | [frontend.md](./frontend.md) |
 | Tests, Testcontainers | [testing.md](./testing.md) |
-| Wireframe kit | [wireframes.md](./wireframes.md) |
+| Wireframe kit | [wireframes.md](./wireframes.md) · **Agent contract:** [wireframes/README § Agent contract](../wireframes/README.md#agent-contract) |

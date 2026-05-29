@@ -2,7 +2,28 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
 
-This playbook covers the wireframe generation system. **Architecture:** [`docs/wireframes/README.md`](../wireframes/README.md).
+This playbook covers the wireframe generation system.
+
+- **Architecture & file map:** [`docs/wireframes/README.md`](../wireframes/README.md)
+- **Agents — spacing, blocks, MUST/MUST NOT:** [README § Agent contract](../wireframes/README.md#agent-contract)
+
+---
+
+## Agent checklist
+
+When you touch `docs/wireframes/**` or use-case `*.excalidraw`:
+
+- [ ] Read [Agent contract](../wireframes/README.md#agent-contract) — auth fields use `authFormField` / `blocks.mjs`, not manual `y + 18`.
+- [ ] Label/help/input spacing changed only in `fieldLabelBlock` (`components.mjs`); field stack gap only in `AUTH_FIELD_STACK_GAP` (`blocks.mjs`).
+- [ ] No new hardcoded px for auth layout (`6`, `8`, `12`, `440`, …).
+- [ ] SSO via `placeAuthExternalSignIn()` — not `component()` on headerless blocks.
+- [ ] `node docs/wireframes/generate-screens.mjs` twice → empty `git diff` on second run.
+- [ ] Regenerated `.svg` for changed screens; [visual-artifact-checklist](./visual-artifact-checklist.md) satisfied.
+- [ ] Use-case `README.md` wireframes table / screen flow updated if screens added or renamed.
+
+**Reference screen:** [register-org](../use-cases/platform-foundation/register-org/README.md) (full block kit usage).
+
+---
 
 | Layer | File |
 |-------|------|
@@ -377,6 +398,7 @@ When writing or editing any wireframe generator, verify against these values (fr
 1. Add a `genXxx()` function in `generate-screens.mjs`:
    - **Authenticated screen**: start with `appShell(prefix, W, H, NAV, activeIdx, pageTitle)`
    - **Auth screen** (login, register, etc.): use `authCard()` — never build the card by hand
+   - **Auth screen with SSO / many fields / help text**: compose from `blocks.mjs` (`authFormField`, `paintRegisterOrg*`, …) — see [Agent contract](../wireframes/README.md#agent-contract)
    - Use `component(buildXxx, cx, cy)` for any element that matches a template section
    - Use `btn`, `inputField`, `badge`, etc. from `components.mjs` for individual controls
    - Use raw `rect`, `text`, etc. only for layout with no template equivalent
@@ -388,9 +410,10 @@ When writing or editing any wireframe generator, verify against these values (fr
 6. Update the use-case `README.md`: add a `## Wireframes` row (and `## Screen flow` when >3 screens) per [docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--wireframes--implementation-status) — see [register-org](../use-cases/platform-foundation/register-org/README.md) for the full layout
 
 **Pre-commit checks for screen wireframes:**
+- [ ] [Agent checklist](#agent-checklist) (spacing contract, blocks, regen twice)
 - [ ] Element count > 0 for every generated file (NaN positions = 0 renderable elements)
 - [ ] All table `tblY` values use the formula (`cy+56` or `cy+82`) — not ad-hoc numbers
-- [ ] All inline label y-positions use `labelY = controlY + (controlH - 16) / 2`
+- [ ] App-shell inline labels: `labelY = controlY + (controlH - 16) / 2` — auth card fields use `authFormField`, not this formula
 - [ ] No custom duplicates of template builders — use `component()` instead
 - [ ] Widest element: `cx + maxElementWidth ≤ W` (no overflow past right edge)
 

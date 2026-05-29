@@ -69,7 +69,7 @@ docs/use-cases/
         └── *.svg            # previews for this use case
 ```
 
-Shared UI kit wireframes: [`../wireframes/`](../wireframes/). Platform architecture diagrams: [`../diagrams/`](../diagrams/).
+Shared wireframe kit (`.mjs` source + `app-shell`): [`../wireframes/`](../wireframes/) — agent spacing/blocks: [Agent contract](../wireframes/README.md#agent-contract). Platform diagrams: [`../diagrams/`](../diagrams/).
 
 ---
 
