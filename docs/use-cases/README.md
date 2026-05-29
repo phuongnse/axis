@@ -28,7 +28,7 @@ Use cases are the user-facing source of truth for behavior. **One markdown file 
 
 When you ship code, update **use-case callout → domain README → PROGRESS** in the same PR. Never mark ✅ while `**Gaps vs spec**` still lists backend work for that layer.
 
-**Use-case file layout:** Purpose/Actor/Trigger, flow sections, AC, wireframes table, diagrams table, implementation status — see [docs-style § Use case files](../playbooks/docs-style.md#use-case-files-flow-first).
+**Use-case file layout:** Purpose/Actor/Trigger, flow sections, AC, optional **Screen flow**, wireframes table, diagrams table, implementation status — see [docs-style § Use-case visual artifacts](../playbooks/docs-style.md#use-case-files--wireframes--implementation-status). Multi-screen reference: [register-org](./platform-foundation/register-org/README.md).
 
 ---
 
@@ -69,7 +69,7 @@ docs/use-cases/
         └── *.svg            # previews for this use case
 ```
 
-Shared UI kit wireframes: [`../wireframes/`](../wireframes/). Platform architecture diagrams: [`../diagrams/`](../diagrams/).
+Shared wireframe kit (`.mjs` source + `app-shell`): [`../wireframes/`](../wireframes/) — agent spacing/blocks: [Agent contract](../wireframes/README.md#agent-contract). Platform diagrams: [`../diagrams/`](../diagrams/).
 
 ---
 

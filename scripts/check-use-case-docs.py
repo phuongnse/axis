@@ -86,8 +86,15 @@ def check_file(path: Path) -> list[str]:
     if not has_ac:
         issues.append(f"{rel}: missing acceptance criteria section")
 
-    if "| Screen | Excalidraw | Preview |" not in text:
-        issues.append(f"{rel}: missing wireframes table header")
+    wireframes_section = ""
+    if "## Wireframes" in text:
+        wireframes_section = text.split("## Wireframes", 1)[1].split("\n## ", 1)[0]
+    if not (
+        "| Screen |" in wireframes_section
+        and "| Excalidraw |" in wireframes_section
+        and "| Preview |" in wireframes_section
+    ):
+        issues.append(f"{rel}: missing wireframes table (need Screen, Excalidraw, Preview columns)")
 
     if "| Diagram | Source | Preview |" not in text:
         issues.append(f"{rel}: missing diagrams table header")

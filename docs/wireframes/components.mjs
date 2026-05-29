@@ -118,16 +118,25 @@ export function component(builderFn, targetX, targetY, contentDy = 48) {
   return translate(content, targetX - 50, targetY - contentDy);
 }
 
+/**
+ * Place a template block with no section header (e.g. buildAuthExternalSignInBlock).
+ * Do not use component() for those — slice(2) would drop the first two content elements.
+ */
+export function componentContent(builderFn, targetX, targetY, contentDy = 48) {
+  const els = builderFn(0);
+  return translate(els, targetX - 50, targetY - contentDy);
+}
+
 // ─── File writer ──────────────────────────────────────────────────────────────
 
-export function writeExcalidraw(filePath, elements) {
+export function writeExcalidraw(filePath, elements, files = {}) {
   const output = JSON.stringify({
     type: 'excalidraw',
     version: 2,
     source: 'https://excalidraw.com',
     elements,
     appState: { gridSize: 8, viewBackgroundColor: '#ffffff' },
-    files: {},
+    files,
   });
   writeFileSync(filePath, output, 'utf-8');
 }
@@ -222,12 +231,134 @@ export function btn(prefix, x, y, label, variant = 'primary') {
   ];
 }
 
-/** Text input. h=40, placeholder at y+11, 13px gray500. */
-export function inputField(prefix, x, y, w, placeholder = '') {
+/** Gap between label text and required * (px) — same on every field. */
+export const REQUIRED_MARKER_GAP = 10;
+
+/** Help row: small ? icon then help copy (icon before text). */
+export const HELP_ICON_SIZE = 12;
+export const HELP_TEXT_ICON_GAP = 6;
+export const FIELD_LABEL_H = 16;
+export const FIELD_HELP_TEXT_H = 14;
+/** Gap between label row and help text row. */
+export const FIELD_LABEL_TO_HELP_GAP = 6;
+/** Gap between label (or help row) and the control below. */
+export const FIELD_HELP_TO_INPUT_GAP = 8;
+
+/** Gap between inline phrases (px). */
+export const INLINE_TEXT_SEGMENT_GAP = 5;
+
+/** Total width of an inline text row (for centering). */
+export function inlineTextRowWidth(segments, fontSize) {
+  let w = 0;
+  segments.forEach((seg, i) => {
+    w += Math.ceil(labelTextWidth(seg.text, fontSize) + 6);
+    if (i < segments.length - 1) {
+      w += INLINE_TEXT_SEGMENT_GAP;
+    }
+  });
+  return w;
+}
+
+/**
+ * Inline text on one row; optional underline per segment (`link: true`).
+ * Uses generous per-segment width so Excalidraw does not kern glyphs together.
+ */
+export function inlineTextRow(prefix, startX, y, lineH, fontSize, segments) {
+  const els = [];
+  let cx = startX;
+  segments.forEach(({ text: str, color, link = false }, i) => {
+    const textW = Math.ceil(labelTextWidth(str, fontSize) + 6);
+    els.push(text(`${prefix}_t${i}`, cx, y, textW, lineH, str, fontSize, color));
+    if (link) {
+      const ulY = y + lineH - 1;
+      els.push(hline(`${prefix}_ul${i}`, cx + 1, ulY, textW - 2, color, 1));
+    }
+    cx += textW;
+    if (i < segments.length - 1) {
+      cx += INLINE_TEXT_SEGMENT_GAP;
+    }
+  });
+  return { els, width: cx - startX };
+}
+
+export function labelTextWidth(str, fontSize = 11) {
+  const scale = fontSize / 11;
+  let w = 0;
+  for (const ch of str) {
+    if (ch === ' ') w += 3.2 * scale;
+    else if (ch >= 'A' && ch <= 'Z') w += 6.4 * scale;
+    else w += 5.5 * scale;
+  }
+  return Math.ceil(w);
+}
+
+/**
+ * Form field label with optional required marker (* in C.danger).
+ * Use on every user-editable field label in screen wireframes.
+ */
+export function fieldLabel(prefix, x, y, label, { required = false, color = C.gray500 } = {}) {
+  return fieldLabelBlock(prefix, x, y, 400, label, { required, color }).els;
+}
+
+/**
+ * Label row + optional help (? icon) + help text line.
+ * Returns label block height and input top offset for stacking fields.
+ */
+export function fieldLabelBlock(prefix, x, y, innerW, label, {
+  required = false,
+  helpText = null,
+  color = C.gray500,
+} = {}) {
+  const labelW = Math.max(8, labelTextWidth(label, 11));
+  const els = [text(`${prefix}_fl`, x, y, labelW, FIELD_LABEL_H, label, 11, color)];
+  if (required) {
+    els.push(text(`${prefix}_req`, x + labelW + REQUIRED_MARKER_GAP, y, 8, FIELD_LABEL_H, '*', 11, C.danger));
+  }
+  let labelBlockH = FIELD_LABEL_H;
+  if (helpText) {
+    const helpY = y + FIELD_LABEL_H + FIELD_LABEL_TO_HELP_GAP;
+    const iconY = helpY + Math.round((FIELD_HELP_TEXT_H - HELP_ICON_SIZE) / 2);
+    els.push(ellipse(`${prefix}_help_ic`, x, iconY, HELP_ICON_SIZE, HELP_ICON_SIZE, C.primaryDark, C.infoBg, 1.5));
+    els.push(text(`${prefix}_help_q`, x, iconY + 1, HELP_ICON_SIZE, 10, '?', 9, C.primaryDark, 'center'));
+    const textX = x + HELP_ICON_SIZE + HELP_TEXT_ICON_GAP;
+    els.push(text(`${prefix}_help`, textX, helpY, innerW - HELP_ICON_SIZE - HELP_TEXT_ICON_GAP, FIELD_HELP_TEXT_H, helpText, 10, C.gray700));
+    labelBlockH = FIELD_LABEL_H + FIELD_LABEL_TO_HELP_GAP + FIELD_HELP_TEXT_H;
+  }
+  const inputY = y + labelBlockH + FIELD_HELP_TO_INPUT_GAP;
+  return { els, labelBlockH, inputY };
+}
+
+/** Right inset when a password reveal toggle is shown (px). */
+export const PASSWORD_INPUT_PAD_RIGHT = 40;
+
+/** Password fields: eye toggle on the right inside the 40px input. */
+export const PASSWORD_TOGGLE_BTN = 28;
+
+export function isPasswordLabel(label) {
+  return /password/i.test(label);
+}
+
+/** Eye icon only (no button circle) — show/hide password affordance. */
+export function passwordRevealToggle(prefix, inputX, inputY, inputW) {
+  const cx = inputX + inputW - 20;
+  const cy = inputY + 20;
   return [
-    rect(`${prefix}_inp`, x, y, w, 40, C.gray300, C.white, 1, true),
-    text(`${prefix}_ph`, x + 12, y + 11, w - 24, 18, placeholder, 13, C.gray500),
+    ellipse(`${prefix}_pw_eye`, cx - 7, cy - 3, 14, 9, C.gray500, 'transparent', 1.25),
+    ellipse(`${prefix}_pw_pupil`, cx - 2.5, cy - 1.5, 5, 5, C.gray500, C.gray500, 0),
   ];
+}
+
+/** Text input. h=40, placeholder at y+11, 13px gray500. */
+export function inputField(prefix, x, y, w, placeholder = '', { password = false } = {}) {
+  const padR = password ? PASSWORD_INPUT_PAD_RIGHT : 24;
+  const els = [
+    rect(`${prefix}_inp`, x, y, w, 40, C.gray300, C.white, 1, true),
+    text(`${prefix}_ph`, x + 12, y + 11, w - 12 - padR, 18, placeholder, 13, C.gray500),
+  ];
+  if (password) {
+    els.push(...passwordRevealToggle(`${prefix}_pw`, x, y, w));
+  }
+  return els;
 }
 
 /** Select / dropdown. h=40, arrow at x+w-22. */

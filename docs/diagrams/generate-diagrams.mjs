@@ -10,6 +10,7 @@
  *   module-overview — 6 modules + Kafka/RabbitMQ/gRPC communication flows
  *
  * Use-case-level (docs/use-cases/{domain}/{use-case}/):
+ *   register-org-flow   — self-service registration (email + providers)  (platform-foundation)
  *   tenant-provisioning — org registration & async schema provisioning  (platform-foundation)
  *   auth-flow           — JWT + refresh token authentication flow         (identity-access)
  *   data-model          — DataModeling entity relationships               (data-modeling)
@@ -578,11 +579,29 @@ function seqBuild({ title, participants, gap = 165, messages, sections = [], not
     els.push(text({ x: CANVAS_W / 2, y: s.y + 12, value: `== ${s.label} ==`, size: 10, bold: true, color: C.muted, anchor: "center" }));
   }
 
-  // Messages
+  // Messages (self-calls render as a loop to the right — zero-length arrows are invisible)
+  const SELF_LOOP_OUTSET = 40;
+  const SELF_LOOP_DEPTH = 22;
   for (const m of messages) {
     const from = ps[m.from];
     const to = ps[m.to];
-    els.push(...arrow({ x1: from.cx, y1: m.y, x2: to.cx, y2: m.y, label: m.label, dashed: m.dashed }));
+    if (m.from === m.to) {
+      const loopX = from.cx + SELF_LOOP_OUTSET;
+      els.push(
+        ...routedArrow({
+          waypoints: [
+            [from.cx, m.y],
+            [loopX, m.y],
+            [loopX, m.y + SELF_LOOP_DEPTH],
+            [from.cx, m.y + SELF_LOOP_DEPTH],
+          ],
+          label: m.label,
+          dashed: m.dashed,
+        }),
+      );
+    } else {
+      els.push(...arrow({ x1: from.cx, y1: m.y, x2: to.cx, y2: m.y, label: m.label, dashed: m.dashed }));
+    }
   }
 
   // Notes (info boxes at bottom)
@@ -591,6 +610,58 @@ function seqBuild({ title, participants, gap = 165, messages, sections = [], not
   }
 
   return excalidraw(els);
+}
+
+// ─── platform-foundation — Register organization ─────────────────────────────────────────────
+
+function registerOrgFlowDiagram() {
+  _id = 1;
+  return seqBuild({
+    title: "Register Organization — Email/Password & External Providers",
+    gap: 155,
+    participants: [
+      { label: "New Admin" },
+      { label: "Web App" },
+      { label: "API Server", sub: "(OpenIddict)" },
+      { label: "Email", sub: "Service", external: true },
+      { label: "IdP", sub: "(MS/Google/GitHub)", external: true },
+    ],
+    sections: [
+      { y: 260, label: "Email / password path" },
+      { y: 440, label: "External provider (OAuth only)" },
+      { y: 600, label: "Post-OAuth completion screen" },
+    ],
+    messages: [
+      { from: 0, to: 1, y: 140, label: "Open registration page" },
+      { from: 1, to: 0, y: 168, label: "Show SSO icons + email/password form", dashed: true },
+
+      { from: 0, to: 1, y: 288, label: "Accept Terms + submit form (Idempotency-Key)" },
+      { from: 1, to: 2, y: 328, label: "POST /api/organizations/" },
+      { from: 2, to: 2, y: 368, label: "Generate slug, hash password, record ToS" },
+      { from: 2, to: 3, y: 408, label: "Send verification email (if new)" },
+      { from: 2, to: 1, y: 448, label: "202 → confirmation screen", dashed: true },
+
+      { from: 0, to: 1, y: 468, label: "Choose Microsoft / Google / GitHub" },
+      { from: 1, to: 4, y: 508, label: "OAuth2 Auth Code + PKCE" },
+      { from: 4, to: 1, y: 548, label: "Verified email + display name", dashed: true },
+      { from: 2, to: 1, y: 588, label: "Reject if email already registered", dashed: true },
+
+      { from: 1, to: 0, y: 628, label: "register-org-complete (org name, slug, Terms)", dashed: true },
+      { from: 0, to: 1, y: 668, label: "Submit completion (Idempotency-Key)" },
+      { from: 1, to: 2, y: 708, label: "POST org + link external login" },
+      { from: 2, to: 3, y: 748, label: "Send verification email (if new)" },
+      { from: 2, to: 1, y: 788, label: "202 → confirmation screen", dashed: true },
+    ],
+    notes: [
+      {
+        x: 20,
+        y: 820,
+        w: 720,
+        h: 44,
+        label: "IdP never supplies organization name. Password-path duplicate email → same confirmation; provider-path duplicate → \"Sign in instead\" before completion.",
+      },
+    ],
+  });
 }
 
 // ─── platform-foundation — Tenant Provisioning ───────────────────────────────────────────────
@@ -886,6 +957,7 @@ const diagrams = [
   { name: "container",            fn: containerDiagram,        dir: architectureDir },
   { name: "module-overview",      fn: moduleOverview,          dir: architectureDir },
   // Domain-level diagrams
+  { name: "register-org-flow",    fn: registerOrgFlowDiagram,    dir: useCaseDir("platform-foundation", "register-org") },
   { name: "tenant-provisioning",  fn: tenantProvisioningDiagram, dir: useCaseDir("platform-foundation", "provision-tenant") },
   { name: "auth-flow",            fn: authFlowDiagram,           dir: useCaseDir("identity-access", "sign-in") },
   { name: "data-model",           fn: dataModelDiagram,          dir: useCaseDir("data-modeling", "create-model") },

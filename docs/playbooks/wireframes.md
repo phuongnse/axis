@@ -2,8 +2,37 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
 
-This playbook covers everything needed to work with the wireframe generation system:
-`components.mjs` (shared library), `generate-template.mjs` (component kit), and `generate-screens.mjs` (screen wireframes).
+This playbook covers the wireframe generation system.
+
+- **Architecture & file map:** [`docs/wireframes/README.md`](../wireframes/README.md)
+- **Agents — spacing, blocks, MUST/MUST NOT:** [README § Agent contract](../wireframes/README.md#agent-contract)
+
+---
+
+## Agent checklist
+
+When you touch `docs/wireframes/**` or use-case `*.excalidraw`:
+
+- [ ] Read [Agent contract](../wireframes/README.md#agent-contract) — auth fields use `authFormField` / `blocks.mjs`, not manual `y + 18`.
+- [ ] Label/help/input spacing changed only in `fieldLabelBlock` (`components.mjs`); field stack gap only in `AUTH_FIELD_STACK_GAP` (`blocks.mjs`).
+- [ ] No new hardcoded px for auth layout (`6`, `8`, `12`, `440`, …).
+- [ ] SSO via `placeAuthExternalSignIn()` — not `component()` on headerless blocks.
+- [ ] Auth brand: `buildAxisLogo` / `buildAuthCardHeader` (mark + "Axis" wordmark); pass `files` to `write()`.
+- [ ] `node docs/wireframes/generate-screens.mjs` twice → empty `git diff` on second run.
+- [ ] Regenerated `.svg` for changed screens; [visual-artifact-checklist](./visual-artifact-checklist.md) satisfied.
+- [ ] Use-case `README.md` wireframes table / screen flow updated if screens added or renamed.
+
+**Reference screen:** [register-org](../use-cases/platform-foundation/register-org/README.md) (full block kit usage).
+
+---
+
+| Layer | File |
+|-------|------|
+| Primitives | `components.mjs` |
+| **Reusable blocks** | **`blocks.mjs`** ← auth / register-org; compose here first |
+| Kit sections | `generate-template.mjs` (S01–S37 builders, import-only) |
+| Screen outputs | `generate-screens.mjs` → `docs/use-cases/.../*.excalidraw` |
+| Shared shell | `docs/wireframes/app-shell.excalidraw` (+ `.svg`) |
 
 > **Required with every wireframe/diagram edit:** run
 > [`visual-artifact-checklist.md`](./visual-artifact-checklist.md)
@@ -15,22 +44,26 @@ This playbook covers everything needed to work with the wireframe generation sys
 
 | File | Purpose |
 |---|---|
-| `docs/wireframes/components.mjs` | **Single source of truth** — primitives, colors, layout constants, helpers |
-| `docs/wireframes/generate-template.mjs` | 34-section component kit — imports from `components.mjs`, exports all builders |
-| `docs/wireframes/generate-screens.mjs` | 27 screen wireframes — imports builders from the template, places them via `component()` |
-| `docs/wireframes/_template.excalidraw` | Generated output of `generate-template.mjs` |
+| `docs/wireframes/components.mjs` | Primitives, colors, `component()` / `componentContent()` |
+| `docs/wireframes/blocks.mjs` | **Reusable blocks** (auth, SSO, fields) — screens import this first |
+| `docs/wireframes/generate-template.mjs` | Kit section builders S01–S37 (tables, canvas, modals, …) |
+| `docs/wireframes/generate-screens.mjs` | Screen layout — `blocks.mjs` + `component(buildXxx)` |
+| `docs/wireframes/README.md` | Kit layers, workflow, block inventory |
+| `docs/wireframes/app-shell.excalidraw` | Shared app chrome (generated; commit with screens when shell changes) |
 | `docs/use-cases/{domain}/{use-case}/*.excalidraw` | Generated outputs of `generate-screens.mjs` — co-located with each use case |
 
 **Regeneration commands:**
 
 ```powershell
-# Regenerate the component kit
-node docs/wireframes/generate-template.mjs
-docs/scripts/generate-wireframes.ps1 -Filter _template
-
-# Regenerate all screen wireframes
+# Regenerate screen wireframes (run twice; git diff must be empty on second run)
+node docs/wireframes/generate-screens.mjs
 node docs/wireframes/generate-screens.mjs
 docs/scripts/generate-wireframes.ps1
+
+# One use-case folder only (optional)
+$env:SCREEN_FILTER = "register-org"
+node docs/wireframes/generate-screens.mjs
+docs/scripts/generate-wireframes.ps1 -Filter register-org
 ```
 
 ---
@@ -67,7 +100,8 @@ Shared spacing constants in `generate-screens.mjs`: `AUTH_CARD_PAD`, `AUTH_SHELL
 | `C` | object | Industrial Calm color palette |
 | `SB`, `HDR`, `CX`, `CY` | constants | Layout: sidebar 230px, header 60px |
 | `translate(els, dx, dy)` | function | Shift all elements by (dx, dy) |
-| `component(builderFn, x, y, contentDy?)` | function | Place a template section at screen coordinates |
+| `component(builderFn, x, y, contentDy?)` | function | Place a full template section (strips 2-line section header) |
+| `componentContent(builderFn, x, y, contentDy?)` | function | Place a headerless block (e.g. `buildAuthExternalSignInBlock`) — do not use `component()` |
 | `appShell(prefix, W, H, navItems, activeIdx, pageTitle)` | function | Parameterized app shell (matches S18 exactly) |
 | `writeExcalidraw(filePath, elements)` | function | Write `.excalidraw` JSON to disk |
 | `btn`, `inputField`, `selectField`, `badge`, `searchBar`, `pageHeader` | functions | Convenience UI builders with canonical dimensions |
@@ -76,34 +110,24 @@ Shared spacing constants in `generate-screens.mjs`: `AUTH_CARD_PAD`, `AUTH_SHELL
 
 ### Import pattern
 
-**`generate-template.mjs`:**
-```js
-import { fileURLToPath } from 'url';
-import {
-  nextSeed, BASE,
-  rect, ellipse, text, hline, vline, arrow, sectionHeader,
-  C,
-  writeExcalidraw,
-} from './components.mjs';
-```
-
 **`generate-screens.mjs`:**
 ```js
 import {
   C, SB, HDR, CX, CY,
-  rect, ellipse, text, hline, vline, arrow,
-  btn, inputField, selectField, badge, searchBar, pageHeader,
-  appShell, component, translate, writeExcalidraw,
+  rect, text, appShell, component, writeExcalidraw,
 } from './components.mjs';
 
 import {
+  placeAuthExternalSignIn,
+  buildAuthCardHeader,
+  authFormField,
+  authCard,
+} from './blocks.mjs';
+
+import {
   buildWorkflowCanvas,
-  buildBuilderLayout,
-  buildExecutionTimeline,
-  buildModal,
-  buildSideSheet,
   buildTable,
-  // ...add more as needed
+  // ...kit sections as needed
 } from './generate-template.mjs';
 ```
 
@@ -136,7 +160,7 @@ const sideEls = component(buildSideSheet, cx + 520, cy);
 ```
 
 **Hard rules:**
-- Always use `component()` when a template builder matches the needed visual — never recreate it from scratch
+- Use `component()` for full kit sections (with section header); use `componentContent()` for shared blocks like external sign-in — never recreate either from scratch
 - If a builder uses `contentDy = 68` (sub-label sections like S04, S16, S19, S22, S23, S25, S26, S27), pass `contentDy = 68` explicitly
 - ID collisions: each builder type must appear at most once per screen file (IDs are fixed in builders); if you need two copies, create a variant builder with a distinct prefix
 
@@ -191,6 +215,14 @@ All canonical dimensions from the template (S03, S04, S09) — never invent size
 | `'danger'` | `C.dangerDark` | `C.danger` | `C.white` | 2 |
 
 Width auto-sized: `label.length × 8 + 32`. Height: **36px**. Text at `y+10`, 13px, centered.
+
+### `fieldLabel(prefix, x, y, label, { required?, color? })`
+
+Form label row (11px, default `C.gray500`). When `required: true`, appends a red `*` in `C.danger` after the label with a fixed `REQUIRED_MARKER_GAP` (10px) from `components.mjs` — same offset on every field. **Change the gap in `components.mjs` only**, then regen affected screens.
+
+### `fieldLabelBlock(prefix, x, y, innerW, label, { required?, helpText?, color? })`
+
+Label row (and `*` when required), then optional **help row**: small `?` (12px circle, `C.primaryDark` on `C.infoBg`) **immediately before** the help copy (10px, `C.gray700`). Returns `{ els, labelBlockH, inputY }`. Prefer `authFormField(…, helpText)` on auth screens.
 
 ### `inputField(prefix, x, y, w, placeholder?)`
 
@@ -300,7 +332,7 @@ authCard(prefix, { title, subtitle?, items, extraLink? }, submitLabel, footerTex
 | `prefix` | string | ID prefix — must be unique per screen |
 | `title` | string | Heading inside the card |
 | `subtitle` | string \| null | Secondary line below the title (optional) |
-| `items` | `{ label, placeholder }[]` | Form fields — each is 72px tall |
+| `items` | `{ label, placeholder, required? }[]` | Form fields — each is 72px tall; set `required: true` for a red `*` (`C.danger`) after the label |
 | `extraLink` | string \| null | Right-aligned link above the submit button (e.g. `'Forgot password?'`) |
 | `submitLabel` | string | Text on the full-width primary button |
 | `footerText` | string | Centered link in the card footer |
@@ -317,6 +349,17 @@ cardY   = Math.round((H - cardH) / 2)
 ```
 
 **Logo rule**: always `text(id, cardX, cardY+16, cardW, 28, '⬡  Axis', 18, C.primary, 'center')` — bounding box must span full `cardW` so `'center'` alignment works correctly. Never use a narrower bounding box.
+
+**External sign-in:** import from `blocks.mjs` only:
+
+```js
+import { placeAuthExternalSignIn, AUTH_CARD_PAD_X, AUTH_EXTERNAL_SIGN_IN_BLOCK_H } from './blocks.mjs';
+
+contentEls.push(...placeAuthExternalSignIn(cardX + AUTH_CARD_PAD_X, y));
+y += AUTH_EXTERNAL_SIGN_IN_BLOCK_H;
+```
+
+`placeAuthExternalSignIn` wraps `componentContent` + `buildAuthExternalSignInBlock` — do not call `component()` on that block.
 
 ---
 
@@ -356,6 +399,7 @@ When writing or editing any wireframe generator, verify against these values (fr
 1. Add a `genXxx()` function in `generate-screens.mjs`:
    - **Authenticated screen**: start with `appShell(prefix, W, H, NAV, activeIdx, pageTitle)`
    - **Auth screen** (login, register, etc.): use `authCard()` — never build the card by hand
+   - **Auth screen with SSO / many fields / help text**: compose from `blocks.mjs` (`authFormField`, `paintRegisterOrg*`, …) — see [Agent contract](../wireframes/README.md#agent-contract)
    - Use `component(buildXxx, cx, cy)` for any element that matches a template section
    - Use `btn`, `inputField`, `badge`, etc. from `components.mjs` for individual controls
    - Use raw `rect`, `text`, etc. only for layout with no template equivalent
@@ -364,18 +408,19 @@ When writing or editing any wireframe generator, verify against these values (fr
 3. Add the output path to the screen inventory table in this playbook
 4. Run `node docs/wireframes/generate-screens.mjs` — **verify output has no `NaN` positions** (element count must be > 0)
 5. Run `docs/scripts/generate-wireframes.ps1` to regenerate SVGs
-6. Add a row to the `## Wireframes` table in the relevant use-case file (per [USE_CASE_TEMPLATE.md](../use-cases/USE_CASE_TEMPLATE.md))
+6. Update the use-case `README.md`: add a `## Wireframes` row (and `## Screen flow` when >3 screens) per [docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--wireframes--implementation-status) — see [register-org](../use-cases/platform-foundation/register-org/README.md) for the full layout
 
 **Pre-commit checks for screen wireframes:**
+- [ ] [Agent checklist](#agent-checklist) (spacing contract, blocks, regen twice)
 - [ ] Element count > 0 for every generated file (NaN positions = 0 renderable elements)
 - [ ] All table `tblY` values use the formula (`cy+56` or `cy+82`) — not ad-hoc numbers
-- [ ] All inline label y-positions use `labelY = controlY + (controlH - 16) / 2`
+- [ ] App-shell inline labels: `labelY = controlY + (controlH - 16) / 2` — auth card fields use `authFormField`, not this formula
 - [ ] No custom duplicates of template builders — use `component()` instead
 - [ ] Widest element: `cx + maxElementWidth ≤ W` (no overflow past right edge)
 
 ---
 
-## Adding a section to the template (`generate-template.mjs`)
+## Adding a kit section (`generate-template.mjs`)
 
 ```js
 export function buildXxx(y0) {
@@ -395,23 +440,10 @@ export function buildXxx(y0) {
 - Element ID prefix: unique 3–6 char snake_case per section. Never reuse a prefix — Excalidraw silently deduplicates IDs.
 - Section number `N` in `sectionHeader(N, ...)` must match visual order. Renumber all subsequent sections when inserting in the middle.
 - Add `export` keyword — all builders must be exported so `generate-screens.mjs` can import them.
-- Add the builder to the compose array inside the `isMain` guard at the bottom, in grouped order with `// S{NN}` comments.
-- Update the TOC comment at the top of the file and the section count.
+- Update the TOC comment at the top of `generate-template.mjs` and the section count.
 - Update the "Current section inventory" table in this playbook.
 
----
-
-## `generate-template.mjs` isMain guard
-
-The compose + write block is wrapped so the file can be imported as a module without side effects:
-
-```js
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  // compose all sections and write _template.excalidraw
-}
-```
-
-This is what makes `import { buildWorkflowCanvas } from './generate-template.mjs'` safe in `generate-screens.mjs`.
+`generate-template.mjs` is **import-only** (no CLI, no `.excalidraw` output). Screens pull builders via `component(buildXxx, cx, cy)`.
 
 ---
 
@@ -419,7 +451,7 @@ This is what makes `import { buildWorkflowCanvas } from './generate-template.mjs
 
 | Domain path | Files |
 |---|---|
-| `docs/wireframes/` | `app-shell`, `_template` |
+| `docs/wireframes/` | `app-shell` only (shared kit artifact) |
 | `docs/use-cases/<domain>/<use-case>/` | use-case-local assets (`*.excalidraw`, `*.svg`) |
 
 ---
@@ -432,6 +464,7 @@ This is what makes `import { buildWorkflowCanvas } from './generate-template.mjs
 |---|---|
 | Foundations | S01–S03 |
 | Input & Forms | S04–S08 |
+| Auth blocks | `blocks.mjs` (not numbered kit sections) |
 | Data Display | S09–S14 |
 | Navigation & Layout | S15–S18 |
 | Feedback & Overlays | S19–S24 |

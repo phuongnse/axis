@@ -2,20 +2,20 @@
  * Axis Screen Wireframes — generate-screens.mjs
  * Run: node docs/wireframes/generate-screens.mjs
  *
- * All visual components are sourced from generate-template.mjs builders.
- * Use component(buildXxx, x, y) to place template sections into screens.
+ * Reusable UI blocks: blocks.mjs (auth, fields, SSO). Large kit sections: generate-template.mjs via component().
+ * Primitives only in components.mjs. Do not duplicate block geometry in this file.
  *
  * Screen width W=1200 ensures 900px template components fit at cx=250
  * (250 + 900 = 1150 < 1200). Never reduce W below 1200.
  *
  * Screens generated:
  *   app-shell (root)
- *   platform-foundation: register-org, email-confirmation, verify-email,
- *        verify-email-rate-limit, workspace-provisioning, pricing, settings-org,
- *        settings-org-upload-states, settings-org-profile-states, settings-org-usage-error,
- *        settings-org-free-plan, settings-org-access-denied,
- *        settings-org-deletion-scheduled, settings-org-delete-modal, settings-org-delete-states,
- *        register-org-states
+ *   platform-foundation: register-org, register-org-complete, register-org-complete-states,
+ *        register-org-states, register-org-provider-states,
+ *        email-confirmation, verify-email, verify-email-rate-limit, workspace-provisioning,
+ *        pricing, settings-org, settings-org-upload-states, settings-org-profile-states,
+ *        settings-org-usage-error, settings-org-free-plan, settings-org-access-denied,
+ *        settings-org-deletion-scheduled, settings-org-delete-modal, settings-org-delete-states
  *   identity-access: login, register, forgot-password, change-password,
  *        settings-users, settings-roles, settings-security, accept-invitation
  *   data-modeling: data-models, data-classes, records
@@ -32,7 +32,7 @@ import { dirname, join } from 'path';
 import {
   C, SB, HDR, CX, CY,
   rect, ellipse, text, hline, vline, arrow,
-  btn, inputField, selectField, badge, searchBar, pageHeader,
+  btn, inputField, selectField, badge, searchBar, pageHeader, fieldLabel,
   appShell, component, translate, writeExcalidraw, setSeed,
   stateHeadline, semanticVariantColor,
 } from './components.mjs';
@@ -46,6 +46,33 @@ import {
   buildTable,
   buildPermissionMatrix,
 } from './generate-template.mjs';
+
+import {
+  AUTH_CARD_W,
+  AUTH_CARD_PAD_X,
+  AUTH_EXTERNAL_SIGN_IN_BLOCK_H,
+  AUTH_HEADER_H,
+  AUTH_HEADER_H_SUBTITLE,
+  AUTH_CARD_FOOTER_ZONE,
+  AUTH_FIELD_STACK_GAP,
+  AUTH_SUBMIT_AFTER_GAP,
+  measureAuthCardHeight,
+  authScreenCanvasHeight,
+  buildAxisLogo,
+  placeAuthExternalSignIn,
+  buildAuthCardBrandBar,
+  buildAuthCardHeader,
+  buildAuthCardFooter,
+  buildAuthSubmitButton,
+  authFormField,
+  authTermsRow,
+  authCard,
+  mergeExcalidrawFiles,
+  REGISTER_ORG_ENTRY_FIELDS,
+  PASSWORD_CRITERIA_PARTIAL,
+  paintRegisterOrgEntryFields,
+  paintRegisterOrgCompleteFields,
+} from './blocks.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dir = dirname(__filename);
@@ -79,103 +106,116 @@ function deterministicSeedForScreen(screenKey) {
 }
 
 function runScreen(screenKey, generator) {
+  const filter = process.env.SCREEN_FILTER ?? '';
+  if (filter && !screenKey.includes(filter)) {
+    return;
+  }
   setSeed(deterministicSeedForScreen(screenKey));
   generator();
 }
 
 // ─── Write helper ─────────────────────────────────────────────────────────────
+// Outputs land flat in docs/use-cases/{domain}/{use-case}/ (see patterns.md).
 
-function write(relativePath, elements) {
+const SCREEN_USE_CASE_OVERRIDES = {
+  'platform-foundation/register-org.excalidraw':
+    'platform-foundation/register-org/register-org.excalidraw',
+  'platform-foundation/register-org-states.excalidraw':
+    'platform-foundation/register-org/register-org-states.excalidraw',
+  'platform-foundation/register-org-complete.excalidraw':
+    'platform-foundation/register-org/register-org-complete.excalidraw',
+  'platform-foundation/register-org-complete-states.excalidraw':
+    'platform-foundation/register-org/register-org-complete-states.excalidraw',
+  'platform-foundation/register-org-provider-states.excalidraw':
+    'platform-foundation/register-org/register-org-provider-states.excalidraw',
+  'platform-foundation/email-confirmation.excalidraw':
+    'platform-foundation/register-org/email-confirmation.excalidraw',
+  'platform-foundation/workspace-provisioning.excalidraw':
+    'platform-foundation/provision-tenant/workspace-provisioning.excalidraw',
+  'platform-foundation/pricing.excalidraw':
+    'platform-foundation/view-plans/pricing.excalidraw',
+  'platform-foundation/settings-org.excalidraw':
+    'platform-foundation/org-settings/settings-org.excalidraw',
+  'platform-foundation/settings-org-upload-states.excalidraw':
+    'platform-foundation/org-profile/settings-org-upload-states.excalidraw',
+  'platform-foundation/settings-org-profile-states.excalidraw':
+    'platform-foundation/org-profile/settings-org-profile-states.excalidraw',
+  'platform-foundation/settings-org-usage-error.excalidraw':
+    'platform-foundation/org-settings/settings-org-usage-error.excalidraw',
+  'platform-foundation/settings-org-free-plan.excalidraw':
+    'platform-foundation/org-settings/settings-org-free-plan.excalidraw',
+  'platform-foundation/settings-org-access-denied.excalidraw':
+    'platform-foundation/org-settings/settings-org-access-denied.excalidraw',
+  'platform-foundation/settings-org-deletion-scheduled.excalidraw':
+    'platform-foundation/delete-org/settings-org-deletion-scheduled.excalidraw',
+  'platform-foundation/settings-org-delete-modal.excalidraw':
+    'platform-foundation/delete-org/settings-org-delete-modal.excalidraw',
+  'platform-foundation/settings-org-delete-states.excalidraw':
+    'platform-foundation/delete-org/settings-org-delete-states.excalidraw',
+  'identity-access/login.excalidraw': 'identity-access/sign-in/login.excalidraw',
+  'identity-access/login-unverified.excalidraw':
+    'identity-access/sign-in/login-unverified.excalidraw',
+  'identity-access/register.excalidraw': 'identity-access/sign-in/register.excalidraw',
+  'identity-access/forgot-password.excalidraw':
+    'identity-access/reset-password/forgot-password.excalidraw',
+  'identity-access/change-password.excalidraw':
+    'identity-access/change-password/change-password.excalidraw',
+  'identity-access/accept-invitation.excalidraw':
+    'identity-access/accept-invite/accept-invitation.excalidraw',
+  'identity-access/settings-users.excalidraw':
+    'identity-access/invite-user/settings-users.excalidraw',
+  'identity-access/settings-roles.excalidraw':
+    'identity-access/list-roles/settings-roles.excalidraw',
+  'identity-access/settings-security.excalidraw':
+    'identity-access/sessions/settings-security.excalidraw',
+  'data-modeling/data-models.excalidraw': 'data-modeling/create-model/data-models.excalidraw',
+  'data-modeling/data-classes.excalidraw':
+    'data-modeling/create-model/data-classes.excalidraw',
+  'data-modeling/records.excalidraw': 'data-modeling/create-model/records.excalidraw',
+  'workflow-builder/workflows.excalidraw':
+    'workflow-builder/list-workflows/workflows.excalidraw',
+  'workflow-builder/workflow-editor.excalidraw':
+    'workflow-builder/create-workflow/workflow-editor.excalidraw',
+  'form-builder/forms.excalidraw': 'form-builder/list-forms/forms.excalidraw',
+  'form-builder/form-editor.excalidraw': 'form-builder/create-form/form-editor.excalidraw',
+  'form-builder/form-submission.excalidraw':
+    'form-builder/create-form/form-submission.excalidraw',
+  'workflow-engine/executions.excalidraw':
+    'workflow-engine/org-execution-history/executions.excalidraw',
+  'workflow-engine/execution-detail.excalidraw':
+    'workflow-engine/isolated-steps/execution-detail.excalidraw',
+};
+
+function resolveUseCaseWireframePath(relativePath) {
+  if (SCREEN_USE_CASE_OVERRIDES[relativePath]) {
+    return SCREEN_USE_CASE_OVERRIDES[relativePath];
+  }
+  const parts = relativePath.split('/');
+  if (parts.length >= 3) {
+    return relativePath;
+  }
+  if (parts.length === 2) {
+    const [domain, file] = parts;
+    const slug = file.replace(/\.excalidraw$/, '');
+    return `${domain}/${slug}/${file}`;
+  }
+  return relativePath;
+}
+
+function write(relativePath, elements, files = {}) {
+  const resolved = resolveUseCaseWireframePath(relativePath);
+  const parts = resolved.split('/');
   let full;
-  if (relativePath.includes('/')) {
-    // Use-case wireframe → docs/use-cases/{domain}/{use-case}/{screen}
-    const [domainFolder, ...rest] = relativePath.split('/');
-    full = join(__dir, '..', 'use-cases', domainFolder, 'wireframes', ...rest);
+  if (parts.length === 1) {
+    full = join(__dir, resolved);
   } else {
-    // Shared wireframe → docs/wireframes/{path}
-    full = join(__dir, relativePath);
+    full = join(__dir, '..', 'use-cases', ...parts);
   }
   mkdirSync(dirname(full), { recursive: true });
-  writeExcalidraw(full, elements);
-  console.log(`✓  ${relativePath}  (${elements.length} elements)`);
-}
-
-// ─── Auth card helper — shared by all standalone auth screens ─────────────────
-// Centered card: logo → divider → title → [subtitle] → fields → [extraLink] → submit → footer.
-//
-// headerH breakdown (no subtitle): logo-gap(16) + logo(28) + gap(16) + divider(0) + gap(16) + title(24) + gap(12) = 112
-// headerH breakdown (with subtitle): +subtitle(18) + gap(6) = 136
-// Each field: label(16) + gap(2) + input(40) + gap(14) = 72px
-// extraLink: 'Forgot password?' shown right-aligned between fields and submit btn (adds 22px)
-// Footer zone: gap(12) + divider(0) + gap(10) + footer-text(16) + gap(6) = 32px from card bottom
-
-function authCard(prefix, { title, subtitle = null, items = [], extraLink = null }, submitLabel, footerText) {
-  const cardW   = 440;
-  const headerH = subtitle ? 136 : 112;  // vertical space from card top to first field
-  const fieldH  = items.length * 72;     // 72px per field: label(16) + gap(2) + input(40) + gap(14)
-  const cardH   = headerH + fieldH + (extraLink ? 22 : 4) + 36 + 12 + 32;
-  const cardX   = Math.round((W - cardW) / 2);
-  const cardY   = Math.round((H - cardH) / 2);
-  const els     = [];
-
-  // Page background
-  els.push(rect(`${prefix}_bg`,   0,     0,     W,     H,     C.gray300, C.gray100, 1, false));
-  // Card surface
-  els.push(rect(`${prefix}_card`, cardX, cardY, cardW, cardH, C.gray300, C.white,   2, true));
-
-  // Logo — full-width bounding box so 'center' alignment is correct
-  els.push(text(`${prefix}_logo`, cardX, cardY + 16, cardW, 28, '⬡  Axis', 18, C.primary, 'center'));
-  els.push(hline(`${prefix}_hdiv`, cardX, cardY + 60, cardW, C.gray300));
-
-  // Title (always present)
-  els.push(text(`${prefix}_title`, cardX + 24, cardY + 76, cardW - 48, 24, title, 17, C.gray900));
-
-  // Optional subtitle
-  if (subtitle) {
-    els.push(text(`${prefix}_sub`, cardX + 24, cardY + 104, cardW - 48, 18, subtitle, 13, C.gray700));
-  }
-
-  // Fields — start at headerH from card top
-  const fieldStartY = cardY + headerH;
-  items.forEach(({ label, placeholder }, i) => {
-    const y = fieldStartY + i * 72;
-    els.push(text(`${prefix}_fl_${i}`, cardX + 24, y,      cardW - 48, 16, label,       11, C.gray500));
-    els.push(...inputField(`${prefix}_fi_${i}`, cardX + 24, y + 18, cardW - 48, placeholder));
-  });
-
-  // Optional secondary link (e.g. 'Forgot password?') — right-aligned, 6px below last field
-  const afterFieldsY = fieldStartY + fieldH;
-  if (extraLink) {
-    els.push(text(`${prefix}_xl`, cardX + 24, afterFieldsY + 6, cardW - 48, 16, extraLink, 12, C.primary, 'right'));
-  }
-
-  // Submit button — full card width minus 24px padding each side
-  const btnY = afterFieldsY + (extraLink ? 22 : 4);
-  const btnW = cardW - 48;
-  els.push(rect(`${prefix}_sbtn`,   cardX + 24, btnY,      btnW, 36, C.accentDark, C.accent, 2, true));
-  els.push(text(`${prefix}_sbtn_t`, cardX + 24, btnY + 10, btnW, 16, submitLabel,  13, C.white, 'center'));
-
-  // Footer divider + link
-  els.push(hline(`${prefix}_fdiv`,  cardX,      cardY + cardH - 32,      cardW,     C.gray300));
-  els.push(text(`${prefix}_footer`, cardX + 24, cardY + cardH - 22, cardW - 48, 16, footerText, 12, C.primary, 'center'));
-
-  return els;
-}
-
-/** Auth form field with optional inline error (tenant-registration / organization profile). */
-function authFormField(prefix, cardX, y, cardW, label, value, errorMsg = null) {
-  const x = cardX + 24;
-  const innerW = cardW - 48;
-  const blockH = errorMsg ? 86 : 72;
-  const els = [
-    text(`${prefix}_fl`, x, y, innerW, 16, label, 11, C.gray500),
-    rect(`${prefix}_inp`, x, y + 18, innerW, 40, errorMsg ? C.dangerBorder : C.gray300, C.white, 1, true),
-    text(`${prefix}_val`, x + 12, y + 29, innerW - 24, 18, value, 13, C.gray900),
-  ];
-  if (errorMsg) {
-    els.push(text(`${prefix}_err`, x, y + 62, innerW, 14, errorMsg, 11, C.danger));
-  }
-  return { els, blockH };
+  writeExcalidraw(full, elements, files);
+  const fileCount = Object.keys(files).length;
+  const filesNote = fileCount > 0 ? `, ${fileCount} embedded file(s)` : '';
+  console.log(`✓  ${resolved}  (${elements.length} elements${filesNote})`);
 }
 
 // ─── App shell (shared layout reference) ─────────────────────────────────────
@@ -217,99 +257,284 @@ function genAppShell() {
 // ─── platform-foundation Platform Foundation ─────────────────────────────────────────────────
 
 /**
- * Register-Org — tenant-registration, plan selection
- * Standard auth card: 5 fields, plan selection shown in subtitle.
- * cardH = 136 (subtitle) + 5×72 (fields) + 4 + 36 + 12 + 32 = 580 → centered vertically.
+ * Register-Org — self-service org registration (email/password + ADR-027 providers).
+ * SSO buttons, email form, auto-generated slug, Terms/Privacy acceptance.
  */
 function genRegisterOrg() {
-  const els = authCard('ro', {
-    title:    'Create your organization',
-    subtitle: 'Plan: Free trial  ·  Change plan →',
-    items: [
-      { label: 'Organization name', placeholder: 'Acme Corp' },
-      { label: 'Admin full name',   placeholder: 'Alex Brown' },
-      { label: 'Email address',     placeholder: 'you@company.com' },
-      { label: 'Password',          placeholder: '••••••••' },
-      { label: 'Confirm password',  placeholder: '••••••••' },
-    ],
-  }, 'Create organization', 'Already have an account? Sign in');
-  write('platform-foundation/register-org.excalidraw', els);
+  const cardW = AUTH_CARD_W;
+  const cardX = Math.round((W - cardW) / 2);
+  const cardY = 16;
+  const headerH = AUTH_HEADER_H;
+  const els = [];
+  let wireFiles = {};
+
+  let y = cardY + headerH;
+  const contentEls = [];
+
+  const header = buildAuthCardHeader('ro', cardX, cardY, cardW, 'Create your organization');
+  contentEls.push(...header.els);
+  wireFiles = mergeExcalidrawFiles(wireFiles, header.files);
+  contentEls.push(...placeAuthExternalSignIn(cardX + AUTH_CARD_PAD_X, y));
+  y += AUTH_EXTERNAL_SIGN_IN_BLOCK_H + AUTH_FIELD_STACK_GAP;
+
+  y = paintRegisterOrgEntryFields(contentEls, 'ro', cardX, y, cardW, REGISTER_ORG_ENTRY_FIELDS);
+
+  const { els: termsEls, blockH: termsH } = authTermsRow('ro_terms', cardX, y, cardW, { checked: true });
+  contentEls.push(...termsEls);
+  y += termsH + AUTH_FIELD_STACK_GAP;
+
+  contentEls.push(...buildAuthSubmitButton('ro', cardX, y, cardW, 'Create organization'));
+  y += 36 + AUTH_SUBMIT_AFTER_GAP;
+
+  const cardH = measureAuthCardHeight(cardY, y, contentEls);
+  const screenH = authScreenCanvasHeight(cardY, cardH, H);
+
+  els.push(rect('ro_bg', 0, 0, W, screenH, C.gray300, C.gray100, 1, false));
+  els.push(rect('ro_card', cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
+  els.push(...contentEls);
+  els.push(...buildAuthCardFooter('ro', cardX, cardY, cardW, cardH, {
+    lead: 'Already have an account? ',
+    link: 'Sign in',
+  }));
+
+  write('platform-foundation/register-org.excalidraw', els, wireFiles);
 }
 
 /**
- * Register-Org states — tenant-registration validation + 5xx (two panels, spec reference).
+ * Register-Org complete — post-OAuth step (ADR-027). Org name + Terms collected here;
+ * email read-only from provider; admin name pre-filled and editable.
+ */
+function genRegisterOrgComplete() {
+  const cardW = AUTH_CARD_W;
+  const cardX = Math.round((W - cardW) / 2);
+  const cardY = 40;
+  const headerH = AUTH_HEADER_H_SUBTITLE;
+  const els = [];
+
+  const contentEls = [];
+  let wireFiles = {};
+  const rocHeader = buildAuthCardHeader(
+    'roc', cardX, cardY, cardW, 'Finish setting up your organization', 'Signed in with Microsoft');
+  contentEls.push(...rocHeader.els);
+  wireFiles = mergeExcalidrawFiles(wireFiles, rocHeader.files);
+
+  let y = cardY + headerH;
+  y = paintRegisterOrgCompleteFields(contentEls, 'roc', cardX, y, cardW);
+  y += AUTH_FIELD_STACK_GAP;
+
+  contentEls.push(...buildAuthSubmitButton('roc', cardX, y, cardW, 'Create organization'));
+  y += 36 + AUTH_SUBMIT_AFTER_GAP;
+
+  const cardH = measureAuthCardHeight(cardY, y, contentEls);
+  const screenH = authScreenCanvasHeight(cardY, cardH, H);
+
+  els.push(rect('roc_bg', 0, 0, W, screenH, C.gray300, C.gray100, 1, false));
+  els.push(rect('roc_card', cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
+  els.push(...contentEls);
+  els.push(...buildAuthCardFooter('roc', cardX, cardY, cardW, cardH, '← Back to registration'));
+
+  write('platform-foundation/register-org-complete.excalidraw', els, wireFiles);
+}
+
+/**
+ * Register-Org complete — validation states (org name, terms) after external sign-in.
+ */
+function genRegisterOrgCompleteStates() {
+  const els = [];
+  let wireFiles = {};
+  const panelW = 520;
+  const panelH = 520;
+  const gap = 40;
+  const startX = Math.round((W - (panelW * 2 + gap)) / 2);
+  const y0 = 48;
+
+  els.push(rect('rocs_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
+  els.push(text('rocs_pg', 0, 16, W, 20,
+    'Post-OAuth completion — validation', 13, C.gray500, 'center'));
+
+  const drawPanel = ({ id, x, lbl, orgErr, terms }) => {
+    const cardY = y0 + 28;
+    const prefix = `rocs_${id}`;
+    els.push(text(`${prefix}_lbl`, x, y0, panelW, 16, lbl, 12, C.danger));
+    els.push(rect(`${prefix}_card`, x, cardY, panelW, panelH, C.gray300, C.white, 2, true));
+    const panelHeader = buildAuthCardHeader(
+      prefix, x, cardY, panelW, 'Finish setting up your organization', 'Signed in with Google');
+    els.push(...panelHeader.els);
+    wireFiles = mergeExcalidrawFiles(wireFiles, panelHeader.files);
+
+    const btnY = cardY + panelH - 68;
+    paintRegisterOrgCompleteFields(els, prefix, x, cardY + AUTH_HEADER_H_SUBTITLE, panelW, {
+      orgName: orgErr ? 'A' : 'Acme Corp',
+      orgErr,
+      terms,
+    });
+    els.push(...buildAuthSubmitButton(prefix, x, btnY, panelW, 'Create organization'));
+  };
+
+  drawPanel({
+    id: 'val',
+    x: startX,
+    lbl: 'Organization name validation',
+    orgErr: 'Must be between 2 and 100 characters.',
+    terms: { checked: true },
+  });
+  drawPanel({
+    id: 'terms',
+    x: startX + panelW + gap,
+    lbl: 'Terms not accepted',
+    orgErr: null,
+    terms: { checked: false, errorMsg: 'You must accept the Terms of Service and Privacy Policy.' },
+  });
+
+  write('platform-foundation/register-org-complete-states.excalidraw', els, wireFiles);
+}
+
+/** Draw one register-org error-state panel (shared by states screens). Returns embedded logo files. */
+function registerOrgStatePanel(els, { id, x, y0, panelW, panelH, lbl, lblColor, serverBanner, fields, terms }) {
+  const cardY = y0 + 28;
+  const prefix = `ros_${id}`;
+  els.push(text(`${prefix}_lbl`, x, y0, panelW, 16, lbl, 12, lblColor));
+  els.push(rect(`${prefix}_card`, x, cardY, panelW, panelH, C.gray300, C.white, 2, true));
+  const panelHeader = buildAuthCardHeader(prefix, x, cardY, panelW, 'Create your organization');
+  els.push(...panelHeader.els);
+
+  let fy = cardY + AUTH_HEADER_H;
+  if (serverBanner) {
+    els.push(rect(`${prefix}_ban`, x + AUTH_CARD_PAD_X, fy, panelW - AUTH_CARD_PAD_X * 2, 40, C.dangerBorder, C.dangerBg, 1, true));
+    els.push(text(`${prefix}_ban_t`, x + AUTH_CARD_PAD_X + 12, fy + 12, panelW - AUTH_CARD_PAD_X * 2 - 24, 16, serverBanner, 12, C.danger));
+    fy += 52;
+  }
+
+  fy = paintRegisterOrgEntryFields(els, prefix, x, fy, panelW, fields);
+
+  if (terms) {
+    const { els: te, blockH: termsBlockH } = authTermsRow(`${prefix}_terms`, x, fy, panelW, terms);
+    els.push(...te);
+    fy += termsBlockH + AUTH_FIELD_STACK_GAP;
+  }
+
+  const btnY = cardY + panelH - 68;
+  els.push(...buildAuthSubmitButton(prefix, x, btnY, panelW, 'Create organization'));
+  return panelHeader.files;
+}
+
+const REGISTER_ORG_STATE_FIELDS = REGISTER_ORG_ENTRY_FIELDS.map((f) => ({
+  ...f,
+  value: f.kind === 'input' && f.label === 'Organization name'
+    ? "O'Brien & Co."
+    : f.kind === 'input' && f.label === 'Email address'
+      ? 'alex@company.com'
+      : f.value,
+}));
+
+/**
+ * Register-Org states — inline validation, terms required, server error (5xx).
  */
 function genRegisterOrgStates() {
   const els = [];
-  const panelW = 540;
-  const panelH = 620;
-  const gap = 60;
+  let wireFiles = {};
+  const panelW = 520;
+  const panelH = 640;
+  const gap = 40;
   const startX = Math.round((W - (panelW * 2 + gap)) / 2);
-  const y0 = 56;
+  const y0 = 40;
 
   els.push(rect('ros_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
-  els.push(text('ros_pg', 0, 24, W, 20, 'Registration form — error states', 13, C.gray500, 'center'));
+  els.push(text('ros_pg', 0, 16, W, 20, 'Registration form — validation & server errors', 13, C.gray500, 'center'));
+
+  wireFiles = mergeExcalidrawFiles(wireFiles, registerOrgStatePanel(els, {
+    id: 'val',
+    x: startX,
+    y0,
+    panelW,
+    panelH,
+    lbl: 'Inline validation (field-level)',
+    lblColor: C.danger,
+    serverBanner: null,
+    fields: [
+      { kind: 'input', label: 'Organization name', value: 'A', err: 'Must be between 2 and 100 characters.', required: true },
+      { kind: 'slug' },
+      { kind: 'input', label: 'Admin full name', value: 'Alex Brown', err: null, required: true },
+      { kind: 'input', label: 'Email address', value: 'not-an-email', err: 'Enter a valid email address.', required: true },
+      {
+        kind: 'password',
+        label: 'Password',
+        value: '•••',
+        err: 'Must be at least 8 characters with a letter and a number.',
+        required: true,
+        passwordCriteria: PASSWORD_CRITERIA_PARTIAL,
+      },
+      { kind: 'input', label: 'Confirm password', value: '••••••••', err: 'Passwords do not match.', required: true },
+    ],
+    terms: { checked: true },
+  }));
+
+  wireFiles = mergeExcalidrawFiles(wireFiles, registerOrgStatePanel(els, {
+    id: 'srv',
+    x: startX + panelW + gap,
+    y0,
+    panelW,
+    panelH,
+    lbl: 'Server error (5xx)',
+    lblColor: C.danger,
+    serverBanner: 'Something went wrong, please try again.',
+    fields: REGISTER_ORG_STATE_FIELDS,
+    terms: { checked: true },
+  }));
+
+  write('platform-foundation/register-org-states.excalidraw', els, wireFiles);
+}
+
+/**
+ * Register-Org provider states — external identity provider error paths (ADR-027).
+ */
+function genRegisterOrgProviderStates() {
+  const els = [];
+  let wireFiles = {};
+  const panelW = 520;
+  const panelH = 300;
+  const gap = 40;
+  const startX = Math.round((W - (panelW * 2 + gap)) / 2);
+  const cardY = 72;
+
+  els.push(rect('rops_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
+  els.push(text('rops_pg', 0, 24, W, 20, 'Registration — external provider errors', 13, C.gray500, 'center'));
 
   const panels = [
     {
-      id: 'val',
+      id: 'dup',
       x: startX,
-      lbl: 'Inline validation (field-level)',
-      lblColor: C.danger,
-      serverBanner: null,
-      fields: [
-        { label: 'Organization name', value: 'A', err: 'Must be between 2 and 100 characters.' },
-        { label: 'Admin full name', value: 'Alex Brown', err: null },
-        { label: 'Email address', value: 'not-an-email', err: 'Enter a valid email address.' },
-        { label: 'Password', value: '••••••••', err: 'Must be at least 8 characters with a letter and a number.' },
-        { label: 'Confirm password', value: '••••••••', err: 'Passwords do not match.' },
-      ],
+      lbl: 'Provider email already registered',
+      msg: 'An account with this email already exists. Sign in instead.',
+      variant: 'warning',
     },
     {
-      id: 'srv',
+      id: 'noemail',
       x: startX + panelW + gap,
-      lbl: 'Server error (5xx)',
-      lblColor: C.danger,
-      serverBanner: 'Something went wrong. Please try again.',
-      fields: [
-        { label: 'Organization name', value: "O'Brien & Co.", err: null },
-        { label: 'Admin full name', value: 'Alex Brown', err: null },
-        { label: 'Email address', value: 'alex@company.com', err: null },
-        { label: 'Password', value: '••••••••', err: null },
-        { label: 'Confirm password', value: '••••••••', err: null },
-      ],
+      lbl: 'Provider returned no verified email',
+      msg: 'Your GitHub account has no verified email; use email and password instead.',
+      variant: 'danger',
     },
   ];
 
-  panels.forEach(({ id, x, lbl, lblColor, serverBanner, fields }) => {
-    const cardY = y0 + 28;
-    els.push(text(`ros_${id}_lbl`, x, y0, panelW, 16, lbl, 12, lblColor));
-    els.push(rect(`ros_${id}_card`, x, cardY, panelW, panelH, C.gray300, C.white, 2, true));
-    els.push(text(`ros_${id}_logo`, x, cardY + 16, panelW, 28, '⬡  Axis', 18, C.primary, 'center'));
-    els.push(hline(`ros_${id}_hdiv`, x, cardY + 60, panelW, C.gray300));
-    els.push(text(`ros_${id}_title`, x + 24, cardY + 76, panelW - 48, 24, 'Create your organization', 17, C.gray900));
-    els.push(text(`ros_${id}_sub`, x + 24, cardY + 104, panelW - 48, 18, 'Plan: Free trial  ·  Change plan →', 13, C.gray700));
-
-    let fy = cardY + 136;
-    if (serverBanner) {
-      els.push(rect(`ros_${id}_ban`, x + 24, fy, panelW - 48, 40, C.dangerBorder, C.dangerBg, 1, true));
-      els.push(text(`ros_${id}_ban_t`, x + 36, fy + 12, panelW - 72, 16, serverBanner, 12, C.danger));
-      fy += 52;
-    }
-
-    fields.forEach((f, i) => {
-      const { els: fe, blockH } = authFormField(`ros_${id}_f${i}`, x, fy, panelW, f.label, f.value, f.err);
-      els.push(...fe);
-      fy += blockH;
-    });
-
-    const btnY = cardY + panelH - 68;
-    const btnW = panelW - 48;
-    els.push(rect(`ros_${id}_sbtn`, x + 24, btnY, btnW, 36, C.accentDark, C.accent, 2, true));
-    els.push(text(`ros_${id}_sbtn_t`, x + 24, btnY + 10, btnW, 16, 'Create organization', 13, C.white, 'center'));
+  panels.forEach(({ id, x, lbl, msg, variant }) => {
+    const icon = variant === 'warning' ? '⚠' : '✕';
+    const prefix = `rops_${id}`;
+    els.push(text(`${prefix}_lbl`, x, 48, panelW, 16, lbl, 12, C.danger));
+    els.push(rect(`${prefix}_card`, x, cardY, panelW, panelH, C.gray300, C.white, 2, true));
+    const brand = buildAuthCardBrandBar(prefix, x, cardY, panelW);
+    els.push(...brand.els);
+    wireFiles = mergeExcalidrawFiles(wireFiles, brand.files);
+    const ix = x + AUTH_CARD_PAD_X;
+    const innerW = panelW - AUTH_CARD_PAD_X * 2;
+    const headY = cardY + 76;
+    els.push(...stateHeadline(prefix, ix, headY, innerW, icon, variant, 'Registration could not continue', 14));
+    const bodyY = headY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
+    els.push(text(`${prefix}_body`, ix, bodyY, innerW, 36, msg, 13, C.gray700));
+    els.push(text(`${prefix}_link`, ix, bodyY + 48, innerW, 16, 'Back to registration →', 12, C.primary, 'center'));
   });
 
-  write('platform-foundation/register-org-states.excalidraw', els);
+  write('platform-foundation/register-org-provider-states.excalidraw', els, wireFiles);
 }
 
 /**
@@ -317,7 +542,7 @@ function genRegisterOrgStates() {
  * Informational card (no form): compact icon, title, copy, resend link.
  */
 function genEmailConfirmation() {
-  const cardW = 440;
+  const cardW = AUTH_CARD_W;
   const cardH = 252;
   const cardX = Math.round((W - cardW) / 2);
   const cardY = Math.round((H - cardH) / 2);
@@ -326,26 +551,24 @@ function genEmailConfirmation() {
   els.push(rect('ec_bg',   0,     0,     W,     H,     C.gray300, C.gray100, 1, false));
   els.push(rect('ec_card', cardX, cardY, cardW, cardH, C.gray300, C.white,   2, true));
 
-  // Logo row
-  els.push(text('ec_logo',  cardX,      cardY + 16,  cardW,      28, '⬡  Axis',            18, C.primary, 'center'));
-  els.push(hline('ec_hdiv', cardX,      cardY + 60,  cardW,          C.gray300));
+  const ecBrand = buildAuthCardBrandBar('ec', cardX, cardY, cardW);
+  els.push(...ecBrand.els);
+  const wireFiles = ecBrand.files;
 
-  const ecInnerW = cardW - AUTH_CARD_PAD * 2;
-  const ecX = cardX + AUTH_CARD_PAD;
+  const ecInnerW = cardW - AUTH_CARD_PAD_X * 2;
+  const ecX = cardX + AUTH_CARD_PAD_X;
   const ecHeadY = cardY + 68;
   els.push(...stateHeadline('ec', ecX, ecHeadY, ecInnerW, '✉', 'info', 'Check your email', 16));
   const ecBodyY = ecHeadY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
-  els.push(text('ec_body1', ecX, ecBodyY, ecInnerW, 18, 'We sent a verification link to:', 13, C.gray700));
-  els.push(text('ec_body2', ecX, ecBodyY + 22, ecInnerW, 18, 'alex@company.com', 13, semanticVariantColor('info')));
+  els.push(text('ec_body1', ecX, ecBodyY, ecInnerW, 36,
+    'If an account exists for this email, you will receive a verification link shortly. Check your inbox.',
+    13, C.gray700));
 
-  // Resend link (email verification)
-  els.push(text('ec_resend', ecX, ecBodyY + 52, ecInnerW, 16, "Didn't receive it?  Resend email →", 12, C.primary, 'center'));
+  els.push(text('ec_resend', ecX, ecBodyY + 44, ecInnerW, 16, "Didn't receive it?  Resend email →", 12, C.primary, 'center'));
 
-  // Footer
-  els.push(hline('ec_fdiv',   cardX,      cardY + cardH - 32, cardW,      C.gray300));
-  els.push(text('ec_footer',  cardX + 24, cardY + cardH - 22, cardW - 48, 16, 'Back to sign in', 12, C.primary, 'center'));
+  els.push(...buildAuthCardFooter('ec', cardX, cardY, cardW, cardH, 'Back to sign in'));
 
-  write('platform-foundation/email-confirmation.excalidraw', els);
+  write('platform-foundation/email-confirmation.excalidraw', els, wireFiles);
 }
 
 /**
@@ -355,7 +578,7 @@ function genEmailConfirmation() {
  */
 function genVerifyEmail() {
   const els   = [];
-  const cardW = 440;
+  const cardW = AUTH_CARD_W;
   const cardH = 176;
   const gapX  = 60;
   const gapY  = 36;   // row gap; first 20px reserved for state label above card
@@ -417,7 +640,7 @@ function genVerifyEmail() {
 }
 
 function genVerifyEmailRateLimit() {
-  const cardW = 440;
+  const cardW = AUTH_CARD_W;
   const cardH = 228;
   const cardX = Math.round((W - cardW) / 2);
   const cardY = Math.round((H - cardH) / 2);
@@ -554,9 +777,11 @@ function genSettingsOrgDeleteModal() {
   els.push(text('sdm_body', mX + 20, mY + 68, mW - 40, 52,
     'This action is permanent and cannot be undone.\nAll data will be deleted after a 30-day grace period.', 13, C.gray700));
 
-  // Confirm input
-  els.push(text('sdm_inp_l', mX + 20, mY + 130, mW - 40, 16, "Type 'Acme Corp' to confirm (case-sensitive):", 12, C.gray500));
-  els.push(...inputField('sdm_inp', mX + 20, mY + 150, mW - 40, 'Acme Corp'));
+  // Confirm input (required — must match org name exactly)
+  els.push(...fieldLabel('sdm_inp_l', mX + 20, mY + 130, 'Organization name', { required: true }));
+  els.push(text('sdm_inp_hint', mX + 20, mY + 146, mW - 40, 14,
+    "Type 'Acme Corp' to confirm (case-sensitive)", 10, C.gray500));
+  els.push(...inputField('sdm_inp', mX + 20, mY + 162, mW - 40, 'Acme Corp'));
 
   // Footer
   els.push(hline('sdm_fdiv', mX, mY + mH - 56, mW, C.gray300));
@@ -627,8 +852,10 @@ function genSettingsOrgDeleteStates() {
       els.push(text(`sods_${id}_ban_t`, mX + 32, mCardY + 72, mW - 64, 16, err, 12, C.danger));
     }
     const inpY = err ? mCardY + 108 : mCardY + 68;
-    els.push(text(`sods_${id}_il`, mX + 20, inpY, mW - 40, 16, "Type 'Acme Corp' to confirm (case-sensitive):", 12, C.gray500));
-    els.push(...inputField(`sods_${id}_in`, mX + 20, inpY + 20, mW - 40, inp));
+    els.push(...fieldLabel(`sods_${id}_il`, mX + 20, inpY, 'Organization name', { required: true }));
+    els.push(text(`sods_${id}_ih`, mX + 20, inpY + 16, mW - 40, 14,
+      "Type 'Acme Corp' to confirm (case-sensitive)", 10, C.gray500));
+    els.push(...inputField(`sods_${id}_in`, mX + 20, inpY + 32, mW - 40, inp));
     const delY = mCardY + mH - 48;
     if (delEnabled) {
       els.push(...btn(`sods_${id}_del`, mX + mW - 20 - 184, delY, 'Delete organization', 'danger'));
@@ -757,15 +984,15 @@ function genSettingsOrg() {
   els.push(text('so_lgic',  cx,      profY + 24, 80,  32, '⬡',           20, C.primary, 'center'));
   els.push(text('so_lglnk', cx + 4,  profY + 62, 72,  14, 'Change logo', 10, C.primary, 'center'));
 
-  // Organization name
-  els.push(text('so_nm_l', cx + 96, profY + 12, 300, 16, 'Organization name', 11, C.gray500));
+  // Organization name (required); timezone / language optional
+  els.push(...fieldLabel('so_nm_l', cx + 96, profY + 12, 'Organization name', { required: true }));
   els.push(...inputField('so_nm', cx + 96, profY + 30, 500, 'Acme Corp'));
 
   // Timezone + Language (row 2 — starts at profY+88 = 212)
   const row2Y = profY + 88;
-  els.push(text('so_tz_l',   cx + 96,       row2Y,      240, 16, 'Timezone',    11, C.gray500));
-  els.push(...selectField('so_tz',   cx + 96,       row2Y + 18, 280, 'UTC+0 · London'));
-  els.push(text('so_ln_l',   cx + 96 + 296, row2Y,      180, 16, 'Language',    11, C.gray500));
+  els.push(...fieldLabel('so_tz_l', cx + 96, row2Y, 'Timezone'));
+  els.push(...selectField('so_tz', cx + 96, row2Y + 18, 280, 'UTC+0 · London'));
+  els.push(...fieldLabel('so_ln_l', cx + 96 + 296, row2Y, 'Language'));
   els.push(...selectField('so_lang', cx + 96 + 296, row2Y + 18, 200, 'English (US)'));
 
   // Created date meta (row2 bottom = row2Y+58 = 270; meta 8px below)
@@ -905,7 +1132,7 @@ function genSettingsOrgProfileStates() {
     els.push(text(`sops_${s.id}_h`, x + 16, y + 16, cardW - 32, 20, s.title, 14, C.gray900));
     els.push(rect(`sops_${s.id}_a`, x + 16, y + 44, cardW - 32, 48, s.stroke, s.bg, 1, true));
     els.push(text(`sops_${s.id}_m`, x + 26, y + 58, cardW - 52, 32, s.msg, 12, s.msgColor));
-    els.push(text(`sops_${s.id}_nl`, x + 16, y + 108, cardW - 32, 16, 'Organization name', 11, C.gray500));
+    els.push(...fieldLabel(`sops_${s.id}_nl`, x + 16, y + 108, 'Organization name', { required: true }));
     const inpStroke = s.fieldErr ? C.dangerBorder : C.gray300;
     els.push(rect(`sops_${s.id}_inp`, x + 16, y + 126, cardW - 32, 40, inpStroke, C.white, 1, true));
     els.push(text(`sops_${s.id}_v`, x + 28, y + 137, cardW - 56, 18, 'Acme Corp', 13, C.gray900));
@@ -1006,27 +1233,29 @@ function genSettingsOrgDeletionScheduled() {
 // ─── identity-access Identity & Access — Auth screens (no sidebar) ───────────────────────
 
 function genLogin() {
-  const els = authCard('li', {
+  const { els, files } = authCard(W, H, 'li', {
     title: 'Sign in to Axis',
     items: [
-      { label: 'Email address', placeholder: 'you@company.com' },
-      { label: 'Password',      placeholder: '••••••••' },
+      { label: 'Email address', placeholder: 'you@company.com', required: true },
+      { label: 'Password',      placeholder: '••••••••', required: true },
     ],
     extraLink: 'Forgot password?',
-  }, 'Sign in', "Don't have an account? Sign up");
-  write('identity-access/login.excalidraw', els);
+  }, 'Sign in', { lead: "Don't have an account? ", link: 'Sign up' });
+  write('identity-access/login.excalidraw', els, files);
 }
 
 /** email verification (tenant-registration) / unverified sign-in — unverified email blocks sign-in. */
 function genLoginUnverified() {
-  const cardW = 440;
+  const cardW = AUTH_CARD_W;
   const cardH = 280;
   const cardX = Math.round((W - cardW) / 2);
   const cardY = Math.round((H - cardH) / 2);
   const els = [];
   els.push(rect('lu_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
   els.push(rect('lu_card', cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
-  els.push(text('lu_logo', cardX, cardY + 16, cardW, 28, '⬡  Axis', 18, C.primary, 'center'));
+  const luBrand = buildAxisLogo('lu', cardX, cardY + 16, cardW, 'auth');
+  els.push(...luBrand.els);
+  const wireFiles = luBrand.files;
   els.push(hline('lu_hdiv', cardX, cardY + 60, cardW, C.gray300));
   els.push(text('lu_title', cardX + 24, cardY + 76, cardW - 48, 24, 'Sign in to Axis', 17, C.gray900));
 
@@ -1034,10 +1263,11 @@ function genLoginUnverified() {
   const innerW = cardW - AUTH_CARD_PAD * 2;
   let fy = cardY + 112;
   [
-    { label: 'Email address', value: 'alex@company.com' },
-    { label: 'Password', value: '••••••••' },
+    { label: 'Email address', value: 'alex@company.com', required: true },
+    { label: 'Password', value: '••••••••', required: true },
   ].forEach((f, i) => {
-    const { els: fe, blockH } = authFormField(`lu_f${i}`, cardX, fy, cardW, f.label, f.value);
+    const { els: fe, blockH } = authFormField(
+      `lu_f${i}`, cardX, fy, cardW, f.label, f.value, null, f.required === true);
     els.push(...fe);
     fy += blockH;
   });
@@ -1051,55 +1281,55 @@ function genLoginUnverified() {
   els.push(rect('lu_sbtn', cardX + 24, btnY, btnW, 36, C.gray300, C.gray100, 1, true));
   els.push(text('lu_sbtn_t', cardX + 24, btnY + 10, btnW, 16, 'Sign in', 13, C.gray300, 'center'));
 
-  write('identity-access/login-unverified.excalidraw', els);
+  write('identity-access/login-unverified.excalidraw', els, wireFiles);
 }
 
 function genRegister() {
-  const els = authCard('reg', {
+  const { els, files } = authCard(W, H, 'reg', {
     title: 'Create your account',
     subtitle: null,
     items: [
-      { label: 'Full name',     placeholder: 'Alex Brown' },
-      { label: 'Email address', placeholder: 'you@company.com' },
-      { label: 'Password',      placeholder: '••••••••' },
+      { label: 'Full name',     placeholder: 'Alex Brown', required: true },
+      { label: 'Email address', placeholder: 'you@company.com', required: true },
+      { label: 'Password',      placeholder: '••••••••', required: true },
     ],
-  }, 'Create account', 'Already have an account? Sign in');
-  write('identity-access/register.excalidraw', els);
+  }, 'Create account', { lead: 'Already have an account? ', link: 'Sign in' });
+  write('identity-access/register.excalidraw', els, files);
 }
 
 function genForgotPassword() {
-  const els = authCard('fp', {
+  const { els, files } = authCard(W, H, 'fp', {
     title: 'Reset your password',
     subtitle: 'Enter your email and we will send you a reset link.',
     items: [
-      { label: 'Email address', placeholder: 'you@company.com' },
+      { label: 'Email address', placeholder: 'you@company.com', required: true },
     ],
-  }, 'Send reset link', 'Remember your password? Sign in');
-  write('identity-access/forgot-password.excalidraw', els);
+  }, 'Send reset link', { lead: 'Remember your password? ', link: 'Sign in' });
+  write('identity-access/forgot-password.excalidraw', els, files);
 }
 
 function genChangePassword() {
-  const els = authCard('cp', {
+  const { els, files } = authCard(W, H, 'cp', {
     title: 'Choose a new password',
     subtitle: null,
     items: [
-      { label: 'New password',     placeholder: '••••••••' },
-      { label: 'Confirm password', placeholder: '••••••••' },
+      { label: 'New password',     placeholder: '••••••••', required: true },
+      { label: 'Confirm password', placeholder: '••••••••', required: true },
     ],
-  }, 'Set new password', 'Back to sign in');
-  write('identity-access/change-password.excalidraw', els);
+  }, 'Set new password', { link: 'Back to sign in' });
+  write('identity-access/change-password.excalidraw', els, files);
 }
 
 function genAcceptInvitation() {
-  const els = authCard('ai', {
+  const { els, files } = authCard(W, H, 'ai', {
     title: 'You have been invited',
     subtitle: 'Join Acme Corp on Axis',
     items: [
-      { label: 'Organization',    placeholder: 'Acme Corp' },
-      { label: 'Choose a password', placeholder: '••••••••' },
+      { label: 'Organization',      placeholder: 'Acme Corp', required: false },
+      { label: 'Choose a password', placeholder: '••••••••', required: true },
     ],
-  }, 'Accept Invitation', 'Already have an account? Sign in');
-  write('identity-access/accept-invitation.excalidraw', els);
+  }, 'Accept Invitation', { lead: 'Already have an account? ', link: 'Sign in' });
+  write('identity-access/accept-invitation.excalidraw', els, files);
 }
 
 // ─── identity-access Identity & Access — Settings screens (with sidebar) ─────────────────
@@ -1470,15 +1700,15 @@ function genFormEditor() {
     rect('fe_form_hdr', fx + lW + 20, fy + toolbarH + 14, cW - 40, 40, C.gray300, C.white, 1, true),
     text('fe_form_title', fx + lW + 36, fy + toolbarH + 26, 200, 18, 'Contact Form', 14, C.gray900),
     // Full Name (selected — primary border, matching S04 focus state)
-    text('fe_fn_lbl', fx + lW + 20, fy + toolbarH + 66, 160, 14, 'Full Name *', 11, C.gray500),
+    ...fieldLabel('fe_fn_lbl', fx + lW + 20, fy + toolbarH + 66, 'Full name', { required: true }),
     rect('fe_fn_inp', fx + lW + 20, fy + toolbarH + 82, cW - 40, 40, C.primary, C.infoBg, 2, true),
     text('fe_fn_ph',  fx + lW + 32, fy + toolbarH + 93, 200, 18, 'Enter your name…', 13, C.gray500),
-    // Email
-    text('fe_em_lbl', fx + lW + 20, fy + toolbarH + 134, 160, 14, 'Email Address *', 11, C.gray500),
+    // Email (required)
+    ...fieldLabel('fe_em_lbl', fx + lW + 20, fy + toolbarH + 134, 'Email address', { required: true }),
     rect('fe_em_inp', fx + lW + 20, fy + toolbarH + 150, cW - 40, 40, C.gray300, C.white, 1, true),
     text('fe_em_ph',  fx + lW + 32, fy + toolbarH + 161, 200, 18, 'you@company.com', 13, C.gray300),
-    // Message
-    text('fe_msg_lbl', fx + lW + 20, fy + toolbarH + 202, 160, 14, 'Message', 11, C.gray500),
+    // Message (optional)
+    ...fieldLabel('fe_msg_lbl', fx + lW + 20, fy + toolbarH + 202, 'Message'),
     rect('fe_msg_inp', fx + lW + 20, fy + toolbarH + 218, cW - 40, 64, C.gray300, C.white, 1, true),
     text('fe_msg_ph',  fx + lW + 32, fy + toolbarH + 229, 200, 18, 'Your message…', 13, C.gray300),
 
@@ -1613,7 +1843,10 @@ runScreen('app-shell', genAppShell);
 
 // platform-foundation — Platform Foundation
 runScreen('platform-foundation/register-org', genRegisterOrg);
+runScreen('platform-foundation/register-org-complete', genRegisterOrgComplete);
+runScreen('platform-foundation/register-org-complete-states', genRegisterOrgCompleteStates);
 runScreen('platform-foundation/register-org-states', genRegisterOrgStates);
+runScreen('platform-foundation/register-org-provider-states', genRegisterOrgProviderStates);
 runScreen('platform-foundation/email-confirmation', genEmailConfirmation);
 runScreen('platform-foundation/verify-email', genVerifyEmail);
 runScreen('platform-foundation/verify-email-rate-limit', genVerifyEmailRateLimit);

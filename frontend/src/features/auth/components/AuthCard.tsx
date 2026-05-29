@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import axisLogo from '@/assets/axis-logo.svg';
 import { cn } from '@/lib/utils';
 
 interface AuthCardProps {
@@ -18,8 +19,13 @@ export function AuthCard({ title, children, footer, banner }: AuthCardProps) {
           'flex flex-col overflow-hidden',
         )}
       >
-        <div className="px-6 pt-5 pb-4 text-center border-b border-border">
-          <p className="text-lg font-medium text-primary tracking-tight">⬡ Axis</p>
+        <div className="px-6 pt-5 pb-4 border-b border-border">
+          <div className="flex items-center justify-center gap-1.5">
+            <img src={axisLogo} alt="Axis" className="h-9 w-9 shrink-0" width={36} height={36} />
+            <span aria-hidden className="text-lg font-semibold tracking-tight text-foreground">
+              Axis
+            </span>
+          </div>
         </div>
         <div className="px-6 py-6 space-y-5">
           <h1 className="text-[17px] font-semibold text-foreground">{title}</h1>

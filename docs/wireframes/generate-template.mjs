@@ -1,6 +1,7 @@
 /**
- * Axis UI Component Kit — _template.excalidraw
- * Run: node docs/wireframes/generate-template.mjs
+ * Axis UI kit section builders (S01–S37).
+ * Import-only module — screens compose via component(buildXxx, x, y) in generate-screens.mjs.
+ * Auth / register-org blocks: blocks.mjs.
  *
  * TOC — 37 sections
  * ─── Foundations ─────────────────── S01 Color Palette
@@ -40,14 +41,13 @@
  *                                     S35 Dashboard & Analytics Stats
  *                                     S36 Advanced Filters / Query Builder
  *                                     S37 Dual Listbox / Transfer List
+ * Auth blocks (SSO, fields, terms): blocks.mjs — not kit sections here.
  */
 
-import { fileURLToPath } from 'url';
 import {
   nextSeed, BASE,
   rect, ellipse, text, hline, vline, arrow, sectionHeader,
-  C,
-  writeExcalidraw,
+  C, fieldLabel, fieldLabelBlock, REQUIRED_MARKER_GAP,
 } from './components.mjs';
 
 // ─── Section builders ─────────────────────────────────────────────────────────
@@ -135,6 +135,17 @@ export function buildFormControls(y0) {
   const yC = y0 + 48;
 
   // ── Col 1: Text input states (x=50) ──
+  els.push(text('inp_req_note', 50, yC, 320, 14,
+    `Required labels — * is ${REQUIRED_MARKER_GAP}px after label (C.danger)`, 10, C.gray500));
+  const inpHelpDemo = fieldLabelBlock('inp_help', 50, yC + 18, 280, 'Organization name', {
+    required: true,
+    helpText: '2–100 characters. Help text sits under the label; ? is the tooltip affordance.',
+  });
+  els.push(...inpHelpDemo.els);
+  els.push(rect('inp_req_demo', 50, inpHelpDemo.inputY, 280, 40, C.gray300, C.white, 1, true));
+  els.push(text('inp_req_ph', 62, inpHelpDemo.inputY + 11, 250, 18, 'Acme Corp', 13, C.gray500));
+
+  const statesY = yC + 90;
   const inputStates = [
     ['Default',  C.gray300,   C.white,    1, 'email@company.com',  C.gray500],
     ['Focus',    C.primary,   C.white,    2, 'email@company.com',  C.gray500],
@@ -142,8 +153,8 @@ export function buildFormControls(y0) {
     ['Disabled', C.gray300,   C.gray100,  1, 'Disabled',           C.gray300],
   ];
   inputStates.forEach(([state, stroke, bg, sw, placeholder, phColor], i) => {
-    const y = yC + i * 78;
-    els.push(text(`inp_lbl_${i}`, 50, y, 100, 16, state, 11, C.gray500));
+    const y = statesY + i * 78;
+    els.push(...fieldLabel(`inp_lbl_${i}`, 50, y, 'Email address', { required: true }));
     els.push(rect(`inp_${i}`, 50, y + 18, 280, 40, stroke, bg, sw, true));
     els.push(text(`inp_ph_${i}`, 62, y + 29, 250, 18, placeholder, 13, phColor));
     if (state === 'Error') {
@@ -155,7 +166,7 @@ export function buildFormControls(y0) {
   const x2 = 380;
 
   // Password
-  els.push(text('pw_lbl', x2, yC, 100, 16, 'Password', 11, C.gray500));
+  els.push(...fieldLabel('pw_lbl', x2, yC, 'Password', { required: true }));
   els.push(rect('pw_inp', x2, yC + 18, 280, 40, C.gray300, C.white, 1, true));
   els.push(text('pw_dots', x2 + 12, yC + 29, 150, 18, '••••••••', 13, C.gray700));
   els.push(text('pw_eye', x2 + 248, yC + 29, 20, 18, '👁', 13, C.gray500));
@@ -1853,76 +1864,3 @@ export function buildColorIconPicker(y0) {
   return els;
 }
 
-// ─── Compose all sections (auto-stacking) ────────────────────────────────────
-
-function sectionBottom(els) {
-  return Math.max(...els.map(e => {
-    if (e.type === 'line') {
-      const pts = e.points || [[0, 0]];
-      return e.y + Math.max(...pts.map(p => p[1]));
-    }
-    return e.y + (e.height || 0);
-  }));
-}
-
-// ─── Run if executed directly ─────────────────────────────────────────────────
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const GAP = 60;
-  const allElements = [];
-  let currentY = 30;
-
-  for (const builder of [
-    // ── Foundations ───────────────────────────────────────────────────────────
-    buildColorPalette,           // S01
-    buildTypography,             // S02
-    buildButtons,                // S03
-    // ── Input & Forms ─────────────────────────────────────────────────────────
-    buildFormControls,           // S04
-    buildDateTimePicker,         // S05
-    buildFileUpload,             // S06
-    buildRichTextEditor,         // S07
-    buildCodeEditor,             // S08
-    // ── Data Display ──────────────────────────────────────────────────────────
-    buildBadges,                 // S09
-    buildTable,                  // S10
-    buildEditableTable,          // S11
-    buildCards,                  // S12
-    buildEmptyStates,            // S13
-    buildSkeletonLoaders,        // S14
-    // ── Navigation & Layout ───────────────────────────────────────────────────
-    buildNavigation,             // S15
-    buildSidebarNav,             // S16
-    buildTabs,                   // S17
-    buildAppShell,               // S18
-    // ── Feedback & Overlays ───────────────────────────────────────────────────
-    buildFeedback,               // S19
-    buildModal,                  // S20
-    buildSideSheet,              // S21
-    buildCommandPalette,         // S22
-    buildNotifications,          // S23
-    buildTooltipPopover,         // S24
-    // ── Interaction Patterns ──────────────────────────────────────────────────
-    buildDropdownContextMenu,    // S25
-    buildDragDrop,               // S26
-    buildUtilities,              // S27
-    buildPermissionMatrix,       // S28
-    buildColorIconPicker,        // S29
-    // ── Axis App Patterns ─────────────────────────────────────────────────────
-    buildWorkflowCanvas,         // S30
-    buildBuilderLayout,          // S31
-    buildExecutionTimeline,      // S32
-    buildFieldTypePicker,        // S33
-    buildRelationLookup,         // S34
-    buildStatsCards,             // S35
-    buildAdvancedFilters,        // S36
-    buildDualListbox,            // S37
-  ]) {
-    const els = builder(currentY);
-    allElements.push(...els);
-    currentY = sectionBottom(els) + GAP;
-  }
-
-  const elements = allElements;
-  writeExcalidraw(fileURLToPath(new URL('./_template.excalidraw', import.meta.url)), elements);
-  console.log(`✓ Generated _template.excalidraw — ${elements.length} elements`);
-}

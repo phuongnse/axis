@@ -5,7 +5,7 @@
   "elements": [
     {
       "id": "diag-1",
-      "x": 257.125,
+      "x": 142.87499999999997,
       "y": 12.5,
       "angle": 0,
       "strokeColor": "#1e293b",
@@ -29,9 +29,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 338.25,
+      "width": 486.75000000000006,
       "height": 21,
-      "text": "Authentication Flow — JWT + Refresh Token",
+      "text": "Register Organization — Email/Password & External Providers",
       "fontSize": 15,
       "fontFamily": 1,
       "textAlign": "center",
@@ -69,7 +69,7 @@
     },
     {
       "id": "diag-3",
-      "x": 40,
+      "x": 35.25,
       "y": 64,
       "angle": 0,
       "strokeColor": "#1e293b",
@@ -93,9 +93,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 40,
+      "width": 49.50000000000001,
       "height": 14,
-      "text": "User",
+      "text": "New Admin",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -128,7 +128,7 @@
       "locked": false,
       "type": "arrow",
       "width": 0,
-      "height": 788,
+      "height": 748,
       "points": [
         [
           0,
@@ -136,7 +136,7 @@
         ],
         [
           0,
-          788
+          748
         ]
       ],
       "startArrowhead": null,
@@ -144,7 +144,7 @@
     },
     {
       "id": "diag-5",
-      "x": 172.5,
+      "x": 152.5,
       "y": 48,
       "angle": 0,
       "strokeColor": "#3b82f6",
@@ -174,8 +174,8 @@
     },
     {
       "id": "diag-6",
-      "x": 215,
-      "y": 54,
+      "x": 195,
+      "y": 64,
       "angle": 0,
       "strokeColor": "#1e293b",
       "backgroundColor": "transparent",
@@ -208,14 +208,14 @@
     },
     {
       "id": "diag-7",
-      "x": 204.75,
-      "y": 72,
+      "x": 215,
+      "y": 90,
       "angle": 0,
-      "strokeColor": "#64748b",
+      "strokeColor": "#94a3b8",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1,
-      "strokeStyle": "solid",
+      "strokeStyle": "dashed",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -231,43 +231,9 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "type": "text",
-      "width": 60.50000000000001,
-      "height": 14,
-      "text": "(React SPA)",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
-    },
-    {
-      "id": "diag-8",
-      "x": 235,
-      "y": 90,
-      "angle": 0,
-      "strokeColor": "#94a3b8",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "dashed",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 8,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
       "type": "arrow",
       "width": 0,
-      "height": 788,
+      "height": 748,
       "points": [
         [
           0,
@@ -275,15 +241,15 @@
         ],
         [
           0,
-          788
+          748
         ]
       ],
       "startArrowhead": null,
       "endArrowhead": null
     },
     {
-      "id": "diag-9",
-      "x": 347.5,
+      "id": "diag-8",
+      "x": 307.5,
       "y": 48,
       "angle": 0,
       "strokeColor": "#3b82f6",
@@ -299,7 +265,7 @@
         "type": 3,
         "value": 6
       },
-      "seed": 9,
+      "seed": 8,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -312,11 +278,45 @@
       "height": 42
     },
     {
-      "id": "diag-10",
-      "x": 382.5,
+      "id": "diag-9",
+      "x": 342.5,
       "y": 54,
       "angle": 0,
       "strokeColor": "#1e293b",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 9,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "text",
+      "width": 55.00000000000001,
+      "height": 14,
+      "text": "API Server",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "id": "diag-10",
+      "x": 337,
+      "y": 72,
+      "angle": 0,
+      "strokeColor": "#64748b",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1,
@@ -337,9 +337,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 55.00000000000001,
+      "width": 66,
       "height": 14,
-      "text": "API Server",
+      "text": "(OpenIddict)",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -347,14 +347,14 @@
     },
     {
       "id": "diag-11",
-      "x": 377,
-      "y": 72,
+      "x": 370,
+      "y": 90,
       "angle": 0,
-      "strokeColor": "#64748b",
+      "strokeColor": "#94a3b8",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1,
-      "strokeStyle": "solid",
+      "strokeStyle": "dashed",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -370,43 +370,9 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "type": "text",
-      "width": 66,
-      "height": 14,
-      "text": "(OpenIddict)",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
-    },
-    {
-      "id": "diag-12",
-      "x": 410,
-      "y": 90,
-      "angle": 0,
-      "strokeColor": "#94a3b8",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "dashed",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 12,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
       "type": "arrow",
       "width": 0,
-      "height": 788,
+      "height": 748,
       "points": [
         [
           0,
@@ -414,19 +380,19 @@
         ],
         [
           0,
-          788
+          748
         ]
       ],
       "startArrowhead": null,
       "endArrowhead": null
     },
     {
-      "id": "diag-13",
-      "x": 522.5,
+      "id": "diag-12",
+      "x": 462.5,
       "y": 48,
       "angle": 0,
-      "strokeColor": "#ea580c",
-      "backgroundColor": "#ffedd5",
+      "strokeColor": "#9333ea",
+      "backgroundColor": "#f3e8ff",
       "fillStyle": "solid",
       "strokeWidth": 1.5,
       "strokeStyle": "solid",
@@ -438,7 +404,7 @@
         "type": 3,
         "value": 6
       },
-      "seed": 13,
+      "seed": 12,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -451,11 +417,45 @@
       "height": 42
     },
     {
-      "id": "diag-14",
-      "x": 565,
+      "id": "diag-13",
+      "x": 505,
       "y": 54,
       "angle": 0,
       "strokeColor": "#1e293b",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 13,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "text",
+      "width": 40,
+      "height": 14,
+      "text": "Email",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "id": "diag-14",
+      "x": 505,
+      "y": 72,
+      "angle": 0,
+      "strokeColor": "#64748b",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1,
@@ -478,7 +478,7 @@
       "type": "text",
       "width": 40,
       "height": 14,
-      "text": "Redis",
+      "text": "Service",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -486,14 +486,14 @@
     },
     {
       "id": "diag-15",
-      "x": 538.25,
-      "y": 72,
+      "x": 525,
+      "y": 90,
       "angle": 0,
-      "strokeColor": "#64748b",
+      "strokeColor": "#94a3b8",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1,
-      "strokeStyle": "solid",
+      "strokeStyle": "dashed",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -509,43 +509,9 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "type": "text",
-      "width": 93.50000000000001,
-      "height": 14,
-      "text": "(token blacklist)",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
-    },
-    {
-      "id": "diag-16",
-      "x": 585,
-      "y": 90,
-      "angle": 0,
-      "strokeColor": "#94a3b8",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "dashed",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 16,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
       "type": "arrow",
       "width": 0,
-      "height": 788,
+      "height": 748,
       "points": [
         [
           0,
@@ -553,19 +519,19 @@
         ],
         [
           0,
-          788
+          748
         ]
       ],
       "startArrowhead": null,
       "endArrowhead": null
     },
     {
-      "id": "diag-17",
-      "x": 697.5,
+      "id": "diag-16",
+      "x": 617.5,
       "y": 48,
       "angle": 0,
-      "strokeColor": "#ea580c",
-      "backgroundColor": "#ffedd5",
+      "strokeColor": "#9333ea",
+      "backgroundColor": "#f3e8ff",
       "fillStyle": "solid",
       "strokeWidth": 1.5,
       "strokeStyle": "solid",
@@ -577,7 +543,7 @@
         "type": 3,
         "value": 6
       },
-      "seed": 17,
+      "seed": 16,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -590,11 +556,45 @@
       "height": 42
     },
     {
-      "id": "diag-18",
-      "x": 732.5,
-      "y": 64,
+      "id": "diag-17",
+      "x": 660,
+      "y": 54,
       "angle": 0,
       "strokeColor": "#1e293b",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 17,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "text",
+      "width": 40,
+      "height": 14,
+      "text": "IdP",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "id": "diag-18",
+      "x": 630.5,
+      "y": 72,
+      "angle": 0,
+      "strokeColor": "#64748b",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1,
@@ -615,9 +615,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 55.00000000000001,
+      "width": 99.00000000000001,
       "height": 14,
-      "text": "PostgreSQL",
+      "text": "(MS/Google/GitHub)",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -625,7 +625,7 @@
     },
     {
       "id": "diag-19",
-      "x": 760,
+      "x": 680,
       "y": 90,
       "angle": 0,
       "strokeColor": "#94a3b8",
@@ -650,7 +650,7 @@
       "locked": false,
       "type": "arrow",
       "width": 0,
-      "height": 788,
+      "height": 748,
       "points": [
         [
           0,
@@ -658,7 +658,7 @@
         ],
         [
           0,
-          788
+          748
         ]
       ],
       "startArrowhead": null,
@@ -667,7 +667,7 @@
     {
       "id": "diag-20",
       "x": 20,
-      "y": 140,
+      "y": 260,
       "angle": 0,
       "strokeColor": "#94a3b8",
       "backgroundColor": "transparent",
@@ -690,7 +690,7 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 812.5,
+      "width": 732.5,
       "height": 0,
       "points": [
         [
@@ -698,7 +698,7 @@
           0
         ],
         [
-          812.5,
+          732.5,
           0
         ]
       ],
@@ -707,8 +707,8 @@
     },
     {
       "id": "diag-21",
-      "x": 390.5,
-      "y": 147,
+      "x": 312,
+      "y": 267,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -731,9 +731,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 71.5,
+      "width": 148.5,
       "height": 14,
-      "text": "== Sign In ==",
+      "text": "== Email / password path ==",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -742,7 +742,7 @@
     {
       "id": "diag-22",
       "x": 20,
-      "y": 320,
+      "y": 440,
       "angle": 0,
       "strokeColor": "#94a3b8",
       "backgroundColor": "transparent",
@@ -765,7 +765,7 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 812.5,
+      "width": 732.5,
       "height": 0,
       "points": [
         [
@@ -773,7 +773,7 @@
           0
         ],
         [
-          812.5,
+          732.5,
           0
         ]
       ],
@@ -782,8 +782,8 @@
     },
     {
       "id": "diag-23",
-      "x": 352,
-      "y": 327,
+      "x": 287.25,
+      "y": 447,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -806,9 +806,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 148.5,
+      "width": 198.00000000000003,
       "height": 14,
-      "text": "== Authenticated Request ==",
+      "text": "== External provider (OAuth only) ==",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -817,7 +817,7 @@
     {
       "id": "diag-24",
       "x": 20,
-      "y": 490,
+      "y": 600,
       "angle": 0,
       "strokeColor": "#94a3b8",
       "backgroundColor": "transparent",
@@ -840,7 +840,7 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 812.5,
+      "width": 732.5,
       "height": 0,
       "points": [
         [
@@ -848,7 +848,7 @@
           0
         ],
         [
-          812.5,
+          732.5,
           0
         ]
       ],
@@ -857,8 +857,8 @@
     },
     {
       "id": "diag-25",
-      "x": 354.75,
-      "y": 497,
+      "x": 292.75,
+      "y": 607,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -881,9 +881,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 143,
+      "width": 187.00000000000003,
       "height": 14,
-      "text": "== Silent Token Refresh ==",
+      "text": "== Post-OAuth completion screen ==",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -891,14 +891,14 @@
     },
     {
       "id": "diag-26",
-      "x": 20,
-      "y": 640,
+      "x": 60,
+      "y": 140,
       "angle": 0,
-      "strokeColor": "#94a3b8",
+      "strokeColor": "#475569",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "dashed",
+      "strokeWidth": 1.5,
+      "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -915,7 +915,7 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 812.5,
+      "width": 155,
       "height": 0,
       "points": [
         [
@@ -923,17 +923,17 @@
           0
         ],
         [
-          812.5,
+          155,
           0
         ]
       ],
       "startArrowhead": null,
-      "endArrowhead": null
+      "endArrowhead": "arrow"
     },
     {
       "id": "diag-27",
-      "x": 387.75,
-      "y": 647,
+      "x": 77,
+      "y": 121,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -956,9 +956,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 77,
+      "width": 121.00000000000001,
       "height": 14,
-      "text": "== Sign Out ==",
+      "text": "Open registration page",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -966,14 +966,14 @@
     },
     {
       "id": "diag-28",
-      "x": 60,
+      "x": 215,
       "y": 168,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1.5,
-      "strokeStyle": "solid",
+      "strokeStyle": "dashed",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -990,7 +990,7 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 175,
+      "width": 155,
       "height": 0,
       "points": [
         [
@@ -998,7 +998,7 @@
           0
         ],
         [
-          175,
+          -155,
           0
         ]
       ],
@@ -1007,7 +1007,7 @@
     },
     {
       "id": "diag-29",
-      "x": 87,
+      "x": 38.499999999999986,
       "y": 149,
       "angle": 0,
       "strokeColor": "#64748b",
@@ -1031,9 +1031,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 121.00000000000001,
+      "width": 198.00000000000003,
       "height": 14,
-      "text": "Enter email + password",
+      "text": "Show SSO icons + email/password form",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -1041,8 +1041,8 @@
     },
     {
       "id": "diag-30",
-      "x": 235,
-      "y": 208,
+      "x": 60,
+      "y": 288,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1065,7 +1065,7 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 175,
+      "width": 155,
       "height": 0,
       "points": [
         [
@@ -1073,7 +1073,7 @@
           0
         ],
         [
-          175,
+          155,
           0
         ]
       ],
@@ -1082,8 +1082,8 @@
     },
     {
       "id": "diag-31",
-      "x": 278.5,
-      "y": 189,
+      "x": 16.499999999999986,
+      "y": 269,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1106,9 +1106,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 88,
+      "width": 242.00000000000003,
       "height": 14,
-      "text": "POST /auth/token",
+      "text": "Accept Terms + submit form (Idempotency-Key)",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -1116,8 +1116,8 @@
     },
     {
       "id": "diag-32",
-      "x": 410,
-      "y": 248,
+      "x": 215,
+      "y": 328,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1140,7 +1140,7 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 350,
+      "width": 155,
       "height": 0,
       "points": [
         [
@@ -1148,7 +1148,7 @@
           0
         ],
         [
-          350,
+          155,
           0
         ]
       ],
@@ -1157,8 +1157,8 @@
     },
     {
       "id": "diag-33",
-      "x": 530,
-      "y": 229,
+      "x": 226.5,
+      "y": 309,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1181,9 +1181,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 110.00000000000001,
+      "width": 132,
       "height": 14,
-      "text": "Validate credentials",
+      "text": "POST /api/organizations/",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -1191,14 +1191,14 @@
     },
     {
       "id": "diag-34",
-      "x": 410,
-      "y": 288,
+      "x": 370,
+      "y": 368,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1.5,
-      "strokeStyle": "dashed",
+      "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -1207,231 +1207,6 @@
         "type": 2
       },
       "seed": 34,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "arrow",
-      "width": 175,
-      "height": 0,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          -175,
-          0
-        ]
-      ],
-      "startArrowhead": null,
-      "endArrowhead": "arrow"
-    },
-    {
-      "id": "diag-35",
-      "x": 242.75,
-      "y": 269,
-      "angle": 0,
-      "strokeColor": "#64748b",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 35,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "text",
-      "width": 159.5,
-      "height": 14,
-      "text": "{access_token, refresh_token}",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
-    },
-    {
-      "id": "diag-36",
-      "x": 60,
-      "y": 348,
-      "angle": 0,
-      "strokeColor": "#475569",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1.5,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 36,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "arrow",
-      "width": 175,
-      "height": 0,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          175,
-          0
-        ]
-      ],
-      "startArrowhead": null,
-      "endArrowhead": "arrow"
-    },
-    {
-      "id": "diag-37",
-      "x": 78.75,
-      "y": 329,
-      "angle": 0,
-      "strokeColor": "#64748b",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 37,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "text",
-      "width": 137.5,
-      "height": 14,
-      "text": "Navigate / perform action",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
-    },
-    {
-      "id": "diag-38",
-      "x": 235,
-      "y": 388,
-      "angle": 0,
-      "strokeColor": "#475569",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1.5,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 38,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "arrow",
-      "width": 175,
-      "height": 0,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          175,
-          0
-        ]
-      ],
-      "startArrowhead": null,
-      "endArrowhead": "arrow"
-    },
-    {
-      "id": "diag-39",
-      "x": 245.5,
-      "y": 369,
-      "angle": 0,
-      "strokeColor": "#64748b",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 39,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "text",
-      "width": 154,
-      "height": 14,
-      "text": "GET /resource (Bearer token)",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
-    },
-    {
-      "id": "diag-40",
-      "x": 410,
-      "y": 428,
-      "angle": 0,
-      "strokeColor": "#475569",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1.5,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 40,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1464,9 +1239,234 @@
       "endArrowhead": "arrow"
     },
     {
+      "id": "diag-35",
+      "x": 300,
+      "y": 371,
+      "angle": 0,
+      "strokeColor": "#64748b",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 35,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "text",
+      "width": 220.00000000000003,
+      "height": 14,
+      "text": "Generate slug, hash password, record ToS",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "id": "diag-36",
+      "x": 370,
+      "y": 408,
+      "angle": 0,
+      "strokeColor": "#475569",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1.5,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 36,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "arrow",
+      "width": 155,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          155,
+          0
+        ]
+      ],
+      "startArrowhead": null,
+      "endArrowhead": "arrow"
+    },
+    {
+      "id": "diag-37",
+      "x": 359.5,
+      "y": 389,
+      "angle": 0,
+      "strokeColor": "#64748b",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 37,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "text",
+      "width": 176,
+      "height": 14,
+      "text": "Send verification email (if new)",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "id": "diag-38",
+      "x": 370,
+      "y": 448,
+      "angle": 0,
+      "strokeColor": "#475569",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1.5,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 38,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "arrow",
+      "width": 155,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -155,
+          0
+        ]
+      ],
+      "startArrowhead": null,
+      "endArrowhead": "arrow"
+    },
+    {
+      "id": "diag-39",
+      "x": 223.75,
+      "y": 429,
+      "angle": 0,
+      "strokeColor": "#64748b",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 39,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "text",
+      "width": 137.5,
+      "height": 14,
+      "text": "202 → confirmation screen",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "id": "diag-40",
+      "x": 60,
+      "y": 468,
+      "angle": 0,
+      "strokeColor": "#475569",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1.5,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 40,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "arrow",
+      "width": 155,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          155,
+          0
+        ]
+      ],
+      "startArrowhead": null,
+      "endArrowhead": "arrow"
+    },
+    {
       "id": "diag-41",
-      "x": 381.25,
-      "y": 431,
+      "x": 43.999999999999986,
+      "y": 449,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1489,9 +1489,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 137.5,
+      "width": 187.00000000000003,
       "height": 14,
-      "text": "Validate JWT + set tenant",
+      "text": "Choose Microsoft / Google / GitHub",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -1499,14 +1499,14 @@
     },
     {
       "id": "diag-42",
-      "x": 410,
-      "y": 460,
+      "x": 215,
+      "y": 508,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1.5,
-      "strokeStyle": "dashed",
+      "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -1523,7 +1523,7 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 175,
+      "width": 465,
       "height": 0,
       "points": [
         [
@@ -1531,7 +1531,7 @@
           0
         ],
         [
-          -175,
+          465,
           0
         ]
       ],
@@ -1540,8 +1540,8 @@
     },
     {
       "id": "diag-43",
-      "x": 286.75,
-      "y": 441,
+      "x": 384.25,
+      "y": 489,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1564,9 +1564,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 71.5,
+      "width": 126.50000000000001,
       "height": 14,
-      "text": "200 OK + data",
+      "text": "OAuth2 Auth Code + PKCE",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -1574,14 +1574,14 @@
     },
     {
       "id": "diag-44",
-      "x": 235,
-      "y": 518,
+      "x": 680,
+      "y": 548,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1.5,
-      "strokeStyle": "solid",
+      "strokeStyle": "dashed",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -1598,7 +1598,7 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 175,
+      "width": 465,
       "height": 0,
       "points": [
         [
@@ -1606,7 +1606,7 @@
           0
         ],
         [
-          175,
+          -465,
           0
         ]
       ],
@@ -1615,8 +1615,8 @@
     },
     {
       "id": "diag-45",
-      "x": 223.5,
-      "y": 499,
+      "x": 367.75,
+      "y": 529,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1639,9 +1639,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 198.00000000000003,
+      "width": 159.5,
       "height": 14,
-      "text": "POST /auth/refresh (httpOnly cookie)",
+      "text": "Verified email + display name",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -1649,14 +1649,14 @@
     },
     {
       "id": "diag-46",
-      "x": 410,
-      "y": 558,
+      "x": 370,
+      "y": 588,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1.5,
-      "strokeStyle": "solid",
+      "strokeStyle": "dashed",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -1673,7 +1673,7 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 350,
+      "width": 155,
       "height": 0,
       "points": [
         [
@@ -1681,7 +1681,7 @@
           0
         ],
         [
-          350,
+          -155,
           0
         ]
       ],
@@ -1690,8 +1690,8 @@
     },
     {
       "id": "diag-47",
-      "x": 499.75,
-      "y": 539,
+      "x": 199,
+      "y": 569,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1714,9 +1714,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 170.5,
+      "width": 187.00000000000003,
       "height": 14,
-      "text": "Validate + rotate refresh token",
+      "text": "Reject if email already registered",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -1724,8 +1724,8 @@
     },
     {
       "id": "diag-48",
-      "x": 410,
-      "y": 598,
+      "x": 215,
+      "y": 628,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1748,7 +1748,7 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 175,
+      "width": 155,
       "height": 0,
       "points": [
         [
@@ -1756,7 +1756,7 @@
           0
         ],
         [
-          -175,
+          -155,
           0
         ]
       ],
@@ -1765,8 +1765,8 @@
     },
     {
       "id": "diag-49",
-      "x": 220.75,
-      "y": 579,
+      "x": 13.749999999999986,
+      "y": 609,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1789,9 +1789,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 203.50000000000003,
+      "width": 247.50000000000003,
       "height": 14,
-      "text": "{new access_token, new refresh_token}",
+      "text": "register-org-complete (org name, slug, Terms)",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -1823,7 +1823,7 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 175,
+      "width": 155,
       "height": 0,
       "points": [
         [
@@ -1831,7 +1831,7 @@
           0
         ],
         [
-          175,
+          155,
           0
         ]
       ],
@@ -1840,7 +1840,7 @@
     },
     {
       "id": "diag-51",
-      "x": 109,
+      "x": 41.249999999999986,
       "y": 649,
       "angle": 0,
       "strokeColor": "#64748b",
@@ -1864,9 +1864,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 77,
+      "width": 192.50000000000003,
       "height": 14,
-      "text": "Click Sign Out",
+      "text": "Submit completion (Idempotency-Key)",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -1874,7 +1874,7 @@
     },
     {
       "id": "diag-52",
-      "x": 235,
+      "x": 215,
       "y": 708,
       "angle": 0,
       "strokeColor": "#475569",
@@ -1898,7 +1898,7 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 175,
+      "width": 155,
       "height": 0,
       "points": [
         [
@@ -1906,7 +1906,7 @@
           0
         ],
         [
-          175,
+          155,
           0
         ]
       ],
@@ -1915,7 +1915,7 @@
     },
     {
       "id": "diag-53",
-      "x": 273,
+      "x": 210,
       "y": 689,
       "angle": 0,
       "strokeColor": "#64748b",
@@ -1939,9 +1939,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 99.00000000000001,
+      "width": 165,
       "height": 14,
-      "text": "POST /auth/signout",
+      "text": "POST org + link external login",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -1949,7 +1949,7 @@
     },
     {
       "id": "diag-54",
-      "x": 410,
+      "x": 370,
       "y": 748,
       "angle": 0,
       "strokeColor": "#475569",
@@ -1973,7 +1973,7 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 175,
+      "width": 155,
       "height": 0,
       "points": [
         [
@@ -1981,7 +1981,7 @@
           0
         ],
         [
-          175,
+          155,
           0
         ]
       ],
@@ -1990,7 +1990,7 @@
     },
     {
       "id": "diag-55",
-      "x": 426,
+      "x": 359.5,
       "y": 729,
       "angle": 0,
       "strokeColor": "#64748b",
@@ -2014,9 +2014,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 143,
+      "width": 176,
       "height": 14,
-      "text": "Blacklist access_token JTI",
+      "text": "Send verification email (if new)",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -2024,14 +2024,14 @@
     },
     {
       "id": "diag-56",
-      "x": 410,
+      "x": 370,
       "y": 788,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1.5,
-      "strokeStyle": "solid",
+      "strokeStyle": "dashed",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -2048,7 +2048,7 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 350,
+      "width": 155,
       "height": 0,
       "points": [
         [
@@ -2056,7 +2056,7 @@
           0
         ],
         [
-          350,
+          -155,
           0
         ]
       ],
@@ -2065,7 +2065,7 @@
     },
     {
       "id": "diag-57",
-      "x": 530,
+      "x": 223.75,
       "y": 769,
       "angle": 0,
       "strokeColor": "#64748b",
@@ -2089,9 +2089,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 110.00000000000001,
+      "width": 137.5,
       "height": 14,
-      "text": "Revoke refresh token",
+      "text": "202 → confirmation screen",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -2099,20 +2099,21 @@
     },
     {
       "id": "diag-58",
-      "x": 410,
-      "y": 828,
+      "x": 20,
+      "y": 820,
       "angle": 0,
-      "strokeColor": "#475569",
-      "backgroundColor": "transparent",
+      "strokeColor": "#ca8a04",
+      "backgroundColor": "#fef9c3",
       "fillStyle": "solid",
       "strokeWidth": 1.5,
-      "strokeStyle": "dashed",
+      "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
       "frameId": null,
       "roundness": {
-        "type": 2
+        "type": 3,
+        "value": 6
       },
       "seed": 58,
       "version": 1,
@@ -2122,28 +2123,16 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "type": "arrow",
-      "width": 175,
-      "height": 0,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          -175,
-          0
-        ]
-      ],
-      "startArrowhead": null,
-      "endArrowhead": "arrow"
+      "type": "rectangle",
+      "width": 720,
+      "height": 44
     },
     {
       "id": "diag-59",
-      "x": 302.5,
-      "y": 809,
+      "x": -35.25000000000006,
+      "y": 837,
       "angle": 0,
-      "strokeColor": "#64748b",
+      "strokeColor": "#1e293b",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1,
@@ -2164,9 +2153,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 40,
+      "width": 830.5000000000001,
       "height": 14,
-      "text": "200 OK",
+      "text": "IdP never supplies organization name. Password-path duplicate email → same confirmation; provider-path duplicate → \"Sign in instead\" before completion.",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
