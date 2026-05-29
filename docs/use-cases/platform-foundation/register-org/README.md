@@ -92,8 +92,10 @@ Canonical order for this use case. **The wireframes table below uses the same ro
 |------|--------|------|
 | 1 | `register-org` | Entry: Microsoft / Google / GitHub **or** email/password form |
 | 2a | `register-org-complete` | **SSO only** — after OAuth; collect org name, slug, Terms (email read-only) |
-| 2b | *(same as step 1)* | **Email/password** — submit on `register-org` (skip step 2a) |
+| 2b | `register-org` *(same screen as step 1)* | **Email/password** — submit on the entry form (skips 2a; no extra wireframe) |
 | 3 | `email-confirmation` | After org create succeeds (either branch) |
+
+Step **2b** is a path, not a separate UI file — only **2a** adds `register-org-complete.excalidraw`. The wireframes table lists files; step **2b** is called out on the `register-org` row below.
 
 **Error / reference screens** (not sequential steps — open when implementing that AC group):
 
@@ -126,7 +128,7 @@ All UI assets in this folder (six screens). Row order matches [Screen flow](#scr
 
 | # | Screen | Role | Excalidraw | Preview |
 |---|--------|------|------------|---------|
-| 1 | register-org | Happy path — entry | [source](./register-org.excalidraw) | [preview](./register-org.svg) |
+| 1 · 2b | register-org | Happy path — entry (1); email/password submit (2b) | [source](./register-org.excalidraw) | [preview](./register-org.svg) |
 | 2a | register-org-complete | Happy path — post-OAuth completion | [source](./register-org-complete.excalidraw) | [preview](./register-org-complete.svg) |
 | 3 | email-confirmation | Happy path — after create | [source](./email-confirmation.excalidraw) | [preview](./email-confirmation.svg) |
 | — | register-org-provider-states | Error — SSO before completion | [source](./register-org-provider-states.excalidraw) | [preview](./register-org-provider-states.svg) |
