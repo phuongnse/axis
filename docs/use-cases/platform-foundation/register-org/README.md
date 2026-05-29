@@ -114,7 +114,7 @@ flowchart TD
   errComplete["register-org-complete-states"]
   errProvider["register-org-provider-states"]
 
-  entry -->|email / password| confirm
+  entry -->|"2b · submit (email/password)"| confirm
   entry -->|SSO| complete
   complete --> confirm
   entry -.-> errEntry

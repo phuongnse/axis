@@ -69,7 +69,7 @@ Skip `## Screen flow` when there are **zero or one** local screen wireframes (a 
 ### `## Screen flow` (content rules)
 
 1. One sentence: row order in `## Wireframes` matches this section.
-2. **Happy path** table: `| Step | Screen | When |` — use `1`, `2a`, `2b`, `3` for branches; screen slug in backticks.
+2. **Happy path** table: `| Step | Screen | When |` — use `1`, `2a`, `2b`, `3` for branches; screen slug in backticks. If a branch reuses the same UI (e.g. 2b submit on step 1’s screen), say so in **Screen** — it does not get a second wireframe row; merge step ids in the wireframes `#` column (e.g. `1 · 2b`) and label the edge in mermaid.
 3. **Error / reference** table (separate): screens that are **not** sequential steps — when to open each (validation, 5xx, provider errors).
 4. Optional **mermaid** `flowchart` — solid edges = happy path, dotted = error/reference (keep labels = screen slugs).
 
