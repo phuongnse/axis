@@ -222,6 +222,19 @@ export function btn(prefix, x, y, label, variant = 'primary') {
   ];
 }
 
+/**
+ * Form field label with optional required marker (* in C.danger).
+ * Use on every user-editable field label in screen wireframes.
+ */
+export function fieldLabel(prefix, x, y, label, { required = false, color = C.gray500 } = {}) {
+  const labelW = Math.max(24, Math.ceil(label.length * 6.8));
+  const els = [text(`${prefix}_fl`, x, y, labelW, 16, label, 11, color)];
+  if (required) {
+    els.push(text(`${prefix}_req`, x + labelW + 2, y, 10, 16, '*', 11, C.danger));
+  }
+  return els;
+}
+
 /** Text input. h=40, placeholder at y+11, 13px gray500. */
 export function inputField(prefix, x, y, w, placeholder = '') {
   return [

@@ -192,6 +192,10 @@ All canonical dimensions from the template (S03, S04, S09) — never invent size
 
 Width auto-sized: `label.length × 8 + 32`. Height: **36px**. Text at `y+10`, 13px, centered.
 
+### `fieldLabel(prefix, x, y, label, { required?, color? })`
+
+Form label row (11px, default `C.gray500`). When `required: true`, appends a red `*` in `C.danger` immediately after the label text. Use for every user-editable required field — including auth screens (`authCard`, `authFormField`) and S04 demos in `_template`.
+
 ### `inputField(prefix, x, y, w, placeholder?)`
 
 Height: **40px**, `C.gray300` border, rounded. Placeholder at `y+11`, 13px, `C.gray500`.
@@ -300,7 +304,7 @@ authCard(prefix, { title, subtitle?, items, extraLink? }, submitLabel, footerTex
 | `prefix` | string | ID prefix — must be unique per screen |
 | `title` | string | Heading inside the card |
 | `subtitle` | string \| null | Secondary line below the title (optional) |
-| `items` | `{ label, placeholder }[]` | Form fields — each is 72px tall |
+| `items` | `{ label, placeholder, required? }[]` | Form fields — each is 72px tall; set `required: true` for a red `*` (`C.danger`) after the label |
 | `extraLink` | string \| null | Right-aligned link above the submit button (e.g. `'Forgot password?'`) |
 | `submitLabel` | string | Text on the full-width primary button |
 | `footerText` | string | Centered link in the card footer |

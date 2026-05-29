@@ -32,7 +32,7 @@ import { dirname, join } from 'path';
 import {
   C, SB, HDR, CX, CY,
   rect, ellipse, text, hline, vline, arrow,
-  btn, inputField, selectField, badge, searchBar, pageHeader,
+  btn, inputField, selectField, badge, searchBar, pageHeader, fieldLabel,
   appShell, component, translate, writeExcalidraw, setSeed,
   stateHeadline, semanticVariantColor,
 } from './components.mjs';
@@ -222,9 +222,9 @@ function authCard(prefix, { title, subtitle = null, items = [], extraLink = null
 
   // Fields — start at headerH from card top
   const fieldStartY = cardY + headerH;
-  items.forEach(({ label, placeholder }, i) => {
+  items.forEach(({ label, placeholder, required = false }, i) => {
     const y = fieldStartY + i * 72;
-    els.push(text(`${prefix}_fl_${i}`, cardX + 24, y,      cardW - 48, 16, label,       11, C.gray500));
+    els.push(...fieldLabel(`${prefix}_fl_${i}`, cardX + 24, y, label, { required }));
     els.push(...inputField(`${prefix}_fi_${i}`, cardX + 24, y + 18, cardW - 48, placeholder));
   });
 
@@ -248,12 +248,12 @@ function authCard(prefix, { title, subtitle = null, items = [], extraLink = null
 }
 
 /** Auth form field with optional inline error (tenant-registration / organization profile). */
-function authFormField(prefix, cardX, y, cardW, label, value, errorMsg = null) {
+function authFormField(prefix, cardX, y, cardW, label, value, errorMsg = null, required = false) {
   const x = cardX + 24;
   const innerW = cardW - 48;
   const blockH = errorMsg ? 86 : 72;
   const els = [
-    text(`${prefix}_fl`, x, y, innerW, 16, label, 11, C.gray500),
+    ...fieldLabel(prefix, x, y, label, { required }),
     rect(`${prefix}_inp`, x, y + 18, innerW, 40, errorMsg ? C.dangerBorder : C.gray300, C.white, 1, true),
     text(`${prefix}_val`, x + 12, y + 29, innerW - 24, 18, value, 13, C.gray900),
   ];
@@ -264,12 +264,12 @@ function authFormField(prefix, cardX, y, cardW, label, value, errorMsg = null) {
 }
 
 /** Read-only value (e.g. email from external provider). */
-function authReadOnlyValueField(prefix, cardX, y, cardW, label, value) {
+function authReadOnlyValueField(prefix, cardX, y, cardW, label, value, required = false) {
   const x = cardX + 24;
   const innerW = cardW - 48;
   const blockH = 72;
   const els = [
-    text(`${prefix}_fl`, x, y, innerW, 16, label, 11, C.gray500),
+    ...fieldLabel(prefix, x, y, label, { required }),
     rect(`${prefix}_inp`, x, y + 18, innerW, 40, C.gray300, C.gray50, 1, true),
     text(`${prefix}_val`, x + 12, y + 29, innerW - 24, 18, value, 13, C.gray700),
   ];
@@ -277,12 +277,12 @@ function authReadOnlyValueField(prefix, cardX, y, cardW, label, value) {
 }
 
 /** Read-only slug preview (auto-generated from organization name). */
-function authSlugPreviewField(prefix, cardX, y, cardW, errorMsg = null) {
+function authSlugPreviewField(prefix, cardX, y, cardW, errorMsg = null, required = false) {
   const x = cardX + 24;
   const innerW = cardW - 48;
   const blockH = errorMsg ? 100 : 86;
   const els = [
-    text(`${prefix}_fl`, x, y, innerW, 16, 'Organization URL slug', 11, C.gray500),
+    ...fieldLabel(prefix, x, y, 'Organization URL slug', { required }),
     rect(`${prefix}_inp`, x, y + 18, innerW, 40, errorMsg ? C.dangerBorder : C.gray300, C.gray50, 1, true),
     text(`${prefix}_val`, x + 12, y + 29, innerW - 24, 18, 'acme-corp', 13, C.gray700),
     text(`${prefix}_hint`, x, y + 62, innerW, 14, 'Auto-generated from organization name', 10, C.gray500),
@@ -415,12 +415,12 @@ function genRegisterOrg() {
   y += orH;
 
   const fields = [
-    { kind: 'input', label: 'Organization name', value: 'Acme Corp' },
+    { kind: 'input', label: 'Organization name', value: 'Acme Corp', required: true },
     { kind: 'slug' },
-    { kind: 'input', label: 'Admin full name', value: 'Alex Brown' },
-    { kind: 'input', label: 'Email address', value: 'you@company.com' },
-    { kind: 'input', label: 'Password', value: '••••••••' },
-    { kind: 'input', label: 'Confirm password', value: '••••••••' },
+    { kind: 'input', label: 'Admin full name', value: 'Alex Brown', required: true },
+    { kind: 'input', label: 'Email address', value: 'you@company.com', required: true },
+    { kind: 'input', label: 'Password', value: '••••••••', required: true },
+    { kind: 'input', label: 'Confirm password', value: '••••••••', required: true },
   ];
   fields.forEach((f, i) => {
     if (f.kind === 'slug') {
@@ -429,9 +429,10 @@ function genRegisterOrg() {
       y += blockH;
       return;
     }
-    contentEls.push(text(`ro_fl_${i}`, cardX + 24, y, cardW - 48, 16, f.label, 11, C.gray500));
-    contentEls.push(...inputField(`ro_fi_${i}`, cardX + 24, y + 18, cardW - 48, f.value));
-    y += 72;
+    const { els: fieldEls, blockH } = authFormField(
+      `ro_f${i}`, cardX, y, cardW, f.label, f.value, null, f.required === true);
+    contentEls.push(...fieldEls);
+    y += blockH;
   });
 
   const { els: termsEls, blockH: termsH } = authTermsRow('ro_terms', cardX, y, cardW, { checked: true });
@@ -485,13 +486,14 @@ function genRegisterOrgComplete() {
   y += emailH;
 
   const { els: nameEls, blockH: nameH } = authFormField(
-    'roc_name', cardX, y, cardW, 'Admin full name', 'Alex Brown');
+    'roc_name', cardX, y, cardW, 'Admin full name', 'Alex Brown', null, true);
   contentEls.push(...nameEls);
   y += nameH;
 
-  contentEls.push(text('roc_org_fl', cardX + 24, y, cardW - 48, 16, 'Organization name', 11, C.gray500));
-  contentEls.push(...inputField('roc_org_fi', cardX + 24, y + 18, cardW - 48, 'Acme Corp'));
-  y += 72;
+  const { els: orgEls, blockH: orgH } = authFormField(
+    'roc_org', cardX, y, cardW, 'Organization name', 'Acme Corp', null, true);
+  contentEls.push(...orgEls);
+  y += orgH;
 
   const { els: slugEls, blockH: slugH } = authSlugPreviewField('roc_slug', cardX, y, cardW);
   contentEls.push(...slugEls);
@@ -550,11 +552,11 @@ function genRegisterOrgCompleteStates() {
     els.push(...em);
     fy += eh;
     const { els: nm, blockH: nh } = authFormField(
-      `rocs_${id}_nm`, x, fy, panelW, 'Admin full name', 'Alex Brown');
+      `rocs_${id}_nm`, x, fy, panelW, 'Admin full name', 'Alex Brown', null, true);
     els.push(...nm);
     fy += nh;
     const { els: oe, blockH: oh } = authFormField(
-      `rocs_${id}_org`, x, fy, panelW, 'Organization name', orgErr ? 'A' : 'Acme Corp', orgErr);
+      `rocs_${id}_org`, x, fy, panelW, 'Organization name', orgErr ? 'A' : 'Acme Corp', orgErr, true);
     els.push(...oe);
     fy += oh;
     const { els: sl, blockH: sh } = authSlugPreviewField(`rocs_${id}_slug`, x, fy, panelW);
@@ -611,7 +613,8 @@ function registerOrgStatePanel(els, { id, x, y0, panelW, panelH, lbl, lblColor, 
       fy += blockH;
       return;
     }
-    const { els: fe, blockH } = authFormField(`ros_${id}_f${i}`, x, fy, panelW, f.label, f.value, f.err);
+    const { els: fe, blockH } = authFormField(
+      `ros_${id}_f${i}`, x, fy, panelW, f.label, f.value, f.err, f.required !== false);
     els.push(...fe);
     fy += blockH;
   });
@@ -629,12 +632,12 @@ function registerOrgStatePanel(els, { id, x, y0, panelW, panelH, lbl, lblColor, 
 }
 
 const REGISTER_ORG_STATE_FIELDS = [
-  { kind: 'input', label: 'Organization name', value: "O'Brien & Co.", err: null },
+  { kind: 'input', label: 'Organization name', value: "O'Brien & Co.", err: null, required: true },
   { kind: 'slug', err: null },
-  { kind: 'input', label: 'Admin full name', value: 'Alex Brown', err: null },
-  { kind: 'input', label: 'Email address', value: 'alex@company.com', err: null },
-  { kind: 'input', label: 'Password', value: '••••••••', err: null },
-  { kind: 'input', label: 'Confirm password', value: '••••••••', err: null },
+  { kind: 'input', label: 'Admin full name', value: 'Alex Brown', err: null, required: true },
+  { kind: 'input', label: 'Email address', value: 'alex@company.com', err: null, required: true },
+  { kind: 'input', label: 'Password', value: '••••••••', err: null, required: true },
+  { kind: 'input', label: 'Confirm password', value: '••••••••', err: null, required: true },
 ];
 
 /**
@@ -661,12 +664,12 @@ function genRegisterOrgStates() {
     lblColor: C.danger,
     serverBanner: null,
     fields: [
-      { kind: 'input', label: 'Organization name', value: 'A', err: 'Must be between 2 and 100 characters.' },
+      { kind: 'input', label: 'Organization name', value: 'A', err: 'Must be between 2 and 100 characters.', required: true },
       { kind: 'slug' },
-      { kind: 'input', label: 'Admin full name', value: 'Alex Brown', err: null },
-      { kind: 'input', label: 'Email address', value: 'not-an-email', err: 'Enter a valid email address.' },
-      { kind: 'input', label: 'Password', value: '••••••••', err: 'Must be at least 8 characters with a letter and a number.' },
-      { kind: 'input', label: 'Confirm password', value: '••••••••', err: 'Passwords do not match.' },
+      { kind: 'input', label: 'Admin full name', value: 'Alex Brown', err: null, required: true },
+      { kind: 'input', label: 'Email address', value: 'not-an-email', err: 'Enter a valid email address.', required: true },
+      { kind: 'input', label: 'Password', value: '••••••••', err: 'Must be at least 8 characters with a letter and a number.', required: true },
+      { kind: 'input', label: 'Confirm password', value: '••••••••', err: 'Passwords do not match.', required: true },
     ],
     terms: { checked: true },
   });
@@ -1433,8 +1436,8 @@ function genLogin() {
   const els = authCard('li', {
     title: 'Sign in to Axis',
     items: [
-      { label: 'Email address', placeholder: 'you@company.com' },
-      { label: 'Password',      placeholder: '••••••••' },
+      { label: 'Email address', placeholder: 'you@company.com', required: true },
+      { label: 'Password',      placeholder: '••••••••', required: true },
     ],
     extraLink: 'Forgot password?',
   }, 'Sign in', "Don't have an account? Sign up");
@@ -1483,9 +1486,9 @@ function genRegister() {
     title: 'Create your account',
     subtitle: null,
     items: [
-      { label: 'Full name',     placeholder: 'Alex Brown' },
-      { label: 'Email address', placeholder: 'you@company.com' },
-      { label: 'Password',      placeholder: '••••••••' },
+      { label: 'Full name',     placeholder: 'Alex Brown', required: true },
+      { label: 'Email address', placeholder: 'you@company.com', required: true },
+      { label: 'Password',      placeholder: '••••••••', required: true },
     ],
   }, 'Create account', 'Already have an account? Sign in');
   write('identity-access/register.excalidraw', els);
@@ -1496,7 +1499,7 @@ function genForgotPassword() {
     title: 'Reset your password',
     subtitle: 'Enter your email and we will send you a reset link.',
     items: [
-      { label: 'Email address', placeholder: 'you@company.com' },
+      { label: 'Email address', placeholder: 'you@company.com', required: true },
     ],
   }, 'Send reset link', 'Remember your password? Sign in');
   write('identity-access/forgot-password.excalidraw', els);
@@ -1507,8 +1510,8 @@ function genChangePassword() {
     title: 'Choose a new password',
     subtitle: null,
     items: [
-      { label: 'New password',     placeholder: '••••••••' },
-      { label: 'Confirm password', placeholder: '••••••••' },
+      { label: 'New password',     placeholder: '••••••••', required: true },
+      { label: 'Confirm password', placeholder: '••••••••', required: true },
     ],
   }, 'Set new password', 'Back to sign in');
   write('identity-access/change-password.excalidraw', els);
@@ -1519,8 +1522,8 @@ function genAcceptInvitation() {
     title: 'You have been invited',
     subtitle: 'Join Acme Corp on Axis',
     items: [
-      { label: 'Organization',    placeholder: 'Acme Corp' },
-      { label: 'Choose a password', placeholder: '••••••••' },
+      { label: 'Organization',      placeholder: 'Acme Corp', required: false },
+      { label: 'Choose a password', placeholder: '••••••••', required: true },
     ],
   }, 'Accept Invitation', 'Already have an account? Sign in');
   write('identity-access/accept-invitation.excalidraw', els);

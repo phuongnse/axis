@@ -46,7 +46,7 @@ import { fileURLToPath } from 'url';
 import {
   nextSeed, BASE,
   rect, ellipse, text, hline, vline, arrow, sectionHeader,
-  C,
+  C, fieldLabel,
   writeExcalidraw,
 } from './components.mjs';
 
@@ -135,6 +135,12 @@ export function buildFormControls(y0) {
   const yC = y0 + 48;
 
   // ── Col 1: Text input states (x=50) ──
+  els.push(text('inp_req_note', 50, yC, 200, 14, 'Required labels (* = C.danger)', 10, C.gray500));
+  els.push(...fieldLabel('inp_req', 50, yC + 18, 'Organization name', { required: true }));
+  els.push(rect('inp_req_demo', 50, yC + 36, 280, 40, C.gray300, C.white, 1, true));
+  els.push(text('inp_req_ph', 62, yC + 47, 250, 18, 'Acme Corp', 13, C.gray500));
+
+  const statesY = yC + 90;
   const inputStates = [
     ['Default',  C.gray300,   C.white,    1, 'email@company.com',  C.gray500],
     ['Focus',    C.primary,   C.white,    2, 'email@company.com',  C.gray500],
@@ -142,8 +148,8 @@ export function buildFormControls(y0) {
     ['Disabled', C.gray300,   C.gray100,  1, 'Disabled',           C.gray300],
   ];
   inputStates.forEach(([state, stroke, bg, sw, placeholder, phColor], i) => {
-    const y = yC + i * 78;
-    els.push(text(`inp_lbl_${i}`, 50, y, 100, 16, state, 11, C.gray500));
+    const y = statesY + i * 78;
+    els.push(...fieldLabel(`inp_lbl_${i}`, 50, y, 'Email address', { required: true }));
     els.push(rect(`inp_${i}`, 50, y + 18, 280, 40, stroke, bg, sw, true));
     els.push(text(`inp_ph_${i}`, 62, y + 29, 250, 18, placeholder, 13, phColor));
     if (state === 'Error') {
@@ -155,7 +161,7 @@ export function buildFormControls(y0) {
   const x2 = 380;
 
   // Password
-  els.push(text('pw_lbl', x2, yC, 100, 16, 'Password', 11, C.gray500));
+  els.push(...fieldLabel('pw_lbl', x2, yC, 'Password', { required: true }));
   els.push(rect('pw_inp', x2, yC + 18, 280, 40, C.gray300, C.white, 1, true));
   els.push(text('pw_dots', x2 + 12, yC + 29, 150, 18, '••••••••', 13, C.gray700));
   els.push(text('pw_eye', x2 + 248, yC + 29, 20, 18, '👁', 13, C.gray500));
