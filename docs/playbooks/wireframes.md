@@ -200,7 +200,7 @@ Form label row (11px, default `C.gray500`). When `required: true`, appends a red
 
 ### `fieldLabelBlock(prefix, x, y, innerW, label, { required?, helpText?, color? })`
 
-Label row + optional **help affordance**: `?` in a 16px circle (top-right of the field column) and a **help text** line (10px, `C.gray500`) under the label, before the control. Returns `{ els, labelBlockH, inputY }` for stacking inputs. Prefer `authFormField(…, helpText)` on auth screens rather than composing by hand.
+Label row + optional **help affordance**: `?` in a 16px circle **inline after the label** (and `*` when required) — `C.primaryDark` on `C.infoBg`, stroke 2px. **Help text** line (10px, `C.gray700`) under the label, before the control. Returns `{ els, labelBlockH, inputY }`. Prefer `authFormField(…, helpText)` on auth screens.
 
 ### `inputField(prefix, x, y, w, placeholder?)`
 
