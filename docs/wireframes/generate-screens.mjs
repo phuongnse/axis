@@ -671,7 +671,7 @@ function genEmailConfirmationStates() {
         title: 'Verification email sent',
         body: 'If an account exists for this email, check your inbox for a new link.',
       },
-      resend: { disabled: true },
+      resend: {},
     },
     {
       id: 'ecs_rl',
