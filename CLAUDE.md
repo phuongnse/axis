@@ -78,7 +78,7 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 - Zero build warnings and zero test failures.
 - Docs in the same PR as code (see [agent-checklist](docs/playbooks/agent-checklist.md)).
 - No new TODO/FIXME/placeholder/stub code.
-- For visual artifact changes (`docs/diagrams/`, `docs/wireframes/`, `docs/use-cases/**` `.excalidraw`/`.svg`): run [`docs/playbooks/visual-artifact-checklist.md`](docs/playbooks/visual-artifact-checklist.md) before commit.
+- For **wireframe** changes (`docs/wireframes/`, `docs/use-cases/**` screen `.excalidraw`/`.svg`): run [`docs/playbooks/visual-artifact-checklist.md`](docs/playbooks/visual-artifact-checklist.md) before commit. **Diagrams** are Mermaid in `docs/README.md` and use-case `README.md` — preview after edit, no Kroki step.
 
 **When blocked:** state blocker → cite constraint → 2–3 options → wait. Never self-unblock on P0.
 

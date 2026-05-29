@@ -89,6 +89,45 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 
 ## Diagrams
 
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| auth-flow | [source](./auth-flow.excalidraw) | [preview](./auth-flow.svg) |
+### auth-flow
+
+```mermaid
+sequenceDiagram
+  actor User as User
+  participant Web as Web App
+  participant API as API Server (OpenIddict)
+  participant Redis as Redis (blacklist)
+  participant DB as PostgreSQL
+
+  rect rgb(240, 249, 255)
+    Note over User,DB: Sign in
+    User->>Web: Enter email + password
+    Web->>API: POST /auth/token
+    API->>DB: Validate credentials
+    API-->>Web: access_token + refresh_token
+  end
+
+  rect rgb(240, 249, 255)
+    Note over User,DB: Authenticated request
+    User->>Web: Navigate / perform action
+    Web->>API: GET /resource (Bearer token)
+    API->>API: Validate JWT + set tenant
+    API-->>Web: 200 OK + data
+  end
+
+  rect rgb(240, 249, 255)
+    Note over User,DB: Silent token refresh
+    Web->>API: POST /auth/refresh (httpOnly cookie)
+    API->>DB: Validate + rotate refresh token
+    API-->>Web: new access_token + refresh_token
+  end
+
+  rect rgb(240, 249, 255)
+    Note over User,DB: Sign out
+    User->>Web: Click Sign Out
+    Web->>API: POST /auth/signout
+    API->>Redis: Blacklist access_token JTI
+    API->>DB: Revoke refresh token
+    API-->>Web: 200 OK
+  end
+```

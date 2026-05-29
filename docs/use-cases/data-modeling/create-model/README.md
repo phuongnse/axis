@@ -71,6 +71,39 @@ Users can create custom data models within their organization. A model defines t
 
 ## Diagrams
 
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| data-model | [source](./data-model.excalidraw) | [preview](./data-model.svg) |
+### data-model
+
+```mermaid
+erDiagram
+  ModelDefinition ||--o{ FieldDefinition : owns
+  FieldDefinition }o--|| FieldType : has
+  DataClassDefinition ||--o{ FieldDefinition : reuses
+  FieldDefinition }o..o| DataClassDefinition : "DataClass ref"
+  ModelDefinition ||--o{ DataRecord : instances
+
+  ModelDefinition {
+    uuid id
+    string name
+    string slug
+    string description
+  }
+  FieldDefinition {
+    uuid id
+    uuid modelId
+    string name
+    FieldType type
+    jsonb config
+  }
+  FieldType {
+    enum values
+  }
+  DataRecord {
+    uuid id
+    uuid modelId
+    jsonb data
+  }
+  DataClassDefinition {
+    uuid id
+    string name
+  }
+```

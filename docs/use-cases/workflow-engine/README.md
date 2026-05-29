@@ -58,7 +58,7 @@ A workflow builder without an execution engine is just a drawing tool. This doma
 
 ## Diagrams
 
-![Execution Flow](./start-execution/execution-flow.svg)
+See [Execution flow](./start-execution/README.md#execution-flow) (Mermaid).
 
 ---
 

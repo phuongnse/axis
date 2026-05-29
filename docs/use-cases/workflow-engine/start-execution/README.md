@@ -70,6 +70,45 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 
 ## Diagrams
 
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| execution-flow | [source](./execution-flow.excalidraw) | [preview](./execution-flow.svg) |
+### execution-flow
+
+```mermaid
+sequenceDiagram
+  participant Trigger as Trigger
+  participant Orch as Execution Orchestrator
+  participant Handler as Step Handler
+  participant Jobs as Wolverine (Jobs)
+  participant DB as PostgreSQL
+  participant Hub as SignalR Hub
+  participant Browser as Browser
+
+  rect rgb(240, 249, 255)
+    Note over Trigger,Browser: Execution start
+    Trigger->>Orch: Start(workflowId, inputPayload)
+    Orch->>DB: Create Execution (PENDING)
+    Orch->>DB: Create StepExecution records
+    Orch->>Jobs: Enqueue ExecuteNextStep
+    Orch->>Hub: ExecutionStarted event
+    Hub->>Browser: Push status update
+  end
+
+  rect rgb(240, 249, 255)
+    Note over Orch,Browser: Step execution loop
+    Jobs->>Orch: ExecuteNextStep(executionId)
+    Orch->>DB: Update step (RUNNING)
+    Orch->>Hub: StepStarted event
+    Orch->>Handler: Execute(stepDefinition, context)
+    Handler->>DB: Form: Create FormTask (PENDING)
+    Handler->>Jobs: Form: Enqueue notification
+    Handler-->>Orch: StepResult(success, output)
+    Orch->>DB: Update step (COMPLETED)
+    Orch->>Jobs: Enqueue ExecuteNextStep
+  end
+
+  rect rgb(240, 249, 255)
+    Note over Orch,Browser: Execution complete
+    Orch->>DB: Update execution (COMPLETED)
+    Orch->>Hub: ExecutionCompleted event
+    Hub->>Browser: Push status update
+  end
+```

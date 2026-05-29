@@ -88,15 +88,20 @@ Assets live **flat** inside this use-case folder. Reference shared kit screens f
 
 ## Diagrams
 
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| `<diagram-slug>` | `/<diagram-slug>.excalidraw` | `/<diagram-slug>.svg` |
+Mermaid blocks in this README (sequence, flowchart, or `erDiagram`). One `### <diagram-slug>` heading per diagram.
 
-Use real markdown links in implemented use cases (see [register-org § Diagrams](./platform-foundation/register-org/README.md#diagrams)).
+```markdown
+### `<diagram-slug>`
 
-**Related (next use case):** optional — short link to the next use case / diagram in prose. See [register-org § Diagrams](./platform-foundation/register-org/README.md#diagrams).
+\`\`\`mermaid
+sequenceDiagram
+  ...
+\`\`\`
+```
 
-Use `| N/A | N/A | N/A |` when this use case has no diagram in its folder.
+See [register-org § Diagrams](./platform-foundation/register-org/README.md#diagrams). **Related (next use case):** optional prose link after the diagrams — do not duplicate another use case’s diagram here.
+
+Omit this section (or note “N/A”) when the use case has no local diagram.
 
 > **Implementation status**
 >

@@ -29,7 +29,7 @@ Ship after data modeling, workflow builder, form builder, and workflow engine.
 
 ## Diagrams
 
-> **Pending** — page-model diagram not yet created. Add `page-model` to `docs/diagrams/generate-diagrams.mjs` when this domain begins.
+> **Pending** — add a `page-model` Mermaid `erDiagram` under `## Diagrams` in the owning use-case README when this domain begins.
 
 ---
 

@@ -78,6 +78,41 @@ Self-service registration flow where a new organization signs up and is automati
 
 ## Diagrams
 
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| tenant-provisioning | [source](./tenant-provisioning.excalidraw) | [preview](./tenant-provisioning.svg) |
+### tenant-provisioning
+
+```mermaid
+sequenceDiagram
+  actor Admin as New Admin
+  participant Web as Web App
+  participant API as API Server
+  participant Email as Email Service
+  participant Jobs as Wolverine (Jobs)
+  participant Pub as PostgreSQL (public)
+  participant Tenant as PostgreSQL (tenant)
+
+  Admin->>Web: Fill registration form
+  Web->>API: POST /auth/register
+  API->>Pub: Save org (PENDING) + user
+  API->>Email: Send verification email
+  API-->>Web: 202 Accepted
+
+  rect rgb(240, 249, 255)
+    Note over Admin,Jobs: Email verification
+    Admin->>Web: Click verification link
+    Web->>API: POST /auth/verify-email
+    API->>Pub: Mark VERIFIED + PROVISIONING
+    API->>Jobs: Enqueue ProvisionTenantJob
+    API-->>Web: 200 OK → Redirect
+  end
+
+  rect rgb(240, 249, 255)
+    Note over Jobs,Tenant: Async provisioning
+    Jobs->>Pub: Generate schema name
+    Jobs->>Tenant: CREATE SCHEMA tenant_{slug}
+    Jobs->>Tenant: Run EF Core migrations
+    Jobs->>Pub: Assign Admin role + ACTIVE
+    Jobs->>Email: Send welcome email
+  end
+
+  Note over Web,API: UI polls org.status = ACTIVE then shows dashboard
+```

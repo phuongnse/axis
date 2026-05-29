@@ -155,9 +155,100 @@ All UI assets in this folder (three happy-path screens + four reference state bo
 
 ## Diagrams
 
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| register-org-flow | [source](./register-org-flow.excalidraw) | [preview](./register-org-flow.svg) |
-| register-org-cases | [source](./register-org-cases.excalidraw) | [preview](./register-org-cases.svg) |
+Mermaid in this file (GitHub / IDE preview). Wireframes remain Excalidraw above.
 
-**Related (next use case):** after email verification, see [provision-tenant](../provision-tenant/) ([`tenant-provisioning`](../provision-tenant/tenant-provisioning.excalidraw)).
+### register-org-flow
+
+Email/password and external-provider registration (happy paths + provider pre-checks).
+
+```mermaid
+sequenceDiagram
+  actor Admin as New Admin
+  participant Web as Web App
+  participant API as Axis API<br/>(Identity + Org)
+  participant Email as Email Service
+  participant IdP as IdP (MS/Google/GitHub)
+
+  Admin->>Web: Open registration page
+  Web-->>Admin: SSO icons + email/password form
+
+  rect rgb(240, 249, 255)
+    Note over Admin,Email: Email / password path
+    Admin->>Web: Accept Terms + submit (Idempotency-Key)
+    Web->>API: POST /api/organizations/
+    API->>API: Generate slug, hash password, record ToS
+    API->>Email: Send verification email (if new)
+    API-->>Web: 202 → confirmation screen
+  end
+
+  rect rgb(240, 249, 255)
+    Note over Admin,IdP: External provider (OAuth only)
+    Admin->>Web: Choose Microsoft / Google / GitHub
+    Web->>IdP: OAuth2 Auth Code + PKCE
+    IdP-->>Web: Verified email + display name
+    Web->>API: Validate claims (verified email required)
+    alt No verified email
+      API-->>Web: Reject: no verified email
+    else Duplicate email
+      API-->>Web: Reject: duplicate email → Sign in
+    else OK
+      API-->>Web: Open register-org-complete
+    end
+  end
+
+  rect rgb(240, 249, 255)
+    Note over Admin,Email: Post-OAuth completion screen
+    Web-->>Admin: register-org-complete (name, slug, Terms)
+    Admin->>Web: Submit completion (Idempotency-Key)
+    Web->>API: POST org + link external login
+    API->>Email: Send verification email (if new)
+    API-->>Web: 202 → confirmation screen
+  end
+
+  Note over Admin,API: IdP never supplies org name. Password duplicate email still returns the same confirmation screen.
+```
+
+### register-org-cases
+
+Dev checklist — API outcomes mapped to wireframe states.
+
+```mermaid
+sequenceDiagram
+  actor Admin as New Admin
+  participant Web as Web App
+  participant API as Axis API
+
+  rect rgb(255, 251, 235)
+    Note over Admin,API: Email/password submission
+    Admin->>Web: Submit register-org (+ Terms, Idempotency-Key)
+    Web->>API: POST /api/organizations/
+    API-->>Web: 400 validation (inline field errors)
+    API-->>Web: 5xx generic banner, re-enable submit
+    API-->>Web: 202 confirmation (new or duplicate email)
+  end
+
+  rect rgb(255, 251, 235)
+    Note over Admin,API: Provider callback pre-check
+    Admin->>Web: Provider OAuth callback completes
+    Web->>API: Validate claims (verified email, uniqueness)
+    API-->>Web: Reject: no verified email → provider error
+    API-->>Web: Reject: duplicate email → Sign in
+    API-->>Web: Open register-org-complete
+  end
+
+  rect rgb(255, 251, 235)
+    Note over Admin,API: Post-OAuth completion submit
+    Admin->>Web: Submit complete form (name, slug, Terms)
+    Web->>API: POST completion (link external login)
+    API-->>Web: 400 org / Terms errors (inline)
+    API-->>Web: 5xx banner, re-enable submit
+  end
+
+  rect rgb(255, 251, 235)
+    Note over Admin,API: Shared confirmation outcome
+    API-->>Web: 202 confirmation screen
+    Web-->>Admin: email-confirmation + resend (204 / 429)
+  end
+```
+
+**Related (next use case):** after email verification, see [provision-tenant](../provision-tenant/) ([tenant provisioning sequence](../provision-tenant/README.md#tenant-provisioning)).

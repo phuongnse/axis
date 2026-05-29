@@ -112,20 +112,20 @@ Sequence/architecture drawings are under [Diagrams](#diagrams).
 
 ### `## Diagrams` (content rules)
 
-- List only `*.excalidraw` **diagrams stored in this use-case folder** (sequence, entity, architecture).
-- Standard table: `| Diagram | Source | Preview |` with `[source](./…)` / `[preview](./…)`.
-- **Related use cases:** if the flow continues in another use case, add one short prose line after the table — `**Related (next use case):** …` with links to that use case and diagram. Do not add another use case’s diagram as a row in this table (one file, one owning README). Keep the Related line brief; the table rule is enough — no need to say “not duplicated” in the README.
-- Use `| N/A | N/A | N/A |` when no local diagram exists (omit the Related line).
+- **Mermaid only** in this README (`sequenceDiagram`, `flowchart`, `erDiagram`, …) — one `### <diagram-slug>` section per diagram.
+- Platform-wide architecture diagrams live in [docs/README.md § Key Diagrams](../README.md#key-diagrams), not duplicated here.
+- **Related use cases:** one short prose line after the diagrams — `**Related (next use case):** …` with a link to the other use-case `## Diagrams` anchor. Do not paste another use case’s Mermaid here.
+- Omit `## Diagrams` when this use case has no local diagram.
 
 ### Adopting this layout on existing use cases
 
 When touching an older use case that only has a flat wireframes table:
 
-1. Count `*.excalidraw` in the folder — split **screens** vs **diagrams** by naming and AC (screens = UI; diagrams = `*-flow`, `*-model`, etc.).
+1. Count `*.excalidraw` in the folder — **screens only** (UI wireframes). Sequence/entity content belongs in `## Diagrams` as Mermaid, not as `.excalidraw` files.
 2. Add or refresh `## Screen flow` if the when-to-add rules apply.
 3. Expand `## Wireframes` so **every screen file** has a row; add `#` / `Role` if helpful.
-4. Move cross-use-case diagram rows out of `## Diagrams` into `**Related:**` prose.
-5. Regenerate `.svg` if `.excalidraw` changed; run [`visual-artifact-checklist.md`](./visual-artifact-checklist.md).
+4. Move cross-use-case diagram references into `**Related:**` prose (link to the other README’s `###` anchor).
+5. Regenerate `.svg` if **wireframe** `.excalidraw` changed; run [`visual-artifact-checklist.md`](./visual-artifact-checklist.md). Preview Mermaid after diagram edits.
 
 No need to bulk-edit all use cases in one PR — update the use case you are already changing, and align siblings in the same domain when obvious.
 

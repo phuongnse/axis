@@ -66,6 +66,31 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 
 ## Diagrams
 
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| form-model | [source](./form-model.excalidraw) | [preview](./form-model.svg) |
+### form-model
+
+```mermaid
+erDiagram
+  FormDefinition ||--o{ FormFieldDefinition : owns
+  FormFieldDefinition }o--|| FormFieldType : type
+  FormDefinition ||--o{ FormSubmission : runtime
+  FormSubmission }o--|| FormSubmissionStatus : status
+
+  FormDefinition {
+    uuid id
+    string name
+    uuid organizationId
+  }
+  FormFieldDefinition {
+    uuid id
+    uuid formId
+    string key
+    FormFieldType type
+    jsonb config
+  }
+  FormSubmission {
+    uuid id
+    uuid formDefinitionId
+    uuid executionId
+    jsonb submittedData
+  }
+```

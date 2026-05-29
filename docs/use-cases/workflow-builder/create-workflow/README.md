@@ -73,6 +73,34 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 
 ## Diagrams
 
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| workflow-model | [source](./workflow-model.excalidraw) | [preview](./workflow-model.svg) |
+### workflow-model
+
+```mermaid
+erDiagram
+  WorkflowDefinition ||--|| TriggerConfig : has
+  WorkflowDefinition ||--o{ StepDefinition : contains
+  WorkflowDefinition ||--o{ Transition : routes
+  WorkflowDefinition }o--|| WorkflowStatus : status
+  TriggerConfig }o--|| TriggerType : type
+  StepDefinition }o--|| StepType : type
+  StepDefinition }o..o| ParallelGroup : "planned 0..1"
+  ParallelGroup }o--|| JoinType : joinType
+
+  WorkflowDefinition {
+    uuid id
+    string name
+    WorkflowStatus status
+    int version
+  }
+  StepDefinition {
+    uuid id
+    uuid workflowId
+    StepType type
+    jsonb config
+  }
+  Transition {
+    uuid fromStepId
+    uuid toStepId
+    string condition
+  }
+```

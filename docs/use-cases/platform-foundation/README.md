@@ -58,7 +58,7 @@ Ship first — tenant registration, isolation, and subscription plans are prereq
 
 ## Diagrams
 
-![Tenant Provisioning Flow](./provision-tenant/tenant-provisioning.svg)
+See [Tenant provisioning sequence](./provision-tenant/README.md#tenant-provisioning) (Mermaid).
 
 ---
 

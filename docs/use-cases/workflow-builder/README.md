@@ -84,7 +84,7 @@ The workflow builder is the heart of the platform. It is what differentiates Axi
 
 ## Diagrams
 
-![Workflow Data Model](./create-workflow/workflow-model.svg)
+See [Workflow model](./create-workflow/README.md#workflow-model) (Mermaid).
 
 ---
 

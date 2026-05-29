@@ -47,30 +47,127 @@
 
 ## Key Diagrams
 
-All diagrams are Excalidraw (`.excalidraw` source + `.svg` preview). Regenerate with `node docs/diagrams/generate-diagrams.mjs` then `docs/scripts/generate-diagrams.ps1`.
+Platform **architecture** diagrams live here as **Mermaid** (renders on GitHub and in editors with Mermaid support). **UI wireframes** stay Excalidraw — see [Wireframes](#wireframes) below.
 
-**System-level** (`docs/diagrams/`):
+Use-case **sequence / entity** diagrams live in each use-case `README.md` under `## Diagrams` (also Mermaid). Index:
 
-| Diagram | Source | Preview |
-|---|---|---|
-| System Context | [system-context.excalidraw](./diagrams/system-context.excalidraw) | [system-context.svg](./diagrams/system-context.svg) |
-| Container Diagram | [container.excalidraw](./diagrams/container.excalidraw) | [container.svg](./diagrams/container.svg) |
-| Module Overview | [module-overview.excalidraw](./diagrams/module-overview.excalidraw) | [module-overview.svg](./diagrams/module-overview.svg) |
+| Diagram | Owner |
+|---|---|
+| Tenant provisioning | [provision-tenant § Diagrams](./use-cases/platform-foundation/provision-tenant/README.md#diagrams) |
+| Register organization (flow + cases) | [register-org § Diagrams](./use-cases/platform-foundation/register-org/README.md#diagrams) |
+| Auth flow | [sign-in § Diagrams](./use-cases/identity-access/sign-in/README.md#diagrams) |
+| Data model | [create-model § Diagrams](./use-cases/data-modeling/create-model/README.md#diagrams) |
+| Workflow model | [create-workflow § Diagrams](./use-cases/workflow-builder/create-workflow/README.md#diagrams) |
+| Form model | [create-form § Diagrams](./use-cases/form-builder/create-form/README.md#diagrams) |
+| Execution flow | [start-execution § Diagrams](./use-cases/workflow-engine/start-execution/README.md#diagrams) |
 
-**Use-case-level** (inside each `docs/use-cases/{domain}/{use-case}/` folder):
+### System context
 
-| Diagram | Source | Preview |
-|---|---|---|
-| Tenant Provisioning | [tenant-provisioning.excalidraw](./use-cases/platform-foundation/provision-tenant/tenant-provisioning.excalidraw) | [tenant-provisioning.svg](./use-cases/platform-foundation/provision-tenant/tenant-provisioning.svg) |
-| Auth Flow | [auth-flow.excalidraw](./use-cases/identity-access/sign-in/auth-flow.excalidraw) | [auth-flow.svg](./use-cases/identity-access/sign-in/auth-flow.svg) |
-| Data Model | [data-model.excalidraw](./use-cases/data-modeling/create-model/data-model.excalidraw) | [data-model.svg](./use-cases/data-modeling/create-model/data-model.svg) |
-| Workflow Model | [workflow-model.excalidraw](./use-cases/workflow-builder/create-workflow/workflow-model.excalidraw) | [workflow-model.svg](./use-cases/workflow-builder/create-workflow/workflow-model.svg) |
-| Form Model | [form-model.excalidraw](./use-cases/form-builder/create-form/form-model.excalidraw) | [form-model.svg](./use-cases/form-builder/create-form/form-model.svg) |
-| Execution Flow | [execution-flow.excalidraw](./use-cases/workflow-engine/start-execution/execution-flow.excalidraw) | [execution-flow.svg](./use-cases/workflow-engine/start-execution/execution-flow.svg) |
+External actors and the Axis platform boundary. Detail: [ARCHITECTURE.md § System Context](./ARCHITECTURE.md#system-context).
+
+```mermaid
+flowchart LR
+  PA[Platform Admin]
+  OA[Org Admin]
+  OM[Org Member]
+  EU[End User]
+
+  subgraph Axis["Axis Platform"]
+    SPA[Web Application]
+    API[Axis.Api Gateway + Modules]
+  end
+
+  Email[(Email Service)]
+  ExtAPI[(External APIs)]
+  Webhook[(Webhook Targets)]
+
+  PA --> API
+  OA --> SPA
+  OM --> SPA
+  EU --> SPA
+  SPA --> API
+  API --> Email
+  API --> ExtAPI
+  API --> Webhook
+```
+
+### Container diagram
+
+Runtime containers, brokers, and per-module databases. Detail: [ARCHITECTURE.md § Containers](./ARCHITECTURE.md#containers).
+
+```mermaid
+flowchart TB
+  subgraph Platform["Axis.Api Gateway + Module Services (modulith)"]
+    SPA[Web Application<br/>React SPA]
+    ID[Identity]
+    DM[DataModeling]
+    WB[WorkflowBuilder]
+    FB[FormBuilder]
+    WE[WorkflowEngine]
+    PB[PageBuilder]
+    Kafka[Kafka + Schema Registry<br/>Events / Snapshots]
+    RMQ[RabbitMQ<br/>Commands / Jobs / Saga]
+    GRPC[gRPC Contracts<br/>Sync RPC]
+    OIDC[OpenIddict<br/>OAuth2 / OIDCE]
+    SR[SignalR]
+  end
+
+  subgraph Data["Per-module PostgreSQL"]
+    DB1[(Identity DB)]
+    DB2[(DataModeling DB)]
+    DB3[(WorkflowBuilder DB)]
+    DB4[(WorkflowEngine DB)]
+    DB5[(FormBuilder DB)]
+    DB6[(PageBuilder DB)]
+  end
+
+  Redis[(Redis)]
+  Vault[HashiCorp Vault]
+  Obs[Grafana Tempo / Loki / Mimir]
+  S3[AWS S3]
+  Mail[Email Service]
+
+  ID & DM & WB & FB & WE & PB --> Kafka
+  ID & DM & WB & FB & WE & PB --> RMQ
+  ID & DM & WB & FB & WE & PB --> GRPC
+  ID & DM & WB & FB & WE & PB --> DB1 & DB2 & DB3 & DB4 & DB5 & DB6
+  Platform --> Redis
+  Platform --> Vault
+  Platform --> Obs
+  Platform --> S3
+  Platform --> Mail
+  SPA --> Platform
+```
+
+### Module overview
+
+Cross-module communication (Kafka events, RabbitMQ commands, gRPC escape hatch). Detail: [ARCHITECTURE.md](./ARCHITECTURE.md).
+
+```mermaid
+flowchart TB
+  SK[Shared Kernel — primitives & abstractions]
+
+  ID[Identity]
+  DM[DataModeling]
+  WB[WorkflowBuilder]
+  FB[FormBuilder]
+  WE[WorkflowEngine]
+  PB[PageBuilder]
+
+  SK --- ID & DM & WB & FB
+  Kafka[Kafka + Schema Registry — Events / Snapshots]
+  RMQ[RabbitMQ — Commands / Jobs / Saga steps]
+  GRPC[gRPC — sync RPC escape hatch]
+
+  WB -->|publish| Kafka
+  Kafka -->|consume| WE
+  RMQ -->|consume command| FB
+  WE -->|local read model| WE
+```
 
 ## Wireframes
 
-Excalidraw wireframes/diagrams live alongside each use case in `docs/use-cases/{domain}/{short-slug}/`. Shared app shell only: `docs/wireframes/app-shell`. Kit source is `.mjs` (`blocks.mjs`, `generate-template.mjs`). Each use case uses a `## Wireframes` + `## Diagrams` table (see [use-case template](./use-cases/USE_CASE_TEMPLATE.md)).
+Excalidraw wireframes live alongside each use case in `docs/use-cases/{domain}/{short-slug}/`. Shared app shell only: `docs/wireframes/app-shell`. Kit source is `.mjs` (`blocks.mjs`, `generate-template.mjs`). Each use case uses `## Wireframes` (Excalidraw) and `## Diagrams` (Mermaid in README) — see [use-case template](./use-cases/USE_CASE_TEMPLATE.md).
 
 | Screen | Source | Preview |
 |---|---|---|
