@@ -139,4 +139,4 @@ All UI assets in this folder (six screens). Row order matches [Screen flow](#scr
 |---------|--------|---------|
 | register-org-flow | [source](./register-org-flow.excalidraw) | [preview](./register-org-flow.svg) |
 
-**Related (next use case):** after the user verifies their email, schema provisioning is specified in [provision-tenant](../provision-tenant/) — diagram [`tenant-provisioning`](../provision-tenant/tenant-provisioning.excalidraw), not duplicated here.
+**Related (next use case):** after email verification, see [provision-tenant](../provision-tenant/) ([`tenant-provisioning`](../provision-tenant/tenant-provisioning.excalidraw)).

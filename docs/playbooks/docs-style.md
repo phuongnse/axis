@@ -114,7 +114,7 @@ Sequence/architecture drawings are under [Diagrams](#diagrams).
 
 - List only `*.excalidraw` **diagrams stored in this use-case folder** (sequence, entity, architecture).
 - Standard table: `| Diagram | Source | Preview |` with `[source](./…)` / `[preview](./…)`.
-- **Related use cases:** if the flow continues in another use case, add one prose line after the table — `**Related (next use case):** …` with a markdown link to that use case and diagram file. **Never** add another use case’s diagram as a row in this table (one file, one owning README).
+- **Related use cases:** if the flow continues in another use case, add one short prose line after the table — `**Related (next use case):** …` with links to that use case and diagram. Do not add another use case’s diagram as a row in this table (one file, one owning README). Keep the Related line brief; the table rule is enough — no need to say “not duplicated” in the README.
 - Use `| N/A | N/A | N/A |` when no local diagram exists (omit the Related line).
 
 ### Adopting this layout on existing use cases

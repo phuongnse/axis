@@ -94,7 +94,7 @@ Assets live **flat** inside this use-case folder. Reference shared kit screens f
 
 Use real markdown links in implemented use cases (see [register-org § Diagrams](./platform-foundation/register-org/README.md#diagrams)).
 
-**Related (next use case):** optional — link to another use case’s diagram in prose only; do not duplicate its row here. See [register-org § Diagrams](./platform-foundation/register-org/README.md#diagrams).
+**Related (next use case):** optional — short link to the next use case / diagram in prose. See [register-org § Diagrams](./platform-foundation/register-org/README.md#diagrams).
 
 Use `| N/A | N/A | N/A |` when this use case has no diagram in its folder.
 
