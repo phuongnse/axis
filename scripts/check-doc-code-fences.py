@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Detect fenced code blocks whose indentation was flattened to a single space.
 
-A bulk find-replace over the docs tree once collapsed every run of two or more
-spaces to one (PR #146 post-mortem). Inside fenced code blocks this silently
-destroyed all indentation — `    .Where(...)` became ` .Where(...)` — so code
-samples in the docs no longer copy-paste correctly. Every existing gate passed:
+A bulk find-replace over the docs tree that collapses every run of two or more
+spaces to one silently destroys indentation inside fenced code blocks —
+`    .Where(...)` becomes ` .Where(...)` — so code samples no longer copy-paste
+correctly. This class of corruption slips past every other gate:
 
   - lychee / check-doc-link-targets only validate links and anchors (none broke).
   - check-use-case-docs only validates structure (sections/tables survived).

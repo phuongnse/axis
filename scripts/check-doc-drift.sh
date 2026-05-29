@@ -47,7 +47,7 @@ check_domain_docs() {
   local label="$3"
   if any_changed "${code_pattern}"; then
     # Dependabot sometimes adds PackageReference lines in .csproj only; that is not
-    # a feature change and must not require domain docs (see PR #104).
+    # a feature change and must not require domain docs.
     if echo "${CHANGED}" | grep -E "${code_pattern}" | grep -Ev '\.csproj$' | grep -q .; then
       if ! docs_changed_under "${doc_prefix}"; then
         fail "${label}: code changed but no files under ${doc_prefix}/ in this PR"
@@ -84,8 +84,7 @@ fi
 # WinForms). We flag it everywhere in src/ — Wolverine and Minimal API are both
 # fully async; there is no legitimate need. (`.Result` and `.Wait()` are not
 # grep-banned here because both names are used by domain types in this codebase;
-# the Roslyn analyzer in PR #99 will catch the Task-typed versions with type
-# info.)
+# a type-aware Roslyn analyzer catches the Task-typed versions instead.)
 #
 # `[(]` `[)]` `[.]` instead of `\(` `\)` `\.` to escape literal punctuation:
 # GNU awk warns on those backslash-escapes and silently treats them as plain
@@ -286,8 +285,8 @@ for target in "${SPEC_TARGETS[@]}"; do
   fi
 done
 
-# Stale terminology / artifact guard. The Epic→Use-case migration in PR #142
-# replaced specific phrases; flagging them keeps the doc tree convergent.
+# Stale terminology / artifact guard. The Epic→Use-case migration replaced
+# specific phrases; flagging them keeps the doc tree convergent.
 #   - "feature file"           → "use-case file" (CLAUDE.md, PR template were stale)
 #   - "see gaps below"         → migration-script artifact, meaningless text
 #   - "> **Wireframe**:"       → old callout style; use the `## Wireframes` table
@@ -300,7 +299,7 @@ for target in ${STALE_TERM_FILES}; do
   [ -f "${target}" ] || continue
   if matches="$(grep -nE "${STALE_TERM_PATTERN}" "${target}" 2>/dev/null)"; then
     while IFS= read -r line; do
-      fail "Stale terminology in ${target}: ${line} (PR #142 migration — see docs/use-cases/README.md)"
+      fail "Stale terminology in ${target}: ${line} (Epic→Use-case migration — see docs/use-cases/README.md)"
     done <<< "${matches}"
   fi
 done
@@ -326,12 +325,12 @@ done < <(
 python3 "${ROOT}/scripts/check-use-case-docs.py" --check || ERR=1
 
 # Relative link / image target resolution across docs/, .github/, repo-root *.md.
-# Catches the broken `![alt](./missing.svg)` class lychee missed in PR #142.
+# Catches the broken `![alt](./missing.svg)` class lychee misses.
 python3 "${ROOT}/scripts/check-doc-link-targets.py" --check || ERR=1
 
 # Code-fence indentation integrity. Catches the collapsed-indentation class a
-# bulk find-replace introduced in PR #146 — invisible to lychee, prettier, and
-# the structural doc checks (see the script header).
+# bulk find-replace introduces — invisible to lychee, prettier, and the
+# structural doc checks (see the script header).
 python3 "${ROOT}/scripts/check-doc-code-fences.py" --check || ERR=1
 
 
