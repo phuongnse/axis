@@ -141,7 +141,7 @@ Record **accepted ToS/Privacy version** on the account at org create (AC above);
 
 ## Wireframes
 
-All UI assets in this folder (three happy-path screens + four reference state boards). Row order matches [Screen flow](#screen-flow) above. Sequence/architecture drawings are under [Diagrams](#diagrams), not listed here.
+Seven screens in this folder (three happy-path, four state boards). Table order follows [Screen flow](#screen-flow). Sequences: [Diagrams](#diagrams).
 
 | # | Screen | Role | Excalidraw | Preview |
 |---|--------|------|------------|---------|
@@ -155,13 +155,12 @@ All UI assets in this folder (three happy-path screens + four reference state bo
 
 ## Diagrams
 
-Mermaid in this file (GitHub / IDE preview). Wireframes remain Excalidraw above.
-
 ### register-org-flow
 
 Email/password and external-provider registration (happy paths + provider pre-checks).
 
 ```mermaid
+%%{init: {'theme': 'neutral'}}%%
 sequenceDiagram
   actor Admin as New Admin
   participant Web as Web App
@@ -172,7 +171,7 @@ sequenceDiagram
   Admin->>Web: Open registration page
   Web-->>Admin: SSO icons + email/password form
 
-  rect rgb(240, 249, 255)
+  rect rgb(248, 250, 252)
     Note over Admin,Email: Email / password path
     Admin->>Web: Accept Terms + submit (Idempotency-Key)
     Web->>API: POST /api/organizations/
@@ -181,7 +180,7 @@ sequenceDiagram
     API-->>Web: 202 → confirmation screen
   end
 
-  rect rgb(240, 249, 255)
+  rect rgb(248, 250, 252)
     Note over Admin,IdP: External provider (OAuth only)
     Admin->>Web: Choose Microsoft / Google / GitHub
     Web->>IdP: OAuth2 Auth Code + PKCE
@@ -196,7 +195,7 @@ sequenceDiagram
     end
   end
 
-  rect rgb(240, 249, 255)
+  rect rgb(248, 250, 252)
     Note over Admin,Email: Post-OAuth completion screen
     Web-->>Admin: register-org-complete (name, slug, Terms)
     Admin->>Web: Submit completion (Idempotency-Key)
@@ -205,7 +204,7 @@ sequenceDiagram
     API-->>Web: 202 → confirmation screen
   end
 
-  Note over Admin,API: IdP never supplies org name. Password duplicate email still returns the same confirmation screen.
+  Note over Admin,API: Org name is collected on register-org-complete. Duplicate password email still returns the same confirmation screen.
 ```
 
 ### register-org-cases
@@ -213,12 +212,13 @@ sequenceDiagram
 Dev checklist — API outcomes mapped to wireframe states.
 
 ```mermaid
+%%{init: {'theme': 'neutral'}}%%
 sequenceDiagram
   actor Admin as New Admin
   participant Web as Web App
   participant API as Axis API
 
-  rect rgb(255, 251, 235)
+  rect rgb(248, 250, 252)
     Note over Admin,API: Email/password submission
     Admin->>Web: Submit register-org (+ Terms, Idempotency-Key)
     Web->>API: POST /api/organizations/
@@ -227,7 +227,7 @@ sequenceDiagram
     API-->>Web: 202 confirmation (new or duplicate email)
   end
 
-  rect rgb(255, 251, 235)
+  rect rgb(248, 250, 252)
     Note over Admin,API: Provider callback pre-check
     Admin->>Web: Provider OAuth callback completes
     Web->>API: Validate claims (verified email, uniqueness)
@@ -236,7 +236,7 @@ sequenceDiagram
     API-->>Web: Open register-org-complete
   end
 
-  rect rgb(255, 251, 235)
+  rect rgb(248, 250, 252)
     Note over Admin,API: Post-OAuth completion submit
     Admin->>Web: Submit complete form (name, slug, Terms)
     Web->>API: POST completion (link external login)
@@ -244,7 +244,7 @@ sequenceDiagram
     API-->>Web: 5xx banner, re-enable submit
   end
 
-  rect rgb(255, 251, 235)
+  rect rgb(248, 250, 252)
     Note over Admin,API: Shared confirmation outcome
     API-->>Web: 202 confirmation screen
     Web-->>Admin: email-confirmation + resend (204 / 429)

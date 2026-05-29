@@ -167,7 +167,7 @@ flowchart TB
 
 ## Wireframes
 
-**UI screens** are Excalidraw (`.excalidraw` + `.svg` preview), not Mermaid. The **full list** for each feature lives only in that use case’s `README.md` under `## Wireframes` — do not treat this hub as a complete file catalog.
+Screen wireframes use Excalidraw (`.excalidraw` + `.svg`). Each use case lists its screens under `## Wireframes` in that use case’s README.
 
 | What | Where |
 |------|--------|
@@ -175,7 +175,7 @@ flowchart TB
 | Shared app shell | [wireframes/app-shell](./wireframes/app-shell.excalidraw) (kit under [wireframes/](./wireframes/), generators in [wireframes.md](./playbooks/wireframes.md)) |
 | Use-case layout rules | [USE_CASE_TEMPLATE](./use-cases/USE_CASE_TEMPLATE.md) · [docs-style § Wireframes](./playbooks/docs-style.md#wireframes-content-rules) |
 
-**Good starting points** (examples of the full table + screen-flow pattern — not an exhaustive list):
+**Example use cases** (full wireframe table + screen flow):
 
 | Use case | Why open this |
 |----------|----------------|
