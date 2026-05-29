@@ -2,7 +2,7 @@
  * Axis UI Component Kit — _template.excalidraw
  * Run: node docs/wireframes/generate-template.mjs
  *
- * TOC — 38 sections
+ * TOC — 39 sections
  * ─── Foundations ─────────────────── S01 Color Palette
  *                                     S02 Typography
  *                                     S03 Buttons
@@ -41,6 +41,7 @@
  *                                     S36 Advanced Filters / Query Builder
  *                                     S37 Dual Listbox / Transfer List
  * ─── Auth (registration) ─────────── S38 External sign-in
+ *                                     S39 Auth blocks (fields, terms)
  */
 
 import { fileURLToPath } from 'url';
@@ -51,14 +52,29 @@ import {
   writeExcalidraw,
 } from './components.mjs';
 
-// ─── Section builders ─────────────────────────────────────────────────────────
+import {
+  buildAuthExternalSignInBlock,
+  buildAuthBlocksCatalog,
+} from './blocks.mjs';
 
-/** Inner width of a 440px auth card (24px padding each side). */
-export const AUTH_INNER_W = 392;
-export const AUTH_PROVIDER_BTN_SIZE = 44;
-export const AUTH_PROVIDER_GAP = 20;
-/** Icon row (44px) + gap (12px) + “or” divider (28px) — stack height after `componentContent(buildAuthExternalSignInBlock, …)`. */
-export const AUTH_EXTERNAL_SIGN_IN_BLOCK_H = AUTH_PROVIDER_BTN_SIZE + 12 + 28;
+// Re-export for screens that already import from this file.
+export {
+  AUTH_CARD_W,
+  AUTH_INNER_W,
+  AUTH_EXTERNAL_SIGN_IN_BLOCK_H,
+  buildAuthExternalSignInBlock,
+  placeAuthExternalSignIn,
+  buildAuthCardHeader,
+  buildAuthCardFooter,
+  buildAuthSubmitButton,
+  authFormField,
+  authReadOnlyValueField,
+  authSlugPreviewField,
+  authTermsRow,
+  authCard,
+} from './blocks.mjs';
+
+// ─── Section builders ─────────────────────────────────────────────────────────
 
 export function buildColorPalette(y0) {
   const swatches = [
@@ -1814,42 +1830,17 @@ export function buildDualListbox(y0) {
   return els;
 }
 
-/**
- * SSO icon row + “or” divider only (x=50). Used by screens via component() — no kit caption.
- */
-export function buildAuthExternalSignInBlock(yC) {
-  const innerW = AUTH_INNER_W;
-  const btnSize = AUTH_PROVIDER_BTN_SIZE;
-  const gap = AUTH_PROVIDER_GAP;
-  const rowW = btnSize * 3 + gap * 2;
-  const startX = 50 + Math.round((innerW - rowW) / 2);
-  const providers = [
-    ['ext_ms', '⊞', '#2563eb', '#eff6ff'],
-    ['ext_go', 'G', '#dc2626', '#fef2f2'],
-    ['ext_gh', '⎇', '#1f2937', '#f3f4f6'],
-  ];
-  const els = [];
-
-  providers.forEach(([id, icon, stroke, bg], i) => {
-    const bx = startX + i * (btnSize + gap);
-    els.push(rect(id, bx, yC, btnSize, btnSize, stroke, bg, 1, true));
-    els.push(text(`${id}_ic`, bx, yC + 11, btnSize, 22, icon, 18, stroke, 'center'));
-  });
-
-  const yOr = yC + btnSize + 12;
-  const mid = 50 + innerW / 2;
-  els.push(hline('ext_or_l', 50, yOr + 10, innerW / 2 - 28, C.gray300));
-  els.push(text('ext_or_t', mid - 20, yOr, 40, 16, 'or', 11, C.gray500, 'center'));
-  els.push(hline('ext_or_r', mid + 28, yOr + 10, innerW / 2 - 28, C.gray300));
-
+/** S38 — external sign-in block (screens use blocks.mjs via placeAuthExternalSignIn). */
+export function buildAuthExternalSignIn(y0) {
+  const els = [...sectionHeader(38, 'External sign-in', y0)];
+  els.push(...buildAuthExternalSignInBlock(y0 + 48));
   return els;
 }
 
-/** S38 kit section — same block as screens; section title only (no extra captions). */
-export function buildAuthExternalSignIn(y0) {
-  const els = [...sectionHeader(38, 'External sign-in', y0)];
-  const yC = y0 + 48;
-  els.push(...buildAuthExternalSignInBlock(yC));
+/** S39 — auth field / terms blocks reused on register-org and auth cards. */
+export function buildAuthBlocks(y0) {
+  const els = [...sectionHeader(39, 'Auth blocks', y0)];
+  els.push(...buildAuthBlocksCatalog(y0));
   return els;
 }
 
@@ -1971,6 +1962,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     buildAdvancedFilters,        // S36
     buildDualListbox,            // S37
     buildAuthExternalSignIn,     // S38
+    buildAuthBlocks,             // S39
   ]) {
     const els = builder(currentY);
     allElements.push(...els);

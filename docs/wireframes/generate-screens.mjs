@@ -2,8 +2,8 @@
  * Axis Screen Wireframes — generate-screens.mjs
  * Run: node docs/wireframes/generate-screens.mjs
  *
- * All visual components are sourced from generate-template.mjs builders.
- * Use component(buildXxx, x, y) to place template sections into screens.
+ * Reusable UI blocks: blocks.mjs (auth, fields, SSO). Large kit sections: generate-template.mjs via component().
+ * Primitives only in components.mjs. Do not duplicate block geometry in this file.
  *
  * Screen width W=1200 ensures 900px template components fit at cx=250
  * (250 + 900 = 1150 < 1200). Never reduce W below 1200.
@@ -33,7 +33,7 @@ import {
   C, SB, HDR, CX, CY,
   rect, ellipse, text, hline, vline, arrow,
   btn, inputField, selectField, badge, searchBar, pageHeader, fieldLabel,
-  appShell, component, componentContent, translate, writeExcalidraw, setSeed,
+  appShell, component, translate, writeExcalidraw, setSeed,
   stateHeadline, semanticVariantColor,
 } from './components.mjs';
 
@@ -45,9 +45,25 @@ import {
   buildSideSheet,
   buildTable,
   buildPermissionMatrix,
-  buildAuthExternalSignInBlock,
-  AUTH_EXTERNAL_SIGN_IN_BLOCK_H,
 } from './generate-template.mjs';
+
+import {
+  AUTH_CARD_W,
+  AUTH_CARD_PAD_X,
+  AUTH_EXTERNAL_SIGN_IN_BLOCK_H,
+  AUTH_HEADER_H,
+  AUTH_HEADER_H_SUBTITLE,
+  AUTH_CARD_FOOTER_ZONE,
+  placeAuthExternalSignIn,
+  buildAuthCardHeader,
+  buildAuthCardFooter,
+  buildAuthSubmitButton,
+  authFormField,
+  authReadOnlyValueField,
+  authSlugPreviewField,
+  authTermsRow,
+  authCard,
+} from './blocks.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dir = dirname(__filename);
@@ -187,136 +203,6 @@ function write(relativePath, elements) {
   console.log(`✓  ${resolved}  (${elements.length} elements)`);
 }
 
-// ─── Auth card helper — shared by all standalone auth screens ─────────────────
-// Centered card: logo → divider → title → [subtitle] → fields → [extraLink] → submit → footer.
-//
-// headerH breakdown (no subtitle): logo-gap(16) + logo(28) + gap(16) + divider(0) + gap(16) + title(24) + gap(12) = 112
-// headerH breakdown (with subtitle): +subtitle(18) + gap(6) = 136
-// Each field: label(16) + gap(2) + input(40) + gap(14) = 72px
-// extraLink: 'Forgot password?' shown right-aligned between fields and submit btn (adds 22px)
-// Footer zone: gap(12) + divider(0) + gap(10) + footer-text(16) + gap(6) = 32px from card bottom
-
-function authCard(prefix, { title, subtitle = null, items = [], extraLink = null }, submitLabel, footerText) {
-  const cardW   = 440;
-  const headerH = subtitle ? 136 : 112;  // vertical space from card top to first field
-  const fieldH  = items.length * 72;     // 72px per field: label(16) + gap(2) + input(40) + gap(14)
-  const cardH   = headerH + fieldH + (extraLink ? 22 : 4) + 36 + 12 + 32;
-  const cardX   = Math.round((W - cardW) / 2);
-  const cardY   = Math.round((H - cardH) / 2);
-  const els     = [];
-
-  // Page background
-  els.push(rect(`${prefix}_bg`,   0,     0,     W,     H,     C.gray300, C.gray100, 1, false));
-  // Card surface
-  els.push(rect(`${prefix}_card`, cardX, cardY, cardW, cardH, C.gray300, C.white,   2, true));
-
-  // Logo — full-width bounding box so 'center' alignment is correct
-  els.push(text(`${prefix}_logo`, cardX, cardY + 16, cardW, 28, '⬡  Axis', 18, C.primary, 'center'));
-  els.push(hline(`${prefix}_hdiv`, cardX, cardY + 60, cardW, C.gray300));
-
-  // Title (always present)
-  els.push(text(`${prefix}_title`, cardX + 24, cardY + 76, cardW - 48, 24, title, 17, C.gray900));
-
-  // Optional subtitle
-  if (subtitle) {
-    els.push(text(`${prefix}_sub`, cardX + 24, cardY + 104, cardW - 48, 18, subtitle, 13, C.gray700));
-  }
-
-  // Fields — start at headerH from card top
-  const fieldStartY = cardY + headerH;
-  items.forEach(({ label, placeholder, required = false }, i) => {
-    const y = fieldStartY + i * 72;
-    els.push(...fieldLabel(`${prefix}_fl_${i}`, cardX + 24, y, label, { required }));
-    els.push(...inputField(`${prefix}_fi_${i}`, cardX + 24, y + 18, cardW - 48, placeholder));
-  });
-
-  // Optional secondary link (e.g. 'Forgot password?') — right-aligned, 6px below last field
-  const afterFieldsY = fieldStartY + fieldH;
-  if (extraLink) {
-    els.push(text(`${prefix}_xl`, cardX + 24, afterFieldsY + 6, cardW - 48, 16, extraLink, 12, C.primary, 'right'));
-  }
-
-  // Submit button — full card width minus 24px padding each side
-  const btnY = afterFieldsY + (extraLink ? 22 : 4);
-  const btnW = cardW - 48;
-  els.push(rect(`${prefix}_sbtn`,   cardX + 24, btnY,      btnW, 36, C.accentDark, C.accent, 2, true));
-  els.push(text(`${prefix}_sbtn_t`, cardX + 24, btnY + 10, btnW, 16, submitLabel,  13, C.white, 'center'));
-
-  // Footer divider + link
-  els.push(hline(`${prefix}_fdiv`,  cardX,      cardY + cardH - 32,      cardW,     C.gray300));
-  els.push(text(`${prefix}_footer`, cardX + 24, cardY + cardH - 22, cardW - 48, 16, footerText, 12, C.primary, 'center'));
-
-  return els;
-}
-
-/** Auth form field with optional inline error (tenant-registration / organization profile). */
-function authFormField(prefix, cardX, y, cardW, label, value, errorMsg = null, required = false) {
-  const x = cardX + 24;
-  const innerW = cardW - 48;
-  const blockH = errorMsg ? 86 : 72;
-  const els = [
-    ...fieldLabel(prefix, x, y, label, { required }),
-    rect(`${prefix}_inp`, x, y + 18, innerW, 40, errorMsg ? C.dangerBorder : C.gray300, C.white, 1, true),
-    text(`${prefix}_val`, x + 12, y + 29, innerW - 24, 18, value, 13, C.gray900),
-  ];
-  if (errorMsg) {
-    els.push(text(`${prefix}_err`, x, y + 62, innerW, 14, errorMsg, 11, C.danger));
-  }
-  return { els, blockH };
-}
-
-/** Read-only value (e.g. email from external provider). */
-function authReadOnlyValueField(prefix, cardX, y, cardW, label, value, required = false) {
-  const x = cardX + 24;
-  const innerW = cardW - 48;
-  const blockH = 72;
-  const els = [
-    ...fieldLabel(prefix, x, y, label, { required }),
-    rect(`${prefix}_inp`, x, y + 18, innerW, 40, C.gray300, C.gray50, 1, true),
-    text(`${prefix}_val`, x + 12, y + 29, innerW - 24, 18, value, 13, C.gray700),
-  ];
-  return { els, blockH };
-}
-
-/** Read-only slug preview (auto-generated from organization name). */
-function authSlugPreviewField(prefix, cardX, y, cardW, errorMsg = null, required = false) {
-  const x = cardX + 24;
-  const innerW = cardW - 48;
-  const blockH = errorMsg ? 100 : 86;
-  const els = [
-    ...fieldLabel(prefix, x, y, 'Organization URL slug', { required }),
-    rect(`${prefix}_inp`, x, y + 18, innerW, 40, errorMsg ? C.dangerBorder : C.gray300, C.gray50, 1, true),
-    text(`${prefix}_val`, x + 12, y + 29, innerW - 24, 18, 'acme-corp', 13, C.gray700),
-    text(`${prefix}_hint`, x, y + 62, innerW, 14, 'Auto-generated from organization name', 10, C.gray500),
-  ];
-  if (errorMsg) {
-    els.push(text(`${prefix}_err`, x, y + 78, innerW, 14, errorMsg, 11, C.danger));
-  }
-  return { els, blockH };
-}
-
-/** Terms + Privacy acceptance row (required before submit / provider sign-up). */
-function authTermsRow(prefix, cardX, y, cardW, { checked = true, errorMsg = null } = {}) {
-  const x = cardX + 24;
-  const innerW = cardW - 48;
-  const chkSize = 18;
-  const lineH = 16;
-  const textY = y + Math.round((chkSize - lineH) / 2);
-  const blockH = errorMsg ? 50 : 28;
-  const els = [
-    rect(`${prefix}_chk`, x, y, chkSize, chkSize, checked ? C.primary : C.dangerBorder, C.white, 1, true),
-    text(`${prefix}_txt`, x + chkSize + 8, textY, innerW - chkSize - 8, lineH,
-      'I agree to the Terms of Service and Privacy Policy →', 11, C.gray700),
-  ];
-  if (checked) {
-    els.push(text(`${prefix}_mark`, x + 4, y + 4, chkSize - 8, 12, '✓', 11, C.primary, 'center'));
-  }
-  if (errorMsg) {
-    els.push(text(`${prefix}_err`, x, y + chkSize + 8, innerW, 14, errorMsg, 11, C.danger));
-  }
-  return { els, blockH };
-}
-
 // ─── App shell (shared layout reference) ─────────────────────────────────────
 
 function genAppShell() {
@@ -360,11 +246,11 @@ function genAppShell() {
  * SSO buttons, email form, auto-generated slug, Terms/Privacy acceptance.
  */
 function genRegisterOrg() {
-  const cardW = 440;
+  const cardW = AUTH_CARD_W;
   const cardX = Math.round((W - cardW) / 2);
   const cardY = 16;
-  const headerH = 112;
-  const footerZone = 44;
+  const headerH = AUTH_HEADER_H;
+  const footerZone = AUTH_CARD_FOOTER_ZONE;
   const els = [];
 
   els.push(rect('ro_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
@@ -372,11 +258,8 @@ function genRegisterOrg() {
   let y = cardY + headerH;
   const contentEls = [];
 
-  contentEls.push(text('ro_logo', cardX, cardY + 16, cardW, 28, '⬡  Axis', 18, C.primary, 'center'));
-  contentEls.push(hline('ro_hdiv', cardX, cardY + 60, cardW, C.gray300));
-  contentEls.push(text('ro_title', cardX + 24, cardY + 76, cardW - 48, 24, 'Create your organization', 17, C.gray900));
-
-  contentEls.push(...componentContent((y0) => buildAuthExternalSignInBlock(y0 + 48), cardX + 24, y, 48));
+  contentEls.push(...buildAuthCardHeader('ro', cardX, cardY, cardW, 'Create your organization'));
+  contentEls.push(...placeAuthExternalSignIn(cardX + AUTH_CARD_PAD_X, y));
   y += AUTH_EXTERNAL_SIGN_IN_BLOCK_H;
 
   const fields = [
@@ -404,19 +287,14 @@ function genRegisterOrg() {
   contentEls.push(...termsEls);
   y += termsH + 14;
 
-  const btnW = cardW - 48;
-  contentEls.push(rect('ro_sbtn', cardX + 24, y, btnW, 36, C.accentDark, C.accent, 2, true));
-  contentEls.push(text('ro_sbtn_t', cardX + 24, y + 10, btnW, 16, 'Create organization', 13, C.white, 'center'));
+  contentEls.push(...buildAuthSubmitButton('ro', cardX, y, cardW, 'Create organization'));
   y += 36 + 16;
 
   const cardH = y - cardY + footerZone;
-  const footerY = cardY + cardH - 32;
 
   els.push(rect('ro_card', cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
   els.push(...contentEls);
-  els.push(hline('ro_fdiv', cardX, footerY, cardW, C.gray300));
-  els.push(text('ro_footer', cardX + 24, footerY + 10, cardW - 48, 16,
-    'Already have an account? Sign in', 12, C.primary, 'center'));
+  els.push(...buildAuthCardFooter('ro', cardX, cardY, cardW, cardH, 'Already have an account? Sign in'));
 
   write('platform-foundation/register-org.excalidraw', els);
 }
@@ -426,7 +304,7 @@ function genRegisterOrg() {
  * email read-only from provider; admin name pre-filled and editable.
  */
 function genRegisterOrgComplete() {
-  const cardW = 440;
+  const cardW = AUTH_CARD_W;
   const cardX = Math.round((W - cardW) / 2);
   const cardY = 40;
   const headerH = 136; // logo + title + provider subtitle
@@ -709,7 +587,7 @@ function genRegisterOrgProviderStates() {
  * Informational card (no form): compact icon, title, copy, resend link.
  */
 function genEmailConfirmation() {
-  const cardW = 440;
+  const cardW = AUTH_CARD_W;
   const cardH = 252;
   const cardX = Math.round((W - cardW) / 2);
   const cardY = Math.round((H - cardH) / 2);
@@ -747,7 +625,7 @@ function genEmailConfirmation() {
  */
 function genVerifyEmail() {
   const els   = [];
-  const cardW = 440;
+  const cardW = AUTH_CARD_W;
   const cardH = 176;
   const gapX  = 60;
   const gapY  = 36;   // row gap; first 20px reserved for state label above card
@@ -809,7 +687,7 @@ function genVerifyEmail() {
 }
 
 function genVerifyEmailRateLimit() {
-  const cardW = 440;
+  const cardW = AUTH_CARD_W;
   const cardH = 228;
   const cardX = Math.round((W - cardW) / 2);
   const cardY = Math.round((H - cardH) / 2);
@@ -1402,7 +1280,7 @@ function genSettingsOrgDeletionScheduled() {
 // ─── identity-access Identity & Access — Auth screens (no sidebar) ───────────────────────
 
 function genLogin() {
-  const els = authCard('li', {
+  const els = authCard(W, H, 'li', {
     title: 'Sign in to Axis',
     items: [
       { label: 'Email address', placeholder: 'you@company.com', required: true },
@@ -1415,7 +1293,7 @@ function genLogin() {
 
 /** email verification (tenant-registration) / unverified sign-in — unverified email blocks sign-in. */
 function genLoginUnverified() {
-  const cardW = 440;
+  const cardW = AUTH_CARD_W;
   const cardH = 280;
   const cardX = Math.round((W - cardW) / 2);
   const cardY = Math.round((H - cardH) / 2);
@@ -1452,7 +1330,7 @@ function genLoginUnverified() {
 }
 
 function genRegister() {
-  const els = authCard('reg', {
+  const els = authCard(W, H, 'reg', {
     title: 'Create your account',
     subtitle: null,
     items: [
@@ -1465,7 +1343,7 @@ function genRegister() {
 }
 
 function genForgotPassword() {
-  const els = authCard('fp', {
+  const els = authCard(W, H, 'fp', {
     title: 'Reset your password',
     subtitle: 'Enter your email and we will send you a reset link.',
     items: [
@@ -1476,7 +1354,7 @@ function genForgotPassword() {
 }
 
 function genChangePassword() {
-  const els = authCard('cp', {
+  const els = authCard(W, H, 'cp', {
     title: 'Choose a new password',
     subtitle: null,
     items: [
@@ -1488,7 +1366,7 @@ function genChangePassword() {
 }
 
 function genAcceptInvitation() {
-  const els = authCard('ai', {
+  const els = authCard(W, H, 'ai', {
     title: 'You have been invited',
     subtitle: 'Join Acme Corp on Axis',
     items: [
