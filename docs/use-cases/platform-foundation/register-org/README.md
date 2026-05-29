@@ -158,5 +158,6 @@ All UI assets in this folder (three happy-path screens + four reference state bo
 | Diagram | Source | Preview |
 |---------|--------|---------|
 | register-org-flow | [source](./register-org-flow.excalidraw) | [preview](./register-org-flow.svg) |
+| register-org-cases | [source](./register-org-cases.excalidraw) | [preview](./register-org-cases.svg) |
 
 **Related (next use case):** after email verification, see [provision-tenant](../provision-tenant/) ([`tenant-provisioning`](../provision-tenant/tenant-provisioning.excalidraw)).

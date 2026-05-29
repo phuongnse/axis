@@ -622,7 +622,7 @@ function registerOrgFlowDiagram() {
     participants: [
       { label: "New Admin" },
       { label: "Web App" },
-      { label: "API Server", sub: "(OpenIddict)" },
+      { label: "Axis API", sub: "(Identity + Org modules)" },
       { label: "Email", sub: "Service", external: true },
       { label: "IdP", sub: "(MS/Google/GitHub)", external: true },
     ],
@@ -644,21 +644,73 @@ function registerOrgFlowDiagram() {
       { from: 0, to: 1, y: 468, label: "Choose Microsoft / Google / GitHub" },
       { from: 1, to: 4, y: 508, label: "OAuth2 Auth Code + PKCE" },
       { from: 4, to: 1, y: 548, label: "Verified email + display name", dashed: true },
-      { from: 2, to: 1, y: 588, label: "Reject if email already registered", dashed: true },
+      { from: 1, to: 2, y: 568, label: "Validate provider claims (verified email required)" },
+      { from: 2, to: 1, y: 588, label: "Reject: no verified email", dashed: true },
+      { from: 2, to: 1, y: 608, label: "Reject: email already registered (Sign in instead)", dashed: true },
 
-      { from: 1, to: 0, y: 628, label: "register-org-complete (org name, slug, Terms)", dashed: true },
-      { from: 0, to: 1, y: 668, label: "Submit completion (Idempotency-Key)" },
-      { from: 1, to: 2, y: 708, label: "POST org + link external login" },
-      { from: 2, to: 3, y: 748, label: "Send verification email (if new)" },
-      { from: 2, to: 1, y: 788, label: "202 → confirmation screen", dashed: true },
+      { from: 2, to: 1, y: 628, label: "Open register-org-complete", dashed: true },
+      { from: 1, to: 0, y: 648, label: "register-org-complete (org name, slug, Terms)", dashed: true },
+      { from: 0, to: 1, y: 688, label: "Submit completion (Idempotency-Key)" },
+      { from: 1, to: 2, y: 728, label: "POST org + link external login" },
+      { from: 2, to: 3, y: 768, label: "Send verification email (if new)" },
+      { from: 2, to: 1, y: 808, label: "202 → confirmation screen", dashed: true },
     ],
     notes: [
       {
         x: 20,
-        y: 820,
+        y: 840,
         w: 720,
         h: 44,
-        label: "IdP never supplies organization name. Password-path duplicate email → same confirmation; provider-path duplicate → \"Sign in instead\" before completion.",
+        label: "IdP never supplies organization name. Provider path must have verified email; duplicate/no-verified-email are rejected before completion. Password duplicate email still returns the same confirmation screen.",
+      },
+    ],
+  });
+}
+
+function registerOrgCasesDiagram() {
+  _id = 1;
+  return seqBuild({
+    title: "Register Organization — Case Matrix (Dev Checklist)",
+    gap: 200,
+    participants: [
+      { label: "New Admin" },
+      { label: "Web App" },
+      { label: "Axis API" },
+    ],
+    sections: [
+      { y: 140, label: "Email/password submission" },
+      { y: 320, label: "Provider callback pre-check" },
+      { y: 520, label: "Post-OAuth completion submit" },
+      { y: 700, label: "Shared confirmation outcome" },
+    ],
+    messages: [
+      { from: 0, to: 1, y: 168, label: "Submit register-org form (Idempotency-Key + Terms checked)" },
+      { from: 1, to: 2, y: 208, label: "POST /api/organizations/" },
+      { from: 2, to: 1, y: 248, label: "400 validation errors (inline field errors)", dashed: true },
+      { from: 2, to: 1, y: 278, label: "5xx generic banner + re-enable submit", dashed: true },
+      { from: 2, to: 1, y: 308, label: "202 confirmation (new OR duplicate email)", dashed: true },
+
+      { from: 0, to: 1, y: 348, label: "Complete provider OAuth callback" },
+      { from: 1, to: 2, y: 388, label: "Validate provider claims (verified email + uniqueness)" },
+      { from: 2, to: 1, y: 428, label: "Reject: no verified email → provider error screen", dashed: true },
+      { from: 2, to: 1, y: 458, label: "Reject: duplicate email → Sign in instead", dashed: true },
+      { from: 2, to: 1, y: 488, label: "Open register-org-complete", dashed: true },
+
+      { from: 0, to: 1, y: 548, label: "Submit register-org-complete (org name + slug + Terms)" },
+      { from: 1, to: 2, y: 588, label: "POST completion (link external login, idempotent)" },
+      { from: 2, to: 1, y: 628, label: "400 org name/terms errors (inline)", dashed: true },
+      { from: 2, to: 1, y: 658, label: "5xx generic banner + re-enable submit", dashed: true },
+
+      { from: 2, to: 1, y: 728, label: "202 confirmation screen", dashed: true },
+      { from: 1, to: 0, y: 768, label: "email-confirmation + resend states (204/429)", dashed: true },
+    ],
+    notes: [
+      {
+        x: 20,
+        y: 800,
+        w: 600,
+        h: 30,
+        label: "Use this as implementation checklist: each dashed outcome maps to an explicit wireframe state.",
       },
     ],
   });
@@ -958,6 +1010,7 @@ const diagrams = [
   { name: "module-overview",      fn: moduleOverview,          dir: architectureDir },
   // Domain-level diagrams
   { name: "register-org-flow",    fn: registerOrgFlowDiagram,    dir: useCaseDir("platform-foundation", "register-org") },
+  { name: "register-org-cases",   fn: registerOrgCasesDiagram,   dir: useCaseDir("platform-foundation", "register-org") },
   { name: "tenant-provisioning",  fn: tenantProvisioningDiagram, dir: useCaseDir("platform-foundation", "provision-tenant") },
   { name: "auth-flow",            fn: authFlowDiagram,           dir: useCaseDir("identity-access", "sign-in") },
   { name: "data-model",           fn: dataModelDiagram,          dir: useCaseDir("data-modeling", "create-model") },

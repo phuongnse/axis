@@ -5,7 +5,7 @@
   "elements": [
     {
       "id": "diag-1",
-      "x": 142.87499999999997,
+      "x": 65.87499999999997,
       "y": 12.5,
       "angle": 0,
       "strokeColor": "#1e293b",
@@ -29,9 +29,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 486.75000000000006,
+      "width": 420.75000000000006,
       "height": 21,
-      "text": "Register Organization — Email/Password & External Providers",
+      "text": "Register Organization — Case Matrix (Dev Checklist)",
       "fontSize": 15,
       "fontFamily": 1,
       "textAlign": "center",
@@ -128,7 +128,7 @@
       "locked": false,
       "type": "arrow",
       "width": 0,
-      "height": 768,
+      "height": 728,
       "points": [
         [
           0,
@@ -136,7 +136,7 @@
         ],
         [
           0,
-          768
+          728
         ]
       ],
       "startArrowhead": null,
@@ -144,7 +144,7 @@
     },
     {
       "id": "diag-5",
-      "x": 152.5,
+      "x": 197.5,
       "y": 48,
       "angle": 0,
       "strokeColor": "#3b82f6",
@@ -174,7 +174,7 @@
     },
     {
       "id": "diag-6",
-      "x": 195,
+      "x": 240,
       "y": 64,
       "angle": 0,
       "strokeColor": "#1e293b",
@@ -208,7 +208,7 @@
     },
     {
       "id": "diag-7",
-      "x": 215,
+      "x": 260,
       "y": 90,
       "angle": 0,
       "strokeColor": "#94a3b8",
@@ -233,7 +233,7 @@
       "locked": false,
       "type": "arrow",
       "width": 0,
-      "height": 768,
+      "height": 728,
       "points": [
         [
           0,
@@ -241,7 +241,7 @@
         ],
         [
           0,
-          768
+          728
         ]
       ],
       "startArrowhead": null,
@@ -249,7 +249,7 @@
     },
     {
       "id": "diag-8",
-      "x": 307.5,
+      "x": 397.5,
       "y": 48,
       "angle": 0,
       "strokeColor": "#3b82f6",
@@ -279,8 +279,8 @@
     },
     {
       "id": "diag-9",
-      "x": 348,
-      "y": 54,
+      "x": 438,
+      "y": 64,
       "angle": 0,
       "strokeColor": "#1e293b",
       "backgroundColor": "transparent",
@@ -313,14 +313,14 @@
     },
     {
       "id": "diag-10",
-      "x": 304,
-      "y": 72,
+      "x": 460,
+      "y": 90,
       "angle": 0,
-      "strokeColor": "#64748b",
+      "strokeColor": "#94a3b8",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1,
-      "strokeStyle": "solid",
+      "strokeStyle": "dashed",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -336,19 +336,26 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "type": "text",
-      "width": 132,
-      "height": 14,
-      "text": "(Identity + Org modules)",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
+      "type": "arrow",
+      "width": 0,
+      "height": 728,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          728
+        ]
+      ],
+      "startArrowhead": null,
+      "endArrowhead": null
     },
     {
       "id": "diag-11",
-      "x": 370,
-      "y": 90,
+      "x": 20,
+      "y": 140,
       "angle": 0,
       "strokeColor": "#94a3b8",
       "backgroundColor": "transparent",
@@ -371,16 +378,16 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 0,
-      "height": 768,
+      "width": 512.5,
+      "height": 0,
       "points": [
         [
           0,
           0
         ],
         [
-          0,
-          768
+          512.5,
+          0
         ]
       ],
       "startArrowhead": null,
@@ -388,21 +395,20 @@
     },
     {
       "id": "diag-12",
-      "x": 462.5,
-      "y": 48,
+      "x": 191,
+      "y": 147,
       "angle": 0,
-      "strokeColor": "#9333ea",
-      "backgroundColor": "#f3e8ff",
+      "strokeColor": "#64748b",
+      "backgroundColor": "transparent",
       "fillStyle": "solid",
-      "strokeWidth": 1.5,
+      "strokeWidth": 1,
       "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
       "frameId": null,
       "roundness": {
-        "type": 3,
-        "value": 6
+        "type": 2
       },
       "seed": 12,
       "version": 1,
@@ -412,20 +418,25 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "type": "rectangle",
-      "width": 125,
-      "height": 42
+      "type": "text",
+      "width": 170.5,
+      "height": 14,
+      "text": "== Email/password submission ==",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
     },
     {
       "id": "diag-13",
-      "x": 505,
-      "y": 54,
+      "x": 20,
+      "y": 320,
       "angle": 0,
-      "strokeColor": "#1e293b",
+      "strokeColor": "#94a3b8",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1,
-      "strokeStyle": "solid",
+      "strokeStyle": "dashed",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -441,19 +452,26 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "type": "text",
-      "width": 40,
-      "height": 14,
-      "text": "Email",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
+      "type": "arrow",
+      "width": 512.5,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          512.5,
+          0
+        ]
+      ],
+      "startArrowhead": null,
+      "endArrowhead": null
     },
     {
       "id": "diag-14",
-      "x": 505,
-      "y": 72,
+      "x": 185.5,
+      "y": 327,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -476,9 +494,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 40,
+      "width": 181.50000000000003,
       "height": 14,
-      "text": "Service",
+      "text": "== Provider callback pre-check ==",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -486,8 +504,8 @@
     },
     {
       "id": "diag-15",
-      "x": 525,
-      "y": 90,
+      "x": 20,
+      "y": 520,
       "angle": 0,
       "strokeColor": "#94a3b8",
       "backgroundColor": "transparent",
@@ -510,16 +528,16 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 0,
-      "height": 768,
+      "width": 512.5,
+      "height": 0,
       "points": [
         [
           0,
           0
         ],
         [
-          0,
-          768
+          512.5,
+          0
         ]
       ],
       "startArrowhead": null,
@@ -527,21 +545,20 @@
     },
     {
       "id": "diag-16",
-      "x": 617.5,
-      "y": 48,
+      "x": 182.75,
+      "y": 527,
       "angle": 0,
-      "strokeColor": "#9333ea",
-      "backgroundColor": "#f3e8ff",
+      "strokeColor": "#64748b",
+      "backgroundColor": "transparent",
       "fillStyle": "solid",
-      "strokeWidth": 1.5,
+      "strokeWidth": 1,
       "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
       "frameId": null,
       "roundness": {
-        "type": 3,
-        "value": 6
+        "type": 2
       },
       "seed": 16,
       "version": 1,
@@ -551,20 +568,25 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "type": "rectangle",
-      "width": 125,
-      "height": 42
+      "type": "text",
+      "width": 187.00000000000003,
+      "height": 14,
+      "text": "== Post-OAuth completion submit ==",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
     },
     {
       "id": "diag-17",
-      "x": 660,
-      "y": 54,
+      "x": 20,
+      "y": 700,
       "angle": 0,
-      "strokeColor": "#1e293b",
+      "strokeColor": "#94a3b8",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1,
-      "strokeStyle": "solid",
+      "strokeStyle": "dashed",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -580,19 +602,26 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "type": "text",
-      "width": 40,
-      "height": 14,
-      "text": "IdP",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
+      "type": "arrow",
+      "width": 512.5,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          512.5,
+          0
+        ]
+      ],
+      "startArrowhead": null,
+      "endArrowhead": null
     },
     {
       "id": "diag-18",
-      "x": 630.5,
-      "y": 72,
+      "x": 185.5,
+      "y": 707,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -615,9 +644,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 99.00000000000001,
+      "width": 181.50000000000003,
       "height": 14,
-      "text": "(MS/Google/GitHub)",
+      "text": "== Shared confirmation outcome ==",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -625,14 +654,14 @@
     },
     {
       "id": "diag-19",
-      "x": 680,
-      "y": 90,
+      "x": 60,
+      "y": 168,
       "angle": 0,
-      "strokeColor": "#94a3b8",
+      "strokeColor": "#475569",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "dashed",
+      "strokeWidth": 1.5,
+      "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -649,31 +678,31 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 0,
-      "height": 768,
+      "width": 200,
+      "height": 0,
       "points": [
         [
           0,
           0
         ],
         [
-          0,
-          768
+          200,
+          0
         ]
       ],
       "startArrowhead": null,
-      "endArrowhead": null
+      "endArrowhead": "arrow"
     },
     {
       "id": "diag-20",
-      "x": 20,
-      "y": 260,
+      "x": 0.5,
+      "y": 149,
       "angle": 0,
-      "strokeColor": "#94a3b8",
+      "strokeColor": "#64748b",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1,
-      "strokeStyle": "dashed",
+      "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -689,31 +718,24 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "type": "arrow",
-      "width": 732.5,
-      "height": 0,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          732.5,
-          0
-        ]
-      ],
-      "startArrowhead": null,
-      "endArrowhead": null
+      "type": "text",
+      "width": 319,
+      "height": 14,
+      "text": "Submit register-org form (Idempotency-Key + Terms checked)",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
     },
     {
       "id": "diag-21",
-      "x": 312,
-      "y": 267,
+      "x": 260,
+      "y": 208,
       "angle": 0,
-      "strokeColor": "#64748b",
+      "strokeColor": "#475569",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
-      "strokeWidth": 1,
+      "strokeWidth": 1.5,
       "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
@@ -730,25 +752,32 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "type": "text",
-      "width": 148.5,
-      "height": 14,
-      "text": "== Email / password path ==",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
+      "type": "arrow",
+      "width": 200,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          200,
+          0
+        ]
+      ],
+      "startArrowhead": null,
+      "endArrowhead": "arrow"
     },
     {
       "id": "diag-22",
-      "x": 20,
-      "y": 440,
+      "x": 294,
+      "y": 189,
       "angle": 0,
-      "strokeColor": "#94a3b8",
+      "strokeColor": "#64748b",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1,
-      "strokeStyle": "dashed",
+      "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -757,422 +786,6 @@
         "type": 2
       },
       "seed": 22,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "arrow",
-      "width": 732.5,
-      "height": 0,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          732.5,
-          0
-        ]
-      ],
-      "startArrowhead": null,
-      "endArrowhead": null
-    },
-    {
-      "id": "diag-23",
-      "x": 287.25,
-      "y": 447,
-      "angle": 0,
-      "strokeColor": "#64748b",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 23,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "text",
-      "width": 198.00000000000003,
-      "height": 14,
-      "text": "== External provider (OAuth only) ==",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
-    },
-    {
-      "id": "diag-24",
-      "x": 20,
-      "y": 600,
-      "angle": 0,
-      "strokeColor": "#94a3b8",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "dashed",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 24,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "arrow",
-      "width": 732.5,
-      "height": 0,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          732.5,
-          0
-        ]
-      ],
-      "startArrowhead": null,
-      "endArrowhead": null
-    },
-    {
-      "id": "diag-25",
-      "x": 292.75,
-      "y": 607,
-      "angle": 0,
-      "strokeColor": "#64748b",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 25,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "text",
-      "width": 187.00000000000003,
-      "height": 14,
-      "text": "== Post-OAuth completion screen ==",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
-    },
-    {
-      "id": "diag-26",
-      "x": 60,
-      "y": 140,
-      "angle": 0,
-      "strokeColor": "#475569",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1.5,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 26,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "arrow",
-      "width": 155,
-      "height": 0,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          155,
-          0
-        ]
-      ],
-      "startArrowhead": null,
-      "endArrowhead": "arrow"
-    },
-    {
-      "id": "diag-27",
-      "x": 77,
-      "y": 121,
-      "angle": 0,
-      "strokeColor": "#64748b",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 27,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "text",
-      "width": 121.00000000000001,
-      "height": 14,
-      "text": "Open registration page",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
-    },
-    {
-      "id": "diag-28",
-      "x": 215,
-      "y": 168,
-      "angle": 0,
-      "strokeColor": "#475569",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1.5,
-      "strokeStyle": "dashed",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 28,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "arrow",
-      "width": 155,
-      "height": 0,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          -155,
-          0
-        ]
-      ],
-      "startArrowhead": null,
-      "endArrowhead": "arrow"
-    },
-    {
-      "id": "diag-29",
-      "x": 38.499999999999986,
-      "y": 149,
-      "angle": 0,
-      "strokeColor": "#64748b",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 29,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "text",
-      "width": 198.00000000000003,
-      "height": 14,
-      "text": "Show SSO icons + email/password form",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
-    },
-    {
-      "id": "diag-30",
-      "x": 60,
-      "y": 288,
-      "angle": 0,
-      "strokeColor": "#475569",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1.5,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 30,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "arrow",
-      "width": 155,
-      "height": 0,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          155,
-          0
-        ]
-      ],
-      "startArrowhead": null,
-      "endArrowhead": "arrow"
-    },
-    {
-      "id": "diag-31",
-      "x": 16.499999999999986,
-      "y": 269,
-      "angle": 0,
-      "strokeColor": "#64748b",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 31,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "text",
-      "width": 242.00000000000003,
-      "height": 14,
-      "text": "Accept Terms + submit form (Idempotency-Key)",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
-    },
-    {
-      "id": "diag-32",
-      "x": 215,
-      "y": 328,
-      "angle": 0,
-      "strokeColor": "#475569",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1.5,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 32,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "arrow",
-      "width": 155,
-      "height": 0,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          155,
-          0
-        ]
-      ],
-      "startArrowhead": null,
-      "endArrowhead": "arrow"
-    },
-    {
-      "id": "diag-33",
-      "x": 226.5,
-      "y": 309,
-      "angle": 0,
-      "strokeColor": "#64748b",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 33,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1190,14 +803,430 @@
       "verticalAlign": "middle"
     },
     {
-      "id": "diag-34",
-      "x": 370,
-      "y": 368,
+      "id": "diag-23",
+      "x": 460,
+      "y": 248,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1.5,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 23,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "arrow",
+      "width": 200,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -200,
+          0
+        ]
+      ],
+      "startArrowhead": null,
+      "endArrowhead": "arrow"
+    },
+    {
+      "id": "diag-24",
+      "x": 241.75,
+      "y": 229,
+      "angle": 0,
+      "strokeColor": "#64748b",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 24,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "text",
+      "width": 236.50000000000003,
+      "height": 14,
+      "text": "400 validation errors (inline field errors)",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "id": "diag-25",
+      "x": 460,
+      "y": 278,
+      "angle": 0,
+      "strokeColor": "#475569",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1.5,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 25,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "arrow",
+      "width": 200,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -200,
+          0
+        ]
+      ],
+      "startArrowhead": null,
+      "endArrowhead": "arrow"
+    },
+    {
+      "id": "diag-26",
+      "x": 258.25,
+      "y": 259,
+      "angle": 0,
+      "strokeColor": "#64748b",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 26,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "text",
+      "width": 203.50000000000003,
+      "height": 14,
+      "text": "5xx generic banner + re-enable submit",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "id": "diag-27",
+      "x": 460,
+      "y": 308,
+      "angle": 0,
+      "strokeColor": "#475569",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1.5,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 27,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "arrow",
+      "width": 200,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -200,
+          0
+        ]
+      ],
+      "startArrowhead": null,
+      "endArrowhead": "arrow"
+    },
+    {
+      "id": "diag-28",
+      "x": 247.25,
+      "y": 289,
+      "angle": 0,
+      "strokeColor": "#64748b",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 28,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "text",
+      "width": 225.50000000000003,
+      "height": 14,
+      "text": "202 confirmation (new OR duplicate email)",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "id": "diag-29",
+      "x": 60,
+      "y": 348,
+      "angle": 0,
+      "strokeColor": "#475569",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1.5,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 29,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "arrow",
+      "width": 200,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          200,
+          0
+        ]
+      ],
+      "startArrowhead": null,
+      "endArrowhead": "arrow"
+    },
+    {
+      "id": "diag-30",
+      "x": 72,
+      "y": 329,
+      "angle": 0,
+      "strokeColor": "#64748b",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 30,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "text",
+      "width": 176,
+      "height": 14,
+      "text": "Complete provider OAuth callback",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "id": "diag-31",
+      "x": 260,
+      "y": 388,
+      "angle": 0,
+      "strokeColor": "#475569",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1.5,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 31,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "arrow",
+      "width": 200,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          200,
+          0
+        ]
+      ],
+      "startArrowhead": null,
+      "endArrowhead": "arrow"
+    },
+    {
+      "id": "diag-32",
+      "x": 211.5,
+      "y": 369,
+      "angle": 0,
+      "strokeColor": "#64748b",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 32,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "text",
+      "width": 297,
+      "height": 14,
+      "text": "Validate provider claims (verified email + uniqueness)",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "id": "diag-33",
+      "x": 460,
+      "y": 428,
+      "angle": 0,
+      "strokeColor": "#475569",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1.5,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 33,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "arrow",
+      "width": 200,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -200,
+          0
+        ]
+      ],
+      "startArrowhead": null,
+      "endArrowhead": "arrow"
+    },
+    {
+      "id": "diag-34",
+      "x": 225.25,
+      "y": 409,
+      "angle": 0,
+      "strokeColor": "#64748b",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
       "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
@@ -1214,40 +1243,25 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "type": "arrow",
-      "width": 40,
-      "height": 22,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          40,
-          0
-        ],
-        [
-          40,
-          22
-        ],
-        [
-          0,
-          22
-        ]
-      ],
-      "startArrowhead": null,
-      "endArrowhead": "arrow"
+      "type": "text",
+      "width": 269.5,
+      "height": 14,
+      "text": "Reject: no verified email → provider error screen",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
     },
     {
       "id": "diag-35",
-      "x": 300,
-      "y": 371,
+      "x": 460,
+      "y": 458,
       "angle": 0,
-      "strokeColor": "#64748b",
+      "strokeColor": "#475569",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
+      "strokeWidth": 1.5,
+      "strokeStyle": "dashed",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -1263,24 +1277,31 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "type": "text",
-      "width": 220.00000000000003,
-      "height": 14,
-      "text": "Generate slug, hash password, record ToS",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
+      "type": "arrow",
+      "width": 200,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -200,
+          0
+        ]
+      ],
+      "startArrowhead": null,
+      "endArrowhead": "arrow"
     },
     {
       "id": "diag-36",
-      "x": 370,
-      "y": 408,
+      "x": 247.25,
+      "y": 439,
       "angle": 0,
-      "strokeColor": "#475569",
+      "strokeColor": "#64748b",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
-      "strokeWidth": 1.5,
+      "strokeWidth": 1,
       "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
@@ -1297,32 +1318,25 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "type": "arrow",
-      "width": 155,
-      "height": 0,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          155,
-          0
-        ]
-      ],
-      "startArrowhead": null,
-      "endArrowhead": "arrow"
+      "type": "text",
+      "width": 225.50000000000003,
+      "height": 14,
+      "text": "Reject: duplicate email → Sign in instead",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
     },
     {
       "id": "diag-37",
-      "x": 359.5,
-      "y": 389,
+      "x": 460,
+      "y": 488,
       "angle": 0,
-      "strokeColor": "#64748b",
+      "strokeColor": "#475569",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
+      "strokeWidth": 1.5,
+      "strokeStyle": "dashed",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -1338,25 +1352,32 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "type": "text",
-      "width": 176,
-      "height": 14,
-      "text": "Send verification email (if new)",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
+      "type": "arrow",
+      "width": 200,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -200,
+          0
+        ]
+      ],
+      "startArrowhead": null,
+      "endArrowhead": "arrow"
     },
     {
       "id": "diag-38",
-      "x": 370,
-      "y": 448,
+      "x": 288.5,
+      "y": 469,
       "angle": 0,
-      "strokeColor": "#475569",
+      "strokeColor": "#64748b",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
-      "strokeWidth": 1.5,
-      "strokeStyle": "dashed",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -1365,572 +1386,6 @@
         "type": 2
       },
       "seed": 38,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "arrow",
-      "width": 155,
-      "height": 0,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          -155,
-          0
-        ]
-      ],
-      "startArrowhead": null,
-      "endArrowhead": "arrow"
-    },
-    {
-      "id": "diag-39",
-      "x": 223.75,
-      "y": 429,
-      "angle": 0,
-      "strokeColor": "#64748b",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 39,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "text",
-      "width": 137.5,
-      "height": 14,
-      "text": "202 → confirmation screen",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
-    },
-    {
-      "id": "diag-40",
-      "x": 60,
-      "y": 468,
-      "angle": 0,
-      "strokeColor": "#475569",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1.5,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 40,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "arrow",
-      "width": 155,
-      "height": 0,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          155,
-          0
-        ]
-      ],
-      "startArrowhead": null,
-      "endArrowhead": "arrow"
-    },
-    {
-      "id": "diag-41",
-      "x": 43.999999999999986,
-      "y": 449,
-      "angle": 0,
-      "strokeColor": "#64748b",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 41,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "text",
-      "width": 187.00000000000003,
-      "height": 14,
-      "text": "Choose Microsoft / Google / GitHub",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
-    },
-    {
-      "id": "diag-42",
-      "x": 215,
-      "y": 508,
-      "angle": 0,
-      "strokeColor": "#475569",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1.5,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 42,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "arrow",
-      "width": 465,
-      "height": 0,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          465,
-          0
-        ]
-      ],
-      "startArrowhead": null,
-      "endArrowhead": "arrow"
-    },
-    {
-      "id": "diag-43",
-      "x": 384.25,
-      "y": 489,
-      "angle": 0,
-      "strokeColor": "#64748b",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 43,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "text",
-      "width": 126.50000000000001,
-      "height": 14,
-      "text": "OAuth2 Auth Code + PKCE",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
-    },
-    {
-      "id": "diag-44",
-      "x": 680,
-      "y": 548,
-      "angle": 0,
-      "strokeColor": "#475569",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1.5,
-      "strokeStyle": "dashed",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 44,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "arrow",
-      "width": 465,
-      "height": 0,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          -465,
-          0
-        ]
-      ],
-      "startArrowhead": null,
-      "endArrowhead": "arrow"
-    },
-    {
-      "id": "diag-45",
-      "x": 367.75,
-      "y": 529,
-      "angle": 0,
-      "strokeColor": "#64748b",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 45,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "text",
-      "width": 159.5,
-      "height": 14,
-      "text": "Verified email + display name",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
-    },
-    {
-      "id": "diag-46",
-      "x": 215,
-      "y": 568,
-      "angle": 0,
-      "strokeColor": "#475569",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1.5,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 46,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "arrow",
-      "width": 155,
-      "height": 0,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          155,
-          0
-        ]
-      ],
-      "startArrowhead": null,
-      "endArrowhead": "arrow"
-    },
-    {
-      "id": "diag-47",
-      "x": 155,
-      "y": 549,
-      "angle": 0,
-      "strokeColor": "#64748b",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 47,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "text",
-      "width": 275,
-      "height": 14,
-      "text": "Validate provider claims (verified email required)",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
-    },
-    {
-      "id": "diag-48",
-      "x": 370,
-      "y": 588,
-      "angle": 0,
-      "strokeColor": "#475569",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1.5,
-      "strokeStyle": "dashed",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 48,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "arrow",
-      "width": 155,
-      "height": 0,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          -155,
-          0
-        ]
-      ],
-      "startArrowhead": null,
-      "endArrowhead": "arrow"
-    },
-    {
-      "id": "diag-49",
-      "x": 223.75,
-      "y": 569,
-      "angle": 0,
-      "strokeColor": "#64748b",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 49,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "text",
-      "width": 137.5,
-      "height": 14,
-      "text": "Reject: no verified email",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
-    },
-    {
-      "id": "diag-50",
-      "x": 370,
-      "y": 608,
-      "angle": 0,
-      "strokeColor": "#475569",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1.5,
-      "strokeStyle": "dashed",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 50,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "arrow",
-      "width": 155,
-      "height": 0,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          -155,
-          0
-        ]
-      ],
-      "startArrowhead": null,
-      "endArrowhead": "arrow"
-    },
-    {
-      "id": "diag-51",
-      "x": 155,
-      "y": 589,
-      "angle": 0,
-      "strokeColor": "#64748b",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 51,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "text",
-      "width": 275,
-      "height": 14,
-      "text": "Reject: email already registered (Sign in instead)",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
-    },
-    {
-      "id": "diag-52",
-      "x": 370,
-      "y": 628,
-      "angle": 0,
-      "strokeColor": "#475569",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1.5,
-      "strokeStyle": "dashed",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 52,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "arrow",
-      "width": 155,
-      "height": 0,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          -155,
-          0
-        ]
-      ],
-      "startArrowhead": null,
-      "endArrowhead": "arrow"
-    },
-    {
-      "id": "diag-53",
-      "x": 221,
-      "y": 609,
-      "angle": 0,
-      "strokeColor": "#64748b",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 53,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1948,9 +1403,159 @@
       "verticalAlign": "middle"
     },
     {
-      "id": "diag-54",
-      "x": 215,
-      "y": 648,
+      "id": "diag-39",
+      "x": 60,
+      "y": 548,
+      "angle": 0,
+      "strokeColor": "#475569",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1.5,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 39,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "arrow",
+      "width": 200,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          200,
+          0
+        ]
+      ],
+      "startArrowhead": null,
+      "endArrowhead": "arrow"
+    },
+    {
+      "id": "diag-40",
+      "x": 11.5,
+      "y": 529,
+      "angle": 0,
+      "strokeColor": "#64748b",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 40,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "text",
+      "width": 297,
+      "height": 14,
+      "text": "Submit register-org-complete (org name + slug + Terms)",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "id": "diag-41",
+      "x": 260,
+      "y": 588,
+      "angle": 0,
+      "strokeColor": "#475569",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1.5,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 41,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "arrow",
+      "width": 200,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          200,
+          0
+        ]
+      ],
+      "startArrowhead": null,
+      "endArrowhead": "arrow"
+    },
+    {
+      "id": "diag-42",
+      "x": 225.25,
+      "y": 569,
+      "angle": 0,
+      "strokeColor": "#64748b",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {
+        "type": 2
+      },
+      "seed": 42,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "type": "text",
+      "width": 269.5,
+      "height": 14,
+      "text": "POST completion (link external login, idempotent)",
+      "fontSize": 10,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "id": "diag-43",
+      "x": 460,
+      "y": 628,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1964,7 +1569,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 54,
+      "seed": 43,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -1973,7 +1578,7 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 155,
+      "width": 200,
       "height": 0,
       "points": [
         [
@@ -1981,7 +1586,7 @@
           0
         ],
         [
-          -155,
+          -200,
           0
         ]
       ],
@@ -1989,9 +1594,9 @@
       "endArrowhead": "arrow"
     },
     {
-      "id": "diag-55",
-      "x": 13.749999999999986,
-      "y": 629,
+      "id": "diag-44",
+      "x": 266.5,
+      "y": 609,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2005,7 +1610,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 55,
+      "seed": 44,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -2014,24 +1619,24 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 247.50000000000003,
+      "width": 187.00000000000003,
       "height": 14,
-      "text": "register-org-complete (org name, slug, Terms)",
+      "text": "400 org name/terms errors (inline)",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
       "verticalAlign": "middle"
     },
     {
-      "id": "diag-56",
-      "x": 60,
-      "y": 688,
+      "id": "diag-45",
+      "x": 460,
+      "y": 658,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1.5,
-      "strokeStyle": "solid",
+      "strokeStyle": "dashed",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -2039,7 +1644,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 56,
+      "seed": 45,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -2048,7 +1653,7 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 155,
+      "width": 200,
       "height": 0,
       "points": [
         [
@@ -2056,7 +1661,7 @@
           0
         ],
         [
-          155,
+          -200,
           0
         ]
       ],
@@ -2064,9 +1669,9 @@
       "endArrowhead": "arrow"
     },
     {
-      "id": "diag-57",
-      "x": 41.249999999999986,
-      "y": 669,
+      "id": "diag-46",
+      "x": 258.25,
+      "y": 639,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2080,7 +1685,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 57,
+      "seed": 46,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -2089,24 +1694,24 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 192.50000000000003,
+      "width": 203.50000000000003,
       "height": 14,
-      "text": "Submit completion (Idempotency-Key)",
+      "text": "5xx generic banner + re-enable submit",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
       "verticalAlign": "middle"
     },
     {
-      "id": "diag-58",
-      "x": 215,
+      "id": "diag-47",
+      "x": 460,
       "y": 728,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1.5,
-      "strokeStyle": "solid",
+      "strokeStyle": "dashed",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -2114,7 +1719,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 58,
+      "seed": 47,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -2123,7 +1728,7 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 155,
+      "width": 200,
       "height": 0,
       "points": [
         [
@@ -2131,7 +1736,7 @@
           0
         ],
         [
-          155,
+          -200,
           0
         ]
       ],
@@ -2139,8 +1744,8 @@
       "endArrowhead": "arrow"
     },
     {
-      "id": "diag-59",
-      "x": 210,
+      "id": "diag-48",
+      "x": 296.75,
       "y": 709,
       "angle": 0,
       "strokeColor": "#64748b",
@@ -2155,7 +1760,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 59,
+      "seed": 48,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -2164,24 +1769,24 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 165,
+      "width": 126.50000000000001,
       "height": 14,
-      "text": "POST org + link external login",
+      "text": "202 confirmation screen",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
       "verticalAlign": "middle"
     },
     {
-      "id": "diag-60",
-      "x": 370,
+      "id": "diag-49",
+      "x": 260,
       "y": 768,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 1.5,
-      "strokeStyle": "solid",
+      "strokeStyle": "dashed",
       "roughness": 1,
       "opacity": 100,
       "groupIds": [],
@@ -2189,7 +1794,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 60,
+      "seed": 49,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -2198,7 +1803,7 @@
       "link": null,
       "locked": false,
       "type": "arrow",
-      "width": 155,
+      "width": 200,
       "height": 0,
       "points": [
         [
@@ -2206,7 +1811,7 @@
           0
         ],
         [
-          155,
+          -200,
           0
         ]
       ],
@@ -2214,8 +1819,8 @@
       "endArrowhead": "arrow"
     },
     {
-      "id": "diag-61",
-      "x": 359.5,
+      "id": "diag-50",
+      "x": 38.999999999999986,
       "y": 749,
       "angle": 0,
       "strokeColor": "#64748b",
@@ -2230,7 +1835,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 61,
+      "seed": 50,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -2239,93 +1844,18 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 176,
+      "width": 242.00000000000003,
       "height": 14,
-      "text": "Send verification email (if new)",
+      "text": "email-confirmation + resend states (204/429)",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
       "verticalAlign": "middle"
     },
     {
-      "id": "diag-62",
-      "x": 370,
-      "y": 808,
-      "angle": 0,
-      "strokeColor": "#475569",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1.5,
-      "strokeStyle": "dashed",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 62,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "arrow",
-      "width": 155,
-      "height": 0,
-      "points": [
-        [
-          0,
-          0
-        ],
-        [
-          -155,
-          0
-        ]
-      ],
-      "startArrowhead": null,
-      "endArrowhead": "arrow"
-    },
-    {
-      "id": "diag-63",
-      "x": 223.75,
-      "y": 789,
-      "angle": 0,
-      "strokeColor": "#64748b",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 1,
-      "opacity": 100,
-      "groupIds": [],
-      "frameId": null,
-      "roundness": {
-        "type": 2
-      },
-      "seed": 63,
-      "version": 1,
-      "versionNonce": 0,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1,
-      "link": null,
-      "locked": false,
-      "type": "text",
-      "width": 137.5,
-      "height": 14,
-      "text": "202 → confirmation screen",
-      "fontSize": 10,
-      "fontFamily": 1,
-      "textAlign": "center",
-      "verticalAlign": "middle"
-    },
-    {
-      "id": "diag-64",
+      "id": "diag-51",
       "x": 20,
-      "y": 840,
+      "y": 800,
       "angle": 0,
       "strokeColor": "#ca8a04",
       "backgroundColor": "#fef9c3",
@@ -2340,7 +1870,7 @@
         "type": 3,
         "value": 6
       },
-      "seed": 64,
+      "seed": 51,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -2349,13 +1879,13 @@
       "link": null,
       "locked": false,
       "type": "rectangle",
-      "width": 720,
-      "height": 44
+      "width": 600,
+      "height": 30
     },
     {
-      "id": "diag-65",
-      "x": -186.5,
-      "y": 857,
+      "id": "diag-52",
+      "x": 61.5,
+      "y": 810,
       "angle": 0,
       "strokeColor": "#1e293b",
       "backgroundColor": "transparent",
@@ -2369,7 +1899,7 @@
       "roundness": {
         "type": 2
       },
-      "seed": 65,
+      "seed": 52,
       "version": 1,
       "versionNonce": 0,
       "isDeleted": false,
@@ -2378,9 +1908,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 1133,
+      "width": 517,
       "height": 14,
-      "text": "IdP never supplies organization name. Provider path must have verified email; duplicate/no-verified-email are rejected before completion. Password duplicate email still returns the same confirmation screen.",
+      "text": "Use this as implementation checklist: each dashed outcome maps to an explicit wireframe state.",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
