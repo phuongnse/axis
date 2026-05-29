@@ -239,7 +239,10 @@ export const HELP_ICON_SIZE = 12;
 export const HELP_TEXT_ICON_GAP = 6;
 export const FIELD_LABEL_H = 16;
 export const FIELD_HELP_TEXT_H = 14;
-export const FIELD_LABEL_HELP_GAP = 2;
+/** Gap between label row and help text row. */
+export const FIELD_LABEL_TO_HELP_GAP = 6;
+/** Gap between label (or help row) and the control below. */
+export const FIELD_HELP_TO_INPUT_GAP = 8;
 
 /** Pixel width of label copy at 11px — positions the required * after the last glyph. */
 export function labelTextWidth(str, fontSize = 11) {
@@ -277,15 +280,15 @@ export function fieldLabelBlock(prefix, x, y, innerW, label, {
   }
   let labelBlockH = FIELD_LABEL_H;
   if (helpText) {
-    const helpY = y + FIELD_LABEL_H + FIELD_LABEL_HELP_GAP;
+    const helpY = y + FIELD_LABEL_H + FIELD_LABEL_TO_HELP_GAP;
     const iconY = helpY + Math.round((FIELD_HELP_TEXT_H - HELP_ICON_SIZE) / 2);
     els.push(ellipse(`${prefix}_help_ic`, x, iconY, HELP_ICON_SIZE, HELP_ICON_SIZE, C.primaryDark, C.infoBg, 1.5));
     els.push(text(`${prefix}_help_q`, x, iconY + 1, HELP_ICON_SIZE, 10, '?', 9, C.primaryDark, 'center'));
     const textX = x + HELP_ICON_SIZE + HELP_TEXT_ICON_GAP;
     els.push(text(`${prefix}_help`, textX, helpY, innerW - HELP_ICON_SIZE - HELP_TEXT_ICON_GAP, FIELD_HELP_TEXT_H, helpText, 10, C.gray700));
-    labelBlockH = FIELD_LABEL_H + FIELD_LABEL_HELP_GAP + FIELD_HELP_TEXT_H;
+    labelBlockH = FIELD_LABEL_H + FIELD_LABEL_TO_HELP_GAP + FIELD_HELP_TEXT_H;
   }
-  const inputY = y + labelBlockH + FIELD_LABEL_HELP_GAP;
+  const inputY = y + labelBlockH + FIELD_HELP_TO_INPUT_GAP;
   return { els, labelBlockH, inputY };
 }
 

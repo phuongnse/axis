@@ -27,8 +27,8 @@ export const AUTH_EXTERNAL_SIGN_IN_BLOCK_H = AUTH_PROVIDER_BTN_SIZE + 12 + 28;
 /** Space below each auth field before the next control. */
 export const AUTH_FIELD_STACK_GAP = 12;
 /** Approx. block height for authCard layout (no help / with help). */
-export const AUTH_FIELD_BLOCK_H = 84;
-export const AUTH_FIELD_BLOCK_H_HELP = 100;
+export const AUTH_FIELD_BLOCK_H = 90;
+export const AUTH_FIELD_BLOCK_H_HELP = 110;
 export const AUTH_HEADER_H = 112;
 export const AUTH_HEADER_H_SUBTITLE = 136;
 export const AUTH_CARD_FOOTER_ZONE = 44;
