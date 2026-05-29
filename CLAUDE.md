@@ -96,7 +96,7 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 
 ### Navigate (do not read this entire file each task)
 
-1. [`agent-checklist.md`](docs/playbooks/agent-checklist.md) — AC map, gates, domain map.
+1. [`agent-checklist.md`](docs/playbooks/agent-checklist.md) — AC map, gates, domain map. New module/event/proto → [`repo-layout-discovery.md`](docs/playbooks/repo-layout-discovery.md).
 2. `docs/use-cases/{domain}/README.md` + `docs/use-cases/{domain}/*.md` for the use case.
 3. [`docs/PROGRESS.md`](docs/PROGRESS.md) for layer status.
 4. Open [`process.md`](docs/playbooks/process.md) / [`patterns.md`](docs/playbooks/patterns.md) only when the checklist says so.
@@ -194,6 +194,7 @@ Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` chan
 | Doc | Use |
 |-----|-----|
 | [agent-checklist.md](docs/playbooks/agent-checklist.md) | **Agents — daily** |
+| [repo-layout-discovery.md](docs/playbooks/repo-layout-discovery.md) | **Agents —** module/event/proto → docs/config checklists + CI discovery rules |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Branches, PRs, drift script |
 | [process.md](docs/playbooks/process.md) | Layer workflow; deferred follow-ups; PR wrap-up |
 | [patterns-index.md](docs/playbooks/patterns-index.md) | Jump table into patterns |

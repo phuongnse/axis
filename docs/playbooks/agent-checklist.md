@@ -157,6 +157,7 @@ Gate 2:
 - Library rename → grep docs/ + src comments / not triggered
 - Deferred follow-up → `**Deferred (PR #N follow-up):**` on affected US + PROGRESS if cross-cutting / not triggered
 - Host wiring (`*Endpoints.cs` / `Program.cs`) → `Map*Endpoints` sweep in process.md / not triggered
+- Repo layout (module, event, proto, domain README) → [repo-layout-discovery.md](./repo-layout-discovery.md) checklists A–E / not triggered
 ```
 
 **Deferred follow-ups (mandatory when leaving work open):** do not wait for the user. Any skipped review item, thin-endpoint refactor, or partial layer needs a named `**Deferred (...):**` line — full rules in [process.md § Deferred follow-up](process.md). Remove the line when fixed.
@@ -235,7 +236,9 @@ Updating only `PROGRESS.md` while changing `src/` without `docs/use-cases/` → 
 
 ## Domain map (code → docs)
 
-**Auto-discovered** by [`scripts/doc_drift_domains.py`](../../scripts/doc_drift_domains.py) from `src/Modules/*` and `*Endpoints.cs` (`using Axis.{Module}.Application`). After adding a module: create `docs/use-cases/{slug}/` (or add `MODULE_DOMAIN_SLUG_OVERRIDES` in [`scripts/axis_repo.py`](../../scripts/axis_repo.py) when the slug differs, e.g. Identity → `identity-access`). Cross-cutting paths only: `EXTRA_CODE_TO_DOC_RULES` in that script.
+**Full rules + agent checklists:** [repo-layout-discovery.md](./repo-layout-discovery.md) (auto vs manual tables, commands, checklists A–E).
+
+**Summary:** [`doc_drift_domains.py`](../../scripts/doc_drift_domains.py) maps `src/Modules/*` and `*Endpoints.cs` → `docs/use-cases/{slug}/`. New module → create domain folder (or `MODULE_DOMAIN_SLUG_OVERRIDES` in [`axis_repo.py`](../../scripts/axis_repo.py) for `Identity` → `identity-access`). Cross-cutting only in `EXTRA_CODE_TO_DOC_RULES`.
 
 | Manual exception | Docs folder |
 |------------------|-------------|
@@ -249,6 +252,7 @@ Updating only `PROGRESS.md` while changing `src/` without `docs/use-cases/` → 
 | Need | File |
 |------|------|
 | Layer order, TDD, gap sweep, deferred docs, PR wrap-up | [process.md](./process.md) |
+| New module / event / proto / domain README — what to update & how CI checks | [repo-layout-discovery.md](./repo-layout-discovery.md) |
 | Find the right patterns section | [patterns-index.md](./patterns-index.md) |
 | EF, API, Wolverine, tenancy | [patterns.md](./patterns.md) |
 | React, Query, a11y | [frontend.md](./frontend.md) |

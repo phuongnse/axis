@@ -31,6 +31,7 @@ One-page map into [`patterns.md`](./patterns.md). Open only the section you need
 | Editing `buf.yaml` / removing a proto field | [Buf breaking rules — what's actually configured (and the gotcha)](./patterns.md#buf-breaking-rules--whats-actually-configured-and-the-gotcha) |
 | Idempotent command / migration | [Command idempotency](./patterns.md#command-idempotency-pattern) |
 | Pre-commit hygiene grep | [Code hygiene checklist](./patterns.md#code-hygiene-checklist) |
+| New module / Kafka / proto / domain README index | [Repo layout discovery](./repo-layout-discovery.md) |
 | React / TanStack Query screen | [Frontend Patterns](./patterns.md#frontend-patterns) · [frontend.md](./frontend.md) |
 | Where logic belongs (handler vs aggregate) | [Axis layering](./patterns.md#axis-layering-srp-at-a-glance) · [Key patterns](./patterns.md#key-patterns) |
 | Business failure vs exception | [Result vs exceptions](./patterns.md#result-pattern-vs-exceptions--when-to-use-what) |

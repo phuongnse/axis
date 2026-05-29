@@ -12,7 +12,7 @@ Extra rules (cross-cutting paths that are not module-scoped) live in
 ``EXTRA_CODE_TO_DOC_RULES`` — keep that list minimal.
 
 Run ``python3 scripts/doc_drift_domains.py --validate`` after adding a module,
-endpoint group, or domain folder.
+endpoint group, or domain folder. Agent checklists: docs/playbooks/repo-layout-discovery.md
 """
 
 from __future__ import annotations

@@ -1,4 +1,7 @@
-"""Shared repository layout discovery for maintenance scripts."""
+"""Shared repository layout discovery for maintenance scripts.
+
+Agent playbook (checklists, auto vs manual): docs/playbooks/repo-layout-discovery.md
+"""
 
 from __future__ import annotations
 
