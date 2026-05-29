@@ -118,6 +118,15 @@ export function component(builderFn, targetX, targetY, contentDy = 48) {
   return translate(content, targetX - 50, targetY - contentDy);
 }
 
+/**
+ * Place a template block with no section header (e.g. buildAuthExternalSignInBlock).
+ * Do not use component() for those — slice(2) would drop the first two content elements.
+ */
+export function componentContent(builderFn, targetX, targetY, contentDy = 48) {
+  const els = builderFn(0);
+  return translate(els, targetX - 50, targetY - contentDy);
+}
+
 // ─── File writer ──────────────────────────────────────────────────────────────
 
 export function writeExcalidraw(filePath, elements) {

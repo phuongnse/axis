@@ -40,7 +40,7 @@
  *                                     S35 Dashboard & Analytics Stats
  *                                     S36 Advanced Filters / Query Builder
  *                                     S37 Dual Listbox / Transfer List
- * ─── Auth (registration) ─────────── S38 Auth External Sign-In (ADR-027)
+ * ─── Auth (registration) ─────────── S38 External sign-in
  */
 
 import { fileURLToPath } from 'url';
@@ -57,7 +57,7 @@ import {
 export const AUTH_INNER_W = 392;
 export const AUTH_PROVIDER_BTN_SIZE = 44;
 export const AUTH_PROVIDER_GAP = 20;
-/** Icon row (44px) + gap (12px) + “or” divider (28px) — stack height after `component(buildAuthExternalSignIn, …)`. */
+/** Icon row (44px) + gap (12px) + “or” divider (28px) — stack height after `componentContent(buildAuthExternalSignInBlock, …)`. */
 export const AUTH_EXTERNAL_SIGN_IN_BLOCK_H = AUTH_PROVIDER_BTN_SIZE + 12 + 28;
 
 export function buildColorPalette(y0) {
@@ -1845,12 +1845,10 @@ export function buildAuthExternalSignInBlock(yC) {
   return els;
 }
 
-/** S38 kit section — includes caption for _template only. */
+/** S38 kit section — same block as screens; section title only (no extra captions). */
 export function buildAuthExternalSignIn(y0) {
-  const els = [...sectionHeader(38, 'Auth External Sign-In (ADR-027)', y0)];
+  const els = [...sectionHeader(38, 'External sign-in', y0)];
   const yC = y0 + 48;
-  els.push(text('ext_note', 50, yC - 16, 400, 14,
-    'Microsoft · Google · GitHub + “or” divider (ADR-027)', 10, C.gray500));
   els.push(...buildAuthExternalSignInBlock(yC));
   return els;
 }

@@ -33,7 +33,7 @@ import {
   C, SB, HDR, CX, CY,
   rect, ellipse, text, hline, vline, arrow,
   btn, inputField, selectField, badge, searchBar, pageHeader, fieldLabel,
-  appShell, component, translate, writeExcalidraw, setSeed,
+  appShell, component, componentContent, translate, writeExcalidraw, setSeed,
   stateHeadline, semanticVariantColor,
 } from './components.mjs';
 
@@ -376,7 +376,7 @@ function genRegisterOrg() {
   contentEls.push(hline('ro_hdiv', cardX, cardY + 60, cardW, C.gray300));
   contentEls.push(text('ro_title', cardX + 24, cardY + 76, cardW - 48, 24, 'Create your organization', 17, C.gray900));
 
-  contentEls.push(...component((y0) => buildAuthExternalSignInBlock(y0 + 48), cardX + 24, y, 48));
+  contentEls.push(...componentContent((y0) => buildAuthExternalSignInBlock(y0 + 48), cardX + 24, y, 48));
   y += AUTH_EXTERNAL_SIGN_IN_BLOCK_H;
 
   const fields = [

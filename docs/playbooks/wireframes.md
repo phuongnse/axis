@@ -67,7 +67,8 @@ Shared spacing constants in `generate-screens.mjs`: `AUTH_CARD_PAD`, `AUTH_SHELL
 | `C` | object | Industrial Calm color palette |
 | `SB`, `HDR`, `CX`, `CY` | constants | Layout: sidebar 230px, header 60px |
 | `translate(els, dx, dy)` | function | Shift all elements by (dx, dy) |
-| `component(builderFn, x, y, contentDy?)` | function | Place a template section at screen coordinates |
+| `component(builderFn, x, y, contentDy?)` | function | Place a full template section (strips 2-line section header) |
+| `componentContent(builderFn, x, y, contentDy?)` | function | Place a headerless block (e.g. `buildAuthExternalSignInBlock`) — do not use `component()` |
 | `appShell(prefix, W, H, navItems, activeIdx, pageTitle)` | function | Parameterized app shell (matches S18 exactly) |
 | `writeExcalidraw(filePath, elements)` | function | Write `.excalidraw` JSON to disk |
 | `btn`, `inputField`, `selectField`, `badge`, `searchBar`, `pageHeader` | functions | Convenience UI builders with canonical dimensions |
@@ -136,7 +137,7 @@ const sideEls = component(buildSideSheet, cx + 520, cy);
 ```
 
 **Hard rules:**
-- Always use `component()` when a template builder matches the needed visual — never recreate it from scratch
+- Use `component()` for full kit sections (with section header); use `componentContent()` for shared blocks like external sign-in — never recreate either from scratch
 - If a builder uses `contentDy = 68` (sub-label sections like S04, S16, S19, S22, S23, S25, S26, S27), pass `contentDy = 68` explicitly
 - ID collisions: each builder type must appear at most once per screen file (IDs are fixed in builders); if you need two copies, create a variant builder with a distinct prefix
 
@@ -322,16 +323,17 @@ cardY   = Math.round((H - cardH) / 2)
 
 **Logo rule**: always `text(id, cardX, cardY+16, cardW, 28, '⬡  Axis', 18, C.primary, 'center')` — bounding box must span full `cardW` so `'center'` alignment works correctly. Never use a narrower bounding box.
 
-**External sign-in (ADR-027):** never draw Microsoft / Google / GitHub icon buttons or the `or` divider by hand. Place the kit block from S38:
+**External sign-in:** never draw provider icon buttons or the `or` divider by hand. Reuse `buildAuthExternalSignInBlock` from S38 via **`componentContent`** (not `component()` — that helper strips two leading elements meant for section headers and would drop the first provider icon).
 
 ```js
+import { componentContent } from './components.mjs';
 import { buildAuthExternalSignInBlock, AUTH_EXTERNAL_SIGN_IN_BLOCK_H } from './generate-template.mjs';
 
-contentEls.push(...component((y0) => buildAuthExternalSignInBlock(y0 + 48), cardX + 24, y, 48));
+contentEls.push(...componentContent((y0) => buildAuthExternalSignInBlock(y0 + 48), cardX + 24, y, 48));
 y += AUTH_EXTERNAL_SIGN_IN_BLOCK_H;
 ```
 
-Icons, colors, and spacing are owned by `buildAuthExternalSignIn` in `generate-template.mjs` only.
+The divider is a horizontal rule with centered **or** (same as other auth screens) — not a `---or---` caption. Icons, colors, and spacing live only in `buildAuthExternalSignInBlock`.
 
 ---
 
