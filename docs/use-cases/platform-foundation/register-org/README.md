@@ -135,7 +135,7 @@ Documented for wireframes and future frontend; **not implemented** in the app ye
 | **Resend email** (`email-confirmation`) | `buildAuthCardInlineRow` — gray lead + underlined **Resend email →**, **left-aligned** with body | `POST /api/auth/resend-verification` with email from registration context. Stay on screen; see `email-confirmation-states` for UI feedback. |
 | **Go to sign in** (`email-confirmation`) | `buildAuthCardFooter` — **Already verified?** + underlined **Go to sign in** + forward arrow on the **right** (`forwardArrow: true`) | Navigates to sign-in (user came from registration, not “back”). |
 
-**Resend UI (wireframe):** idle on `email-confirmation`; after click → **Sending…** (link disabled) → **204** success banner + disabled resend, or **429** warning banner (same copy rhythm as `verify-email-rate-limit`). API always returns **204** when under cap, even if email unknown (no leakage).
+**Resend UI (wireframe):** idle on `email-confirmation`; after click → info banner **Sending…** + same **Didn't receive it? Resend email →** row (disabled/grey) → **204** success banner + disabled resend, or **429** warning banner (same copy rhythm as `verify-email-rate-limit`). API always returns **204** when under cap, even if email unknown (no leakage).
 
 Record **accepted ToS/Privacy version** on the account at org create (AC above); legal page content and versioning are out of scope for this wireframe pass.
 

@@ -549,7 +549,7 @@ const EMAIL_CONFIRMATION_BODY =
 
 /**
  * Paint email-confirmation card body (shared by happy path + resend state panels).
- * @param {{ notice?: { title: string, body?: string, variant?: string }, resend?: { disabled?: boolean, sending?: boolean } }} opts
+ * @param {{ notice?: { title: string, body?: string, variant?: string }, resend?: { disabled?: boolean } }} opts
  */
 function paintEmailConfirmationCard(els, opts, wireAcc) {
   const {
@@ -561,7 +561,7 @@ function paintEmailConfirmationCard(els, opts, wireAcc) {
     notice = null,
     resend = {},
   } = opts;
-  const { disabled: resendDisabled = false, sending: resendSending = false } = resend;
+  const { disabled: resendDisabled = false } = resend;
 
   const brand = buildAuthCardBrandBar(prefix, cardX, cardY, cardW);
   els.push(...brand.els);
@@ -593,17 +593,15 @@ function paintEmailConfirmationCard(els, opts, wireAcc) {
     cy += banner.blockH + 12;
   }
 
-  const resendSegments = resendSending
-    ? [{ text: 'Sending…', color: C.gray500 }]
-    : resendDisabled
-      ? [
-          { text: "Didn't receive it?", color: C.gray700 },
-          { text: 'Resend email →', color: C.gray300 },
-        ]
-      : [
-          { text: "Didn't receive it?", color: C.gray700 },
-          { text: 'Resend email →', color: C.primary, link: true },
-        ];
+  const resendSegments = resendDisabled
+    ? [
+        { text: "Didn't receive it?", color: C.gray700 },
+        { text: 'Resend email →', color: C.gray300 },
+      ]
+    : [
+        { text: "Didn't receive it?", color: C.gray700 },
+        { text: 'Resend email →', color: C.primary, link: true },
+      ];
   els.push(...buildAuthCardInlineRow(`${prefix}_resend`, cardX, cardW, cy, resendSegments));
   els.push(...buildAuthCardFooter(prefix, cardX, cardY, cardW, cardH, {
     lead: 'Already verified?',
@@ -695,9 +693,9 @@ function genEmailConfirmationStates() {
       notice: {
         variant: 'info',
         title: 'Sending…',
-        body: 'Stay on this screen; the link is disabled until the request completes.',
+        body: 'Stay on this screen; the resend link is disabled until the request completes.',
       },
-      resend: { sending: true },
+      resend: { disabled: true },
     },
   ];
 
