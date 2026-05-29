@@ -93,50 +93,50 @@ flowchart LR
 
 ### Container diagram
 
-Runtime containers, brokers, and per-module databases. Detail: [ARCHITECTURE.md § Containers](./ARCHITECTURE.md#containers).
+Runtime containers in **layers** (top → bottom). Each module owns one PostgreSQL database; messaging is shared infrastructure, not drawn per-module to avoid clutter. Detail: [ARCHITECTURE.md § Containers](./ARCHITECTURE.md#containers) (table + ADRs).
 
 ```mermaid
 flowchart TB
-  subgraph Platform["Axis.Api Gateway + Module Services (modulith)"]
-    SPA[Web Application<br/>React SPA]
+  SPA["Web Application<br/><small>React SPA · TanStack Query</small>"]
+
+  API["Axis.Api Gateway<br/><small>REST / OpenAPI · JWT via JWKS</small>"]
+
+  AUTH["OpenIddict + SignalR<br/><small>OAuth2 / OIDC · live execution status</small>"]
+
+  subgraph MOD["Module services — modulith boundaries (extractable to K8s services)"]
+    direction LR
     ID[Identity]
     DM[DataModeling]
     WB[WorkflowBuilder]
     FB[FormBuilder]
     WE[WorkflowEngine]
     PB[PageBuilder]
-    Kafka[Kafka + Schema Registry<br/>Events / Snapshots]
-    RMQ[RabbitMQ<br/>Commands / Jobs / Saga]
-    GRPC[gRPC Contracts<br/>Sync RPC]
-    OIDC[OpenIddict<br/>OAuth2 / OIDCE]
-    SR[SignalR]
   end
 
-  subgraph Data["Per-module PostgreSQL"]
-    DB1[(Identity DB)]
-    DB2[(DataModeling DB)]
-    DB3[(WorkflowBuilder DB)]
-    DB4[(WorkflowEngine DB)]
-    DB5[(FormBuilder DB)]
-    DB6[(PageBuilder DB)]
+  subgraph BUS["Cross-module transport"]
+    direction LR
+    K["Kafka + Schema Registry<br/><small>events · snapshots · Avro</small>"]
+    R["RabbitMQ<br/><small>commands · jobs · saga steps</small>"]
+    G["gRPC contracts<br/><small>sync RPC escape hatch</small>"]
   end
 
-  Redis[(Redis)]
-  Vault[HashiCorp Vault]
-  Obs[Grafana Tempo / Loki / Mimir]
-  S3[AWS S3]
-  Mail[Email Service]
+  PG[("PostgreSQL × 6<br/><small>one DB per module · schema-per-tenant · Wolverine outbox</small>")]
 
-  ID & DM & WB & FB & WE & PB --> Kafka
-  ID & DM & WB & FB & WE & PB --> RMQ
-  ID & DM & WB & FB & WE & PB --> GRPC
-  ID & DM & WB & FB & WE & PB --> DB1 & DB2 & DB3 & DB4 & DB5 & DB6
-  Platform --> Redis
-  Platform --> Vault
-  Platform --> Obs
-  Platform --> S3
-  Platform --> Mail
-  SPA --> Platform
+  subgraph EXT["External & production ops"]
+    direction LR
+    Redis[("Redis<br/><small>cache · locks</small>")]
+    S3[("S3<br/><small>files</small>")]
+    Mail[("Email<br/><small>SMTP</small>")]
+    Vault[("Vault<br/><small>secrets</small>")]
+    Obs[("Observability<br/><small>Tempo · Loki · Mimir</small>")]
+  end
+
+  SPA --> API
+  API --> AUTH
+  API --> MOD
+  MOD --> BUS
+  MOD --> PG
+  MOD --> EXT
 ```
 
 ### Module overview
