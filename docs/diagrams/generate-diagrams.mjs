@@ -831,13 +831,17 @@ function registerOrgCasesDiagram() {
   const providerEnd = pRejectDup + retStep;
   const completeDiv = providerEnd + phaseGap;
   const completeStart = completeDiv + afterDiv;
-  const completeEnd = completeStart + step * 3;
-  const sharedDiv = completeEnd + phaseGap;
-  const sharedStart = sharedDiv + afterDiv;
+  const cSubmit = completeStart;
+  const cPost = cSubmit + step;
+  const c400 = cPost + step;
+  const c5xx = c400 + retStep;
+  const sharedDiv = c5xx + 56;
+  const sharedStart = sharedDiv + 36;
+  const sharedEmail = sharedStart + retStep;
 
   return seqBuild({
     title: "Register Organization — Case Matrix (Dev Checklist)",
-    gap: 220,
+    gap: 168,
     participants: [
       { label: "New Admin" },
       { label: "Web App" },
@@ -862,18 +866,18 @@ function registerOrgCasesDiagram() {
       { from: 2, to: 1, y: pRejectDup, label: "Reject: duplicate email → Sign in", dashed: true, labelBelow: true },
       { from: 2, to: 1, y: providerEnd, label: "Open register-org-complete", dashed: true, labelBelow: true },
 
-      { from: 0, to: 1, y: completeStart, label: "Submit complete form (org name, slug, Terms)" },
-      { from: 1, to: 2, y: completeStart + step, label: "POST completion (link external login)" },
-      { from: 2, to: 1, y: completeStart + step * 2, label: "400 org name / Terms errors (inline)", dashed: true, labelBelow: false },
-      { from: 2, to: 1, y: completeEnd, label: "5xx generic banner, re-enable submit", dashed: true, labelBelow: true },
+      { from: 0, to: 1, y: cSubmit, label: "Submit complete form (name, slug, Terms)" },
+      { from: 1, to: 2, y: cPost, label: "POST completion + link login", labelBelow: false },
+      { from: 2, to: 1, y: c400, label: "400 org / Terms errors (inline)", dashed: true, labelBelow: false },
+      { from: 2, to: 1, y: c5xx, label: "5xx banner, re-enable submit", dashed: true, labelBelow: true },
 
       { from: 2, to: 1, y: sharedStart, label: "202 confirmation screen", dashed: true, labelBelow: false },
-      { from: 1, to: 0, y: sharedStart + step, label: "email-confirmation + resend (204 / 429)", dashed: true, labelBelow: true },
+      { from: 1, to: 0, y: sharedEmail, label: "email-confirmation + resend (204/429)", dashed: true, labelBelow: true },
     ],
     notes: [
       {
         x: 20,
-        y: sharedStart + step + phaseGap,
+        y: sharedEmail + phaseGap,
         label: "Use this as implementation checklist: each dashed outcome maps to an explicit wireframe state.",
       },
     ],
