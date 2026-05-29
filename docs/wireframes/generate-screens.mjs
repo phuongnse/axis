@@ -515,8 +515,7 @@ function genRegisterOrgProviderStates() {
       variant: 'warning',
       bodySegments: [
         { text: 'An account with this email already exists. ', color: C.gray700 },
-        { text: 'Sign in instead', color: C.primary, link: true },
-        { text: ' →', color: C.primary, link: true },
+        { text: 'Sign in instead →', color: C.primary, link: true },
       ],
     },
     {
