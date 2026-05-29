@@ -80,6 +80,9 @@ All auth fields that use `authFormField`, `authReadOnlyValueField`, or `authSlug
 | `HELP_ICON_SIZE` | 12px | `components.mjs` | `?` circle on help row |
 | `HELP_TEXT_ICON_GAP` | 6px | `components.mjs` | `?` icon → help copy (same row) |
 | `AUTH_FIELD_STACK_GAP` | 12px | `blocks.mjs` | Bottom of one field block → next field |
+| `AUTH_CARD_FOOTER_ZONE` | 44px | `blocks.mjs` | Footer divider + link inside card |
+| `measureAuthCardHeight` | — | `blocks.mjs` | Card height from layout cursor **and** max painted element bottom |
+| `authScreenCanvasHeight` | — | `blocks.mjs` | Gray background `H` when card exceeds 700px |
 | `AUTH_CARD_W` | 440px | `blocks.mjs` | Centered auth card width |
 | `AUTH_CARD_PAD_X` | 24px | `blocks.mjs` | Card inner horizontal padding |
 

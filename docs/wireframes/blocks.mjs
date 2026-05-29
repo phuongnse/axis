@@ -32,6 +32,39 @@ export const AUTH_FIELD_BLOCK_H_HELP = 110;
 export const AUTH_HEADER_H = 112;
 export const AUTH_HEADER_H_SUBTITLE = 136;
 export const AUTH_CARD_FOOTER_ZONE = 44;
+/** Gap below primary submit before footer divider. */
+export const AUTH_SUBMIT_AFTER_GAP = 16;
+
+/** Bottom edge of an Excalidraw element (for card height sync). */
+export function elementBottom(el) {
+  if (el.type === 'line') {
+    const pts = el.points || [[0, 0]];
+    return el.y + Math.max(...pts.map((p) => p[1]));
+  }
+  return el.y + (el.height || 0);
+}
+
+/**
+ * Card height from layout cursor after submit + trailing gap, or from measured content.
+ * Pass contentEls to grow the card when blockH math and painted geometry diverge.
+ */
+export function measureAuthCardHeight(cardY, yAfterSubmitTrailing, contentEls = []) {
+  const fromCursor = yAfterSubmitTrailing - cardY + AUTH_CARD_FOOTER_ZONE;
+  if (contentEls.length === 0) {
+    return fromCursor;
+  }
+  let maxB = cardY;
+  for (const el of contentEls) {
+    maxB = Math.max(maxB, elementBottom(el));
+  }
+  const fromContent = maxB - cardY + AUTH_CARD_FOOTER_ZONE;
+  return Math.max(fromCursor, fromContent);
+}
+
+/** Canvas height when auth card is taller than default screen H. */
+export function authScreenCanvasHeight(cardY, cardH, minHeight = 700) {
+  return Math.max(minHeight, cardY + cardH + 24);
+}
 
 // ─── External sign-in (Microsoft / Google / GitHub + or) ─────────────────────
 

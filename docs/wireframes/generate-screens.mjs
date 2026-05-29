@@ -55,6 +55,9 @@ import {
   AUTH_HEADER_H_SUBTITLE,
   AUTH_CARD_FOOTER_ZONE,
   AUTH_FIELD_STACK_GAP,
+  AUTH_SUBMIT_AFTER_GAP,
+  measureAuthCardHeight,
+  authScreenCanvasHeight,
   placeAuthExternalSignIn,
   buildAuthCardBrandBar,
   buildAuthCardHeader,
@@ -256,17 +259,14 @@ function genRegisterOrg() {
   const cardX = Math.round((W - cardW) / 2);
   const cardY = 16;
   const headerH = AUTH_HEADER_H;
-  const footerZone = AUTH_CARD_FOOTER_ZONE;
   const els = [];
-
-  els.push(rect('ro_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
 
   let y = cardY + headerH;
   const contentEls = [];
 
   contentEls.push(...buildAuthCardHeader('ro', cardX, cardY, cardW, 'Create your organization'));
   contentEls.push(...placeAuthExternalSignIn(cardX + AUTH_CARD_PAD_X, y));
-  y += AUTH_EXTERNAL_SIGN_IN_BLOCK_H;
+  y += AUTH_EXTERNAL_SIGN_IN_BLOCK_H + AUTH_FIELD_STACK_GAP;
 
   y = paintRegisterOrgEntryFields(contentEls, 'ro', cardX, y, cardW, REGISTER_ORG_ENTRY_FIELDS);
 
@@ -275,10 +275,12 @@ function genRegisterOrg() {
   y += termsH + AUTH_FIELD_STACK_GAP;
 
   contentEls.push(...buildAuthSubmitButton('ro', cardX, y, cardW, 'Create organization'));
-  y += 36 + 16;
+  y += 36 + AUTH_SUBMIT_AFTER_GAP;
 
-  const cardH = y - cardY + footerZone;
+  const cardH = measureAuthCardHeight(cardY, y, contentEls);
+  const screenH = authScreenCanvasHeight(cardY, cardH, H);
 
+  els.push(rect('ro_bg', 0, 0, W, screenH, C.gray300, C.gray100, 1, false));
   els.push(rect('ro_card', cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
   els.push(...contentEls);
   els.push(...buildAuthCardFooter('ro', cardX, cardY, cardW, cardH, 'Already have an account? Sign in'));
@@ -295,10 +297,7 @@ function genRegisterOrgComplete() {
   const cardX = Math.round((W - cardW) / 2);
   const cardY = 40;
   const headerH = AUTH_HEADER_H_SUBTITLE;
-  const footerZone = AUTH_CARD_FOOTER_ZONE;
   const els = [];
-
-  els.push(rect('roc_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
 
   const contentEls = [];
   contentEls.push(...buildAuthCardHeader(
@@ -309,10 +308,12 @@ function genRegisterOrgComplete() {
   y += AUTH_FIELD_STACK_GAP;
 
   contentEls.push(...buildAuthSubmitButton('roc', cardX, y, cardW, 'Create organization'));
-  y += 36 + 16;
+  y += 36 + AUTH_SUBMIT_AFTER_GAP;
 
-  const cardH = y - cardY + footerZone;
+  const cardH = measureAuthCardHeight(cardY, y, contentEls);
+  const screenH = authScreenCanvasHeight(cardY, cardH, H);
 
+  els.push(rect('roc_bg', 0, 0, W, screenH, C.gray300, C.gray100, 1, false));
   els.push(rect('roc_card', cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
   els.push(...contentEls);
   els.push(...buildAuthCardFooter('roc', cardX, cardY, cardW, cardH, '← Back to registration'));
