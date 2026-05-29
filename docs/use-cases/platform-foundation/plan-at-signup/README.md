@@ -41,10 +41,10 @@ Self-service registration flow where a new organization signs up and is automati
 - [ ] Feature limits are enforced immediately after provisioning (e.g., creating a 4th workflow on a 3-workflow plan returns HTTP 402 with a clear upgrade message).
 
 *Edge cases*
-- [ ] If a paid plan is selected in MVP (before billing integration), it is treated as trial with a flag for the Axis team to follow up.
+- [ ] If a paid plan is selected before billing integration is live, it is assigned like any other plan (no separate billing flag column yet); payment collection is the billing initiative follow-up.
 
 *Out of scope*
-- Credit card collection and payment processing — Phase 2.
+- Credit card collection and payment processing — part of the separate billing initiative.
 - Plan upgrade/downgrade self-service — covered in subscription-plans.
 
 > **Implementation status**
@@ -63,7 +63,7 @@ Self-service registration flow where a new organization signs up and is automati
 > - org stores `subscription_plan_id`
 > - subscription-plans enforces limits (402) after provisioning.
 >
-> **Decisions:** MVP paid plan selection has no billing flag column yet — treat as normal plan assignment until billing Phase 2.
+> **Decisions:** Paid plan selection uses normal `subscription_plan_id` assignment until billing integration; no trial-only flag column.
 
 ## Wireframes
 

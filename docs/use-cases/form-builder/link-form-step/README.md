@@ -44,7 +44,7 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 - [ ] The same form can be used in multiple Form steps within the same workflow (e.g., a multi-stage approval process using the same form at each stage).
 
 *Out of scope*
-- Creating a new form from within the workflow canvas (must go to Form Builder) — not in MVP.
+- Creating a new form from within the workflow canvas (must go to Form Builder).
 
 > **Implementation status**
 >

@@ -42,7 +42,7 @@ Organization admins can create custom roles, assign permissions to each role, an
 - [ ] If an org has no custom roles yet, the list shows only the 4 default system roles with a prompt to create a custom role.
 
 *Out of scope*
-- Role hierarchy / role inheritance — not in MVP (flat role model only).
+- Role hierarchy / role inheritance — flat role model only.
 
 > **Implementation status**
 >

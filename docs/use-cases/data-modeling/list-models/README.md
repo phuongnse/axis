@@ -44,7 +44,7 @@ Users can create custom data models within their organization. A model defines t
 - [ ] Record count may be slightly behind real-time (cached with 1-minute TTL) to avoid expensive COUNT queries on every list load.
 
 *Out of scope*
-- Folders or categories for organizing models — not in MVP.
+- Folders or categories for organizing models.
 
 > **Implementation status**
 >

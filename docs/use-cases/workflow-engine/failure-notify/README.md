@@ -36,7 +36,7 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 - [ ] In-app notification appears in the bell icon and persists until dismissed.
 
 *Validation & errors*
-- [ ] If the email notification itself fails to deliver, the failure is logged but does not create a cascading error (no retry for notification delivery in MVP).
+- [ ] If the email notification itself fails to deliver, the failure is logged but does not create a cascading error (no retry for notification delivery).
 - [ ] If no notification channels are configured for the workflow, the failure notification is sent to all org Admins by default as a safety net.
 
 *Edge cases*
@@ -44,7 +44,7 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 - [ ] If the same workflow fails repeatedly in a short period (e.g., schedule trigger firing every 5 minutes and always failing), notifications are rate-limited to 1 per 15 minutes per workflow per channel to avoid notification flooding.
 
 *Out of scope*
-- PagerDuty / OpsGenie / Slack integration for error notifications — not in MVP.
+- PagerDuty / OpsGenie / Slack integration for error notifications.
 
 > **Implementation status**
 >

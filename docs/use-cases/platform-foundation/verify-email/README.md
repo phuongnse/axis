@@ -46,7 +46,7 @@ Self-service registration flow where a new organization signs up and is automati
 - [ ] Verification link works regardless of which browser or device it is opened on.
 
 *Out of scope*
-- Automatic re-send after X minutes — not in MVP.
+- Automatic re-send after X minutes.
 
 > **Implementation status**
 >

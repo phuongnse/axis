@@ -55,18 +55,22 @@ Axis provides a unified platform where non-technical users can:
 
 ---
 
-## MVP Scope (Phase 1)
+## Production platform scope
 
-The MVP focuses on the core loop that makes the platform valuable:
+Axis targets **production readiness** across all product domains. There is no separate "MVP" or "Phase 2" product cut — every capability listed in use-case specs is in scope. Capabilities a use case has not built yet are tracked as gaps in its `> **Implementation status**` callout (or listed under its `*Out of scope*` AC group), not cut from the product.
 
+**Core user journey:**
+
+```text
+Register & authenticate → Model data → Build workflows → Add forms
+  → Execute & monitor → Publish pages for end users
 ```
-Define Data → Build Workflow → Collect via Form → Execute & Monitor
-```
 
-| Capability | Included in MVP |
+| Capability | In scope |
 |---|---|
-| Multi-tenant organization management | Yes |
-| User authentication & RBAC | Yes |
+| Multi-tenant organization management (registration, slug, provisioning, plans) | Yes |
+| Authentication (email/password + Microsoft, Google, GitHub) & RBAC | Yes |
+| Legal acceptance (Terms of Service, Privacy Policy) at registration | Yes |
 | Custom data modeling | Yes |
 | Workflow builder (visual canvas) | Yes |
 | Step types: Form, HTTP, Condition, Script, Notification | Yes |
@@ -75,5 +79,18 @@ Define Data → Build Workflow → Collect via Form → Execute & Monitor
 | Form builder | Yes |
 | Workflow execution engine | Yes |
 | Execution history & error notifications | Yes |
-| Page & UI builder | No (Phase 2) |
+| Page & UI builder | Yes |
+
+**Implementation order** follows domain **Open work** and use-case **Gaps vs spec** — not a reduced feature phase. Deferred items in a use case are backlog within the same product scope, not excluded from the platform.
+
+**External sign-in (required providers):** Microsoft (Entra ID / Microsoft account), Google, and GitHub — in addition to email/password. Details: [sign-in](./use-cases/identity-access/sign-in/README.md), [register-org](./use-cases/platform-foundation/register-org/README.md), [TECH_STACK § ADR-027](./TECH_STACK.md#adr-027-external-identity-providers-for-sign-in-and-registration).
+
+---
+
+## Non-goals (platform)
+
+These remain outside the product unless a future ADR explicitly adds them:
+
+- Built-in payment processing (billing integration is a separate initiative; plan assignment and limits are in scope today).
+- Axis-operated mobile native apps (responsive web SPA is the client).
 

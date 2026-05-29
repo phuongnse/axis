@@ -45,7 +45,7 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 - [ ] The canvas remains fully interactive (pan, zoom, add steps) while a configuration panel is open.
 
 *Out of scope*
-- Full-screen step config modal — the panel-based UI is the only config surface in MVP.
+- Full-screen step config modal — the panel-based UI is the only config surface.
 
 > **Implementation status**
 >

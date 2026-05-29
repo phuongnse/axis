@@ -43,7 +43,7 @@ Form fields define what data the form collects. Each field has a type, label, he
 - [ ] Deleting a section header does not delete the fields below it; they move up to the previous section (or become ungrouped if they were in the first section).
 
 *Out of scope*
-- Collapsible sections — not in MVP.
+- Collapsible sections.
 
 > **Implementation status**
 >

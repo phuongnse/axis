@@ -33,7 +33,7 @@ Each step has a type that determines what it does when executed. Users configure
 *Happy path*
 - [ ] Channel options: Email or Webhook.
 - [ ] Email config: recipient(s) (comma-separated emails or context expressions), subject, and body (rich text with `{{expression}}` placeholders).
-- [ ] Webhook config: URL (supports expressions), HTTP method (POST only in MVP), and an optional JSON payload template.
+- [ ] Webhook config: URL (supports expressions), HTTP method (POST only), and an optional JSON payload template.
 - [ ] The step does not pause execution; the workflow continues immediately after the notification is dispatched (fire-and-forget).
 
 *Validation & errors*
@@ -47,8 +47,8 @@ Each step has a type that determines what it does when executed. Users configure
 - [ ] Expression placeholders that resolve to `null` or undefined are rendered as an empty string in the notification body.
 
 *Out of scope*
-- SMS, Slack, or Teams notification channels — not in MVP.
-- Notification templates shared across workflows — not in MVP.
+- SMS, Slack, or Teams notification channels.
+- Notification templates shared across workflows.
 
 > **Implementation status**
 >

@@ -49,7 +49,7 @@ Allow organization admins to manage their organization's profile, settings, and 
 
 *Out of scope*
 - Data export before deletion — available separately as a future feature.
-- Immediate hard delete without grace period — the 30-day window is non-negotiable in MVP.
+- Immediate hard delete without grace period — the 30-day window is non-negotiable.
 
 > **Implementation status**
 >

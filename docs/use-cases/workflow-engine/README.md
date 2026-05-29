@@ -12,9 +12,9 @@ The runtime engine that takes a workflow definition and executes it step-by-step
 
 A workflow builder without an execution engine is just a drawing tool. This domain is what makes workflows actually run and deliver value.
 
-## Phase
+## Scope
 
-**MVP**
+**Production scope** — in the full product scope; no separate MVP/Phase cut.
 
 ---
 

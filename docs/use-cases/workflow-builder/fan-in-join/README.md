@@ -45,7 +45,7 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 - [ ] Changing the join type after the workflow is published requires creating a new version.
 
 *Out of scope*
-- "Wait for N of M" join type (e.g., wait for 2 out of 3 branches) — not in MVP.
+- "Wait for N of M" join type (e.g., wait for 2 out of 3 branches).
 
 > **Implementation status**
 >
@@ -58,6 +58,8 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** AND/OR join execution, branch cancellation, and grace period pending workflow-engine.
+>
+> **Deferred (PR #146 follow-up):** "Wait for N of M" join type (e.g., wait for 2 of 3 branches).
 
 ## Wireframes
 

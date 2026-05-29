@@ -47,8 +47,8 @@ A workflow must have at least one trigger before it can be published. Triggers d
 - [ ] `execution.completed` event for a workflow does not re-trigger itself (self-triggering is blocked at the platform level).
 
 *Out of scope*
-- Custom platform events defined by users — not in MVP.
-- Listening to events from external systems (without going through a Webhook trigger) — not in MVP.
+- Custom platform events defined by users.
+- Listening to events from external systems (without going through a Webhook trigger).
 
 > **Implementation status**
 >
@@ -63,6 +63,8 @@ A workflow must have at least one trigger before it can be published. Triggers d
 > **Gaps vs spec:**
 > - Wolverine event subscription wiring and filter expression evaluation pending workflow-engine
 > - event type registry and model-picker UI pending API + Frontend.
+>
+> **Deferred (PR #146 follow-up):** Custom platform events defined by users; listening to external-system events without a Webhook trigger.
 
 ## Wireframes
 

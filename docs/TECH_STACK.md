@@ -102,7 +102,7 @@
 
 ### ADR-004: OpenIddict as OAuth2/OIDC Server
 **Decision:** Use OpenIddict 5.x as the in-process OAuth2/OIDC authorization server.
-**Reason:** Axis will support external systems triggering workflows via API — this requires a standards-compliant OAuth2 Client Credentials flow so third-party tools can authenticate without user interaction. OpenIddict also enables Authorization Code + PKCE for the SPA (more secure than custom JWT for browser clients) and positions Axis to support enterprise SSO in the future. Keeping the auth server in-process avoids external service dependencies.
+**Reason:** Axis will support external systems triggering workflows via API — this requires a standards-compliant OAuth2 Client Credentials flow so third-party tools can authenticate without user interaction. OpenIddict also enables Authorization Code + PKCE for the SPA (more secure than custom JWT for browser clients) and hosts external identity providers for interactive sign-in (see [ADR-027](#adr-027-external-identity-providers-for-sign-in-and-registration)). Keeping the auth server in-process avoids external service dependencies.
 
 ### ADR-005: React over Vue/Svelte for Frontend
 **Decision:** Use React with TypeScript.
@@ -167,7 +167,7 @@
 
 - **Per-module DB is the prerequisite for [ADR-010](#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy).** A module cannot be extracted without its data; if data is shared, extraction means manual table-by-table copy + dual-write transition periods. Separate databases make extraction a connection-string change.
 - **Schema-per-tenant kept inside each module.** Three multitenancy models were evaluated:
-  - **Database-per-tenant:** strongest isolation but explodes operations (`N modules × M tenants` databases). Rejected for cost at MVP scale, can be revisited per-module if a large tenant needs it.
+  - **Database-per-tenant:** strongest isolation but explodes operations (`N modules × M tenants` databases). Rejected for cost at production scale, can be revisited per-module if a large tenant needs it.
   - **Row-level with Postgres RLS:** scales best with many small tenants but requires RLS discipline on every query and complicates per-tenant backups. Rejected because Axis prefers strong-isolation defaults.
   - **Schema-per-tenant inside the module DB:** preserves existing `tenant_{orgId:N}` shape, isolates tenants strongly, and extracts cleanly. **Chosen.**
 - **`public` schema in each module DB** holds module-level metadata (e.g. cross-tenant indexes, configuration). Identity's `public` is special: it owns organizations, users, and roles — the registry that all other modules reference via JWT claims, never via SQL.
@@ -396,3 +396,15 @@
 
 - "Same message goes to both transports" — pick one based on semantics. Duplicating writes doubles failure modes.
 - Suffix-less message names (just `ProvisionTenant`) — ambiguous routing; pre-commit hook should reject.
+
+### ADR-027: External identity providers for sign-in and registration
+
+**Decision:** Support **Microsoft** (Entra ID / Microsoft account), **Google**, and **GitHub** as external sign-in providers alongside email/password. They are wired into the OpenIddict server (ADR-004) via the ASP.NET Core external-authentication handlers; OpenIddict remains the only token issuer — external providers authenticate the user, Axis still mints its own access/refresh tokens.
+
+**Reason:** Production scope requires low-friction sign-up and sign-in. Organizations expect to onboard with the corporate or developer identity they already have, and password-only auth raises abandonment at registration. Routing all three through OpenIddict keeps a single token format, a single JWKS, and one RBAC mapping regardless of how the user authenticated.
+
+**Configuration:** per-provider `client_id` / `client_secret` stored in HashiCorp Vault in production ([ADR-022](#adr-022-secrets-management-via-hashicorp-vault-in-production)) and `.env` in development. Redirect URIs are registered per environment. A provider can be disabled per deployment without code changes.
+
+**Registration:** an external sign-in either creates a new organization (the register-org flow) or signs into an existing one. Accounts are linked to an existing Axis user by **verified email** — a provider login whose email matches a verified local account attaches to it rather than creating a duplicate.
+
+**Rejected:** full enterprise SSO federation (SAML, SCIM provisioning, per-tenant IdP) is deferred — it is a separate initiative driven by enterprise-tenant demand, not part of the baseline production scope.

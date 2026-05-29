@@ -44,7 +44,7 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 - [ ] Soft-deleted data classes are permanently purged after 30 days along with model soft-deletes.
 
 *Out of scope*
-- Merging two data classes into one — not in MVP.
+- Merging two data classes into one.
 
 > **Implementation status**
 >

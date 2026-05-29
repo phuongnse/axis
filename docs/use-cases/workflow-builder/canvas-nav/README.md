@@ -44,7 +44,7 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 - [ ] Mini-map can be collapsed to avoid obscuring the canvas for users who don't need it.
 
 *Out of scope*
-- Touch/gesture controls for tablet use — not in MVP.
+- Touch/gesture controls for tablet use.
 
 > **Implementation status**
 >

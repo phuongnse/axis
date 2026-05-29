@@ -44,7 +44,7 @@ Users can create, read, update, and delete records against any model. Records ar
 - [ ] Bulk export of more than 5,000 records is processed asynchronously; the user receives a download link via email or in-app notification when ready.
 
 *Out of scope*
-- Bulk edit (updating multiple records at once) — not in MVP.
+- Bulk edit (updating multiple records at once).
 
 > **Implementation status**
 >

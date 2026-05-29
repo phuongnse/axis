@@ -45,7 +45,7 @@ Organization admins can create custom roles, assign permissions to each role, an
 - [ ] A user whose active session loses a permission they were relying on will receive HTTP 403 on their next request for that resource; the UI re-fetches their permissions and updates accordingly.
 
 *Out of scope*
-- Permission change notifications to affected users — not in MVP.
+- Permission change notifications to affected users.
 
 > **Implementation status**
 >

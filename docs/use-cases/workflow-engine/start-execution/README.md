@@ -46,7 +46,7 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 - [ ] A workflow triggered multiple times in rapid succession creates independent executions; there is no implicit deduplication except for Schedule triggers (see max_concurrent_runs).
 
 *Out of scope*
-- Triggering a specific version of a workflow (other than the current active version) — not in MVP.
+- Triggering a specific version of a workflow (other than the current active version).
 
 > **Implementation status**
 >

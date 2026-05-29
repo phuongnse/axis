@@ -34,29 +34,25 @@ When you ship code, update **use-case callout → domain README → PROGRESS** i
 
 ## Domains
 
-| Domain | Phase | Scope |
-|--------|-------|--------|
-| [platform-foundation](./platform-foundation/README.md) | MVP | Tenant registration, org management, isolation, subscription plans |
-| [identity-access](./identity-access/README.md) | MVP | Authentication, users, roles, permissions, security, i18n/theming |
-| [data-modeling](./data-modeling/README.md) | MVP | Models, field types, data classes, record CRUD |
-| [workflow-builder](./workflow-builder/README.md) | MVP | Canvas, steps, triggers, branching, parallel, import/export |
-| [form-builder](./form-builder/README.md) | MVP | Forms, fields, workflow integration, submissions |
-| [workflow-engine](./workflow-engine/README.md) | MVP | Execution, handlers, errors, history, retry |
-| [page-builder](./page-builder/README.md) | Phase 2 | Pages, widgets, drag & drop, data binding |
+| Domain | Scope |
+|--------|--------|
+| [platform-foundation](./platform-foundation/README.md) | Tenant registration, org management, isolation, subscription plans |
+| [identity-access](./identity-access/README.md) | Authentication, users, roles, permissions, security, i18n/theming |
+| [data-modeling](./data-modeling/README.md) | Models, field types, data classes, record CRUD |
+| [workflow-builder](./workflow-builder/README.md) | Canvas, steps, triggers, branching, parallel, import/export |
+| [form-builder](./form-builder/README.md) | Forms, fields, workflow integration, submissions |
+| [workflow-engine](./workflow-engine/README.md) | Execution, handlers, errors, history, retry |
+| [page-builder](./page-builder/README.md) | Pages, widgets, drag & drop, data binding |
+
+All domains are in the production scope ([PRODUCT_VISION § Production platform scope](../PRODUCT_VISION.md#production-platform-scope)). Capabilities a use case does not ship are tracked under its `*Out of scope*` AC group and `> **Implementation status**` callout — backlog within the same scope, not a separate phase cut.
 
 ---
 
-## MVP core loop
+## Platform core loop
 
 ```
-Platform setup → Identity & users → Model data
-    → Build workflows → Add forms → Execute & monitor
-```
-
-## Phase 2
-
-```
-Execution data → Build pages & widgets → End users
+Platform setup → Identity & users → Model data → Build workflows
+    → Add forms → Execute & monitor → Build pages & widgets → End users
 ```
 
 ---

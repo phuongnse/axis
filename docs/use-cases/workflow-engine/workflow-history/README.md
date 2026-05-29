@@ -45,7 +45,7 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 - [ ] Executions that are currently `RUNNING` appear at the top of the list regardless of sort order, with a live elapsed time counter.
 
 *Out of scope*
-- Execution analytics dashboard (charts, trends) — not in MVP.
+- Execution analytics dashboard (charts, trends).
 
 > **Implementation status**
 >

@@ -57,11 +57,14 @@ jobs:
             doc-drift-scope:
               - 'src/**'
               - 'tests/**'
-              - 'docs/use-cases/**'
-              - 'docs/PROGRESS.md'
-              - 'scripts/check-doc-drift.sh'
-              - 'scripts/check-local-dev-docs.py'
-              - 'scripts/check-buf-modules.sh'
+              # The umbrella's full-tree checks (link targets, use-case
+              # structure, code-fence integrity) validate every doc, so any
+              # doc change must trigger them — not just use-cases.
+              - 'docs/**'
+              # Globbed, not enumerated: the umbrella invokes several checker
+              # scripts, and a new one must trigger the job without anyone
+              # remembering to add it here.
+              - 'scripts/**'
               - 'buf.yaml'
               - '.github/workflows/build-and-test.yml'
             protobuf:

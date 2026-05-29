@@ -43,7 +43,7 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 - [ ] Soft-deleted forms are permanently purged after 30 days.
 
 *Out of scope*
-- Recovering a soft-deleted form — not in MVP.
+- Recovering a soft-deleted form.
 
 > **Implementation status**
 >

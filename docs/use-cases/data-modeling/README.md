@@ -12,9 +12,9 @@ Allow users to define their own data structures — Models (like database tables
 
 Custom data modeling is the core differentiator of Axis. Without it, the platform is just another workflow tool with a fixed data structure. With it, users can model any business domain.
 
-## Phase
+## Scope
 
-**MVP**
+**Production scope** — in the full product scope; no separate MVP/Phase cut.
 
 ---
 
@@ -38,7 +38,7 @@ Custom data modeling is the core differentiator of Axis. Without it, the platfor
 |---|---|
 | [Create a data class](create-data-class/) | Create a data class so that I can define a reusable nested object structure. |
 | [Use a data class as a field in a model](data-class-field/) | Use a data class as a field type in a model so that I can embed structured nested objects without duplicating field… |
-| [Delete a data class](delete-data-class/) | Delete a data class |
+| [Delete a data class](delete-data-class/) | Delete a data class that is no longer used by any model so that I can keep the type catalogue tidy. |
 | [Edit a data class](edit-data-class/) | Edit a data class so that I can add or remove fields as requirements change. |
 
 ### Records

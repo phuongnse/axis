@@ -45,7 +45,7 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 - [ ] If a configured role has no members, the role channel is skipped (no error; a warning is logged).
 
 *Out of scope*
-- Different notification channels for different failure scenarios (e.g., "only notify on HTTP step failures") — not in MVP; all failures use the same channels.
+- Different notification channels for different failure scenarios (e.g., "only notify on HTTP step failures") — all failures use the same channels.
 
 > **Implementation status**
 >

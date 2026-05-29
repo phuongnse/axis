@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Validate that every relative markdown link and image target resolves.
 
-CI's lychee job catches dead anchors and external 404s, but it has missed
-broken `![alt](./relative.svg)` image refs (5 of them landed in PR #142).
-This script is the explicit, file-by-file check that closes that gap.
+CI's lychee job catches dead anchors and external 404s, but it misses
+broken `![alt](./relative.svg)` image refs. This script is the explicit,
+file-by-file check that closes that gap.
 
 Rules:
 - Scan every `.md` under `docs/`, plus repo-root markdown (`CLAUDE.md`,
@@ -29,7 +29,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # Roots scanned for `.md`. Add new roots conservatively — the cost of a false
 # positive in CI is wasted developer time, the cost of a missed broken link
-# is what PR #142 had to fix.
+# is a doc that ships with a dead image reference.
 SCAN_ROOTS = [
     ROOT / "docs",
     ROOT / ".github",

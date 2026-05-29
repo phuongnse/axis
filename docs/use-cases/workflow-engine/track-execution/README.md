@@ -46,7 +46,7 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 - [ ] Very long executions (running for hours): the elapsed time counter and timeline remain accurate; no frontend timeout occurs.
 
 *Out of scope*
-- Real-time execution graph overlay on the workflow canvas — not in MVP (timeline list only).
+- Real-time execution graph overlay on the workflow canvas — timeline list only.
 
 > **Implementation status**
 >

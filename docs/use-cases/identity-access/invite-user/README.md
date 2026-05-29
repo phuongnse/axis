@@ -49,7 +49,7 @@ Organization admins can invite new members, manage their accounts, and deactivat
 - [ ] An admin cannot invite themselves (their own email address).
 
 *Out of scope*
-- Bulk invitation via CSV upload — not in MVP.
+- Bulk invitation via CSV upload.
 
 > **Implementation status**
 >
@@ -62,6 +62,8 @@ Organization admins can invite new members, manage their accounts, and deactivat
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** Admin self-invite check not implemented (compare invite email to `ICurrentUser` email).
+>
+> **Deferred (PR #146 follow-up):** Bulk invitation via CSV upload.
 >
 > **Done:** HTTP 402 when user plan limit reached (`InviteUserHandler`, platform-foundation subscription plans).
 >

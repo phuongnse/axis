@@ -46,8 +46,8 @@ Users can create, read, update, and delete records against any model. Records ar
 - [ ] Relation field columns display the target record's `display_field` value, not the raw UUID. If the target record was deleted, it shows "[Deleted record]".
 
 *Out of scope*
-- Saved views / custom column configurations — not in MVP.
-- Inline editing in the list — not in MVP.
+- Saved views / custom column configurations.
+- Inline editing in the list.
 
 > **Implementation status**
 >

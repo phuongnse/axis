@@ -47,8 +47,8 @@ Allow organization admins to manage their organization's profile, settings, and 
 - [ ] Organization name change does not affect the internal schema name (slug), which is immutable after provisioning.
 
 *Out of scope*
-- Custom domain / vanity URL — not in MVP.
-- White-label theming (custom colors, fonts) — not in MVP.
+- Custom domain / vanity URL.
+- White-label theming (custom colors, fonts).
 
 > **Implementation status**
 >

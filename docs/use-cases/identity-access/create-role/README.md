@@ -45,7 +45,7 @@ Organization admins can create custom roles, assign permissions to each role, an
 - [ ] The permissions list is complete and does not require a page reload to reflect newly added platform permissions.
 
 *Out of scope*
-- Copying permissions from an existing role as a starting point — not in MVP (user selects permissions manually).
+- Copying permissions from an existing role as a starting point — user selects permissions manually.
 
 > **Implementation status**
 >

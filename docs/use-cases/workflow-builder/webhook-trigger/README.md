@@ -46,8 +46,8 @@ A workflow must have at least one trigger before it can be published. Triggers d
 - [ ] Large webhook payloads (> 1 MB) are rejected with HTTP 413: "Payload too large. Maximum size is 1 MB."
 
 *Out of scope*
-- GET webhook triggers — POST only in MVP.
-- Event-type filtering on a single webhook URL (multiple workflows sharing one URL) — not in MVP.
+- GET webhook triggers — POST only.
+- Event-type filtering on a single webhook URL (multiple workflows sharing one URL).
 
 > **Implementation status**
 >

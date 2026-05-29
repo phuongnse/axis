@@ -31,7 +31,7 @@ Axis runs as a **modulith with strict service boundaries** — each module is a 
 | **WorkflowBuilder service** | Workflow definitions, steps, transitions, triggers. |
 | **WorkflowEngine service** | Execution lifecycle, step runtime, saga orchestrator. |
 | **FormBuilder service** | Form definitions, form-task submissions. |
-| **PageBuilder service** | Visual page builder (Phase 2). |
+| **PageBuilder service** | Visual page builder (module not started — see [PROGRESS.md](./PROGRESS.md)). |
 | **Per-module PostgreSQL** | One database per module (`axis_identity`, `axis_datamodeling`, …). Schema-per-tenant inside each ([ADR-011](./TECH_STACK.md#adr-011-per-module-database-with-schema-per-tenant-inside)). Per-module Wolverine outbox schema lives alongside ([ADR-012](./TECH_STACK.md#adr-012-per-module-wolverine-schema-in-the-modules-own-database)). |
 | **Apache Kafka + Schema Registry** | Cross-module **event** transport + event-sourced aggregate log. Topics partitioned by `organizationId`. Avro payloads with CloudEvents envelopes ([ADR-013](./TECH_STACK.md#adr-013-apache-kafka-for-cross-module-domain-events-and-event-sourced-aggregates), [ADR-019](./TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). |
 | **RabbitMQ** | Cross-module **command + job + saga** transport. Work-queue semantics (ACK, requeue, DLX, prefetch). Per-message routing rule in [ADR-025](./TECH_STACK.md#adr-025-transport-selection-rule-by-message-name-suffix). |
@@ -93,7 +93,7 @@ axis_datamodeling DB
 axis_workflowbuilder DB           ← same shape
 axis_workflowengine DB            ← same shape
 axis_formbuilder DB               ← same shape
-axis_pagebuilder DB               ← same shape (Phase 2)
+axis_pagebuilder DB               ← same shape (when PageBuilder module ships)
 ```
 
 **Tenant resolution:** every external request carries a JWT with an `org_id` claim. The gateway extracts it and propagates via gRPC metadata (sync calls) and CloudEvents `tenantid` extension (events). Each module restores it into a scoped `ITenantContext`. EF Core sets the per-connection `search_path` to the tenant schema via `TenantSchemaInterceptor`.

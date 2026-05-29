@@ -46,7 +46,7 @@ Handler specifications (Form, HTTP, Condition, Script, Notification) remain docu
 - [ ] Two concurrent deliveries of the same step handler message (race condition): the second one detects the step is already `RUNNING` and exits; only one execution proceeds.
 
 *Out of scope*
-- Custom step types defined by users — not in MVP.
+- Custom step types defined by users.
 
 ## Wireframes
 

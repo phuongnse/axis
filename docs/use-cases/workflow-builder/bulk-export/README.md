@@ -42,7 +42,7 @@ Workflow definitions can be exported as portable JSON files and imported into an
 - [ ] An org with 0 workflows: export downloads an empty ZIP with a README.txt explaining the format.
 
 *Out of scope*
-- Scheduled automatic backups — not in MVP.
+- Scheduled automatic backups.
 
 > **Implementation status**
 >

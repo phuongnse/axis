@@ -44,7 +44,7 @@ Organization admins can create custom roles, assign permissions to each role, an
 - [ ] A user can hold multiple roles simultaneously; their effective permissions are the union of all role permissions.
 
 *Out of scope*
-- Time-limited role assignments (e.g., "grant admin for 24 hours") — not in MVP.
+- Time-limited role assignments (e.g., "grant admin for 24 hours").
 
 > **Implementation status**
 >

@@ -43,7 +43,7 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 - [ ] A workflow with multiple trigger types shows the first trigger's icon and a "+N" badge.
 
 *Out of scope*
-- Workflow folders / tags — not in MVP.
+- Workflow folders / tags.
 
 > **Implementation status**
 >

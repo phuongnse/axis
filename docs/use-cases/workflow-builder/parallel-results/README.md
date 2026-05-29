@@ -42,7 +42,7 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 - [ ] If two parallel branches write to the same output variable name (via Script steps), the value from whichever branch completes last wins. A design-time warning is shown when this is detected.
 
 *Out of scope*
-- Merging/reducing outputs from parallel branches with built-in aggregation functions — not in MVP; use a Script step after the group for custom aggregation.
+- Merging/reducing outputs from parallel branches with built-in aggregation functions — use a Script step after the group for custom aggregation.
 
 > **Implementation status**
 >

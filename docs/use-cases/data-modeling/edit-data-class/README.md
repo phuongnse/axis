@@ -42,7 +42,7 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 - [ ] Adding a required field to a data class that is already used in models with existing records: the field is added as optional automatically (with a warning), to avoid retroactively invalidating existing records. The user must consciously make it required.
 
 *Out of scope*
-- Version history of data class changes — not in MVP.
+- Version history of data class changes.
 
 > **Implementation status**
 >

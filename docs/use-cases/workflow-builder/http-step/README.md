@@ -47,8 +47,8 @@ Each step has a type that determines what it does when executed. Users configure
 - [ ] Redirect responses (3xx): the client follows up to 5 redirects by default; configurable.
 
 *Out of scope*
-- GraphQL or gRPC step types — not in MVP.
-- Response streaming — not in MVP.
+- GraphQL or gRPC step types.
+- Response streaming.
 
 > **Implementation status**
 >

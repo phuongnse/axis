@@ -45,7 +45,7 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 - [ ] Context snapshots are immutable after being recorded — they reflect the exact state at that point in time, regardless of subsequent context changes.
 
 *Out of scope*
-- Replaying or simulating an execution from any point with a different context — not in MVP.
+- Replaying or simulating an execution from any point with a different context.
 
 > **Implementation status**
 >

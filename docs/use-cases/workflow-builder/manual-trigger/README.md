@@ -45,7 +45,7 @@ A workflow must have at least one trigger before it can be published. Triggers d
 - [ ] Triggering the same workflow many times in quick succession creates independent executions (no deduplication for manual triggers).
 
 *Out of scope*
-- Triggering with pre-filled input from a page button (Page Builder) — not in MVP for this domain; covered in page-builder.
+- Triggering with pre-filled input from a page button (Page Builder) — covered in page-builder.
 
 > **Implementation status**
 >

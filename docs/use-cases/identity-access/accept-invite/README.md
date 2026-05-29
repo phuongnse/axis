@@ -46,7 +46,7 @@ Organization admins can invite new members, manage their accounts, and deactivat
 - [ ] If the org was deleted before the user accepted, the link shows: "This organization no longer exists."
 
 *Out of scope*
-- Inviting users who already have accounts on other orgs to join a second org simultaneously — each user belongs to one org in MVP.
+- Inviting users who already have accounts on other orgs to join a second org simultaneously — each user belongs to one org.
 
 > **Implementation status**
 >

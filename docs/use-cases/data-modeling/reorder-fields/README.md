@@ -43,7 +43,7 @@ Each field in a model has a type that determines what data it stores, how it's v
 - [ ] Two users reordering fields simultaneously: last write wins; no conflict detection required for ordering.
 
 *Out of scope*
-- Hiding fields from the default list view per user — not in MVP.
+- Hiding fields from the default list view per user.
 
 > **Implementation status**
 >

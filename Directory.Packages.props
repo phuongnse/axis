@@ -6,10 +6,10 @@
     <!--
       VS Threading analyzers — catches sync-over-async (VSTHRD002:
       "synchronously waiting on tasks may cause deadlocks") and related
-      async pitfalls with full type info. Replaces the originally-planned
-      custom Roslyn analyzer (PR #99 thread) — Microsoft ships this for
-      free and maintains it across .NET versions. Applied to every project
-      via Directory.Build.props.
+      async pitfalls with full type info. Replaces an originally-planned
+      custom Roslyn analyzer — Microsoft ships this for free and maintains
+      it across .NET versions. Applied to every project via
+      Directory.Build.props.
     -->
     <PackageVersion Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.14.15" />
   </ItemGroup>
@@ -18,7 +18,7 @@
     <!--
       System.Formats.Asn1 below 8.0.1 has a High-severity advisory
       (https://github.com/advisories/GHSA-447r-wph3-92pm). Surfaced by the
-      vulnerable-packages CI check added in PR #96. Pulled transitively via
+      vulnerable-packages CI check. Pulled transitively via
       OpenIddict + ASP.NET cryptography stack. When the check flags a new
       project, add an explicit PackageReference to System.Formats.Asn1 in
       that project (or the closest shared csproj on its dependency chain).

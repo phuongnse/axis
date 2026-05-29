@@ -45,7 +45,7 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 - [ ] Sensitive values (auth tokens, API keys) are never shown in error details — they are replaced with `[REDACTED]`.
 
 *Out of scope*
-- Sharing a link to a specific error detail view with another user — not in MVP.
+- Sharing a link to a specific error detail view with another user.
 
 > **Implementation status**
 >

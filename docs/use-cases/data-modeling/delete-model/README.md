@@ -45,7 +45,7 @@ Users can create custom data models within their organization. A model defines t
 - [ ] Relation fields in other models that point to the deleted model are also flagged as broken.
 
 *Out of scope*
-- Recovering a soft-deleted model — not in MVP.
+- Recovering a soft-deleted model.
 
 > **Implementation status**
 >

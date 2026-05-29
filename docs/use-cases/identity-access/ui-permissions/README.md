@@ -44,7 +44,7 @@ A resource-based permission system where each permission grants the ability to p
 - [ ] If a user's permissions change mid-session (role edited by admin), the UI reflects the change on the next token refresh (within 15 min) or on the next page navigation that fetches fresh permissions.
 
 *Out of scope*
-- Per-record UI permissions (e.g., hiding individual table rows) — not in MVP.
+- Per-record UI permissions (e.g., hiding individual table rows).
 
 > **Implementation status**
 >

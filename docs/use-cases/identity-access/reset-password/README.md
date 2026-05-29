@@ -51,7 +51,7 @@ Allow users to reset forgotten passwords, change their current password, and man
 - [ ] A user resets their password while still signed in on another device: that device's session is invalidated.
 
 *Out of scope*
-- Security questions as a backup reset method — not in MVP.
+- Security questions as a backup reset method.
 
 > **Implementation status**
 >

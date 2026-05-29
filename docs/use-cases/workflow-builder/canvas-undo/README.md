@@ -41,11 +41,11 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 
 *Edge cases*
 - [ ] Undo history depth: at least 20 actions.
-- [ ] Undo/redo applies to canvas layout actions only (node position, connections, adding/removing steps). Step configuration changes (saved via auto-save) are NOT undoable in MVP.
+- [ ] Undo/redo applies to canvas layout actions only (node position, connections, adding/removing steps). Step configuration changes (saved via auto-save) are NOT undoable.
 - [ ] Refreshing the page clears undo history (history is in-memory only).
 
 *Out of scope*
-- Server-side version history with named snapshots — not in MVP.
+- Server-side version history with named snapshots.
 
 > **Implementation status**
 >

@@ -44,7 +44,7 @@ When a workflow execution fails at a step, users can manually retry from the fai
 - [ ] There is no maximum retry count imposed by the platform; the user can retry as many times as needed.
 
 *Out of scope*
-- Comparing two retry attempts side-by-side — not in MVP.
+- Comparing two retry attempts side-by-side.
 
 > **Implementation status**
 >
