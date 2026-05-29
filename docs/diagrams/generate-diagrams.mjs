@@ -137,7 +137,7 @@ function estimateWidth(str, size) {
   return Math.max(str.length * size * 0.55, 40);
 }
 
-function arrow({ x1, y1, x2, y2, label, color = C.arrow, dashed = false }) {
+function arrow({ x1, y1, x2, y2, label, color = C.arrow, dashed = false, labelBelow = false }) {
   const el = {
     ...base(),
     type: "arrow",
@@ -159,12 +159,13 @@ function arrow({ x1, y1, x2, y2, label, color = C.arrow, dashed = false }) {
   if (label) {
     const mx = (x1 + x2) / 2;
     const my = (y1 + y2) / 2;
-    els.push(text({ x: mx, y: my - 18, value: label, size: 10, color: C.muted, anchor: "center" }));
+    const labelY = labelBelow ? my + 22 : my - 26;
+    els.push(text({ x: mx, y: labelY, value: label, size: 10, color: C.muted, anchor: "center" }));
   }
   return els;
 }
 
-function routedArrow({ waypoints, label, color = C.arrow, dashed = false }) {
+function routedArrow({ waypoints, label, color = C.arrow, dashed = false, labelBelow = false }) {
   const [ox, oy] = waypoints[0];
   const points = waypoints.map(([x, y]) => [x - ox, y - oy]);
   const xs = waypoints.map(([x]) => x);
@@ -189,7 +190,8 @@ function routedArrow({ waypoints, label, color = C.arrow, dashed = false }) {
   const els = [el];
   if (label) {
     const mid = waypoints[Math.floor(waypoints.length / 2)];
-    els.push(text({ x: mid[0], y: mid[1] - 18, value: label, size: 10, color: C.muted, anchor: "center" }));
+    const labelY = labelBelow ? mid[1] + 22 : mid[1] - 26;
+    els.push(text({ x: mid[0], y: labelY, value: label, size: 10, color: C.muted, anchor: "center" }));
   }
   return els;
 }
@@ -638,18 +640,27 @@ function seqBuild({ title, participants, gap = 165, messages, sections = [], not
     els.push(...vline({ x: p.cx, y: LIFE_TOP, h: LIFE_BOT - LIFE_TOP, color: "#94a3b8", dashed: true }));
   }
 
-  // Section dividers
+  // Section dividers (drawn in whitespace between message groups)
   for (const s of sections) {
     els.push(...hline({ x: 20, y: s.y, w: CANVAS_W - 40, color: "#94a3b8", dashed: true }));
-    els.push(text({ x: CANVAS_W / 2, y: s.y + 12, value: `== ${s.label} ==`, size: 10, bold: true, color: C.muted, anchor: "center" }));
+    els.push(text({ x: CANVAS_W / 2, y: s.y + 14, value: `== ${s.label} ==`, size: 10, bold: true, color: C.muted, anchor: "center" }));
   }
 
   // Messages (self-calls render as a loop to the right — zero-length arrows are invisible)
   const SELF_LOOP_OUTSET = 40;
   const SELF_LOOP_DEPTH = 22;
+  const laneFlip = new Map();
   for (const m of messages) {
     const from = ps[m.from];
     const to = ps[m.to];
+    let labelBelow = m.labelBelow === true;
+    if (m.from !== m.to) {
+      const lane = `${m.from}->${m.to}`;
+      if (m.labelBelow === undefined) {
+        labelBelow = laneFlip.get(lane) === true;
+        laneFlip.set(lane, !laneFlip.get(lane));
+      }
+    }
     if (m.from === m.to) {
       const loopX = from.cx + SELF_LOOP_OUTSET;
       els.push(
@@ -662,10 +673,14 @@ function seqBuild({ title, participants, gap = 165, messages, sections = [], not
           ],
           label: m.label,
           dashed: m.dashed,
+          labelBelow,
         }),
       );
     } else {
-      els.push(...arrow({ x1: from.cx, y1: m.y, x2: to.cx, y2: m.y, label: m.label, dashed: m.dashed }));
+      els.push(...arrow({
+        x1: from.cx, y1: m.y, x2: to.cx, y2: m.y,
+        label: m.label, dashed: m.dashed, labelBelow,
+      }));
     }
   }
 
@@ -693,6 +708,18 @@ function seqBuild({ title, participants, gap = 165, messages, sections = [], not
 
 function registerOrgFlowDiagram() {
   _id = 1;
+  const step = 72;
+  const phaseGap = 100;
+
+  const emailStart = 328;
+  const emailEnd = emailStart + step * 4;
+  const oauthDiv = emailEnd + phaseGap;
+  const oauthStart = oauthDiv + 44;
+  const oauthEnd = oauthStart + step * 6;
+  const completeDiv = oauthEnd + phaseGap;
+  const completeStart = completeDiv + 44;
+  const completeEnd = completeStart + step * 4;
+
   return seqBuild({
     title: "Register Organization — Email/Password & External Providers",
     gap: 175,
@@ -704,38 +731,38 @@ function registerOrgFlowDiagram() {
       { label: "IdP", sub: "(MS/Google/GitHub)", external: true },
     ],
     sections: [
-      { y: 288, label: "Email / password path" },
-      { y: 532, label: "External provider (OAuth only)" },
-      { y: 768, label: "Post-OAuth completion screen" },
+      { y: 268, label: "Email / password path" },
+      { y: oauthDiv, label: "External provider (OAuth only)" },
+      { y: completeDiv, label: "Post-OAuth completion screen" },
     ],
     messages: [
-      { from: 0, to: 1, y: 140, label: "Open registration page" },
-      { from: 1, to: 0, y: 192, label: "Show SSO icons + email/password form", dashed: true },
+      { from: 0, to: 1, y: 132, label: "Open registration page" },
+      { from: 1, to: 0, y: 204, label: "Show SSO icons + email/password form", dashed: true },
 
-      { from: 0, to: 1, y: 312, label: "Accept Terms + submit form (Idempotency-Key)" },
-      { from: 1, to: 2, y: 360, label: "POST /api/organizations/" },
-      { from: 2, to: 2, y: 408, label: "Generate slug, hash password, record ToS" },
-      { from: 2, to: 3, y: 456, label: "Send verification email (if new)" },
-      { from: 2, to: 1, y: 504, label: "202 → confirmation screen", dashed: true },
+      { from: 0, to: 1, y: emailStart, label: "Accept Terms + submit form (Idempotency-Key)" },
+      { from: 1, to: 2, y: emailStart + step, label: "POST /api/organizations/" },
+      { from: 2, to: 2, y: emailStart + step * 2, label: "Generate slug, hash password, record ToS" },
+      { from: 2, to: 3, y: emailStart + step * 3, label: "Send verification email (if new)" },
+      { from: 2, to: 1, y: emailEnd, label: "202 → confirmation screen", dashed: true, labelBelow: true },
 
-      { from: 0, to: 1, y: 556, label: "Choose Microsoft / Google / GitHub" },
-      { from: 1, to: 4, y: 604, label: "OAuth2 Auth Code + PKCE" },
-      { from: 4, to: 1, y: 652, label: "Verified email + display name", dashed: true },
-      { from: 1, to: 2, y: 700, label: "Validate provider claims (verified email required)" },
-      { from: 2, to: 1, y: 748, label: "Reject: no verified email", dashed: true },
-      { from: 2, to: 1, y: 796, label: "Reject: email already registered (Sign in instead)", dashed: true },
+      { from: 0, to: 1, y: oauthStart, label: "Choose Microsoft / Google / GitHub" },
+      { from: 1, to: 4, y: oauthStart + step, label: "OAuth2 Auth Code + PKCE" },
+      { from: 4, to: 1, y: oauthStart + step * 2, label: "Verified email + display name", dashed: true, labelBelow: true },
+      { from: 1, to: 2, y: oauthStart + step * 3, label: "Validate provider claims (verified email required)" },
+      { from: 2, to: 1, y: oauthStart + step * 4, label: "Reject: no verified email", dashed: true, labelBelow: false },
+      { from: 2, to: 1, y: oauthStart + step * 5, label: "Reject: duplicate email → Sign in", dashed: true, labelBelow: true },
+      { from: 2, to: 1, y: oauthEnd, label: "Open register-org-complete", dashed: true, labelBelow: false },
 
-      { from: 2, to: 1, y: 844, label: "Open register-org-complete", dashed: true },
-      { from: 1, to: 0, y: 892, label: "register-org-complete (org name, slug, Terms)", dashed: true },
-      { from: 0, to: 1, y: 940, label: "Submit completion (Idempotency-Key)" },
-      { from: 1, to: 2, y: 988, label: "POST org + link external login" },
-      { from: 2, to: 3, y: 1036, label: "Send verification email (if new)" },
-      { from: 2, to: 1, y: 1084, label: "202 → confirmation screen", dashed: true },
+      { from: 1, to: 0, y: completeStart, label: "register-org-complete (org name, slug, Terms)", dashed: true, labelBelow: true },
+      { from: 0, to: 1, y: completeStart + step, label: "Submit completion (Idempotency-Key)" },
+      { from: 1, to: 2, y: completeStart + step * 2, label: "POST org + link external login" },
+      { from: 2, to: 3, y: completeStart + step * 3, label: "Send verification email (if new)" },
+      { from: 2, to: 1, y: completeEnd, label: "202 → confirmation screen", dashed: true, labelBelow: true },
     ],
     notes: [
       {
         x: 20,
-        y: 1140,
+        y: completeEnd + phaseGap,
         label: "IdP never supplies organization name.\nProvider path requires verified email; reject duplicate / no-verified-email before completion.\nPassword duplicate email still returns the same confirmation screen.",
       },
     ],
@@ -744,6 +771,20 @@ function registerOrgFlowDiagram() {
 
 function registerOrgCasesDiagram() {
   _id = 1;
+  const step = 72;
+  const phaseGap = 100;
+
+  const emailStart = 220;
+  const emailEnd = emailStart + step * 4;
+  const providerDiv = emailEnd + phaseGap;
+  const providerStart = providerDiv + 44;
+  const providerEnd = providerStart + step * 4;
+  const completeDiv = providerEnd + phaseGap;
+  const completeStart = completeDiv + 44;
+  const completeEnd = completeStart + step * 3;
+  const sharedDiv = completeEnd + phaseGap;
+  const sharedStart = sharedDiv + 44;
+
   return seqBuild({
     title: "Register Organization — Case Matrix (Dev Checklist)",
     gap: 220,
@@ -753,36 +794,36 @@ function registerOrgCasesDiagram() {
       { label: "Axis API" },
     ],
     sections: [
-      { y: 164, label: "Email/password submission" },
-      { y: 404, label: "Provider callback pre-check" },
-      { y: 668, label: "Post-OAuth completion submit" },
-      { y: 900, label: "Shared confirmation outcome" },
+      { y: 168, label: "Email/password submission" },
+      { y: providerDiv, label: "Provider callback pre-check" },
+      { y: completeDiv, label: "Post-OAuth completion submit" },
+      { y: sharedDiv, label: "Shared confirmation outcome" },
     ],
     messages: [
-      { from: 0, to: 1, y: 188, label: "Submit register-org form (Idempotency-Key + Terms checked)" },
-      { from: 1, to: 2, y: 236, label: "POST /api/organizations/" },
-      { from: 2, to: 1, y: 284, label: "400 validation errors (inline field errors)", dashed: true },
-      { from: 2, to: 1, y: 332, label: "5xx generic banner + re-enable submit", dashed: true },
-      { from: 2, to: 1, y: 380, label: "202 confirmation (new OR duplicate email)", dashed: true },
+      { from: 0, to: 1, y: emailStart, label: "Submit register-org form (Idempotency-Key + Terms checked)" },
+      { from: 1, to: 2, y: emailStart + step, label: "POST /api/organizations/" },
+      { from: 2, to: 1, y: emailStart + step * 2, label: "400 validation errors (inline field errors)", dashed: true, labelBelow: false },
+      { from: 2, to: 1, y: emailStart + step * 3, label: "5xx generic banner + re-enable submit", dashed: true, labelBelow: true },
+      { from: 2, to: 1, y: emailEnd, label: "202 confirmation (new OR duplicate email)", dashed: true, labelBelow: false },
 
-      { from: 0, to: 1, y: 428, label: "Complete provider OAuth callback" },
-      { from: 1, to: 2, y: 476, label: "Validate provider claims (verified email + uniqueness)" },
-      { from: 2, to: 1, y: 524, label: "Reject: no verified email → provider error screen", dashed: true },
-      { from: 2, to: 1, y: 572, label: "Reject: duplicate email → Sign in instead", dashed: true },
-      { from: 2, to: 1, y: 620, label: "Open register-org-complete", dashed: true },
+      { from: 0, to: 1, y: providerStart, label: "Complete provider OAuth callback" },
+      { from: 1, to: 2, y: providerStart + step, label: "Validate provider claims (verified email + uniqueness)" },
+      { from: 2, to: 1, y: providerStart + step * 2, label: "Reject: no verified email → provider error", dashed: true, labelBelow: false },
+      { from: 2, to: 1, y: providerStart + step * 3, label: "Reject: duplicate email → Sign in", dashed: true, labelBelow: true },
+      { from: 2, to: 1, y: providerEnd, label: "Open register-org-complete", dashed: true, labelBelow: false },
 
-      { from: 0, to: 1, y: 692, label: "Submit register-org-complete (org name + slug + Terms)" },
-      { from: 1, to: 2, y: 740, label: "POST completion (link external login, idempotent)" },
-      { from: 2, to: 1, y: 788, label: "400 org name/terms errors (inline)", dashed: true },
-      { from: 2, to: 1, y: 836, label: "5xx generic banner + re-enable submit", dashed: true },
+      { from: 0, to: 1, y: completeStart, label: "Submit register-org-complete (org name + slug + Terms)" },
+      { from: 1, to: 2, y: completeStart + step, label: "POST completion (link external login, idempotent)" },
+      { from: 2, to: 1, y: completeStart + step * 2, label: "400 org name/terms errors (inline)", dashed: true, labelBelow: false },
+      { from: 2, to: 1, y: completeEnd, label: "5xx generic banner + re-enable submit", dashed: true, labelBelow: true },
 
-      { from: 2, to: 1, y: 924, label: "202 confirmation screen", dashed: true },
-      { from: 1, to: 0, y: 972, label: "email-confirmation + resend states (204/429)", dashed: true },
+      { from: 2, to: 1, y: sharedStart, label: "202 confirmation screen", dashed: true, labelBelow: false },
+      { from: 1, to: 0, y: sharedStart + step, label: "email-confirmation + resend states (204/429)", dashed: true, labelBelow: true },
     ],
     notes: [
       {
         x: 20,
-        y: 1030,
+        y: sharedStart + step + phaseGap,
         label: "Use this as implementation checklist: each dashed outcome maps to an explicit wireframe state.",
       },
     ],

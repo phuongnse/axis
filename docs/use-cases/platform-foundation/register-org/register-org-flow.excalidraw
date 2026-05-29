@@ -31,7 +31,7 @@
       "locked": false,
       "type": "rectangle",
       "width": 852.5,
-      "height": 1268
+      "height": 1852
     },
     {
       "id": "diag-1",
@@ -158,7 +158,7 @@
       "locked": false,
       "type": "arrow",
       "width": 0,
-      "height": 1146,
+      "height": 1730,
       "points": [
         [
           0,
@@ -166,7 +166,7 @@
         ],
         [
           0,
-          1146
+          1730
         ]
       ],
       "startArrowhead": null,
@@ -263,7 +263,7 @@
       "locked": false,
       "type": "arrow",
       "width": 0,
-      "height": 1146,
+      "height": 1730,
       "points": [
         [
           0,
@@ -271,7 +271,7 @@
         ],
         [
           0,
-          1146
+          1730
         ]
       ],
       "startArrowhead": null,
@@ -402,7 +402,7 @@
       "locked": false,
       "type": "arrow",
       "width": 0,
-      "height": 1146,
+      "height": 1730,
       "points": [
         [
           0,
@@ -410,7 +410,7 @@
         ],
         [
           0,
-          1146
+          1730
         ]
       ],
       "startArrowhead": null,
@@ -541,7 +541,7 @@
       "locked": false,
       "type": "arrow",
       "width": 0,
-      "height": 1146,
+      "height": 1730,
       "points": [
         [
           0,
@@ -549,7 +549,7 @@
         ],
         [
           0,
-          1146
+          1730
         ]
       ],
       "startArrowhead": null,
@@ -680,7 +680,7 @@
       "locked": false,
       "type": "arrow",
       "width": 0,
-      "height": 1146,
+      "height": 1730,
       "points": [
         [
           0,
@@ -688,7 +688,7 @@
         ],
         [
           0,
-          1146
+          1730
         ]
       ],
       "startArrowhead": null,
@@ -697,7 +697,7 @@
     {
       "id": "diag-20",
       "x": 20,
-      "y": 288,
+      "y": 268,
       "angle": 0,
       "strokeColor": "#94a3b8",
       "backgroundColor": "transparent",
@@ -738,7 +738,7 @@
     {
       "id": "diag-21",
       "x": 352,
-      "y": 295,
+      "y": 277,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -772,7 +772,7 @@
     {
       "id": "diag-22",
       "x": 20,
-      "y": 532,
+      "y": 716,
       "angle": 0,
       "strokeColor": "#94a3b8",
       "backgroundColor": "transparent",
@@ -813,7 +813,7 @@
     {
       "id": "diag-23",
       "x": 327.25,
-      "y": 539,
+      "y": 725,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -847,7 +847,7 @@
     {
       "id": "diag-24",
       "x": 20,
-      "y": 768,
+      "y": 1292,
       "angle": 0,
       "strokeColor": "#94a3b8",
       "backgroundColor": "transparent",
@@ -888,7 +888,7 @@
     {
       "id": "diag-25",
       "x": 332.75,
-      "y": 775,
+      "y": 1301,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -922,7 +922,7 @@
     {
       "id": "diag-26",
       "x": 60,
-      "y": 140,
+      "y": 132,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -963,7 +963,7 @@
     {
       "id": "diag-27",
       "x": 87,
-      "y": 117,
+      "y": 101,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -997,7 +997,7 @@
     {
       "id": "diag-28",
       "x": 235,
-      "y": 192,
+      "y": 204,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1038,7 +1038,7 @@
     {
       "id": "diag-29",
       "x": 48.499999999999986,
-      "y": 169,
+      "y": 173,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1072,7 +1072,7 @@
     {
       "id": "diag-30",
       "x": 60,
-      "y": 312,
+      "y": 328,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1113,7 +1113,7 @@
     {
       "id": "diag-31",
       "x": 26.499999999999986,
-      "y": 289,
+      "y": 345,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1147,7 +1147,7 @@
     {
       "id": "diag-32",
       "x": 235,
-      "y": 360,
+      "y": 400,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1188,7 +1188,7 @@
     {
       "id": "diag-33",
       "x": 256.5,
-      "y": 337,
+      "y": 369,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1222,7 +1222,7 @@
     {
       "id": "diag-34",
       "x": 410,
-      "y": 408,
+      "y": 472,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1271,7 +1271,7 @@
     {
       "id": "diag-35",
       "x": 340,
-      "y": 407,
+      "y": 463,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1305,7 +1305,7 @@
     {
       "id": "diag-36",
       "x": 410,
-      "y": 456,
+      "y": 544,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1346,7 +1346,7 @@
     {
       "id": "diag-37",
       "x": 409.5,
-      "y": 433,
+      "y": 513,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1380,7 +1380,7 @@
     {
       "id": "diag-38",
       "x": 410,
-      "y": 504,
+      "y": 616,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1421,7 +1421,7 @@
     {
       "id": "diag-39",
       "x": 253.75,
-      "y": 481,
+      "y": 633,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1455,7 +1455,7 @@
     {
       "id": "diag-40",
       "x": 60,
-      "y": 556,
+      "y": 760,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1496,7 +1496,7 @@
     {
       "id": "diag-41",
       "x": 53.999999999999986,
-      "y": 533,
+      "y": 729,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1530,7 +1530,7 @@
     {
       "id": "diag-42",
       "x": 235,
-      "y": 604,
+      "y": 832,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1571,7 +1571,7 @@
     {
       "id": "diag-43",
       "x": 434.25,
-      "y": 581,
+      "y": 801,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1605,7 +1605,7 @@
     {
       "id": "diag-44",
       "x": 760,
-      "y": 652,
+      "y": 904,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1646,7 +1646,7 @@
     {
       "id": "diag-45",
       "x": 417.75,
-      "y": 629,
+      "y": 921,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1680,7 +1680,7 @@
     {
       "id": "diag-46",
       "x": 235,
-      "y": 700,
+      "y": 976,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1721,7 +1721,7 @@
     {
       "id": "diag-47",
       "x": 185,
-      "y": 677,
+      "y": 993,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1755,7 +1755,7 @@
     {
       "id": "diag-48",
       "x": 410,
-      "y": 748,
+      "y": 1048,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1796,7 +1796,7 @@
     {
       "id": "diag-49",
       "x": 253.75,
-      "y": 725,
+      "y": 1017,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1830,7 +1830,7 @@
     {
       "id": "diag-50",
       "x": 410,
-      "y": 796,
+      "y": 1120,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1870,8 +1870,8 @@
     },
     {
       "id": "diag-51",
-      "x": 185,
-      "y": 773,
+      "x": 231.75,
+      "y": 1137,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1894,9 +1894,9 @@
       "link": null,
       "locked": false,
       "type": "text",
-      "width": 275,
+      "width": 181.50000000000003,
       "height": 14,
-      "text": "Reject: email already registered (Sign in instead)",
+      "text": "Reject: duplicate email → Sign in",
       "fontSize": 10,
       "fontFamily": 1,
       "textAlign": "center",
@@ -1905,7 +1905,7 @@
     {
       "id": "diag-52",
       "x": 410,
-      "y": 844,
+      "y": 1192,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -1946,7 +1946,7 @@
     {
       "id": "diag-53",
       "x": 251,
-      "y": 821,
+      "y": 1161,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -1980,7 +1980,7 @@
     {
       "id": "diag-54",
       "x": 235,
-      "y": 892,
+      "y": 1336,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -2021,7 +2021,7 @@
     {
       "id": "diag-55",
       "x": 23.749999999999986,
-      "y": 869,
+      "y": 1353,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2055,7 +2055,7 @@
     {
       "id": "diag-56",
       "x": 60,
-      "y": 940,
+      "y": 1408,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -2096,7 +2096,7 @@
     {
       "id": "diag-57",
       "x": 51.249999999999986,
-      "y": 917,
+      "y": 1425,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2130,7 +2130,7 @@
     {
       "id": "diag-58",
       "x": 235,
-      "y": 988,
+      "y": 1480,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -2171,7 +2171,7 @@
     {
       "id": "diag-59",
       "x": 240,
-      "y": 965,
+      "y": 1449,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2205,7 +2205,7 @@
     {
       "id": "diag-60",
       "x": 410,
-      "y": 1036,
+      "y": 1552,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -2246,7 +2246,7 @@
     {
       "id": "diag-61",
       "x": 409.5,
-      "y": 1013,
+      "y": 1569,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2280,7 +2280,7 @@
     {
       "id": "diag-62",
       "x": 410,
-      "y": 1084,
+      "y": 1624,
       "angle": 0,
       "strokeColor": "#475569",
       "backgroundColor": "transparent",
@@ -2321,7 +2321,7 @@
     {
       "id": "diag-63",
       "x": 253.75,
-      "y": 1061,
+      "y": 1641,
       "angle": 0,
       "strokeColor": "#64748b",
       "backgroundColor": "transparent",
@@ -2355,7 +2355,7 @@
     {
       "id": "diag-64",
       "x": 20,
-      "y": 1140,
+      "y": 1724,
       "angle": 0,
       "strokeColor": "#ca8a04",
       "backgroundColor": "#fef9c3",
@@ -2385,7 +2385,7 @@
     {
       "id": "diag-65",
       "x": 324.5,
-      "y": 1155,
+      "y": 1739,
       "angle": 0,
       "strokeColor": "#1e293b",
       "backgroundColor": "transparent",
@@ -2419,7 +2419,7 @@
     {
       "id": "diag-66",
       "x": 167.75,
-      "y": 1171,
+      "y": 1755,
       "angle": 0,
       "strokeColor": "#1e293b",
       "backgroundColor": "transparent",
@@ -2453,7 +2453,7 @@
     {
       "id": "diag-67",
       "x": 239.24999999999997,
-      "y": 1187,
+      "y": 1771,
       "angle": 0,
       "strokeColor": "#1e293b",
       "backgroundColor": "transparent",
