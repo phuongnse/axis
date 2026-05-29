@@ -93,7 +93,7 @@ flowchart LR
 
 ### Container diagram
 
-Runtime containers in **layers** (top → bottom). Each module owns one PostgreSQL database; messaging is shared infrastructure, not drawn per-module to avoid clutter. Detail: [ARCHITECTURE.md § Containers](./ARCHITECTURE.md#containers) (table + ADRs).
+Runtime containers in **layers** (top → bottom). Each module owns one PostgreSQL database; messaging is one shared layer below the module row. Detail: [ARCHITECTURE.md § Containers](./ARCHITECTURE.md#containers) (table + ADRs).
 
 ```mermaid
 flowchart TB
