@@ -65,6 +65,7 @@ import {
   buildAuthCardHeader,
   buildAuthCardFooter,
   buildAuthCardBackFooter,
+  buildAuthCardInlineRow,
   buildAuthCardCenteredInlineRow,
   authNoticeBanner,
   buildAuthSubmitButton,
@@ -603,7 +604,7 @@ function paintEmailConfirmationCard(els, opts, wireAcc) {
           { text: "Didn't receive it?", color: C.gray700 },
           { text: 'Resend email →', color: C.primary, link: true },
         ];
-  els.push(...buildAuthCardCenteredInlineRow(`${prefix}_resend`, cardX, cardW, cy, resendSegments));
+  els.push(...buildAuthCardInlineRow(`${prefix}_resend`, cardX, cardW, cy, resendSegments));
   els.push(...buildAuthCardFooter(prefix, cardX, cardY, cardW, cardH, {
     lead: 'Already verified?',
     link: 'Go to sign in',

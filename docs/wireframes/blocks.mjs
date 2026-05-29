@@ -180,7 +180,15 @@ export function buildAuthCardFooter(prefix, cardX, cardY, cardW, cardH, footer) 
   return row;
 }
 
-/** Centered inline row inside auth card (e.g. resend link with gray lead-in). */
+/** Left-aligned inline row inside auth card (aligns with body copy padding). */
+export function buildAuthCardInlineRow(prefix, cardX, cardW, y, segments, fontSize = 12) {
+  const startX = cardX + AUTH_CARD_PAD_X;
+  const lineH = 16;
+  const { els } = inlineTextRow(`${prefix}_inline`, startX, y, lineH, fontSize, segments);
+  return els;
+}
+
+/** Centered inline row inside auth card. */
 export function buildAuthCardCenteredInlineRow(prefix, cardX, cardW, y, segments, fontSize = 12) {
   const innerX = cardX + AUTH_CARD_PAD_X;
   const innerW = cardW - AUTH_CARD_PAD_X * 2;
