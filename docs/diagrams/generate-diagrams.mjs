@@ -10,6 +10,7 @@
  *   module-overview — 6 modules + Kafka/RabbitMQ/gRPC communication flows
  *
  * Use-case-level (docs/use-cases/{domain}/{use-case}/):
+ *   register-org-flow   — self-service registration (email + providers)  (platform-foundation)
  *   tenant-provisioning — org registration & async schema provisioning  (platform-foundation)
  *   auth-flow           — JWT + refresh token authentication flow         (identity-access)
  *   data-model          — DataModeling entity relationships               (data-modeling)
@@ -593,6 +594,52 @@ function seqBuild({ title, participants, gap = 165, messages, sections = [], not
   return excalidraw(els);
 }
 
+// ─── platform-foundation — Register organization ─────────────────────────────────────────────
+
+function registerOrgFlowDiagram() {
+  _id = 1;
+  return seqBuild({
+    title: "Register Organization — Email/Password & External Providers",
+    gap: 155,
+    participants: [
+      { label: "New Admin" },
+      { label: "Web App" },
+      { label: "API Server", sub: "(OpenIddict)" },
+      { label: "Email", sub: "Service", external: true },
+      { label: "IdP", sub: "(MS/Google/GitHub)", external: true },
+    ],
+    sections: [
+      { y: 300, label: "Email / password path" },
+      { y: 520, label: "External provider path (ADR-027)" },
+    ],
+    messages: [
+      { from: 0, to: 1, y: 140, label: "Open registration page" },
+      { from: 1, to: 0, y: 168, label: "Show SSO + form + Terms checkbox", dashed: true },
+      { from: 0, to: 1, y: 328, label: "Accept Terms + submit form (Idempotency-Key)" },
+      { from: 1, to: 2, y: 368, label: "POST /api/organizations/" },
+      { from: 2, to: 2, y: 408, label: "Generate slug, hash password, record ToS version" },
+      { from: 2, to: 3, y: 448, label: "Send verification email (if new)" },
+      { from: 2, to: 1, y: 488, label: "202 — same confirmation screen always", dashed: true },
+      { from: 1, to: 0, y: 518, label: "Check your email (no email-exists leak)", dashed: true },
+
+      { from: 0, to: 1, y: 548, label: "Choose Microsoft / Google / GitHub" },
+      { from: 1, to: 4, y: 588, label: "OAuth2 Auth Code + PKCE" },
+      { from: 4, to: 1, y: 628, label: "Verified email + display name", dashed: true },
+      { from: 1, to: 0, y: 658, label: "Confirm Terms (required)", dashed: true },
+      { from: 1, to: 2, y: 698, label: "Create org (no password) or reject duplicate email" },
+    ],
+    notes: [
+      {
+        x: 20,
+        y: 738,
+        w: 700,
+        h: 36,
+        label: "Duplicate email → same confirmation (password) or \"Sign in instead\" (provider). See tenant-provisioning for post-verify flow.",
+      },
+    ],
+  });
+}
+
 // ─── platform-foundation — Tenant Provisioning ───────────────────────────────────────────────
 
 function tenantProvisioningDiagram() {
@@ -886,6 +933,7 @@ const diagrams = [
   { name: "container",            fn: containerDiagram,        dir: architectureDir },
   { name: "module-overview",      fn: moduleOverview,          dir: architectureDir },
   // Domain-level diagrams
+  { name: "register-org-flow",    fn: registerOrgFlowDiagram,    dir: useCaseDir("platform-foundation", "register-org") },
   { name: "tenant-provisioning",  fn: tenantProvisioningDiagram, dir: useCaseDir("platform-foundation", "provision-tenant") },
   { name: "auth-flow",            fn: authFlowDiagram,           dir: useCaseDir("identity-access", "sign-in") },
   { name: "data-model",           fn: dataModelDiagram,          dir: useCaseDir("data-modeling", "create-model") },

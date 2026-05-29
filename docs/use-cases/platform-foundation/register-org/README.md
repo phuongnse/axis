@@ -85,9 +85,12 @@ Self-service registration flow where a new organization signs up and is automati
 |--------|------------|---------|
 | register-org | [source](./register-org.excalidraw) | [preview](./register-org.svg) |
 | register-org-states | [source](./register-org-states.excalidraw) | [preview](./register-org-states.svg) |
+| register-org-provider-states | [source](./register-org-provider-states.excalidraw) | [preview](./register-org-provider-states.svg) |
+| email-confirmation | [source](./email-confirmation.excalidraw) | [preview](./email-confirmation.svg) |
 
 ## Diagrams
 
 | Diagram | Source | Preview |
 |---------|--------|---------|
-| N/A | N/A | N/A |
+| register-org-flow | [source](./register-org-flow.excalidraw) | [preview](./register-org-flow.svg) |
+| tenant-provisioning | [source](../provision-tenant/tenant-provisioning.excalidraw) | [preview](../provision-tenant/tenant-provisioning.svg) |
