@@ -67,4 +67,4 @@ docs/scripts/generate-wireframes.ps1 -Filter register-org
 | `paintRegisterOrgEntryFields`, `paintRegisterOrgCompleteFields` | register-org + `*-states` |
 | `authCard` | login, register, forgot/change password, accept invite |
 
-Constants (`AUTH_CARD_W`, `AUTH_EXTERNAL_SIGN_IN_BLOCK_H`, …): import from `blocks.mjs`; do not hardcode `440` on screens.
+Constants (`AUTH_CARD_W`, `AUTH_FIELD_STACK_GAP`, `AUTH_EXTERNAL_SIGN_IN_BLOCK_H`, …): import from `blocks.mjs`; do not hardcode `440` on screens.

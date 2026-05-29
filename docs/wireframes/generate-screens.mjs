@@ -54,6 +54,7 @@ import {
   AUTH_HEADER_H,
   AUTH_HEADER_H_SUBTITLE,
   AUTH_CARD_FOOTER_ZONE,
+  AUTH_FIELD_STACK_GAP,
   placeAuthExternalSignIn,
   buildAuthCardBrandBar,
   buildAuthCardHeader,
@@ -271,7 +272,7 @@ function genRegisterOrg() {
 
   const { els: termsEls, blockH: termsH } = authTermsRow('ro_terms', cardX, y, cardW, { checked: true });
   contentEls.push(...termsEls);
-  y += termsH + 14;
+  y += termsH + AUTH_FIELD_STACK_GAP;
 
   contentEls.push(...buildAuthSubmitButton('ro', cardX, y, cardW, 'Create organization'));
   y += 36 + 16;
@@ -305,7 +306,7 @@ function genRegisterOrgComplete() {
 
   let y = cardY + headerH;
   y = paintRegisterOrgCompleteFields(contentEls, 'roc', cardX, y, cardW);
-  y += 14;
+  y += AUTH_FIELD_STACK_GAP;
 
   contentEls.push(...buildAuthSubmitButton('roc', cardX, y, cardW, 'Create organization'));
   y += 36 + 16;
@@ -389,7 +390,7 @@ function registerOrgStatePanel(els, { id, x, y0, panelW, panelH, lbl, lblColor, 
   if (terms) {
     const { els: te, blockH: termsBlockH } = authTermsRow(`${prefix}_terms`, x, fy, panelW, terms);
     els.push(...te);
-    fy += termsBlockH + 8;
+    fy += termsBlockH + AUTH_FIELD_STACK_GAP;
   }
 
   const btnY = cardY + panelH - 68;

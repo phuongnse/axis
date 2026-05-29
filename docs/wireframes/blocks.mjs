@@ -24,10 +24,11 @@ export const AUTH_PROVIDER_BTN_SIZE = 44;
 export const AUTH_PROVIDER_GAP = 20;
 /** Icon row + gap + “or” divider — use after placeAuthExternalSignIn(). */
 export const AUTH_EXTERNAL_SIGN_IN_BLOCK_H = AUTH_PROVIDER_BTN_SIZE + 12 + 28;
-/** Default field block without help text (label + input + spacing). */
-export const AUTH_FIELD_BLOCK_H = 72;
-/** Field block when label includes help text line. */
-export const AUTH_FIELD_BLOCK_H_HELP = 88;
+/** Space below each auth field before the next control. */
+export const AUTH_FIELD_STACK_GAP = 12;
+/** Approx. block height for authCard layout (no help / with help). */
+export const AUTH_FIELD_BLOCK_H = 84;
+export const AUTH_FIELD_BLOCK_H_HELP = 100;
 export const AUTH_HEADER_H = 112;
 export const AUTH_HEADER_H_SUBTITLE = 136;
 export const AUTH_CARD_FOOTER_ZONE = 44;
@@ -122,7 +123,7 @@ export function authFormField(
   if (errorMsg) {
     els.push(text(`${prefix}_err`, x, errY, innerW, 14, errorMsg, 11, C.danger));
   }
-  const blockH = (errorMsg ? errY + 16 : inputY + 48) - y;
+  const blockH = (errorMsg ? errY + 16 : inputY + 48) - y + AUTH_FIELD_STACK_GAP;
   return { els, blockH };
 }
 
@@ -136,7 +137,7 @@ export function authReadOnlyValueField(
     rect(`${prefix}_inp`, x, inputY, innerW, 40, C.gray300, C.gray50, 1, true),
     text(`${prefix}_val`, x + 12, inputY + 11, innerW - 24, 18, value, 13, C.gray700),
   ];
-  const blockH = inputY + 48 - y;
+  const blockH = inputY + 48 - y + AUTH_FIELD_STACK_GAP;
   return { els, blockH };
 }
 
@@ -157,7 +158,7 @@ export function authSlugPreviewField(
   if (errorMsg) {
     els.push(text(`${prefix}_err`, x, previewY + 16, innerW, 14, errorMsg, 11, C.danger));
   }
-  const blockH = (errorMsg ? previewY + 30 : previewY + 14) - y;
+  const blockH = (errorMsg ? previewY + 30 : previewY + 14) - y + AUTH_FIELD_STACK_GAP;
   return { els, blockH };
 }
 
