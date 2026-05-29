@@ -134,7 +134,43 @@ function text({ x, y, value, size = 13, color = C.text, bold = false, anchor = "
 }
 
 function estimateWidth(str, size) {
-  return Math.max(str.length * size * 0.55, 40);
+  return Math.max(str.length * size * 0.62, 48);
+}
+
+/** Arrow / return-message labels — wrap to fit lane width so glyphs are not squeezed. */
+function seqMessageLabelEls({ x1, y1, x2, y2, label, labelBelow = false, size = 10 }) {
+  const mx = (x1 + x2) / 2;
+  const my = (y1 + y2) / 2;
+  const span = Math.abs(x2 - x1);
+  const maxWidth = Math.max(span - 20, 140);
+  const lines = wrapNoteLines(label, maxWidth, size);
+  const lineH = 15;
+  const blockH = lines.length * lineH;
+  const els = [];
+  const topY = labelBelow ? my + 18 : my - 18 - blockH;
+  lines.forEach((line, i) => {
+    const w = estimateWidth(line, size);
+    els.push({
+      ...base(),
+      type: "text",
+      x: mx - w / 2,
+      y: topY + i * lineH + lineH / 2 - size / 2,
+      width: w,
+      height: lineH,
+      text: line,
+      fontSize: size,
+      fontFamily: 1,
+      textAlign: "left",
+      verticalAlign: "top",
+      strokeColor: C.muted,
+      backgroundColor: "transparent",
+      fillStyle: "solid",
+      roughness: 1,
+      strokeWidth: 1,
+      strokeStyle: "solid",
+    });
+  });
+  return els;
 }
 
 function arrow({ x1, y1, x2, y2, label, color = C.arrow, dashed = false, labelBelow = false }) {
@@ -157,10 +193,7 @@ function arrow({ x1, y1, x2, y2, label, color = C.arrow, dashed = false, labelBe
   };
   const els = [el];
   if (label) {
-    const mx = (x1 + x2) / 2;
-    const my = (y1 + y2) / 2;
-    const labelY = labelBelow ? my + 22 : my - 26;
-    els.push(text({ x: mx, y: labelY, value: label, size: 10, color: C.muted, anchor: "center" }));
+    els.push(...seqMessageLabelEls({ x1, y1, x2, y2, label, labelBelow }));
   }
   return els;
 }
@@ -190,8 +223,10 @@ function routedArrow({ waypoints, label, color = C.arrow, dashed = false, labelB
   const els = [el];
   if (label) {
     const mid = waypoints[Math.floor(waypoints.length / 2)];
-    const labelY = labelBelow ? mid[1] + 22 : mid[1] - 26;
-    els.push(text({ x: mid[0], y: labelY, value: label, size: 10, color: C.muted, anchor: "center" }));
+    const prev = waypoints[Math.max(0, Math.floor(waypoints.length / 2) - 1)];
+    els.push(...seqMessageLabelEls({
+      x1: prev[0], y1: prev[1], x2: mid[0], y2: mid[1], label, labelBelow,
+    }));
   }
   return els;
 }
@@ -708,16 +743,17 @@ function seqBuild({ title, participants, gap = 165, messages, sections = [], not
 
 function registerOrgFlowDiagram() {
   _id = 1;
-  const step = 72;
-  const phaseGap = 100;
+  const step = 66;
+  const phaseGap = 52;
+  const afterDiv = 30;
 
-  const emailStart = 328;
+  const emailStart = 300;
   const emailEnd = emailStart + step * 4;
   const oauthDiv = emailEnd + phaseGap;
-  const oauthStart = oauthDiv + 44;
+  const oauthStart = oauthDiv + afterDiv;
   const oauthEnd = oauthStart + step * 6;
   const completeDiv = oauthEnd + phaseGap;
-  const completeStart = completeDiv + 44;
+  const completeStart = completeDiv + afterDiv;
   const completeEnd = completeStart + step * 4;
 
   return seqBuild({
@@ -736,10 +772,10 @@ function registerOrgFlowDiagram() {
       { y: completeDiv, label: "Post-OAuth completion screen" },
     ],
     messages: [
-      { from: 0, to: 1, y: 132, label: "Open registration page" },
-      { from: 1, to: 0, y: 204, label: "Show SSO icons + email/password form", dashed: true },
+      { from: 0, to: 1, y: 128, label: "Open registration page" },
+      { from: 1, to: 0, y: 194, label: "Show SSO icons + email/password form", dashed: true },
 
-      { from: 0, to: 1, y: emailStart, label: "Accept Terms + submit form (Idempotency-Key)" },
+      { from: 0, to: 1, y: emailStart, label: "Accept Terms + submit (Idempotency-Key)" },
       { from: 1, to: 2, y: emailStart + step, label: "POST /api/organizations/" },
       { from: 2, to: 2, y: emailStart + step * 2, label: "Generate slug, hash password, record ToS" },
       { from: 2, to: 3, y: emailStart + step * 3, label: "Send verification email (if new)" },
@@ -748,12 +784,12 @@ function registerOrgFlowDiagram() {
       { from: 0, to: 1, y: oauthStart, label: "Choose Microsoft / Google / GitHub" },
       { from: 1, to: 4, y: oauthStart + step, label: "OAuth2 Auth Code + PKCE" },
       { from: 4, to: 1, y: oauthStart + step * 2, label: "Verified email + display name", dashed: true, labelBelow: true },
-      { from: 1, to: 2, y: oauthStart + step * 3, label: "Validate provider claims (verified email required)" },
+      { from: 1, to: 2, y: oauthStart + step * 3, label: "Validate claims (verified email required)" },
       { from: 2, to: 1, y: oauthStart + step * 4, label: "Reject: no verified email", dashed: true, labelBelow: false },
       { from: 2, to: 1, y: oauthStart + step * 5, label: "Reject: duplicate email → Sign in", dashed: true, labelBelow: true },
       { from: 2, to: 1, y: oauthEnd, label: "Open register-org-complete", dashed: true, labelBelow: false },
 
-      { from: 1, to: 0, y: completeStart, label: "register-org-complete (org name, slug, Terms)", dashed: true, labelBelow: true },
+      { from: 1, to: 0, y: completeStart, label: "Show register-org-complete (name, slug, Terms)", dashed: true, labelBelow: true },
       { from: 0, to: 1, y: completeStart + step, label: "Submit completion (Idempotency-Key)" },
       { from: 1, to: 2, y: completeStart + step * 2, label: "POST org + link external login" },
       { from: 2, to: 3, y: completeStart + step * 3, label: "Send verification email (if new)" },
@@ -771,19 +807,20 @@ function registerOrgFlowDiagram() {
 
 function registerOrgCasesDiagram() {
   _id = 1;
-  const step = 72;
-  const phaseGap = 100;
+  const step = 66;
+  const phaseGap = 52;
+  const afterDiv = 30;
 
-  const emailStart = 220;
+  const emailStart = 208;
   const emailEnd = emailStart + step * 4;
   const providerDiv = emailEnd + phaseGap;
-  const providerStart = providerDiv + 44;
+  const providerStart = providerDiv + afterDiv;
   const providerEnd = providerStart + step * 4;
   const completeDiv = providerEnd + phaseGap;
-  const completeStart = completeDiv + 44;
+  const completeStart = completeDiv + afterDiv;
   const completeEnd = completeStart + step * 3;
   const sharedDiv = completeEnd + phaseGap;
-  const sharedStart = sharedDiv + 44;
+  const sharedStart = sharedDiv + afterDiv;
 
   return seqBuild({
     title: "Register Organization — Case Matrix (Dev Checklist)",
@@ -800,25 +837,25 @@ function registerOrgCasesDiagram() {
       { y: sharedDiv, label: "Shared confirmation outcome" },
     ],
     messages: [
-      { from: 0, to: 1, y: emailStart, label: "Submit register-org form (Idempotency-Key + Terms checked)" },
+      { from: 0, to: 1, y: emailStart, label: "Submit register-org (+ Terms, Idempotency-Key)" },
       { from: 1, to: 2, y: emailStart + step, label: "POST /api/organizations/" },
-      { from: 2, to: 1, y: emailStart + step * 2, label: "400 validation errors (inline field errors)", dashed: true, labelBelow: false },
-      { from: 2, to: 1, y: emailStart + step * 3, label: "5xx generic banner + re-enable submit", dashed: true, labelBelow: true },
-      { from: 2, to: 1, y: emailEnd, label: "202 confirmation (new OR duplicate email)", dashed: true, labelBelow: false },
+      { from: 2, to: 1, y: emailStart + step * 2, label: "400 validation (inline field errors)", dashed: true, labelBelow: false },
+      { from: 2, to: 1, y: emailStart + step * 3, label: "5xx generic banner, re-enable submit", dashed: true, labelBelow: true },
+      { from: 2, to: 1, y: emailEnd, label: "202 confirmation (new or duplicate email)", dashed: true, labelBelow: false },
 
-      { from: 0, to: 1, y: providerStart, label: "Complete provider OAuth callback" },
-      { from: 1, to: 2, y: providerStart + step, label: "Validate provider claims (verified email + uniqueness)" },
+      { from: 0, to: 1, y: providerStart, label: "Provider OAuth callback completes" },
+      { from: 1, to: 2, y: providerStart + step, label: "Validate claims (verified email, uniqueness)" },
       { from: 2, to: 1, y: providerStart + step * 2, label: "Reject: no verified email → provider error", dashed: true, labelBelow: false },
       { from: 2, to: 1, y: providerStart + step * 3, label: "Reject: duplicate email → Sign in", dashed: true, labelBelow: true },
       { from: 2, to: 1, y: providerEnd, label: "Open register-org-complete", dashed: true, labelBelow: false },
 
-      { from: 0, to: 1, y: completeStart, label: "Submit register-org-complete (org name + slug + Terms)" },
-      { from: 1, to: 2, y: completeStart + step, label: "POST completion (link external login, idempotent)" },
-      { from: 2, to: 1, y: completeStart + step * 2, label: "400 org name/terms errors (inline)", dashed: true, labelBelow: false },
-      { from: 2, to: 1, y: completeEnd, label: "5xx generic banner + re-enable submit", dashed: true, labelBelow: true },
+      { from: 0, to: 1, y: completeStart, label: "Submit complete form (org name, slug, Terms)" },
+      { from: 1, to: 2, y: completeStart + step, label: "POST completion (link external login)" },
+      { from: 2, to: 1, y: completeStart + step * 2, label: "400 org name / Terms errors (inline)", dashed: true, labelBelow: false },
+      { from: 2, to: 1, y: completeEnd, label: "5xx generic banner, re-enable submit", dashed: true, labelBelow: true },
 
       { from: 2, to: 1, y: sharedStart, label: "202 confirmation screen", dashed: true, labelBelow: false },
-      { from: 1, to: 0, y: sharedStart + step, label: "email-confirmation + resend states (204/429)", dashed: true, labelBelow: true },
+      { from: 1, to: 0, y: sharedStart + step, label: "email-confirmation + resend (204 / 429)", dashed: true, labelBelow: true },
     ],
     notes: [
       {
