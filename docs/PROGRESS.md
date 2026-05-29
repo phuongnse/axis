@@ -85,7 +85,7 @@ Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoi
 
 ## Tenant provisioning (cross-cutting)
 
-**Verify email → provision:** `User.VerifyEmail()` sets org `Provisioning`, seeds `tenant_module_provisions`, publishes `OrganizationVerifiedEvent` → each module provisions and reports via `TenantModuleProvisionReportEvent`; Identity coordinator retries (3×, exponential backoff) and logs critical alert on exhaustion; `GET /api/auth/provisioning-status?token=` for polling. **Deferred:** provisioning wait UI (Frontend).
+**Register org (verify link) → provision:** `User.VerifyEmail()` sets org `Provisioning`, seeds `tenant_module_provisions`, publishes `OrganizationVerifiedEvent` → each module provisions and reports via `TenantModuleProvisionReportEvent`; Identity coordinator retries (3×, exponential backoff) and logs critical alert on exhaustion; `GET /api/auth/provisioning-status?token=` for polling. **Deferred:** provisioning wait UI (Frontend).
 
 ## Page Builder (`page-builder`)
 

@@ -26,8 +26,7 @@ Ship first — tenant registration, isolation, and subscription plans are prereq
 |---|---|
 | [Select a subscription plan during registration](plan-at-signup/) | Choose a subscription plan during registration so that I know what features and limits I have access to. |
 | [Automatic tenant provisioning](provision-tenant/) | My organization's environment to be ready immediately after email verification so that I can start using the platform… |
-| [Register a new organization](register-org/) | Register my organization on the Axis platform — with email/password or a Microsoft, Google, or GitHub account — so that… |
-| [Verify email and activate account](verify-email/) | Verify my email address so that my account is activated and I can access the platform. |
+| [Register a new organization](register-org/) | Register my organization on the Axis platform — with email/password or Microsoft, Google, or GitHub — confirm my inbox… |
 
 ### Subscription plans
 
@@ -78,12 +77,12 @@ See [Tenant provisioning sequence](./provision-tenant/README.md#tenant-provision
 | Shared Domain | ✅ Done | `Entity`, `AggregateRoot`, `ValueObject`, `IDomainEvent`, `Result<T>` |
 | Shared Application | ✅ Done | `ICommand/IQuery`, `ICommandHandler/IQueryHandler`, `ValidationBehavior`, `ITenantContext` |
 | Shared Infrastructure | ✅ Done | `TenantSchemaInterceptor`, per-module `UnitOfWork` ([ADR-017](../../TECH_STACK.md#adr-017-axisshared-is-abstractions-only-no-shared-implementation)); **OpenTelemetry** host wiring on `Axis.Api` ([ADR-018](../../TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability), [patterns § OpenTelemetry](../../playbooks/patterns.md#opentelemetry-observability)) |
-| [Register org](register-org/) | ✅ Done | Self-service signup + verification email — backend complete. Frontend polish ⏳ |
+| [Register org](register-org/) | ⚠️ Partial | Signup + email verification backend largely done; Terms/OAuth completion + registration Frontend ⏳ |
 | [Tenant provisioning](provision-tenant/) | ✅ Done | Kafka-driven per-module provisioning, coordinator retries, `GET /api/auth/provisioning-status`. Frontend wait screen ⏳ |
 | [Subscription plans](view-plans/) | ✅ Done | `GET /api/plans`, pricing data, 402 limits — see [enforce limits](enforce-limits/). Frontend pricing UI ⏳ |
 | [Tenant isolation](tenant-scope/) | ✅ Done | `TenantSchemaInterceptor`, `TenantOrganizationAccessMiddleware`, cross-tenant API tests |
 | [Organization management](org-profile/) | ✅ Done | Profile, settings + usage, scheduled deletion + hard-delete job ✅. Frontend settings UI ⏳ |
-| Frontend | ⏳ Pending | Verify flow, provisioning wait, settings, pricing |
+| Frontend | ⏳ Pending | Register-org journey (incl. verify screens), provisioning wait, settings, pricing |
 
 ---
 
@@ -92,7 +91,7 @@ See [Tenant provisioning sequence](./provision-tenant/README.md#tenant-provision
 | Priority | Item | Where |
 |----------|------|--------|
 | **Backend** | ✅ platform-foundation backend use cases complete. Optional: bulk workflow import when product needs [bulk export](../workflow-builder/bulk-export/) AC | [enforce-limits/](enforce-limits/) |
-| Frontend | [Verify email](verify-email/), [provisioning wait](provision-tenant/), [pricing](view-plans/), [org settings](org-settings/) wireframes | see **Use Cases** table below |
+| Frontend | [Register org](register-org/) (incl. verify link screens), [provisioning wait](provision-tenant/), [pricing](view-plans/), [org settings](org-settings/) wireframes | see **Use Cases** table below |
 
 Domain-level checkboxes above remain spec-only; status is in use-case **Implementation status** callouts.
 

@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Register my organization on the Axis platform — with email/password or a Microsoft, Google, or GitHub account — so that I can start building workflows for my team.
+Register my organization on the Axis platform — with email/password or Microsoft, Google, or GitHub — confirm my inbox, verify the email link, and activate the account so that I can start building workflows for my team.
 
 ## Primary actor
 
@@ -34,8 +34,10 @@ Self-service registration flow where a new organization signs up and is automati
 - [ ] Registration form collects: organization name, admin full name, admin email, password, and password confirmation.
 - [ ] The user must accept the Terms of Service and Privacy Policy (linked) before the form can be submitted; the accepted version is recorded with the account.
 - [ ] An organization slug is auto-generated from the organization name (uniqueness-checked) and shown to the user.
-- [ ] On successful submission, a verification email is sent and the user sees a confirmation screen.
+- [ ] On successful submission, a verification email is sent (within 60 seconds) and the user sees a confirmation screen.
 - [ ] The confirmation screen tells the user to check their email and does not reveal whether the email already exists.
+- [ ] Clicking the verification link activates the account and automatically signs the user in.
+- [ ] After activation, the user is redirected to the workspace (or to the provisioning wait screen if the tenant schema is still being created).
 
 *Validation & errors*
 - [ ] Organization name: required, 2–100 characters.
@@ -62,8 +64,17 @@ Self-service registration flow where a new organization signs up and is automati
 - [ ] Submitting the completion form creates the organization and admin account with an external login linked (no password). Idempotency applies the same as `POST /api/organizations/`.
 - [ ] On success, the user sees the same confirmation screen as the email/password path (verification email when applicable; no email-exists leakage).
 
+*Email verification (link from inbox)*
+- [ ] Verification link is valid for 24 hours; an expired link shows a clear message with a **Resend verification email** button.
+- [ ] An already-used link shows "This link has already been used. Please sign in."
+- [ ] A tampered or invalid token shows "Invalid verification link."
+- [ ] Resend is rate-limited: max 3 requests per email per hour; further attempts show "Please wait before requesting another email" (see `verify-email-rate-limit` wireframe).
+- [ ] If the user tries to sign in before verifying, they see "Please verify your email first" with a resend option ([sign-in](../../identity-access/sign-in/) owns the login-page AC; backend returns the same message).
+- [ ] The verification link works from any browser or device.
+
 *Out of scope*
 - CAPTCHA / bot protection on the registration form.
+- Automatic re-send of verification email after X minutes (no timer-based resend).
 
 > **Implementation status**
 >
@@ -73,14 +84,15 @@ Self-service registration flow where a new organization signs up and is automati
 > | Application | ⚠️ |
 > | Infrastructure | ⚠️ |
 > | API | ⚠️ |
-> | Frontend | ⚠️ |
+> | Frontend | ⏳ |
 >
-> **Gaps vs spec:** Email/password registration is complete — `Idempotency-Key` header on `POST /api/organizations/` deduplicates rapid resubmits (Pending/Completed/Failed state), slug auto-generated with uniqueness retry. **Not yet implemented:** Terms of Service / Privacy Policy acceptance (recording accepted version on the account), external-provider sign-up (Microsoft/Google/GitHub, ADR-027), the post-OAuth **register-org-complete** screen — no provider registration in OpenIddict, no provider buttons on the registration page — and CAPTCHA/bot protection (PR #146; see *Out of scope*).
+> **Gaps vs spec:** **Registration:** email/password path is largely complete (`Idempotency-Key` on `POST /api/organizations/`, slug uniqueness retry). **Not yet:** Terms of Service / Privacy Policy acceptance (record accepted version), external-provider sign-up (ADR-027), **register-org-complete** screen, CAPTCHA (see *Out of scope*). **Email verification (backend ✅):** opaque one-time tokens in `email_verification_tokens` (SHA-256 at rest, 24h TTL), resend rate limit 3/email/hour (`IResendVerificationRateLimiter`, HTTP 429), login blocks unverified users, `GET /api/auth/provisioning-status?token=` after verify. **Frontend ⏳:** confirmation + link-click screens, post-verify auto sign-in, provisioning wait (**Deferred — PR #125 follow-up**).
 >
 > **Decisions:**
 > - duplicate email returns silently without creating anything — matches "same confirmation screen" AC. `RegisterOrganizationCommandValidator` enforces: org name 2–100 chars, valid email, password min 8 chars + letter + number, confirmation match. Org slug auto-generated with uniqueness retry loop
 > - BCrypt work factor 12. 4 default system roles seeded atomically in the same transaction.
 > - **External providers:** industry-standard **post-OAuth completion** — IdPs supply identity only (email + display name); organization name is always collected on `register-org-complete` before the org is created. Short-lived server session holds the external login between OAuth callback and completion submit.
+> - **Resend / verify:** `ResendVerificationEmailCommand` silently succeeds for unknown or already-verified emails (no information leakage). IP-level `auth` rate limiter applies to `/connect/login` and Identity gRPC only — not on verify/resend (keeps integration tests stable).
 
 ## Screen flow
 
@@ -92,6 +104,8 @@ Canonical order for this use case. **The wireframes table below uses the same ro
 | 2a | `register-org-complete` | **SSO only** — after OAuth; collect org name, slug, Terms (email read-only) |
 | 2b | `register-org` *(same screen as step 1)* | **Email/password** — submit on the entry form (skips 2a; no extra wireframe) |
 | 3 | `email-confirmation` | After org create succeeds (either branch) |
+| 4 | `verify-email` | User opens the link from the inbox (success, expired, used, invalid — 2×2 state board) |
+| 5 | workspace / provisioning | After successful verify — workspace or [provision-tenant](../provision-tenant/) wait |
 
 Step **2b** is a path, not a separate UI file — only **2a** adds `register-org-complete.excalidraw`. The wireframes table lists files; step **2b** is called out on the `register-org` row below.
 
@@ -102,7 +116,8 @@ Step **2b** is a path, not a separate UI file — only **2a** adds `register-org
 | `register-org-provider-states` | SSO rejected before completion (duplicate email, no verified email) |
 | `register-org-states` | Validation or 5xx on the entry form |
 | `register-org-complete-states` | Validation or Terms not accepted on completion form |
-| `email-confirmation-states` | Resend verification: in-flight, success (204), rate limit (429) |
+| `email-confirmation-states` | Resend from confirmation screen: in-flight, success (204), rate limit (429) |
+| `verify-email-rate-limit` | Resend cap (3/hour) from verify landing or shared resend flows |
 
 ```mermaid
 %%{init: {'theme':'dark','themeVariables':{'background':'#0d1117','mainBkg':'#0d1117','primaryColor':'#161b22','primaryBorderColor':'#388bfd','primaryTextColor':'#e6edf3','secondaryColor':'#21262d','secondaryBorderColor':'#388bfd','secondaryTextColor':'#e6edf3','tertiaryColor':'#161b22','tertiaryTextColor':'#e6edf3','lineColor':'#58a6ff','textColor':'#e6edf3','nodeBorder':'#388bfd','clusterBkg':'#161b22','clusterBorder':'#388bfd','titleColor':'#e6edf3','edgeLabelBackground':'#161b22','actorBkg':'#161b22','actorBorder':'#388bfd','actorTextColor':'#e6edf3','signalColor':'#58a6ff','labelBoxBkgColor':'#161b22','labelBoxBorderColor':'#388bfd','noteBkgColor':'#161b22','noteBorderColor':'#388bfd','noteTextColor':'#c9d1d9','activationBkgColor':'#30363d'}}}%%
@@ -110,18 +125,22 @@ flowchart TD
   entry["1 · register-org"]
   complete["2a · register-org-complete"]
   confirm["3 · email-confirmation"]
+  verify["4 · verify-email"]
   errEntry["register-org-states"]
   errComplete["register-org-complete-states"]
   errProvider["register-org-provider-states"]
   errResend["email-confirmation-states"]
+  errVerifyRl["verify-email-rate-limit"]
 
   entry -->|"2b · submit (email/password)"| confirm
   entry -->|SSO| complete
   complete --> confirm
+  confirm -->|Open inbox link| verify
   entry -.-> errEntry
   complete -.-> errComplete
   entry -.->|SSO error| errProvider
   confirm -.->|Resend email| errResend
+  verify -.->|Resend cap| errVerifyRl
 ```
 
 ## Legal links & footer links (UX)
@@ -142,14 +161,16 @@ Record **accepted ToS/Privacy version** on the account at org create (AC above);
 
 ## Wireframes
 
-Seven screens in this folder (three happy-path, four state boards). Table order follows [Screen flow](#screen-flow). Sequences: [Diagrams](#diagrams).
+Nine screens in this folder (four happy-path / journey steps, five state boards). Table order follows [Screen flow](#screen-flow). Sequences: [Diagrams](#diagrams).
 
 | # | Screen | Role | Excalidraw | Preview |
 |---|--------|------|------------|---------|
 | 1 · 2b | register-org | Happy path — entry (1); email/password submit (2b) | [source](./register-org.excalidraw) | [preview](./register-org.svg) |
 | 2a | register-org-complete | Happy path — post-OAuth completion | [source](./register-org-complete.excalidraw) | [preview](./register-org-complete.svg) |
 | 3 | email-confirmation | Happy path — after create (resend link idle) | [source](./email-confirmation.excalidraw) | [preview](./email-confirmation.svg) |
-| — | email-confirmation-states | Resend — in-flight, 204, 429 | [source](./email-confirmation-states.excalidraw) | [preview](./email-confirmation-states.svg) |
+| 4 | verify-email | Happy path / outcomes — link click (2×2 grid) | [source](./verify-email.excalidraw) | [preview](./verify-email.svg) |
+| — | email-confirmation-states | Resend from step 3 — in-flight, 204, 429 | [source](./email-confirmation-states.excalidraw) | [preview](./email-confirmation-states.svg) |
+| — | verify-email-rate-limit | Resend cap — 3/hour | [source](./verify-email-rate-limit.excalidraw) | [preview](./verify-email-rate-limit.svg) |
 | — | register-org-provider-states | Error — SSO before completion | [source](./register-org-provider-states.excalidraw) | [preview](./register-org-provider-states.svg) |
 | — | register-org-states | Error — entry form validation / 5xx | [source](./register-org-states.excalidraw) | [preview](./register-org-states.svg) |
 | — | register-org-complete-states | Error — completion form validation / Terms | [source](./register-org-complete-states.excalidraw) | [preview](./register-org-complete-states.svg) |
@@ -254,4 +275,4 @@ sequenceDiagram
   end
 ```
 
-**Related (next use case):** after email verification, see [provision-tenant](../provision-tenant/) ([tenant provisioning sequence](../provision-tenant/README.md#tenant-provisioning)).
+**Related:** tenant schema provisioning after verify — [provision-tenant](../provision-tenant/) ([tenant provisioning sequence](../provision-tenant/README.md#tenant-provisioning)). The former standalone **verify-email** use-case folder was merged here (same registration journey; API remains `POST /api/auth/verify-email`).

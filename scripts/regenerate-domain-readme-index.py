@@ -21,7 +21,7 @@ SKIP_DIRS = set()
 GROUPS: dict[str, list[tuple[str, object]]] = {
     "platform-foundation": [
         ("Registration & provisioning", lambda s: s in {
-            "register-org", "verify-email", "provision-tenant", "plan-at-signup",
+            "register-org", "provision-tenant", "plan-at-signup",
         }),
         ("Subscription plans", lambda s: s in {"view-plans", "enforce-limits", "admin-change-plan"}),
         ("Organization settings", lambda s: s in {"org-profile", "org-settings", "delete-org"}),

@@ -137,6 +137,10 @@ const SCREEN_USE_CASE_OVERRIDES = {
     'platform-foundation/register-org/email-confirmation.excalidraw',
   'platform-foundation/email-confirmation-states.excalidraw':
     'platform-foundation/register-org/email-confirmation-states.excalidraw',
+  'platform-foundation/verify-email.excalidraw':
+    'platform-foundation/register-org/verify-email.excalidraw',
+  'platform-foundation/verify-email-rate-limit.excalidraw':
+    'platform-foundation/register-org/verify-email-rate-limit.excalidraw',
   'platform-foundation/workspace-provisioning.excalidraw':
     'platform-foundation/provision-tenant/workspace-provisioning.excalidraw',
   'platform-foundation/pricing.excalidraw':
