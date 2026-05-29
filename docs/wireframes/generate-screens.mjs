@@ -279,33 +279,44 @@ function authSlugPreviewField(prefix, cardX, y, cardW, errorMsg = null) {
 function authTermsRow(prefix, cardX, y, cardW, { checked = true, errorMsg = null } = {}) {
   const x = cardX + 24;
   const innerW = cardW - 48;
-  const blockH = errorMsg ? 48 : 32;
+  const chkSize = 18;
+  const lineH = 16;
+  const textY = y + Math.round((chkSize - lineH) / 2);
+  const blockH = errorMsg ? 50 : 28;
   const els = [
-    rect(`${prefix}_chk`, x, y + 6, 18, 18, checked ? C.primary : C.dangerBorder, C.white, 1, true),
-    text(`${prefix}_txt`, x + 26, y, innerW - 26, 32,
+    rect(`${prefix}_chk`, x, y, chkSize, chkSize, checked ? C.primary : C.dangerBorder, C.white, 1, true),
+    text(`${prefix}_txt`, x + chkSize + 8, textY, innerW - chkSize - 8, lineH,
       'I agree to the Terms of Service and Privacy Policy →', 11, C.gray700),
   ];
   if (checked) {
-    els.push(text(`${prefix}_mark`, x + 6, y + 8, 10, 12, '✓', 10, C.primary));
+    els.push(text(`${prefix}_mark`, x + 4, y + 4, chkSize - 8, 12, '✓', 11, C.primary, 'center'));
   }
   if (errorMsg) {
-    els.push(text(`${prefix}_err`, x, y + 34, innerW, 14, errorMsg, 11, C.danger));
+    els.push(text(`${prefix}_err`, x, y + chkSize + 8, innerW, 14, errorMsg, 11, C.danger));
   }
   return { els, blockH };
 }
 
-/** External identity provider sign-up / sign-in buttons (ADR-027). */
-function authProviderButtons(prefix, cardX, y, cardW) {
+/** Compact SSO icon row — three providers, centered (ADR-027). */
+function authProviderIconRow(prefix, cardX, y, cardW) {
   const innerX = cardX + 24;
   const innerW = cardW - 48;
-  const providers = ['Microsoft', 'Google', 'GitHub'];
+  const btnSize = 44;
+  const gap = 20;
+  const rowW = btnSize * 3 + gap * 2;
+  const startX = innerX + Math.round((innerW - rowW) / 2);
+  const providers = [
+    { icon: '⊞', stroke: '#2563eb', bg: '#eff6ff' },
+    { icon: 'G', stroke: '#dc2626', bg: '#fef2f2' },
+    { icon: '⎇', stroke: '#1f2937', bg: '#f3f4f6' },
+  ];
   const els = [];
-  let rowY = y;
-  providers.forEach((name, i) => {
-    els.push(...btn(`${prefix}_p${i}`, innerX, rowY, name, 'secondary'));
-    rowY += 40;
+  providers.forEach((p, i) => {
+    const bx = startX + i * (btnSize + gap);
+    els.push(rect(`${prefix}_p${i}`, bx, y, btnSize, btnSize, p.stroke, p.bg, 1, true));
+    els.push(text(`${prefix}_p${i}_ic`, bx, y + 11, btnSize, 22, p.icon, 18, p.stroke, 'center'));
   });
-  return { els, height: providers.length * 40 };
+  return { els, height: btnSize + 12 };
 }
 
 function authOrDivider(prefix, cardX, cardW, y) {
@@ -363,28 +374,26 @@ function genAppShell() {
  */
 function genRegisterOrg() {
   const cardW = 440;
-  const headerH = 112;
-  const ssoH = 120;
-  const orH = 28;
-  const fieldBlocks = 72 + 86 + 72 * 4; // org name, slug, admin, email, passwords
-  const termsH = 32;
-  const footerZone = 48;
-  const cardH = headerH + ssoH + orH + fieldBlocks + termsH + 36 + footerZone;
   const cardX = Math.round((W - cardW) / 2);
-  const cardY = 24;
+  const cardY = 16;
+  const headerH = 112;
+  const orH = 28;
+  const footerZone = 44;
   const els = [];
 
   els.push(rect('ro_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
-  els.push(rect('ro_card', cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
-  els.push(text('ro_logo', cardX, cardY + 16, cardW, 28, '⬡  Axis', 18, C.primary, 'center'));
-  els.push(hline('ro_hdiv', cardX, cardY + 60, cardW, C.gray300));
-  els.push(text('ro_title', cardX + 24, cardY + 76, cardW - 48, 24, 'Create your organization', 17, C.gray900));
 
   let y = cardY + headerH;
-  const { els: ssoEls } = authProviderButtons('ro', cardX, y, cardW);
-  els.push(...ssoEls);
+  const contentEls = [];
+
+  contentEls.push(text('ro_logo', cardX, cardY + 16, cardW, 28, '⬡  Axis', 18, C.primary, 'center'));
+  contentEls.push(hline('ro_hdiv', cardX, cardY + 60, cardW, C.gray300));
+  contentEls.push(text('ro_title', cardX + 24, cardY + 76, cardW - 48, 24, 'Create your organization', 17, C.gray900));
+
+  const { els: ssoEls, height: ssoH } = authProviderIconRow('ro', cardX, y, cardW);
+  contentEls.push(...ssoEls);
   y += ssoH;
-  els.push(...authOrDivider('ro', cardX, cardW, y));
+  contentEls.push(...authOrDivider('ro', cardX, cardW, y));
   y += orH;
 
   const fields = [
@@ -398,24 +407,31 @@ function genRegisterOrg() {
   fields.forEach((f, i) => {
     if (f.kind === 'slug') {
       const { els: slugEls, blockH } = authSlugPreviewField(`ro_slug`, cardX, y, cardW);
-      els.push(...slugEls);
+      contentEls.push(...slugEls);
       y += blockH;
       return;
     }
-    els.push(text(`ro_fl_${i}`, cardX + 24, y, cardW - 48, 16, f.label, 11, C.gray500));
-    els.push(...inputField(`ro_fi_${i}`, cardX + 24, y + 18, cardW - 48, f.value));
+    contentEls.push(text(`ro_fl_${i}`, cardX + 24, y, cardW - 48, 16, f.label, 11, C.gray500));
+    contentEls.push(...inputField(`ro_fi_${i}`, cardX + 24, y + 18, cardW - 48, f.value));
     y += 72;
   });
 
-  const { els: termsEls } = authTermsRow('ro_terms', cardX, y, cardW, { checked: true });
-  els.push(...termsEls);
-  y += termsH;
+  const { els: termsEls, blockH: termsH } = authTermsRow('ro_terms', cardX, y, cardW, { checked: true });
+  contentEls.push(...termsEls);
+  y += termsH + 14;
 
   const btnW = cardW - 48;
-  els.push(rect('ro_sbtn', cardX + 24, y, btnW, 36, C.accentDark, C.accent, 2, true));
-  els.push(text('ro_sbtn_t', cardX + 24, y + 10, btnW, 16, 'Create organization', 13, C.white, 'center'));
-  els.push(hline('ro_fdiv', cardX, cardY + cardH - 32, cardW, C.gray300));
-  els.push(text('ro_footer', cardX + 24, cardY + cardH - 22, cardW - 48, 16,
+  contentEls.push(rect('ro_sbtn', cardX + 24, y, btnW, 36, C.accentDark, C.accent, 2, true));
+  contentEls.push(text('ro_sbtn_t', cardX + 24, y + 10, btnW, 16, 'Create organization', 13, C.white, 'center'));
+  y += 36 + 16;
+
+  const cardH = y - cardY + footerZone;
+  const footerY = cardY + cardH - 32;
+
+  els.push(rect('ro_card', cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
+  els.push(...contentEls);
+  els.push(hline('ro_fdiv', cardX, footerY, cardW, C.gray300));
+  els.push(text('ro_footer', cardX + 24, footerY + 10, cardW - 48, 16,
     'Already have an account? Sign in', 12, C.primary, 'center'));
 
   write('platform-foundation/register-org.excalidraw', els);
@@ -450,9 +466,9 @@ function registerOrgStatePanel(els, { id, x, y0, panelW, panelH, lbl, lblColor, 
   });
 
   if (terms) {
-    const { els: te, blockH } = authTermsRow(`ros_${id}_terms`, x, fy, panelW, terms);
+    const { els: te, blockH: termsBlockH } = authTermsRow(`ros_${id}_terms`, x, fy, panelW, terms);
     els.push(...te);
-    fy += blockH;
+    fy += termsBlockH + 8;
   }
 
   const btnY = cardY + panelH - 68;
