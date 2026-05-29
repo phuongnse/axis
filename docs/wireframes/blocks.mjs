@@ -12,6 +12,9 @@ import {
   hline,
   fieldLabelBlock,
   inputField,
+  isPasswordLabel,
+  PASSWORD_INPUT_PAD_RIGHT,
+  passwordRevealToggle,
   componentContent,
 } from './components.mjs';
 
@@ -162,15 +165,21 @@ export function buildAuthSubmitButton(prefix, cardX, y, cardW, label) {
 // ─── Auth form field blocks ────────────────────────────────────────────────────
 
 export function authFormField(
-  prefix, cardX, y, cardW, label, value, errorMsg = null, required = false, helpText = null) {
+  prefix, cardX, y, cardW, label, value, errorMsg = null, required = false, helpText = null,
+  isPassword = null) {
   const x = cardX + AUTH_CARD_PAD_X;
   const innerW = cardW - AUTH_CARD_PAD_X * 2;
+  const password = isPassword ?? isPasswordLabel(label);
+  const valuePadR = password ? PASSWORD_INPUT_PAD_RIGHT : 24;
   const { els: labelEls, inputY } = fieldLabelBlock(prefix, x, y, innerW, label, { required, helpText });
   const els = [
     ...labelEls,
     rect(`${prefix}_inp`, x, inputY, innerW, 40, errorMsg ? C.dangerBorder : C.gray300, C.white, 1, true),
-    text(`${prefix}_val`, x + 12, inputY + 11, innerW - 24, 18, value, 13, C.gray900),
+    text(`${prefix}_val`, x + 12, inputY + 11, innerW - 12 - valuePadR, 18, value, 13, C.gray900),
   ];
+  if (password) {
+    els.push(...passwordRevealToggle(`${prefix}_pw`, x, inputY, innerW));
+  }
   const errY = inputY + 44;
   if (errorMsg) {
     els.push(text(`${prefix}_err`, x, errY, innerW, 14, errorMsg, 11, C.danger));
@@ -260,12 +269,13 @@ export function authCard(screenW, screenH, prefix, { title, subtitle = null, ite
 
   const fieldStartY = cardY + headerH;
   let fy = fieldStartY;
-  items.forEach(({ label, placeholder, required = false, helpText = null }, i) => {
+  items.forEach(({ label, placeholder, required = false, helpText = null, password = null }, i) => {
     const x = cardX + AUTH_CARD_PAD_X;
     const innerW = cardW - AUTH_CARD_PAD_X * 2;
+    const isPw = password ?? isPasswordLabel(label);
     const { els: labelEls, inputY } = fieldLabelBlock(`${prefix}_fl_${i}`, x, fy, innerW, label, { required, helpText });
     els.push(...labelEls);
-    els.push(...inputField(`${prefix}_fi_${i}`, x, inputY, innerW, placeholder));
+    els.push(...inputField(`${prefix}_fi_${i}`, x, inputY, innerW, placeholder, { password: isPw }));
     fy += helpText ? AUTH_FIELD_BLOCK_H_HELP : AUTH_FIELD_BLOCK_H;
   });
 
@@ -309,7 +319,7 @@ export const REGISTER_ORG_ENTRY_FIELDS = [
     helpText: 'We send a verification link to this address.',
   },
   {
-    kind: 'input',
+    kind: 'password',
     label: 'Password',
     value: '••••••••',
     err: null,
@@ -317,7 +327,7 @@ export const REGISTER_ORG_ENTRY_FIELDS = [
     helpText: 'At least 8 characters with a letter and a number.',
   },
   {
-    kind: 'input',
+    kind: 'password',
     label: 'Confirm password',
     value: '••••••••',
     err: null,
@@ -342,8 +352,10 @@ export function paintRegisterOrgEntryFields(els, idPrefix, cardX, y, cardW, fiel
       fy += blockH;
       return;
     }
+    const password = f.kind === 'password' || (f.kind === 'input' && isPasswordLabel(f.label));
     const { els: fieldEls, blockH } = authFormField(
-      `${idPrefix}_f${i}`, cardX, fy, cardW, f.label, f.value, f.err ?? null, f.required !== false, f.helpText ?? null);
+      `${idPrefix}_f${i}`, cardX, fy, cardW, f.label, f.value, f.err ?? null, f.required !== false, f.helpText ?? null,
+      password);
     els.push(...fieldEls);
     fy += blockH;
   });

@@ -292,12 +292,41 @@ export function fieldLabelBlock(prefix, x, y, innerW, label, {
   return { els, labelBlockH, inputY };
 }
 
-/** Text input. h=40, placeholder at y+11, 13px gray500. */
-export function inputField(prefix, x, y, w, placeholder = '') {
+/** Right inset when a password reveal toggle is shown (px). */
+export const PASSWORD_INPUT_PAD_RIGHT = 40;
+
+/** Password fields: eye toggle on the right inside the 40px input. */
+export const PASSWORD_TOGGLE_BTN = 28;
+
+export function isPasswordLabel(label) {
+  return /password/i.test(label);
+}
+
+/** Eye icon control (wireframe — show/hide password). */
+export function passwordRevealToggle(prefix, inputX, inputY, inputW) {
+  const btn = PASSWORD_TOGGLE_BTN;
+  const bx = inputX + inputW - btn - 6;
+  const by = inputY + 6;
+  const cx = bx + btn / 2;
+  const cy = by + btn / 2;
   return [
-    rect(`${prefix}_inp`, x, y, w, 40, C.gray300, C.white, 1, true),
-    text(`${prefix}_ph`, x + 12, y + 11, w - 24, 18, placeholder, 13, C.gray500),
+    ellipse(`${prefix}_pw_tgl`, bx, by, btn, btn, C.gray300, C.gray50, 1),
+    ellipse(`${prefix}_pw_eye`, cx - 7, cy - 3, 14, 9, C.gray500, 'transparent', 1.25),
+    ellipse(`${prefix}_pw_pupil`, cx - 2.5, cy - 1.5, 5, 5, C.gray500, C.gray500, 0),
   ];
+}
+
+/** Text input. h=40, placeholder at y+11, 13px gray500. */
+export function inputField(prefix, x, y, w, placeholder = '', { password = false } = {}) {
+  const padR = password ? PASSWORD_INPUT_PAD_RIGHT : 24;
+  const els = [
+    rect(`${prefix}_inp`, x, y, w, 40, C.gray300, C.white, 1, true),
+    text(`${prefix}_ph`, x + 12, y + 11, w - 12 - padR, 18, placeholder, 13, C.gray500),
+  ];
+  if (password) {
+    els.push(...passwordRevealToggle(`${prefix}_pw`, x, y, w));
+  }
+  return els;
 }
 
 /** Select / dropdown. h=40, arrow at x+w-22. */
