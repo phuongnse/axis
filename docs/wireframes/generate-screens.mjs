@@ -12,7 +12,7 @@
  *   app-shell (root)
  *   platform-foundation: register-org, register-org-complete, register-org-complete-states,
  *        register-org-states, register-org-provider-states,
- *        email-confirmation, verify-email, verify-email-states, workspace-provisioning,
+ *        email-confirmation, verify-email-states, workspace-provisioning,
  *        pricing, settings-org, settings-org-upload-states, settings-org-profile-states,
  *        settings-org-usage-error, settings-org-free-plan, settings-org-access-denied,
  *        settings-org-deletion-scheduled, settings-org-delete-modal, settings-org-delete-states
@@ -137,8 +137,6 @@ const SCREEN_USE_CASE_OVERRIDES = {
     'platform-foundation/register-org/email-confirmation.excalidraw',
   'platform-foundation/email-confirmation-states.excalidraw':
     'platform-foundation/register-org/email-confirmation-states.excalidraw',
-  'platform-foundation/verify-email.excalidraw':
-    'platform-foundation/register-org/verify-email.excalidraw',
   'platform-foundation/verify-email-states.excalidraw':
     'platform-foundation/register-org/verify-email-states.excalidraw',
   'platform-foundation/workspace-provisioning.excalidraw':
@@ -795,7 +793,7 @@ function measureVerifyEmailOutcomeCardH(body, { hasCta = false, accentLine = fal
 }
 
 /**
- * Paint verify-email outcome card (shared by happy path + error state panels).
+ * Paint verify-email outcome card (verify-email-states panels).
  * @param {{ variant: string, icon: string, title: string, body: string, cta?: { label: string, variant?: string, disabled?: boolean }, accentLine?: string, footer?: object }} opts
  */
 function paintVerifyEmailOutcomeCard(els, opts, wireAcc) {
@@ -846,36 +844,6 @@ function paintVerifyEmailOutcomeCard(els, opts, wireAcc) {
   if (footer) {
     els.push(...buildAuthCardFooter(prefix, cardX, cardY, cardW, cardH, footer));
   }
-}
-
-/**
- * Verify-Email — happy path after POST /api/auth/verify-email succeeds (brief, then redirect).
- */
-function genVerifyEmail() {
-  const cardW = AUTH_CARD_W;
-  const wireAcc = { files: {} };
-  const body = 'Your account is ready. Signing you in…';
-  const cardH = measureVerifyEmailOutcomeCardH(body);
-  const cardX = Math.round((W - cardW) / 2);
-  const cardY = Math.round((H - cardH) / 2);
-  const screenH = authScreenCanvasHeight(cardY, cardH, H);
-  const els = [];
-
-  els.push(rect('ve_bg', 0, 0, W, screenH, C.gray300, C.gray100, 1, false));
-  els.push(rect('ve_card', cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
-  paintVerifyEmailOutcomeCard(els, {
-    prefix: 've',
-    cardX,
-    cardY,
-    cardW,
-    cardH,
-    variant: 'success',
-    icon: '✓',
-    title: 'Email verified!',
-    body,
-  }, wireAcc);
-
-  write('platform-foundation/verify-email.excalidraw', els, wireAcc.files);
 }
 
 /**
@@ -2178,7 +2146,6 @@ runScreen('platform-foundation/register-org-states', genRegisterOrgStates);
 runScreen('platform-foundation/register-org-provider-states', genRegisterOrgProviderStates);
 runScreen('platform-foundation/email-confirmation', genEmailConfirmation);
 runScreen('platform-foundation/email-confirmation-states', genEmailConfirmationStates);
-runScreen('platform-foundation/verify-email', genVerifyEmail);
 runScreen('platform-foundation/verify-email-states', genVerifyEmailStates);
 runScreen('platform-foundation/workspace-provisioning', genWorkspaceProvisioning);
 runScreen('platform-foundation/pricing', genPricing);

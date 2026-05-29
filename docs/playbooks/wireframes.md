@@ -83,7 +83,7 @@ All generated wireframes must use deterministic seeds per screen (`setSeed(deter
 
 ### Auth outcome cards — `stateHeadline` (platform-foundation email flows)
 
-Use one layout for informational / error states (`email-confirmation`, `verify-email`, `verify-email-states` panels):
+Use one layout for informational / error states (`email-confirmation`, `verify-email-states` panels):
 
 - **Row:** semantic-colored icon + title (`stateHeadline` in `components.mjs`)
 - **Accent:** short underline (64px) in `semanticVariantBorder` — not a full-width bar or alert box

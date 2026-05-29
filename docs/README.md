@@ -187,7 +187,7 @@ Screen wireframes use Excalidraw (`.excalidraw` + `.svg`). Each use case lists i
 | Use case | Why open this |
 |----------|----------------|
 | [register-org § Wireframes](./use-cases/platform-foundation/register-org/README.md#wireframes) | Multi-screen happy path, error `*-states`, links to Mermaid diagrams |
-| [register-org § Wireframes](./use-cases/platform-foundation/register-org/README.md#wireframes) | Full journey incl. verify link + `workspace-provisioning` |
+| [register-org § Wireframes](./use-cases/platform-foundation/register-org/README.md#wireframes) | Registration journey; verify errors in `verify-email-states` only |
 
 Regenerate screen `.svg` after `.excalidraw` changes: `node docs/wireframes/generate-screens.mjs` and Kroki (see [wireframes.md](./playbooks/wireframes.md)).
 

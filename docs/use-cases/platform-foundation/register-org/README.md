@@ -117,8 +117,8 @@ Canonical order for this use case. **The wireframes table below uses the same ro
 | 2a | `register-org-complete` | **SSO only** — after OAuth; collect org name, slug, Terms (email read-only) |
 | 2b | `register-org` *(same screen as step 1)* | **Email/password** — submit on the entry form (skips 2a; no extra wireframe) |
 | 3 | `email-confirmation` | After org create succeeds (either branch) |
-| 4 | `verify-email` | User opens the inbox link — **one** centered card (success, then redirect to step 5) |
-| 5 | `workspace-provisioning` | After successful verify — poll until tenant ready, then workspace / dashboard |
+| — | *(no screen on success)* | User opens inbox link → `POST /api/auth/verify-email` → **200 redirects straight to step 4** (no success card) |
+| 4 | `workspace-provisioning` | After verify succeeds — poll until tenant ready, then workspace / dashboard |
 
 Step **2b** is a path, not a separate UI file — only **2a** adds `register-org-complete.excalidraw`. The wireframes table lists files; step **2b** is called out on the `register-org` row below.
 
@@ -130,7 +130,7 @@ Step **2b** is a path, not a separate UI file — only **2a** adds `register-org
 | `register-org-states` | Validation or 5xx on the entry form |
 | `register-org-complete-states` | Validation or Terms not accepted on completion form |
 | `email-confirmation-states` | Resend from confirmation screen: in-flight, success (204), rate limit (429) |
-| `verify-email-states` | Link-click errors: expired, already used, invalid, resend cap (429) — reference board (runtime shows one card) |
+| `verify-email-states` | Verify link **errors only** (expired, already used, invalid, 429) — reference board; runtime shows one card |
 
 ```mermaid
 %%{init: {'theme':'dark','themeVariables':{'background':'#0d1117','mainBkg':'#0d1117','primaryColor':'#161b22','primaryBorderColor':'#388bfd','primaryTextColor':'#e6edf3','secondaryColor':'#21262d','secondaryBorderColor':'#388bfd','secondaryTextColor':'#e6edf3','tertiaryColor':'#161b22','tertiaryTextColor':'#e6edf3','lineColor':'#58a6ff','textColor':'#e6edf3','nodeBorder':'#388bfd','clusterBkg':'#161b22','clusterBorder':'#388bfd','titleColor':'#e6edf3','edgeLabelBackground':'#161b22','actorBkg':'#161b22','actorBorder':'#388bfd','actorTextColor':'#e6edf3','signalColor':'#58a6ff','labelBoxBkgColor':'#161b22','labelBoxBorderColor':'#388bfd','noteBkgColor':'#161b22','noteBorderColor':'#388bfd','noteTextColor':'#c9d1d9','activationBkgColor':'#30363d'}}}%%
@@ -138,7 +138,6 @@ flowchart TD
   entry["1 · register-org"]
   complete["2a · register-org-complete"]
   confirm["3 · email-confirmation"]
-  verify["4 · verify-email"]
   errEntry["register-org-states"]
   errComplete["register-org-complete-states"]
   errProvider["register-org-provider-states"]
@@ -148,13 +147,13 @@ flowchart TD
   entry -->|"2b · submit (email/password)"| confirm
   entry -->|SSO| complete
   complete --> confirm
-  confirm -->|Open inbox link| verify
-  verify -->|Activated| provision["5 · workspace-provisioning"]
+  provision["4 · workspace-provisioning"]
+  confirm -->|Open link · verify 200| provision
   entry -.-> errEntry
   complete -.-> errComplete
   entry -.->|SSO error| errProvider
   confirm -.->|Resend email| errResend
-  verify -.->|Expired / invalid / 429| errVerify
+  confirm -.->|Verify failed| errVerify
 ```
 
 ## Legal links & footer links (UX)
@@ -175,17 +174,16 @@ Record **accepted ToS/Privacy version** on the account at org create (AC above);
 
 ## Wireframes
 
-Ten screens in this folder (five happy-path journey steps, five `*-states` reference boards). Table order follows [Screen flow](#screen-flow). **Runtime:** steps 1–5 each show **one** UI; `*-states` files are multi-panel specs for implementers (same pattern as `email-confirmation` + `email-confirmation-states`). Diagrams: [`register-org-journey`](#register-org-journey), [`register-org-cases`](#register-org-cases), [`tenant-provisioning`](#tenant-provisioning).
+Nine screens in this folder (four happy-path UI steps, five `*-states` reference boards). Table order follows [Screen flow](#screen-flow). **Verify on success:** no wireframe — redirect to `workspace-provisioning`. **Verify on error:** one card from `verify-email-states`. Diagrams: [`register-org-journey`](#register-org-journey), [`register-org-cases`](#register-org-cases), [`tenant-provisioning`](#tenant-provisioning).
 
 | # | Screen | Role | Excalidraw | Preview |
 |---|--------|------|------------|---------|
 | 1 · 2b | register-org | Happy path — entry (1); email/password submit (2b) | [source](./register-org.excalidraw) | [preview](./register-org.svg) |
 | 2a | register-org-complete | Happy path — post-OAuth completion | [source](./register-org-complete.excalidraw) | [preview](./register-org-complete.svg) |
 | 3 | email-confirmation | Happy path — after create (resend link idle) | [source](./email-confirmation.excalidraw) | [preview](./email-confirmation.svg) |
-| 4 | verify-email | Happy path — link verified, signing in | [source](./verify-email.excalidraw) | [preview](./verify-email.svg) |
-| 5 | workspace-provisioning | Happy path — poll provisioning status | [source](./workspace-provisioning.excalidraw) | [preview](./workspace-provisioning.svg) |
+| 4 | workspace-provisioning | Happy path — after verify API succeeds | [source](./workspace-provisioning.excalidraw) | [preview](./workspace-provisioning.svg) |
 | — | email-confirmation-states | Resend from step 3 — in-flight, 204, 429 | [source](./email-confirmation-states.excalidraw) | [preview](./email-confirmation-states.svg) |
-| — | verify-email-states | Step 4 errors — expired, used, invalid, 429 | [source](./verify-email-states.excalidraw) | [preview](./verify-email-states.svg) |
+| — | verify-email-states | Verify link errors — expired, used, invalid, 429 | [source](./verify-email-states.excalidraw) | [preview](./verify-email-states.svg) |
 | — | register-org-provider-states | Error — SSO before completion | [source](./register-org-provider-states.excalidraw) | [preview](./register-org-provider-states.svg) |
 | — | register-org-states | Error — entry form validation / 5xx | [source](./register-org-states.excalidraw) | [preview](./register-org-states.svg) |
 | — | register-org-complete-states | Error — completion form validation / Terms | [source](./register-org-complete-states.excalidraw) | [preview](./register-org-complete-states.svg) |
@@ -240,16 +238,19 @@ sequenceDiagram
   end
 
   rect rgb(22, 35, 58)
-    Note over Admin,API: 4 · verify-email
+    Note over Admin,API: Verify link (no success screen)
     Email-->>Web: Deep link with token
     Web->>API: POST /api/auth/verify-email
     API->>API: Activate user, org → Provisioning, publish events
-    API-->>Web: 200 OK
-    Web-->>Admin: Email verified (auto sign-in when Frontend ships)
+    API-->>Web: 200 OK → redirect (session cookie when Frontend ships)
+    alt Verify error
+      API-->>Web: Expired / used / invalid / 429
+      Web-->>Admin: verify-email-states (one card)
+    end
   end
 
   rect rgb(22, 35, 58)
-    Note over Admin,Web: 5 · Workspace or provisioning wait
+    Note over Admin,Web: 4 · workspace-provisioning
     alt Tenant ready
       Web-->>Admin: Workspace / dashboard
     else Schema still provisioning
@@ -264,7 +265,7 @@ sequenceDiagram
 
 ### tenant-provisioning
 
-Async multi-module tenant setup after `POST /api/auth/verify-email` (not a separate use case — same registration journey as `register-org-journey` step 5).
+Async multi-module tenant setup after `POST /api/auth/verify-email` (same registration journey as `register-org-journey` — after redirect to step 4).
 
 ```mermaid
 %%{init: {'theme':'dark','themeVariables':{'background':'#0d1117','mainBkg':'#0d1117','primaryColor':'#161b22','primaryBorderColor':'#388bfd','primaryTextColor':'#e6edf3','secondaryColor':'#21262d','secondaryBorderColor':'#388bfd','secondaryTextColor':'#e6edf3','tertiaryColor':'#161b22','tertiaryTextColor':'#e6edf3','lineColor':'#58a6ff','textColor':'#e6edf3','nodeBorder':'#388bfd','clusterBkg':'#161b22','clusterBorder':'#388bfd','titleColor':'#e6edf3','edgeLabelBackground':'#161b22','actorBkg':'#161b22','actorBorder':'#388bfd','actorTextColor':'#e6edf3','signalColor':'#58a6ff','labelBoxBkgColor':'#161b22','labelBoxBorderColor':'#388bfd','noteBkgColor':'#161b22','noteBorderColor':'#388bfd','noteTextColor':'#c9d1d9','activationBkgColor':'#30363d'}}}%%
@@ -350,7 +351,7 @@ sequenceDiagram
     Note over Admin,API: verify-email link outcomes
     Admin->>Web: Open verification link
     Web->>API: POST /api/auth/verify-email
-    API-->>Web: 200 → verify-email success panel
+    API-->>Web: 200 → redirect workspace-provisioning (no success card)
     API-->>Web: Expired token → Resend CTA
     API-->>Web: Already used → Sign in
     API-->>Web: Invalid / tampered → verify-email invalid panel
