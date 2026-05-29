@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" fill="none" role="img" aria-label="Axis concept: orbit axis">
+  <title>Axis  orbit axis</title>
+  <line x1="18" y1="7" x2="18" y2="29" stroke="#667A6E" stroke-opacity="0.55" stroke-linecap="round" stroke-width="1.1" />
+  <ellipse cx="18" cy="18" rx="11.5" ry="4.8" stroke="#C58B55" stroke-opacity="0.85" stroke-width="1.2" transform="rotate(-28 18 18)" />
+  <ellipse cx="18" cy="18" rx="11.5" ry="4.8" stroke="#5B9EC9" stroke-opacity="0.8" stroke-width="1.1" transform="rotate(38 18 18)" />
+  <ellipse cx="18" cy="18" rx="11.5" ry="4.8" stroke="#8A9E93" stroke-opacity="0.75" stroke-width="1" transform="rotate(98 18 18)" />
+  <circle cx="18" cy="18" r="2.2" fill="#D4A06A" stroke="#C58B55" stroke-width="0.45" />
+  <circle cx="18" cy="18" r="0.85" fill="#FFFCF8" />
+</svg>

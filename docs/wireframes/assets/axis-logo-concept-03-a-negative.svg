@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" fill="none" role="img" aria-label="Axis concept: negative space A">
+  <title>Axis  negative A</title>
+  <path stroke="#667A6E" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 27 18 9 25 27" />
+  <path stroke="#C58B55" stroke-linecap="round" stroke-width="1.35" d="M13.5 21.5h9" />
+  <circle cx="18" cy="11.5" r="2.4" fill="#D4A06A" stroke="#C58B55" stroke-width="0.45" />
+  <circle cx="12" cy="26" r="2" fill="#8A9E93" stroke="#667A6E" stroke-width="0.4" />
+  <circle cx="24" cy="26" r="2" fill="#72A8CC" stroke="#5B9EC9" stroke-width="0.4" />
+</svg>

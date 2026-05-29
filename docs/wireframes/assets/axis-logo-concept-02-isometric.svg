@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" fill="none" role="img" aria-label="Axis concept: isometric cube">
+  <title>Axis  isometric cube</title>
+  <!-- Top: amber | Left: sage | Right: blue -->
+  <path fill="#D4A06A" stroke="#C58B55" stroke-width="0.45" d="M18 8 27 13.5 18 19 9 13.5 18 8Z" />
+  <path fill="#8A9E93" stroke="#667A6E" stroke-width="0.45" d="M9 13.5 18 19v11L9 24.5V13.5Z" />
+  <path fill="#72A8CC" stroke="#5B9EC9" stroke-width="0.45" d="M18 19 27 13.5V24.5L18 30V19Z" />
+  <path stroke="#F4F3EF" stroke-linecap="round" stroke-width="0.9" stroke-opacity="0.9" d="M18 13.5v5.5M13.5 16.5 22.5 20.5" />
+</svg>
