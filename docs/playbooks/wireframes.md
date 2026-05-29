@@ -2,15 +2,15 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
 
-This playbook covers the wireframe generation system. **Architecture (blocks vs template vs catalog):** [`docs/wireframes/README.md`](../wireframes/README.md).
+This playbook covers the wireframe generation system. **Architecture:** [`docs/wireframes/README.md`](../wireframes/README.md).
 
 | Layer | File |
 |-------|------|
 | Primitives | `components.mjs` |
-| **Reusable blocks** | **`blocks.mjs`** ← screens compose from here first |
-| Kit sections | `generate-template.mjs` |
+| **Reusable blocks** | **`blocks.mjs`** ← auth / register-org; compose here first |
+| Kit sections | `generate-template.mjs` (S01–S37 builders, import-only) |
 | Screen outputs | `generate-screens.mjs` → `docs/use-cases/.../*.excalidraw` |
-| Catalog preview | `_template.excalidraw` (generated; regen when blocks/S-sections change) |
+| Shared shell | `docs/wireframes/app-shell.excalidraw` (+ `.svg`) |
 
 > **Required with every wireframe/diagram edit:** run
 > [`visual-artifact-checklist.md`](./visual-artifact-checklist.md)
@@ -24,22 +24,24 @@ This playbook covers the wireframe generation system. **Architecture (blocks vs 
 |---|---|
 | `docs/wireframes/components.mjs` | Primitives, colors, `component()` / `componentContent()` |
 | `docs/wireframes/blocks.mjs` | **Reusable blocks** (auth, SSO, fields) — screens import this first |
-| `docs/wireframes/generate-template.mjs` | Kit sections S01–S39; re-exports blocks; builds `_template` catalog |
-| `docs/wireframes/generate-screens.mjs` | Screen layout only — blocks + `component(buildXxx)` |
-| `docs/wireframes/_template.excalidraw` | Generated catalog (not hand-edited) |
+| `docs/wireframes/generate-template.mjs` | Kit section builders S01–S37 (tables, canvas, modals, …) |
+| `docs/wireframes/generate-screens.mjs` | Screen layout — `blocks.mjs` + `component(buildXxx)` |
 | `docs/wireframes/README.md` | Kit layers, workflow, block inventory |
+| `docs/wireframes/app-shell.excalidraw` | Shared app chrome (generated; commit with screens when shell changes) |
 | `docs/use-cases/{domain}/{use-case}/*.excalidraw` | Generated outputs of `generate-screens.mjs` — co-located with each use case |
 
 **Regeneration commands:**
 
 ```powershell
-# Regenerate the component kit
-node docs/wireframes/generate-template.mjs
-docs/scripts/generate-wireframes.ps1 -Filter _template
-
-# Regenerate all screen wireframes
+# Regenerate screen wireframes (run twice; git diff must be empty on second run)
+node docs/wireframes/generate-screens.mjs
 node docs/wireframes/generate-screens.mjs
 docs/scripts/generate-wireframes.ps1
+
+# One use-case folder only (optional)
+$env:SCREEN_FILTER = "register-org"
+node docs/wireframes/generate-screens.mjs
+docs/scripts/generate-wireframes.ps1 -Filter register-org
 ```
 
 ---
@@ -86,34 +88,24 @@ Shared spacing constants in `generate-screens.mjs`: `AUTH_CARD_PAD`, `AUTH_SHELL
 
 ### Import pattern
 
-**`generate-template.mjs`:**
-```js
-import { fileURLToPath } from 'url';
-import {
-  nextSeed, BASE,
-  rect, ellipse, text, hline, vline, arrow, sectionHeader,
-  C,
-  writeExcalidraw,
-} from './components.mjs';
-```
-
 **`generate-screens.mjs`:**
 ```js
 import {
   C, SB, HDR, CX, CY,
-  rect, ellipse, text, hline, vline, arrow,
-  btn, inputField, selectField, badge, searchBar, pageHeader,
-  appShell, component, translate, writeExcalidraw,
+  rect, text, appShell, component, writeExcalidraw,
 } from './components.mjs';
 
 import {
+  placeAuthExternalSignIn,
+  buildAuthCardHeader,
+  authFormField,
+  authCard,
+} from './blocks.mjs';
+
+import {
   buildWorkflowCanvas,
-  buildBuilderLayout,
-  buildExecutionTimeline,
-  buildModal,
-  buildSideSheet,
   buildTable,
-  // ...add more as needed
+  // ...kit sections as needed
 } from './generate-template.mjs';
 ```
 
@@ -204,7 +196,7 @@ Width auto-sized: `label.length × 8 + 32`. Height: **36px**. Text at `y+10`, 13
 
 ### `fieldLabel(prefix, x, y, label, { required?, color? })`
 
-Form label row (11px, default `C.gray500`). When `required: true`, appends a red `*` in `C.danger` after the label with a fixed `REQUIRED_MARKER_GAP` (10px) from `components.mjs` — same offset on every field. **Change the gap in `components.mjs` only**, then run `generate-template.mjs` before `generate-screens.mjs` so S04 `_template` and screens stay in sync. Use for every user-editable required field — including auth screens (`authCard`, `authFormField`) and S04 demos in `_template`.
+Form label row (11px, default `C.gray500`). When `required: true`, appends a red `*` in `C.danger` after the label with a fixed `REQUIRED_MARKER_GAP` (10px) from `components.mjs` — same offset on every field. **Change the gap in `components.mjs` only**, then regen affected screens. Use on every required field — including `authFormField` / `authCard` in `blocks.mjs`.
 
 ### `inputField(prefix, x, y, w, placeholder?)`
 
@@ -400,7 +392,7 @@ When writing or editing any wireframe generator, verify against these values (fr
 
 ---
 
-## Adding a section to the template (`generate-template.mjs`)
+## Adding a kit section (`generate-template.mjs`)
 
 ```js
 export function buildXxx(y0) {
@@ -420,23 +412,10 @@ export function buildXxx(y0) {
 - Element ID prefix: unique 3–6 char snake_case per section. Never reuse a prefix — Excalidraw silently deduplicates IDs.
 - Section number `N` in `sectionHeader(N, ...)` must match visual order. Renumber all subsequent sections when inserting in the middle.
 - Add `export` keyword — all builders must be exported so `generate-screens.mjs` can import them.
-- Add the builder to the compose array inside the `isMain` guard at the bottom, in grouped order with `// S{NN}` comments.
-- Update the TOC comment at the top of the file and the section count.
+- Update the TOC comment at the top of `generate-template.mjs` and the section count.
 - Update the "Current section inventory" table in this playbook.
 
----
-
-## `generate-template.mjs` isMain guard
-
-The compose + write block is wrapped so the file can be imported as a module without side effects:
-
-```js
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  // compose all sections and write _template.excalidraw
-}
-```
-
-This is what makes `import { buildWorkflowCanvas } from './generate-template.mjs'` safe in `generate-screens.mjs`.
+`generate-template.mjs` is **import-only** (no CLI, no `.excalidraw` output). Screens pull builders via `component(buildXxx, cx, cy)`.
 
 ---
 
@@ -444,7 +423,7 @@ This is what makes `import { buildWorkflowCanvas } from './generate-template.mjs
 
 | Domain path | Files |
 |---|---|
-| `docs/wireframes/` | `app-shell`, `_template` |
+| `docs/wireframes/` | `app-shell` only (shared kit artifact) |
 | `docs/use-cases/<domain>/<use-case>/` | use-case-local assets (`*.excalidraw`, `*.svg`) |
 
 ---
@@ -457,7 +436,7 @@ This is what makes `import { buildWorkflowCanvas } from './generate-template.mjs
 |---|---|
 | Foundations | S01–S03 |
 | Input & Forms | S04–S08 |
-| Auth blocks | S38 external sign-in, S39 auth fields/terms (`blocks.mjs`) |
+| Auth blocks | `blocks.mjs` (not numbered kit sections) |
 | Data Display | S09–S14 |
 | Navigation & Layout | S15–S18 |
 | Feedback & Overlays | S19–S24 |

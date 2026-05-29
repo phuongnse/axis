@@ -1,8 +1,9 @@
 /**
- * Axis UI Component Kit — _template.excalidraw
- * Run: node docs/wireframes/generate-template.mjs
+ * Axis UI kit section builders (S01–S37).
+ * Import-only module — screens compose via component(buildXxx, x, y) in generate-screens.mjs.
+ * Auth / register-org blocks: blocks.mjs.
  *
- * TOC — 39 sections
+ * TOC — 37 sections
  * ─── Foundations ─────────────────── S01 Color Palette
  *                                     S02 Typography
  *                                     S03 Buttons
@@ -40,39 +41,14 @@
  *                                     S35 Dashboard & Analytics Stats
  *                                     S36 Advanced Filters / Query Builder
  *                                     S37 Dual Listbox / Transfer List
- * ─── Auth (registration) ─────────── S38 External sign-in
- *                                     S39 Auth blocks (fields, terms)
+ * Auth blocks (SSO, fields, terms): blocks.mjs — not kit sections here.
  */
 
-import { fileURLToPath } from 'url';
 import {
   nextSeed, BASE,
   rect, ellipse, text, hline, vline, arrow, sectionHeader,
   C, fieldLabel, REQUIRED_MARKER_GAP,
-  writeExcalidraw,
 } from './components.mjs';
-
-import {
-  buildAuthExternalSignInBlock,
-  buildAuthBlocksCatalog,
-} from './blocks.mjs';
-
-// Re-export for screens that already import from this file.
-export {
-  AUTH_CARD_W,
-  AUTH_INNER_W,
-  AUTH_EXTERNAL_SIGN_IN_BLOCK_H,
-  buildAuthExternalSignInBlock,
-  placeAuthExternalSignIn,
-  buildAuthCardHeader,
-  buildAuthCardFooter,
-  buildAuthSubmitButton,
-  authFormField,
-  authReadOnlyValueField,
-  authSlugPreviewField,
-  authTermsRow,
-  authCard,
-} from './blocks.mjs';
 
 // ─── Section builders ─────────────────────────────────────────────────────────
 
@@ -1830,20 +1806,6 @@ export function buildDualListbox(y0) {
   return els;
 }
 
-/** S38 — external sign-in block (screens use blocks.mjs via placeAuthExternalSignIn). */
-export function buildAuthExternalSignIn(y0) {
-  const els = [...sectionHeader(38, 'External sign-in', y0)];
-  els.push(...buildAuthExternalSignInBlock(y0 + 48));
-  return els;
-}
-
-/** S39 — auth field / terms blocks reused on register-org and auth cards. */
-export function buildAuthBlocks(y0) {
-  const els = [...sectionHeader(39, 'Auth blocks', y0)];
-  els.push(...buildAuthBlocksCatalog(y0));
-  return els;
-}
-
 export function buildColorIconPicker(y0) {
   const els = [...sectionHeader(29, 'Color & Icon Picker', y0)];
   const yC = y0 + 68;
@@ -1898,78 +1860,3 @@ export function buildColorIconPicker(y0) {
   return els;
 }
 
-// ─── Compose all sections (auto-stacking) ────────────────────────────────────
-
-function sectionBottom(els) {
-  return Math.max(...els.map(e => {
-    if (e.type === 'line') {
-      const pts = e.points || [[0, 0]];
-      return e.y + Math.max(...pts.map(p => p[1]));
-    }
-    return e.y + (e.height || 0);
-  }));
-}
-
-// ─── Run if executed directly ─────────────────────────────────────────────────
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const GAP = 60;
-  const allElements = [];
-  let currentY = 30;
-
-  for (const builder of [
-    // ── Foundations ───────────────────────────────────────────────────────────
-    buildColorPalette,           // S01
-    buildTypography,             // S02
-    buildButtons,                // S03
-    // ── Input & Forms ─────────────────────────────────────────────────────────
-    buildFormControls,           // S04
-    buildDateTimePicker,         // S05
-    buildFileUpload,             // S06
-    buildRichTextEditor,         // S07
-    buildCodeEditor,             // S08
-    // ── Data Display ──────────────────────────────────────────────────────────
-    buildBadges,                 // S09
-    buildTable,                  // S10
-    buildEditableTable,          // S11
-    buildCards,                  // S12
-    buildEmptyStates,            // S13
-    buildSkeletonLoaders,        // S14
-    // ── Navigation & Layout ───────────────────────────────────────────────────
-    buildNavigation,             // S15
-    buildSidebarNav,             // S16
-    buildTabs,                   // S17
-    buildAppShell,               // S18
-    // ── Feedback & Overlays ───────────────────────────────────────────────────
-    buildFeedback,               // S19
-    buildModal,                  // S20
-    buildSideSheet,              // S21
-    buildCommandPalette,         // S22
-    buildNotifications,          // S23
-    buildTooltipPopover,         // S24
-    // ── Interaction Patterns ──────────────────────────────────────────────────
-    buildDropdownContextMenu,    // S25
-    buildDragDrop,               // S26
-    buildUtilities,              // S27
-    buildPermissionMatrix,       // S28
-    buildColorIconPicker,        // S29
-    // ── Axis App Patterns ─────────────────────────────────────────────────────
-    buildWorkflowCanvas,         // S30
-    buildBuilderLayout,          // S31
-    buildExecutionTimeline,      // S32
-    buildFieldTypePicker,        // S33
-    buildRelationLookup,         // S34
-    buildStatsCards,             // S35
-    buildAdvancedFilters,        // S36
-    buildDualListbox,            // S37
-    buildAuthExternalSignIn,     // S38
-    buildAuthBlocks,             // S39
-  ]) {
-    const els = builder(currentY);
-    allElements.push(...els);
-    currentY = sectionBottom(els) + GAP;
-  }
-
-  const elements = allElements;
-  writeExcalidraw(fileURLToPath(new URL('./_template.excalidraw', import.meta.url)), elements);
-  console.log(`✓ Generated _template.excalidraw — ${elements.length} elements`);
-}

@@ -2,8 +2,7 @@
  * Axis Wireframes — Reusable blocks (single source for screen composition).
  *
  * Screens import blocks here — not hand-drawn duplicates in generate-screens.mjs.
- * Primitives: components.mjs. Large kit sections (tables, canvas): generate-template.mjs.
- * _template.excalidraw: optional catalog preview; regen when blocks or S-sections change.
+ * Primitives: components.mjs. Large kit sections (tables, canvas): generate-template.mjs (S01–S37).
  */
 
 import {
@@ -271,20 +270,3 @@ export function paintRegisterOrgCompleteFields(els, idPrefix, cardX, y, cardW, {
   return fy;
 }
 
-/** Kit catalog slice: external sign-in + sample field + terms (S39). Authored at x=50. */
-export function buildAuthBlocksCatalog(y0) {
-  const yC = y0 + 48;
-  const cardW = AUTH_CARD_W;
-  const els = [
-    ...buildAuthExternalSignInBlock(yC),
-  ];
-  let y = yC + AUTH_EXTERNAL_SIGN_IN_BLOCK_H + 16;
-  const cardX = 50;
-  const { els: fe, blockH: fh } = authFormField('blk_nm', cardX, y, cardW, 'Organization name', 'Acme Corp', null, true);
-  els.push(...fe);
-  y += fh;
-  const { els: te, blockH: th } = authTermsRow('blk_terms', cardX, y, cardW, { checked: true });
-  els.push(...te);
-  y += th;
-  return els;
-}

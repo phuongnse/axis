@@ -70,7 +70,7 @@ All diagrams are Excalidraw (`.excalidraw` source + `.svg` preview). Regenerate 
 
 ## Wireframes
 
-Excalidraw wireframes/diagrams live alongside each use case in `docs/use-cases/{domain}/{short-slug}/`. Shared kit screens (template, app-shell) remain in `docs/wireframes/`. Each use case uses a `## Wireframes` + `## Diagrams` table (see [use-case template](./use-cases/USE_CASE_TEMPLATE.md)).
+Excalidraw wireframes/diagrams live alongside each use case in `docs/use-cases/{domain}/{short-slug}/`. Shared app shell only: `docs/wireframes/app-shell`. Kit source is `.mjs` (`blocks.mjs`, `generate-template.mjs`). Each use case uses a `## Wireframes` + `## Diagrams` table (see [use-case template](./use-cases/USE_CASE_TEMPLATE.md)).
 
 | Screen | Source | Preview |
 |---|---|---|

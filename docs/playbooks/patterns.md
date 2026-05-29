@@ -1909,11 +1909,12 @@ npm run test    # vitest run — all tests must pass
 
 Wireframes use Excalidraw (`.excalidraw` JSON). Both files — source and SVG preview — are committed.
 
-**File location:** assets sit **flat** inside each use-case folder. The shared kit (`app-shell`, `_template`) stays under top-level `docs/wireframes/`.
+**File location:** assets sit **flat** inside each use-case folder. Shared app shell (`app-shell`) stays under top-level `docs/wireframes/`; kit geometry is `.mjs` source in the same folder.
 
 ```
 docs/
-├── wireframes/                          ← shared kit (app-shell, _template)
+├── wireframes/                          ← kit source (.mjs) + shared app-shell
+│   ├── components.mjs, blocks.mjs, generate-template.mjs, generate-screens.mjs
 │   ├── app-shell.excalidraw
 │   └── app-shell.svg
 └── use-cases/
