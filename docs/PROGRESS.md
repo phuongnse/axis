@@ -89,7 +89,7 @@ Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoi
 
 ## Page Builder (`page-builder`)
 
-**⏳ Not started** — in full product scope; see [page-builder use cases](./use-cases/page-builder/README.md).
+**⏳ Not started** — see [page-builder use cases](./use-cases/page-builder/README.md).
 
 ---
 

@@ -57,7 +57,7 @@ Axis provides a unified platform where non-technical users can:
 
 ## Production platform scope
 
-Axis targets **production readiness** across all product domains. There is no separate "MVP" or "Phase 2" product cut — every capability listed in use-case specs is in scope. Capabilities a use case has not built yet are tracked as gaps in its `> **Implementation status**` callout (or listed under its `*Out of scope*` AC group), not cut from the product.
+Use-case specs are the product contract. Work not shipped yet is listed in each file's `> **Implementation status**` callout or `*Out of scope*` acceptance criteria.
 
 **Core user journey:**
 

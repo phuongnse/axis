@@ -11,7 +11,7 @@
   - [Per use case workflow](#per-use-case-workflow)
 - [Frontend Process](#frontend-process)
   - [Phase 1 — Foundation](#phase-1--foundation-one-time)
-  - [Phase 2 — Per-feature workflow](#phase-2--per-feature-workflow)
+  - [Per-feature workflow](#per-feature-workflow)
 
 ---
 
@@ -128,7 +128,7 @@ Complete in order before building any feature screen. Do not skip or reorder.
 | 3 | **Global 401 handling** — `fetchApi` 401 branch navigates to `/login` and calls `queryClient.clear()` | Any expired-session API call redirects without per-feature handling |
 | 4 | **App shell** — root authenticated layout with sidebar + header; all protected routes render as `<Outlet />` inside it | Every protected page inherits sidebar + header automatically |
 
-### Phase 2 — Per-feature workflow
+### Per-feature workflow
 
 Repeat for every screen / feature area. **Never skip the wireframe step** — it is part of the US, not a pre-task.
 

@@ -1144,10 +1144,10 @@ Grafana UI: `http://localhost:3001`. OTLP endpoint for host-run API: `http://loc
 
 ### Rules
 
-- Do **not** register OpenTelemetry in individual module Infrastructure projects while the modulith hosts all modules — one `AddAxisOpenTelemetry` on `Axis.Api` (or each extracted module's entrypoint when Phase 2 lands).
+- Do **not** register OpenTelemetry in individual module Infrastructure projects while the modulith hosts all modules — one `AddAxisOpenTelemetry` on `Axis.Api` (or each extracted module's entrypoint when that module is deployed standalone).
 - Disable telemetry in integration tests via `OpenTelemetry:DisableInTesting` (default `true`) — no Testcontainers for Tempo required.
 - Skip instrumentation for `/health`, `/metrics`, and `/swagger` paths (configured in `OpenTelemetryServiceExtensions`).
-- **Deferred (Phase 2):** propagate trace context through Wolverine envelope headers and gRPC interceptors for cross-process module calls ([ADR-018](../TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability)).
+- **Deferred follow-up:** propagate trace context through Wolverine envelope headers and gRPC interceptors for cross-process module calls ([ADR-018](../TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability)).
 
 ---
 

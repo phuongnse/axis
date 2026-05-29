@@ -401,10 +401,10 @@
 
 **Decision:** Support **Microsoft** (Entra ID / Microsoft account), **Google**, and **GitHub** as external sign-in providers alongside email/password. They are wired into the OpenIddict server (ADR-004) via the ASP.NET Core external-authentication handlers; OpenIddict remains the only token issuer — external providers authenticate the user, Axis still mints its own access/refresh tokens.
 
-**Reason:** Production scope requires low-friction sign-up and sign-in. Organizations expect to onboard with the corporate or developer identity they already have, and password-only auth raises abandonment at registration. Routing all three through OpenIddict keeps a single token format, a single JWKS, and one RBAC mapping regardless of how the user authenticated.
+**Reason:** Low-friction sign-up and sign-in are required for onboarding. Organizations expect to onboard with the corporate or developer identity they already have, and password-only auth raises abandonment at registration. Routing all three through OpenIddict keeps a single token format, a single JWKS, and one RBAC mapping regardless of how the user authenticated.
 
 **Configuration:** per-provider `client_id` / `client_secret` stored in HashiCorp Vault in production ([ADR-022](#adr-022-secrets-management-via-hashicorp-vault-in-production)) and `.env` in development. Redirect URIs are registered per environment. A provider can be disabled per deployment without code changes.
 
 **Registration:** an external sign-in either creates a new organization (the register-org flow) or signs into an existing one. Accounts are linked to an existing Axis user by **verified email** — a provider login whose email matches a verified local account attaches to it rather than creating a duplicate.
 
-**Rejected:** full enterprise SSO federation (SAML, SCIM provisioning, per-tenant IdP) is deferred — it is a separate initiative driven by enterprise-tenant demand, not part of the baseline production scope.
+**Rejected:** full enterprise SSO federation (SAML, SCIM provisioning, per-tenant IdP) is deferred — it is a separate initiative driven by enterprise-tenant demand, not part of the baseline product scope in use-case specs.

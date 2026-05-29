@@ -44,8 +44,6 @@ When you ship code, update **use-case callout → domain README → PROGRESS** i
 | [workflow-engine](./workflow-engine/README.md) | Execution, handlers, errors, history, retry |
 | [page-builder](./page-builder/README.md) | Pages, widgets, drag & drop, data binding |
 
-All domains are in the production scope ([PRODUCT_VISION § Production platform scope](../PRODUCT_VISION.md#production-platform-scope)). Capabilities a use case does not ship are tracked under its `*Out of scope*` AC group and `> **Implementation status**` callout — backlog within the same scope, not a separate phase cut.
-
 ---
 
 ## Platform core loop
