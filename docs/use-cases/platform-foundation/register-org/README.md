@@ -84,16 +84,52 @@ Self-service registration flow where a new organization signs up and is automati
 > - BCrypt work factor 12. 4 default system roles seeded atomically in the same transaction.
 > - **External providers:** industry-standard **post-OAuth completion** — IdPs supply identity only (email + display name); organization name is always collected on `register-org-complete` before the org is created. Short-lived server session holds the external login between OAuth callback and completion submit.
 
+## Screen flow
+
+Canonical order for this use case. **The wireframes table below uses the same row order** — read top to bottom when reviewing assets.
+
+| Step | Screen | When |
+|------|--------|------|
+| 1 | `register-org` | Entry: Microsoft / Google / GitHub **or** email/password form |
+| 2a | `register-org-complete` | **SSO only** — after OAuth; collect org name, slug, Terms (email read-only) |
+| 2b | *(same as step 1)* | **Email/password** — submit on `register-org` (skip step 2a) |
+| 3 | `email-confirmation` | After org create succeeds (either branch) |
+
+**Error / reference screens** (not sequential steps — open when implementing that AC group):
+
+| Screen | When |
+|--------|------|
+| `register-org-provider-states` | SSO rejected before completion (duplicate email, no verified email) |
+| `register-org-states` | Validation or 5xx on the entry form |
+| `register-org-complete-states` | Validation or Terms not accepted on completion form |
+
+```mermaid
+flowchart TD
+  entry["1 · register-org"]
+  complete["2a · register-org-complete"]
+  confirm["3 · email-confirmation"]
+  errEntry["register-org-states"]
+  errComplete["register-org-complete-states"]
+  errProvider["register-org-provider-states"]
+
+  entry -->|email / password| confirm
+  entry -->|SSO| complete
+  complete --> confirm
+  entry -.-> errEntry
+  complete -.-> errComplete
+  entry -.->|SSO error| errProvider
+```
+
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | register-org | [source](./register-org.excalidraw) | [preview](./register-org.svg) |
 | register-org-complete | [source](./register-org-complete.excalidraw) | [preview](./register-org-complete.svg) |
-| register-org-complete-states | [source](./register-org-complete-states.excalidraw) | [preview](./register-org-complete-states.svg) |
-| register-org-states | [source](./register-org-states.excalidraw) | [preview](./register-org-states.svg) |
-| register-org-provider-states | [source](./register-org-provider-states.excalidraw) | [preview](./register-org-provider-states.svg) |
 | email-confirmation | [source](./email-confirmation.excalidraw) | [preview](./email-confirmation.svg) |
+| register-org-provider-states | [source](./register-org-provider-states.excalidraw) | [preview](./register-org-provider-states.svg) |
+| register-org-states | [source](./register-org-states.excalidraw) | [preview](./register-org-states.svg) |
+| register-org-complete-states | [source](./register-org-complete-states.excalidraw) | [preview](./register-org-complete-states.svg) |
 
 ## Diagrams
 

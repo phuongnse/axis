@@ -60,6 +60,7 @@ Every `docs/use-cases/<domain>/<short-slug>/README.md` file uses these layouts s
 - Reference **shared kit screens** (e.g. `app-shell`, `_template`) from `../../../wireframes/` — do not copy duplicates.
 - Use `N/A` rows when no wireframe applies.
 - One table per `README.md` — no blockquote wireframe stacks.
+- When a use case has **more than three screens** (including error/reference variants), add a **`## Screen flow`** section **above** `## Wireframes`: numbered happy-path steps, a short table for error/reference screens, and an optional mermaid diagram. **Row order in `## Wireframes` must match** happy path first, then error screens in the order listed in Screen flow.
 
 ### Implementation status (after each US AC block)
 
