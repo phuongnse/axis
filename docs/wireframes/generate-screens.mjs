@@ -34,7 +34,7 @@ import {
   rect, ellipse, text, hline, vline, arrow,
   btn, inputField, selectField, badge, searchBar, pageHeader, fieldLabel,
   appShell, component, translate, writeExcalidraw, setSeed,
-  stateHeadline, semanticVariantColor,
+  stateHeadline, semanticVariantColor, wrappedTextBlock,
 } from './components.mjs';
 
 import {
@@ -545,37 +545,46 @@ function genRegisterOrgProviderStates() {
  */
 function genEmailConfirmation() {
   const cardW = AUTH_CARD_W;
-  const cardH = 268;
   const cardX = Math.round((W - cardW) / 2);
+  const ecInnerW = cardW - AUTH_CARD_PAD_X * 2;
+  const ecX = cardX + AUTH_CARD_PAD_X;
+  const ecHeadY = 68;
+  const ecBodyY = ecHeadY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
+  const bodyCopy =
+    'If an account exists for this email, you will receive a verification link shortly.';
+  const body1Size = wrappedTextBlock('ec_body1', 0, 0, ecInnerW, bodyCopy, 13, C.gray700, 0.78);
+  const body2Size = wrappedTextBlock('ec_body2', 0, 0, ecInnerW, 'Check your inbox.', 13, C.gray700, 0.78);
+  const resendY = ecBodyY + body1Size.blockH + 8 + body2Size.blockH + 14;
+  const cardH = resendY + 24 + AUTH_CARD_FOOTER_ZONE;
   const cardY = Math.round((H - cardH) / 2);
-  const els   = [];
+  const screenH = authScreenCanvasHeight(cardY, cardH, H);
+  const els = [];
 
-  els.push(rect('ec_bg',   0,     0,     W,     H,     C.gray300, C.gray100, 1, false));
-  els.push(rect('ec_card', cardX, cardY, cardW, cardH, C.gray300, C.white,   2, true));
+  els.push(rect('ec_bg', 0, 0, W, screenH, C.gray300, C.gray100, 1, false));
+  els.push(rect('ec_card', cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
 
   const ecBrand = buildAuthCardBrandBar('ec', cardX, cardY, cardW);
   els.push(...ecBrand.els);
   const wireFiles = ecBrand.files;
 
-  const ecInnerW = cardW - AUTH_CARD_PAD_X * 2;
-  const ecX = cardX + AUTH_CARD_PAD_X;
-  const ecHeadY = cardY + 68;
-  els.push(...stateHeadline('ec', ecX, ecHeadY, ecInnerW, '✉', 'info', 'Check your email', 16));
-  const ecBodyY = ecHeadY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
-  const bodyLineH = 18;
-  els.push(text('ec_body1', ecX, ecBodyY, ecInnerW, bodyLineH,
-    'If an account exists for this email, you will receive a verification link shortly.',
-    13, C.gray700));
-  els.push(text('ec_body2', ecX, ecBodyY + bodyLineH + 4, ecInnerW, bodyLineH,
+  els.push(...stateHeadline('ec', ecX, cardY + ecHeadY, ecInnerW, '✉', 'info', 'Check your email', 16));
+  const body1 = wrappedTextBlock('ec_body1', ecX, cardY + ecBodyY, ecInnerW, bodyCopy, 13, C.gray700, 0.78);
+  els.push(...body1.els);
+  const body2 = wrappedTextBlock(
+    'ec_body2',
+    ecX,
+    cardY + ecBodyY + body1.blockH + 8,
+    ecInnerW,
     'Check your inbox.',
-    13, C.gray700));
-
-  const resendY = ecBodyY + bodyLineH * 2 + 16;
-  els.push(...buildAuthCardCenteredInlineRow('ec_resend', cardX, cardW, resendY, [
+    13,
+    C.gray700,
+    0.78,
+  );
+  els.push(...body2.els);
+  els.push(...buildAuthCardCenteredInlineRow('ec_resend', cardX, cardW, cardY + resendY, [
     { text: "Didn't receive it?", color: C.gray700 },
     { text: 'Resend email →', color: C.primary, link: true },
   ]));
-
   els.push(...buildAuthCardBackFooter('ec', cardX, cardY, cardW, cardH, 'Back to sign in'));
 
   write('platform-foundation/email-confirmation.excalidraw', els, wireFiles);

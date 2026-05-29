@@ -10,10 +10,12 @@ import {
   rect,
   text,
   hline,
+  arrow,
   fieldLabelBlock,
   inputField,
   inlineTextRow,
   inlineTextRowWidth,
+  labelTextWidth,
   isPasswordLabel,
   PASSWORD_INPUT_PAD_RIGHT,
   passwordRevealToggle,
@@ -184,18 +186,26 @@ export function buildAuthCardCenteredInlineRow(prefix, cardX, cardW, y, segments
   return els;
 }
 
-/** Footer back navigation — left-aligned primary link with ← icon. */
+/**
+ * Footer back control — centered row: chevron icon + underlined link (icon is not part of the label text).
+ */
 export function buildAuthCardBackFooter(prefix, cardX, cardY, cardW, cardH, linkLabel) {
   const footerY = cardY + cardH - 32;
   const lineY = footerY + 10;
   const lineH = 16;
   const fontSize = 12;
-  const label = linkLabel.startsWith('←') ? linkLabel : `← ${linkLabel}`;
+  const label = linkLabel.replace(/^←\s*/, '').trim();
+  const iconSlot = 14;
+  const iconGap = 6;
+  const textW = Math.ceil(labelTextWidth(label, fontSize) + 8);
+  const totalW = iconSlot + iconGap + textW;
+  const startX = cardX + Math.round((cardW - totalW) / 2);
+  const textX = startX + iconSlot + iconGap;
   const segments = [{ text: label, color: C.primary, link: true }];
-  const startX = cardX + AUTH_CARD_PAD_X;
-  const { els: rowEls } = inlineTextRow(`${prefix}_footer`, startX, lineY, lineH, fontSize, segments);
+  const { els: rowEls } = inlineTextRow(`${prefix}_footer`, textX, lineY, lineH, fontSize, segments);
   return [
     hline(`${prefix}_fdiv`, cardX, footerY, cardW, C.gray300),
+    arrow(`${prefix}_back_ic`, startX + 10, lineY + 5, -8, 0, C.primary, 1.5),
     ...rowEls,
   ];
 }

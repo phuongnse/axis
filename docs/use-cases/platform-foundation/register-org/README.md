@@ -130,7 +130,7 @@ Documented for wireframes and future frontend; **not implemented** in the app ye
 | **Terms of Service** / **Privacy Policy** | Primary inline links with **underline** in the agree sentence | Open the legal document in a **new browser tab** (public URLs TBD, e.g. `/legal/terms`, `/legal/privacy`). Does not submit the form or clear fields. |
 | Card footer (e.g. **Sign in**) | `buildAuthCardFooter` — gray lead-in + underlined **primary link** | Navigates to the target auth route (e.g. sign-in page). Same link styling as Terms/Privacy. |
 | **Resend email** (`email-confirmation`) | `buildAuthCardCenteredInlineRow` — gray lead-in + underlined **Resend email →** | Triggers resend verification (rate-limited; see verify-email-rate-limit). |
-| **Back** (`email-confirmation`) | `buildAuthCardBackFooter` — **←** icon + underlined link, **left-aligned** in footer | Returns to sign-in. |
+| **Back** (`email-confirmation`) | `buildAuthCardBackFooter` — chevron **icon** + underlined **Back to sign in**, **centered** as one control | Returns to sign-in. |
 
 Record **accepted ToS/Privacy version** on the account at org create (AC above); legal page content and versioning are out of scope for this wireframe pass.
 
