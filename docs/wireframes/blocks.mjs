@@ -29,8 +29,10 @@ export {
 export const AUTH_CARD_W = 440;
 export const AUTH_CARD_PAD_X = 24;
 export const AUTH_INNER_W = AUTH_CARD_W - AUTH_CARD_PAD_X * 2;
-export const AUTH_PROVIDER_BTN_SIZE = 44;
-export const AUTH_PROVIDER_GAP = 20;
+/** External IdP buttons (Microsoft / Google / GitHub). */
+export const AUTH_PROVIDER_BTN_SIZE = 36;
+export const AUTH_PROVIDER_GAP = 16;
+export const AUTH_PROVIDER_ICON_FONT = 15;
 /** Icon row + gap + “or” divider — use after placeAuthExternalSignIn(). */
 export const AUTH_EXTERNAL_SIGN_IN_BLOCK_H = AUTH_PROVIDER_BTN_SIZE + 12 + 28;
 /** Space below each auth field before the next control. */
@@ -90,10 +92,13 @@ export function buildAuthExternalSignInBlock(yC) {
   ];
   const els = [];
 
+  const iconFont = AUTH_PROVIDER_ICON_FONT;
+  const iconY = yC + Math.round((btnSize - iconFont) / 2) - 1;
+
   providers.forEach(([id, icon, stroke, bg], i) => {
     const bx = startX + i * (btnSize + gap);
     els.push(rect(id, bx, yC, btnSize, btnSize, stroke, bg, 1, true));
-    els.push(text(`${id}_ic`, bx, yC + 11, btnSize, 22, icon, 18, stroke, 'center'));
+    els.push(text(`${id}_ic`, bx, iconY, btnSize, iconFont + 4, icon, iconFont, stroke, 'center'));
   });
 
   const yOr = yC + btnSize + 12;
