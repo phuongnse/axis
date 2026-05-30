@@ -69,8 +69,3 @@ A resource-based permission system where each permission grants the ability to p
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

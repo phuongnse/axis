@@ -64,8 +64,3 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

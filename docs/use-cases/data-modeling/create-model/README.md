@@ -71,6 +71,40 @@ Users can create custom data models within their organization. A model defines t
 
 ## Diagrams
 
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| data-model | [source](./data-model.excalidraw) | [preview](./data-model.svg) |
+### data-model
+
+```mermaid
+%%{init: {'theme':'dark','themeVariables':{'background':'#0d1117','mainBkg':'#0d1117','primaryColor':'#161b22','primaryBorderColor':'#388bfd','primaryTextColor':'#e6edf3','secondaryColor':'#21262d','secondaryBorderColor':'#388bfd','secondaryTextColor':'#e6edf3','tertiaryColor':'#161b22','tertiaryTextColor':'#e6edf3','lineColor':'#58a6ff','textColor':'#e6edf3','nodeBorder':'#388bfd','clusterBkg':'#161b22','clusterBorder':'#388bfd','titleColor':'#e6edf3','edgeLabelBackground':'#161b22','actorBkg':'#161b22','actorBorder':'#388bfd','actorTextColor':'#e6edf3','signalColor':'#58a6ff','labelBoxBkgColor':'#161b22','labelBoxBorderColor':'#388bfd','noteBkgColor':'#161b22','noteBorderColor':'#388bfd','noteTextColor':'#c9d1d9','activationBkgColor':'#30363d'}}}%%
+erDiagram
+  ModelDefinition ||--o{ FieldDefinition : owns
+  FieldDefinition }o--|| FieldType : has
+  DataClassDefinition ||--o{ FieldDefinition : reuses
+  FieldDefinition }o..o| DataClassDefinition : "DataClass ref"
+  ModelDefinition ||--o{ DataRecord : instances
+
+  ModelDefinition {
+    uuid id
+    string name
+    string slug
+    string description
+  }
+  FieldDefinition {
+    uuid id
+    uuid modelId
+    string name
+    FieldType type
+    jsonb config
+  }
+  FieldType {
+    enum values
+  }
+  DataRecord {
+    uuid id
+    uuid modelId
+    jsonb data
+  }
+  DataClassDefinition {
+    uuid id
+    string name
+  }
+```

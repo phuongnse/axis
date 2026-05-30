@@ -68,8 +68,3 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

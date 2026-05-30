@@ -58,6 +58,7 @@ Canonical order for this use case. **The wireframes table below uses the same ro
 | `<screen>-states` | … |
 
 ```mermaid
+%%{init: {'theme':'dark','themeVariables':{'background':'#0d1117','mainBkg':'#0d1117','primaryColor':'#161b22','primaryBorderColor':'#388bfd','primaryTextColor':'#e6edf3','secondaryColor':'#21262d','secondaryBorderColor':'#388bfd','secondaryTextColor':'#e6edf3','tertiaryColor':'#161b22','tertiaryTextColor':'#e6edf3','lineColor':'#58a6ff','textColor':'#e6edf3','nodeBorder':'#388bfd','clusterBkg':'#161b22','clusterBorder':'#388bfd','titleColor':'#e6edf3','edgeLabelBackground':'#161b22','actorBkg':'#161b22','actorBorder':'#388bfd','actorTextColor':'#e6edf3','signalColor':'#58a6ff','labelBoxBkgColor':'#161b22','labelBoxBorderColor':'#388bfd','noteBkgColor':'#161b22','noteBorderColor':'#388bfd','noteTextColor':'#c9d1d9','activationBkgColor':'#30363d'}}}%%
 flowchart TD
   step1["1 · <screen-slug>"]
   step1 --> step3["3 · <screen-slug>"]
@@ -88,15 +89,20 @@ Assets live **flat** inside this use-case folder. Reference shared kit screens f
 
 ## Diagrams
 
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| `<diagram-slug>` | `/<diagram-slug>.excalidraw` | `/<diagram-slug>.svg` |
+Mermaid blocks in this README (sequence, flowchart, or `erDiagram`). One `### <diagram-slug>` heading per diagram. Multi-screen journeys: prefer **one** `<slug>-journey` sequence + **optional** `<slug>-cases` for error wireframes ([docs-style § Diagrams](../playbooks/docs-style.md#diagrams-content-rules)).
 
-Use real markdown links in implemented use cases (see [register-org § Diagrams](./platform-foundation/register-org/README.md#diagrams)).
+```markdown
+### `<slug>-journey`
 
-**Related (next use case):** optional — short link to the next use case / diagram in prose. See [register-org § Diagrams](./platform-foundation/register-org/README.md#diagrams).
+\`\`\`mermaid
+sequenceDiagram
+  ...
+\`\`\`
+```
 
-Use `| N/A | N/A | N/A |` when this use case has no diagram in its folder.
+See [register-org § Diagrams](./platform-foundation/register-org/README.md#diagrams). **Related (next use case):** optional prose link after the diagrams — do not duplicate another use case’s diagram here.
+
+Omit this section (or note “N/A”) when the use case has no local diagram.
 
 > **Implementation status**
 >

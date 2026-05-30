@@ -24,6 +24,51 @@ When you touch `docs/wireframes/**` or use-case `*.excalidraw`:
 
 **Reference screen:** [register-org](../use-cases/platform-foundation/register-org/README.md) (full block kit usage).
 
+**Multi-screen journeys:** [Multi-screen journey pattern](#multi-screen-journey-pattern) below — generic checklist; use register-org as the worked example.
+
+---
+
+## Multi-screen journey pattern
+
+Reusable pattern for use cases with several UI steps and error variants. Keep rules here generic; product copy and APIs stay in the use-case README.
+
+**Worked example:** [register-org](../use-cases/platform-foundation/register-org/README.md) (screen flow, wireframes table, diagrams). **README layout rules:** [docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--wireframes--implementation-status).
+
+### Documentation (use-case `README.md`)
+
+| Do | Avoid |
+|----|--------|
+| One folder per **actor journey** (all steps that belong to one story) | A separate folder per micro-step when the user sees one continuous flow |
+| `## Screen flow` when there are branches, many screens, or easy-to-confuse error screens | Listing error screens as if they were sequential steps |
+| `## Wireframes` — every UI `.excalidraw` in the folder has a row; order matches screen flow | Diagram-only assets in the wireframes table |
+| `## Diagrams` — one **journey** diagram (happy path); optional **cases** diagram (outcomes → wireframes) | Two diagrams that both narrate the same happy path |
+| Note **runtime** behavior with no dedicated screen (e.g. redirect on success) | A wireframe file the app never renders |
+
+### Screen assets
+
+| Type | Purpose |
+|------|---------|
+| **Happy-path file** | One file per **distinct** screen the user sees on the main path |
+| **`*-states` file** | Reference board: validation, API feedback, alternate entry — **not** a second copy of the happy path |
+| **Panel label** | Short state name above each card on a board (implementers map API/status → one panel) |
+
+**Split `*-states` by trigger:** interactions on the **same** screen (resend, submit errors) → one board; a **different** route or entry (e.g. link from email vs inbox wait) → separate board or outcome layout.
+
+**Board layout:** shared card width; equal card height per row; state label above the card — same grid idea across use cases (see existing `*-states` generators).
+
+### Generator (`generate-screens.mjs` + `blocks.mjs`)
+
+- **Shared painter** — one `paint…()` (or block) for the happy-path card and `*-states` panels so spacing and chrome stay aligned.
+- **Auth-style outcomes** — brand bar, `stateHeadline`, body copy, `authNoticeBanner` for blocking messages, full-width primary actions and **underlined** footer/inline links from `blocks.mjs` (see [Auth outcome cards](#auth-outcome-cards--stateheadline-platform-foundation-email-flows)).
+- **Non-auth wait/progress** — OK to break the auth card shape; prefer **aggregated** user copy over internal subsystem names unless the AC requires them.
+- **Deterministic seeds** — each screen through `runScreen`; run `generate-screens.mjs` twice before commit ([Deterministic seed rule](#deterministic-seed-rule-non-negotiable)).
+
+### Before merge
+
+- [ ] README screen flow + wireframes table updated ([visual-artifact-checklist](./visual-artifact-checklist.md))
+- [ ] `.svg` regenerated for touched `.excalidraw`
+- [ ] No new per-screen magic numbers for auth layout ([Agent contract](../wireframes/README.md#agent-contract))
+
 ---
 
 | Layer | File |
@@ -83,7 +128,7 @@ All generated wireframes must use deterministic seeds per screen (`setSeed(deter
 
 ### Auth outcome cards — `stateHeadline` (platform-foundation email flows)
 
-Use one layout for informational / error states (`email-confirmation`, `verify-email` grid cards, `verify-email-rate-limit`):
+Use one layout for informational / error states (`email-confirmation`, `verify-email-states` panels):
 
 - **Row:** semantic-colored icon + title (`stateHeadline` in `components.mjs`)
 - **Accent:** short underline (64px) in `semanticVariantBorder` — not a full-width bar or alert box

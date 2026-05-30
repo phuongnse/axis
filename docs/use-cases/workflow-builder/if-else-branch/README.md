@@ -66,8 +66,3 @@ Workflows can take different execution paths based on data values using Conditio
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

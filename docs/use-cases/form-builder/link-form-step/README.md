@@ -66,8 +66,3 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

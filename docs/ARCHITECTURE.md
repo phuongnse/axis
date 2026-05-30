@@ -10,7 +10,7 @@
 
 ## System Context
 
-![System Context](./diagrams/system-context.svg)
+See [System context](./README.md#system-context) in the docs index (Mermaid).
 
 The Axis platform serves four actor types: **Platform Admins** (Axis team), **Organization Admins**, **Organization Members**, and **End Users**. External systems include an email service for notifications, external APIs called by workflow HTTP steps, and webhook targets that receive workflow events.
 
@@ -18,7 +18,7 @@ The Axis platform serves four actor types: **Platform Admins** (Axis team), **Or
 
 ## Containers
 
-![Container Diagram](./diagrams/container.svg)
+See [Container diagram](./README.md#container-diagram) in the docs index (Mermaid).
 
 Axis runs as a **modulith with strict service boundaries** — each module is a deployable service contract; modulith packaging is the deployment shape today, K8s services tomorrow. See [TECH_STACK.md § ADR-010](./TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy).
 
@@ -46,7 +46,7 @@ Concrete versions in [TECH_STACK.md](./TECH_STACK.md).
 
 ## Module = Service: layering and contract surface
 
-![Module Overview](./diagrams/module-overview.svg)
+See [Module overview](./README.md#module-overview) in the docs index (Mermaid).
 
 Each module *is* a service contract — modulith mode collocates them as in-process targets, but the contract surface is identical to the extracted form. Source tree and project naming live in [CLAUDE.md § Solution tree](../CLAUDE.md#docs-index).
 
@@ -128,6 +128,6 @@ Detailed flow, redirect URIs, and error states: [docs/use-cases/identity-access/
 
 ## Workflow Execution
 
-![Execution Flow](./use-cases/workflow-engine/start-execution/execution-flow.svg)
+See [Execution flow](./use-cases/workflow-engine/start-execution/README.md#execution-flow) (Mermaid in use-case README).
 
 Full execution model — step lifecycle, retry semantics, history, real-time push — lives under [docs/use-cases/workflow-engine/](./use-cases/workflow-engine/README.md).

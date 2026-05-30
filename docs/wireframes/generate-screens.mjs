@@ -12,7 +12,7 @@
  *   app-shell (root)
  *   platform-foundation: register-org, register-org-complete, register-org-complete-states,
  *        register-org-states, register-org-provider-states,
- *        email-confirmation, verify-email, verify-email-rate-limit, workspace-provisioning,
+ *        email-confirmation, verify-email-states, workspace-provisioning,
  *        pricing, settings-org, settings-org-upload-states, settings-org-profile-states,
  *        settings-org-usage-error, settings-org-free-plan, settings-org-access-denied,
  *        settings-org-deletion-scheduled, settings-org-delete-modal, settings-org-delete-states
@@ -34,7 +34,8 @@ import {
   rect, ellipse, text, hline, vline, arrow,
   btn, inputField, selectField, badge, searchBar, pageHeader, fieldLabel,
   appShell, component, translate, writeExcalidraw, setSeed,
-  stateHeadline, semanticVariantColor,
+  stateHeadline, wrappedTextBlock,
+  inlineTextRow, inlineTextRowWidth,
 } from './components.mjs';
 
 import {
@@ -50,6 +51,7 @@ import {
 import {
   AUTH_CARD_W,
   AUTH_CARD_PAD_X,
+  AUTH_INNER_W,
   AUTH_EXTERNAL_SIGN_IN_BLOCK_H,
   AUTH_HEADER_H,
   AUTH_HEADER_H_SUBTITLE,
@@ -63,6 +65,10 @@ import {
   buildAuthCardBrandBar,
   buildAuthCardHeader,
   buildAuthCardFooter,
+  buildAuthCardBackFooter,
+  buildAuthCardInlineRow,
+  buildAuthCardCenteredInlineRow,
+  authNoticeBanner,
   buildAuthSubmitButton,
   authFormField,
   authTermsRow,
@@ -130,8 +136,12 @@ const SCREEN_USE_CASE_OVERRIDES = {
     'platform-foundation/register-org/register-org-provider-states.excalidraw',
   'platform-foundation/email-confirmation.excalidraw':
     'platform-foundation/register-org/email-confirmation.excalidraw',
+  'platform-foundation/email-confirmation-states.excalidraw':
+    'platform-foundation/register-org/email-confirmation-states.excalidraw',
+  'platform-foundation/verify-email-states.excalidraw':
+    'platform-foundation/register-org/verify-email-states.excalidraw',
   'platform-foundation/workspace-provisioning.excalidraw':
-    'platform-foundation/provision-tenant/workspace-provisioning.excalidraw',
+    'platform-foundation/register-org/workspace-provisioning.excalidraw',
   'platform-foundation/pricing.excalidraw':
     'platform-foundation/view-plans/pricing.excalidraw',
   'platform-foundation/settings-org.excalidraw':
@@ -339,83 +349,126 @@ function genRegisterOrgComplete() {
 /**
  * Register-Org complete — validation states (org name, terms) after external sign-in.
  */
+/** Dual-panel auth states: measure content, align card heights, paint back-to-front. */
+function flushDualAuthStatePanels(els, panels) {
+  const maxCardH = Math.max(...panels.map((p) => p.card.cardH));
+  for (const p of panels) {
+    els.push(text(p.lbl.id, p.lbl.x, p.lbl.y, p.lbl.panelW, 16, p.lbl.text, 12, p.lbl.color));
+    els.push(rect(p.card.id, p.card.x, p.card.y, p.card.panelW, maxCardH, C.gray300, C.white, 2, true));
+    els.push(...p.contentEls);
+  }
+  return maxCardH;
+}
+
+function buildRegisterOrgCompleteStatePanel({ id, x, y0, panelW, lbl, orgErr, terms }) {
+  const cardY = y0 + 28;
+  const prefix = `rocs_${id}`;
+  const contentEls = [];
+
+  const panelHeader = buildAuthCardHeader(
+    prefix, x, cardY, panelW, 'Finish setting up your organization', 'Signed in with Google');
+  contentEls.push(...panelHeader.els);
+
+  let fy = cardY + AUTH_HEADER_H_SUBTITLE;
+  fy = paintRegisterOrgCompleteFields(contentEls, prefix, x, fy, panelW, {
+    orgName: orgErr ? 'A' : 'Acme Corp',
+    orgErr,
+    terms,
+  });
+  fy += AUTH_FIELD_STACK_GAP;
+  contentEls.push(...buildAuthSubmitButton(prefix, x, fy, panelW, 'Create organization'));
+  fy += 36 + AUTH_SUBMIT_AFTER_GAP;
+
+  const cardH = measureAuthCardHeight(cardY, fy, contentEls);
+
+  return {
+    files: panelHeader.files,
+    lbl: { id: `${prefix}_lbl`, x, y: y0, panelW, text: lbl, color: C.danger },
+    card: { id: `${prefix}_card`, x, y: cardY, panelW, cardH },
+    contentEls,
+  };
+}
+
 function genRegisterOrgCompleteStates() {
   const els = [];
   let wireFiles = {};
   const panelW = 520;
-  const panelH = 520;
   const gap = 40;
   const startX = Math.round((W - (panelW * 2 + gap)) / 2);
   const y0 = 48;
+  const cardY = y0 + 28;
 
-  els.push(rect('rocs_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
+  const panels = [
+    buildRegisterOrgCompleteStatePanel({
+      id: 'val',
+      x: startX,
+      y0,
+      panelW,
+      lbl: 'Organization name validation',
+      orgErr: 'Must be between 2 and 100 characters.',
+      terms: { checked: true },
+    }),
+    buildRegisterOrgCompleteStatePanel({
+      id: 'terms',
+      x: startX + panelW + gap,
+      y0,
+      panelW,
+      lbl: 'Terms not accepted',
+      orgErr: null,
+      terms: { checked: false, errorMsg: 'You must accept the Terms of Service and Privacy Policy.' },
+    }),
+  ];
+
+  const maxCardH = Math.max(...panels.map((p) => p.card.cardH));
+  const screenH = authScreenCanvasHeight(cardY, maxCardH, H);
+
+  els.push(rect('rocs_bg', 0, 0, W, screenH, C.gray300, C.gray100, 1, false));
   els.push(text('rocs_pg', 0, 16, W, 20,
     'Post-OAuth completion — validation', 13, C.gray500, 'center'));
-
-  const drawPanel = ({ id, x, lbl, orgErr, terms }) => {
-    const cardY = y0 + 28;
-    const prefix = `rocs_${id}`;
-    els.push(text(`${prefix}_lbl`, x, y0, panelW, 16, lbl, 12, C.danger));
-    els.push(rect(`${prefix}_card`, x, cardY, panelW, panelH, C.gray300, C.white, 2, true));
-    const panelHeader = buildAuthCardHeader(
-      prefix, x, cardY, panelW, 'Finish setting up your organization', 'Signed in with Google');
-    els.push(...panelHeader.els);
-    wireFiles = mergeExcalidrawFiles(wireFiles, panelHeader.files);
-
-    const btnY = cardY + panelH - 68;
-    paintRegisterOrgCompleteFields(els, prefix, x, cardY + AUTH_HEADER_H_SUBTITLE, panelW, {
-      orgName: orgErr ? 'A' : 'Acme Corp',
-      orgErr,
-      terms,
-    });
-    els.push(...buildAuthSubmitButton(prefix, x, btnY, panelW, 'Create organization'));
-  };
-
-  drawPanel({
-    id: 'val',
-    x: startX,
-    lbl: 'Organization name validation',
-    orgErr: 'Must be between 2 and 100 characters.',
-    terms: { checked: true },
-  });
-  drawPanel({
-    id: 'terms',
-    x: startX + panelW + gap,
-    lbl: 'Terms not accepted',
-    orgErr: null,
-    terms: { checked: false, errorMsg: 'You must accept the Terms of Service and Privacy Policy.' },
-  });
+  flushDualAuthStatePanels(els, panels);
+  for (const p of panels) {
+    wireFiles = mergeExcalidrawFiles(wireFiles, p.files);
+  }
 
   write('platform-foundation/register-org-complete-states.excalidraw', els, wireFiles);
 }
 
-/** Draw one register-org error-state panel (shared by states screens). Returns embedded logo files. */
-function registerOrgStatePanel(els, { id, x, y0, panelW, panelH, lbl, lblColor, serverBanner, fields, terms }) {
+function buildRegisterOrgStatePanel({ id, x, y0, panelW, lbl, lblColor, serverBanner, fields, terms }) {
   const cardY = y0 + 28;
   const prefix = `ros_${id}`;
-  els.push(text(`${prefix}_lbl`, x, y0, panelW, 16, lbl, 12, lblColor));
-  els.push(rect(`${prefix}_card`, x, cardY, panelW, panelH, C.gray300, C.white, 2, true));
+  const contentEls = [];
+
   const panelHeader = buildAuthCardHeader(prefix, x, cardY, panelW, 'Create your organization');
-  els.push(...panelHeader.els);
+  contentEls.push(...panelHeader.els);
 
   let fy = cardY + AUTH_HEADER_H;
   if (serverBanner) {
-    els.push(rect(`${prefix}_ban`, x + AUTH_CARD_PAD_X, fy, panelW - AUTH_CARD_PAD_X * 2, 40, C.dangerBorder, C.dangerBg, 1, true));
-    els.push(text(`${prefix}_ban_t`, x + AUTH_CARD_PAD_X + 12, fy + 12, panelW - AUTH_CARD_PAD_X * 2 - 24, 16, serverBanner, 12, C.danger));
+    contentEls.push(
+      rect(`${prefix}_ban`, x + AUTH_CARD_PAD_X, fy, panelW - AUTH_CARD_PAD_X * 2, 40, C.dangerBorder, C.dangerBg, 1, true),
+      text(`${prefix}_ban_t`, x + AUTH_CARD_PAD_X + 12, fy + 12, panelW - AUTH_CARD_PAD_X * 2 - 24, 16, serverBanner, 12, C.danger),
+    );
     fy += 52;
   }
 
-  fy = paintRegisterOrgEntryFields(els, prefix, x, fy, panelW, fields);
+  fy = paintRegisterOrgEntryFields(contentEls, prefix, x, fy, panelW, fields);
 
   if (terms) {
     const { els: te, blockH: termsBlockH } = authTermsRow(`${prefix}_terms`, x, fy, panelW, terms);
-    els.push(...te);
+    contentEls.push(...te);
     fy += termsBlockH + AUTH_FIELD_STACK_GAP;
   }
 
-  const btnY = cardY + panelH - 68;
-  els.push(...buildAuthSubmitButton(prefix, x, btnY, panelW, 'Create organization'));
-  return panelHeader.files;
+  contentEls.push(...buildAuthSubmitButton(prefix, x, fy, panelW, 'Create organization'));
+  fy += 36 + AUTH_SUBMIT_AFTER_GAP;
+
+  const cardH = measureAuthCardHeight(cardY, fy, contentEls);
+
+  return {
+    files: panelHeader.files,
+    lbl: { id: `${prefix}_lbl`, x, y: y0, panelW, text: lbl, color: lblColor },
+    card: { id: `${prefix}_card`, x, y: cardY, panelW, cardH },
+    contentEls,
+  };
 }
 
 const REGISTER_ORG_STATE_FIELDS = REGISTER_ORG_ENTRY_FIELDS.map((f) => ({
@@ -434,53 +487,59 @@ function genRegisterOrgStates() {
   const els = [];
   let wireFiles = {};
   const panelW = 520;
-  const panelH = 640;
   const gap = 40;
   const startX = Math.round((W - (panelW * 2 + gap)) / 2);
   const y0 = 40;
+  const cardY = y0 + 28;
 
-  els.push(rect('ros_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
+  const panels = [
+    buildRegisterOrgStatePanel({
+      id: 'val',
+      x: startX,
+      y0,
+      panelW,
+      lbl: 'Inline validation (field-level)',
+      lblColor: C.danger,
+      serverBanner: null,
+      fields: [
+        { kind: 'input', label: 'Organization name', value: 'A', err: 'Must be between 2 and 100 characters.', required: true },
+        { kind: 'slug' },
+        { kind: 'input', label: 'Admin full name', value: 'Alex Brown', err: null, required: true },
+        { kind: 'input', label: 'Email address', value: 'not-an-email', err: 'Enter a valid email address.', required: true },
+        {
+          kind: 'password',
+          label: 'Password',
+          value: '•••',
+          err: 'Must be at least 8 characters with a letter and a number.',
+          required: true,
+          passwordCriteria: PASSWORD_CRITERIA_PARTIAL,
+        },
+        { kind: 'input', label: 'Confirm password', value: '••••••••', err: 'Passwords do not match.', required: true },
+      ],
+      terms: { checked: true },
+    }),
+    buildRegisterOrgStatePanel({
+      id: 'srv',
+      x: startX + panelW + gap,
+      y0,
+      panelW,
+      lbl: 'Server error (5xx)',
+      lblColor: C.danger,
+      serverBanner: 'Something went wrong, please try again.',
+      fields: REGISTER_ORG_STATE_FIELDS,
+      terms: { checked: true },
+    }),
+  ];
+
+  const maxCardH = Math.max(...panels.map((p) => p.card.cardH));
+  const screenH = authScreenCanvasHeight(cardY, maxCardH, 920);
+
+  els.push(rect('ros_bg', 0, 0, W, screenH, C.gray300, C.gray100, 1, false));
   els.push(text('ros_pg', 0, 16, W, 20, 'Registration form — validation & server errors', 13, C.gray500, 'center'));
-
-  wireFiles = mergeExcalidrawFiles(wireFiles, registerOrgStatePanel(els, {
-    id: 'val',
-    x: startX,
-    y0,
-    panelW,
-    panelH,
-    lbl: 'Inline validation (field-level)',
-    lblColor: C.danger,
-    serverBanner: null,
-    fields: [
-      { kind: 'input', label: 'Organization name', value: 'A', err: 'Must be between 2 and 100 characters.', required: true },
-      { kind: 'slug' },
-      { kind: 'input', label: 'Admin full name', value: 'Alex Brown', err: null, required: true },
-      { kind: 'input', label: 'Email address', value: 'not-an-email', err: 'Enter a valid email address.', required: true },
-      {
-        kind: 'password',
-        label: 'Password',
-        value: '•••',
-        err: 'Must be at least 8 characters with a letter and a number.',
-        required: true,
-        passwordCriteria: PASSWORD_CRITERIA_PARTIAL,
-      },
-      { kind: 'input', label: 'Confirm password', value: '••••••••', err: 'Passwords do not match.', required: true },
-    ],
-    terms: { checked: true },
-  }));
-
-  wireFiles = mergeExcalidrawFiles(wireFiles, registerOrgStatePanel(els, {
-    id: 'srv',
-    x: startX + panelW + gap,
-    y0,
-    panelW,
-    panelH,
-    lbl: 'Server error (5xx)',
-    lblColor: C.danger,
-    serverBanner: 'Something went wrong, please try again.',
-    fields: REGISTER_ORG_STATE_FIELDS,
-    terms: { checked: true },
-  }));
+  flushDualAuthStatePanels(els, panels);
+  for (const p of panels) {
+    wireFiles = mergeExcalidrawFiles(wireFiles, p.files);
+  }
 
   write('platform-foundation/register-org-states.excalidraw', els, wireFiles);
 }
@@ -492,7 +551,7 @@ function genRegisterOrgProviderStates() {
   const els = [];
   let wireFiles = {};
   const panelW = 520;
-  const panelH = 300;
+  const panelH = 272;
   const gap = 40;
   const startX = Math.round((W - (panelW * 2 + gap)) / 2);
   const cardY = 72;
@@ -505,19 +564,22 @@ function genRegisterOrgProviderStates() {
       id: 'dup',
       x: startX,
       lbl: 'Provider email already registered',
-      msg: 'An account with this email already exists. Sign in instead.',
       variant: 'warning',
+      bodySegments: [
+        { text: 'An account with this email already exists. ', color: C.gray700 },
+        { text: 'Sign in instead →', color: C.primary, link: true },
+      ],
     },
     {
       id: 'noemail',
       x: startX + panelW + gap,
       lbl: 'Provider returned no verified email',
-      msg: 'Your GitHub account has no verified email; use email and password instead.',
       variant: 'danger',
+      bodyText: 'Your GitHub account has no verified email; use email and password instead.',
     },
   ];
 
-  panels.forEach(({ id, x, lbl, msg, variant }) => {
+  panels.forEach(({ id, x, lbl, variant, bodySegments, bodyText }) => {
     const icon = variant === 'warning' ? '⚠' : '✕';
     const prefix = `rops_${id}`;
     els.push(text(`${prefix}_lbl`, x, 48, panelW, 16, lbl, 12, C.danger));
@@ -530,214 +592,528 @@ function genRegisterOrgProviderStates() {
     const headY = cardY + 76;
     els.push(...stateHeadline(prefix, ix, headY, innerW, icon, variant, 'Registration could not continue', 14));
     const bodyY = headY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
-    els.push(text(`${prefix}_body`, ix, bodyY, innerW, 36, msg, 13, C.gray700));
-    els.push(text(`${prefix}_link`, ix, bodyY + 48, innerW, 16, 'Back to registration →', 12, C.primary, 'center'));
+    if (bodySegments) {
+      els.push(...buildAuthCardInlineRow(prefix, x, panelW, bodyY, bodySegments));
+    } else {
+      els.push(...wrappedTextBlock(`${prefix}_body`, ix, bodyY, innerW, bodyText, 13, C.gray700, 0.78).els);
+    }
+    els.push(...buildAuthCardBackFooter(prefix, x, cardY, panelW, panelH, 'Back to registration'));
   });
 
   write('platform-foundation/register-org-provider-states.excalidraw', els, wireFiles);
 }
 
+const EMAIL_CONFIRMATION_BODY =
+  'If an account exists for this email, you will receive a verification link shortly.';
+
 /**
- * Email-Confirmation — registration success, email verification resend
- * Informational card (no form): compact icon, title, copy, resend link.
+ * Paint email-confirmation card body (shared by happy path + resend state panels).
+ * @param {{ notice?: { title: string, body?: string, variant?: string }, resend?: { disabled?: boolean } }} opts
  */
-function genEmailConfirmation() {
-  const cardW = AUTH_CARD_W;
-  const cardH = 252;
-  const cardX = Math.round((W - cardW) / 2);
-  const cardY = Math.round((H - cardH) / 2);
-  const els   = [];
+function paintEmailConfirmationCard(els, opts, wireAcc) {
+  const {
+    prefix,
+    cardX,
+    cardY,
+    cardW,
+    cardH,
+    notice = null,
+    resend = {},
+  } = opts;
+  const { disabled: resendDisabled = false } = resend;
 
-  els.push(rect('ec_bg',   0,     0,     W,     H,     C.gray300, C.gray100, 1, false));
-  els.push(rect('ec_card', cardX, cardY, cardW, cardH, C.gray300, C.white,   2, true));
-
-  const ecBrand = buildAuthCardBrandBar('ec', cardX, cardY, cardW);
-  els.push(...ecBrand.els);
-  const wireFiles = ecBrand.files;
+  const brand = buildAuthCardBrandBar(prefix, cardX, cardY, cardW);
+  els.push(...brand.els);
+  wireAcc.files = mergeExcalidrawFiles(wireAcc.files, brand.files);
 
   const ecInnerW = cardW - AUTH_CARD_PAD_X * 2;
   const ecX = cardX + AUTH_CARD_PAD_X;
   const ecHeadY = cardY + 68;
-  els.push(...stateHeadline('ec', ecX, ecHeadY, ecInnerW, '✉', 'info', 'Check your email', 16));
+  els.push(...stateHeadline(prefix, ecX, ecHeadY, ecInnerW, '✉', 'info', 'Check your email', 16));
+
+  let cy = ecHeadY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
+  const body1 = wrappedTextBlock(`${prefix}_body1`, ecX, cy, ecInnerW, EMAIL_CONFIRMATION_BODY, 13, C.gray700, 0.78);
+  els.push(...body1.els);
+  cy += body1.blockH + 8;
+  const body2 = wrappedTextBlock(`${prefix}_body2`, ecX, cy, ecInnerW, 'Check your inbox.', 13, C.gray700, 0.78);
+  els.push(...body2.els);
+  cy += body2.blockH + 12;
+
+  if (notice) {
+    const banner = authNoticeBanner(
+      `${prefix}_notice`,
+      ecX,
+      cy,
+      ecInnerW,
+      { title: notice.title, body: notice.body },
+      notice.variant ?? 'info',
+    );
+    els.push(...banner.els);
+    cy += banner.blockH + 12;
+  }
+
+  const resendSegments = resendDisabled
+    ? [
+        { text: "Didn't receive it?", color: C.gray700 },
+        { text: 'Resend email →', color: C.gray300 },
+      ]
+    : [
+        { text: "Didn't receive it?", color: C.gray700 },
+        { text: 'Resend email →', color: C.primary, link: true },
+      ];
+  els.push(...buildAuthCardInlineRow(`${prefix}_resend`, cardX, cardW, cy, resendSegments));
+  els.push(...buildAuthCardFooter(prefix, cardX, cardY, cardW, cardH, {
+    lead: 'Already verified?',
+    link: 'Go to sign in',
+    forwardArrow: true,
+  }));
+}
+
+function measureEmailConfirmationCardH(noticeBlockH = 0, hasNotice = false) {
+  const ecHeadY = 68;
   const ecBodyY = ecHeadY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
-  els.push(text('ec_body1', ecX, ecBodyY, ecInnerW, 36,
-    'If an account exists for this email, you will receive a verification link shortly. Check your inbox.',
-    13, C.gray700));
-
-  els.push(text('ec_resend', ecX, ecBodyY + 44, ecInnerW, 16, "Didn't receive it?  Resend email →", 12, C.primary, 'center'));
-
-  els.push(...buildAuthCardFooter('ec', cardX, cardY, cardW, cardH, 'Back to sign in'));
-
-  write('platform-foundation/email-confirmation.excalidraw', els, wireFiles);
+  const body1Size = wrappedTextBlock('m', 0, 0, AUTH_INNER_W, EMAIL_CONFIRMATION_BODY, 13, C.gray700, 0.78);
+  const body2Size = wrappedTextBlock('m', 0, 0, AUTH_INNER_W, 'Check your inbox.', 13, C.gray700, 0.78);
+  const resendY = ecBodyY + body1Size.blockH + 8 + body2Size.blockH + 12 + (hasNotice ? noticeBlockH + 12 : 0) + 16;
+  return resendY + 24 + AUTH_CARD_FOOTER_ZONE;
 }
 
 /**
- * Verify-Email — email verification (all 4 outcome states)
- * 2×2 grid of state cards: success, expired, already-used, invalid.
- * Each card: 440×176. Grid centred at W=1200.
+ * Email-Confirmation — registration success (step 3); resend link idle.
  */
-function genVerifyEmail() {
-  const els   = [];
+function genEmailConfirmation() {
   const cardW = AUTH_CARD_W;
-  const cardH = 176;
-  const gapX  = 60;
-  const gapY  = 36;   // row gap; first 20px reserved for state label above card
-  const col1X = Math.round((W - (cardW * 2 + gapX)) / 2);  // 130
-  const col2X = col1X + cardW + gapX;
-  const row1Y = 100;
-  const row2Y = row1Y + cardH + gapY;
+  const cardH = measureEmailConfirmationCardH();
+  const cardX = Math.round((W - cardW) / 2);
+  const cardY = Math.round((H - cardH) / 2);
+  const screenH = authScreenCanvasHeight(cardY, cardH, H);
+  const els = [];
+  const wireAcc = { files: {} };
 
-  els.push(rect('ve_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
-  els.push(text('ve_pg', 0, 48, W, 20, 'Email Verification — States', 13, C.gray500, 'center'));
+  els.push(rect('ec_bg', 0, 0, W, screenH, C.gray300, C.gray100, 1, false));
+  els.push(rect('ec_card', cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
+  paintEmailConfirmationCard(els, {
+    prefix: 'ec',
+    cardX,
+    cardY,
+    cardW,
+    cardH,
+  }, wireAcc);
 
-  const states = [
+  write('platform-foundation/email-confirmation.excalidraw', els, wireAcc.files);
+}
+
+/**
+ * Email-Confirmation — resend interaction states (204, in-flight, 429).
+ */
+function genEmailConfirmationStates() {
+  const els = [];
+  const wireAcc = { files: {} };
+  const panelW = AUTH_CARD_W;
+  const panelH = 332;
+  const gap = 40;
+  const startX = Math.round((W - (panelW * 2 + gap)) / 2);
+  const y0 = 40;
+
+  const canvasH = y0 + 28 + panelH + 44 + panelH + 48;
+  els.push(rect('ecs_bg', 0, 0, W, canvasH, C.gray300, C.gray100, 1, false));
+  els.push(text('ecs_pg', 0, 16, W, 20, 'Email confirmation — resend interactions', 13, C.gray500, 'center'));
+
+  const panels = [
     {
-      id: 've_ok',   x: col1X, y: row1Y,
-      stateLbl: '✓  Success',       lblColor: C.success, variant: 'success', icon: '✓',
-      title: 'Email verified!',
-      body:  'Your account is ready. Signing you in…',
-      btnLabel: null, btnVariant: null,
+      id: 'ecs_sent',
+      x: startX,
+      lbl: 'After resend succeeds (204)',
+      lblColor: C.success,
+      notice: {
+        variant: 'success',
+        title: 'Verification email sent',
+        body: 'If an account exists for this email, check your inbox for a new link.',
+      },
+      resend: {},
     },
     {
-      id: 've_exp',  x: col2X, y: row1Y,
-      stateLbl: 'Expired link',     lblColor: C.warning, variant: 'warning', icon: '⏱',
-      title: 'Verification link expired',
-      body:  'This link was valid for 24 hours.',
-      btnLabel: 'Resend verification email', btnVariant: 'secondary',
+      id: 'ecs_rl',
+      x: startX + panelW + gap,
+      lbl: 'Rate limited (429)',
+      lblColor: C.warning,
+      notice: {
+        variant: 'warning',
+        title: 'Please wait before requesting another email.',
+        body: 'You reached the resend limit (3 per hour). Try again in 37 minutes.',
+      },
+      resend: { disabled: true },
     },
     {
-      id: 've_used', x: col1X, y: row2Y,
-      stateLbl: 'Already verified', lblColor: C.gray500, variant: 'neutral', icon: '✓',
-      title: 'Already verified',
-      body:  'This link has already been used. Please sign in.',
-      btnLabel: 'Sign in', btnVariant: 'ghost',
-    },
-    {
-      id: 've_inv',  x: col2X, y: row2Y,
-      stateLbl: 'Invalid token',    lblColor: C.danger, variant: 'danger', icon: '✕',
-      title: 'Invalid verification link',
-      body:  'This link is invalid or has been tampered with.',
-      btnLabel: null, btnVariant: null,
+      id: 'ecs_req',
+      x: Math.round((W - panelW) / 2),
+      lbl: 'While resend request is in flight',
+      lblColor: C.primary,
+      notice: {
+        variant: 'info',
+        title: 'Sending…',
+        body: 'Stay on this screen; the resend link is disabled until the request completes.',
+      },
+      resend: { disabled: true },
     },
   ];
 
-  states.forEach(({ id, x, y, stateLbl, lblColor, variant, icon, title, body, btnLabel, btnVariant }) => {
-    els.push(text(`${id}_lbl`,   x,      y - 20,  cardW,      16, stateLbl, 12, lblColor));
-    els.push(rect(`${id}_card`,  x,      y,       cardW,      cardH, C.gray300, C.white, 2, true));
-    els.push(text(`${id}_logo`,  x,      y + 12,  cardW,      18, '⬡  Axis', 12, C.primary, 'center'));
-    els.push(hline(`${id}_hdiv`, x, y + 34, cardW, C.gray300));
-    const ix = x + AUTH_CARD_PAD;
-    const innerW = cardW - AUTH_CARD_PAD * 2;
-    const headY = y + 38;
-    els.push(...stateHeadline(`${id}`, ix, headY, innerW, icon, variant, title, 14));
-    els.push(text(`${id}_body`, ix, headY + AUTH_HEADLINE_H + AUTH_BODY_GAP, innerW, 36, body, 12, C.gray700));
-    if (btnLabel) {
-      els.push(...btn(`${id}_cta`, ix, y + cardH - 40, btnLabel, btnVariant));
-    }
+  panels.forEach(({ id, x, lbl, lblColor, notice, resend }, index) => {
+    const cardY = index < 2 ? y0 + 28 : y0 + 28 + panelH + 44;
+    const labelY = index < 2 ? y0 : y0 + panelH + 44;
+    els.push(text(`${id}_lbl`, x, labelY, panelW, 16, lbl, 12, lblColor));
+    els.push(rect(`${id}_card`, x, cardY, panelW, panelH, C.gray300, C.white, 2, true));
+    paintEmailConfirmationCard(els, {
+      prefix: id,
+      cardX: x,
+      cardY,
+      cardW: panelW,
+      cardH: panelH,
+      notice,
+      resend,
+    }, wireAcc);
   });
 
-  write('platform-foundation/verify-email.excalidraw', els);
-}
-
-function genVerifyEmailRateLimit() {
-  const cardW = AUTH_CARD_W;
-  const cardH = 228;
-  const cardX = Math.round((W - cardW) / 2);
-  const cardY = Math.round((H - cardH) / 2);
-  const els = [];
-
-  els.push(rect('vrl_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
-  els.push(text('vrl_lbl', 0, 76, W, 18, 'Resend rate limit state', 12, C.warning, 'center'));
-  els.push(rect('vrl_card', cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
-  els.push(text('vrl_logo', cardX, cardY + 12, cardW, 18, '⬡  Axis', 12, C.primary, 'center'));
-  els.push(hline('vrl_hdiv', cardX, cardY + 34, cardW, C.gray300));
-
-  const vrlX = cardX + AUTH_CARD_PAD;
-  const vrlInnerW = cardW - AUTH_CARD_PAD * 2;
-  const vrlHeadY = cardY + 38;
-  els.push(...stateHeadline('vrl', vrlX, vrlHeadY, vrlInnerW, '⏳', 'warning', 'Please wait before requesting another email.', 14));
-  const vrlBodyY = vrlHeadY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
-  els.push(text('vrl_body', vrlX, vrlBodyY, vrlInnerW, 32, 'You reached the resend limit (3 requests per hour).', 12, C.gray700));
-  els.push(text('vrl_cnt', vrlX, vrlBodyY + 34, vrlInnerW, 18, 'Try again in 37 minutes.', 13, semanticVariantColor('warning')));
-
-  els.push(rect('vrl_btn', cardX + AUTH_CARD_PAD, cardY + cardH - 40, 220, 36, C.gray300, C.gray100, 1, true));
-  els.push(text('vrl_btn_t', cardX + AUTH_CARD_PAD, cardY + cardH - 30, 220, 16, 'Resend verification email', 13, C.gray300, 'center'));
-  els.push(text('vrl_hint', cardX + 252, cardY + cardH - 26, 168, 16, 'Button disabled until timer ends', 10, C.gray500, 'center'));
-
-  write('platform-foundation/verify-email-rate-limit.excalidraw', els);
+  write('platform-foundation/email-confirmation-states.excalidraw', els, wireAcc.files);
 }
 
 /**
- * Workspace-Provisioning — tenant provisioning (2 states side by side)
- * Left:  In-progress — spinner + step 2 active.
- * Right: Failed (after 3 retries) — error icon + failed step + contact link.
- *
- * W=1200 split at x=600. Each panel: 520px usable, centred at x=300/900.
- * Steps y baseline: 278. 4 × 40px → bottom 438.
+ * Measure verify-email outcome card (brand bar + stateHeadline + body + optional banner/CTA/footer).
+ */
+function measureVerifyEmailOutcomeCardH({
+  body,
+  notice = null,
+  primaryCta = false,
+  backFooter = false,
+  authFooter = false,
+}) {
+  const headTop = 68;
+  let cy = headTop + AUTH_HEADLINE_H + AUTH_BODY_GAP;
+  const bodyBlock = wrappedTextBlock('m', 0, 0, AUTH_INNER_W, body, 13, C.gray700, 0.78);
+  cy += bodyBlock.blockH + 12;
+  if (notice) {
+    const banner = authNoticeBanner(
+      'm',
+      0,
+      cy,
+      AUTH_INNER_W,
+      { title: notice.title, body: notice.body },
+      notice.variant ?? 'warning',
+    );
+    cy += banner.blockH + 12;
+  }
+  if (primaryCta) {
+    cy += 48;
+  }
+  if (backFooter || authFooter) {
+    return cy + AUTH_CARD_FOOTER_ZONE;
+  }
+  return cy + 24;
+}
+
+function paintAuthSubmitButtonDisabled(prefix, cardX, y, cardW, label) {
+  const btnW = cardW - AUTH_CARD_PAD_X * 2;
+  return [
+    rect(`${prefix}_sbtn`, cardX + AUTH_CARD_PAD_X, y, btnW, 36, C.gray300, C.gray100, 1, true),
+    text(`${prefix}_sbtn_t`, cardX + AUTH_CARD_PAD_X, y + 10, btnW, 16, label, 13, C.gray300, 'center'),
+  ];
+}
+
+/**
+ * Paint verify-email outcome card (matches email-confirmation / provider-error auth style).
+ */
+function paintVerifyEmailOutcomeCard(els, opts, wireAcc) {
+  const {
+    prefix,
+    cardX,
+    cardY,
+    cardW,
+    cardH,
+    variant,
+    icon,
+    title,
+    body,
+    notice = null,
+    primaryCta = null,
+    backFooter = false,
+    authFooter = null,
+  } = opts;
+
+  const brand = buildAuthCardBrandBar(prefix, cardX, cardY, cardW);
+  els.push(...brand.els);
+  wireAcc.files = mergeExcalidrawFiles(wireAcc.files, brand.files);
+
+  const ix = cardX + AUTH_CARD_PAD_X;
+  const innerW = cardW - AUTH_CARD_PAD_X * 2;
+  const headY = cardY + 68;
+  els.push(...stateHeadline(prefix, ix, headY, innerW, icon, variant, title, 16));
+
+  let cy = headY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
+  const bodyBlock = wrappedTextBlock(`${prefix}_body`, ix, cy, innerW, body, 13, C.gray700, 0.78);
+  els.push(...bodyBlock.els);
+  cy += bodyBlock.blockH + 12;
+
+  if (notice) {
+    const banner = authNoticeBanner(
+      `${prefix}_notice`,
+      ix,
+      cy,
+      innerW,
+      { title: notice.title, body: notice.body },
+      notice.variant ?? 'warning',
+    );
+    els.push(...banner.els);
+    cy += banner.blockH + 12;
+  }
+
+  if (primaryCta) {
+    if (primaryCta.disabled) {
+      els.push(...paintAuthSubmitButtonDisabled(prefix, cardX, cy, cardW, primaryCta.label));
+    } else {
+      els.push(...buildAuthSubmitButton(prefix, cardX, cy, cardW, primaryCta.label));
+    }
+    cy += 48;
+  }
+
+  if (backFooter) {
+    els.push(...buildAuthCardBackFooter(prefix, cardX, cardY, cardW, cardH, 'Back to registration'));
+  }
+  if (authFooter) {
+    els.push(...buildAuthCardFooter(prefix, cardX, cardY, cardW, cardH, authFooter));
+  }
+}
+
+/** Panel definitions for verify-email-states reference board. */
+const VERIFY_EMAIL_STATE_PANELS = [
+  {
+    id: 'ves_exp',
+    stateLbl: 'Expired link',
+    lblColor: C.warning,
+    variant: 'warning',
+    icon: '⏱',
+    title: 'Verification link expired',
+    body: 'This link was valid for 24 hours. Request a new verification email.',
+    primaryCta: { label: 'Resend verification email' },
+  },
+  {
+    id: 'ves_used',
+    stateLbl: 'Already verified',
+    lblColor: C.gray500,
+    variant: 'neutral',
+    icon: '✓',
+    title: 'Already verified',
+    body: 'This link has already been used.',
+    authFooter: { lead: 'Ready to continue?', link: 'Go to sign in', forwardArrow: true },
+  },
+  {
+    id: 'ves_inv',
+    stateLbl: 'Invalid token',
+    lblColor: C.danger,
+    variant: 'danger',
+    icon: '✕',
+    title: 'Invalid verification link',
+    body: 'This link is invalid or has been tampered with.',
+    backFooter: true,
+  },
+  {
+    id: 'ves_rl',
+    stateLbl: 'Resend rate limit (429)',
+    lblColor: C.warning,
+    variant: 'warning',
+    icon: '⏳',
+    title: 'Please wait',
+    body: 'Too many resend requests for this email.',
+    notice: {
+      variant: 'warning',
+      title: 'Please wait before requesting another email.',
+      body: 'You reached the resend limit (3 per hour). Try again in 37 minutes.',
+    },
+    primaryCta: { label: 'Resend verification email', disabled: true },
+  },
+];
+
+/**
+ * Verify-Email — link-click error / edge states (reference board; runtime shows one card).
+ * 2×2 layout aligned with email-confirmation-states.
+ */
+function genVerifyEmailStates() {
+  const els = [];
+  const wireAcc = { files: {} };
+  const panelW = AUTH_CARD_W;
+  const gap = 40;
+  const startX = Math.round((W - (panelW * 2 + gap)) / 2);
+  const y0 = 40;
+
+  const panelH = Math.max(
+    ...VERIFY_EMAIL_STATE_PANELS.map((def) => measureVerifyEmailOutcomeCardH({
+      body: def.body,
+      notice: def.notice ?? null,
+      primaryCta: Boolean(def.primaryCta),
+      backFooter: Boolean(def.backFooter),
+      authFooter: Boolean(def.authFooter),
+    })),
+  );
+
+  const canvasH = y0 + 28 + panelH + 44 + panelH + 48;
+  els.push(rect('ves_bg', 0, 0, W, canvasH, C.gray300, C.gray100, 1, false));
+  els.push(text('ves_pg', 0, 16, W, 20, 'Verify email link — outcome states', 13, C.gray500, 'center'));
+  els.push(text('ves_hint', 0, 34, W, 14,
+    'Runtime: one card after POST /api/auth/verify-email (success → redirect, no card)', 10, C.gray500, 'center'));
+
+  VERIFY_EMAIL_STATE_PANELS.forEach((def, index) => {
+    const col = index % 2;
+    const row = Math.floor(index / 2);
+    const x = startX + col * (panelW + gap);
+    const labelY = row === 0 ? y0 : y0 + 28 + panelH + 44;
+    const cardY = labelY + 28;
+
+    els.push(text(`${def.id}_lbl`, x, labelY, panelW, 16, def.stateLbl, 12, def.lblColor));
+    els.push(rect(`${def.id}_card`, x, cardY, panelW, panelH, C.gray300, C.white, 2, true));
+    paintVerifyEmailOutcomeCard(els, {
+      prefix: def.id,
+      cardX: x,
+      cardY,
+      cardW: panelW,
+      cardH: panelH,
+      variant: def.variant,
+      icon: def.icon,
+      title: def.title,
+      body: def.body,
+      notice: def.notice ?? null,
+      primaryCta: def.primaryCta ?? null,
+      backFooter: def.backFooter ?? false,
+      authFooter: def.authFooter ?? null,
+    }, wireAcc);
+  });
+
+  write('platform-foundation/verify-email-states.excalidraw', els, wireAcc.files);
+}
+
+/** User-facing checklist on workspace-provisioning (backend still provisions per module — see tenant-provisioning diagram). */
+const WP_UI_STEPS = [
+  { label: 'Creating your workspace', sub: "Preparing your organization's data" },
+  { label: 'Assigning admin role', sub: null },
+  { label: 'Opening workspace', sub: null },
+];
+
+/** Wireframe placeholder — production UI uses org display name from registration context. */
+const WP_DEMO_ORG_NAME = 'Acme Corp';
+
+/** Example in-progress retry line (live UI: max `attemptCount` across provisioning modules). */
+const WP_DEMO_ATTEMPT_LINE = 'Processing attempt 2 of 3';
+
+function pushCenteredInlineRow(els, id, panelX, panelW, y, fontSize, segments) {
+  const lineH = 16;
+  const totalW = inlineTextRowWidth(segments, fontSize);
+  const startX = panelX + Math.round((panelW - totalW) / 2);
+  const { els: rowEls } = inlineTextRow(id, startX, y, lineH, fontSize, segments);
+  els.push(...rowEls);
+}
+
+function paintProvisioningChecklist(els, prefix, stepsX, stepsY, stepStates, rowH = 36) {
+  let y = stepsY;
+  WP_UI_STEPS.forEach(({ label, sub }, i) => {
+    const { icon, color } = stepStates[i];
+    els.push(text(`${prefix}_si_${i}`, stepsX, y + 1, 18, 18, icon, 13, color));
+    els.push(text(`${prefix}_sl_${i}`, stepsX + 24, y, 320, 16, label, 12, color === C.gray300 ? C.gray300 : C.gray700));
+    if (sub) {
+      els.push(text(`${prefix}_ss_${i}`, stepsX + 24, y + 16, 320, 14, sub, 10, C.gray500));
+      y += rowH + 4;
+    } else {
+      y += rowH - 8;
+    }
+  });
+  return y;
+}
+
+/**
+ * Workspace-Provisioning — poll UI while tenant schemas provision (register-org AC).
+ * Reference board: in progress | failed after 3 retries. UI shows aggregated steps only (no module names).
  */
 function genWorkspaceProvisioning() {
   const els = [];
+  const wireAcc = { files: {} };
+  const rowH = 36;
+  const checklistRows = WP_UI_STEPS.length;
+  const heroH = 168;
+  const canvasH = 90 + heroH + 24 + checklistRows * rowH + 72;
 
-  els.push(rect('wp_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
+  els.push(rect('wp_bg', 0, 0, W, canvasH, C.gray300, C.gray100, 1, false));
 
-  // Shared header row
-  els.push(text('wp_logo',    0, 24, W, 28, '⬡  Axis',                  18, C.primary, 'center'));
-  els.push(text('wp_heading', 0, 60, W, 18, 'Workspace Setup — States', 12, C.gray500, 'center'));
-  els.push(vline('wp_div', W / 2, 86, H - 86, C.gray300));
+  const wpBrand = buildAxisLogo('wp', 0, 20, W, 'auth');
+  els.push(...wpBrand.els);
+  wireAcc.files = mergeExcalidrawFiles(wireAcc.files, wpBrand.files);
+  els.push(hline('wp_hdiv', 0, 60, W, C.gray300));
+  els.push(text('wp_heading', 0, 68, W, 18, 'Workspace provisioning — states', 12, C.gray500, 'center'));
+  els.push(text('wp_hint', 0, 86, W, 14, 'Poll GET /api/auth/provisioning-status every 5s (UI does not list modules)', 10, C.gray500, 'center'));
+  els.push(vline('wp_div', W / 2, 104, canvasH - 104, C.gray300));
 
-  // ── Left: In-progress ────────────────────────────────────────────────────────
-  const lX    = 40;
-  const lW    = W / 2 - 80;  // 520
-  const lMidX = W / 4;        // 300
+  const lX = 40;
+  const lW = W / 2 - 80;
+  const lMidX = W / 4;
+  const rX = W / 2 + 40;
+  const rW = W / 2 - 80;
+  const rMidX = (W * 3) / 4;
+  const lStepsX = lMidX - 168;
+  const rStepsX = rMidX - 168;
+  const headerY = 112;
 
-  els.push(text('wp_l_lbl', lX, 90, lW, 16, '↻  In progress', 12, C.primary));
-  els.push(ellipse('wp_l_spin',   lMidX - 28, 116, 56, 56, C.infoBorder, C.infoBg, 2));
-  els.push(text('wp_l_spin_t',    lMidX - 28, 131, 56, 26, '↻', 18, C.primary, 'center'));
-  els.push(text('wp_l_title', lX, 190, lW, 26, 'Setting up your workspace…', 18, C.gray900, 'center'));
-  els.push(text('wp_l_org',   lX, 222, lW, 18, 'For Acme Corp',              13, C.accent,  'center'));
-  els.push(text('wp_l_sub',   lX, 246, lW, 14, "Don't close this tab.",      11, C.gray500, 'center'));
+  // ── Left: In progress ────────────────────────────────────────────────────────
+  els.push(text('wp_l_lbl', lX, headerY, lW, 16, '↻  In progress', 12, C.primary));
+  els.push(ellipse('wp_l_spin', lMidX - 28, headerY + 26, 56, 56, C.infoBorder, C.infoBg, 2));
+  els.push(text('wp_l_spin_t', lMidX - 28, headerY + 41, 56, 26, '↻', 18, C.primary, 'center'));
+  els.push(text('wp_l_title', lX, headerY + 92, lW, 32,
+    `Setting up "${WP_DEMO_ORG_NAME}" workspace…`, 17, C.gray900, 'center'));
 
-  const stepsY  = 278;
-  const lStepsX = lMidX - 160;  // 140
-  [
-    { icon: '✓', label: 'Email verified',          c: C.success },
-    { icon: '↻', label: 'Creating your workspace', c: C.primary },
-    { icon: '○', label: 'Configuring defaults',    c: C.gray300 },
-    { icon: '○', label: 'Assigning admin role',    c: C.gray300 },
-  ].forEach(({ icon, label, c }, i) => {
-    const y = stepsY + i * 40;
-    els.push(text(`wp_l_si_${i}`, lStepsX,      y, 20,  20, icon,  14, c));
-    els.push(text(`wp_l_sl_${i}`, lStepsX + 28, y, 280, 20, label, 13, c === C.gray300 ? C.gray300 : C.gray700));
-  });
-  els.push(text('wp_l_note', lX, stepsY + 4 * 40 + 8, lW, 14,
-    'Retrying automatically if this takes longer.', 10, C.gray300, 'center'));
+  const lStepsY = headerY + 148;
+  const lEndY = paintProvisioningChecklist(
+    els,
+    'wp_l',
+    lStepsX,
+    lStepsY,
+    [
+      { icon: '↻', color: C.primary },
+      { icon: '○', color: C.gray300 },
+      { icon: '○', color: C.gray300 },
+    ],
+    rowH,
+  );
+  pushCenteredInlineRow(els, 'wp_l_attempt', lX, lW, lEndY + 10, 11, [
+    { text: WP_DEMO_ATTEMPT_LINE, color: C.gray500 },
+  ]);
 
   // ── Right: Failed (after 3 retries) ─────────────────────────────────────────
-  const rX    = W / 2 + 40;    // 640
-  const rW    = W / 2 - 80;    // 520
-  const rMidX = (W * 3) / 4;   // 900
+  els.push(text('wp_r_lbl', rX, headerY, rW, 16, '✕  Failed (after 3 retries)', 12, C.danger));
+  els.push(ellipse('wp_r_err', rMidX - 28, headerY + 26, 56, 56, C.dangerBorder, C.dangerBg, 2));
+  els.push(text('wp_r_err_t', rMidX - 28, headerY + 41, 56, 26, '✕', 18, C.danger, 'center'));
+  els.push(text('wp_r_title', rX, headerY + 92, rW, 26, 'Setup failed', 18, C.gray900, 'center'));
+  els.push(text('wp_r_body', rX, headerY + 120, rW, 20,
+    'Provisioning failed after 3 attempts.', 12, C.gray700, 'center'));
 
-  els.push(text('wp_r_lbl', rX, 90, rW, 16, '✕  Failed (after 3 retries)', 12, C.danger));
-  els.push(ellipse('wp_r_err',   rMidX - 28, 116, 56, 56, C.dangerBorder, C.dangerBg, 2));
-  els.push(text('wp_r_err_t',    rMidX - 28, 131, 56, 26, '✕', 18, C.danger, 'center'));
-  els.push(text('wp_r_title', rX, 190, rW, 26, 'Setup failed',                                        18, C.gray900, 'center'));
-  els.push(text('wp_r_body',  rX, 222, rW, 36, 'Provisioning failed after 3 attempts.\nOur team has been notified.', 12, C.gray700, 'center'));
+  const rStepsY = headerY + 148;
+  const rEndY = paintProvisioningChecklist(
+    els,
+    'wp_r',
+    rStepsX,
+    rStepsY,
+    [
+      { icon: '✕', color: C.danger },
+      { icon: '○', color: C.gray300 },
+      { icon: '○', color: C.gray300 },
+    ],
+    rowH,
+  );
+  pushCenteredInlineRow(els, 'wp_r_retry', rX, rW, rEndY + 8, 12, [
+    { text: 'Try again', color: C.primary, link: true },
+    { text: ' →', color: C.primary, link: true },
+  ]);
+  pushCenteredInlineRow(els, 'wp_r_supp', rX, rW, rEndY + 26, 11, [
+    { text: 'If the issue persists, ', color: C.gray500 },
+    { text: 'contact support', color: C.primary, link: true },
+    { text: ' →', color: C.primary, link: true },
+  ]);
 
-  const rStepsX = rMidX - 160;  // 740
-  [
-    { icon: '✓', label: 'Email verified',          c: C.success },
-    { icon: '✕', label: 'Creating your workspace', c: C.danger  },
-    { icon: '○', label: 'Configuring defaults',    c: C.gray300 },
-    { icon: '○', label: 'Assigning admin role',    c: C.gray300 },
-  ].forEach(({ icon, label, c }, i) => {
-    const y = stepsY + i * 40;
-    els.push(text(`wp_r_si_${i}`, rStepsX,      y, 20,  20, icon,  14, c));
-    els.push(text(`wp_r_sl_${i}`, rStepsX + 28, y, 280, 20, label, 13, c === C.gray300 ? C.gray300 : C.gray700));
-  });
-  els.push(text('wp_r_supp', rX, stepsY + 4 * 40 + 8, rW, 14,
-    'Contact support if the issue persists →', 11, C.primary, 'center'));
-
-  write('platform-foundation/workspace-provisioning.excalidraw', els);
+  write('platform-foundation/workspace-provisioning.excalidraw', els, wireAcc.files);
 }
 
 /**
@@ -1848,8 +2224,8 @@ runScreen('platform-foundation/register-org-complete-states', genRegisterOrgComp
 runScreen('platform-foundation/register-org-states', genRegisterOrgStates);
 runScreen('platform-foundation/register-org-provider-states', genRegisterOrgProviderStates);
 runScreen('platform-foundation/email-confirmation', genEmailConfirmation);
-runScreen('platform-foundation/verify-email', genVerifyEmail);
-runScreen('platform-foundation/verify-email-rate-limit', genVerifyEmailRateLimit);
+runScreen('platform-foundation/email-confirmation-states', genEmailConfirmationStates);
+runScreen('platform-foundation/verify-email-states', genVerifyEmailStates);
 runScreen('platform-foundation/workspace-provisioning', genWorkspaceProvisioning);
 runScreen('platform-foundation/pricing', genPricing);
 runScreen('platform-foundation/settings-org', genSettingsOrg);

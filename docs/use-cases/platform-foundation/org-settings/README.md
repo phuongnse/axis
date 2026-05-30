@@ -68,8 +68,3 @@ Allow organization admins to manage their organization's profile, settings, and 
 | settings-org-free-plan | [source](./settings-org-free-plan.excalidraw) | [preview](./settings-org-free-plan.svg) |
 | settings-org-access-denied | [source](./settings-org-access-denied.excalidraw) | [preview](./settings-org-access-denied.svg) |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

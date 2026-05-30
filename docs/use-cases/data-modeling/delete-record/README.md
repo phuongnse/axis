@@ -64,8 +64,3 @@ Users can create, read, update, and delete records against any model. Records ar
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

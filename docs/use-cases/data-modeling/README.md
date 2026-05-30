@@ -52,7 +52,7 @@ Custom data modeling is the core differentiator of Axis. Without it, the platfor
 
 ## Diagrams
 
-![Data Model Structure](./create-model/data-model.svg)
+See [Data model](./create-model/README.md#data-model) (Mermaid).
 
 ---
 

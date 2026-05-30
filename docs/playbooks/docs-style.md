@@ -47,6 +47,8 @@ Every `docs/use-cases/<domain>/<short-slug>/README.md` file uses these layouts s
 
 **Canonical example (multi-screen + diagrams):** [platform-foundation/register-org/README.md](../use-cases/platform-foundation/register-org/README.md). Copy that structure when refreshing older use cases.
 
+**Wireframe practice (generic):** [wireframes.md § Multi-screen journey pattern](./wireframes.md#multi-screen-journey-pattern) — happy path vs `*-states`, diagrams, generator habits; register-org is the concrete reference.
+
 ### Section order (after AC, before implementation status)
 
 ```text
@@ -75,7 +77,7 @@ Skip `## Screen flow` when there are **zero or one** local screen wireframes (a 
 
 Do **not** duplicate Excalidraw links here; links live only in `## Wireframes`.
 
-### `## Wireframes` (content rules)
+### Wireframes (content rules)
 
 - Assets live **flat** in the use-case folder (`<screen>.excalidraw` + `.svg` next to `README.md`).
 - Reference **shared kit** screens from `../../../wireframes/` (e.g. `app-shell`) — do not copy files into the use-case folder.
@@ -84,7 +86,7 @@ Do **not** duplicate Excalidraw links here; links live only in `## Wireframes`.
 - **Inventory:** every `*.excalidraw` **UI screen** in this folder must have a row. Include error/reference variants (`*-states`). Use `N/A` only when the use case truly has no wireframes.
 - **Columns:** minimum `| Screen | Excalidraw | Preview |`. When `## Screen flow` exists, use `| # | Screen | Role | Excalidraw | Preview |` — `#` matches flow steps (`1`, `2a`, `—` for non-step error screens); `Role` = short happy-path / error label.
 - **Row order:** happy-path screens first (same order as Screen flow), then error/reference screens (same order as the error table in Screen flow).
-- **Do not** list diagrams here (e.g. `*-flow`, `tenant-provisioning`, entity models) — those are not UI screens.
+- **Do not** list diagrams here (e.g. `*-flow`, `tenant-provisioning`, entity models) — those are not UI screens; sequence/architecture diagrams belong under `## Diagrams` as Mermaid, not in this table.
 
 Minimal table (few screens, no Screen flow):
 
@@ -110,22 +112,27 @@ Sequence/architecture drawings are under [Diagrams](#diagrams).
 | — | …-states | Error — … | [source](./….excalidraw) | [preview](./….svg) |
 ```
 
-### `## Diagrams` (content rules)
+### Diagrams (content rules)
 
-- List only `*.excalidraw` **diagrams stored in this use-case folder** (sequence, entity, architecture).
-- Standard table: `| Diagram | Source | Preview |` with `[source](./…)` / `[preview](./…)`.
-- **Related use cases:** if the flow continues in another use case, add one short prose line after the table — `**Related (next use case):** …` with links to that use case and diagram. Do not add another use case’s diagram as a row in this table (one file, one owning README). Keep the Related line brief; the table rule is enough — no need to say “not duplicated” in the README.
-- Use `| N/A | N/A | N/A |` when no local diagram exists (omit the Related line).
+- **Mermaid only** in this README (`sequenceDiagram`, `flowchart`, `erDiagram`, …) — one `### <diagram-slug>` section per diagram. First line inside each fence: `MERMAID_INIT` from [`mermaid-theme.mjs`](../diagrams/mermaid-theme.mjs) ([playbook](./mermaid.md)). **Do not** add Excalidraw diagram link tables in this section (pre-Mermaid inventory tables are retired).
+- **Standard set (multi-screen user journeys):**
+  - **One** `### <slug>-journey` `sequenceDiagram` — actor happy path from first screen through the use-case outcome (use `rect rgb(22, 35, 58)` phase bands; keep SSO/error branches minimal — details belong in `*-cases`).
+  - **Zero or one** `### <slug>-cases` `sequenceDiagram` — dev/QA map of API responses to `*-states` wireframes. Skip when there are few error screens.
+  - **Do not** add a second happy-path sequence (e.g. avoid both `*-flow` and `*-journey` for the same story).
+- Platform-wide architecture diagrams live in [docs/README.md § Key Diagrams](../README.md#key-diagrams), not duplicated here.
+- **Related use cases:** prefer **one use-case folder** for a single actor journey (e.g. register → verify → provisioning wait). Add extra `###` diagram sections (`tenant-provisioning`, …) instead of a second README. Link out only when the story is truly a different actor/domain. Do not paste another use case’s Mermaid in a separate folder if it is the same journey.
+- After diagrams, optional **APIs** or **Related** line — anchors within the same README (`#tenant-provisioning`), not duplicate folders.
+- Omit `## Diagrams` when this use case has no local diagram.
 
 ### Adopting this layout on existing use cases
 
 When touching an older use case that only has a flat wireframes table:
 
-1. Count `*.excalidraw` in the folder — split **screens** vs **diagrams** by naming and AC (screens = UI; diagrams = `*-flow`, `*-model`, etc.).
+1. Count `*.excalidraw` in the folder — **screens only** (UI wireframes). Sequence/entity content belongs in `## Diagrams` as Mermaid, not as `.excalidraw` files.
 2. Add or refresh `## Screen flow` if the when-to-add rules apply.
 3. Expand `## Wireframes` so **every screen file** has a row; add `#` / `Role` if helpful.
-4. Move cross-use-case diagram rows out of `## Diagrams` into `**Related:**` prose.
-5. Regenerate `.svg` if `.excalidraw` changed; run [`visual-artifact-checklist.md`](./visual-artifact-checklist.md).
+4. Move cross-use-case diagram references into `**Related:**` prose (link to the other README’s `###` anchor).
+5. Regenerate `.svg` if **wireframe** `.excalidraw` changed; run [`visual-artifact-checklist.md`](./visual-artifact-checklist.md). Preview Mermaid after diagram edits.
 
 No need to bulk-edit all use cases in one PR — update the use case you are already changing, and align siblings in the same domain when obvious.
 
@@ -183,7 +190,7 @@ Avoid writing engineering process constraints as end-user use cases. Keep those 
 ## When you add a new `.md` file
 
 1. Add the back-link header (per [`docs/README.md`](../README.md)): `> **Navigation**: [← parent.md](...)` so future readers can climb back up.
-2. Add a row to the relevant table in `docs/README.md` (playbooks / diagrams / wireframes).
+2. If it belongs in the docs hub: add a playbook row, a [Key Diagrams](../README.md#key-diagrams) index link, or a [Wireframes](../README.md#wireframes) domain pointer — **not** a per-screen wireframe file row (those stay in the owning use-case `## Wireframes` only).
 3. If it owns a topic, add it to the **Single source of truth** table.
 4. If the topic could be enforced mechanically, add a rule to `scripts/check-doc-drift.sh` — that is what makes the convention survive.
 

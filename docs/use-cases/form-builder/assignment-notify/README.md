@@ -76,8 +76,3 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

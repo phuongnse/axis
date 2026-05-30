@@ -71,8 +71,3 @@ Self-service registration flow where a new organization signs up and is automati
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

@@ -16,7 +16,9 @@ ROOT = Path(__file__).resolve().parent.parent
 USE_CASES = ROOT / "docs" / "use-cases"
 SKIP_DIRS = set()
 
-REQUIRED_HEADINGS = ["## Wireframes", "## Diagrams"]
+REQUIRED_HEADINGS = ["## Wireframes"]
+
+LEGACY_DIAGRAM_TABLE_HEADER = "| Diagram | Source | Preview |"
 
 # Placeholder markers from USE_CASE_TEMPLATE.md that must be replaced before a
 # use case can be considered written. Listed individually so the validator can
@@ -96,8 +98,18 @@ def check_file(path: Path) -> list[str]:
     ):
         issues.append(f"{rel}: missing wireframes table (need Screen, Excalidraw, Preview columns)")
 
-    if "| Diagram | Source | Preview |" not in text:
-        issues.append(f"{rel}: missing diagrams table header")
+    if LEGACY_DIAGRAM_TABLE_HEADER in text:
+        issues.append(
+            f"{rel}: legacy Excalidraw diagrams table — use Mermaid under ## Diagrams "
+            "(docs-style) or omit ## Diagrams when there is no local diagram",
+        )
+    elif "## Diagrams" in text:
+        diagrams_section = text.split("## Diagrams", 1)[1].split("\n## ", 1)[0]
+        if "```mermaid" not in diagrams_section:
+            issues.append(
+                f"{rel}: ## Diagrams must contain at least one ```mermaid block "
+                "(or omit ## Diagrams when there is no local diagram)",
+            )
 
     if "> **Implementation status**" not in text:
         issues.append(f"{rel}: missing implementation status callout")

@@ -52,11 +52,6 @@ Enforce subscription plan limits at the API so that organizations cannot exceed 
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |
 
 > **Implementation status**
 >
@@ -80,8 +75,3 @@ Enforce subscription plan limits at the API so that organizations cannot exceed 
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

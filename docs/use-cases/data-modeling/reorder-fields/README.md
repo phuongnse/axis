@@ -65,8 +65,3 @@ Each field in a model has a type that determines what data it stores, how it's v
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

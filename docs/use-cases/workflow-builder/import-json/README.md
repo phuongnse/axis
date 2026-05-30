@@ -70,8 +70,3 @@ Workflow definitions can be exported as portable JSON files and imported into an
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

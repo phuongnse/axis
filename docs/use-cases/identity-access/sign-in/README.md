@@ -89,6 +89,46 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 
 ## Diagrams
 
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| auth-flow | [source](./auth-flow.excalidraw) | [preview](./auth-flow.svg) |
+### auth-flow
+
+```mermaid
+%%{init: {'theme':'dark','themeVariables':{'background':'#0d1117','mainBkg':'#0d1117','primaryColor':'#161b22','primaryBorderColor':'#388bfd','primaryTextColor':'#e6edf3','secondaryColor':'#21262d','secondaryBorderColor':'#388bfd','secondaryTextColor':'#e6edf3','tertiaryColor':'#161b22','tertiaryTextColor':'#e6edf3','lineColor':'#58a6ff','textColor':'#e6edf3','nodeBorder':'#388bfd','clusterBkg':'#161b22','clusterBorder':'#388bfd','titleColor':'#e6edf3','edgeLabelBackground':'#161b22','actorBkg':'#161b22','actorBorder':'#388bfd','actorTextColor':'#e6edf3','signalColor':'#58a6ff','labelBoxBkgColor':'#161b22','labelBoxBorderColor':'#388bfd','noteBkgColor':'#161b22','noteBorderColor':'#388bfd','noteTextColor':'#c9d1d9','activationBkgColor':'#30363d'}}}%%
+sequenceDiagram
+  actor User as User
+  participant Web as Web App
+  participant API as API Server (OpenIddict)
+  participant Redis as Redis (blacklist)
+  participant DB as PostgreSQL
+
+  rect rgb(240, 249, 255)
+    Note over User,DB: Sign in
+    User->>Web: Enter email + password
+    Web->>API: POST /auth/token
+    API->>DB: Validate credentials
+    API-->>Web: access_token + refresh_token
+  end
+
+  rect rgb(240, 249, 255)
+    Note over User,DB: Authenticated request
+    User->>Web: Navigate / perform action
+    Web->>API: GET /resource (Bearer token)
+    API->>API: Validate JWT + set tenant
+    API-->>Web: 200 OK + data
+  end
+
+  rect rgb(240, 249, 255)
+    Note over User,DB: Silent token refresh
+    Web->>API: POST /auth/refresh (httpOnly cookie)
+    API->>DB: Validate + rotate refresh token
+    API-->>Web: new access_token + refresh_token
+  end
+
+  rect rgb(240, 249, 255)
+    Note over User,DB: Sign out
+    User->>Web: Click Sign Out
+    Web->>API: POST /auth/signout
+    API->>Redis: Blacklist access_token JTI
+    API->>DB: Revoke refresh token
+    API-->>Web: 200 OK
+  end
+```

@@ -70,8 +70,3 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

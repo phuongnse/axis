@@ -48,11 +48,6 @@ Compare available subscription plans so that I can choose the one that fits my n
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |
 
 > **Implementation status**
 >
@@ -74,8 +69,3 @@ Compare available subscription plans so that I can choose the one that fits my n
 |--------|------------|---------|
 | pricing | [source](./pricing.excalidraw) | [preview](./pricing.svg) |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

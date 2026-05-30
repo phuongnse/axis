@@ -61,8 +61,3 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

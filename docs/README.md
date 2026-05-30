@@ -27,6 +27,7 @@
 | [Frontend](./playbooks/frontend.md) | TanStack Query patterns, TypeScript discipline, routing, component design |
 | [Wireframe kit](./playbooks/wireframes.md) | Screen generators, kit sections; **agents:** [spacing & blocks contract](./wireframes/README.md#agent-contract) |
 | [Visual artifact checklist](./playbooks/visual-artifact-checklist.md) | Required review checklist for diagrams/wireframes/use-case visuals before commit |
+| [Mermaid theme](./playbooks/mermaid.md) | One `%%{init}%%` for every diagram in `docs/` |
 | [Docs style](./playbooks/docs-style.md) | Anti-patterns for `.md` files — single-owner rule, size budgets, when to create vs absorb |
 
 ---
@@ -47,39 +48,148 @@
 
 ## Key Diagrams
 
-All diagrams are Excalidraw (`.excalidraw` source + `.svg` preview). Regenerate with `node docs/diagrams/generate-diagrams.mjs` then `docs/scripts/generate-diagrams.ps1`.
+Platform **architecture** diagrams live here as **Mermaid** (one shared [dark theme](./playbooks/mermaid.md) via `docs/diagrams/mermaid-theme.mjs`). **UI wireframes** stay Excalidraw — see [Wireframes](#wireframes) below.
 
-**System-level** (`docs/diagrams/`):
+Use-case **sequence / entity** diagrams live in each use-case `README.md` under `## Diagrams` (also Mermaid). Index:
 
-| Diagram | Source | Preview |
-|---|---|---|
-| System Context | [system-context.excalidraw](./diagrams/system-context.excalidraw) | [system-context.svg](./diagrams/system-context.svg) |
-| Container Diagram | [container.excalidraw](./diagrams/container.excalidraw) | [container.svg](./diagrams/container.svg) |
-| Module Overview | [module-overview.excalidraw](./diagrams/module-overview.excalidraw) | [module-overview.svg](./diagrams/module-overview.svg) |
+| Diagram | Owner |
+|---|---|
+| Registration journey | [register-org § Diagrams](./use-cases/platform-foundation/register-org/README.md#diagrams) |
+| Register organization (flow + cases) | [register-org § Diagrams](./use-cases/platform-foundation/register-org/README.md#diagrams) |
+| Auth flow | [sign-in § Diagrams](./use-cases/identity-access/sign-in/README.md#diagrams) |
+| Data model | [create-model § Diagrams](./use-cases/data-modeling/create-model/README.md#diagrams) |
+| Workflow model | [create-workflow § Diagrams](./use-cases/workflow-builder/create-workflow/README.md#diagrams) |
+| Form model | [create-form § Diagrams](./use-cases/form-builder/create-form/README.md#diagrams) |
+| Execution flow | [start-execution § Diagrams](./use-cases/workflow-engine/start-execution/README.md#diagrams) |
 
-**Use-case-level** (inside each `docs/use-cases/{domain}/{use-case}/` folder):
+### System context
 
-| Diagram | Source | Preview |
-|---|---|---|
-| Tenant Provisioning | [tenant-provisioning.excalidraw](./use-cases/platform-foundation/provision-tenant/tenant-provisioning.excalidraw) | [tenant-provisioning.svg](./use-cases/platform-foundation/provision-tenant/tenant-provisioning.svg) |
-| Auth Flow | [auth-flow.excalidraw](./use-cases/identity-access/sign-in/auth-flow.excalidraw) | [auth-flow.svg](./use-cases/identity-access/sign-in/auth-flow.svg) |
-| Data Model | [data-model.excalidraw](./use-cases/data-modeling/create-model/data-model.excalidraw) | [data-model.svg](./use-cases/data-modeling/create-model/data-model.svg) |
-| Workflow Model | [workflow-model.excalidraw](./use-cases/workflow-builder/create-workflow/workflow-model.excalidraw) | [workflow-model.svg](./use-cases/workflow-builder/create-workflow/workflow-model.svg) |
-| Form Model | [form-model.excalidraw](./use-cases/form-builder/create-form/form-model.excalidraw) | [form-model.svg](./use-cases/form-builder/create-form/form-model.svg) |
-| Execution Flow | [execution-flow.excalidraw](./use-cases/workflow-engine/start-execution/execution-flow.excalidraw) | [execution-flow.svg](./use-cases/workflow-engine/start-execution/execution-flow.svg) |
+External actors and the Axis platform boundary. Detail: [ARCHITECTURE.md § System Context](./ARCHITECTURE.md#system-context).
+
+```mermaid
+%%{init: {'theme':'dark','themeVariables':{'background':'#0d1117','mainBkg':'#0d1117','primaryColor':'#161b22','primaryBorderColor':'#388bfd','primaryTextColor':'#e6edf3','secondaryColor':'#21262d','secondaryBorderColor':'#388bfd','secondaryTextColor':'#e6edf3','tertiaryColor':'#161b22','tertiaryTextColor':'#e6edf3','lineColor':'#58a6ff','textColor':'#e6edf3','nodeBorder':'#388bfd','clusterBkg':'#161b22','clusterBorder':'#388bfd','titleColor':'#e6edf3','edgeLabelBackground':'#161b22','actorBkg':'#161b22','actorBorder':'#388bfd','actorTextColor':'#e6edf3','signalColor':'#58a6ff','labelBoxBkgColor':'#161b22','labelBoxBorderColor':'#388bfd','noteBkgColor':'#161b22','noteBorderColor':'#388bfd','noteTextColor':'#c9d1d9','activationBkgColor':'#30363d'}}}%%
+
+flowchart LR
+  PA[Platform Admin]
+  OA[Org Admin]
+  OM[Org Member]
+  EU[End User]
+
+  subgraph Axis["Axis Platform"]
+    SPA[Web Application]
+    API[Axis.Api Gateway + Modules]
+  end
+
+  Email[(Email Service)]
+  ExtAPI[(External APIs)]
+  Webhook[(Webhook Targets)]
+
+  PA --> API
+  OA --> SPA
+  OM --> SPA
+  EU --> SPA
+  SPA --> API
+  API --> Email
+  API --> ExtAPI
+  API --> Webhook
+```
+
+### Container diagram
+
+Runtime containers in **layers** (top → bottom). Each module owns one PostgreSQL database; messaging is one shared layer below the module row. Detail: [ARCHITECTURE.md § Containers](./ARCHITECTURE.md#containers) (table + ADRs).
+
+```mermaid
+%%{init: {'theme':'dark','themeVariables':{'background':'#0d1117','mainBkg':'#0d1117','primaryColor':'#161b22','primaryBorderColor':'#388bfd','primaryTextColor':'#e6edf3','secondaryColor':'#21262d','secondaryBorderColor':'#388bfd','secondaryTextColor':'#e6edf3','tertiaryColor':'#161b22','tertiaryTextColor':'#e6edf3','lineColor':'#58a6ff','textColor':'#e6edf3','nodeBorder':'#388bfd','clusterBkg':'#161b22','clusterBorder':'#388bfd','titleColor':'#e6edf3','edgeLabelBackground':'#161b22','actorBkg':'#161b22','actorBorder':'#388bfd','actorTextColor':'#e6edf3','signalColor':'#58a6ff','labelBoxBkgColor':'#161b22','labelBoxBorderColor':'#388bfd','noteBkgColor':'#161b22','noteBorderColor':'#388bfd','noteTextColor':'#c9d1d9','activationBkgColor':'#30363d'}}}%%
+
+flowchart TB
+  SPA["Web Application<br/><small>React SPA · TanStack Query</small>"]
+
+  API["Axis.Api Gateway<br/><small>REST / OpenAPI · JWT via JWKS</small>"]
+
+  AUTH["OpenIddict + SignalR<br/><small>OAuth2 / OIDC · live execution status</small>"]
+
+  subgraph MOD["Module services — modulith boundaries (extractable to K8s services)"]
+    direction LR
+    ID[Identity]
+    DM[DataModeling]
+    WB[WorkflowBuilder]
+    FB[FormBuilder]
+    WE[WorkflowEngine]
+    PB[PageBuilder]
+  end
+
+  subgraph BUS["Cross-module transport"]
+    direction LR
+    K["Kafka + Schema Registry<br/><small>events · snapshots · Avro</small>"]
+    R["RabbitMQ<br/><small>commands · jobs · saga steps</small>"]
+    G["gRPC contracts<br/><small>sync RPC escape hatch</small>"]
+  end
+
+  PG[("PostgreSQL × 6<br/><small>one DB per module · schema-per-tenant · Wolverine outbox</small>")]
+
+  subgraph EXT["External & production ops"]
+    direction LR
+    Redis[("Redis<br/><small>cache · locks</small>")]
+    S3[("S3<br/><small>files</small>")]
+    Mail[("Email<br/><small>SMTP</small>")]
+    Vault[("Vault<br/><small>secrets</small>")]
+    Obs[("Observability<br/><small>Tempo · Loki · Mimir</small>")]
+  end
+
+  SPA --> API
+  API --> AUTH
+  API --> MOD
+  MOD --> BUS
+  MOD --> PG
+  MOD --> EXT
+```
+
+### Module overview
+
+Cross-module communication (Kafka events, RabbitMQ commands, gRPC escape hatch). Detail: [ARCHITECTURE.md](./ARCHITECTURE.md).
+
+```mermaid
+%%{init: {'theme':'dark','themeVariables':{'background':'#0d1117','mainBkg':'#0d1117','primaryColor':'#161b22','primaryBorderColor':'#388bfd','primaryTextColor':'#e6edf3','secondaryColor':'#21262d','secondaryBorderColor':'#388bfd','secondaryTextColor':'#e6edf3','tertiaryColor':'#161b22','tertiaryTextColor':'#e6edf3','lineColor':'#58a6ff','textColor':'#e6edf3','nodeBorder':'#388bfd','clusterBkg':'#161b22','clusterBorder':'#388bfd','titleColor':'#e6edf3','edgeLabelBackground':'#161b22','actorBkg':'#161b22','actorBorder':'#388bfd','actorTextColor':'#e6edf3','signalColor':'#58a6ff','labelBoxBkgColor':'#161b22','labelBoxBorderColor':'#388bfd','noteBkgColor':'#161b22','noteBorderColor':'#388bfd','noteTextColor':'#c9d1d9','activationBkgColor':'#30363d'}}}%%
+
+flowchart TB
+  SK[Shared Kernel — primitives & abstractions]
+
+  ID[Identity]
+  DM[DataModeling]
+  WB[WorkflowBuilder]
+  FB[FormBuilder]
+  WE[WorkflowEngine]
+  PB[PageBuilder]
+
+  SK --- ID & DM & WB & FB
+  Kafka[Kafka + Schema Registry — Events / Snapshots]
+  RMQ[RabbitMQ — Commands / Jobs / Saga steps]
+  GRPC[gRPC — sync RPC escape hatch]
+
+  WB -->|publish| Kafka
+  Kafka -->|consume| WE
+  RMQ -->|consume command| FB
+  WE -->|local read model| WE
+```
 
 ## Wireframes
 
-Excalidraw wireframes/diagrams live alongside each use case in `docs/use-cases/{domain}/{short-slug}/`. Shared app shell only: `docs/wireframes/app-shell`. Kit source is `.mjs` (`blocks.mjs`, `generate-template.mjs`). Each use case uses a `## Wireframes` + `## Diagrams` table (see [use-case template](./use-cases/USE_CASE_TEMPLATE.md)).
+Screen wireframes use Excalidraw (`.excalidraw` + `.svg`). Each use case lists its screens under `## Wireframes` in that use case’s README.
 
-| Screen | Source | Preview |
-|---|---|---|
-| Register organization | [register-org.excalidraw](./use-cases/platform-foundation/register-org/register-org.excalidraw) | [register-org.svg](./use-cases/platform-foundation/register-org/register-org.svg) |
-| Verify email | [verify-email.excalidraw](./use-cases/platform-foundation/verify-email/verify-email.excalidraw) | [verify-email.svg](./use-cases/platform-foundation/verify-email/verify-email.svg) |
-| Pricing | [pricing.excalidraw](./use-cases/platform-foundation/view-plans/pricing.excalidraw) | [pricing.svg](./use-cases/platform-foundation/view-plans/pricing.svg) |
-| Change password | [change-password.excalidraw](./use-cases/identity-access/change-password/change-password.excalidraw) | [change-password.svg](./use-cases/identity-access/change-password/change-password.svg) |
-| Reset password | [forgot-password.excalidraw](./use-cases/identity-access/reset-password/forgot-password.excalidraw) | [forgot-password.svg](./use-cases/identity-access/reset-password/forgot-password.svg) |
-| Accept invitation | [accept-invitation.excalidraw](./use-cases/identity-access/accept-invite/accept-invitation.excalidraw) | [accept-invitation.svg](./use-cases/identity-access/accept-invite/accept-invitation.svg) |
+| What | Where |
+|------|--------|
+| Browse by domain | [use-cases](./use-cases/README.md) → domain `README.md` → use-case `README.md` → `## Wireframes` |
+| Shared app shell | [wireframes/app-shell](./wireframes/app-shell.excalidraw) (kit under [wireframes/](./wireframes/), generators in [wireframes.md](./playbooks/wireframes.md)) |
+| Use-case layout rules | [USE_CASE_TEMPLATE](./use-cases/USE_CASE_TEMPLATE.md) · [docs-style § Wireframes](./playbooks/docs-style.md#wireframes-content-rules) |
+
+**Example use cases** (full wireframe table + screen flow):
+
+| Use case | Why open this |
+|----------|----------------|
+| [register-org § Wireframes](./use-cases/platform-foundation/register-org/README.md#wireframes) | Multi-screen happy path, error `*-states`, links to Mermaid diagrams |
+| [register-org § Wireframes](./use-cases/platform-foundation/register-org/README.md#wireframes) | Registration journey; verify errors in `verify-email-states` only |
+
+Regenerate screen `.svg` after `.excalidraw` changes: `node docs/wireframes/generate-screens.mjs` and Kroki (see [wireframes.md](./playbooks/wireframes.md)).
 
 ---
 
@@ -98,3 +208,4 @@ When two docs disagree, the **owner** wins. Update the owner first; everything e
 | Daily agent workflow + gates | [playbooks/agent-checklist.md](./playbooks/agent-checklist.md) |
 | Local dev (compose, ports, URLs) | [playbooks/local-dev.md](./playbooks/local-dev.md) + [`docker-compose.yml`](../docker-compose.yml) |
 | Implementation patterns and pitfalls | [playbooks/patterns.md](./playbooks/patterns.md) (start at [patterns-index.md](./playbooks/patterns-index.md)) |
+| UI wireframes (per screen / use case) | `docs/use-cases/{domain}/{use-case}/README.md` → `## Wireframes` ([hub § Wireframes](./README.md#wireframes) for navigation only) |

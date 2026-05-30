@@ -65,8 +65,3 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

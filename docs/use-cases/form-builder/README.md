@@ -50,7 +50,7 @@ Forms are the primary mechanism for human interaction within a workflow. Without
 
 ## Diagrams
 
-![Form Model](./create-form/form-model.svg)
+See [Form model](./create-form/README.md#form-model) (Mermaid).
 
 ---
 

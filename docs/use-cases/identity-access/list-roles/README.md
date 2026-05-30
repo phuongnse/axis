@@ -62,8 +62,3 @@ Organization admins can create custom roles, assign permissions to each role, an
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

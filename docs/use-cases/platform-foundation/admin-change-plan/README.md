@@ -79,8 +79,3 @@ Define subscription plan tiers with feature limits and enforce those limits at t
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

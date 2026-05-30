@@ -72,8 +72,3 @@ A workflow must have at least one trigger before it can be published. Triggers d
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

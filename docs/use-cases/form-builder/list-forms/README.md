@@ -67,8 +67,3 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |
