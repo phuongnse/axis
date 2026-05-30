@@ -96,8 +96,16 @@ def check_file(path: Path) -> list[str]:
     ):
         issues.append(f"{rel}: missing wireframes table (need Screen, Excalidraw, Preview columns)")
 
-    if "| Diagram | Source | Preview |" not in text:
-        issues.append(f"{rel}: missing diagrams table header")
+    diagrams_section = ""
+    if "## Diagrams" in text:
+        diagrams_section = text.split("## Diagrams", 1)[1].split("\n## ", 1)[0]
+    has_legacy_diagrams_table = "| Diagram | Source | Preview |" in text
+    has_mermaid_diagrams = "## Diagrams" in text and "```mermaid" in diagrams_section
+    if not has_legacy_diagrams_table and not has_mermaid_diagrams:
+        issues.append(
+            f"{rel}: missing diagrams "
+            "(need ```mermaid under ## Diagrams, or | Diagram | Source | Preview | table)",
+        )
 
     if "> **Implementation status**" not in text:
         issues.append(f"{rel}: missing implementation status callout")

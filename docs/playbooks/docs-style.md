@@ -77,7 +77,7 @@ Skip `## Screen flow` when there are **zero or one** local screen wireframes (a 
 
 Do **not** duplicate Excalidraw links here; links live only in `## Wireframes`.
 
-### `## Wireframes` (content rules)
+### Wireframes (content rules)
 
 - Assets live **flat** in the use-case folder (`<screen>.excalidraw` + `.svg` next to `README.md`).
 - Reference **shared kit** screens from `../../../wireframes/` (e.g. `app-shell`) — do not copy files into the use-case folder.
@@ -112,7 +112,7 @@ Sequence/architecture drawings are under [Diagrams](#diagrams).
 | — | …-states | Error — … | [source](./….excalidraw) | [preview](./….svg) |
 ```
 
-### `## Diagrams` (content rules)
+### Diagrams (content rules)
 
 - **Mermaid only** in this README (`sequenceDiagram`, `flowchart`, `erDiagram`, …) — one `### <diagram-slug>` section per diagram. First line inside each fence: `MERMAID_INIT` from [`mermaid-theme.mjs`](../diagrams/mermaid-theme.mjs) ([playbook](./mermaid.md)).
 - **Standard set (multi-screen user journeys):**
