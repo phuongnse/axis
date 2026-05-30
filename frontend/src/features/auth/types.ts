@@ -27,6 +27,10 @@ export interface LoginAttemptResult {
   location: string | null;
 }
 
+export interface VerifyEmailResponse {
+  sessionEstablished: boolean;
+}
+
 export interface ProvisioningStatusResponse {
   organizationId: string;
   organizationStatus: string;

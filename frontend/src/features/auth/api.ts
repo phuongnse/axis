@@ -8,12 +8,14 @@ import {
   loadPkceSession,
   REDIRECT_URI,
 } from './pkce';
+import { storePostVerifyProvisioningToken } from './post-verify-session';
 import type {
   LoginAttemptResult,
   LoginCredentials,
   ProvisioningStatusResponse,
   RegisterOrganizationRequest,
   RegisterOrganizationResponse,
+  VerifyEmailResponse,
 } from './types';
 
 export const authKeys = {
@@ -138,11 +140,18 @@ export async function exchangeAuthorizationCode(code: string): Promise<string> {
   return data.access_token;
 }
 
-export async function verifyEmail(token: string): Promise<void> {
-  await fetchApi<null>('/auth/verify-email', {
+export async function verifyEmail(token: string): Promise<VerifyEmailResponse> {
+  return fetchApi<VerifyEmailResponse>('/auth/verify-email', {
     method: 'POST',
     body: JSON.stringify({ token }),
   });
+}
+
+export async function completePostVerifyPkceFlow(verificationToken: string): Promise<void> {
+  storePostVerifyProvisioningToken(verificationToken);
+  const pkce = createPkceSession();
+  const authorizeUrl = await buildAuthorizeUrl(pkce.state, pkce.verifier);
+  window.location.assign(authorizeUrl);
 }
 
 export async function resendVerificationEmail(email: string): Promise<void> {

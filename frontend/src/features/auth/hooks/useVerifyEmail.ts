@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 
-import { verifyEmail } from '@/features/auth/api';
+import { completePostVerifyPkceFlow, verifyEmail } from '@/features/auth/api';
 import { getProblemDetail } from '@/features/auth/problem-details';
 import type { VerifyEmailErrorKind } from '@/features/auth/types';
 import { ApiError } from '@/lib/api';
@@ -20,7 +20,12 @@ export function useVerifyEmail() {
 
   const mutation = useMutation({
     mutationFn: verifyEmail,
-    onSuccess: (_data, token) => {
+    onSuccess: async (data, token) => {
+      if (data.sessionEstablished) {
+        await completePostVerifyPkceFlow(token);
+        return;
+      }
+
       void navigate({
         to: '/provisioning',
         search: { token },
