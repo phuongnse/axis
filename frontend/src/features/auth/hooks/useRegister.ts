@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
 import { useRef } from 'react';
 import { type FieldPath, type UseFormReturn, useForm } from 'react-hook-form';
 
@@ -8,12 +9,10 @@ import {
   registerOrganization,
   toAdminNameParts,
 } from '@/features/auth/api';
+import { saveRegistrationContext } from '@/features/auth/registration-context';
 import { type RegisterFormValues, registerSchema } from '@/features/auth/schemas/register-schema';
 import type { RegisterValidationErrorData } from '@/features/auth/types';
 import { ApiError } from '@/lib/api';
-
-const DEFAULT_SUCCESS_MESSAGE =
-  'Registration successful. Please check your email to verify your account.';
 
 const GENERIC_SUBMIT_ERROR = 'Something went wrong, please try again';
 
@@ -82,6 +81,7 @@ function applyRegisterValidationErrors(
 }
 
 export function useRegister() {
+  const navigate = useNavigate();
   const idempotencyKeyRef = useRef(createRegisterIdempotencyKey());
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -110,8 +110,13 @@ export function useRegister() {
         idempotencyKeyRef.current,
       );
     },
-    onSuccess: () => {
+    onSuccess: (_data, values) => {
+      saveRegistrationContext({
+        email: values.email.trim(),
+        organizationName: values.organizationName.trim(),
+      });
       form.reset();
+      void navigate({ to: '/register/confirmation' });
     },
     onError: (error: unknown) => {
       if (error instanceof ApiError && error.status < 500) {
@@ -139,22 +144,9 @@ export function useRegister() {
     }
   }
 
-  function resetFlow() {
-    idempotencyKeyRef.current = createRegisterIdempotencyKey();
-    mutation.reset();
-    form.clearErrors();
-    form.reset();
-  }
-
-  const successMessage = mutation.isSuccess
-    ? (mutation.data?.message ?? DEFAULT_SUCCESS_MESSAGE)
-    : null;
-
   return {
     form,
     loading: mutation.isPending,
-    successMessage,
     submit,
-    resetFlow,
   };
 }

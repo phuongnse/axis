@@ -5,9 +5,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RegisterPage } from '../src/features/auth/components/RegisterPage';
 import { renderWithRouter } from './render-with-router';
 
+const navigateMock = vi.fn();
+
+vi.mock('@tanstack/react-router', async () => {
+  const actual =
+    await vi.importActual<typeof import('@tanstack/react-router')>('@tanstack/react-router');
+  return {
+    ...actual,
+    useNavigate: () => navigateMock,
+  };
+});
+
 describe('RegisterPage', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
+    navigateMock.mockReset();
+    sessionStorage.clear();
   });
 
   afterEach(() => {
@@ -28,7 +41,7 @@ describe('RegisterPage', () => {
     expect(screen.getByText('Password confirmation is required')).toBeInTheDocument();
   });
 
-  it('shows confirmation screen after successful submit', async () => {
+  it('navigates to confirmation screen after successful submit', async () => {
     const user = userEvent.setup();
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,
@@ -50,12 +63,10 @@ describe('RegisterPage', () => {
     await user.type(screen.getByLabelText('Confirm password'), 'Passw0rd');
     await user.click(screen.getByRole('button', { name: /create account/i }));
 
-    expect(await screen.findByRole('heading', { name: /check your email/i })).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'If an account exists for this email, you will receive a verification link shortly.',
-      ),
-    ).toBeInTheDocument();
+    expect(navigateMock).toHaveBeenCalledWith({ to: '/register/confirmation' });
+    const stored = sessionStorage.getItem('axis.registration-context');
+    expect(stored).toContain('alex@example.com');
+    expect(stored).toContain("O'Brien & Co.");
   });
 
   it('maps backend validation errors to inline field messages', async () => {

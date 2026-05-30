@@ -11,9 +11,15 @@ import {
 import type {
   LoginAttemptResult,
   LoginCredentials,
+  ProvisioningStatusResponse,
   RegisterOrganizationRequest,
   RegisterOrganizationResponse,
 } from './types';
+
+export const authKeys = {
+  all: ['auth'] as const,
+  provisioningStatus: (token: string) => [...authKeys.all, 'provisioning-status', token] as const,
+};
 
 interface TokenResponse {
   access_token: string;
@@ -130,6 +136,25 @@ export async function exchangeAuthorizationCode(code: string): Promise<string> {
   clearPkceSession();
   useAuthStore.getState().setSession(data.access_token);
   return data.access_token;
+}
+
+export async function verifyEmail(token: string): Promise<void> {
+  await fetchApi<null>('/auth/verify-email', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  });
+}
+
+export async function resendVerificationEmail(email: string): Promise<void> {
+  await fetchApi<null>('/auth/resend-verification', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function getProvisioningStatus(token: string): Promise<ProvisioningStatusResponse> {
+  const params = new URLSearchParams({ token });
+  return fetchApi<ProvisioningStatusResponse>(`/auth/provisioning-status?${params.toString()}`);
 }
 
 /** Best-effort server sign-out; callers must clear local session regardless of outcome. */
