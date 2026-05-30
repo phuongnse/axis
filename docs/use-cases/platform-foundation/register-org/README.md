@@ -180,7 +180,7 @@ Maps to *Tenant provisioning* ACs. **Backend** (async, per module): [`tenant-pro
 
 | UI step | Covers (spec) |
 |---------|----------------|
-| **Creating your workspace** | All tenant-scoped module schemas + migrations (AC: per-module backend work, one user-facing line) |
+| **Creating your workspace** | Subcopy: *Preparing your organization's data* — backend: all tenant-scoped module schemas + migrations (AC: per-module work, one user-facing line) |
 | **Assigning admin role** | AC: Admin role when provisioning completes |
 | **Opening workspace** | AC: redirect to dashboard when org ACTIVE |
 

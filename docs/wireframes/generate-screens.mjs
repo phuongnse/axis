@@ -966,7 +966,7 @@ function genVerifyEmailStates() {
 
 /** User-facing checklist on workspace-provisioning (backend still provisions per module — see tenant-provisioning diagram). */
 const WP_UI_STEPS = [
-  { label: 'Creating your workspace', sub: 'Tenant database and defaults' },
+  { label: 'Creating your workspace', sub: "Preparing your organization's data" },
   { label: 'Assigning admin role', sub: null },
   { label: 'Opening workspace', sub: null },
 ];
