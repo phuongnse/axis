@@ -52,10 +52,13 @@ public static class OrganizationEndpoints
             request.AdminFirstName,
             request.AdminLastName,
             request.AdminEmail,
-            request.Password,
-            request.PasswordConfirmation,
+            request.Password ?? string.Empty,
+            request.PasswordConfirmation ?? string.Empty,
             request.SubscriptionPlanId,
-            idempotencyKey), ct);
+            idempotencyKey,
+            request.ExternalRegistrationSessionId,
+            request.AcceptedTermsVersion,
+            request.AcceptedPrivacyVersion), ct);
 
         // always return the same success screen — no email-existence leakage
         return Results.Ok(new

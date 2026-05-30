@@ -23,6 +23,8 @@ public sealed class User : AggregateRoot<Guid>
     public int FailedLoginAttempts { get; private set; }
     public DateTime? LockedUntil { get; private set; }
     public DateTime CreatedAt { get; private set; }
+    public string? AcceptedTermsVersion { get; private set; }
+    public string? AcceptedPrivacyVersion { get; private set; }
 
     public bool IsLockedOut => LockedUntil.HasValue && DateTime.UtcNow < LockedUntil.Value;
 
@@ -67,6 +69,18 @@ public sealed class User : AggregateRoot<Guid>
 
         IsEmailVerified = true;
         RaiseDomainEvent(new OrganizationVerified(OrganizationId));
+    }
+
+    public void RecordLegalAcceptance(string termsVersion, string privacyVersion)
+    {
+        if (string.IsNullOrWhiteSpace(termsVersion))
+            throw new ArgumentException("Terms version is required.", nameof(termsVersion));
+
+        if (string.IsNullOrWhiteSpace(privacyVersion))
+            throw new ArgumentException("Privacy version is required.", nameof(privacyVersion));
+
+        AcceptedTermsVersion = termsVersion.Trim();
+        AcceptedPrivacyVersion = privacyVersion.Trim();
     }
 
     public void RecordFailedLogin()

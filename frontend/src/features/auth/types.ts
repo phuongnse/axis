@@ -5,10 +5,22 @@ export interface RegisterOrganizationRequest {
   admin_email: string;
   password: string;
   password_confirmation: string;
+  external_registration_session_id?: string;
+  accepted_terms_version?: string;
+  accepted_privacy_version?: string;
 }
 
 export interface RegisterOrganizationResponse {
   message?: string;
+}
+
+export interface ExternalProvidersResponse {
+  providers: string[];
+}
+
+export interface ExternalRegistrationSessionResponse {
+  email: string;
+  display_name: string;
 }
 
 export interface RegisterValidationErrorData {
@@ -26,3 +38,13 @@ export interface LoginAttemptResult {
   authorizeUrl: string;
   location: string | null;
 }
+
+export type ExternalProviderId = 'microsoft' | 'google' | 'github';
+
+export const LEGAL_VERSION = '1.0';
+
+export const EXTERNAL_PROVIDER_LABELS: Record<ExternalProviderId, string> = {
+  microsoft: 'Microsoft',
+  google: 'Google',
+  github: 'GitHub',
+};

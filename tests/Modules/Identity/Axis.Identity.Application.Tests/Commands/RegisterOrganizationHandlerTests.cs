@@ -25,7 +25,11 @@ public class RegisterOrganizationHandlerTests
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     private RegisterOrganizationHandler CreateHandler() =>
-        new(_orgRepo, _planRepo, _userRepo, _roleRepo, _idempotencyRepo, _verificationTokenStore, _hasher, _emailSender, _uow);
+        new(_orgRepo, _planRepo, _userRepo, _roleRepo, _idempotencyRepo,
+            Substitute.For<IExternalRegistrationSessionRepository>(),
+            Substitute.For<IUserExternalLoginRepository>(),
+            Substitute.For<ITenantModuleProvisioningRepository>(),
+            _verificationTokenStore, _hasher, _emailSender, _uow);
 
     private static RegisterOrganizationCommand ValidCommand() => new(
         OrgName: "Acme Corp",

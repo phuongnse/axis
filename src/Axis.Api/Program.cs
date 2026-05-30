@@ -20,6 +20,7 @@ using Axis.FormBuilder.Contracts;
 using Axis.FormBuilder.Infrastructure.Extensions;
 using Axis.FormBuilder.Infrastructure.Persistence;
 using Axis.Identity.Application.Commands.RegisterOrganization;
+using Axis.Identity.Application.Services;
 using Axis.Identity.Contracts;
 using Axis.Identity.Infrastructure.Extensions;
 using Axis.Identity.Infrastructure.Persistence;
@@ -284,7 +285,10 @@ try
             // Challenge returns 302 to /connect/login — only hit by the authorize endpoint.
             // API endpoints use OpenIddict validation which challenges with 401 Bearer.
             opts.LoginPath = "/connect/login";
-        });
+        })
+        .AddExternalRegistrationProviders(builder.Configuration);
+
+    builder.Services.AddSingleton<IExternalAuthProviderRegistry, ExternalAuthProviderRegistry>();
 
     builder.Services.AddOpenIddict()
         // Core: EF Core token/application/scope stores (registered in IdentityInfrastructureExtensions)
@@ -484,6 +488,7 @@ try
 
     // ── OpenIddict connect endpoints ───────────────────────────────────────
     app.MapConnectEndpoints();
+    app.MapExternalRegistrationEndpoints();
 
     // ── Module endpoints ───────────────────────────────────────────────────
     app.MapAuthEndpoints();

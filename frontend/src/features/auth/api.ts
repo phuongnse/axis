@@ -9,6 +9,8 @@ import {
   REDIRECT_URI,
 } from './pkce';
 import type {
+  ExternalProvidersResponse,
+  ExternalRegistrationSessionResponse,
   LoginAttemptResult,
   LoginCredentials,
   RegisterOrganizationRequest,
@@ -50,6 +52,29 @@ export async function registerOrganization(
     },
     body: JSON.stringify(payload),
   });
+}
+
+export async function fetchExternalProviders(): Promise<string[]> {
+  const response = await fetchApi<ExternalProvidersResponse>('/auth/external-providers');
+  return response.providers ?? [];
+}
+
+export async function fetchExternalRegistrationSession(
+  sessionId: string,
+): Promise<ExternalRegistrationSessionResponse> {
+  return fetchApi<ExternalRegistrationSessionResponse>(`/auth/external-registration/${sessionId}`);
+}
+
+export function buildExternalRegistrationUrl(provider: string): string {
+  return `/connect/external/register/${provider}`;
+}
+
+export function slugifyOrganizationName(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
 export class LoginRequestError extends Error {
