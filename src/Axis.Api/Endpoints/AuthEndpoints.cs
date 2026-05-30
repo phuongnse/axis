@@ -3,6 +3,7 @@ using Axis.Api.Extensions;
 using Axis.Api.Infrastructure;
 using Axis.Identity.Application.Commands.RequestPasswordReset;
 using Axis.Identity.Application.Commands.ResetPassword;
+using Axis.Identity.Application.Commands.RetryTenantProvisioning;
 using Axis.Identity.Application.Commands.VerifyEmail;
 using Axis.Identity.Application.Queries.GetProvisioningStatus;
 using Axis.Shared.Domain.Primitives;
@@ -43,6 +44,14 @@ public static class AuthEndpoints
             .WithTags("Identity")
             .Produces<ProvisioningStatusDto>()
             .Produces(404);
+
+        group.MapPost("/retry-provisioning", RetryProvisioning)
+            .AllowAnonymous()
+            .WithName("RetryTenantProvisioning")
+            .WithSummary("Manually re-queue tenant provisioning after automatic retries are exhausted")
+            .WithTags("Identity")
+            .Produces(204)
+            .ProducesProblem(400);
 
         group.MapPost("/resend-verification", ResendVerification)
             .AllowAnonymous()
@@ -128,6 +137,18 @@ public static class AuthEndpoints
             return Results.NotFound();
 
         return Results.Ok(status);
+    }
+
+    private static async Task<IResult> RetryProvisioning(
+        [FromBody] RetryProvisioningRequest request,
+        ISender mediator,
+        CancellationToken ct)
+    {
+        Result result = await mediator.Send(new RetryTenantProvisioningCommand(request.Token), ct);
+        if (result.IsFailure)
+            return result.ToProblemDetails();
+
+        return Results.NoContent();
     }
 
     private static async Task<IResult> ResendVerification(

@@ -76,4 +76,12 @@ public sealed class TenantModuleProvisioning : Entity<(Guid OrganizationId, stri
         AttemptCount = attemptCount;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
+
+    public void ResetForManualRetry()
+    {
+        Status = TenantModuleProvisioningStatus.Pending;
+        AttemptCount = 0;
+        LastError = null;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
 }
