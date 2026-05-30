@@ -73,8 +73,3 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

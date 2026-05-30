@@ -69,8 +69,3 @@ Form fields define what data the form collects. Each field has a type, label, he
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

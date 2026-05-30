@@ -76,8 +76,3 @@ Allow users to reset forgotten passwords, change their current password, and man
 |--------|------------|---------|
 | forgot-password | [source](./forgot-password.excalidraw) | [preview](./forgot-password.svg) |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

@@ -69,8 +69,3 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

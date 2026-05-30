@@ -70,8 +70,3 @@ Allow organization admins to manage their organization's profile, settings, and 
 |--------|------------|---------|
 | settings-org-profile-states | [source](./settings-org-profile-states.excalidraw) | [preview](./settings-org-profile-states.svg) |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

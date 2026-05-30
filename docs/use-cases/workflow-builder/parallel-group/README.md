@@ -68,8 +68,3 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

@@ -89,8 +89,3 @@ Define user-facing localization and visual theme behavior for the SPA so each us
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

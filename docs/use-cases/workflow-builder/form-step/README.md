@@ -71,8 +71,3 @@ Each step has a type that determines what it does when executed. Users configure
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

@@ -86,7 +86,7 @@ Do **not** duplicate Excalidraw links here; links live only in `## Wireframes`.
 - **Inventory:** every `*.excalidraw` **UI screen** in this folder must have a row. Include error/reference variants (`*-states`). Use `N/A` only when the use case truly has no wireframes.
 - **Columns:** minimum `| Screen | Excalidraw | Preview |`. When `## Screen flow` exists, use `| # | Screen | Role | Excalidraw | Preview |` — `#` matches flow steps (`1`, `2a`, `—` for non-step error screens); `Role` = short happy-path / error label.
 - **Row order:** happy-path screens first (same order as Screen flow), then error/reference screens (same order as the error table in Screen flow).
-- **Do not** list diagrams here (e.g. `*-flow`, `tenant-provisioning`, entity models) — those are not UI screens.
+- **Do not** list diagrams here (e.g. `*-flow`, `tenant-provisioning`, entity models) — those are not UI screens; sequence/architecture diagrams belong under `## Diagrams` as Mermaid, not in this table.
 
 Minimal table (few screens, no Screen flow):
 
@@ -114,7 +114,7 @@ Sequence/architecture drawings are under [Diagrams](#diagrams).
 
 ### Diagrams (content rules)
 
-- **Mermaid only** in this README (`sequenceDiagram`, `flowchart`, `erDiagram`, …) — one `### <diagram-slug>` section per diagram. First line inside each fence: `MERMAID_INIT` from [`mermaid-theme.mjs`](../diagrams/mermaid-theme.mjs) ([playbook](./mermaid.md)).
+- **Mermaid only** in this README (`sequenceDiagram`, `flowchart`, `erDiagram`, …) — one `### <diagram-slug>` section per diagram. First line inside each fence: `MERMAID_INIT` from [`mermaid-theme.mjs`](../diagrams/mermaid-theme.mjs) ([playbook](./mermaid.md)). **Do not** add Excalidraw diagram link tables in this section (pre-Mermaid inventory tables are retired).
 - **Standard set (multi-screen user journeys):**
   - **One** `### <slug>-journey` `sequenceDiagram` — actor happy path from first screen through the use-case outcome (use `rect rgb(22, 35, 58)` phase bands; keep SSO/error branches minimal — details belong in `*-cases`).
   - **Zero or one** `### <slug>-cases` `sequenceDiagram` — dev/QA map of API responses to `*-states` wireframes. Skip when there are few error screens.

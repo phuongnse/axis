@@ -260,7 +260,7 @@ done
 #   - "docs/epics/"            → old folder, removed
 #   - "_template-feature-us"   → old template name, replaced by USE_CASE_TEMPLATE.md
 # Scope: docs/, .github/, CLAUDE.md, CONTRIBUTING.md, README.md.
-STALE_TERM_PATTERN='feature file|see gaps below|^> \*\*Wireframe\*\*:|docs/epics/|_template-feature-us'
+STALE_TERM_PATTERN='feature file|see gaps below|^> \*\*Wireframe\*\*:|docs/epics/|_template-feature-us|\| Diagram \| Source \| Preview \|'
 STALE_TERM_FILES="$(find docs .github -type f -name '*.md' 2>/dev/null) CLAUDE.md CONTRIBUTING.md README.md"
 for target in ${STALE_TERM_FILES}; do
   [ -f "${target}" ] || continue

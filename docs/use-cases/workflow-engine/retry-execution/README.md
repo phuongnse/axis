@@ -71,8 +71,3 @@ When a workflow execution fails at a step, users can manually retry from the fai
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

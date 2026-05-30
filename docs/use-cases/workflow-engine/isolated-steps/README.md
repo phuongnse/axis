@@ -54,11 +54,6 @@ Handler specifications (Form, HTTP, Condition, Script, Notification) remain docu
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |
 
 > **Implementation status**
 >
@@ -83,8 +78,3 @@ Handler specifications (Form, HTTP, Condition, Script, Notification) remain docu
 |--------|------------|---------|
 | execution-detail | [source](./execution-detail.excalidraw) | [preview](./execution-detail.svg) |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

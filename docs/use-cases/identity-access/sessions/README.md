@@ -72,8 +72,3 @@ Allow users to reset forgotten passwords, change their current password, and man
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

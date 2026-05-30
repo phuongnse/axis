@@ -66,8 +66,3 @@ Organization admins can invite new members, manage their accounts, and deactivat
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |

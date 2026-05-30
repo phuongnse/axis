@@ -65,8 +65,3 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 |--------|------------|---------|
 | N/A | N/A | N/A |
 
-## Diagrams
-
-| Diagram | Source | Preview |
-|---------|--------|---------|
-| N/A | N/A | N/A |
