@@ -35,6 +35,7 @@ import {
   btn, inputField, selectField, badge, searchBar, pageHeader, fieldLabel,
   appShell, component, translate, writeExcalidraw, setSeed,
   stateHeadline, semanticVariantColor, wrappedTextBlock,
+  inlineTextRow, inlineTextRowWidth,
 } from './components.mjs';
 
 import {
@@ -974,6 +975,17 @@ const WP_UI_STEPS = [
 /** Wireframe placeholder — production UI uses org display name from registration context. */
 const WP_DEMO_ORG_NAME = 'Acme Corp';
 
+/** Example in-progress retry line (live UI: max `attemptCount` across provisioning modules). */
+const WP_DEMO_ATTEMPT_LINE = 'Processing attempt 2 of 3';
+
+function pushCenteredInlineRow(els, id, panelX, panelW, y, fontSize, segments) {
+  const lineH = 16;
+  const totalW = inlineTextRowWidth(segments, fontSize);
+  const startX = panelX + Math.round((panelW - totalW) / 2);
+  const { els: rowEls } = inlineTextRow(id, startX, y, lineH, fontSize, segments);
+  els.push(...rowEls);
+}
+
 function paintProvisioningChecklist(els, prefix, stepsX, stepsY, stepStates, rowH = 36) {
   let y = stepsY;
   WP_UI_STEPS.forEach(({ label, sub }, i) => {
@@ -1042,16 +1054,17 @@ function genWorkspaceProvisioning() {
     ],
     rowH,
   );
-  els.push(text('wp_l_note', lX, lEndY + 8, lW, 28,
-    'If setup is slow, we retry automatically (up to 3 attempts).', 10, C.gray300, 'center'));
+  pushCenteredInlineRow(els, 'wp_l_attempt', lX, lW, lEndY + 10, 11, [
+    { text: WP_DEMO_ATTEMPT_LINE, color: C.gray500 },
+  ]);
 
   // ── Right: Failed (after 3 retries) ─────────────────────────────────────────
   els.push(text('wp_r_lbl', rX, headerY, rW, 16, '✕  Failed (after 3 retries)', 12, C.danger));
   els.push(ellipse('wp_r_err', rMidX - 28, headerY + 26, 56, 56, C.dangerBorder, C.dangerBg, 2));
   els.push(text('wp_r_err_t', rMidX - 28, headerY + 41, 56, 26, '✕', 18, C.danger, 'center'));
   els.push(text('wp_r_title', rX, headerY + 92, rW, 26, 'Setup failed', 18, C.gray900, 'center'));
-  els.push(text('wp_r_body', rX, headerY + 120, rW, 40,
-    'Provisioning failed after 3 attempts.\nOur team has been notified.', 12, C.gray700, 'center'));
+  els.push(text('wp_r_body', rX, headerY + 120, rW, 20,
+    'Provisioning failed after 3 attempts.', 12, C.gray700, 'center'));
 
   const rStepsY = headerY + 148;
   const rEndY = paintProvisioningChecklist(
@@ -1066,9 +1079,15 @@ function genWorkspaceProvisioning() {
     ],
     rowH,
   );
-  els.push(text('wp_r_retry', rX, rEndY + 8, rW, 14, 'Try again →', 11, C.primary, 'center'));
-  els.push(text('wp_r_supp', rX, rEndY + 26, rW, 14,
-    'Contact support if the issue persists →', 11, C.gray500, 'center'));
+  pushCenteredInlineRow(els, 'wp_r_retry', rX, rW, rEndY + 8, 12, [
+    { text: 'Try again', color: C.primary, link: true },
+    { text: ' →', color: C.primary, link: true },
+  ]);
+  pushCenteredInlineRow(els, 'wp_r_supp', rX, rW, rEndY + 26, 11, [
+    { text: 'If the issue persists, ', color: C.gray500 },
+    { text: 'contact support', color: C.primary, link: true },
+    { text: ' →', color: C.primary, link: true },
+  ]);
 
   write('platform-foundation/workspace-provisioning.excalidraw', els, wireAcc.files);
 }

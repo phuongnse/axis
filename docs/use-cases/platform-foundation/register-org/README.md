@@ -183,8 +183,9 @@ Maps to *Tenant provisioning* ACs. **Backend** (async, per module): [`tenant-pro
 |-----------------|------|
 | Headline | `Setting up "{organizationName}" workspace…` (placeholder **Acme Corp** on wireframe) |
 | Tab | User may leave; poll resumes on return until redirect when `isReady` |
-| Footer (in progress) | `If setup is slow, we retry automatically (up to 3 attempts).` — matches coordinator `MaxAttempts = 3` |
-| Failure actions | **Try again →** then **Contact support if the issue persists →** |
+| Footer (in progress) | `Processing attempt {n} of 3` — `n` = highest `attemptCount` among modules while any module is still retrying; hide when complete |
+| Failure body | `Provisioning failed after 3 attempts.` (no “team notified” copy on screen — platform alert is backend-only) |
+| Failure actions | Underlined **Try again** link; gray lead-in + underlined **contact support** link (`mailto:` or `/support` TBD) |
 
 | UI step | Covers (spec) |
 |---------|----------------|
