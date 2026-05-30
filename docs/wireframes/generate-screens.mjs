@@ -34,7 +34,7 @@ import {
   rect, ellipse, text, hline, vline, arrow,
   btn, inputField, selectField, badge, searchBar, pageHeader, fieldLabel,
   appShell, component, translate, writeExcalidraw, setSeed,
-  stateHeadline, semanticVariantColor, wrappedTextBlock,
+  stateHeadline, wrappedTextBlock,
   inlineTextRow, inlineTextRowWidth,
 } from './components.mjs';
 
@@ -778,24 +778,49 @@ function genEmailConfirmationStates() {
 }
 
 /**
- * Measure verify-email outcome card height (brand bar + headline + body + optional CTA/footer).
+ * Measure verify-email outcome card (brand bar + stateHeadline + body + optional banner/CTA/footer).
  */
-function measureVerifyEmailOutcomeCardH(body, { hasCta = false, accentLine = false } = {}) {
-  const headY = 68;
+function measureVerifyEmailOutcomeCardH({
+  body,
+  notice = null,
+  primaryCta = false,
+  backFooter = false,
+  authFooter = false,
+}) {
+  const headTop = 68;
+  let cy = headTop + AUTH_HEADLINE_H + AUTH_BODY_GAP;
   const bodyBlock = wrappedTextBlock('m', 0, 0, AUTH_INNER_W, body, 13, C.gray700, 0.78);
-  let cy = headY + AUTH_HEADLINE_H + AUTH_BODY_GAP + bodyBlock.blockH + 12;
-  if (accentLine) {
-    cy += 22;
+  cy += bodyBlock.blockH + 12;
+  if (notice) {
+    const banner = authNoticeBanner(
+      'm',
+      0,
+      cy,
+      AUTH_INNER_W,
+      { title: notice.title, body: notice.body },
+      notice.variant ?? 'warning',
+    );
+    cy += banner.blockH + 12;
   }
-  if (hasCta) {
+  if (primaryCta) {
     cy += 48;
   }
-  return cy + AUTH_CARD_FOOTER_ZONE;
+  if (backFooter || authFooter) {
+    return cy + AUTH_CARD_FOOTER_ZONE;
+  }
+  return cy + 24;
+}
+
+function paintAuthSubmitButtonDisabled(prefix, cardX, y, cardW, label) {
+  const btnW = cardW - AUTH_CARD_PAD_X * 2;
+  return [
+    rect(`${prefix}_sbtn`, cardX + AUTH_CARD_PAD_X, y, btnW, 36, C.gray300, C.gray100, 1, true),
+    text(`${prefix}_sbtn_t`, cardX + AUTH_CARD_PAD_X, y + 10, btnW, 16, label, 13, C.gray300, 'center'),
+  ];
 }
 
 /**
- * Paint verify-email outcome card (verify-email-states panels).
- * @param {{ variant: string, icon: string, title: string, body: string, cta?: { label: string, variant?: string, disabled?: boolean }, accentLine?: string, footer?: object }} opts
+ * Paint verify-email outcome card (matches email-confirmation / provider-error auth style).
  */
 function paintVerifyEmailOutcomeCard(els, opts, wireAcc) {
   const {
@@ -808,9 +833,10 @@ function paintVerifyEmailOutcomeCard(els, opts, wireAcc) {
     icon,
     title,
     body,
-    cta = null,
-    accentLine = null,
-    footer = null,
+    notice = null,
+    primaryCta = null,
+    backFooter = false,
+    authFooter = null,
   } = opts;
 
   const brand = buildAuthCardBrandBar(prefix, cardX, cardY, cardW);
@@ -818,147 +844,145 @@ function paintVerifyEmailOutcomeCard(els, opts, wireAcc) {
   wireAcc.files = mergeExcalidrawFiles(wireAcc.files, brand.files);
 
   const ix = cardX + AUTH_CARD_PAD_X;
+  const innerW = cardW - AUTH_CARD_PAD_X * 2;
   const headY = cardY + 68;
-  els.push(...stateHeadline(prefix, ix, headY, AUTH_INNER_W, icon, variant, title, 16));
+  els.push(...stateHeadline(prefix, ix, headY, innerW, icon, variant, title, 16));
 
   let cy = headY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
-  const bodyBlock = wrappedTextBlock(`${prefix}_body`, ix, cy, AUTH_INNER_W, body, 13, C.gray700, 0.78);
+  const bodyBlock = wrappedTextBlock(`${prefix}_body`, ix, cy, innerW, body, 13, C.gray700, 0.78);
   els.push(...bodyBlock.els);
   cy += bodyBlock.blockH + 12;
 
-  if (accentLine) {
-    els.push(text(`${prefix}_accent`, ix, cy, AUTH_INNER_W, 18, accentLine, 13, semanticVariantColor(variant === 'warning' ? 'warning' : 'info')));
-    cy += 22;
+  if (notice) {
+    const banner = authNoticeBanner(
+      `${prefix}_notice`,
+      ix,
+      cy,
+      innerW,
+      { title: notice.title, body: notice.body },
+      notice.variant ?? 'warning',
+    );
+    els.push(...banner.els);
+    cy += banner.blockH + 12;
   }
 
-  if (cta) {
-    const btnY = cy;
-    if (cta.disabled) {
-      els.push(rect(`${prefix}_cta`, ix, btnY, 220, 36, C.gray300, C.gray100, 1, true));
-      els.push(text(`${prefix}_cta_t`, ix, btnY + 10, 220, 16, cta.label, 13, C.gray300, 'center'));
+  if (primaryCta) {
+    if (primaryCta.disabled) {
+      els.push(...paintAuthSubmitButtonDisabled(prefix, cardX, cy, cardW, primaryCta.label));
     } else {
-      els.push(...btn(`${prefix}_cta`, ix, btnY, cta.label, cta.variant ?? 'secondary'));
+      els.push(...buildAuthSubmitButton(prefix, cardX, cy, cardW, primaryCta.label));
     }
     cy += 48;
   }
 
-  if (footer) {
-    els.push(...buildAuthCardFooter(prefix, cardX, cardY, cardW, cardH, footer));
+  if (backFooter) {
+    els.push(...buildAuthCardBackFooter(prefix, cardX, cardY, cardW, cardH, 'Back to registration'));
+  }
+  if (authFooter) {
+    els.push(...buildAuthCardFooter(prefix, cardX, cardY, cardW, cardH, authFooter));
   }
 }
 
+/** Panel definitions for verify-email-states reference board. */
+const VERIFY_EMAIL_STATE_PANELS = [
+  {
+    id: 'ves_exp',
+    stateLbl: 'Expired link',
+    lblColor: C.warning,
+    variant: 'warning',
+    icon: '⏱',
+    title: 'Verification link expired',
+    body: 'This link was valid for 24 hours. Request a new verification email.',
+    primaryCta: { label: 'Resend verification email' },
+  },
+  {
+    id: 'ves_used',
+    stateLbl: 'Already verified',
+    lblColor: C.gray500,
+    variant: 'neutral',
+    icon: '✓',
+    title: 'Already verified',
+    body: 'This link has already been used.',
+    authFooter: { lead: 'Ready to continue?', link: 'Go to sign in', forwardArrow: true },
+  },
+  {
+    id: 'ves_inv',
+    stateLbl: 'Invalid token',
+    lblColor: C.danger,
+    variant: 'danger',
+    icon: '✕',
+    title: 'Invalid verification link',
+    body: 'This link is invalid or has been tampered with.',
+    backFooter: true,
+  },
+  {
+    id: 'ves_rl',
+    stateLbl: 'Resend rate limit (429)',
+    lblColor: C.warning,
+    variant: 'warning',
+    icon: '⏳',
+    title: 'Please wait',
+    body: 'Too many resend requests for this email.',
+    notice: {
+      variant: 'warning',
+      title: 'Please wait before requesting another email.',
+      body: 'You reached the resend limit (3 per hour). Try again in 37 minutes.',
+    },
+    primaryCta: { label: 'Resend verification email', disabled: true },
+  },
+];
+
 /**
  * Verify-Email — link-click error / edge states (reference board; runtime shows one card).
- * 2×2: expired, already used, invalid, resend rate limit (429 from this page).
+ * 2×2 layout aligned with email-confirmation-states.
  */
 function genVerifyEmailStates() {
   const els = [];
   const wireAcc = { files: {} };
-  const cardW = AUTH_CARD_W;
-  const gapX = 60;
-  const gapY = 36;
-  const col1X = Math.round((W - (cardW * 2 + gapX)) / 2);
-  const col2X = col1X + cardW + gapX;
-  const row1Y = 100;
-  const panels = [
-    {
-      id: 'ves_exp',
-      x: col1X,
-      y: row1Y,
-      stateLbl: 'Expired link',
-      lblColor: C.warning,
-      variant: 'warning',
-      icon: '⏱',
-      title: 'Verification link expired',
-      body: 'This link was valid for 24 hours.',
-      cta: { label: 'Resend verification email', variant: 'secondary' },
-    },
-    {
-      id: 'ves_used',
-      x: col2X,
-      y: row1Y,
-      stateLbl: 'Already verified',
-      lblColor: C.gray500,
-      variant: 'neutral',
-      icon: '✓',
-      title: 'Already verified',
-      body: 'This link has already been used. Please sign in.',
-      cta: { label: 'Sign in', variant: 'ghost' },
-    },
-    {
-      id: 'ves_inv',
-      x: col1X,
-      stateLbl: 'Invalid token',
-      lblColor: C.danger,
-      variant: 'danger',
-      icon: '✕',
-      title: 'Invalid verification link',
-      body: 'This link is invalid or has been tampered with.',
-    },
-    {
-      id: 'ves_rl',
-      x: col2X,
-      stateLbl: 'Resend rate limit (429)',
-      lblColor: C.warning,
-      variant: 'warning',
-      icon: '⏳',
-      title: 'Please wait before requesting another email.',
-      body: 'You reached the resend limit (3 requests per hour).',
-      accentLine: 'Try again in 37 minutes.',
-      cta: { label: 'Resend verification email', disabled: true },
-    },
-  ];
+  const panelW = AUTH_CARD_W;
+  const gap = 40;
+  const startX = Math.round((W - (panelW * 2 + gap)) / 2);
+  const y0 = 40;
 
-  const row1CardH = Math.max(
-    measureVerifyEmailOutcomeCardH(panels[0].body, { hasCta: true }),
-    measureVerifyEmailOutcomeCardH(panels[1].body, { hasCta: true }),
+  const panelH = Math.max(
+    ...VERIFY_EMAIL_STATE_PANELS.map((def) => measureVerifyEmailOutcomeCardH({
+      body: def.body,
+      notice: def.notice ?? null,
+      primaryCta: Boolean(def.primaryCta),
+      backFooter: Boolean(def.backFooter),
+      authFooter: Boolean(def.authFooter),
+    })),
   );
-  const row2Y = row1Y + row1CardH + gapY;
-  panels[0].y = row1Y;
-  panels[1].y = row1Y;
-  panels[2].y = row2Y;
-  panels[3].y = row2Y;
-  const row2CardH = Math.max(
-    measureVerifyEmailOutcomeCardH(panels[2].body),
-    measureVerifyEmailOutcomeCardH(panels[3].body, { hasCta: true, accentLine: true }),
-  );
-  const canvasH = row2Y + row2CardH + 48;
 
+  const canvasH = y0 + 28 + panelH + 44 + panelH + 48;
   els.push(rect('ves_bg', 0, 0, W, canvasH, C.gray300, C.gray100, 1, false));
-  els.push(text('ves_pg', 0, 48, W, 20, 'Verify email link — outcome states', 13, C.gray500, 'center'));
+  els.push(text('ves_pg', 0, 16, W, 20, 'Verify email link — outcome states', 13, C.gray500, 'center'));
+  els.push(text('ves_hint', 0, 34, W, 14,
+    'Runtime: one card after POST /api/auth/verify-email (success → redirect, no card)', 10, C.gray500, 'center'));
 
-  panels.forEach((panel) => {
-    const {
-      id,
-      x,
-      y,
-      stateLbl,
-      lblColor,
-      variant,
-      icon,
-      title,
-      body,
-      cta,
-      accentLine,
-    } = panel;
-    const cardH = measureVerifyEmailOutcomeCardH(body, {
-      hasCta: Boolean(cta),
-      accentLine: Boolean(accentLine),
-    });
-    els.push(text(`${id}_lbl`, x, y - 20, cardW, 16, stateLbl, 12, lblColor));
-    els.push(rect(`${id}_card`, x, y, cardW, cardH, C.gray300, C.white, 2, true));
+  VERIFY_EMAIL_STATE_PANELS.forEach((def, index) => {
+    const col = index % 2;
+    const row = Math.floor(index / 2);
+    const x = startX + col * (panelW + gap);
+    const labelY = row === 0 ? y0 : y0 + 28 + panelH + 44;
+    const cardY = labelY + 28;
+
+    els.push(text(`${def.id}_lbl`, x, labelY, panelW, 16, def.stateLbl, 12, def.lblColor));
+    els.push(rect(`${def.id}_card`, x, cardY, panelW, panelH, C.gray300, C.white, 2, true));
     paintVerifyEmailOutcomeCard(els, {
-      prefix: id,
+      prefix: def.id,
       cardX: x,
-      cardY: y,
-      cardW,
-      cardH,
-      variant,
-      icon,
-      title,
-      body,
-      cta,
-      accentLine,
+      cardY,
+      cardW: panelW,
+      cardH: panelH,
+      variant: def.variant,
+      icon: def.icon,
+      title: def.title,
+      body: def.body,
+      notice: def.notice ?? null,
+      primaryCta: def.primaryCta ?? null,
+      backFooter: def.backFooter ?? false,
+      authFooter: def.authFooter ?? null,
     }, wireAcc);
   });
 

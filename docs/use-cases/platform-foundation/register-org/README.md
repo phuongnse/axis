@@ -131,7 +131,7 @@ Step **2b** is a path, not a separate UI file — only **2a** adds `register-org
 | `register-org-states` | Validation or 5xx on the entry form |
 | `register-org-complete-states` | Validation or Terms not accepted on completion form |
 | `email-confirmation-states` | Resend from confirmation screen: in-flight, success (204), rate limit (429) |
-| `verify-email-states` | Verify link **errors only** (expired, already used, invalid, 429) — reference board; runtime shows one card |
+| `verify-email-states` | Verify link **errors only** (expired, already used, invalid, 429) — reference board; runtime shows one card. Same auth kit as `email-confirmation`: `buildAuthCardBrandBar`, `stateHeadline`, `authNoticeBanner` (429), full-width `buildAuthSubmitButton`, footer links |
 
 ```mermaid
 %%{init: {'theme':'dark','themeVariables':{'background':'#0d1117','mainBkg':'#0d1117','primaryColor':'#161b22','primaryBorderColor':'#388bfd','primaryTextColor':'#e6edf3','secondaryColor':'#21262d','secondaryBorderColor':'#388bfd','secondaryTextColor':'#e6edf3','tertiaryColor':'#161b22','tertiaryTextColor':'#e6edf3','lineColor':'#58a6ff','textColor':'#e6edf3','nodeBorder':'#388bfd','clusterBkg':'#161b22','clusterBorder':'#388bfd','titleColor':'#e6edf3','edgeLabelBackground':'#161b22','actorBkg':'#161b22','actorBorder':'#388bfd','actorTextColor':'#e6edf3','signalColor':'#58a6ff','labelBoxBkgColor':'#161b22','labelBoxBorderColor':'#388bfd','noteBkgColor':'#161b22','noteBorderColor':'#388bfd','noteTextColor':'#c9d1d9','activationBkgColor':'#30363d'}}}%%
