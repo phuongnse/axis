@@ -174,16 +174,17 @@ Record **accepted ToS/Privacy version** on the account at org create (AC above);
 
 ## Workspace-provisioning UI (step 4)
 
-Maps to *Tenant provisioning* ACs and [`tenant-provisioning`](#tenant-provisioning). **Runtime:** one checklist driven by `GET /api/auth/provisioning-status?token=` (poll every 5 seconds). The wireframe is a **reference board** (in progress | module failed).
+Maps to *Tenant provisioning* ACs. **Backend** (async, per module): [`tenant-provisioning`](#tenant-provisioning) diagram — Kafka, schema `tenant_{orgId:N}`, migrations, retries.
 
-| Checklist row | Spec source |
-|---------------|-------------|
-| **Data modeling**, **Workflow builder**, **Form builder**, **Workflow engine** | Per-module PostgreSQL schema + EF migrations ([ARCHITECTURE.md](../../../ARCHITECTURE.md) tenant-scoped services; Page Builder excluded — not started) |
-| Subcopy *Schema + migrations* | AC: schema created per module + base tables migrated |
-| **Assigning admin role** | AC: registering user gets Admin role when provisioning completes |
-| **Opening workspace** | AC: redirect to functional workspace / dashboard when org is ACTIVE |
+**UI (this wireframe):** one **aggregated** checklist — do **not** show Data modeling / Workflow builder / … by name. Poll `GET /api/auth/provisioning-status?token=` every 5 seconds; map API `orgStatus` + module aggregate to the three rows below (icons only — no module list).
 
-**Not shown on this screen:** email verification (prior step — redirect here on verify 200). **Failure:** one module stuck failed after retries → failed panel; platform alert per AC.
+| UI step | Covers (spec) |
+|---------|----------------|
+| **Creating your workspace** | All tenant-scoped module schemas + migrations (AC: per-module backend work, one user-facing line) |
+| **Assigning admin role** | AC: Admin role when provisioning completes |
+| **Opening workspace** | AC: redirect to dashboard when org ACTIVE |
+
+**Failure:** failed panel when provisioning cannot complete after retries; platform alert per AC. Email verification is the prior step (redirect here on verify 200).
 
 ## Wireframes
 
@@ -194,7 +195,7 @@ Nine screens in this folder (four happy-path UI steps, five `*-states` reference
 | 1 · 2b | register-org | Happy path — entry (1); email/password submit (2b) | [source](./register-org.excalidraw) | [preview](./register-org.svg) |
 | 2a | register-org-complete | Happy path — post-OAuth completion | [source](./register-org-complete.excalidraw) | [preview](./register-org-complete.svg) |
 | 3 | email-confirmation | Happy path — after create (resend link idle) | [source](./email-confirmation.excalidraw) | [preview](./email-confirmation.svg) |
-| 4 | workspace-provisioning | Poll UI — per-module checklist + final steps (reference: in progress \| failed) | [source](./workspace-provisioning.excalidraw) | [preview](./workspace-provisioning.svg) |
+| 4 | workspace-provisioning | Poll UI — aggregated checklist (reference: in progress \| failed) | [source](./workspace-provisioning.excalidraw) | [preview](./workspace-provisioning.svg) |
 | — | email-confirmation-states | Resend from step 3 — in-flight, 204, 429 | [source](./email-confirmation-states.excalidraw) | [preview](./email-confirmation-states.svg) |
 | — | verify-email-states | Verify link errors — expired, used, invalid, 429 | [source](./verify-email-states.excalidraw) | [preview](./verify-email-states.svg) |
 | — | register-org-provider-states | Error — SSO before completion | [source](./register-org-provider-states.excalidraw) | [preview](./register-org-provider-states.svg) |
@@ -268,7 +269,7 @@ sequenceDiagram
       Web-->>Admin: Workspace / dashboard
     else Schema still provisioning
       Web->>API: GET /api/auth/provisioning-status?token=
-      API-->>Web: Module progress
+      API-->>Web: Org status (modules not shown in UI)
       Web-->>Admin: workspace-provisioning screen
     end
   end
@@ -311,7 +312,7 @@ sequenceDiagram
   rect rgb(22, 35, 58)
     Note over Web,API: workspace-provisioning UI
     Web->>API: GET /api/auth/provisioning-status?token=
-    API-->>Web: Per-module progress (poll ~5s)
+    API-->>Web: Org + module status (UI maps to aggregated checklist)
     Web-->>Web: Redirect to dashboard when ACTIVE
   end
 ```

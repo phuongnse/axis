@@ -964,62 +964,39 @@ function genVerifyEmailStates() {
   write('platform-foundation/verify-email-states.excalidraw', els, wireAcc.files);
 }
 
-/**
- * Tenant-scoped modules in register-org AC (schema + migrations each). Page Builder omitted — not started per ARCHITECTURE.
- */
-const WP_TENANT_MODULES = [
-  'Data modeling',
-  'Workflow builder',
-  'Form builder',
-  'Workflow engine',
+/** User-facing checklist on workspace-provisioning (backend still provisions per module — see tenant-provisioning diagram). */
+const WP_UI_STEPS = [
+  { label: 'Creating your workspace', sub: 'Tenant database and defaults' },
+  { label: 'Assigning admin role', sub: null },
+  { label: 'Opening workspace', sub: null },
 ];
 
-/** Final steps after all modules succeed (register-org tenant provisioning AC). */
-const WP_FINAL_STEPS = [
-  'Assigning admin role',
-  'Opening workspace',
-];
-
-function paintProvisioningChecklist(els, prefix, stepsX, stepsY, steps, rowH = 34) {
-  steps.forEach(({ icon, label, sub, color }, i) => {
-    const y = stepsY + i * rowH;
+function paintProvisioningChecklist(els, prefix, stepsX, stepsY, stepStates, rowH = 36) {
+  let y = stepsY;
+  WP_UI_STEPS.forEach(({ label, sub }, i) => {
+    const { icon, color } = stepStates[i];
     els.push(text(`${prefix}_si_${i}`, stepsX, y + 1, 18, 18, icon, 13, color));
     els.push(text(`${prefix}_sl_${i}`, stepsX + 24, y, 320, 16, label, 12, color === C.gray300 ? C.gray300 : C.gray700));
     if (sub) {
       els.push(text(`${prefix}_ss_${i}`, stepsX + 24, y + 16, 320, 14, sub, 10, C.gray500));
+      y += rowH + 4;
+    } else {
+      y += rowH - 8;
     }
   });
-  return stepsY + steps.length * rowH;
-}
-
-function buildWorkspaceProvisioningSteps(moduleStates, finalStates) {
-  const steps = WP_TENANT_MODULES.map((label, i) => ({
-    icon: moduleStates[i].icon,
-    label,
-    sub: 'Schema + migrations',
-    color: moduleStates[i].color,
-  }));
-  WP_FINAL_STEPS.forEach((label, i) => {
-    steps.push({
-      icon: finalStates[i].icon,
-      label,
-      sub: null,
-      color: finalStates[i].color,
-    });
-  });
-  return steps;
+  return y;
 }
 
 /**
  * Workspace-Provisioning — poll UI while tenant schemas provision (register-org AC).
- * Reference board: in progress (per-module checklist) | failed after 3 retries on one module.
+ * Reference board: in progress | failed after 3 retries. UI shows aggregated steps only (no module names).
  */
 function genWorkspaceProvisioning() {
   const els = [];
   const wireAcc = { files: {} };
-  const rowH = 34;
-  const checklistRows = WP_TENANT_MODULES.length + WP_FINAL_STEPS.length;
-  const canvasH = 90 + 188 + 24 + checklistRows * rowH + 48;
+  const rowH = 36;
+  const checklistRows = WP_UI_STEPS.length;
+  const canvasH = 90 + 188 + 24 + checklistRows * rowH + 56;
 
   els.push(rect('wp_bg', 0, 0, W, canvasH, C.gray300, C.gray100, 1, false));
 
@@ -1028,7 +1005,7 @@ function genWorkspaceProvisioning() {
   wireAcc.files = mergeExcalidrawFiles(wireAcc.files, wpBrand.files);
   els.push(hline('wp_hdiv', 0, 60, W, C.gray300));
   els.push(text('wp_heading', 0, 68, W, 18, 'Workspace provisioning — states', 12, C.gray500, 'center'));
-  els.push(text('wp_hint', 0, 86, W, 14, 'Runtime polls GET /api/auth/provisioning-status every 5s', 10, C.gray500, 'center'));
+  els.push(text('wp_hint', 0, 86, W, 14, 'Poll GET /api/auth/provisioning-status every 5s (UI does not list modules)', 10, C.gray500, 'center'));
   els.push(vline('wp_div', W / 2, 104, canvasH - 104, C.gray300));
 
   const lX = 40;
@@ -1050,28 +1027,20 @@ function genWorkspaceProvisioning() {
   els.push(text('wp_l_sub', lX, headerY + 140, lW, 14, "Don't close this tab.", 11, C.gray500, 'center'));
 
   const lStepsY = headerY + 168;
-  els.push(text('wp_l_sec', lStepsX, lStepsY - 18, 340, 14, 'Per-module (tenant schema)', 10, C.gray500));
   const lEndY = paintProvisioningChecklist(
     els,
     'wp_l',
     lStepsX,
     lStepsY,
-    buildWorkspaceProvisioningSteps(
-      [
-        { icon: '✓', color: C.success },
-        { icon: '↻', color: C.primary },
-        { icon: '○', color: C.gray300 },
-        { icon: '○', color: C.gray300 },
-      ],
-      [
-        { icon: '○', color: C.gray300 },
-        { icon: '○', color: C.gray300 },
-      ],
-    ),
+    [
+      { icon: '↻', color: C.primary },
+      { icon: '○', color: C.gray300 },
+      { icon: '○', color: C.gray300 },
+    ],
     rowH,
   );
   els.push(text('wp_l_note', lX, lEndY + 8, lW, 28,
-    'Modules retry automatically on failure (up to 3×).', 10, C.gray300, 'center'));
+    'We retry automatically if setup takes longer (up to 3×).', 10, C.gray300, 'center'));
 
   // ── Right: Failed (after 3 retries) ─────────────────────────────────────────
   els.push(text('wp_r_lbl', rX, headerY, rW, 16, '✕  Failed (after 3 retries)', 12, C.danger));
@@ -1082,24 +1051,16 @@ function genWorkspaceProvisioning() {
     'Provisioning failed after 3 attempts.\nOur team has been notified.', 12, C.gray700, 'center'));
 
   const rStepsY = headerY + 168;
-  els.push(text('wp_r_sec', rStepsX, rStepsY - 18, 340, 14, 'Per-module (tenant schema)', 10, C.gray500));
   const rEndY = paintProvisioningChecklist(
     els,
     'wp_r',
     rStepsX,
     rStepsY,
-    buildWorkspaceProvisioningSteps(
-      [
-        { icon: '✓', color: C.success },
-        { icon: '✕', color: C.danger },
-        { icon: '○', color: C.gray300 },
-        { icon: '○', color: C.gray300 },
-      ],
-      [
-        { icon: '○', color: C.gray300 },
-        { icon: '○', color: C.gray300 },
-      ],
-    ),
+    [
+      { icon: '✕', color: C.danger },
+      { icon: '○', color: C.gray300 },
+      { icon: '○', color: C.gray300 },
+    ],
     rowH,
   );
   els.push(text('wp_r_supp', rX, rEndY + 8, rW, 14,
