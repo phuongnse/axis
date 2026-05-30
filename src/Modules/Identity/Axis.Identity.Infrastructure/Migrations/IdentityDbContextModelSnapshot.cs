@@ -199,6 +199,16 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasColumnType("character varying(2048)")
                         .HasColumnName("avatar_url");
 
+                    b.Property<string>("AcceptedPrivacyVersion")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("accepted_privacy_version");
+
+                    b.Property<string>("AcceptedTermsVersion")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("accepted_terms_version");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -224,6 +234,10 @@ namespace Axis.Identity.Infrastructure.Migrations
                     b.Property<bool>("IsEmailVerified")
                         .HasColumnType("boolean")
                         .HasColumnName("is_email_verified");
+
+                    b.Property<DateTime?>("LegalAcceptedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("legal_accepted_at");
 
                     b.Property<string>("LastName")
                         .IsRequired()

@@ -16,11 +16,40 @@ vi.mock('@tanstack/react-router', async () => {
   };
 });
 
+const LEGAL_VERSIONS = {
+  termsVersion: '2026-05-01',
+  privacyVersion: '2026-05-01',
+};
+
+function mockLegalVersionsFetch() {
+  vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
+    const url = typeof input === 'string' ? input : input.toString();
+    if (url.includes('/api/legal/versions')) {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify(LEGAL_VERSIONS)),
+      } as unknown as Response);
+    }
+    return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+  });
+}
+
+async function fillRegisterForm(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByLabelText('Organization name'), "O'Brien & Co.");
+  await user.type(screen.getByLabelText('Full name'), 'Alex Brown');
+  await user.type(screen.getByLabelText('Email address'), 'alex@example.com');
+  await user.type(screen.getByLabelText('Password'), 'Passw0rd');
+  await user.type(screen.getByLabelText('Confirm password'), 'Passw0rd');
+  await user.click(screen.getByRole('checkbox', { name: /terms of service/i }));
+}
+
 describe('RegisterPage', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
     navigateMock.mockReset();
     sessionStorage.clear();
+    mockLegalVersionsFetch();
   });
 
   afterEach(() => {
@@ -39,28 +68,40 @@ describe('RegisterPage', () => {
     expect(screen.getByText('Email address is required')).toBeInTheDocument();
     expect(screen.getByText('Password is required')).toBeInTheDocument();
     expect(screen.getByText('Password confirmation is required')).toBeInTheDocument();
+    expect(
+      screen.getByText('You must accept the Terms of Service and Privacy Policy'),
+    ).toBeInTheDocument();
   });
 
   it('navigates to confirmation screen after successful submit', async () => {
     const user = userEvent.setup();
-    vi.mocked(fetch).mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      text: () =>
-        Promise.resolve(
-          JSON.stringify({
-            message: 'Registration successful. Please check your email to verify your account.',
-          }),
-        ),
-    } as unknown as Response);
+    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/legal/versions')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(JSON.stringify(LEGAL_VERSIONS)),
+        } as unknown as Response);
+      }
+      if (url.includes('/api/organizations') && init?.method === 'POST') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () =>
+            Promise.resolve(
+              JSON.stringify({
+                message: 'Registration successful. Please check your email to verify your account.',
+              }),
+            ),
+        } as unknown as Response);
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
 
     await renderWithRouter(<RegisterPage />, { path: '/register' });
 
-    await user.type(screen.getByLabelText('Organization name'), "O'Brien & Co.");
-    await user.type(screen.getByLabelText('Full name'), 'Alex Brown');
-    await user.type(screen.getByLabelText('Email address'), 'alex@example.com');
-    await user.type(screen.getByLabelText('Password'), 'Passw0rd');
-    await user.type(screen.getByLabelText('Confirm password'), 'Passw0rd');
+    await fillRegisterForm(user);
     await user.click(screen.getByRole('button', { name: /create account/i }));
 
     await waitFor(() =>
@@ -73,25 +114,34 @@ describe('RegisterPage', () => {
 
   it('maps backend validation errors to inline field messages', async () => {
     const user = userEvent.setup();
-    vi.mocked(fetch).mockResolvedValueOnce({
-      ok: false,
-      status: 400,
-      statusText: 'Bad Request',
-      json: () =>
-        Promise.resolve({
-          errors: {
-            org_name: ['Organization name must be between 2 and 100 characters.'],
-          },
-        }),
-    } as unknown as Response);
+    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/legal/versions')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(JSON.stringify(LEGAL_VERSIONS)),
+        } as unknown as Response);
+      }
+      if (url.includes('/api/organizations') && init?.method === 'POST') {
+        return Promise.resolve({
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+          json: () =>
+            Promise.resolve({
+              errors: {
+                org_name: ['Organization name must be between 2 and 100 characters.'],
+              },
+            }),
+        } as unknown as Response);
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
 
     await renderWithRouter(<RegisterPage />, { path: '/register' });
 
-    await user.type(screen.getByLabelText('Organization name'), 'Acme Corp');
-    await user.type(screen.getByLabelText('Full name'), 'Alex Brown');
-    await user.type(screen.getByLabelText('Email address'), 'alex@example.com');
-    await user.type(screen.getByLabelText('Password'), 'Passw0rd');
-    await user.type(screen.getByLabelText('Confirm password'), 'Passw0rd');
+    await fillRegisterForm(user);
     await user.click(screen.getByRole('button', { name: /create account/i }));
 
     expect(
@@ -102,20 +152,29 @@ describe('RegisterPage', () => {
 
   it('shows generic server error when API returns 5xx', async () => {
     const user = userEvent.setup();
-    vi.mocked(fetch).mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      statusText: 'Internal Server Error',
-      json: () => Promise.resolve({ message: 'boom' }),
-    } as unknown as Response);
+    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/legal/versions')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(JSON.stringify(LEGAL_VERSIONS)),
+        } as unknown as Response);
+      }
+      if (url.includes('/api/organizations') && init?.method === 'POST') {
+        return Promise.resolve({
+          ok: false,
+          status: 500,
+          statusText: 'Internal Server Error',
+          json: () => Promise.resolve({ message: 'boom' }),
+        } as unknown as Response);
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
 
     await renderWithRouter(<RegisterPage />, { path: '/register' });
 
-    await user.type(screen.getByLabelText('Organization name'), 'Acme Corp');
-    await user.type(screen.getByLabelText('Full name'), 'Alex Brown');
-    await user.type(screen.getByLabelText('Email address'), 'alex@example.com');
-    await user.type(screen.getByLabelText('Password'), 'Passw0rd');
-    await user.type(screen.getByLabelText('Confirm password'), 'Passw0rd');
+    await fillRegisterForm(user);
     await user.click(screen.getByRole('button', { name: /create account/i }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(

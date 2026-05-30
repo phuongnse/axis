@@ -487,6 +487,7 @@ try
 
     // ── Module endpoints ───────────────────────────────────────────────────
     app.MapAuthEndpoints();
+    app.MapLegalEndpoints();
     app.MapPlanEndpoints();
     app.MapOrganizationEndpoints();
     app.MapOrganizationSettingsEndpoints();
