@@ -166,6 +166,13 @@ export async function getProvisioningStatus(token: string): Promise<Provisioning
   return fetchApi<ProvisioningStatusResponse>(`/auth/provisioning-status?${params.toString()}`);
 }
 
+export async function retryProvisioning(token: string): Promise<void> {
+  await fetchApi<null>('/auth/retry-provisioning', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  });
+}
+
 /** Best-effort server sign-out; callers must clear local session regardless of outcome. */
 export async function signOut(): Promise<void> {
   try {

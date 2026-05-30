@@ -1,8 +1,10 @@
 import { Link } from '@tanstack/react-router';
 import { AlertCircle, CheckCircle2, Circle, Loader2 } from 'lucide-react';
 
+import { Button } from '@/components/ui/button';
 import { AuthCard } from '@/features/auth/components/AuthCard';
 import { useProvisioningStatus } from '@/features/auth/hooks/useProvisioningStatus';
+import { useRetryProvisioning } from '@/features/auth/hooks/useRetryProvisioning';
 import type { ProvisioningStepVisual } from '@/features/auth/provisioning-steps';
 import { loadRegistrationContext } from '@/features/auth/registration-context';
 import { useQueryParam } from '@/features/auth/use-query-param';
@@ -32,6 +34,7 @@ export function WorkspaceProvisioningPage() {
   const context = loadRegistrationContext();
   const organizationName = context?.organizationName ?? 'your organization';
   const { status, uiState, loading, error } = useProvisioningStatus(token);
+  const retry = useRetryProvisioning(token);
 
   if (!token) {
     return (
@@ -131,11 +134,16 @@ export function WorkspaceProvisioningPage() {
 
           {failed ? (
             <div className="pt-2 space-y-2 text-sm">
-              <p>
-                <span className="text-muted-foreground">Automatic retries were exhausted. </span>
-                <span className="font-medium text-primary">Try again</span>
-                <span className="text-muted-foreground"> (coming soon)</span>
-              </p>
+              <p className="text-muted-foreground">Automatic retries were exhausted.</p>
+              <Button
+                type="button"
+                variant="cta"
+                className="h-9"
+                disabled={retry.isPending}
+                onClick={() => void retry.mutateAsync().catch(() => {})}
+              >
+                {retry.isPending ? 'Retrying…' : 'Try again'}
+              </Button>
               <p>
                 <span className="text-muted-foreground">If the issue persists, </span>
                 <a
