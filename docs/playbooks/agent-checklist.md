@@ -4,6 +4,8 @@
 
 **Daily workflow.** Walk Gates 0–3 **locally** while implementing; reflect outcomes in the [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) checkboxes. **PR description = Summary + Linked spec + Requirements only** — no Gate paste blocks, no commit list, no CI/Doc-drift status (GitHub Checks tab covers that).
 
+**Large use cases:** split into **isolated PRs** (each branch from `main`, each mergeable alone). See [pr-slicing.md](./pr-slicing.md) — never stack slice B on slice A's branch.
+
 The paste-block templates below are for *your own* walk-through (agent reasoning, scratchpad, or PR thread comment if asked) — not for the PR description.
 
 ---
