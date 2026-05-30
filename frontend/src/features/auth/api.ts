@@ -9,11 +9,19 @@ import {
   REDIRECT_URI,
 } from './pkce';
 import type {
+  LegalVersionsResponse,
   LoginAttemptResult,
   LoginCredentials,
+  OrganizationSlugPreviewResponse,
   RegisterOrganizationRequest,
   RegisterOrganizationResponse,
 } from './types';
+
+export const authKeys = {
+  all: ['auth'] as const,
+  legalVersions: [...['auth'], 'legal-versions'] as const,
+  slugPreview: (orgName: string) => [...['auth'], 'slug-preview', orgName] as const,
+};
 
 interface TokenResponse {
   access_token: string;
@@ -50,6 +58,19 @@ export async function registerOrganization(
     },
     body: JSON.stringify(payload),
   });
+}
+
+export async function getLegalVersions(): Promise<LegalVersionsResponse> {
+  return fetchApi<LegalVersionsResponse>('/legal/versions');
+}
+
+export async function getOrganizationSlugPreview(
+  orgName: string,
+): Promise<OrganizationSlugPreviewResponse> {
+  const params = new URLSearchParams({ org_name: orgName });
+  return fetchApi<OrganizationSlugPreviewResponse>(
+    `/organizations/slug-preview?${params.toString()}`,
+  );
 }
 
 export class LoginRequestError extends Error {

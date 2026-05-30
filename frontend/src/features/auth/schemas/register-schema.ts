@@ -16,6 +16,9 @@ export const registerSchema = z
       .regex(/[a-zA-Z]/, 'Password must contain at least one letter')
       .regex(/\d/, 'Password must contain at least one number'),
     passwordConfirmation: z.string().min(1, 'Password confirmation is required'),
+    acceptedTerms: z.boolean().refine((value) => value === true, {
+      message: 'You must accept the Terms of Service and Privacy Policy',
+    }),
   })
   .superRefine((values, context) => {
     if (values.passwordConfirmation !== values.password) {
