@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
@@ -16,6 +15,7 @@ public sealed class RegisterOrganizationHandler(
     IRoleRepository roleRepo,
     IRegistrationIdempotencyRepository idempotencyRepo,
     IEmailVerificationTokenStore verificationTokenStore,
+    IOrganizationSlugGenerator slugGenerator,
     IPasswordHasher hasher,
     IEmailSender emailSender,
     IUnitOfWork uow)
@@ -63,6 +63,13 @@ public sealed class RegisterOrganizationHandler(
 
     public async Task<Result> Handle(RegisterOrganizationCommand command, CancellationToken cancellationToken)
     {
+        if (!string.IsNullOrWhiteSpace(command.ExternalRegistrationSessionId))
+        {
+            return Result.Failure(
+                ErrorCodes.InvalidInput,
+                "External provider registration is not available yet.");
+        }
+
         string? idempotencyKey = string.IsNullOrWhiteSpace(command.IdempotencyKey)
             ? null
             : command.IdempotencyKey.Trim();
@@ -93,7 +100,8 @@ public sealed class RegisterOrganizationHandler(
                 return Result.Success();
             }
 
-            OrganizationSlug slug = await GenerateUniqueSlugAsync(command.OrgName, cancellationToken);
+            OrganizationSlug slug =
+                await slugGenerator.GenerateUniqueSlugAsync(command.OrgName, cancellationToken);
 
             Guid planId = await ResolveSubscriptionPlanIdAsync(command.SubscriptionPlanId, cancellationToken);
 
@@ -110,9 +118,9 @@ public sealed class RegisterOrganizationHandler(
             await roleRepo.AddAsync(viewerRole, cancellationToken);
             await roleRepo.AddAsync(endUserRole, cancellationToken);
 
-            string passwordHash = hasher.Hash(command.Password);
             User user = User.Create(command.AdminFirstName, command.AdminLastName, email.Value, org.Id);
-            user.SetPasswordHash(passwordHash);
+            user.SetPasswordHash(hasher.Hash(command.Password!));
+            user.RecordLegalAcceptance(command.AcceptedTermsVersion, command.AcceptedPrivacyVersion);
             user.AssignRole(adminRole.Id);
             await userRepo.AddAsync(user, cancellationToken);
 
@@ -148,29 +156,6 @@ public sealed class RegisterOrganizationHandler(
         idempotencyKey is null
             ? Task.CompletedTask
             : idempotencyRepo.MarkCompletedAsync(idempotencyKey, cancellationToken);
-
-    private async Task<OrganizationSlug> GenerateUniqueSlugAsync(string orgName, CancellationToken ct)
-    {
-        string baseSlug = GenerateSlugFromName(orgName);
-        Result<OrganizationSlug> candidate = OrganizationSlug.Create(baseSlug);
-
-        if (candidate.IsSuccess && !await orgRepo.SlugExistsAsync(candidate.Value, ct))
-            return candidate.Value;
-
-        for (int i = 0; i < 10; i++)
-        {
-            string suffix = Random.Shared.Next(1000, 9999).ToString();
-            Result<OrganizationSlug> withSuffix = OrganizationSlug.Create($"{baseSlug}-{suffix}");
-            if (withSuffix.IsSuccess && !await orgRepo.SlugExistsAsync(withSuffix.Value, ct))
-                return withSuffix.Value;
-        }
-
-        return OrganizationSlug.Create($"org-{Guid.NewGuid():N}"[..20]).Value;
-    }
-
-    private static string GenerateSlugFromName(string name) =>
-        Regex.Replace(name.ToLowerInvariant().Trim(), @"[^a-z0-9]+", "-")
-            .Trim('-');
 
     private async Task<Guid> ResolveSubscriptionPlanIdAsync(Guid? requestedPlanId, CancellationToken cancellationToken)
     {

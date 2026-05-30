@@ -16,15 +16,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     private readonly HttpClient _client = fixture.Client;
     private static readonly JsonSerializerOptions Json = ApiTestFixture.JsonOptions;
 
-    private static object RegisterPayload(string suffix) => new
-    {
-        org_name = $"TestOrg{suffix}",
-        admin_first_name = "Test",
-        admin_last_name = "Admin",
-        admin_email = $"admin{suffix}@test.com",
-        password = "TestPass1",
-        password_confirmation = "TestPass1",
-    };
+    private static object RegisterPayload(string suffix) => TestRegistrationPayload.Create(suffix);
 
     // ── Registration ──────────────────────────────────────────────────────────
 
@@ -68,7 +60,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
 
         HttpResponseMessage verifyResp = await _client.PostAsJsonAsync(
             "/api/auth/verify-email", new { token = verifyToken }, Json);
-        verifyResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        verifyResp.StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Full PKCE flow on independent client (isolated cookie jar)
         HttpClient pkceClient = fixture.CreateNewClient();
@@ -212,7 +204,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
             ?? throw new InvalidOperationException("Verification token not captured.");
         HttpResponseMessage first = await _client.PostAsJsonAsync(
             "/api/auth/verify-email", new { token }, Json);
-        first.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        first.StatusCode.Should().Be(HttpStatusCode.OK);
 
         HttpResponseMessage second = await _client.PostAsJsonAsync(
             "/api/auth/verify-email", new { token }, Json);

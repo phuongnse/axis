@@ -15,12 +15,14 @@ public sealed class VerifyEmailHandler(
     ITenantModuleProvisioningRepository provisioningRepo,
     IRoleRepository roleRepo,
     IUnitOfWork uow)
-    : ICommandHandler<VerifyEmailCommand>
+    : ICommandHandler<VerifyEmailCommand, VerifyEmailSuccessDto>
 {
-    public async Task<Result> Handle(VerifyEmailCommand command, CancellationToken cancellationToken)
+    public async Task<Result<VerifyEmailSuccessDto>> Handle(
+        VerifyEmailCommand command,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(command.Token))
-            return Result.Failure(ErrorCodes.BusinessRule, "Invalid verification link.");
+            return Result.Failure<VerifyEmailSuccessDto>(ErrorCodes.BusinessRule, "Invalid verification link.");
 
         string tokenHash = OpaqueTokenGenerator.Hash(command.Token.Trim());
         EmailVerificationTokenResolveResult resolved =
@@ -29,36 +31,40 @@ public sealed class VerifyEmailHandler(
         return resolved.State switch
         {
             EmailVerificationTokenState.NotFound =>
-                Result.Failure(ErrorCodes.BusinessRule, "Invalid verification link."),
+                Result.Failure<VerifyEmailSuccessDto>(ErrorCodes.BusinessRule, "Invalid verification link."),
             EmailVerificationTokenState.Expired =>
-                Result.Failure(
+                Result.Failure<VerifyEmailSuccessDto>(
                     ErrorCodes.BusinessRule,
                     "This verification link has expired. Please request a new verification email."),
             EmailVerificationTokenState.AlreadyUsed =>
-                Result.Failure(
+                Result.Failure<VerifyEmailSuccessDto>(
                     ErrorCodes.BusinessRule,
                     "This link has already been used. Please sign in."),
             EmailVerificationTokenState.Valid => await VerifyUserAsync(
                 resolved.UserId!.Value,
                 cancellationToken),
-            _ => Result.Failure(ErrorCodes.BusinessRule, "Invalid verification link."),
+            _ => Result.Failure<VerifyEmailSuccessDto>(ErrorCodes.BusinessRule, "Invalid verification link."),
         };
     }
 
-    private async Task<Result> VerifyUserAsync(
+    private async Task<Result<VerifyEmailSuccessDto>> VerifyUserAsync(
         Guid userId,
         CancellationToken cancellationToken)
     {
         User? user = await userRepo.GetByIdPlatformWideAsync(userId, cancellationToken);
         if (user is null)
-            return Result.Failure(ErrorCodes.BusinessRule, "Invalid verification link.");
+            return Result.Failure<VerifyEmailSuccessDto>(ErrorCodes.BusinessRule, "Invalid verification link.");
 
         if (user.IsEmailVerified)
-            return Result.Failure(ErrorCodes.BusinessRule, "This link has already been used. Please sign in.");
+        {
+            return Result.Failure<VerifyEmailSuccessDto>(
+                ErrorCodes.BusinessRule,
+                "This link has already been used. Please sign in.");
+        }
 
         Organization? organization = await organizationRepo.GetByIdAsync(user.OrganizationId, cancellationToken);
         if (organization is null)
-            return Result.Failure(ErrorCodes.BusinessRule, "Invalid verification link.");
+            return Result.Failure<VerifyEmailSuccessDto>(ErrorCodes.BusinessRule, "Invalid verification link.");
 
         organization.BeginProvisioning();
 
@@ -74,6 +80,10 @@ public sealed class VerifyEmailHandler(
         user.VerifyEmail();
         await uow.SaveChangesAsync(cancellationToken);
 
-        return Result.Success();
+        return Result.Success(new VerifyEmailSuccessDto(
+            user.Id,
+            user.OrganizationId,
+            user.Email.Value,
+            user.FullName));
     }
 }

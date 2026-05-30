@@ -148,6 +148,15 @@ public sealed class Organization : AggregateRoot<Guid>
         Status = OrganizationStatus.ProvisioningFailed;
     }
 
+    public void RetryProvisioning()
+    {
+        if (Status != OrganizationStatus.ProvisioningFailed)
+            throw new InvalidOperationException("Only provisioning-failed organizations can be manually retried.");
+
+        Status = OrganizationStatus.Provisioning;
+        RaiseDomainEvent(new OrganizationVerified(Id));
+    }
+
     public void Archive()
     {
         if (Status == OrganizationStatus.Archived)

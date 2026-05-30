@@ -7,4 +7,7 @@ public record RegisterOrganizationRequest(
     string AdminEmail,
     string Password,
     string PasswordConfirmation,
-    Guid? SubscriptionPlanId = null);
+    string AcceptedTermsVersion,
+    string AcceptedPrivacyVersion,
+    Guid? SubscriptionPlanId = null,
+    string? ExternalRegistrationSessionId = null);
