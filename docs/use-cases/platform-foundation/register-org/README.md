@@ -79,7 +79,8 @@ Self-service registration flow where a new organization signs up and is automati
 - [ ] Once provisioning completes, the workspace dashboard is fully functional.
 - [ ] If provisioning fails (e.g., DB timeout), the error is logged with full context and a retry is scheduled automatically (up to 3 retries, exponential backoff).
 - [ ] If provisioning fails after all retries, a platform alert is triggered for the Axis team to investigate.
-- [ ] The user is not stuck: the UI shows `workspace-provisioning` ("Setting up your workspace…") and polls `GET /api/auth/provisioning-status?token=` every 5 seconds.
+- [ ] The user is not stuck: the UI shows `workspace-provisioning` (headline **Setting up "{organizationName}" workspace…**, org name from registration context) and polls `GET /api/auth/provisioning-status?token=` every 5 seconds until `isReady`, then redirects to the dashboard. Closing the tab is allowed — reopening the provisioning URL (token in query) or signing in while the org is still `Provisioning` returns to this screen.
+- [ ] When automatic retries are exhausted (`ProvisioningFailed`), the UI shows a failed state with **Try again** (manual re-queue; idempotent) and a support link. `POST /api/auth/retry-provisioning` with the same verification token.
 - [ ] Provisioning is idempotent: running it twice for the same org does not create duplicate schemas or tables.
 - [ ] If a tenant schema already exists (partial previous run), the migration runner continues from where it left off.
 
@@ -98,7 +99,7 @@ Self-service registration flow where a new organization signs up and is automati
 > | API | ⚠️ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** **Registration:** email/password path is largely complete (`Idempotency-Key` on `POST /api/organizations/`, slug uniqueness retry). **Not yet:** Terms of Service / Privacy Policy acceptance (record accepted version), external-provider sign-up (ADR-027), **register-org-complete** screen, CAPTCHA (see *Out of scope*). **Email verification (backend ✅):** opaque one-time tokens in `email_verification_tokens` (SHA-256 at rest, 24h TTL), resend rate limit 3/email/hour (`IResendVerificationRateLimiter`, HTTP 429), login blocks unverified users. **Tenant provisioning (backend ✅):** org enters `Provisioning` on verify, `OrganizationVerifiedEvent` → per-module `TenantModuleProvisionReportEvent`, Identity coordinator retries (3×, exponential backoff), critical log on exhaustion, `GET /api/auth/provisioning-status?token=` for polling. **Frontend ⏳:** registration + `verify-email-states` (errors) + `workspace-provisioning`; no verify-success screen — redirect on verify 200 (**Deferred — PR #125 follow-up**).
+> **Gaps vs spec:** **Registration:** email/password path is largely complete (`Idempotency-Key` on `POST /api/organizations/`, slug uniqueness retry). **Not yet:** Terms of Service / Privacy Policy acceptance (record accepted version), external-provider sign-up (ADR-027), **register-org-complete** screen, CAPTCHA (see *Out of scope*). **Email verification (backend ✅):** opaque one-time tokens in `email_verification_tokens` (SHA-256 at rest, 24h TTL), resend rate limit 3/email/hour (`IResendVerificationRateLimiter`, HTTP 429), login blocks unverified users. **Tenant provisioning (backend ✅):** org enters `Provisioning` on verify, `OrganizationVerifiedEvent` → per-module `TenantModuleProvisionReportEvent`, Identity coordinator retries (3×, exponential backoff), critical log on exhaustion, `GET /api/auth/provisioning-status?token=` for polling. **Frontend ⏳:** registration + `verify-email-states` (errors) + `workspace-provisioning`; no verify-success screen — redirect on verify 200 (**Deferred — PR #125 follow-up**). **Manual provisioning retry:** `POST /api/auth/retry-provisioning` + **Try again** UI (**Deferred** — coordinator auto-retry only today).
 >
 > **Decisions:**
 > - duplicate email returns silently without creating anything — matches "same confirmation screen" AC. `RegisterOrganizationCommandValidator` enforces: org name 2–100 chars, valid email, password min 8 chars + letter + number, confirmation match. Org slug auto-generated with uniqueness retry loop
@@ -178,13 +179,20 @@ Maps to *Tenant provisioning* ACs. **Backend** (async, per module): [`tenant-pro
 
 **UI (this wireframe):** one **aggregated** checklist — do **not** show Data modeling / Workflow builder / … by name. Poll `GET /api/auth/provisioning-status?token=` every 5 seconds; map API `orgStatus` + module aggregate to the three rows below (icons only — no module list).
 
+| Copy / behavior | Spec |
+|-----------------|------|
+| Headline | `Setting up "{organizationName}" workspace…` (placeholder **Acme Corp** on wireframe) |
+| Tab | User may leave; poll resumes on return until redirect when `isReady` |
+| Footer (in progress) | `If setup is slow, we retry automatically (up to 3 attempts).` — matches coordinator `MaxAttempts = 3` |
+| Failure actions | **Try again →** then **Contact support if the issue persists →** |
+
 | UI step | Covers (spec) |
 |---------|----------------|
 | **Creating your workspace** | Subcopy: *Preparing your organization's data* — backend: all tenant-scoped module schemas + migrations (AC: per-module work, one user-facing line) |
 | **Assigning admin role** | AC: Admin role when provisioning completes |
 | **Opening workspace** | AC: redirect to dashboard when org ACTIVE |
 
-**Failure:** failed panel when provisioning cannot complete after retries; platform alert per AC. Email verification is the prior step (redirect here on verify 200).
+**Failure:** failed panel when provisioning cannot complete after retries; platform alert per AC; **Try again** calls `POST /api/auth/retry-provisioning` (not implemented yet — see gaps). Email verification is the prior step (redirect here on verify 200).
 
 ## Wireframes
 
@@ -374,4 +382,4 @@ sequenceDiagram
   end
 ```
 
-**APIs (registration journey):** `POST /api/organizations/`, `POST /api/auth/resend-verification`, `POST /api/auth/verify-email`, `GET /api/auth/provisioning-status`. The former standalone **verify-email** and **provision-tenant** use-case folders were merged into this README.
+**APIs (registration journey):** `POST /api/organizations/`, `POST /api/auth/resend-verification`, `POST /api/auth/verify-email`, `GET /api/auth/provisioning-status`, `POST /api/auth/retry-provisioning` (manual retry after failure — planned). The former standalone **verify-email** and **provision-tenant** use-case folders were merged into this README.

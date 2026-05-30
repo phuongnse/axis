@@ -971,6 +971,9 @@ const WP_UI_STEPS = [
   { label: 'Opening workspace', sub: null },
 ];
 
+/** Wireframe placeholder — production UI uses org display name from registration context. */
+const WP_DEMO_ORG_NAME = 'Acme Corp';
+
 function paintProvisioningChecklist(els, prefix, stepsX, stepsY, stepStates, rowH = 36) {
   let y = stepsY;
   WP_UI_STEPS.forEach(({ label, sub }, i) => {
@@ -996,7 +999,8 @@ function genWorkspaceProvisioning() {
   const wireAcc = { files: {} };
   const rowH = 36;
   const checklistRows = WP_UI_STEPS.length;
-  const canvasH = 90 + 188 + 24 + checklistRows * rowH + 56;
+  const heroH = 168;
+  const canvasH = 90 + heroH + 24 + checklistRows * rowH + 72;
 
   els.push(rect('wp_bg', 0, 0, W, canvasH, C.gray300, C.gray100, 1, false));
 
@@ -1022,11 +1026,10 @@ function genWorkspaceProvisioning() {
   els.push(text('wp_l_lbl', lX, headerY, lW, 16, '↻  In progress', 12, C.primary));
   els.push(ellipse('wp_l_spin', lMidX - 28, headerY + 26, 56, 56, C.infoBorder, C.infoBg, 2));
   els.push(text('wp_l_spin_t', lMidX - 28, headerY + 41, 56, 26, '↻', 18, C.primary, 'center'));
-  els.push(text('wp_l_title', lX, headerY + 92, lW, 26, 'Setting up your workspace…', 18, C.gray900, 'center'));
-  els.push(text('wp_l_org', lX, headerY + 120, lW, 18, 'For Acme Corp', 13, C.accent, 'center'));
-  els.push(text('wp_l_sub', lX, headerY + 140, lW, 14, "Don't close this tab.", 11, C.gray500, 'center'));
+  els.push(text('wp_l_title', lX, headerY + 92, lW, 32,
+    `Setting up "${WP_DEMO_ORG_NAME}" workspace…`, 17, C.gray900, 'center'));
 
-  const lStepsY = headerY + 168;
+  const lStepsY = headerY + 148;
   const lEndY = paintProvisioningChecklist(
     els,
     'wp_l',
@@ -1040,7 +1043,7 @@ function genWorkspaceProvisioning() {
     rowH,
   );
   els.push(text('wp_l_note', lX, lEndY + 8, lW, 28,
-    'We retry automatically if setup takes longer (up to 3×).', 10, C.gray300, 'center'));
+    'If setup is slow, we retry automatically (up to 3 attempts).', 10, C.gray300, 'center'));
 
   // ── Right: Failed (after 3 retries) ─────────────────────────────────────────
   els.push(text('wp_r_lbl', rX, headerY, rW, 16, '✕  Failed (after 3 retries)', 12, C.danger));
@@ -1050,7 +1053,7 @@ function genWorkspaceProvisioning() {
   els.push(text('wp_r_body', rX, headerY + 120, rW, 40,
     'Provisioning failed after 3 attempts.\nOur team has been notified.', 12, C.gray700, 'center'));
 
-  const rStepsY = headerY + 168;
+  const rStepsY = headerY + 148;
   const rEndY = paintProvisioningChecklist(
     els,
     'wp_r',
@@ -1063,8 +1066,9 @@ function genWorkspaceProvisioning() {
     ],
     rowH,
   );
-  els.push(text('wp_r_supp', rX, rEndY + 8, rW, 14,
-    'Contact support if the issue persists →', 11, C.primary, 'center'));
+  els.push(text('wp_r_retry', rX, rEndY + 8, rW, 14, 'Try again →', 11, C.primary, 'center'));
+  els.push(text('wp_r_supp', rX, rEndY + 26, rW, 14,
+    'Contact support if the issue persists →', 11, C.gray500, 'center'));
 
   write('platform-foundation/workspace-provisioning.excalidraw', els, wireAcc.files);
 }
