@@ -5,6 +5,7 @@ using Axis.Identity.Application.Commands.RequestPasswordReset;
 using Axis.Identity.Application.Commands.ResetPassword;
 using Axis.Identity.Application.Commands.VerifyEmail;
 using Axis.Identity.Application.Queries.GetProvisioningStatus;
+using Axis.Identity.Application.Queries.GetUserTokenClaims;
 using Axis.Shared.Domain.Primitives;
 using MediatR;
 using Microsoft.AspNetCore.Authentication;
@@ -31,9 +32,9 @@ public static class AuthEndpoints
         group.MapPost("/verify-email", VerifyEmail)
             .AllowAnonymous()
             .WithName("VerifyEmail")
-            .WithSummary("Verify email address with a one-time token")
+            .WithSummary("Verify email address with a one-time token and establish a sign-in session")
             .WithTags("Identity")
-            .Produces(204)
+            .Produces<object>()
             .ProducesProblem(400);
 
         group.MapGet("/provisioning-status", GetProvisioningStatus)
@@ -77,7 +78,6 @@ public static class AuthEndpoints
         HttpContext httpContext,
         CancellationToken ct)
     {
-        // Revoke the refresh token stored in the httpOnly cookie
         string? rawRefreshToken = httpContext.Request.Cookies["refresh_token"];
         if (!string.IsNullOrEmpty(rawRefreshToken))
         {
@@ -86,10 +86,8 @@ public static class AuthEndpoints
                 await tokenManager.TryRevokeAsync(token, ct);
         }
 
-        // Blacklist the access token's JTI for its remaining lifetime so replayed
-        // access tokens are rejected even before they naturally expire
         string? expStr = httpContext.User.FindFirst("exp")?.Value;
-        TimeSpan ttl = TimeSpan.FromMinutes(15); // safe default
+        TimeSpan ttl = TimeSpan.FromMinutes(15);
         if (expStr is not null && long.TryParse(expStr, out long expUnix))
         {
             TimeSpan remaining = DateTimeOffset.FromUnixTimeSeconds(expUnix) - DateTimeOffset.UtcNow;
@@ -98,11 +96,9 @@ public static class AuthEndpoints
         }
         await jtiBlacklist.BlacklistAsync(currentUser.Jti, ttl, ct);
 
-        // Clear the refresh token cookie
         httpContext.Response.Cookies.Delete("refresh_token",
             new CookieOptions { Path = "/connect" });
 
-        // Clear the PKCE session cookie (if still alive)
         await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
 
         return Results.NoContent();
@@ -111,11 +107,50 @@ public static class AuthEndpoints
     private static async Task<IResult> VerifyEmail(
         [FromBody] VerifyEmailRequest request,
         ISender mediator,
+        HttpContext httpContext,
         CancellationToken ct)
     {
-        Result result = await mediator.Send(new VerifyEmailCommand(request.Token), ct);
-        if (result.IsFailure) return result.ToProblemDetails();
-        return Results.NoContent();
+        Result<VerifyEmailSuccessDto> result =
+            await mediator.Send(new VerifyEmailCommand(request.Token), ct);
+        if (result.IsFailure)
+            return result.ToProblemDetails();
+
+        Result<UserTokenClaimsDto> claimsResult = await mediator.Send(
+            new GetUserTokenClaimsQuery(result.Value.UserId, result.Value.OrganizationId),
+            ct);
+        if (claimsResult.IsFailure)
+            return claimsResult.ToProblemDetails();
+
+        await SignInPkceSessionAsync(httpContext, claimsResult.Value);
+
+        return Results.Ok(new { sessionEstablished = true });
+    }
+
+    private static async Task SignInPkceSessionAsync(HttpContext httpContext, UserTokenClaimsDto claims)
+    {
+        List<Claim> claimList =
+        [
+            new(ClaimTypes.NameIdentifier, claims.UserId.ToString()),
+            new("org_id", claims.OrganizationId.ToString()),
+            new(ClaimTypes.Email, claims.Email),
+            new("name", claims.FullName),
+        ];
+        foreach (string permission in claims.Permissions)
+            claimList.Add(new Claim("permissions", permission));
+
+        ClaimsIdentity identity = new(claimList, CookieAuthenticationDefaults.AuthenticationScheme);
+        ClaimsPrincipal principal = new(identity);
+
+        AuthenticationProperties props = new()
+        {
+            IsPersistent = false,
+            ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(5),
+        };
+
+        await httpContext.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            principal,
+            props);
     }
 
     private static async Task<IResult> GetProvisioningStatus(

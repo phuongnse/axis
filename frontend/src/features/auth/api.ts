@@ -13,7 +13,9 @@ import type {
   LoginCredentials,
   RegisterOrganizationRequest,
   RegisterOrganizationResponse,
+  VerifyEmailResponse,
 } from './types';
+import { storePostVerifyProvisioningToken } from './post-verify-session';
 
 interface TokenResponse {
   access_token: string;
@@ -130,6 +132,24 @@ export async function exchangeAuthorizationCode(code: string): Promise<string> {
   clearPkceSession();
   useAuthStore.getState().setSession(data.access_token);
   return data.access_token;
+}
+
+export async function verifyEmail(token: string): Promise<VerifyEmailResponse> {
+  return fetchApi<VerifyEmailResponse>('/auth/verify-email', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  });
+}
+
+/**
+ * After verify-email establishes a session cookie, run PKCE so the SPA receives tokens.
+ * Stores the verification token for the callback to redirect to provisioning.
+ */
+export async function completePostVerifyPkceFlow(verificationToken: string): Promise<void> {
+  storePostVerifyProvisioningToken(verificationToken);
+  const pkce = createPkceSession();
+  const authorizeUrl = await buildAuthorizeUrl(pkce.state, pkce.verifier);
+  window.location.assign(authorizeUrl);
 }
 
 /** Best-effort server sign-out; callers must clear local session regardless of outcome. */

@@ -26,3 +26,7 @@ export interface LoginAttemptResult {
   authorizeUrl: string;
   location: string | null;
 }
+
+export interface VerifyEmailResponse {
+  sessionEstablished: boolean;
+}

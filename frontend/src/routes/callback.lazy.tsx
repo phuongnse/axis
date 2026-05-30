@@ -1,6 +1,7 @@
 import { createLazyFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { exchangeAuthorizationCode } from '@/features/auth/api';
+import { consumePostVerifyProvisioningToken } from '@/features/auth/post-verify-session';
 import { clearPkceSession, loadPkceSession } from '@/features/auth/pkce';
 
 export const Route = createLazyFileRoute('/callback')({
@@ -16,6 +17,7 @@ function CallbackPage() {
     const code = params.get('code');
     const state = params.get('state');
     const pkce = loadPkceSession();
+    const provisioningToken = consumePostVerifyProvisioningToken();
 
     if (!code || !pkce || state !== pkce.state) {
       clearPkceSession();
@@ -24,7 +26,17 @@ function CallbackPage() {
     }
 
     exchangeAuthorizationCode(code)
-      .then(() => navigate({ to: '/dashboard', replace: true }))
+      .then(() => {
+        if (provisioningToken) {
+          void navigate({
+            to: '/provisioning',
+            search: { token: provisioningToken },
+            replace: true,
+          });
+          return;
+        }
+        void navigate({ to: '/dashboard', replace: true });
+      })
       .catch(() => {
         clearPkceSession();
         setError('Could not complete sign-in. Please try again.');
