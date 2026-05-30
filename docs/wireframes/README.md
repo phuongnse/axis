@@ -2,7 +2,7 @@
 
 > **Navigation**: [Wireframe playbook](../playbooks/wireframes.md) · [← docs/README.md](../README.md)
 
-**Agents:** before changing wireframes, read **[Agent contract](#agent-contract)** below and [wireframes.md § Agent checklist](../playbooks/wireframes.md#agent-checklist).
+**Agents:** before changing wireframes, read **[Agent contract](#agent-contract)** below and [wireframes.md § Agent checklist](../playbooks/wireframes.md#agent-checklist). Multi-screen use cases: [wireframes.md § Multi-screen journey pattern](../playbooks/wireframes.md#multi-screen-journey-pattern).
 
 ## Goal
 

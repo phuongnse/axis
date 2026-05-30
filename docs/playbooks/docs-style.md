@@ -47,6 +47,8 @@ Every `docs/use-cases/<domain>/<short-slug>/README.md` file uses these layouts s
 
 **Canonical example (multi-screen + diagrams):** [platform-foundation/register-org/README.md](../use-cases/platform-foundation/register-org/README.md). Copy that structure when refreshing older use cases.
 
+**Wireframe practice (generic):** [wireframes.md § Multi-screen journey pattern](./wireframes.md#multi-screen-journey-pattern) — happy path vs `*-states`, diagrams, generator habits; register-org is the concrete reference.
+
 ### Section order (after AC, before implementation status)
 
 ```text
