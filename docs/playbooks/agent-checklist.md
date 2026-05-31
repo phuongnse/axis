@@ -12,6 +12,7 @@ The paste-block templates below are for *your own* walk-through (agent reasoning
 
 ## Gate 0 — Ready (before code)
 
+- **Design Gate** ([design-gate.md](./design-gate.md)): re-derive the rules governing the surface you touch and produce the dossier (rules quoted, blast-radius `grep`, contract+casing, gate plan); **high-risk surfaces require user sign-off before code**
 - AC map: every row has layer + file/test — **no blank cells**
 - Read: domain README → use-case file → same-module code
 - Skim [`docs/WORKAROUNDS.md`](../WORKAROUNDS.md) for entries touching the same files/modules — known shortcuts may explain surprising code
