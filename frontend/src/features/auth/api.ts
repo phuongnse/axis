@@ -8,6 +8,7 @@ import {
   loadPkceSession,
   REDIRECT_URI,
 } from './pkce';
+import { storePostVerifyProvisioningToken } from './post-verify-session';
 import type {
   LoginAttemptResult,
   LoginCredentials,
@@ -15,7 +16,6 @@ import type {
   RegisterOrganizationResponse,
   VerifyEmailResponse,
 } from './types';
-import { storePostVerifyProvisioningToken } from './post-verify-session';
 
 interface TokenResponse {
   access_token: string;

@@ -1,8 +1,8 @@
 import { createLazyFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { exchangeAuthorizationCode } from '@/features/auth/api';
-import { consumePostVerifyProvisioningToken } from '@/features/auth/post-verify-session';
 import { clearPkceSession, loadPkceSession } from '@/features/auth/pkce';
+import { consumePostVerifyProvisioningToken } from '@/features/auth/post-verify-session';
 
 export const Route = createLazyFileRoute('/callback')({
   component: CallbackPage,
@@ -17,7 +17,6 @@ function CallbackPage() {
     const code = params.get('code');
     const state = params.get('state');
     const pkce = loadPkceSession();
-    const provisioningToken = consumePostVerifyProvisioningToken();
 
     if (!code || !pkce || state !== pkce.state) {
       clearPkceSession();
@@ -27,12 +26,13 @@ function CallbackPage() {
 
     exchangeAuthorizationCode(code)
       .then(() => {
+        // Consume the post-verify token only once the exchange has succeeded, so a
+        // failed/invalid callback does not discard a still-valid provisioning token.
+        const provisioningToken = consumePostVerifyProvisioningToken();
         if (provisioningToken) {
-          void navigate({
-            to: '/provisioning',
-            search: { token: provisioningToken },
-            replace: true,
-          });
+          // Hard redirect (not typed router navigation) so this slice compiles and
+          // works whether or not the /provisioning route from the journey slice is present.
+          window.location.assign(`/provisioning?token=${encodeURIComponent(provisioningToken)}`);
           return;
         }
         void navigate({ to: '/dashboard', replace: true });

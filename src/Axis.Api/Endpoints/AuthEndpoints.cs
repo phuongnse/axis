@@ -78,6 +78,7 @@ public static class AuthEndpoints
         HttpContext httpContext,
         CancellationToken ct)
     {
+        // Revoke the refresh token stored in the httpOnly cookie
         string? rawRefreshToken = httpContext.Request.Cookies["refresh_token"];
         if (!string.IsNullOrEmpty(rawRefreshToken))
         {
@@ -86,8 +87,10 @@ public static class AuthEndpoints
                 await tokenManager.TryRevokeAsync(token, ct);
         }
 
+        // Blacklist the access token's JTI for its remaining lifetime so replayed
+        // access tokens are rejected even before they naturally expire
         string? expStr = httpContext.User.FindFirst("exp")?.Value;
-        TimeSpan ttl = TimeSpan.FromMinutes(15);
+        TimeSpan ttl = TimeSpan.FromMinutes(15); // safe default
         if (expStr is not null && long.TryParse(expStr, out long expUnix))
         {
             TimeSpan remaining = DateTimeOffset.FromUnixTimeSeconds(expUnix) - DateTimeOffset.UtcNow;
@@ -96,9 +99,11 @@ public static class AuthEndpoints
         }
         await jtiBlacklist.BlacklistAsync(currentUser.Jti, ttl, ct);
 
+        // Clear the refresh token cookie
         httpContext.Response.Cookies.Delete("refresh_token",
             new CookieOptions { Path = "/connect" });
 
+        // Clear the PKCE session cookie (if still alive)
         await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
 
         return Results.NoContent();
