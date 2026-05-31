@@ -5,6 +5,17 @@ export interface RegisterOrganizationRequest {
   admin_email: string;
   password: string;
   password_confirmation: string;
+  accepted_terms_version: string;
+  accepted_privacy_version: string;
+}
+
+export interface LegalVersionsResponse {
+  terms_version: string;
+  privacy_version: string;
+}
+
+export interface OrganizationSlugPreviewResponse {
+  slug: string;
 }
 
 export interface RegisterOrganizationResponse {

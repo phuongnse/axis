@@ -20,6 +20,9 @@ public sealed class User : AggregateRoot<Guid>
     public string? PasswordHash { get; private set; }
     public UserStatus Status { get; private set; }
     public bool IsEmailVerified { get; private set; }
+    public string? AcceptedTermsVersion { get; private set; }
+    public string? AcceptedPrivacyVersion { get; private set; }
+    public DateTime? LegalAcceptedAt { get; private set; }
     public int FailedLoginAttempts { get; private set; }
     public DateTime? LockedUntil { get; private set; }
     public DateTime CreatedAt { get; private set; }
@@ -58,6 +61,18 @@ public sealed class User : AggregateRoot<Guid>
         if (string.IsNullOrWhiteSpace(hash))
             throw new ArgumentException("Password hash cannot be empty.", nameof(hash));
         PasswordHash = hash;
+    }
+
+    public void RecordLegalAcceptance(string termsVersion, string privacyVersion)
+    {
+        if (string.IsNullOrWhiteSpace(termsVersion))
+            throw new ArgumentException("Terms version is required.", nameof(termsVersion));
+        if (string.IsNullOrWhiteSpace(privacyVersion))
+            throw new ArgumentException("Privacy version is required.", nameof(privacyVersion));
+
+        AcceptedTermsVersion = termsVersion.Trim();
+        AcceptedPrivacyVersion = privacyVersion.Trim();
+        LegalAcceptedAt = DateTime.UtcNow;
     }
 
     public void VerifyEmail()

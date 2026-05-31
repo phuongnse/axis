@@ -1,3 +1,4 @@
+using Axis.Identity.Domain.Legal;
 using FluentValidation;
 
 namespace Axis.Identity.Application.Commands.RegisterOrganization;
@@ -21,6 +22,14 @@ public sealed class RegisterOrganizationCommandValidator : AbstractValidator<Reg
         RuleFor(x => x.AdminEmail)
             .NotEmpty().WithMessage("Email is required.")
             .EmailAddress().WithMessage("Email must be a valid email address.");
+
+        RuleFor(x => x.AcceptedTermsVersion)
+            .Equal(WellKnownLegalDocuments.TermsVersion)
+            .WithMessage("You must accept the current Terms of Service.");
+
+        RuleFor(x => x.AcceptedPrivacyVersion)
+            .Equal(WellKnownLegalDocuments.PrivacyVersion)
+            .WithMessage("You must accept the current Privacy Policy.");
 
         RuleFor(x => x.Password)
             .NotEmpty().WithMessage("Password is required.")

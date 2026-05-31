@@ -3,6 +3,7 @@ using Axis.Api.Extensions;
 using Axis.Api.Infrastructure;
 using Axis.Identity.Application.Commands.InviteUser;
 using Axis.Identity.Application.Commands.RegisterOrganization;
+using Axis.Identity.Application.Queries.GetOrganizationSlugPreview;
 using Axis.Shared.Domain.Primitives;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -14,6 +15,13 @@ public static class OrganizationEndpoints
     public static IEndpointRouteBuilder MapOrganizationEndpoints(this IEndpointRouteBuilder app)
     {
         RouteGroupBuilder group = app.MapGroup("/api/organizations");
+
+        group.MapGet("/slug-preview", GetSlugPreview)
+            .AllowAnonymous()
+            .WithName("GetOrganizationSlugPreview")
+            .WithSummary("Preview organization URL slug from a proposed name")
+            .WithTags("Identity")
+            .Produces<OrganizationSlugPreviewDto>();
 
         group.MapPost("/", Register)
             .AllowAnonymous()
@@ -39,6 +47,16 @@ public static class OrganizationEndpoints
         return app;
     }
 
+    private static async Task<IResult> GetSlugPreview(
+        [FromQuery(Name = "org_name")] string orgName,
+        ISender mediator,
+        CancellationToken ct)
+    {
+        OrganizationSlugPreviewDto preview =
+            await mediator.Send(new GetOrganizationSlugPreviewQuery(orgName), ct);
+        return Results.Ok(preview);
+    }
+
     private static async Task<IResult> Register(
         [FromBody] RegisterOrganizationRequest request,
         HttpContext httpContext,
@@ -47,17 +65,21 @@ public static class OrganizationEndpoints
     {
         string? idempotencyKey = httpContext.Request.Headers["Idempotency-Key"].FirstOrDefault();
 
-        await mediator.Send(new RegisterOrganizationCommand(
+        Result result = await mediator.Send(new RegisterOrganizationCommand(
             request.OrgName,
             request.AdminFirstName,
             request.AdminLastName,
             request.AdminEmail,
             request.Password,
             request.PasswordConfirmation,
+            request.AcceptedTermsVersion,
+            request.AcceptedPrivacyVersion,
             request.SubscriptionPlanId,
             idempotencyKey), ct);
 
-        // always return the same success screen — no email-existence leakage
+        if (result.IsFailure)
+            return result.ToProblemDetails();
+
         return Results.Ok(new
         {
             message = "Registration successful. Please check your email to verify your account.",
