@@ -23,7 +23,7 @@ import type {
 export const authKeys = {
   all: ['auth'] as const,
   provisioningStatus: (token: string) => [...authKeys.all, 'provisioning-status', token] as const,
-  legalVersions: [...authKeys.all, 'legal-versions'] as const,
+  legalVersions: ['auth', 'legal-versions'] as const,
   slugPreview: (orgName: string) => [...authKeys.all, 'slug-preview', orgName] as const,
 };
 
