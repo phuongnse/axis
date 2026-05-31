@@ -271,6 +271,23 @@ for target in ${STALE_TERM_FILES}; do
   fi
 done
 
+# Incident/lesson framing guard: practice/reference docs state the general rule;
+# incident specifics belong in the use-case file, PROGRESS.md, or the PR retro
+# (docs/playbooks/docs-style.md § Keep practice docs general; agent-checklist
+# Gate 3 "Incident-level detail in rule text?"). Deliberately narrow — flags the
+# recurring "Lesson (...)" / "**Lesson" callout class, not every over-fit example.
+# Scope: playbooks + CLAUDE.md + ARCHITECTURE.md.
+LESSON_PATTERN='\*\*Lesson|[Ll]esson \(|[Ll]esson\)'
+LESSON_FILES="$(find docs/playbooks -type f -name '*.md' 2>/dev/null) CLAUDE.md docs/ARCHITECTURE.md"
+for target in ${LESSON_FILES}; do
+  [ -f "${target}" ] || continue
+  if matches="$(grep -nE "${LESSON_PATTERN}" "${target}" 2>/dev/null)"; then
+    while IFS= read -r line; do
+      fail "Incident/lesson framing in practice doc — generalize the rule, move specifics to the use-case/PROGRESS/retro (docs-style.md § Keep practice docs general): ${target}:${line}"
+    done <<< "${matches}"
+  fi
+done
+
 # EF migration pairs: every non-snapshot Migration .cs must have a .Designer.cs
 # (hand-written migrations often forget the Designer and never apply in MigrateAsync).
 while IFS= read -r migration; do

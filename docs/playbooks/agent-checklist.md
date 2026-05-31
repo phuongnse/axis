@@ -67,8 +67,8 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 | Wrong | Right |
 |-------|--------|
-| Ship register → settings → delete endpoints, then claim backend ✅ | AC map row per bullet (happy, validation, edge) with file/test or explicit deferral |
-| Wait for the user to ask “đã cover đủ AC chưa?” | Run the self-audit **before the first PR push** — that question is the agent’s job |
+| Ship the main CRUD/flow endpoints, then claim the layer ✅ | AC map row per bullet (happy, validation, edge) with file/test or explicit deferral |
+| Wait for the user to ask whether every AC is covered | Run the self-audit **before the first PR push** — that question is the agent’s job |
 | Fix gaps only in a follow-up commit after review | Same PR when possible; otherwise `**Deferred (PR #N):**` + **exact AC bullet text** in the feature callout |
 
 **Before push checklist (backend feature PRs):**
@@ -84,7 +84,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
    - downstream dependency failure path where applicable (transport/storage/service unavailable).
    If a path does not apply to that surface, mark it `N/A` in the AC map instead of skipping it silently.
 
-**Lesson (platform-foundation organization management):** A first pass shipped profile/settings/deletion APIs but missed Redis usage TTL (≤5 min), schedule rollback on queue failure, hard-delete purge, and form-task cancel — caught by spec review, not by “flow works.” See [organization-management callouts](../use-cases/platform-foundation/README.md) for what “done” looks like after self-audit.
+**Why this matters:** "the main flow works" routinely hides missed validation, edge-case, and cross-cutting ACs — TTLs, rollback-on-failure, purge/cleanup jobs, cancel paths, isolation boundaries. These surface in spec review, not in a happy-path demo. Run the self-audit against every in-scope AC bullet **before** the first push, not after review.
 
 ---
 
@@ -101,7 +101,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 **CI-only gates** (run automatically on PR, no local action required):
 
-- **Doc drift** — enforces same-PR docs, new-handler tests, no-new TODO/FIXME, new raw-SQL review, [WORKAROUND comment ↔ inventory sync](../WORKAROUNDS.md), [speculation guard](./docs-style.md#anti-patterns-dont-ship-these), `GetAwaiter().GetResult()` ban, hardcoded connection-string ban, `DateTime.Now` ban (use `UtcNow`), and a stale-terminology guard (current pattern list lives in [`scripts/check-doc-drift.sh`](../../scripts/check-doc-drift.sh) — search for `STALE_TERM_PATTERN`). **Module/API → use-case domain** — [`doc_drift_domains.py`](../../scripts/doc_drift_domains.py) + [`axis_repo.py`](../../scripts/axis_repo.py). **Layout drift** in the same job: [`sync_buf_yaml.py --check`](../../scripts/sync_buf_yaml.py), [`check_kafka_wiring.py`](../../scripts/check_kafka_wiring.py), [`regenerate-domain-readme-index.py --check`](../../scripts/regenerate-domain-readme-index.py).
+- **Doc drift** — enforces same-PR docs, new-handler tests, no-new TODO/FIXME, new raw-SQL review, [WORKAROUND comment ↔ inventory sync](../WORKAROUNDS.md), [speculation guard](./docs-style.md#anti-patterns-dont-ship-these), [incident/lesson framing guard](./docs-style.md#keep-practice-docs-general), `GetAwaiter().GetResult()` ban, hardcoded connection-string ban, `DateTime.Now` ban (use `UtcNow`), and a stale-terminology guard (current pattern list lives in [`scripts/check-doc-drift.sh`](../../scripts/check-doc-drift.sh) — search for `STALE_TERM_PATTERN`). **Module/API → use-case domain** — [`doc_drift_domains.py`](../../scripts/doc_drift_domains.py) + [`axis_repo.py`](../../scripts/axis_repo.py). **Layout drift** in the same job: [`sync_buf_yaml.py --check`](../../scripts/sync_buf_yaml.py), [`check_kafka_wiring.py`](../../scripts/check_kafka_wiring.py), [`regenerate-domain-readme-index.py --check`](../../scripts/regenerate-domain-readme-index.py).
 - **Markdown link check** — `lychee` verifies internal links and `#anchors`. **Relative file/image targets** (`![alt](./asset.svg)`, `[text](./file.md)`) are double-checked by [`scripts/check-doc-link-targets.py`](../../scripts/check-doc-link-targets.py) inside the drift script — catches the broken-image class lychee misses.
 - **Code-fence integrity** — [`scripts/check-doc-code-fences.py`](../../scripts/check-doc-code-fences.py) (inside the drift script) flags code-block lines with collapsed indentation (a lone leading space). Catches the bulk-find-replace corruption class that lychee, prettier, and the structural checks all let through.
 - **Use-case docs** — [`scripts/check-use-case-docs.py`](../../scripts/check-use-case-docs.py) validates use-case file structure (required sections + tables + status callout), flags template placeholders (`_(One sentence...)_`, `_(Actor)_`, `_(What starts...)_`), flags self-links `[name](./README.md)` and truncated summary rows in domain READMEs, and counts use cases still on the stock Main flow.
