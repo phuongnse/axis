@@ -21,7 +21,9 @@ export function useVerifyEmail() {
   const mutation = useMutation({
     mutationFn: verifyEmail,
     onSuccess: async (data, token) => {
-      if (data.sessionEstablished) {
+      // `data` is null when verify-email returns 204 (the contract on `main`,
+      // before the verify-session slice lands); fall through to the poll redirect.
+      if (data?.sessionEstablished) {
         await completePostVerifyPkceFlow(token);
         return;
       }
