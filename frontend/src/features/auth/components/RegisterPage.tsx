@@ -114,11 +114,21 @@ export function RegisterPage() {
             />
             <Label htmlFor="acceptedTerms" className="font-normal leading-snug">
               I agree to the{' '}
-              <a href="/legal/terms" className="font-medium text-primary hover:underline">
+              <a
+                href="/legal/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-primary hover:underline"
+              >
                 Terms of Service
               </a>{' '}
               and{' '}
-              <a href="/legal/privacy" className="font-medium text-primary hover:underline">
+              <a
+                href="/legal/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-primary hover:underline"
+              >
                 Privacy Policy
               </a>
             </Label>

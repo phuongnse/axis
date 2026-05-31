@@ -125,7 +125,7 @@ public class RegisterOrganizationHandlerTests
     }
 
     [Fact]
-    public async Task RegisterOrganization_WhenSlugCollides_GeneratesUniqueSlug()
+    public async Task RegisterOrganization_DelegatesSlugGenerationToGenerator()
     {
         SetupDefaultPlan();
         SetupDefaultSlug();
@@ -136,6 +136,8 @@ public class RegisterOrganizationHandlerTests
 
         await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
+        // Uniqueness/collision retry lives in OrganizationSlugGenerator (covered by its own
+        // unit tests); the handler only delegates to it.
         await _slugGenerator.Received(1).GenerateUniqueSlugAsync("Acme Corp", Arg.Any<CancellationToken>());
         await _orgRepo.Received(1).AddAsync(Arg.Any<Organization>(), Arg.Any<CancellationToken>());
     }

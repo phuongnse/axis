@@ -12,7 +12,7 @@ public static class LegalEndpoints
             .WithName("GetLegalVersions")
             .WithSummary("Current Terms of Service and Privacy Policy versions")
             .WithTags("Identity")
-            .Produces<object>();
+            .Produces<LegalVersionsDto>();
 
         return app;
     }
@@ -20,10 +20,6 @@ public static class LegalEndpoints
     private static async Task<IResult> GetLegalVersions(ISender mediator, CancellationToken ct)
     {
         LegalVersionsDto versions = await mediator.Send(new GetLegalVersionsQuery(), ct);
-        return Results.Ok(new
-        {
-            termsVersion = versions.TermsVersion,
-            privacyVersion = versions.PrivacyVersion,
-        });
+        return Results.Ok(versions);
     }
 }
