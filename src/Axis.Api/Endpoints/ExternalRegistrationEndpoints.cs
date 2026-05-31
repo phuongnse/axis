@@ -255,23 +255,16 @@ internal static class ExternalAuthClaimsExtractor
 
         bool verified = provider switch
         {
-            ExternalIdentityProvider.Google =>
-                string.Equals(
-                    principal.FindFirstValue("email_verified"),
-                    "true",
-                    StringComparison.OrdinalIgnoreCase),
+            // Microsoft Account / Entra ID only surfaces an account's primary email,
+            // which is verified by the provider.
             ExternalIdentityProvider.Microsoft => true,
-            ExternalIdentityProvider.GitHub =>
-                string.Equals(
-                    principal.FindFirstValue("email_verified"),
-                    "true",
-                    StringComparison.OrdinalIgnoreCase)
-                || principal.FindFirst("email")?.Properties.ContainsKey("verified") != true,
+            // Google and GitHub both expose an explicit verified flag. Require it and
+            // fail closed: an unverified provider email must never be treated as verified,
+            // otherwise an attacker could register an address they do not control.
+            ExternalIdentityProvider.Google => IsEmailVerifiedClaimTrue(principal),
+            ExternalIdentityProvider.GitHub => IsEmailVerifiedClaimTrue(principal),
             _ => false,
         };
-
-        if (provider == ExternalIdentityProvider.GitHub && email.Contains('@'))
-            verified = true;
 
         return new ExternalAuthClaims(
             providerKey,
@@ -279,6 +272,12 @@ internal static class ExternalAuthClaimsExtractor
             string.IsNullOrWhiteSpace(displayName) ? email.Trim() : displayName.Trim(),
             verified);
     }
+
+    private static bool IsEmailVerifiedClaimTrue(ClaimsPrincipal principal) =>
+        string.Equals(
+            principal.FindFirstValue("email_verified"),
+            "true",
+            StringComparison.OrdinalIgnoreCase);
 
     private static string BuildDisplayName(ClaimsPrincipal principal)
     {

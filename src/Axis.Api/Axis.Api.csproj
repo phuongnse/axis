@@ -7,6 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Axis.Api.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Modules\Identity\Axis.Identity.Infrastructure\Axis.Identity.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\DataModeling\Axis.DataModeling.Infrastructure\Axis.DataModeling.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\WorkflowBuilder\Axis.WorkflowBuilder.Infrastructure\Axis.WorkflowBuilder.Infrastructure.csproj" />
