@@ -123,8 +123,8 @@ export function useRegister() {
           admin_email: values.email.trim(),
           password: values.password,
           password_confirmation: values.passwordConfirmation,
-          accepted_terms_version: legalVersions.termsVersion,
-          accepted_privacy_version: legalVersions.privacyVersion,
+          accepted_terms_version: legalVersions.terms_version,
+          accepted_privacy_version: legalVersions.privacy_version,
         },
         idempotencyKeyRef.current,
       );

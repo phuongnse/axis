@@ -10,8 +10,8 @@ export interface RegisterOrganizationRequest {
 }
 
 export interface LegalVersionsResponse {
-  termsVersion: string;
-  privacyVersion: string;
+  terms_version: string;
+  privacy_version: string;
 }
 
 export interface OrganizationSlugPreviewResponse {

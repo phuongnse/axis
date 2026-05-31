@@ -17,8 +17,8 @@ vi.mock('@tanstack/react-router', async () => {
 });
 
 const LEGAL_VERSIONS = {
-  termsVersion: '2026-05-01',
-  privacyVersion: '2026-05-01',
+  terms_version: '2026-05-01',
+  privacy_version: '2026-05-01',
 };
 
 function mockLegalVersionsFetch() {
