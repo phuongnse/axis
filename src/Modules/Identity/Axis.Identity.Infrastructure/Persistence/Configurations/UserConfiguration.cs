@@ -66,6 +66,14 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.PasswordHash)
             .HasColumnName("password_hash");
 
+        builder.Property(u => u.AcceptedTermsVersion)
+            .HasColumnName("accepted_terms_version")
+            .HasMaxLength(32);
+
+        builder.Property(u => u.AcceptedPrivacyVersion)
+            .HasColumnName("accepted_privacy_version")
+            .HasMaxLength(32);
+
         // Map private backing field _roleIds as a uuid[] column
         builder.PrimitiveCollection<List<Guid>>("_roleIds")
             .HasField("_roleIds")

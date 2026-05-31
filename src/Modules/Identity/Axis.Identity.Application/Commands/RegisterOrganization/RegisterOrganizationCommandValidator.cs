@@ -22,13 +22,25 @@ public sealed class RegisterOrganizationCommandValidator : AbstractValidator<Reg
             .NotEmpty().WithMessage("Email is required.")
             .EmailAddress().WithMessage("Email must be a valid email address.");
 
-        RuleFor(x => x.Password)
-            .NotEmpty().WithMessage("Password is required.")
-            .MinimumLength(8).WithMessage("Password must be at least 8 characters.")
-            .Matches(@"[a-zA-Z]").WithMessage("Password must contain at least one letter.")
-            .Matches(@"\d").WithMessage("Password must contain at least one number.");
+        When(x => x.ExternalRegistrationSessionId is null, () =>
+        {
+            RuleFor(x => x.Password)
+                .NotEmpty().WithMessage("Password is required.")
+                .MinimumLength(8).WithMessage("Password must be at least 8 characters.")
+                .Matches(@"[a-zA-Z]").WithMessage("Password must contain at least one letter.")
+                .Matches(@"\d").WithMessage("Password must contain at least one number.");
 
-        RuleFor(x => x.PasswordConfirmation)
-            .Equal(x => x.Password).WithMessage("Password confirmation must match password.");
+            RuleFor(x => x.PasswordConfirmation)
+                .Equal(x => x.Password).WithMessage("Password confirmation must match password.");
+        });
+
+        When(x => x.ExternalRegistrationSessionId is not null, () =>
+        {
+            RuleFor(x => x.AcceptedTermsVersion)
+                .NotEmpty().WithMessage("Terms of Service acceptance is required.");
+
+            RuleFor(x => x.AcceptedPrivacyVersion)
+                .NotEmpty().WithMessage("Privacy Policy acceptance is required.");
+        });
     }
 }

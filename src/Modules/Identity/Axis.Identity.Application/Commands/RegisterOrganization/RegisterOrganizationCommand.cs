@@ -10,4 +10,7 @@ public record RegisterOrganizationCommand(
     string Password,
     string PasswordConfirmation,
     Guid? SubscriptionPlanId = null,
-    string? IdempotencyKey = null) : ICommand;
+    string? IdempotencyKey = null,
+    Guid? ExternalRegistrationSessionId = null,
+    string? AcceptedTermsVersion = null,
+    string? AcceptedPrivacyVersion = null) : ICommand;

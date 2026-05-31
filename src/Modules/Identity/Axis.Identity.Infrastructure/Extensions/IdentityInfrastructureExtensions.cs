@@ -49,6 +49,8 @@ public static class IdentityInfrastructureExtensions
         services.AddScoped<IRoleRepository, RoleRepository>();
         services.AddScoped<IInvitationRepository, InvitationRepository>();
         services.AddScoped<IRegistrationIdempotencyRepository, RegistrationIdempotencyRepository>();
+        services.AddScoped<IExternalRegistrationSessionRepository, ExternalRegistrationSessionRepository>();
+        services.AddScoped<IUserExternalLoginRepository, UserExternalLoginRepository>();
 
         services.AddScoped<IUnitOfWork, IdentityUnitOfWork>();
         services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();

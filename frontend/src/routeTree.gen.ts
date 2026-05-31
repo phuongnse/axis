@@ -18,6 +18,7 @@ const LoginLazyRouteImport = createFileRoute('/login')()
 const ForgotPasswordLazyRouteImport = createFileRoute('/forgot-password')()
 const CallbackLazyRouteImport = createFileRoute('/callback')()
 const IndexLazyRouteImport = createFileRoute('/')()
+const RegisterCompleteLazyRouteImport = createFileRoute('/register/complete')()
 const AuthenticatedDashboardLazyRouteImport = createFileRoute(
   '/_authenticated/dashboard',
 )()
@@ -53,6 +54,13 @@ const IndexLazyRoute = IndexLazyRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/index.lazy').then((d) => d.Route))
+const RegisterCompleteLazyRoute = RegisterCompleteLazyRouteImport.update({
+  id: '/complete',
+  path: '/complete',
+  getParentRoute: () => RegisterLazyRoute,
+} as any).lazy(() =>
+  import('./routes/register.complete.lazy').then((d) => d.Route),
+)
 const AuthenticatedDashboardLazyRoute =
   AuthenticatedDashboardLazyRouteImport.update({
     id: '/dashboard',
@@ -67,16 +75,18 @@ export interface FileRoutesByFullPath {
   '/callback': typeof CallbackLazyRoute
   '/forgot-password': typeof ForgotPasswordLazyRoute
   '/login': typeof LoginLazyRoute
-  '/register': typeof RegisterLazyRoute
+  '/register': typeof RegisterLazyRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardLazyRoute
+  '/register/complete': typeof RegisterCompleteLazyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexLazyRoute
   '/callback': typeof CallbackLazyRoute
   '/forgot-password': typeof ForgotPasswordLazyRoute
   '/login': typeof LoginLazyRoute
-  '/register': typeof RegisterLazyRoute
+  '/register': typeof RegisterLazyRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardLazyRoute
+  '/register/complete': typeof RegisterCompleteLazyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -85,8 +95,9 @@ export interface FileRoutesById {
   '/callback': typeof CallbackLazyRoute
   '/forgot-password': typeof ForgotPasswordLazyRoute
   '/login': typeof LoginLazyRoute
-  '/register': typeof RegisterLazyRoute
+  '/register': typeof RegisterLazyRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardLazyRoute
+  '/register/complete': typeof RegisterCompleteLazyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -97,6 +108,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/dashboard'
+    | '/register/complete'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -105,6 +117,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/dashboard'
+    | '/register/complete'
   id:
     | '__root__'
     | '/'
@@ -114,6 +127,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/_authenticated/dashboard'
+    | '/register/complete'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -122,7 +136,7 @@ export interface RootRouteChildren {
   CallbackLazyRoute: typeof CallbackLazyRoute
   ForgotPasswordLazyRoute: typeof ForgotPasswordLazyRoute
   LoginLazyRoute: typeof LoginLazyRoute
-  RegisterLazyRoute: typeof RegisterLazyRoute
+  RegisterLazyRoute: typeof RegisterLazyRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -169,6 +183,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexLazyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/register/complete': {
+      id: '/register/complete'
+      path: '/complete'
+      fullPath: '/register/complete'
+      preLoaderRoute: typeof RegisterCompleteLazyRouteImport
+      parentRoute: typeof RegisterLazyRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -191,13 +212,25 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
   AuthenticatedRouteChildren,
 )
 
+interface RegisterLazyRouteChildren {
+  RegisterCompleteLazyRoute: typeof RegisterCompleteLazyRoute
+}
+
+const RegisterLazyRouteChildren: RegisterLazyRouteChildren = {
+  RegisterCompleteLazyRoute: RegisterCompleteLazyRoute,
+}
+
+const RegisterLazyRouteWithChildren = RegisterLazyRoute._addFileChildren(
+  RegisterLazyRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexLazyRoute: IndexLazyRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   CallbackLazyRoute: CallbackLazyRoute,
   ForgotPasswordLazyRoute: ForgotPasswordLazyRoute,
   LoginLazyRoute: LoginLazyRoute,
-  RegisterLazyRoute: RegisterLazyRoute,
+  RegisterLazyRoute: RegisterLazyRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

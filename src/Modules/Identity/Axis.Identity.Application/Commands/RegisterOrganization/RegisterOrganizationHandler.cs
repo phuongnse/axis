@@ -1,7 +1,9 @@
 using System.Text.RegularExpressions;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
+using Axis.Identity.Contracts;
 using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Domain.Provisioning;
 using Axis.Identity.Domain.Subscriptions;
 using Axis.Identity.Domain.ValueObjects;
 using Axis.Shared.Application.CQRS;
@@ -15,6 +17,9 @@ public sealed class RegisterOrganizationHandler(
     IUserRepository userRepo,
     IRoleRepository roleRepo,
     IRegistrationIdempotencyRepository idempotencyRepo,
+    IExternalRegistrationSessionRepository externalSessionRepo,
+    IUserExternalLoginRepository externalLoginRepo,
+    ITenantModuleProvisioningRepository provisioningRepo,
     IEmailVerificationTokenStore verificationTokenStore,
     IPasswordHasher hasher,
     IEmailSender emailSender,
@@ -93,6 +98,23 @@ public sealed class RegisterOrganizationHandler(
                 return Result.Success();
             }
 
+            ExternalRegistrationSession? externalSession = null;
+            if (command.ExternalRegistrationSessionId is Guid sessionId)
+            {
+                externalSession = await externalSessionRepo.GetByIdAsync(sessionId, cancellationToken);
+                if (externalSession is null
+                    || externalSession.IsExpired
+                    || externalSession.IsCompleted
+                    || !string.Equals(
+                        externalSession.Email.Value,
+                        email.Value.Value,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    await MarkIdempotencyCompletedIfNeededAsync(idempotencyKey, cancellationToken);
+                    return Result.Success();
+                }
+            }
+
             OrganizationSlug slug = await GenerateUniqueSlugAsync(command.OrgName, cancellationToken);
 
             Guid planId = await ResolveSubscriptionPlanIdAsync(command.SubscriptionPlanId, cancellationToken);
@@ -110,25 +132,56 @@ public sealed class RegisterOrganizationHandler(
             await roleRepo.AddAsync(viewerRole, cancellationToken);
             await roleRepo.AddAsync(endUserRole, cancellationToken);
 
-            string passwordHash = hasher.Hash(command.Password);
-            User user = User.Create(command.AdminFirstName, command.AdminLastName, email.Value, org.Id);
-            user.SetPasswordHash(passwordHash);
+            User user = User.Create(
+                command.AdminFirstName,
+                command.AdminLastName,
+                email.Value,
+                org.Id);
             user.AssignRole(adminRole.Id);
-            await userRepo.AddAsync(user, cancellationToken);
 
+            if (externalSession is not null)
+            {
+                user.RecordLegalAcceptance(
+                    command.AcceptedTermsVersion!,
+                    command.AcceptedPrivacyVersion!);
+
+                UserExternalLogin externalLogin = UserExternalLogin.Create(
+                    user.Id,
+                    externalSession.Provider,
+                    externalSession.ProviderKey);
+                await externalLoginRepo.AddAsync(externalLogin, cancellationToken);
+
+                org.BeginProvisioning();
+                List<TenantModuleProvisioning> pendingModules = TenantModuleNames.All
+                    .Select(module => TenantModuleProvisioning.CreatePending(org.Id, module))
+                    .ToList();
+                await provisioningRepo.AddRangeAsync(pendingModules, cancellationToken);
+                user.VerifyEmail();
+                externalSession.MarkCompleted();
+            }
+            else
+            {
+                string passwordHash = hasher.Hash(command.Password);
+                user.SetPasswordHash(passwordHash);
+            }
+
+            await userRepo.AddAsync(user, cancellationToken);
             await uow.SaveChangesAsync(cancellationToken);
 
-            (string rawToken, string tokenHash) = OpaqueTokenGenerator.Create();
-            await verificationTokenStore.CreateAsync(
-                user.Id,
-                tokenHash,
-                DateTime.UtcNow.Add(VerificationTokenLifetime),
-                cancellationToken);
+            if (externalSession is null)
+            {
+                (string rawToken, string tokenHash) = OpaqueTokenGenerator.Create();
+                await verificationTokenStore.CreateAsync(
+                    user.Id,
+                    tokenHash,
+                    DateTime.UtcNow.Add(VerificationTokenLifetime),
+                    cancellationToken);
 
-            await emailSender.SendVerificationEmailAsync(
-                email.Value.Value,
-                rawToken,
-                cancellationToken);
+                await emailSender.SendVerificationEmailAsync(
+                    email.Value.Value,
+                    rawToken,
+                    cancellationToken);
+            }
 
             await MarkIdempotencyCompletedIfNeededAsync(idempotencyKey, cancellationToken);
             return Result.Success();
