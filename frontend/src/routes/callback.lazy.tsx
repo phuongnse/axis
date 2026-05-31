@@ -2,6 +2,7 @@ import { createLazyFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { exchangeAuthorizationCode } from '@/features/auth/api';
 import { clearPkceSession, loadPkceSession } from '@/features/auth/pkce';
+import { consumePostVerifyProvisioningToken } from '@/features/auth/post-verify-session';
 
 export const Route = createLazyFileRoute('/callback')({
   component: CallbackPage,
@@ -24,7 +25,18 @@ function CallbackPage() {
     }
 
     exchangeAuthorizationCode(code)
-      .then(() => navigate({ to: '/dashboard', replace: true }))
+      .then(() => {
+        // Consume the post-verify token only once the exchange has succeeded, so a
+        // failed/invalid callback does not discard a still-valid provisioning token.
+        const provisioningToken = consumePostVerifyProvisioningToken();
+        if (provisioningToken) {
+          // Hard redirect (not typed router navigation) so this slice compiles and
+          // works whether or not the /provisioning route from the journey slice is present.
+          window.location.assign(`/provisioning?token=${encodeURIComponent(provisioningToken)}`);
+          return;
+        }
+        void navigate({ to: '/dashboard', replace: true });
+      })
       .catch(() => {
         clearPkceSession();
         setError('Could not complete sign-in. Please try again.');

@@ -54,11 +54,12 @@ public class VerifyEmailHandlerTests
         _organizationRepo.GetByIdAsync(organization.Id).Returns(organization);
         _roleRepo.GetByNameAsync("Admin", organization.Id).Returns(adminRole);
 
-        Result result = await CreateHandler().Handle(
+        Result<VerifyEmailSuccessDto> result = await CreateHandler().Handle(
             new VerifyEmailCommand(rawToken),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
+        result.Value.Email.Should().Be("alice@acme.com");
         user.IsEmailVerified.Should().BeTrue();
         organization.Status.Should().Be(OrganizationStatus.Provisioning);
 
@@ -81,7 +82,7 @@ public class VerifyEmailHandlerTests
         _tokenStore.ResolveForVerificationAsync(tokenHash, Arg.Any<CancellationToken>())
             .Returns(new EmailVerificationTokenResolveResult(EmailVerificationTokenState.NotFound, null));
 
-        Result result = await CreateHandler().Handle(
+        Result<VerifyEmailSuccessDto> result = await CreateHandler().Handle(
             new VerifyEmailCommand("unknown-token"),
             CancellationToken.None);
 
@@ -99,7 +100,7 @@ public class VerifyEmailHandlerTests
         _tokenStore.ResolveForVerificationAsync(tokenHash, Arg.Any<CancellationToken>())
             .Returns(new EmailVerificationTokenResolveResult(EmailVerificationTokenState.Expired, Guid.NewGuid()));
 
-        Result result = await CreateHandler().Handle(
+        Result<VerifyEmailSuccessDto> result = await CreateHandler().Handle(
             new VerifyEmailCommand(rawToken),
             CancellationToken.None);
 
@@ -117,7 +118,7 @@ public class VerifyEmailHandlerTests
         _tokenStore.ResolveForVerificationAsync(tokenHash, Arg.Any<CancellationToken>())
             .Returns(new EmailVerificationTokenResolveResult(EmailVerificationTokenState.AlreadyUsed, user.Id));
 
-        Result result = await CreateHandler().Handle(
+        Result<VerifyEmailSuccessDto> result = await CreateHandler().Handle(
             new VerifyEmailCommand(rawToken),
             CancellationToken.None);
 
@@ -139,7 +140,7 @@ public class VerifyEmailHandlerTests
             .Returns(new EmailVerificationTokenResolveResult(EmailVerificationTokenState.Valid, user.Id));
         _userRepo.GetByIdPlatformWideAsync(user.Id).Returns(user);
 
-        Result result = await CreateHandler().Handle(
+        Result<VerifyEmailSuccessDto> result = await CreateHandler().Handle(
             new VerifyEmailCommand(rawToken),
             CancellationToken.None);
 
