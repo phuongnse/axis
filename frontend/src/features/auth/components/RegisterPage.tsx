@@ -7,39 +7,13 @@ import { AuthCard } from '@/features/auth/components/AuthCard';
 import { useRegister } from '@/features/auth/hooks/useRegister';
 
 export function RegisterPage() {
-  const { form, loading, successMessage, submit, resetFlow } = useRegister();
+  const { form, loading, submit } = useRegister();
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = form;
   const submitError = errors.root?.message;
-
-  if (successMessage) {
-    return (
-      <AuthCard
-        title="Check your email"
-        footer={
-          <>
-            Already verified?{' '}
-            <Link to="/login" className="font-medium hover:underline">
-              Sign in
-            </Link>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">{successMessage}</p>
-          <p className="text-sm text-muted-foreground">
-            If an account exists for this email, you will receive a verification link shortly.
-          </p>
-          <Button type="button" variant="outline" className="w-full h-9" onClick={resetFlow}>
-            Register another organization
-          </Button>
-        </div>
-      </AuthCard>
-    );
-  }
 
   return (
     <AuthCard

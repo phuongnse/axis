@@ -26,3 +26,25 @@ export interface LoginAttemptResult {
   authorizeUrl: string;
   location: string | null;
 }
+
+export interface VerifyEmailResponse {
+  sessionEstablished: boolean;
+}
+
+export interface ProvisioningStatusResponse {
+  organizationId: string;
+  organizationStatus: string;
+  isReady: boolean;
+  modules: ModuleProvisioningStatus[];
+}
+
+export interface ModuleProvisioningStatus {
+  module: string;
+  status: string;
+  attemptCount: number;
+  lastError: string | null;
+}
+
+export type VerifyEmailErrorKind = 'expired' | 'already_used' | 'invalid' | 'rate_limited';
+
+export type ResendVerificationState = 'idle' | 'sending' | 'success' | 'rate_limited' | 'error';
