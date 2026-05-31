@@ -76,7 +76,7 @@ Registration journey (sign-up → verify → provisioning): [register-org § Dia
 | Shared Domain | ✅ Done | `Entity`, `AggregateRoot`, `ValueObject`, `IDomainEvent`, `Result<T>` |
 | Shared Application | ✅ Done | `ICommand/IQuery`, `ICommandHandler/IQueryHandler`, `ValidationBehavior`, `ITenantContext` |
 | Shared Infrastructure | ✅ Done | `TenantSchemaInterceptor`, per-module `UnitOfWork` ([ADR-017](../../TECH_STACK.md#adr-017-axisshared-is-abstractions-only-no-shared-implementation)); **OpenTelemetry** host wiring on `Axis.Api` ([ADR-018](../../TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability), [patterns § OpenTelemetry](../../playbooks/patterns.md#opentelemetry-observability)) |
-| [Register org](register-org/) | ⚠️ Partial | Signup, verify, and tenant provisioning backend largely done; Terms/OAuth + full journey Frontend ⏳ |
+| [Register org](register-org/) | ⚠️ Partial | Signup, verify, and tenant provisioning backend largely done; Frontend journey steps 3–4 shipped (confirmation, verify, provisioning poll); Terms/OAuth + register-org-complete ⏳ |
 | [Subscription plans](view-plans/) | ✅ Done | `GET /api/plans`, pricing data, 402 limits — see [enforce limits](enforce-limits/). Frontend pricing UI ⏳ |
 | [Tenant isolation](tenant-scope/) | ✅ Done | `TenantSchemaInterceptor`, `TenantOrganizationAccessMiddleware`, cross-tenant API tests |
 | [Organization management](org-profile/) | ✅ Done | Profile, settings + usage, scheduled deletion + hard-delete job ✅. Frontend settings UI ⏳ |
