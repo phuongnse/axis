@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -63,7 +63,9 @@ describe('RegisterPage', () => {
     await user.type(screen.getByLabelText('Confirm password'), 'Passw0rd');
     await user.click(screen.getByRole('button', { name: /create account/i }));
 
-    expect(navigateMock).toHaveBeenCalledWith({ to: '/register/confirmation' });
+    await waitFor(() =>
+      expect(navigateMock).toHaveBeenCalledWith({ to: '/register/confirmation' }),
+    );
     const stored = sessionStorage.getItem('axis.registration-context');
     expect(stored).toContain('alex@example.com');
     expect(stored).toContain("O'Brien & Co.");

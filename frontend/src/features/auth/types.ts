@@ -47,4 +47,4 @@ export interface ModuleProvisioningStatus {
 
 export type VerifyEmailErrorKind = 'expired' | 'already_used' | 'invalid' | 'rate_limited';
 
-export type ResendVerificationState = 'idle' | 'sending' | 'success' | 'rate_limited';
+export type ResendVerificationState = 'idle' | 'sending' | 'success' | 'rate_limited' | 'error';

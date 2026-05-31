@@ -95,6 +95,14 @@ export function EmailConfirmationPage() {
           />
         ) : null}
 
+        {state === 'error' ? (
+          <NoticeBanner
+            variant="warning"
+            title="Couldn't send the email"
+            body="Something went wrong sending the verification email. Please try again."
+          />
+        ) : null}
+
         <div className="text-sm">
           <span className="text-muted-foreground">Didn&apos;t receive it? </span>
           {context?.email ? (

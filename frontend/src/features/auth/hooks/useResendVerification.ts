@@ -20,6 +20,8 @@ export function useResendVerification() {
     state = 'success';
   } else if (mutation.error instanceof ApiError && mutation.error.status === 429) {
     state = 'rate_limited';
+  } else if (mutation.isError) {
+    state = 'error';
   }
 
   const rateLimitMessage =

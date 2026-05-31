@@ -24,8 +24,13 @@ export function useVerifyEmail() {
       // `data` is null when verify-email returns 204 (the contract on `main`,
       // before the verify-session slice lands); fall through to the poll redirect.
       if (data?.sessionEstablished) {
-        await completePostVerifyPkceFlow(token);
-        return;
+        try {
+          await completePostVerifyPkceFlow(token);
+          return;
+        } catch {
+          // PKCE setup failed — fall back to the provisioning poll so the user
+          // is not stranded on the "Redirecting…" screen.
+        }
       }
 
       void navigate({

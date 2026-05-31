@@ -1,6 +1,9 @@
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from '@tanstack/react-router';
 import { AlertCircle, CheckCircle2, Clock, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +14,12 @@ import { useVerifyEmail } from '@/features/auth/hooks/useVerifyEmail';
 import { loadRegistrationContext } from '@/features/auth/registration-context';
 import type { VerifyEmailErrorKind } from '@/features/auth/types';
 import { useQueryParam } from '@/features/auth/use-query-param';
+
+const resendSchema = z.object({
+  email: z.string().min(1, 'Email address is required').email('Enter a valid email address'),
+});
+
+type ResendFormValues = z.infer<typeof resendSchema>;
 
 function VerifyEmailOutcome({
   kind,
@@ -23,7 +32,15 @@ function VerifyEmailOutcome({
   onResend: (email: string) => Promise<void>;
   resendLoading: boolean;
 }) {
-  const [resendEmail, setResendEmail] = useState(email);
+  const {
+    register: registerResend,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ResendFormValues>({
+    resolver: zodResolver(resendSchema),
+    mode: 'onSubmit',
+    defaultValues: { email },
+  });
   const showResend = kind === 'expired' || kind === 'rate_limited';
 
   const config = {
@@ -86,10 +103,8 @@ function VerifyEmailOutcome({
         {showResend ? (
           <form
             className="space-y-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void onResend(resendEmail.trim());
-            }}
+            onSubmit={handleSubmit((values) => void onResend(values.email.trim()))}
+            noValidate
           >
             <div className="space-y-1.5">
               <Label htmlFor="resend-email">Email address</Label>
@@ -97,16 +112,19 @@ function VerifyEmailOutcome({
                 id="resend-email"
                 type="email"
                 autoComplete="email"
-                value={resendEmail}
-                onChange={(event) => setResendEmail(event.target.value)}
+                aria-invalid={errors.email ? true : undefined}
                 disabled={kind === 'rate_limited' || resendLoading}
+                {...registerResend('email')}
               />
+              {errors.email ? (
+                <p className="text-xs text-destructive">{errors.email.message}</p>
+              ) : null}
             </div>
             <Button
               type="submit"
               variant="cta"
               className="w-full h-9"
-              disabled={!resendEmail.trim() || kind === 'rate_limited' || resendLoading}
+              disabled={kind === 'rate_limited' || resendLoading}
             >
               {resendLoading ? 'Sending…' : 'Resend verification email'}
             </Button>
