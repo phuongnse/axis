@@ -15,15 +15,7 @@ public class OrganizationEndpointTests(ApiTestFixture fixture)
 {
     private static readonly JsonSerializerOptions Json = ApiTestFixture.JsonOptions;
 
-    private static object RegisterPayload(string suffix) => new
-    {
-        org_name = $"TestOrg{suffix}",
-        admin_first_name = "Test",
-        admin_last_name = "Admin",
-        admin_email = $"admin{suffix}@test.com",
-        password = "TestPass1",
-        password_confirmation = "TestPass1",
-    };
+    private static object RegisterPayload(string suffix) => TestRegistrationPayload.Create(suffix);
 
     [Fact]
     public async Task Register_WhenSameIdempotencyKeyTwice_CreatesOnlyOneOrganization()
@@ -104,5 +96,34 @@ public class OrganizationEndpointTests(ApiTestFixture fixture)
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
         body.GetProperty("message").GetString().Should().Contain("newuser@test.com");
+    }
+
+    [Fact]
+    public async Task GetSlugPreview_WhenOrgNameProvided_ReturnsBaseSlug()
+    {
+        HttpResponseMessage resp = await fixture.Client.GetAsync(
+            "/api/organizations/slug-preview?org_name=O'Brien%20%26%20Co.");
+
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
+        body.GetProperty("slug").GetString().Should().Be("o-brien-co");
+    }
+
+    [Fact]
+    public async Task Register_WhenTermsVersionsMissing_Returns400()
+    {
+        object payload = new
+        {
+            org_name = "Acme Corp",
+            admin_first_name = "Test",
+            admin_last_name = "Admin",
+            admin_email = "noterms@test.com",
+            password = "TestPass1",
+            password_confirmation = "TestPass1",
+        };
+
+        HttpResponseMessage resp = await fixture.Client.PostAsJsonAsync("/api/organizations", payload, Json);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 }

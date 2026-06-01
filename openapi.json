@@ -2476,6 +2476,27 @@
         }
       }
     },
+    "/api/legal/versions": {
+      "get": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Current Terms of Service and Privacy Policy versions",
+        "operationId": "GetLegalVersions",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegalVersionsDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/signout": {
       "post": {
         "tags": [
@@ -2658,6 +2679,37 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/organizations/slug-preview": {
+      "get": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Preview organization URL slug from a proposed name",
+        "operationId": "GetOrganizationSlugPreview",
+        "parameters": [
+          {
+            "name": "org_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSlugPreviewDto"
                 }
               }
             }
@@ -6522,6 +6574,18 @@
         },
         "additionalProperties": false
       },
+      "LegalVersionsDto": {
+        "type": "object",
+        "properties": {
+          "terms_version": {
+            "type": "string"
+          },
+          "privacy_version": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "ModelDetailDto": {
         "type": "object",
         "properties": {
@@ -6610,6 +6674,15 @@
           "last_error": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationSlugPreviewDto": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -6738,6 +6811,12 @@
             "type": "string"
           },
           "password_confirmation": {
+            "type": "string"
+          },
+          "accepted_terms_version": {
+            "type": "string"
+          },
+          "accepted_privacy_version": {
             "type": "string"
           },
           "subscription_plan_id": {

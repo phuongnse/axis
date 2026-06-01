@@ -56,6 +56,7 @@ public static class IdentityInfrastructureExtensions
         services.AddSingleton<IResendVerificationRateLimiter, RedisResendVerificationRateLimiter>();
         services.AddScoped<IPasswordResetTokenStore, PasswordResetTokenStore>();
         services.AddScoped<IEmailVerificationTokenStore, EmailVerificationTokenStore>();
+        services.AddScoped<IOrganizationSlugGenerator, OrganizationSlugGenerator>();
         services.AddScoped<ISessionStore, SessionStoreService>();
 
         services.AddGrpc();

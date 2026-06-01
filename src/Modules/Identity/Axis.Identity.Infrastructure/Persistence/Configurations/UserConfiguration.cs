@@ -51,6 +51,17 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnName("is_email_verified")
             .IsRequired();
 
+        builder.Property(u => u.AcceptedTermsVersion)
+            .HasColumnName("accepted_terms_version")
+            .HasMaxLength(32);
+
+        builder.Property(u => u.AcceptedPrivacyVersion)
+            .HasColumnName("accepted_privacy_version")
+            .HasMaxLength(32);
+
+        builder.Property(u => u.LegalAcceptedAt)
+            .HasColumnName("legal_accepted_at");
+
         builder.Property(u => u.FailedLoginAttempts)
             .HasColumnName("failed_login_attempts")
             .HasDefaultValue(0)

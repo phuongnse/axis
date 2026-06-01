@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Pre-push gate: runs the fast local mirror of CI before any push, so the
+# "build passed locally but CI failed" class (charset/format, frontend type,
+# casing, drift) is caught here instead of after a red CI run.
+#
+# Enable once:  git config core.hooksPath scripts/hooks   (or: scripts/install-hooks.sh)
+# Bypass (rare, justify it):  git push --no-verify
+#
+# Heavy integration tests (Testcontainers) are NOT run here — use
+# `scripts/verify.sh full` or rely on CI for those.
+exec "$(git rev-parse --show-toplevel)/scripts/verify.sh" fast

@@ -10,8 +10,10 @@ import {
 } from './pkce';
 import { storePostVerifyProvisioningToken } from './post-verify-session';
 import type {
+  LegalVersionsResponse,
   LoginAttemptResult,
   LoginCredentials,
+  OrganizationSlugPreviewResponse,
   ProvisioningStatusResponse,
   RegisterOrganizationRequest,
   RegisterOrganizationResponse,
@@ -21,6 +23,8 @@ import type {
 export const authKeys = {
   all: ['auth'] as const,
   provisioningStatus: (token: string) => [...authKeys.all, 'provisioning-status', token] as const,
+  legalVersions: ['auth', 'legal-versions'] as const,
+  slugPreview: (orgName: string) => [...authKeys.all, 'slug-preview', orgName] as const,
 };
 
 interface TokenResponse {
@@ -58,6 +62,19 @@ export async function registerOrganization(
     },
     body: JSON.stringify(payload),
   });
+}
+
+export async function getLegalVersions(): Promise<LegalVersionsResponse> {
+  return fetchApi<LegalVersionsResponse>('/legal/versions');
+}
+
+export async function getOrganizationSlugPreview(
+  orgName: string,
+): Promise<OrganizationSlugPreviewResponse> {
+  const params = new URLSearchParams({ org_name: orgName });
+  return fetchApi<OrganizationSlugPreviewResponse>(
+    `/organizations/slug-preview?${params.toString()}`,
+  );
 }
 
 export class LoginRequestError extends Error {

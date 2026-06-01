@@ -408,6 +408,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/legal/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Current Terms of Service and Privacy Policy versions */
+        get: operations["GetLegalVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/signout": {
         parameters: {
             query?: never;
@@ -504,6 +521,23 @@ export interface paths {
         put?: never;
         /** Reset password using a one-time token */
         post: operations["ResetPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations/slug-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview organization URL slug from a proposed name */
+        get: operations["GetOrganizationSlugPreview"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1482,6 +1516,10 @@ export interface components {
             /** Format: uuid */
             role_id?: string;
         };
+        LegalVersionsDto: {
+            terms_version?: string;
+            privacy_version?: string;
+        };
         ModelDetailDto: {
             /** Format: uuid */
             id?: string;
@@ -1513,6 +1551,9 @@ export interface components {
             /** Format: int32 */
             attempt_count?: number;
             last_error?: string | null;
+        };
+        OrganizationSlugPreviewDto: {
+            slug?: string;
         };
         ProblemDetails: {
             type?: string | null;
@@ -1562,6 +1603,8 @@ export interface components {
             admin_email?: string;
             password?: string;
             password_confirmation?: string;
+            accepted_terms_version?: string;
+            accepted_privacy_version?: string;
             /** Format: uuid */
             subscription_plan_id?: string | null;
         };
@@ -3693,6 +3736,26 @@ export interface operations {
             };
         };
     };
+    GetLegalVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LegalVersionsDto"];
+                };
+            };
+        };
+    };
     SignOut: {
         parameters: {
             query?: never;
@@ -3862,6 +3925,28 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetOrganizationSlugPreview: {
+        parameters: {
+            query: {
+                org_name: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationSlugPreviewDto"];
                 };
             };
         };

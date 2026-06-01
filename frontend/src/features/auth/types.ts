@@ -1,8 +1,12 @@
 import type { components } from '@/lib/api-types';
 
-// Derived from the backend OpenAPI schema (snake_case) so the request shape can
-// never drift from the API. Regenerate with `npm run gen:api-types`.
+// Derived from the backend OpenAPI schema (snake_case) so request/response
+// shapes can never drift from the API. Regenerate with `npm run gen:api-types`.
 export type RegisterOrganizationRequest = components['schemas']['RegisterOrganizationRequest'];
+
+export type LegalVersionsResponse = components['schemas']['LegalVersionsDto'];
+
+export type OrganizationSlugPreviewResponse = components['schemas']['OrganizationSlugPreviewDto'];
 
 export interface RegisterOrganizationResponse {
   message?: string;
