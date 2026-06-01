@@ -5,41 +5,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AuthCard } from '@/features/auth/components/AuthCard';
 import { useRegister } from '@/features/auth/hooks/useRegister';
+import { useSlugPreview } from '@/features/auth/hooks/useSlugPreview';
 
 export function RegisterPage() {
-  const { form, loading, successMessage, submit, resetFlow } = useRegister();
+  const { form, loading, submit } = useRegister();
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = form;
+  const organizationName = watch('organizationName');
+  const { slug } = useSlugPreview(organizationName);
   const submitError = errors.root?.message;
-
-  if (successMessage) {
-    return (
-      <AuthCard
-        title="Check your email"
-        footer={
-          <>
-            Already verified?{' '}
-            <Link to="/login" className="font-medium hover:underline">
-              Sign in
-            </Link>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">{successMessage}</p>
-          <p className="text-sm text-muted-foreground">
-            If an account exists for this email, you will receive a verification link shortly.
-          </p>
-          <Button type="button" variant="outline" className="w-full h-9" onClick={resetFlow}>
-            Register another organization
-          </Button>
-        </div>
-      </AuthCard>
-    );
-  }
 
   return (
     <AuthCard
@@ -62,6 +40,11 @@ export function RegisterPage() {
             aria-invalid={errors.organizationName ? true : undefined}
             {...register('organizationName')}
           />
+          {slug ? (
+            <p className="text-xs text-muted-foreground">
+              Workspace URL: <span className="font-medium text-foreground">{slug}</span>
+            </p>
+          ) : null}
           {errors.organizationName ? (
             <p className="text-xs text-destructive">{errors.organizationName.message}</p>
           ) : null}
@@ -117,6 +100,41 @@ export function RegisterPage() {
           />
           {errors.passwordConfirmation ? (
             <p className="text-xs text-destructive">{errors.passwordConfirmation.message}</p>
+          ) : null}
+        </div>
+
+        <div className="space-y-1.5">
+          <div className="flex items-start gap-2">
+            <input
+              id="acceptedTerms"
+              type="checkbox"
+              className="mt-1 h-4 w-4 rounded border-border"
+              aria-invalid={errors.acceptedTerms ? true : undefined}
+              {...register('acceptedTerms')}
+            />
+            <Label htmlFor="acceptedTerms" className="font-normal leading-snug">
+              I agree to the{' '}
+              <a
+                href="/legal/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-primary hover:underline"
+              >
+                Terms of Service
+              </a>{' '}
+              and{' '}
+              <a
+                href="/legal/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-primary hover:underline"
+              >
+                Privacy Policy
+              </a>
+            </Label>
+          </div>
+          {errors.acceptedTerms ? (
+            <p className="text-xs text-destructive">{errors.acceptedTerms.message}</p>
           ) : null}
         </div>
 

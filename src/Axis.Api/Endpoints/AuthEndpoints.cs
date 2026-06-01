@@ -32,9 +32,9 @@ public static class AuthEndpoints
         group.MapPost("/verify-email", VerifyEmail)
             .AllowAnonymous()
             .WithName("VerifyEmail")
-            .WithSummary("Verify email address with a one-time token")
+            .WithSummary("Verify email address with a one-time token and establish a sign-in session")
             .WithTags("Identity")
-            .Produces(204)
+            .Produces<VerifyEmailSessionEstablishedDto>()
             .ProducesProblem(400);
 
         group.MapGet("/provisioning-status", GetProvisioningStatus)
@@ -120,11 +120,44 @@ public static class AuthEndpoints
     private static async Task<IResult> VerifyEmail(
         [FromBody] VerifyEmailRequest request,
         ISender mediator,
+        HttpContext httpContext,
         CancellationToken ct)
     {
-        Result result = await mediator.Send(new VerifyEmailCommand(request.Token), ct);
-        if (result.IsFailure) return result.ToProblemDetails();
-        return Results.NoContent();
+        Result<VerifyEmailSuccessDto> result =
+            await mediator.Send(new VerifyEmailCommand(request.Token), ct);
+        if (result.IsFailure)
+            return result.ToProblemDetails();
+
+        await SignInPkceSessionAsync(httpContext, result.Value);
+
+        return Results.Ok(new VerifyEmailSessionEstablishedDto(true));
+    }
+
+    private static async Task SignInPkceSessionAsync(HttpContext httpContext, VerifyEmailSuccessDto claims)
+    {
+        List<Claim> claimList =
+        [
+            new(ClaimTypes.NameIdentifier, claims.UserId.ToString()),
+            new("org_id", claims.OrganizationId.ToString()),
+            new(ClaimTypes.Email, claims.Email),
+            new("name", claims.FullName),
+        ];
+        foreach (string permission in claims.Permissions)
+            claimList.Add(new Claim("permissions", permission));
+
+        ClaimsIdentity identity = new(claimList, CookieAuthenticationDefaults.AuthenticationScheme);
+        ClaimsPrincipal principal = new(identity);
+
+        AuthenticationProperties props = new()
+        {
+            IsPersistent = false,
+            ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(5),
+        };
+
+        await httpContext.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            principal,
+            props);
     }
 
     private static async Task<IResult> GetProvisioningStatus(

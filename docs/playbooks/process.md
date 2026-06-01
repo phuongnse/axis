@@ -107,6 +107,7 @@ For every match: confirm the SQL only references tables owned by that match's ow
 
 #### Step 6 — Update docs (same PR)
 
+- Large features: if the use case spans multiple PRs, follow [pr-slicing.md](./pr-slicing.md) — each slice updates callouts for what **that** slice ships, defers remaining bullets explicitly, and owns its shared seams.
 - Update use-case file `> **Implementation status**` callout for this US
 - If all USes in the feature are complete for a layer: update Domain README status table
 - If the full layer is done for the module: update `docs/PROGRESS.md`

@@ -343,6 +343,13 @@ dotnet_analyzer_diagnostic.category-Design.severity = suggestion
 dotnet_analyzer_diagnostic.category-Performance.severity = suggestion
 dotnet_analyzer_diagnostic.category-Reliability.severity = suggestion
 
+# ── Escalated to warning (→ build error via TreatWarningsAsErrors) ──
+# Recurring review findings that are mechanical and deterministic: cheaper to
+# fail the build than to re-flag in review. See docs/review-findings-ledger.md.
+# CA2016: forward the CancellationToken parameter to methods that take one.
+# Caught dropped tokens in schedulers/middleware/gRPC that review kept finding.
+dotnet_diagnostic.CA2016.severity = warning
+
 # Microsoft.VisualStudio.Threading.Analyzers — selective rule overrides.
 # The analyzer is wired in Directory.Build.props; severities below tune
 # which rules block the build. Keep this list narrow and justify each

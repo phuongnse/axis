@@ -97,9 +97,9 @@ Self-service registration flow where a new organization signs up and is automati
 > | Application | ⚠️ |
 > | Infrastructure | ⚠️ |
 > | API | ⚠️ |
-> | Frontend | ⏳ |
+> | Frontend | ⚠️ |
 >
-> **Gaps vs spec:** **Registration:** email/password path is largely complete (`Idempotency-Key` on `POST /api/organizations/`, slug uniqueness retry). **Not yet:** Terms of Service / Privacy Policy acceptance (record accepted version), external-provider sign-up (ADR-027), **register-org-complete** screen, CAPTCHA (see *Out of scope*). **Email verification (backend ✅):** opaque one-time tokens in `email_verification_tokens` (SHA-256 at rest, 24h TTL), resend rate limit 3/email/hour (`IResendVerificationRateLimiter`, HTTP 429), login blocks unverified users. **Tenant provisioning (backend ✅):** org enters `Provisioning` on verify, `OrganizationVerifiedEvent` → per-module `TenantModuleProvisionReportEvent`, Identity coordinator retries (3×, exponential backoff), critical log on exhaustion, `GET /api/auth/provisioning-status?token=` for polling. **Frontend ⏳:** registration + `verify-email-states` (errors) + `workspace-provisioning`; no verify-success screen — redirect on verify 200 (**Deferred — PR #125 follow-up**). **Manual provisioning retry:** `POST /api/auth/retry-provisioning` + **Try again** UI (**Deferred** — coordinator auto-retry only today).
+> **Gaps vs spec:** **Registration:** email/password path complete (`Idempotency-Key`, slug uniqueness retry); **Terms/Privacy acceptance + `GET /api/legal/versions` + debounced slug preview on register (this PR ✅).** **Frontend journey ✅:** `/register/confirmation`, `/auth/verify`, `/provisioning` poll UI. **Email verification / tenant provisioning (backend ✅):** tokens, resend rate limit, event-driven coordinator, `GET /api/auth/provisioning-status?token=`. **Not yet:** verify PKCE session (slice 3), manual retry UI (slice 4), external-provider sign-up / **register-org-complete** (ADR-027, slice 5), CAPTCHA (*Out of scope*) — [pr-slicing.md](../../../playbooks/pr-slicing.md).
 >
 > **Decisions:**
 > - duplicate email returns silently without creating anything — matches "same confirmation screen" AC. `RegisterOrganizationCommandValidator` enforces: org name 2–100 chars, valid email, password min 8 chars + letter + number, confirmation match. Org slug auto-generated with uniqueness retry loop

@@ -92,20 +92,15 @@ await PostgresModuleTestDatabase.MigrateAsync<DataModelingDbContext>(
 
 **Rule:** when adding a module to `ApiTestFixture`, add `CreateAsync` + env var + `MigrateAsync` — never `EnsureCreatedAsync`, never a shared Wolverine-only database.
 
-### Tenant isolation tests vs async provisioning tests (platform-foundation tenant isolation/tenant-registration lesson)
+### Keep deterministic tests separate from async-pipeline tests
 
-Do not couple tenant-isolation API tests to asynchronous provisioning-event timing.
+Do not couple request-path / synchronous tests to the timing of an asynchronous, eventually-consistent pipeline (event handlers, background coordinators, retries).
 
-- **Tenant isolation API tests (tenant-isolation)** should verify request-path behavior (`org_id` resolution, schema-scoped reads, 403/404 boundaries) with **deterministic fixture setup**. Provision tenant schemas synchronously in test setup and assert required tenant tables exist before making API calls.
-- **Async provisioning workflow tests ([register-org § tenant-provisioning](../use-cases/platform-foundation/register-org/README.md#tenant-provisioning))** should be a **separate test suite** that targets coordinator/handler behavior (retry scheduling, exhaustion alerts, completion transitions), not a precondition for every API test.
-- Shared helpers (e.g., auth helpers used by many endpoint suites) must not wait on eventually-consistent background pipelines with long polling loops. That pattern can create CI-wide flakes/timeouts and hide the real failing concern.
+- **Request-path tests** (id/context resolution, scoped reads, authz/isolation boundaries, status codes) need **deterministic fixture setup**: create the required preconditions synchronously in setup and assert they exist before exercising the API. No waiting on background work.
+- **Async-workflow tests** (retry scheduling, exhaustion/alert behavior, completion transitions) belong in a **separate suite** that targets the coordinator/handler directly — not as an implicit precondition of every request-path test.
+- **Shared helpers** (e.g. an auth/setup helper used by many suites) must never poll an eventually-consistent pipeline in a long loop. One slow or flaky pipeline then fails or times out every suite that touches the helper, hiding the real failure.
 
-When diagnosing CI failures in this area:
-
-1. Download TRX artifacts and identify the first failing test names.
-2. Check for `42P01 relation tenant_*.{table} does not exist` (schema/table readiness issue).
-3. Check for timeout exceptions from helper-level provisioning waits (coupling issue).
-4. Fix setup determinism first, then verify event-pipeline behavior in its dedicated suite.
+When a suite in this class flakes, fix setup determinism first (is the precondition actually present before the call?), then verify the pipeline behavior in its dedicated suite. See [patterns.md § Testing rules](./patterns.md#testing-rules) for the technique.
 
 ---
 
