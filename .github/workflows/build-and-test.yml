@@ -49,10 +49,18 @@ jobs:
               - 'Axis.sln'
               - '.editorconfig'
               - 'global.json'
+              # OpenApiDocumentTests regenerates openapi.json and diffs it
+              # against the committed copy — a hand-edit that drifts from the
+              # code must trigger the .NET job to be caught.
+              - 'openapi.json'
               - '.github/workflows/build-and-test.yml'
             frontend:
               - 'frontend/**'
               - '.editorconfig'
+              # api-types.ts is generated from openapi.json; any change to the
+              # contract must run the "API types in sync" guard below, even
+              # when no frontend/** file is touched in the same PR.
+              - 'openapi.json'
               - '.github/workflows/build-and-test.yml'
             doc-drift-scope:
               - 'src/**'
@@ -91,7 +99,7 @@ jobs:
       # setup-dotnet's built-in cache hashes every csproj + packages.lock.json
       # (when present) and restores ~/.nuget/packages keyed on the hash.
       - name: Setup .NET
-        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
+        uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
         with:
           dotnet-version: 8.0.x
           cache: true
@@ -152,6 +160,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: API types in sync with openapi.json
+        run: |
+          npm run gen:api-types
+          git diff --exit-code -- src/lib/api-types.ts \
+            || { echo "::error::api-types.ts is stale — run 'npm run gen:api-types' in frontend/ and commit"; exit 1; }
 
       - name: Type check and lint (zero errors, zero warnings)
         run: npm run ci

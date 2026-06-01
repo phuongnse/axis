@@ -28,19 +28,9 @@ public static class AuthHelper
     {
         string email = $"admin{suffix}@test.com";
 
-        // 1. Register
+        // 1. Register (TestRegistrationPayload includes the required legal versions)
         HttpResponseMessage regResp = await fixture.Client.PostAsJsonAsync(
-            "/api/organizations",
-            new
-            {
-                org_name = $"TestOrg{suffix}",
-                admin_first_name = "Test",
-                admin_last_name = "Admin",
-                admin_email = email,
-                password = "TestPass1",
-                password_confirmation = "TestPass1",
-            },
-            Json);
+            "/api/organizations", TestRegistrationPayload.Create(suffix), Json);
 
         if (!regResp.IsSuccessStatusCode)
             throw new InvalidOperationException($"Registration failed: {regResp.StatusCode}");

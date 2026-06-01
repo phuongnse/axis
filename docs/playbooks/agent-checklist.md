@@ -4,12 +4,15 @@
 
 **Daily workflow.** Walk Gates 0–3 **locally** while implementing; reflect outcomes in the [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) checkboxes. **PR description = Summary + Linked spec + Requirements only** — no Gate paste blocks, no commit list, no CI/Doc-drift status (GitHub Checks tab covers that).
 
+**Large use cases:** split into **genuinely isolated PRs** (each branch from `main`, each passing the two-sided isolation test). See [pr-slicing.md](./pr-slicing.md) — never stack slice B on slice A's branch, never claim "Gate 1 green" you did not run, and assign one owner per shared seam.
+
 The paste-block templates below are for *your own* walk-through (agent reasoning, scratchpad, or PR thread comment if asked) — not for the PR description.
 
 ---
 
 ## Gate 0 — Ready (before code)
 
+- **Design Gate** ([design-gate.md](./design-gate.md)): re-derive the rules governing the surface you touch and produce the dossier (rules quoted, blast-radius `grep`, contract+casing, gate plan); **high-risk surfaces require user sign-off before code**
 - AC map: every row has layer + file/test — **no blank cells**
 - Read: domain README → use-case file → same-module code
 - Skim [`docs/WORKAROUNDS.md`](../WORKAROUNDS.md) for entries touching the same files/modules — known shortcuts may explain surprising code
@@ -65,8 +68,8 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 | Wrong | Right |
 |-------|--------|
-| Ship register → settings → delete endpoints, then claim backend ✅ | AC map row per bullet (happy, validation, edge) with file/test or explicit deferral |
-| Wait for the user to ask “đã cover đủ AC chưa?” | Run the self-audit **before the first PR push** — that question is the agent’s job |
+| Ship the main CRUD/flow endpoints, then claim the layer ✅ | AC map row per bullet (happy, validation, edge) with file/test or explicit deferral |
+| Wait for the user to ask whether every AC is covered | Run the self-audit **before the first PR push** — that question is the agent’s job |
 | Fix gaps only in a follow-up commit after review | Same PR when possible; otherwise `**Deferred (PR #N):**` + **exact AC bullet text** in the feature callout |
 
 **Before push checklist (backend feature PRs):**
@@ -82,7 +85,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
    - downstream dependency failure path where applicable (transport/storage/service unavailable).
    If a path does not apply to that surface, mark it `N/A` in the AC map instead of skipping it silently.
 
-**Lesson (platform-foundation organization management):** A first pass shipped profile/settings/deletion APIs but missed Redis usage TTL (≤5 min), schedule rollback on queue failure, hard-delete purge, and form-task cancel — caught by spec review, not by “flow works.” See [organization-management callouts](../use-cases/platform-foundation/README.md) for what “done” looks like after self-audit.
+**Why this matters:** "the main flow works" routinely hides missed validation, edge-case, and cross-cutting ACs — TTLs, rollback-on-failure, purge/cleanup jobs, cancel paths, isolation boundaries. These surface in spec review, not in a happy-path demo. Run the self-audit against every in-scope AC bullet **before** the first push, not after review.
 
 ---
 
@@ -99,7 +102,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 **CI-only gates** (run automatically on PR, no local action required):
 
-- **Doc drift** — enforces same-PR docs, new-handler tests, no-new TODO/FIXME, new raw-SQL review, [WORKAROUND comment ↔ inventory sync](../WORKAROUNDS.md), [speculation guard](./docs-style.md#anti-patterns-dont-ship-these), `GetAwaiter().GetResult()` ban, hardcoded connection-string ban, `DateTime.Now` ban (use `UtcNow`), and a stale-terminology guard (current pattern list lives in [`scripts/check-doc-drift.sh`](../../scripts/check-doc-drift.sh) — search for `STALE_TERM_PATTERN`). **Module/API → use-case domain** — [`doc_drift_domains.py`](../../scripts/doc_drift_domains.py) + [`axis_repo.py`](../../scripts/axis_repo.py). **Layout drift** in the same job: [`sync_buf_yaml.py --check`](../../scripts/sync_buf_yaml.py), [`check_kafka_wiring.py`](../../scripts/check_kafka_wiring.py), [`regenerate-domain-readme-index.py --check`](../../scripts/regenerate-domain-readme-index.py).
+- **Doc drift** — enforces same-PR docs, new-handler tests, no-new TODO/FIXME, new raw-SQL review, [WORKAROUND comment ↔ inventory sync](../WORKAROUNDS.md), [speculation guard](./docs-style.md#anti-patterns-dont-ship-these), [incident/lesson framing guard](./docs-style.md#keep-practice-docs-general), `GetAwaiter().GetResult()` ban, hardcoded connection-string ban, `DateTime.Now` ban (use `UtcNow`), and a stale-terminology guard (current pattern list lives in [`scripts/check-doc-drift.sh`](../../scripts/check-doc-drift.sh) — search for `STALE_TERM_PATTERN`). **Module/API → use-case domain** — [`doc_drift_domains.py`](../../scripts/doc_drift_domains.py) + [`axis_repo.py`](../../scripts/axis_repo.py). **Layout drift** in the same job: [`sync_buf_yaml.py --check`](../../scripts/sync_buf_yaml.py), [`check_kafka_wiring.py`](../../scripts/check_kafka_wiring.py), [`regenerate-domain-readme-index.py --check`](../../scripts/regenerate-domain-readme-index.py).
 - **Markdown link check** — `lychee` verifies internal links and `#anchors`. **Relative file/image targets** (`![alt](./asset.svg)`, `[text](./file.md)`) are double-checked by [`scripts/check-doc-link-targets.py`](../../scripts/check-doc-link-targets.py) inside the drift script — catches the broken-image class lychee misses.
 - **Code-fence integrity** — [`scripts/check-doc-code-fences.py`](../../scripts/check-doc-code-fences.py) (inside the drift script) flags code-block lines with collapsed indentation (a lone leading space). Catches the bulk-find-replace corruption class that lychee, prettier, and the structural checks all let through.
 - **Use-case docs** — [`scripts/check-use-case-docs.py`](../../scripts/check-use-case-docs.py) validates use-case file structure (required sections + tables + status callout), flags template placeholders (`_(One sentence...)_`, `_(Actor)_`, `_(What starts...)_`), flags self-links `[name](./README.md)` and truncated summary rows in domain READMEs, and counts use cases still on the stock Main flow.
@@ -116,6 +119,8 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 **Priority:** Gate **1** blocks commit (failing build/tests). Gate **2** keeps docs in the same PR — required before merge, not a substitute for Gate 1. The [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) lists Gate 1 before Gate 2.
 
 ### Gate 1 — verify before push (local = CI)
+
+**One command:** [`scripts/verify.sh`](../../scripts/verify.sh) mirrors the CI matrix below — `fast` (build + `dotnet format --verify` + frontend `ci`/test + drift; no Docker) or `full` (adds the Testcontainers test run, exactly like CI). It only runs the layers whose files changed. The committed **pre-push hook** runs `verify.sh fast` automatically (enable once: [`scripts/install-hooks.sh`](../../scripts/install-hooks.sh)). "Build passed" ≠ "CI passed" — `fast` surfaces format/charset, casing, and drift; **integration (Testcontainers) runs only in `full`**, so that class can still first appear in CI unless you run `verify.sh full` locally.
 
 | Changed | Commands (all must pass when triggered) |
 |---------|----------------------------------------|
@@ -194,7 +199,10 @@ Gate 3:
 - Review-driven change left as a shortcut when a better design was feasible? → No
 - Spec gap discovered? → No
 - Incident-level detail in rule text? → No
+- Repeat of a prior review finding class? → No
 ```
+
+If the last line is **Yes**, record the class in [review-findings-ledger.md](../review-findings-ledger.md): point it at a mechanism (analyzer / fitness test / codegen / CI guard) or mark it deliberately manual with a reason. A finding class should be reviewed once, then prevented — not re-flagged every PR.
 
 ---
 

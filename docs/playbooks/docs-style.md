@@ -25,6 +25,7 @@ When you find yourself editing the same fact in two files, the architecture is w
 | **Empty "TODO: fill later" sections** | Look authoritative, contain nothing, lie to readers | Delete the section. Add it when there's content to add. |
 | **"Process about process"** docs > 100 lines | Nobody reads them; the rules don't get followed | Embed the rule into the **drift script** or a **template**. Doctrine without enforcement is decoration. |
 | **New file for content that fits in an existing file** | Doc graph fragments; agents have to read more files to get less | Absorb into the closest existing file. New file only when topic is genuinely separate **and** ≥ ~50 lines worth. |
+| **Incident / lesson detail baked into a general rule** | Reads as universal guidance but only fits the one case it came from; ages into noise and is hard to apply elsewhere | State the **general principle** in the playbook; keep the instance specifics in the use-case file / `PROGRESS.md` / PR retro. See § Keep practice docs general. |
 
 ---
 
@@ -38,6 +39,23 @@ When you find yourself editing the same fact in two files, the architecture is w
 | Use-case file | no hard cap | Already scoped by AC list |
 
 `patterns.md` is the only intentional outlier — its size is mitigated by the lazy-load index pattern. Don't replicate that escape hatch elsewhere without the same mitigation.
+
+---
+
+## Keep practice docs general
+
+Practice / reference docs (playbooks, `CLAUDE.md`, `ARCHITECTURE.md`) state the **general principle**. A concrete instance appears only as a clearly-labeled, linked **example** (`e.g.`, `Canonical example:`, `Reference screen:`) — never as the rule itself.
+
+When you learn something from a specific incident:
+
+| Goes in the playbook | Goes elsewhere |
+|---|---|
+| The general rule, phrased so it applies to any future case | The incident specifics — which feature, which fields, which error code |
+| (optional) one labeled example link | Detail lives in the use-case file, `PROGRESS.md`, or the PR retrospective |
+
+**Test:** read the rule as if you'd never seen the originating feature. If it only makes sense with that one use case in mind, generalize it and move the specifics out. (This is what [agent-checklist § Gate 3](./agent-checklist.md) means by "Incident-level detail in rule text? → No".)
+
+Enforced by the incident/lesson-framing guard in [`scripts/check-doc-drift.sh`](../../scripts/check-doc-drift.sh), which flags lesson-style callouts (a bold *Lesson* heading, or a rule tagged with one specific feature in parentheses) in practice docs. The guard is deliberately narrow — it catches the recurring callout class, not every over-fit; the rest is on review and this section.
 
 ---
 

@@ -30,9 +30,11 @@ function CallbackPage() {
         // failed/invalid callback does not discard a still-valid provisioning token.
         const provisioningToken = consumePostVerifyProvisioningToken();
         if (provisioningToken) {
-          // Hard redirect (not typed router navigation) so this slice compiles and
-          // works whether or not the /provisioning route from the journey slice is present.
-          window.location.assign(`/provisioning?token=${encodeURIComponent(provisioningToken)}`);
+          void navigate({
+            to: '/provisioning',
+            search: { token: provisioningToken },
+            replace: true,
+          });
           return;
         }
         void navigate({ to: '/dashboard', replace: true });

@@ -16,15 +16,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     private readonly HttpClient _client = fixture.Client;
     private static readonly JsonSerializerOptions Json = ApiTestFixture.JsonOptions;
 
-    private static object RegisterPayload(string suffix) => new
-    {
-        org_name = $"TestOrg{suffix}",
-        admin_first_name = "Test",
-        admin_last_name = "Admin",
-        admin_email = $"admin{suffix}@test.com",
-        password = "TestPass1",
-        password_confirmation = "TestPass1",
-    };
+    private static object RegisterPayload(string suffix) => TestRegistrationPayload.Create(suffix);
 
     // ── Registration ──────────────────────────────────────────────────────────
 
