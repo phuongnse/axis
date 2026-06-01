@@ -428,6 +428,9 @@ try
     builder.Services.AddSwaggerGen(opts =>
     {
         opts.SwaggerDoc("v1", new OpenApiInfo { Title = "Axis API", Version = "v1" });
+        // Non-nullable C# reference types → non-nullable + required in the schema, so the
+        // generated frontend types keep required-ness (not everything optional/nullable).
+        opts.SupportNonNullableReferenceTypes();
         opts.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
         {
             Type = SecuritySchemeType.Http,

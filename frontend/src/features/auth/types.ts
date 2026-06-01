@@ -1,11 +1,8 @@
-export interface RegisterOrganizationRequest {
-  org_name: string;
-  admin_first_name: string;
-  admin_last_name: string;
-  admin_email: string;
-  password: string;
-  password_confirmation: string;
-}
+import type { components } from '@/lib/api-types';
+
+// Derived from the backend OpenAPI schema (snake_case) so the request shape can
+// never drift from the API. Regenerate with `npm run gen:api-types`.
+export type RegisterOrganizationRequest = components['schemas']['RegisterOrganizationRequest'];
 
 export interface RegisterOrganizationResponse {
   message?: string;

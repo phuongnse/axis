@@ -153,6 +153,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: API types in sync with openapi.json
+        run: |
+          npm run gen:api-types
+          git diff --exit-code -- src/lib/api-types.ts \
+            || { echo "::error::api-types.ts is stale — run 'npm run gen:api-types' in frontend/ and commit"; exit 1; }
+
       - name: Type check and lint (zero errors, zero warnings)
         run: npm run ci
 
