@@ -2526,7 +2526,7 @@
         "tags": [
           "Identity"
         ],
-        "summary": "Verify email address with a one-time token",
+        "summary": "Verify email address with a one-time token and establish a sign-in session",
         "operationId": "VerifyEmail",
         "requestBody": {
           "content": {
@@ -2539,8 +2539,15 @@
           "required": true
         },
         "responses": {
-          "204": {
-            "description": "No Content"
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyEmailSessionEstablishedDto"
+                }
+              }
+            }
           },
           "400": {
             "description": "Bad Request",
@@ -7271,6 +7278,15 @@
         "properties": {
           "token": {
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "VerifyEmailSessionEstablishedDto": {
+        "type": "object",
+        "properties": {
+          "session_established": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

@@ -21,9 +21,9 @@ export function useVerifyEmail() {
   const mutation = useMutation({
     mutationFn: verifyEmail,
     onSuccess: async (data, token) => {
-      // `data` is null when verify-email returns 204 (the contract on `main`,
-      // before the verify-session slice lands); fall through to the poll redirect.
-      if (data?.sessionEstablished) {
+      // `data` may be null/empty if the session was not established; only run the
+      // PKCE hand-off when the API confirms it. Field is snake_case from the API.
+      if (data?.session_established) {
         try {
           await completePostVerifyPkceFlow(token);
           return;

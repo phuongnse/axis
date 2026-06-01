@@ -4,4 +4,5 @@ public sealed record VerifyEmailSuccessDto(
     Guid UserId,
     Guid OrganizationId,
     string Email,
-    string FullName);
+    string FullName,
+    IReadOnlyList<string> Permissions);

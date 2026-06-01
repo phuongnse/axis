@@ -78,12 +78,24 @@ public sealed class VerifyEmailHandler(
             user.AssignRole(adminRole.Id);
 
         user.VerifyEmail();
+
+        // Gather the sign-in claims here so the endpoint can establish the session
+        // from a single command result — no second round-trip that could fail after
+        // the one-time link has already been consumed. Read before commit so any
+        // failure leaves the verification token unused.
+        IReadOnlyList<Role> roles = await roleRepo.GetByIdsAsync(user.RoleIds, organization.Id, cancellationToken);
+        List<string> permissions = roles
+            .SelectMany(role => role.Permissions)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
         await uow.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new VerifyEmailSuccessDto(
             user.Id,
             user.OrganizationId,
             user.Email.Value,
-            user.FullName));
+            user.FullName,
+            permissions));
     }
 }

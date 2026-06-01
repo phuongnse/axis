@@ -28,9 +28,7 @@ export interface LoginAttemptResult {
   location: string | null;
 }
 
-export interface VerifyEmailResponse {
-  sessionEstablished: boolean;
-}
+export type VerifyEmailResponse = components['schemas']['VerifyEmailSessionEstablishedDto'];
 
 export interface ProvisioningStatusResponse {
   organizationId: string;

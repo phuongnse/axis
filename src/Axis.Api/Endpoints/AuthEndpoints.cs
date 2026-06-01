@@ -5,7 +5,6 @@ using Axis.Identity.Application.Commands.RequestPasswordReset;
 using Axis.Identity.Application.Commands.ResetPassword;
 using Axis.Identity.Application.Commands.VerifyEmail;
 using Axis.Identity.Application.Queries.GetProvisioningStatus;
-using Axis.Identity.Application.Queries.GetUserTokenClaims;
 using Axis.Shared.Domain.Primitives;
 using MediatR;
 using Microsoft.AspNetCore.Authentication;
@@ -34,7 +33,7 @@ public static class AuthEndpoints
             .WithName("VerifyEmail")
             .WithSummary("Verify email address with a one-time token and establish a sign-in session")
             .WithTags("Identity")
-            .Produces<object>()
+            .Produces<VerifyEmailSessionEstablishedDto>()
             .ProducesProblem(400);
 
         group.MapGet("/provisioning-status", GetProvisioningStatus)
@@ -120,18 +119,12 @@ public static class AuthEndpoints
         if (result.IsFailure)
             return result.ToProblemDetails();
 
-        Result<UserTokenClaimsDto> claimsResult = await mediator.Send(
-            new GetUserTokenClaimsQuery(result.Value.UserId, result.Value.OrganizationId),
-            ct);
-        if (claimsResult.IsFailure)
-            return claimsResult.ToProblemDetails();
+        await SignInPkceSessionAsync(httpContext, result.Value);
 
-        await SignInPkceSessionAsync(httpContext, claimsResult.Value);
-
-        return Results.Ok(new { sessionEstablished = true });
+        return Results.Ok(new VerifyEmailSessionEstablishedDto(true));
     }
 
-    private static async Task SignInPkceSessionAsync(HttpContext httpContext, UserTokenClaimsDto claims)
+    private static async Task SignInPkceSessionAsync(HttpContext httpContext, VerifyEmailSuccessDto claims)
     {
         List<Claim> claimList =
         [
