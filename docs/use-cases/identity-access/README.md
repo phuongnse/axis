@@ -8,6 +8,8 @@
 
 Provide secure authentication and a flexible role-based access control (RBAC) system. Users belong to an organization, hold one or more roles, and each role grants a set of permissions. All identity data is tenant-scoped.
 
+> **API contract → typed SPA:** the identity REST endpoints are the source of truth for the SPA's TypeScript types. `Axis.Api` emits `openapi.json` (verified in sync by `OpenApiDocumentTests`), which is compiled to `frontend/src/lib/api-types.ts`, so request/response shapes (registration, legal versions, slug preview, …) never drift from the wire. Regenerate with `npm run gen:api-types`.
+
 ## Business Value
 
 Security and access control are non-negotiable for a SaaS product. Organizations need confidence that their users see only what they should see.

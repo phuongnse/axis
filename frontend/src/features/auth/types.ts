@@ -1,22 +1,12 @@
-export interface RegisterOrganizationRequest {
-  org_name: string;
-  admin_first_name: string;
-  admin_last_name: string;
-  admin_email: string;
-  password: string;
-  password_confirmation: string;
-  accepted_terms_version: string;
-  accepted_privacy_version: string;
-}
+import type { components } from '@/lib/api-types';
 
-export interface LegalVersionsResponse {
-  terms_version: string;
-  privacy_version: string;
-}
+// Derived from the backend OpenAPI schema (snake_case) so request/response
+// shapes can never drift from the API. Regenerate with `npm run gen:api-types`.
+export type RegisterOrganizationRequest = components['schemas']['RegisterOrganizationRequest'];
 
-export interface OrganizationSlugPreviewResponse {
-  slug: string;
-}
+export type LegalVersionsResponse = components['schemas']['LegalVersionsDto'];
+
+export type OrganizationSlugPreviewResponse = components['schemas']['OrganizationSlugPreviewDto'];
 
 export interface RegisterOrganizationResponse {
   message?: string;
