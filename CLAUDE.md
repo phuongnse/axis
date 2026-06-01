@@ -60,6 +60,7 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 - Never weaken tests, `.Skip()`, or mock away behavior under test.
 - Never bypass auth, skip an AC silently, or mark ✅ to avoid a hard gap.
 - Domain: zero external dependencies.
+- No implementation of a non-trivial change without completing the **Design Gate** ([design-gate.md](docs/playbooks/design-gate.md)); high-risk surfaces require user sign-off before code.
 - Never commit with failing Gate 1; docs and requirements satisfied before merge (agent-checklist + PR template).
 - When `src/`, `tests/`, or `docs/use-cases/` change: run `./scripts/check-doc-drift.sh` before push (bash — on Windows use Git Bash, not PowerShell); CI **Doc drift** must be green. Tick **Gate 2** in the PR template — do not paste drift-script output.
 
@@ -101,15 +102,21 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 3. [`docs/PROGRESS.md`](docs/PROGRESS.md) for layer status.
 4. Open [`process.md`](docs/playbooks/process.md) / [`patterns.md`](docs/playbooks/patterns.md) only when the checklist says so.
 
-### Multi-file / new-layer tasks (response header)
+### Design Gate (mandatory before code)
+
+Before a non-trivial change, complete the **Design Gate** ([design-gate.md](docs/playbooks/design-gate.md)): re-derive the rules governing the exact surface you touch and produce the dossier — governing rules quoted with `file:section`, blast-radius `grep` (every caller/consumer/test), request/response shape **and casing** decision, and the full-scope gate plan. Artifacts, not "I thought carefully."
+
+**High-risk surfaces** — new/changed endpoint or contract/required field, migration/schema, cross-module interaction, auth, new library or public API surface — require **user sign-off via plan mode before writing code**.
+
+Response header for multi-file / new-layer tasks:
 
 1. Affected module(s) and layer(s)  
-2. Docs to read  
+2. Governing rules (quoted) + docs to read  
 3. Key decisions (2–3) — confirm with user before new API surface or library  
-4. Plan  
+4. Blast radius + plan  
 5. Risks / ambiguities  
 
-Skip for single-file fixes and doc-only edits.
+Skip for trivial single-file fixes and doc-only edits.
 
 ### Gates
 
