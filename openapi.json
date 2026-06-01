@@ -2596,6 +2596,40 @@
         }
       }
     },
+    "/api/auth/retry-provisioning": {
+      "post": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Manually re-queue tenant provisioning after automatic retries are exhausted",
+        "operationId": "RetryTenantProvisioning",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetryProvisioningRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/resend-verification": {
       "post": {
         "tags": [
@@ -6906,6 +6940,15 @@
             "additionalProperties": {
               "nullable": true
             }
+          }
+        },
+        "additionalProperties": false
+      },
+      "RetryProvisioningRequest": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
           }
         },
         "additionalProperties": false
