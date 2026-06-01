@@ -451,7 +451,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Verify email address with a one-time token */
+        /** Verify email address with a one-time token and establish a sign-in session */
         post: operations["VerifyEmail"];
         delete?: never;
         options?: never;
@@ -1754,6 +1754,9 @@ export interface components {
         };
         VerifyEmailRequest: {
             token?: string;
+        };
+        VerifyEmailSessionEstablishedDto: {
+            session_established?: boolean;
         };
         WorkflowDetailDto: {
             /** Format: uuid */
@@ -3796,12 +3799,14 @@ export interface operations {
             };
         };
         responses: {
-            /** @description No Content */
-            204: {
+            /** @description OK */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["VerifyEmailSessionEstablishedDto"];
+                };
             };
             /** @description Bad Request */
             400: {

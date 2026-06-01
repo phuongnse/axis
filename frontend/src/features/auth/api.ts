@@ -164,6 +164,10 @@ export async function verifyEmail(token: string): Promise<VerifyEmailResponse> {
   });
 }
 
+/**
+ * After verify-email establishes a session cookie, run PKCE so the SPA receives tokens.
+ * Stores the verification token for the callback to redirect to provisioning.
+ */
 export async function completePostVerifyPkceFlow(verificationToken: string): Promise<void> {
   storePostVerifyProvisioningToken(verificationToken);
   const pkce = createPkceSession();

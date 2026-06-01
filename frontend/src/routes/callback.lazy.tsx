@@ -17,7 +17,6 @@ function CallbackPage() {
     const code = params.get('code');
     const state = params.get('state');
     const pkce = loadPkceSession();
-    const provisioningToken = consumePostVerifyProvisioningToken();
 
     if (!code || !pkce || state !== pkce.state) {
       clearPkceSession();
@@ -27,6 +26,9 @@ function CallbackPage() {
 
     exchangeAuthorizationCode(code)
       .then(() => {
+        // Consume the post-verify token only once the exchange has succeeded, so a
+        // failed/invalid callback does not discard a still-valid provisioning token.
+        const provisioningToken = consumePostVerifyProvisioningToken();
         if (provisioningToken) {
           void navigate({
             to: '/provisioning',

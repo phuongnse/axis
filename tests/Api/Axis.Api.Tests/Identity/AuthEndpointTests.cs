@@ -60,7 +60,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
 
         HttpResponseMessage verifyResp = await _client.PostAsJsonAsync(
             "/api/auth/verify-email", new { token = verifyToken }, Json);
-        verifyResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        verifyResp.StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Full PKCE flow on independent client (isolated cookie jar)
         HttpClient pkceClient = fixture.CreateNewClient();
@@ -204,7 +204,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
             ?? throw new InvalidOperationException("Verification token not captured.");
         HttpResponseMessage first = await _client.PostAsJsonAsync(
             "/api/auth/verify-email", new { token }, Json);
-        first.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        first.StatusCode.Should().Be(HttpStatusCode.OK);
 
         HttpResponseMessage second = await _client.PostAsJsonAsync(
             "/api/auth/verify-email", new { token }, Json);

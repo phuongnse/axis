@@ -42,21 +42,79 @@ public static class AuthHelper
 
         HttpResponseMessage verifyResp = await fixture.Client.PostAsJsonAsync(
             "/api/auth/verify-email", new { token = verifyToken }, Json);
-        if (verifyResp.StatusCode != HttpStatusCode.NoContent)
+        if (verifyResp.StatusCode != HttpStatusCode.OK)
             throw new InvalidOperationException($"Email verification failed: {verifyResp.StatusCode}");
 
         await fixture.EnsureTenantProvisionedAsync(email);
 
-        // 3. Run the Authorization Code + PKCE flow on an independent client
-        // (so cookie jar is isolated from the shared fixture client)
-        HttpClient pkceClient = fixture.CreateNewClient();
-        string accessToken = await CompletePkceFlowAsync(pkceClient, email, "TestPass1");
+        string accessToken = await CompletePkceFlowWithSessionAsync(fixture.Client);
 
         HttpClient authedClient = fixture.CreateNewClient();
         authedClient.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", accessToken);
 
         return authedClient;
+    }
+
+    /// <summary>
+    /// Executes PKCE after the session cookie was established (e.g. by verify-email).
+    /// </summary>
+    public static async Task<string> CompletePkceFlowWithSessionAsync(HttpClient client)
+    {
+        string codeVerifier = GenerateCodeVerifier();
+        string codeChallenge = ComputeCodeChallenge(codeVerifier);
+        string state = Convert.ToBase64String(RandomNumberGenerator.GetBytes(16));
+
+        string authorizeQuery = string.Concat(
+            "/connect/authorize",
+            "?response_type=code",
+            "&client_id=", Uri.EscapeDataString(ClientId),
+            "&redirect_uri=", Uri.EscapeDataString(RedirectUri),
+            "&code_challenge=", Uri.EscapeDataString(codeChallenge),
+            "&code_challenge_method=S256",
+            "&scope=", Uri.EscapeDataString("openid email profile offline_access permissions"),
+            "&state=", Uri.EscapeDataString(state));
+
+        HttpResponseMessage authResp = await client.GetAsync(authorizeQuery);
+        if (authResp.StatusCode != HttpStatusCode.Redirect)
+        {
+            throw new InvalidOperationException(
+                $"Expected 302 from /connect/authorize with session, got {authResp.StatusCode}. " +
+                $"Body: {await authResp.Content.ReadAsStringAsync()}");
+        }
+
+        Uri callbackUri = authResp.Headers.Location
+            ?? throw new InvalidOperationException("No Location header in authorize response.");
+
+        string? code = ExtractQueryParam(callbackUri, "code");
+        if (string.IsNullOrEmpty(code))
+        {
+            throw new InvalidOperationException(
+                $"Authorization code not found in redirect: {callbackUri}");
+        }
+
+        HttpResponseMessage tokenResp = await client.PostAsync("/connect/token",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["grant_type"] = "authorization_code",
+                ["client_id"] = ClientId,
+                ["code"] = code,
+                ["redirect_uri"] = RedirectUri,
+                ["code_verifier"] = codeVerifier,
+            }));
+
+        if (!tokenResp.IsSuccessStatusCode)
+        {
+            string body = await tokenResp.Content.ReadAsStringAsync();
+            throw new InvalidOperationException(
+                $"Token exchange failed ({tokenResp.StatusCode}): {body}");
+        }
+
+        JsonElement tokenBody = await tokenResp.Content.ReadFromJsonAsync<JsonElement>();
+        string? accessToken = tokenBody.GetProperty("access_token").GetString();
+
+        return accessToken
+            ?? throw new InvalidOperationException("No access_token in token response.");
     }
 
     /// <summary>
