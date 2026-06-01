@@ -54,6 +54,8 @@ CodeRabbit-config PR, + reviewer judgment).
 | Side effects committed before the DB transaction they depend on | CodeRabbit path-instruction | manual | **Manual** — needs data-flow judgment |
 | Test asserts something other than its name claims (e.g. `Returns403` asserts 401) | CodeRabbit path-instruction; analyzer pilot under consideration | manual → analyzer? | **Manual** — green-but-wrong test; pilot a name↔asserted-status analyzer if it recurs |
 | `Result`/`Result<T>` vs bespoke bool/tuple/throw for business failures | CodeRabbit path-instruction | manual | **Manual** (P1, design judgment) |
+| Endpoint returns `object`/anonymous JSON instead of an Application-layer DTO | Candidate fitness test: flag `.Produces<object>()` / `Results.Ok(new { … })` in `Axis.Api/Endpoints` | arch-test | **Planned** (candidate — flagged by CodeRabbit on [#155](https://github.com/phuongnse/axis/pull/155); semi-deterministic) |
+| Minimal-API endpoint orchestrates >1 `mediator.Send` (logic in endpoint; side-effect consumed before a later step can fail) | Candidate fitness test: flag endpoint methods with multiple `mediator.Send`/`ISender.Send` calls | arch-test | **Planned** (candidate — flagged by CodeRabbit on [#155](https://github.com/phuongnse/axis/pull/155)) |
 
 Status: **Closed** = a mechanism fails the build/CI; **Partial** = mechanized
 with a documented gap; **Planned** = agreed, not yet built; **Manual** = kept in
