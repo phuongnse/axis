@@ -413,6 +413,16 @@ try
         opts.SerializerOptions.Converters.Add(new AddFormFieldRequestConverter());
     });
 
+    // Swashbuckle derives schema property names from MVC's JsonOptions, not from
+    // ConfigureHttpJsonOptions above. There are no MVC controllers, so this is inert
+    // at runtime — it exists only so the generated OpenAPI schema (and the frontend
+    // types generated from it) matches the snake_case wire the app actually emits.
+    builder.Services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(opts =>
+    {
+        opts.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
+        opts.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
+
     // ── OpenAPI ────────────────────────────────────────────────────────────
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(opts =>
