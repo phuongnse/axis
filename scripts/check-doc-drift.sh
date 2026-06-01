@@ -37,6 +37,20 @@ docs_changed_under() {
   echo "${CHANGED}" | grep -q "^$1"
 }
 
+# Generated frontend artifacts carry no authored behavior — the contract lives
+# in the backend (which has its own doc rules) and these files are emitted by a
+# tool, not written by hand. A PR that only regenerates them needs no use-case
+# doc. Keep this list TIGHT: only truly machine-generated files, or the rule
+# below stops protecting hand-written feature code.
+#   - frontend/src/lib/api-types.ts  ← openapi-typescript output (npm run gen:api-types)
+FRONTEND_GENERATED='^frontend/src/lib/api-types\.ts$'
+
+# True when frontend/src/ has at least one hand-authored change (i.e. a change
+# that is not purely a generated artifact).
+frontend_authored_changed() {
+  echo "${CHANGED}" | grep -E '^frontend/src/' | grep -qvE "${FRONTEND_GENERATED}"
+}
+
 # Module + API endpoint → use-case domain rules are discovered from the tree
 # (see scripts/doc_drift_domains.py). Only cross-cutting paths stay in EXTRA_* there.
 python3 "${ROOT}/scripts/doc_drift_domains.py" --validate || ERR=1
@@ -50,7 +64,7 @@ fi
 
 echo "${CHANGED}" | python3 "${ROOT}/scripts/doc_drift_domains.py" --check || ERR=1
 
-if any_changed '^frontend/src/'; then
+if frontend_authored_changed; then
   if ! docs_changed_under 'docs/use-cases/'; then
     fail "frontend/src/ changed but no files under docs/use-cases/ in this PR"
   fi
