@@ -46,6 +46,16 @@ else
   changed '^frontend/' && FE=true
 fi
 
+# A change under Axis.Api/Endpoints that does NOT also touch openapi.json is the
+# single most common late CI failure in this repo: OpenApiDocumentTests drift,
+# because the OpenAPI contract (and the frontend types generated from it) was not
+# regenerated. The contract is generated, never hand-edited — see
+# repo-layout-discovery.md. Surface it here so it is caught before CI, not after.
+API_SURFACE_DRIFT=false
+if changed '^src/Axis\.Api/Endpoints/' && ! changed '^openapi\.json$'; then
+  API_SURFACE_DRIFT=true
+fi
+
 FAILED=()
 step() {
   local name="$1" cmd="$2"
@@ -76,6 +86,17 @@ fi
 
 # Doc drift self-skips when there is no relevant diff, so it is always safe to run.
 step "doc drift" "./scripts/check-doc-drift.sh"
+
+# Non-blocking: a real contract change can only be confirmed by OpenApiDocumentTests
+# (needs Docker), so this is a reminder, not a gate. The hard gate stays in CI.
+if [ "${API_SURFACE_DRIFT}" = true ]; then
+  echo ""
+  echo "⚠ API surface changed (src/Axis.Api/Endpoints/) but openapi.json is unchanged."
+  echo "  If you added or changed a route / request / response shape, regenerate the contract:"
+  echo "    dotnet test tests/Api/Axis.Api.Tests --filter OpenApiDocumentTests   # rewrites openapi.json on drift (Docker)"
+  echo "    (cd frontend && npm run gen:api-types)                               # refresh generated types"
+  echo "  then commit openapi.json + api-types.ts — CI's OpenApiDocumentTests fails otherwise."
+fi
 
 echo ""
 if [ "${#FAILED[@]}" -eq 0 ]; then

@@ -86,6 +86,7 @@ python3 scripts/regenerate-domain-readme-index.py --check
 - [ ] `Map*Endpoints` in `Program.cs` ([process.md § Host wiring](./process.md)).
 - [ ] Domain README: set API row to ⚠️ or ✅ when endpoints ship (not `| API | ⏳`).
 - [ ] Handler tests: `*Handler.cs` → `*HandlerTests.cs` (drift).
+- [ ] **Regenerate the OpenAPI contract** — a new/changed route, request, or response shape changes the wire. Run `OpenApiDocumentTests` (rewrites `openapi.json` on drift) then `npm run gen:api-types` in `frontend/`, and **commit both**. `openapi.json` is generated, never hand-edited. CI's `OpenApiDocumentTests` + the frontend api-types-sync guard fail otherwise (the #1 late CI failure here). `scripts/verify.sh` warns when `Endpoints/` changed without `openapi.json`.
 - [ ] `./scripts/check-doc-drift.sh`.
 
 ### D — New Kafka event
