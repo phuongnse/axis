@@ -13,7 +13,7 @@ Docs-first development: feature specs in `docs/use-cases/` are the contract; cod
 
 ## Before you push
 
-**Run the gate locally — it mirrors CI.** [`scripts/verify.sh`](scripts/verify.sh) runs the same commands CI runs (`fast` = build + `dotnet format --verify` + frontend `ci`/test + drift; `full` = adds the Testcontainers test run), only for the layers you changed. Enable the **pre-push hook** once so it runs automatically: `./scripts/install-hooks.sh` (sets `core.hooksPath`). This closes the "build passed locally but CI failed" gap (charset/format, integration, casing). Bypass only with `--no-verify` and a reason.
+**Run the gate locally — it mirrors CI.** [`scripts/verify.sh`](scripts/verify.sh) runs the same commands CI runs (`fast` = build + `dotnet format --verify` + frontend `ci`/test + drift; `full` = adds the Testcontainers test run), only for the layers you changed. Enable the **pre-push hook** once so it runs automatically: `./scripts/install-hooks.sh` (sets `core.hooksPath`). The hook runs `fast`, which closes the "build passed locally but CI failed" gap for charset/format, casing, and drift; **integration (Testcontainers) is not in `fast`** — run `scripts/verify.sh full` (needs Docker) or rely on CI for that class. Bypass only with `--no-verify` and a reason.
 
 1. Walk **Gates 0–3** in [docs/playbooks/agent-checklist.md](docs/playbooks/agent-checklist.md) locally; tick the matching boxes in the PR body.
 2. When you touch C# under `src/` or `tests/`, run `dotnet format Axis.sln` — style and naming rules live in [`.editorconfig`](.editorconfig) (CI runs `dotnet format --verify-no-changes`).

@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Local mirror of the CI gate (.github/workflows/build-and-test.yml).
 # Closes the "build passed locally but CI failed" gap: runs the SAME commands CI
-# runs, so charset/format, integration, casing, and drift surface here, not in CI.
+# runs, so charset/format, casing, and drift surface here, not in CI. Integration
+# (Testcontainers) surfaces here only in `full` mode — `fast` (the default, and
+# what the pre-push hook runs) skips it, so that class can still first appear in CI.
 #
 # Usage: scripts/verify.sh [fast|full]   (default: fast)
 #   fast — build + dotnet format --verify + frontend ci+test + doc drift   (no Docker)
