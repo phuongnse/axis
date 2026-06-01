@@ -10,9 +10,19 @@
 # Only the layers whose files changed (vs origin/main) run, so doc-only work stays quick.
 # On Windows run via Git Bash. Wired as the pre-push hook (scripts/hooks/pre-push).
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || {
+  echo "verify.sh: failed to locate repository root" >&2
+  exit 1
+}
 
 MODE="${1:-fast}"
+case "${MODE}" in
+  fast|full) ;;
+  *)
+    echo "verify.sh: unknown mode '${MODE}' — usage: scripts/verify.sh [fast|full]" >&2
+    exit 2
+    ;;
+esac
 
 # ── What changed? (mirror CI's "Detect changes"; run everything if unknown) ──
 BASE="${BASE_BRANCH:-main}"
@@ -50,12 +60,10 @@ step() {
 echo "verify.sh (${MODE}) — .NET=${DOTNET} frontend=${FE}"
 
 if [ "${DOTNET}" = true ]; then
+  step ".NET build"   "dotnet build Axis.sln --nologo"
+  step ".NET format"  "dotnet format Axis.sln --verify-no-changes"
   if [ "${MODE}" = full ]; then
-    step ".NET format"  "dotnet format Axis.sln --verify-no-changes"
     step ".NET test (full, Testcontainers)" "dotnet test Axis.sln --nologo"
-  else
-    step ".NET build"   "dotnet build Axis.sln --nologo"
-    step ".NET format"  "dotnet format Axis.sln --verify-no-changes"
   fi
 fi
 
