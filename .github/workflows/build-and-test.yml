@@ -49,10 +49,18 @@ jobs:
               - 'Axis.sln'
               - '.editorconfig'
               - 'global.json'
+              # OpenApiDocumentTests regenerates openapi.json and diffs it
+              # against the committed copy — a hand-edit that drifts from the
+              # code must trigger the .NET job to be caught.
+              - 'openapi.json'
               - '.github/workflows/build-and-test.yml'
             frontend:
               - 'frontend/**'
               - '.editorconfig'
+              # api-types.ts is generated from openapi.json; any change to the
+              # contract must run the "API types in sync" guard below, even
+              # when no frontend/** file is touched in the same PR.
+              - 'openapi.json'
               - '.github/workflows/build-and-test.yml'
             doc-drift-scope:
               - 'src/**'
