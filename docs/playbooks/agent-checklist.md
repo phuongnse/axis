@@ -196,7 +196,10 @@ Gate 3:
 - Review-driven change left as a shortcut when a better design was feasible? → No
 - Spec gap discovered? → No
 - Incident-level detail in rule text? → No
+- Repeat of a prior review finding class? → No
 ```
+
+If the last line is **Yes**, record the class in [review-findings-ledger.md](../review-findings-ledger.md): point it at a mechanism (analyzer / fitness test / codegen / CI guard) or mark it deliberately manual with a reason. A finding class should be reviewed once, then prevented — not re-flagged every PR.
 
 ---
 
