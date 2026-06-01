@@ -119,6 +119,8 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 ### Gate 1 — verify before push (local = CI)
 
+**One command:** [`scripts/verify.sh`](../../scripts/verify.sh) mirrors the CI matrix below — `fast` (build + `dotnet format --verify` + frontend `ci`/test + drift; no Docker) or `full` (adds the Testcontainers test run, exactly like CI). It only runs the layers whose files changed. The committed **pre-push hook** runs `verify.sh fast` automatically (enable once: [`scripts/install-hooks.sh`](../../scripts/install-hooks.sh)). "Build passed" ≠ "CI passed" — `fast` surfaces format/charset, casing, and drift; **integration (Testcontainers) runs only in `full`**, so that class can still first appear in CI unless you run `verify.sh full` locally.
+
 | Changed | Commands (all must pass when triggered) |
 |---------|----------------------------------------|
 | `src/` or `tests/` | `dotnet build` then `dotnet test` (full `Axis.sln` — includes Infrastructure, API, Testcontainers) |
