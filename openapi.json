@@ -89,7 +89,9 @@
             "description": "Created",
             "content": {
               "application/json": {
-                "schema": { }
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedResponse"
+                }
               }
             }
           },
@@ -367,7 +369,9 @@
             "description": "Created",
             "content": {
               "application/json": {
-                "schema": { }
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedResponse"
+                }
               }
             }
           },
@@ -719,7 +723,9 @@
             "description": "Created",
             "content": {
               "application/json": {
-                "schema": { }
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedResponse"
+                }
               }
             }
           },
@@ -987,7 +993,9 @@
             "description": "Created",
             "content": {
               "application/json": {
-                "schema": { }
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedResponse"
+                }
               }
             }
           },
@@ -1251,7 +1259,9 @@
             "description": "Created",
             "content": {
               "application/json": {
-                "schema": { }
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedResponse"
+                }
               }
             }
           },
@@ -1773,7 +1783,9 @@
             "description": "Created",
             "content": {
               "application/json": {
-                "schema": { }
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedResponse"
+                }
               }
             }
           },
@@ -2105,7 +2117,9 @@
             "description": "Created",
             "content": {
               "application/json": {
-                "schema": { }
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedResponse"
+                }
               }
             }
           },
@@ -2686,7 +2700,9 @@
             "description": "OK",
             "content": {
               "application/json": {
-                "schema": { }
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
               }
             }
           }
@@ -2780,7 +2796,9 @@
             "description": "OK",
             "content": {
               "application/json": {
-                "schema": { }
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
               }
             }
           },
@@ -2829,7 +2847,9 @@
             "description": "OK",
             "content": {
               "application/json": {
-                "schema": { }
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
               }
             }
           },
@@ -2898,7 +2918,9 @@
             "description": "OK",
             "content": {
               "application/json": {
-                "schema": { }
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSettingsDto"
+                }
               }
             }
           },
@@ -3117,7 +3139,9 @@
             "description": "OK",
             "content": {
               "application/json": {
-                "schema": { }
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationByTokenDto"
+                }
               }
             }
           },
@@ -3220,7 +3244,9 @@
             "description": "OK",
             "content": {
               "application/json": {
-                "schema": { }
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentUserProfileDto"
+                }
               }
             }
           },
@@ -3365,7 +3391,12 @@
             "description": "OK",
             "content": {
               "application/json": {
-                "schema": { }
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserSessionResponse"
+                  }
+                }
               }
             }
           },
@@ -3672,7 +3703,9 @@
             "description": "Created",
             "content": {
               "application/json": {
-                "schema": { }
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedResponse"
+                }
               }
             }
           },
@@ -3851,7 +3884,9 @@
             "description": "OK",
             "content": {
               "application/json": {
-                "schema": { }
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
               }
             }
           },
@@ -3969,7 +4004,9 @@
             "description": "Created",
             "content": {
               "application/json": {
-                "schema": { }
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedResponse"
+                }
               }
             }
           },
@@ -4432,7 +4469,9 @@
             "description": "Created",
             "content": {
               "application/json": {
-                "schema": { }
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedResponse"
+                }
               }
             }
           },
@@ -4546,7 +4585,9 @@
             "description": "Created",
             "content": {
               "application/json": {
-                "schema": { }
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedResponse"
+                }
               }
             }
           },
@@ -4650,7 +4691,9 @@
             "description": "Created",
             "content": {
               "application/json": {
-                "schema": { }
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedResponse"
+                }
               }
             }
           },
@@ -5397,7 +5440,9 @@
             "description": "Created",
             "content": {
               "application/json": {
-                "schema": { }
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedResponse"
+                }
               }
             }
           },
@@ -5477,7 +5522,9 @@
             "description": "Created",
             "content": {
               "application/json": {
-                "schema": { }
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedResponse"
+                }
               }
             }
           },
@@ -5696,7 +5743,9 @@
             "description": "Created",
             "content": {
               "application/json": {
-                "schema": { }
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedResponse"
+                }
               }
             }
           },
@@ -6024,6 +6073,55 @@
           "description": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreatedResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CurrentUserProfileDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string"
+          },
+          "first_name": {
+            "type": "string"
+          },
+          "last_name": {
+            "type": "string"
+          },
+          "full_name": {
+            "type": "string"
+          },
+          "avatar_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "org_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": false
@@ -6602,6 +6700,26 @@
         },
         "additionalProperties": { }
       },
+      "InvitationByTokenDto": {
+        "type": "object",
+        "properties": {
+          "invitation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
       "InviteUserRequest": {
         "type": "object",
         "properties": {
@@ -6622,6 +6740,15 @@
             "type": "string"
           },
           "privacy_version": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MessageResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
             "type": "string"
           }
         },
@@ -6715,6 +6842,52 @@
           "last_error": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationSettingsDto": {
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "logo_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "plan_name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "time_zone_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "default_language": {
+            "type": "string",
+            "nullable": true
+          },
+          "scheduled_hard_delete_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "usage": {
+            "$ref": "#/components/schemas/UsageStatsDto"
           }
         },
         "additionalProperties": false
@@ -7312,6 +7485,62 @@
           "description": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UsageStatsDto": {
+        "type": "object",
+        "properties": {
+          "workflows_used": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "workflows_limit": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "executions_used_this_month": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "executions_per_month_limit": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "users_used": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "users_limit": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserSessionResponse": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string"
+          },
+          "device_info": {
+            "type": "string"
+          },
+          "last_activity": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "is_current": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

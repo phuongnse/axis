@@ -40,7 +40,7 @@ public static class FormEndpoints
             .WithName("CreateForm")
             .WithSummary("Create a new form definition")
             .WithTags("FormBuilder")
-            .Produces<object>(201)
+            .Produces<CreatedResponse>(201)
             .ProducesProblem(400)
             .ProducesProblem(401)
             .ProducesProblem(403)
@@ -95,7 +95,7 @@ public static class FormEndpoints
             .WithName("AddFieldToForm")
             .WithSummary("Add a field (or section divider) to a form")
             .WithTags("FormBuilder")
-            .Produces<object>(201)
+            .Produces<CreatedResponse>(201)
             .ProducesProblem(400)
             .ProducesProblem(401)
             .ProducesProblem(403)
@@ -150,7 +150,7 @@ public static class FormEndpoints
             currentUser.UserId.ToString()), ct);
 
         if (result.IsFailure) return result.ToProblemDetails();
-        return Results.Created($"/api/forms/{result.Value}", new { id = result.Value });
+        return Results.Created($"/api/forms/{result.Value}", new CreatedResponse(result.Value));
     }
 
     private static async Task<IResult> GetFormPicker(
@@ -220,7 +220,7 @@ public static class FormEndpoints
             request.Config), ct);
 
         if (result.IsFailure) return result.ToProblemDetails();
-        return Results.Created($"/api/forms/{formId}/fields/{result.Value}", new { id = result.Value });
+        return Results.Created($"/api/forms/{formId}/fields/{result.Value}", new CreatedResponse(result.Value));
     }
 
     private static async Task<IResult> RemoveField(

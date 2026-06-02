@@ -6,6 +6,7 @@ using Axis.Identity.Application.Commands.ResetPassword;
 using Axis.Identity.Application.Commands.RetryTenantProvisioning;
 using Axis.Identity.Application.Commands.VerifyEmail;
 using Axis.Identity.Application.Queries.GetProvisioningStatus;
+using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using MediatR;
 using Microsoft.AspNetCore.Authentication;
@@ -66,7 +67,7 @@ public static class AuthEndpoints
             .WithName("ForgotPassword")
             .WithSummary("Request a password reset link")
             .WithTags("Identity")
-            .Produces<object>();
+            .Produces<MessageResponse>();
 
         group.MapPost("/reset-password", ResetPassword)
             .AllowAnonymous()
@@ -202,10 +203,8 @@ public static class AuthEndpoints
         CancellationToken ct)
     {
         await mediator.Send(new RequestPasswordResetCommand(request.Email), ct);
-        return Results.Ok(new
-        {
-            message = "If this email is registered, you'll receive a reset link shortly.",
-        });
+        return Results.Ok(new MessageResponse(
+            "If this email is registered, you'll receive a reset link shortly."));
     }
 
     private static async Task<IResult> ResetPassword(

@@ -4,6 +4,7 @@ using Axis.Api.Infrastructure;
 using Axis.Identity.Application.Commands.InviteUser;
 using Axis.Identity.Application.Commands.RegisterOrganization;
 using Axis.Identity.Application.Queries.GetOrganizationSlugPreview;
+using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -28,7 +29,7 @@ public static class OrganizationEndpoints
             .WithName("RegisterOrganization")
             .WithSummary("Register a new organization and admin account")
             .WithTags("Identity")
-            .Produces<object>()
+            .Produces<MessageResponse>()
             .ProducesProblem(400)
             .ProducesProblem(409);
 
@@ -37,7 +38,7 @@ public static class OrganizationEndpoints
             .WithName("InviteUser")
             .WithSummary("Invite a user to the organization by email")
             .WithTags("Identity")
-            .Produces<object>()
+            .Produces<MessageResponse>()
             .ProducesProblem(400)
             .ProducesProblem(401)
             .ProducesProblem(403)
@@ -80,10 +81,8 @@ public static class OrganizationEndpoints
         if (result.IsFailure)
             return result.ToProblemDetails();
 
-        return Results.Ok(new
-        {
-            message = "Registration successful. Please check your email to verify your account.",
-        });
+        return Results.Ok(new MessageResponse(
+            "Registration successful. Please check your email to verify your account."));
     }
 
     private static async Task<IResult> InviteUser(
@@ -102,6 +101,6 @@ public static class OrganizationEndpoints
             currentUser.UserId), ct);
 
         if (result.IsFailure) return result.ToProblemDetails();
-        return Results.Ok(new { message = $"Invitation sent to {request.Email}." });
+        return Results.Ok(new MessageResponse($"Invitation sent to {request.Email}."));
     }
 }

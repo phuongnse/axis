@@ -1,6 +1,7 @@
 using Axis.Api.Extensions;
 using Axis.Api.Infrastructure;
 using Axis.Identity.Application.Commands.ChangeOrganizationPlan;
+using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -18,7 +19,7 @@ public static class PlatformOrganizationEndpoints
             .WithName("ChangeOrganizationPlan")
             .WithSummary("Platform admin: change an organization's subscription plan")
             .WithTags("Platform")
-            .Produces<object>()
+            .Produces<MessageResponse>()
             .ProducesProblem(401)
             .ProducesProblem(403)
             .ProducesProblem(404);
@@ -40,6 +41,6 @@ public static class PlatformOrganizationEndpoints
         if (result.IsFailure)
             return result.ToProblemDetails();
 
-        return Results.Ok(new { message = "Organization plan updated." });
+        return Results.Ok(new MessageResponse("Organization plan updated."));
     }
 }

@@ -54,7 +54,7 @@ public static class WorkflowEndpoints
             .WithName("CreateWorkflow")
             .WithSummary("Create a new workflow definition in Draft status")
             .WithTags("WorkflowBuilder")
-            .Produces<object>(201)
+            .Produces<CreatedResponse>(201)
             .ProducesProblem(400)
             .ProducesProblem(401)
             .ProducesProblem(403)
@@ -132,7 +132,7 @@ public static class WorkflowEndpoints
             .WithName("DuplicateWorkflow")
             .WithSummary("Create a full copy of a workflow in Draft status")
             .WithTags("WorkflowBuilder")
-            .Produces<object>(201)
+            .Produces<CreatedResponse>(201)
             .ProducesProblem(401)
             .ProducesProblem(403)
             .ProducesProblem(404);
@@ -154,7 +154,7 @@ public static class WorkflowEndpoints
             .WithName("ImportWorkflow")
             .WithSummary("Import a workflow from a previously exported JSON body")
             .WithTags("WorkflowBuilder")
-            .Produces<object>(201)
+            .Produces<CreatedResponse>(201)
             .ProducesProblem(400)
             .ProducesProblem(401)
             .ProducesProblem(403);
@@ -175,7 +175,7 @@ public static class WorkflowEndpoints
             .WithName("AddStep")
             .WithSummary("Add a typed step to a workflow definition")
             .WithTags("WorkflowBuilder")
-            .Produces<object>(201)
+            .Produces<CreatedResponse>(201)
             .ProducesProblem(400)
             .ProducesProblem(401)
             .ProducesProblem(403)
@@ -280,7 +280,7 @@ public static class WorkflowEndpoints
         Result<Guid> result = await mediator.Send(
             new CreateWorkflowCommand(request.Name, request.Description, currentUser.OrgId, currentUser.UserId.ToString()), ct);
         if (result.IsFailure) return result.ToProblemDetails();
-        return Results.Created($"/api/workflows/{result.Value}", new { id = result.Value });
+        return Results.Created($"/api/workflows/{result.Value}", new CreatedResponse(result.Value));
     }
 
     private static async Task<IResult> GetWorkflow(
@@ -366,7 +366,7 @@ public static class WorkflowEndpoints
         Result<Guid> result = await mediator.Send(
             new DuplicateWorkflowCommand(workflowId, currentUser.OrgId, currentUser.UserId.ToString()), ct);
         if (result.IsFailure) return result.ToProblemDetails();
-        return Results.Created($"/api/workflows/{result.Value}", new { id = result.Value });
+        return Results.Created($"/api/workflows/{result.Value}", new CreatedResponse(result.Value));
     }
 
     private static async Task<IResult> ExportWorkflow(
@@ -401,7 +401,7 @@ public static class WorkflowEndpoints
         Result<Guid> result = await mediator.Send(
             new ImportWorkflowCommand(currentUser.OrgId, currentUser.UserId.ToString(), exportData), ct);
         if (result.IsFailure) return result.ToProblemDetails();
-        return Results.Created($"/api/workflows/{result.Value}", new { id = result.Value });
+        return Results.Created($"/api/workflows/{result.Value}", new CreatedResponse(result.Value));
     }
 
     private static async Task<IResult> BulkExportWorkflows(
@@ -452,7 +452,7 @@ public static class WorkflowEndpoints
         Result<Guid> result = await mediator.Send(
             new AddStepCommand(workflowId, currentUser.OrgId, request.Name, request.StepType, request.Config), ct);
         if (result.IsFailure) return result.ToProblemDetails();
-        return Results.Created($"/api/workflows/{workflowId}/steps/{result.Value}", new { id = result.Value });
+        return Results.Created($"/api/workflows/{workflowId}/steps/{result.Value}", new CreatedResponse(result.Value));
     }
 
     private static async Task<IResult> ConfigureStep(
