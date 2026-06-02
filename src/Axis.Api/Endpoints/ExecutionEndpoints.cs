@@ -60,7 +60,7 @@ public static class ExecutionEndpoints
             .WithName("RetryExecution")
             .WithSummary("Retry a failed execution from the failed step")
             .WithTags("WorkflowEngine")
-            .Produces<object>(201)
+            .Produces<CreatedResponse>(201)
             .ProducesProblem(401)
             .ProducesProblem(403)
             .ProducesProblem(404)
@@ -71,7 +71,7 @@ public static class ExecutionEndpoints
             .WithName("RetryExecutionWithContext")
             .WithSummary("Retry a failed execution using a modified context")
             .WithTags("WorkflowEngine")
-            .Produces<object>(201)
+            .Produces<CreatedResponse>(201)
             .ProducesProblem(400)
             .ProducesProblem(401)
             .ProducesProblem(403)
@@ -104,7 +104,7 @@ public static class ExecutionEndpoints
             .WithName("StartExecution")
             .WithSummary("Manually start a workflow execution")
             .WithTags("WorkflowEngine")
-            .Produces<object>(201)
+            .Produces<CreatedResponse>(201)
             .ProducesProblem(401)
             .ProducesProblem(403)
             .ProducesProblem(422);
@@ -168,7 +168,7 @@ public static class ExecutionEndpoints
             request?.Input), ct);
 
         if (result.IsFailure) return result.ToProblemDetails();
-        return Results.Created($"/api/executions/{result.Value}", new { id = result.Value });
+        return Results.Created($"/api/executions/{result.Value}", new CreatedResponse(result.Value));
     }
 
     private static async Task<IResult> CancelExecution(
@@ -192,7 +192,7 @@ public static class ExecutionEndpoints
         Result<Guid> result = await mediator.Send(new RetryExecutionCommand(
             executionId, currentUser.OrgId, currentUser.UserId), ct);
         if (result.IsFailure) return result.ToProblemDetails();
-        return Results.Created($"/api/executions/{result.Value}", new { id = result.Value });
+        return Results.Created($"/api/executions/{result.Value}", new CreatedResponse(result.Value));
     }
 
     private static async Task<IResult> RetryExecutionWithContext(
@@ -208,7 +208,7 @@ public static class ExecutionEndpoints
             currentUser.UserId,
             request.ModifiedContext), ct);
         if (result.IsFailure) return result.ToProblemDetails();
-        return Results.Created($"/api/executions/{result.Value}", new { id = result.Value });
+        return Results.Created($"/api/executions/{result.Value}", new CreatedResponse(result.Value));
     }
 
     private static async Task<IResult> GetRetryHistory(

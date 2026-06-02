@@ -1319,6 +1319,23 @@ export interface components {
             name?: string;
             description?: string | null;
         };
+        CreatedResponse: {
+            /** Format: uuid */
+            id?: string;
+        };
+        CurrentUserProfileDto: {
+            /** Format: uuid */
+            id?: string;
+            email?: string;
+            first_name?: string;
+            last_name?: string;
+            full_name?: string;
+            avatar_url?: string | null;
+            is_active?: boolean;
+            /** Format: uuid */
+            org_id?: string;
+            permissions?: string[];
+        };
         DataClassDetailDto: {
             /** Format: uuid */
             id?: string;
@@ -1528,6 +1545,14 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        InvitationByTokenDto: {
+            /** Format: uuid */
+            invitation_id?: string;
+            email?: string;
+            status?: string;
+            /** Format: date-time */
+            expires_at?: string;
+        };
         InviteUserRequest: {
             email?: string;
             /** Format: uuid */
@@ -1536,6 +1561,9 @@ export interface components {
         LegalVersionsDto: {
             terms_version?: string;
             privacy_version?: string;
+        };
+        MessageResponse: {
+            message?: string;
         };
         ModelDetailDto: {
             /** Format: uuid */
@@ -1568,6 +1596,22 @@ export interface components {
             /** Format: int32 */
             attempt_count?: number;
             last_error?: string | null;
+        };
+        OrganizationSettingsDto: {
+            /** Format: uuid */
+            organization_id?: string;
+            name?: string;
+            slug?: string;
+            logo_url?: string | null;
+            plan_name?: string;
+            status?: string;
+            /** Format: date-time */
+            created_at?: string;
+            time_zone_id?: string | null;
+            default_language?: string | null;
+            /** Format: date-time */
+            scheduled_hard_delete_at?: string | null;
+            usage?: components["schemas"]["UsageStatsDto"];
         };
         OrganizationSlugPreviewDto: {
             slug?: string;
@@ -1772,6 +1816,29 @@ export interface components {
             name?: string;
             description?: string | null;
         };
+        UsageStatsDto: {
+            /** Format: int32 */
+            workflows_used?: number;
+            /** Format: int32 */
+            workflows_limit?: number | null;
+            /** Format: int32 */
+            executions_used_this_month?: number;
+            /** Format: int32 */
+            executions_per_month_limit?: number | null;
+            /** Format: int32 */
+            users_used?: number;
+            /** Format: int32 */
+            users_limit?: number | null;
+        };
+        UserSessionResponse: {
+            session_id?: string;
+            device_info?: string;
+            /** Format: date-time */
+            last_activity?: string;
+            /** Format: date-time */
+            expires_at?: string;
+            is_current?: boolean;
+        };
         VerifyEmailRequest: {
             token?: string;
         };
@@ -1910,7 +1977,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CreatedResponse"];
                 };
             };
             /** @description Bad Request */
@@ -2137,7 +2204,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CreatedResponse"];
                 };
             };
             /** @description Bad Request */
@@ -2407,7 +2474,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CreatedResponse"];
                 };
             };
             /** @description Bad Request */
@@ -2625,7 +2692,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CreatedResponse"];
                 };
             };
             /** @description Bad Request */
@@ -2802,7 +2869,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CreatedResponse"];
                 };
             };
             /** @description Bad Request */
@@ -3187,7 +3254,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CreatedResponse"];
                 };
             };
             /** @description Bad Request */
@@ -3461,7 +3528,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CreatedResponse"];
                 };
             };
             /** @description Bad Request */
@@ -3949,7 +4016,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MessageResponse"];
                 };
             };
         };
@@ -4026,7 +4093,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MessageResponse"];
                 };
             };
             /** @description Bad Request */
@@ -4068,7 +4135,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MessageResponse"];
                 };
             };
             /** @description Bad Request */
@@ -4133,7 +4200,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OrganizationSettingsDto"];
                 };
             };
             /** @description Unauthorized */
@@ -4334,7 +4401,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["InvitationByTokenDto"];
                 };
             };
             /** @description Not Found */
@@ -4423,7 +4490,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CurrentUserProfileDto"];
                 };
             };
             /** @description Unauthorized */
@@ -4559,7 +4626,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["UserSessionResponse"][];
                 };
             };
             /** @description Unauthorized */
@@ -4809,7 +4876,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CreatedResponse"];
                 };
             };
             /** @description Bad Request */
@@ -4951,7 +5018,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MessageResponse"];
                 };
             };
             /** @description Unauthorized */
@@ -5043,7 +5110,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CreatedResponse"];
                 };
             };
             /** @description Bad Request */
@@ -5434,7 +5501,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CreatedResponse"];
                 };
             };
             /** @description Unauthorized */
@@ -5532,7 +5599,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CreatedResponse"];
                 };
             };
             /** @description Bad Request */
@@ -5621,7 +5688,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CreatedResponse"];
                 };
             };
             /** @description Bad Request */
@@ -6208,7 +6275,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CreatedResponse"];
                 };
             };
             /** @description Unauthorized */
@@ -6270,7 +6337,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CreatedResponse"];
                 };
             };
             /** @description Bad Request */
@@ -6425,7 +6492,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CreatedResponse"];
                 };
             };
             /** @description Unauthorized */

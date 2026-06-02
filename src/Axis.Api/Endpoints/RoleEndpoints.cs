@@ -31,7 +31,7 @@ public static class RoleEndpoints
             .WithName("CreateRole")
             .WithSummary("Create a new role")
             .WithTags("Identity")
-            .Produces<object>(201)
+            .Produces<CreatedResponse>(201)
             .ProducesProblem(400)
             .ProducesProblem(401)
             .ProducesProblem(403)
@@ -75,7 +75,7 @@ public static class RoleEndpoints
             request.Permissions), ct);
 
         if (result.IsFailure) return result.ToProblemDetails();
-        return Results.Created($"/api/roles/{result.Value}", new { id = result.Value, message = $"Role '{request.Name}' created." });
+        return Results.Created($"/api/roles/{result.Value}", new CreatedResponse(result.Value));
     }
 
     private static async Task<IResult> UpdateRole(

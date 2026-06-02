@@ -27,7 +27,7 @@ public static class UserEndpoints
             .WithName("GetMe")
             .WithSummary("Get the current user's profile")
             .WithTags("Identity")
-            .Produces<object>()
+            .Produces<CurrentUserProfileDto>()
             .ProducesProblem(401)
             .ProducesProblem(404);
 
@@ -53,7 +53,7 @@ public static class UserEndpoints
             .WithName("GetUserSessions")
             .WithSummary("List active sessions for the current user")
             .WithTags("Identity")
-            .Produces<object>()
+            .Produces<IReadOnlyList<UserSessionResponse>>()
             .ProducesProblem(401);
 
         group.MapDelete("/me/sessions/{sessionId}", RevokeSession)
@@ -109,18 +109,7 @@ public static class UserEndpoints
         if (profile is null)
             return Results.NotFound();
 
-        return Results.Ok(new
-        {
-            id = profile.Id,
-            email = profile.Email,
-            first_name = profile.FirstName,
-            last_name = profile.LastName,
-            full_name = profile.FullName,
-            avatar_url = profile.AvatarUrl,
-            is_active = profile.IsActive,
-            org_id = profile.OrgId,
-            permissions = profile.Permissions,
-        });
+        return Results.Ok(profile);
     }
 
     private static async Task<IResult> UpdateProfile(
@@ -178,14 +167,12 @@ public static class UserEndpoints
         IReadOnlyList<UserSession> sessions = await mediator.Send(
             new GetUserSessionsQuery(currentUser.UserId, CurrentTokenId: string.Empty), ct);
 
-        return Results.Ok(sessions.Select(s => new
-        {
-            session_id = s.SessionId,
-            device_info = s.DeviceInfo,
-            last_activity = s.LastActivity,
-            expires_at = s.ExpiresAt,
-            is_current = s.IsCurrentSession,
-        }));
+        return Results.Ok(sessions.Select(s => new UserSessionResponse(
+            s.SessionId,
+            s.DeviceInfo,
+            s.LastActivity,
+            s.ExpiresAt,
+            s.IsCurrentSession)));
     }
 
     private static async Task<IResult> RevokeSession(

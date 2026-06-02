@@ -21,7 +21,7 @@ public static class InvitationEndpoints
             .WithName("GetInvitation")
             .WithSummary("Get invitation details by token")
             .WithTags("Identity")
-            .Produces<object>()
+            .Produces<InvitationByTokenDto>()
             .ProducesProblem(404);
 
         group.MapPost("/{token}/accept", AcceptInvitation)
@@ -46,13 +46,7 @@ public static class InvitationEndpoints
         if (invitation is null)
             return Results.Problem("Invitation not found.", statusCode: StatusCodes.Status404NotFound);
 
-        return Results.Ok(new
-        {
-            invitation_id = invitation.InvitationId,
-            email = invitation.Email,
-            status = invitation.Status,
-            expires_at = invitation.ExpiresAt,
-        });
+        return Results.Ok(invitation);
     }
 
     private static async Task<IResult> AcceptInvitation(

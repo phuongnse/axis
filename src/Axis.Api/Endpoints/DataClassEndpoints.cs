@@ -38,7 +38,7 @@ public static class DataClassEndpoints
             .WithName("CreateDataClass")
             .WithSummary("Create a new data class")
             .WithTags("DataModeling")
-            .Produces<object>(201)
+            .Produces<CreatedResponse>(201)
             .ProducesProblem(400)
             .ProducesProblem(401)
             .ProducesProblem(403)
@@ -81,7 +81,7 @@ public static class DataClassEndpoints
             .WithName("AddFieldToDataClass")
             .WithSummary("Add a field to a data class")
             .WithTags("DataModeling")
-            .Produces<object>(201)
+            .Produces<CreatedResponse>(201)
             .ProducesProblem(400)
             .ProducesProblem(401)
             .ProducesProblem(403)
@@ -125,7 +125,7 @@ public static class DataClassEndpoints
             currentUser.UserId.ToString()), ct);
 
         if (result.IsFailure) return result.ToProblemDetails();
-        return Results.Created($"/api/data-classes/{result.Value}", new { id = result.Value });
+        return Results.Created($"/api/data-classes/{result.Value}", new CreatedResponse(result.Value));
     }
 
     private static async Task<IResult> GetDataClass(
@@ -185,7 +185,7 @@ public static class DataClassEndpoints
             request.Config), ct);
 
         if (result.IsFailure) return result.ToProblemDetails();
-        return Results.Created($"/api/data-classes/{dataClassId}/fields/{result.Value}", new { id = result.Value });
+        return Results.Created($"/api/data-classes/{dataClassId}/fields/{result.Value}", new CreatedResponse(result.Value));
     }
 
     private static async Task<IResult> RemoveField(

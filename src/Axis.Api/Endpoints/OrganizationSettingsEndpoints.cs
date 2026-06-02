@@ -23,7 +23,7 @@ public static class OrganizationSettingsEndpoints
             .WithName("GetOrganizationSettings")
             .WithSummary("Get organization settings and usage stats")
             .WithTags("Identity")
-            .Produces<object>()
+            .Produces<OrganizationSettingsDto>()
             .ProducesProblem(401)
             .ProducesProblem(403)
             .ProducesProblem(404);
@@ -74,28 +74,7 @@ public static class OrganizationSettingsEndpoints
         if (settings is null)
             return Results.NotFound();
 
-        return Results.Ok(new
-        {
-            organization_id = settings.OrganizationId,
-            name = settings.Name,
-            slug = settings.Slug,
-            logo_url = settings.LogoUrl,
-            plan_name = settings.PlanName,
-            status = settings.Status,
-            created_at = settings.CreatedAt,
-            time_zone_id = settings.TimeZoneId,
-            default_language = settings.DefaultLanguage,
-            scheduled_hard_delete_at = settings.ScheduledHardDeleteAt,
-            usage = new
-            {
-                workflows_used = settings.Usage.WorkflowsUsed,
-                workflows_limit = settings.Usage.WorkflowsLimit,
-                executions_used_this_month = settings.Usage.ExecutionsUsedThisMonth,
-                executions_per_month_limit = settings.Usage.ExecutionsPerMonthLimit,
-                users_used = settings.Usage.UsersUsed,
-                users_limit = settings.Usage.UsersLimit,
-            },
-        });
+        return Results.Ok(settings);
     }
 
     private static async Task<IResult> UpdateProfile(

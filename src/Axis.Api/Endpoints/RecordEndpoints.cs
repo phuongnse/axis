@@ -9,6 +9,7 @@ using Axis.DataModeling.Application.Commands.UpdateRecord;
 using Axis.DataModeling.Application.Queries.ExportRecordsCsv;
 using Axis.DataModeling.Application.Queries.GetRecord;
 using Axis.DataModeling.Application.Queries.GetRecords;
+using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -60,7 +61,7 @@ public static class RecordEndpoints
             .WithName("CreateRecord")
             .WithSummary("Create a new record")
             .WithTags("DataModeling")
-            .Produces<object>(201)
+            .Produces<CreatedResponse>(201)
             .ProducesProblem(400)
             .ProducesProblem(401)
             .ProducesProblem(403)
@@ -178,7 +179,7 @@ public static class RecordEndpoints
         Result<Guid> result = await mediator.Send(
             new CreateRecordCommand(modelId, currentUser.OrgId, data, currentUser.UserId.ToString()), ct);
         if (result.IsFailure) return result.ToProblemDetails();
-        return Results.Created($"/api/models/{modelId}/records/{result.Value}", new { id = result.Value });
+        return Results.Created($"/api/models/{modelId}/records/{result.Value}", new CreatedResponse(result.Value));
     }
 
     private static async Task<IResult> GetRecord(

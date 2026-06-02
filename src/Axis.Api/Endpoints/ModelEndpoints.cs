@@ -40,7 +40,7 @@ public static class ModelEndpoints
             .WithName("CreateModel")
             .WithSummary("Create a new data model")
             .WithTags("DataModeling")
-            .Produces<object>(201)
+            .Produces<CreatedResponse>(201)
             .ProducesProblem(400)
             .ProducesProblem(401)
             .ProducesProblem(403)
@@ -84,7 +84,7 @@ public static class ModelEndpoints
             .WithName("AddFieldToModel")
             .WithSummary("Add a field to a data model")
             .WithTags("DataModeling")
-            .Produces<object>(201)
+            .Produces<CreatedResponse>(201)
             .ProducesProblem(400)
             .ProducesProblem(401)
             .ProducesProblem(403)
@@ -151,7 +151,7 @@ public static class ModelEndpoints
             currentUser.UserId.ToString()), ct);
 
         if (result.IsFailure) return result.ToProblemDetails();
-        return Results.Created($"/api/models/{result.Value}", new { id = result.Value });
+        return Results.Created($"/api/models/{result.Value}", new CreatedResponse(result.Value));
     }
 
     private static async Task<IResult> GetModel(
@@ -212,7 +212,7 @@ public static class ModelEndpoints
             request.Config), ct);
 
         if (result.IsFailure) return result.ToProblemDetails();
-        return Results.Created($"/api/models/{modelId}/fields/{result.Value}", new { id = result.Value });
+        return Results.Created($"/api/models/{modelId}/fields/{result.Value}", new CreatedResponse(result.Value));
     }
 
     private static async Task<IResult> UpdateField(
