@@ -26,4 +26,22 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" PrivateAssets="all" />
   </ItemGroup>
+
+  <!--
+    Auto-wire the committed git hooks so the pre-push gate (full local CI mirror,
+    incl. Testcontainers integration tests) is active for everyone — without
+    relying on each contributor remembering to run scripts/install-hooks.sh.
+    This is the same repo-local config that script sets; equivalent to Husky's
+    npm-prepare wiring. Skipped on CI (CI sets CI=true) and when there is no .git
+    (e.g. building from a source tarball). git-missing is tolerated so a build
+    never fails on this convenience step.
+  -->
+  <Target Name="EnsureGitHooksPath"
+          BeforeTargets="Build"
+          Condition="'$(CI)' != 'true' And Exists('$(MSBuildThisFileDirectory).git')">
+    <Exec Command="git config core.hooksPath scripts/hooks"
+          ContinueOnError="true"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low" />
+  </Target>
 </Project>

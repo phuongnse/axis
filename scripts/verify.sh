@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 # Local mirror of the CI gate (.github/workflows/build-and-test.yml).
 # Closes the "build passed locally but CI failed" gap: runs the SAME commands CI
-# runs, so charset/format, casing, and drift surface here, not in CI. Integration
-# (Testcontainers) surfaces here only in `full` mode — `fast` (the default, and
-# what the pre-push hook runs) skips it, so that class can still first appear in CI.
+# runs — INCLUDING the Testcontainers integration tests — so charset/format,
+# casing, drift AND integration failures surface here, before push, not after a
+# red CI run. There is no "fast"/skip-integration mode: a backend change never
+# reaches a PR without its integration tests having passed locally first.
 #
-# Usage: scripts/verify.sh [fast|full]   (default: fast)
-#   fast — build + dotnet format --verify + frontend ci+test + doc drift   (no Docker)
-#   full — fast scope + full `dotnet test` (Testcontainers; needs Docker), exactly like CI
+# Usage: scripts/verify.sh
+#   build + dotnet format --verify + FULL `dotnet test` (Testcontainers; needs
+#   Docker) + frontend ci+test + doc drift. This is THE push gate.
 #
-# Only the layers whose files changed (vs origin/main) run, so doc-only work stays quick.
+# Only the layers whose files changed (vs origin/main) run, so doc-only and
+# frontend-only work stays quick and does not require Docker.
 # On Windows run via Git Bash. Wired as the pre-push hook (scripts/hooks/pre-push).
 set -uo pipefail
 cd "$(dirname "$0")/.." || {
@@ -17,14 +19,12 @@ cd "$(dirname "$0")/.." || {
   exit 1
 }
 
-MODE="${1:-fast}"
-case "${MODE}" in
-  fast|full) ;;
-  *)
-    echo "verify.sh: unknown mode '${MODE}' — usage: scripts/verify.sh [fast|full]" >&2
-    exit 2
-    ;;
-esac
+# The fast/full mode split was removed: integration tests are mandatory before
+# push. Tolerate (and ignore) a leftover argument so old `verify.sh fast|full`
+# invocations and muscle memory still run the one real gate.
+if [ "$#" -gt 0 ]; then
+  echo "verify.sh: mode argument '$1' ignored — verify.sh always runs the full gate (integration tests included)." >&2
+fi
 
 # ── What changed? (mirror CI's "Detect changes"; run everything if unknown) ──
 BASE="${BASE_BRANCH:-main}"
@@ -69,14 +69,27 @@ step() {
   fi
 }
 
-echo "verify.sh (${MODE}) — .NET=${DOTNET} frontend=${FE}"
+echo "verify.sh — .NET=${DOTNET} frontend=${FE}"
+
+# The .NET test step runs the Testcontainers integration tests, which need a
+# running Docker daemon. When backend files changed, fail early with an
+# actionable message instead of a cryptic Testcontainers error mid-run.
+# (Doc-only / frontend-only pushes set DOTNET=false and never reach this — so
+# they still do not require Docker.)
+if [ "${DOTNET}" = true ]; then
+  if ! docker info >/dev/null 2>&1; then
+    echo "" >&2
+    echo "✗ Docker is not available, but backend changed and the gate runs the Testcontainers integration tests." >&2
+    echo "  Integration tests are REQUIRED before pushing backend changes (Gate 1 — local = CI)." >&2
+    echo "  Start Docker and re-run 'scripts/verify.sh'." >&2
+    exit 1
+  fi
+fi
 
 if [ "${DOTNET}" = true ]; then
   step ".NET build"   "dotnet build Axis.sln --nologo"
   step ".NET format"  "dotnet format Axis.sln --verify-no-changes"
-  if [ "${MODE}" = full ]; then
-    step ".NET test (full, Testcontainers)" "dotnet test Axis.sln --nologo"
-  fi
+  step ".NET test (full, Testcontainers)" "dotnet test Axis.sln --nologo"
 fi
 
 if [ "${FE}" = true ]; then
@@ -100,9 +113,7 @@ fi
 
 echo ""
 if [ "${#FAILED[@]}" -eq 0 ]; then
-  echo "verify.sh: PASS (${MODE})"
-  [ "${MODE}" != full ] && [ "${DOTNET}" = true ] && \
-    echo "note: integration tests (Testcontainers) run in CI — run 'scripts/verify.sh full' to mirror them locally (needs Docker)."
+  echo "verify.sh: PASS"
   exit 0
 fi
 
