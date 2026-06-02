@@ -8,7 +8,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -131,6 +133,79 @@ def count_template_main_flow(files: list[Path]) -> int:
     return sum(1 for p in files if TEMPLATE_MAIN_FLOW in p.read_text(encoding="utf-8"))
 
 
+def changed_paths_against_base() -> list[Path]:
+    """Return changed paths for PR-style ratchets; fail closed without diff context."""
+    base = os.environ.get("BASE_BRANCH", "main")
+    candidates = [f"origin/{base}", base]
+    range_spec: str | None = None
+
+    for candidate in candidates:
+        result = subprocess.run(
+            ["git", "rev-parse", "--verify", candidate],
+            cwd=ROOT,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        if result.returncode == 0:
+            range_spec = f"{candidate}...HEAD"
+            break
+
+    if range_spec is None:
+        result = subprocess.run(
+            ["git", "rev-parse", "--verify", "HEAD~1"],
+            cwd=ROOT,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        if result.returncode == 0:
+            range_spec = "HEAD~1...HEAD"
+
+    if range_spec is None:
+        raise RuntimeError(
+            "check-use-case-docs: failed to find a git diff base "
+            f"(tried origin/{base}, {base}, and HEAD~1)"
+        )
+
+    result = subprocess.run(
+        ["git", "diff", "--name-only", range_spec],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"check-use-case-docs: failed to diff {range_spec}")
+
+    paths: list[Path] = []
+    for line in result.stdout.splitlines():
+        if line.strip():
+            paths.append((ROOT / line.strip()).resolve())
+    return paths
+
+
+def check_changed_stock_main_flow(files: list[Path]) -> list[str]:
+    """Ratchet: existing stock flows are debt; touched use cases must replace them."""
+    changed = set(changed_paths_against_base())
+    if not changed:
+        return []
+
+    issues: list[str] = []
+    for path in files:
+        resolved = path.resolve()
+        if resolved not in changed:
+            continue
+        if TEMPLATE_MAIN_FLOW not in path.read_text(encoding="utf-8"):
+            continue
+        rel = path.relative_to(ROOT)
+        issues.append(
+            f"{rel}: changed use-case still has the stock Main flow — replace it with the real user/system flow"
+        )
+    return issues
+
+
 # Row in a domain README that references `./README.md` from inside that same
 # README is a self-link — it resolves to the current page and conveys
 # nothing.
@@ -200,6 +275,10 @@ def main() -> int:
     issues: list[str] = []
     for path in files:
         issues.extend(check_file(path))
+    try:
+        issues.extend(check_changed_stock_main_flow(files))
+    except RuntimeError as exc:
+        issues.append(str(exc))
     for readme in iter_domain_readmes():
         issues.extend(check_domain_readme(readme))
 

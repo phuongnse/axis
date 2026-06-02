@@ -14,8 +14,8 @@ A slice is isolated only if **both** sides hold. Verify both before marking the 
 
 | Side | Definition | How to verify |
 |------|------------|---------------|
-| **A — Stands alone** | A fresh checkout of the branch compiles and the **full Gate 1** is green, and every route / endpoint / contract / symbol the slice *references* already exists on its merge target. | Switch to the branch on a clean tree → run the full Gate 1, no filters. |
-| **B — Integrates** | After **rebasing onto current `main`**, it still compiles and is green, and merging it requires **no unmerged sibling**. | Rebase onto `origin/main`, re-run Gate 1. |
+| **A — Stands alone** | A fresh checkout of the branch compiles, the local Gate 1 fast gate is green, CI is expected to run the full suite, and every route / endpoint / contract / symbol the slice *references* already exists on its merge target. | Switch to the branch on a clean tree → run `scripts/verify.sh`; rely on CI/branch protection for full `dotnet test Axis.sln`. |
+| **B — Integrates** | After **rebasing onto current `main`**, it still compiles and is green, and merging it requires **no unmerged sibling**. | Rebase onto `origin/main`, re-run `scripts/verify.sh`; CI must rerun on the rebased branch before merge. |
 
 If a slice references something an **unmerged sibling owns** (a route it navigates to, an endpoint it calls, a symbol it imports, a constant it reads), it fails side A — it is stacked in disguise, not isolated. Either pull that dependency into this slice, or ship a fallback that compiles and degrades gracefully on the current `main`.
 
@@ -26,7 +26,7 @@ If a slice references something an **unmerged sibling owns** (a route it navigat
 | Rule | Meaning |
 |------|---------|
 | **Branch from `main`** | Each slice starts from `origin/main`. Never stack slice B on slice A's branch. |
-| **Prove both sides before "ready"** | Run the full Gate 1 on the branch **and** after a trial rebase onto `origin/main`. |
+| **Prove both sides before "ready"** | Run the local Gate 1 fast gate on the branch **and** after a trial rebase onto `origin/main`; CI/branch protection owns the full suite. |
 | **Vertical when a contract changes** | If an endpoint adds a **required** field or changes a response/contract already used on `main`, ship backend + minimal caller in the **same** PR so `main` never breaks. |
 | **Horizontal when additive** | New UI on existing APIs can be frontend-only; a new API with no caller on `main` yet can be backend-only. |
 | **One owner per shared seam** | A file or symbol touched by more than one slice has exactly **one owning slice**; the others consume it, never re-add it. See below. |
@@ -60,7 +60,9 @@ Common seam categories:
 
 ## Gate 1 honesty
 
-"Gate 1 green" in a PR body is a factual claim that you ran the **full** verification on this branch (full solution build/test + frontend `ci`/tests + drift where applicable) — not a filtered subset, and not the one file you touched. See [agent-checklist § Gates](./agent-checklist.md) for the exact command matrix.
+"Gate 1 green" in a PR body is a factual claim that you ran the local Gate 1 fast gate on this branch: `scripts/verify.sh` with the command matrix in [agent-checklist § Gate 1](./agent-checklist.md#gate-1--verify-before-push-fast-local-gate). Do not present unit-only output, a one-file test, or a partial command as Gate 1.
+
+The full suite is a separate claim: full local verification means full `dotnet test Axis.sln --nologo` plus the applicable frontend and drift checks. CI/branch protection is the authoritative full gate before merge.
 
 If you cannot run a piece (e.g. an integration suite needs infra you do not have), **say so explicitly** in your own walk-through. Never tick a green box you did not verify — the cost of a false green lands on review, not on you.
 
@@ -70,7 +72,7 @@ If you cannot run a piece (e.g. an integration suite needs infra you do not have
 
 1. **Document the order** in each PR body (product/contract sequence).
 2. **Enable branch protection:** *require branches to be up to date before merging*, so each slice's CI re-runs against the post-merge tree — a stale-`main` green is not accepted.
-3. **After every merge**, rebase each remaining slice onto updated `main`, re-run Gate 1, and consolidate seams (drop anything now owned by the just-merged slice).
+3. **After every merge**, rebase each remaining slice onto updated `main`, re-run `scripts/verify.sh`, and consolidate seams (drop anything now owned by the just-merged slice).
 4. Do not mark the parent use case ✅ until all in-scope slices are merged or explicitly deferred.
 
 ---
@@ -109,7 +111,7 @@ an unmerged sibling owns?
 ## Agent workflow
 
 1. Read the use-case ACs; split into slices. **List the shared seams and assign one owner each.**
-2. For each slice: branch from `origin/main`, implement, run the **full** Gate 1, push, open a **draft** PR.
+2. For each slice: branch from `origin/main`, implement, run `scripts/verify.sh`, push, open a **draft** PR, and let CI prove the full gate.
 3. PR description: Summary, linked spec, Requirements — plus one line: **Merge independence:** what still works on `main` if only this PR lands.
 4. Do not mark the parent use case ✅ until all in-scope slices are merged or explicitly deferred.
 
@@ -118,7 +120,7 @@ an unmerged sibling owns?
 ## Checklist before push (each slice)
 
 - [ ] Branch created from current `origin/main`, not from another feature branch
-- [ ] **Stands alone:** fresh checkout builds + full Gate 1 green (no filters)
+- [ ] **Stands alone:** fresh checkout builds + `scripts/verify.sh` green
 - [ ] **Integrates:** trial rebase onto `origin/main` still builds + green
 - [ ] No route / endpoint / symbol / constant referenced that an unmerged sibling owns (or a compiling fallback is in place)
 - [ ] No new file path also added by another open PR

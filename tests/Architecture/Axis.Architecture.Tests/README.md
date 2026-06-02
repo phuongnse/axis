@@ -25,7 +25,7 @@ These rules don't enforce a P0/P1 from CLAUDE.md directly — they encode the im
 | [HandlerConventionTests](./HandlerConventionTests.cs) | Every MediatR handler accepts `CancellationToken` as the last `Handle` parameter and is `sealed`. |
 | [RepositoryConventionTests](./RepositoryConventionTests.cs) | Repository public methods don't return `IQueryable<>` (must materialize); repositories don't expose `SaveChanges*`/`Commit*` (that's `IUnitOfWork`'s job). |
 | [AggregateConventionTests](./AggregateConventionTests.cs) | Aggregate roots have no public mutable setters (init-only allowed for EF) and no public parameterless ctor — forces factory + behavior-method pattern. |
-| [EndpointConventionTests](./EndpointConventionTests.cs) | Static classes hosting `Map*` extension methods are named `*Endpoints`. (Authorization-presence check ships in PR #97 with the DI scanner.) |
+| [EndpointConventionTests](./EndpointConventionTests.cs) | Static classes hosting `Map*` extension methods are named `*Endpoints`. Authorization presence is enforced separately by [`EndpointAuthorizationTests`](../../Api/Axis.Api.Tests/Architecture/EndpointAuthorizationTests.cs), which walks runtime endpoint metadata. |
 
 ## What this does NOT catch
 

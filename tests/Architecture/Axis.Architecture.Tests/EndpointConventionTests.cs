@@ -18,10 +18,10 @@ namespace Axis.Architecture.Tests;
 ///
 /// <para>
 /// <b>Authorization presence</b> (every endpoint chains <c>.RequireAuthorization()</c>
-/// unless deliberately anonymous) is NOT checked here — it requires walking
-/// the <c>EndpointDataSource</c> at runtime via a <c>WebApplicationFactory</c>.
-/// That check belongs with the DI registration scanner that shares the same
-/// factory infrastructure.
+/// unless deliberately anonymous) is checked by
+/// <c>tests/Api/Axis.Api.Tests/Architecture/EndpointAuthorizationTests.cs</c>,
+/// because it requires walking the <c>EndpointDataSource</c> at runtime via a
+/// <c>WebApplicationFactory</c>.
 /// </para>
 /// </summary>
 public class EndpointConventionTests

@@ -59,11 +59,11 @@ See [agent-checklist.md § Gate 1](./agent-checklist.md) and CLAUDE.md. When `sr
 
 ```bash
 dotnet build
-dotnet test
+bash scripts/test-unit.sh
 dotnet format --verify-no-changes
 ```
 
-`dotnet test` runs the **full** solution (Domain, Application, Infrastructure with Testcontainers, API tests). Docker must be available — same expectation as CI. When adding a test project, add it to `Axis.sln` only (no solution filter).
+`scripts/test-unit.sh` discovers committed `*.Domain.Tests` and `*.Application.Tests` projects from `git ls-files`; it does not use a static solution filter. Run `scripts/check-test-project-classification.sh` when adding a test project; CI fails if a committed `*.Tests.csproj` is not classified. Full `dotnet test Axis.sln --nologo` runs Domain, Application, Infrastructure with Testcontainers, and API tests; Docker must be available for that full local run and CI always runs it before merge.
 
 ### Integration test maintenance
 
