@@ -21,15 +21,17 @@ reviews:
     - path: "**/*.cs"
       instructions: |
         Project rules: CLAUDE.md (machine rules P0-P2) and .editorconfig are
-        authoritative. Style/naming (no `var` for locals, one public type per
-        file, `using` not fully-qualified names) are analyzer-enforced — only
-        flag them if the build somehow did not. Focus review on:
+        authoritative. Style/naming (no `var` for locals, `using` not
+        fully-qualified names) and CancellationToken forwarding (CA2016, escalated
+        in .editorconfig + TreatWarningsAsErrors) are analyzer-enforced and fail
+        the build — only flag them if the build somehow did not. (One-public-type-
+        per-file is deliberately NOT enforced — it conflicts with intentional
+        groupings like Result/Result<T>, ICommand/ICommand<T>, and polymorphic
+        value-object hierarchies; see review-findings-ledger.md. Do not flag it.)
+        Focus review on:
         - Result / Result<T> for business failures; exceptions only for
           infrastructure faults (CLAUDE.md P1). Flag bespoke bool/tuple/throw
           patterns where a Result belongs.
-        - CancellationToken forwarded to every downstream async call (CA2016 is
-          being escalated; until it lands, flag dropped tokens in services,
-          schedulers, middleware, and gRPC methods — not just MediatR handlers).
         - Side effects (external storage, messaging) must not commit before the
           DB transaction they depend on — flag ordering that can leave drift.
     - path: "src/Modules/**/*.cs"
@@ -79,3 +81,11 @@ reviews:
         test name claims. If a test named ..._Returns403 asserts a 401 (or any
         status/outcome that contradicts its name), flag it — a green test that
         asserts the wrong thing is worse than a missing one.
+    - path: "**/*.md"
+      instructions: |
+        Docs follow docs/playbooks/docs-style.md (§ Prose style, § Single owner,
+        § Keep practice docs general). Flag: verbose prose (filler, restatement,
+        paragraphs where a table/list fits), a fact duplicated instead of linking
+        its single owner, and over-detailed code snippets tied to one feature
+        (docs show the generic shape — placeholders over real names/fields).
+        Real rot only, not nitpicks.

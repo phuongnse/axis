@@ -103,9 +103,8 @@ Large canvas or DnD builder features (React Flow, dnd-kit) require explicit rend
 
 - Wrap node-level and item-level components in `React.memo` — rerenders in a graph propagate aggressively without it.
 - Stabilise all callbacks passed as props with `useCallback`. Unstable function references bypass `memo` and cause full subtree rerenders.
-- Never pass new object or array literals as props inline — extract them to `useMemo` or module-level constants.
+- Never pass inline object / array / function literals as props — they are new references each render and bypass `memo` (worst in deeply nested builder components). Extract to `useMemo` or module-level constants.
 - Keep store selectors granular: subscribe to the smallest slice of Zustand state needed. Coarse selectors cause the entire canvas to rerender on unrelated state changes.
-- Never pass inline object or function literals as props into deeply nested builder components — they are new references on every render and bypass `memo` entirely.
 - Memoize expensive derived structures (filtered node lists, computed edge maps, layout calculations) with `useMemo`. Recomputing them on every render compounds quickly in graph UIs.
 - Profile with React DevTools before assuming performance is acceptable. Canvas/builder UIs hide rerender storms until data volume increases.
 
