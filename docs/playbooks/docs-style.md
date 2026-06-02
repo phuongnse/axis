@@ -14,6 +14,23 @@ When you find yourself editing the same fact in two files, the architecture is w
 
 ---
 
+## Prose style (write tight)
+
+Reference and practice docs are **scanned, not read**. Optimize for a reader who needs the rule in seconds. Concise, not thin: keep every load-bearing fact, cut everything else.
+
+- **Lead with the rule; one clause of why.** Imperative voice (`Run X`, not `You should run X`). Drop filler (`in order to`, `it should be noted`, `as mentioned`).
+- **Tables / lists** for rule sets and matrices, not paragraphs.
+- **No duplication** — link the owner (§ Single owner), don't re-explain.
+- **Test:** can a sentence be cut without losing a fact or a rule? Then cut it.
+
+**Code & examples in docs — keep generic:**
+
+- Show the **shape**, not a copy of one call site: placeholders (`{Module}`, `Foo`, `…`) over real names/fields from one feature.
+- Snippets illustrate a pattern; **code is the source of truth**. Trim to the lines that carry the point.
+- A concrete instance appears only as a labeled example (`e.g.`), never as the rule itself — see § Keep practice docs general.
+
+---
+
 ## Anti-patterns (don't ship these)
 
 | Anti-pattern | Why it rots | Do instead |
@@ -216,4 +233,4 @@ Avoid writing engineering process constraints as end-user use cases. Keep those 
 
 ## When you touch any `.md` file
 
-Boy-scout pass: while you're in the file, scan for the anti-patterns above. Stale links and `⏳` / `TODO` lines that have since shipped are the most common rot. The cost of removing one is seconds; the cost of leaving it accumulates.
+Boy-scout pass: while you're in the file, scan for the anti-patterns above and tighten prose to § Prose style. Stale links and `⏳` / `TODO` lines that have since shipped are the most common rot. The cost of removing one is seconds; the cost of leaving it accumulates.
