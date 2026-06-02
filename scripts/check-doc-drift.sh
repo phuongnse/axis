@@ -159,6 +159,58 @@ done < <(
       '
 )
 
+# Contract-less endpoint response guard (review-findings-ledger.md: "Endpoint
+# returns object/anonymous JSON instead of an Application-layer DTO").
+# `.Produces<object>()` emits a bare `object` schema into openapi.json, which
+# makes the generated frontend types (api-types.ts) useless — it defeats the
+# FE/BE type-safety codegen the repo closed in #165. `Results.Ok(new { … })`
+# returns an anonymous type that is not a real contract. Both must be a named
+# Application-layer DTO (e.g. `.Produces<CreateModelResponse>(201)`).
+#
+# Added-lines-only, so this is a ratchet: existing violations are grandfathered
+# and burned down separately; NO NEW one may be introduced. Scope: endpoints.
+#
+# `[.]` `[(]` `[{]` for literal punctuation (GNU awk mangles `\.`/`\(`); `<object>`
+# is literal in ERE.
+ENDPOINT_OBJECT_PATTERN='[.]Produces<object>|Results[.](Ok|Json|Created|Accepted)[(]new[ ]*[{]'
+while IFS= read -r added; do
+  [ -z "${added}" ] && continue
+  fail "Endpoint returns object/anonymous JSON — use a named Application-layer DTO (review-findings-ledger.md): ${added}"
+done < <(
+  git diff --unified=0 "${RANGE}" -- 'src/Axis.Api/Endpoints/*.cs' 2>/dev/null \
+    | awk -v pat="${ENDPOINT_OBJECT_PATTERN}" '
+        /^\+\+\+ b\// { file = substr($0, 7); next }
+        /^\+[^+]/ && $0 ~ pat { print file ": " substr($0, 2) }
+      '
+)
+
+# Endpoint orchestration guard (review-findings-ledger.md): a Minimal-API
+# endpoint handler must not call the mediator more than once — multiple sends
+# mean orchestration logic leaked into the endpoint (combine into one
+# command/handler or a saga). Full-state scan of endpoint handler methods
+# (those returning Task<IResult>); baseline is zero, so any new occurrence
+# fails. `.Send(`/`.Publish(` inside the Map* registration method (which returns
+# IEndpointRouteBuilder, not Task<IResult>) is never counted. Limit:
+# inline-lambda endpoints are not covered — the repo uses named handler methods.
+#
+# `[.]` `[(]` for literal punctuation (GNU awk mangles `\.`/`\(`).
+while IFS= read -r hit; do
+  [ -z "${hit}" ] && continue
+  fail "Endpoint handler calls the mediator more than once — move orchestration into a single command/handler or saga (review-findings-ledger.md): ${hit}"
+done < <(
+  for ep in src/Axis.Api/Endpoints/*.cs; do
+    [ -f "${ep}" ] || continue
+    awk -v file="${ep}" '
+      /Task<IResult>/ {
+        if (method != "" && cnt > 1) print file " :: " method " (" cnt " mediator calls)"
+        sig = $0; sub(/^[ \t]+/, "", sig); method = sig; cnt = 0; next
+      }
+      /[.]Send[(]|[.]Publish[(]/ { cnt++ }
+      END { if (method != "" && cnt > 1) print file " :: " method " (" cnt " mediator calls)" }
+    ' "${ep}"
+  done
+)
+
 # New OR renamed handler must have a matching test file.
 # Status A = added; R### = renamed (git emits `R100\tOLD\tNEW`).
 while IFS= read -r handler; do
