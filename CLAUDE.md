@@ -125,7 +125,7 @@ Skip for trivial single-file fixes and doc-only edits.
 This file keeps policy-level requirements only:
 
 - **Gate 0 policy:** no blank AC map rows for in-scope bullets; no happy-path-only completion claims.
-- **Gate 1 policy:** local verification must mirror CI scope (full `Axis.sln` for .NET, no solution filter).
+- **Gate 1 policy:** local verification must mirror CI scope (full `Axis.sln` for .NET, no solution filter) — **including the Testcontainers integration tests**. All tests (unit + integration) must pass before push; the pre-push hook runs `scripts/verify.sh` (Docker required for backend changes). There is no skip-integration mode; never rely on CI to catch integration failures and never use `--no-verify` to bypass the gate.
 
 **Gate 2** — docs in same PR ([agent-checklist.md § Gate 2](docs/playbooks/agent-checklist.md)). **Doc drift** — run script before push when code/use-cases change; CI job must be green.
 
