@@ -61,8 +61,8 @@ Present the dossier through **plan mode** and **do not write code until the user
 ## Close the loop (after implementing)
 
 1. **Self-review the diff against the dossier** — was every governing rule honored, every caller in the blast radius updated, the contract emitted as decided?
-2. **Run the gate plan at full scope** — the actual CI commands (`dotnet build` + `dotnet format --verify-no-changes` + full `dotnet test` + `npm run ci` + `npm test` + `./scripts/check-doc-drift.sh`), not a subset. "Build passed" ≠ "CI passed" — formatting, integration, and casing only surface in the full gate. See [agent-checklist § Gate 1](./agent-checklist.md) and [pr-slicing § Gate 1 honesty](./pr-slicing.md#gate-1-honesty).
-3. A green claim means you ran it. Anything you could not run (e.g. Testcontainers without Docker) is stated explicitly.
+2. **Run the gate plan at full scope** — the actual CI commands (`dotnet build` + `dotnet format --verify-no-changes` + full `dotnet test` **including the Testcontainers integration tests** + `npm run ci` + `npm test` + `./scripts/check-doc-drift.sh`), not a subset. `scripts/verify.sh` runs exactly this (no skip-integration mode); the pre-push hook runs it for you. "Build passed" ≠ "CI passed" — formatting, integration, and casing only surface in the full gate. See [agent-checklist § Gate 1](./agent-checklist.md) and [pr-slicing § Gate 1 honesty](./pr-slicing.md#gate-1-honesty).
+3. A green claim means you ran it — including the integration tests. Docker is required to push backend changes; "I skipped Testcontainers locally" is not an acceptable state for a backend PR. If Docker is genuinely unavailable, do not push the backend change until it can run.
 
 ---
 

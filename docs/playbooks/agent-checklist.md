@@ -120,7 +120,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 ### Gate 1 — verify before push (local = CI)
 
-**One command:** [`scripts/verify.sh`](../../scripts/verify.sh) mirrors the CI matrix below — `fast` (build + `dotnet format --verify` + frontend `ci`/test + drift; no Docker) or `full` (adds the Testcontainers test run, exactly like CI). It only runs the layers whose files changed. The committed **pre-push hook** runs `verify.sh fast` automatically (enable once: [`scripts/install-hooks.sh`](../../scripts/install-hooks.sh)). "Build passed" ≠ "CI passed" — `fast` surfaces format/charset, casing, and drift; **integration (Testcontainers) runs only in `full`**, so that class can still first appear in CI unless you run `verify.sh full` locally.
+**One command:** [`scripts/verify.sh`](../../scripts/verify.sh) mirrors the CI matrix below — build + `dotnet format --verify` + the **full `dotnet test` including Testcontainers integration tests** + frontend `ci`/test + drift. It only runs the layers whose files changed (so doc-only and frontend-only work stays quick and needs no Docker). **There is no skip-integration mode** — a backend change always runs its integration tests. The committed **pre-push hook** runs `verify.sh` automatically and **auto-wires itself on your first `dotnet build`** (MSBuild target sets `core.hooksPath`; skipped on CI; [`scripts/install-hooks.sh`](../../scripts/install-hooks.sh) sets it explicitly for frontend-only work), so **no backend change reaches a PR without its integration tests passing locally first**. Docker must be running for backend changes (Testcontainers) — `verify.sh` fails early with an actionable message if it is down.
 
 | Changed | Commands (all must pass when triggered) |
 |---------|----------------------------------------|
@@ -142,7 +142,7 @@ Gate 1 self-check:
 
 Example (docs-only): every line `not triggered — no src/, tests/, or frontend/ changes`.
 
-**Docker:** integration and API tests run as part of `dotnet test`; Docker must be available locally (same as CI runners with Testcontainers).
+**Docker:** integration and API tests run as part of `dotnet test`; Docker must be available locally (same as CI runners with Testcontainers). These tests are **required before push** — the pre-push hook runs them via `verify.sh`. There is no skip-integration mode; never use `--no-verify` to get a green-looking local run. A backend push without passing integration tests is exactly the quality gap this gate closes.
 
 ### Gate 2 — docs walk-through
 
