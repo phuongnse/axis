@@ -96,7 +96,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 | Gate | Action |
 |------|--------|
 | **0** | AC map + docs touched (when `src/`, `tests/`, or `frontend/` change) |
-| **1** | Full .NET + frontend verification (table below) |
+| **1** | Local fast verification (table below); CI/branch protection owns the full suite |
 | **2** | Doc walk-through (rows below) |
 | **3** | Retrospective (questions below) |
 
@@ -107,7 +107,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 - **Code-fence integrity** — [`scripts/check-doc-code-fences.py`](../../scripts/check-doc-code-fences.py) (inside the drift script) flags code-block lines with collapsed indentation (a lone leading space). Catches the bulk-find-replace corruption class that lychee, prettier, and the structural checks all let through.
 - **Use-case docs** — [`scripts/check-use-case-docs.py`](../../scripts/check-use-case-docs.py) validates use-case file structure (required sections + tables + status callout), flags template placeholders (`_(One sentence...)_`, `_(Actor)_`, `_(What starts...)_`), flags self-links `[name](./README.md)` and truncated summary rows in domain READMEs, and counts use cases still on the stock Main flow.
 - **Secret scanning** — TruffleHog scans the full PR diff for committed secrets (API keys, passwords, tokens) and verifies each finding against the alleged service before reporting (`--only-verified` cuts false positives).
-- **Vulnerable packages** — `dotnet list package --vulnerable --include-transitive` fails on any known CVE in the dep tree (covers transitive packages too).
+- **Vulnerable packages** — [`scripts/check-vulnerable-packages.sh`](../../scripts/check-vulnerable-packages.sh) wraps `dotnet list package --vulnerable --include-transitive` and fails on any known CVE in the dep tree (covers transitive packages too).
 - **Architecture fitness tests** run as part of `dotnet test` — failures there mean a CLAUDE.md P0/P1 rule got violated structurally. See [tests README](../../tests/Architecture/Axis.Architecture.Tests/README.md).
 - **EF migrations** — only `dotnet ef migrations add` (no hand-written `.cs` / orphan `.Designer.cs`). Each `{Name}.cs` needs `{Name}.Designer.cs`. See [local-dev.md § EF Core migrations](./local-dev.md#ef-core-migrations-dotnet-ef).
 - **Local dev docs** — [`docker-compose.yml`](../../docker-compose.yml) changes require [`docs/playbooks/local-dev.md`](./local-dev.md) in the same PR; CI runs [`scripts/check-local-dev-docs.py`](../../scripts/check-local-dev-docs.py).
@@ -118,13 +118,24 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 **Priority:** Gate **1** blocks commit (failing build/tests). Gate **2** keeps docs in the same PR — required before merge, not a substitute for Gate 1. The [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) lists Gate 1 before Gate 2.
 
-### Gate 1 — verify before push (local = CI)
+### Gate 1 — verify before push (fast local gate)
 
-**One command:** [`scripts/verify.sh`](../../scripts/verify.sh) mirrors the CI matrix below — build + `dotnet format --verify` + the **full `dotnet test` including Testcontainers integration tests** + frontend `ci`/test + drift. It only runs the layers whose files changed (so doc-only and frontend-only work stays quick and needs no Docker). **There is no skip-integration mode** — a backend change always runs its integration tests. The committed **pre-push hook** runs `verify.sh` automatically and **auto-wires itself on your first `dotnet build`** (MSBuild target sets `core.hooksPath`; skipped on CI; [`scripts/install-hooks.sh`](../../scripts/install-hooks.sh) sets it explicitly for frontend-only work), so **no backend change reaches a PR without its integration tests passing locally first**. Docker must be running for backend changes (Testcontainers) — `verify.sh` fails early with an actionable message if it is down.
+**One command:** [`scripts/verify.sh`](../../scripts/verify.sh) runs the fast local gate — build + vulnerable package scan + `dotnet format --verify` + **unit test projects only** + frontend `ci`/test + drift. It only runs the layers whose files changed (so doc-only and frontend-only work stays quick). Run [`scripts/bootstrap.sh`](../../scripts/bootstrap.sh) once to install the committed **pre-push hook** explicitly (`core.hooksPath = scripts/hooks`); build commands must not mutate Git config. CI/branch protection remains the authoritative full gate and runs full `dotnet test` including Testcontainers before merge.
+
+**Development loop vs enforcement:** while implementing, run the narrow check for the surface you are changing; do not repeatedly run `scripts/verify.sh` after every small edit. The pre-push hook runs `scripts/verify.sh` once as the local enforcement point, and CI/branch protection runs the full suite before merge.
+
+| During development | Prefer |
+|--------------------|--------|
+| Process/docs change | `./scripts/check-doc-drift.sh` or the specific doc guard named in its output |
+| Test classification / unit project change | `bash scripts/check-test-project-classification.sh` and `bash scripts/test-unit.sh` |
+| Frontend change | `npm run ci` and/or `npm run test` |
+| Backend compile-sensitive change | `dotnet build` or the directly affected test project |
+| Review fix touching a rule/guard | The specific guard for that rule, then rely on pre-push for the full fast gate |
 
 | Changed | Commands (all must pass when triggered) |
 |---------|----------------------------------------|
-| `src/` or `tests/` | `dotnet build` then `dotnet test` (full `Axis.sln` — includes Infrastructure, API, Testcontainers) |
+| `src/` or `tests/` | `dotnet build` then `bash scripts/test-unit.sh` (auto-discovers `*.Domain.Tests` and `*.Application.Tests`) |
+| `src/`, `tests/`, dependency props, or API contract | `bash scripts/check-vulnerable-packages.sh` |
 | `src/` or `tests/` | `dotnet format --verify-no-changes` |
 | `frontend/` | `npm run ci` then `npm run test` |
 | `src/Axis.Api/Endpoints/` or API contract | Update + run `tests/Api/Axis.Api.Tests/` |
@@ -134,7 +145,8 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 ```text
 Gate 1 self-check:
 - dotnet build → ran / not triggered (reason)
-- dotnet test (full solution) → ran / not triggered (reason)
+- vulnerable package scan → ran / not triggered (reason)
+- unit test projects → ran / not triggered (reason)
 - dotnet format --verify-no-changes → ran / not triggered (reason)
 - npm run ci + npm run test → ran / not triggered (reason)
 - ./scripts/check-doc-drift.sh → ran / not triggered (reason)
@@ -142,7 +154,7 @@ Gate 1 self-check:
 
 Example (docs-only): every line `not triggered — no src/, tests/, or frontend/ changes`.
 
-**Docker:** integration and API tests run as part of `dotnet test`; Docker must be available locally (same as CI runners with Testcontainers). These tests are **required before push** — the pre-push hook runs them via `verify.sh`. There is no skip-integration mode; never use `--no-verify` to get a green-looking local run. A backend push without passing integration tests is exactly the quality gap this gate closes.
+**Full suite:** integration and API tests run in CI as part of full `dotnet test`; Docker/Testcontainers is required there. Run full local `dotnet test Axis.sln --nologo` when debugging CI, changing Infrastructure/API behavior, or preparing a high-risk backend PR. For Docker through WSL2, either `docker info` must work in the shell running the full suite, or `DOCKER_HOST` must point at a reachable daemon (for example `tcp://localhost:2375`).
 
 ### Gate 2 — docs walk-through
 
@@ -241,7 +253,7 @@ Updating only `PROGRESS.md` while changing `src/` without `docs/use-cases/` → 
 - Frontend screen → wireframe row in use-case `## Wireframes` table (every `*.excalidraw` **screen** in the folder; use `## Screen flow` + `#`/`Role` columns when >3 screens — [docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--wireframes--implementation-status), example [register-org](../use-cases/platform-foundation/register-org/README.md))
 - Use-case diagram → row only if the `.excalidraw` lives **in that use-case folder**; link other use cases in `**Related:**` prose, not in `## Diagrams` table
 - No `.Skip()`, weakened tests, or ✅ when ACs are open
-- **Full solution only:** always `dotnet build` + `dotnet test` on `Axis.sln` (no solution filter)
+- **Full suite honesty:** local pre-push uses the fast Gate 1 command matrix; CI/branch protection runs full `dotnet test Axis.sln`. If you claim the full suite ran locally, it must be full `Axis.sln` with integration/API tests, not a solution filter or unit-only run.
 
 ---
 

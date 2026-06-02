@@ -63,7 +63,7 @@ Repeat for every user story, in layer order: Domain → Application → Infrastr
 
 1. Implement `IEntityTypeConfiguration<T>` — Fluent API only, no Data Annotations
 2. Implement repository — `AsNoTracking()` on reads, tracked queries on writes
-3. Run `dotnet ef migrations add {PascalCaseName}` — **never hand-write** migration files; use the module Infrastructure project as both `--project` and `--startup-project` when a `*DbContextFactory` exists ([local-dev.md § EF Core migrations](./local-dev.md#ef-core-migrations-dotnet-ef)). In agent shells set `DOTNET_ROOT=$HOME/.dotnet` if `dotnet ef` is missing.
+3. Run `dotnet ef migrations add {PascalCaseName}` — **never hand-write** migration files; use the module Infrastructure project as both `--project` and `--startup-project` when a `*DbContextFactory` exists ([local-dev.md § EF Core migrations](./local-dev.md#ef-core-migrations-dotnet-ef)). `dotnet ef` must resolve from `PATH`; if it is missing, fix the SDK/tool installation before generating migrations.
 4. Verify the migration has a paired `.Designer.cs`; run integration tests against Testcontainers PostgreSQL
 5. Run `dotnet test` (full `Axis.sln`) — still green
 

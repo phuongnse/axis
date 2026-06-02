@@ -1,15 +1,11 @@
 #!/usr/bin/env bash
-# Pre-push gate: runs the full local mirror of CI before any push — build,
-# format, frontend, doc drift AND the Testcontainers integration tests — so no
-# backend change reaches a PR without its integration tests having passed
-# locally first. Catches the "build passed locally but CI failed" class AND the
-# integration-only failures that used to first appear in CI. There is no
-# skip-integration mode.
+# Pre-push gate: runs fast local checks before any push - build, vulnerable
+# package scan, format, unit tests, frontend, and doc drift.
 #
-# Requires a running Docker daemon when backend files changed (Testcontainers).
-# verify.sh fails early with an actionable message if Docker is down.
+# CI remains the authoritative full gate and runs the Testcontainers-backed
+# Infrastructure/API tests before merge.
 #
 # Enable once:  git config core.hooksPath scripts/hooks   (or: scripts/install-hooks.sh)
-# Bypass is reserved for genuine emergencies, never to skip failing tests:
-#   git push --no-verify   (justify it; CI still runs the same gate)
+# Emergency escape hatch remains Git's standard:
+#   git push --no-verify   (justify it; CI still runs the full gate)
 exec "$(git rev-parse --show-toplevel)/scripts/verify.sh"

@@ -111,6 +111,12 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
 
+      - name: Vulnerable packages
+        run: bash ./scripts/check-vulnerable-packages.sh
+
+      - name: Test project classification
+        run: bash ./scripts/check-test-project-classification.sh
+
       - name: Build
         run: dotnet build --no-restore
 
@@ -125,6 +131,9 @@ jobs:
           dotnet test --no-build --verbosity normal
           --logger "trx;LogFileName=test-results.trx"
           --results-directory ${{ github.workspace }}/TestResults
+          --collect:"XPlat Code Coverage"
+          --
+          DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
 
       # Upload TRX even on failure so PR annotations + post-mortem work.
       - name: Upload test results
@@ -133,6 +142,14 @@ jobs:
         with:
           name: dotnet-test-results
           path: ${{ github.workspace }}/TestResults/**/*.trx
+          retention-days: 14
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dotnet-coverage
+          path: ${{ github.workspace }}/TestResults/**/coverage.cobertura.xml
           retention-days: 14
 
   frontend:
@@ -268,4 +285,3 @@ jobs:
           base: ${{ github.event.pull_request.base.sha }}
           head: ${{ github.event.pull_request.head.sha }}
           extra_args: --only-verified
-

@@ -3,5 +3,23 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 git config core.hooksPath scripts/hooks
-chmod +x scripts/hooks/* scripts/verify.sh 2>/dev/null || true
-echo "Installed: core.hooksPath = scripts/hooks (pre-push runs scripts/verify.sh — all tests incl. Testcontainers; Docker required for backend changes)."
+
+required_files=(
+  scripts/hooks/pre-push
+  scripts/verify.sh
+  scripts/bootstrap.sh
+  scripts/check-vulnerable-packages.sh
+  scripts/check-test-project-classification.sh
+  scripts/test-unit.sh
+)
+
+chmod +x "${required_files[@]}"
+
+for file in "${required_files[@]}"; do
+  if [ ! -x "${file}" ]; then
+    echo "install-hooks: ${file} is not executable after chmod" >&2
+    exit 1
+  fi
+done
+
+echo "Installed: core.hooksPath = scripts/hooks (pre-push runs scripts/verify.sh - fast local gate; CI runs the full Testcontainers suite)."
