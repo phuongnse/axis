@@ -102,6 +102,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 **CI-only gates** (run automatically on PR, no local action required):
 
+- **PR body guard** — [`scripts/check-pr-body.py`](../../scripts/check-pr-body.py) validates that the PR body keeps the template contract: `Summary`, `Linked spec`, and `Requirements & rules followed` are present; requirement checkboxes are checked or explicitly marked `N/A` with a concrete reason. The template in [`.github/PULL_REQUEST_TEMPLATE.md`](../../.github/PULL_REQUEST_TEMPLATE.md) auto-fills the body; this CI job is the enforcement.
 - **Doc drift** — enforces same-PR docs, new-handler tests, no-new TODO/FIXME, new raw-SQL review, [WORKAROUND comment ↔ inventory sync](../WORKAROUNDS.md), [speculation guard](./docs-style.md#anti-patterns-dont-ship-these), [incident/lesson framing guard](./docs-style.md#keep-practice-docs-general), `GetAwaiter().GetResult()` ban, hardcoded connection-string ban, `DateTime.Now` ban (use `UtcNow`), and a stale-terminology guard (current pattern list lives in [`scripts/check-doc-drift.sh`](../../scripts/check-doc-drift.sh) — search for `STALE_TERM_PATTERN`). **Module/API → use-case domain** — [`doc_drift_domains.py`](../../scripts/doc_drift_domains.py) + [`axis_repo.py`](../../scripts/axis_repo.py). **Layout drift** in the same job: [`sync_buf_yaml.py --check`](../../scripts/sync_buf_yaml.py), [`check_kafka_wiring.py`](../../scripts/check_kafka_wiring.py), [`regenerate-domain-readme-index.py --check`](../../scripts/regenerate-domain-readme-index.py).
 - **Markdown link check** — `lychee` verifies internal links and `#anchors`. **Relative file/image targets** (`![alt](./asset.svg)`, `[text](./file.md)`) are double-checked by [`scripts/check-doc-link-targets.py`](../../scripts/check-doc-link-targets.py) inside the drift script — catches the broken-image class lychee misses.
 - **Code-fence integrity** — [`scripts/check-doc-code-fences.py`](../../scripts/check-doc-code-fences.py) (inside the drift script) flags code-block lines with collapsed indentation (a lone leading space). Catches the bulk-find-replace corruption class that lychee, prettier, and the structural checks all let through.
@@ -214,7 +215,7 @@ Gate 3:
 - Repeat of a prior review finding class? → No
 ```
 
-If the last line is **Yes**, record the class in [review-findings-ledger.md](../review-findings-ledger.md): point it at a mechanism (analyzer / fitness test / codegen / CI guard) or mark it deliberately manual with a reason. A finding class should be reviewed once, then prevented — not re-flagged every PR.
+If the last line is **Yes**, record the class in [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md): point it at a mechanism (analyzer / fitness test / codegen / CI guard) or mark it deliberately manual with a reason. A finding class should be reviewed once, then prevented — not re-flagged every PR.
 
 ---
 

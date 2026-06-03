@@ -1,6 +1,6 @@
 # Axis — Project Context for Claude
 
-> **Agents:** [agent-checklist.md](docs/playbooks/agent-checklist.md) for gates during work; [PR template](.github/PULL_REQUEST_TEMPLATE.md) for description (**Summary + Requirements** only.
+> **Agents:** [agent-checklist.md](docs/playbooks/agent-checklist.md) for gates during work; [PR template](.github/PULL_REQUEST_TEMPLATE.md) for description (**Summary + Linked spec + Requirements** only; enforced by CI job **PR body guard**).
 
 ## Contents
 
@@ -212,7 +212,7 @@ Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` chan
 | [TECH_STACK.md](docs/TECH_STACK.md) | Libraries + ADRs |
 | [PROGRESS.md](docs/PROGRESS.md) | Module layer status |
 | [WORKAROUNDS.md](docs/WORKAROUNDS.md) | Intentional rule violations + cleanup triggers (**read when touching legacy or shipping a known shortcut**) |
-| [review-findings-ledger.md](docs/review-findings-ledger.md) | Recurring review finding classes → the gate that prevents each (or why manual); wired to Gate 3 |
+| [REVIEW_FINDINGS.md](docs/REVIEW_FINDINGS.md) | Recurring review finding classes → the gate that prevents each (or why manual); wired to Gate 3 |
 | [docs/playbooks/visual-artifact-checklist.md](docs/playbooks/visual-artifact-checklist.md) | **Required when changing diagrams/wireframes/use-case visuals** |
 | [Architecture tests README](tests/Architecture/Axis.Architecture.Tests/README.md) | What's mechanically enforced + how to add a new rule |
 | [docs/use-cases/](docs/use-cases/README.md) | Features + ACs |
