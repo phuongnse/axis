@@ -438,7 +438,7 @@ export function authCard(screenW, screenH, prefix, { title, subtitle = null, ite
   return { els, files };
 }
 
-/** Default register-org entry fields (email/password path). */
+/** Default register-org entry fields (organization onboarding only). */
 export const REGISTER_ORG_ENTRY_FIELDS = [
   {
     kind: 'input',
@@ -451,35 +451,11 @@ export const REGISTER_ORG_ENTRY_FIELDS = [
   { kind: 'slug', err: null },
   {
     kind: 'input',
-    label: 'Admin full name',
-    value: 'Alex Brown',
+    label: 'Organization contact email',
+    value: 'admin@company.com',
     err: null,
     required: true,
-    helpText: 'Your name as the organization administrator.',
-  },
-  {
-    kind: 'input',
-    label: 'Email address',
-    value: 'you@company.com',
-    err: null,
-    required: true,
-    helpText: 'We send a verification link to this address.',
-  },
-  {
-    kind: 'password',
-    label: 'Password',
-    value: '••••••••',
-    err: null,
-    required: true,
-    passwordCriteria: PASSWORD_CRITERIA_MET,
-  },
-  {
-    kind: 'password',
-    label: 'Confirm password',
-    value: '••••••••',
-    err: null,
-    required: true,
-    helpText: 'Must match the password above.',
+    helpText: 'Use an official organization mailbox. User sign-in is set up later.',
   },
 ];
 
@@ -513,36 +489,3 @@ export function paintRegisterOrgEntryFields(els, idPrefix, cardX, y, cardW, fiel
 /**
  * Post-OAuth register-org complete fields; returns y after terms row.
  */
-export function paintRegisterOrgCompleteFields(els, idPrefix, cardX, y, cardW, {
-  orgName = 'Acme Corp',
-  orgErr = null,
-  terms = { checked: true },
-} = {}) {
-  let fy = y;
-  const { els: emailEls, blockH: emailH } = authReadOnlyValueField(
-    `${idPrefix}_email`, cardX, fy, cardW, 'Email address', 'alex@company.com', false,
-    'From your sign-in provider; cannot be changed here.');
-  els.push(...emailEls);
-  fy += emailH;
-
-  const { els: nameEls, blockH: nameH } = authFormField(
-    `${idPrefix}_name`, cardX, fy, cardW, 'Admin full name', 'Alex Brown', null, true,
-    'Pre-filled from your provider; you may edit it.');
-  els.push(...nameEls);
-  fy += nameH;
-
-  const { els: orgEls, blockH: orgH } = authFormField(
-    `${idPrefix}_org`, cardX, fy, cardW, 'Organization name', orgName, orgErr, true, REGISTER_ORG_ORG_NAME_HELP);
-  els.push(...orgEls);
-  fy += orgH;
-
-  const { els: slugEls, blockH: slugH } = authSlugPreviewField(`${idPrefix}_slug`, cardX, fy, cardW);
-  els.push(...slugEls);
-  fy += slugH;
-
-  const { els: termsEls, blockH: termsH } = authTermsRow(`${idPrefix}_terms`, cardX, fy, cardW, terms);
-  els.push(...termsEls);
-  fy += termsH;
-  return fy;
-}
-

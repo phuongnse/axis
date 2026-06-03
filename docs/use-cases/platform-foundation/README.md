@@ -25,7 +25,7 @@ Ship first — tenant registration, isolation, and subscription plans are prereq
 | Use case | Summary |
 |---|---|
 | [Select a subscription plan during registration](plan-at-signup/) | Choose a subscription plan during registration so that I know what features and limits I have access to. |
-| [Register a new organization](register-org/) | Register my organization on the Axis platform — with email/password or Microsoft, Google, or GitHub — confirm my inbox… |
+| [Register a new organization](register-org/) | Register an organization on the Axis platform with an official organization contact email, verify that contact channel… |
 
 ### Subscription plans
 
@@ -56,13 +56,13 @@ Ship first — tenant registration, isolation, and subscription plans are prereq
 
 ## Diagrams
 
-Registration journey (sign-up → verify → provisioning): [register-org § Diagrams](./register-org/README.md#diagrams) (`register-org-journey`, `tenant-provisioning`).
+Organization onboarding journey (org contact email → verify → provisioning): [register-org § Diagrams](./register-org/README.md#diagrams) (`register-org-journey`, `tenant-provisioning`). User identity setup continues in [identity-access/register-user](../identity-access/register-user/).
 
 ---
 
 ## Acceptance Criteria (domain)
 
-- [ ] A new organization can register and be fully provisioned (own schema, admin account) within 60 seconds.
+- [ ] A new organization can register and be fully provisioned with isolated tenant schemas after organization email verification.
 - [ ] No tenant can read or write data belonging to another tenant under any circumstances.
 - [ ] Tenant schema is automatically created and migrated on registration.
 - [ ] Organization can update its profile (name, logo, settings) without affecting other tenants.
@@ -76,7 +76,7 @@ Registration journey (sign-up → verify → provisioning): [register-org § Dia
 | Shared Domain | ✅ Done | `Entity`, `AggregateRoot`, `ValueObject`, `IDomainEvent`, `Result<T>` |
 | Shared Application | ✅ Done | `ICommand/IQuery`, `ICommandHandler/IQueryHandler`, `ValidationBehavior`, `ITenantContext` |
 | Shared Infrastructure | ✅ Done | `TenantSchemaInterceptor`, per-module `UnitOfWork` ([ADR-017](../../TECH_STACK.md#adr-017-axisshared-is-abstractions-only-no-shared-implementation)); **OpenTelemetry** host wiring on `Axis.Api` ([ADR-018](../../TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability), [patterns § OpenTelemetry](../../playbooks/patterns.md#opentelemetry-observability)) |
-| [Register org](register-org/) | ⚠️ Partial | Signup, verify, and tenant provisioning backend largely done; Frontend journey steps 3–4 shipped (confirmation, verify, provisioning poll); Terms/OAuth + register-org-complete ⏳ |
+| [Register org](register-org/) | ⚠️ Partial | Organization onboarding needs refactor: organization contact email + org verification + tenant provisioning stay here; user account registration and third-party providers move to [identity-access/register-user](../identity-access/register-user/). |
 | [Subscription plans](view-plans/) | ✅ Done | `GET /api/plans`, pricing data, 402 limits — see [enforce limits](enforce-limits/). Frontend pricing UI ⏳ |
 | [Tenant isolation](tenant-scope/) | ✅ Done | `TenantSchemaInterceptor`, `TenantOrganizationAccessMiddleware`, cross-tenant API tests |
 | [Organization management](org-profile/) | ✅ Done | Profile, settings + usage, scheduled deletion + hard-delete job ✅. Frontend settings UI ⏳ |
@@ -89,7 +89,7 @@ Registration journey (sign-up → verify → provisioning): [register-org § Dia
 | Priority | Item | Where |
 |----------|------|--------|
 | **Backend** | ✅ platform-foundation backend use cases complete. Optional: bulk workflow import when product needs [bulk export](../workflow-builder/bulk-export/) AC | [enforce-limits/](enforce-limits/) |
-| Frontend | [Register org](register-org/) (full journey wireframes), [pricing](view-plans/), [org settings](org-settings/) | see **Use Cases** table above |
+| Frontend | [Register org](register-org/) organization onboarding, [pricing](view-plans/), [org settings](org-settings/) | see **Use Cases** table above |
 
 Domain-level checkboxes above remain spec-only; status is in use-case **Implementation status** callouts.
 

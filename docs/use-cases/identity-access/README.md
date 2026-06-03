@@ -54,6 +54,12 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 | [Switch application language (English / Vietnamese)](language/) | Switch the application language between English and Vietnamese so that I can read and operate the app in my preferred… |
 | [Switch visual theme (light / dark / system)](theme/) | Switch the visual theme between light, dark, and system so that I can choose a comfortable theme and preserve readable… |
 
+### Other
+
+| Use case | Summary |
+|---|---|
+| [Register a user account](register-user/) | Register my user identity with email/password or Microsoft, Google, or GitHub so that I can join an existing… |
+
 
 
 ---
@@ -96,10 +102,10 @@ See [Auth flow](./sign-in/README.md#auth-flow) (Mermaid).
 | Infrastructure | ✅ Done | `IdentityDbContext` (public schema), EF Core mappings, all repositories, `BCryptPasswordHasher` (work factor 12), `MailKitEmailSender`, `IdentityUnitOfWork` (maps domain events → Avro integration events on save), `PasswordResetTokenStore`, `SessionStoreService` (wraps `IOpenIddictTokenManager`), `OpenIddictSeeder`. `IdentityGrpcService` exposes `GetUserPermissions` ([ADR-014](../../TECH_STACK.md#adr-014-grpc-for-internal-sync-rpc-and-rest-openapi-for-external-api)). `IdentityEventMapper` translates 5 domain events to Avro records published via Wolverine outbox → Kafka (ADR-019). |
 | Contracts | ✅ Done | `Axis.Identity.Contracts` — `Protos/axis/identity/v1/identity_service.proto` (`GetUserPermissions`) + 5 Avro schemas (`OrganizationVerifiedEvent`, `UserDeactivatedEvent`, `UserReactivatedEvent`, `RoleAssignedEvent`, `RoleRemovedEvent`) with hand-written `ISpecificRecord` generated code + `IdentityKafkaTopics` + `IdentityEventExtensions` (typed GUID accessors). |
 | API | ✅ Done | OpenIddict 5.x OAuth2/OIDC server: `GET /connect/authorize` (PKCE), `POST /connect/login` (credential validation + session cookie), `POST /connect/token` (code exchange, refresh, client credentials). `POST /api/auth/signout` (revoke refresh token + JTI blacklist). Refresh token delivered as httpOnly `Secure SameSite=Strict` cookie via `ApplyRefreshTokenCookieHandler`; extracted from cookie on refresh via `ExtractRefreshTokenFromCookieHandler`. Permission-based authorization via `PermissionPolicyProvider` + `OpenIddictValidationAspNetCore`. JTI Redis blacklist. `POST /api/auth/verify-email` consumes the one-time token, marks the email verified, and establishes a sign-in session so the SPA can complete PKCE without re-entering credentials (`VerifyEmailHandler` → `VerifyEmailSuccessDto`). `POST /api/auth/retry-provisioning` re-queues failed tenant module provisioning for a verification token (`RetryTenantProvisioningHandler`). Integration-tested with WebApplicationFactory + Testcontainers (PKCE full-flow helpers in `AuthHelper`). User/role/session/settings endpoints return typed DTOs (`CreatedResponse`, `MessageResponse`, `UserSessionResponse`) — no anonymous `object`. |
-| Frontend | ⚠️ Partial | Login (PKCE), app shell, dashboard scaffold on PR #50; settings/invitation/session flows and multi-tab refresh still pending. tenant registration use case register page is shipped under Platform Foundation docs. Register-org post-submit journey screens (email confirmation + resend, verify-email states, workspace-provisioning poll) live in `features/auth`; spec owned by [platform-foundation/register-org](../platform-foundation/register-org/). Register form records accepted Terms/Privacy versions and shows a debounced slug preview (`GET /api/legal/versions`, `GET /api/organizations/slug-preview`). After verify-email, the SPA runs PKCE from the callback and redirects to workspace provisioning (`completePostVerifyPkceFlow` → `/callback` → `/provisioning`). |
+| Frontend | ⚠️ Partial | Login (PKCE), app shell, dashboard scaffold on PR #50; settings/invitation/session flows and multi-tab refresh still pending. Organization registration screens are owned by [platform-foundation/register-org](../platform-foundation/register-org/); user registration and external-provider account setup are owned by [register-user](./register-user/). After org/user verification, the SPA runs PKCE from the callback and redirects to workspace provisioning (`completePostVerifyPkceFlow` → `/callback` → `/provisioning`). |
 
 **Key implementation decisions:**
-- Identity uses the global `public` PostgreSQL schema (not a tenant schema) — registration has no tenant context and email uniqueness is platform-wide.
+- Identity uses the global `public` PostgreSQL schema (not a tenant schema). User email uniqueness is platform-wide; organization contact email belongs to [platform-foundation/register-org](../platform-foundation/register-org/).
 - Passwords are hashed with BCrypt (work factor 12) via `IPasswordHasher`. The hash is stored as a first-class property on `User` (`PasswordHash`), not a shadow property.
 - The 4 default system roles (Admin, Editor, Viewer, End User) and their full permission sets are seeded automatically by `RegisterOrganizationHandler` — see [api-permissions](./api-permissions/) and [ui-permissions](./ui-permissions/) for the permission catalogue.
 - **OpenIddict implementation**: OpenIddict 5.x serves as the in-process OAuth2/OIDC authorization server (ADR-004). Authorization Code + PKCE for the SPA; Client Credentials for M2M. Refresh tokens are stored as opaque reference tokens in the OpenIddict `OpenIddictTokens` table and delivered via httpOnly cookie. Access token JTIs are blacklisted in Redis on sign-out. Ephemeral signing/encryption keys are used in development; production should use Azure Key Vault certificates.
@@ -113,7 +119,7 @@ See [Auth flow](./sign-in/README.md#auth-flow) (Mermaid).
 | Area | Status | Detail |
 |------|--------|--------|
 | **Backend** | ⚠️ polish | [reset-password](./reset-password/), [change-password](./change-password/), [sessions](./sessions/): rate limits, session list API wiring. [api-permissions](./api-permissions/): `[RequirePermission]` / policy tests. [invite-user](./invite-user/): block admin self-invite at API. |
-| **Frontend** | ⏳ | Register, settings, invitation accept, session management UI, and localization/theming foundation — see per–use-case callouts in [sign-in](./sign-in/), [accept-invite](./accept-invite/), [sessions](./sessions/), [language](./language/), [theme](./theme/). |
+| **Frontend** | ⏳ | User registration, settings, invitation accept, session management UI, and localization/theming foundation — see per–use-case callouts in [register-user](./register-user/), [sign-in](./sign-in/), [accept-invite](./accept-invite/), [sessions](./sessions/), [language](./language/), [theme](./theme/). |
 
 Core auth/OIDC/RBAC backend is ✅; use feature **Gaps vs spec** for the next use case, not domain-level checkboxes.
 

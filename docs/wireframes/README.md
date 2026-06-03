@@ -143,11 +143,10 @@ Auth / registration form?
 
 | Screen | Generator | Blocks used |
 |--------|-----------|-------------|
-| `register-org` | `genRegisterOrg` | SSO, `paintRegisterOrgEntryFields`, terms, submit/footer |
-| `register-org-complete` | `genRegisterOrgComplete` | `paintRegisterOrgCompleteFields` |
-| `*-states` | `registerOrgStatePanel` / `drawPanel` | Same painters + validation copy on fields |
+| `register-org` | `genRegisterOrg` | Organization fields, terms, submit/footer |
+| `register-org-states` | `registerOrgStatePanel` / `drawPanel` | Same painter + validation copy on fields |
 
-When adding a field to register-org: add `{ label, value, helpText, … }` to `REGISTER_ORG_ENTRY_FIELDS` (or complete painter), not new rects in `generate-screens.mjs`.
+When adding a field to register-org: add `{ label, value, helpText, … }` to `REGISTER_ORG_ENTRY_FIELDS`, not new rects in `generate-screens.mjs`. External-provider / user identity screens belong to `identity-access/register-user`, not `platform-foundation/register-org`.
 
 ### Kit demo
 

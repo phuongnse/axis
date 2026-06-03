@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Axis Screen Wireframes — generate-screens.mjs
  * Run: node docs/wireframes/generate-screens.mjs
  *
@@ -10,8 +10,7 @@
  *
  * Screens generated:
  *   app-shell (root)
- *   platform-foundation: register-org, register-org-complete, register-org-complete-states,
- *        register-org-states, register-org-provider-states,
+ *   platform-foundation: register-org, register-org-states,
  *        email-confirmation, verify-email-states, workspace-provisioning,
  *        pricing, settings-org, settings-org-upload-states, settings-org-profile-states,
  *        settings-org-usage-error, settings-org-free-plan, settings-org-access-denied,
@@ -52,16 +51,13 @@ import {
   AUTH_CARD_W,
   AUTH_CARD_PAD_X,
   AUTH_INNER_W,
-  AUTH_EXTERNAL_SIGN_IN_BLOCK_H,
   AUTH_HEADER_H,
-  AUTH_HEADER_H_SUBTITLE,
   AUTH_CARD_FOOTER_ZONE,
   AUTH_FIELD_STACK_GAP,
   AUTH_SUBMIT_AFTER_GAP,
   measureAuthCardHeight,
   authScreenCanvasHeight,
   buildAxisLogo,
-  placeAuthExternalSignIn,
   buildAuthCardBrandBar,
   buildAuthCardHeader,
   buildAuthCardFooter,
@@ -77,7 +73,6 @@ import {
   REGISTER_ORG_ENTRY_FIELDS,
   PASSWORD_CRITERIA_PARTIAL,
   paintRegisterOrgEntryFields,
-  paintRegisterOrgCompleteFields,
 } from './blocks.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -128,12 +123,6 @@ const SCREEN_USE_CASE_OVERRIDES = {
     'platform-foundation/register-org/register-org.excalidraw',
   'platform-foundation/register-org-states.excalidraw':
     'platform-foundation/register-org/register-org-states.excalidraw',
-  'platform-foundation/register-org-complete.excalidraw':
-    'platform-foundation/register-org/register-org-complete.excalidraw',
-  'platform-foundation/register-org-complete-states.excalidraw':
-    'platform-foundation/register-org/register-org-complete-states.excalidraw',
-  'platform-foundation/register-org-provider-states.excalidraw':
-    'platform-foundation/register-org/register-org-provider-states.excalidraw',
   'platform-foundation/email-confirmation.excalidraw':
     'platform-foundation/register-org/email-confirmation.excalidraw',
   'platform-foundation/email-confirmation-states.excalidraw':
@@ -267,8 +256,8 @@ function genAppShell() {
 // ─── platform-foundation Platform Foundation ─────────────────────────────────────────────────
 
 /**
- * Register-Org — self-service org registration (email/password + ADR-027 providers).
- * SSO buttons, email form, auto-generated slug, Terms/Privacy acceptance.
+ * Register-Org — organization onboarding only.
+ * Organization contact email, auto-generated slug, Terms/Privacy acceptance.
  */
 function genRegisterOrg() {
   const cardW = AUTH_CARD_W;
@@ -284,9 +273,6 @@ function genRegisterOrg() {
   const header = buildAuthCardHeader('ro', cardX, cardY, cardW, 'Create your organization');
   contentEls.push(...header.els);
   wireFiles = mergeExcalidrawFiles(wireFiles, header.files);
-  contentEls.push(...placeAuthExternalSignIn(cardX + AUTH_CARD_PAD_X, y));
-  y += AUTH_EXTERNAL_SIGN_IN_BLOCK_H + AUTH_FIELD_STACK_GAP;
-
   y = paintRegisterOrgEntryFields(contentEls, 'ro', cardX, y, cardW, REGISTER_ORG_ENTRY_FIELDS);
 
   const { els: termsEls, blockH: termsH } = authTermsRow('ro_terms', cardX, y, cardW, { checked: true });
@@ -310,45 +296,6 @@ function genRegisterOrg() {
   write('platform-foundation/register-org.excalidraw', els, wireFiles);
 }
 
-/**
- * Register-Org complete — post-OAuth step (ADR-027). Org name + Terms collected here;
- * email read-only from provider; admin name pre-filled and editable.
- */
-function genRegisterOrgComplete() {
-  const cardW = AUTH_CARD_W;
-  const cardX = Math.round((W - cardW) / 2);
-  const cardY = 40;
-  const headerH = AUTH_HEADER_H_SUBTITLE;
-  const els = [];
-
-  const contentEls = [];
-  let wireFiles = {};
-  const rocHeader = buildAuthCardHeader(
-    'roc', cardX, cardY, cardW, 'Finish setting up your organization', 'Signed in with Microsoft');
-  contentEls.push(...rocHeader.els);
-  wireFiles = mergeExcalidrawFiles(wireFiles, rocHeader.files);
-
-  let y = cardY + headerH;
-  y = paintRegisterOrgCompleteFields(contentEls, 'roc', cardX, y, cardW);
-  y += AUTH_FIELD_STACK_GAP;
-
-  contentEls.push(...buildAuthSubmitButton('roc', cardX, y, cardW, 'Create organization'));
-  y += 36 + AUTH_SUBMIT_AFTER_GAP;
-
-  const cardH = measureAuthCardHeight(cardY, y, contentEls);
-  const screenH = authScreenCanvasHeight(cardY, cardH, H);
-
-  els.push(rect('roc_bg', 0, 0, W, screenH, C.gray300, C.gray100, 1, false));
-  els.push(rect('roc_card', cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
-  els.push(...contentEls);
-  els.push(...buildAuthCardFooter('roc', cardX, cardY, cardW, cardH, '← Back to registration'));
-
-  write('platform-foundation/register-org-complete.excalidraw', els, wireFiles);
-}
-
-/**
- * Register-Org complete — validation states (org name, terms) after external sign-in.
- */
 /** Dual-panel auth states: measure content, align card heights, paint back-to-front. */
 function flushDualAuthStatePanels(els, panels) {
   const maxCardH = Math.max(...panels.map((p) => p.card.cardH));
@@ -358,79 +305,6 @@ function flushDualAuthStatePanels(els, panels) {
     els.push(...p.contentEls);
   }
   return maxCardH;
-}
-
-function buildRegisterOrgCompleteStatePanel({ id, x, y0, panelW, lbl, orgErr, terms }) {
-  const cardY = y0 + 28;
-  const prefix = `rocs_${id}`;
-  const contentEls = [];
-
-  const panelHeader = buildAuthCardHeader(
-    prefix, x, cardY, panelW, 'Finish setting up your organization', 'Signed in with Google');
-  contentEls.push(...panelHeader.els);
-
-  let fy = cardY + AUTH_HEADER_H_SUBTITLE;
-  fy = paintRegisterOrgCompleteFields(contentEls, prefix, x, fy, panelW, {
-    orgName: orgErr ? 'A' : 'Acme Corp',
-    orgErr,
-    terms,
-  });
-  fy += AUTH_FIELD_STACK_GAP;
-  contentEls.push(...buildAuthSubmitButton(prefix, x, fy, panelW, 'Create organization'));
-  fy += 36 + AUTH_SUBMIT_AFTER_GAP;
-
-  const cardH = measureAuthCardHeight(cardY, fy, contentEls);
-
-  return {
-    files: panelHeader.files,
-    lbl: { id: `${prefix}_lbl`, x, y: y0, panelW, text: lbl, color: C.danger },
-    card: { id: `${prefix}_card`, x, y: cardY, panelW, cardH },
-    contentEls,
-  };
-}
-
-function genRegisterOrgCompleteStates() {
-  const els = [];
-  let wireFiles = {};
-  const panelW = 520;
-  const gap = 40;
-  const startX = Math.round((W - (panelW * 2 + gap)) / 2);
-  const y0 = 48;
-  const cardY = y0 + 28;
-
-  const panels = [
-    buildRegisterOrgCompleteStatePanel({
-      id: 'val',
-      x: startX,
-      y0,
-      panelW,
-      lbl: 'Organization name validation',
-      orgErr: 'Must be between 2 and 100 characters.',
-      terms: { checked: true },
-    }),
-    buildRegisterOrgCompleteStatePanel({
-      id: 'terms',
-      x: startX + panelW + gap,
-      y0,
-      panelW,
-      lbl: 'Terms not accepted',
-      orgErr: null,
-      terms: { checked: false, errorMsg: 'You must accept the Terms of Service and Privacy Policy.' },
-    }),
-  ];
-
-  const maxCardH = Math.max(...panels.map((p) => p.card.cardH));
-  const screenH = authScreenCanvasHeight(cardY, maxCardH, H);
-
-  els.push(rect('rocs_bg', 0, 0, W, screenH, C.gray300, C.gray100, 1, false));
-  els.push(text('rocs_pg', 0, 16, W, 20,
-    'Post-OAuth completion — validation', 13, C.gray500, 'center'));
-  flushDualAuthStatePanels(els, panels);
-  for (const p of panels) {
-    wireFiles = mergeExcalidrawFiles(wireFiles, p.files);
-  }
-
-  write('platform-foundation/register-org-complete-states.excalidraw', els, wireFiles);
 }
 
 function buildRegisterOrgStatePanel({ id, x, y0, panelW, lbl, lblColor, serverBanner, fields, terms }) {
@@ -475,8 +349,8 @@ const REGISTER_ORG_STATE_FIELDS = REGISTER_ORG_ENTRY_FIELDS.map((f) => ({
   ...f,
   value: f.kind === 'input' && f.label === 'Organization name'
     ? "O'Brien & Co."
-    : f.kind === 'input' && f.label === 'Email address'
-      ? 'alex@company.com'
+    : f.kind === 'input' && f.label === 'Organization contact email'
+      ? 'admin@company.com'
       : f.value,
 }));
 
@@ -504,17 +378,13 @@ function genRegisterOrgStates() {
       fields: [
         { kind: 'input', label: 'Organization name', value: 'A', err: 'Must be between 2 and 100 characters.', required: true },
         { kind: 'slug' },
-        { kind: 'input', label: 'Admin full name', value: 'Alex Brown', err: null, required: true },
-        { kind: 'input', label: 'Email address', value: 'not-an-email', err: 'Enter a valid email address.', required: true },
         {
-          kind: 'password',
-          label: 'Password',
-          value: '•••',
-          err: 'Must be at least 8 characters with a letter and a number.',
+          kind: 'input',
+          label: 'Organization contact email',
+          value: 'not-an-email',
+          err: 'Enter a valid organization contact email.',
           required: true,
-          passwordCriteria: PASSWORD_CRITERIA_PARTIAL,
         },
-        { kind: 'input', label: 'Confirm password', value: '••••••••', err: 'Passwords do not match.', required: true },
       ],
       terms: { checked: true },
     }),
@@ -546,140 +416,6 @@ function genRegisterOrgStates() {
 
 /**
  * Register-Org provider states — external identity provider error paths (ADR-027).
- */
-function genRegisterOrgProviderStates() {
-  const els = [];
-  let wireFiles = {};
-  const panelW = 520;
-  const panelH = 272;
-  const gap = 40;
-  const startX = Math.round((W - (panelW * 2 + gap)) / 2);
-  const cardY = 72;
-
-  els.push(rect('rops_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
-  els.push(text('rops_pg', 0, 24, W, 20, 'Registration — external provider errors', 13, C.gray500, 'center'));
-
-  const panels = [
-    {
-      id: 'dup',
-      x: startX,
-      lbl: 'Provider email already registered',
-      variant: 'warning',
-      bodySegments: [
-        { text: 'An account with this email already exists. ', color: C.gray700 },
-        { text: 'Sign in instead →', color: C.primary, link: true },
-      ],
-    },
-    {
-      id: 'noemail',
-      x: startX + panelW + gap,
-      lbl: 'Provider returned no verified email',
-      variant: 'danger',
-      bodyText: 'Your GitHub account has no verified email; use email and password instead.',
-    },
-  ];
-
-  panels.forEach(({ id, x, lbl, variant, bodySegments, bodyText }) => {
-    const icon = variant === 'warning' ? '⚠' : '✕';
-    const prefix = `rops_${id}`;
-    els.push(text(`${prefix}_lbl`, x, 48, panelW, 16, lbl, 12, C.danger));
-    els.push(rect(`${prefix}_card`, x, cardY, panelW, panelH, C.gray300, C.white, 2, true));
-    const brand = buildAuthCardBrandBar(prefix, x, cardY, panelW);
-    els.push(...brand.els);
-    wireFiles = mergeExcalidrawFiles(wireFiles, brand.files);
-    const ix = x + AUTH_CARD_PAD_X;
-    const innerW = panelW - AUTH_CARD_PAD_X * 2;
-    const headY = cardY + 76;
-    els.push(...stateHeadline(prefix, ix, headY, innerW, icon, variant, 'Registration could not continue', 14));
-    const bodyY = headY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
-    if (bodySegments) {
-      els.push(...buildAuthCardInlineRow(prefix, x, panelW, bodyY, bodySegments));
-    } else {
-      els.push(...wrappedTextBlock(`${prefix}_body`, ix, bodyY, innerW, bodyText, 13, C.gray700, 0.78).els);
-    }
-    els.push(...buildAuthCardBackFooter(prefix, x, cardY, panelW, panelH, 'Back to registration'));
-  });
-
-  write('platform-foundation/register-org-provider-states.excalidraw', els, wireFiles);
-}
-
-const EMAIL_CONFIRMATION_BODY =
-  'If an account exists for this email, you will receive a verification link shortly.';
-
-/**
- * Paint email-confirmation card body (shared by happy path + resend state panels).
- * @param {{ notice?: { title: string, body?: string, variant?: string }, resend?: { disabled?: boolean } }} opts
- */
-function paintEmailConfirmationCard(els, opts, wireAcc) {
-  const {
-    prefix,
-    cardX,
-    cardY,
-    cardW,
-    cardH,
-    notice = null,
-    resend = {},
-  } = opts;
-  const { disabled: resendDisabled = false } = resend;
-
-  const brand = buildAuthCardBrandBar(prefix, cardX, cardY, cardW);
-  els.push(...brand.els);
-  wireAcc.files = mergeExcalidrawFiles(wireAcc.files, brand.files);
-
-  const ecInnerW = cardW - AUTH_CARD_PAD_X * 2;
-  const ecX = cardX + AUTH_CARD_PAD_X;
-  const ecHeadY = cardY + 68;
-  els.push(...stateHeadline(prefix, ecX, ecHeadY, ecInnerW, '✉', 'info', 'Check your email', 16));
-
-  let cy = ecHeadY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
-  const body1 = wrappedTextBlock(`${prefix}_body1`, ecX, cy, ecInnerW, EMAIL_CONFIRMATION_BODY, 13, C.gray700, 0.78);
-  els.push(...body1.els);
-  cy += body1.blockH + 8;
-  const body2 = wrappedTextBlock(`${prefix}_body2`, ecX, cy, ecInnerW, 'Check your inbox.', 13, C.gray700, 0.78);
-  els.push(...body2.els);
-  cy += body2.blockH + 12;
-
-  if (notice) {
-    const banner = authNoticeBanner(
-      `${prefix}_notice`,
-      ecX,
-      cy,
-      ecInnerW,
-      { title: notice.title, body: notice.body },
-      notice.variant ?? 'info',
-    );
-    els.push(...banner.els);
-    cy += banner.blockH + 12;
-  }
-
-  const resendSegments = resendDisabled
-    ? [
-        { text: "Didn't receive it?", color: C.gray700 },
-        { text: 'Resend email →', color: C.gray300 },
-      ]
-    : [
-        { text: "Didn't receive it?", color: C.gray700 },
-        { text: 'Resend email →', color: C.primary, link: true },
-      ];
-  els.push(...buildAuthCardInlineRow(`${prefix}_resend`, cardX, cardW, cy, resendSegments));
-  els.push(...buildAuthCardFooter(prefix, cardX, cardY, cardW, cardH, {
-    lead: 'Already verified?',
-    link: 'Go to sign in',
-    forwardArrow: true,
-  }));
-}
-
-function measureEmailConfirmationCardH(noticeBlockH = 0, hasNotice = false) {
-  const ecHeadY = 68;
-  const ecBodyY = ecHeadY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
-  const body1Size = wrappedTextBlock('m', 0, 0, AUTH_INNER_W, EMAIL_CONFIRMATION_BODY, 13, C.gray700, 0.78);
-  const body2Size = wrappedTextBlock('m', 0, 0, AUTH_INNER_W, 'Check your inbox.', 13, C.gray700, 0.78);
-  const resendY = ecBodyY + body1Size.blockH + 8 + body2Size.blockH + 12 + (hasNotice ? noticeBlockH + 12 : 0) + 16;
-  return resendY + 24 + AUTH_CARD_FOOTER_ZONE;
-}
-
-/**
- * Email-Confirmation — registration success (step 3); resend link idle.
  */
 function genEmailConfirmation() {
   const cardW = AUTH_CARD_W;
@@ -2219,10 +1955,7 @@ runScreen('app-shell', genAppShell);
 
 // platform-foundation — Platform Foundation
 runScreen('platform-foundation/register-org', genRegisterOrg);
-runScreen('platform-foundation/register-org-complete', genRegisterOrgComplete);
-runScreen('platform-foundation/register-org-complete-states', genRegisterOrgCompleteStates);
 runScreen('platform-foundation/register-org-states', genRegisterOrgStates);
-runScreen('platform-foundation/register-org-provider-states', genRegisterOrgProviderStates);
 runScreen('platform-foundation/email-confirmation', genEmailConfirmation);
 runScreen('platform-foundation/email-confirmation-states', genEmailConfirmationStates);
 runScreen('platform-foundation/verify-email-states', genVerifyEmailStates);
