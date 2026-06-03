@@ -1,4 +1,4 @@
-# Review findings ledger
+# Review findings
 
 > **Navigation**: [← docs/README.md](./README.md) · [← CLAUDE.md](../CLAUDE.md)
 

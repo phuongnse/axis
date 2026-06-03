@@ -18,7 +18,7 @@ Install the local hook once with [`scripts/bootstrap.sh`](scripts/bootstrap.sh),
 1. Walk **Gates 0-3** in [docs/playbooks/agent-checklist.md](docs/playbooks/agent-checklist.md) locally; tick the matching boxes in the PR body.
 2. When you touch C# under `src/` or `tests/`, run `dotnet format Axis.sln` - style and naming rules live in [`.editorconfig`](.editorconfig) (CI runs `dotnet format --verify-no-changes`).
 3. Run `./scripts/check-doc-drift.sh` (bash - use Git Bash on Windows) when `src/`, `tests/`, or `docs/use-cases/` change. **New module, endpoint, Kafka event, or proto?** Follow [docs/playbooks/repo-layout-discovery.md](docs/playbooks/repo-layout-discovery.md) (checklists A-E - what CI auto-checks vs what you still edit by hand). Use-case layout: [USE_CASE_TEMPLATE.md](docs/use-cases/USE_CASE_TEMPLATE.md). If `docker-compose.yml` changes, update [local-dev.md](docs/playbooks/local-dev.md). CI job **Doc drift** must be green.
-4. PR description: **Summary + Linked spec + Requirements only** - no commit list, no CI status (the Checks tab covers that). Template: [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md).
+4. PR description: **Summary + Linked spec + Requirements only** - no commit list, no CI status (the Checks tab covers that). GitHub auto-fills [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md); CI job **PR body guard** enforces the required sections and checklist state.
 5. When adding or changing `.proto` files: run `python3 scripts/sync_buf_yaml.py --write` (updates [`buf.yaml`](buf.yaml) module paths), then `buf lint` - see [repo-layout-discovery.md section D](docs/playbooks/repo-layout-discovery.md). CI **Protobuf** job runs on proto/`buf.yaml` changes.
 
 ## Dependency updates (Dependabot)

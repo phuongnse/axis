@@ -13,6 +13,20 @@ permissions:
   pull-requests: read   # dorny/paths-filter calls pulls.listFiles to detect changed paths
 
 jobs:
+  pr-body:
+    name: PR body guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Validate PR body
+        run: python scripts/check-pr-body.py
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+
   # Detects which scopes the PR actually touches so the heavy jobs below
   # can skip themselves on PRs that don't affect them. Job-level `if:`
   # evaluating to false causes the job to report "Skipped", which counts

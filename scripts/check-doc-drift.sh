@@ -159,7 +159,7 @@ done < <(
       '
 )
 
-# Contract-less endpoint response guard (review-findings-ledger.md: "Endpoint
+# Contract-less endpoint response guard (REVIEW_FINDINGS.md: "Endpoint
 # returns object/anonymous JSON instead of an Application-layer DTO").
 # `.Produces<object>()` emits a bare `object` schema into openapi.json, which
 # makes the generated frontend types (api-types.ts) useless — it defeats the
@@ -175,7 +175,7 @@ done < <(
 ENDPOINT_OBJECT_PATTERN='[.]Produces<object>|Results[.](Ok|Json|Created|Accepted)[(]new[ ]*[{]'
 while IFS= read -r added; do
   [ -z "${added}" ] && continue
-  fail "Endpoint returns object/anonymous JSON — use a named Application-layer DTO (review-findings-ledger.md): ${added}"
+  fail "Endpoint returns object/anonymous JSON — use a named Application-layer DTO (REVIEW_FINDINGS.md): ${added}"
 done < <(
   git diff --unified=0 "${RANGE}" -- 'src/Axis.Api/Endpoints/*.cs' 2>/dev/null \
     | awk -v pat="${ENDPOINT_OBJECT_PATTERN}" '
@@ -184,7 +184,7 @@ done < <(
       '
 )
 
-# Endpoint orchestration guard (review-findings-ledger.md): a Minimal-API
+# Endpoint orchestration guard (REVIEW_FINDINGS.md): a Minimal-API
 # endpoint handler must not call the mediator more than once — multiple sends
 # mean orchestration logic leaked into the endpoint (combine into one
 # command/handler or a saga). Full-state scan of endpoint handler methods
@@ -196,7 +196,7 @@ done < <(
 # `[.]` `[(]` for literal punctuation (GNU awk mangles `\.`/`\(`).
 while IFS= read -r hit; do
   [ -z "${hit}" ] && continue
-  fail "Endpoint handler calls the mediator more than once — move orchestration into a single command/handler or saga (review-findings-ledger.md): ${hit}"
+  fail "Endpoint handler calls the mediator more than once — move orchestration into a single command/handler or saga (REVIEW_FINDINGS.md): ${hit}"
 done < <(
   for ep in src/Axis.Api/Endpoints/*.cs; do
     [ -f "${ep}" ] || continue
