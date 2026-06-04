@@ -197,7 +197,7 @@ public class FormEndpointTests(ApiTestFixture fixture)
             label = "First Name",
             type = "Text",
             required = true,
-            config = new { maxLength = 100, placeholder = (string?)null, multiline = false },
+            config = new { maxLength = 100, multiline = false },
         }, Json);
 
         addResp.StatusCode.Should().Be(HttpStatusCode.Created);
