@@ -13,8 +13,8 @@ permissions:
   pull-requests: read   # dorny/paths-filter calls pulls.listFiles to detect changed paths
 
 jobs:
-  pr-body:
-    name: PR body guard
+  pr:
+    name: PR guard
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -22,9 +22,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Validate PR body
-        run: python scripts/check-pr-body.py
+      - name: Validate PR metadata
+        run: python scripts/check-pr.py
         env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
 
   # Detects which scopes the PR actually touches so the heavy jobs below

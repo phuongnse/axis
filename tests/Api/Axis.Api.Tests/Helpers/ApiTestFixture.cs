@@ -78,7 +78,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true,
     };
 
@@ -283,7 +283,9 @@ public sealed class ApiTestFixture : IAsyncLifetime
         {
             User user = await identityContext.Users
                 .SingleAsync(u => u.Email == email);
-            organizationId = user.OrganizationId;
+            OrganizationMembership membership = await identityContext.OrganizationMemberships
+                .SingleAsync(m => m.UserId == user.Id);
+            organizationId = membership.OrganizationId;
         }
 
         await EnsureModuleSchemasAsync(organizationId);

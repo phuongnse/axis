@@ -125,7 +125,7 @@ export function EmailConfirmationPage() {
           to="/register"
           className="inline-flex w-full h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
         >
-          Register another organization
+          Register another account
         </Link>
       </div>
     </AuthCard>

@@ -12,12 +12,24 @@ internal sealed class UserRepository(IdentityDbContext context) : IUserRepositor
         await context.Users.AddAsync(user, ct);
 
     public async Task<User?> GetByIdAsync(Guid id, Guid organizationId, CancellationToken ct = default) =>
-        await context.Users
-            .FirstOrDefaultAsync(u => u.Id == id && u.OrganizationId == organizationId, ct);
+        await context.OrganizationMemberships
+            .Where(m => m.UserId == id && m.OrganizationId == organizationId)
+            .Join(
+                context.Users,
+                membership => membership.UserId,
+                user => user.Id,
+                (_, user) => user)
+            .FirstOrDefaultAsync(ct);
 
     public async Task<User?> GetByEmailAsync(Email email, Guid organizationId, CancellationToken ct = default) =>
-        await context.Users
-            .FirstOrDefaultAsync(u => u.Email == email && u.OrganizationId == organizationId, ct);
+        await context.OrganizationMemberships
+            .Where(m => m.OrganizationId == organizationId)
+            .Join(
+                context.Users.Where(u => u.Email == email),
+                membership => membership.UserId,
+                user => user.Id,
+                (_, user) => user)
+            .FirstOrDefaultAsync(ct);
 
     public async Task<bool> EmailExistsPlatformWideAsync(Email email, CancellationToken ct = default) =>
         await context.Users.AnyAsync(u => u.Email == email, ct);
@@ -28,19 +40,31 @@ internal sealed class UserRepository(IdentityDbContext context) : IUserRepositor
     public async Task<User?> GetByIdPlatformWideAsync(Guid id, CancellationToken ct = default) =>
         await context.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
 
-    public async Task<int> CountAdminsAsync(Guid organizationId, Guid adminRoleId, CancellationToken ct = default) =>
-        await context.Users
-            .Where(u => u.OrganizationId == organizationId
-                     && EF.Property<List<Guid>>(u, "_roleIds").Contains(adminRoleId))
-            .CountAsync(ct);
+    public Task<int> CountAdminsAsync(Guid organizationId, Guid adminRoleId, CancellationToken ct = default) =>
+        context.Set<OrganizationMembershipRole>()
+            .Join(
+                context.OrganizationMemberships,
+                role => role.MembershipId,
+                membership => membership.Id,
+                (role, membership) => new { role, membership })
+            .CountAsync(
+                row => row.role.RoleId == adminRoleId
+                       && row.membership.OrganizationId == organizationId
+                       && row.membership.Status == OrganizationMembershipStatus.Active,
+                ct);
 
     public Task<int> CountActiveUsersAsync(Guid organizationId, CancellationToken ct = default) =>
-        context.Users.CountAsync(
-            u => u.OrganizationId == organizationId && u.Status == UserStatus.Active,
+        context.OrganizationMemberships.CountAsync(
+            m => m.OrganizationId == organizationId && m.Status == OrganizationMembershipStatus.Active,
             ct);
 
     public async Task<IReadOnlyList<User>> GetAllByOrganizationAsync(Guid organizationId, CancellationToken ct = default) =>
-        await context.Users
-            .Where(u => u.OrganizationId == organizationId)
+        await context.OrganizationMemberships
+            .Where(m => m.OrganizationId == organizationId)
+            .Join(
+                context.Users,
+                membership => membership.UserId,
+                user => user.Id,
+                (_, user) => user)
             .ToListAsync(ct);
 }

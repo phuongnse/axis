@@ -24,7 +24,7 @@ public class UpdateUserProfileHandlerTests
 
     private static User MakeUser(string? avatarUrl = null)
     {
-        User user = User.Create("Alice", "Smith", Email.Create("alice@example.com").Value, OrgId);
+        User user = User.Create("Alice", "Smith", Email.Create("alice@example.com").Value);
         if (avatarUrl is not null)
             user.UpdateAvatar(avatarUrl);
         return user;

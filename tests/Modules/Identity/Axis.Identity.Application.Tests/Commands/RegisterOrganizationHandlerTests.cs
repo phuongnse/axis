@@ -16,6 +16,7 @@ public class RegisterOrganizationHandlerTests
     private readonly IOrganizationRepository _orgRepo = Substitute.For<IOrganizationRepository>();
     private readonly ISubscriptionPlanRepository _planRepo = Substitute.For<ISubscriptionPlanRepository>();
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
+    private readonly IOrganizationMembershipRepository _membershipRepo = Substitute.For<IOrganizationMembershipRepository>();
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
     private readonly IRegistrationIdempotencyRepository _idempotencyRepo =
         Substitute.For<IRegistrationIdempotencyRepository>();
@@ -31,6 +32,7 @@ public class RegisterOrganizationHandlerTests
             _orgRepo,
             _planRepo,
             _userRepo,
+            _membershipRepo,
             _roleRepo,
             _idempotencyRepo,
             _verificationTokenStore,
@@ -88,6 +90,7 @@ public class RegisterOrganizationHandlerTests
 
         await _orgRepo.Received(1).AddAsync(Arg.Any<Organization>(), Arg.Any<CancellationToken>());
         await _userRepo.Received(1).AddAsync(Arg.Any<User>(), Arg.Any<CancellationToken>());
+        await _membershipRepo.Received(1).AddAsync(Arg.Any<OrganizationMembership>(), Arg.Any<CancellationToken>());
         await _roleRepo.Received(4).AddAsync(Arg.Any<Role>(), Arg.Any<CancellationToken>());
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }

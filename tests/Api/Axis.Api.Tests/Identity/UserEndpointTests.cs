@@ -31,8 +31,8 @@ public class UserEndpointTests(ApiTestFixture fixture)
         JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
 
         body.GetProperty("email").GetString().Should().Be("adminuser1@test.com");
-        body.GetProperty("first_name").GetString().Should().Be("Test");
-        body.GetProperty("is_active").GetBoolean().Should().BeTrue();
+        body.GetProperty("firstName").GetString().Should().Be("Test");
+        body.GetProperty("isActive").GetBoolean().Should().BeTrue();
         body.GetProperty("permissions").GetArrayLength().Should().BeGreaterThan(0);
     }
 
@@ -42,7 +42,7 @@ public class UserEndpointTests(ApiTestFixture fixture)
     public async Task UpdateProfile_WhenNoToken_Returns401()
     {
         HttpResponseMessage resp = await fixture.Client.PatchAsync("/api/users/me",
-            JsonContent.Create(new { first_name = "X", last_name = "Y" }, options: Json));
+            JsonContent.Create(new { firstName = "X", lastName = "Y" }, options: Json));
 
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -53,7 +53,7 @@ public class UserEndpointTests(ApiTestFixture fixture)
         HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "user2");
 
         HttpResponseMessage resp = await client.PatchAsync("/api/users/me",
-            JsonContent.Create(new { first_name = "Updated", last_name = "Name" }, options: Json));
+            JsonContent.Create(new { firstName = "Updated", lastName = "Name" }, options: Json));
 
         resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
@@ -64,7 +64,7 @@ public class UserEndpointTests(ApiTestFixture fixture)
     public async Task ChangePassword_WhenNoToken_Returns401()
     {
         HttpResponseMessage resp = await fixture.Client.PostAsJsonAsync("/api/users/me/change-password",
-            new { current_password = "TestPass1", new_password = "NewPass2!", confirm_password = "NewPass2!" }, Json);
+            new { currentPassword = "TestPass1", newPassword = "NewPass2!", confirmPassword = "NewPass2!" }, Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -76,9 +76,9 @@ public class UserEndpointTests(ApiTestFixture fixture)
 
         HttpResponseMessage resp = await client.PostAsJsonAsync("/api/users/me/change-password", new
         {
-            current_password = "WrongPass99",
-            new_password = "NewPass2!",
-            confirm_password = "NewPass2!",
+            currentPassword = "WrongPass99",
+            newPassword = "NewPass2!",
+            confirmPassword = "NewPass2!",
         }, Json);
 
         // Either 422 (validation) or 401 — must not be 200
@@ -107,9 +107,9 @@ public class UserEndpointTests(ApiTestFixture fixture)
         sessions.Should().NotBeNull();
         sessions!.Length.Should().BeGreaterThan(0);
 
-        // is_current is always false in this test: the access token does not yet carry
+        // isCurrent is always false in this test: the access token does not yet carry
         // the refresh token ID as a claim (tracked gap — rt_id claim not yet implemented).
-        sessions.All(s => !s.GetProperty("is_current").GetBoolean()).Should().BeTrue();
+        sessions.All(s => !s.GetProperty("isCurrent").GetBoolean()).Should().BeTrue();
     }
 
     // PATCH /api/users/{userId}/status
@@ -125,7 +125,7 @@ public class UserEndpointTests(ApiTestFixture fixture)
         string userId = me.GetProperty("id").GetString()!;
 
         HttpResponseMessage resp = await client.PatchAsync($"/api/users/{userId}/status",
-            JsonContent.Create(new { is_active = false }, options: Json));
+            JsonContent.Create(new { isActive = false }, options: Json));
 
         resp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
         JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);

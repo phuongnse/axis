@@ -12,6 +12,7 @@ public sealed record RetryTenantProvisioningCommand(string Token) : ICommand;
 public sealed class RetryTenantProvisioningHandler(
     IEmailVerificationTokenStore verificationTokenStore,
     IUserRepository userRepo,
+    IOrganizationMembershipRepository membershipRepo,
     IOrganizationRepository organizationRepo,
     ITenantModuleProvisioningRepository provisioningRepo,
     IUnitOfWork uow)
@@ -33,7 +34,12 @@ public sealed class RetryTenantProvisioningHandler(
         if (user is null || !user.IsEmailVerified)
             return Result.Failure(ErrorCodes.BusinessRule, "Account is not ready for provisioning retry.");
 
-        Organization? organization = await organizationRepo.GetByIdAsync(user.OrganizationId, cancellationToken);
+        OrganizationMembership? membership =
+            await membershipRepo.GetFirstActiveByUserIdAsync(user.Id, cancellationToken);
+        if (membership is null)
+            return Result.Failure(ErrorCodes.NotFound, "Organization not found.");
+
+        Organization? organization = await organizationRepo.GetByIdAsync(membership.OrganizationId, cancellationToken);
         if (organization is null)
             return Result.Failure(ErrorCodes.NotFound, "Organization not found.");
 
@@ -41,7 +47,7 @@ public sealed class RetryTenantProvisioningHandler(
             return Result.Success();
 
         IReadOnlyList<TenantModuleProvisioning> modules =
-            await provisioningRepo.GetAllForOrganizationAsync(user.OrganizationId, cancellationToken);
+            await provisioningRepo.GetAllForOrganizationAsync(membership.OrganizationId, cancellationToken);
 
         foreach (TenantModuleProvisioning module in modules)
         {

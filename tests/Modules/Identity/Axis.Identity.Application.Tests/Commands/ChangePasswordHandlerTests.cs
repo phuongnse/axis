@@ -24,7 +24,7 @@ public class ChangePasswordHandlerTests
 
     private static User MakeUser()
     {
-        User user = User.Create("Alice", "Smith", Email.Create("alice@acme.com").Value, OrgId);
+        User user = User.Create("Alice", "Smith", Email.Create("alice@acme.com").Value);
         user.SetPasswordHash("old_hash");
         user.VerifyEmail();
         return user;

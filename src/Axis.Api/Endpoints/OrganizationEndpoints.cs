@@ -49,7 +49,7 @@ public static class OrganizationEndpoints
     }
 
     private static async Task<IResult> GetSlugPreview(
-        [FromQuery(Name = "org_name")] string orgName,
+        [FromQuery(Name = "orgName")] string orgName,
         ISender mediator,
         CancellationToken ct)
     {

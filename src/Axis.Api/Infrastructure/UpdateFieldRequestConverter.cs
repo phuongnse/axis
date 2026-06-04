@@ -15,8 +15,8 @@ public sealed class UpdateFieldRequestConverter : JsonConverter<UpdateFieldReque
 
         FieldType type = JsonSerializer.Deserialize<FieldType>(root.GetProperty("type").GetRawText(), options);
         string label = root.GetProperty("label").GetString()!;
-        string? helpText = root.TryGetProperty("help_text", out JsonElement helpEl) ? helpEl.GetString() : null;
-        bool isRequired = root.GetProperty("is_required").GetBoolean();
+        string? helpText = root.TryGetProperty("helpText", out JsonElement helpEl) ? helpEl.GetString() : null;
+        bool isRequired = root.GetProperty("isRequired").GetBoolean();
         JsonElement configEl = root.TryGetProperty("config", out JsonElement c) ? c : default;
         FieldConfig config = FieldConfigDeserializer.Deserialize(type, configEl, options);
 

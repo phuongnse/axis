@@ -8,6 +8,7 @@ namespace Axis.Identity.Application.Commands.DeactivateUser;
 
 public sealed class DeactivateUserHandler(
     IUserRepository userRepo,
+    IOrganizationMembershipRepository membershipRepo,
     IRoleRepository roleRepo,
     ISessionStore sessionStore,
     IUnitOfWork uow)
@@ -23,19 +24,26 @@ public sealed class DeactivateUserHandler(
         if (user is null)
             return Result.Failure(ErrorCodes.NotFound, "User not found.");
 
+        OrganizationMembership? membership = await membershipRepo.GetByUserAndOrganizationAsync(
+            command.UserId,
+            command.OrganizationId,
+            cancellationToken);
+        if (membership is null)
+            return Result.Failure(ErrorCodes.NotFound, "Membership not found.");
+
         Role? adminRole = await roleRepo.GetByNameAsync("Admin", command.OrganizationId, cancellationToken);
         if (adminRole is null)
             return Result.Failure(ErrorCodes.NotFound, "Admin role not found.");
 
         Guid adminRoleId = adminRole.Id;
 
-        // cannot deactivate last admin
-        int adminCount = await userRepo.CountAdminsAsync(
+        // Last admin is a membership-scoped invariant.
+        int adminCount = await membershipRepo.CountAdminsAsync(
             command.OrganizationId, adminRoleId, cancellationToken);
-        if (adminCount <= 1 && user.RoleIds.Contains(adminRoleId))
+        if (adminCount <= 1 && membership.RoleIds.Contains(adminRoleId))
             return Result.Failure(ErrorCodes.BusinessRule, "You cannot deactivate the last admin of the organization.");
 
-        user.Deactivate();
+        membership.Deactivate();
         await uow.SaveChangesAsync(cancellationToken);
         await sessionStore.RevokeAllAsync(command.UserId, cancellationToken);
         return Result.Success();

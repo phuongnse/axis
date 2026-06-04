@@ -10,6 +10,7 @@ namespace Axis.Identity.Application.Queries.GetProvisioningStatus;
 public sealed class GetProvisioningStatusHandler(
     IEmailVerificationTokenStore verificationTokenStore,
     IUserRepository userRepo,
+    IOrganizationMembershipRepository membershipRepo,
     IOrganizationRepository organizationRepo,
     ITenantModuleProvisioningRepository provisioningRepo)
     : IQueryHandler<GetProvisioningStatusQuery, ProvisioningStatusDto?>
@@ -32,12 +33,17 @@ public sealed class GetProvisioningStatusHandler(
         if (user is null || !user.IsEmailVerified)
             return null;
 
-        Organization? organization = await organizationRepo.GetByIdAsync(user.OrganizationId, cancellationToken);
+        OrganizationMembership? membership =
+            await membershipRepo.GetFirstActiveByUserIdAsync(user.Id, cancellationToken);
+        if (membership is null)
+            return null;
+
+        Organization? organization = await organizationRepo.GetByIdAsync(membership.OrganizationId, cancellationToken);
         if (organization is null)
             return null;
 
         IReadOnlyList<TenantModuleProvisioning> modules =
-            await provisioningRepo.GetAllForOrganizationAsync(user.OrganizationId, cancellationToken);
+            await provisioningRepo.GetAllForOrganizationAsync(membership.OrganizationId, cancellationToken);
 
         bool isReady = organization.Status == OrganizationStatus.Active
             && TenantModuleNames.All.All(moduleName =>

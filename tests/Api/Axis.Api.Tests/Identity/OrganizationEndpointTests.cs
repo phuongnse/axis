@@ -56,7 +56,7 @@ public class OrganizationEndpointTests(ApiTestFixture fixture)
     {
         HttpResponseMessage resp = await fixture.Client.PostAsJsonAsync(
             "/api/organizations/me/invitations",
-            new { email = "someone@test.com", role_id = Guid.NewGuid() }, Json);
+            new { email = "someone@test.com", roleId = Guid.NewGuid() }, Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -68,7 +68,7 @@ public class OrganizationEndpointTests(ApiTestFixture fixture)
 
         HttpResponseMessage resp = await client.PostAsJsonAsync(
             "/api/organizations/me/invitations",
-            new { email = "adminorginv1@test.com", role_id = Guid.NewGuid() }, Json);
+            new { email = "adminorginv1@test.com", roleId = Guid.NewGuid() }, Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
         JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
@@ -80,10 +80,10 @@ public class OrganizationEndpointTests(ApiTestFixture fixture)
     {
         HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "orginv2");
 
-        // Get org_id from authenticated user, then fetch role scoped to that org
+        // Get orgId from authenticated user, then fetch role scoped to that org
         HttpResponseMessage meResp = await client.GetAsync("/api/users/me");
         JsonElement me = await meResp.Content.ReadFromJsonAsync<JsonElement>(Json);
-        Guid orgId = Guid.Parse(me.GetProperty("org_id").GetString()!);
+        Guid orgId = Guid.Parse(me.GetProperty("orgId").GetString()!);
 
         using IServiceScope scope = fixture.CreateScope();
         IdentityDbContext ctx = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
@@ -91,7 +91,7 @@ public class OrganizationEndpointTests(ApiTestFixture fixture)
 
         HttpResponseMessage resp = await client.PostAsJsonAsync(
             "/api/organizations/me/invitations",
-            new { email = "newuser@test.com", role_id = viewerRole.Id }, Json);
+            new { email = "newuser@test.com", roleId = viewerRole.Id }, Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
@@ -102,7 +102,7 @@ public class OrganizationEndpointTests(ApiTestFixture fixture)
     public async Task GetSlugPreview_WhenOrgNameProvided_ReturnsBaseSlug()
     {
         HttpResponseMessage resp = await fixture.Client.GetAsync(
-            "/api/organizations/slug-preview?org_name=O'Brien%20%26%20Co.");
+            "/api/organizations/slug-preview?orgName=O'Brien%20%26%20Co.");
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
@@ -114,12 +114,12 @@ public class OrganizationEndpointTests(ApiTestFixture fixture)
     {
         object payload = new
         {
-            org_name = "Acme Corp",
-            admin_first_name = "Test",
-            admin_last_name = "Admin",
-            admin_email = "noterms@test.com",
+            orgName = "Acme Corp",
+            adminFirstName = "Test",
+            adminLastName = "Admin",
+            adminEmail = "noterms@test.com",
             password = "TestPass1",
-            password_confirmation = "TestPass1",
+            passwordConfirmation = "TestPass1",
         };
 
         HttpResponseMessage resp = await fixture.Client.PostAsJsonAsync("/api/organizations", payload, Json);

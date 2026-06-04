@@ -77,7 +77,10 @@ public sealed class TenantIsolationEndpointTests(ApiTestFixture fixture)
         using IServiceScope scope = fixture.CreateScope();
         IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         User user = await db.Users.AsNoTracking().SingleAsync(u => u.Email == email);
-        return user.OrganizationId;
+        OrganizationMembership membership = await db.OrganizationMemberships
+            .AsNoTracking()
+            .SingleAsync(m => m.UserId == user.Id);
+        return membership.OrganizationId;
     }
 
     private async Task SetOrganizationStatusAsync(Guid organizationId, OrganizationStatus status)

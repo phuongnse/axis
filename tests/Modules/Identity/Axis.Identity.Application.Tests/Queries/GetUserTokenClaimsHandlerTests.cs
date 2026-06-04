@@ -12,11 +12,12 @@ namespace Axis.Identity.Application.Tests.Queries;
 public sealed class GetUserTokenClaimsHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
+    private readonly IOrganizationMembershipRepository _membershipRepo = Substitute.For<IOrganizationMembershipRepository>();
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
 
-    private GetUserTokenClaimsHandler CreateHandler() => new(_userRepo, _roleRepo);
+    private GetUserTokenClaimsHandler CreateHandler() => new(_userRepo, _membershipRepo, _roleRepo);
 
     [Fact]
     public async Task Handle_WhenUserNotFound_ReturnsNotFound()
@@ -35,7 +36,7 @@ public sealed class GetUserTokenClaimsHandlerTests
     [Fact]
     public async Task Handle_WhenUserInactive_ReturnsNotFound()
     {
-        User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value, OrgId);
+        User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value);
         user.Deactivate();
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
 
@@ -50,10 +51,12 @@ public sealed class GetUserTokenClaimsHandlerTests
     [Fact]
     public async Task Handle_WhenOrganizationIdOmitted_UsesUserOrganization()
     {
-        User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value, OrgId);
+        User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value);
         Role role = Role.CreateSystem("Editor", OrgId, ["workflow:definition:read"]);
-        user.AssignRole(role.Id);
+        OrganizationMembership membership = OrganizationMembership.Create(user.Id, OrgId);
+        membership.AssignRole(role.Id);
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
+        _membershipRepo.GetFirstActiveByUserIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(membership);
         _roleRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), OrgId, Arg.Any<CancellationToken>())
             .Returns(new List<Role> { role });
 
@@ -69,7 +72,7 @@ public sealed class GetUserTokenClaimsHandlerTests
     [Fact]
     public async Task Handle_WhenOrganizationIdMismatchesUser_ReturnsBusinessRuleFailure()
     {
-        User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value, OrgId);
+        User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value);
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
 
         Guid otherOrgId = Guid.NewGuid();
@@ -88,10 +91,12 @@ public sealed class GetUserTokenClaimsHandlerTests
     [Fact]
     public async Task Handle_WhenUserActive_ReturnsTokenClaims()
     {
-        User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value, OrgId);
+        User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value);
         Role editor = Role.CreateSystem("Editor", OrgId, ["workflow:definition:read", "workflow:definition:write"]);
-        user.AssignRole(editor.Id);
+        OrganizationMembership membership = OrganizationMembership.Create(user.Id, OrgId);
+        membership.AssignRole(editor.Id);
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
+        _membershipRepo.GetByUserAndOrganizationAsync(user.Id, OrgId, Arg.Any<CancellationToken>()).Returns(membership);
         _roleRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), OrgId, Arg.Any<CancellationToken>())
             .Returns(new List<Role> { editor });
 

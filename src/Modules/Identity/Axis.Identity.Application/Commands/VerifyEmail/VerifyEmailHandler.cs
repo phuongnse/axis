@@ -11,6 +11,7 @@ namespace Axis.Identity.Application.Commands.VerifyEmail;
 public sealed class VerifyEmailHandler(
     IEmailVerificationTokenStore tokenStore,
     IUserRepository userRepo,
+    IOrganizationMembershipRepository membershipRepo,
     IOrganizationRepository organizationRepo,
     ITenantModuleProvisioningRepository provisioningRepo,
     IRoleRepository roleRepo,
@@ -62,11 +63,26 @@ public sealed class VerifyEmailHandler(
                 "This link has already been used. Please sign in.");
         }
 
-        Organization? organization = await organizationRepo.GetByIdAsync(user.OrganizationId, cancellationToken);
+        OrganizationMembership? membership =
+            await membershipRepo.GetFirstActiveByUserIdAsync(user.Id, cancellationToken);
+        if (membership is null)
+        {
+            user.VerifyEmail();
+            await uow.SaveChangesAsync(cancellationToken);
+
+            return Result.Success(new VerifyEmailSuccessDto(
+                user.Id,
+                null,
+                user.Email.Value,
+                user.FullName,
+                []));
+        }
+
+        Organization? organization = await organizationRepo.GetByIdAsync(membership.OrganizationId, cancellationToken);
         if (organization is null)
             return Result.Failure<VerifyEmailSuccessDto>(ErrorCodes.BusinessRule, "Invalid verification link.");
 
-        organization.BeginProvisioning();
+        organization.BeginProvisioningAfterOwnerVerification();
 
         List<TenantModuleProvisioning> pendingModules = TenantModuleNames.All
             .Select(module => TenantModuleProvisioning.CreatePending(organization.Id, module))
@@ -74,8 +90,8 @@ public sealed class VerifyEmailHandler(
         await provisioningRepo.AddRangeAsync(pendingModules, cancellationToken);
 
         Role? adminRole = await roleRepo.GetByNameAsync("Admin", organization.Id, cancellationToken);
-        if (adminRole is not null && !user.RoleIds.Contains(adminRole.Id))
-            user.AssignRole(adminRole.Id);
+        if (adminRole is not null && !membership.RoleIds.Contains(adminRole.Id))
+            membership.AssignRole(adminRole.Id);
 
         user.VerifyEmail();
 
@@ -83,7 +99,7 @@ public sealed class VerifyEmailHandler(
         // from a single command result — no second round-trip that could fail after
         // the one-time link has already been consumed. Read before commit so any
         // failure leaves the verification token unused.
-        IReadOnlyList<Role> roles = await roleRepo.GetByIdsAsync(user.RoleIds, organization.Id, cancellationToken);
+        IReadOnlyList<Role> roles = await roleRepo.GetByIdsAsync(membership.RoleIds, organization.Id, cancellationToken);
         List<string> permissions = roles
             .SelectMany(role => role.Permissions)
             .Distinct(StringComparer.Ordinal)
@@ -93,7 +109,7 @@ public sealed class VerifyEmailHandler(
 
         return Result.Success(new VerifyEmailSuccessDto(
             user.Id,
-            user.OrganizationId,
+            organization.Id,
             user.Email.Value,
             user.FullName,
             permissions));

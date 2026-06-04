@@ -16,13 +16,19 @@ Sign in with my email and password — or with Microsoft, Google, or GitHub — 
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. User opens the sign-in page.
+2. User enters email/password or chooses a configured external identity provider.
+3. System validates the credential or external provider callback and establishes an Axis session through OpenIddict.
+4. SPA exchanges the authorization code with PKCE and stores the access token in memory.
+5. User is redirected to the workspace dashboard for their active organization.
 
 ## Alternate / error flows
 
-- Validation failures and edge cases in Acceptance Criteria.
+- Missing email/password: show inline field errors and do not submit.
+- Invalid credential or unknown user: show a generic "Incorrect email or password" message.
+- Unverified account: show the verify-email reminder and resend option.
+- Deactivated account or missing organization access: reject sign-in with the documented account-state message.
+- External provider failure or unlinked provider account: return to sign-in with a provider-specific error.
 
 ## Context
 
@@ -44,10 +50,10 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 - [ ] Server error (5xx): "Something went wrong. Please try again." — the password field is cleared, email retained.
 
 *External identity providers*
-- [ ] Sign-in page offers **Microsoft**, **Google**, and **GitHub** buttons alongside the email/password form ([ADR-027](../../../TECH_STACK.md#adr-027-external-identity-providers-for-sign-in-and-registration)).
+- [ ] Sign-in page offers **Microsoft**, **Google**, and **GitHub** buttons alongside the email/password form ([ADR-027](../../../TECH_STACK.md#adr-027-external-identity-providers-for-user-sign-in-and-registration)).
 - [ ] Selecting a provider runs the OAuth2 Authorization Code + PKCE flow through OpenIddict; on return, Axis mints its own access + refresh tokens (the external token is never exposed to the client).
 - [ ] A provider login whose verified email matches an existing user attaches to that account rather than creating a duplicate (account linking by verified email).
-- [ ] A provider login with no matching account and no pending invitation is rejected with "No account found. Ask your organization admin for an invitation." (provider sign-up happens only through the register-org flow).
+- [ ] A provider login with no matching account and no pending invitation/setup token is rejected with "No account found. Ask your organization admin for an invitation." Provider account setup belongs to [register-user](../register-user/).
 - [ ] If the provider returns no verified email, sign-in is rejected with "Your <provider> account has no verified email; use email and password instead."
 - [ ] A disabled provider (not configured for this deployment) is not shown.
 
@@ -59,7 +65,7 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 
 *Out of scope*
 - 2FA / MFA (TOTP or WebAuthn).
-- Enterprise SSO federation (SAML, SCIM provisioning, per-tenant IdP) — separate initiative, see [ADR-027](../../../TECH_STACK.md#adr-027-external-identity-providers-for-sign-in-and-registration).
+- Enterprise SSO federation (SAML, SCIM provisioning, per-tenant IdP) — separate initiative, see [ADR-027](../../../TECH_STACK.md#adr-027-external-identity-providers-for-user-sign-in-and-registration).
 
 > **Implementation status**
 >
@@ -85,7 +91,8 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| N/A | N/A | N/A |
+| login | [source](./login.excalidraw) | [preview](./login.svg) |
+| login-unverified | [source](./login-unverified.excalidraw) | [preview](./login-unverified.svg) |
 
 ## Diagrams
 

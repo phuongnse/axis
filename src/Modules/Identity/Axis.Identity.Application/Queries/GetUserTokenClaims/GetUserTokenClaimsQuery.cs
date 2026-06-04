@@ -8,7 +8,7 @@ public sealed record GetUserTokenClaimsQuery(Guid UserId, Guid? OrganizationId)
 
 public sealed record UserTokenClaimsDto(
     Guid UserId,
-    Guid OrganizationId,
+    Guid? OrganizationId,
     string Email,
     string FullName,
     IReadOnlyList<string> Permissions);

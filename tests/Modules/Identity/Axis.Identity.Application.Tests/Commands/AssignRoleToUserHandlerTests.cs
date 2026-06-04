@@ -13,6 +13,7 @@ namespace Axis.Identity.Application.Tests.Commands;
 public class AssignRoleToUserHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
+    private readonly IOrganizationMembershipRepository _membershipRepo = Substitute.For<IOrganizationMembershipRepository>();
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
@@ -20,21 +21,23 @@ public class AssignRoleToUserHandlerTests
     private static readonly Guid AdminRoleId = Guid.NewGuid();
     private static readonly Guid EditorRoleId = Guid.NewGuid();
 
-    private AssignRoleToUserHandler CreateHandler() => new(_userRepo, _roleRepo, _uow);
+    private AssignRoleToUserHandler CreateHandler() => new(_userRepo, _membershipRepo, _roleRepo, _uow);
 
-    private static User MakeUser(string email = "user@acme.com")
+    private static (User User, OrganizationMembership Membership) MakeUserWithMembership(string email = "user@acme.com")
     {
-        User u = User.Create("Test", "User", Email.Create(email).Value, OrgId);
-        u.AssignRole(EditorRoleId);
-        return u;
+        User u = User.Create("Test", "User", Email.Create(email).Value);
+        OrganizationMembership membership = OrganizationMembership.Create(u.Id, OrgId);
+        membership.AssignRole(EditorRoleId);
+        return (u, membership);
     }
 
     [Fact]
     public async Task AssignRoleToUser_WhenRoleIsValid_AddsRoleToUser()
     {
-        User user = MakeUser();
+        (User user, OrganizationMembership membership) = MakeUserWithMembership();
         Role newRole = Role.Create("Manager", null, OrgId, ["workflow:definition:read"]);
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
+        _membershipRepo.GetByUserAndOrganizationAsync(user.Id, OrgId).Returns(membership);
         _roleRepo.GetByIdAsync(newRole.Id, OrgId).Returns(newRole);
 
         Result result = await CreateHandler().Handle(
@@ -42,34 +45,36 @@ public class AssignRoleToUserHandlerTests
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        user.RoleIds.Should().Contain(newRole.Id);
+        membership.RoleIds.Should().Contain(newRole.Id);
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task AssignRoleToUser_WhenActionIsRemove_RemovesRoleFromUser()
     {
-        User user = MakeUser();
+        (User user, OrganizationMembership membership) = MakeUserWithMembership();
         Role editorRole = Role.Create("Editor", null, OrgId, ["workflow:definition:read"]);
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
+        _membershipRepo.GetByUserAndOrganizationAsync(user.Id, OrgId).Returns(membership);
         _roleRepo.GetByIdAsync(EditorRoleId, OrgId).Returns(editorRole);
-        user.AssignRole(AdminRoleId); // give another role so we can remove editor
+        membership.AssignRole(AdminRoleId); // give another role so we can remove editor
 
         Result result = await CreateHandler().Handle(
             new AssignRoleToUserCommand(user.Id, OrgId, EditorRoleId, Action: RoleAction.Remove),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        user.RoleIds.Should().NotContain(EditorRoleId);
+        membership.RoleIds.Should().NotContain(EditorRoleId);
     }
 
     [Fact]
     public async Task AssignRoleToUser_WhenRemovingLastRole_ReturnsBusinessRuleFailure()
     {
         // User has only EditorRoleId
-        User user = MakeUser();
+        (User user, OrganizationMembership membership) = MakeUserWithMembership();
         Role editorRole = Role.Create("Editor", null, OrgId, ["workflow:definition:read"]);
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
+        _membershipRepo.GetByUserAndOrganizationAsync(user.Id, OrgId).Returns(membership);
         _roleRepo.GetByIdAsync(EditorRoleId, OrgId).Returns(editorRole);
 
         Result result = await CreateHandler().Handle(
@@ -85,12 +90,13 @@ public class AssignRoleToUserHandlerTests
     [Fact]
     public async Task AssignRoleToUser_WhenRemovingAdminRoleFromLastAdmin_ReturnsBusinessRuleFailure()
     {
-        User user = MakeUser();
-        user.AssignRole(AdminRoleId);
+        (User user, OrganizationMembership membership) = MakeUserWithMembership();
+        membership.AssignRole(AdminRoleId);
         Role adminRole = Role.CreateSystem("Admin", OrgId, ["users:read"]);
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
+        _membershipRepo.GetByUserAndOrganizationAsync(user.Id, OrgId).Returns(membership);
         _roleRepo.GetByIdAsync(AdminRoleId, OrgId).Returns(adminRole);
-        _userRepo.CountAdminsAsync(OrgId, AdminRoleId).Returns(1); // last admin
+        _membershipRepo.CountAdminsAsync(OrgId, AdminRoleId).Returns(1); // last admin
 
         Result result = await CreateHandler().Handle(
             new AssignRoleToUserCommand(user.Id, OrgId, AdminRoleId, Action: RoleAction.Remove),
@@ -105,8 +111,9 @@ public class AssignRoleToUserHandlerTests
     [Fact]
     public async Task AssignRoleToUser_WhenRoleNotFoundInOrg_ReturnsNotFound()
     {
-        User user = MakeUser();
+        (User user, OrganizationMembership membership) = MakeUserWithMembership();
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
+        _membershipRepo.GetByUserAndOrganizationAsync(user.Id, OrgId).Returns(membership);
         _roleRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).ReturnsNull();
 
         Result result = await CreateHandler().Handle(
@@ -121,7 +128,7 @@ public class AssignRoleToUserHandlerTests
     [Fact]
     public async Task AssignRoleToUser_WhenUserBelongsToAnotherOrg_ReturnsNotFound()
     {
-        User user = MakeUser();
+        (User user, _) = MakeUserWithMembership();
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
 
         Guid otherOrgId = Guid.NewGuid();

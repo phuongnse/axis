@@ -14,6 +14,7 @@ public class AcceptInvitationHandlerTests
 {
     private readonly IInvitationRepository _invitationRepo = Substitute.For<IInvitationRepository>();
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
+    private readonly IOrganizationMembershipRepository _membershipRepo = Substitute.For<IOrganizationMembershipRepository>();
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
     private readonly IPasswordHasher _hasher = Substitute.For<IPasswordHasher>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
@@ -24,7 +25,7 @@ public class AcceptInvitationHandlerTests
     private static readonly Email InvitedEmail = Email.Create("new@acme.com").Value;
 
     private AcceptInvitationHandler CreateHandler() =>
-        new(_invitationRepo, _userRepo, _roleRepo, _hasher, _uow);
+        new(_invitationRepo, _userRepo, _membershipRepo, _roleRepo, _hasher, _uow);
 
     private AcceptInvitationCommand ValidCommand(string token = "valid-token") =>
         new(token, "Bob", "Jones", "NewPass1");
@@ -51,10 +52,13 @@ public class AcceptInvitationHandlerTests
             Arg.Is<User>(u =>
                 u.FirstName == "Bob" &&
                 u.LastName == "Jones" &&
-                u.OrganizationId == OrgId &&
                 u.IsEmailVerified &&
-                u.RoleIds.Contains(RoleId) &&
                 u.PasswordHash == "hashed"),
+            Arg.Any<CancellationToken>());
+        await _membershipRepo.Received(1).AddAsync(
+            Arg.Is<OrganizationMembership>(m =>
+                m.OrganizationId == OrgId &&
+                m.RoleIds.Contains(RoleId)),
             Arg.Any<CancellationToken>());
 
         invitation.Status.Should().Be(InvitationStatus.Accepted);

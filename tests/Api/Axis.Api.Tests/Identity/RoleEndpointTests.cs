@@ -46,7 +46,7 @@ public class RoleEndpointTests(ApiTestFixture fixture)
         JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
         List<JsonElement> roles = body.GetProperty("items").EnumerateArray().ToList();
 
-        roles.All(r => r.GetProperty("is_system").GetBoolean()).Should().BeTrue();
+        roles.All(r => r.GetProperty("isSystem").GetBoolean()).Should().BeTrue();
     }
 
     // POST /api/roles

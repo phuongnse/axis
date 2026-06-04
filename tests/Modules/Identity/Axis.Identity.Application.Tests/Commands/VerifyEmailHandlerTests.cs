@@ -18,6 +18,7 @@ public class VerifyEmailHandlerTests
 {
     private readonly IEmailVerificationTokenStore _tokenStore = Substitute.For<IEmailVerificationTokenStore>();
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
+    private readonly IOrganizationMembershipRepository _membershipRepo = Substitute.For<IOrganizationMembershipRepository>();
     private readonly IOrganizationRepository _organizationRepo = Substitute.For<IOrganizationRepository>();
     private readonly ITenantModuleProvisioningRepository _provisioningRepo =
         Substitute.For<ITenantModuleProvisioningRepository>();
@@ -25,9 +26,9 @@ public class VerifyEmailHandlerTests
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     private VerifyEmailHandler CreateHandler() =>
-        new(_tokenStore, _userRepo, _organizationRepo, _provisioningRepo, _roleRepo, _uow);
+        new(_tokenStore, _userRepo, _membershipRepo, _organizationRepo, _provisioningRepo, _roleRepo, _uow);
 
-    private static (User User, Organization Organization) MakeUnverifiedUserWithOrg()
+    private static (User User, Organization Organization, OrganizationMembership Membership) MakeUnverifiedUserWithOrg()
     {
         Email email = Email.Create("alice@acme.com").Value!;
         Organization organization = Organization.Create(
@@ -35,15 +36,16 @@ public class VerifyEmailHandlerTests
             OrganizationSlug.Create("acme").Value!,
             email,
             WellKnownSubscriptionPlans.FreeId);
-        User user = User.Create("Alice", "Smith", email, organization.Id);
+        User user = User.Create("Alice", "Smith", email);
         user.SetPasswordHash("hashed");
-        return (user, organization);
+        OrganizationMembership membership = OrganizationMembership.Create(user.Id, organization.Id);
+        return (user, organization, membership);
     }
 
     [Fact]
     public async Task VerifyEmail_WhenTokenIsValid_VerifiesEmailAndRaisesDomainEvent()
     {
-        (User user, Organization organization) = MakeUnverifiedUserWithOrg();
+        (User user, Organization organization, OrganizationMembership membership) = MakeUnverifiedUserWithOrg();
         Role adminRole = Role.CreateSystem("Admin", organization.Id, ["users:read"]);
         string rawToken = "valid-raw-token";
         string tokenHash = OpaqueTokenGenerator.Hash(rawToken);
@@ -51,6 +53,7 @@ public class VerifyEmailHandlerTests
         _tokenStore.ResolveForVerificationAsync(tokenHash, Arg.Any<CancellationToken>())
             .Returns(new EmailVerificationTokenResolveResult(EmailVerificationTokenState.Valid, user.Id));
         _userRepo.GetByIdPlatformWideAsync(user.Id).Returns(user);
+        _membershipRepo.GetFirstActiveByUserIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(membership);
         _organizationRepo.GetByIdAsync(organization.Id).Returns(organization);
         _roleRepo.GetByNameAsync("Admin", organization.Id).Returns(adminRole);
 
@@ -67,9 +70,9 @@ public class VerifyEmailHandlerTests
             Arg.Is<IEnumerable<TenantModuleProvisioning>>(rows => rows.Count() == TenantModuleNames.All.Count),
             Arg.Any<CancellationToken>());
 
-        user.DomainEvents.Should().ContainSingle(e => e is OrganizationVerified)
+        organization.DomainEvents.Should().ContainSingle(e => e is OrganizationVerified)
             .Which.Should().BeOfType<OrganizationVerified>()
-            .Which.OrganizationId.Should().Be(user.OrganizationId);
+            .Which.OrganizationId.Should().Be(organization.Id);
 
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
         await _tokenStore.DidNotReceive().InvalidateAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
@@ -112,7 +115,7 @@ public class VerifyEmailHandlerTests
     [Fact]
     public async Task VerifyEmail_WhenTokenAlreadyUsed_ReturnsBusinessRuleFailure()
     {
-        (User user, Organization _) = MakeUnverifiedUserWithOrg();
+        (User user, Organization _, OrganizationMembership _) = MakeUnverifiedUserWithOrg();
         string rawToken = "used-token";
         string tokenHash = OpaqueTokenGenerator.Hash(rawToken);
         _tokenStore.ResolveForVerificationAsync(tokenHash, Arg.Any<CancellationToken>())
@@ -131,7 +134,7 @@ public class VerifyEmailHandlerTests
     [Fact]
     public async Task VerifyEmail_WhenUserAlreadyVerified_ReturnsBusinessRuleFailure()
     {
-        (User user, Organization _) = MakeUnverifiedUserWithOrg();
+        (User user, Organization _, OrganizationMembership _) = MakeUnverifiedUserWithOrg();
         user.VerifyEmail();
         user.ClearDomainEvents();
         string rawToken = "still-valid-token";

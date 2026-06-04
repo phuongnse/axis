@@ -681,6 +681,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/users/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Register a standalone user account */
+        post: operations["RegisterUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/users/me": {
         parameters: {
             query?: never;
@@ -1222,22 +1239,22 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         AcceptInvitationRequest: {
-            first_name?: string;
-            last_name?: string;
+            firstName?: string;
+            lastName?: string;
             password?: string;
         };
         AddDataClassFieldRequest: {
             name?: string;
             label?: string;
             type?: components["schemas"]["FieldType"];
-            is_required?: boolean;
+            isRequired?: boolean;
             config?: components["schemas"]["FieldConfig"];
         };
         AddFieldRequest: {
             name?: string;
             label?: string;
             type?: components["schemas"]["FieldType"];
-            is_required?: boolean;
+            isRequired?: boolean;
             config?: components["schemas"]["FieldConfig"];
         };
         AddFormFieldRequest: {
@@ -1249,27 +1266,27 @@ export interface components {
         };
         AddStepRequest: {
             name?: string;
-            step_type?: components["schemas"]["StepType"];
+            stepType?: components["schemas"]["StepType"];
             config?: {
                 [key: string]: unknown;
             } | null;
         };
         AddTransitionRequest: {
             /** Format: uuid */
-            from_step_id?: string;
+            fromStepId?: string;
             /** Format: uuid */
-            to_step_id?: string;
+            toStepId?: string;
             label?: string | null;
         };
         AddTriggerRequest: {
-            trigger_type?: components["schemas"]["TriggerType"];
+            triggerType?: components["schemas"]["TriggerType"];
             config?: {
                 [key: string]: unknown;
             } | null;
         };
         AssignRoleRequest: {
             /** Format: uuid */
-            role_id?: string;
+            roleId?: string;
             action?: string;
         };
         BulkDeleteRequest: {
@@ -1279,16 +1296,16 @@ export interface components {
             /** Format: int32 */
             deleted?: number;
             /** Format: int32 */
-            not_found?: number;
+            notFound?: number;
         };
         ChangeOrganizationPlanRequest: {
             /** Format: uuid */
-            plan_id?: string;
+            planId?: string;
         };
         ChangePasswordRequest: {
-            current_password?: string;
-            new_password?: string;
-            confirm_password?: string;
+            currentPassword?: string;
+            newPassword?: string;
+            confirmPassword?: string;
         };
         ConfigureStepRequest: {
             name?: string;
@@ -1327,13 +1344,13 @@ export interface components {
             /** Format: uuid */
             id?: string;
             email?: string;
-            first_name?: string;
-            last_name?: string;
-            full_name?: string;
-            avatar_url?: string | null;
-            is_active?: boolean;
+            firstName?: string;
+            lastName?: string;
+            fullName?: string;
+            avatarUrl?: string | null;
+            isActive?: boolean;
             /** Format: uuid */
-            org_id?: string;
+            orgId?: string | null;
             permissions?: string[];
         };
         DataClassDetailDto: {
@@ -1342,7 +1359,7 @@ export interface components {
             name?: string;
             description?: string | null;
             /** Format: date-time */
-            created_at?: string;
+            createdAt?: string;
             fields?: components["schemas"]["FieldDefinitionDto"][];
         };
         DataClassSummaryDto: {
@@ -1351,31 +1368,31 @@ export interface components {
             name?: string;
             description?: string | null;
             /** Format: int32 */
-            field_count?: number;
+            fieldCount?: number;
             /** Format: date-time */
-            created_at?: string;
+            createdAt?: string;
         };
         ExecutionResponse: {
             /** Format: uuid */
             id?: string;
             /** Format: uuid */
-            workflow_definition_id?: string;
+            workflowDefinitionId?: string;
             status?: string;
-            trigger_type?: string;
+            triggerType?: string;
             /** Format: uuid */
-            triggered_by_user_id?: string | null;
+            triggeredByUserId?: string | null;
             /** Format: uuid */
-            retry_of_execution_id?: string | null;
-            error_message?: string | null;
+            retryOfExecutionId?: string | null;
+            errorMessage?: string | null;
             context?: {
                 [key: string]: unknown;
             };
             /** Format: date-time */
-            created_at?: string;
+            createdAt?: string;
             /** Format: date-time */
-            started_at?: string | null;
+            startedAt?: string | null;
             /** Format: date-time */
-            completed_at?: string | null;
+            completedAt?: string | null;
             steps?: components["schemas"]["ExecutionStepResponse"][];
         };
         /** @enum {string} */
@@ -1384,53 +1401,53 @@ export interface components {
             /** Format: uuid */
             id?: string;
             /** Format: uuid */
-            step_definition_id?: string;
+            stepDefinitionId?: string;
             name?: string;
-            step_type?: string;
+            stepType?: string;
             /** Format: int32 */
-            display_order?: number;
+            displayOrder?: number;
             status?: string;
-            input_snapshot?: {
+            inputSnapshot?: {
                 [key: string]: unknown;
             } | null;
-            output_snapshot?: {
+            outputSnapshot?: {
                 [key: string]: unknown;
             } | null;
-            error_details?: string | null;
+            errorDetails?: string | null;
             /** Format: date-time */
-            started_at?: string | null;
+            startedAt?: string | null;
             /** Format: date-time */
-            completed_at?: string | null;
+            completedAt?: string | null;
             /** Format: date-time */
-            created_at?: string;
+            createdAt?: string;
         };
         ExecutionSummaryResponse: {
             /** Format: uuid */
             id?: string;
             /** Format: uuid */
-            workflow_definition_id?: string;
+            workflowDefinitionId?: string;
             status?: string;
-            trigger_type?: string;
+            triggerType?: string;
             /** Format: uuid */
-            triggered_by_user_id?: string | null;
+            triggeredByUserId?: string | null;
             /** Format: uuid */
-            retry_of_execution_id?: string | null;
-            error_message?: string | null;
+            retryOfExecutionId?: string | null;
+            errorMessage?: string | null;
             /** Format: date-time */
-            created_at?: string;
+            createdAt?: string;
             /** Format: date-time */
-            started_at?: string | null;
+            startedAt?: string | null;
             /** Format: date-time */
-            completed_at?: string | null;
+            completedAt?: string | null;
         };
         ExecutionSummaryResponsePagedResult: {
             items?: components["schemas"]["ExecutionSummaryResponse"][];
             /** Format: int32 */
-            total_count?: number;
+            totalCount?: number;
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
-            page_size?: number;
+            pageSize?: number;
         };
         FieldConfig: Record<string, never>;
         FieldDefinitionDto: {
@@ -1438,12 +1455,12 @@ export interface components {
             id?: string;
             name?: string;
             label?: string;
-            help_text?: string | null;
+            helpText?: string | null;
             type?: string;
-            is_required?: boolean;
-            is_system?: boolean;
+            isRequired?: boolean;
+            isSystem?: boolean;
             /** Format: int32 */
-            display_order?: number;
+            displayOrder?: number;
             config?: components["schemas"]["FieldConfig"];
         };
         /** @enum {string} */
@@ -1456,11 +1473,11 @@ export interface components {
             id?: string;
             name?: string;
             description?: string | null;
-            created_by?: string;
+            createdBy?: string;
             /** Format: date-time */
-            created_at?: string;
+            createdAt?: string;
             /** Format: date-time */
-            updated_at?: string;
+            updatedAt?: string;
             fields?: components["schemas"]["FormFieldDto"][];
         };
         FormFieldConfig: Record<string, never>;
@@ -1472,9 +1489,9 @@ export interface components {
             type?: components["schemas"]["FormFieldType"];
             required?: boolean;
             /** Format: int32 */
-            display_order?: number;
+            displayOrder?: number;
             config?: components["schemas"]["FormFieldConfig"];
-            is_broken?: boolean;
+            isBroken?: boolean;
         };
         /** @enum {string} */
         FormFieldType: "Text" | "Number" | "Boolean" | "Date" | "Dropdown" | "MultiSelect" | "RelationPicker" | "FileUpload" | "Section";
@@ -1484,53 +1501,53 @@ export interface components {
             name?: string;
             description?: string | null;
             /** Format: int32 */
-            field_count?: number;
+            fieldCount?: number;
             /** Format: date-time */
-            updated_at?: string;
+            updatedAt?: string;
         };
         FormSummaryDtoPagedResult: {
             items?: components["schemas"]["FormSummaryDto"][];
             /** Format: int32 */
-            total_count?: number;
+            totalCount?: number;
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
-            page_size?: number;
+            pageSize?: number;
         };
         FormTaskByTokenDto: {
             /** Format: uuid */
-            submission_id?: string;
+            submissionId?: string;
             status?: string;
             /** Format: uuid */
-            form_definition_id?: string;
-            form_name?: string;
-            form_description?: string | null;
+            formDefinitionId?: string;
+            formName?: string;
+            formDescription?: string | null;
             fields?: components["schemas"]["FormFieldDto"][];
             /** Format: date-time */
-            expires_at?: string | null;
+            expiresAt?: string | null;
         };
         FormTaskSummaryDto: {
             /** Format: uuid */
             id?: string;
             /** Format: uuid */
-            form_definition_id?: string;
-            form_name?: string;
+            formDefinitionId?: string;
+            formName?: string;
             /** Format: uuid */
-            execution_id?: string;
+            executionId?: string;
             status?: string;
             /** Format: date-time */
-            created_at?: string;
+            createdAt?: string;
             /** Format: date-time */
-            expires_at?: string | null;
+            expiresAt?: string | null;
             /** Format: uuid */
-            access_token?: string;
+            accessToken?: string;
         };
         GetFormPickerDto: {
             /** Format: uuid */
             id?: string;
             name?: string;
             /** Format: int32 */
-            field_count?: number;
+            fieldCount?: number;
         };
         HttpValidationProblemDetails: {
             type?: string | null;
@@ -1547,20 +1564,20 @@ export interface components {
         };
         InvitationByTokenDto: {
             /** Format: uuid */
-            invitation_id?: string;
+            invitationId?: string;
             email?: string;
             status?: string;
             /** Format: date-time */
-            expires_at?: string;
+            expiresAt?: string;
         };
         InviteUserRequest: {
             email?: string;
             /** Format: uuid */
-            role_id?: string;
+            roleId?: string;
         };
         LegalVersionsDto: {
-            terms_version?: string;
-            privacy_version?: string;
+            termsVersion?: string;
+            privacyVersion?: string;
         };
         MessageResponse: {
             message?: string;
@@ -1573,9 +1590,9 @@ export interface components {
             icon?: string | null;
             color?: string | null;
             /** Format: date-time */
-            created_at?: string;
+            createdAt?: string;
             /** Format: date-time */
-            updated_at?: string;
+            updatedAt?: string;
             fields?: components["schemas"]["FieldDefinitionDto"][];
         };
         ModelSummaryDto: {
@@ -1586,31 +1603,31 @@ export interface components {
             icon?: string | null;
             color?: string | null;
             /** Format: int32 */
-            field_count?: number;
+            fieldCount?: number;
             /** Format: date-time */
-            updated_at?: string;
+            updatedAt?: string;
         };
         ModuleProvisioningStatusDto: {
             module?: string;
             status?: string;
             /** Format: int32 */
-            attempt_count?: number;
-            last_error?: string | null;
+            attemptCount?: number;
+            lastError?: string | null;
         };
         OrganizationSettingsDto: {
             /** Format: uuid */
-            organization_id?: string;
+            organizationId?: string;
             name?: string;
             slug?: string;
-            logo_url?: string | null;
-            plan_name?: string;
+            logoUrl?: string | null;
+            planName?: string;
             status?: string;
             /** Format: date-time */
-            created_at?: string;
-            time_zone_id?: string | null;
-            default_language?: string | null;
+            createdAt?: string;
+            timeZoneId?: string | null;
+            defaultLanguage?: string | null;
             /** Format: date-time */
-            scheduled_hard_delete_at?: string | null;
+            scheduledHardDeleteAt?: string | null;
             usage?: components["schemas"]["UsageStatsDto"];
         };
         OrganizationSlugPreviewDto: {
@@ -1628,20 +1645,20 @@ export interface components {
         };
         ProvisioningStatusDto: {
             /** Format: uuid */
-            organization_id?: string;
-            organization_status?: string;
-            is_ready?: boolean;
+            organizationId?: string;
+            organizationStatus?: string;
+            isReady?: boolean;
             modules?: components["schemas"]["ModuleProvisioningStatusDto"][];
         };
         RecordDto: {
             /** Format: uuid */
             id?: string;
             /** Format: uuid */
-            model_id?: string;
+            modelId?: string;
             /** Format: date-time */
-            created_at?: string;
+            createdAt?: string;
             /** Format: date-time */
-            updated_at?: string;
+            updatedAt?: string;
             data?: {
                 [key: string]: unknown;
             };
@@ -1649,48 +1666,57 @@ export interface components {
         RecordsPageDto: {
             records?: components["schemas"]["RecordDto"][];
             /** Format: int32 */
-            total_count?: number;
+            totalCount?: number;
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
-            page_size?: number;
+            pageSize?: number;
             /** Format: int32 */
-            total_pages?: number;
+            totalPages?: number;
         };
         RegisterOrganizationRequest: {
-            org_name?: string;
-            admin_first_name?: string;
-            admin_last_name?: string;
-            admin_email?: string;
+            orgName?: string;
+            adminFirstName?: string;
+            adminLastName?: string;
+            adminEmail?: string;
             password?: string;
-            password_confirmation?: string;
-            accepted_terms_version?: string;
-            accepted_privacy_version?: string;
+            passwordConfirmation?: string;
+            acceptedTermsVersion?: string;
+            acceptedPrivacyVersion?: string;
             /** Format: uuid */
-            subscription_plan_id?: string | null;
+            subscriptionPlanId?: string | null;
+        };
+        RegisterUserRequest: {
+            firstName?: string;
+            lastName?: string;
+            email?: string;
+            password?: string;
+            passwordConfirmation?: string;
+            acceptedTermsVersion?: string;
+            acceptedPrivacyVersion?: string;
         };
         RemoveTransitionRequest: {
             /** Format: uuid */
-            from_step_id?: string;
+            fromStepId?: string;
             /** Format: uuid */
-            to_step_id?: string;
+            toStepId?: string;
         };
         ReorderFieldsRequest: {
-            field_ids?: string[];
+            fieldIds?: string[];
         };
         ReorderFormFieldsRequest: {
-            field_ids?: string[];
+            fieldIds?: string[];
         };
         ResendVerificationRequest: {
             email?: string;
         };
         ResetPasswordRequest: {
             token?: string;
-            new_password?: string;
-            confirm_password?: string;
+            newPassword?: string;
+            confirmPassword?: string;
         };
         RetryExecutionWithContextRequest: {
-            modified_context?: {
+            modifiedContext?: {
                 [key: string]: unknown;
             };
         };
@@ -1702,11 +1728,11 @@ export interface components {
             id?: string;
             name?: string;
             description?: string | null;
-            is_system?: boolean;
+            isSystem?: boolean;
             permissions?: string[];
         };
         ScheduleOrganizationDeletionRequest: {
-            confirmation_name?: string;
+            confirmationName?: string;
         };
         StartExecutionRequest: {
             input?: {
@@ -1724,9 +1750,9 @@ export interface components {
         };
         StepTransitionDto: {
             /** Format: uuid */
-            from_step_id?: string;
+            fromStepId?: string;
             /** Format: uuid */
-            to_step_id?: string;
+            toStepId?: string;
             label?: string | null;
         };
         /** @enum {string} */
@@ -1742,24 +1768,24 @@ export interface components {
             name?: string;
             slug?: string;
             /** Format: int32 */
-            monthly_price_cents?: number;
+            monthlyPriceCents?: number;
             /** Format: int32 */
-            max_workflows?: number | null;
+            maxWorkflows?: number | null;
             /** Format: int32 */
-            max_executions_per_month?: number | null;
+            maxExecutionsPerMonth?: number | null;
             /** Format: int32 */
-            max_users?: number | null;
+            maxUsers?: number | null;
             /** Format: int64 */
-            max_storage_megabytes?: number | null;
-            feature_flags?: string[];
-            is_current?: boolean;
-            is_available_for_new_signups?: boolean;
+            maxStorageMegabytes?: number | null;
+            featureFlags?: string[];
+            isCurrent?: boolean;
+            isAvailableForNewSignups?: boolean;
         };
         TransitionExportDto: {
             /** Format: uuid */
-            from_step_id?: string;
+            fromStepId?: string;
             /** Format: uuid */
-            to_step_id?: string;
+            toStepId?: string;
             label?: string | null;
         };
         TriggerExportDto: {
@@ -1777,8 +1803,8 @@ export interface components {
         UpdateFieldRequest: {
             type?: components["schemas"]["FieldType"];
             label?: string;
-            help_text?: string | null;
-            is_required?: boolean;
+            helpText?: string | null;
+            isRequired?: boolean;
             config?: components["schemas"]["FieldConfig"];
         };
         UpdateFormRequest: {
@@ -1793,16 +1819,16 @@ export interface components {
         };
         UpdateOrganizationProfileRequest: {
             name?: string;
-            time_zone_id?: string | null;
-            default_language?: string | null;
-            logo_base64?: string | null;
-            logo_content_type?: string | null;
+            timeZoneId?: string | null;
+            defaultLanguage?: string | null;
+            logoBase64?: string | null;
+            logoContentType?: string | null;
         };
         UpdateProfileRequest: {
-            first_name?: string;
-            last_name?: string;
-            avatar_base64?: string | null;
-            avatar_content_type?: string | null;
+            firstName?: string;
+            lastName?: string;
+            avatarBase64?: string | null;
+            avatarContentType?: string | null;
         };
         UpdateRoleRequest: {
             name?: string;
@@ -1810,7 +1836,7 @@ export interface components {
             permissions?: string[];
         };
         UpdateStatusRequest: {
-            is_active?: boolean;
+            isActive?: boolean;
         };
         UpdateWorkflowRequest: {
             name?: string;
@@ -1818,32 +1844,35 @@ export interface components {
         };
         UsageStatsDto: {
             /** Format: int32 */
-            workflows_used?: number;
+            workflowsUsed?: number;
             /** Format: int32 */
-            workflows_limit?: number | null;
+            workflowsLimit?: number | null;
             /** Format: int32 */
-            executions_used_this_month?: number;
+            executionsUsedThisMonth?: number;
             /** Format: int32 */
-            executions_per_month_limit?: number | null;
+            executionsPerMonthLimit?: number | null;
             /** Format: int32 */
-            users_used?: number;
+            usersUsed?: number;
             /** Format: int32 */
-            users_limit?: number | null;
+            usersLimit?: number | null;
         };
         UserSessionResponse: {
-            session_id?: string;
-            device_info?: string;
+            sessionId?: string;
+            deviceInfo?: string;
             /** Format: date-time */
-            last_activity?: string;
+            lastActivity?: string;
             /** Format: date-time */
-            expires_at?: string;
-            is_current?: boolean;
+            expiresAt?: string;
+            isCurrent?: boolean;
         };
+        /** @enum {string} */
+        VerifyEmailNextStep: "Dashboard" | "WorkspaceProvisioning";
         VerifyEmailRequest: {
             token?: string;
         };
         VerifyEmailSessionEstablishedDto: {
-            session_established?: boolean;
+            sessionEstablished?: boolean;
+            nextStep?: components["schemas"]["VerifyEmailNextStep"];
         };
         WorkflowDetailDto: {
             /** Format: uuid */
@@ -1851,11 +1880,11 @@ export interface components {
             name?: string;
             description?: string | null;
             status?: components["schemas"]["WorkflowStatus"];
-            created_by?: string;
+            createdBy?: string;
             /** Format: date-time */
-            created_at?: string;
+            createdAt?: string;
             /** Format: date-time */
-            updated_at?: string;
+            updatedAt?: string;
             steps?: components["schemas"]["WorkflowStepDto"][];
             transitions?: components["schemas"]["StepTransitionDto"][];
             triggers?: components["schemas"]["WorkflowTriggerDto"][];
@@ -1877,7 +1906,7 @@ export interface components {
             config?: {
                 [key: string]: unknown;
             } | null;
-            is_broken?: boolean;
+            isBroken?: boolean;
         };
         WorkflowSummaryDto: {
             /** Format: uuid */
@@ -1886,27 +1915,27 @@ export interface components {
             description?: string | null;
             status?: components["schemas"]["WorkflowStatus"];
             /** Format: int32 */
-            step_count?: number;
+            stepCount?: number;
             /** Format: int32 */
-            trigger_count?: number;
+            triggerCount?: number;
             /** Format: date-time */
-            updated_at?: string;
+            updatedAt?: string;
         };
         WorkflowSummaryDtoPagedResult: {
             items?: components["schemas"]["WorkflowSummaryDto"][];
             /** Format: int32 */
-            total_count?: number;
+            totalCount?: number;
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
-            page_size?: number;
+            pageSize?: number;
         };
         WorkflowTriggerDto: {
             type?: components["schemas"]["TriggerType"];
             config?: {
                 [key: string]: unknown;
             } | null;
-            is_broken?: boolean;
+            isBroken?: boolean;
         };
     };
     responses: never;
@@ -4055,7 +4084,7 @@ export interface operations {
     GetOrganizationSlugPreview: {
         parameters: {
             query: {
-                org_name: string;
+                orgName: string;
             };
             header?: never;
             path?: never;
@@ -4466,6 +4495,48 @@ export interface operations {
             };
             /** @description Unprocessable Content */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RegisterUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterUserRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

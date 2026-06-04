@@ -10,6 +10,7 @@ namespace Axis.Identity.Application.Commands.AcceptInvitation;
 public sealed class AcceptInvitationHandler(
     IInvitationRepository invitationRepo,
     IUserRepository userRepo,
+    IOrganizationMembershipRepository membershipRepo,
     IRoleRepository roleRepo,
     IPasswordHasher hasher,
     IUnitOfWork uow)
@@ -37,12 +38,16 @@ public sealed class AcceptInvitationHandler(
 
         string passwordHash = hasher.Hash(command.Password);
 
-        User user = User.Create(command.FirstName, command.LastName, invitation.Email, invitation.OrganizationId);
+        User user = User.Create(command.FirstName, command.LastName, invitation.Email);
         user.SetPasswordHash(passwordHash);
         user.VerifyEmail();
-        user.AssignRole(invitation.RoleId);
 
         await userRepo.AddAsync(user, cancellationToken);
+
+        OrganizationMembership membership = OrganizationMembership.Create(user.Id, invitation.OrganizationId);
+        membership.AssignRole(invitation.RoleId);
+        await membershipRepo.AddAsync(membership, cancellationToken);
+
         await uow.SaveChangesAsync(cancellationToken);
 
         IReadOnlyList<Role> roles = await roleRepo.GetByIdsAsync([invitation.RoleId], invitation.OrganizationId, cancellationToken);

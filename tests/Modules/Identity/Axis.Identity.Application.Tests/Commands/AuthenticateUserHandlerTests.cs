@@ -14,6 +14,7 @@ namespace Axis.Identity.Application.Tests.Commands;
 public class AuthenticateUserHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
+    private readonly IOrganizationMembershipRepository _membershipRepo = Substitute.For<IOrganizationMembershipRepository>();
     private readonly IOrganizationRepository _orgRepo = Substitute.For<IOrganizationRepository>();
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
     private readonly IPasswordHasher _hasher = Substitute.For<IPasswordHasher>();
@@ -30,16 +31,22 @@ public class AuthenticateUserHandlerTests
             Email.Create("owner@acme.com").Value,
             WellKnownSubscriptionPlans.FreeId);
         _orgRepo.GetByIdAsync(OrgId, Arg.Any<CancellationToken>()).Returns(organization);
-        return new(_userRepo, _orgRepo, _roleRepo, _hasher, _uow);
+        return new(_userRepo, _membershipRepo, _orgRepo, _roleRepo, _hasher, _uow);
     }
 
     private static User MakeActiveUser(string email = "alice@acme.com")
     {
-        User user = User.Create("Alice", "Smith", Email.Create(email).Value, OrgId);
+        User user = User.Create("Alice", "Smith", Email.Create(email).Value);
         user.SetPasswordHash("hashed");
         user.VerifyEmail();
-        user.AssignRole(RoleId);
         return user;
+    }
+
+    private static OrganizationMembership MakeMembership(User user)
+    {
+        OrganizationMembership membership = OrganizationMembership.Create(user.Id, OrgId);
+        membership.AssignRole(RoleId);
+        return membership;
     }
 
     private static Role MakeRole(string[] permissions) =>
@@ -55,10 +62,13 @@ public class AuthenticateUserHandlerTests
             Email.Create("owner@acme.com").Value,
             WellKnownSubscriptionPlans.FreeId);
         organization.MarkDeleted();
+        OrganizationMembership membership = MakeMembership(user);
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).Returns(user);
-        _orgRepo.GetByIdAsync(user.OrganizationId, Arg.Any<CancellationToken>()).Returns(organization);
+        _membershipRepo.GetFirstActiveByUserIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(membership);
+        _orgRepo.GetByIdAsync(OrgId, Arg.Any<CancellationToken>()).Returns(organization);
+        _hasher.Verify("password123", "hashed").Returns(true);
 
-        AuthenticateUserHandler handler = new(_userRepo, _orgRepo, _roleRepo, _hasher, _uow);
+        AuthenticateUserHandler handler = new(_userRepo, _membershipRepo, _orgRepo, _roleRepo, _hasher, _uow);
         Result<AuthenticationResult> result = await handler.Handle(
             new AuthenticateUserCommand("alice@acme.com", "password123"),
             CancellationToken.None);
@@ -71,8 +81,10 @@ public class AuthenticateUserHandlerTests
     public async Task AuthenticateUser_WhenCredentialsAreValid_ReturnsSuccessWithUserInfoAndPermissions()
     {
         User user = MakeActiveUser();
+        OrganizationMembership membership = MakeMembership(user);
         Role role = MakeRole(["workflow:definition:read", "users:read"]);
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).Returns(user);
+        _membershipRepo.GetFirstActiveByUserIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(membership);
         _hasher.Verify("password123", "hashed").Returns(true);
         _roleRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), OrgId).Returns([role]);
 
@@ -157,7 +169,7 @@ public class AuthenticateUserHandlerTests
     [Fact]
     public async Task AuthenticateUser_WhenEmailNotVerified_ReturnsEmailNotVerified()
     {
-        User user = User.Create("Alice", "Smith", Email.Create("alice@acme.com").Value, OrgId);
+        User user = User.Create("Alice", "Smith", Email.Create("alice@acme.com").Value);
         user.SetPasswordHash("hashed");
         // Email NOT verified
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).Returns(user);

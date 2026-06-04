@@ -517,7 +517,8 @@ _ = Task.Run(async () =>
 
 ## EF Core aggregate mapping patterns
 
-- **Private backing fields** (`_roleIds`, `_permissions`): use `PrimitiveCollection<List<T>>(fieldName).HasField(fieldName).UsePropertyAccessMode(PropertyAccessMode.Field)` — the type parameter must be the *collection* type, not the element type.
+- **Domain relationships are tables, not primitive id arrays**: do not store relationship ids in `PrimitiveCollection<List<Guid>>` or query private fields with `EF.Property(..., "_field")`. Model the relationship explicitly as an entity/join table so invariants, indexes, and future metadata stay visible.
+- **Private backing fields for owned value state**: backing fields are fine for aggregate-owned value/child state (for example form fields, workflow steps, role permission strings) when repositories do not query them by magic string. Use `HasField(...)`/field access for encapsulation, but expose relationship queries through named entities and repositories.
 - **No-args EF Core constructor**: when an aggregate's only constructor takes params EF Core can't bind (e.g. `IEnumerable<string>`), add a private no-args constructor: `private MyAggregate() : base(default) { RequiredField = null!; }`. Initialize all non-nullable reference-type fields to silence CS8618 — EF Core will never use these sentinel values because it always materialises via the real constructor path.
 - **Migrations strategy** ([ADR-023](../TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)): every environment uses `Database.MigrateAsync()` — production, dev bootstrap, tenant provisioning, and Testcontainers fixtures. One EF migration chain per `DbContext`; never `EnsureCreated`/`EnsureCreatedAsync`.
 - **Identity uses the global `public` schema** — `IdentityDbContext` is a plain `DbContext` with no `TenantSchemaInterceptor`. All other modules use `AxisDbContext` with `TenantSchemaInterceptor`.
@@ -1587,7 +1588,7 @@ string hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
 
 app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions { … });
 
-opts.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower;
+opts.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
 ```
 
 **Right:**

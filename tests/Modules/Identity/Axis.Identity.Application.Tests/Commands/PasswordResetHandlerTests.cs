@@ -25,7 +25,7 @@ public class RequestPasswordResetHandlerTests
 
     private static User MakeUser()
     {
-        User user = User.Create("Alice", "Smith", Email.Create("alice@acme.com").Value, OrgId);
+        User user = User.Create("Alice", "Smith", Email.Create("alice@acme.com").Value);
         user.SetPasswordHash("hashed");
         user.VerifyEmail();
         return user;

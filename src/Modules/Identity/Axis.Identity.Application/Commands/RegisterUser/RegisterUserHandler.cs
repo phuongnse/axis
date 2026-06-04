@@ -1,0 +1,90 @@
+using Axis.Identity.Application.Repositories;
+using Axis.Identity.Application.Services;
+using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Domain.ValueObjects;
+using Axis.Shared.Application.CQRS;
+using Axis.Shared.Domain.Primitives;
+
+namespace Axis.Identity.Application.Commands.RegisterUser;
+
+public sealed class RegisterUserHandler(
+    IUserRepository userRepo,
+    IRegistrationIdempotencyRepository idempotencyRepo,
+    IEmailVerificationTokenStore verificationTokenStore,
+    IPasswordHasher hasher,
+    IEmailSender emailSender,
+    IUnitOfWork uow)
+    : ICommandHandler<RegisterUserCommand>
+{
+    private static readonly TimeSpan VerificationTokenLifetime = TimeSpan.FromHours(24);
+
+    public async Task<Result> Handle(RegisterUserCommand command, CancellationToken cancellationToken)
+    {
+        string? idempotencyKey = string.IsNullOrWhiteSpace(command.IdempotencyKey)
+            ? null
+            : command.IdempotencyKey.Trim();
+
+        RegistrationIdempotencyAcquireResult acquireResult = RegistrationIdempotencyAcquireResult.Acquired;
+        if (idempotencyKey is not null)
+        {
+            acquireResult = await idempotencyRepo.AcquireAsync(idempotencyKey, cancellationToken);
+            if (acquireResult is RegistrationIdempotencyAcquireResult.AlreadyCompleted
+                or RegistrationIdempotencyAcquireResult.InProgress)
+            {
+                return Result.Success();
+            }
+        }
+
+        try
+        {
+            Result<Email> email = Email.Create(command.Email);
+            if (email.IsFailure)
+            {
+                return Result.Failure(ErrorCodes.InvalidInput, "Email must be a valid email address.");
+            }
+
+            if (await userRepo.EmailExistsPlatformWideAsync(email.Value, cancellationToken))
+            {
+                return Result.Failure(
+                    ErrorCodes.Conflict,
+                    "An account with this email already exists. Sign in instead.");
+            }
+
+            User user = User.Create(command.FirstName, command.LastName, email.Value);
+            user.SetPasswordHash(hasher.Hash(command.Password));
+            user.RecordLegalAcceptance(command.AcceptedTermsVersion, command.AcceptedPrivacyVersion);
+            await userRepo.AddAsync(user, cancellationToken);
+
+            await uow.SaveChangesAsync(cancellationToken);
+
+            (string rawToken, string tokenHash) = OpaqueTokenGenerator.Create();
+            await verificationTokenStore.CreateAsync(
+                user.Id,
+                tokenHash,
+                DateTime.UtcNow.Add(VerificationTokenLifetime),
+                cancellationToken);
+
+            await emailSender.SendVerificationEmailAsync(
+                email.Value.Value,
+                rawToken,
+                cancellationToken);
+
+            await MarkIdempotencyCompletedIfNeededAsync(idempotencyKey, cancellationToken);
+            return Result.Success();
+        }
+        catch
+        {
+            if (idempotencyKey is not null && acquireResult == RegistrationIdempotencyAcquireResult.Acquired)
+                await idempotencyRepo.MarkFailedAsync(idempotencyKey, cancellationToken);
+
+            throw;
+        }
+    }
+
+    private Task MarkIdempotencyCompletedIfNeededAsync(
+        string? idempotencyKey,
+        CancellationToken cancellationToken) =>
+        idempotencyKey is null
+            ? Task.CompletedTask
+            : idempotencyRepo.MarkCompletedAsync(idempotencyKey, cancellationToken);
+}

@@ -12,6 +12,7 @@ public sealed class RegisterOrganizationHandler(
     IOrganizationRepository orgRepo,
     ISubscriptionPlanRepository planRepo,
     IUserRepository userRepo,
+    IOrganizationMembershipRepository membershipRepo,
     IRoleRepository roleRepo,
     IRegistrationIdempotencyRepository idempotencyRepo,
     IEmailVerificationTokenStore verificationTokenStore,
@@ -111,11 +112,14 @@ public sealed class RegisterOrganizationHandler(
             await roleRepo.AddAsync(viewerRole, cancellationToken);
             await roleRepo.AddAsync(endUserRole, cancellationToken);
 
-            User user = User.Create(command.AdminFirstName, command.AdminLastName, email.Value, org.Id);
+            User user = User.Create(command.AdminFirstName, command.AdminLastName, email.Value);
             user.SetPasswordHash(hasher.Hash(command.Password));
             user.RecordLegalAcceptance(command.AcceptedTermsVersion, command.AcceptedPrivacyVersion);
-            user.AssignRole(adminRole.Id);
             await userRepo.AddAsync(user, cancellationToken);
+
+            OrganizationMembership membership = OrganizationMembership.Create(user.Id, org.Id);
+            membership.AssignRole(adminRole.Id);
+            await membershipRepo.AddAsync(membership, cancellationToken);
 
             await uow.SaveChangesAsync(cancellationToken);
 

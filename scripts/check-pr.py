@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Validate pull request body structure.
+"""Validate pull request title and body structure.
 
 Usage:
-  PR_BODY="..." python scripts/check-pr-body.py
-  python scripts/check-pr-body.py --body-file pr-body.md
+  PR_TITLE="feat(scope): subject" PR_BODY="..." python scripts/check-pr.py
+  python scripts/check-pr.py --title "feat(scope): subject" --body-file pr-body.md
 """
 
 from __future__ import annotations
@@ -18,12 +18,15 @@ COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 HEADING_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 CHECKBOX_RE = re.compile(r"^\s*-\s+\[(?P<state>[ xX])\]\s+(?P<label>.+)$", re.MULTILINE)
 NA_REASON_RE = re.compile(r"\bN/A\b\s*(?:[-:\u2014]|\()\s*\S+", re.IGNORECASE)
+PR_TITLE_RE = re.compile(r"^[a-z]+(?:\([a-z0-9-]+\))?!?: .{8,}$")
 
 REQUIRED_SECTIONS = (
     "Summary",
     "Linked spec",
     "Requirements & rules followed",
 )
+
+PR_TITLE_EXAMPLE = "feat(identity): implement standalone user registration"
 
 
 def strip_comments(text: str) -> str:
@@ -53,7 +56,20 @@ def has_na_reason(line: str) -> bool:
     return bool(NA_REASON_RE.search(line))
 
 
-def validate(body: str) -> list[str]:
+def validate_title(title: str) -> list[str]:
+    title = title.strip()
+    if not title:
+        return [f"PR title is empty; use Conventional Commit style, e.g. `{PR_TITLE_EXAMPLE}`"]
+    if not PR_TITLE_RE.match(title):
+        return [
+            "PR title must use Conventional Commit style: "
+            "`type(scope): subject` or `type: subject`, "
+            f"e.g. `{PR_TITLE_EXAMPLE}`",
+        ]
+    return []
+
+
+def validate_body(body: str) -> list[str]:
     body = body.lstrip("\ufeff")
     issues: list[str] = []
     if not strip_comments(body).strip():
@@ -91,24 +107,30 @@ def validate(body: str) -> list[str]:
     return issues
 
 
+def validate(title: str, body: str) -> list[str]:
+    return [*validate_title(title), *validate_body(body)]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--title", help="PR title. Defaults to PR_TITLE env var")
     parser.add_argument("--body-file", type=Path, help="Read PR body from a file")
     args = parser.parse_args()
 
+    title = args.title if args.title is not None else os.environ.get("PR_TITLE", "")
     if args.body_file:
         body = args.body_file.read_text(encoding="utf-8")
     else:
         body = os.environ.get("PR_BODY", "")
 
-    issues = validate(body)
+    issues = validate(title, body)
     if issues:
-        print("check-pr-body FAIL:", file=sys.stderr)
+        print("check-pr FAIL:", file=sys.stderr)
         for issue in issues:
             print(f"  - {issue}", file=sys.stderr)
         return 1
 
-    print("check-pr-body: OK")
+    print("check-pr: OK")
     return 0
 
 

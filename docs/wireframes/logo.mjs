@@ -30,6 +30,7 @@ export const AXIS_LOGO_COMPACT_W = AXIS_MARK_COMPACT_W + AXIS_WORD_GAP + AXIS_WO
 export const AXIS_LOGO_COMPACT_H = AXIS_MARK_COMPACT_H;
 
 const LOGO_FILE_ID = 'axis_brand_logo_svg';
+const LOGO_TIMESTAMP = 1700000000000;
 
 let logoFileBundle = null;
 
@@ -42,7 +43,7 @@ export function axisLogoExcalidrawFiles() {
         mimeType: 'image/svg+xml',
         id: LOGO_FILE_ID,
         dataURL,
-        created: Date.now(),
+        created: LOGO_TIMESTAMP,
       },
     };
   }
@@ -75,7 +76,7 @@ export function imageElement(id, fileId, x, y, w, h) {
     index: null,
     isDeleted: false,
     boundElements: null,
-    updated: Date.now(),
+    updated: LOGO_TIMESTAMP,
     link: null,
     locked: false,
     status: 'saved',

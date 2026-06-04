@@ -102,7 +102,7 @@
 
 ### ADR-004: OpenIddict as OAuth2/OIDC Server
 **Decision:** Use OpenIddict 5.x as the in-process OAuth2/OIDC authorization server.
-**Reason:** Axis will support external systems triggering workflows via API — this requires a standards-compliant OAuth2 Client Credentials flow so third-party tools can authenticate without user interaction. OpenIddict also enables Authorization Code + PKCE for the SPA (more secure than custom JWT for browser clients) and hosts external identity providers for interactive sign-in (see [ADR-027](#adr-027-external-identity-providers-for-sign-in-and-registration)). Keeping the auth server in-process avoids external service dependencies.
+**Reason:** Axis will support external systems triggering workflows via API — this requires a standards-compliant OAuth2 Client Credentials flow so third-party tools can authenticate without user interaction. OpenIddict also enables Authorization Code + PKCE for the SPA (more secure than custom JWT for browser clients) and hosts external identity providers for interactive user sign-in (see [ADR-027](#adr-027-external-identity-providers-for-user-sign-in-and-registration)). Keeping the auth server in-process avoids external service dependencies.
 
 ### ADR-005: React over Vue/Svelte for Frontend
 **Decision:** Use React with TypeScript.
@@ -397,11 +397,11 @@
 - "Same message goes to both transports" — pick one based on semantics. Duplicating writes doubles failure modes.
 - Suffix-less message names (just `ProvisionTenant`) — ambiguous routing; pre-commit hook should reject.
 
-### ADR-027: External identity providers for sign-in and registration
+### ADR-027: External identity providers for user sign-in and registration
 
-**Decision:** Support **Microsoft** (Entra ID / Microsoft account), **Google**, and **GitHub** as external sign-in providers alongside email/password. They are wired into the OpenIddict server (ADR-004) via the ASP.NET Core external-authentication handlers; OpenIddict remains the only token issuer — external providers authenticate the user, Axis still mints its own access/refresh tokens.
+**Decision:** Support **Microsoft** (Entra ID / Microsoft account), **Google**, and **GitHub** as external providers for user sign-in and [user registration](./use-cases/identity-access/register-user/README.md) alongside email/password. They are wired into the OpenIddict server (ADR-004) via the ASP.NET Core external-authentication handlers; OpenIddict remains the only token issuer — external providers authenticate the user, Axis still mints its own access/refresh tokens. External providers do **not** create organizations; organization onboarding is owned by [register-org](./use-cases/platform-foundation/register-org/README.md) and uses an official organization contact email.
 
-**Reason:** Low-friction sign-up and sign-in are required for onboarding. Organizations expect to onboard with the corporate or developer identity they already have, and password-only auth raises abandonment at registration. Routing all three through OpenIddict keeps a single token format, a single JWKS, and one RBAC mapping regardless of how the user authenticated.
+**Reason:** Low-friction user sign-up and sign-in are required for onboarding. Users expect to use the corporate or developer identity they already have, and password-only auth raises abandonment at account setup. However, a generic Microsoft / Google / GitHub user identity does not prove authority over an organization, so organization registration remains a separate flow based on organization contact verification. Routing all user providers through OpenIddict keeps a single token format, a single JWKS, and one RBAC mapping regardless of how the user authenticated.
 
 **Configuration:** per-provider `client_id` / `client_secret` stored in HashiCorp Vault in production ([ADR-022](#adr-022-secrets-management-via-hashicorp-vault-in-production)) and `.env` in development. Redirect URIs are registered per environment. A provider can be disabled per deployment without code changes.
 

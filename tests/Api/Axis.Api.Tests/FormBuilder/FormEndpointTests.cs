@@ -30,7 +30,7 @@ public class FormEndpointTests(ApiTestFixture fixture)
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
         body.GetProperty("items").EnumerateArray().ToList().Should().BeEmpty();
-        body.GetProperty("total_count").GetInt32().Should().Be(0);
+        body.GetProperty("totalCount").GetInt32().Should().Be(0);
     }
 
     // ── POST /api/forms ───────────────────────────────────────────────────────
@@ -197,7 +197,7 @@ public class FormEndpointTests(ApiTestFixture fixture)
             label = "First Name",
             type = "Text",
             required = true,
-            config = new { max_length = 100, placeholder = (string?)null, multiline = false },
+            config = new { maxLength = 100, multiline = false },
         }, Json);
 
         addResp.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -283,7 +283,7 @@ public class FormEndpointTests(ApiTestFixture fixture)
         string fieldB = await AddTextFieldAsync(client, formId, "field_b", "Field B");
 
         HttpResponseMessage reorderResp = await client.PutAsJsonAsync($"/api/forms/{formId}/fields/reorder",
-            new { field_ids = new[] { fieldB, fieldA } }, Json);
+            new { fieldIds = new[] { fieldB, fieldA } }, Json);
 
         reorderResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
@@ -302,7 +302,7 @@ public class FormEndpointTests(ApiTestFixture fixture)
 
         // Send empty list — must contain all field IDs
         HttpResponseMessage resp = await client.PutAsJsonAsync($"/api/forms/{formId}/fields/reorder",
-            new { field_ids = Array.Empty<string>() }, Json);
+            new { fieldIds = Array.Empty<string>() }, Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }

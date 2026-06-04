@@ -9,6 +9,7 @@ namespace Axis.Identity.Application.Commands.AuthenticateUser;
 
 public sealed class AuthenticateUserHandler(
     IUserRepository userRepo,
+    IOrganizationMembershipRepository membershipRepo,
     IOrganizationRepository organizationRepo,
     IRoleRepository roleRepo,
     IPasswordHasher hasher,
@@ -32,9 +33,8 @@ public sealed class AuthenticateUserHandler(
         if (!user.IsEmailVerified)
             return AuthenticationResult.Fail(AuthFailureReason.EmailNotVerified);
 
-        Organization? organization = await organizationRepo.GetByIdAsync(user.OrganizationId, cancellationToken);
-        if (organization is null || !organization.AllowsSignIn())
-            return AuthenticationResult.Fail(AuthFailureReason.OrganizationDeleted);
+        OrganizationMembership? membership =
+            await membershipRepo.GetFirstActiveByUserIdAsync(user.Id, cancellationToken);
 
         if (user.IsLockedOut)
             return AuthenticationResult.Fail(AuthFailureReason.AccountLocked, user.LockedUntil);
@@ -49,13 +49,26 @@ public sealed class AuthenticateUserHandler(
         user.ResetFailedLogins();
         await uow.SaveChangesAsync(cancellationToken);
 
-        IReadOnlyList<Role> roles = await roleRepo.GetByIdsAsync(user.RoleIds, user.OrganizationId, cancellationToken);
+        if (membership is null)
+        {
+            return AuthenticationResult.Ok(
+                user.Id, null, user.Email.Value, user.FullName, []);
+        }
+
+        Organization? organization = await organizationRepo.GetByIdAsync(membership.OrganizationId, cancellationToken);
+        if (organization is null || !organization.AllowsSignIn())
+            return AuthenticationResult.Fail(AuthFailureReason.OrganizationDeleted);
+
+        IReadOnlyList<Role> roles = await roleRepo.GetByIdsAsync(
+            membership.RoleIds,
+            membership.OrganizationId,
+            cancellationToken);
         List<string> permissions = roles
             .SelectMany(r => r.Permissions)
             .Distinct()
             .ToList();
 
         return AuthenticationResult.Ok(
-            user.Id, user.OrganizationId, user.Email.Value, user.FullName, permissions);
+            user.Id, membership.OrganizationId, user.Email.Value, user.FullName, permissions);
     }
 }
