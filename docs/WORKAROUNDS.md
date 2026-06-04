@@ -1,6 +1,6 @@
 # Architectural Workarounds Inventory
 
-> [← docs/README.md](README.md) · [← CLAUDE.md](../CLAUDE.md) · [← TECH_STACK.md](TECH_STACK.md)
+> **Navigation**: [← docs/README.md](./README.md) · [← CLAUDE.md](../CLAUDE.md) · [← TECH_STACK.md](./TECH_STACK.md)
 
 ## Why this file exists
 
@@ -23,7 +23,7 @@ Without these five fields, the entry is just noise. Don't add an entry you can't
 You add a workaround when you ship code that **knowingly** violates a rule. Steps:
 
 1. Open this file. Add an entry under **Active workarounds** using the template below.
-2. Add a code comment at the workaround site: `// WORKAROUND: see docs/WORKAROUNDS.md#<slug>`. The `<slug>` is the lowercased, hyphenated heading of your entry. The drift check (`scripts/check-doc-drift.sh`) verifies every `WORKAROUND:` comment links to a real section.
+2. Add a code comment at the workaround site: `// WORKAROUND: see docs/WORKAROUNDS.md#<slug>`. The `<slug>` is the lowercased, hyphenated heading of your entry. The drift check (`python scripts/axis.py check doc-drift`) verifies every `WORKAROUND:` comment links to a real section.
 3. If the workaround is detected by an architecture fitness test, add it to the test's allow-list (e.g. `KnownBoundaryWorkarounds` in `tests/Architecture/Axis.Architecture.Tests/ModuleBoundaryTests.cs`). Reference this file from the test comment.
 4. In the PR description, mention the new workaround so reviewers see it.
 

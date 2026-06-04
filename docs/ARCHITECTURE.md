@@ -1,6 +1,6 @@
 # Architecture
 
-[← Back to Docs Home](./README.md)
+> **Navigation**: [← docs/README.md](./README.md) · [← CLAUDE.md](../CLAUDE.md)
 
 > **Scope:** Architectural shape — what containers exist, how tenancy and auth work end-to-end, where the modules sit. **Not** the source of truth for: library versions ([TECH_STACK.md](./TECH_STACK.md)), source tree ([CLAUDE.md](../CLAUDE.md) § Solution tree), feature behaviour (`docs/use-cases/`), implementation rules (`docs/playbooks/`).
 >

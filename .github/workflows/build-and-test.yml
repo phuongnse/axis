@@ -23,7 +23,7 @@ jobs:
           persist-credentials: false
 
       - name: Validate PR metadata
-        run: python scripts/check-pr.py
+        run: python scripts/axis.py check pr
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
@@ -93,7 +93,7 @@ jobs:
             protobuf:
               - '**/*.proto'
               - 'buf.yaml'
-              - 'scripts/check-buf-modules.sh'
+              - 'scripts/axis.py'
               - '.github/workflows/build-and-test.yml'
             markdown:
               - '**/*.md'
@@ -127,10 +127,10 @@ jobs:
         run: dotnet restore
 
       - name: Vulnerable packages
-        run: bash ./scripts/check-vulnerable-packages.sh
+        run: python scripts/axis.py check vulnerable-packages
 
       - name: Test project classification
-        run: bash ./scripts/check-test-project-classification.sh
+        run: python scripts/axis.py check test-project-classification
 
       - name: Build
         run: dotnet build --no-restore
@@ -218,7 +218,7 @@ jobs:
           persist-credentials: false
 
       - name: Check doc drift
-        run: ./scripts/check-doc-drift.sh
+        run: python scripts/axis.py check doc-drift
         env:
           BASE_BRANCH: main
 
@@ -248,7 +248,7 @@ jobs:
       - name: buf breaking (vs base branch)
         env:
           BASE_REF: origin/${{ github.event.pull_request.base.ref || 'main' }}
-        run: ./scripts/buf-breaking-against-base.sh
+        run: python scripts/axis.py check buf-breaking-against-base
 
   link-check:
     name: Markdown link check

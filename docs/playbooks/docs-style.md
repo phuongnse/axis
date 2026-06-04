@@ -2,7 +2,7 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
 
-Short anti-pattern checklist for everything under `docs/`. Read once; come back when adding a new file. Most of these are enforced by [`scripts/check-doc-drift.sh`](../../scripts/check-doc-drift.sh) and the **Markdown link check** CI job — the doctrine here exists so the rules feel justified, not arbitrary.
+Short anti-pattern checklist for everything under `docs/`. Read once; come back when adding a new file. Most of these are enforced by `python scripts/axis.py check doc-drift` and the **Markdown link check** CI job — the doctrine here exists so the rules feel justified, not arbitrary.
 
 ---
 
@@ -36,8 +36,9 @@ Reference and practice docs are **scanned, not read**. Optimize for a reader who
 | Anti-pattern | Why it rots | Do instead |
 |---|---|---|
 | **Speculation in reference docs** ("Not yet implemented", "planned design", "Will be wired") | Reads as reference, is actually guesswork; the real design will diverge | Put forward-looking content in `docs/PROGRESS.md` (current status) or a domain use-case file (spec). Enforced for `docs/ARCHITECTURE.md` by the drift script. |
+| **Dead-end docs without navigation** | Readers cannot climb back to the owning index; agents miss related guidance | Every `docs/**/*.md` file starts with an H1 followed by `> **Navigation**:` links to the relevant index |
 | **Duplicating versions / paths / commands** across docs | Both copies drift; readers don't know which is canonical | Link to the owner doc (see ownership table) |
-| **Duplicating compose ports / service URLs** | Playbooks drift from `docker-compose.yml` | Owner: [local-dev.md](./local-dev.md) + compose file; enforced by [`check-local-dev-docs.py`](../../scripts/check-local-dev-docs.py) |
+| **Duplicating compose ports / service URLs** | Playbooks drift from `docker-compose.yml` | Owner: [local-dev.md](./local-dev.md) + compose file; enforced by `python scripts/axis.py check local-dev-docs` |
 | **Aspirational metrics** in engineering docs (e.g. "50 customers in 6 months") | Nobody measures or tests against them; they age into embarrassment | Keep in pitch deck / `PRODUCT_VISION.md` if anywhere; do not pollute technical reference |
 | **Empty "TODO: fill later" sections** | Look authoritative, contain nothing, lie to readers | Delete the section. Add it when there's content to add. |
 | **"Process about process"** docs > 100 lines | Nobody reads them; the rules don't get followed | Embed the rule into the **drift script** or a **template**. Doctrine without enforcement is decoration. |
@@ -72,7 +73,7 @@ When you learn something from a specific incident:
 
 **Test:** read the rule as if you'd never seen the originating feature. If it only makes sense with that one use case in mind, generalize it and move the specifics out. (This is what [agent-checklist § Gate 3](./agent-checklist.md) means by "Incident-level detail in rule text? → No".)
 
-Enforced by the incident/lesson-framing guard in [`scripts/check-doc-drift.sh`](../../scripts/check-doc-drift.sh), which flags lesson-style callouts (a bold *Lesson* heading, or a rule tagged with one specific feature in parentheses) in practice docs. The guard is deliberately narrow — it catches the recurring callout class, not every over-fit; the rest is on review and this section.
+Enforced by the incident/lesson-framing guard in `python scripts/axis.py check doc-drift`, which flags lesson-style callouts (a bold *Lesson* heading, or a rule tagged with one specific feature in parentheses) in practice docs. The guard is deliberately narrow — it catches the recurring callout class, not every over-fit; the rest is on review and this section.
 
 ---
 
@@ -202,7 +203,7 @@ Rules:
 - **`Gaps vs spec`** lists remaining AC bullets; never write `pending API layer` when endpoints already exist — say what is missing (`403 test`, `date filter query param`, etc.).
 - **`API ✅`** on a US means in-scope REST/OpenAPI AC for that story are shipped; Frontend-only gaps do not downgrade API to ⚠️.
 
-**Bulk validate:** `python3 scripts/check-use-case-docs.py --check` (also run via `check-doc-drift.sh`).
+**Bulk validate:** `python scripts/axis.py check use-case-docs` (also run via `python scripts/axis.py check doc-drift`).
 
 ---
 
@@ -227,7 +228,7 @@ Avoid writing engineering process constraints as end-user use cases. Keep those 
 1. Add the back-link header (per [`docs/README.md`](../README.md)): `> **Navigation**: [← parent.md](...)` so future readers can climb back up.
 2. If it belongs in the docs hub: add a playbook row, a [Key Diagrams](../README.md#key-diagrams) index link, or a [Wireframes](../README.md#wireframes) domain pointer — **not** a per-screen wireframe file row (those stay in the owning use-case `## Wireframes` only).
 3. If it owns a topic, add it to the **Single source of truth** table.
-4. If the topic could be enforced mechanically, add a rule to `scripts/check-doc-drift.sh` — that is what makes the convention survive.
+4. If the topic could be enforced mechanically, add a rule to `scripts/axis.py check doc-drift` — that is what makes the convention survive.
 
 ---
 

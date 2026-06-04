@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
-# Pre-push gate: runs fast local checks before any push - build, vulnerable
-# package scan, format, unit tests, frontend, and doc drift.
-#
-# CI remains the authoritative full gate and runs the Testcontainers-backed
-# Infrastructure/API tests before merge.
-#
-# Enable once:  git config core.hooksPath scripts/hooks   (or: scripts/install-hooks.sh)
-# Emergency escape hatch remains Git's standard:
-#   git push --no-verify   (justify it; CI still runs the full gate)
-exec "$(git rev-parse --show-toplevel)/scripts/verify.sh"
+# Git hook entrypoint. Python is the source of truth: scripts/axis.py verify.
+set -euo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+if [ -z "${PYTHON:-}" ]; then
+  if command -v python3 >/dev/null 2>&1; then
+    PYTHON=python3
+  elif command -v python >/dev/null 2>&1; then
+    PYTHON=python
+  else
+    echo "Python is required. Set PYTHON or install python/python3 on PATH." >&2
+    exit 1
+  fi
+fi
+exec "${PYTHON}" "${ROOT}/scripts/axis.py" verify

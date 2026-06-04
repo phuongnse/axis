@@ -4,7 +4,7 @@
 
 The full dev stack runs from one `docker compose up -d`: **Postgres**, **Redis**, **MailDev**, **LocalStack**, **Kafka** (KRaft), **Schema Registry**, **RabbitMQ**, **Vault** (dev mode), the **.NET API**, and the **Vite SPA**. Backend hot-reloads via `dotnet watch`; frontend hot-reloads via Vite. Source is bind-mounted — edit on the host, containers pick up changes.
 
-**Canonical port list:** [`docker-compose.yml`](../../docker-compose.yml) is the source of truth; this doc explains how to use it. CI runs [`scripts/check-local-dev-docs.py`](../../scripts/check-local-dev-docs.py) to catch drift.
+**Canonical port list:** [`docker-compose.yml`](../../docker-compose.yml) is the source of truth; this doc explains how to use it. CI runs `python scripts/axis.py check local-dev-docs` to catch drift.
 
 ---
 
@@ -195,7 +195,7 @@ docker compose up -d
 | File | Role |
 |---|---|
 | [`docker-compose.yml`](../../docker-compose.yml) | Service graph, env vars, volumes, healthchecks — **port source of truth** |
-| [`scripts/check-local-dev-docs.py`](../../scripts/check-local-dev-docs.py) | CI/doc drift: verifies this file matches compose |
+| `python scripts/axis.py check local-dev-docs` | CI/doc drift: verifies this file matches compose |
 | [`Dockerfile`](../../Dockerfile) | Production API image (not used by default compose dev) |
 | [`frontend/Dockerfile.dev`](../../frontend/Dockerfile.dev) | Node + Vite dev image |
 | [`frontend/vite.config.ts`](../../frontend/vite.config.ts) | `VITE_API_PROXY_TARGET`, `VITE_USE_POLLING` |

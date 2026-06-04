@@ -62,7 +62,7 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 - Domain: zero external dependencies.
 - No implementation of a non-trivial change without completing the **Design Gate** ([design-gate.md](docs/playbooks/design-gate.md)); high-risk surfaces require user sign-off before code.
 - Never commit with failing Gate 1; docs and requirements satisfied before merge (agent-checklist + PR template).
-- When `src/`, `tests/`, or `docs/use-cases/` change: run `./scripts/check-doc-drift.sh` before push (bash — on Windows use Git Bash, not PowerShell); CI **Doc drift** must be green. Tick **Gate 2** in the PR template — do not paste drift-script output.
+- When `src/`, `tests/`, or `docs/use-cases/` change: run `python scripts/axis.py check doc-drift` before push; CI **Doc drift** must be green. Tick **Gate 2** in the PR template — do not paste drift-script output.
 
 **P1 — confirm with user before deviating:**
 
@@ -190,7 +190,7 @@ Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, use-c
 
 **Per layer / module:** all use-case callouts updated; domain README table; [`PROGRESS.md`](docs/PROGRESS.md) (layer summary only — not per-class detail).
 
-**Per PR before merge:** PR description = Summary + Linked spec + Requirements only (no CI status, no commit list — Checks tab covers that). Run `./scripts/check-doc-drift.sh` before push when `src/`, `tests/`, or `docs/use-cases/` change — the script enforces use-case-docs same-PR, new-handler tests, the no-new `TODO`/`FIXME`/`stub` rule, and new raw-SQL call review (cross-module guard).
+**Per PR before merge:** PR description = Summary + Linked spec + Requirements only (no CI status, no commit list — Checks tab covers that). Run `python scripts/axis.py check doc-drift` before push when `src/`, `tests/`, or `docs/use-cases/` change — the command enforces use-case-docs same-PR, new-handler tests, the no-new `TODO`/`FIXME`/`stub` rule, script-standard enforcement, and new raw-SQL call review (cross-module guard).
 
 Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` changes. Agents must pass [`docs/playbooks/visual-artifact-checklist.md`](docs/playbooks/visual-artifact-checklist.md) before commit.
 

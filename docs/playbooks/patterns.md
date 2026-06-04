@@ -530,7 +530,7 @@ _ = Task.Run(async () =>
 
 - Never run `dotnet test --no-build` after editing test code — always let it recompile.
 - **Never hardcode environment configurations**: connection strings, API URLs, Docker endpoints, secret keys must use environment variables, `appsettings.json`, or `.testcontainers.properties`.
-- **Pre-push / CI**: local pre-push runs the fast gate (`scripts/verify.sh`), including unit test projects via `scripts/test-unit.sh`. CI runs full `dotnet test Axis.sln`, including Testcontainers integration and API tests.
+- **Pre-push / CI**: local pre-push runs the fast gate (`python scripts/axis.py verify`), including unit test projects via `python scripts/axis.py test unit`. CI runs full `dotnet test Axis.sln`, including Testcontainers integration and API tests.
 
 ### Pattern — keep API isolation tests deterministic, test async provisioning separately
 
@@ -1310,7 +1310,7 @@ message GetUserPermissionsResponse {
 1. Place files under `src/Modules/{Module}/Axis.{Module}.Contracts/Protos/axis/{module}/v{n}/` with `package axis.{module}.v{n};` matching the directory (`PACKAGE_DIRECTORY_MATCH`).
 2. Add the `Protos` directory to `modules:` in [`buf.yaml`](../../buf.yaml) at the repo root (copy an existing line).
 3. Keep `Grpc.Tools` `<Protobuf Include=...>` in the `.csproj` — Buf does not replace codegen.
-4. Run `buf lint` locally (`buf` CLI) and `./scripts/check-buf-modules.sh` (also runs in CI **Doc drift**).
+4. Run `buf lint` locally (`buf` CLI) and `python scripts/axis.py check buf-modules` (also runs in CI **Doc drift**).
 5. **Changing `buf.yaml` breaking policy or removing a field?** Read [Buf breaking rules — what's actually configured (and the gotcha)](#buf-breaking-rules--whats-actually-configured-and-the-gotcha) first. The v2 category model splits deletion rules in a way that's easy to misread, and "buf passes locally" can mean "no rule fires" rather than "the relaxed rule passed".
 
 CI runs `buf lint` and `buf breaking` against `main` when `.proto` or `buf.yaml` changes.
@@ -1500,7 +1500,7 @@ This violates the Share Nothing principle (cross-module DB query), forces every 
 grep -rn "SqlQueryRaw\|ExecuteSqlRaw\|FromSqlRaw\|ExecuteSqlInterpolated" src/Modules/ --include="*.cs"
 ```
 
-For every match: confirm the SQL only references tables owned by that match's own module. If it references another module's table → P0 violation, must fix before committing. The `check-doc-drift.sh` script also enforces this on PR.
+For every match: confirm the SQL only references tables owned by that match's own module. If it references another module's table → P0 violation, must fix before committing. `python scripts/axis.py check doc-drift` also enforces this on PR.
 
 ---
 
@@ -1716,40 +1716,37 @@ gh pr create …
 
 ## Drift script regex constraints {#drift-regex-constraints}
 
-[`scripts/check-doc-drift.sh`](../../scripts/check-doc-drift.sh) feeds its forbidden-pattern regexes into **GNU awk**. Awk's regex dialect differs from grep/PCRE/.NET in two ways that silently degrade patterns instead of erroring out — anyone adding a new check to the drift script must follow these conventions.
+`python scripts/axis.py check doc-drift` owns the forbidden-pattern ratchets. The implementation uses Python `re`, not shell/awk, so new checks should use Python regex syntax and live in [`scripts/axis.py`](../../scripts/axis.py) or a focused Python helper wired from that command.
 
-### Backslash escapes for punctuation are silently broken
+### Keep rules readable
 
-Backslash-escaped punctuation like `\.`, `\(`, `\)`, `\?`, `\+` triggers a GNU awk warning ("escape sequence treated as plain") and is then **silently degraded** to the unescaped character. The degraded pattern keeps running with surprising semantics:
+Prefer narrow, readable Python regexes over clever one-liners. If a rule can be
+implemented by parsing structured data (JSON, Markdown sections, paths), use
+Python data structures instead of regex-only matching.
 
-| What you wrote | What GNU awk runs | Consequence |
-|---|---|---|
-| `\.` | `.` (any character) | Broadened match — `DateTime\.Now` also matches `DateTimeXNow` |
-| `\(\)` | `()` (empty group) | Empty group matches the empty string anywhere — `GetAwaiter\(\)\.GetResult\(\)` actually matches the substring `GetAwaiterXGetResult` (one any-char between) |
+Use raw strings for regex patterns:
 
-**Rule:** in any pattern fed to awk inside the drift script, escape literal punctuation with POSIX bracket expressions:
+```python
+re.compile(r"DateTime[.]Now")
+re.compile(r"GetAwaiter[(][)][.]GetResult[(][)]")
+```
 
-| Wrong (silently degraded) | Right (literal match) |
-|---|---|
-| `DateTime\.Now` | `DateTime[.]Now` |
-| `GetAwaiter\(\)\.GetResult\(\)` | `GetAwaiter[(][)][.]GetResult[(][)]` |
-| `\?` | `[?]` |
-
-`[x]` is a POSIX bracket expression with a single character — awk treats every character inside `[…]` as a literal except the special set (`]`, `^`, `-`).
-
-### `\b` word boundary does not exist
-
-GNU awk has no word-boundary metacharacter. Patterns like `\bFoo\b` silently match nothing useful. If you need word-boundary semantics, accept that the regex will match substrings and document the false-positive risk in a comment next to the pattern. Don't try to fake it with `[^A-Za-z]` — that requires a non-letter character on both sides, which line ends won't provide and the pattern fails on edge cases.
+Bracket punctuation (`[.]`, `[(]`) remains acceptable because it is visually
+unambiguous and works across regex dialects, but Python also supports escaped
+punctuation such as `\.`. Pick one style per pattern and keep the comment clear.
 
 ### Validation before commit
 
 Always test new patterns with the literal target string before pushing:
 
 ```bash
-echo "DateTime.Now;" | awk '$0 ~ /DateTime[.]Now/ { print "MATCH" }'
+python - <<'PY'
+import re
+assert re.search(r"DateTime[.]Now", "DateTime.Now;")
+PY
 ```
 
-The drift script's CI run will surface real failures, but `awk` warnings only appear on stderr — easy to miss.
+Run `python scripts/axis.py check doc-drift` before opening the PR.
 
 ---
 
