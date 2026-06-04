@@ -30,7 +30,7 @@ public class FormEndpointTests(ApiTestFixture fixture)
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
         body.GetProperty("items").EnumerateArray().ToList().Should().BeEmpty();
-        body.GetProperty("total_count").GetInt32().Should().Be(0);
+        body.GetProperty("totalCount").GetInt32().Should().Be(0);
     }
 
     // ── POST /api/forms ───────────────────────────────────────────────────────

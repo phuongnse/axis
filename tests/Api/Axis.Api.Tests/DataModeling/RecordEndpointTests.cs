@@ -38,7 +38,7 @@ public class RecordEndpointTests(ApiTestFixture fixture)
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
-        body.GetProperty("total_count").GetInt32().Should().Be(0);
+        body.GetProperty("totalCount").GetInt32().Should().Be(0);
         body.GetProperty("records").GetArrayLength().Should().Be(0);
     }
 
@@ -60,7 +60,7 @@ public class RecordEndpointTests(ApiTestFixture fixture)
 
         HttpResponseMessage listResp = await client.GetAsync($"/api/models/{modelId}/records");
         JsonElement page = await listResp.Content.ReadFromJsonAsync<JsonElement>(Json);
-        page.GetProperty("total_count").GetInt32().Should().Be(1);
+        page.GetProperty("totalCount").GetInt32().Should().Be(1);
     }
 
     // GET /api/models/{id}/records/{recordId}
@@ -153,6 +153,6 @@ public class RecordEndpointTests(ApiTestFixture fixture)
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         JsonElement page = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
-        page.GetProperty("total_count").GetInt32().Should().Be(2);
+        page.GetProperty("totalCount").GetInt32().Should().Be(2);
     }
 }
