@@ -7,7 +7,7 @@ namespace Axis.Identity.Application.Tests.Queries;
 public class GetLegalVersionsHandlerTests
 {
     [Fact]
-    public async Task Handle_ReturnsCurrentWellKnownVersions()
+    public async Task Handle_WhenLegalVersionsAreRequested_ReturnsCurrentWellKnownVersions()
     {
         LegalVersionsDto result = await new GetLegalVersionsHandler().Handle(
             new GetLegalVersionsQuery(),

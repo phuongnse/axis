@@ -16,7 +16,7 @@ public class OrganizationSlugGeneratorTests
     [InlineData("O'Brien & Co.", "o-brien-co")]
     [InlineData("  Acme  Corp  ", "acme-corp")]
     [InlineData("***", "")]
-    public void GenerateBaseSlug_NormalizesToUrlSafeSlug(string input, string expected)
+    public void GenerateBaseSlug_WhenInputIsProvided_ReturnsUrlSafeSlug(string input, string expected)
     {
         CreateGenerator().GenerateBaseSlug(input).Should().Be(expected);
     }

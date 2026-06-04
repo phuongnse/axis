@@ -10,7 +10,7 @@ namespace Axis.Architecture.Tests;
 public sealed class TenantProvisioningConventionTests
 {
     [Fact]
-    public void TenantModuleNames_All_matches_modules_with_organization_verified_handler()
+    public void TenantModuleNames_WhenEnumerated_MatchModulesWithOrganizationVerifiedHandler()
     {
         string[] expected = DiscoverProvisioningModuleSlugs();
         TenantModuleNames.All.Should().BeEquivalentTo(expected);

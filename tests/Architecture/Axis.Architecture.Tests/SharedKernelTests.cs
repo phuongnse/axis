@@ -34,7 +34,7 @@ public class SharedKernelTests
     ];
 
     [Fact]
-    public void SharedDomain_HasZeroPersistenceOrMessagingDependencies()
+    public void SharedDomain_WhenInspected_HasZeroPersistenceOrMessagingDependencies()
     {
         Assembly sharedDomain = Conventions.TryLoad("Axis.Shared.Domain")
             ?? throw new InvalidOperationException("Axis.Shared.Domain not loadable.");
@@ -53,7 +53,7 @@ public class SharedKernelTests
     }
 
     [Fact]
-    public void SharedApplication_HasZeroPersistenceOrTransportDependencies()
+    public void SharedApplication_WhenInspected_HasZeroPersistenceOrTransportDependencies()
     {
         Assembly sharedApp = Conventions.TryLoad("Axis.Shared.Application")
             ?? throw new InvalidOperationException("Axis.Shared.Application not loadable.");
@@ -71,7 +71,7 @@ public class SharedKernelTests
     }
 
     [Fact]
-    public void NoModuleAssembly_ReferencesSharedInfrastructurePersistencePrimitives()
+    public void ModuleAssembly_WhenInspected_DoesNotReferenceSharedInfrastructurePersistencePrimitives()
     {
         // Future-proofing: if Axis.Shared.Infrastructure ever ships a UnitOfWork
         // base class or DbContext base class, modules must not depend on it

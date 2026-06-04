@@ -47,7 +47,7 @@ public class RecordFieldValidatorTests
     }
 
     [Fact]
-    public void Validate_SystemFieldsAreSkipped()
+    public void Validate_WhenOnlySystemFieldsArePresent_ReturnsNoErrors()
     {
         // id, created_at, updated_at are system fields — never validated against required rule
         DataModel model = DataModel.Create("Test", null, null, null, OrgId, UserId);

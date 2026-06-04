@@ -12,7 +12,7 @@ The full dev stack runs from one `docker compose up -d`: **Postgres**, **Redis**
 
 - **Docker** — Docker Engine + Compose v2.
   - **Linux / macOS:** run commands from the repo root.
-  - **Windows:** Docker inside WSL2 (Ubuntu/Debian). Use `wsl -- bash -lc "cd /path/to/axis && …"` for the examples below, or open a WSL shell and `cd` there.
+  - **Windows:** use the Docker endpoint available to your shell when `docker info` works. If it does not, but Docker Engine lives inside WSL2, run compose commands from WSL (`wsl -- bash -lc "cd /path/to/axis && …"`) or open a WSL shell and `cd` there.
 - Host ports free (default compose bindings):
 
   `3000`, `5280`, `5432`, `6379`, `1025`, `1080`, `4566`, `29092`, `8081`, `5672`, `15672`, `8200`
@@ -124,6 +124,19 @@ Backend integration tests use **Testcontainers** — no compose stack required f
 dotnet build && dotnet test
 cd frontend && npm run ci && npm run test
 ```
+
+When `docker info` works in the shell running .NET, Testcontainers uses that
+Docker endpoint and no extra configuration is needed. If it does not, but Docker
+Engine is running inside WSL2 with its TCP daemon exported, point Testcontainers
+at that daemon:
+
+```powershell
+$env:DOCKER_HOST = "tcp://127.0.0.1:2375"
+dotnet test Axis.sln --nologo
+```
+
+Use `http://127.0.0.1:2375/_ping` as the quick WSL2 daemon probe when
+`docker.exe` is not available in PowerShell.
 
 ---
 

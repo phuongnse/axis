@@ -13,7 +13,7 @@ public class LegalEndpointTests(ApiTestFixture fixture)
     private static readonly JsonSerializerOptions Json = ApiTestFixture.JsonOptions;
 
     [Fact]
-    public async Task GetLegalVersions_ReturnsCurrentDocumentVersions()
+    public async Task GetLegalVersions_WhenRequested_ReturnsCurrentDocumentVersions()
     {
         HttpResponseMessage resp = await fixture.Client.GetAsync("/api/legal/versions");
 

@@ -219,7 +219,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     }
 
     [Fact]
-    public async Task WorkflowDefinitionReader_GetSnapshotAsync_WhenSnapshotExists_ReturnsItWithStepsAndTransitions()
+    public async Task GetSnapshotAsync_WhenSnapshotExists_ReturnsItWithStepsAndTransitions()
     {
         Guid wfId = Guid.NewGuid();
         Guid step1Id = Guid.NewGuid();
@@ -250,7 +250,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     }
 
     [Fact]
-    public async Task WorkflowDefinitionReader_GetSnapshotAsync_WhenNoSnapshot_ReturnsNull()
+    public async Task GetSnapshotAsync_WhenNoSnapshotExists_ReturnsNull()
     {
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
         WorkflowDefinitionReader reader = new(ctx);

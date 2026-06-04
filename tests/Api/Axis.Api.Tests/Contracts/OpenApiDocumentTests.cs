@@ -6,7 +6,7 @@ using Microsoft.OpenApi.Extensions;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Swagger;
 
-namespace Axis.Api.Tests;
+namespace Axis.Api.Tests.Contracts;
 
 [Collection("Api")]
 public class OpenApiDocumentTests(ApiTestFixture fixture)
@@ -17,7 +17,7 @@ public class OpenApiDocumentTests(ApiTestFixture fixture)
     /// so the FE types can never silently diverge from the real API contract.
     /// </summary>
     [Fact]
-    public void OpenApiDocument_IsInSyncWithCommittedSnapshot()
+    public void OpenApiDocument_WhenGeneratedFromRunningApi_MatchesCommittedSnapshot()
     {
         using IServiceScope scope = fixture.CreateScope();
         ISwaggerProvider provider = scope.ServiceProvider.GetRequiredService<ISwaggerProvider>();
