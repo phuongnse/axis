@@ -32,6 +32,7 @@ function Export-ExcalidrawToSvg {
 }
 
 $docsRoot      = Split-Path $PSScriptRoot -Parent
+$repoRoot      = Split-Path $docsRoot -Parent
 $sharedWireframesRoot = Join-Path $docsRoot "wireframes"
 $useCasesRoot   = Join-Path $docsRoot "use-cases"
 
@@ -54,6 +55,24 @@ function Normalize-RepoPath {
     return $Path.Replace("\", "/").TrimStart("./")
 }
 
+function Resolve-RepoPath {
+    param([string]$Path)
+    return [System.IO.Path]::GetFullPath((Join-Path $repoRoot $Path))
+}
+
+function Get-RepoRelativePath {
+    param([string]$FullPath)
+
+    $basePath = [System.IO.Path]::GetFullPath($repoRoot)
+    if (-not $basePath.EndsWith([System.IO.Path]::DirectorySeparatorChar)) {
+        $basePath += [System.IO.Path]::DirectorySeparatorChar
+    }
+
+    $baseUri = [System.Uri]$basePath
+    $fullUri = [System.Uri]([System.IO.Path]::GetFullPath($FullPath))
+    return [System.Uri]::UnescapeDataString($baseUri.MakeRelativeUri($fullUri).ToString())
+}
+
 function Resolve-LinkedWireframe {
     param([string]$MarkdownPath, [string]$Href)
 
@@ -61,14 +80,15 @@ function Resolve-LinkedWireframe {
     if (-not $cleanHref.EndsWith(".excalidraw")) { return $null }
     if ($cleanHref.StartsWith("docs/")) { return Normalize-RepoPath $cleanHref }
 
-    $markdownDir = Split-Path (Normalize-RepoPath $MarkdownPath) -Parent
-    $relativeHref = if ($cleanHref.StartsWith("./")) { $cleanHref.Substring(2) } else { $cleanHref }
-    return Normalize-RepoPath (Join-Path $markdownDir $relativeHref)
+    $markdownFullPath = Resolve-RepoPath $MarkdownPath
+    $markdownDir = Split-Path $markdownFullPath -Parent
+    $resolved = [System.IO.Path]::GetFullPath((Join-Path $markdownDir $cleanHref))
+    return Normalize-RepoPath (Get-RepoRelativePath $resolved)
 }
 
 $changedExcalidraws = @{}
 if ($Changed) {
-    $statusLines = git -C (Split-Path $docsRoot -Parent) status --porcelain -- docs
+    $statusLines = git -C $repoRoot status --porcelain -- docs
     foreach ($line in $statusLines) {
         if (-not $line) { continue }
         $changedPath = Normalize-RepoPath $line.Substring(3)
@@ -80,8 +100,10 @@ if ($Changed) {
             $changedExcalidraws[$changedPath] = $true
         } elseif ($changedPath.EndsWith(".svg")) {
             $changedExcalidraws[(Normalize-RepoPath ([System.IO.Path]::ChangeExtension($changedPath, ".excalidraw")))] = $true
-        } elseif ($changedPath.EndsWith(".md") -and (Test-Path $changedPath)) {
-            $content = Get-Content $changedPath -Raw -Encoding UTF8
+        } elseif ($changedPath.EndsWith(".md")) {
+            $markdownFullPath = Resolve-RepoPath $changedPath
+            if (-not (Test-Path $markdownFullPath)) { continue }
+            $content = Get-Content $markdownFullPath -Raw -Encoding UTF8
             $matches = [regex]::Matches($content, "\]\(([^)]+\.excalidraw(?:#[^)]+)?)\)")
             foreach ($match in $matches) {
                 $linkedPath = Resolve-LinkedWireframe -MarkdownPath $changedPath -Href $match.Groups[1].Value
@@ -96,7 +118,7 @@ if ($Changed) {
 $filtered = $wireframes
 if ($Changed) {
     $filtered = $filtered | Where-Object {
-        $repoPath = Normalize-RepoPath (Resolve-Path -Relative $_.src)
+        $repoPath = Normalize-RepoPath (Get-RepoRelativePath $_.src)
         $changedExcalidraws.ContainsKey($repoPath)
     }
 }

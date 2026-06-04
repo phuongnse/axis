@@ -610,7 +610,7 @@ function paintEmailConfirmationCard(els, opts, wireAcc) {
   els.push(...buildAuthCardInlineRow(`${prefix}_resend`, cardX, cardW, cy, resendSegments));
   els.push(...buildAuthCardFooter(prefix, cardX, cardY, cardW, cardH, {
     lead: 'Already verified?',
-    link: 'Go to sign in',
+    link: 'Continue setup',
     forwardArrow: true,
   }));
 }
@@ -671,7 +671,7 @@ function genEmailConfirmationStates() {
       notice: {
         variant: 'success',
         title: 'Verification email sent',
-        body: 'If an account exists for this email, check your inbox for a new link.',
+        body: 'If an organization registration exists for this contact email, check your inbox for a new link.',
       },
       resend: {},
     },
@@ -834,7 +834,7 @@ const VERIFY_EMAIL_STATE_PANELS = [
     icon: '✓',
     title: 'Already verified',
     body: 'This link has already been used.',
-    authFooter: { lead: 'Ready to continue?', link: 'Go to sign in', forwardArrow: true },
+    authFooter: { lead: 'Ready to continue?', link: 'Continue setup', forwardArrow: true },
   },
   {
     id: 'ves_inv',
@@ -921,8 +921,6 @@ function genVerifyEmailStates() {
 /** User-facing checklist on workspace-provisioning (backend still provisions per module — see tenant-provisioning diagram). */
 const WP_UI_STEPS = [
   { label: 'Creating your workspace', sub: "Preparing your organization's data" },
-  { label: 'Assigning admin role', sub: null },
-  { label: 'Opening workspace', sub: null },
 ];
 
 /** Wireframe placeholder — production UI uses org display name from registration context. */
@@ -1001,8 +999,6 @@ function genWorkspaceProvisioning() {
     lStepsY,
     [
       { icon: '↻', color: C.primary },
-      { icon: '○', color: C.gray300 },
-      { icon: '○', color: C.gray300 },
     ],
     rowH,
   );
@@ -1026,8 +1022,6 @@ function genWorkspaceProvisioning() {
     rStepsY,
     [
       { icon: '✕', color: C.danger },
-      { icon: '○', color: C.gray300 },
-      { icon: '○', color: C.gray300 },
     ],
     rowH,
   );

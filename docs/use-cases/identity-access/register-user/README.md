@@ -75,20 +75,6 @@ This use case owns user identity onboarding. Axis is multi-tenant, but an organi
 - Invitation acceptance details already covered by [accept-invite](../accept-invite/) unless this use case replaces that flow in a future consolidation.
 - CAPTCHA / bot protection.
 
-> **Implementation status**
->
-> | Layer | Status |
-> |-------|--------|
-> | Domain | ⚠️ |
-> | Application | ⚠️ |
-> | Infrastructure | ⚠️ |
-> | API | ⏳ |
-> | Frontend | ⏳ |
->
-> **Gaps vs spec:** Current implementation has pieces of user onboarding in [accept-invite](../accept-invite/), [sign-in](../sign-in/), and the older organization registration flow. A dedicated user registration command/API and external-login linking model still need to be implemented from `main`.
->
-> **Decisions:** Microsoft / Google / GitHub providers belong to user identity only. They can create or link a `UserExternalLogin`; they must never create an organization directly.
-
 ## Wireframes
 
 User registration reuses the auth card system with external-provider entry points and email/password setup. Organization context is optional and should not be shown as a required field on the default registration screen.
@@ -121,8 +107,24 @@ sequenceDiagram
     API->>API: Create user + link external login
   end
   opt Invitation/setup token present
-    API->>API: Attach user to target organization + role
+    API->>API: Attach user to target organization
+    API->>API: Assign role from invitation/setup token
   end
   API->>OIDC: Establish Axis sign-in session
-  API-->>Web: Personal/home, workspace, or provisioning redirect
+  API-->>Web: Personal/home, target workspace, or provisioning redirect
+  Web-->>User: Open the target workspace when the organization is active
 ```
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ⚠️ |
+> | Application | ⚠️ |
+> | Infrastructure | ⚠️ |
+> | API | ⏳ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** Current implementation has pieces of user onboarding in [accept-invite](../accept-invite/), [sign-in](../sign-in/), and the older organization registration flow. A dedicated user registration command/API and external-login linking model still need to be implemented from `main`.
+>
+> **Decisions:** Microsoft / Google / GitHub providers belong to user identity only. They can create or link a `UserExternalLogin`; they must never create an organization directly.

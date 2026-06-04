@@ -18,7 +18,7 @@ Export a workflow as a JSON file so that I can back it up or share it with anoth
 
 1. Actor opens the workflow list context menu or workflow editor toolbar and selects **Export JSON**.
 2. System verifies the actor has `workflow:definition:read` for the workflow's organization.
-3. System loads the workflow definition, step configurations, trigger configuration, and referenced form/model structures.
+3. System loads the workflow definition, step configurations, and trigger configuration.
 4. System removes sensitive credential values from exported step configuration fields.
 5. System serializes the export using the public API JSON contract casing (`camelCase`).
 6. System downloads `{workflow-slug}-{date}.json`.
@@ -37,7 +37,7 @@ Workflow definitions can be exported as portable JSON files and imported into an
 *Happy path*
 - [ ] Export option is accessible from the workflow's context menu (list view) and from the workflow editor (toolbar).
 - [ ] Exported file is named `{workflow-slug}-{date}.json` and downloaded immediately.
-- [ ] The export includes: workflow definition, all step configurations, trigger config, and referenced form/model definitions (structure only, not records).
+- [ ] The export includes: workflow definition, all step configurations, and trigger config.
 - [ ] Exported JSON uses the public API contract casing (`camelCase`) so generated frontend types, OpenAPI docs, and downloaded workflow files stay consistent.
 
 *Validation & errors*
@@ -63,6 +63,7 @@ Workflow definitions can be exported as portable JSON files and imported into an
 >
 > **Gaps vs spec:**
 > - broken-reference `"broken": true` flag pending data-modeling/form-builder integration
+> - referenced form/model definition export pending an owning contract across Workflow Builder, Form Builder, and Data Modeling.
 > - export notice and broken-reference warning UI pending Frontend.
 >
 > **Deferred (PR #146 follow-up):** Exporting execution history (definitions only today); export formats other than JSON (YAML, BPMN).

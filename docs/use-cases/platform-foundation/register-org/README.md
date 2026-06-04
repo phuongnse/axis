@@ -42,7 +42,7 @@ Axis supports standalone user accounts. Registering an organization is required 
 - [ ] Registration form collects organization name and organization contact email.
 - [ ] The user must accept the Terms of Service and Privacy Policy before the organization registration can be submitted; the accepted versions are recorded with the organization registration record.
 - [ ] An organization slug is auto-generated from the organization name, uniqueness-checked, and shown to the actor before submission.
-- [ ] On successful submission, a verification email is sent to the organization contact email within 60 seconds and the actor sees a confirmation screen.
+- [ ] On successful submission, a verification email is sent to the organization contact email and the actor sees a confirmation screen.
 - [ ] Clicking the verification link verifies the organization contact email and starts tenant provisioning.
 - [ ] After organization verification, the system creates a short-lived first-user setup token/link for [register-user](../../identity-access/register-user/); the organization is not usable until a user account is created and attached.
 - [ ] Once tenant provisioning completes, the first registered owner/admin can access the workspace.
