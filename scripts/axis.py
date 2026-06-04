@@ -65,6 +65,8 @@ def run(
         args,
         cwd=cwd,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         stdout=subprocess.PIPE if capture else None,
         stderr=subprocess.PIPE if capture else None,
         check=False,
@@ -86,18 +88,27 @@ def ref_exists(ref: str) -> bool:
 
 def diff_range() -> str:
     base = os.environ.get("BASE_BRANCH", "main")
-    if ref_exists(f"origin/{base}"):
-        return f"origin/{base}...HEAD"
-    if ref_exists(base):
-        return f"{base}...HEAD"
-    return "HEAD~1...HEAD"
+    candidates = [os.environ.get("BASE_REF"), f"origin/{base}", base]
+    attempted: list[str] = []
+    for candidate in candidates:
+        if not candidate:
+            continue
+        attempted.append(candidate)
+        if not ref_exists(candidate):
+            continue
+        result = run([exe("git"), "merge-base", candidate, "HEAD"], capture=True, check=False)
+        if result.returncode == 0 and result.stdout.strip():
+            return f"{result.stdout.strip()}...HEAD"
+    tried = ", ".join(attempted)
+    raise CheckError(f"diff_range: cannot determine diff base (tried {tried}); set BASE_REF or fetch the base branch")
 
 
 def changed_paths(range_spec: str | None = None) -> list[str]:
     range_spec = range_spec or diff_range()
     result = run([exe("git"), "diff", "--name-only", range_spec], capture=True, check=False)
     if result.returncode != 0:
-        return []
+        detail = (result.stderr or result.stdout or "").strip()
+        raise CheckError(f"changed_paths: git diff failed for {range_spec}: {detail}")
     return [line.strip().replace("\\", "/") for line in result.stdout.splitlines() if line.strip()]
 
 
@@ -105,7 +116,8 @@ def changed_name_status(range_spec: str | None = None) -> list[list[str]]:
     range_spec = range_spec or diff_range()
     result = run([exe("git"), "diff", "--name-status", range_spec], capture=True, check=False)
     if result.returncode != 0:
-        return []
+        detail = (result.stderr or result.stdout or "").strip()
+        raise CheckError(f"changed_name_status: git diff failed for {range_spec}: {detail}")
     return [line.split("\t") for line in result.stdout.splitlines() if line.strip()]
 
 
@@ -393,7 +405,8 @@ def check_scripts_standard(_args: argparse.Namespace | None = None) -> int:
 def added_lines(range_spec: str, include: callable[[str], bool]) -> Iterable[tuple[str, str]]:
     result = run([exe("git"), "diff", "--unified=0", range_spec], capture=True, check=False)
     if result.returncode != 0:
-        return []
+        detail = (result.stderr or result.stdout or "").strip()
+        raise CheckError(f"added_lines: git diff failed for {range_spec}: {detail}")
     current = ""
     rows: list[tuple[str, str]] = []
     for line in result.stdout.splitlines():
@@ -440,6 +453,15 @@ def endpoint_mediator_hits() -> list[str]:
     return hits
 
 
+def is_workaround_comment(path: Path, line: str) -> bool:
+    stripped = line.lstrip()
+    if path.suffix == ".py":
+        return stripped.startswith("#") and "WORKAROUND:" in stripped
+    if path.suffix in {".cs", ".ts", ".tsx"}:
+        return ("// WORKAROUND:" in line) or ("/* WORKAROUND:" in line)
+    return "WORKAROUND:" in line
+
+
 def check_workarounds(issues: list[str]) -> None:
     workarounds = ROOT / "docs" / "WORKAROUNDS.md"
     if not workarounds.is_file():
@@ -449,12 +471,12 @@ def check_workarounds(issues: list[str]) -> None:
         if line.startswith("### "):
             slug = re.sub(r"[^A-Za-z0-9-]", "", line[4:]).lower()
             known.add(slug)
-    roots = [ROOT / "src", ROOT / "tests", ROOT / "frontend" / "src"]
+    roots = [ROOT / "src", ROOT / "tests", ROOT / "frontend" / "src", ROOT / "scripts"]
     for root in roots:
-        for path in iter_files(root, (".cs", ".ts", ".tsx", ".md")):
+        for path in iter_files(root, (".cs", ".ts", ".tsx", ".md", ".py")):
             text = path.read_text(encoding="utf-8", errors="ignore")
             for idx, line in enumerate(text.splitlines(), 1):
-                if "WORKAROUND:" not in line:
+                if not is_workaround_comment(path, line):
                     continue
                 match = re.search(r"docs/WORKAROUNDS[.]md#([A-Za-z0-9-]+)", line)
                 if not match:
@@ -844,7 +866,11 @@ def main(argv: list[str] | None = None) -> int:
     avro.set_defaults(func=register_avro_schemas)
 
     args = parser.parse_args(argv)
-    return int(args.func(args))
+    try:
+        return int(args.func(args))
+    except CheckError as exc:
+        print(exc, file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":
