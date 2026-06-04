@@ -16,9 +16,13 @@ Export a workflow as a JSON file so that I can back it up or share it with anoth
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor opens the workflow list context menu or workflow editor toolbar and selects **Export JSON**.
+2. System verifies the actor has `workflow:definition:read` for the workflow's organization.
+3. System loads the workflow definition, step configurations, trigger configuration, and referenced form/model structures.
+4. System removes sensitive credential values from exported step configuration fields.
+5. System serializes the export using the public API JSON contract casing (`camelCase`).
+6. System downloads `{workflow-slug}-{date}.json`.
+7. Actor can store the file as a backup or share it for import into another Axis organization.
 
 ## Alternate / error flows
 
@@ -34,6 +38,7 @@ Workflow definitions can be exported as portable JSON files and imported into an
 - [ ] Export option is accessible from the workflow's context menu (list view) and from the workflow editor (toolbar).
 - [ ] Exported file is named `{workflow-slug}-{date}.json` and downloaded immediately.
 - [ ] The export includes: workflow definition, all step configurations, trigger config, and referenced form/model definitions (structure only, not records).
+- [ ] Exported JSON uses the public API contract casing (`camelCase`) so generated frontend types, OpenAPI docs, and downloaded workflow files stay consistent.
 
 *Validation & errors*
 - [ ] Sensitive values in HTTP step configs (Bearer tokens, Basic auth passwords, API keys) are replaced with `"[REDACTED]"` in the export. A notice is shown: "Sensitive credential values have been removed from the export."
@@ -69,4 +74,3 @@ Workflow definitions can be exported as portable JSON files and imported into an
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-
