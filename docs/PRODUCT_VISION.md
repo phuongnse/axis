@@ -1,6 +1,6 @@
 # Product Vision
 
-[← Back to Docs Home](./README.md)
+> **Navigation**: [← docs/README.md](./README.md) · [← CLAUDE.md](../CLAUDE.md)
 
 ---
 

@@ -305,6 +305,34 @@ def check_frontend_api_contracts(_args: argparse.Namespace | None = None) -> int
     return 0
 
 
+NAVIGATION_RE = re.compile(r"^> \*\*Navigation\*\*: .*\[[^\]]+\]\([^)]+\)")
+
+
+def check_doc_navigation(_args: argparse.Namespace | None = None) -> int:
+    issues: list[str] = []
+    files = sorted((ROOT / "docs").rglob("*.md"))
+    for path in files:
+        text = path.read_text(encoding="utf-8")
+        lines = text.splitlines()
+        if not lines or not lines[0].startswith("# "):
+            issues.append(f"{rel(path)}: first line must be an H1 heading")
+            continue
+        window = lines[1:6]
+        nav_lines = [line for line in window if line.startswith("> **Navigation**:")]
+        if not nav_lines:
+            issues.append(f"{rel(path)}: missing `> **Navigation**:` block immediately after the H1")
+            continue
+        if not any(NAVIGATION_RE.search(line) for line in nav_lines):
+            issues.append(f"{rel(path)}: navigation block must include at least one markdown link")
+    if issues:
+        print("check-doc-navigation FAIL:", file=sys.stderr)
+        for issue in issues:
+            print(f"  - {issue}", file=sys.stderr)
+        return 1
+    print(f"check-doc-navigation: OK ({len(files)} files scanned)")
+    return 0
+
+
 def check_buf_modules(_args: argparse.Namespace | None = None) -> int:
     return sync_buf_yaml.main_with_args(["--check"]) if hasattr(sync_buf_yaml, "main_with_args") else module_main("sync_buf_yaml.py", ["--check"])
 
@@ -581,6 +609,7 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         ("check-frontend-api-contracts", check_frontend_api_contracts),
         ("check-use-case-docs.py", lambda _=None: run_module_check("check-use-case-docs.py", ["--check"])),
         ("check-doc-link-targets.py", lambda _=None: run_module_check("check-doc-link-targets.py", ["--check"])),
+        ("check-doc-navigation", check_doc_navigation),
         ("check-doc-code-fences.py", lambda _=None: run_module_check("check-doc-code-fences.py", ["--check"])),
         ("check-local-dev-docs.py", lambda _=None: run_module_check("check-local-dev-docs.py", ["--check"])),
         ("sync_buf_yaml.py", lambda _=None: module_main("sync_buf_yaml.py", ["--check"])),
@@ -775,6 +804,7 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("doc-link-targets").set_defaults(
         func=lambda _args: run_module_check("check-doc-link-targets.py", ["--check"])
     )
+    check_sub.add_parser("doc-navigation").set_defaults(func=check_doc_navigation)
     check_sub.add_parser("doc-code-fences").set_defaults(
         func=lambda _args: run_module_check("check-doc-code-fences.py", ["--check"])
     )

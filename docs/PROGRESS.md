@@ -1,5 +1,7 @@
 # Implementation Progress
 
+> **Navigation**: [← docs/README.md](./README.md) · [← CLAUDE.md](../CLAUDE.md)
+
 > Updated each time a layer is completed. Source of truth for current implementation state.
 > When completing a layer, update this file — **not** CLAUDE.md.
 

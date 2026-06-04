@@ -1,6 +1,6 @@
 # Use Cases
 
-[← Back to Docs Home](../README.md)
+> **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
 
 Use cases are the user-facing source of truth for behavior. **One markdown file = one use case** (flow, AC, wireframes, diagrams, implementation status). Domain `README.md` indexes all use cases in that area.
 

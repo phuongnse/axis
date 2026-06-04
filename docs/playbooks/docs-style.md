@@ -36,6 +36,7 @@ Reference and practice docs are **scanned, not read**. Optimize for a reader who
 | Anti-pattern | Why it rots | Do instead |
 |---|---|---|
 | **Speculation in reference docs** ("Not yet implemented", "planned design", "Will be wired") | Reads as reference, is actually guesswork; the real design will diverge | Put forward-looking content in `docs/PROGRESS.md` (current status) or a domain use-case file (spec). Enforced for `docs/ARCHITECTURE.md` by the drift script. |
+| **Dead-end docs without navigation** | Readers cannot climb back to the owning index; agents miss related guidance | Every `docs/**/*.md` file starts with an H1 followed by `> **Navigation**:` links to the relevant index |
 | **Duplicating versions / paths / commands** across docs | Both copies drift; readers don't know which is canonical | Link to the owner doc (see ownership table) |
 | **Duplicating compose ports / service URLs** | Playbooks drift from `docker-compose.yml` | Owner: [local-dev.md](./local-dev.md) + compose file; enforced by `python scripts/axis.py check local-dev-docs` |
 | **Aspirational metrics** in engineering docs (e.g. "50 customers in 6 months") | Nobody measures or tests against them; they age into embarrassment | Keep in pitch deck / `PRODUCT_VISION.md` if anywhere; do not pollute technical reference |
