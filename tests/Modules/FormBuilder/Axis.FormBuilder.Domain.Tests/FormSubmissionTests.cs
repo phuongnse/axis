@@ -136,7 +136,7 @@ public class FormSubmissionTests
     }
 
     [Fact]
-    public void Submit_RaisesEventWithCorrectPayload()
+    public void Submit_WhenSubmissionIsPending_RaisesEventWithCorrectPayload()
     {
         FormSubmission submission = CreatePending();
         Guid submittedBy = Guid.NewGuid();
@@ -176,7 +176,7 @@ public class FormSubmissionTests
     }
 
     [Fact]
-    public void Expire_RaisesEventWithCorrectPayload()
+    public void Expire_WhenSubmissionIsPending_RaisesEventWithCorrectPayload()
     {
         FormSubmission submission = CreatePending(expiresAt: DateTimeOffset.UtcNow.AddHours(1));
         submission.Expire();
@@ -213,7 +213,7 @@ public class FormSubmissionTests
     }
 
     [Fact]
-    public void Cancel_RaisesEventWithCorrectPayload()
+    public void Cancel_WhenSubmissionIsPending_RaisesEventWithCorrectPayload()
     {
         FormSubmission submission = CreatePending();
         submission.Cancel();

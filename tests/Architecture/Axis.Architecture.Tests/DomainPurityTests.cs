@@ -45,7 +45,7 @@ public class DomainPurityTests
 
     [Theory]
     [MemberData(nameof(DomainAssemblies))]
-    public void DomainAssembly_HasZeroInfrastructureDependencies(string module, Assembly domainAssembly)
+    public void DomainAssembly_WhenInspected_HasZeroInfrastructureDependencies(string module, Assembly domainAssembly)
     {
         TestResult result = Types.InAssembly(domainAssembly)
             .Should()
@@ -58,7 +58,7 @@ public class DomainPurityTests
     }
 
     [Fact]
-    public void SharedDomainAssembly_HasZeroInfrastructureDependencies()
+    public void SharedDomainAssembly_WhenInspected_HasZeroInfrastructureDependencies()
     {
         Assembly sharedDomain = Conventions.TryLoad("Axis.Shared.Domain")
             ?? throw new InvalidOperationException("Axis.Shared.Domain not loadable.");

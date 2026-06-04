@@ -124,18 +124,22 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 **One command:** `python scripts/axis.py verify` runs the fast local gate — build + vulnerable package scan + `dotnet format --verify` + **unit test projects only** + frontend `ci`/test + drift. It only runs the layers whose files changed (so doc-only and frontend-only work stays quick). Run `python scripts/axis.py bootstrap` once to install the committed **pre-push hook** explicitly (`core.hooksPath = scripts/hooks`); build commands must not mutate Git config. CI/branch protection remains the authoritative full gate and runs full `dotnet test` including Testcontainers before merge.
 
+The .NET branch of `python scripts/axis.py verify` also runs the enforced
+`{Subject}_{Condition}_{ExpectedOutcome}` test-name check.
+
 **Development loop vs enforcement:** while implementing, run the narrow check for the surface you are changing; do not repeatedly run `python scripts/axis.py verify` after every small edit. The pre-push hook runs `python scripts/axis.py verify` once as the local enforcement point, and CI/branch protection runs the full suite before merge.
 
 | During development | Prefer |
 |--------------------|--------|
 | Process/docs change | `python scripts/axis.py check doc-drift` or the specific doc guard named in its output |
-| Test classification / unit project change | `python scripts/axis.py check test-project-classification` and `python scripts/axis.py test unit` |
+| Test change | `python scripts/axis.py check test-naming`; for project changes also run `python scripts/axis.py check test-project-classification` and `python scripts/axis.py test unit` |
 | Frontend change | `npm run ci` and/or `npm run test` |
 | Backend compile-sensitive change | `dotnet build` or the directly affected test project |
 | Review fix touching a rule/guard | The specific guard for that rule, then rely on pre-push for the full fast gate |
 
 | Changed | Commands (all must pass when triggered) |
 |---------|----------------------------------------|
+| `tests/` | `python scripts/axis.py check test-naming` |
 | `src/` or `tests/` | `dotnet build` then `python scripts/axis.py test unit` (auto-discovers `*.Domain.Tests` and `*.Application.Tests`) |
 | `src/`, `tests/`, dependency props, or API contract | `python scripts/axis.py check vulnerable-packages` |
 | `src/` or `tests/` | `dotnet format --verify-no-changes` |
@@ -146,6 +150,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 ```text
 Gate 1 self-check:
+- test naming → ran / not triggered (reason)
 - dotnet build → ran / not triggered (reason)
 - vulnerable package scan → ran / not triggered (reason)
 - unit test projects → ran / not triggered (reason)
@@ -156,7 +161,7 @@ Gate 1 self-check:
 
 Example (docs-only): every line `not triggered — no src/, tests/, or frontend/ changes`.
 
-**Full suite:** integration and API tests run in CI as part of full `dotnet test`; Docker/Testcontainers is required there. Run full local `dotnet test Axis.sln --nologo` when debugging CI, changing Infrastructure/API behavior, or preparing a high-risk backend PR. For Docker through WSL2, either `docker info` must work in the shell running the full suite, or `DOCKER_HOST` must point at a reachable daemon (for example `tcp://localhost:2375`).
+**Full suite:** integration and API tests run in CI as part of full `dotnet test`; Docker/Testcontainers is required there. Run full local `dotnet test Axis.sln --nologo` when debugging CI, changing Infrastructure/API behavior, or preparing a high-risk backend PR. Use the Docker endpoint available to the shell running the suite when `docker info` works. If it does not and Docker Engine lives inside WSL2, set `DOCKER_HOST` to the exported daemon instead (prefer `tcp://127.0.0.1:2375`).
 
 ### Gate 2 — docs walk-through
 

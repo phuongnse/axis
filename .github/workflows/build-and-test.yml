@@ -64,7 +64,7 @@ jobs:
               - 'Axis.sln'
               - '.editorconfig'
               - 'global.json'
-              # OpenApiDocumentTests regenerates openapi.json and diffs it
+              # OpenApiDocumentTests generates the current document and diffs it
               # against the committed copy — a hand-edit that drifts from the
               # code must trigger the .NET job to be caught.
               - 'openapi.json'
@@ -131,6 +131,9 @@ jobs:
 
       - name: Test project classification
         run: python scripts/axis.py check test-project-classification
+
+      - name: Test naming convention
+        run: python scripts/axis.py check test-naming
 
       - name: Build
         run: dotnet build --no-restore

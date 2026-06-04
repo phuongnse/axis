@@ -84,11 +84,9 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await Task.WhenAll(
-            _postgres.StartAsync(),
-            _redis.StartAsync(),
-            _kafka.StartAsync(),
-            _rabbitMq.StartAsync());
+        // Remote Docker endpoints exposed from WSL2 are more reliable when
+        // container lifecycle calls are serialized.
+        await _postgres.StartAsync();
 
         _postgresAdminConnectionString = _postgres.GetConnectionString();
         _identityConnectionString =
@@ -117,8 +115,6 @@ public sealed class ApiTestFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("ConnectionStrings__WorkflowBuilder", _workflowBuilderConnectionString);
         Environment.SetEnvironmentVariable("ConnectionStrings__FormBuilder", _formBuilderConnectionString);
         Environment.SetEnvironmentVariable("ConnectionStrings__WorkflowEngine", _workflowEngineConnectionString);
-        Environment.SetEnvironmentVariable("Kafka__Brokers", _kafka.GetBootstrapAddress());
-        Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", _rabbitMq.GetConnectionString());
 
         DbContextOptions<IdentityDbContext> identityOptions = new DbContextOptionsBuilder<IdentityDbContext>()
             .UseNpgsql(_identityConnectionString)
@@ -142,6 +138,13 @@ public sealed class ApiTestFixture : IAsyncLifetime
         await PostgresModuleTestDatabase.MigrateAsync<WorkflowEngineDbContext>(
             _workflowEngineConnectionString,
             opts => new WorkflowEngineDbContext(opts, new PublicSchemaTenantContext()));
+
+        await _redis.StartAsync();
+        await _rabbitMq.StartAsync();
+        await _kafka.StartAsync();
+
+        Environment.SetEnvironmentVariable("Kafka__Brokers", _kafka.GetBootstrapAddress());
+        Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", _rabbitMq.GetConnectionString());
 
         AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
 
@@ -247,12 +250,15 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        await _factory.DisposeAsync();
-        await Task.WhenAll(
-            _postgres.DisposeAsync().AsTask(),
-            _redis.DisposeAsync().AsTask(),
-            _kafka.DisposeAsync().AsTask(),
-            _rabbitMq.DisposeAsync().AsTask());
+        if (_factory is not null)
+        {
+            await _factory.DisposeAsync();
+        }
+
+        await _postgres.DisposeAsync();
+        await _redis.DisposeAsync();
+        await _kafka.DisposeAsync();
+        await _rabbitMq.DisposeAsync();
 
         Environment.SetEnvironmentVariable("ConnectionStrings__Identity", _previousIdentityConnectionStringEnv);
         Environment.SetEnvironmentVariable("ConnectionStrings__DataModeling", _previousDataModelingConnectionStringEnv);

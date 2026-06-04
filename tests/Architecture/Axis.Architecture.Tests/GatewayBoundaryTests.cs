@@ -17,7 +17,7 @@ public class GatewayBoundaryTests
     private const string ApplicationServicesSuffix = ".Application.Services";
 
     [Fact]
-    public void ApiEndpoints_MustNotDependOnOtherModulesApplicationRepositories()
+    public void ApiEndpoints_WhenInspected_DoNotDependOnOtherModulesApplicationRepositories()
     {
         Assembly? api = Conventions.TryLoad("Axis.Api");
         api.Should().NotBeNull("Axis.Api assembly must be referenced by architecture tests.");
@@ -46,7 +46,7 @@ public class GatewayBoundaryTests
     }
 
     [Fact]
-    public void ApiInfrastructure_MustNotDependOnOtherModulesApplicationLayer()
+    public void ApiInfrastructure_WhenInspected_DoesNotDependOnOtherModulesApplicationLayer()
     {
         Assembly? api = Conventions.TryLoad("Axis.Api");
         api.Should().NotBeNull();

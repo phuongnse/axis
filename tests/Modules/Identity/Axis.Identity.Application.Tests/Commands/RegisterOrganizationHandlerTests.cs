@@ -128,7 +128,7 @@ public class RegisterOrganizationHandlerTests
     }
 
     [Fact]
-    public async Task RegisterOrganization_DelegatesSlugGenerationToGenerator()
+    public async Task RegisterOrganization_WhenHandled_DelegatesSlugGenerationToGenerator()
     {
         SetupDefaultPlan();
         SetupDefaultSlug();

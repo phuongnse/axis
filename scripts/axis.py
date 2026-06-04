@@ -170,6 +170,67 @@ def git_ls_files(pattern: str) -> list[str]:
     return [line for line in git(["ls-files", pattern]).splitlines() if line.strip()]
 
 
+TEST_ATTRIBUTE_RE = re.compile(r"^\s*\[(?:Xunit[.])?(?:Fact|Theory)(?:Attribute)?(?:\s*[(]|\s*\])")
+TEST_METHOD_RE = re.compile(
+    r"\bpublic\s+"
+    r"(?:(?:static|async|virtual|override|new|sealed)\s+)*"
+    r"(?:void|(?:System[.]Threading[.]Tasks[.])?(?:Task|ValueTask)(?:<[^>]+>)?)\s+"
+    r"(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*[(]"
+)
+TEST_NAME_RE = re.compile(r"^[A-Z][A-Za-z0-9]*_[A-Z][A-Za-z0-9]*_[A-Z][A-Za-z0-9]*$")
+
+
+def check_test_naming(_args: argparse.Namespace | None = None) -> int:
+    issues: list[str] = []
+    test_count = 0
+
+    for path in sorted(iter_files(ROOT / "tests", (".cs",))):
+        pending_attribute_line: int | None = None
+        declaration = ""
+
+        for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if TEST_ATTRIBUTE_RE.match(line):
+                if pending_attribute_line is not None:
+                    issues.append(
+                        f"{rel(path)}:{pending_attribute_line}: [Fact]/[Theory] is not followed "
+                        "by a supported public void/Task/ValueTask test method"
+                    )
+                pending_attribute_line = line_number
+                declaration = line.split("]", 1)[1] if "]" in line else ""
+            elif pending_attribute_line is not None:
+                declaration = f"{declaration} {line.strip()}"
+            else:
+                continue
+
+            method = TEST_METHOD_RE.search(declaration)
+            if method is None:
+                continue
+
+            test_count += 1
+            name = method.group("name")
+            if not TEST_NAME_RE.fullmatch(name):
+                issues.append(
+                    f"{rel(path)}:{line_number}: {name} must match "
+                    "{Subject}_{Condition}_{ExpectedOutcome} with exactly three PascalCase segments"
+                )
+            pending_attribute_line = None
+            declaration = ""
+
+        if pending_attribute_line is not None:
+            issues.append(
+                f"{rel(path)}:{pending_attribute_line}: [Fact]/[Theory] is not followed "
+                "by a supported public void/Task/ValueTask test method"
+            )
+
+    if issues:
+        print("check-test-naming FAIL:", file=sys.stderr)
+        for issue in issues:
+            print(f"  - {issue}", file=sys.stderr)
+        return 1
+    print(f"check-test-naming: OK ({test_count} tests scanned)")
+    return 0
+
+
 def check_test_project_classification(_args: argparse.Namespace | None = None) -> int:
     failed = False
     for project in git_ls_files("tests/**/*.csproj"):
@@ -691,6 +752,7 @@ def verify(args: argparse.Namespace) -> int:
     print(f"verify - .NET={dotnet} frontend={frontend}")
 
     if dotnet:
+        step(".NET test naming", lambda: check_test_naming())
         step(".NET build", lambda: run([exe("dotnet"), "build", "Axis.sln", "--nologo"], check=False).returncode)
         step(".NET vulnerable packages", lambda: check_vulnerable_packages())
         step(".NET format", lambda: run([exe("dotnet"), "format", "Axis.sln", "--verify-no-changes"], check=False).returncode)
@@ -814,6 +876,7 @@ def main(argv: list[str] | None = None) -> int:
     check_sub = check.add_subparsers(dest="check_command", required=True)
     check_sub.add_parser("doc-drift").set_defaults(func=check_doc_drift)
     check_sub.add_parser("scripts-standard").set_defaults(func=check_scripts_standard)
+    check_sub.add_parser("test-naming").set_defaults(func=check_test_naming)
     check_sub.add_parser("test-project-classification").set_defaults(func=check_test_project_classification)
     check_sub.add_parser("vulnerable-packages").set_defaults(func=check_vulnerable_packages)
     check_sub.add_parser("ef-domain-mapping").set_defaults(func=check_ef_domain_mapping)

@@ -18,6 +18,9 @@
 
 `{Subject}_{Condition}_{ExpectedOutcome}` — e.g. `CreateWorkflow_WhenNameIsDuplicate_ReturnsConflictError`.
 
+Every `[Fact]` and `[Theory]` name is mechanically checked by
+`python scripts/axis.py check test-naming`; the fast local gate and CI both run it.
+
 ### Test isolation
 
 Each integration test class implements `IAsyncLifetime` (one Testcontainer per class). Each test method calls `ResetAsync()` at its start to truncate relevant tables. See `docs/playbooks/patterns.md` for the full `IAsyncLifetime` pattern.
@@ -59,11 +62,18 @@ See [agent-checklist.md § Gate 1](./agent-checklist.md) and CLAUDE.md. When `sr
 
 ```bash
 dotnet build
+python scripts/axis.py check test-naming
 python scripts/axis.py test unit
 dotnet format --verify-no-changes
 ```
 
 `python scripts/axis.py test unit` discovers committed `*.Domain.Tests` and `*.Application.Tests` projects from `git ls-files`; it does not use a static solution filter. Run `python scripts/axis.py check test-project-classification` when adding a test project; CI fails if a committed `*.Tests.csproj` is not classified. Full `dotnet test Axis.sln --nologo` runs Domain, Application, Infrastructure with Testcontainers, and API tests; Docker must be available for that full local run and CI always runs it before merge.
+
+Use the Docker endpoint already available to the shell running .NET when
+`docker info` works. Only set `DOCKER_HOST=tcp://127.0.0.1:2375` when that
+shell cannot see Docker but Docker Engine is running inside WSL2 with its TCP
+daemon exported; probe that fallback with
+`Invoke-WebRequest http://127.0.0.1:2375/_ping`.
 
 ### Integration test maintenance
 

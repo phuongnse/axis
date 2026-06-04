@@ -18,7 +18,7 @@ namespace Axis.Architecture.Tests;
 public class MediatorScopeTests
 {
     [Fact]
-    public void MediatRScopeRule_IsCoveredByModuleBoundaryTests()
+    public void MediatRScopeRule_WhenInspected_IsCoveredByModuleBoundaryTests()
     {
         // This is a marker test, not a separate check. The CLAUDE.md rule
         // "MediatR is intra-module only" is mechanically equivalent to

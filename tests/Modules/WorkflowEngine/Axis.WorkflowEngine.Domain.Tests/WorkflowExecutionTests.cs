@@ -140,7 +140,7 @@ public class WorkflowExecutionTests
     // ─── Steps ────────────────────────────────────────────────────────────────
 
     [Fact]
-    public void AddStep_AddsStepToCollection()
+    public void AddStep_WhenStepIsValid_AddsStepToCollection()
     {
         WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.AddStep(StepDefId, "Send Email", StepType.Notification, 0);

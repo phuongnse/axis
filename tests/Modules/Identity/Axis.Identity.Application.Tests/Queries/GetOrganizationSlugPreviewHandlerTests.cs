@@ -13,7 +13,7 @@ public class GetOrganizationSlugPreviewHandlerTests
     private GetOrganizationSlugPreviewHandler CreateHandler() => new(_slugGenerator);
 
     [Fact]
-    public async Task Handle_ReturnsGeneratedBaseSlug()
+    public async Task Handle_WhenOrganizationNameIsProvided_ReturnsGeneratedBaseSlug()
     {
         _slugGenerator.GenerateBaseSlug("Acme Corp").Returns("acme-corp");
 

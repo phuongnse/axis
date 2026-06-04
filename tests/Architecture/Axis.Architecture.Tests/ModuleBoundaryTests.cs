@@ -43,21 +43,21 @@ public class ModuleBoundaryTests
 
     [Theory]
     [MemberData(nameof(CrossModulePairs))]
-    public void Module_MustNotReferenceOtherModuleDomain(string moduleA, string moduleB)
+    public void Module_WhenInspected_DoesNotReferenceOtherModuleDomain(string moduleA, string moduleB)
     {
         AssertNoCrossModuleDependency(moduleA, moduleB, layer: "Domain");
     }
 
     [Theory]
     [MemberData(nameof(CrossModulePairs))]
-    public void Module_MustNotReferenceOtherModuleApplication(string moduleA, string moduleB)
+    public void Module_WhenInspected_DoesNotReferenceOtherModuleApplication(string moduleA, string moduleB)
     {
         AssertNoCrossModuleDependency(moduleA, moduleB, layer: "Application");
     }
 
     [Theory]
     [MemberData(nameof(CrossModulePairs))]
-    public void Module_MustNotReferenceOtherModuleInfrastructure(string moduleA, string moduleB)
+    public void Module_WhenInspected_DoesNotReferenceOtherModuleInfrastructure(string moduleA, string moduleB)
     {
         AssertNoCrossModuleDependency(moduleA, moduleB, layer: "Infrastructure");
     }
