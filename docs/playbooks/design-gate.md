@@ -61,7 +61,7 @@ Present the dossier through **plan mode** and **do not write code until the user
 ## Close the loop (after implementing)
 
 1. **Self-review the diff against the dossier** — was every governing rule honored, every caller in the blast radius updated, the contract emitted as decided?
-2. **Run the local gate before push** — `scripts/verify.sh` runs build, vulnerable package scan, format, unit test projects, frontend checks, and doc drift. CI/branch protection is the required full gate and runs full `dotnet test` including Testcontainers before merge. "Build passed" ≠ "PR is mergeable" — formatting, integration, and casing only fully surface in the CI gate. See [agent-checklist § Gate 1](./agent-checklist.md) and [pr-slicing § Gate 1 honesty](./pr-slicing.md#gate-1-honesty).
+2. **Run the local gate before push** — `python scripts/axis.py verify` runs build, vulnerable package scan, format, unit test projects, frontend checks, and doc drift. CI/branch protection is the required full gate and runs full `dotnet test` including Testcontainers before merge. "Build passed" ≠ "PR is mergeable" — formatting, integration, and casing only fully surface in the CI gate. See [agent-checklist § Gate 1](./agent-checklist.md) and [pr-slicing § Gate 1 honesty](./pr-slicing.md#gate-1-honesty).
 3. If you claim the **full suite** ran locally, that means full `dotnet test Axis.sln` ran — including the integration tests. Docker is required for that full local run; if Docker is unavailable, rely on CI for the authoritative full gate instead of presenting a partial run as full.
 
 ---

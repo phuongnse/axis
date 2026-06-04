@@ -91,7 +91,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 ## Gates (every PR)
 
-**Doc drift:** when `src/`, `tests/`, or `docs/use-cases/` change — run `./scripts/check-doc-drift.sh` **before push** (P0; bash — use Git Bash on Windows); CI job **Doc drift** must be green. When `docker-compose.yml` changes, update [local-dev.md](./local-dev.md) in the same PR (`check-local-dev-docs.py` runs inside the drift script). Script output is not a PR artefact — walk Gate 2 rows below mentally and tick the Gate 2 checkbox.
+**Doc drift:** when `src/`, `tests/`, or `docs/use-cases/` change — run `python scripts/axis.py check doc-drift` **before push** (P0); CI job **Doc drift** must be green. When `docker-compose.yml` changes, update [local-dev.md](./local-dev.md) in the same PR (`check-local-dev-docs.py` runs inside the drift command). Script output is not a PR artefact — walk Gate 2 rows below mentally and tick the Gate 2 checkbox.
 
 | Gate | Action |
 |------|--------|
@@ -103,15 +103,15 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 **CI-only gates** (run automatically on PR, no local action required):
 
 - **PR guard** — [`scripts/check-pr.py`](../../scripts/check-pr.py) validates PR metadata in one place: the PR title must use Conventional Commit style (`type(scope): subject` or `type: subject`), and the PR body must keep the template contract: `Summary`, `Linked spec`, and `Requirements & rules followed` are present; requirement checkboxes are checked or explicitly marked `N/A` with a concrete reason. The template in [`.github/PULL_REQUEST_TEMPLATE.md`](../../.github/PULL_REQUEST_TEMPLATE.md) auto-fills the body; this CI job is the enforcement.
-- **Doc drift** — enforces same-PR docs, new-handler tests, no-new TODO/FIXME, new raw-SQL review, [WORKAROUND comment ↔ inventory sync](../WORKAROUNDS.md), [speculation guard](./docs-style.md#anti-patterns-dont-ship-these), [incident/lesson framing guard](./docs-style.md#keep-practice-docs-general), `GetAwaiter().GetResult()` ban, hardcoded connection-string ban, `DateTime.Now` ban (use `UtcNow`), and a stale-terminology guard (current pattern list lives in [`scripts/check-doc-drift.sh`](../../scripts/check-doc-drift.sh) — search for `STALE_TERM_PATTERN`). **Module/API → use-case domain** — [`doc_drift_domains.py`](../../scripts/doc_drift_domains.py) + [`axis_repo.py`](../../scripts/axis_repo.py). **Layout drift** in the same job: [`sync_buf_yaml.py --check`](../../scripts/sync_buf_yaml.py), [`check_kafka_wiring.py`](../../scripts/check_kafka_wiring.py), [`regenerate-domain-readme-index.py --check`](../../scripts/regenerate-domain-readme-index.py).
-- **Markdown link check** — `lychee` verifies internal links and `#anchors`. **Relative file/image targets** (`![alt](./asset.svg)`, `[text](./file.md)`) are double-checked by [`scripts/check-doc-link-targets.py`](../../scripts/check-doc-link-targets.py) inside the drift script — catches the broken-image class lychee misses.
-- **Code-fence integrity** — [`scripts/check-doc-code-fences.py`](../../scripts/check-doc-code-fences.py) (inside the drift script) flags code-block lines with collapsed indentation (a lone leading space). Catches the bulk-find-replace corruption class that lychee, prettier, and the structural checks all let through.
-- **Use-case docs** — [`scripts/check-use-case-docs.py`](../../scripts/check-use-case-docs.py) validates use-case file structure (required sections + tables + status callout), flags template placeholders (`_(One sentence...)_`, `_(Actor)_`, `_(What starts...)_`), flags self-links `[name](./README.md)` and truncated summary rows in domain READMEs, and counts use cases still on the stock Main flow.
+- **Doc drift** — enforces same-PR docs, new-handler tests, no-new TODO/FIXME, new raw-SQL review, [WORKAROUND comment ↔ inventory sync](../WORKAROUNDS.md), [speculation guard](./docs-style.md#anti-patterns-dont-ship-these), [incident/lesson framing guard](./docs-style.md#keep-practice-docs-general), `GetAwaiter().GetResult()` ban, hardcoded connection-string ban, `DateTime.Now` ban (use `UtcNow`), script-standard enforcement, and a stale-terminology guard (current pattern list lives in [`scripts/axis.py`](../../scripts/axis.py)). **Module/API → use-case domain** — [`doc_drift_domains.py`](../../scripts/doc_drift_domains.py) + [`axis_repo.py`](../../scripts/axis_repo.py). **Layout drift** in the same job: `python scripts/axis.py check buf-modules`, `python scripts/axis.py check kafka-wiring`, `python scripts/axis.py check domain-readme-index`.
+- **Markdown link check** — `lychee` verifies internal links and `#anchors`. **Relative file/image targets** (`![alt](./asset.svg)`, `[text](./file.md)`) are double-checked by `python scripts/axis.py check doc-link-targets` inside the drift command — catches the broken-image class lychee misses.
+- **Code-fence integrity** — `python scripts/axis.py check doc-code-fences` (inside the drift command) flags code-block lines with collapsed indentation (a lone leading space). Catches the bulk-find-replace corruption class that lychee, prettier, and the structural checks all let through.
+- **Use-case docs** — `python scripts/axis.py check use-case-docs` validates use-case file structure (required sections + tables + status callout), flags template placeholders (`_(One sentence...)_`, `_(Actor)_`, `_(What starts...)_`), flags self-links `[name](./README.md)` and truncated summary rows in domain READMEs, and counts use cases still on the stock Main flow.
 - **Secret scanning** — TruffleHog scans the full PR diff for committed secrets (API keys, passwords, tokens) and verifies each finding against the alleged service before reporting (`--only-verified` cuts false positives).
-- **Vulnerable packages** — [`scripts/check-vulnerable-packages.sh`](../../scripts/check-vulnerable-packages.sh) wraps `dotnet list package --vulnerable --include-transitive` and fails on any known CVE in the dep tree (covers transitive packages too).
+- **Vulnerable packages** — `python scripts/axis.py check vulnerable-packages` wraps `dotnet list package --vulnerable --include-transitive` and fails on any known CVE in the dep tree (covers transitive packages too).
 - **Architecture fitness tests** run as part of `dotnet test` — failures there mean a CLAUDE.md P0/P1 rule got violated structurally. See [tests README](../../tests/Architecture/Axis.Architecture.Tests/README.md).
 - **EF migrations** — only `dotnet ef migrations add` (no hand-written `.cs` / orphan `.Designer.cs`). Each `{Name}.cs` needs `{Name}.Designer.cs`. See [local-dev.md § EF Core migrations](./local-dev.md#ef-core-migrations-dotnet-ef).
-- **Local dev docs** — [`docker-compose.yml`](../../docker-compose.yml) changes require [`docs/playbooks/local-dev.md`](./local-dev.md) in the same PR; CI runs [`scripts/check-local-dev-docs.py`](../../scripts/check-local-dev-docs.py).
+- **Local dev docs** — [`docker-compose.yml`](../../docker-compose.yml) changes require [`docs/playbooks/local-dev.md`](./local-dev.md) in the same PR; CI runs `python scripts/axis.py check local-dev-docs`.
 - **Async-safety analyzers** (`Microsoft.VisualStudio.Threading.Analyzers`) — type-aware checks at build time for sync-over-async (VSTHRD002), async-void (VSTHRD100), unobserved async results (VSTHRD110). Rule selection rationale in [patterns.md § Async patterns](./patterns.md#async-patterns).
 - **Coverage report** uploaded as artifact (`dotnet-coverage`). No threshold yet — see [CONTRIBUTING.md § Coverage](../../CONTRIBUTING.md#coverage).
 
@@ -121,27 +121,27 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 ### Gate 1 — verify before push (fast local gate)
 
-**One command:** [`scripts/verify.sh`](../../scripts/verify.sh) runs the fast local gate — build + vulnerable package scan + `dotnet format --verify` + **unit test projects only** + frontend `ci`/test + drift. It only runs the layers whose files changed (so doc-only and frontend-only work stays quick). Run [`scripts/bootstrap.sh`](../../scripts/bootstrap.sh) once to install the committed **pre-push hook** explicitly (`core.hooksPath = scripts/hooks`); build commands must not mutate Git config. CI/branch protection remains the authoritative full gate and runs full `dotnet test` including Testcontainers before merge.
+**One command:** `python scripts/axis.py verify` runs the fast local gate — build + vulnerable package scan + `dotnet format --verify` + **unit test projects only** + frontend `ci`/test + drift. It only runs the layers whose files changed (so doc-only and frontend-only work stays quick). Run `python scripts/axis.py bootstrap` once to install the committed **pre-push hook** explicitly (`core.hooksPath = scripts/hooks`); build commands must not mutate Git config. CI/branch protection remains the authoritative full gate and runs full `dotnet test` including Testcontainers before merge.
 
-**Development loop vs enforcement:** while implementing, run the narrow check for the surface you are changing; do not repeatedly run `scripts/verify.sh` after every small edit. The pre-push hook runs `scripts/verify.sh` once as the local enforcement point, and CI/branch protection runs the full suite before merge.
+**Development loop vs enforcement:** while implementing, run the narrow check for the surface you are changing; do not repeatedly run `python scripts/axis.py verify` after every small edit. The pre-push hook runs `python scripts/axis.py verify` once as the local enforcement point, and CI/branch protection runs the full suite before merge.
 
 | During development | Prefer |
 |--------------------|--------|
-| Process/docs change | `./scripts/check-doc-drift.sh` or the specific doc guard named in its output |
-| Test classification / unit project change | `bash scripts/check-test-project-classification.sh` and `bash scripts/test-unit.sh` |
+| Process/docs change | `python scripts/axis.py check doc-drift` or the specific doc guard named in its output |
+| Test classification / unit project change | `python scripts/axis.py check test-project-classification` and `python scripts/axis.py test unit` |
 | Frontend change | `npm run ci` and/or `npm run test` |
 | Backend compile-sensitive change | `dotnet build` or the directly affected test project |
 | Review fix touching a rule/guard | The specific guard for that rule, then rely on pre-push for the full fast gate |
 
 | Changed | Commands (all must pass when triggered) |
 |---------|----------------------------------------|
-| `src/` or `tests/` | `dotnet build` then `bash scripts/test-unit.sh` (auto-discovers `*.Domain.Tests` and `*.Application.Tests`) |
-| `src/`, `tests/`, dependency props, or API contract | `bash scripts/check-vulnerable-packages.sh` |
+| `src/` or `tests/` | `dotnet build` then `python scripts/axis.py test unit` (auto-discovers `*.Domain.Tests` and `*.Application.Tests`) |
+| `src/`, `tests/`, dependency props, or API contract | `python scripts/axis.py check vulnerable-packages` |
 | `src/` or `tests/` | `dotnet format --verify-no-changes` |
 | `frontend/` | `npm run ci` then `npm run test` |
 | `src/Axis.Api/Endpoints/` or API contract | Update + run `tests/Api/Axis.Api.Tests/` |
-| Any of the above + `docs/use-cases/` | `./scripts/check-doc-drift.sh` (bash) — also runs `check-use-case-docs.py --check` and `check-local-dev-docs.py`, enforces no-new `TODO`/`FIXME`/`stub`, reviews new raw-SQL calls |
-| `docker-compose.yml` | Update [local-dev.md](./local-dev.md) in same PR; `./scripts/check-doc-drift.sh` |
+| Any of the above + `docs/use-cases/` | `python scripts/axis.py check doc-drift` — also runs `check use-case-docs` and `check local-dev-docs`, enforces no-new `TODO`/`FIXME`/`stub`, reviews new raw-SQL calls |
+| `docker-compose.yml` | Update [local-dev.md](./local-dev.md) in same PR; `python scripts/axis.py check doc-drift` |
 
 ```text
 Gate 1 self-check:
@@ -150,7 +150,7 @@ Gate 1 self-check:
 - unit test projects → ran / not triggered (reason)
 - dotnet format --verify-no-changes → ran / not triggered (reason)
 - npm run ci + npm run test → ran / not triggered (reason)
-- ./scripts/check-doc-drift.sh → ran / not triggered (reason)
+- python scripts/axis.py check doc-drift → ran / not triggered (reason)
 ```
 
 Example (docs-only): every line `not triggered — no src/, tests/, or frontend/ changes`.
