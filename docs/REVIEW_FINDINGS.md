@@ -1,72 +1,84 @@
 # Review findings
 
-> **Navigation**: [← docs/README.md](./README.md) · [← CLAUDE.md](../CLAUDE.md)
+> **Navigation**: [<- docs/README.md](./README.md) . [<- CLAUDE.md](../CLAUDE.md)
 
-A register of recurring code-review finding **classes** and how each is
-prevented. The goal: a given finding class is reviewed by a human (or
-CodeRabbit) **once**; after that the project either mechanizes it away
-(analyzer / fitness test / codegen / CI guard) or records a deliberate
-decision to keep catching it in review. This turns review feedback into
-prevention instead of re-explaining the same rule every PR.
+Recurring review finding classes and how each is prevented. A finding class
+should be explained once; after that it is either mechanized, kept explicitly
+review-only, downgraded to guidance, or deleted as noise.
 
-Sibling register: [WORKAROUNDS.md](./WORKAROUNDS.md) (intentional rule
-violations). This file is the inverse — rules we are progressively making
-impossible to violate.
+Sibling register: [WORKAROUNDS.md](./WORKAROUNDS.md) tracks intentional rule
+violations. This file tracks the rules we are trying to make hard to violate.
+
+---
+
+## Enforcement taxonomy
+
+Use these labels consistently in docs, PR templates, and review comments:
+
+| Status | Meaning | Allowed language |
+|---|---|---|
+| **Enforced** | CI/build/tooling fails the PR for this class. Custom repo gates have a counterexample test proving the rule fires. | "gate", "enforced", "must" |
+| **Partial** | Tooling blocks a deterministic subset and the known gap is documented. | "partially enforced"; name the gap |
+| **Review-only** | Human/CodeRabbit judgment is required; CI cannot prove it without false positives. | "review checkpoint", not "gate" |
+| **Guidance** | Useful convention or example, but not a defect class. | "prefer", "pattern", "example" |
+| **Not a rule** | Deliberately not enforced or reviewed. | Avoid rule language |
+
+Custom gates are not trusted just because they pass on a clean repo. Before a
+custom rule can be marked **Enforced**, add a negative test under
+[`scripts/tests`](../scripts/tests/test_policy_gates.py) or the relevant test
+project showing the bad example fails. Analyzer/compiler/tool rules can rely on
+the tool, but the repo-specific wiring still needs to run in CI.
 
 ---
 
 ## When to add a row
 
-Wired into **Gate 3** ([agent-checklist.md § Gate 3](./playbooks/agent-checklist.md)):
-when a review finding **repeats a class already seen** in a prior PR, it must
-land here — either pointed at a mechanism or recorded as deliberately manual.
+Wired into **Review Checkpoint 3** ([agent-checklist.md](./playbooks/agent-checklist.md)):
+when a review finding repeats a class already seen, record it here. Pick a
+status honestly; do not upgrade review-only guidance into a fake gate.
 
-Before building a gate, the class must pass all three tests. If any is "no",
-leave it in the **manual** tier with the reason; an unreliable gate costs more
-than the review it replaces.
+Before building a gate, the class must pass all three tests. If any answer is
+"no", leave it review-only or guidance.
 
-1. **Deterministic?** Can a rule decide it without understanding intent? (A
-   dropped `CancellationToken` is; "this should be a `Result<T>`" often is not.)
-2. **Recurred?** Seen ≥ 2–3 times across PRs — a real pattern, not a one-off.
-3. **Cheaper than re-review?** Gate build + maintenance (incl. false-positive
-   noise) is less than the cost of flagging it forever.
+1. **Deterministic?** Can a rule decide it without understanding intent?
+2. **Recurred?** Seen at least 2-3 times across PRs?
+3. **Cheaper than re-review?** Gate build and maintenance cost less than
+   catching it by review?
 
-Mechanism tiers, cheapest first: **existing analyzer rule** (just escalate
-severity in [`.editorconfig`](../.editorconfig)) → **architecture fitness test**
-([tests/Architecture](../tests/Architecture/Axis.Architecture.Tests/README.md))
-→ **codegen / source generator** → **CI guard** (workflow step or paths-filter)
-→ **manual** (CodeRabbit path-instruction in `.coderabbit.yaml`, added by the
-CodeRabbit-config PR, + reviewer judgment).
+Mechanism tiers, cheapest first: analyzer severity in [`.editorconfig`](../.editorconfig)
+-> architecture fitness test ([tests/Architecture](../tests/Architecture/Axis.Architecture.Tests/README.md))
+-> codegen/source generator -> CI guard -> review-only.
 
 ---
 
 ## Ledger
 
-| Finding class | Mechanism | Tier | Status |
+| Finding class | Mechanism | Proof / scope | Status |
 |---|---|---|---|
-| FE/BE casing & wire-shape drift | `gen:api-types` from `openapi.json` + `OpenApiDocumentTests` + paths-filter on `openapi.json` | codegen + CI | **Closed** ([#165](https://github.com/phuongnse/axis/pull/165)) |
-| `CancellationToken` not forwarded to a callee that accepts one | `CA2016` escalated to `warning` → build error via `TreatWarningsAsErrors` | analyzer | **Closed** (`.editorconfig`) |
-| Cross-module in-process call / illegal project ref | Architecture fitness tests + CodeRabbit path-instruction | arch-test + manual | **Partial** — fitness tests miss runtime DI resolved via `Contracts`; CodeRabbit flags the rest |
-| One public type per `.cs` file | — (kept at `suggestion`) | manual | **Won't mechanize** — not a defect class; a hard rule fights intentional groupings (`Result<T>`, `ICommand<T>`, polymorphic VO hierarchies, query+DTO colocation). 2026-06 scan: 22 files, mostly idiomatic |
-| `using` not fully-qualified names | `IDE0001`/`IDE0002` (currently `suggestion`) | analyzer | **Planned** (low ROI — no real defect) |
-| Auth/permission check before input validation | CodeRabbit path-instruction (`src/Axis.Api/Endpoints`) | manual | **Manual** — ordering intent not reliably analyzable |
-| Wrong status code on bad input (400 vs 500) | CodeRabbit path-instruction | manual | **Manual** |
-| Side effects committed before the DB transaction they depend on | CodeRabbit path-instruction | manual | **Manual** — needs data-flow judgment |
-| Test asserts something other than its name claims (e.g. `Returns403` asserts 401) | CodeRabbit path-instruction; analyzer pilot under consideration | manual → analyzer? | **Manual** — green-but-wrong test; pilot a name↔asserted-status analyzer if it recurs |
-| `Result`/`Result<T>` vs bespoke bool/tuple/throw for business failures | CodeRabbit path-instruction | manual | **Manual** (P1, design judgment) |
-| Endpoint returns `object`/anonymous JSON instead of an Application-layer DTO | `python scripts/axis.py check doc-drift` added-lines ratchet: bans new `.Produces<object>` / `Results.Ok(new { … })` in `Axis.Api/Endpoints` | CI guard | **Closed** — 30 endpoints converted to named DTOs (`CreatedResponse`/`MessageResponse`, query DTOs, `UserSessionResponse`); `openapi.json`/`api-types.ts` regenerated. Flagged on [#155](https://github.com/phuongnse/axis/pull/155) |
-| Minimal-API endpoint orchestrates >1 `mediator.Send` (logic in endpoint; side-effect consumed before a later step can fail) | `python scripts/axis.py check doc-drift` full-state guard: fails if any endpoint handler (returning `Task<IResult>`) has >1 `.Send(`/`.Publish(` | CI guard | **Closed** — baseline 0; fails build on any new. Drift guard over a Roslyn analyzer: cheaper, no new dependency for one rule. Limit: named handlers only, not inline lambdas. Flagged on [#155](https://github.com/phuongnse/axis/pull/155) |
-
-Status: **Closed** = a mechanism fails the build/CI; **Partial** = mechanized
-with a documented gap; **Planned** = agreed, not yet built; **Manual** = kept in
-review on purpose (reason in the row).
+| FE/BE casing and wire-shape drift | `OpenApiDocumentTests` + frontend `gen:api-types` diff on `openapi.json` | CI .NET/frontend jobs run when `openapi.json` or relevant source changes | **Enforced** |
+| .NET test name convention | `python scripts/axis.py check test-naming` | `scripts/tests/test_policy_gates.py` negative test + CI policy tests | **Enforced** |
+| Python policy gates still fire | `python scripts/axis.py check policy-tests` | CI `Doc drift` job runs on every PR | **Enforced** |
+| `CancellationToken` not forwarded to a callee that accepts one | `CA2016` escalated to `warning`, build fails via `TreatWarningsAsErrors` | Analyzer/compiler wiring in `.editorconfig` + `Directory.Build.props` | **Enforced** |
+| New skipped tests | Added-line ratchet rejects `Skip =` under `tests/` | `scripts/tests/test_policy_gates.py` negative test | **Enforced** |
+| `EnsureCreated` reintroduced | Added-line ratchet rejects `EnsureCreated` / `EnsureCreatedAsync` under `src/` and `tests/` | `scripts/tests/test_policy_gates.py` negative test | **Enforced** |
+| New or modified Application handler without matching test file | Diff ratchet checks changed `Commands/*Handler.cs` and `Queries/*Handler.cs` | `scripts/tests/test_policy_gates.py` negative test; untouched legacy files are not swept | **Partial** |
+| Endpoint returns `object`/anonymous JSON instead of an Application-layer DTO | Added-line ratchet bans new `.Produces<object>` / `Results.Ok(new { ... })` in `Axis.Api/Endpoints` | `scripts/tests/test_policy_gates.py` covers the ratchet class | **Enforced** |
+| Minimal-API endpoint orchestrates more than one mediator call | Full-state guard counts `.Send(`/`.Publish(` in named endpoint handlers | CI `Doc drift`; known gap: inline lambdas are not parsed | **Partial** |
+| Cross-module in-process call / illegal project ref | Architecture fitness tests + CodeRabbit path instruction | Tests catch project/type graph violations; runtime DI via `Contracts` still needs review | **Partial** |
+| Cross-module raw SQL | CodeRabbit path instruction + review | Path-only grep cannot know table ownership safely | **Review-only** |
+| Auth/permission check before input validation | CodeRabbit path instruction | Requires endpoint intent and failure-order judgment | **Review-only** |
+| Wrong status code on bad input | CodeRabbit path instruction | Requires semantic assertion and error taxonomy judgment | **Review-only** |
+| Side effects committed before the DB transaction they depend on | CodeRabbit path instruction | Requires data-flow and transaction-boundary judgment | **Review-only** |
+| Test asserts something other than its name claims | CodeRabbit path instruction; analyzer pilot only if it recurs | Green-but-wrong tests require assertion semantics | **Review-only** |
+| `Result`/`Result<T>` vs bespoke bool/tuple/throw for business failures | CodeRabbit path instruction | Design judgment; exceptions are valid for infrastructure faults | **Review-only** |
+| One public type per `.cs` file | None | Intentional groupings are common and valid | **Not a rule** |
+| Inline fully-qualified type names instead of `using` directives | IDE suggestions / `dotnet format` cleanup | Low defect value; keep as style guidance unless it becomes recurring review noise | **Guidance** |
 
 ---
 
 ## Metric
 
-The point is a downward trend in **findings per PR for already-closed classes**
-— ideally zero (a closed class reappearing means the gate has a hole, like the
-`openapi.json` paths-filter gap [#165] closed). Note repeat-of-closed-class
-occurrences in the Gate 3 retrospective so holes surface instead of being
-re-fixed by hand.
+Track repeat findings for already **Enforced** classes. A repeat means either
+the gate has a hole, the CI trigger is wrong, or the docs overstated the rule.
+Record that in Review Checkpoint 3 so the fix is a stronger mechanism, not more
+prose.

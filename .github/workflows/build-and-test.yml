@@ -42,7 +42,6 @@ jobs:
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
-      doc-drift-scope: ${{ steps.filter.outputs['doc-drift-scope'] }}
       protobuf: ${{ steps.filter.outputs.protobuf }}
       markdown: ${{ steps.filter.outputs.markdown }}
     steps:
@@ -76,19 +75,6 @@ jobs:
               # contract must run the "API types in sync" guard below, even
               # when no frontend/** file is touched in the same PR.
               - 'openapi.json'
-              - '.github/workflows/build-and-test.yml'
-            doc-drift-scope:
-              - 'src/**'
-              - 'tests/**'
-              # The umbrella's full-tree checks (link targets, use-case
-              # structure, code-fence integrity) validate every doc, so any
-              # doc change must trigger them — not just use-cases.
-              - 'docs/**'
-              # Globbed, not enumerated: the umbrella invokes several checker
-              # scripts, and a new one must trigger the job without anyone
-              # remembering to add it here.
-              - 'scripts/**'
-              - 'buf.yaml'
               - '.github/workflows/build-and-test.yml'
             protobuf:
               - '**/*.proto'
@@ -210,8 +196,6 @@ jobs:
 
   doc-drift:
     name: Doc drift
-    needs: detect
-    if: needs.detect.outputs['doc-drift-scope'] == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -219,6 +203,9 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Test policy gates
+        run: python scripts/axis.py check policy-tests
 
       - name: Check doc drift
         run: python scripts/axis.py check doc-drift

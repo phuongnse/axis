@@ -1,15 +1,13 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 #
 # CodeRabbit config for Axis. Purpose: make automated review cite this repo's
-# canonical rules (CLAUDE.md + docs/playbooks) instead of generic advice, so
-# every finding maps to a section a human (or agent) can act on — and so the
-# review-findings ledger (docs/review-findings-ledger.md) can track which
-# finding classes have been mechanized away vs. still need human review.
+# canonical rules (CLAUDE.md + docs/playbooks) instead of generic advice.
+# Every finding should map to a section a human or agent can act on. The
+# enforcement taxonomy lives in docs/REVIEW_FINDINGS.md.
 #
-# Deterministic rules (no var, one-type-per-file, using-not-FQCN, forward
-# CancellationToken) are enforced by analyzers in .editorconfig — they should
-# fail the build, not wait for review. The instructions below are for the
-# judgment-based classes that an analyzer cannot reliably catch.
+# Deterministic rules like no-var locals and CancellationToken forwarding are
+# enforced by analyzers/.editorconfig and should fail the build, not wait for
+# review. The instructions below are for judgment-based classes or guidance.
 language: en-US
 
 reviews:
@@ -20,14 +18,14 @@ reviews:
   path_instructions:
     - path: "**/*.cs"
       instructions: |
-        Project rules: CLAUDE.md (machine rules P0-P2) and .editorconfig are
-        authoritative. Style/naming (no `var` for locals, `using` not
-        fully-qualified names) and CancellationToken forwarding (CA2016, escalated
-        in .editorconfig + TreatWarningsAsErrors) are analyzer-enforced and fail
-        the build — only flag them if the build somehow did not. (One-public-type-
-        per-file is deliberately NOT enforced — it conflicts with intentional
-        groupings like Result/Result<T>, ICommand/ICommand<T>, and polymorphic
-        value-object hierarchies; see review-findings-ledger.md. Do not flag it.)
+        Project rules: CLAUDE.md (machine rules P0-P2), .editorconfig, and
+        docs/REVIEW_FINDINGS.md are authoritative. No `var` for locals and
+        CancellationToken forwarding (CA2016) are analyzer-enforced and fail
+        the build; only flag them if the build somehow did not. Inline
+        fully-qualified type names are style guidance, not a hard gate.
+        One-public-type-per-file is deliberately NOT enforced because it
+        conflicts with intentional groupings; see docs/REVIEW_FINDINGS.md.
+        Do not flag it.
         Focus review on:
         - Result / Result<T> for business failures; exceptions only for
           infrastructure faults (CLAUDE.md P1). Flag bespoke bool/tuple/throw

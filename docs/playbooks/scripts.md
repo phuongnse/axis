@@ -9,6 +9,7 @@ Top-level maintenance scripts under `scripts/` should be Python only.
 
 ```bash
 python scripts/axis.py verify
+python scripts/axis.py check policy-tests
 python scripts/axis.py check doc-drift
 python scripts/axis.py check scripts-standard
 python scripts/axis.py check doc-navigation

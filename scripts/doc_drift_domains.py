@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
-"""Discover code-path → use-case domain mappings for doc-drift checks.
+"""Validate module/API to use-case-domain layout discovery.
 
-Mappings are derived from the repo layout, not a hand-maintained list:
-
-  - ``src/Modules/{Module}/`` → ``docs/use-cases/{domain}/`` (PascalCase → kebab-case,
-    with a small override table for names that do not match the folder slug).
-  - ``src/Axis.Api/Endpoints/*Endpoints.cs`` → same domain as the module referenced
-    by ``using Axis.{Module}.Application`` (first non-Shared Application import).
-
-Extra rules (cross-cutting paths that are not module-scoped) live in
-``EXTRA_CODE_TO_DOC_RULES`` — keep that list minimal.
+Mappings are derived from the repo layout so new modules and endpoint groups
+cannot silently point at a missing domain. This checker does not require an
+unrelated use-case doc edit for every code change; behavioral doc accuracy is a
+review checkpoint because a path-only rule cannot determine whether behavior
+changed.
 
 Run ``python3 scripts/doc_drift_domains.py --validate`` after adding a module,
 endpoint group, or domain folder. Agent checklists: docs/playbooks/repo-layout-discovery.md
@@ -20,16 +16,14 @@ from __future__ import annotations
 import argparse
 import re
 import sys
-from dataclasses import dataclass, field
 from pathlib import Path
 
 _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from axis_repo import (
+from axis_repo import (  # noqa: E402
     ENDPOINTS_DIR,
-    MODULES_DIR,
     ROOT,
     USE_CASES_DIR,
     iter_module_names,
@@ -37,70 +31,9 @@ from axis_repo import (
     primary_application_module,
 )
 
-# Cross-cutting paths: (code regex, doc prefix under repo root, label).
-EXTRA_CODE_TO_DOC_RULES: list[tuple[str, str, str]] = [
-    (
-        r"src/Modules/.*/.*OrganizationVerifiedHandler",
-        "docs/use-cases/platform-foundation",
-        "platform-foundation tenant provisioning",
-    ),
-    (
-        r"frontend/src/(features/auth|routes/|components/layout/AppShell)",
-        "docs/use-cases/identity-access",
-        "identity-access auth frontend",
-    ),
-]
-
-
-@dataclass
-class DomainDriftRule:
-    """Require docs under doc_prefix when any code_pattern matches a changed path."""
-
-    doc_prefix: str
-    label: str
-    code_patterns: list[str] = field(default_factory=list)
-
-
-def discover_rules() -> list[DomainDriftRule]:
-    """Build merged rules (one per doc_prefix) from modules, endpoints, and extras."""
-    by_doc: dict[str, DomainDriftRule] = {}
-
-    def add_pattern(doc_prefix: str, label: str, pattern: str) -> None:
-        rule = by_doc.get(doc_prefix)
-        if rule is None:
-            rule = DomainDriftRule(doc_prefix=doc_prefix, label=label, code_patterns=[])
-            by_doc[doc_prefix] = rule
-        if pattern not in rule.code_patterns:
-            rule.code_patterns.append(pattern)
-
-    for module in iter_module_names():
-        domain = module_to_domain_slug(module)
-        doc_prefix = f"docs/use-cases/{domain}"
-        add_pattern(
-            doc_prefix,
-            f"{domain} module",
-            f"src/Modules/{module}/",
-        )
-
-    for endpoint_file in sorted(ENDPOINTS_DIR.glob("*Endpoints.cs")):
-        module = primary_application_module(endpoint_file)
-        domain = module_to_domain_slug(module)
-        doc_prefix = f"docs/use-cases/{domain}"
-        stem = endpoint_file.stem[: -len("Endpoints")]
-        add_pattern(
-            doc_prefix,
-            f"{domain} API",
-            f"src/Axis\\.Api/Endpoints/{re.escape(stem)}",
-        )
-
-    for pattern, doc_prefix, label in EXTRA_CODE_TO_DOC_RULES:
-        add_pattern(doc_prefix, label, pattern)
-
-    return sorted(by_doc.values(), key=lambda r: r.doc_prefix)
-
 
 def validate_discovery() -> list[str]:
-    """Fail fast when the tree and mapping table are out of sync."""
+    """Fail fast when module/endpoint discovery points at missing docs."""
     issues: list[str] = []
 
     for module in iter_module_names():
@@ -115,12 +48,12 @@ def validate_discovery() -> list[str]:
 
     for endpoint_file in sorted(ENDPOINTS_DIR.glob("*Endpoints.cs")):
         try:
-            primary_application_module(endpoint_file)
+            module_to_domain_slug(primary_application_module(endpoint_file))
         except ValueError as exc:
             issues.append(str(exc))
 
     for domain_dir in sorted(USE_CASES_DIR.iterdir()):
-        if not domain_dir.is_dir() or domain_dir.name.startswith("_"):
+        if not domain_dir.is_dir() or domain_dir.name.startswith((".", "_")):
             continue
         if domain_dir.name == "page-builder":
             continue
@@ -134,37 +67,8 @@ def path_matches_pattern(path: str, pattern: str) -> bool:
     return re.search(pattern, path) is not None
 
 
-def is_csproj_only_match(changed_paths: list[str], pattern: str) -> bool:
-    """True when every changed path matching pattern is a .csproj (Dependabot noise)."""
-    matches = [p for p in changed_paths if path_matches_pattern(p, pattern)]
-    if not matches:
-        return False
-    return all(p.endswith(".csproj") for p in matches)
-
-
-def check_domain_docs(changed_paths: list[str], rules: list[DomainDriftRule]) -> list[str]:
-    errors: list[str] = []
-    for rule in rules:
-        triggered = False
-        for pattern in rule.code_patterns:
-            if not any(path_matches_pattern(p, pattern) for p in changed_paths):
-                continue
-            if is_csproj_only_match(changed_paths, pattern):
-                continue
-            triggered = True
-            break
-        if not triggered:
-            continue
-        doc_prefix = rule.doc_prefix + "/"
-        if not any(p.startswith(doc_prefix) for p in changed_paths):
-            errors.append(
-                f"{rule.label}: code changed but no files under {rule.doc_prefix}/ in this PR"
-            )
-    return errors
-
-
 def check_readme_api_status(changed_paths: list[str]) -> list[str]:
-    """Domain README must not keep '| API | ⏳' after API endpoint files change."""
+    """Domain README must not keep '| API | pending' after endpoint files change."""
     errors: list[str] = []
     domains_to_check: set[str] = set()
     for endpoint_file in ENDPOINTS_DIR.glob("*Endpoints.cs"):
@@ -178,11 +82,17 @@ def check_readme_api_status(changed_paths: list[str]) -> list[str]:
         readme = USE_CASES_DIR / domain / "README.md"
         if not readme.is_file():
             continue
-        if re.search(r"\| API \| ⏳", readme.read_text(encoding="utf-8")):
-            errors.append(
-                f"docs/use-cases/{domain}/README.md still '| API | ⏳' — set ⚠️ or ✅"
-            )
+        if re.search(r"\| API \| \u23f3", readme.read_text(encoding="utf-8")):
+            errors.append(f"docs/use-cases/{domain}/README.md still has pending API status")
     return errors
+
+
+def print_mappings() -> None:
+    for module in iter_module_names():
+        print(f"src/Modules/{module}/ -> docs/use-cases/{module_to_domain_slug(module)}/")
+    for endpoint_file in sorted(ENDPOINTS_DIR.glob("*Endpoints.cs")):
+        module = primary_application_module(endpoint_file)
+        print(f"{endpoint_file.relative_to(ROOT)} -> docs/use-cases/{module_to_domain_slug(module)}/")
 
 
 def main() -> int:
@@ -200,7 +110,7 @@ def main() -> int:
     parser.add_argument(
         "--list",
         action="store_true",
-        help="print discovered rules (debug)",
+        help="print discovered module/API to docs mappings (debug)",
     )
     args = parser.parse_args()
 
@@ -211,27 +121,20 @@ def main() -> int:
             print(f"  - {issue}", file=sys.stderr)
         return 1
 
-    rules = discover_rules()
-
     if args.list:
-        for rule in rules:
-            print(f"{rule.doc_prefix}  ({rule.label})")
-            for pat in rule.code_patterns:
-                print(f"  {pat}")
+        print_mappings()
         return 0
 
     if args.validate:
         print(
             f"doc-drift-domains: OK ({len(iter_module_names())} modules, "
-            f"{len(list(ENDPOINTS_DIR.glob('*Endpoints.cs')))} endpoint groups, "
-            f"{len(rules)} doc rules)"
+            f"{len(list(ENDPOINTS_DIR.glob('*Endpoints.cs')))} endpoint groups)"
         )
         return 0
 
     if args.check:
         changed = [line.strip() for line in sys.stdin if line.strip()]
-        errors = check_domain_docs(changed, rules)
-        errors.extend(check_readme_api_status(changed))
+        errors = check_readme_api_status(changed)
         if errors:
             print("check-doc-domain-drift failed:", file=sys.stderr)
             for err in errors:
