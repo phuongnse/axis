@@ -11,7 +11,7 @@
 | What changes | How CI knows | Agent fix when check fails |
 |--------------|--------------|----------------------------|
 | `src/Modules/{Module}/` | Folder name → `docs/use-cases/{slug}/` ([`doc_drift_domains.py`](../../scripts/doc_drift_domains.py)) | Add or map the domain folder when adding a module |
-| `src/Axis.Api/Endpoints/*Endpoints.cs` | `using Axis.{Module}.Application` → same domain as module | Ensure the endpoint group maps to an existing domain; update behavior docs via Review Checkpoint 2 when behavior changes |
+| `src/Axis.Api/Endpoints/*Endpoints.cs` | `using Axis.{Module}.Application` → same domain as module | Ensure the endpoint group maps to an existing domain; update behavior docs via Docs review when behavior changes |
 | `*Event.avsc` under `Contracts/Schemas/` | `python scripts/axis.py register avro-schemas --dry-run` globs `*Event.avsc` | No script edit; optional local: `python scripts/axis.py register avro-schemas` |
 | `Contracts/Protos/*.proto` | `python scripts/axis.py check buf-modules` vs `buf.yaml` | `python scripts/axis.py generate buf-yaml` then `buf lint` |
 | `*KafkaTopics.cs` constants | `python scripts/axis.py check kafka-wiring` vs `Program.cs` | Add `PublishAndListenWithAvro` + `PublishLocally` for new `{Class}.{Const}` |
@@ -78,7 +78,7 @@ python scripts/axis.py check domain-readme-index
 
 ### C — New REST surface (`*Endpoints.cs` or handler in existing module)
 
-- [ ] Spec under correct domain in `docs/use-cases/` when shipping behavior; this is Review Checkpoint 2, not a path-only gate.
+- [ ] Spec under correct domain in `docs/use-cases/` when shipping behavior; this is Docs review, not a path-only gate.
 - [ ] `Map*Endpoints` in `Program.cs` ([process.md § Host wiring](./process.md)).
 - [ ] Domain README: set API row away from pending when endpoints ship.
 - [ ] Handler tests: changed `*Handler.cs` → matching `*HandlerTests.cs` (diff ratchet).
@@ -113,7 +113,7 @@ python scripts/axis.py check domain-readme-index
 
 | Doc | Topic |
 |-----|--------|
-| [agent-checklist.md](./agent-checklist.md) | Gate 1, review checkpoints, domain layout summary |
+| [agent-checklist.md](./agent-checklist.md) | Verification gate, review checks, domain layout summary |
 | [process.md](./process.md) | Layer order, host wiring, deferred follow-ups |
 | [patterns.md § gRPC](./patterns.md) | Buf, proto layout |
 | [Architecture tests README](../../tests/Architecture/Axis.Architecture.Tests/README.md) | Fitness tests + new module |

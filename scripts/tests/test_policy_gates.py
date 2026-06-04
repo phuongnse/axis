@@ -85,7 +85,7 @@ This summary is long enough.
 docs/use-cases/example/README.md
 
 ## Requirements & rules followed
-- [ ] **Gate 1** - local checks
+- [ ] **Verification gate** - local checks
 """
         self.assertTrue(check_pr.validate("feat(example): improve gates", body))
 
@@ -97,7 +97,7 @@ This summary is long enough.
 docs/use-cases/example/README.md
 
 ## Requirements & rules followed
-- [x] **Gate 1** - local checks
+- [x] **Verification gate** - local checks
 """
         self.assertEqual([], check_pr.validate("feat(example): improve gates", body))
 

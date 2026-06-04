@@ -33,7 +33,7 @@ the tool, but the repo-specific wiring still needs to run in CI.
 
 ## When to add a row
 
-Wired into **Review Checkpoint 3** ([agent-checklist.md](./playbooks/agent-checklist.md)):
+Wired into **Retrospective review** ([agent-checklist.md](./playbooks/agent-checklist.md)):
 when a review finding repeats a class already seen, record it here. Pick a
 status honestly; do not upgrade review-only guidance into a fake gate.
 
@@ -80,5 +80,5 @@ Mechanism tiers, cheapest first: analyzer severity in [`.editorconfig`](../.edit
 
 Track repeat findings for already **Enforced** classes. A repeat means either
 the gate has a hole, the CI trigger is wrong, or the docs overstated the rule.
-Record that in Review Checkpoint 3 so the fix is a stronger mechanism, not more
+Record that in Retrospective review so the fix is a stronger mechanism, not more
 prose.

@@ -6,7 +6,7 @@ Defects are **born before code is written** — when the agent edits a surface w
 
 The discipline: **re-derive the governing rules for the exact surface you are about to touch, before touching it** — the rigor an independent reviewer applies, applied up front.
 
-> **This gate fails the same way "Gate 1 green" failed** — by being ticked, not done. So it is **artifact-producing**, not a feeling: you quote rules with `file:section`, you paste the blast-radius `grep`, you name the contract. "I thought carefully" is not a Design Gate.
+> **This gate fails the same way "Verification gate green" fails** — by being ticked, not done. So it is **artifact-producing**, not a feeling: you quote rules with `file:section`, you paste the blast-radius `grep`, you name the contract. "I thought carefully" is not a Design Gate.
 
 ---
 
@@ -61,7 +61,7 @@ Present the dossier through **plan mode** and **do not write code until the user
 ## Close the loop (after implementing)
 
 1. **Self-review the diff against the dossier** — was every governing rule honored, every caller in the blast radius updated, the contract emitted as decided?
-2. **Run the local gate before push** — `python scripts/axis.py verify` runs build, vulnerable package scan, format, unit test projects, frontend checks, and doc drift. CI/branch protection is the required full gate and runs full `dotnet test` including Testcontainers before merge. "Build passed" ≠ "PR is mergeable" — formatting, integration, and casing only fully surface in the CI gate. See [agent-checklist § Gate 1](./agent-checklist.md) and [pr-slicing § Gate 1 honesty](./pr-slicing.md#gate-1-honesty).
+2. **Run the local gate before push** — `python scripts/axis.py verify` runs build, vulnerable package scan, format, unit test projects, frontend checks, policy tests, and doc drift. CI/branch protection is the required full gate and runs full `dotnet test` including Testcontainers before merge. "Build passed" ≠ "PR is mergeable" — formatting, integration, and casing only fully surface in the CI gate. See [agent-checklist § Verification Gate](./agent-checklist.md#verification-gate--verify-before-push) and [pr-slicing § Verification Gate Honesty](./pr-slicing.md#verification-gate-honesty).
 3. If you claim the **full suite** ran locally, that means full `dotnet test Axis.sln` ran — including the integration tests. Docker is required for that full local run; if Docker is unavailable, rely on CI for the authoritative full gate instead of presenting a partial run as full.
 
 ---

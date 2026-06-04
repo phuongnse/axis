@@ -2,15 +2,15 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
 
-**Daily workflow.** Walk Review Checkpoints 0, 2, and 3 locally while implementing; run Gate 1 before push. Reflect outcomes in the [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) checkboxes. **PR description = Summary + Linked spec + Requirements only** — no gate paste blocks, no commit list, no CI/Doc-drift status (GitHub Checks tab covers that).
+**Daily workflow.** Walk the Ready review, Docs review, and Retrospective review while implementing; run the Verification gate before push. Reflect outcomes in the [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) checkboxes. **PR description = Summary + Linked spec + Requirements only** — no review/gate paste blocks, no commit list, no CI/Doc-drift status (GitHub Checks tab covers that).
 
-**Large use cases:** split into **genuinely isolated PRs** (each branch from `main`, each passing the two-sided isolation test). See [pr-slicing.md](./pr-slicing.md) — never stack slice B on slice A's branch, never claim "Gate 1 green" you did not run, and assign one owner per shared seam.
+**Large use cases:** split into **genuinely isolated PRs** (each branch from `main`, each passing the two-sided isolation test). See [pr-slicing.md](./pr-slicing.md) — never stack slice B on slice A's branch, never claim the Verification gate is green when you did not run it, and assign one owner per shared seam.
 
 The paste-block templates below are for *your own* walk-through (agent reasoning, scratchpad, or PR thread comment if asked) — not for the PR description.
 
 ---
 
-## Review Checkpoint 0 — Ready (before code)
+## Ready Review — before code
 
 - **Design Gate** ([design-gate.md](./design-gate.md)): re-derive the rules governing the surface you touch and produce the dossier (rules quoted, blast-radius `grep`, contract+casing, gate plan); **high-risk surfaces require user sign-off before code**
 - AC map: every row has layer + file/test — **no blank cells**
@@ -20,7 +20,7 @@ The paste-block templates below are for *your own* walk-through (agent reasoning
 - End of PR: [process.md § PR wrap-up](process.md) — deferred lines, host wiring, callouts (no user reminder)
 
 ```markdown
-## Checkpoint 0
+## Ready review
 | AC / use case | Layer | File / test |
 |---------|-------|-------------|
 | …       | …     | …           |
@@ -64,7 +64,7 @@ Use-case files group ACs under **Happy path**, **Validation & errors**, **Edge c
 
 ### Anti-pattern: `Gaps vs spec: none` after happy path only
 
-Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because the main API flow works. That is not Checkpoint 0 complete.
+Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because the main API flow works. That is not Ready review complete.
 
 | Wrong | Right |
 |-------|--------|
@@ -95,10 +95,10 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 | Item | Type | Action |
 |------|------|--------|
-| **Checkpoint 0** | Review-only | AC map + docs identified when shipping behavior |
-| **Gate 1** | Enforced | Local fast verification; CI/branch protection owns the full suite |
-| **Checkpoint 2** | Review-only | Docs walkthrough when behavior/spec/status changes |
-| **Checkpoint 3** | Review-only | Retrospective and REVIEW_FINDINGS update when a rule/finding repeats |
+| **Ready review** | Review-only | AC map + docs identified when shipping behavior |
+| **Verification gate** | Enforced | Local fast verification; CI/branch protection owns the full suite |
+| **Docs review** | Review-only | Docs walkthrough when behavior/spec/status changes |
+| **Retrospective review** | Review-only | Retrospective and REVIEW_FINDINGS update when a rule/finding repeats |
 
 **CI-enforced checks** (run automatically on PR, no local action required unless debugging):
 
@@ -119,9 +119,9 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 **Adding new CI checks — verify GitHub plan support first.** Some GitHub-native security workflows require **GitHub Advanced Security (GHAS)** on private repos (a paid add-on). On `phuong-labs/axis` this includes `actions/dependency-review-action` and CodeQL code-scanning *upload* (analysis runs, only the SARIF upload fails). Verify GHAS provisioning before adding such checks; otherwise the PR will fail and need a follow-up to disable. Dependabot security updates work on any plan and cover the same threat model with a publish-time delay — use it as the baseline. The disabled-job comment in [`.github/workflows/build-and-test.yml`](../../.github/workflows/build-and-test.yml) lists the specific jobs to restore when GHAS is provisioned.
 
-**Priority:** Gate 1 and CI-enforced checks block merge. Checkpoints 0, 2, and 3 are review-only self-audits captured by the PR checklist.
+**Priority:** the Verification gate and CI-enforced checks block merge. Ready, Docs, and Retrospective reviews are review-only self-audits captured by the PR checklist.
 
-### Gate 1 — verify before push (fast local gate)
+### Verification Gate — verify before push
 
 **One command:** `python scripts/axis.py verify` runs the fast local gate — build + vulnerable package scan + `dotnet format --verify` + **unit test projects only** + frontend `ci`/test + drift. It only runs the layers whose files changed (so doc-only and frontend-only work stays quick). Run `python scripts/axis.py bootstrap` once to install the committed **pre-push hook** explicitly (`core.hooksPath = scripts/hooks`); build commands must not mutate Git config. CI/branch protection remains the authoritative full gate and runs full `dotnet test` including Testcontainers before merge.
 
@@ -150,7 +150,7 @@ The .NET branch of `python scripts/axis.py verify` also runs the enforced
 | `docker-compose.yml` | Update [local-dev.md](./local-dev.md) in same PR; `python scripts/axis.py check doc-drift` |
 
 ```text
-Gate 1 self-check:
+Verification gate self-check:
 - test naming → ran / not triggered (reason)
 - dotnet build → ran / not triggered (reason)
 - vulnerable package scan → ran / not triggered (reason)
@@ -165,12 +165,12 @@ Example (docs-only): every line `not triggered — no src/, tests/, or frontend/
 
 **Full suite:** integration and API tests run in CI as part of full `dotnet test`; Docker/Testcontainers is required there. Run full local `dotnet test Axis.sln --nologo` when debugging CI, changing Infrastructure/API behavior, or preparing a high-risk backend PR. Use the Docker endpoint available to the shell running the suite when `docker info` works. If it does not and Docker Engine lives inside WSL2, set `DOCKER_HOST` to the exported daemon instead (prefer `tcp://127.0.0.1:2375`).
 
-### Review Checkpoint 2 — docs walk-through
+### Docs Review
 
-Paste block format: header `Checkpoint 2:` then one `-` line per row (Checkpoint 3 uses the same bullet style). Mark pure refactor/style/test-only changes as `not triggered` instead of inventing docs churn.
+Paste block format: header `Docs review:` then one `-` line per row (Retrospective review uses the same bullet style). Mark pure refactor/style/test-only changes as `not triggered` instead of inventing docs churn.
 
 ```text
-Checkpoint 2:
+Docs review:
 - Library → TECH_STACK.md / not triggered
 - New pattern → patterns.md or REVIEW_FINDINGS.md / not triggered
 - Use-case layer callout → docs/use-cases/{domain}/… (layout per [docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--wireframes--implementation-status); multi-screen example [register-org](../use-cases/platform-foundation/register-org/README.md)) / not triggered
@@ -206,12 +206,12 @@ Do **not** ship the first diff that only makes CI green or closes the thread. Fo
 
 **Examples** (illustrative — not an exhaustive list): splitting an invariant across “mutate then query”; external calls with catch-only patches; duplicating logic to silence a linter. In those cases, look for a single owner of the invariant or parity with existing guards/handlers in the repo.
 
-### Review Checkpoint 3 — retrospective
+### Retrospective Review
 
-Answer **Yes** or **No** on **each line** (same `-` bullet style as Checkpoint 2 — do not collapse to a single `No`). If **Yes**, name the doc, test, or ledger row updated in this PR.
+Answer **Yes** or **No** on **each line** (same `-` bullet style as Docs review — do not collapse to a single `No`). If **Yes**, name the doc, test, or ledger row updated in this PR.
 
 ```text
-Checkpoint 3:
+Retrospective review:
 - New rule from test failure? → No
 - Invented invariant without AC? → No
 - Infrastructure footgun? → No
@@ -262,7 +262,7 @@ These expectations still matter, but do not call them CI gates unless [REVIEW_FI
 - Frontend screen → wireframe row in the owning use-case `## Wireframes` table when the screen changes.
 - Use-case diagram → row only if the `.excalidraw` lives **in that use-case folder**; link other use cases in `**Related:**` prose, not in `## Diagrams` table.
 - No test `Skip = ...`, weakened tests, or completed layer status when ACs are open. New test skips are enforced; weakened assertions/status honesty remain review-only.
-- **Full suite honesty:** local pre-push uses the fast Gate 1 command matrix; CI/branch protection runs full `dotnet test Axis.sln`. If you claim the full suite ran locally, it must be full `Axis.sln` with integration/API tests, not a solution filter or unit-only run.
+- **Full suite honesty:** local pre-push uses the fast Verification gate command matrix; CI/branch protection runs full `dotnet test Axis.sln`. If you claim the full suite ran locally, it must be full `Axis.sln` with integration/API tests, not a solution filter or unit-only run.
 
 ---
 
@@ -270,7 +270,7 @@ These expectations still matter, but do not call them CI gates unless [REVIEW_FI
 
 **Full rules + agent checklists:** [repo-layout-discovery.md](./repo-layout-discovery.md) (auto vs manual tables, commands, checklists A–E).
 
-**Summary:** [`doc_drift_domains.py`](../../scripts/doc_drift_domains.py) validates that module folders and endpoint groups map to existing `docs/use-cases/{slug}/` domains. It does not require a token docs edit for every module-code change; behavior/spec/status doc accuracy is Review Checkpoint 2.
+**Summary:** [`doc_drift_domains.py`](../../scripts/doc_drift_domains.py) validates that module folders and endpoint groups map to existing `docs/use-cases/{slug}/` domains. It does not require a token docs edit for every module-code change; behavior/spec/status doc accuracy is Docs review.
 
 ---
 

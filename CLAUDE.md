@@ -61,8 +61,8 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 - Never bypass auth, skip an AC silently, or mark ✅ to avoid a hard gap.
 - Domain: zero external dependencies.
 - No implementation of a non-trivial change without completing the **Design Gate** ([design-gate.md](docs/playbooks/design-gate.md)); high-risk surfaces require user sign-off before code.
-- Never commit with failing Gate 1; docs and requirements satisfied before merge (agent-checklist + PR template).
-- Run `python scripts/axis.py check policy-tests` and `python scripts/axis.py check doc-drift` before push when touching docs, scripts, repo layout, handlers, endpoints, or generated-contract surfaces; CI **Doc drift** runs on every PR and must be green. Tick **Checkpoint 2** in the PR template when docs were reviewed — do not paste drift-script output.
+- Never commit with a failing Verification gate; docs and requirements satisfied before merge (agent-checklist + PR template).
+- Run `python scripts/axis.py check policy-tests` and `python scripts/axis.py check doc-drift` before push when touching docs, scripts, repo layout, handlers, endpoints, or generated-contract surfaces; CI **Doc drift** runs on every PR and must be green. Tick **Docs review** in the PR template when docs were reviewed — do not paste drift-script output.
 
 **P1 — confirm with user before deviating:**
 
@@ -118,18 +118,18 @@ Response header for multi-file / new-layer tasks:
 
 Skip for trivial single-file fixes and doc-only edits.
 
-### Gates
+### Reviews And Gates
 
-**Checkpoint 0 / Gate 1 ownership:** detailed AC-map/path-coverage requirements and the authoritative Gate 1 command matrix are owned by
+**Ready review / Verification gate ownership:** detailed AC-map/path-coverage requirements and the authoritative Verification gate command matrix are owned by
 [agent-checklist.md](docs/playbooks/agent-checklist.md) (single source).
 This file keeps policy-level requirements only:
 
-- **Checkpoint 0 policy:** no blank AC map rows for in-scope bullets; no happy-path-only completion claims.
-- **Gate 1 policy:** follow [agent-checklist.md § Gate 1](docs/playbooks/agent-checklist.md#gate-1--verify-before-push-fast-local-gate), the single owner for local fast-gate commands and CI full-gate expectations. Never present a unit-only/local-fast run as a full-suite run.
+- **Ready review policy:** no blank AC map rows for in-scope bullets; no happy-path-only completion claims.
+- **Verification gate policy:** follow [agent-checklist.md § Verification Gate](docs/playbooks/agent-checklist.md#verification-gate--verify-before-push), the single owner for local fast-gate commands and CI full-gate expectations. Never present a unit-only/local-fast run as a full-suite run.
 
-**Checkpoint 2** — docs walkthrough when behavior/spec/status changes ([agent-checklist.md](docs/playbooks/agent-checklist.md)). **Doc drift** — CI-enforced deterministic policy/doc checks; it does not require a token docs edit for every code diff.
+**Docs review** — docs walkthrough when behavior/spec/status changes ([agent-checklist.md](docs/playbooks/agent-checklist.md)). **Doc drift** — CI-enforced deterministic policy/doc checks; it does not require a token docs edit for every code diff.
 
-**Checkpoint 3** — retrospective ([agent-checklist.md](docs/playbooks/agent-checklist.md)); update docs, tests, or [REVIEW_FINDINGS.md](docs/REVIEW_FINDINGS.md) on any "yes".
+**Retrospective review** — update docs, tests, or [REVIEW_FINDINGS.md](docs/REVIEW_FINDINGS.md) when a durable rule or repeat finding emerges.
 
 ### Git
 
@@ -212,7 +212,7 @@ Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` chan
 | [TECH_STACK.md](docs/TECH_STACK.md) | Libraries + ADRs |
 | [PROGRESS.md](docs/PROGRESS.md) | Module layer status |
 | [WORKAROUNDS.md](docs/WORKAROUNDS.md) | Intentional rule violations + cleanup triggers (**read when touching legacy or shipping a known shortcut**) |
-| [REVIEW_FINDINGS.md](docs/REVIEW_FINDINGS.md) | Recurring review finding classes → Enforced / Partial / Review-only / Guidance status; wired to Checkpoint 3 |
+| [REVIEW_FINDINGS.md](docs/REVIEW_FINDINGS.md) | Recurring review finding classes → Enforced / Partial / Review-only / Guidance status; wired to Retrospective review |
 | [docs/playbooks/visual-artifact-checklist.md](docs/playbooks/visual-artifact-checklist.md) | **Required when changing diagrams/wireframes/use-case visuals** |
 | [Architecture tests README](tests/Architecture/Axis.Architecture.Tests/README.md) | What's mechanically enforced + how to add a new rule |
 | [docs/use-cases/](docs/use-cases/README.md) | Features + ACs |

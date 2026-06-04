@@ -71,7 +71,7 @@ When you learn something from a specific incident:
 | The general rule, phrased so it applies to any future case | The incident specifics — which feature, which fields, which error code |
 | (optional) one labeled example link | Detail lives in the use-case file, `PROGRESS.md`, or the PR retrospective |
 
-**Test:** read the rule as if you'd never seen the originating feature. If it only makes sense with that one use case in mind, generalize it and move the specifics out. (This is what [agent-checklist Review Checkpoint 3](./agent-checklist.md) means by "Incident-level detail in rule text? → No".)
+**Test:** read the rule as if you'd never seen the originating feature. If it only makes sense with that one use case in mind, generalize it and move the specifics out. (This is what [agent-checklist Retrospective review](./agent-checklist.md) means by "Incident-level detail in rule text? → No".)
 
 Enforced by the incident/lesson-framing guard in `python scripts/axis.py check doc-drift`, which flags lesson-style callouts (a bold *Lesson* heading, or a rule tagged with one specific feature in parentheses) in practice docs. The guard is deliberately narrow — it catches the recurring callout class, not every over-fit; the rest is on review and this section.
 

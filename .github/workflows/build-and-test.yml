@@ -124,7 +124,7 @@ jobs:
       - name: Build
         run: dotnet build --no-restore
 
-      # Format gate — see CLAUDE.md § Gate 1. Runs after build so analyzer
+      # Format gate — see CLAUDE.md § Verification gate. Runs after build so analyzer
       # diagnostics are populated. Fails the job on any whitespace / charset
       # / style violation the local `dotnet format` would also catch.
       - name: Verify formatting (dotnet format)

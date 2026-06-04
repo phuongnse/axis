@@ -13,9 +13,9 @@ Docs-first development: feature specs in `docs/use-cases/` are the contract; cod
 
 ## Before you push
 
-Install the local hook once with `python scripts/axis.py bootstrap`, then use `python scripts/axis.py verify` for the fast pre-push gate. During implementation, prefer targeted checks for the surface you are editing; the hook is the local enforcement point before push. The authoritative Gate 1 policy and command matrix live in [agent-checklist.md § Gate 1](docs/playbooks/agent-checklist.md#gate-1--verify-before-push-fast-local-gate); unit-only feedback is available via `python scripts/axis.py test unit`. Script standards live in [scripts.md](docs/playbooks/scripts.md).
+Install the local hook once with `python scripts/axis.py bootstrap`, then use `python scripts/axis.py verify` for the fast pre-push gate. During implementation, prefer targeted checks for the surface you are editing; the hook is the local enforcement point before push. The authoritative Verification gate policy and command matrix live in [agent-checklist.md § Verification Gate](docs/playbooks/agent-checklist.md#verification-gate--verify-before-push); unit-only feedback is available via `python scripts/axis.py test unit`. Script standards live in [scripts.md](docs/playbooks/scripts.md).
 
-1. Walk Review Checkpoints 0/2/3 and Gate 1 in [docs/playbooks/agent-checklist.md](docs/playbooks/agent-checklist.md) locally; tick the matching boxes in the PR body.
+1. Walk Ready review, Verification gate, Docs review, and Retrospective review in [docs/playbooks/agent-checklist.md](docs/playbooks/agent-checklist.md) locally; tick the matching boxes in the PR body.
 2. When you touch C# under `src/` or `tests/`, run `dotnet format Axis.sln` - style and naming rules live in [`.editorconfig`](.editorconfig) (CI runs `dotnet format --verify-no-changes`).
 3. Run `python scripts/axis.py check policy-tests` and `python scripts/axis.py check doc-drift` when touching docs, scripts, repo layout, handlers, endpoints, or generated-contract surfaces. **New module, endpoint, Kafka event, or proto?** Follow [docs/playbooks/repo-layout-discovery.md](docs/playbooks/repo-layout-discovery.md) (checklists A-E - what CI auto-checks vs what you still edit by hand). Use-case layout: [USE_CASE_TEMPLATE.md](docs/use-cases/USE_CASE_TEMPLATE.md). If `docker-compose.yml` changes, update [local-dev.md](docs/playbooks/local-dev.md). CI job **Doc drift** runs on every PR and must be green.
 4. PR description: **Summary + Linked spec + Requirements only** - no commit list, no CI status (the Checks tab covers that). GitHub auto-fills [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md); CI job **PR body guard** enforces the required sections and checklist state.
@@ -54,7 +54,7 @@ When you change [`docker-compose.yml`](docker-compose.yml), update that playbook
 | Doc | Purpose |
 |-----|---------|
 | [CLAUDE.md](CLAUDE.md) | Architecture rules, P0 stops, machine rules |
-| [docs/playbooks/agent-checklist.md](docs/playbooks/agent-checklist.md) | Daily workflow, Gate 1, and review checkpoints |
+| [docs/playbooks/agent-checklist.md](docs/playbooks/agent-checklist.md) | Daily workflow, Verification gate, and review checks |
 | [docs/playbooks/process.md](docs/playbooks/process.md) | Layer-by-layer implementation + deferred follow-ups |
 | [docs/playbooks/patterns-index.md](docs/playbooks/patterns-index.md) | Jump table into patterns |
 | [docs/README.md](docs/README.md) | Documentation hub + single source of truth per topic |
