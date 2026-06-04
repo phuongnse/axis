@@ -15,6 +15,15 @@ public sealed class CurrentUser(IHttpContextAccessor accessor)
         Principal?.FindFirstValue("org_id")
         ?? throw new InvalidOperationException("No org_id claim"));
 
+    public Guid? OrgIdOrNull
+    {
+        get
+        {
+            string? orgId = Principal?.FindFirstValue("org_id");
+            return Guid.TryParse(orgId, out Guid id) ? id : null;
+        }
+    }
+
     public string Email =>
         Principal?.GetClaim(OpenIddictConstants.Claims.Email)
         ?? throw new InvalidOperationException("No email claim");

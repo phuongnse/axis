@@ -62,7 +62,7 @@ public class InviteUserHandlerTests
     [Fact]
     public async Task InviteUser_WhenEmailIsExistingMember_ReturnsConflict()
     {
-        User existingUser = User.Create("Bob", "Jones", Email.Create("invited@example.com").Value, OrgId);
+        User existingUser = User.Create("Bob", "Jones", Email.Create("invited@example.com").Value);
         _userRepo.GetByEmailAsync(Arg.Any<Email>(), OrgId).Returns(existingUser);
 
         Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
@@ -93,7 +93,7 @@ public class InviteUserHandlerTests
         InviteUserCommand selfCommand = new(OrgId, "invited@example.com", RoleId,
             InvitedById: InvitedById);
         User inviter = User.Create("Alice", "Smith",
-            Email.Create("invited@example.com").Value, OrgId);
+            Email.Create("invited@example.com").Value);
         // Same user Id
         _userRepo.GetByEmailAsync(Arg.Any<Email>(), OrgId).Returns(inviter);
 

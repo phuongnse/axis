@@ -34,12 +34,12 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     {
         HttpResponseMessage resp = await _client.PostAsJsonAsync("/api/organizations", new
         {
-            org_name = "A",          // too short
-            admin_first_name = "",
-            admin_last_name = "",
-            admin_email = "not-an-email",
+            orgName = "A",          // too short
+            adminFirstName = "",
+            adminLastName = "",
+            adminEmail = "not-an-email",
             password = "weak",       // too short
-            password_confirmation = "different",
+            passwordConfirmation = "different",
         }, Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);

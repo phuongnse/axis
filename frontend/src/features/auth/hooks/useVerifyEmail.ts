@@ -21,22 +21,23 @@ export function useVerifyEmail() {
   const mutation = useMutation({
     mutationFn: verifyEmail,
     onSuccess: async (data, token) => {
-      // `data` may be null/empty if the session was not established; only run the
-      // PKCE hand-off when the API confirms it. Field is snake_case from the API.
-      if (data?.session_established) {
+      if (data?.sessionEstablished) {
+        const shouldProvision = data.nextStep === 'WorkspaceProvisioning';
         try {
-          await completePostVerifyPkceFlow(token);
+          await completePostVerifyPkceFlow(shouldProvision ? token : null);
           return;
         } catch {
-          // PKCE setup failed — fall back to the provisioning poll so the user
-          // is not stranded on the "Redirecting…" screen.
+          if (shouldProvision) {
+            void navigate({
+              to: '/provisioning',
+              search: { token },
+            });
+            return;
+          }
         }
       }
 
-      void navigate({
-        to: '/provisioning',
-        search: { token },
-      });
+      void navigate({ to: '/login' });
     },
   });
 

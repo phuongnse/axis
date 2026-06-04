@@ -36,11 +36,7 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
                 e => e.Value,
                 s => Email.Create(s).Value!));
 
-        builder.HasIndex(u => new { u.Email, u.OrganizationId }).IsUnique();
-
-        builder.Property(u => u.OrganizationId)
-            .HasColumnName("organization_id")
-            .IsRequired();
+        builder.HasIndex(u => u.Email).IsUnique();
 
         builder.Property(u => u.Status)
             .HasColumnName("status")
@@ -77,16 +73,7 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.PasswordHash)
             .HasColumnName("password_hash");
 
-        // Map private backing field _roleIds as a uuid[] column
-        builder.PrimitiveCollection<List<Guid>>("_roleIds")
-            .HasField("_roleIds")
-            .UsePropertyAccessMode(PropertyAccessMode.Field)
-            .HasColumnName("role_ids")
-            .IsRequired();
-
-        // Computed / domain-only properties — not stored
         builder.Ignore(u => u.FullName);
         builder.Ignore(u => u.IsLockedOut);
-        builder.Ignore(u => u.RoleIds);
     }
 }

@@ -10,8 +10,8 @@ export interface ProvisioningUiState {
 }
 
 export function deriveProvisioningUiState(status: ProvisioningStatusResponse): ProvisioningUiState {
-  const modules = status.modules;
-  const maxAttempt = modules.reduce((max, module) => Math.max(max, module.attemptCount), 0);
+  const modules = status.modules ?? [];
+  const maxAttempt = modules.reduce((max, module) => Math.max(max, module.attemptCount ?? 0), 0);
   const allModulesSucceeded =
     modules.length > 0 && modules.every((module) => module.status === 'Succeeded');
   const failed = status.organizationStatus === 'ProvisioningFailed';

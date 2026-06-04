@@ -24,13 +24,22 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     public async Task DisposeAsync() => await _ctx.DisposeAsync();
 
     private static User MakeUser(string email) =>
-        User.Create("Jane", "Doe", Email.Create(email).Value, OrgId);
+        User.Create("Jane", "Doe", Email.Create(email).Value);
+
+    private static OrganizationMembership MakeMembership(User user, Guid organizationId, params Guid[] roleIds)
+    {
+        OrganizationMembership membership = OrganizationMembership.Create(user.Id, organizationId);
+        foreach (Guid roleId in roleIds)
+            membership.AssignRole(roleId);
+        return membership;
+    }
 
     [Fact]
     public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
     {
         User user = MakeUser("getbyid@example.com");
         await _sut.AddAsync(user);
+        await _ctx.OrganizationMemberships.AddAsync(MakeMembership(user, OrgId));
         await _ctx.SaveChangesAsync();
         User? loaded = await _sut.GetByIdAsync(user.Id, OrgId);
 
@@ -45,6 +54,7 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     {
         User user = MakeUser("byemail@example.com");
         await _sut.AddAsync(user);
+        await _ctx.OrganizationMemberships.AddAsync(MakeMembership(user, OrgId));
         await _ctx.SaveChangesAsync();
         Email email = Email.Create("byemail@example.com").Value;
         User? loaded = await _sut.GetByEmailAsync(email, OrgId);
@@ -58,6 +68,7 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     {
         User user = MakeUser("difforg@example.com");
         await _sut.AddAsync(user);
+        await _ctx.OrganizationMemberships.AddAsync(MakeMembership(user, OrgId));
         await _ctx.SaveChangesAsync();
         Email email = Email.Create("difforg@example.com").Value;
         User? result = await _sut.GetByEmailAsync(email, Guid.NewGuid());
@@ -86,14 +97,15 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task AddAsync_WhenUserHasRoles_PersistsAndReloadsRoleIds()
+    public async Task AddAsync_WhenMembershipHasRoles_PersistsAndReloadsRoleIds()
     {
         Guid roleId = Guid.NewGuid();
         User user = MakeUser("withrole@example.com");
-        user.AssignRole(roleId);
+        OrganizationMembership membership = MakeMembership(user, OrgId, roleId);
         await _sut.AddAsync(user);
+        await _ctx.OrganizationMemberships.AddAsync(membership);
         await _ctx.SaveChangesAsync();
-        User? loaded = await _sut.GetByIdAsync(user.Id, OrgId);
+        OrganizationMembership? loaded = await _ctx.OrganizationMemberships.FindAsync(membership.Id);
 
         loaded!.RoleIds.Should().ContainSingle().Which.Should().Be(roleId);
     }
@@ -104,6 +116,7 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
         User user = MakeUser("withhash@example.com");
         user.SetPasswordHash("$2a$12$fakehashvalue");
         await _sut.AddAsync(user);
+        await _ctx.OrganizationMemberships.AddAsync(MakeMembership(user, OrgId));
         await _ctx.SaveChangesAsync();
         User? loaded = await _sut.GetByIdAsync(user.Id, OrgId);
 
@@ -116,15 +129,17 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
         Guid adminRoleId = Guid.NewGuid();
         Guid adminOrgId = Guid.NewGuid();
 
-        User admin1 = User.Create("A", "One", Email.Create($"admin1-{adminOrgId:N}@example.com").Value, adminOrgId);
-        admin1.AssignRole(adminRoleId);
-        User admin2 = User.Create("A", "Two", Email.Create($"admin2-{adminOrgId:N}@example.com").Value, adminOrgId);
-        admin2.AssignRole(adminRoleId);
-        User nonAdmin = User.Create("B", "One", Email.Create($"nonadmin-{adminOrgId:N}@example.com").Value, adminOrgId);
+        User admin1 = User.Create("A", "One", Email.Create($"admin1-{adminOrgId:N}@example.com").Value);
+        OrganizationMembership admin1Membership = MakeMembership(admin1, adminOrgId, adminRoleId);
+        User admin2 = User.Create("A", "Two", Email.Create($"admin2-{adminOrgId:N}@example.com").Value);
+        OrganizationMembership admin2Membership = MakeMembership(admin2, adminOrgId, adminRoleId);
+        User nonAdmin = User.Create("B", "One", Email.Create($"nonadmin-{adminOrgId:N}@example.com").Value);
+        OrganizationMembership nonAdminMembership = MakeMembership(nonAdmin, adminOrgId);
 
         await _sut.AddAsync(admin1);
         await _sut.AddAsync(admin2);
         await _sut.AddAsync(nonAdmin);
+        await _ctx.OrganizationMemberships.AddRangeAsync(admin1Membership, admin2Membership, nonAdminMembership);
         await _ctx.SaveChangesAsync();
 
         int count = await _sut.CountAdminsAsync(adminOrgId, adminRoleId);
@@ -136,6 +151,7 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     {
         User user = MakeUser($"crossorg-{Guid.NewGuid():N}@example.com");
         await _sut.AddAsync(user);
+        await _ctx.OrganizationMemberships.AddAsync(MakeMembership(user, OrgId));
         await _ctx.SaveChangesAsync();
 
         User? result = await _sut.GetByIdAsync(user.Id, Guid.NewGuid());

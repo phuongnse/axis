@@ -58,7 +58,7 @@ Security and access control are non-negotiable for a SaaS product. Organizations
 
 | Use case | Summary |
 |---|---|
-| [Register a user account](register-user/) | Register my user identity with email/password or Microsoft, Google, or GitHub so that I can join an existing… |
+| [Register a user account](register-user/) | Register my user identity with email/password or Microsoft, Google, or GitHub so that I can use Axis as an individual… |
 
 
 

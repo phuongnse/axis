@@ -23,9 +23,9 @@ internal sealed class OrganizationIdentityPurger(
             }
         }
 
-        IQueryable<Guid> userIds = context.Users
-            .Where(u => u.OrganizationId == organizationId)
-            .Select(u => u.Id);
+        IQueryable<Guid> userIds = context.OrganizationMemberships
+            .Where(m => m.OrganizationId == organizationId)
+            .Select(m => m.UserId);
 
         await context.EmailVerificationTokens
             .Where(t => userIds.Contains(t.UserId))
@@ -47,8 +47,8 @@ internal sealed class OrganizationIdentityPurger(
             .Where(r => r.OrganizationId == organizationId)
             .ExecuteDeleteAsync(cancellationToken);
 
-        await context.Users
-            .Where(u => u.OrganizationId == organizationId)
+        await context.OrganizationMemberships
+            .Where(m => m.OrganizationId == organizationId)
             .ExecuteDeleteAsync(cancellationToken);
 
         await context.Organizations

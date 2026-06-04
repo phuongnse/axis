@@ -485,7 +485,3 @@ export function paintRegisterOrgEntryFields(els, idPrefix, cardX, y, cardW, fiel
   });
   return fy;
 }
-
-/**
- * Post-OAuth register-org complete fields; returns y after terms row.
- */

@@ -53,7 +53,7 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 - [ ] Sign-in page offers **Microsoft**, **Google**, and **GitHub** buttons alongside the email/password form ([ADR-027](../../../TECH_STACK.md#adr-027-external-identity-providers-for-user-sign-in-and-registration)).
 - [ ] Selecting a provider runs the OAuth2 Authorization Code + PKCE flow through OpenIddict; on return, Axis mints its own access + refresh tokens (the external token is never exposed to the client).
 - [ ] A provider login whose verified email matches an existing user attaches to that account rather than creating a duplicate (account linking by verified email).
-- [ ] A provider login with no matching account and no pending invitation is rejected with "No account found. Ask your organization admin for an invitation." (provider sign-up happens only through the register-org flow).
+- [ ] A provider login with no matching account and no pending invitation/setup token is rejected with "No account found. Ask your organization admin for an invitation." Provider account setup belongs to [register-user](../register-user/).
 - [ ] If the provider returns no verified email, sign-in is rejected with "Your <provider> account has no verified email; use email and password instead."
 - [ ] A disabled provider (not configured for this deployment) is not shown.
 
@@ -91,7 +91,8 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
-| N/A | N/A | N/A |
+| login | [source](./login.excalidraw) | [preview](./login.svg) |
+| login-unverified | [source](./login-unverified.excalidraw) | [preview](./login-unverified.svg) |
 
 ## Diagrams
 

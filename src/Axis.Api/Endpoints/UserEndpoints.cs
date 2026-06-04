@@ -4,11 +4,13 @@ using Axis.Api.Infrastructure;
 using Axis.Identity.Application.Commands.AssignRoleToUser;
 using Axis.Identity.Application.Commands.ChangePassword;
 using Axis.Identity.Application.Commands.DeactivateUser;
+using Axis.Identity.Application.Commands.RegisterUser;
 using Axis.Identity.Application.Commands.RevokeSession;
 using Axis.Identity.Application.Commands.UpdateUserProfile;
 using Axis.Identity.Application.Queries.GetCurrentUserProfile;
 using Axis.Identity.Application.Queries.GetUserSessions;
 using Axis.Identity.Application.Services;
+using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using MediatR;
 using Microsoft.AspNetCore.Authentication;
@@ -21,7 +23,18 @@ public static class UserEndpoints
 {
     public static IEndpointRouteBuilder MapUserEndpoints(this IEndpointRouteBuilder app)
     {
-        RouteGroupBuilder group = app.MapGroup("/api/users").RequireAuthorization();
+        RouteGroupBuilder publicGroup = app.MapGroup("/api/users");
+
+        publicGroup.MapPost("/register", Register)
+            .AllowAnonymous()
+            .WithName("RegisterUser")
+            .WithSummary("Register a standalone user account")
+            .WithTags("Identity")
+            .Produces<MessageResponse>()
+            .ProducesProblem(400)
+            .ProducesProblem(409);
+
+        RouteGroupBuilder group = publicGroup.MapGroup("").RequireAuthorization();
 
         group.MapGet("/me", GetMe)
             .WithName("GetMe")
@@ -95,6 +108,31 @@ public static class UserEndpoints
         return app;
     }
 
+    private static async Task<IResult> Register(
+        [FromBody] RegisterUserRequest request,
+        HttpContext httpContext,
+        ISender mediator,
+        CancellationToken ct)
+    {
+        string? idempotencyKey = httpContext.Request.Headers["Idempotency-Key"].FirstOrDefault();
+
+        Result result = await mediator.Send(new RegisterUserCommand(
+            request.FirstName,
+            request.LastName,
+            request.Email,
+            request.Password,
+            request.PasswordConfirmation,
+            request.AcceptedTermsVersion,
+            request.AcceptedPrivacyVersion,
+            idempotencyKey), ct);
+
+        if (result.IsFailure)
+            return result.ToProblemDetails();
+
+        return Results.Ok(new MessageResponse(
+            "Registration successful. Please check your email to verify your account."));
+    }
+
     private static async Task<IResult> GetMe(
         CurrentUser currentUser,
         ISender mediator,
@@ -103,7 +141,7 @@ public static class UserEndpoints
         CurrentUserProfileDto? profile = await mediator.Send(
             new GetCurrentUserProfileQuery(
                 currentUser.UserId,
-                currentUser.OrgId,
+                currentUser.OrgIdOrNull,
                 currentUser.Permissions),
             ct);
         if (profile is null)

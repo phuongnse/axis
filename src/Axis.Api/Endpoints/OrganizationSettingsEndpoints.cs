@@ -97,7 +97,7 @@ public static class OrganizationSettingsEndpoints
                 return Results.ValidationProblem(
                     new Dictionary<string, string[]>
                     {
-                        ["logo_base64"] = ["Logo must be valid Base64-encoded data."],
+                        ["logoBase64"] = ["Logo must be valid Base64-encoded data."],
                     },
                     statusCode: StatusCodes.Status400BadRequest);
             }

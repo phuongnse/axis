@@ -11,11 +11,12 @@ namespace Axis.Identity.Application.Tests.Queries;
 public sealed class GetUserPermissionsHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
+    private readonly IOrganizationMembershipRepository _membershipRepo = Substitute.For<IOrganizationMembershipRepository>();
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
 
     private static readonly Guid OrgId = Guid.NewGuid();
 
-    private GetUserPermissionsHandler CreateHandler() => new(_userRepo, _roleRepo);
+    private GetUserPermissionsHandler CreateHandler() => new(_userRepo, _membershipRepo, _roleRepo);
 
     [Fact]
     public async Task Handle_WhenUserNotFound_ReturnsNotFound()
@@ -34,7 +35,7 @@ public sealed class GetUserPermissionsHandlerTests
     [Fact]
     public async Task Handle_WhenUserInactive_ReturnsEmptyPermissions()
     {
-        User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value, OrgId);
+        User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value);
         user.Deactivate();
         _userRepo.GetByIdAsync(user.Id, OrgId, Arg.Any<CancellationToken>())
             .Returns(user);
@@ -50,14 +51,17 @@ public sealed class GetUserPermissionsHandlerTests
     [Fact]
     public async Task Handle_WhenUserHasRoles_ReturnsDistinctPermissions()
     {
-        User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value, OrgId);
+        User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value);
         Role editor = Role.CreateSystem("Editor", OrgId, ["workflow:definition:read", "workflow:definition:write"]);
         Role viewer = Role.CreateSystem("Viewer", OrgId, ["workflow:definition:read"]);
-        user.AssignRole(editor.Id);
-        user.AssignRole(viewer.Id);
+        OrganizationMembership membership = OrganizationMembership.Create(user.Id, OrgId);
+        membership.AssignRole(editor.Id);
+        membership.AssignRole(viewer.Id);
 
         _userRepo.GetByIdAsync(user.Id, OrgId, Arg.Any<CancellationToken>())
             .Returns(user);
+        _membershipRepo.GetByUserAndOrganizationAsync(user.Id, OrgId, Arg.Any<CancellationToken>())
+            .Returns(membership);
         _roleRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), OrgId, Arg.Any<CancellationToken>())
             .Returns(new List<Role> { editor, viewer });
 

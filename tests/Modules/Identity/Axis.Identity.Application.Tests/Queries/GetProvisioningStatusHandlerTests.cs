@@ -19,12 +19,13 @@ public sealed class GetProvisioningStatusHandlerTests
     private readonly IEmailVerificationTokenStore _verificationTokenStore =
         Substitute.For<IEmailVerificationTokenStore>();
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
+    private readonly IOrganizationMembershipRepository _membershipRepo = Substitute.For<IOrganizationMembershipRepository>();
     private readonly IOrganizationRepository _organizationRepo = Substitute.For<IOrganizationRepository>();
     private readonly ITenantModuleProvisioningRepository _provisioningRepo =
         Substitute.For<ITenantModuleProvisioningRepository>();
 
     private GetProvisioningStatusHandler CreateHandler() =>
-        new(_verificationTokenStore, _userRepo, _organizationRepo, _provisioningRepo);
+        new(_verificationTokenStore, _userRepo, _membershipRepo, _organizationRepo, _provisioningRepo);
 
     private void StubProvisioningPollForUser(User user)
     {
@@ -33,7 +34,7 @@ public sealed class GetProvisioningStatusHandlerTests
             .Returns(user.Id);
     }
 
-    private static (User User, Organization Organization) MakeVerifiedUserWithOrg()
+    private static (User User, Organization Organization, OrganizationMembership Membership) MakeVerifiedUserWithOrg()
     {
         Email email = Email.Create("alice@acme.com").Value!;
         Organization organization = Organization.Create(
@@ -41,9 +42,10 @@ public sealed class GetProvisioningStatusHandlerTests
             OrganizationSlug.Create("acme").Value!,
             email,
             WellKnownSubscriptionPlans.FreeId);
-        User user = User.Create("Alice", "Smith", email, organization.Id);
+        User user = User.Create("Alice", "Smith", email);
         user.VerifyEmail();
-        return (user, organization);
+        OrganizationMembership membership = OrganizationMembership.Create(user.Id, organization.Id);
+        return (user, organization, membership);
     }
 
     [Fact]
@@ -85,7 +87,7 @@ public sealed class GetProvisioningStatusHandlerTests
             OrganizationSlug.Create("acme").Value!,
             email,
             WellKnownSubscriptionPlans.FreeId);
-        User user = User.Create("Bob", "Smith", email, organization.Id);
+        User user = User.Create("Bob", "Smith", email);
         StubProvisioningPollForUser(user);
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
 
@@ -99,7 +101,7 @@ public sealed class GetProvisioningStatusHandlerTests
     [Fact]
     public async Task Handle_WhenAllModulesSucceededAndOrgActive_ReturnsReady()
     {
-        (User user, Organization organization) = MakeVerifiedUserWithOrg();
+        (User user, Organization organization, OrganizationMembership membership) = MakeVerifiedUserWithOrg();
         IReadOnlyList<TenantModuleProvisioning> modules = TenantModuleNames.All
             .Select(m =>
             {
@@ -111,6 +113,7 @@ public sealed class GetProvisioningStatusHandlerTests
 
         StubProvisioningPollForUser(user);
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
+        _membershipRepo.GetFirstActiveByUserIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(membership);
         _organizationRepo.GetByIdAsync(organization.Id, Arg.Any<CancellationToken>()).Returns(organization);
         _provisioningRepo.GetAllForOrganizationAsync(organization.Id, Arg.Any<CancellationToken>())
             .Returns(modules);
@@ -129,7 +132,7 @@ public sealed class GetProvisioningStatusHandlerTests
     [Fact]
     public async Task Handle_WhenOnlySubsetOfModulesSucceeded_ReturnsNotReady()
     {
-        (User user, Organization organization) = MakeVerifiedUserWithOrg();
+        (User user, Organization organization, OrganizationMembership membership) = MakeVerifiedUserWithOrg();
         TenantModuleProvisioning succeeded = TenantModuleProvisioning.CreatePending(
             organization.Id,
             TenantModuleNames.DataModeling);
@@ -138,6 +141,7 @@ public sealed class GetProvisioningStatusHandlerTests
 
         StubProvisioningPollForUser(user);
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
+        _membershipRepo.GetFirstActiveByUserIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(membership);
         _organizationRepo.GetByIdAsync(organization.Id, Arg.Any<CancellationToken>()).Returns(organization);
         _provisioningRepo.GetAllForOrganizationAsync(organization.Id, Arg.Any<CancellationToken>())
             .Returns(modules);
@@ -153,7 +157,7 @@ public sealed class GetProvisioningStatusHandlerTests
     [Fact]
     public async Task Handle_WhenOrganizationStillProvisioning_ReturnsNotReady()
     {
-        (User user, Organization organization) = MakeVerifiedUserWithOrg();
+        (User user, Organization organization, OrganizationMembership membership) = MakeVerifiedUserWithOrg();
         organization.BeginProvisioning();
         IReadOnlyList<TenantModuleProvisioning> modules =
         [
@@ -162,6 +166,7 @@ public sealed class GetProvisioningStatusHandlerTests
 
         StubProvisioningPollForUser(user);
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
+        _membershipRepo.GetFirstActiveByUserIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(membership);
         _organizationRepo.GetByIdAsync(organization.Id, Arg.Any<CancellationToken>()).Returns(organization);
         _provisioningRepo.GetAllForOrganizationAsync(organization.Id, Arg.Any<CancellationToken>())
             .Returns(modules);

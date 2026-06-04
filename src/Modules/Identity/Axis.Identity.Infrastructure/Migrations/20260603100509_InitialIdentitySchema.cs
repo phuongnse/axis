@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore.Migrations;
 
@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Axis.Identity.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class InitialIdentitySchema : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -74,6 +74,21 @@ namespace Axis.Identity.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_OpenIddictScopes", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "organization_memberships",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    user_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    organization_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    status = table.Column<string>(type: "text", nullable: false),
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_organization_memberships", x => x.id);
                 });
 
             migrationBuilder.CreateTable(
@@ -152,14 +167,15 @@ namespace Axis.Identity.Infrastructure.Migrations
                     last_name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     avatar_url = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
                     email = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: false),
-                    organization_id = table.Column<Guid>(type: "uuid", nullable: false),
                     password_hash = table.Column<string>(type: "text", nullable: true),
                     status = table.Column<string>(type: "text", nullable: false),
                     is_email_verified = table.Column<bool>(type: "boolean", nullable: false),
+                    accepted_terms_version = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: true),
+                    accepted_privacy_version = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: true),
+                    legal_accepted_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     failed_login_attempts = table.Column<int>(type: "integer", nullable: false, defaultValue: 0),
                     locked_until = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    role_ids = table.Column<List<Guid>>(type: "uuid[]", nullable: false)
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -191,6 +207,25 @@ namespace Axis.Identity.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "organization_membership_roles",
+                columns: table => new
+                {
+                    membership_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    role_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    assigned_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_organization_membership_roles", x => new { x.membership_id, x.role_id });
+                    table.ForeignKey(
+                        name: "FK_organization_membership_roles_organization_memberships_memb~",
+                        column: x => x.membership_id,
+                        principalTable: "organization_memberships",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "organizations",
                 columns: table => new
                 {
@@ -200,7 +235,11 @@ namespace Axis.Identity.Infrastructure.Migrations
                     owner_email = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: false),
                     status = table.Column<string>(type: "text", nullable: false),
                     subscription_plan_id = table.Column<Guid>(type: "uuid", nullable: false, defaultValue: new Guid("11111111-1111-1111-1111-111111111101")),
-                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    logo_url = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
+                    time_zone_id = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
+                    default_language = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: true),
+                    scheduled_hard_delete_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -375,6 +414,22 @@ namespace Axis.Identity.Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_organization_membership_roles_role_id",
+                table: "organization_membership_roles",
+                column: "role_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_organization_memberships_organization_id",
+                table: "organization_memberships",
+                column: "organization_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_organization_memberships_user_id_organization_id",
+                table: "organization_memberships",
+                columns: new[] { "user_id", "organization_id" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_organization_plan_change_logs_new_plan_id",
                 table: "organization_plan_change_logs",
                 column: "new_plan_id");
@@ -424,9 +479,9 @@ namespace Axis.Identity.Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_users_email_organization_id",
+                name: "IX_users_email",
                 table: "users",
-                columns: new[] { "email", "organization_id" },
+                column: "email",
                 unique: true);
         }
 
@@ -446,6 +501,9 @@ namespace Axis.Identity.Infrastructure.Migrations
                 name: "OpenIddictTokens");
 
             migrationBuilder.DropTable(
+                name: "organization_membership_roles");
+
+            migrationBuilder.DropTable(
                 name: "organization_plan_change_logs");
 
             migrationBuilder.DropTable(
@@ -462,6 +520,9 @@ namespace Axis.Identity.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "OpenIddictAuthorizations");
+
+            migrationBuilder.DropTable(
+                name: "organization_memberships");
 
             migrationBuilder.DropTable(
                 name: "organizations");

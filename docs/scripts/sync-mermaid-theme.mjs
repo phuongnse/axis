@@ -4,13 +4,13 @@
  * Run from repo root: node docs/scripts/sync-mermaid-theme.mjs
  */
 import { readFileSync, writeFileSync, readdirSync, statSync } from "fs";
-import { join } from "path";
+import { join, relative } from "path";
 import { MERMAID_INIT } from "../diagrams/mermaid-theme.mjs";
 
 const docsRoot = join(import.meta.dirname, "..");
 const skipFiles = new Set(["playbooks/mermaid.md"]);
 const initLine = MERMAID_INIT;
-const initRegex = /^%%\{init:[\s\S]*?\}%%\s*$/m;
+const initRegex = /^%%\{init:[\s\S]*?\}%%[ \t]*(?:\r?\n[ \t]*)*/;
 
 function walk(dir, files = []) {
   for (const name of readdirSync(dir)) {
@@ -41,13 +41,13 @@ function syncMermaidBlocks(content) {
 
 let updated = 0;
 for (const file of walk(docsRoot)) {
-  const rel = file.replace(docsRoot + "/", "");
-  if (skipFiles.has(rel)) continue;
+  const normalizedRel = relative(docsRoot, file).replace(/\\/g, "/");
+  if (skipFiles.has(normalizedRel)) continue;
   const raw = readFileSync(file, "utf8");
   const { content, changed } = syncMermaidBlocks(raw);
   if (changed) {
     writeFileSync(file, content, "utf8");
-    console.log(`updated ${file.replace(docsRoot + "/", "docs/")}`);
+    console.log(`updated docs/${normalizedRel}`);
     updated++;
   }
 }

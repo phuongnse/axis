@@ -131,7 +131,11 @@ public static class AuthEndpoints
 
         await SignInPkceSessionAsync(httpContext, result.Value);
 
-        return Results.Ok(new VerifyEmailSessionEstablishedDto(true));
+        VerifyEmailNextStep nextStep = result.Value.OrganizationId is null
+            ? VerifyEmailNextStep.Dashboard
+            : VerifyEmailNextStep.WorkspaceProvisioning;
+
+        return Results.Ok(new VerifyEmailSessionEstablishedDto(true, nextStep));
     }
 
     private static async Task SignInPkceSessionAsync(HttpContext httpContext, VerifyEmailSuccessDto claims)
@@ -139,10 +143,11 @@ public static class AuthEndpoints
         List<Claim> claimList =
         [
             new(ClaimTypes.NameIdentifier, claims.UserId.ToString()),
-            new("org_id", claims.OrganizationId.ToString()),
             new(ClaimTypes.Email, claims.Email),
             new("name", claims.FullName),
         ];
+        if (claims.OrganizationId is Guid organizationId)
+            claimList.Add(new Claim("org_id", organizationId.ToString()));
         foreach (string permission in claims.Permissions)
             claimList.Add(new Claim("permissions", permission));
 

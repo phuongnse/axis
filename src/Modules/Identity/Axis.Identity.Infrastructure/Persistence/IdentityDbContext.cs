@@ -13,6 +13,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
     public DbSet<TenantModuleProvisioning> TenantModuleProvisions => Set<TenantModuleProvisioning>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<OrganizationMembership> OrganizationMemberships => Set<OrganizationMembership>();
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Invitation> Invitations => Set<Invitation>();
     internal DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
@@ -28,6 +29,8 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
         modelBuilder.ApplyConfiguration(new RegistrationIdempotencyRecordConfiguration());
         modelBuilder.ApplyConfiguration(new TenantModuleProvisioningConfiguration());
         modelBuilder.ApplyConfiguration(new UserConfiguration());
+        modelBuilder.ApplyConfiguration(new OrganizationMembershipConfiguration());
+        modelBuilder.ApplyConfiguration(new OrganizationMembershipRoleConfiguration());
         modelBuilder.ApplyConfiguration(new RoleConfiguration());
         modelBuilder.ApplyConfiguration(new InvitationConfiguration());
         modelBuilder.ApplyConfiguration(new PasswordResetTokenConfiguration());

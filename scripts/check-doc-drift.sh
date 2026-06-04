@@ -159,6 +159,9 @@ done < <(
       '
 )
 
+"${ROOT}/scripts/check-ef-domain-mapping.sh" || ERR=1
+"${ROOT}/scripts/check-frontend-api-contracts.sh" || ERR=1
+
 # Contract-less endpoint response guard (REVIEW_FINDINGS.md: "Endpoint
 # returns object/anonymous JSON instead of an Application-layer DTO").
 # `.Produces<object>()` emits a bare `object` schema into openapi.json, which

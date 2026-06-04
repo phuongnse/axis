@@ -7,6 +7,7 @@ namespace Axis.Identity.Application.Queries.GetUserPermissions;
 
 public sealed class GetUserPermissionsHandler(
     IUserRepository userRepo,
+    IOrganizationMembershipRepository membershipRepo,
     IRoleRepository roleRepo)
     : IQueryHandler<GetUserPermissionsQuery, Result<GetUserPermissionsResult>>
 {
@@ -21,8 +22,16 @@ public sealed class GetUserPermissionsHandler(
         if (user.Status == UserStatus.Inactive)
             return Result.Success(new GetUserPermissionsResult([]));
 
+        OrganizationMembership? membership =
+            await membershipRepo.GetByUserAndOrganizationAsync(
+                query.UserId,
+                query.OrganizationId,
+                cancellationToken);
+        if (membership is null || membership.Status == OrganizationMembershipStatus.Inactive)
+            return Result.Success(new GetUserPermissionsResult([]));
+
         IReadOnlyList<Role> roles =
-            await roleRepo.GetByIdsAsync(user.RoleIds, user.OrganizationId, cancellationToken);
+            await roleRepo.GetByIdsAsync(membership.RoleIds, membership.OrganizationId, cancellationToken);
 
         List<string> permissions = roles
             .SelectMany(r => r.Permissions)

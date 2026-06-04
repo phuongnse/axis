@@ -19,7 +19,7 @@ public class LegalEndpointTests(ApiTestFixture fixture)
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
-        body.GetProperty("terms_version").GetString().Should().Be(WellKnownLegalDocuments.TermsVersion);
-        body.GetProperty("privacy_version").GetString().Should().Be(WellKnownLegalDocuments.PrivacyVersion);
+        body.GetProperty("termsVersion").GetString().Should().Be(WellKnownLegalDocuments.TermsVersion);
+        body.GetProperty("privacyVersion").GetString().Should().Be(WellKnownLegalDocuments.PrivacyVersion);
     }
 }

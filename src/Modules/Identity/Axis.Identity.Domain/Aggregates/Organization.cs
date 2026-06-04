@@ -129,6 +129,12 @@ public sealed class Organization : AggregateRoot<Guid>
         Status = OrganizationStatus.Provisioning;
     }
 
+    public void BeginProvisioningAfterOwnerVerification()
+    {
+        BeginProvisioning();
+        RaiseDomainEvent(new OrganizationVerified(Id));
+    }
+
     public void CompleteProvisioning()
     {
         if (Status != OrganizationStatus.Provisioning)

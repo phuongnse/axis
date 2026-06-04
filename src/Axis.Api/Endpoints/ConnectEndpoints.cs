@@ -115,10 +115,11 @@ public static class ConnectEndpoints
         List<Claim> claims =
         [
             new(ClaimTypes.NameIdentifier, auth.UserId.ToString()),
-            new("org_id", auth.OrganizationId.ToString()),
             new(ClaimTypes.Email, auth.Email),
             new("name", auth.FullName),
         ];
+        if (auth.OrganizationId is Guid organizationId)
+            claims.Add(new Claim("org_id", organizationId.ToString()));
         foreach (string permission in auth.Permissions)
             claims.Add(new Claim("permissions", permission));
 
@@ -250,7 +251,7 @@ public static class ConnectEndpoints
 
         return BuildUserPrincipal(
             Guid.Parse(sub),
-            Guid.TryParse(orgId, out Guid gOrgId) ? gOrgId : Guid.Empty,
+            Guid.TryParse(orgId, out Guid gOrgId) ? gOrgId : null,
             email ?? string.Empty,
             name ?? string.Empty,
             permissions.ToList(),
@@ -259,7 +260,7 @@ public static class ConnectEndpoints
 
     private static ClaimsPrincipal BuildUserPrincipal(
         Guid userId,
-        Guid orgId,
+        Guid? orgId,
         string email,
         string name,
         IReadOnlyList<string> permissions,
@@ -269,7 +270,8 @@ public static class ConnectEndpoints
         identity.AddClaim(new Claim(Claims.Subject, userId.ToString()));
         identity.AddClaim(new Claim(Claims.Email, email));
         identity.AddClaim(new Claim("name", name));
-        identity.AddClaim(new Claim("org_id", orgId.ToString()));
+        if (orgId is Guid organizationId)
+            identity.AddClaim(new Claim("org_id", organizationId.ToString()));
 
         foreach (string permission in permissions)
             identity.AddClaim(new Claim("permissions", permission));

@@ -7,6 +7,7 @@ namespace Axis.Identity.Application.Queries.GetUserTokenClaims;
 
 public sealed class GetUserTokenClaimsHandler(
     IUserRepository userRepo,
+    IOrganizationMembershipRepository membershipRepo,
     IRoleRepository roleRepo)
     : IQueryHandler<GetUserTokenClaimsQuery, Result<UserTokenClaimsDto>>
 {
@@ -22,16 +23,31 @@ public sealed class GetUserTokenClaimsHandler(
                 "The account is no longer active.");
         }
 
-        if (query.OrganizationId.HasValue && query.OrganizationId.Value != user.OrganizationId)
+        OrganizationMembership? membership = query.OrganizationId is Guid organizationId
+            ? await membershipRepo.GetByUserAndOrganizationAsync(user.Id, organizationId, cancellationToken)
+            : await membershipRepo.GetFirstActiveByUserIdAsync(user.Id, cancellationToken);
+
+        if (query.OrganizationId.HasValue && membership is null)
         {
             return Result.Failure<UserTokenClaimsDto>(
                 ErrorCodes.BusinessRule,
                 "Invalid organization scope for this user.");
         }
 
-        Guid orgId = user.OrganizationId;
+        if (membership is null)
+        {
+            return Result.Success(new UserTokenClaimsDto(
+                user.Id,
+                null,
+                user.Email.Value,
+                $"{user.FirstName} {user.LastName}",
+                []));
+        }
 
-        IReadOnlyList<Role> roles = await roleRepo.GetByIdsAsync(user.RoleIds, orgId, cancellationToken);
+        IReadOnlyList<Role> roles = await roleRepo.GetByIdsAsync(
+            membership.RoleIds,
+            membership.OrganizationId,
+            cancellationToken);
         List<string> permissions = roles
             .SelectMany(r => r.Permissions)
             .Distinct(StringComparer.Ordinal)
@@ -39,7 +55,7 @@ public sealed class GetUserTokenClaimsHandler(
 
         return Result.Success(new UserTokenClaimsDto(
             user.Id,
-            orgId,
+            membership.OrganizationId,
             user.Email.Value,
             $"{user.FirstName} {user.LastName}",
             permissions));

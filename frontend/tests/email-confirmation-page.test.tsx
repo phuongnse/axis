@@ -11,7 +11,6 @@ describe('EmailConfirmationPage', () => {
     vi.stubGlobal('fetch', vi.fn());
     saveRegistrationContext({
       email: 'alex@example.com',
-      organizationName: 'Acme Corp',
     });
   });
 

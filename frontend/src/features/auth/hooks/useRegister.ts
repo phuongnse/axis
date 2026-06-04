@@ -4,11 +4,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { useRef } from 'react';
 import { type FieldPath, type UseFormReturn, useForm } from 'react-hook-form';
 
-import {
-  createRegisterIdempotencyKey,
-  registerOrganization,
-  toAdminNameParts,
-} from '@/features/auth/api';
+import { createRegisterIdempotencyKey, registerUser, toAdminNameParts } from '@/features/auth/api';
 import { useLegalVersions } from '@/features/auth/hooks/useLegalVersions';
 import { saveRegistrationContext } from '@/features/auth/registration-context';
 import { type RegisterFormValues, registerSchema } from '@/features/auth/schemas/register-schema';
@@ -35,33 +31,27 @@ function applyRegisterValidationErrors(
 ): boolean {
   let hasMappedFieldError = false;
 
-  const organizationNameError = pickFirstError(
-    errorData.errors,
-    'OrgName',
-    'org_name',
-    'organizationName',
-  );
   const fullNameError = pickFirstError(
     errorData.errors,
-    'AdminFirstName',
-    'admin_first_name',
-    'AdminLastName',
-    'admin_last_name',
+    'FirstName',
+    'firstName',
+    'LastName',
+    'lastName',
     'fullName',
   );
-  const emailError = pickFirstError(errorData.errors, 'AdminEmail', 'admin_email', 'email');
+  const emailError = pickFirstError(errorData.errors, 'Email', 'email');
   const passwordError = pickFirstError(errorData.errors, 'Password', 'password');
   const passwordConfirmationError = pickFirstError(
     errorData.errors,
     'PasswordConfirmation',
-    'password_confirmation',
+    'passwordConfirmation',
   );
   const termsError = pickFirstError(
     errorData.errors,
     'AcceptedTermsVersion',
-    'accepted_terms_version',
+    'acceptedTermsVersion',
     'AcceptedPrivacyVersion',
-    'accepted_privacy_version',
+    'acceptedPrivacyVersion',
   );
 
   const setFieldError = (field: FieldPath<RegisterFormValues>, message: string) => {
@@ -69,9 +59,6 @@ function applyRegisterValidationErrors(
     hasMappedFieldError = true;
   };
 
-  if (organizationNameError) {
-    setFieldError('organizationName', organizationNameError);
-  }
   if (fullNameError) {
     setFieldError('fullName', fullNameError);
   }
@@ -98,7 +85,6 @@ export function useRegister() {
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
-      organizationName: '',
       fullName: '',
       email: '',
       password: '',
@@ -115,16 +101,15 @@ export function useRegister() {
       }
 
       const names = toAdminNameParts(values.fullName);
-      return registerOrganization(
+      return registerUser(
         {
-          org_name: values.organizationName.trim(),
-          admin_first_name: names.firstName,
-          admin_last_name: names.lastName,
-          admin_email: values.email.trim(),
+          firstName: names.firstName,
+          lastName: names.lastName,
+          email: values.email.trim(),
           password: values.password,
-          password_confirmation: values.passwordConfirmation,
-          accepted_terms_version: legalVersions.terms_version,
-          accepted_privacy_version: legalVersions.privacy_version,
+          passwordConfirmation: values.passwordConfirmation,
+          acceptedTermsVersion: legalVersions.termsVersion,
+          acceptedPrivacyVersion: legalVersions.privacyVersion,
         },
         idempotencyKeyRef.current,
       );
@@ -132,7 +117,6 @@ export function useRegister() {
     onSuccess: (_data, values) => {
       saveRegistrationContext({
         email: values.email.trim(),
-        organizationName: values.organizationName.trim(),
       });
       form.reset();
       void navigate({ to: '/register/confirmation' });

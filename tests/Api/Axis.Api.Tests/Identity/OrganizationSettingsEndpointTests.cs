@@ -24,7 +24,7 @@ public class OrganizationSettingsEndpointTests(ApiTestFixture fixture)
         HttpClient admin = await AuthHelper.CreateAdminClientAsync(fixture, "orgset1");
         HttpResponseMessage meResp = await admin.GetAsync("/api/users/me");
         JsonElement me = await meResp.Content.ReadFromJsonAsync<JsonElement>(Json);
-        Guid orgId = Guid.Parse(me.GetProperty("org_id").GetString()!);
+        Guid orgId = Guid.Parse(me.GetProperty("orgId").GetString()!);
 
         using (IServiceScope scope = fixture.CreateScope())
         {
@@ -33,7 +33,7 @@ public class OrganizationSettingsEndpointTests(ApiTestFixture fixture)
 
             HttpResponseMessage inviteResp = await admin.PostAsJsonAsync(
                 "/api/organizations/me/invitations",
-                new { email = viewerEmail, role_id = viewerRole.Id },
+                new { email = viewerEmail, roleId = viewerRole.Id },
                 Json);
             inviteResp.EnsureSuccessStatusCode();
 
@@ -49,8 +49,8 @@ public class OrganizationSettingsEndpointTests(ApiTestFixture fixture)
                 $"/api/invitations/{token}/accept",
                 new
                 {
-                    first_name = "View",
-                    last_name = "Only",
+                    firstName = "View",
+                    lastName = "Only",
                     password = viewerPassword,
                 },
                 Json);
@@ -73,7 +73,7 @@ public class OrganizationSettingsEndpointTests(ApiTestFixture fixture)
 
         HttpResponseMessage resp = await client.PutAsJsonAsync(
             "/api/organizations/current/profile",
-            new { name = "Test Org", logo_base64 = "not-valid-base64!!!" },
+            new { name = "Test Org", logoBase64 = "not-valid-base64!!!" },
             Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -89,8 +89,8 @@ public class OrganizationSettingsEndpointTests(ApiTestFixture fixture)
             new
             {
                 name = "Renamed Org",
-                time_zone_id = "America/New_York",
-                default_language = "en-US",
+                timeZoneId = "America/New_York",
+                defaultLanguage = "en-US",
             },
             Json);
 
@@ -100,7 +100,7 @@ public class OrganizationSettingsEndpointTests(ApiTestFixture fixture)
         settingsResp.EnsureSuccessStatusCode();
         JsonElement body = await settingsResp.Content.ReadFromJsonAsync<JsonElement>(Json);
         body.GetProperty("name").GetString().Should().Be("Renamed Org");
-        body.GetProperty("time_zone_id").GetString().Should().Be("America/New_York");
+        body.GetProperty("timeZoneId").GetString().Should().Be("America/New_York");
     }
 
     [Fact]
@@ -110,7 +110,7 @@ public class OrganizationSettingsEndpointTests(ApiTestFixture fixture)
 
         HttpResponseMessage resp = await client.PutAsJsonAsync(
             "/api/organizations/current/profile",
-            new { name = "Test Org", default_language = "english" },
+            new { name = "Test Org", defaultLanguage = "english" },
             Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
@@ -123,7 +123,7 @@ public class OrganizationSettingsEndpointTests(ApiTestFixture fixture)
 
         HttpResponseMessage resp = await client.PutAsJsonAsync(
             "/api/organizations/current/profile",
-            new { name = "Test Org", time_zone_id = "Not/A/Timezone" },
+            new { name = "Test Org", timeZoneId = "Not/A/Timezone" },
             Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
@@ -136,7 +136,7 @@ public class OrganizationSettingsEndpointTests(ApiTestFixture fixture)
 
         HttpResponseMessage resp = await client.PostAsJsonAsync(
             "/api/organizations/current/deletion",
-            new { confirmation_name = "Wrong Name" },
+            new { confirmationName = "Wrong Name" },
             Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
@@ -153,7 +153,7 @@ public class OrganizationSettingsEndpointTests(ApiTestFixture fixture)
 
         HttpResponseMessage resp = await client.PostAsJsonAsync(
             "/api/organizations/current/deletion",
-            new { confirmation_name = orgName },
+            new { confirmationName = orgName },
             Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -161,6 +161,6 @@ public class OrganizationSettingsEndpointTests(ApiTestFixture fixture)
         HttpResponseMessage settingsAfter = await client.GetAsync("/api/organizations/current/settings");
         JsonElement after = await settingsAfter.Content.ReadFromJsonAsync<JsonElement>(Json);
         after.GetProperty("status").GetString().Should().Be(nameof(OrganizationStatus.DeletionScheduled));
-        after.GetProperty("scheduled_hard_delete_at").ValueKind.Should().NotBe(JsonValueKind.Null);
+        after.GetProperty("scheduledHardDeleteAt").ValueKind.Should().NotBe(JsonValueKind.Null);
     }
 }

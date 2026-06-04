@@ -13,8 +13,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Axis.Identity.Infrastructure.Migrations
 {
     [DbContext(typeof(IdentityDbContext))]
-    [Migration("20260526041108_AddOrganizationProfileAndDeletion")]
-    partial class AddOrganizationProfileAndDeletion
+    [Migration("20260603100509_InitialIdentitySchema")]
+    partial class InitialIdentitySchema
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -147,6 +147,61 @@ namespace Axis.Identity.Infrastructure.Migrations
                     b.ToTable("organizations", (string)null);
                 });
 
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.OrganizationMembership", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("UserId", "OrganizationId")
+                        .IsUnique();
+
+                    b.ToTable("organization_memberships", (string)null);
+                });
+
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.OrganizationMembershipRole", b =>
+                {
+                    b.Property<Guid>("MembershipId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("membership_id");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("role_id");
+
+                    b.Property<DateTime>("AssignedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("assigned_at");
+
+                    b.HasKey("MembershipId", "RoleId");
+
+                    b.HasIndex("RoleId");
+
+                    b.ToTable("organization_membership_roles", (string)null);
+                });
+
             modelBuilder.Entity("Axis.Identity.Domain.Aggregates.Role", b =>
                 {
                     b.Property<Guid>("Id")
@@ -197,6 +252,16 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("AcceptedPrivacyVersion")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("accepted_privacy_version");
+
+                    b.Property<string>("AcceptedTermsVersion")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("accepted_terms_version");
+
                     b.Property<string>("AvatarUrl")
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)")
@@ -234,13 +299,13 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("last_name");
 
+                    b.Property<DateTime?>("LegalAcceptedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("legal_accepted_at");
+
                     b.Property<DateTime?>("LockedUntil")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("locked_until");
-
-                    b.Property<Guid>("OrganizationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("organization_id");
 
                     b.Property<string>("PasswordHash")
                         .HasColumnType("text")
@@ -251,14 +316,9 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("status");
 
-                    b.PrimitiveCollection<List<Guid>>("_roleIds")
-                        .IsRequired()
-                        .HasColumnType("uuid[]")
-                        .HasColumnName("role_ids");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("Email", "OrganizationId")
+                    b.HasIndex("Email")
                         .IsUnique();
 
                     b.ToTable("users", (string)null);
@@ -694,6 +754,15 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.OrganizationMembershipRole", b =>
+                {
+                    b.HasOne("Axis.Identity.Domain.Aggregates.OrganizationMembership", null)
+                        .WithMany("Roles")
+                        .HasForeignKey("MembershipId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.EmailVerificationToken", b =>
                 {
                     b.HasOne("Axis.Identity.Domain.Aggregates.User", null)
@@ -755,6 +824,11 @@ namespace Axis.Identity.Infrastructure.Migrations
                     b.Navigation("Application");
 
                     b.Navigation("Authorization");
+                });
+
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.OrganizationMembership", b =>
+                {
+                    b.Navigation("Roles");
                 });
 
             modelBuilder.Entity("OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreApplication", b =>

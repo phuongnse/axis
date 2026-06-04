@@ -382,7 +382,7 @@ public static class WorkflowEndpoints
 
         string json = JsonSerializer.Serialize(dto, new JsonSerializerOptions
         {
-            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             WriteIndented = true,
         });
         string slug = ToSafeSlug(dto.Name);
@@ -414,7 +414,7 @@ public static class WorkflowEndpoints
 
         JsonSerializerOptions jsonOpts = new()
         {
-            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             WriteIndented = true,
         };
 

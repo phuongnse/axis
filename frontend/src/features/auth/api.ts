@@ -13,10 +13,11 @@ import type {
   LegalVersionsResponse,
   LoginAttemptResult,
   LoginCredentials,
+  MessageResponse,
   OrganizationSlugPreviewResponse,
   ProvisioningStatusResponse,
   RegisterOrganizationRequest,
-  RegisterOrganizationResponse,
+  RegisterUserRequest,
   VerifyEmailResponse,
 } from './types';
 
@@ -26,12 +27,6 @@ export const authKeys = {
   legalVersions: ['auth', 'legal-versions'] as const,
   slugPreview: (orgName: string) => [...authKeys.all, 'slug-preview', orgName] as const,
 };
-
-interface TokenResponse {
-  access_token: string;
-  token_type: string;
-  expires_in: number;
-}
 
 export function createRegisterIdempotencyKey(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -54,8 +49,21 @@ export function toAdminNameParts(fullName: string): { firstName: string; lastNam
 export async function registerOrganization(
   payload: RegisterOrganizationRequest,
   idempotencyKey: string,
-): Promise<RegisterOrganizationResponse> {
-  return fetchApi<RegisterOrganizationResponse>('/organizations', {
+): Promise<MessageResponse> {
+  return fetchApi<MessageResponse>('/organizations', {
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function registerUser(
+  payload: RegisterUserRequest,
+  idempotencyKey: string,
+): Promise<MessageResponse> {
+  return fetchApi<MessageResponse>('/users/register', {
     method: 'POST',
     headers: {
       'Idempotency-Key': idempotencyKey,
@@ -71,7 +79,7 @@ export async function getLegalVersions(): Promise<LegalVersionsResponse> {
 export async function getOrganizationSlugPreview(
   orgName: string,
 ): Promise<OrganizationSlugPreviewResponse> {
-  const params = new URLSearchParams({ org_name: orgName });
+  const params = new URLSearchParams({ orgName });
   return fetchApi<OrganizationSlugPreviewResponse>(
     `/organizations/slug-preview?${params.toString()}`,
   );
@@ -151,10 +159,11 @@ export async function exchangeAuthorizationCode(code: string): Promise<string> {
     throw new Error('Token exchange failed');
   }
 
-  const data = (await response.json()) as TokenResponse;
+  const data = await response.json();
+  const accessToken = readAccessToken(data);
   clearPkceSession();
-  useAuthStore.getState().setSession(data.access_token);
-  return data.access_token;
+  useAuthStore.getState().setSession(accessToken);
+  return accessToken;
 }
 
 export async function verifyEmail(token: string): Promise<VerifyEmailResponse> {
@@ -168,11 +177,26 @@ export async function verifyEmail(token: string): Promise<VerifyEmailResponse> {
  * After verify-email establishes a session cookie, run PKCE so the SPA receives tokens.
  * Stores the verification token for the callback to redirect to provisioning.
  */
-export async function completePostVerifyPkceFlow(verificationToken: string): Promise<void> {
-  storePostVerifyProvisioningToken(verificationToken);
+export async function completePostVerifyPkceFlow(verificationToken?: string | null): Promise<void> {
+  if (verificationToken) {
+    storePostVerifyProvisioningToken(verificationToken);
+  }
   const pkce = createPkceSession();
   const authorizeUrl = await buildAuthorizeUrl(pkce.state, pkce.verifier);
   window.location.assign(authorizeUrl);
+}
+
+function readAccessToken(data: unknown): string {
+  if (!data || typeof data !== 'object') {
+    throw new Error('Token exchange returned an invalid response');
+  }
+
+  const accessToken = (data as Record<string, unknown>).access_token;
+  if (typeof accessToken !== 'string' || accessToken.length === 0) {
+    throw new Error('Token exchange returned an invalid response');
+  }
+
+  return accessToken;
 }
 
 export async function resendVerificationEmail(email: string): Promise<void> {

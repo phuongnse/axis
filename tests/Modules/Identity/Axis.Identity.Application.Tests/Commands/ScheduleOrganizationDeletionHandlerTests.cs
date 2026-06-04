@@ -52,7 +52,7 @@ public class ScheduleOrganizationDeletionHandlerTests
             OrganizationSlug.Create("acme").Value,
             Email.Create("owner@acme.com").Value,
             WellKnownSubscriptionPlans.FreeId);
-        User user = User.Create("A", "B", Email.Create("admin@acme.com").Value, OrgId);
+        User user = User.Create("A", "B", Email.Create("admin@acme.com").Value);
         _orgRepo.GetByIdAsync(OrgId, Arg.Any<CancellationToken>()).Returns(org);
         _userRepo.GetByIdAsync(UserId, OrgId, Arg.Any<CancellationToken>()).Returns(user);
         _scheduler.ScheduleHardDeleteAsync(Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())

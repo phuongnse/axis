@@ -5,18 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AuthCard } from '@/features/auth/components/AuthCard';
 import { useRegister } from '@/features/auth/hooks/useRegister';
-import { useSlugPreview } from '@/features/auth/hooks/useSlugPreview';
 
 export function RegisterPage() {
   const { form, loading, submit } = useRegister();
   const {
     register,
     handleSubmit,
-    watch,
     formState: { errors },
   } = form;
-  const organizationName = watch('organizationName');
-  const { slug } = useSlugPreview(organizationName);
   const submitError = errors.root?.message;
 
   return (
@@ -32,24 +28,6 @@ export function RegisterPage() {
       }
     >
       <form className="space-y-4" onSubmit={handleSubmit(submit)} noValidate>
-        <div className="space-y-1.5">
-          <Label htmlFor="organizationName">Organization name</Label>
-          <Input
-            id="organizationName"
-            autoComplete="organization"
-            aria-invalid={errors.organizationName ? true : undefined}
-            {...register('organizationName')}
-          />
-          {slug ? (
-            <p className="text-xs text-muted-foreground">
-              Workspace URL: <span className="font-medium text-foreground">{slug}</span>
-            </p>
-          ) : null}
-          {errors.organizationName ? (
-            <p className="text-xs text-destructive">{errors.organizationName.message}</p>
-          ) : null}
-        </div>
-
         <div className="space-y-1.5">
           <Label htmlFor="fullName">Full name</Label>
           <Input
@@ -148,7 +126,7 @@ export function RegisterPage() {
         ) : null}
 
         <Button type="submit" variant="cta" className="w-full h-9" disabled={loading}>
-          {loading ? 'Creating account…' : 'Create account'}
+          {loading ? 'Creating account...' : 'Create account'}
         </Button>
       </form>
     </AuthCard>

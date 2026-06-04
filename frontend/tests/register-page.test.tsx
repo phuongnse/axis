@@ -17,8 +17,8 @@ vi.mock('@tanstack/react-router', async () => {
 });
 
 const LEGAL_VERSIONS = {
-  terms_version: '2026-05-01',
-  privacy_version: '2026-05-01',
+  termsVersion: '2026-05-01',
+  privacyVersion: '2026-05-01',
 };
 
 function mockLegalVersionsFetch() {
@@ -36,7 +36,6 @@ function mockLegalVersionsFetch() {
 }
 
 async function fillRegisterForm(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByLabelText('Organization name'), "O'Brien & Co.");
   await user.type(screen.getByLabelText('Full name'), 'Alex Brown');
   await user.type(screen.getByLabelText('Email address'), 'alex@example.com');
   await user.type(screen.getByLabelText('Password'), 'Passw0rd');
@@ -63,7 +62,6 @@ describe('RegisterPage', () => {
 
     await user.click(screen.getByRole('button', { name: /create account/i }));
 
-    expect(await screen.findByText('Organization name is required')).toBeInTheDocument();
     expect(screen.getByText('Full name is required')).toBeInTheDocument();
     expect(screen.getByText('Email address is required')).toBeInTheDocument();
     expect(screen.getByText('Password is required')).toBeInTheDocument();
@@ -84,7 +82,7 @@ describe('RegisterPage', () => {
           text: () => Promise.resolve(JSON.stringify(LEGAL_VERSIONS)),
         } as unknown as Response);
       }
-      if (url.includes('/api/organizations') && init?.method === 'POST') {
+      if (url.includes('/api/users/register') && init?.method === 'POST') {
         return Promise.resolve({
           ok: true,
           status: 200,
@@ -109,7 +107,7 @@ describe('RegisterPage', () => {
     );
     const stored = sessionStorage.getItem('axis.registration-context');
     expect(stored).toContain('alex@example.com');
-    expect(stored).toContain("O'Brien & Co.");
+    expect(stored).not.toContain('organizationName');
   });
 
   it('maps backend validation errors to inline field messages', async () => {
@@ -123,7 +121,7 @@ describe('RegisterPage', () => {
           text: () => Promise.resolve(JSON.stringify(LEGAL_VERSIONS)),
         } as unknown as Response);
       }
-      if (url.includes('/api/organizations') && init?.method === 'POST') {
+      if (url.includes('/api/users/register') && init?.method === 'POST') {
         return Promise.resolve({
           ok: false,
           status: 400,
@@ -131,7 +129,7 @@ describe('RegisterPage', () => {
           json: () =>
             Promise.resolve({
               errors: {
-                org_name: ['Organization name must be between 2 and 100 characters.'],
+                email: ['Email is already registered.'],
               },
             }),
         } as unknown as Response);
@@ -144,9 +142,7 @@ describe('RegisterPage', () => {
     await fillRegisterForm(user);
     await user.click(screen.getByRole('button', { name: /create account/i }));
 
-    expect(
-      await screen.findByText('Organization name must be between 2 and 100 characters.'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Email is already registered.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /create account/i })).toBeEnabled();
   });
 
@@ -161,7 +157,7 @@ describe('RegisterPage', () => {
           text: () => Promise.resolve(JSON.stringify(LEGAL_VERSIONS)),
         } as unknown as Response);
       }
-      if (url.includes('/api/organizations') && init?.method === 'POST') {
+      if (url.includes('/api/users/register') && init?.method === 'POST') {
         return Promise.resolve({
           ok: false,
           status: 500,

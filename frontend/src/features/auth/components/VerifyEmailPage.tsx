@@ -187,7 +187,7 @@ export function VerifyEmailPage() {
     <AuthCard title="Verifying your email">
       <div className="flex items-center gap-3 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-        <span>Redirecting to workspace setup…</span>
+        <span>Completing sign-in...</span>
       </div>
     </AuthCard>
   );

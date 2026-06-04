@@ -73,7 +73,7 @@ Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoi
 
 ## Platform Foundation (`platform-foundation`)
 
-**Tenant registration:** ⚠️ refactor needed after process/design split. `register-org` now owns organization contact email verification + tenant provisioning only; user identity setup and third-party providers move to `identity-access/register-user`. Reusable pieces: slug preview, legal versions, confirmation/resend, verify-email states, provisioning poll UI. Remaining frontend: organization-contact copy/validation, first-user setup handoff, manual provisioning retry.
+**Tenant registration:** ⚠️ refactor needed after process/design split. `register-org` now owns organization contact email verification + tenant provisioning only; standalone user registration, optional organization join/setup context, and third-party providers move to `identity-access/register-user`. Reusable pieces: slug preview, legal versions, confirmation/resend, verify-email states, provisioning status UI. Remaining backend/API: organization-only registration contract and optional first-user setup handoff. Remaining frontend: organization-contact copy/validation, optional setup-token handoff, manual provisioning retry.
 
 **Subscription plans (backend):** ✅ `GET /api/plans`, platform plan change, 402 limits (workflows / users / executions), Redis counters. Frontend pricing UI ⏳. **Deferred:** atomic execution counter under concurrency; fail-closed when Redis unavailable; bulk multi-workflow import limit AC until bulk endpoint exists.
 

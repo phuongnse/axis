@@ -34,6 +34,8 @@ Register an organization on the Axis platform with an official organization cont
 
 This use case is about organization onboarding, not user identity onboarding. The email collected here is an official organization contact email, such as `admin@company.com` or `it@company.com`; it is not a personal user login. Microsoft / Google / GitHub identity providers belong to [register-user](../../identity-access/register-user/) and [sign-in](../../identity-access/sign-in/), where they authenticate an individual user.
 
+Axis supports standalone user accounts. Registering an organization is required only when a user wants to create or join an organization workspace; it is not a prerequisite for normal user registration.
+
 ## Acceptance Criteria
 
 *Happy path*
@@ -69,6 +71,7 @@ This use case is about organization onboarding, not user identity onboarding. Th
 
 *Out of scope*
 - User account registration, password setup, account linking, and Microsoft / Google / GitHub login; see [register-user](../../identity-access/register-user/).
+- Standalone user registration without organization context; see [register-user](../../identity-access/register-user/).
 - Enterprise SAML/SCIM federation and per-tenant IdP configuration.
 - CAPTCHA / bot protection on the organization registration form.
 - Automatic re-send of verification email after X minutes.
@@ -90,6 +93,7 @@ This use case is about organization onboarding, not user identity onboarding. Th
 > - `register-org` owns organization facts only: organization name, organization contact email, legal acceptance, slug, verification, and tenant provisioning.
 > - Microsoft / Google / GitHub authenticate users, not organizations. Generic OAuth provider claims must not be used as proof that someone controls an organization.
 > - First owner/admin creation is a follow-up user-registration step using a short-lived setup token/link after organization verification.
+> - Organization onboarding is optional from the product perspective: a user can register and use Axis without creating or joining an organization.
 
 ## Screen flow
 
@@ -100,14 +104,14 @@ Canonical order for this use case. **The wireframes table below uses the same ro
 | 1 | `register-org` | Enter organization name, organization contact email, slug preview, and legal acceptance |
 | 2 | `email-confirmation` | After organization registration submit; tells actor to verify the organization email |
 | 3 | `workspace-provisioning` | After organization email verification; tenant setup is running |
-| 4 | [register-user](../../identity-access/register-user/) | First owner/admin sets up their user identity after organization verification |
+| 4 | [register-user](../../identity-access/register-user/) | First owner/admin sets up their user identity after organization verification; standalone user registration does not require this flow |
 
 **Error / reference screens** (not sequential steps):
 
 | Screen | When |
 |--------|------|
 | `register-org-states` | Validation or 5xx on the organization registration form |
-| `email-confirmation-states` | Resend organization verification email: in-flight, success, rate limit |
+| `email-confirmation-states` | Resend organization verification email: success and rate limit |
 | `verify-email-states` | Organization email verification link expired, already used, invalid, or rate-limited |
 
 ```mermaid
@@ -146,7 +150,7 @@ Six UI assets in this folder. Row order matches [Screen flow](#screen-flow). Ext
 
 ### register-org-journey
 
-Organization onboarding only. User identity setup continues in [register-user](../../identity-access/register-user/).
+Organization onboarding only. User identity setup continues in [register-user](../../identity-access/register-user/) only for users who are creating or joining an organization.
 
 ```mermaid
 %%{init: {'theme':'dark','themeVariables':{'background':'#0d1117','mainBkg':'#0d1117','primaryColor':'#161b22','primaryBorderColor':'#388bfd','primaryTextColor':'#e6edf3','secondaryColor':'#21262d','secondaryBorderColor':'#388bfd','secondaryTextColor':'#e6edf3','tertiaryColor':'#161b22','tertiaryTextColor':'#e6edf3','lineColor':'#58a6ff','textColor':'#e6edf3','nodeBorder':'#388bfd','clusterBkg':'#161b22','clusterBorder':'#388bfd','titleColor':'#e6edf3','edgeLabelBackground':'#161b22','actorBkg':'#161b22','actorBorder':'#388bfd','actorTextColor':'#e6edf3','signalColor':'#58a6ff','labelBoxBkgColor':'#161b22','labelBoxBorderColor':'#388bfd','noteBkgColor':'#161b22','noteBorderColor':'#388bfd','noteTextColor':'#c9d1d9','activationBkgColor':'#30363d'}}}%%
@@ -196,4 +200,4 @@ sequenceDiagram
   end
 ```
 
-**Related:** [register-user](../../identity-access/register-user/) owns first owner/admin account setup and third-party identity providers.
+**Related:** [register-user](../../identity-access/register-user/) owns standalone user registration, first owner/admin account setup, organization join context, and third-party identity providers.

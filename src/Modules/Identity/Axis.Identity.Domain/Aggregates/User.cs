@@ -9,14 +9,11 @@ public sealed class User : AggregateRoot<Guid>
     private const int MaxFailedAttempts = 5;
     private const int LockoutMinutes = 15;
 
-    private readonly List<Guid> _roleIds = [];
-
     public string FirstName { get; private set; }
     public string LastName { get; private set; }
     public string FullName => $"{FirstName} {LastName}";
     public string? AvatarUrl { get; private set; }
     public Email Email { get; private set; }
-    public Guid OrganizationId { get; private set; }
     public string? PasswordHash { get; private set; }
     public UserStatus Status { get; private set; }
     public bool IsEmailVerified { get; private set; }
@@ -29,30 +26,26 @@ public sealed class User : AggregateRoot<Guid>
 
     public bool IsLockedOut => LockedUntil.HasValue && DateTime.UtcNow < LockedUntil.Value;
 
-    public IReadOnlyList<Guid> RoleIds => _roleIds.AsReadOnly();
-
     private User(
         Guid id,
         string firstName,
         string lastName,
         Email email,
-        Guid organizationId,
         DateTime createdAt)
         : base(id)
     {
         FirstName = firstName;
         LastName = lastName;
         Email = email;
-        OrganizationId = organizationId;
         Status = UserStatus.Active;
         IsEmailVerified = false;
         CreatedAt = createdAt;
     }
 
-    public static User Create(string firstName, string lastName, Email email, Guid organizationId)
+    public static User Create(string firstName, string lastName, Email email)
     {
-        User user = new User(Guid.NewGuid(), firstName, lastName, email, organizationId, DateTime.UtcNow);
-        user.RaiseDomainEvent(new UserRegistered(user.Id, organizationId, email.Value));
+        User user = new User(Guid.NewGuid(), firstName, lastName, email, DateTime.UtcNow);
+        user.RaiseDomainEvent(new UserRegistered(user.Id, email.Value));
         return user;
     }
 
@@ -81,7 +74,6 @@ public sealed class User : AggregateRoot<Guid>
             return;
 
         IsEmailVerified = true;
-        RaiseDomainEvent(new OrganizationVerified(OrganizationId));
     }
 
     public void RecordFailedLogin()
@@ -107,7 +99,6 @@ public sealed class User : AggregateRoot<Guid>
             throw new InvalidOperationException("User is already inactive.");
 
         Status = UserStatus.Inactive;
-        RaiseDomainEvent(new UserDeactivated(Id, OrganizationId));
     }
 
     public void Reactivate()
@@ -116,35 +107,16 @@ public sealed class User : AggregateRoot<Guid>
             throw new InvalidOperationException("User is already active.");
 
         Status = UserStatus.Active;
-        RaiseDomainEvent(new UserReactivated(Id, OrganizationId));
     }
 
     public void UpdateProfile(string firstName, string lastName)
     {
         FirstName = firstName;
         LastName = lastName;
-        RaiseDomainEvent(new Events.UserProfileUpdated(Id, OrganizationId, FullName, AvatarUrl));
     }
 
     public void UpdateAvatar(string? avatarUrl)
     {
         AvatarUrl = avatarUrl;
-    }
-
-    public void AssignRole(Guid roleId)
-    {
-        if (_roleIds.Contains(roleId))
-            return;
-
-        _roleIds.Add(roleId);
-        RaiseDomainEvent(new RoleAssigned(Id, OrganizationId, roleId));
-    }
-
-    public void RemoveRole(Guid roleId)
-    {
-        if (!_roleIds.Remove(roleId))
-            return;
-
-        RaiseDomainEvent(new RoleRemoved(Id, OrganizationId, roleId));
     }
 }

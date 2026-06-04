@@ -1,4 +1,3 @@
-using System.Text;
 using Axis.Api.Tests.Helpers;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,7 +13,7 @@ public class OpenApiDocumentTests(ApiTestFixture fixture)
 {
     /// <summary>
     /// The committed <c>openapi.json</c> is the source of truth the frontend types are
-    /// generated from. This regenerates it from the running app and fails if it drifted,
+    /// generated from. This verifies it against the running app and fails if it drifted,
     /// so the FE types can never silently diverge from the real API contract.
     /// </summary>
     [Fact]
@@ -26,20 +25,19 @@ public class OpenApiDocumentTests(ApiTestFixture fixture)
         OpenApiDocument doc = provider.GetSwagger("v1");
         string fresh = doc.SerializeAsJson(OpenApiSpecVersion.OpenApi3_0).ReplaceLineEndings("\n");
 
-        // The schema must match the snake_case wire the app actually emits.
-        fresh.Should().Contain("\"org_name\"");
-        fresh.Should().NotContain("\"orgName\"");
+        // The schema must match the camelCase wire the app actually emits.
+        fresh.Should().Contain("\"orgName\"");
+        fresh.Should().NotContain("\"org_name\"");
 
         string path = Path.Combine(RepoRoot(), "openapi.json");
         string? committed = File.Exists(path) ? File.ReadAllText(path).ReplaceLineEndings("\n") : null;
 
         if (committed != fresh)
         {
-            File.WriteAllText(path, fresh, new UTF8Encoding(false));
             committed.Should().Be(
                 fresh,
-                "openapi.json drifted from the API — it has been regenerated; commit it and run "
-                    + "`npm run gen:api-types` in frontend/ to refresh the generated types");
+                "openapi.json drifted from the API. Run `scripts/generate-api-contracts.ps1` "
+                    + "to regenerate openapi.json and frontend/src/lib/api-types.ts, then commit both");
         }
     }
 

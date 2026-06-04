@@ -32,7 +32,7 @@ public sealed class GetCurrentUserProfileHandlerTests
     [Fact]
     public async Task Handle_WhenUserExists_ReturnsProfileWithJwtPermissions()
     {
-        User user = User.Create("Ada", "Lovelace", Email.Create("ada@acme.com").Value, OrgId);
+        User user = User.Create("Ada", "Lovelace", Email.Create("ada@acme.com").Value);
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
         IReadOnlyList<string> jwtPermissions = ["workflow:definition:read", "users:read"];
 
