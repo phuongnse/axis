@@ -227,7 +227,7 @@ public class WorkflowEndpointTests(ApiTestFixture fixture)
         HttpResponseMessage addResp = await client.PostAsJsonAsync($"/api/workflows/{id}/steps", new
         {
             name = "Send Form",
-            step_type = "Form",
+            stepType = "Form",
             config = (object?)null,
         }, Json);
 
@@ -247,7 +247,7 @@ public class WorkflowEndpointTests(ApiTestFixture fixture)
 
         string id = await CreateWorkflowAsync(client, "Remove Step Flow");
         HttpResponseMessage addResp = await client.PostAsJsonAsync($"/api/workflows/{id}/steps",
-            new { name = "Temp Step", step_type = "Script", config = (object?)null }, Json);
+            new { name = "Temp Step", stepType = "Script", config = (object?)null }, Json);
         string stepId = (await addResp.Content.ReadFromJsonAsync<JsonElement>(Json)).GetProperty("id").GetString()!;
 
         HttpResponseMessage removeResp = await client.DeleteAsync($"/api/workflows/{id}/steps/{stepId}");
@@ -271,7 +271,7 @@ public class WorkflowEndpointTests(ApiTestFixture fixture)
         string endId = steps.First(s => s.GetProperty("name").GetString() == "End").GetProperty("id").GetString()!;
 
         HttpResponseMessage resp = await client.PostAsJsonAsync($"/api/workflows/{id}/transitions",
-            new { from_step_id = startId, to_step_id = endId, label = (string?)null }, Json);
+            new { fromStepId = startId, toStepId = endId, label = (string?)null }, Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
@@ -286,7 +286,7 @@ public class WorkflowEndpointTests(ApiTestFixture fixture)
         string id = await CreateWorkflowAsync(client, "Triggered Flow");
 
         HttpResponseMessage resp = await client.PostAsJsonAsync($"/api/workflows/{id}/triggers",
-            new { trigger_type = "Manual", config = (object?)null }, Json);
+            new { triggerType = "Manual", config = (object?)null }, Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
@@ -298,7 +298,7 @@ public class WorkflowEndpointTests(ApiTestFixture fixture)
 
         string id = await CreateWorkflowAsync(client, "Remove Trigger Flow");
         await client.PostAsJsonAsync($"/api/workflows/{id}/triggers",
-            new { trigger_type = "Manual", config = (object?)null }, Json);
+            new { triggerType = "Manual", config = (object?)null }, Json);
 
         HttpResponseMessage resp = await client.DeleteAsync($"/api/workflows/{id}/triggers/Manual");
         resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -372,7 +372,7 @@ public class WorkflowEndpointTests(ApiTestFixture fixture)
         string id = await CreateWorkflowAsync(client, name);
 
         await client.PostAsJsonAsync($"/api/workflows/{id}/triggers",
-            new { trigger_type = "Manual", config = (object?)null }, Json);
+            new { triggerType = "Manual", config = (object?)null }, Json);
 
         JsonElement detail = await (await client.GetAsync($"/api/workflows/{id}")).Content.ReadFromJsonAsync<JsonElement>(Json);
         List<JsonElement> steps = detail.GetProperty("steps").EnumerateArray().ToList();
@@ -380,13 +380,13 @@ public class WorkflowEndpointTests(ApiTestFixture fixture)
         string endId = steps.First(s => s.GetProperty("type").GetString() == "End").GetProperty("id").GetString()!;
 
         HttpResponseMessage stepResp = await client.PostAsJsonAsync($"/api/workflows/{id}/steps",
-            new { name = "Task", step_type = "Form", config = (object?)null }, Json);
+            new { name = "Task", stepType = "Form", config = (object?)null }, Json);
         string stepId = (await stepResp.Content.ReadFromJsonAsync<JsonElement>(Json)).GetProperty("id").GetString()!;
 
         await client.PostAsJsonAsync($"/api/workflows/{id}/transitions",
-            new { from_step_id = startId, to_step_id = stepId, label = (string?)null }, Json);
+            new { fromStepId = startId, toStepId = stepId, label = (string?)null }, Json);
         await client.PostAsJsonAsync($"/api/workflows/{id}/transitions",
-            new { from_step_id = stepId, to_step_id = endId, label = (string?)null }, Json);
+            new { fromStepId = stepId, toStepId = endId, label = (string?)null }, Json);
 
         await client.PostAsync($"/api/workflows/{id}/publish", null);
 

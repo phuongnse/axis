@@ -96,10 +96,10 @@ public class ModelEndpointTests(ApiTestFixture fixture)
         JsonElement model = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
         model.GetProperty("name").GetString().Should().Be("Orders");
 
-        // System fields (id, created_at, updated_at) should be present
+        // System fields (id, createdAt, updatedAt) should be present
         List<JsonElement> fields = model.GetProperty("fields").EnumerateArray().ToList();
         fields.Should().NotBeEmpty();
-        fields.Should().Contain(f => f.GetProperty("is_system").GetBoolean());
+        fields.Should().Contain(f => f.GetProperty("isSystem").GetBoolean());
     }
 
     // PUT /api/models/{id}
@@ -161,8 +161,8 @@ public class ModelEndpointTests(ApiTestFixture fixture)
             name = "amount",
             label = "Amount",
             type = "Number",
-            is_required = true,
-            config = new { min = 0, decimal_places = 2 },
+            isRequired = true,
+            config = new { min = 0, decimalPlaces = 2 },
         }, Json);
 
         addFieldResp.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -186,15 +186,15 @@ public class ModelEndpointTests(ApiTestFixture fixture)
         string modelId = (await createResp.Content.ReadFromJsonAsync<JsonElement>(Json)).GetProperty("id").GetString()!;
 
         HttpResponseMessage f1Resp = await client.PostAsJsonAsync($"/api/models/{modelId}/fields",
-            new { name = "title", label = "Title", type = "Text", is_required = true, config = new { } }, Json);
+            new { name = "title", label = "Title", type = "Text", isRequired = true, config = new { } }, Json);
         string f1Id = (await f1Resp.Content.ReadFromJsonAsync<JsonElement>(Json)).GetProperty("id").GetString()!;
 
         HttpResponseMessage f2Resp = await client.PostAsJsonAsync($"/api/models/{modelId}/fields",
-            new { name = "due_date", label = "Due Date", type = "Date", is_required = false, config = new { } }, Json);
+            new { name = "due_date", label = "Due Date", type = "Date", isRequired = false, config = new { } }, Json);
         string f2Id = (await f2Resp.Content.ReadFromJsonAsync<JsonElement>(Json)).GetProperty("id").GetString()!;
 
         HttpResponseMessage reorderResp = await client.PutAsJsonAsync($"/api/models/{modelId}/fields/order",
-            new { field_ids = new[] { f2Id, f1Id } }, Json);
+            new { fieldIds = new[] { f2Id, f1Id } }, Json);
 
         reorderResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
