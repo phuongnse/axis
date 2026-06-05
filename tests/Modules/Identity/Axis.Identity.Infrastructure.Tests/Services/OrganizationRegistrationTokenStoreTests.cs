@@ -26,7 +26,7 @@ public class OrganizationRegistrationTokenStoreTests(IdentityDatabaseFixture db)
     public async Task DisposeAsync() => await _ctx.DisposeAsync();
 
     [Fact]
-    public async Task CreateFirstUserSetupAsync_DoesNotPersistBeforeUnitOfWorkSave()
+    public async Task CreateFirstUserSetupAsync_BeforeUnitOfWorkSave_DoesNotPersistToken()
     {
         string suffix = Guid.NewGuid().ToString("N")[..8];
         Organization org = Organization.RegisterForContactVerification(
