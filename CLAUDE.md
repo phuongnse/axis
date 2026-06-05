@@ -190,7 +190,7 @@ Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, use-c
 
 **Per layer / module:** all use-case callouts updated; domain README table; [`PROGRESS.md`](docs/PROGRESS.md) (layer summary only — not per-class detail).
 
-**Per PR before merge:** PR description = Summary + Linked spec + Requirements only (no CI status, no commit list — Checks tab covers that). Run `python scripts/axis.py check policy-tests` and `python scripts/axis.py check doc-drift` before push when touching docs, scripts, repo layout, handlers, endpoints, or generated-contract surfaces. The CI job runs on every PR and enforces deterministic policy/doc checks: changed-handler test files, no-new `TODO`/`FIXME`/`stub`, no new test `Skip = ...`, no `EnsureCreated`, script standards, layout checks, and docs integrity.
+**Per PR before merge:** PR description = Summary + Linked spec + Requirements only (no CI status, no commit list — Checks tab covers that). Run `python scripts/axis.py check policy-tests` and `python scripts/axis.py check doc-drift` before push when touching docs, scripts, repo layout, handlers, endpoints, generated-contract surfaces, or bulk file rewrites. The CI job runs on every PR and enforces deterministic policy/doc checks: text encoding (`UTF-8` without BOM + LF), changed-handler test files, no-new `TODO`/`FIXME`/`stub`, no new test `Skip = ...`, no `EnsureCreated`, script standards, layout checks, and docs integrity.
 
 Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` changes. Agents must pass [`docs/playbooks/visual-artifact-checklist.md`](docs/playbooks/visual-artifact-checklist.md) before commit.
 

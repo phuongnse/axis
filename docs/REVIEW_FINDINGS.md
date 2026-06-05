@@ -58,6 +58,7 @@ Mechanism tiers, cheapest first: analyzer severity in [`.editorconfig`](../.edit
 | FE/BE casing and wire-shape drift | `OpenApiDocumentTests` + frontend `gen:api-types` diff on `openapi.json` | CI .NET/frontend jobs run when `openapi.json` or relevant source changes | **Enforced** |
 | .NET test name convention | `python scripts/axis.py check test-naming` | `scripts/tests/test_policy_gates.py` negative test + CI policy tests | **Enforced** |
 | Python policy gates still fire | `python scripts/axis.py check policy-tests` | CI `Doc drift` job runs on every PR | **Enforced** |
+| Tracked text file encoding drift | `python scripts/axis.py check text-encoding` | `scripts/tests/test_policy_gates.py` rejects BOM, CRLF, invalid UTF-8, and common mojibake markers | **Enforced** |
 | `CancellationToken` not forwarded to a callee that accepts one | `CA2016` escalated to `warning`, build fails via `TreatWarningsAsErrors` | Analyzer/compiler wiring in `.editorconfig` + `Directory.Build.props` | **Enforced** |
 | New skipped tests | Added-line ratchet rejects `Skip =` under `tests/` | `scripts/tests/test_policy_gates.py` negative test | **Enforced** |
 | `EnsureCreated` reintroduced | Added-line ratchet rejects `EnsureCreated` / `EnsureCreatedAsync` under `src/` and `tests/` | `scripts/tests/test_policy_gates.py` negative test | **Enforced** |

@@ -91,7 +91,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 ## Automated gates and review checkpoints
 
-**Doc drift:** CI runs `python scripts/axis.py check policy-tests` and `python scripts/axis.py check doc-drift` on every PR. Run them locally when touching docs, scripts, repo layout, handlers, endpoints, or generated-contract surfaces. This job enforces deterministic policy/doc checks; it does not require a docs edit for every code diff.
+**Doc drift:** CI runs `python scripts/axis.py check policy-tests` and `python scripts/axis.py check doc-drift` on every PR. Run them locally when touching docs, scripts, repo layout, handlers, endpoints, generated-contract surfaces, or bulk file rewrites. This job enforces deterministic policy/doc checks; it does not require a docs edit for every code diff.
 
 | Item | Type | Action |
 |------|------|--------|
@@ -104,7 +104,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 - **PR guard** — [`scripts/check-pr.py`](../../scripts/check-pr.py) validates PR metadata shape and checkbox self-attestation. It cannot prove that review-only checkpoints happened.
 - **Policy gate tests** — `python scripts/axis.py check policy-tests` runs counterexample tests for custom Python gates so a regex/path change cannot silently disable enforcement.
-- **Doc drift** — validates module/API discovery, changed-handler test files, no-new TODO/FIXME/stub markers, no new test `Skip = ...`, no `EnsureCreated`, endpoint named DTO ratchets, [WORKAROUND comment ↔ inventory sync](../WORKAROUNDS.md), [speculation guard](./docs-style.md#anti-patterns-dont-ship-these), [incident/lesson framing guard](./docs-style.md#keep-practice-docs-general), `GetAwaiter().GetResult()` ban, hardcoded connection-string ban, `DateTime.Now` ban, script standards, stale terminology, and layout checks (`buf`, Kafka wiring, domain README index).
+- **Doc drift** — validates text encoding (`UTF-8` without BOM + LF), module/API discovery, changed-handler test files, no-new TODO/FIXME/stub markers, no new test `Skip = ...`, no `EnsureCreated`, endpoint named DTO ratchets, [WORKAROUND comment ↔ inventory sync](../WORKAROUNDS.md), [speculation guard](./docs-style.md#anti-patterns-dont-ship-these), [incident/lesson framing guard](./docs-style.md#keep-practice-docs-general), `GetAwaiter().GetResult()` ban, hardcoded connection-string ban, `DateTime.Now` ban, script standards, stale terminology, and layout checks (`buf`, Kafka wiring, domain README index).
 - **Markdown link check** — `lychee` verifies internal links and `#anchors`. **Relative file/image targets** (`![alt](./asset.svg)`, `[text](./file.md)`) are double-checked by `python scripts/axis.py check doc-link-targets` inside the drift command — catches the broken-image class lychee misses.
 - **Doc navigation** — `python scripts/axis.py check doc-navigation` requires every `docs/**/*.md` file to start with an H1 and a `> **Navigation**:` block so docs never become dead ends.
 - **Code-fence integrity** — `python scripts/axis.py check doc-code-fences` (inside the drift command) flags code-block lines with collapsed indentation (a lone leading space). Catches the bulk-find-replace corruption class that lychee, prettier, and the structural checks all let through.
@@ -158,6 +158,7 @@ Verification gate self-check:
 - dotnet format --verify-no-changes → ran / not triggered (reason)
 - npm run ci + npm run test → ran / not triggered (reason)
 - policy gate tests → ran / not triggered (reason)
+- python scripts/axis.py check text-encoding → ran / not triggered (reason)
 - python scripts/axis.py check doc-drift → ran / not triggered (reason)
 ```
 

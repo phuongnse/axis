@@ -123,6 +123,41 @@ class TestDocDriftRatchets(unittest.TestCase):
         self.assertEqual([], issues)
 
 
+class TestTextEncodingGate(unittest.TestCase):
+    def issues_for_file(self, name: str, content: bytes) -> str:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+            return "\n".join(axis.text_encoding_issues([path], root=root))
+
+    def test_rejects_utf8_bom(self) -> None:
+        issues = self.issues_for_file("docs/example.md", b"\xef\xbb\xbf# Title\n")
+        self.assertIn("UTF-8 BOM found", issues)
+
+    def test_rejects_invalid_utf8(self) -> None:
+        issues = self.issues_for_file("docs/example.md", b"# Title\n\xff\n")
+        self.assertIn("invalid UTF-8 byte", issues)
+
+    def test_rejects_crlf_line_endings(self) -> None:
+        issues = self.issues_for_file("docs/example.md", b"# Title\r\n")
+        self.assertIn("CRLF/CR line ending", issues)
+
+    def test_rejects_common_mojibake_markers(self) -> None:
+        mojibake_dash = "—".encode("utf-8").decode("cp1252")
+        issues = self.issues_for_file("docs/example.md", f"Broken {mojibake_dash} dash\n".encode("utf-8"))
+        self.assertIn("mojibake marker found", issues)
+
+    def test_accepts_utf8_unicode_without_bom_and_lf(self) -> None:
+        issues = self.issues_for_file("docs/example.md", "Tiếng Việt → ✅\n".encode("utf-8"))
+        self.assertEqual("", issues)
+
+    def test_current_repository_text_encoding_still_passes(self) -> None:
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(0, axis.check_text_encoding())
+
+
 class TestHandlerTestRatchet(unittest.TestCase):
     def test_modified_handler_requires_matching_test_file(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

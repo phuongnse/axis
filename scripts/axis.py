@@ -166,8 +166,135 @@ def iter_files(root: Path, suffixes: tuple[str, ...]) -> Iterable[Path]:
     )
 
 
-def git_ls_files(pattern: str) -> list[str]:
-    return [line for line in git(["ls-files", pattern]).splitlines() if line.strip()]
+def git_ls_files(pattern: str | None = None) -> list[str]:
+    args = ["ls-files"]
+    if pattern is not None:
+        args.append(pattern)
+    return [line for line in git(args).splitlines() if line.strip()]
+
+
+TEXT_ENCODING_SUFFIXES = {
+    ".avsc",
+    ".cs",
+    ".cshtml",
+    ".csproj",
+    ".css",
+    ".dockerignore",
+    ".editorconfig",
+    ".env",
+    ".excalidraw",
+    ".gitattributes",
+    ".gitignore",
+    ".graphql",
+    ".html",
+    ".http",
+    ".js",
+    ".json",
+    ".jsonc",
+    ".jsx",
+    ".md",
+    ".mjs",
+    ".props",
+    ".proto",
+    ".ps1",
+    ".py",
+    ".runsettings",
+    ".scss",
+    ".sh",
+    ".sln",
+    ".sql",
+    ".svg",
+    ".targets",
+    ".ts",
+    ".tsx",
+    ".txt",
+    ".xml",
+    ".yaml",
+    ".yml",
+}
+TEXT_ENCODING_FILENAMES = {
+    ".coderabbit.yaml",
+    ".editorconfig",
+    ".gitattributes",
+    ".gitignore",
+    "Dockerfile",
+    "Makefile",
+}
+TEXT_ENCODING_SKIP_PARTS = {".git", "bin", "coverage", "dist", "node_modules", "obj"}
+UTF8_BOM = b"\xef\xbb\xbf"
+
+
+def mojibake_marker(text: str) -> str:
+    return text.encode("utf-8").decode("cp1252", errors="ignore")
+
+
+MOJIBAKE_MARKERS = (
+    "\ufffd",
+    "\u00c2",
+    mojibake_marker("’"),
+    mojibake_marker("“"),
+    mojibake_marker("”"),
+    mojibake_marker("–"),
+    mojibake_marker("—"),
+    mojibake_marker("→"),
+    mojibake_marker("←"),
+    mojibake_marker("✓"),
+    mojibake_marker("✅"),
+    mojibake_marker("⚠"),
+    mojibake_marker("⏳"),
+)
+
+
+def should_check_text_encoding(path: str) -> bool:
+    normalized = path.replace("\\", "/")
+    if any(part in TEXT_ENCODING_SKIP_PARTS for part in normalized.split("/")):
+        return False
+    p = Path(normalized)
+    return p.suffix.lower() in TEXT_ENCODING_SUFFIXES or p.name in TEXT_ENCODING_FILENAMES
+
+
+def text_encoding_issues(paths: Iterable[Path], *, root: Path = ROOT) -> list[str]:
+    issues: list[str] = []
+    for path in sorted(paths):
+        if not path.is_file():
+            continue
+        normalized = str(path.relative_to(root)).replace("\\", "/")
+        if not should_check_text_encoding(normalized):
+            continue
+
+        data = path.read_bytes()
+        if data.startswith(UTF8_BOM):
+            issues.append(f"{normalized}: UTF-8 BOM found - save as UTF-8 without BOM")
+
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            issues.append(f"{normalized}: invalid UTF-8 byte at offset {exc.start}")
+            continue
+
+        if b"\r" in data:
+            issues.append(f"{normalized}: CRLF/CR line ending found - use LF")
+
+        for line_number, line in enumerate(text.splitlines(), 1):
+            if any(marker in line for marker in MOJIBAKE_MARKERS):
+                snippet = line.strip()
+                if len(snippet) > 160:
+                    snippet = f"{snippet[:157]}..."
+                issues.append(f"{normalized}:{line_number}: mojibake marker found: {snippet}")
+    return issues
+
+
+def check_text_encoding(_args: argparse.Namespace | None = None) -> int:
+    paths = [ROOT / path for path in git_ls_files() if should_check_text_encoding(path)]
+    issues = text_encoding_issues(paths)
+    if issues:
+        print("check-text-encoding FAIL:", file=sys.stderr)
+        for issue in issues:
+            print(f"  - {issue}", file=sys.stderr)
+        print("\nUse UTF-8 without BOM and LF line endings for tracked text files.", file=sys.stderr)
+        return 1
+    print(f"check-text-encoding: OK ({len(paths)} files scanned)")
+    return 0
 
 
 TEST_ATTRIBUTE_RE = re.compile(r"^\s*\[(?:Xunit[.])?(?:Fact|Theory)(?:Attribute)?(?:\s*[(]|\s*\])")
@@ -719,6 +846,7 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
             fail(issues, f"EF migration missing .Designer.cs - regenerate with dotnet ef: {rel(migration)}")
 
     checkers = [
+        ("check-text-encoding", check_text_encoding),
         ("check-scripts-standard", check_scripts_standard),
         ("check-ef-domain-mapping", check_ef_domain_mapping),
         ("check-frontend-api-contracts", check_frontend_api_contracts),
@@ -909,6 +1037,7 @@ def main(argv: list[str] | None = None) -> int:
     check_sub = check.add_subparsers(dest="check_command", required=True)
     check_sub.add_parser("doc-drift").set_defaults(func=check_doc_drift)
     check_sub.add_parser("policy-tests").set_defaults(func=check_policy_tests)
+    check_sub.add_parser("text-encoding").set_defaults(func=check_text_encoding)
     check_sub.add_parser("scripts-standard").set_defaults(func=check_scripts_standard)
     check_sub.add_parser("test-naming").set_defaults(func=check_test_naming)
     check_sub.add_parser("test-project-classification").set_defaults(func=check_test_project_classification)
