@@ -17,7 +17,7 @@ Install the local hook once with `python scripts/axis.py bootstrap`, then use `p
 
 1. Walk Ready review, Verification gate, Docs review, and Retrospective review in [docs/playbooks/agent-checklist.md](docs/playbooks/agent-checklist.md) locally; tick the matching boxes in the PR body.
 2. When you touch C# under `src/` or `tests/`, run `dotnet format Axis.sln` - style and naming rules live in [`.editorconfig`](.editorconfig) (CI runs `dotnet format --verify-no-changes`).
-3. Run `python scripts/axis.py check policy-tests` and `python scripts/axis.py check doc-drift` when touching docs, scripts, repo layout, handlers, endpoints, or generated-contract surfaces. **New module, endpoint, Kafka event, or proto?** Follow [docs/playbooks/repo-layout-discovery.md](docs/playbooks/repo-layout-discovery.md) (checklists A-E - what CI auto-checks vs what you still edit by hand). Use-case layout: [USE_CASE_TEMPLATE.md](docs/use-cases/USE_CASE_TEMPLATE.md). If `docker-compose.yml` changes, update [local-dev.md](docs/playbooks/local-dev.md). CI job **Doc drift** runs on every PR and must be green.
+3. For docs, scripts, repo layout, handlers, endpoints, generated-contract surfaces, or bulk rewrites, run the policy/doc checks triggered by [agent-checklist.md § Verification Gate](docs/playbooks/agent-checklist.md#verification-gate--verify-before-push). **New module, endpoint, Kafka event, or proto?** Follow [docs/playbooks/repo-layout-discovery.md](docs/playbooks/repo-layout-discovery.md) (checklists A-E - what CI auto-checks vs what you still edit by hand). Use-case layout: [USE_CASE_TEMPLATE.md](docs/use-cases/USE_CASE_TEMPLATE.md). If `docker-compose.yml` changes, update [local-dev.md](docs/playbooks/local-dev.md). CI job **Doc drift** runs on every PR and must be green.
 4. PR description: **Summary + Linked spec + Requirements only** - no commit list, no CI status (the Checks tab covers that). GitHub auto-fills [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md); CI job **PR body guard** enforces the required sections and checklist state.
 5. When adding or changing `.proto` files: run `python scripts/axis.py generate buf-yaml` (updates [`buf.yaml`](buf.yaml) module paths), then `buf lint` - see [repo-layout-discovery.md § Auto-discovered](docs/playbooks/repo-layout-discovery.md#auto-discovered-do-not-duplicate-lists-elsewhere). CI **Protobuf** job runs on proto/`buf.yaml` changes.
 
@@ -47,7 +47,7 @@ When introducing a threshold, set it from the **current measured value** of Doma
 
 `docker compose up -d` starts the full stack. **Ports, URLs, startup order, hot reload, and reset commands** live in one place: [docs/playbooks/local-dev.md](docs/playbooks/local-dev.md).
 
-When you change [`docker-compose.yml`](docker-compose.yml), update that playbook in the same PR. CI runs `python scripts/axis.py check local-dev-docs` (also wired into `python scripts/axis.py check doc-drift`).
+When you change [`docker-compose.yml`](docker-compose.yml), update that playbook in the same PR. CI runs `python scripts/axis.py check local-dev-docs`; the same guard is also part of Doc drift.
 
 ## Where to read more
 

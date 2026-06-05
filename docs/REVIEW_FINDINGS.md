@@ -23,11 +23,33 @@ Use these labels consistently in docs, PR templates, and review comments:
 | **Guidance** | Useful convention or example, but not a defect class. | "prefer", "pattern", "example" |
 | **Not a rule** | Deliberately not enforced or reviewed. | Avoid rule language |
 
+P0/P1/P2 in [`CLAUDE.md`](../CLAUDE.md) describe severity and escalation, not
+automation. A P0 can still be **Review-only** if CI cannot decide it without
+intent. Conversely, a low-severity convention can be **Enforced** if a cheap,
+deterministic check exists. Use this file to decide wording before adding
+"must", "gate", or "enforced" language elsewhere.
+
 Custom gates are not trusted just because they pass on a clean repo. Before a
 custom rule can be marked **Enforced**, add a negative test under
 [`scripts/tests`](../scripts/tests/test_policy_gates.py) or the relevant test
 project showing the bad example fails. Analyzer/compiler/tool rules can rely on
 the tool, but the repo-specific wiring still needs to run in CI.
+
+## Ownership boundaries
+
+Avoid duplicating rule text across docs. Each surface has one job:
+
+| Surface | Owns | Does not own |
+|---|---|---|
+| [`CLAUDE.md`](../CLAUDE.md) | Severity, architecture stops, escalation rules | Command matrices, proof that a rule is enforced |
+| [`agent-checklist.md`](./playbooks/agent-checklist.md) | Workflow, AC/path coverage, Verification gate command matrix | Reclassifying review-only checks as gates |
+| This file | Enforcement status, known gaps, repeat finding classes | Feature specs or implementation patterns |
+| [`WORKAROUNDS.md`](./WORKAROUNDS.md) | Intentional P0/P1 violations and cleanup triggers | General lessons or resolved history |
+| `scripts/axis.py`, tests, CI | Mechanical enforcement | New policy prose without docs ownership |
+
+If a doc needs to mention another surface's rule, link to the owner instead of
+restating the mechanism. Restatement is allowed only for a one-line summary that
+does not change commands, status, or scope.
 
 ---
 
@@ -58,6 +80,7 @@ Mechanism tiers, cheapest first: analyzer severity in [`.editorconfig`](../.edit
 | FE/BE casing and wire-shape drift | `OpenApiDocumentTests` + frontend `gen:api-types` diff on `openapi.json` | CI .NET/frontend jobs run when `openapi.json` or relevant source changes | **Enforced** |
 | .NET test name convention | `python scripts/axis.py check test-naming` | `scripts/tests/test_policy_gates.py` negative test + CI policy tests | **Enforced** |
 | Python policy gates still fire | `python scripts/axis.py check policy-tests` | CI `Doc drift` job runs on every PR | **Enforced** |
+| Governance owner-boundary drift | `python scripts/axis.py check doc-drift` rejects policy command restatement in entry docs and Design Gate machine-gate wording | `scripts/tests/test_policy_gates.py` negative tests; scoped to `CLAUDE.md`, `CONTRIBUTING.md`, and the PR template | **Enforced** |
 | Tracked text file encoding drift | `python scripts/axis.py check text-encoding` | `scripts/tests/test_policy_gates.py` rejects BOM, CRLF, invalid UTF-8, and common mojibake markers | **Enforced** |
 | `CancellationToken` not forwarded to a callee that accepts one | `CA2016` escalated to `warning`, build fails via `TreatWarningsAsErrors` | Analyzer/compiler wiring in `.editorconfig` + `Directory.Build.props` | **Enforced** |
 | New skipped tests | Added-line ratchet rejects `Skip =` under `tests/` | `scripts/tests/test_policy_gates.py` negative test | **Enforced** |

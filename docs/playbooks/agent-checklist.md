@@ -2,7 +2,7 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
 
-**Daily workflow.** Walk the Ready review, Docs review, and Retrospective review while implementing; run the Verification gate before push. Reflect outcomes in the [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) checkboxes. **PR description = Summary + Linked spec + Requirements only** — no review/gate paste blocks, no commit list, no CI/Doc-drift status (GitHub Checks tab covers that).
+**Daily workflow.** Walk the Ready review, Docs review, and Retrospective review while implementing; run the Verification gate before push. Reflect outcomes in the [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) checkboxes. **PR description = Summary + Linked spec + Requirements only** — no review/check paste blocks, no commit list, no CI/Doc-drift status (GitHub Checks tab covers that).
 
 **Large use cases:** split into **genuinely isolated PRs** (each branch from `main`, each passing the two-sided isolation test). See [pr-slicing.md](./pr-slicing.md) — never stack slice B on slice A's branch, never claim the Verification gate is green when you did not run it, and assign one owner per shared seam.
 
@@ -12,7 +12,7 @@ The paste-block templates below are for *your own* walk-through (agent reasoning
 
 ## Ready Review — before code
 
-- **Design Gate** ([design-gate.md](./design-gate.md)): re-derive the rules governing the surface you touch and produce the dossier (rules quoted, blast-radius `grep`, contract+casing, gate plan); **high-risk surfaces require user sign-off before code**
+- **Design Gate** ([design-gate.md](./design-gate.md)): required review artifact before non-trivial code; re-derive the rules governing the surface you touch and produce the dossier (rules quoted, blast-radius `grep`, contract+casing, gate plan); **high-risk surfaces require user sign-off before code**
 - AC map: every row has layer + file/test — **no blank cells**
 - Read: domain README → use-case file → same-module code
 - Skim [`docs/WORKAROUNDS.md`](../WORKAROUNDS.md) for entries touching the same files/modules — known shortcuts may explain surprising code
@@ -91,6 +91,8 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 ## Automated gates and review checkpoints
 
+Use the terms from [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md#enforcement-taxonomy). "Gate" means a command, build, or CI job can fail the PR. Ready review, Docs review, Retrospective review, and Design Gate are required review artifacts/checkpoints unless a deterministic subset is listed below as CI-enforced.
+
 **Doc drift:** CI runs `python scripts/axis.py check policy-tests` and `python scripts/axis.py check doc-drift` on every PR. Run them locally when touching docs, scripts, repo layout, handlers, endpoints, generated-contract surfaces, or bulk file rewrites. This job enforces deterministic policy/doc checks; it does not require a docs edit for every code diff.
 
 | Item | Type | Action |
@@ -104,7 +106,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 - **PR guard** — [`scripts/check-pr.py`](../../scripts/check-pr.py) validates PR metadata shape and checkbox self-attestation. It cannot prove that review-only checkpoints happened.
 - **Policy gate tests** — `python scripts/axis.py check policy-tests` runs counterexample tests for custom Python gates so a regex/path change cannot silently disable enforcement.
-- **Doc drift** — validates text encoding (`UTF-8` without BOM + LF), module/API discovery, changed-handler test files, no-new TODO/FIXME/stub markers, no new test `Skip = ...`, no `EnsureCreated`, endpoint named DTO ratchets, [WORKAROUND comment ↔ inventory sync](../WORKAROUNDS.md), [speculation guard](./docs-style.md#anti-patterns-dont-ship-these), [incident/lesson framing guard](./docs-style.md#keep-practice-docs-general), `GetAwaiter().GetResult()` ban, hardcoded connection-string ban, `DateTime.Now` ban, script standards, stale terminology, and layout checks (`buf`, Kafka wiring, domain README index).
+- **Doc drift** — validates text encoding (`UTF-8` without BOM + LF), module/API discovery, governance owner-boundary wording, changed-handler test files, no-new TODO/FIXME/stub markers, no new test `Skip = ...`, no `EnsureCreated`, endpoint named DTO ratchets, [WORKAROUND comment ↔ inventory sync](../WORKAROUNDS.md), [speculation guard](./docs-style.md#anti-patterns-dont-ship-these), [incident/lesson framing guard](./docs-style.md#keep-practice-docs-general), `GetAwaiter().GetResult()` ban, hardcoded connection-string ban, `DateTime.Now` ban, script standards, stale terminology, and layout checks (`buf`, Kafka wiring, domain README index).
 - **Markdown link check** — `lychee` verifies internal links and `#anchors`. **Relative file/image targets** (`![alt](./asset.svg)`, `[text](./file.md)`) are double-checked by `python scripts/axis.py check doc-link-targets` inside the drift command — catches the broken-image class lychee misses.
 - **Doc navigation** — `python scripts/axis.py check doc-navigation` requires every `docs/**/*.md` file to start with an H1 and a `> **Navigation**:` block so docs never become dead ends.
 - **Code-fence integrity** — `python scripts/axis.py check doc-code-fences` (inside the drift command) flags code-block lines with collapsed indentation (a lone leading space). Catches the bulk-find-replace corruption class that lychee, prettier, and the structural checks all let through.
