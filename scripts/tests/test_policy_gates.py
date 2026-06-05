@@ -153,6 +153,10 @@ class TestTextEncodingGate(unittest.TestCase):
         issues = self.issues_for_file("docs/example.md", "Tiếng Việt → ✅\n".encode("utf-8"))
         self.assertEqual("", issues)
 
+    def test_accepts_valid_latin_capital_a_with_circumflex(self) -> None:
+        issues = self.issues_for_file("docs/example.md", "Ângström\n".encode("utf-8"))
+        self.assertEqual("", issues)
+
     def test_current_repository_text_encoding_still_passes(self) -> None:
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(0, axis.check_text_encoding())

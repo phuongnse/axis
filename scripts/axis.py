@@ -230,7 +230,6 @@ def mojibake_marker(text: str) -> str:
 
 MOJIBAKE_MARKERS = (
     "\ufffd",
-    "\u00c2",
     mojibake_marker("’"),
     mojibake_marker("“"),
     mojibake_marker("”"),
