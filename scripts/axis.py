@@ -777,6 +777,23 @@ GOVERNANCE_COMMANDS_OWNED_BY_AGENT_CHECKLIST = [
     "python scripts/axis.py check doc-drift",
 ]
 
+REVIEW_FINDINGS_LEDGER_HEADER = [
+    "Finding class",
+    "Rule owner",
+    "Trigger / scope",
+    "Mechanism",
+    "Proof / gap",
+    "Status",
+]
+
+REVIEW_FINDINGS_ALLOWED_STATUSES = {
+    "Enforced",
+    "Partial",
+    "Review-only",
+    "Guidance",
+    "Not a rule",
+}
+
 
 def governance_owner_boundary_issues(*, root: Path | None = None) -> list[str]:
     """Keep governance entry docs from duplicating enforceable rule mechanics."""
@@ -817,6 +834,116 @@ def governance_owner_boundary_issues(*, root: Path | None = None) -> list[str]:
                     f"{normalized}:{idx}: Design Gate is a review artifact, not a machine/CI gate. "
                     "Move deterministic enforcement to scripts/tests and REVIEW_FINDINGS.md."
                 )
+
+    return issues
+
+
+def markdown_table_cells(line: str) -> list[str]:
+    if not line.lstrip().startswith("|"):
+        return []
+    return [cell.strip() for cell in line.strip().strip("|").split("|")]
+
+
+def markdown_table_separator(cells: list[str]) -> bool:
+    return bool(cells) and all(re.fullmatch(r":?-{3,}:?", cell.replace(" ", "")) for cell in cells)
+
+
+def plain_markdown_cell(value: str) -> str:
+    return re.sub(r"[*_`]", "", value).strip()
+
+
+def review_findings_registry_issues(*, root: Path | None = None) -> list[str]:
+    """Validate REVIEW_FINDINGS.md as the single rule registry."""
+    root = root or ROOT
+    path = root / "docs" / "REVIEW_FINDINGS.md"
+    normalized = "docs/REVIEW_FINDINGS.md"
+
+    if not path.is_file():
+        return [f"{normalized}: missing rule registry"]
+
+    lines = path.read_text(encoding="utf-8").splitlines()
+    try:
+        ledger_start = next(idx for idx, line in enumerate(lines) if line.strip() == "## Ledger")
+    except StopIteration:
+        return [f"{normalized}: missing ## Ledger rule registry"]
+
+    header_idx = None
+    for idx in range(ledger_start + 1, len(lines)):
+        cells = markdown_table_cells(lines[idx])
+        if cells:
+            header_idx = idx
+            break
+
+    if header_idx is None:
+        return [f"{normalized}: ## Ledger must contain a markdown table"]
+
+    header = markdown_table_cells(lines[header_idx])
+    if header != REVIEW_FINDINGS_LEDGER_HEADER:
+        return [
+            f"{normalized}:{header_idx + 1}: ledger header must be "
+            f"`{' | '.join(REVIEW_FINDINGS_LEDGER_HEADER)}`"
+        ]
+
+    issues: list[str] = []
+    row_count = 0
+    for idx in range(header_idx + 1, len(lines)):
+        line = lines[idx]
+        cells = markdown_table_cells(line)
+        if not cells:
+            if row_count:
+                break
+            continue
+        if markdown_table_separator(cells):
+            continue
+
+        row_count += 1
+        if len(cells) != len(REVIEW_FINDINGS_LEDGER_HEADER):
+            issues.append(
+                f"{normalized}:{idx + 1}: ledger row must have "
+                f"{len(REVIEW_FINDINGS_LEDGER_HEADER)} cells"
+            )
+            continue
+
+        row = dict(zip(REVIEW_FINDINGS_LEDGER_HEADER, cells))
+        for field, value in row.items():
+            if not value:
+                issues.append(f"{normalized}:{idx + 1}: ledger `{field}` cell is empty")
+
+        status = plain_markdown_cell(row["Status"])
+        if status not in REVIEW_FINDINGS_ALLOWED_STATUSES:
+            issues.append(
+                f"{normalized}:{idx + 1}: unknown ledger status `{row['Status']}`; "
+                f"use one of {sorted(REVIEW_FINDINGS_ALLOWED_STATUSES)}"
+            )
+            continue
+
+        owner = plain_markdown_cell(row["Rule owner"]).lower()
+        mechanism = plain_markdown_cell(row["Mechanism"]).lower()
+        proof = plain_markdown_cell(row["Proof / gap"]).lower()
+        combined = f"{owner} {mechanism} {proof}"
+
+        if status == "Enforced":
+            evidence_markers = ("ci", "test", "analyzer", "compiler", "build", "workflow")
+            if not any(marker in combined for marker in evidence_markers):
+                issues.append(
+                    f"{normalized}:{idx + 1}: Enforced row needs CI/build/tooling proof "
+                    "or a negative test"
+                )
+        elif status == "Partial":
+            if "known gap" not in proof:
+                issues.append(f"{normalized}:{idx + 1}: Partial row must name a known gap")
+        elif status == "Review-only":
+            if re.search(r"\b(gate|enforced)\b|fail(?:s|ed)? the pr|\bci\b", combined):
+                issues.append(f"{normalized}:{idx + 1}: Review-only row must not use gate/enforced language")
+        elif status == "Guidance":
+            if re.search(r"\b(must|gate|enforced)\b", combined):
+                issues.append(f"{normalized}:{idx + 1}: Guidance row must not use rule/gate language")
+        elif status == "Not a rule":
+            if owner not in {"none", "n/a"} or mechanism not in {"none", "n/a"}:
+                issues.append(f"{normalized}:{idx + 1}: Not-a-rule row must use `None` owner and mechanism")
+
+    if row_count == 0:
+        issues.append(f"{normalized}: ## Ledger must contain at least one rule row")
 
     return issues
 
@@ -863,6 +990,9 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
     check_workarounds(issues)
 
     for issue in governance_owner_boundary_issues():
+        fail(issues, issue)
+
+    for issue in review_findings_registry_issues():
         fail(issues, issue)
 
     spec_target = ROOT / "docs" / "ARCHITECTURE.md"

@@ -162,6 +162,57 @@ class TestGovernanceOwnerBoundary(unittest.TestCase):
         self.assertEqual([], axis.governance_owner_boundary_issues())
 
 
+class TestReviewFindingsRegistry(unittest.TestCase):
+    def issues_for_review_findings(self, ledger_rows: str) -> list[str]:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = root / "docs" / "REVIEW_FINDINGS.md"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                """# Review findings
+
+## Ledger
+
+| Finding class | Rule owner | Trigger / scope | Mechanism | Proof / gap | Status |
+|---|---|---|---|---|---|
+"""
+                + ledger_rows,
+                encoding="utf-8",
+            )
+            return axis.review_findings_registry_issues(root=root)
+
+    def test_rejects_missing_rule_owner(self) -> None:
+        issues = self.issues_for_review_findings(
+            "| Example finding |  | PR scope | CI job | negative test | **Enforced** |\n"
+        )
+
+        self.assertIn("Rule owner", "\n".join(issues))
+
+    def test_rejects_unknown_status(self) -> None:
+        issues = self.issues_for_review_findings(
+            "| Example finding | This file | PR scope | Review | Human review | **Mandatory** |\n"
+        )
+
+        self.assertIn("unknown ledger status", "\n".join(issues))
+
+    def test_rejects_partial_without_known_gap(self) -> None:
+        issues = self.issues_for_review_findings(
+            "| Example finding | This file | PR scope | Diff ratchet | Untouched files are not swept | **Partial** |\n"
+        )
+
+        self.assertIn("Partial row must name a known gap", "\n".join(issues))
+
+    def test_rejects_review_only_gate_language(self) -> None:
+        issues = self.issues_for_review_findings(
+            "| Example finding | This file | PR scope | CI gate | Human review | **Review-only** |\n"
+        )
+
+        self.assertIn("must not use gate/enforced language", "\n".join(issues))
+
+    def test_current_repository_review_findings_registry_still_passes(self) -> None:
+        self.assertEqual([], axis.review_findings_registry_issues())
+
+
 class TestTextEncodingGate(unittest.TestCase):
     def issues_for_file(self, name: str, content: bytes) -> str:
         with tempfile.TemporaryDirectory() as temp:
