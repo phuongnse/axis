@@ -18,6 +18,8 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     public DbSet<Invitation> Invitations => Set<Invitation>();
     internal DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     internal DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
+    internal DbSet<OrganizationRegistrationToken> OrganizationRegistrationTokens =>
+        Set<OrganizationRegistrationToken>();
     internal DbSet<RegistrationIdempotencyRecord> RegistrationIdempotencyRecords =>
         Set<RegistrationIdempotencyRecord>();
 
@@ -35,6 +37,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
         modelBuilder.ApplyConfiguration(new InvitationConfiguration());
         modelBuilder.ApplyConfiguration(new PasswordResetTokenConfiguration());
         modelBuilder.ApplyConfiguration(new EmailVerificationTokenConfiguration());
+        modelBuilder.ApplyConfiguration(new OrganizationRegistrationTokenConfiguration());
 
         // Register OpenIddict entity model (Applications, Authorizations, Scopes, Tokens)
         modelBuilder.UseOpenIddict();

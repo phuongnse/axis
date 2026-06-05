@@ -124,6 +124,7 @@ public static class UserEndpoints
             request.PasswordConfirmation,
             request.AcceptedTermsVersion,
             request.AcceptedPrivacyVersion,
+            request.OrganizationSetupToken,
             idempotencyKey), ct);
 
         if (result.IsFailure)

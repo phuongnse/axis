@@ -11,6 +11,7 @@ public sealed record RetryTenantProvisioningCommand(string Token) : ICommand;
 
 public sealed class RetryTenantProvisioningHandler(
     IEmailVerificationTokenStore verificationTokenStore,
+    IOrganizationRegistrationTokenStore organizationTokenStore,
     IUserRepository userRepo,
     IOrganizationMembershipRepository membershipRepo,
     IOrganizationRepository organizationRepo,
@@ -24,6 +25,12 @@ public sealed class RetryTenantProvisioningHandler(
             return Result.Failure(ErrorCodes.BusinessRule, "Invalid verification token.");
 
         string tokenHash = OpaqueTokenGenerator.Hash(command.Token.Trim());
+        Guid? organizationId = await organizationTokenStore.ResolveOrganizationIdForProvisioningPollAsync(
+            tokenHash,
+            cancellationToken);
+        if (organizationId is Guid resolvedOrganizationId)
+            return await RetryForOrganizationAsync(resolvedOrganizationId, cancellationToken);
+
         Guid? userId = await verificationTokenStore.ResolveUserIdForProvisioningPollAsync(
             tokenHash,
             cancellationToken);
@@ -39,7 +46,14 @@ public sealed class RetryTenantProvisioningHandler(
         if (membership is null)
             return Result.Failure(ErrorCodes.NotFound, "Organization not found.");
 
-        Organization? organization = await organizationRepo.GetByIdAsync(membership.OrganizationId, cancellationToken);
+        return await RetryForOrganizationAsync(membership.OrganizationId, cancellationToken);
+    }
+
+    private async Task<Result> RetryForOrganizationAsync(
+        Guid organizationId,
+        CancellationToken cancellationToken)
+    {
+        Organization? organization = await organizationRepo.GetByIdAsync(organizationId, cancellationToken);
         if (organization is null)
             return Result.Failure(ErrorCodes.NotFound, "Organization not found.");
 
@@ -47,7 +61,7 @@ public sealed class RetryTenantProvisioningHandler(
             return Result.Success();
 
         IReadOnlyList<TenantModuleProvisioning> modules =
-            await provisioningRepo.GetAllForOrganizationAsync(membership.OrganizationId, cancellationToken);
+            await provisioningRepo.GetAllForOrganizationAsync(organizationId, cancellationToken);
 
         foreach (TenantModuleProvisioning module in modules)
         {

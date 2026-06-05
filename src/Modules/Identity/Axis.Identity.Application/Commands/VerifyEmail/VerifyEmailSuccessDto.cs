@@ -1,8 +1,9 @@
 namespace Axis.Identity.Application.Commands.VerifyEmail;
 
 public sealed record VerifyEmailSuccessDto(
-    Guid UserId,
+    Guid? UserId,
     Guid? OrganizationId,
     string Email,
     string FullName,
-    IReadOnlyList<string> Permissions);
+    IReadOnlyList<string> Permissions,
+    string? OrganizationSetupToken = null);

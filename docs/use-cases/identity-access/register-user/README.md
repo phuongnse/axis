@@ -119,12 +119,12 @@ sequenceDiagram
 >
 > | Layer | Status |
 > |-------|--------|
-> | Domain | ⚠️ |
+> | Domain | ✅ |
 > | Application | ⚠️ |
 > | Infrastructure | ⚠️ |
-> | API | ⏳ |
-> | Frontend | ⏳ |
+> | API | ✅ |
+> | Frontend | ⚠️ |
 >
-> **Gaps vs spec:** Current implementation has pieces of user onboarding in [accept-invite](../accept-invite/), [sign-in](../sign-in/), and the older organization registration flow. A dedicated user registration command/API and external-login linking model still need to be implemented from `main`.
+> **Gaps vs spec:** Email/password registration is implemented at `POST /api/users/register`, including standalone registration, idempotency, email verification, and first-user setup-token attachment after organization verification. Remaining gaps are external-provider registration/linking, invitation-token consolidation, and frontend polish for organization-linked post-registration routing.
 >
 > **Decisions:** Microsoft / Google / GitHub providers belong to user identity only. They can create or link a `UserExternalLogin`; they must never create an organization directly.

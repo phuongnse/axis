@@ -35,11 +35,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
         HttpResponseMessage resp = await _client.PostAsJsonAsync("/api/organizations", new
         {
             orgName = "A",          // too short
-            adminFirstName = "",
-            adminLastName = "",
-            adminEmail = "not-an-email",
-            password = "weak",       // too short
-            passwordConfirmation = "different",
+            organizationContactEmail = "not-an-email",
         }, Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -52,20 +48,12 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task Authorize_WhenEmailIsVerified_ReturnsAccessToken()
     {
-        // Register
-        await _client.PostAsJsonAsync("/api/organizations", RegisterPayload("auth_pkce1"), Json);
-
-        string verifyToken = fixture.EmailCapture.GetVerificationToken("adminauth_pkce1@test.com")
-            ?? throw new InvalidOperationException("Verification token not captured.");
-
-        HttpResponseMessage verifyResp = await _client.PostAsJsonAsync(
-            "/api/auth/verify-email", new { token = verifyToken }, Json);
-        verifyResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        string email = await AuthHelper.RegisterAndVerifyAdminAsync(fixture, "auth_pkce1");
 
         // Full PKCE flow on independent client (isolated cookie jar)
         HttpClient pkceClient = fixture.CreateNewClient();
         string accessToken = await AuthHelper.CompletePkceFlowAsync(
-            pkceClient, "adminauth_pkce1@test.com", "TestPass1");
+            pkceClient, email, TestRegistrationPayload.AdminPassword);
 
         accessToken.Should().NotBeNullOrEmpty();
     }
@@ -73,16 +61,15 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task Authorize_WhenEmailIsNotVerified_Returns401()
     {
-        // Register but do NOT verify email
-        await _client.PostAsJsonAsync("/api/organizations", RegisterPayload("auth_noverify1"), Json);
+        await AuthHelper.RegisterFirstAdminWithoutUserVerificationAsync(fixture, "auth_noverify1");
 
         // POST /connect/login directly — should fail because email is not verified
         HttpClient pkceClient = fixture.CreateNewClient();
         HttpResponseMessage loginResp = await pkceClient.PostAsync("/connect/login",
             new FormUrlEncodedContent(new Dictionary<string, string>
             {
-                ["email"] = "adminauth_noverify1@test.com",
-                ["password"] = "TestPass1",
+                ["email"] = TestRegistrationPayload.AdminEmail("auth_noverify1"),
+                ["password"] = TestRegistrationPayload.AdminPassword,
                 ["return_url"] = "/connect/authorize",
             }));
 
@@ -94,19 +81,14 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task Login_WhenPasswordIsWrong_Returns401()
     {
-        // Register + verify
-        await _client.PostAsJsonAsync("/api/organizations", RegisterPayload("auth_badpwd1"), Json);
-
-        string verifyToken = fixture.EmailCapture.GetVerificationToken("adminauth_badpwd1@test.com")
-            ?? throw new InvalidOperationException("Verification token not captured.");
-        await _client.PostAsJsonAsync("/api/auth/verify-email", new { token = verifyToken }, Json);
+        string email = await AuthHelper.RegisterAndVerifyAdminAsync(fixture, "auth_badpwd1");
 
         // Attempt login with wrong password
         HttpClient pkceClient = fixture.CreateNewClient();
         HttpResponseMessage loginResp = await pkceClient.PostAsync("/connect/login",
             new FormUrlEncodedContent(new Dictionary<string, string>
             {
-                ["email"] = "adminauth_badpwd1@test.com",
+                ["email"] = email,
                 ["password"] = "WrongPassword1",
                 ["return_url"] = "/connect/authorize",
             }));
@@ -190,9 +172,9 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task ResendVerification_WhenFourthRequestWithinHour_Returns429()
     {
-        await _client.PostAsJsonAsync("/api/organizations", RegisterPayload("resend_rl1"), Json);
+        await AuthHelper.RegisterFirstAdminWithoutUserVerificationAsync(fixture, "resend_rl1");
 
-        string email = "adminresend_rl1@test.com";
+        string email = TestRegistrationPayload.AdminEmail("resend_rl1");
         for (int i = 0; i < 3; i++)
         {
             HttpResponseMessage ok = await _client.PostAsJsonAsync(
@@ -213,9 +195,9 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task VerifyEmail_WhenTokenAlreadyUsed_ReturnsBusinessRuleProblem()
     {
-        await _client.PostAsJsonAsync("/api/organizations", RegisterPayload("verify_used1"), Json);
+        await AuthHelper.RegisterFirstAdminWithoutUserVerificationAsync(fixture, "verify_used1");
 
-        string token = fixture.EmailCapture.GetVerificationToken("adminverify_used1@test.com")
+        string token = fixture.EmailCapture.GetVerificationToken(TestRegistrationPayload.AdminEmail("verify_used1"))
             ?? throw new InvalidOperationException("Verification token not captured.");
         HttpResponseMessage first = await _client.PostAsJsonAsync(
             "/api/auth/verify-email", new { token }, Json);
@@ -231,9 +213,9 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task VerifyEmail_WhenTokenExpired_ReturnsExpiredMessage()
     {
-        await _client.PostAsJsonAsync("/api/organizations", RegisterPayload("verify_exp1"), Json);
+        await AuthHelper.RegisterFirstAdminWithoutUserVerificationAsync(fixture, "verify_exp1");
 
-        string token = fixture.EmailCapture.GetVerificationToken("adminverify_exp1@test.com")
+        string token = fixture.EmailCapture.GetVerificationToken(TestRegistrationPayload.AdminEmail("verify_exp1"))
             ?? throw new InvalidOperationException("Verification token not captured.");
         string tokenHash = OpaqueTokenGenerator.Hash(token);
 
@@ -260,15 +242,11 @@ public class AuthEndpointTests(ApiTestFixture fixture)
         // Complete PKCE flow — refresh token is set as httpOnly cookie on the client
         HttpClient pkceClient = fixture.CreateNewClient();
 
-        await _client.PostAsJsonAsync("/api/organizations", RegisterPayload("auth_refresh1"), Json);
-
-        string verifyToken = fixture.EmailCapture.GetVerificationToken("adminauth_refresh1@test.com")
-            ?? throw new InvalidOperationException("Verification token not captured.");
-        await _client.PostAsJsonAsync("/api/auth/verify-email", new { token = verifyToken }, Json);
+        string email = await AuthHelper.RegisterAndVerifyAdminAsync(fixture, "auth_refresh1");
 
         // PKCE flow sets refresh_token cookie on pkceClient
         string firstAccessToken = await AuthHelper.CompletePkceFlowAsync(
-            pkceClient, "adminauth_refresh1@test.com", "TestPass1");
+            pkceClient, email, TestRegistrationPayload.AdminPassword);
         firstAccessToken.Should().NotBeNullOrEmpty();
 
         // Refresh — the cookie is automatically sent by pkceClient

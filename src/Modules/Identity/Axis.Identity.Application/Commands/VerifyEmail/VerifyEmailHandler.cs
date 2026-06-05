@@ -10,6 +10,7 @@ namespace Axis.Identity.Application.Commands.VerifyEmail;
 
 public sealed class VerifyEmailHandler(
     IEmailVerificationTokenStore tokenStore,
+    IOrganizationRegistrationTokenStore organizationTokenStore,
     IUserRepository userRepo,
     IOrganizationMembershipRepository membershipRepo,
     IOrganizationRepository organizationRepo,
@@ -18,6 +19,8 @@ public sealed class VerifyEmailHandler(
     IUnitOfWork uow)
     : ICommandHandler<VerifyEmailCommand, VerifyEmailSuccessDto>
 {
+    private static readonly TimeSpan FirstUserSetupTokenLifetime = TimeSpan.FromHours(24);
+
     public async Task<Result<VerifyEmailSuccessDto>> Handle(
         VerifyEmailCommand command,
         CancellationToken cancellationToken)
@@ -32,7 +35,7 @@ public sealed class VerifyEmailHandler(
         return resolved.State switch
         {
             EmailVerificationTokenState.NotFound =>
-                Result.Failure<VerifyEmailSuccessDto>(ErrorCodes.BusinessRule, "Invalid verification link."),
+                await VerifyOrganizationContactAsync(tokenHash, cancellationToken),
             EmailVerificationTokenState.Expired =>
                 Result.Failure<VerifyEmailSuccessDto>(
                     ErrorCodes.BusinessRule,
@@ -46,6 +49,72 @@ public sealed class VerifyEmailHandler(
                 cancellationToken),
             _ => Result.Failure<VerifyEmailSuccessDto>(ErrorCodes.BusinessRule, "Invalid verification link."),
         };
+    }
+
+    private async Task<Result<VerifyEmailSuccessDto>> VerifyOrganizationContactAsync(
+        string tokenHash,
+        CancellationToken cancellationToken)
+    {
+        OrganizationVerificationTokenResolveResult resolved =
+            await organizationTokenStore.ResolveVerificationAsync(tokenHash, cancellationToken);
+
+        return resolved.State switch
+        {
+            OrganizationVerificationTokenState.NotFound =>
+                Result.Failure<VerifyEmailSuccessDto>(ErrorCodes.BusinessRule, "Invalid verification link."),
+            OrganizationVerificationTokenState.Expired =>
+                Result.Failure<VerifyEmailSuccessDto>(
+                    ErrorCodes.BusinessRule,
+                    "This verification link has expired. Please request a new verification email."),
+            OrganizationVerificationTokenState.AlreadyUsed =>
+                Result.Failure<VerifyEmailSuccessDto>(
+                    ErrorCodes.BusinessRule,
+                    "This link has already been used. Please sign in."),
+            OrganizationVerificationTokenState.Valid => await VerifyOrganizationAsync(
+                resolved.OrganizationId!.Value,
+                cancellationToken),
+            _ => Result.Failure<VerifyEmailSuccessDto>(ErrorCodes.BusinessRule, "Invalid verification link."),
+        };
+    }
+
+    private async Task<Result<VerifyEmailSuccessDto>> VerifyOrganizationAsync(
+        Guid organizationId,
+        CancellationToken cancellationToken)
+    {
+        Organization? organization = await organizationRepo.GetByIdAsync(organizationId, cancellationToken);
+        if (organization is null)
+            return Result.Failure<VerifyEmailSuccessDto>(ErrorCodes.BusinessRule, "Invalid verification link.");
+
+        if (organization.Status != OrganizationStatus.PendingVerification)
+        {
+            return Result.Failure<VerifyEmailSuccessDto>(
+                ErrorCodes.BusinessRule,
+                "This link has already been used. Please sign in.");
+        }
+
+        organization.BeginProvisioningAfterContactVerification();
+
+        List<TenantModuleProvisioning> pendingModules = TenantModuleNames.All
+            .Select(module => TenantModuleProvisioning.CreatePending(organization.Id, module))
+            .ToList();
+        await provisioningRepo.AddRangeAsync(pendingModules, cancellationToken);
+
+        (string rawSetupToken, string setupTokenHash) = OpaqueTokenGenerator.Create();
+        await uow.SaveChangesAsync(cancellationToken);
+
+        await organizationTokenStore.CreateFirstUserSetupAsync(
+            organization.Id,
+            setupTokenHash,
+            DateTime.UtcNow.Add(FirstUserSetupTokenLifetime),
+            cancellationToken);
+
+        return Result.Success(new VerifyEmailSuccessDto(
+            null,
+            organization.Id,
+            organization.OwnerEmail.Value,
+            organization.Name,
+            [],
+            rawSetupToken));
     }
 
     private async Task<Result<VerifyEmailSuccessDto>> VerifyUserAsync(
@@ -82,12 +151,21 @@ public sealed class VerifyEmailHandler(
         if (organization is null)
             return Result.Failure<VerifyEmailSuccessDto>(ErrorCodes.BusinessRule, "Invalid verification link.");
 
-        organization.BeginProvisioningAfterOwnerVerification();
+        if (organization.Status == OrganizationStatus.PendingVerification)
+        {
+            organization.BeginProvisioningAfterOwnerVerification();
 
-        List<TenantModuleProvisioning> pendingModules = TenantModuleNames.All
-            .Select(module => TenantModuleProvisioning.CreatePending(organization.Id, module))
-            .ToList();
-        await provisioningRepo.AddRangeAsync(pendingModules, cancellationToken);
+            List<TenantModuleProvisioning> pendingModules = TenantModuleNames.All
+                .Select(module => TenantModuleProvisioning.CreatePending(organization.Id, module))
+                .ToList();
+            await provisioningRepo.AddRangeAsync(pendingModules, cancellationToken);
+        }
+        else if (!organization.AllowsSignIn())
+        {
+            return Result.Failure<VerifyEmailSuccessDto>(
+                ErrorCodes.BusinessRule,
+                "Organization is not ready for sign-in.");
+        }
 
         Role? adminRole = await roleRepo.GetByNameAsync("Admin", organization.Id, cancellationToken);
         if (adminRole is not null && !membership.RoleIds.Contains(adminRole.Id))

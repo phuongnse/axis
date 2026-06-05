@@ -9,8 +9,12 @@ namespace Axis.Identity.Application.Commands.RegisterUser;
 
 public sealed class RegisterUserHandler(
     IUserRepository userRepo,
+    IOrganizationRepository organizationRepo,
+    IOrganizationMembershipRepository membershipRepo,
+    IRoleRepository roleRepo,
     IRegistrationIdempotencyRepository idempotencyRepo,
     IEmailVerificationTokenStore verificationTokenStore,
+    IOrganizationRegistrationTokenStore organizationTokenStore,
     IPasswordHasher hasher,
     IEmailSender emailSender,
     IUnitOfWork uow)
@@ -55,6 +59,19 @@ public sealed class RegisterUserHandler(
             user.RecordLegalAcceptance(command.AcceptedTermsVersion, command.AcceptedPrivacyVersion);
             await userRepo.AddAsync(user, cancellationToken);
 
+            string? setupToken = string.IsNullOrWhiteSpace(command.OrganizationSetupToken)
+                ? null
+                : command.OrganizationSetupToken.Trim();
+            if (setupToken is not null)
+            {
+                Result attachResult = await AttachFirstUserToOrganizationAsync(
+                    user,
+                    setupToken,
+                    cancellationToken);
+                if (attachResult.IsFailure)
+                    return attachResult;
+            }
+
             await uow.SaveChangesAsync(cancellationToken);
 
             (string rawToken, string tokenHash) = OpaqueTokenGenerator.Create();
@@ -87,4 +104,45 @@ public sealed class RegisterUserHandler(
         idempotencyKey is null
             ? Task.CompletedTask
             : idempotencyRepo.MarkCompletedAsync(idempotencyKey, cancellationToken);
+
+    private async Task<Result> AttachFirstUserToOrganizationAsync(
+        User user,
+        string setupToken,
+        CancellationToken cancellationToken)
+    {
+        string tokenHash = OpaqueTokenGenerator.Hash(setupToken);
+        OrganizationSetupTokenConsumeResult setupResult =
+            await organizationTokenStore.ConsumeFirstUserSetupAsync(
+                tokenHash,
+                user.Id,
+                cancellationToken);
+
+        if (setupResult.State == OrganizationSetupTokenState.NotFound)
+            return Result.Failure(ErrorCodes.BusinessRule, "Invalid organization setup link.");
+
+        if (setupResult.State == OrganizationSetupTokenState.Expired)
+            return Result.Failure(
+                ErrorCodes.BusinessRule,
+                "This organization setup link has expired. Please request a new setup link.");
+
+        if (setupResult.State == OrganizationSetupTokenState.AlreadyUsed)
+            return Result.Failure(
+                ErrorCodes.BusinessRule,
+                "This organization setup link has already been used.");
+
+        Guid organizationId = setupResult.OrganizationId!.Value;
+        Organization? organization = await organizationRepo.GetByIdAsync(organizationId, cancellationToken);
+        if (organization is null || !organization.AllowsSignIn())
+            return Result.Failure(ErrorCodes.BusinessRule, "Organization is not ready for user setup.");
+
+        Role? adminRole = await roleRepo.GetByNameAsync("Admin", organization.Id, cancellationToken);
+        if (adminRole is null)
+            return Result.Failure(ErrorCodes.BusinessRule, "Organization is missing the Admin role.");
+
+        OrganizationMembership membership = OrganizationMembership.Create(user.Id, organization.Id);
+        membership.AssignRole(adminRole.Id);
+        await membershipRepo.AddAsync(membership, cancellationToken);
+
+        return Result.Success();
+    }
 }

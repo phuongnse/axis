@@ -134,20 +134,29 @@ public static class AuthEndpoints
         if (result.IsFailure)
             return result.ToProblemDetails();
 
-        await SignInPkceSessionAsync(httpContext, result.Value);
+        bool sessionEstablished = result.Value.UserId.HasValue;
+        if (sessionEstablished)
+            await SignInPkceSessionAsync(httpContext, result.Value);
 
-        VerifyEmailNextStep nextStep = result.Value.OrganizationId is null
-            ? VerifyEmailNextStep.Dashboard
-            : VerifyEmailNextStep.WorkspaceProvisioning;
+        VerifyEmailNextStep nextStep;
+        if (result.Value.OrganizationSetupToken is not null)
+            nextStep = VerifyEmailNextStep.RegisterUser;
+        else if (result.Value.OrganizationId is null)
+            nextStep = VerifyEmailNextStep.Dashboard;
+        else
+            nextStep = VerifyEmailNextStep.WorkspaceProvisioning;
 
-        return Results.Ok(new VerifyEmailSessionEstablishedDto(true, nextStep));
+        return Results.Ok(new VerifyEmailSessionEstablishedDto(
+            sessionEstablished,
+            nextStep,
+            result.Value.OrganizationSetupToken));
     }
 
     private static async Task SignInPkceSessionAsync(HttpContext httpContext, VerifyEmailSuccessDto claims)
     {
         List<Claim> claimList =
         [
-            new(ClaimTypes.NameIdentifier, claims.UserId.ToString()),
+            new(ClaimTypes.NameIdentifier, claims.UserId!.Value.ToString()),
             new(ClaimTypes.Email, claims.Email),
             new("name", claims.FullName),
         ];

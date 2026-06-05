@@ -11,13 +11,10 @@ namespace Axis.Identity.Application.Commands.RegisterOrganization;
 public sealed class RegisterOrganizationHandler(
     IOrganizationRepository orgRepo,
     ISubscriptionPlanRepository planRepo,
-    IUserRepository userRepo,
-    IOrganizationMembershipRepository membershipRepo,
     IRoleRepository roleRepo,
     IRegistrationIdempotencyRepository idempotencyRepo,
-    IEmailVerificationTokenStore verificationTokenStore,
+    IOrganizationRegistrationTokenStore organizationTokenStore,
     IOrganizationSlugGenerator slugGenerator,
-    IPasswordHasher hasher,
     IEmailSender emailSender,
     IUnitOfWork uow)
     : ICommandHandler<RegisterOrganizationCommand>
@@ -81,17 +78,10 @@ public sealed class RegisterOrganizationHandler(
 
         try
         {
-            Result<Email> email = Email.Create(command.AdminEmail);
+            Result<Email> email = Email.Create(command.OrganizationContactEmail);
             if (email.IsFailure)
             {
-                await MarkIdempotencyCompletedIfNeededAsync(idempotencyKey, cancellationToken);
-                return Result.Success();
-            }
-
-            if (await userRepo.EmailExistsPlatformWideAsync(email.Value, cancellationToken))
-            {
-                await MarkIdempotencyCompletedIfNeededAsync(idempotencyKey, cancellationToken);
-                return Result.Success();
+                return Result.Failure(ErrorCodes.InvalidInput, "Email must be a valid email address.");
             }
 
             OrganizationSlug slug =
@@ -99,7 +89,13 @@ public sealed class RegisterOrganizationHandler(
 
             Guid planId = await ResolveSubscriptionPlanIdAsync(command.SubscriptionPlanId, cancellationToken);
 
-            Organization org = Organization.Create(command.OrgName, slug, email.Value, planId);
+            Organization org = Organization.RegisterForContactVerification(
+                command.OrgName,
+                slug,
+                email.Value,
+                planId,
+                command.AcceptedTermsVersion,
+                command.AcceptedPrivacyVersion);
             await orgRepo.AddAsync(org, cancellationToken);
 
             Role adminRole = Role.CreateSystem("Admin", org.Id, AdminPermissions);
@@ -112,20 +108,11 @@ public sealed class RegisterOrganizationHandler(
             await roleRepo.AddAsync(viewerRole, cancellationToken);
             await roleRepo.AddAsync(endUserRole, cancellationToken);
 
-            User user = User.Create(command.AdminFirstName, command.AdminLastName, email.Value);
-            user.SetPasswordHash(hasher.Hash(command.Password));
-            user.RecordLegalAcceptance(command.AcceptedTermsVersion, command.AcceptedPrivacyVersion);
-            await userRepo.AddAsync(user, cancellationToken);
-
-            OrganizationMembership membership = OrganizationMembership.Create(user.Id, org.Id);
-            membership.AssignRole(adminRole.Id);
-            await membershipRepo.AddAsync(membership, cancellationToken);
-
             await uow.SaveChangesAsync(cancellationToken);
 
             (string rawToken, string tokenHash) = OpaqueTokenGenerator.Create();
-            await verificationTokenStore.CreateAsync(
-                user.Id,
+            await organizationTokenStore.CreateVerificationAsync(
+                org.Id,
                 tokenHash,
                 DateTime.UtcNow.Add(VerificationTokenLifetime),
                 cancellationToken);

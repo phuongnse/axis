@@ -81,13 +81,13 @@ Axis supports standalone user accounts. Registering an organization is required 
 >
 > | Layer | Status |
 > |-------|--------|
-> | Domain | ⚠️ |
-> | Application | ⚠️ |
-> | Infrastructure | ⚠️ |
-> | API | ⚠️ |
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
 > | Frontend | ⚠️ |
 >
-> **Gaps vs spec:** Current implementation was originally shaped as "register organization + first admin user" and must be refactored to split organization onboarding from user registration. Existing tenant provisioning, slug preview, legal-version recording, email confirmation, verify-email states, and workspace-provisioning pieces are reusable. Password collection and third-party identity-provider flows must move to [register-user](../../identity-access/register-user/).
+> **Gaps vs spec:** Backend/API now split organization onboarding from user identity registration: `POST /api/organizations` records organization facts + legal versions, sends org-contact verification, starts provisioning after verification, and issues a short-lived setup token for [register-user](../../identity-access/register-user/). Remaining work is the dedicated register-org frontend copy/validation and polished setup-token handoff UI.
 >
 > **Decisions:**
 > - `register-org` owns organization facts only: organization name, organization contact email, legal acceptance, slug, verification, and tenant provisioning.
@@ -97,14 +97,14 @@ Axis supports standalone user accounts. Registering an organization is required 
 
 ## Screen flow
 
-Canonical order for this use case. **The wireframes table below uses the same row order** — read top to bottom when reviewing assets.
+Canonical order for this use case. Screens owned by another use case are linked inline.
 
 | Step | Screen | When |
 |------|--------|------|
 | 1 | `register-org` | Enter organization name, organization contact email, slug preview, and legal acceptance |
 | 2 | `email-confirmation` | After organization registration submit; tells actor to verify the organization email |
-| 3 | `workspace-provisioning` | After organization email verification; tenant setup is running |
-| 4 | [register-user](../../identity-access/register-user/) | First owner/admin sets up their user identity after organization verification; standalone user registration does not require this flow |
+| 3 | [register-user](../../identity-access/register-user/) | First owner/admin uses the setup token and creates a user identity after organization verification |
+| 4 | `workspace-provisioning` | After user email verification when tenant setup is still running |
 
 **Error / reference screens** (not sequential steps):
 
@@ -119,15 +119,15 @@ Canonical order for this use case. **The wireframes table below uses the same ro
 flowchart TD
   entry["1 · register-org"]
   confirm["2 · email-confirmation"]
-  provision["3 · workspace-provisioning"]
-  user["4 · register-user"]
+  user["3 · register-user"]
+  provision["4 · workspace-provisioning"]
   errEntry["register-org-states"]
   errEmail["email-confirmation-states"]
   errVerify["verify-email-states"]
 
   entry --> confirm
-  confirm -->|"verify org email"| provision
-  provision --> user
+  confirm -->|"verify org email + setup token"| user
+  user -->|"verify user email; tenant still provisioning"| provision
   entry -.-> errEntry
   confirm -.-> errEmail
   confirm -.-> errVerify
@@ -135,13 +135,13 @@ flowchart TD
 
 ## Wireframes
 
-Six UI assets in this folder. Row order matches [Screen flow](#screen-flow). External-provider/user-identity screens are owned by [register-user](../../identity-access/register-user/), not this folder.
+UI assets in this folder cover organization-owned screens. External-provider/user-identity screens are owned by [register-user](../../identity-access/register-user/), not this folder.
 
 | # | Screen | Role | Excalidraw | Preview |
 |---|--------|------|------------|---------|
 | 1 | register-org | Happy path — organization registration form | [source](./register-org.excalidraw) | [preview](./register-org.svg) |
 | 2 | email-confirmation | Happy path — organization email confirmation | [source](./email-confirmation.excalidraw) | [preview](./email-confirmation.svg) |
-| 3 | workspace-provisioning | Tenant setup progress / failure reference | [source](./workspace-provisioning.excalidraw) | [preview](./workspace-provisioning.svg) |
+| 4 | workspace-provisioning | Tenant setup progress / failure reference | [source](./workspace-provisioning.excalidraw) | [preview](./workspace-provisioning.svg) |
 | — | register-org-states | Validation / 5xx reference | [source](./register-org-states.excalidraw) | [preview](./register-org-states.svg) |
 | — | email-confirmation-states | Resend org verification email states | [source](./email-confirmation-states.excalidraw) | [preview](./email-confirmation-states.svg) |
 | — | verify-email-states | Org verification link error states | [source](./verify-email-states.excalidraw) | [preview](./verify-email-states.svg) |

@@ -570,7 +570,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register a new organization and admin account */
+        /** Register a new organization contact for verification */
         post: operations["RegisterOrganization"];
         delete?: never;
         options?: never;
@@ -1676,11 +1676,7 @@ export interface components {
         };
         RegisterOrganizationRequest: {
             orgName?: string;
-            adminFirstName?: string;
-            adminLastName?: string;
-            adminEmail?: string;
-            password?: string;
-            passwordConfirmation?: string;
+            organizationContactEmail?: string;
             acceptedTermsVersion?: string;
             acceptedPrivacyVersion?: string;
             /** Format: uuid */
@@ -1694,6 +1690,7 @@ export interface components {
             passwordConfirmation?: string;
             acceptedTermsVersion?: string;
             acceptedPrivacyVersion?: string;
+            organizationSetupToken?: string | null;
         };
         RemoveTransitionRequest: {
             /** Format: uuid */
@@ -1866,13 +1863,14 @@ export interface components {
             isCurrent?: boolean;
         };
         /** @enum {string} */
-        VerifyEmailNextStep: "Dashboard" | "WorkspaceProvisioning";
+        VerifyEmailNextStep: "Dashboard" | "RegisterUser" | "WorkspaceProvisioning";
         VerifyEmailRequest: {
             token?: string;
         };
         VerifyEmailSessionEstablishedDto: {
             sessionEstablished?: boolean;
             nextStep?: components["schemas"]["VerifyEmailNextStep"];
+            organizationSetupToken?: string | null;
         };
         WorkflowDetailDto: {
             /** Format: uuid */

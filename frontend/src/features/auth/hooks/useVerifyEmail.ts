@@ -21,6 +21,14 @@ export function useVerifyEmail() {
   const mutation = useMutation({
     mutationFn: verifyEmail,
     onSuccess: async (data, token) => {
+      if (data?.nextStep === 'RegisterUser' && data.organizationSetupToken) {
+        void navigate({
+          to: '/register',
+          search: { setupToken: data.organizationSetupToken },
+        });
+        return;
+      }
+
       if (data?.sessionEstablished) {
         const shouldProvision = data.nextStep === 'WorkspaceProvisioning';
         try {
