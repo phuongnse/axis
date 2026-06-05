@@ -213,6 +213,78 @@ class TestReviewFindingsRegistry(unittest.TestCase):
         self.assertEqual([], axis.review_findings_registry_issues())
 
 
+class TestEnforcementTruthAudit(unittest.TestCase):
+    def write_truth_repo(self, root: Path, mutate=None) -> None:
+        files: dict[Path, str] = {}
+        for relative, requirements in axis.ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS:
+            files[relative] = "\n".join(snippet for snippet, _description in requirements) + "\n"
+
+        workflow = Path(".github/workflows/build-and-test.yml")
+        files[workflow] += "- 'openapi.json'\n- 'openapi.json'\n"
+
+        if mutate is not None:
+            mutate(files)
+
+        for relative, content in files.items():
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+
+    def test_rejects_ci_without_doc_drift(self) -> None:
+        def mutate(files: dict[Path, str]) -> None:
+            workflow = Path(".github/workflows/build-and-test.yml")
+            files[workflow] = files[workflow].replace("run: python scripts/axis.py check doc-drift\n", "")
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_truth_repo(root, mutate)
+            issues = axis.enforcement_truth_audit_issues(root=root)
+
+        self.assertIn("doc drift runs in CI", "\n".join(issues))
+
+    def test_rejects_missing_pre_push_verify_delegate(self) -> None:
+        def mutate(files: dict[Path, str]) -> None:
+            hook = Path("scripts/hooks/pre-push")
+            files[hook] = files[hook].replace('scripts/axis.py" verify', 'scripts/other.py" verify')
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_truth_repo(root, mutate)
+            issues = axis.enforcement_truth_audit_issues(root=root)
+
+        self.assertIn("pre-push delegates", "\n".join(issues))
+
+    def test_rejects_missing_analyzer_warnings_as_errors(self) -> None:
+        def mutate(files: dict[Path, str]) -> None:
+            build_props = Path("Directory.Build.props")
+            files[build_props] = files[build_props].replace(
+                "<TreatWarningsAsErrors>true</TreatWarningsAsErrors>",
+                "<TreatWarningsAsErrors>false</TreatWarningsAsErrors>",
+            )
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_truth_repo(root, mutate)
+            issues = axis.enforcement_truth_audit_issues(root=root)
+
+        self.assertIn("build treats warnings as errors", "\n".join(issues))
+
+    def test_rejects_openapi_not_triggering_both_ci_filters(self) -> None:
+        def mutate(files: dict[Path, str]) -> None:
+            workflow = Path(".github/workflows/build-and-test.yml")
+            files[workflow] = files[workflow].replace("- 'openapi.json'\n- 'openapi.json'\n", "- 'openapi.json'\n")
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_truth_repo(root, mutate)
+            issues = axis.enforcement_truth_audit_issues(root=root)
+
+        self.assertIn("both backend and frontend CI filters", "\n".join(issues))
+
+    def test_current_repository_enforcement_truth_audit_still_passes(self) -> None:
+        self.assertEqual([], axis.enforcement_truth_audit_issues())
+
+
 class TestTextEncodingGate(unittest.TestCase):
     def issues_for_file(self, name: str, content: bytes) -> str:
         with tempfile.TemporaryDirectory() as temp:

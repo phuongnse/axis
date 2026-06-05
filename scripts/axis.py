@@ -794,6 +794,78 @@ REVIEW_FINDINGS_ALLOWED_STATUSES = {
     "Not a rule",
 }
 
+ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
+    (
+        Path(".github/workflows/build-and-test.yml"),
+        [
+            ("pull_request:", "CI workflow runs for pull requests"),
+            ("run: python scripts/axis.py check pr", "PR metadata guard runs in CI"),
+            ("run: python scripts/axis.py check vulnerable-packages", "vulnerable package gate runs in CI"),
+            ("run: python scripts/axis.py check test-naming", ".NET test naming gate runs in CI"),
+            ("run: dotnet build --no-restore", ".NET build runs in CI"),
+            ("run: dotnet format Axis.sln --verify-no-changes --no-restore", ".NET format gate runs in CI"),
+            ("dotnet test --no-build", "full .NET test suite runs in CI"),
+            ("npm run gen:api-types", "frontend API type generation runs in CI"),
+            ("git diff --exit-code -- src/lib/api-types.ts", "frontend API type diff fails stale generated types"),
+            ("run: npm run ci", "frontend typecheck/lint runs in CI"),
+            ("run: npm run test", "frontend tests run in CI"),
+            ("run: python scripts/axis.py check policy-tests", "policy gate tests run in CI"),
+            ("run: python scripts/axis.py check doc-drift", "doc drift runs in CI"),
+            ("BASE_BRANCH: main", "doc drift compares against main"),
+        ],
+    ),
+    (
+        Path("scripts/axis.py"),
+        [
+            ('step("policy gate tests", lambda: check_policy_tests())', "local verify runs policy gate tests"),
+            ('step("doc drift", lambda: check_doc_drift())', "local verify runs doc drift"),
+            ("for issue in governance_owner_boundary_issues():", "doc drift checks governance owner boundaries"),
+            ("for issue in review_findings_registry_issues():", "doc drift checks review findings registry rows"),
+            ("for issue in enforcement_truth_audit_issues():", "doc drift checks enforcement truth wiring"),
+        ],
+    ),
+    (
+        Path("scripts/hooks/pre-push"),
+        [
+            ('scripts/axis.py" verify', "pre-push delegates to scripts/axis.py verify"),
+        ],
+    ),
+    (
+        Path("Directory.Build.props"),
+        [
+            ("<TreatWarningsAsErrors>true</TreatWarningsAsErrors>", "build treats warnings as errors"),
+            ('<PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers"', "async-safety analyzer package is wired"),
+        ],
+    ),
+    (
+        Path(".editorconfig"),
+        [
+            ("dotnet_diagnostic.CA2016.severity = warning", "CA2016 dropped CancellationToken analyzer is escalated"),
+        ],
+    ),
+    (
+        Path("tests/Api/Axis.Api.Tests/Contracts/OpenApiDocumentTests.cs"),
+        [
+            ("OpenApiDocument_WhenGeneratedFromRunningApi_MatchesCommittedSnapshot", "OpenAPI snapshot test exists"),
+            ("openapi.json drifted from the API", "OpenAPI test fails on committed contract drift"),
+            ('fresh.Should().Contain("\\"orgName\\"");', "OpenAPI test asserts camelCase wire shape"),
+            ('fresh.Should().NotContain("\\"org_name\\"");', "OpenAPI test rejects snake_case wire drift"),
+        ],
+    ),
+    (
+        Path("frontend/package.json"),
+        [
+            ('"gen:api-types": "openapi-typescript ../openapi.json -o src/lib/api-types.ts"', "frontend API types generate from committed openapi.json"),
+        ],
+    ),
+    (
+        Path("Axis.sln"),
+        [
+            ("tests\\Architecture\\Axis.Architecture.Tests\\Axis.Architecture.Tests.csproj", "architecture fitness tests are included in Axis.sln"),
+        ],
+    ),
+]
+
 
 def governance_owner_boundary_issues(*, root: Path | None = None) -> list[str]:
     """Keep governance entry docs from duplicating enforceable rule mechanics."""
@@ -834,6 +906,39 @@ def governance_owner_boundary_issues(*, root: Path | None = None) -> list[str]:
                     f"{normalized}:{idx}: Design Gate is a review artifact, not a machine/CI gate. "
                     "Move deterministic enforcement to scripts/tests and REVIEW_FINDINGS.md."
                 )
+
+    return issues
+
+
+def normalized_text(path: Path) -> str:
+    return path.read_text(encoding="utf-8", errors="ignore").replace("\r\n", "\n").replace("\r", "\n")
+
+
+def enforcement_truth_audit_issues(*, root: Path | None = None) -> list[str]:
+    """Verify committed CI/script wiring still supports registry enforcement claims."""
+    root = root or ROOT
+    issues: list[str] = []
+
+    for relative, requirements in ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS:
+        path = root / relative
+        normalized = relative.as_posix()
+        if not path.is_file():
+            issues.append(f"{normalized}: enforcement truth audit missing required file")
+            continue
+
+        text = normalized_text(path)
+        for snippet, description in requirements:
+            if snippet not in text:
+                issues.append(f"{normalized}: enforcement truth audit missing {description}: `{snippet}`")
+
+    workflow = root / ".github" / "workflows" / "build-and-test.yml"
+    if workflow.is_file():
+        workflow_text = normalized_text(workflow)
+        if workflow_text.count("- 'openapi.json'") < 2:
+            issues.append(
+                ".github/workflows/build-and-test.yml: enforcement truth audit requires "
+                "`openapi.json` to trigger both backend and frontend CI filters"
+            )
 
     return issues
 
@@ -993,6 +1098,9 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         fail(issues, issue)
 
     for issue in review_findings_registry_issues():
+        fail(issues, issue)
+
+    for issue in enforcement_truth_audit_issues():
         fail(issues, issue)
 
     spec_target = ROOT / "docs" / "ARCHITECTURE.md"
