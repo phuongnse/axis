@@ -2715,7 +2715,7 @@
         "tags": [
           "Identity"
         ],
-        "summary": "Verify email address with a one-time token and establish a sign-in session",
+        "summary": "Verify an email token and return the next registration or sign-in step",
         "operationId": "VerifyEmail",
         "requestBody": {
           "content": {
@@ -3457,7 +3457,7 @@
         "tags": [
           "Identity"
         ],
-        "summary": "Register a standalone user account",
+        "summary": "Register a user account standalone or with an organization setup token",
         "operationId": "RegisterUser",
         "requestBody": {
           "content": {

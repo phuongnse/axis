@@ -106,6 +106,19 @@ public class OrganizationTests
     }
 
     [Fact]
+    public void BeginProvisioningAfterContactVerification_WhenAlreadyProvisioning_DoesNotRaiseDuplicateEvent()
+    {
+        Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail, WellKnownSubscriptionPlans.FreeId);
+        org.BeginProvisioning();
+        org.ClearDomainEvents();
+
+        org.BeginProvisioningAfterContactVerification();
+
+        org.Status.Should().Be(OrganizationStatus.Provisioning);
+        org.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
     public void MarkProvisioningFailed_WhenNotProvisioning_Throws()
     {
         Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail, WellKnownSubscriptionPlans.FreeId);

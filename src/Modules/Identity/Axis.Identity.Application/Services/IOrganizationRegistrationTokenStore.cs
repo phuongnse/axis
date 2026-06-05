@@ -1,3 +1,5 @@
+using Axis.Shared.Domain.Primitives;
+
 namespace Axis.Identity.Application.Services;
 
 public interface IOrganizationRegistrationTokenStore
@@ -8,7 +10,7 @@ public interface IOrganizationRegistrationTokenStore
         DateTime expiresAt,
         CancellationToken ct = default);
 
-    Task<OrganizationVerificationTokenResolveResult> ResolveVerificationAsync(
+    Task<Result<Guid>> ResolveVerificationAsync(
         string tokenHash,
         CancellationToken ct = default);
 
@@ -22,7 +24,7 @@ public interface IOrganizationRegistrationTokenStore
         DateTime expiresAt,
         CancellationToken ct = default);
 
-    Task<OrganizationSetupTokenConsumeResult> ConsumeFirstUserSetupAsync(
+    Task<Result<Guid>> ConsumeFirstUserSetupAsync(
         string tokenHash,
         Guid userId,
         CancellationToken ct = default);

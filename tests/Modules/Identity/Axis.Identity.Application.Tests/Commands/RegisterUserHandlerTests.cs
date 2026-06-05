@@ -102,9 +102,7 @@ public class RegisterUserHandlerTests
                 setupTokenHash,
                 Arg.Any<Guid>(),
                 Arg.Any<CancellationToken>())
-            .Returns(new OrganizationSetupTokenConsumeResult(
-                OrganizationSetupTokenState.Valid,
-                organizationId));
+            .Returns(Result.Success(organizationId));
         _organizationRepo.GetByIdAsync(organizationId, Arg.Any<CancellationToken>())
             .Returns(organization);
         _roleRepo.GetByNameAsync("Admin", organization.Id, Arg.Any<CancellationToken>())
@@ -136,9 +134,9 @@ public class RegisterUserHandlerTests
                 setupTokenHash,
                 Arg.Any<Guid>(),
                 Arg.Any<CancellationToken>())
-            .Returns(new OrganizationSetupTokenConsumeResult(
-                OrganizationSetupTokenState.Expired,
-                Guid.NewGuid()));
+            .Returns(Result.Failure<Guid>(
+                ErrorCodes.BusinessRule,
+                "This organization setup link has expired. Please request a new setup link."));
 
         Result result = await CreateHandler().Handle(
             ValidCommand() with { OrganizationSetupToken = setupToken },
@@ -146,10 +144,12 @@ public class RegisterUserHandlerTests
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        await _userRepo.DidNotReceive().AddAsync(Arg.Any<User>(), Arg.Any<CancellationToken>());
         await _membershipRepo.DidNotReceive().AddAsync(
             Arg.Any<OrganizationMembership>(),
             Arg.Any<CancellationToken>());
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        await _idempotencyRepo.Received(1).MarkFailedAsync("idem-1", Arg.Any<CancellationToken>());
     }
 
     [Fact]

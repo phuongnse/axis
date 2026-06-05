@@ -33,9 +33,7 @@ public class VerifyEmailHandlerTests
         _organizationTokenStore.ResolveVerificationAsync(
                 Arg.Any<string>(),
                 Arg.Any<CancellationToken>())
-            .Returns(new OrganizationVerificationTokenResolveResult(
-                OrganizationVerificationTokenState.NotFound,
-                null));
+            .Returns(Result.Failure<Guid>(ErrorCodes.BusinessRule, "Invalid verification link."));
     }
 
     private VerifyEmailHandler CreateHandler() =>
@@ -86,6 +84,7 @@ public class VerifyEmailHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Email.Should().Be("alice@acme.com");
+        result.Value.NextStep.Should().Be(VerifyEmailNextStep.WorkspaceProvisioning);
         user.IsEmailVerified.Should().BeTrue();
         organization.Status.Should().Be(OrganizationStatus.Provisioning);
 
@@ -118,9 +117,7 @@ public class VerifyEmailHandlerTests
         _tokenStore.ResolveForVerificationAsync(tokenHash, Arg.Any<CancellationToken>())
             .Returns(new EmailVerificationTokenResolveResult(EmailVerificationTokenState.NotFound, null));
         _organizationTokenStore.ResolveVerificationAsync(tokenHash, Arg.Any<CancellationToken>())
-            .Returns(new OrganizationVerificationTokenResolveResult(
-                OrganizationVerificationTokenState.Valid,
-                organization.Id));
+            .Returns(Result.Success(organization.Id));
         _organizationRepo.GetByIdAsync(organization.Id, Arg.Any<CancellationToken>())
             .Returns(organization);
 
@@ -131,6 +128,7 @@ public class VerifyEmailHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.UserId.Should().BeNull();
         result.Value.OrganizationId.Should().Be(organization.Id);
+        result.Value.NextStep.Should().Be(VerifyEmailNextStep.RegisterUser);
         result.Value.OrganizationSetupToken.Should().NotBeNullOrWhiteSpace();
         organization.Status.Should().Be(OrganizationStatus.Provisioning);
 

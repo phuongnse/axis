@@ -46,8 +46,10 @@ public class OrganizationEndpointTests(ApiTestFixture fixture)
         IdentityDbContext ctx = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         ctx.Organizations.Count(o => o.Name == "TestOrgidem1a").Should().Be(1);
         ctx.Organizations.Count(o => o.Name == "TestOrgidem1b").Should().Be(0);
-        ctx.Users.Count(u => u.Email == Email.Create("adminidem1a@test.com").Value).Should().Be(0);
-        ctx.Users.Count(u => u.Email == Email.Create("adminidem1b@test.com").Value).Should().Be(0);
+        ctx.Users.Count(u => u.Email == Email.Create(TestRegistrationPayload.OrganizationContactEmail("idem1a")).Value)
+            .Should().Be(0);
+        ctx.Users.Count(u => u.Email == Email.Create(TestRegistrationPayload.OrganizationContactEmail("idem1b")).Value)
+            .Should().Be(0);
     }
 
     // POST /api/organizations/me/invitations

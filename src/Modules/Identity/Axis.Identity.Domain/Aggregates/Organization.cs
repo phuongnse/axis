@@ -172,6 +172,9 @@ public sealed class Organization : AggregateRoot<Guid>
             return;
         }
 
+        if (Status == OrganizationStatus.Provisioning)
+            return;
+
         BeginProvisioning();
         RaiseDomainEvent(new OrganizationVerified(Id));
     }

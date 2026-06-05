@@ -451,7 +451,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Verify email address with a one-time token and establish a sign-in session */
+        /** Verify an email token and return the next registration or sign-in step */
         post: operations["VerifyEmail"];
         delete?: never;
         options?: never;
@@ -690,7 +690,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register a standalone user account */
+        /** Register a user account standalone or with an organization setup token */
         post: operations["RegisterUser"];
         delete?: never;
         options?: never;

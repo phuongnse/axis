@@ -108,14 +108,14 @@ public sealed class RegisterOrganizationHandler(
             await roleRepo.AddAsync(viewerRole, cancellationToken);
             await roleRepo.AddAsync(endUserRole, cancellationToken);
 
-            await uow.SaveChangesAsync(cancellationToken);
-
             (string rawToken, string tokenHash) = OpaqueTokenGenerator.Create();
             await organizationTokenStore.CreateVerificationAsync(
                 org.Id,
                 tokenHash,
                 DateTime.UtcNow.Add(VerificationTokenLifetime),
                 cancellationToken);
+
+            await uow.SaveChangesAsync(cancellationToken);
 
             await emailSender.SendVerificationEmailAsync(
                 email.Value.Value,

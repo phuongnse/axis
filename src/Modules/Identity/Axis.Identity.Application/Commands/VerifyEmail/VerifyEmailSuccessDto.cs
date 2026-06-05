@@ -6,4 +6,8 @@ public sealed record VerifyEmailSuccessDto(
     string Email,
     string FullName,
     IReadOnlyList<string> Permissions,
-    string? OrganizationSetupToken = null);
+    VerifyEmailNextStep NextStep,
+    string? OrganizationSetupToken = null)
+{
+    public bool SessionEstablished => UserId.HasValue;
+}

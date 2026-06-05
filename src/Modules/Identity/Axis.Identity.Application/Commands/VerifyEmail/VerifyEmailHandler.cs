@@ -55,26 +55,14 @@ public sealed class VerifyEmailHandler(
         string tokenHash,
         CancellationToken cancellationToken)
     {
-        OrganizationVerificationTokenResolveResult resolved =
+        Result<Guid> resolved =
             await organizationTokenStore.ResolveVerificationAsync(tokenHash, cancellationToken);
 
-        return resolved.State switch
-        {
-            OrganizationVerificationTokenState.NotFound =>
-                Result.Failure<VerifyEmailSuccessDto>(ErrorCodes.BusinessRule, "Invalid verification link."),
-            OrganizationVerificationTokenState.Expired =>
-                Result.Failure<VerifyEmailSuccessDto>(
-                    ErrorCodes.BusinessRule,
-                    "This verification link has expired. Please request a new verification email."),
-            OrganizationVerificationTokenState.AlreadyUsed =>
-                Result.Failure<VerifyEmailSuccessDto>(
-                    ErrorCodes.BusinessRule,
-                    "This link has already been used. Please sign in."),
-            OrganizationVerificationTokenState.Valid => await VerifyOrganizationAsync(
-                resolved.OrganizationId!.Value,
-                cancellationToken),
-            _ => Result.Failure<VerifyEmailSuccessDto>(ErrorCodes.BusinessRule, "Invalid verification link."),
-        };
+        return resolved.IsFailure
+            ? Result.Failure<VerifyEmailSuccessDto>(
+                resolved.ErrorCode ?? ErrorCodes.BusinessRule,
+                resolved.Error)
+            : await VerifyOrganizationAsync(resolved.Value, cancellationToken);
     }
 
     private async Task<Result<VerifyEmailSuccessDto>> VerifyOrganizationAsync(
@@ -100,13 +88,13 @@ public sealed class VerifyEmailHandler(
         await provisioningRepo.AddRangeAsync(pendingModules, cancellationToken);
 
         (string rawSetupToken, string setupTokenHash) = OpaqueTokenGenerator.Create();
-        await uow.SaveChangesAsync(cancellationToken);
-
         await organizationTokenStore.CreateFirstUserSetupAsync(
             organization.Id,
             setupTokenHash,
             DateTime.UtcNow.Add(FirstUserSetupTokenLifetime),
             cancellationToken);
+
+        await uow.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new VerifyEmailSuccessDto(
             null,
@@ -114,6 +102,7 @@ public sealed class VerifyEmailHandler(
             organization.OwnerEmail.Value,
             organization.Name,
             [],
+            VerifyEmailNextStep.RegisterUser,
             rawSetupToken));
     }
 
@@ -144,7 +133,8 @@ public sealed class VerifyEmailHandler(
                 null,
                 user.Email.Value,
                 user.FullName,
-                []));
+                [],
+                VerifyEmailNextStep.Dashboard));
         }
 
         Organization? organization = await organizationRepo.GetByIdAsync(membership.OrganizationId, cancellationToken);
@@ -190,6 +180,7 @@ public sealed class VerifyEmailHandler(
             organization.Id,
             user.Email.Value,
             user.FullName,
-            permissions));
+            permissions,
+            VerifyEmailNextStep.WorkspaceProvisioning));
     }
 }

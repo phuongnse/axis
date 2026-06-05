@@ -1,6 +1,7 @@
 using Axis.Identity.Application.Services;
 using Axis.Identity.Infrastructure.Persistence;
 using Axis.Identity.Infrastructure.Persistence.Entities;
+using Axis.Shared.Domain.Primitives;
 using Microsoft.EntityFrameworkCore;
 
 namespace Axis.Identity.Infrastructure.Services;
@@ -22,48 +23,32 @@ internal sealed class OrganizationRegistrationTokenStore(IdentityDbContext conte
             ct);
     }
 
-    public async Task<OrganizationVerificationTokenResolveResult> ResolveVerificationAsync(
+    public async Task<Result<Guid>> ResolveVerificationAsync(
         string tokenHash,
         CancellationToken ct = default)
     {
         DateTime now = DateTime.UtcNow;
-        int consumed = await context.Set<OrganizationRegistrationToken>()
-            .Where(t =>
+        OrganizationRegistrationToken? token = await context.Set<OrganizationRegistrationToken>()
+            .FirstOrDefaultAsync(t =>
                 t.TokenHash == tokenHash
-                && t.Purpose == OrganizationRegistrationTokenPurpose.ContactEmailVerification
-                && t.UsedAt == null
-                && t.ExpiresAt > now)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, now), ct);
+                && t.Purpose == OrganizationRegistrationTokenPurpose.ContactEmailVerification,
+                ct);
 
-        if (consumed == 1)
-        {
-            Guid organizationId = await context.Set<OrganizationRegistrationToken>()
-                .Where(t => t.TokenHash == tokenHash)
-                .Select(t => t.OrganizationId)
-                .FirstAsync(ct);
-            return new OrganizationVerificationTokenResolveResult(
-                OrganizationVerificationTokenState.Valid,
-                organizationId);
-        }
+        if (token is null)
+            return Result.Failure<Guid>(ErrorCodes.BusinessRule, "Invalid verification link.");
 
-        OrganizationRegistrationToken? token = await GetTokenAsync(
-            tokenHash,
-            OrganizationRegistrationTokenPurpose.ContactEmailVerification,
-            ct);
+        if (token.UsedAt is not null)
+            return Result.Failure<Guid>(
+                ErrorCodes.BusinessRule,
+                "This link has already been used. Please sign in.");
 
-        return token is null
-            ? new OrganizationVerificationTokenResolveResult(OrganizationVerificationTokenState.NotFound, null)
-            : token.UsedAt is not null
-                ? new OrganizationVerificationTokenResolveResult(
-                    OrganizationVerificationTokenState.AlreadyUsed,
-                    token.OrganizationId)
-                : now >= token.ExpiresAt
-                    ? new OrganizationVerificationTokenResolveResult(
-                        OrganizationVerificationTokenState.Expired,
-                        token.OrganizationId)
-                    : new OrganizationVerificationTokenResolveResult(
-                        OrganizationVerificationTokenState.AlreadyUsed,
-                        token.OrganizationId);
+        if (now >= token.ExpiresAt)
+            return Result.Failure<Guid>(
+                ErrorCodes.BusinessRule,
+                "This verification link has expired. Please request a new verification email.");
+
+        token.UsedAt = now;
+        return Result.Success(token.OrganizationId);
     }
 
     public async Task<Guid?> ResolveOrganizationIdForProvisioningPollAsync(
@@ -97,52 +82,34 @@ internal sealed class OrganizationRegistrationTokenStore(IdentityDbContext conte
             ct);
     }
 
-    public async Task<OrganizationSetupTokenConsumeResult> ConsumeFirstUserSetupAsync(
+    public async Task<Result<Guid>> ConsumeFirstUserSetupAsync(
         string tokenHash,
         Guid userId,
         CancellationToken ct = default)
     {
         DateTime now = DateTime.UtcNow;
-        int consumed = await context.Set<OrganizationRegistrationToken>()
-            .Where(t =>
+        OrganizationRegistrationToken? token = await context.Set<OrganizationRegistrationToken>()
+            .FirstOrDefaultAsync(t =>
                 t.TokenHash == tokenHash
-                && t.Purpose == OrganizationRegistrationTokenPurpose.FirstUserSetup
-                && t.UsedAt == null
-                && t.ExpiresAt > now)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(t => t.UsedAt, now)
-                .SetProperty(t => t.UsedByUserId, (Guid?)userId),
+                && t.Purpose == OrganizationRegistrationTokenPurpose.FirstUserSetup,
                 ct);
 
-        if (consumed == 1)
-        {
-            Guid organizationId = await context.Set<OrganizationRegistrationToken>()
-                .Where(t => t.TokenHash == tokenHash)
-                .Select(t => t.OrganizationId)
-                .FirstAsync(ct);
-            return new OrganizationSetupTokenConsumeResult(
-                OrganizationSetupTokenState.Valid,
-                organizationId);
-        }
+        if (token is null)
+            return Result.Failure<Guid>(ErrorCodes.BusinessRule, "Invalid organization setup link.");
 
-        OrganizationRegistrationToken? token = await GetTokenAsync(
-            tokenHash,
-            OrganizationRegistrationTokenPurpose.FirstUserSetup,
-            ct);
+        if (token.UsedAt is not null)
+            return Result.Failure<Guid>(
+                ErrorCodes.BusinessRule,
+                "This organization setup link has already been used.");
 
-        return token is null
-            ? new OrganizationSetupTokenConsumeResult(OrganizationSetupTokenState.NotFound, null)
-            : token.UsedAt is not null
-                ? new OrganizationSetupTokenConsumeResult(
-                    OrganizationSetupTokenState.AlreadyUsed,
-                    token.OrganizationId)
-                : now >= token.ExpiresAt
-                    ? new OrganizationSetupTokenConsumeResult(
-                        OrganizationSetupTokenState.Expired,
-                        token.OrganizationId)
-                    : new OrganizationSetupTokenConsumeResult(
-                        OrganizationSetupTokenState.AlreadyUsed,
-                        token.OrganizationId);
+        if (now >= token.ExpiresAt)
+            return Result.Failure<Guid>(
+                ErrorCodes.BusinessRule,
+                "This organization setup link has expired. Please request a new setup link.");
+
+        token.UsedAt = now;
+        token.UsedByUserId = userId;
+        return Result.Success(token.OrganizationId);
     }
 
     private async Task CreateAsync(
@@ -162,14 +129,5 @@ internal sealed class OrganizationRegistrationTokenStore(IdentityDbContext conte
             CreatedAt = DateTime.UtcNow,
         };
         await context.Set<OrganizationRegistrationToken>().AddAsync(token, ct);
-        await context.SaveChangesAsync(ct);
     }
-
-    private Task<OrganizationRegistrationToken?> GetTokenAsync(
-        string tokenHash,
-        OrganizationRegistrationTokenPurpose purpose,
-        CancellationToken ct) =>
-        context.Set<OrganizationRegistrationToken>()
-            .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash && t.Purpose == purpose, ct);
 }
