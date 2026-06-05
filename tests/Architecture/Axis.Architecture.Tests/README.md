@@ -30,7 +30,7 @@ These rules don't enforce a P0/P1 from CLAUDE.md directly — they encode the im
 ## What this does NOT catch
 
 These tests work at the **assembly reference / namespace** level. They cannot detect:
-- Raw SQL strings that cross module boundaries (use `check-doc-drift.sh` grep instead).
+- Raw SQL strings that cross module boundaries (use `python scripts/axis.py check doc-drift` grep instead).
 - Runtime DI patterns (e.g. `services.GetRequiredService<IFromAnotherModule>()` where the interface lives in `Contracts`).
 - Conceptual violations like "this domain event should have been an integration event".
 - Quality of names, comments, or test coverage.
@@ -68,7 +68,7 @@ This way the test ratchets in one direction: the allow-list can only shrink. Nev
 
 ## Why NetArchTest (and not source-only grep)
 
-Grep (in `check-doc-drift.sh`) catches text patterns; it cannot follow type relationships, generics, or transitive references. NetArchTest loads the built assemblies and inspects them via reflection — it sees the same thing the runtime sees, which is the only source of truth for "what does this code depend on?"
+Grep (in `python scripts/axis.py check doc-drift`) catches text patterns; it cannot follow type relationships, generics, or transitive references. NetArchTest loads the built assemblies and inspects them via reflection — it sees the same thing the runtime sees, which is the only source of truth for "what does this code depend on?"
 
 Both layers stay in the repo: grep catches the obvious (`SqlQueryRaw`); NetArchTest catches the structural (type-graph rules).
 
