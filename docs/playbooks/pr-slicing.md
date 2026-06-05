@@ -14,7 +14,7 @@ A slice is isolated only if **both** sides hold. Verify both before marking the 
 
 | Side | Definition | How to verify |
 |------|------------|---------------|
-| **A — Stands alone** | A fresh checkout of the branch compiles, the local Gate 1 fast gate is green, CI is expected to run the full suite, and every route / endpoint / contract / symbol the slice *references* already exists on its merge target. | Switch to the branch on a clean tree → run `python scripts/axis.py verify`; rely on CI/branch protection for full `dotnet test Axis.sln`. |
+| **A — Stands alone** | A fresh checkout of the branch compiles, the local Verification gate is green, CI is expected to run the full suite, and every route / endpoint / contract / symbol the slice *references* already exists on its merge target. | Switch to the branch on a clean tree → run `python scripts/axis.py verify`; rely on CI/branch protection for full `dotnet test Axis.sln`. |
 | **B — Integrates** | After **rebasing onto current `main`**, it still compiles and is green, and merging it requires **no unmerged sibling**. | Rebase onto `origin/main`, re-run `python scripts/axis.py verify`; CI must rerun on the rebased branch before merge. |
 
 If a slice references something an **unmerged sibling owns** (a route it navigates to, an endpoint it calls, a symbol it imports, a constant it reads), it fails side A — it is stacked in disguise, not isolated. Either pull that dependency into this slice, or ship a fallback that compiles and degrades gracefully on the current `main`.
@@ -26,7 +26,7 @@ If a slice references something an **unmerged sibling owns** (a route it navigat
 | Rule | Meaning |
 |------|---------|
 | **Branch from `main`** | Each slice starts from `origin/main`. Never stack slice B on slice A's branch. |
-| **Prove both sides before "ready"** | Run the local Gate 1 fast gate on the branch **and** after a trial rebase onto `origin/main`; CI/branch protection owns the full suite. |
+| **Prove both sides before "ready"** | Run the local Verification gate on the branch **and** after a trial rebase onto `origin/main`; CI/branch protection owns the full suite. |
 | **Vertical when a contract changes** | If an endpoint adds a **required** field or changes a response/contract already used on `main`, ship backend + minimal caller in the **same** PR so `main` never breaks. |
 | **Horizontal when additive** | New UI on existing APIs can be frontend-only; a new API with no caller on `main` yet can be backend-only. |
 | **One owner per shared seam** | A file or symbol touched by more than one slice has exactly **one owning slice**; the others consume it, never re-add it. See below. |
@@ -58,9 +58,9 @@ Common seam categories:
 
 ---
 
-## Gate 1 honesty
+## Verification Gate Honesty
 
-"Gate 1 green" in a PR body is a factual claim that you ran the local Gate 1 fast gate on this branch: `python scripts/axis.py verify` with the command matrix in [agent-checklist § Gate 1](./agent-checklist.md#gate-1--verify-before-push-fast-local-gate). Do not present unit-only output, a one-file test, or a partial command as Gate 1.
+"Verification gate green" in a PR body is a factual claim that you ran the local Verification gate on this branch: `python scripts/axis.py verify` with the command matrix in [agent-checklist § Verification Gate](./agent-checklist.md#verification-gate--verify-before-push). Do not present unit-only output, a one-file test, or a partial command as the Verification gate.
 
 The full suite is a separate claim: full local verification means full `dotnet test Axis.sln --nologo` plus the applicable frontend and drift checks. CI/branch protection is the authoritative full gate before merge.
 
@@ -100,7 +100,7 @@ an unmerged sibling owns?
 | Symptom at merge time | Rule |
 |-----------------------|------|
 | Branch does not compile because it references something only a sibling adds | Two-sided test, side A · shared-seam ownership |
-| "Gate 1 green" in the body but CI is red | Gate 1 honesty |
+| "Verification gate green" in the body but CI is red | Verification gate honesty |
 | Two open PRs add the same new file → add/add conflict | No duplicate new files across siblings |
 | Two slices add the same member/migration → broken model snapshot | One owner per shared seam |
 | Two slices disagree on a shared constant/contract value | One source for shared values/contracts |
@@ -127,4 +127,4 @@ an unmerged sibling owns?
 - [ ] Shared values/contracts imported from their single owner, not re-hardcoded
 - [ ] Any partially-done spec bullet listed under `**Deferred (PR #N follow-up):**`
 - [ ] `python scripts/axis.py check doc-drift` when `src/`, `tests/`, or `docs/use-cases/` change
-- [ ] "Gate 1 green" in the PR body reflects commands you actually ran (anything skipped is stated)
+- [ ] "Verification gate green" in the PR body reflects commands you actually ran (anything skipped is stated)

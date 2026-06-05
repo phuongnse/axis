@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Axis Screen Wireframes — generate-screens.mjs
  * Run: node docs/wireframes/generate-screens.mjs
  * Filter: node docs/wireframes/generate-screens.mjs identity-access/login,identity-access/register-user

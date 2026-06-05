@@ -10,8 +10,8 @@
 
 | What changes | How CI knows | Agent fix when check fails |
 |--------------|--------------|----------------------------|
-| `src/Modules/{Module}/` | Folder name → `docs/use-cases/{slug}/` ([`doc_drift_domains.py`](../../scripts/doc_drift_domains.py)) | Add domain folder + use-case docs in **same PR** as module code |
-| `src/Axis.Api/Endpoints/*Endpoints.cs` | `using Axis.{Module}.Application` → same domain as module | Same as row above |
+| `src/Modules/{Module}/` | Folder name → `docs/use-cases/{slug}/` ([`doc_drift_domains.py`](../../scripts/doc_drift_domains.py)) | Add or map the domain folder when adding a module |
+| `src/Axis.Api/Endpoints/*Endpoints.cs` | `using Axis.{Module}.Application` → same domain as module | Ensure the endpoint group maps to an existing domain; update behavior docs via Docs review when behavior changes |
 | `*Event.avsc` under `Contracts/Schemas/` | `python scripts/axis.py register avro-schemas --dry-run` globs `*Event.avsc` | No script edit; optional local: `python scripts/axis.py register avro-schemas` |
 | `Contracts/Protos/*.proto` | `python scripts/axis.py check buf-modules` vs `buf.yaml` | `python scripts/axis.py generate buf-yaml` then `buf lint` |
 | `*KafkaTopics.cs` constants | `python scripts/axis.py check kafka-wiring` vs `Program.cs` | Add `PublishAndListenWithAvro` + `PublishLocally` for new `{Class}.{Const}` |
@@ -21,10 +21,6 @@
 | `OrganizationVerifiedHandler` in a module | [`TenantProvisioningConventionTests`](../../tests/Architecture/Axis.Architecture.Tests/TenantProvisioningConventionTests.cs) vs `TenantModuleNames.All` | Add const + entry in `TenantModuleNames` ([`TenantProvisioningContracts.cs`](../../src/Modules/Identity/Axis.Identity.Contracts/TenantProvisioningContracts.cs)) |
 
 **Slug override (rare):** when module folder name ≠ `docs/use-cases/` folder (only `Identity` → `identity-access` today), add one line to `MODULE_DOMAIN_SLUG_OVERRIDES` in [`axis_repo.py`](../../scripts/axis_repo.py).
-
-**Cross-cutting doc rules (rare):** paths that are not owned by a single module (e.g. auth `AppShell`, `OrganizationVerifiedHandler`) stay in `EXTRA_CODE_TO_DOC_RULES` inside [`doc_drift_domains.py`](../../scripts/doc_drift_domains.py).
-
----
 
 ## Still manual (CI catches omissions)
 
@@ -40,19 +36,19 @@
 
 ## One command before push (layout + docs)
 
-When `src/`, `tests/`, or `docs/use-cases/` change:
+When touching docs, scripts, repo layout, handlers, endpoints, or generated-contract surfaces:
 
 ```bash
+python scripts/axis.py check policy-tests
 python scripts/axis.py check doc-drift
 ```
 
-That runs (among others): domain doc rules on the PR diff, `check buf-modules`, `check kafka-wiring`, `check domain-readme-index`, `check use-case-docs`, link targets, local-dev sync, and script-standard enforcement.
+That runs (among others): module/API layout discovery, changed-handler test ratchets, `check buf-modules`, `check kafka-wiring`, `check domain-readme-index`, `check use-case-docs`, link targets, local-dev sync, script-standard enforcement, and policy counterexample tests.
 
 When only validating discovery (no PR diff yet):
 
 ```bash
-python scripts/axis.py check doc-drift
-python scripts/doc_drift_domains.py --list    # debug: code → docs rules
+python scripts/doc_drift_domains.py --list    # debug: module/API → docs mapping
 python scripts/axis.py check buf-modules
 python scripts/axis.py check kafka-wiring
 python scripts/axis.py check domain-readme-index
@@ -82,12 +78,12 @@ python scripts/axis.py check domain-readme-index
 
 ### C — New REST surface (`*Endpoints.cs` or handler in existing module)
 
-- [ ] Spec under correct domain in `docs/use-cases/` (drift enforces same-PR doc touch on module/API change).
+- [ ] Spec under correct domain in `docs/use-cases/` when shipping behavior; this is Docs review, not a path-only gate.
 - [ ] `Map*Endpoints` in `Program.cs` ([process.md § Host wiring](./process.md)).
-- [ ] Domain README: set API row to ⚠️ or ✅ when endpoints ship (not `| API | ⏳`).
-- [ ] Handler tests: `*Handler.cs` → `*HandlerTests.cs` (drift).
-- [ ] **Regenerate the OpenAPI contract** — a new/changed route, request, or response shape changes the wire. Run `python scripts/axis.py generate api-contracts` and **commit both** `openapi.json` and `frontend/src/lib/api-types.ts`. `openapi.json` and `api-types.ts` are generated, never hand-edited. CI's `OpenApiDocumentTests` plus `python scripts/axis.py check frontend-api-contracts` fail when contracts drift or frontend code defines hand-authored `*Request`/`*Response`/`*Dto` API models.
-- [ ] `python scripts/axis.py check doc-drift`.
+- [ ] Domain README: set API row away from pending when endpoints ship.
+- [ ] Handler tests: changed `*Handler.cs` → matching `*HandlerTests.cs` (diff ratchet).
+- [ ] **Regenerate the OpenAPI contract** when a route, request, or response shape changes. Run `python scripts/axis.py generate api-contracts` and commit both `openapi.json` and `frontend/src/lib/api-types.ts`.
+- [ ] `python scripts/axis.py check policy-tests` and `python scripts/axis.py check doc-drift`.
 
 ### D — New Kafka event
 
@@ -106,10 +102,10 @@ python scripts/axis.py check domain-readme-index
 ## Rules (P0/P1 for agents)
 
 1. **Do not** add parallel hardcoded module/endpoint lists to `python scripts/axis.py check doc-drift` — extend [`axis_repo.py`](../../scripts/axis_repo.py) / the dedicated checker, then wire it into drift.
-2. **Do not** skip `docs/use-cases/` when changing `src/Modules/` or `*Endpoints.cs` — drift fails by design.
-3. **Do** run `python scripts/axis.py generate domain-readme-index` after changing use-case titles/Purpose or adding a use-case folder.
-4. **Do** treat `TenantModuleNames` and `Program.cs` Kafka wiring as contract edits — architecture + kafka checks must pass.
-5. **Chore PRs** that touch module code still need a minimal accurate doc touch in the matching domain ([agent-checklist § Chore/style PRs](./agent-checklist.md)).
+2. **Do** create or map the domain folder when adding a new module or endpoint group; discovery fails if the owning domain is missing.
+3. **Do** update owning docs in the same PR when behavior/spec/status changes. Pure refactor, style, dependency, and test-only changes do not need a token docs edit.
+4. **Do** run `python scripts/axis.py generate domain-readme-index` after changing use-case titles/Purpose or adding a use-case folder.
+5. **Do** treat `TenantModuleNames` and `Program.cs` Kafka wiring as contract edits — architecture + kafka checks must pass.
 
 ---
 
@@ -117,7 +113,7 @@ python scripts/axis.py check domain-readme-index
 
 | Doc | Topic |
 |-----|--------|
-| [agent-checklist.md](./agent-checklist.md) | Gates 0–3, domain map summary |
+| [agent-checklist.md](./agent-checklist.md) | Verification gate, review checks, domain layout summary |
 | [process.md](./process.md) | Layer order, host wiring, deferred follow-ups |
 | [patterns.md § gRPC](./patterns.md) | Buf, proto layout |
 | [Architecture tests README](../../tests/Architecture/Axis.Architecture.Tests/README.md) | Fitness tests + new module |

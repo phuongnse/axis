@@ -166,8 +166,134 @@ def iter_files(root: Path, suffixes: tuple[str, ...]) -> Iterable[Path]:
     )
 
 
-def git_ls_files(pattern: str) -> list[str]:
-    return [line for line in git(["ls-files", pattern]).splitlines() if line.strip()]
+def git_ls_files(pattern: str | None = None) -> list[str]:
+    args = ["ls-files"]
+    if pattern is not None:
+        args.append(pattern)
+    return [line for line in git(args).splitlines() if line.strip()]
+
+
+TEXT_ENCODING_SUFFIXES = {
+    ".avsc",
+    ".cs",
+    ".cshtml",
+    ".csproj",
+    ".css",
+    ".dockerignore",
+    ".editorconfig",
+    ".env",
+    ".excalidraw",
+    ".gitattributes",
+    ".gitignore",
+    ".graphql",
+    ".html",
+    ".http",
+    ".js",
+    ".json",
+    ".jsonc",
+    ".jsx",
+    ".md",
+    ".mjs",
+    ".props",
+    ".proto",
+    ".ps1",
+    ".py",
+    ".runsettings",
+    ".scss",
+    ".sh",
+    ".sln",
+    ".sql",
+    ".svg",
+    ".targets",
+    ".ts",
+    ".tsx",
+    ".txt",
+    ".xml",
+    ".yaml",
+    ".yml",
+}
+TEXT_ENCODING_FILENAMES = {
+    ".coderabbit.yaml",
+    ".editorconfig",
+    ".gitattributes",
+    ".gitignore",
+    "Dockerfile",
+    "Makefile",
+}
+TEXT_ENCODING_SKIP_PARTS = {".git", "bin", "coverage", "dist", "node_modules", "obj"}
+UTF8_BOM = b"\xef\xbb\xbf"
+
+
+def mojibake_marker(text: str) -> str:
+    return text.encode("utf-8").decode("cp1252", errors="ignore")
+
+
+MOJIBAKE_MARKERS = (
+    "\ufffd",
+    mojibake_marker("’"),
+    mojibake_marker("“"),
+    mojibake_marker("”"),
+    mojibake_marker("–"),
+    mojibake_marker("—"),
+    mojibake_marker("→"),
+    mojibake_marker("←"),
+    mojibake_marker("✓"),
+    mojibake_marker("✅"),
+    mojibake_marker("⚠"),
+    mojibake_marker("⏳"),
+)
+
+
+def should_check_text_encoding(path: str) -> bool:
+    normalized = path.replace("\\", "/")
+    if any(part in TEXT_ENCODING_SKIP_PARTS for part in normalized.split("/")):
+        return False
+    p = Path(normalized)
+    return p.suffix.lower() in TEXT_ENCODING_SUFFIXES or p.name in TEXT_ENCODING_FILENAMES
+
+
+def text_encoding_issues(paths: Iterable[Path], *, root: Path = ROOT) -> list[str]:
+    issues: list[str] = []
+    for path in sorted(paths):
+        if not path.is_file():
+            continue
+        normalized = str(path.relative_to(root)).replace("\\", "/")
+        if not should_check_text_encoding(normalized):
+            continue
+
+        data = path.read_bytes()
+        if data.startswith(UTF8_BOM):
+            issues.append(f"{normalized}: UTF-8 BOM found - save as UTF-8 without BOM")
+
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            issues.append(f"{normalized}: invalid UTF-8 byte at offset {exc.start}")
+            continue
+
+        if b"\r" in data:
+            issues.append(f"{normalized}: CRLF/CR line ending found - use LF")
+
+        for line_number, line in enumerate(text.splitlines(), 1):
+            if any(marker in line for marker in MOJIBAKE_MARKERS):
+                snippet = line.strip()
+                if len(snippet) > 160:
+                    snippet = f"{snippet[:157]}..."
+                issues.append(f"{normalized}:{line_number}: mojibake marker found: {snippet}")
+    return issues
+
+
+def check_text_encoding(_args: argparse.Namespace | None = None) -> int:
+    paths = [ROOT / path for path in git_ls_files() if should_check_text_encoding(path)]
+    issues = text_encoding_issues(paths)
+    if issues:
+        print("check-text-encoding FAIL:", file=sys.stderr)
+        for issue in issues:
+            print(f"  - {issue}", file=sys.stderr)
+        print("\nUse UTF-8 without BOM and LF line endings for tracked text files.", file=sys.stderr)
+        return 1
+    print(f"check-text-encoding: OK ({len(paths)} files scanned)")
+    return 0
 
 
 TEST_ATTRIBUTE_RE = re.compile(r"^\s*\[(?:Xunit[.])?(?:Fact|Theory)(?:Attribute)?(?:\s*[(]|\s*\])")
@@ -463,6 +589,22 @@ def check_scripts_standard(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
+def check_policy_tests(_args: argparse.Namespace | None = None) -> int:
+    return run(
+        [
+            sys.executable,
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "scripts/tests",
+            "-p",
+            "test_*.py",
+        ],
+        check=False,
+    ).returncode
+
+
 def added_lines(range_spec: str, include: callable[[str], bool]) -> Iterable[tuple[str, str]]:
     result = run([exe("git"), "diff", "--unified=0", range_spec], capture=True, check=False)
     if result.returncode != 0:
@@ -493,6 +635,79 @@ def docs_changed_under(paths: list[str], prefix: str) -> bool:
 def fail(issues: list[str], message: str) -> None:
     issues.append(message)
     print(f"check-doc-drift FAIL: {message}", file=sys.stderr)
+
+
+DOC_DRIFT_ADDED_LINE_RULES = [
+    (
+        r"GetAwaiter[(][)][.]GetResult[(][)]",
+        lambda p: p.startswith("src/") and p.endswith(".cs"),
+        "Sync-over-async introduced - make the caller async instead",
+    ),
+    (
+        r'"(Host=|Server=|Data Source=)',
+        lambda p: p.startswith("src/") and p.endswith(".cs"),
+        "Hardcoded connection string introduced - use configuration/options",
+    ),
+    (
+        r"DateTime[.]Now",
+        lambda p: (p.startswith("src/") or p.startswith("tests/")) and p.endswith(".cs"),
+        "DateTime.Now introduced - use DateTimeOffset.UtcNow / TimeProvider",
+    ),
+    (
+        r"[.]Produces<object>|Results[.](Ok|Json|Created|Accepted)[(]new[ ]*[{]",
+        lambda p: p.startswith("src/Axis.Api/Endpoints/") and p.endswith(".cs"),
+        "Endpoint returns object/anonymous JSON - use a named Application-layer DTO (REVIEW_FINDINGS.md)",
+    ),
+    (
+        r"\bSkip\s*=",
+        lambda p: p.startswith("tests/") and p.endswith(".cs"),
+        "Skipped test introduced - fix or remove the test instead",
+    ),
+    (
+        r"[.]EnsureCreated(?:Async)?[(]",
+        lambda p: (p.startswith("src/") or p.startswith("tests/")) and p.endswith(".cs"),
+        "EnsureCreated introduced - use the owning DbContext migration chain",
+    ),
+    (
+        r"TODO|FIXME|NotImplementedException|placeholder|stub",
+        lambda p: (p.startswith("src/") or p.startswith("tests/") or p.startswith("frontend/src/"))
+        and "/obj/" not in p
+        and "/node_modules/" not in p,
+        "New TODO/FIXME/stub marker introduced - resolve or open an issue",
+    ),
+]
+
+
+def doc_drift_added_line_issues(rows: Iterable[tuple[str, str]]) -> list[str]:
+    issues: list[str] = []
+    for path, line in rows:
+        for pattern, include, message in DOC_DRIFT_ADDED_LINE_RULES:
+            if include(path) and re.search(pattern, line):
+                issues.append(f"{message}: {path}: {line}")
+    return issues
+
+
+def missing_handler_test_issues(changes: Iterable[list[str]], *, root: Path | None = None) -> list[str]:
+    root = root or ROOT
+    issues: list[str] = []
+    for parts in changes:
+        status = parts[0]
+        if status == "D" or not (status in {"A", "M"} or status.startswith("R")):
+            continue
+        handler = (parts[2] if status.startswith("R") and len(parts) > 2 else parts[1]).replace("\\", "/")
+        if not re.match(r"^src/Modules/.*/(Commands|Queries)/.*Handler[.]cs$", handler):
+            continue
+        module_match = re.match(r"src/Modules/([^/]+)/", handler)
+        if not module_match:
+            continue
+        module = module_match.group(1)
+        subdir = "Commands" if "/Commands/" in handler else "Queries"
+        handler_name = Path(handler).stem
+        test_file = root / "tests" / "Modules" / module / f"Axis.{module}.Application.Tests" / subdir / f"{handler_name}Tests.cs"
+        if not test_file.is_file():
+            relative_test = str(test_file.relative_to(root)).replace("\\", "/")
+            issues.append(f"Handler {handler} - create {relative_test}")
+    return issues
 
 
 def endpoint_mediator_hits() -> list[str]:
@@ -568,60 +783,17 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
             print(f"check-doc-drift: no diff in {range_spec} - skip")
         return 1 if issues else 0
 
-    rules = doc_drift_domains.discover_rules()
-    domain_errors = doc_drift_domains.check_domain_docs(paths, rules)
-    domain_errors.extend(doc_drift_domains.check_readme_api_status(paths))
+    domain_errors = doc_drift_domains.check_readme_api_status(paths)
     for err in domain_errors:
         fail(issues, err)
-
-    frontend_generated = re.compile(r"^frontend/src/lib/api-types[.]ts$")
-    frontend_authored = any(path.startswith("frontend/src/") and not frontend_generated.search(path) for path in paths)
-    if frontend_authored and not docs_changed_under(paths, "docs/use-cases/"):
-        fail(issues, "frontend/src/ changed but no files under docs/use-cases/ in this PR")
 
     if any(path.startswith("src/") for path in paths) and docs_changed_under(paths, "docs/PROGRESS.md"):
         if not any(path.startswith("docs/use-cases/") for path in paths):
             fail(issues, "docs/PROGRESS.md updated but no docs/use-cases/ change while src/ changed")
 
-    rule_sets = [
-        (
-            r"GetAwaiter[(][)][.]GetResult[(][)]",
-            lambda p: p.startswith("src/") and p.endswith(".cs"),
-            "Sync-over-async introduced - make the caller async instead",
-        ),
-        (
-            r'"(Host=|Server=|Data Source=)',
-            lambda p: p.startswith("src/") and p.endswith(".cs"),
-            "Hardcoded connection string introduced - use configuration/options",
-        ),
-        (
-            r"DateTime[.]Now",
-            lambda p: (p.startswith("src/") or p.startswith("tests/")) and p.endswith(".cs"),
-            "DateTime.Now introduced - use DateTimeOffset.UtcNow / TimeProvider",
-        ),
-        (
-            r"SqlQueryRaw|ExecuteSqlRaw|FromSqlRaw|ExecuteSqlInterpolated|FromSqlInterpolated",
-            lambda p: p.startswith("src/Modules/") and p.endswith(".cs"),
-            "New raw-SQL call in module code - confirm same-module tables only",
-        ),
-        (
-            r"[.]Produces<object>|Results[.](Ok|Json|Created|Accepted)[(]new[ ]*[{]",
-            lambda p: p.startswith("src/Axis.Api/Endpoints/") and p.endswith(".cs"),
-            "Endpoint returns object/anonymous JSON - use a named Application-layer DTO (REVIEW_FINDINGS.md)",
-        ),
-        (
-            r"TODO|FIXME|NotImplementedException|placeholder|stub",
-            lambda p: (p.startswith("src/") or p.startswith("tests/") or p.startswith("frontend/src/"))
-            and "/obj/" not in p
-            and "/node_modules/" not in p,
-            "New TODO/FIXME/stub marker introduced - resolve or open an issue",
-        ),
-    ]
-    for pattern, include, message in rule_sets:
-        rx = re.compile(pattern)
-        for path, line in added_lines(range_spec, include):
-            if rx.search(line):
-                fail(issues, f"{message}: {path}: {line}")
+    all_added_lines = added_lines(range_spec, lambda _path: True)
+    for issue in doc_drift_added_line_issues(all_added_lines):
+        fail(issues, issue)
 
     for hit in endpoint_mediator_hits():
         fail(
@@ -630,22 +802,8 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
             f"command/handler or saga (REVIEW_FINDINGS.md): {hit}",
         )
 
-    for parts in changed_name_status(range_spec):
-        status = parts[0]
-        if not (status == "A" or status.startswith("R")):
-            continue
-        handler = (parts[2] if status.startswith("R") and len(parts) > 2 else parts[1]).replace("\\", "/")
-        if not re.match(r"^src/Modules/.*/(Commands|Queries)/.*Handler[.]cs$", handler):
-            continue
-        module_match = re.match(r"src/Modules/([^/]+)/", handler)
-        if not module_match:
-            continue
-        module = module_match.group(1)
-        subdir = "Commands" if "/Commands/" in handler else "Queries"
-        handler_name = Path(handler).stem
-        test_file = ROOT / "tests" / "Modules" / module / f"Axis.{module}.Application.Tests" / subdir / f"{handler_name}Tests.cs"
-        if not test_file.is_file():
-            fail(issues, f"Handler {handler} - create {rel(test_file)}")
+    for issue in missing_handler_test_issues(changed_name_status(range_spec)):
+        fail(issues, issue)
 
     check_workarounds(issues)
 
@@ -687,6 +845,7 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
             fail(issues, f"EF migration missing .Designer.cs - regenerate with dotnet ef: {rel(migration)}")
 
     checkers = [
+        ("check-text-encoding", check_text_encoding),
         ("check-scripts-standard", check_scripts_standard),
         ("check-ef-domain-mapping", check_ef_domain_mapping),
         ("check-frontend-api-contracts", check_frontend_api_contracts),
@@ -762,6 +921,7 @@ def verify(args: argparse.Namespace) -> int:
         step("frontend ci (tsc + biome)", lambda: run([exe("npm"), "run", "ci"], cwd=ROOT / "frontend", check=False).returncode)
         step("frontend test", lambda: run([exe("npm"), "run", "test"], cwd=ROOT / "frontend", check=False).returncode)
 
+    step("policy gate tests", lambda: check_policy_tests())
     step("doc drift", lambda: check_doc_drift())
 
     if api_surface_drift:
@@ -875,6 +1035,8 @@ def main(argv: list[str] | None = None) -> int:
     check = sub.add_parser("check")
     check_sub = check.add_subparsers(dest="check_command", required=True)
     check_sub.add_parser("doc-drift").set_defaults(func=check_doc_drift)
+    check_sub.add_parser("policy-tests").set_defaults(func=check_policy_tests)
+    check_sub.add_parser("text-encoding").set_defaults(func=check_text_encoding)
     check_sub.add_parser("scripts-standard").set_defaults(func=check_scripts_standard)
     check_sub.add_parser("test-naming").set_defaults(func=check_test_naming)
     check_sub.add_parser("test-project-classification").set_defaults(func=check_test_project_classification)

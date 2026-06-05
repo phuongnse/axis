@@ -73,7 +73,7 @@ Each module *is* a service contract — modulith mode collocates them as in-proc
 
 Per-message transport selection follows the suffix convention in [ADR-025](./TECH_STACK.md#adr-025-transport-selection-rule-by-message-name-suffix): `*Command`/`*Job`/`*SagaStep` → RabbitMQ, `*Event`/`*Snapshot` → Kafka.
 
-Forbidden: shared `DbContext`, direct C# method calls into another module's Application services, cross-module SQL, in-process `IMediator` for cross-module dispatch. The drift script and CI enforce these — see [CLAUDE.md § Service boundaries](../CLAUDE.md) and [playbooks/patterns.md § Cross-module communication](./playbooks/patterns.md#cross-module-communication-pattern).
+Forbidden: shared `DbContext`, direct C# method calls into another module's Application services, cross-module SQL, in-process `IMediator` for cross-module dispatch. Architecture tests and CI enforce the structural subset; cross-module raw SQL and runtime DI gaps remain review-owned. See [CLAUDE.md § Service boundaries](../CLAUDE.md), [REVIEW_FINDINGS.md](./REVIEW_FINDINGS.md), and [playbooks/patterns.md § Cross-module communication](./playbooks/patterns.md#cross-module-communication-pattern).
 
 ---
 

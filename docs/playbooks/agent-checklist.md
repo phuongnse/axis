@@ -2,15 +2,15 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
 
-**Daily workflow.** Walk Gates 0–3 **locally** while implementing; reflect outcomes in the [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) checkboxes. **PR description = Summary + Linked spec + Requirements only** — no Gate paste blocks, no commit list, no CI/Doc-drift status (GitHub Checks tab covers that).
+**Daily workflow.** Walk the Ready review, Docs review, and Retrospective review while implementing; run the Verification gate before push. Reflect outcomes in the [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) checkboxes. **PR description = Summary + Linked spec + Requirements only** — no review/gate paste blocks, no commit list, no CI/Doc-drift status (GitHub Checks tab covers that).
 
-**Large use cases:** split into **genuinely isolated PRs** (each branch from `main`, each passing the two-sided isolation test). See [pr-slicing.md](./pr-slicing.md) — never stack slice B on slice A's branch, never claim "Gate 1 green" you did not run, and assign one owner per shared seam.
+**Large use cases:** split into **genuinely isolated PRs** (each branch from `main`, each passing the two-sided isolation test). See [pr-slicing.md](./pr-slicing.md) — never stack slice B on slice A's branch, never claim the Verification gate is green when you did not run it, and assign one owner per shared seam.
 
 The paste-block templates below are for *your own* walk-through (agent reasoning, scratchpad, or PR thread comment if asked) — not for the PR description.
 
 ---
 
-## Gate 0 — Ready (before code)
+## Ready Review — before code
 
 - **Design Gate** ([design-gate.md](./design-gate.md)): re-derive the rules governing the surface you touch and produce the dossier (rules quoted, blast-radius `grep`, contract+casing, gate plan); **high-risk surfaces require user sign-off before code**
 - AC map: every row has layer + file/test — **no blank cells**
@@ -20,7 +20,7 @@ The paste-block templates below are for *your own* walk-through (agent reasoning
 - End of PR: [process.md § PR wrap-up](process.md) — deferred lines, host wiring, callouts (no user reminder)
 
 ```markdown
-## Gate 0
+## Ready review
 | AC / use case | Layer | File / test |
 |---------|-------|-------------|
 | …       | …     | …           |
@@ -64,7 +64,7 @@ Use-case files group ACs under **Happy path**, **Validation & errors**, **Edge c
 
 ### Anti-pattern: `Gaps vs spec: none` after happy path only
 
-Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because the main API flow works. That is not Gate 0 complete.
+Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because the main API flow works. That is not Ready review complete.
 
 | Wrong | Right |
 |-------|--------|
@@ -89,21 +89,22 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 
 ---
 
-## Gates (every PR)
+## Automated gates and review checkpoints
 
-**Doc drift:** when `src/`, `tests/`, or `docs/use-cases/` change — run `python scripts/axis.py check doc-drift` **before push** (P0); CI job **Doc drift** must be green. When `docker-compose.yml` changes, update [local-dev.md](./local-dev.md) in the same PR (`check-local-dev-docs.py` runs inside the drift command). Script output is not a PR artefact — walk Gate 2 rows below mentally and tick the Gate 2 checkbox.
+**Doc drift:** CI runs `python scripts/axis.py check policy-tests` and `python scripts/axis.py check doc-drift` on every PR. Run them locally when touching docs, scripts, repo layout, handlers, endpoints, generated-contract surfaces, or bulk file rewrites. This job enforces deterministic policy/doc checks; it does not require a docs edit for every code diff.
 
-| Gate | Action |
-|------|--------|
-| **0** | AC map + docs touched (when `src/`, `tests/`, or `frontend/` change) |
-| **1** | Local fast verification (table below); CI/branch protection owns the full suite |
-| **2** | Doc walk-through (rows below) |
-| **3** | Retrospective (questions below) |
+| Item | Type | Action |
+|------|------|--------|
+| **Ready review** | Review-only | AC map + docs identified when shipping behavior |
+| **Verification gate** | Enforced | Local fast verification; CI/branch protection owns the full suite |
+| **Docs review** | Review-only | Docs walkthrough when behavior/spec/status changes |
+| **Retrospective review** | Review-only | Retrospective and REVIEW_FINDINGS update when a rule/finding repeats |
 
-**CI-only gates** (run automatically on PR, no local action required):
+**CI-enforced checks** (run automatically on PR, no local action required unless debugging):
 
-- **PR guard** — [`scripts/check-pr.py`](../../scripts/check-pr.py) validates PR metadata in one place: the PR title must use Conventional Commit style (`type(scope): subject` or `type: subject`), and the PR body must keep the template contract: `Summary`, `Linked spec`, and `Requirements & rules followed` are present; requirement checkboxes are checked or explicitly marked `N/A` with a concrete reason. The template in [`.github/PULL_REQUEST_TEMPLATE.md`](../../.github/PULL_REQUEST_TEMPLATE.md) auto-fills the body; this CI job is the enforcement.
-- **Doc drift** — enforces same-PR docs, new-handler tests, no-new TODO/FIXME, new raw-SQL review, [WORKAROUND comment ↔ inventory sync](../WORKAROUNDS.md), [speculation guard](./docs-style.md#anti-patterns-dont-ship-these), [incident/lesson framing guard](./docs-style.md#keep-practice-docs-general), `GetAwaiter().GetResult()` ban, hardcoded connection-string ban, `DateTime.Now` ban (use `UtcNow`), script-standard enforcement, and a stale-terminology guard (current pattern list lives in [`scripts/axis.py`](../../scripts/axis.py)). **Module/API → use-case domain** — [`doc_drift_domains.py`](../../scripts/doc_drift_domains.py) + [`axis_repo.py`](../../scripts/axis_repo.py). **Layout drift** in the same job: `python scripts/axis.py check buf-modules`, `python scripts/axis.py check kafka-wiring`, `python scripts/axis.py check domain-readme-index`.
+- **PR guard** — [`scripts/check-pr.py`](../../scripts/check-pr.py) validates PR metadata shape and checkbox self-attestation. It cannot prove that review-only checkpoints happened.
+- **Policy gate tests** — `python scripts/axis.py check policy-tests` runs counterexample tests for custom Python gates so a regex/path change cannot silently disable enforcement.
+- **Doc drift** — validates text encoding (`UTF-8` without BOM + LF), module/API discovery, changed-handler test files, no-new TODO/FIXME/stub markers, no new test `Skip = ...`, no `EnsureCreated`, endpoint named DTO ratchets, [WORKAROUND comment ↔ inventory sync](../WORKAROUNDS.md), [speculation guard](./docs-style.md#anti-patterns-dont-ship-these), [incident/lesson framing guard](./docs-style.md#keep-practice-docs-general), `GetAwaiter().GetResult()` ban, hardcoded connection-string ban, `DateTime.Now` ban, script standards, stale terminology, and layout checks (`buf`, Kafka wiring, domain README index).
 - **Markdown link check** — `lychee` verifies internal links and `#anchors`. **Relative file/image targets** (`![alt](./asset.svg)`, `[text](./file.md)`) are double-checked by `python scripts/axis.py check doc-link-targets` inside the drift command — catches the broken-image class lychee misses.
 - **Doc navigation** — `python scripts/axis.py check doc-navigation` requires every `docs/**/*.md` file to start with an H1 and a `> **Navigation**:` block so docs never become dead ends.
 - **Code-fence integrity** — `python scripts/axis.py check doc-code-fences` (inside the drift command) flags code-block lines with collapsed indentation (a lone leading space). Catches the bulk-find-replace corruption class that lychee, prettier, and the structural checks all let through.
@@ -111,16 +112,16 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 - **Secret scanning** — TruffleHog scans the full PR diff for committed secrets (API keys, passwords, tokens) and verifies each finding against the alleged service before reporting (`--only-verified` cuts false positives).
 - **Vulnerable packages** — `python scripts/axis.py check vulnerable-packages` wraps `dotnet list package --vulnerable --include-transitive` and fails on any known CVE in the dep tree (covers transitive packages too).
 - **Architecture fitness tests** run as part of `dotnet test` — failures there mean a CLAUDE.md P0/P1 rule got violated structurally. See [tests README](../../tests/Architecture/Axis.Architecture.Tests/README.md).
-- **EF migrations** — only `dotnet ef migrations add` (no hand-written `.cs` / orphan `.Designer.cs`). Each `{Name}.cs` needs `{Name}.Designer.cs`. See [local-dev.md § EF Core migrations](./local-dev.md#ef-core-migrations-dotnet-ef).
+- **EF migrations** — drift verifies each migration `.cs` has its `.Designer.cs`. The command used to create the migration remains review-owned. See [local-dev.md § EF Core migrations](./local-dev.md#ef-core-migrations-dotnet-ef).
 - **Local dev docs** — [`docker-compose.yml`](../../docker-compose.yml) changes require [`docs/playbooks/local-dev.md`](./local-dev.md) in the same PR; CI runs `python scripts/axis.py check local-dev-docs`.
 - **Async-safety analyzers** (`Microsoft.VisualStudio.Threading.Analyzers`) — type-aware checks at build time for sync-over-async (VSTHRD002), async-void (VSTHRD100), unobserved async results (VSTHRD110). Rule selection rationale in [patterns.md § Async patterns](./patterns.md#async-patterns).
 - **Coverage report** uploaded as artifact (`dotnet-coverage`). No threshold yet — see [CONTRIBUTING.md § Coverage](../../CONTRIBUTING.md#coverage).
 
 **Adding new CI checks — verify GitHub plan support first.** Some GitHub-native security workflows require **GitHub Advanced Security (GHAS)** on private repos (a paid add-on). On `phuong-labs/axis` this includes `actions/dependency-review-action` and CodeQL code-scanning *upload* (analysis runs, only the SARIF upload fails). Verify GHAS provisioning before adding such checks; otherwise the PR will fail and need a follow-up to disable. Dependabot security updates work on any plan and cover the same threat model with a publish-time delay — use it as the baseline. The disabled-job comment in [`.github/workflows/build-and-test.yml`](../../.github/workflows/build-and-test.yml) lists the specific jobs to restore when GHAS is provisioned.
 
-**Priority:** Gate **1** blocks commit (failing build/tests). Gate **2** keeps docs in the same PR — required before merge, not a substitute for Gate 1. The [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) lists Gate 1 before Gate 2.
+**Priority:** the Verification gate and CI-enforced checks block merge. Ready, Docs, and Retrospective reviews are review-only self-audits captured by the PR checklist.
 
-### Gate 1 — verify before push (fast local gate)
+### Verification Gate — verify before push
 
 **One command:** `python scripts/axis.py verify` runs the fast local gate — build + vulnerable package scan + `dotnet format --verify` + **unit test projects only** + frontend `ci`/test + drift. It only runs the layers whose files changed (so doc-only and frontend-only work stays quick). Run `python scripts/axis.py bootstrap` once to install the committed **pre-push hook** explicitly (`core.hooksPath = scripts/hooks`); build commands must not mutate Git config. CI/branch protection remains the authoritative full gate and runs full `dotnet test` including Testcontainers before merge.
 
@@ -145,17 +146,19 @@ The .NET branch of `python scripts/axis.py verify` also runs the enforced
 | `src/` or `tests/` | `dotnet format --verify-no-changes` |
 | `frontend/` | `npm run ci` then `npm run test` |
 | `src/Axis.Api/Endpoints/` or API contract | Update + run `tests/Api/Axis.Api.Tests/` |
-| Any of the above + `docs/use-cases/` | `python scripts/axis.py check doc-drift` — also runs `check use-case-docs` and `check local-dev-docs`, enforces no-new `TODO`/`FIXME`/`stub`, reviews new raw-SQL calls |
+| Docs/scripts/layout/policy change | `python scripts/axis.py check policy-tests` then `python scripts/axis.py check doc-drift` |
 | `docker-compose.yml` | Update [local-dev.md](./local-dev.md) in same PR; `python scripts/axis.py check doc-drift` |
 
 ```text
-Gate 1 self-check:
+Verification gate self-check:
 - test naming → ran / not triggered (reason)
 - dotnet build → ran / not triggered (reason)
 - vulnerable package scan → ran / not triggered (reason)
 - unit test projects → ran / not triggered (reason)
 - dotnet format --verify-no-changes → ran / not triggered (reason)
 - npm run ci + npm run test → ran / not triggered (reason)
+- policy gate tests → ran / not triggered (reason)
+- python scripts/axis.py check text-encoding → ran / not triggered (reason)
 - python scripts/axis.py check doc-drift → ran / not triggered (reason)
 ```
 
@@ -163,14 +166,14 @@ Example (docs-only): every line `not triggered — no src/, tests/, or frontend/
 
 **Full suite:** integration and API tests run in CI as part of full `dotnet test`; Docker/Testcontainers is required there. Run full local `dotnet test Axis.sln --nologo` when debugging CI, changing Infrastructure/API behavior, or preparing a high-risk backend PR. Use the Docker endpoint available to the shell running the suite when `docker info` works. If it does not and Docker Engine lives inside WSL2, set `DOCKER_HOST` to the exported daemon instead (prefer `tcp://127.0.0.1:2375`).
 
-### Gate 2 — docs walk-through
+### Docs Review
 
-Paste block format: header `Gate 2:` then one `-` line per row (Gate 3 uses the same bullet style).
+Paste block format: header `Docs review:` then one `-` line per row (Retrospective review uses the same bullet style). Mark pure refactor/style/test-only changes as `not triggered` instead of inventing docs churn.
 
 ```text
-Gate 2:
+Docs review:
 - Library → TECH_STACK.md / not triggered
-- New pattern → patterns.md / not triggered
+- New pattern → patterns.md or REVIEW_FINDINGS.md / not triggered
 - Use-case layer callout → docs/use-cases/{domain}/… (layout per [docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--wireframes--implementation-status); multi-screen example [register-org](../use-cases/platform-foundation/register-org/README.md)) / not triggered
 - Use-case wireframes/diagrams README → Screen flow + full wireframes inventory + Diagrams owned in-folder only ([docs-style](./docs-style.md#use-case-files--wireframes--implementation-status)) / not triggered
 - Domain README + PROGRESS → … / not triggered
@@ -204,12 +207,12 @@ Do **not** ship the first diff that only makes CI green or closes the thread. Fo
 
 **Examples** (illustrative — not an exhaustive list): splitting an invariant across “mutate then query”; external calls with catch-only patches; duplicating logic to silence a linter. In those cases, look for a single owner of the invariant or parity with existing guards/handlers in the repo.
 
-### Gate 3 — retrospective
+### Retrospective Review
 
-Answer **Yes** or **No** on **each line** (same `-` bullet style as Gate 2 — do not collapse to a single `No`). If **Yes**, name the doc updated in this PR.
+Answer **Yes** or **No** on **each line** (same `-` bullet style as Docs review — do not collapse to a single `No`). If **Yes**, name the doc, test, or ledger row updated in this PR.
 
 ```text
-Gate 3:
+Retrospective review:
 - New rule from test failure? → No
 - Invented invariant without AC? → No
 - Infrastructure footgun? → No
@@ -221,7 +224,7 @@ Gate 3:
 - Repeat of a prior review finding class? → No
 ```
 
-If the last line is **Yes**, record the class in [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md): point it at a mechanism (analyzer / fitness test / codegen / CI guard) or mark it deliberately manual with a reason. A finding class should be reviewed once, then prevented — not re-flagged every PR.
+If the last line is **Yes**, record the class in [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md): mark it Enforced, Partial, Review-only, Guidance, or Not a rule. A finding class should be reviewed once, then prevented or explicitly kept human-owned.
 
 ---
 
@@ -243,37 +246,32 @@ Never ✅ and "pending …" in the same callout. Checkboxes in use-case files ar
 | **2 — Domain** | A layer is complete for the module | Domain `README.md` implementation table + **Open work (agents)** section (remove or reword items you closed) |
 | **3 — Platform** | Module-wide summary changed | `docs/PROGRESS.md` — layer status only |
 
-Updating only `PROGRESS.md` while changing `src/` without `docs/use-cases/` → drift fails. Domain README `| API | ⏳` after endpoints ship → drift fails.
+Updating only `PROGRESS.md` while changing `src/` without a use-case callout still fails because platform status needs an owning source. Domain README pending API status after endpoints ship also fails.
 
 **Agents starting a task:** read [use cases README § How agents find open work](../use-cases/README.md#how-agents-find-open-work) — checkboxes in use-case files are not progress.
 
-**Chore/style PRs that touch module code:** drift still applies — add one small, accurate detail to the matching domain doc (a chunk size, a behavior nuance, a deferral note already true). Don't propose loosening the script, don't strand the format gunk waiting for a "real" PR, and don't invent fake content. The script's intent is *prompt the developer to look at docs*, not *require rewrite proportional to code change*.
+---
+
+## Review-only project expectations
+
+These expectations still matter, but do not call them CI gates unless [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md) marks the class **Enforced**.
+
+- Spec → code, never the reverse.
+- No cross-module SQL / shared `DbContext` / `IMediator` for domain events. Structural subsets are enforced; semantic SQL and runtime DI remain review-only.
+- Changed `*Handler.cs` → matching `*HandlerTests.cs`. The diff ratchet enforces changed Application handlers; untouched legacy files are not swept.
+- Behavior/spec/status changes → update the owning docs in the same PR. Pure refactor, style, dependency, and test-only changes do not need a token docs edit.
+- Frontend screen → wireframe row in the owning use-case `## Wireframes` table when the screen changes.
+- Use-case diagram → row only if the `.excalidraw` lives **in that use-case folder**; link other use cases in `**Related:**` prose, not in `## Diagrams` table.
+- No test `Skip = ...`, weakened tests, or completed layer status when ACs are open. New test skips are enforced; weakened assertions/status honesty remain review-only.
+- **Full suite honesty:** local pre-push uses the fast Verification gate command matrix; CI/branch protection runs full `dotnet test Axis.sln`. If you claim the full suite ran locally, it must be full `Axis.sln` with integration/API tests, not a solution filter or unit-only run.
 
 ---
 
-## P0 (CI + culture)
-
-- Spec → code, never the reverse
-- No cross-module SQL / shared `DbContext` / `IMediator` for domain events
-- New `*Handler.cs` → `*HandlerTests.cs` (drift script)
-- Module code → `docs/use-cases/{module}/` in **same PR**
-- Frontend screen → wireframe row in use-case `## Wireframes` table (every `*.excalidraw` **screen** in the folder; use `## Screen flow` + `#`/`Role` columns when >3 screens — [docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--wireframes--implementation-status), example [register-org](../use-cases/platform-foundation/register-org/README.md))
-- Use-case diagram → row only if the `.excalidraw` lives **in that use-case folder**; link other use cases in `**Related:**` prose, not in `## Diagrams` table
-- No `.Skip()`, weakened tests, or ✅ when ACs are open
-- **Full suite honesty:** local pre-push uses the fast Gate 1 command matrix; CI/branch protection runs full `dotnet test Axis.sln`. If you claim the full suite ran locally, it must be full `Axis.sln` with integration/API tests, not a solution filter or unit-only run.
-
----
-
-## Domain map (code → docs)
+## Domain layout discovery
 
 **Full rules + agent checklists:** [repo-layout-discovery.md](./repo-layout-discovery.md) (auto vs manual tables, commands, checklists A–E).
 
-**Summary:** [`doc_drift_domains.py`](../../scripts/doc_drift_domains.py) maps `src/Modules/*` and `*Endpoints.cs` → `docs/use-cases/{slug}/`. New module → create domain folder (or `MODULE_DOMAIN_SLUG_OVERRIDES` in [`axis_repo.py`](../../scripts/axis_repo.py) for `Identity` → `identity-access`). Cross-cutting only in `EXTRA_CODE_TO_DOC_RULES`.
-
-| Manual exception | Docs folder |
-|------------------|-------------|
-| `OrganizationVerifiedHandler` in any module | `docs/use-cases/platform-foundation/` |
-| `frontend/src/features/auth`, `routes/`, `AppShell` | `docs/use-cases/identity-access/` |
+**Summary:** [`doc_drift_domains.py`](../../scripts/doc_drift_domains.py) validates that module folders and endpoint groups map to existing `docs/use-cases/{slug}/` domains. It does not require a token docs edit for every module-code change; behavior/spec/status doc accuracy is Docs review.
 
 ---
 

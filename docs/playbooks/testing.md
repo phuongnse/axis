@@ -58,7 +58,7 @@ Testing playbook responsibility here is implementation technique:
 
 ### Pre-commit gate
 
-See [agent-checklist.md § Gate 1](./agent-checklist.md) and CLAUDE.md. When `src/` or `tests/` change:
+See [agent-checklist.md § Verification Gate](./agent-checklist.md#verification-gate--verify-before-push) and CLAUDE.md. When `src/` or `tests/` change:
 
 ```bash
 dotnet build

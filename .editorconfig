@@ -18,6 +18,7 @@
 root = true
 
 [*]
+# Enforced by `python scripts/axis.py check text-encoding`.
 charset = utf-8
 end_of_line = lf
 indent_style = space
@@ -345,7 +346,7 @@ dotnet_analyzer_diagnostic.category-Reliability.severity = suggestion
 
 # ── Escalated to warning (→ build error via TreatWarningsAsErrors) ──
 # Recurring review findings that are mechanical and deterministic: cheaper to
-# fail the build than to re-flag in review. See docs/review-findings-ledger.md.
+# fail the build than to re-flag in review. See docs/REVIEW_FINDINGS.md.
 # CA2016: forward the CancellationToken parameter to methods that take one.
 # Caught dropped tokens in schedulers/middleware/gRPC that review kept finding.
 dotnet_diagnostic.CA2016.severity = warning

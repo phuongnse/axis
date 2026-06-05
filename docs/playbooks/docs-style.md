@@ -2,7 +2,7 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
 
-Short anti-pattern checklist for everything under `docs/`. Read once; come back when adding a new file. Most of these are enforced by `python scripts/axis.py check doc-drift` and the **Markdown link check** CI job — the doctrine here exists so the rules feel justified, not arbitrary.
+Short anti-pattern checklist for everything under `docs/`. Read once; come back when adding a new file. Some items are CI-enforced, some are review-only guidance; the enforcement status lives in [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md). Do not call a docs convention a gate unless CI actually blocks it.
 
 ---
 
@@ -41,7 +41,8 @@ Reference and practice docs are **scanned, not read**. Optimize for a reader who
 | **Duplicating compose ports / service URLs** | Playbooks drift from `docker-compose.yml` | Owner: [local-dev.md](./local-dev.md) + compose file; enforced by `python scripts/axis.py check local-dev-docs` |
 | **Aspirational metrics** in engineering docs (e.g. "50 customers in 6 months") | Nobody measures or tests against them; they age into embarrassment | Keep in pitch deck / `PRODUCT_VISION.md` if anywhere; do not pollute technical reference |
 | **Empty "TODO: fill later" sections** | Look authoritative, contain nothing, lie to readers | Delete the section. Add it when there's content to add. |
-| **"Process about process"** docs > 100 lines | Nobody reads them; the rules don't get followed | Embed the rule into the **drift script** or a **template**. Doctrine without enforcement is decoration. |
+| **Accidental encoding rewrites** | Review diffs become unreadable; PowerShell/default tool output can turn Unicode into mojibake | Tracked text files must be UTF-8 without BOM and LF line endings. `python scripts/axis.py check text-encoding` enforces this and still allows real Unicode such as Vietnamese, arrows, and status icons. |
+| **"Process about process"** docs > 100 lines | Nobody reads them; the rules don't get followed | If deterministic, embed the rule into a tested gate or template. If not, keep it short and label it review-only guidance. |
 | **New file for content that fits in an existing file** | Doc graph fragments; agents have to read more files to get less | Absorb into the closest existing file. New file only when topic is genuinely separate **and** ≥ ~50 lines worth. |
 | **Incident / lesson detail baked into a general rule** | Reads as universal guidance but only fits the one case it came from; ages into noise and is hard to apply elsewhere | State the **general principle** in the playbook; keep the instance specifics in the use-case file / `PROGRESS.md` / PR retro. See § Keep practice docs general. |
 
@@ -71,7 +72,7 @@ When you learn something from a specific incident:
 | The general rule, phrased so it applies to any future case | The incident specifics — which feature, which fields, which error code |
 | (optional) one labeled example link | Detail lives in the use-case file, `PROGRESS.md`, or the PR retrospective |
 
-**Test:** read the rule as if you'd never seen the originating feature. If it only makes sense with that one use case in mind, generalize it and move the specifics out. (This is what [agent-checklist § Gate 3](./agent-checklist.md) means by "Incident-level detail in rule text? → No".)
+**Test:** read the rule as if you'd never seen the originating feature. If it only makes sense with that one use case in mind, generalize it and move the specifics out. (This is what [agent-checklist Retrospective review](./agent-checklist.md) means by "Incident-level detail in rule text? → No".)
 
 Enforced by the incident/lesson-framing guard in `python scripts/axis.py check doc-drift`, which flags lesson-style callouts (a bold *Lesson* heading, or a rule tagged with one specific feature in parentheses) in practice docs. The guard is deliberately narrow — it catches the recurring callout class, not every over-fit; the rest is on review and this section.
 
@@ -228,7 +229,7 @@ Avoid writing engineering process constraints as end-user use cases. Keep those 
 1. Add the back-link header (per [`docs/README.md`](../README.md)): `> **Navigation**: [← parent.md](...)` so future readers can climb back up.
 2. If it belongs in the docs hub: add a playbook row, a [Key Diagrams](../README.md#key-diagrams) index link, or a [Wireframes](../README.md#wireframes) domain pointer — **not** a per-screen wireframe file row (those stay in the owning use-case `## Wireframes` only).
 3. If it owns a topic, add it to the **Single source of truth** table.
-4. If the topic could be enforced mechanically, add a rule to `scripts/axis.py check doc-drift` — that is what makes the convention survive.
+4. If the topic could be enforced mechanically, add a tested rule to `scripts/axis.py` and document it in [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md). If it cannot be tested without noisy false positives, label it review-only guidance.
 
 ---
 
