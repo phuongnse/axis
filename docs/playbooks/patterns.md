@@ -1317,7 +1317,7 @@ CI runs `buf lint` and `buf breaking` against `main` when `.proto` or `buf.yaml`
 
 #### Buf breaking rules — what's actually configured (and the gotcha)
 
-Field-deletion enforcement in `buf.yaml` is **non-obvious** because the buf v2 category model splits deletion rules across categories in a way that's easy to misread. The bug we hit in PR #145: dropping `FIELD_NO_DELETE` alone leaves *zero* enforcement on field removal — the "reserved variant" is not implicit in FILE/PACKAGE.
+Field-deletion enforcement in `buf.yaml` is **non-obvious** because the buf v2 category model splits deletion rules across categories in a way that's easy to misread. Dropping `FIELD_NO_DELETE` alone leaves *zero* enforcement on field removal — the "reserved variant" is not implicit in FILE/PACKAGE.
 
 Rule map (verify with `buf config ls-breaking-rules --version=v2`):
 
@@ -1346,7 +1346,7 @@ Result: a field may be removed **iff** the proto has `reserved <number>;` AND `r
 When changing `buf.yaml` to allow a previously-forbidden change:
 
 1. **Run `buf config ls-breaking-rules --version=v2`** to see exactly which rules a category contains. Don't infer from category names — `PACKAGE` does *not* relax `FIELD_NO_DELETE`; the relaxed variant lives in `WIRE_JSON`/`WIRE` and is OFF by default.
-2. **Test the negative case before declaring the fix works.** Delete a `reserved` line locally, run `buf breaking`, and confirm it now fails. If it passes, you didn't fix it — you disabled enforcement. *"Buf passes" ≠ "rule fires correctly"*. The PR #145 first attempt (`use: PACKAGE`) and second attempt (`FILE except FIELD_NO_DELETE` alone) both "passed local buf" but enforced nothing.
+2. **Test the negative case before declaring the fix works.** Delete a `reserved` line locally, run `buf breaking`, and confirm it now fails. If it passes, you didn't fix it — you disabled enforcement. *"Buf passes" ≠ "rule fires correctly"*. A common bad fix is switching to `use: PACKAGE` or `FILE except FIELD_NO_DELETE` alone; both can pass local buf while enforcing nothing.
 3. **Reserved fields alone are hygiene only.** Without an enforced rule, `reserved` is documentation — it tells humans not to reuse the number, but buf won't fail anyone who forgets.
 
 The shortcut "if CI is green, the rule is doing its job" fails here because the absence of an error proves the absence of a check, not the presence of a working check. Always force the rule to fire on a counterexample before trusting it.

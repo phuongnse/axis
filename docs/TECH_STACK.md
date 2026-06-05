@@ -38,7 +38,7 @@
 
 | Technology | Version | Role | Rationale |
 |---|---|---|---|
-| **React** | 19.x | UI framework | Richest ecosystem for complex builder UIs. Bumped from 18 → 19 via Dependabot PR #64; `@vitejs/plugin-react@5` supports React 19 + Vite 6, so the rest of the toolchain stays put. |
+| **React** | 19.x | UI framework | Richest ecosystem for complex builder UIs. Bumped from 18 → 19; `@vitejs/plugin-react@5` supports React 19 + Vite 6, so the rest of the toolchain stays put. |
 | **TypeScript** | 6.x | Type safety | Catches errors early, essential for a large codebase. `strict: true` + `noUnusedLocals/Parameters` enforced. |
 | **Vite** | 6.x | Build tool | Fast dev server and build |
 | **@vitejs/plugin-react** | 5.x | React Vite plugin | Babel-based React transform; v5 supports vite 4–7 |
@@ -156,7 +156,7 @@
 
 - Direct C# method calls or `services.GetRequiredService<IFooFromAnotherModule>()` for cross-module interaction.
 - Shared `DbContext`, shared transactions, shared aggregate roots across modules.
-- "We'll add the broker later" — the broker exists from PR #1 of Phase 1.
+- "We'll add the broker later" — the broker is part of the Phase 1 foundation.
 - "Tests can skip the network hops" — tests run with the same broker (Testcontainers) so failure modes match production.
 
 ### ADR-011: Per-module database with schema-per-tenant inside
@@ -335,7 +335,7 @@
 
 **Reason:**
 
-- **`EnsureCreated` is unsafe in tests as soon as more than one schema-owner targets the same database.** EF Core's "if any user table exists, skip" heuristic causes cross-module skips (this is exactly what blocked PR #58's test fixture). Migrations have no such heuristic — they always apply each `Up` step deterministically.
+- **`EnsureCreated` is unsafe in tests as soon as more than one schema-owner targets the same database.** EF Core's "if any user table exists, skip" heuristic causes cross-module skips. Migrations have no such heuristic — they always apply each `Up` step deterministically.
 - **Tests should mirror production.** If production deploys via migrations, tests must use migrations too. Otherwise tests pass for reasons that won't hold in production.
 - **Migration history is the audit trail.** `__EFMigrationsHistory` per module DB documents every schema change. `EnsureCreated` is opaque.
 - **Wolverine schema is migrated separately.** Per [ADR-012](#adr-012-per-module-wolverine-schema-in-the-modules-own-database) each module's Wolverine schema is migrated via scripted SQL alongside the EF migrations.

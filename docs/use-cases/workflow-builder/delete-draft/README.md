@@ -16,9 +16,9 @@ Delete a Draft workflow so that I can permanently remove workflows I no longer n
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Member opens a Draft workflow and chooses Delete.
+2. System confirms the workflow is still in Draft status, soft-deletes it, and returns HTTP 204.
+3. Member returns to the workflow list and the deleted draft no longer appears.
 
 ## Alternate / error flows
 
@@ -54,11 +54,10 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 >
 > **Gaps vs spec:** soft-delete only; restore-from-archive UI pending Frontend.
 >
-> **Deferred (PR #146 follow-up):** Hard delete / permanent purge; bulk delete.
+> **Deferred:** Hard delete / permanent purge; bulk delete.
 
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

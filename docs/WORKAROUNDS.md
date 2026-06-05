@@ -52,7 +52,7 @@ When the cleanup trigger fires and you remove the workaround:
 - **Why it exists**: 1-3 sentences. What's the blocker?
 - **Cleanup trigger**: specific event — "when PR for workflow-builder Contracts lands", "when Kafka schema registry is provisioned in prod", "when feature flag X is removed"
 - **Owner**: GitHub handle (optional, but helpful)
-- **Added**: PR #N (link)
+- **Added**: <date or short context>
 ```
 
 ---
@@ -65,4 +65,3 @@ When the cleanup trigger fires and you remove the workaround:
 - **Violates**: CLAUDE.md P0 — cross-module work must use Kafka events or RabbitMQ commands, not in-process calls into another module's infrastructure
 - **Why it exists**: organization-management [organization deletion](./README.md) hard-delete must cancel Workflow Engine executions and Form Builder pending tasks before dropping tenant schemas. Modulith composition registers `IOrganizationExecutionCanceller` and `IOrganizationFormTaskCanceller` at `Axis.Api` startup; Identity invokes them synchronously inside the scheduled `OrganizationHardDeleteJob` handler. RabbitMQ command contracts and outbox handlers are not yet defined for these two steps.
 - **Cleanup trigger**: When Workflow Engine and Form Builder expose versioned `*Command` handlers for org-scoped cancellation (ADR-024/025) and module extraction wiring no longer shares a process, replace direct canceller calls with Wolverine `IMessageBus` publish and remove the shared canceller interfaces from the hard-delete path.
-- **Added**: PR #127

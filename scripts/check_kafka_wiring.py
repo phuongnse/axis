@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify Axis.Api Program.cs wires every *KafkaTopics.cs constant (ADR-019 / ADR-025)."""
+"""Verify Axis.Api startup wiring references every *KafkaTopics.cs constant (ADR-019 / ADR-025)."""
 
 from __future__ import annotations
 
@@ -12,12 +12,13 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from axis_repo import MODULES_DIR, PROGRAM_CS, ROOT, pascal_to_kebab
+from axis_repo import MODULES_DIR, ROOT, pascal_to_kebab
 
 KAFKA_TOPIC_CONST_RE = re.compile(
     r"public\s+const\s+string\s+(\w+)\s*=\s*\"(axis\.[^\"]+)\";",
     re.MULTILINE,
 )
+AXIS_API_DIR = ROOT / "src" / "Axis.Api"
 
 
 def iter_kafka_topic_constants() -> list[tuple[str, str, str]]:
@@ -39,6 +40,16 @@ def expected_topic_from_avsc_path(path: str) -> str:
     return f"axis.{module_name.lower()}.{pascal_to_kebab(event_stem)}"
 
 
+def read_axis_api_source() -> str:
+    if not AXIS_API_DIR.is_dir():
+        raise FileNotFoundError(AXIS_API_DIR)
+
+    return "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in sorted(AXIS_API_DIR.glob("**/*.cs"))
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="validate and exit non-zero on drift")
@@ -47,20 +58,20 @@ def main() -> int:
         parser.print_help()
         return 2
 
-    if not PROGRAM_CS.is_file():
-        print("check-kafka-wiring FAIL: Program.cs missing", file=sys.stderr)
+    if not AXIS_API_DIR.is_dir():
+        print("check-kafka-wiring FAIL: src/Axis.Api missing", file=sys.stderr)
         return 1
 
-    program_text = PROGRAM_CS.read_text(encoding="utf-8")
+    axis_api_source = read_axis_api_source()
     issues: list[str] = []
     constants = iter_kafka_topic_constants()
     topic_values = {topic for _, _, topic in constants}
 
     for class_name, const_name, topic in constants:
         ref = f"{class_name}.{const_name}"
-        if ref not in program_text:
+        if ref not in axis_api_source:
             issues.append(
-                f"Program.cs missing {ref} (topic {topic!r}) in "
+                f"Axis.Api startup wiring missing {ref} (topic {topic!r}) in "
                 f"PublishAndListenWithAvro / PublishLocally"
             )
 

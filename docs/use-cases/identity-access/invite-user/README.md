@@ -16,9 +16,9 @@ Invite a team member by email so that they can join the workspace and start coll
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Admin opens the Users area, starts a new invitation, enters the invitee email, and selects a role.
+2. System validates the email, role, membership state, pending invitations, and plan limit, then creates a pending invitation and sends the email.
+3. Admin sees the invitee in Pending status with resend/cancel actions, and the invitee receives a 48-hour accept link.
 
 ## Alternate / error flows
 
@@ -63,7 +63,7 @@ Organization admins can invite new members, manage their accounts, and deactivat
 >
 > **Gaps vs spec:** Admin self-invite check not implemented (compare invite email to `ICurrentUser` email).
 >
-> **Deferred (PR #146 follow-up):** Bulk invitation via CSV upload.
+> **Deferred:** Bulk invitation via CSV upload.
 >
 > **Done:** HTTP 402 when user plan limit reached (`InviteUserHandler`, platform-foundation subscription plans).
 >
@@ -74,4 +74,3 @@ Organization admins can invite new members, manage their accounts, and deactivat
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

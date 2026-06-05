@@ -16,9 +16,9 @@ Trigger a workflow automatically when a platform event occurs so that I don't ne
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Member selects Event trigger for a workflow and chooses a platform event type.
+2. System collects required event-specific configuration, including model selection for record events and optional filter conditions.
+3. Workflow stores the trigger configuration and exposes matching event payload variables to downstream steps.
 
 ## Alternate / error flows
 
@@ -64,11 +64,10 @@ A workflow must have at least one trigger before it can be published. Triggers d
 > - Wolverine event subscription wiring and filter expression evaluation pending workflow-engine
 > - event type registry and model-picker UI pending API + Frontend.
 >
-> **Deferred (PR #146 follow-up):** Custom platform events defined by users; listening to external-system events without a Webhook trigger.
+> **Deferred:** Custom platform events defined by users; listening to external-system events without a Webhook trigger.
 
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

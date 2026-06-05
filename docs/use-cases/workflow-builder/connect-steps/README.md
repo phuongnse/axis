@@ -16,9 +16,9 @@ Draw connections between steps so that the workflow knows the execution order.
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Member drags from an output handle on one step to an input handle on another step.
+2. System validates direction, cycle rules, and step-specific handle rules, then creates the directed transition.
+3. Member sees the arrow on the canvas and can delete or adjust the connection.
 
 ## Alternate / error flows
 
@@ -61,11 +61,10 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 > - canvas edge drawing and cycle-block toast pending Frontend
 > - condition step label enforcement on connection pending Frontend.
 >
-> **Deferred (PR #146 follow-up):** Animated transitions showing flow direction — static arrows only.
+> **Deferred:** Animated transitions showing flow direction — static arrows only.
 
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

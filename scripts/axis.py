@@ -1237,12 +1237,26 @@ def verify(args: argparse.Namespace) -> int:
 
 def generate_api_contracts(_args: argparse.Namespace | None = None) -> int:
     commands = [
-        ([exe("dotnet"), "build", "src/Axis.Api/Axis.Api.csproj", "--nologo"], ROOT),
-        ([exe("dotnet"), "tool", "run", "swagger", "tofile", "--output", str(ROOT / "openapi.json"), "bin/Debug/net8.0/Axis.Api.dll", "v1"], ROOT / "src" / "Axis.Api"),
-        ([exe("npm"), "run", "gen:api-types"], ROOT / "frontend"),
+        ([exe("dotnet"), "build", "src/Axis.Api/Axis.Api.csproj", "--nologo"], ROOT, None),
+        (
+            [
+                exe("dotnet"),
+                "tool",
+                "run",
+                "swagger",
+                "tofile",
+                "--output",
+                str(ROOT / "openapi.json"),
+                "bin/Debug/net8.0/Axis.Api.dll",
+                "v1",
+            ],
+            ROOT / "src" / "Axis.Api",
+            {"ASPNETCORE_ENVIRONMENT": "Testing", "DOTNET_ENVIRONMENT": "Testing"},
+        ),
+        ([exe("npm"), "run", "gen:api-types"], ROOT / "frontend", None),
     ]
-    for command, cwd in commands:
-        result = run(command, cwd=cwd, check=False)
+    for command, cwd, env in commands:
+        result = run(command, cwd=cwd, env=env, check=False)
         if result.returncode != 0:
             return result.returncode
     return 0

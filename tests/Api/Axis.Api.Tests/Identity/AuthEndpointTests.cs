@@ -150,6 +150,21 @@ public class AuthEndpointTests(ApiTestFixture fixture)
         resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
+    [Fact]
+    public async Task Signout_WhenTokenIsBlacklisted_SubsequentApiCallReturns401()
+    {
+        HttpClient authedClient = await AuthHelper.CreateAdminClientAsync(fixture, "auth_signout_blacklist1");
+
+        HttpResponseMessage beforeSignout = await authedClient.GetAsync("/api/users/me");
+        beforeSignout.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        HttpResponseMessage signout = await authedClient.PostAsync("/api/auth/signout", null);
+        signout.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        HttpResponseMessage afterSignout = await authedClient.GetAsync("/api/users/me");
+        afterSignout.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
     // ── Password Reset ────────────────────────────────────────────────────────
 
     [Fact]

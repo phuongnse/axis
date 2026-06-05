@@ -56,26 +56,31 @@ public static class AuthEndpoints
 
         group.MapPost("/resend-verification", ResendVerification)
             .AllowAnonymous()
+            .RequireRateLimiting("auth")
             .WithName("ResendEmailVerification")
             .WithSummary("Resend email verification link")
             .WithTags("Identity")
             .Produces(204)
-            .ProducesProblem(429);
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
         group.MapPost("/forgot-password", ForgotPassword)
             .AllowAnonymous()
+            .RequireRateLimiting("auth")
             .WithName("ForgotPassword")
             .WithSummary("Request a password reset link")
             .WithTags("Identity")
-            .Produces<MessageResponse>();
+            .Produces<MessageResponse>()
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
         group.MapPost("/reset-password", ResetPassword)
             .AllowAnonymous()
+            .RequireRateLimiting("auth")
             .WithName("ResetPassword")
             .WithSummary("Reset password using a one-time token")
             .WithTags("Identity")
             .Produces(204)
-            .ProducesProblem(400);
+            .ProducesProblem(400)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
         return app;
     }

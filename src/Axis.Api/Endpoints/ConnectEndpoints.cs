@@ -33,6 +33,7 @@ public static class ConnectEndpoints
             .WithName("Login")
             .WithSummary("Validate credentials and issue session cookie for PKCE flow")
             .WithTags("OpenIddict")
+            .RequireRateLimiting("auth")
             .DisableAntiforgery()
             .ExcludeFromDescription();
 
@@ -42,6 +43,7 @@ public static class ConnectEndpoints
             .WithName("Token")
             .WithSummary("Exchange code or refresh token for access token")
             .WithTags("OpenIddict")
+            .RequireRateLimiting("auth")
             .DisableAntiforgery()
             .ExcludeFromDescription();
 

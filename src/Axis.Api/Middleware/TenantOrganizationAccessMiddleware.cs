@@ -9,13 +9,13 @@ namespace Axis.Api.Middleware;
 /// Rejects tenant-scoped API calls when the JWT <c>org_id</c> references a missing,
 /// suspended, or not-yet-ready organization.
 /// </summary>
-internal sealed class TenantOrganizationAccessMiddleware(
-    RequestDelegate next,
-    ITenantOrganizationAccessService accessService)
+internal sealed class TenantOrganizationAccessMiddleware(RequestDelegate next)
 {
     private const string OrgIdClaim = "org_id";
 
-    public async Task InvokeAsync(HttpContext context)
+    public async Task InvokeAsync(
+        HttpContext context,
+        ITenantOrganizationAccessService accessService)
     {
         if (!TenantDataApiPaths.RequiresTenantDataAccess(context.Request.Path)
             || context.User.Identity?.IsAuthenticated != true)
