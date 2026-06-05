@@ -27,7 +27,7 @@ public static class OrganizationEndpoints
         group.MapPost("/", Register)
             .AllowAnonymous()
             .WithName("RegisterOrganization")
-            .WithSummary("Register a new organization and admin account")
+            .WithSummary("Register a new organization contact for verification")
             .WithTags("Identity")
             .Produces<MessageResponse>()
             .ProducesProblem(400)
@@ -68,11 +68,7 @@ public static class OrganizationEndpoints
 
         Result result = await mediator.Send(new RegisterOrganizationCommand(
             request.OrgName,
-            request.AdminFirstName,
-            request.AdminLastName,
-            request.AdminEmail,
-            request.Password,
-            request.PasswordConfirmation,
+            request.OrganizationContactEmail,
             request.AcceptedTermsVersion,
             request.AcceptedPrivacyVersion,
             request.SubscriptionPlanId,
@@ -82,7 +78,7 @@ public static class OrganizationEndpoints
             return result.ToProblemDetails();
 
         return Results.Ok(new MessageResponse(
-            "Registration successful. Please check your email to verify your account."));
+            "Registration successful. Please check your email to verify your organization."));
     }
 
     private static async Task<IResult> InviteUser(

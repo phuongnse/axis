@@ -4,11 +4,7 @@ namespace Axis.Identity.Application.Commands.RegisterOrganization;
 
 public record RegisterOrganizationCommand(
     string OrgName,
-    string AdminFirstName,
-    string AdminLastName,
-    string AdminEmail,
-    string Password,
-    string PasswordConfirmation,
+    string OrganizationContactEmail,
     string AcceptedTermsVersion,
     string AcceptedPrivacyVersion,
     Guid? SubscriptionPlanId = null,

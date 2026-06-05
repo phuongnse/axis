@@ -9,6 +9,7 @@ import { useLegalVersions } from '@/features/auth/hooks/useLegalVersions';
 import { saveRegistrationContext } from '@/features/auth/registration-context';
 import { type RegisterFormValues, registerSchema } from '@/features/auth/schemas/register-schema';
 import type { RegisterValidationErrorData } from '@/features/auth/types';
+import { useQueryParam } from '@/features/auth/use-query-param';
 import { ApiError } from '@/lib/api';
 
 const GENERIC_SUBMIT_ERROR = 'Something went wrong, please try again';
@@ -80,6 +81,7 @@ function applyRegisterValidationErrors(
 
 export function useRegister() {
   const navigate = useNavigate();
+  const organizationSetupToken = useQueryParam('setupToken');
   const { data: legalVersions } = useLegalVersions();
   const idempotencyKeyRef = useRef(createRegisterIdempotencyKey());
   const form = useForm<RegisterFormValues>({
@@ -110,6 +112,7 @@ export function useRegister() {
           passwordConfirmation: values.passwordConfirmation,
           acceptedTermsVersion: legalVersions.termsVersion,
           acceptedPrivacyVersion: legalVersions.privacyVersion,
+          organizationSetupToken,
         },
         idempotencyKeyRef.current,
       );

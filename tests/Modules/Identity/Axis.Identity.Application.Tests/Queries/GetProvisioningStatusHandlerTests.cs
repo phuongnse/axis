@@ -18,14 +18,30 @@ public sealed class GetProvisioningStatusHandlerTests
 
     private readonly IEmailVerificationTokenStore _verificationTokenStore =
         Substitute.For<IEmailVerificationTokenStore>();
+    private readonly IOrganizationRegistrationTokenStore _organizationTokenStore =
+        Substitute.For<IOrganizationRegistrationTokenStore>();
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
     private readonly IOrganizationMembershipRepository _membershipRepo = Substitute.For<IOrganizationMembershipRepository>();
     private readonly IOrganizationRepository _organizationRepo = Substitute.For<IOrganizationRepository>();
     private readonly ITenantModuleProvisioningRepository _provisioningRepo =
         Substitute.For<ITenantModuleProvisioningRepository>();
 
+    public GetProvisioningStatusHandlerTests()
+    {
+        _organizationTokenStore.ResolveOrganizationIdForProvisioningPollAsync(
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns((Guid?)null);
+    }
+
     private GetProvisioningStatusHandler CreateHandler() =>
-        new(_verificationTokenStore, _userRepo, _membershipRepo, _organizationRepo, _provisioningRepo);
+        new(
+            _verificationTokenStore,
+            _organizationTokenStore,
+            _userRepo,
+            _membershipRepo,
+            _organizationRepo,
+            _provisioningRepo);
 
     private void StubProvisioningPollForUser(User user)
     {
@@ -127,6 +143,43 @@ public sealed class GetProvisioningStatusHandlerTests
         dto.OrganizationStatus.Should().Be(nameof(OrganizationStatus.Active));
         dto.Modules.Should().HaveCount(TenantModuleNames.All.Count);
         dto.Modules.Should().OnlyContain(m => m.Status == nameof(TenantModuleProvisioningStatus.Succeeded));
+    }
+
+    [Fact]
+    public async Task Handle_WhenOrganizationVerificationTokenResolves_ReturnsOrganizationStatus()
+    {
+        Email email = Email.Create("admin@acme.com").Value!;
+        Organization organization = Organization.Create(
+            "Acme",
+            OrganizationSlug.Create("acme").Value!,
+            email,
+            WellKnownSubscriptionPlans.FreeId);
+        organization.BeginProvisioning();
+        IReadOnlyList<TenantModuleProvisioning> modules =
+        [
+            TenantModuleProvisioning.CreatePending(organization.Id, TenantModuleNames.DataModeling),
+        ];
+
+        string tokenHash = OpaqueTokenGenerator.Hash(PollToken);
+        _organizationTokenStore.ResolveOrganizationIdForProvisioningPollAsync(
+                tokenHash,
+                Arg.Any<CancellationToken>())
+            .Returns(organization.Id);
+        _organizationRepo.GetByIdAsync(organization.Id, Arg.Any<CancellationToken>())
+            .Returns(organization);
+        _provisioningRepo.GetAllForOrganizationAsync(organization.Id, Arg.Any<CancellationToken>())
+            .Returns(modules);
+
+        ProvisioningStatusDto? dto = await CreateHandler().Handle(
+            new GetProvisioningStatusQuery(PollToken),
+            CancellationToken.None);
+
+        dto.Should().NotBeNull();
+        dto!.OrganizationId.Should().Be(organization.Id);
+        dto.OrganizationStatus.Should().Be(nameof(OrganizationStatus.Provisioning));
+        await _verificationTokenStore.DidNotReceive().ResolveUserIdForProvisioningPollAsync(
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]

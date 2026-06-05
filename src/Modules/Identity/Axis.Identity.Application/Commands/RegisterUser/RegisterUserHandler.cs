@@ -9,8 +9,12 @@ namespace Axis.Identity.Application.Commands.RegisterUser;
 
 public sealed class RegisterUserHandler(
     IUserRepository userRepo,
+    IOrganizationRepository organizationRepo,
+    IOrganizationMembershipRepository membershipRepo,
+    IRoleRepository roleRepo,
     IRegistrationIdempotencyRepository idempotencyRepo,
     IEmailVerificationTokenStore verificationTokenStore,
+    IOrganizationRegistrationTokenStore organizationTokenStore,
     IPasswordHasher hasher,
     IEmailSender emailSender,
     IUnitOfWork uow)
@@ -53,8 +57,27 @@ public sealed class RegisterUserHandler(
             User user = User.Create(command.FirstName, command.LastName, email.Value);
             user.SetPasswordHash(hasher.Hash(command.Password));
             user.RecordLegalAcceptance(command.AcceptedTermsVersion, command.AcceptedPrivacyVersion);
-            await userRepo.AddAsync(user, cancellationToken);
 
+            string? setupToken = string.IsNullOrWhiteSpace(command.OrganizationSetupToken)
+                ? null
+                : command.OrganizationSetupToken.Trim();
+            if (setupToken is not null)
+            {
+                Result attachResult = await AttachFirstUserToOrganizationAsync(
+                    user,
+                    setupToken,
+                    cancellationToken);
+                if (attachResult.IsFailure)
+                {
+                    await MarkIdempotencyFailedIfNeededAsync(
+                        idempotencyKey,
+                        acquireResult,
+                        cancellationToken);
+                    return attachResult;
+                }
+            }
+
+            await userRepo.AddAsync(user, cancellationToken);
             await uow.SaveChangesAsync(cancellationToken);
 
             (string rawToken, string tokenHash) = OpaqueTokenGenerator.Create();
@@ -74,8 +97,10 @@ public sealed class RegisterUserHandler(
         }
         catch
         {
-            if (idempotencyKey is not null && acquireResult == RegistrationIdempotencyAcquireResult.Acquired)
-                await idempotencyRepo.MarkFailedAsync(idempotencyKey, cancellationToken);
+            await MarkIdempotencyFailedIfNeededAsync(
+                idempotencyKey,
+                acquireResult,
+                cancellationToken);
 
             throw;
         }
@@ -87,4 +112,45 @@ public sealed class RegisterUserHandler(
         idempotencyKey is null
             ? Task.CompletedTask
             : idempotencyRepo.MarkCompletedAsync(idempotencyKey, cancellationToken);
+
+    private Task MarkIdempotencyFailedIfNeededAsync(
+        string? idempotencyKey,
+        RegistrationIdempotencyAcquireResult acquireResult,
+        CancellationToken cancellationToken) =>
+        idempotencyKey is not null && acquireResult == RegistrationIdempotencyAcquireResult.Acquired
+            ? idempotencyRepo.MarkFailedAsync(idempotencyKey, cancellationToken)
+            : Task.CompletedTask;
+
+    private async Task<Result> AttachFirstUserToOrganizationAsync(
+        User user,
+        string setupToken,
+        CancellationToken cancellationToken)
+    {
+        string tokenHash = OpaqueTokenGenerator.Hash(setupToken);
+        Result<Guid> setupResult =
+            await organizationTokenStore.ConsumeFirstUserSetupAsync(
+                tokenHash,
+                user.Id,
+                cancellationToken);
+
+        if (setupResult.IsFailure)
+            return Result.Failure(
+                setupResult.ErrorCode ?? ErrorCodes.BusinessRule,
+                setupResult.Error);
+
+        Guid organizationId = setupResult.Value;
+        Organization? organization = await organizationRepo.GetByIdAsync(organizationId, cancellationToken);
+        if (organization is null || !organization.AllowsSignIn())
+            return Result.Failure(ErrorCodes.BusinessRule, "Organization is not ready for user setup.");
+
+        Role? adminRole = await roleRepo.GetByNameAsync("Admin", organization.Id, cancellationToken);
+        if (adminRole is null)
+            return Result.Failure(ErrorCodes.BusinessRule, "Organization is missing the Admin role.");
+
+        OrganizationMembership membership = OrganizationMembership.Create(user.Id, organization.Id);
+        membership.AssignRole(adminRole.Id);
+        await membershipRepo.AddAsync(membership, cancellationToken);
+
+        return Result.Success();
+    }
 }

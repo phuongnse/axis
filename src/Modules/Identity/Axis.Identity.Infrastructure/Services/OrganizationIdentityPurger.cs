@@ -31,6 +31,10 @@ internal sealed class OrganizationIdentityPurger(
             .Where(t => userIds.Contains(t.UserId))
             .ExecuteDeleteAsync(cancellationToken);
 
+        await context.OrganizationRegistrationTokens
+            .Where(t => t.OrganizationId == organizationId)
+            .ExecuteDeleteAsync(cancellationToken);
+
         await context.PasswordResetTokens
             .Where(t => userIds.Contains(t.UserId))
             .ExecuteDeleteAsync(cancellationToken);

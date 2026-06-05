@@ -11,15 +11,7 @@ public sealed class RegisterOrganizationCommandValidator : AbstractValidator<Reg
             .NotEmpty().WithMessage("Organization name is required.")
             .Length(2, 100).WithMessage("Organization name must be between 2 and 100 characters.");
 
-        RuleFor(x => x.AdminFirstName)
-            .NotEmpty().WithMessage("First name is required.")
-            .MaximumLength(50);
-
-        RuleFor(x => x.AdminLastName)
-            .NotEmpty().WithMessage("Last name is required.")
-            .MaximumLength(50);
-
-        RuleFor(x => x.AdminEmail)
+        RuleFor(x => x.OrganizationContactEmail)
             .NotEmpty().WithMessage("Email is required.")
             .EmailAddress().WithMessage("Email must be a valid email address.");
 
@@ -30,14 +22,5 @@ public sealed class RegisterOrganizationCommandValidator : AbstractValidator<Reg
         RuleFor(x => x.AcceptedPrivacyVersion)
             .Equal(WellKnownLegalDocuments.PrivacyVersion)
             .WithMessage("You must accept the current Privacy Policy.");
-
-        RuleFor(x => x.Password)
-            .NotEmpty().WithMessage("Password is required.")
-            .MinimumLength(8).WithMessage("Password must be at least 8 characters.")
-            .Matches(@"[a-zA-Z]").WithMessage("Password must contain at least one letter.")
-            .Matches(@"\d").WithMessage("Password must contain at least one number.");
-
-        RuleFor(x => x.PasswordConfirmation)
-            .Equal(x => x.Password).WithMessage("Password confirmation must match password.");
     }
 }

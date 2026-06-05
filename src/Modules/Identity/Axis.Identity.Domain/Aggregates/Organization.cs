@@ -16,6 +16,9 @@ public sealed class Organization : AggregateRoot<Guid>
     public OrganizationStatus Status { get; private set; }
     public Guid SubscriptionPlanId { get; private set; }
     public DateTime CreatedAt { get; private set; }
+    public string? AcceptedTermsVersion { get; private set; }
+    public string? AcceptedPrivacyVersion { get; private set; }
+    public DateTime? LegalAcceptedAt { get; private set; }
     public string? LogoUrl { get; private set; }
     public string? TimeZoneId { get; private set; }
     public string? DefaultLanguage { get; private set; }
@@ -54,6 +57,32 @@ public sealed class Organization : AggregateRoot<Guid>
             DateTime.UtcNow);
         org.RaiseDomainEvent(new OrganizationCreated(org.Id, org.Name, slug.Value, ownerEmail.Value));
         return org;
+    }
+
+    public static Organization RegisterForContactVerification(
+        string name,
+        OrganizationSlug slug,
+        Email contactEmail,
+        Guid subscriptionPlanId,
+        string termsVersion,
+        string privacyVersion)
+    {
+        Organization org = Create(name, slug, contactEmail, subscriptionPlanId);
+        org.Status = OrganizationStatus.PendingVerification;
+        org.RecordLegalAcceptance(termsVersion, privacyVersion);
+        return org;
+    }
+
+    public void RecordLegalAcceptance(string termsVersion, string privacyVersion)
+    {
+        if (string.IsNullOrWhiteSpace(termsVersion))
+            throw new ArgumentException("Terms version is required.", nameof(termsVersion));
+        if (string.IsNullOrWhiteSpace(privacyVersion))
+            throw new ArgumentException("Privacy version is required.", nameof(privacyVersion));
+
+        AcceptedTermsVersion = termsVersion.Trim();
+        AcceptedPrivacyVersion = privacyVersion.Trim();
+        LegalAcceptedAt = DateTime.UtcNow;
     }
 
     public void ChangeSubscriptionPlan(Guid newPlanId)
@@ -131,6 +160,21 @@ public sealed class Organization : AggregateRoot<Guid>
 
     public void BeginProvisioningAfterOwnerVerification()
     {
+        BeginProvisioningAfterContactVerification();
+    }
+
+    public void BeginProvisioningAfterContactVerification()
+    {
+        if (Status == OrganizationStatus.PendingVerification)
+        {
+            Status = OrganizationStatus.Provisioning;
+            RaiseDomainEvent(new OrganizationVerified(Id));
+            return;
+        }
+
+        if (Status == OrganizationStatus.Provisioning)
+            return;
+
         BeginProvisioning();
         RaiseDomainEvent(new OrganizationVerified(Id));
     }

@@ -26,24 +26,7 @@ public static class AuthHelper
     /// </summary>
     public static async Task<HttpClient> CreateAdminClientAsync(ApiTestFixture fixture, string suffix)
     {
-        string email = $"admin{suffix}@test.com";
-
-        // 1. Register (TestRegistrationPayload includes the required legal versions)
-        HttpResponseMessage regResp = await fixture.Client.PostAsJsonAsync(
-            "/api/organizations", TestRegistrationPayload.Create(suffix), Json);
-
-        if (!regResp.IsSuccessStatusCode)
-            throw new InvalidOperationException($"Registration failed: {regResp.StatusCode}");
-
-        // 2. Verify email (opaque token from registration email)
-        string verifyToken = fixture.EmailCapture.GetVerificationToken(email)
-            ?? throw new InvalidOperationException(
-                $"No verification token captured for {email}.");
-
-        HttpResponseMessage verifyResp = await fixture.Client.PostAsJsonAsync(
-            "/api/auth/verify-email", new { token = verifyToken }, Json);
-        if (verifyResp.StatusCode != HttpStatusCode.OK)
-            throw new InvalidOperationException($"Email verification failed: {verifyResp.StatusCode}");
+        string email = await RegisterAndVerifyAdminAsync(fixture, suffix);
 
         await fixture.EnsureTenantProvisionedAsync(email);
 
@@ -54,6 +37,67 @@ public static class AuthHelper
             new AuthenticationHeaderValue("Bearer", accessToken);
 
         return authedClient;
+    }
+
+    public static async Task<string> RegisterAndVerifyAdminAsync(
+        ApiTestFixture fixture,
+        string suffix)
+    {
+        string email = await RegisterFirstAdminWithoutUserVerificationAsync(fixture, suffix);
+
+        string userVerifyToken = fixture.EmailCapture.GetVerificationToken(email)
+            ?? throw new InvalidOperationException(
+                $"No verification token captured for {email}.");
+
+        HttpResponseMessage userVerifyResp = await fixture.Client.PostAsJsonAsync(
+            "/api/auth/verify-email", new { token = userVerifyToken }, Json);
+        if (userVerifyResp.StatusCode != HttpStatusCode.OK)
+            throw new InvalidOperationException($"User email verification failed: {userVerifyResp.StatusCode}");
+
+        return email;
+    }
+
+    public static async Task<string> RegisterFirstAdminWithoutUserVerificationAsync(
+        ApiTestFixture fixture,
+        string suffix)
+    {
+        string setupToken = await RegisterAndVerifyOrganizationAsync(fixture, suffix);
+        string email = TestRegistrationPayload.AdminEmail(suffix);
+
+        HttpResponseMessage userRegResp = await fixture.Client.PostAsJsonAsync(
+            "/api/users/register", TestRegistrationPayload.CreateUser(suffix, setupToken), Json);
+        if (!userRegResp.IsSuccessStatusCode)
+            throw new InvalidOperationException($"User registration failed: {userRegResp.StatusCode}");
+
+        return email;
+    }
+
+    public static async Task<string> RegisterAndVerifyOrganizationAsync(
+        ApiTestFixture fixture,
+        string suffix)
+    {
+        string contactEmail = TestRegistrationPayload.OrganizationContactEmail(suffix);
+
+        HttpResponseMessage regResp = await fixture.Client.PostAsJsonAsync(
+            "/api/organizations", TestRegistrationPayload.Create(suffix), Json);
+
+        if (!regResp.IsSuccessStatusCode)
+            throw new InvalidOperationException($"Registration failed: {regResp.StatusCode}");
+
+        string verifyToken = fixture.EmailCapture.GetVerificationToken(contactEmail)
+            ?? throw new InvalidOperationException(
+                $"No verification token captured for {contactEmail}.");
+
+        HttpResponseMessage verifyResp = await fixture.Client.PostAsJsonAsync(
+            "/api/auth/verify-email", new { token = verifyToken }, Json);
+        if (verifyResp.StatusCode != HttpStatusCode.OK)
+            throw new InvalidOperationException($"Organization verification failed: {verifyResp.StatusCode}");
+
+        JsonElement verifyBody = await verifyResp.Content.ReadFromJsonAsync<JsonElement>(Json);
+        string? setupToken = verifyBody.GetProperty("organizationSetupToken").GetString();
+
+        return setupToken
+            ?? throw new InvalidOperationException("No organizationSetupToken in verification response.");
     }
 
     /// <summary>

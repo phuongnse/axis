@@ -9,6 +9,7 @@ namespace Axis.Identity.Application.Queries.GetProvisioningStatus;
 
 public sealed class GetProvisioningStatusHandler(
     IEmailVerificationTokenStore verificationTokenStore,
+    IOrganizationRegistrationTokenStore organizationTokenStore,
     IUserRepository userRepo,
     IOrganizationMembershipRepository membershipRepo,
     IOrganizationRepository organizationRepo,
@@ -23,6 +24,12 @@ public sealed class GetProvisioningStatusHandler(
             return null;
 
         string tokenHash = OpaqueTokenGenerator.Hash(query.Token.Trim());
+        Guid? organizationId = await organizationTokenStore.ResolveOrganizationIdForProvisioningPollAsync(
+            tokenHash,
+            cancellationToken);
+        if (organizationId is Guid resolvedOrganizationId)
+            return await BuildStatusAsync(resolvedOrganizationId, cancellationToken);
+
         Guid? userId = await verificationTokenStore.ResolveUserIdForProvisioningPollAsync(
             tokenHash,
             cancellationToken);
@@ -38,12 +45,19 @@ public sealed class GetProvisioningStatusHandler(
         if (membership is null)
             return null;
 
-        Organization? organization = await organizationRepo.GetByIdAsync(membership.OrganizationId, cancellationToken);
+        return await BuildStatusAsync(membership.OrganizationId, cancellationToken);
+    }
+
+    private async Task<ProvisioningStatusDto?> BuildStatusAsync(
+        Guid organizationId,
+        CancellationToken cancellationToken)
+    {
+        Organization? organization = await organizationRepo.GetByIdAsync(organizationId, cancellationToken);
         if (organization is null)
             return null;
 
         IReadOnlyList<TenantModuleProvisioning> modules =
-            await provisioningRepo.GetAllForOrganizationAsync(membership.OrganizationId, cancellationToken);
+            await provisioningRepo.GetAllForOrganizationAsync(organizationId, cancellationToken);
 
         bool isReady = organization.Status == OrganizationStatus.Active
             && TenantModuleNames.All.All(moduleName =>

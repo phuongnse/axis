@@ -28,7 +28,7 @@ public static class UserEndpoints
         publicGroup.MapPost("/register", Register)
             .AllowAnonymous()
             .WithName("RegisterUser")
-            .WithSummary("Register a standalone user account")
+            .WithSummary("Register a user account standalone or with an organization setup token")
             .WithTags("Identity")
             .Produces<MessageResponse>()
             .ProducesProblem(400)
@@ -124,6 +124,7 @@ public static class UserEndpoints
             request.PasswordConfirmation,
             request.AcceptedTermsVersion,
             request.AcceptedPrivacyVersion,
+            request.OrganizationSetupToken,
             idempotencyKey), ct);
 
         if (result.IsFailure)

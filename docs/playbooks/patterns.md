@@ -147,9 +147,9 @@ await _context.SaveChangesAsync(ct);
 
 ---
 
-### 2. SaveChanges inside a repository — breaks Unit of Work
+### 2. SaveChanges inside a repository/store — breaks Unit of Work
 
-Calling `SaveChangesAsync` inside a repository method commits a partial transaction. If a second operation in the same handler fails afterward, the first change is already persisted — no rollback possible.
+Calling `SaveChangesAsync` inside a repository, store, or persistence helper commits a partial transaction. If a second operation in the same handler fails afterward, the first change is already persisted — no rollback possible.
 
 ```csharp
 // ❌ wrong — partial commit, breaks atomicity
@@ -167,7 +167,7 @@ public async Task AddAsync(WorkflowDefinition wf, CancellationToken ct)
 // Handler calls: await _uow.SaveChangesAsync(ct) at the end
 ```
 
-**Rule:** Repositories only interact with `DbSet<T>`. `SaveChangesAsync` is always called via `IUnitOfWork` in the handler, never inside a repository.
+**Rule:** Repositories, token stores, and persistence helpers only interact with `DbSet<T>` or set-based EF operations. `SaveChangesAsync` is called via `IUnitOfWork` in the handler, never inside these helpers.
 
 ---
 
@@ -1527,6 +1527,8 @@ public async Task<Result<Guid>> Handle(CreateWorkflowCommand cmd, CancellationTo
 **Pattern 2 — caller-supplied idempotency key (for external triggers):**
 
 Commands triggered by external systems (webhooks, scheduled jobs) accept a caller-supplied `IdempotencyKey` (UUID). The handler checks if a record with that key already exists and returns the existing result without re-executing.
+
+When a handler releases a caller-supplied idempotency key after a business failure, the release must not flush unrelated tracked entities from the same `DbContext`. Prefer a set-based status update (`ExecuteUpdateAsync`) in the idempotency repository, and add a regression test when the failure path happens after the handler has built other aggregate objects.
 
 **Pattern 3 — try-catch `DbUpdateException` for Wolverine at-least-once concurrent INSERT race:**
 

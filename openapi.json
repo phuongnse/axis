@@ -2715,7 +2715,7 @@
         "tags": [
           "Identity"
         ],
-        "summary": "Verify email address with a one-time token and establish a sign-in session",
+        "summary": "Verify an email token and return the next registration or sign-in step",
         "operationId": "VerifyEmail",
         "requestBody": {
           "content": {
@@ -2974,7 +2974,7 @@
         "tags": [
           "Identity"
         ],
-        "summary": "Register a new organization and admin account",
+        "summary": "Register a new organization contact for verification",
         "operationId": "RegisterOrganization",
         "requestBody": {
           "content": {
@@ -3457,7 +3457,7 @@
         "tags": [
           "Identity"
         ],
-        "summary": "Register a standalone user account",
+        "summary": "Register a user account standalone or with an organization setup token",
         "operationId": "RegisterUser",
         "requestBody": {
           "content": {
@@ -7479,19 +7479,7 @@
           "orgName": {
             "type": "string"
           },
-          "adminFirstName": {
-            "type": "string"
-          },
-          "adminLastName": {
-            "type": "string"
-          },
-          "adminEmail": {
-            "type": "string"
-          },
-          "password": {
-            "type": "string"
-          },
-          "passwordConfirmation": {
+          "organizationContactEmail": {
             "type": "string"
           },
           "acceptedTermsVersion": {
@@ -7531,6 +7519,10 @@
           },
           "acceptedPrivacyVersion": {
             "type": "string"
+          },
+          "organizationSetupToken": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -8042,6 +8034,7 @@
       "VerifyEmailNextStep": {
         "enum": [
           "Dashboard",
+          "RegisterUser",
           "WorkspaceProvisioning"
         ],
         "type": "string"
@@ -8063,6 +8056,10 @@
           },
           "nextStep": {
             "$ref": "#/components/schemas/VerifyEmailNextStep"
+          },
+          "organizationSetupToken": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

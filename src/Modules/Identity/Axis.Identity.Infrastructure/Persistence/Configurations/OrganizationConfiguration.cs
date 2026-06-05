@@ -47,6 +47,17 @@ internal sealed class OrganizationConfiguration : IEntityTypeConfiguration<Organ
             .HasColumnName("created_at")
             .IsRequired();
 
+        builder.Property(o => o.AcceptedTermsVersion)
+            .HasColumnName("accepted_terms_version")
+            .HasMaxLength(32);
+
+        builder.Property(o => o.AcceptedPrivacyVersion)
+            .HasColumnName("accepted_privacy_version")
+            .HasMaxLength(32);
+
+        builder.Property(o => o.LegalAcceptedAt)
+            .HasColumnName("legal_accepted_at");
+
         builder.Property(o => o.SubscriptionPlanId)
             .HasColumnName("subscription_plan_id")
             .HasDefaultValue(WellKnownSubscriptionPlans.FreeId)

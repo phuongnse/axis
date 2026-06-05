@@ -33,7 +33,7 @@ public static class AuthEndpoints
         group.MapPost("/verify-email", VerifyEmail)
             .AllowAnonymous()
             .WithName("VerifyEmail")
-            .WithSummary("Verify email address with a one-time token and establish a sign-in session")
+            .WithSummary("Verify an email token and return the next registration or sign-in step")
             .WithTags("Identity")
             .Produces<VerifyEmailSessionEstablishedDto>()
             .ProducesProblem(400);
@@ -134,20 +134,17 @@ public static class AuthEndpoints
         if (result.IsFailure)
             return result.ToProblemDetails();
 
-        await SignInPkceSessionAsync(httpContext, result.Value);
+        if (result.Value.SessionEstablished)
+            await SignInPkceSessionAsync(httpContext, result.Value);
 
-        VerifyEmailNextStep nextStep = result.Value.OrganizationId is null
-            ? VerifyEmailNextStep.Dashboard
-            : VerifyEmailNextStep.WorkspaceProvisioning;
-
-        return Results.Ok(new VerifyEmailSessionEstablishedDto(true, nextStep));
+        return Results.Ok(VerifyEmailSessionEstablishedDto.From(result.Value));
     }
 
     private static async Task SignInPkceSessionAsync(HttpContext httpContext, VerifyEmailSuccessDto claims)
     {
         List<Claim> claimList =
         [
-            new(ClaimTypes.NameIdentifier, claims.UserId.ToString()),
+            new(ClaimTypes.NameIdentifier, claims.UserId!.Value.ToString()),
             new(ClaimTypes.Email, claims.Email),
             new("name", claims.FullName),
         ];

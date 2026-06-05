@@ -1,4 +1,6 @@
 using Axis.Identity.Application.Repositories;
+using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Domain.ValueObjects;
 using Axis.Identity.Infrastructure.Persistence.Entities;
 using Axis.Identity.Infrastructure.Tests.Fixtures;
 using FluentAssertions;
@@ -114,5 +116,34 @@ public class RegistrationIdempotencyRepositoryTests(IdentityDatabaseFixture db) 
         RegistrationIdempotencyRecord row = await _ctx.Set<RegistrationIdempotencyRecord>()
             .SingleAsync(r => r.IdempotencyKey == "retry");
         row.Status.Should().Be(RegistrationIdempotencyStatus.Pending);
+    }
+
+    [Fact]
+    public async Task MarkFailedAsync_WhenOtherEntitiesAreTracked_DoesNotPersistUnrelatedChanges()
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        _ctx.Set<RegistrationIdempotencyRecord>().Add(new RegistrationIdempotencyRecord
+        {
+            IdempotencyKey = "failed-with-tracked-user",
+            Status = RegistrationIdempotencyStatus.Pending,
+            CreatedAt = now,
+            UpdatedAt = now,
+        });
+        await _ctx.SaveChangesAsync();
+
+        User unrelated = User.Create(
+            "Pending",
+            "User",
+            Email.Create("pending-user@example.com").Value!);
+        _ctx.Users.Add(unrelated);
+
+        await _sut.MarkFailedAsync("failed-with-tracked-user");
+
+        _ctx.ChangeTracker.Clear();
+        RegistrationIdempotencyRecord row = await _ctx.Set<RegistrationIdempotencyRecord>()
+            .SingleAsync(r => r.IdempotencyKey == "failed-with-tracked-user");
+        row.Status.Should().Be(RegistrationIdempotencyStatus.Failed);
+        bool userPersisted = await _ctx.Users.AnyAsync(u => u.Email == Email.Create("pending-user@example.com").Value);
+        userPersisted.Should().BeFalse();
     }
 }

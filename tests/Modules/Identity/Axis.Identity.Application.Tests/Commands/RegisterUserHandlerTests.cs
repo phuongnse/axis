@@ -3,6 +3,7 @@ using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.Legal;
+using Axis.Identity.Domain.Subscriptions;
 using Axis.Identity.Domain.ValueObjects;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
@@ -13,10 +14,16 @@ namespace Axis.Identity.Application.Tests.Commands;
 public class RegisterUserHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
+    private readonly IOrganizationRepository _organizationRepo = Substitute.For<IOrganizationRepository>();
+    private readonly IOrganizationMembershipRepository _membershipRepo =
+        Substitute.For<IOrganizationMembershipRepository>();
+    private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
     private readonly IRegistrationIdempotencyRepository _idempotencyRepo =
         Substitute.For<IRegistrationIdempotencyRepository>();
     private readonly IEmailVerificationTokenStore _verificationTokenStore =
         Substitute.For<IEmailVerificationTokenStore>();
+    private readonly IOrganizationRegistrationTokenStore _organizationTokenStore =
+        Substitute.For<IOrganizationRegistrationTokenStore>();
     private readonly IPasswordHasher _hasher = Substitute.For<IPasswordHasher>();
     private readonly IEmailSender _emailSender = Substitute.For<IEmailSender>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
@@ -24,8 +31,12 @@ public class RegisterUserHandlerTests
     private RegisterUserHandler CreateHandler() =>
         new(
             _userRepo,
+            _organizationRepo,
+            _membershipRepo,
+            _roleRepo,
             _idempotencyRepo,
             _verificationTokenStore,
+            _organizationTokenStore,
             _hasher,
             _emailSender,
             _uow);
@@ -66,6 +77,79 @@ public class RegisterUserHandlerTests
         await _emailSender.Received(1).SendVerificationEmailAsync(
             "alice@example.com", Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _idempotencyRepo.Received(1).MarkCompletedAsync("idem-1", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RegisterUser_WhenSetupTokenIsValid_AttachesUserAsOrganizationAdmin()
+    {
+        Guid organizationId = Guid.NewGuid();
+        string setupToken = "setup-token";
+        string setupTokenHash = OpaqueTokenGenerator.Hash(setupToken);
+        Organization organization = Organization.Create(
+            "Acme",
+            OrganizationSlug.Create("acme").Value!,
+            Email.Create("admin@acme.com").Value!,
+            WellKnownSubscriptionPlans.FreeId);
+        organization.BeginProvisioning();
+        Role adminRole = Role.CreateSystem("Admin", organization.Id, ["users:read"]);
+
+        _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>(), Arg.Any<CancellationToken>())
+            .Returns(false);
+        _idempotencyRepo.AcquireAsync("idem-1", Arg.Any<CancellationToken>())
+            .Returns(RegistrationIdempotencyAcquireResult.Acquired);
+        _hasher.Hash("SecurePass1").Returns("hashed_password");
+        _organizationTokenStore.ConsumeFirstUserSetupAsync(
+                setupTokenHash,
+                Arg.Any<Guid>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Result.Success(organizationId));
+        _organizationRepo.GetByIdAsync(organizationId, Arg.Any<CancellationToken>())
+            .Returns(organization);
+        _roleRepo.GetByNameAsync("Admin", organization.Id, Arg.Any<CancellationToken>())
+            .Returns(adminRole);
+
+        Result result = await CreateHandler().Handle(
+            ValidCommand() with { OrganizationSetupToken = setupToken },
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        await _membershipRepo.Received(1).AddAsync(
+            Arg.Is<OrganizationMembership>(m =>
+                m.OrganizationId == organization.Id
+                && m.RoleIds.Contains(adminRole.Id)),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RegisterUser_WhenSetupTokenIsExpired_ReturnsBusinessRuleWithoutCreatingMembership()
+    {
+        string setupToken = "expired-token";
+        string setupTokenHash = OpaqueTokenGenerator.Hash(setupToken);
+        _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>(), Arg.Any<CancellationToken>())
+            .Returns(false);
+        _idempotencyRepo.AcquireAsync("idem-1", Arg.Any<CancellationToken>())
+            .Returns(RegistrationIdempotencyAcquireResult.Acquired);
+        _hasher.Hash("SecurePass1").Returns("hashed_password");
+        _organizationTokenStore.ConsumeFirstUserSetupAsync(
+                setupTokenHash,
+                Arg.Any<Guid>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Result.Failure<Guid>(
+                ErrorCodes.BusinessRule,
+                "This organization setup link has expired. Please request a new setup link."));
+
+        Result result = await CreateHandler().Handle(
+            ValidCommand() with { OrganizationSetupToken = setupToken },
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        await _userRepo.DidNotReceive().AddAsync(Arg.Any<User>(), Arg.Any<CancellationToken>());
+        await _membershipRepo.DidNotReceive().AddAsync(
+            Arg.Any<OrganizationMembership>(),
+            Arg.Any<CancellationToken>());
+        await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        await _idempotencyRepo.Received(1).MarkFailedAsync("idem-1", Arg.Any<CancellationToken>());
     }
 
     [Fact]

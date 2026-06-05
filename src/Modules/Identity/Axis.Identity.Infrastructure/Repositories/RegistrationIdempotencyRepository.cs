@@ -61,25 +61,25 @@ internal sealed class RegistrationIdempotencyRepository(IdentityDbContext contex
 
     public async Task MarkCompletedAsync(string idempotencyKey, CancellationToken cancellationToken = default)
     {
-        RegistrationIdempotencyRecord? row = await context.Set<RegistrationIdempotencyRecord>()
-            .FirstOrDefaultAsync(r => r.IdempotencyKey == idempotencyKey, cancellationToken);
-        if (row is null)
-            return;
-
-        row.Status = RegistrationIdempotencyStatus.Completed;
-        row.UpdatedAt = DateTimeOffset.UtcNow;
-        await context.SaveChangesAsync(cancellationToken);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        await context.Set<RegistrationIdempotencyRecord>()
+            .Where(r => r.IdempotencyKey == idempotencyKey)
+            .ExecuteUpdateAsync(
+                s => s
+                    .SetProperty(r => r.Status, RegistrationIdempotencyStatus.Completed)
+                    .SetProperty(r => r.UpdatedAt, now),
+                cancellationToken);
     }
 
     public async Task MarkFailedAsync(string idempotencyKey, CancellationToken cancellationToken = default)
     {
-        RegistrationIdempotencyRecord? row = await context.Set<RegistrationIdempotencyRecord>()
-            .FirstOrDefaultAsync(r => r.IdempotencyKey == idempotencyKey, cancellationToken);
-        if (row is null)
-            return;
-
-        row.Status = RegistrationIdempotencyStatus.Failed;
-        row.UpdatedAt = DateTimeOffset.UtcNow;
-        await context.SaveChangesAsync(cancellationToken);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        await context.Set<RegistrationIdempotencyRecord>()
+            .Where(r => r.IdempotencyKey == idempotencyKey)
+            .ExecuteUpdateAsync(
+                s => s
+                    .SetProperty(r => r.Status, RegistrationIdempotencyStatus.Failed)
+                    .SetProperty(r => r.UpdatedAt, now),
+                cancellationToken);
     }
 }

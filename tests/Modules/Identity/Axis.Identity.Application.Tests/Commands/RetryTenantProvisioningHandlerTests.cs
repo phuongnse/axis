@@ -16,6 +16,8 @@ public class RetryTenantProvisioningHandlerTests
 {
     private readonly IEmailVerificationTokenStore _tokenStore =
         Substitute.For<IEmailVerificationTokenStore>();
+    private readonly IOrganizationRegistrationTokenStore _organizationTokenStore =
+        Substitute.For<IOrganizationRegistrationTokenStore>();
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
     private readonly IOrganizationMembershipRepository _membershipRepo = Substitute.For<IOrganizationMembershipRepository>();
     private readonly IOrganizationRepository _organizationRepo = Substitute.For<IOrganizationRepository>();
@@ -23,8 +25,23 @@ public class RetryTenantProvisioningHandlerTests
         Substitute.For<ITenantModuleProvisioningRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
+    public RetryTenantProvisioningHandlerTests()
+    {
+        _organizationTokenStore.ResolveOrganizationIdForProvisioningPollAsync(
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns((Guid?)null);
+    }
+
     private RetryTenantProvisioningHandler CreateHandler() =>
-        new(_tokenStore, _userRepo, _membershipRepo, _organizationRepo, _provisioningRepo, _uow);
+        new(
+            _tokenStore,
+            _organizationTokenStore,
+            _userRepo,
+            _membershipRepo,
+            _organizationRepo,
+            _provisioningRepo,
+            _uow);
 
     private static (User User, Organization Organization, OrganizationMembership Membership) MakeVerifiedUserWithOrg()
     {
@@ -187,6 +204,44 @@ public class RetryTenantProvisioningHandlerTests
             .Which.Should().BeOfType<OrganizationVerified>()
             .Which.OrganizationId.Should().Be(organization.Id);
 
+        await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RetryProvisioning_WhenOrganizationTokenResolves_RequeuesFailedOrganization()
+    {
+        Email email = Email.Create("admin@acme.com").Value!;
+        Organization organization = Organization.Create(
+            "Acme",
+            OrganizationSlug.Create("acme").Value!,
+            email,
+            WellKnownSubscriptionPlans.FreeId);
+        FailProvisioning(organization);
+        TenantModuleProvisioning failedModule =
+            TenantModuleProvisioning.CreatePending(organization.Id, "data-modeling");
+        failedModule.RecordFailure("boom", attemptCount: 3);
+
+        string rawToken = "org-token";
+        string tokenHash = OpaqueTokenGenerator.Hash(rawToken);
+        _organizationTokenStore.ResolveOrganizationIdForProvisioningPollAsync(
+                tokenHash,
+                Arg.Any<CancellationToken>())
+            .Returns(organization.Id);
+        _organizationRepo.GetByIdAsync(organization.Id, Arg.Any<CancellationToken>())
+            .Returns(organization);
+        _provisioningRepo.GetAllForOrganizationAsync(organization.Id, Arg.Any<CancellationToken>())
+            .Returns([failedModule]);
+
+        Result result = await CreateHandler().Handle(
+            new RetryTenantProvisioningCommand(rawToken),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        failedModule.Status.Should().Be(TenantModuleProvisioningStatus.Pending);
+        organization.Status.Should().Be(OrganizationStatus.Provisioning);
+        await _tokenStore.DidNotReceive().ResolveUserIdForProvisioningPollAsync(
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 }

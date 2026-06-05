@@ -1,5 +1,6 @@
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.Events;
+using Axis.Identity.Domain.Legal;
 using Axis.Identity.Domain.Subscriptions;
 using Axis.Identity.Domain.ValueObjects;
 using FluentAssertions;
@@ -29,6 +30,23 @@ public class OrganizationTests
 
         org.DomainEvents.Should().ContainSingle()
             .Which.Should().BeOfType<OrganizationCreated>();
+    }
+
+    [Fact]
+    public void Organization_WhenRegisteredForContactVerification_IsPendingAndRecordsLegalVersions()
+    {
+        Organization org = Organization.RegisterForContactVerification(
+            "Acme Corp",
+            ValidSlug,
+            ValidEmail,
+            WellKnownSubscriptionPlans.FreeId,
+            WellKnownLegalDocuments.TermsVersion,
+            WellKnownLegalDocuments.PrivacyVersion);
+
+        org.Status.Should().Be(OrganizationStatus.PendingVerification);
+        org.AcceptedTermsVersion.Should().Be(WellKnownLegalDocuments.TermsVersion);
+        org.AcceptedPrivacyVersion.Should().Be(WellKnownLegalDocuments.PrivacyVersion);
+        org.LegalAcceptedAt.Should().NotBeNull();
     }
 
     [Fact]
@@ -85,6 +103,19 @@ public class OrganizationTests
         org.BeginProvisioning();
 
         org.Status.Should().Be(OrganizationStatus.Provisioning);
+    }
+
+    [Fact]
+    public void BeginProvisioningAfterContactVerification_WhenAlreadyProvisioning_DoesNotRaiseDuplicateEvent()
+    {
+        Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail, WellKnownSubscriptionPlans.FreeId);
+        org.BeginProvisioning();
+        org.ClearDomainEvents();
+
+        org.BeginProvisioningAfterContactVerification();
+
+        org.Status.Should().Be(OrganizationStatus.Provisioning);
+        org.DomainEvents.Should().BeEmpty();
     }
 
     [Fact]
@@ -171,6 +202,7 @@ public class OrganizationTests
     [Theory]
     [InlineData(OrganizationStatus.Active, true)]
     [InlineData(OrganizationStatus.DeletionScheduled, true)]
+    [InlineData(OrganizationStatus.PendingVerification, false)]
     [InlineData(OrganizationStatus.Provisioning, false)]
     [InlineData(OrganizationStatus.ProvisioningFailed, false)]
     [InlineData(OrganizationStatus.Deleted, false)]
@@ -179,11 +211,23 @@ public class OrganizationTests
         OrganizationStatus status,
         bool expected)
     {
-        Organization org = Organization.Create("Acme Corp", ValidSlug, ValidEmail, WellKnownSubscriptionPlans.FreeId);
-        org.BeginProvisioning();
+        Organization org = status == OrganizationStatus.PendingVerification
+            ? Organization.RegisterForContactVerification(
+                "Acme Corp",
+                ValidSlug,
+                ValidEmail,
+                WellKnownSubscriptionPlans.FreeId,
+                WellKnownLegalDocuments.TermsVersion,
+                WellKnownLegalDocuments.PrivacyVersion)
+            : Organization.Create("Acme Corp", ValidSlug, ValidEmail, WellKnownSubscriptionPlans.FreeId);
+
+        if (status != OrganizationStatus.PendingVerification)
+            org.BeginProvisioning();
 
         switch (status)
         {
+            case OrganizationStatus.PendingVerification:
+                break;
             case OrganizationStatus.Active:
                 org.CompleteProvisioning();
                 break;

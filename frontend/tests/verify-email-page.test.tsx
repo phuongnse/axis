@@ -36,7 +36,7 @@ describe('VerifyEmailPage', () => {
     vi.restoreAllMocks();
   });
 
-  it('starts PKCE and stores provisioning token after org verification', async () => {
+  it('starts PKCE and stores provisioning token after user verification', async () => {
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -55,6 +55,31 @@ describe('VerifyEmailPage', () => {
       expect(completePostVerifyPkceFlow).toHaveBeenCalledWith('valid-token');
     });
     expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it('navigates to user registration when organization contact is verified', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            sessionEstablished: false,
+            nextStep: 'RegisterUser',
+            organizationSetupToken: 'setup-token',
+          }),
+        ),
+    } as unknown as Response);
+
+    await renderWithRouter(<VerifyEmailPage />, { path: '/auth/verify?token=org-token' });
+
+    await waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith({
+        to: '/register',
+        search: { setupToken: 'setup-token' },
+      });
+    });
+    expect(completePostVerifyPkceFlow).not.toHaveBeenCalled();
   });
 
   it('shows expired message when verification token expired', async () => {
