@@ -123,6 +123,45 @@ class TestDocDriftRatchets(unittest.TestCase):
         self.assertEqual([], issues)
 
 
+class TestGovernanceOwnerBoundary(unittest.TestCase):
+    def issues_for_doc(self, relative_path: str, content: str) -> list[str]:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = root / relative_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+            return axis.governance_owner_boundary_issues(root=root)
+
+    def test_rejects_policy_command_restatement_in_entry_docs(self) -> None:
+        issues = self.issues_for_doc(
+            "CLAUDE.md",
+            "Run `python scripts/axis.py check policy-tests` before push.\n",
+        )
+
+        self.assertEqual(1, len(issues))
+        self.assertIn("governance doc restates", issues[0])
+
+    def test_rejects_design_gate_as_machine_gate_wording(self) -> None:
+        issues = self.issues_for_doc(
+            "CONTRIBUTING.md",
+            "Design Gate is a CI gate for high-risk work.\n",
+        )
+
+        self.assertEqual(1, len(issues))
+        self.assertIn("review artifact", issues[0])
+
+    def test_allows_design_gate_review_artifact_wording(self) -> None:
+        issues = self.issues_for_doc(
+            "CLAUDE.md",
+            "Design Gate is a required review artifact, not a machine-enforced CI gate.\n",
+        )
+
+        self.assertEqual([], issues)
+
+    def test_current_repository_governance_owner_boundaries_still_pass(self) -> None:
+        self.assertEqual([], axis.governance_owner_boundary_issues())
+
+
 class TestTextEncodingGate(unittest.TestCase):
     def issues_for_file(self, name: str, content: bytes) -> str:
         with tempfile.TemporaryDirectory() as temp:

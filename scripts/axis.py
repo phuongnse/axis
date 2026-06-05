@@ -766,6 +766,61 @@ def check_workarounds(issues: list[str]) -> None:
                     )
 
 
+GOVERNANCE_ENTRY_DOCS = [
+    Path("CLAUDE.md"),
+    Path("CONTRIBUTING.md"),
+    Path(".github/PULL_REQUEST_TEMPLATE.md"),
+]
+
+GOVERNANCE_COMMANDS_OWNED_BY_AGENT_CHECKLIST = [
+    "python scripts/axis.py check policy-tests",
+    "python scripts/axis.py check doc-drift",
+]
+
+
+def governance_owner_boundary_issues(*, root: Path | None = None) -> list[str]:
+    """Keep governance entry docs from duplicating enforceable rule mechanics."""
+    root = root or ROOT
+    issues: list[str] = []
+
+    for relative in GOVERNANCE_ENTRY_DOCS:
+        path = root / relative
+        if not path.is_file():
+            continue
+
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except UnicodeDecodeError:
+            continue
+
+        normalized = relative.as_posix()
+        for idx, line in enumerate(lines, 1):
+            for command in GOVERNANCE_COMMANDS_OWNED_BY_AGENT_CHECKLIST:
+                if command in line:
+                    issues.append(
+                        f"{normalized}:{idx}: governance doc restates `{command}`. "
+                        "Link to agent-checklist.md#verification-gate--verify-before-push instead."
+                    )
+
+            if "Design Gate" not in line:
+                continue
+
+            line_lower = line.lower()
+            mentions_machine_gate = (
+                "ci gate" in line_lower
+                or "machine gate" in line_lower
+                or "machine-enforced" in line_lower
+                or "automated gate" in line_lower
+            )
+            if mentions_machine_gate and "not " not in line_lower and "not-a-" not in line_lower:
+                issues.append(
+                    f"{normalized}:{idx}: Design Gate is a review artifact, not a machine/CI gate. "
+                    "Move deterministic enforcement to scripts/tests and REVIEW_FINDINGS.md."
+                )
+
+    return issues
+
+
 def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
     range_spec = diff_range()
     issues: list[str] = []
@@ -806,6 +861,9 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         fail(issues, issue)
 
     check_workarounds(issues)
+
+    for issue in governance_owner_boundary_issues():
+        fail(issues, issue)
 
     spec_target = ROOT / "docs" / "ARCHITECTURE.md"
     if spec_target.is_file():

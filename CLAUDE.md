@@ -1,6 +1,6 @@
 # Axis — Project Context for Claude
 
-> **Agents:** [agent-checklist.md](docs/playbooks/agent-checklist.md) for gates during work; [PR template](.github/PULL_REQUEST_TEMPLATE.md) for description (**Summary + Linked spec + Requirements** only; enforced by CI job **PR body guard**).
+> **Agents:** [agent-checklist.md](docs/playbooks/agent-checklist.md) for gates/checkpoints during work; [PR template](.github/PULL_REQUEST_TEMPLATE.md) for description (**Summary + Linked spec + Requirements** only; enforced by CI job **PR body guard**).
 
 ## Contents
 
@@ -23,6 +23,8 @@ Multi-tenant low-code SaaS: custom data models, visual workflows, forms, and UI 
 ## Tech stack & architecture
 
 Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md). Module list and per-module responsibilities are owned by [`docs/use-cases/README.md`](docs/use-cases/README.md). Architectural shape (containers, multi-tenancy, auth) is owned by [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). This file owns only the **rules** — the things below that must hold no matter which library version is in `Directory.Packages.props`.
+
+**Enforcement language:** P0/P1/P2 describe severity, not whether a rule is machine-enforced. Enforcement status and allowed wording (`Enforced`, `Partial`, `Review-only`, `Guidance`, `Not a rule`) are owned by [`docs/REVIEW_FINDINGS.md`](docs/REVIEW_FINDINGS.md). Do not call a rule a "gate" unless CI/build/tooling can fail the PR for that class.
 
 **Shared kernel:** `Axis.Shared.Domain`, `Axis.Shared.Application` — **abstractions only**, no shared implementation ([ADR-017](docs/TECH_STACK.md#adr-017-axisshared-is-abstractions-only-no-shared-implementation)). `Axis.Shared.Infrastructure` exists only for genuinely cross-cutting infrastructure (e.g. common JSON policy), never for per-module concerns like UnitOfWork or repository base classes.
 
@@ -60,9 +62,9 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 - Never weaken tests, add test `Skip = ...`, or mock away behavior under test.
 - Never bypass auth, skip an AC silently, or mark ✅ to avoid a hard gap.
 - Domain: zero external dependencies.
-- No implementation of a non-trivial change without completing the **Design Gate** ([design-gate.md](docs/playbooks/design-gate.md)); high-risk surfaces require user sign-off before code.
-- Never commit with a failing Verification gate; docs and requirements satisfied before merge (agent-checklist + PR template).
-- Run `python scripts/axis.py check policy-tests` and `python scripts/axis.py check doc-drift` before push when touching docs, scripts, repo layout, handlers, endpoints, or generated-contract surfaces; CI **Doc drift** runs on every PR and must be green. Tick **Docs review** in the PR template when docs were reviewed — do not paste drift-script output.
+- No implementation of a non-trivial change without producing the **Design Gate** review artifact ([design-gate.md](docs/playbooks/design-gate.md)); high-risk surfaces require user sign-off before code.
+- Never commit with a failing Verification gate; the command matrix and "full suite" honesty rules live in [agent-checklist.md](docs/playbooks/agent-checklist.md#verification-gate--verify-before-push).
+- Deterministic policy/doc checks (`policy-tests`, `doc-drift`, and the checks they call) must pass when triggered by touched paths; CI **Doc drift** runs on every PR and must be green.
 
 **P1 — confirm with user before deviating:**
 
@@ -97,7 +99,7 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 
 ### Navigate (do not read this entire file each task)
 
-1. [`agent-checklist.md`](docs/playbooks/agent-checklist.md) — AC map, gates, domain map. New module/event/proto → [`repo-layout-discovery.md`](docs/playbooks/repo-layout-discovery.md).
+1. [`agent-checklist.md`](docs/playbooks/agent-checklist.md) — AC map, gates/checkpoints, domain map. New module/event/proto → [`repo-layout-discovery.md`](docs/playbooks/repo-layout-discovery.md).
 2. `docs/use-cases/{domain}/README.md` + `docs/use-cases/{domain}/*.md` for the use case.
 3. [`docs/PROGRESS.md`](docs/PROGRESS.md) for layer status.
 4. Open [`process.md`](docs/playbooks/process.md) / [`patterns.md`](docs/playbooks/patterns.md) only when the checklist says so.
@@ -105,6 +107,8 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 ### Design Gate (mandatory before code)
 
 Before a non-trivial change, complete the **Design Gate** ([design-gate.md](docs/playbooks/design-gate.md)): re-derive the rules governing the exact surface you touch and produce the dossier — governing rules quoted with `file:section`, blast-radius `grep` (every caller/consumer/test), request/response shape **and casing** decision, and the full-scope gate plan. Artifacts, not "I thought carefully."
+
+Design Gate is a required review artifact, not a machine-enforced CI gate. Reviewers and agents own the evidence; deterministic subsets belong in scripts/tests and then in [REVIEW_FINDINGS.md](docs/REVIEW_FINDINGS.md).
 
 **High-risk surfaces** — new/changed endpoint or contract/required field, migration/schema, cross-module interaction, auth, new library or public API surface — require **user sign-off via plan mode before writing code**.
 
@@ -130,6 +134,8 @@ This file keeps policy-level requirements only:
 **Docs review** — docs walkthrough when behavior/spec/status changes ([agent-checklist.md](docs/playbooks/agent-checklist.md)). **Doc drift** — CI-enforced deterministic policy/doc checks; it does not require a token docs edit for every code diff.
 
 **Retrospective review** — update docs, tests, or [REVIEW_FINDINGS.md](docs/REVIEW_FINDINGS.md) when a durable rule or repeat finding emerges.
+
+When adding or rewording a rule, keep the owner boundary intact: this file states severity, [agent-checklist.md](docs/playbooks/agent-checklist.md) states workflow/commands, and [REVIEW_FINDINGS.md](docs/REVIEW_FINDINGS.md) states enforcement status. Link instead of restating command matrices or gate semantics.
 
 ### Git
 
@@ -190,7 +196,7 @@ Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, use-c
 
 **Per layer / module:** all use-case callouts updated; domain README table; [`PROGRESS.md`](docs/PROGRESS.md) (layer summary only — not per-class detail).
 
-**Per PR before merge:** PR description = Summary + Linked spec + Requirements only (no CI status, no commit list — Checks tab covers that). Run `python scripts/axis.py check policy-tests` and `python scripts/axis.py check doc-drift` before push when touching docs, scripts, repo layout, handlers, endpoints, generated-contract surfaces, or bulk file rewrites. The CI job runs on every PR and enforces deterministic policy/doc checks: text encoding (`UTF-8` without BOM + LF), changed-handler test files, no-new `TODO`/`FIXME`/`stub`, no new test `Skip = ...`, no `EnsureCreated`, script standards, layout checks, and docs integrity.
+**Per PR before merge:** PR description = Summary + Linked spec + Requirements only (no CI status, no commit list — Checks tab covers that). Run the triggered Verification gate commands from [agent-checklist.md](docs/playbooks/agent-checklist.md#verification-gate--verify-before-push). CI owns the authoritative full gate and always runs deterministic policy/doc checks in **Doc drift**.
 
 Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` changes. Agents must pass [`docs/playbooks/visual-artifact-checklist.md`](docs/playbooks/visual-artifact-checklist.md) before commit.
 
