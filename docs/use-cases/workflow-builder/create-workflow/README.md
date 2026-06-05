@@ -16,9 +16,9 @@ Create a new workflow so that I can start designing an automated process.
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Member opens the workflow list and starts a new workflow from the create action.
+2. System validates the name and plan limit, creates a Draft workflow with Start and End nodes, and persists it for the organization.
+3. Member lands in the canvas editor for the new Draft workflow and can continue adding steps.
 
 ## Alternate / error flows
 
@@ -57,7 +57,7 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 >
 > **Gaps vs spec:** canvas/list UI only (backend).
 >
-> **Deferred (PR #146 follow-up):** Workflow templates / starter library.
+> **Deferred:** Workflow templates / starter library.
 >
 > **Done:** HTTP 402 on create when workflow plan limit reached (`CreateWorkflowHandler` + platform-foundation subscription plans).
 >

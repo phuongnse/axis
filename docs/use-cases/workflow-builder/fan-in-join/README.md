@@ -16,9 +16,9 @@ Configure how the workflow continues after parallel steps complete so that I can
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Member opens the Parallel Group configuration and chooses the join behavior.
+2. System records the selected AND or OR join strategy and validates branch behavior for publish.
+3. Member sees the join type label on the group's output handle and the workflow continues according to that strategy at execution time.
 
 ## Alternate / error flows
 
@@ -59,11 +59,10 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 >
 > **Gaps vs spec:** AND/OR join execution, branch cancellation, and grace period pending workflow-engine.
 >
-> **Deferred (PR #146 follow-up):** "Wait for N of M" join type (e.g., wait for 2 of 3 branches).
+> **Deferred:** "Wait for N of M" join type (e.g., wait for 2 of 3 branches).
 
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

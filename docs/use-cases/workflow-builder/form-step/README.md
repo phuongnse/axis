@@ -16,9 +16,9 @@ Configure a Form step with a specific form and assignee so that the right person
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Member adds or selects a Form step and opens its configuration panel.
+2. System validates the form, assignee, optional timeout, and any context expression used by the assignee.
+3. Member saves the step and the canvas shows the selected form and assignee summary.
 
 ## Alternate / error flows
 
@@ -61,7 +61,7 @@ Each step has a type that determines what it does when executed. Users configure
 >
 > **Gaps vs spec:** form picker UI, assignee expression evaluation, and timeout enforcement pending Frontend + workflow-engine.
 >
-> **Deferred (PR #146 follow-up):** Multiple assignees on one Form step (assign to all, first response wins).
+> **Deferred:** Multiple assignees on one Form step (assign to all, first response wins).
 >
 > **Decisions:** step config (formId, assignee, timeout) stored as JSONB dict in `steps` column. `StepType` enum includes `Start` and `End` values.
 
@@ -70,4 +70,3 @@ Each step has a type that determines what it does when executed. Users configure
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

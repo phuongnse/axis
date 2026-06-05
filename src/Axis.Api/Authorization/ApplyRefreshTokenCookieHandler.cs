@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore;
+using Microsoft.Extensions.Configuration;
 using OpenIddict.Server;
 using static OpenIddict.Server.OpenIddictServerEvents;
 
@@ -10,7 +11,7 @@ namespace Axis.Api.Authorization;
 /// WHY: Storing the refresh token in an httpOnly cookie prevents JavaScript from
 /// accessing it (XSS protection). The access token lives in memory only.
 /// </summary>
-public sealed class ApplyRefreshTokenCookieHandler
+public sealed class ApplyRefreshTokenCookieHandler(IConfiguration configuration)
     : IOpenIddictServerHandler<ApplyTokenResponseContext>
 {
     public ValueTask HandleAsync(ApplyTokenResponseContext context)
@@ -25,6 +26,8 @@ public sealed class ApplyRefreshTokenCookieHandler
         if (httpRequest is null)
             return default;
 
+        int refreshTokenTtlDays = configuration.GetValue("RefreshToken:TtlDays", 7);
+
         httpRequest.HttpContext.Response.Cookies.Append("refresh_token", refreshToken, new CookieOptions
         {
             HttpOnly = true,
@@ -33,7 +36,7 @@ public sealed class ApplyRefreshTokenCookieHandler
             Secure = httpRequest.IsHttps,
             SameSite = SameSiteMode.Strict,
             Path = "/connect",
-            Expires = DateTimeOffset.UtcNow.AddDays(7),
+            Expires = DateTimeOffset.UtcNow.AddDays(refreshTokenTtlDays),
         });
 
         // Remove from the response JSON — the refresh token lives in the cookie only

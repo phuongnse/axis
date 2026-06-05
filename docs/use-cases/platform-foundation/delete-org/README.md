@@ -16,9 +16,9 @@ Permanently delete my organization so that all our data is removed from the plat
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Admin opens the Settings danger zone, chooses Delete organization, and types the organization name exactly in the confirmation modal.
+2. System schedules the deletion job, sends the confirmation email, and blocks further normal access while the grace period is active.
+3. Admin is signed out or redirected according to the current UI support, and the organization enters the scheduled-for-deletion state.
 
 ## Alternate / error flows
 
@@ -61,7 +61,7 @@ Allow organization admins to manage their organization's profile, settings, and 
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Deferred (PR #127 follow-up):**
+> **Deferred:**
 > - marketing-page redirect + forced sign-out after schedule (Frontend/session)
 > - abandon in-flight Wolverine step dispatch beyond execution + form-task cancel
 > - cross-module hard-delete steps via RabbitMQ commands when modules are extracted (see `docs/WORKAROUNDS.md#org-hard-delete-modulith-cancellers`).
@@ -77,4 +77,3 @@ Allow organization admins to manage their organization's profile, settings, and 
 |--------|------------|---------|
 | settings-org-delete-modal | [source](./settings-org-delete-modal.excalidraw) | [preview](./settings-org-delete-modal.svg) |
 | settings-org-delete-states | [source](./settings-org-delete-states.excalidraw) | [preview](./settings-org-delete-states.svg) |
-

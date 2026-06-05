@@ -16,9 +16,9 @@ Add a Condition step so that my workflow can take different paths based on data 
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Member selects a Condition step on the canvas and opens its configuration panel.
+2. System lets the member define ordered branches with context variables, operators, labels, and an optional Default branch.
+3. Member saves the step configuration; the canvas shows labeled outgoing branches in evaluation order.
 
 ## Alternate / error flows
 
@@ -60,11 +60,10 @@ Each step has a type that determines what it does when executed. Users configure
 >
 > **Gaps vs spec:** expression builder UI and branch evaluation pending Frontend + workflow-engine; condition branches stored in step config JSONB.
 >
-> **Deferred (PR #146 follow-up):** Raw expression editing (code-only interface) — visual builder only.
+> **Deferred:** Raw expression editing (code-only interface) — visual builder only.
 
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-
