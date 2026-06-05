@@ -6,7 +6,7 @@
 
 - [What is Axis](#what-is-axis)
 - [Tech stack & architecture](#tech-stack--architecture)
-- [Machine rules (P0–P2)](#machine-rules-p0p2)
+- [Severity rules (P0–P2)](#severity-rules-p0p2)
 - [Workflow](#workflow)
 - [Development rules](#development-rules)
 - [Definition of done](#definition-of-done)
@@ -53,7 +53,7 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 
 ---
 
-## Machine rules (P0–P2)
+## Severity rules (P0–P2)
 
 **P0 — always wrong if violated:**
 
@@ -64,7 +64,7 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 - Domain: zero external dependencies.
 - No implementation of a non-trivial change without producing the **Design Gate** review artifact ([design-gate.md](docs/playbooks/design-gate.md)); high-risk surfaces require user sign-off before code.
 - Never commit with a failing Verification gate; the command matrix and "full suite" honesty rules live in [agent-checklist.md](docs/playbooks/agent-checklist.md#verification-gate--verify-before-push).
-- Deterministic policy/doc checks (`policy-tests`, `doc-drift`, and the checks they call) must pass when triggered by touched paths; CI **Doc drift** runs on every PR and must be green.
+- Deterministic policy/doc checks must pass when triggered by touched paths; command ownership lives in [agent-checklist.md](docs/playbooks/agent-checklist.md#verification-gate--verify-before-push), enforcement status in [REVIEW_FINDINGS.md](docs/REVIEW_FINDINGS.md).
 
 **P1 — confirm with user before deviating:**
 
@@ -89,7 +89,7 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 
 **Integrity:** legacy code ≠ authority if it conflicts with docs; surface conflicts. Verify with grep before claiming "done". Document deferrals in callouts (`**Deferred (PR #N follow-up):**`), not as ✅ — **proactively**, without waiting for the user to ask ([process.md § Deferred follow-up](docs/playbooks/process.md)).
 
-**Workarounds:** if you intentionally ship code that violates a P0/P1 rule (because the proper solution is blocked), record it in [`docs/WORKAROUNDS.md`](docs/WORKAROUNDS.md) **in the same PR** with a cleanup trigger. Add a `// WORKAROUND: see docs/WORKAROUNDS.md#<slug>` comment at the violation site. The drift script and the architecture fitness tests (`tests/Architecture/Axis.Architecture.Tests`) enforce both ends.
+**Workarounds:** intentional P0/P1 violations must follow [`docs/WORKAROUNDS.md`](docs/WORKAROUNDS.md): inventory entry, cleanup trigger, and site reference in the same PR. This file owns severity; WORKAROUNDS owns the workflow and current debt.
 
 **Work priority:** (1) gaps/bugs/failing tests (2) finish current layer (3) next layer in order. Before API work: `grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/use-cases/` — resolve or document deferrals ([process.md § 4.5](docs/playbooks/process.md)).
 
@@ -124,12 +124,7 @@ Skip for trivial single-file fixes and doc-only edits.
 
 ### Reviews And Gates
 
-**Ready review / Verification gate ownership:** detailed AC-map/path-coverage requirements and the authoritative Verification gate command matrix are owned by
-[agent-checklist.md](docs/playbooks/agent-checklist.md) (single source).
-This file keeps policy-level requirements only:
-
-- **Ready review policy:** no blank AC map rows for in-scope bullets; no happy-path-only completion claims.
-- **Verification gate policy:** follow [agent-checklist.md § Verification Gate](docs/playbooks/agent-checklist.md#verification-gate--verify-before-push), the single owner for local fast-gate commands and CI full-gate expectations. Never present a unit-only/local-fast run as a full-suite run.
+**Ready review / Verification gate ownership:** [agent-checklist.md](docs/playbooks/agent-checklist.md) owns AC-map/path coverage details and the Verification gate command matrix. This file keeps only policy-level constraints: no blank in-scope AC rows, no happy-path-only completion claims, and no unit-only/local-fast run presented as a full suite.
 
 **Docs review** — docs walkthrough when behavior/spec/status changes ([agent-checklist.md](docs/playbooks/agent-checklist.md)). **Doc drift** — CI-enforced deterministic policy/doc checks; it does not require a token docs edit for every code diff.
 
@@ -160,8 +155,8 @@ Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, use-c
 
 | | .NET | Frontend |
 |---|------|----------|
-| Types | No `var` for locals (see `.editorconfig`); explicit types; one type per file | `const`/`let`, no `var`; strict TS, no `any` |
-| Hygiene | `using` not FQCN; `dotnet format Axis.sln` before push (CI `--verify-no-changes`) | Biome via `npm run ci` |
+| Types | No `var` for locals (see `.editorconfig`); explicit types; keep files focused | `const`/`let`, no `var`; strict TS, no `any` |
+| Hygiene | Prefer `using` over inline FQCN; `dotnet format Axis.sln` before push (CI `--verify-no-changes`) | Biome via `npm run ci` |
 | Scope | Fix violation class in one PR, not one file | Feature folders; no cross-feature imports except `index.ts` |
 
 **Enforced C# rules** live in [`.editorconfig`](.editorconfig) at the repo root (naming, braces, file-scoped namespaces, analyzer severities). Do not restate style here — run `dotnet format` and follow the file. Architecture patterns: [`patterns.md`](docs/playbooks/patterns.md). Frontend: [`frontend.md`](docs/playbooks/frontend.md).
@@ -196,7 +191,7 @@ Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, use-c
 
 **Per layer / module:** all use-case callouts updated; domain README table; [`PROGRESS.md`](docs/PROGRESS.md) (layer summary only — not per-class detail).
 
-**Per PR before merge:** PR description = Summary + Linked spec + Requirements only (no CI status, no commit list — Checks tab covers that). Run the triggered Verification gate commands from [agent-checklist.md](docs/playbooks/agent-checklist.md#verification-gate--verify-before-push). CI owns the authoritative full gate and always runs deterministic policy/doc checks in **Doc drift**.
+**Per PR before merge:** PR description = Summary + Linked spec + Requirements only (no CI status, no commit list — Checks tab covers that). Run the triggered Verification gate commands from [agent-checklist.md](docs/playbooks/agent-checklist.md#verification-gate--verify-before-push); CI/Doc drift enforcement status is tracked in [REVIEW_FINDINGS.md](docs/REVIEW_FINDINGS.md).
 
 Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` changes. Agents must pass [`docs/playbooks/visual-artifact-checklist.md`](docs/playbooks/visual-artifact-checklist.md) before commit.
 
