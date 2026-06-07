@@ -1,8 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from '@tanstack/react-router';
+import type { TFunction } from 'i18next';
 import { AlertCircle, CheckCircle2, Clock, Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
@@ -15,11 +17,13 @@ import { loadRegistrationContext } from '@/features/auth/registration-context';
 import type { VerifyEmailErrorKind } from '@/features/auth/types';
 import { useQueryParam } from '@/features/auth/use-query-param';
 
-const resendSchema = z.object({
-  email: z.string().min(1, 'Email address is required').email('Enter a valid email address'),
-});
+function createResendSchema(t: TFunction) {
+  return z.object({
+    email: z.string().min(1, t('validation.emailRequired')).email(t('validation.emailInvalid')),
+  });
+}
 
-type ResendFormValues = z.infer<typeof resendSchema>;
+type ResendFormValues = z.infer<ReturnType<typeof createResendSchema>>;
 
 function VerifyEmailOutcome({
   kind,
@@ -32,6 +36,8 @@ function VerifyEmailOutcome({
   onResend: (email: string) => Promise<void>;
   resendLoading: boolean;
 }) {
+  const { t } = useTranslation();
+  const resendSchema = useMemo(() => createResendSchema(t), [t]);
   const {
     register: registerResend,
     handleSubmit,
@@ -46,26 +52,26 @@ function VerifyEmailOutcome({
   const config = {
     expired: {
       icon: Clock,
-      title: 'Verification link expired',
-      body: 'This link was valid for 24 hours. Request a new verification email.',
+      title: t('verifyEmail.expiredTitle'),
+      body: t('verifyEmail.expiredBody'),
       iconClass: 'text-amber-600 bg-amber-500/10',
     },
     already_used: {
       icon: CheckCircle2,
-      title: 'Already verified',
-      body: 'This link has already been used.',
+      title: t('verifyEmail.alreadyUsedTitle'),
+      body: t('verifyEmail.alreadyUsedBody'),
       iconClass: 'text-muted-foreground bg-muted',
     },
     invalid: {
       icon: AlertCircle,
-      title: 'Invalid verification link',
-      body: 'This link is invalid or has been tampered with.',
+      title: t('verifyEmail.invalidTitle'),
+      body: t('verifyEmail.invalidBody'),
       iconClass: 'text-destructive bg-destructive/10',
     },
     rate_limited: {
       icon: Clock,
-      title: 'Please wait',
-      body: 'Too many resend requests for this email.',
+      title: t('verifyEmail.rateLimitedTitle'),
+      body: t('verifyEmail.rateLimitedBody'),
       iconClass: 'text-amber-600 bg-amber-500/10',
     },
   }[kind];
@@ -78,14 +84,14 @@ function VerifyEmailOutcome({
       footer={
         kind === 'already_used' ? (
           <>
-            Ready to continue?{' '}
+            {t('verifyEmail.readyToContinue')}{' '}
             <Link to="/login" className="font-medium hover:underline">
-              Go to sign in →
+              {t('emailConfirmation.goToSignIn')}
             </Link>
           </>
         ) : kind === 'invalid' ? (
           <Link to="/register" className="font-medium hover:underline">
-            Back to registration
+            {t('emailConfirmation.backToRegistration')}
           </Link>
         ) : undefined
       }
@@ -107,7 +113,7 @@ function VerifyEmailOutcome({
             noValidate
           >
             <div className="space-y-1.5">
-              <Label htmlFor="resend-email">Email address</Label>
+              <Label htmlFor="resend-email">{t('common.emailAddress')}</Label>
               <Input
                 id="resend-email"
                 type="email"
@@ -126,7 +132,7 @@ function VerifyEmailOutcome({
               className="w-full h-9"
               disabled={kind === 'rate_limited' || resendLoading}
             >
-              {resendLoading ? 'Sending…' : 'Resend verification email'}
+              {resendLoading ? t('verifyEmail.sending') : t('verifyEmail.resendVerificationEmail')}
             </Button>
           </form>
         ) : null}
@@ -136,6 +142,7 @@ function VerifyEmailOutcome({
 }
 
 export function VerifyEmailPage() {
+  const { t } = useTranslation();
   const token = useQueryParam('token');
   const context = loadRegistrationContext();
   const { submit, loading, errorKind } = useVerifyEmail();
@@ -163,10 +170,10 @@ export function VerifyEmailPage() {
 
   if (loading) {
     return (
-      <AuthCard title="Verifying your email">
+      <AuthCard title={t('verifyEmail.verifyingTitle')}>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-          <span>Confirming your verification link…</span>
+          <span>{t('verifyEmail.confirmingLink')}</span>
         </div>
       </AuthCard>
     );
@@ -184,10 +191,10 @@ export function VerifyEmailPage() {
   }
 
   return (
-    <AuthCard title="Verifying your email">
+    <AuthCard title={t('verifyEmail.verifyingTitle')}>
       <div className="flex items-center gap-3 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-        <span>Completing sign-in...</span>
+        <span>{t('verifyEmail.completingSignIn')}</span>
       </div>
     </AuthCard>
   );

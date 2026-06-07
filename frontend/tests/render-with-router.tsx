@@ -8,6 +8,9 @@ import {
 import { type RenderOptions, type RenderResult, render } from '@testing-library/react';
 import type { ReactElement } from 'react';
 
+import { PreferenceEffects } from '../src/features/preferences';
+import '../src/features/preferences/i18n';
+
 interface RenderWithRouterOptions extends Omit<RenderOptions, 'wrapper'> {
   path?: string;
 }
@@ -42,6 +45,7 @@ export async function renderWithRouter(
 
   const result = render(
     <QueryClientProvider client={queryClient}>
+      <PreferenceEffects />
       <RouterProvider router={router} />
     </QueryClientProvider>,
     renderOptions,

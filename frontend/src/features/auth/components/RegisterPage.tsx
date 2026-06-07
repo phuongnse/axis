@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +8,7 @@ import { AuthCard } from '@/features/auth/components/AuthCard';
 import { useRegister } from '@/features/auth/hooks/useRegister';
 
 export function RegisterPage() {
+  const { t } = useTranslation();
   const { form, loading, submit } = useRegister();
   const {
     register,
@@ -17,19 +19,19 @@ export function RegisterPage() {
 
   return (
     <AuthCard
-      title="Create your account"
+      title={t('register.title')}
       footer={
         <>
-          Already have an account?{' '}
+          {t('register.footerPrompt')}{' '}
           <Link to="/login" className="font-medium hover:underline">
-            Sign in
+            {t('common.signIn')}
           </Link>
         </>
       }
     >
       <form className="space-y-4" onSubmit={handleSubmit(submit)} noValidate>
         <div className="space-y-1.5">
-          <Label htmlFor="fullName">Full name</Label>
+          <Label htmlFor="fullName">{t('register.fullName')}</Label>
           <Input
             id="fullName"
             autoComplete="name"
@@ -42,7 +44,7 @@ export function RegisterPage() {
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="email">Email address</Label>
+          <Label htmlFor="email">{t('common.emailAddress')}</Label>
           <Input
             id="email"
             type="email"
@@ -54,7 +56,7 @@ export function RegisterPage() {
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password">{t('common.password')}</Label>
           <Input
             id="password"
             type="password"
@@ -68,7 +70,7 @@ export function RegisterPage() {
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="passwordConfirmation">Confirm password</Label>
+          <Label htmlFor="passwordConfirmation">{t('register.confirmPassword')}</Label>
           <Input
             id="passwordConfirmation"
             type="password"
@@ -91,23 +93,23 @@ export function RegisterPage() {
               {...register('acceptedTerms')}
             />
             <Label htmlFor="acceptedTerms" className="font-normal leading-snug">
-              I agree to the{' '}
+              {t('register.agreePrefix')}{' '}
               <a
                 href="/legal/terms"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-medium text-primary hover:underline"
               >
-                Terms of Service
+                {t('register.termsOfService')}
               </a>{' '}
-              and{' '}
+              {t('register.agreeMiddle')}{' '}
               <a
                 href="/legal/privacy"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-medium text-primary hover:underline"
               >
-                Privacy Policy
+                {t('register.privacyPolicy')}
               </a>
             </Label>
           </div>
@@ -126,7 +128,7 @@ export function RegisterPage() {
         ) : null}
 
         <Button type="submit" variant="cta" className="w-full h-9" disabled={loading}>
-          {loading ? 'Creating account...' : 'Create account'}
+          {loading ? t('register.creatingAccount') : t('common.createAccount')}
         </Button>
       </form>
     </AuthCard>

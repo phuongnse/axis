@@ -1,9 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
+import type { TFunction } from 'i18next';
+import { useMemo } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 
 import { LoginRequestError, loginWithPassword } from '@/features/auth/api';
-import { type LoginFormValues, loginSchema } from '@/features/auth/schemas/login-schema';
+import { createLoginSchema, type LoginFormValues } from '@/features/auth/schemas/login-schema';
 
 export type LoginErrorKind = 'credentials' | 'unverified' | 'deactivated' | 'locked' | 'server';
 
@@ -12,28 +15,30 @@ export interface LoginError {
   message: string;
 }
 
-function mapLoginFailure(status: number, bodyText: string): LoginError {
+function mapLoginFailure(status: number, bodyText: string, t: TFunction): LoginError {
   const lower = bodyText.toLowerCase();
   if (lower.includes('verify') || lower.includes('unverified'))
     return {
       kind: 'unverified',
-      message: 'Please verify your email before signing in.',
+      message: t('login.errors.unverified'),
     };
   if (lower.includes('deactivated'))
     return {
       kind: 'deactivated',
-      message: 'Your account has been deactivated. Contact your organization admin.',
+      message: t('login.errors.deactivated'),
     };
   if (lower.includes('too many') || lower.includes('locked'))
     return {
       kind: 'locked',
-      message: 'Too many failed attempts. Try again later.',
+      message: t('login.errors.locked'),
     };
-  if (status === 401) return { kind: 'credentials', message: 'Incorrect email or password' };
-  return { kind: 'server', message: 'Something went wrong. Please try again.' };
+  if (status === 401) return { kind: 'credentials', message: t('login.errors.credentials') };
+  return { kind: 'server', message: t('login.errors.server') };
 }
 
 export function useLogin() {
+  const { t } = useTranslation();
+  const loginSchema = useMemo(() => createLoginSchema(t), [t]);
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
@@ -53,7 +58,7 @@ export function useLogin() {
     },
     onError: (error: unknown) => {
       if (error instanceof LoginRequestError) {
-        const mapped = mapLoginFailure(error.status, error.bodyText);
+        const mapped = mapLoginFailure(error.status, error.bodyText, t);
         form.setError('root', { type: 'server', message: mapped.message });
         if (mapped.kind === 'server') {
           form.setValue('password', '');
@@ -61,7 +66,7 @@ export function useLogin() {
         return;
       }
 
-      form.setError('root', { type: 'server', message: 'Something went wrong. Please try again.' });
+      form.setError('root', { type: 'server', message: t('login.errors.server') });
       form.setValue('password', '');
     },
   });
@@ -77,7 +82,7 @@ export function useLogin() {
 
   const loginError =
     mutation.error instanceof LoginRequestError
-      ? mapLoginFailure(mutation.error.status, mutation.error.bodyText)
+      ? mapLoginFailure(mutation.error.status, mutation.error.bodyText, t)
       : form.formState.errors.root?.message
         ? { kind: 'server', message: form.formState.errors.root.message }
         : null;

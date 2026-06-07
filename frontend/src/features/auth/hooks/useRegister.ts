@@ -1,18 +1,20 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import { type FieldPath, type UseFormReturn, useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 
 import { createRegisterIdempotencyKey, registerUser, toAdminNameParts } from '@/features/auth/api';
 import { useLegalVersions } from '@/features/auth/hooks/useLegalVersions';
 import { saveRegistrationContext } from '@/features/auth/registration-context';
-import { type RegisterFormValues, registerSchema } from '@/features/auth/schemas/register-schema';
+import {
+  createRegisterSchema,
+  type RegisterFormValues,
+} from '@/features/auth/schemas/register-schema';
 import type { RegisterValidationErrorData } from '@/features/auth/types';
 import { useQueryParam } from '@/features/auth/use-query-param';
 import { ApiError } from '@/lib/api';
-
-const GENERIC_SUBMIT_ERROR = 'Something went wrong, please try again';
 
 function pickFirstError(
   errors: Record<string, string[]> | undefined,
@@ -80,10 +82,13 @@ function applyRegisterValidationErrors(
 }
 
 export function useRegister() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const organizationSetupToken = useQueryParam('setupToken');
   const { data: legalVersions } = useLegalVersions();
   const idempotencyKeyRef = useRef(createRegisterIdempotencyKey());
+  const registerSchema = useMemo(() => createRegisterSchema(t), [t]);
+  const genericSubmitError = t('validation.genericSubmit');
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -99,7 +104,7 @@ export function useRegister() {
   const mutation = useMutation({
     mutationFn: async (values: RegisterFormValues) => {
       if (!legalVersions) {
-        throw new Error('Legal document versions are not loaded yet.');
+        throw new Error(t('validation.legalVersionsMissing'));
       }
 
       const names = toAdminNameParts(values.fullName);
@@ -131,13 +136,13 @@ export function useRegister() {
         if (!hasMappedFieldError) {
           form.setError('root', {
             type: 'server',
-            message: errorData.message ?? errorData.title ?? GENERIC_SUBMIT_ERROR,
+            message: errorData.message ?? errorData.title ?? genericSubmitError,
           });
         }
         return;
       }
 
-      form.setError('root', { type: 'server', message: GENERIC_SUBMIT_ERROR });
+      form.setError('root', { type: 'server', message: genericSubmitError });
     },
   });
 

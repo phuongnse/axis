@@ -1,6 +1,8 @@
 import { Link } from '@tanstack/react-router';
-import { Mail } from 'lucide-react';
+import { Mail, UserPlus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
+import { ActionLink } from '@/components/ui/action-link';
 import { AuthCard } from '@/features/auth/components/AuthCard';
 import { useResendVerification } from '@/features/auth/hooks/useResendVerification';
 import { loadRegistrationContext } from '@/features/auth/registration-context';
@@ -30,6 +32,7 @@ function NoticeBanner({
 }
 
 export function EmailConfirmationPage() {
+  const { t } = useTranslation();
   const context = loadRegistrationContext();
   const { resend, state, rateLimitMessage, reset } = useResendVerification();
 
@@ -45,12 +48,12 @@ export function EmailConfirmationPage() {
 
   return (
     <AuthCard
-      title="Check your email"
+      title={t('emailConfirmation.title')}
       footer={
         <>
-          Already verified?{' '}
+          {t('emailConfirmation.footerPrompt')}{' '}
           <Link to="/login" className="font-medium hover:underline">
-            Go to sign in →
+            {t('emailConfirmation.goToSignIn')}
           </Link>
         </>
       }
@@ -61,12 +64,12 @@ export function EmailConfirmationPage() {
             <Mail className="h-4 w-4" aria-hidden />
           </div>
           <div className="space-y-2 text-sm text-muted-foreground">
-            <p>
-              If an account exists for this email, you will receive a verification link shortly.
-            </p>
-            <p>Check your inbox.</p>
+            <p>{t('emailConfirmation.intro')}</p>
+            <p>{t('emailConfirmation.checkInbox')}</p>
             {context?.email ? (
-              <p className="text-xs text-muted-foreground/80">Sent to {context.email}</p>
+              <p className="text-xs text-muted-foreground/80">
+                {t('emailConfirmation.sentTo', { email: context.email })}
+              </p>
             ) : null}
           </div>
         </div>
@@ -74,37 +77,37 @@ export function EmailConfirmationPage() {
         {state === 'sending' ? (
           <NoticeBanner
             variant="info"
-            title="Sending…"
-            body="Stay on this screen; the resend link is disabled until the request completes."
+            title={t('emailConfirmation.sendingTitle')}
+            body={t('emailConfirmation.sendingBody')}
           />
         ) : null}
 
         {state === 'success' ? (
           <NoticeBanner
             variant="success"
-            title="Verification email sent"
-            body="If an account exists for this email, check your inbox for a new link."
+            title={t('emailConfirmation.successTitle')}
+            body={t('emailConfirmation.successBody')}
           />
         ) : null}
 
         {state === 'rate_limited' ? (
           <NoticeBanner
             variant="warning"
-            title="Please wait before requesting another email."
-            body={rateLimitMessage ?? 'You reached the resend limit (3 per hour).'}
+            title={t('emailConfirmation.waitTitle')}
+            body={rateLimitMessage ?? t('emailConfirmation.waitBodyDefault')}
           />
         ) : null}
 
         {state === 'error' ? (
           <NoticeBanner
             variant="warning"
-            title="Couldn't send the email"
-            body="Something went wrong sending the verification email. Please try again."
+            title={t('emailConfirmation.errorTitle')}
+            body={t('emailConfirmation.errorBody')}
           />
         ) : null}
 
         <div className="text-sm">
-          <span className="text-muted-foreground">Didn&apos;t receive it? </span>
+          <span className="text-muted-foreground">{t('emailConfirmation.didntReceive')} </span>
           {context?.email ? (
             <button
               type="button"
@@ -112,21 +115,18 @@ export function EmailConfirmationPage() {
               disabled={state === 'sending' || state === 'rate_limited'}
               onClick={() => void handleResend()}
             >
-              Resend email →
+              {t('emailConfirmation.resendEmail')}
             </button>
           ) : (
             <Link to="/register" className="font-medium text-primary hover:underline">
-              Back to registration →
+              {t('emailConfirmation.backToRegistration')}
             </Link>
           )}
         </div>
 
-        <Link
-          to="/register"
-          className="inline-flex w-full h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
-        >
-          Register another account
-        </Link>
+        <ActionLink to="/register" icon={UserPlus} variant="secondary" className="w-full">
+          {t('emailConfirmation.registerAnotherAccount')}
+        </ActionLink>
       </div>
     </AuthCard>
   );

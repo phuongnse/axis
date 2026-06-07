@@ -75,9 +75,16 @@ Define user-facing localization and visual theme behavior for the SPA so each us
 > | Application | N/A |
 > | Infrastructure | N/A |
 > | API | N/A |
-> | Frontend | ⏳ |
+> | Frontend | ✅ |
 >
-> **Gaps vs spec:** use case not started.
+> **Gaps vs spec:** none for the current SPA foundation. Backend-localized API error payloads are future work outside this frontend preference use case.
+>
+> **Implemented:**
+> - `i18next` + `react-i18next` initialize key-based `en` / `vi` resources with English fallback.
+> - `PreferenceControls` is available on public/auth screens and in the authenticated header.
+> - Locale preference persists in `localStorage` under `axis.language`; `<html lang>` updates immediately.
+> - Current visible SPA strings in landing, auth, provisioning, app shell, topology background, and dashboard scaffold use locale keys.
+> - Vitest covers immediate language switching and preference persistence.
 >
 > **Decisions:**
 > - Translation is key-based (`feature.section.key`) with English fallback.
@@ -88,4 +95,3 @@ Define user-facing localization and visual theme behavior for the SPA so each us
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

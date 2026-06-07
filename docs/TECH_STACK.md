@@ -45,6 +45,7 @@
 | **TanStack Query** | 5.x | Server state / data fetching | Caching, background refetch, request deduplication |
 | **TanStack Router** | 1.x | Routing | Type-safe routing with search param management and built-in prefetching |
 | **Zustand** | 5.x | Client state management | Lightweight, minimal boilerplate |
+| **i18next + react-i18next** | i18next 26.x / react-i18next 17.x | Localization | Key-based EN/VI resources with English fallback; integrated with React hooks for immediate language switching |
 | **Fetch API** | (native) | HTTP client | Native browser API for network requests; custom wrapper (`fetchApi`) for auth, timeout, and error normalisation |
 | **shadcn/ui + @base-ui/react** | latest | UI components | shadcn/ui for pre-built patterns; @base-ui/react for lower-level unstyled primitives |
 | **Tailwind CSS** | 3.x | Styling | Utility-first, fast iteration |

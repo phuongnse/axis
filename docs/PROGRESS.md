@@ -37,7 +37,7 @@ Feature work (frontend feature UIs, page-builder) tracks per-domain **Open work*
 
 Full auth, user, role, invitation, and session management. OpenIddict 5.x OIDC server (Authorization Code + PKCE for SPA; Client Credentials for M2M). RBAC via custom permission policies. All Identity API endpoints covered by integration tests.
 
-> 📝 **Docs-first next scope:** [localization and theming](./use-cases/identity-access/README.md#use-cases) — EN/VI, light/dark/system mode, rollout rules before implementation.
+> ✅ **Frontend preference foundation:** [language](./use-cases/identity-access/language/) and [theme](./use-cases/identity-access/theme/) now cover EN/VI locale switching plus light/dark/system mode for the current SPA shell.
 
 > ✅ **Phase 2 complete:** `Axis.Identity.Contracts` with `IdentityService.GetUserPermissions` gRPC + 5 Avro lifecycle event schemas published via Wolverine outbox → Kafka with CloudEvents envelope (ADR-019). Each of DataModeling/FormBuilder/WorkflowBuilder/WorkflowEngine subscribes to `OrganizationVerifiedEvent` and provisions its own tenant schema (central `TenantSchemaProvisioner` and `ProvisionTenantMessage` removed — extraction is now a redeploy per ADR-010). Gateway uses `AddGrpcClient<IdentityService.IdentityServiceClient>` with `Modules:Identity:GrpcUrl` config; JWKS-only validation rule documented in [patterns.md § Pattern 3](playbooks/patterns.md#-pattern-3-jwks-only-jwt-validation-in-consuming-modules).
 
@@ -99,4 +99,4 @@ Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoi
 
 **Status: ✅ Tooling complete — feature implementation ⏳**
 
-React 19 + TypeScript + Vite. TanStack Router, TanStack Query, Zustand, shadcn/ui, Tailwind. Biome (lint + format). `npm run ci` gate enforced. All module feature UIs remain ⏳.
+React 19 + TypeScript + Vite. TanStack Router, TanStack Query, Zustand, i18next/react-i18next, shadcn/ui, Tailwind. Biome (lint + format). `npm run ci` gate enforced. All module feature UIs remain ⏳.

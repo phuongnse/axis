@@ -22,11 +22,11 @@ export function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <div className="flex min-h-screen bg-muted/30">
+    <div className="flex min-h-screen flex-col bg-background lg:flex-row">
       <AppSidebar />
-      <div className="flex flex-1 flex-col min-w-0">
+      <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader onSignOut={handleSignOut} />
-        <main className="flex-1 p-6 md:p-8 overflow-auto">{children}</main>
+        <main className="axis-grid flex-1 overflow-auto p-4 sm:p-6 md:p-8">{children}</main>
       </div>
     </div>
   );
