@@ -32,12 +32,13 @@ export const resources = {
         setTheme: 'Switch theme to {{theme}}',
       },
       landing: {
-        heroTitle: 'Axis control plane',
+        accessLabel: 'Secure access',
+        heroTitle: 'Workspace control plane',
         heroBody:
           'Build and operate data models, workflows, and workspace processes from one place.',
         accessPath: 'Access path',
         signInStep: 'Account',
-        signInStepMeta: 'Sign in or create an Axis account',
+        signInStepMeta: 'Sign in or create an account',
         verifyAccess: 'Verify access',
         verifyAccessMeta: 'Confirm email and permissions',
         openWorkspace: 'Open workspace',
@@ -45,12 +46,12 @@ export const resources = {
       },
       auth: {
         secureWorkspaceAccess: 'Account access',
-        sideTitle: 'Use your Axis account to continue.',
+        sideTitle: 'Use your account to continue.',
         sideBody: 'After verification, you can open the workspaces you have access to.',
         unverifiedHint: 'Check your inbox for the verification link.',
       },
       login: {
-        title: 'Sign in to Axis',
+        title: 'Sign in',
         footerPrompt: "Don't have an account?",
         forgotPassword: 'Forgot password?',
         signingIn: 'Signing in...',
@@ -278,11 +279,12 @@ export const resources = {
         setTheme: 'Chọn chế độ {{theme}}',
       },
       landing: {
-        heroTitle: 'Trung tâm vận hành Axis',
+        accessLabel: 'Truy cập an toàn',
+        heroTitle: 'Trung tâm vận hành',
         heroBody: 'Quản lý mô hình dữ liệu, quy trình và không gian làm việc ở một nơi.',
         accessPath: 'Luồng truy cập',
         signInStep: 'Tài khoản',
-        signInStepMeta: 'Đăng nhập hoặc tạo tài khoản Axis',
+        signInStepMeta: 'Đăng nhập hoặc tạo tài khoản',
         verifyAccess: 'Xác thực truy cập',
         verifyAccessMeta: 'Xác nhận email và quyền truy cập',
         openWorkspace: 'Mở không gian làm việc',
@@ -290,12 +292,12 @@ export const resources = {
       },
       auth: {
         secureWorkspaceAccess: 'Truy cập tài khoản',
-        sideTitle: 'Tiếp tục bằng tài khoản Axis.',
+        sideTitle: 'Tiếp tục bằng tài khoản của bạn.',
         sideBody: 'Sau khi xác thực, bạn có thể mở những không gian làm việc mình được cấp quyền.',
         unverifiedHint: 'Mở email xác minh trong hộp thư của bạn.',
       },
       login: {
-        title: 'Đăng nhập Axis',
+        title: 'Đăng nhập',
         footerPrompt: 'Chưa có tài khoản?',
         forgotPassword: 'Quên mật khẩu?',
         signingIn: 'Đang đăng nhập...',
@@ -308,7 +310,7 @@ export const resources = {
         },
       },
       register: {
-        title: 'Tạo tài khoản Axis',
+        title: 'Tạo tài khoản',
         footerPrompt: 'Đã có tài khoản?',
         fullName: 'Họ và tên',
         confirmPassword: 'Nhập lại mật khẩu',
@@ -390,7 +392,7 @@ export const resources = {
         failedTitle: 'Thiết lập chưa thành công',
         failedBody: 'Quá trình thiết lập thất bại sau 3 lần thử.',
         activeBody:
-          'Axis đang tạo không gian làm việc, phân quyền quản trị và khởi tạo các phân hệ.',
+          'Hệ thống đang tạo không gian làm việc, phân quyền quản trị và khởi tạo các phân hệ.',
         attempt: 'Lần thử',
         limit: 'Tối đa',
         state: 'Trạng thái',

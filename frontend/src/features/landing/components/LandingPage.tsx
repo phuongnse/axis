@@ -14,12 +14,9 @@ function BrandLockup() {
   return (
     <div className="flex items-center gap-3">
       <img src={axisLogo} alt="Axis" className="size-11 shrink-0" width={44} height={44} />
-      <div>
-        <p className="text-lg font-semibold">Axis</p>
-        <p className="text-xs uppercase tracking-[0.18em] text-white/45">
-          {t('common.controlPlane')}
-        </p>
-      </div>
+      <p className="text-xs uppercase tracking-[0.18em] text-white/45">
+        {t('landing.accessLabel')}
+      </p>
     </div>
   );
 }

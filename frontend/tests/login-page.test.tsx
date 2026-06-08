@@ -30,6 +30,6 @@ describe('LoginPage', () => {
       'href',
       '/forgot-password',
     );
-    expect(screen.getByRole('img', { name: 'Axis' })).toBeInTheDocument();
+    expect(screen.getByText('Language and theme preferences')).toBeInTheDocument();
   });
 });

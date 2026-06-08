@@ -22,12 +22,9 @@ export function AuthSignalPanel() {
         <div className="space-y-7">
           <div className="flex items-center gap-3">
             <img src={axisLogo} alt="" className="size-10 shrink-0" width={40} height={40} />
-            <div>
-              <p className="text-base font-semibold">Axis</p>
-              <p className="text-xs uppercase tracking-[0.18em] text-white/45">
-                {t('common.controlPlane')}
-              </p>
-            </div>
+            <p className="text-xs uppercase tracking-[0.18em] text-white/45">
+              {t('common.controlPlane')}
+            </p>
           </div>
           <HeaderRule tone="inverted" />
         </div>

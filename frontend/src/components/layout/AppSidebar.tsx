@@ -18,12 +18,9 @@ export function AppSidebar() {
       <div className="space-y-4 border-b border-white/10 px-5 py-5">
         <div className="flex items-center gap-2">
           <img src={axisLogo} alt="Axis" className="size-8 shrink-0" width={32} height={32} />
-          <div>
-            <p className="text-sm font-semibold">Axis</p>
-            <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">
-              {t('common.controlPlane')}
-            </p>
-          </div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">
+            {t('common.controlPlane')}
+          </p>
         </div>
         <button
           type="button"

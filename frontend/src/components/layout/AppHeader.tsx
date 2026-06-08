@@ -18,12 +18,8 @@ export function AppHeader({ onSignOut }: AppHeaderProps) {
   return (
     <header className="shrink-0 border-b border-border bg-background/90 backdrop-blur">
       <div className="flex min-h-14 items-center gap-3 px-4 py-3 sm:px-6">
-        <p className="min-w-0 shrink text-[13px] text-muted-foreground sm:min-w-[160px]">
-          <span className="font-medium text-primary">Axis</span>
-          <span className="mx-2 text-border">/</span>
-          <span className="inline-block max-w-[9rem] truncate align-bottom sm:max-w-none">
-            {pageTitle}
-          </span>
+        <p className="min-w-0 shrink truncate text-[13px] font-medium text-foreground sm:min-w-[160px]">
+          {pageTitle}
         </p>
 
         <div className="mx-auto hidden max-w-lg flex-1 justify-center md:flex">
