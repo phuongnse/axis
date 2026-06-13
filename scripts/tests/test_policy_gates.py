@@ -539,10 +539,10 @@ class TestEnforcementTruthAudit(unittest.TestCase):
 
         self.assertIn("doc drift runs in CI", "\n".join(issues))
 
-    def test_rejects_missing_pre_push_verify_delegate(self) -> None:
+    def test_rejects_missing_pre_push_quick_gate_delegate(self) -> None:
         def mutate(files: dict[Path, str]) -> None:
             hook = Path("scripts/hooks/pre-push")
-            files[hook] = files[hook].replace('scripts/axis.py" verify', 'scripts/other.py" verify')
+            files[hook] = files[hook].replace('scripts/axis.py" pre-push', 'scripts/other.py" pre-push')
 
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

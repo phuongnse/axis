@@ -2,7 +2,7 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← agent-checklist.md](./agent-checklist.md) · [← CLAUDE.md](../../CLAUDE.md)
 
-**Single source** for how CI maps **code paths → docs/config** without hand-maintained lists in `python scripts/axis.py check doc-drift`. Shared logic lives in [`scripts/axis_repo.py`](../../scripts/axis_repo.py). Agents **run the checks locally** before push; CI runs the same commands inside **Doc drift** and **dotnet test**.
+**Single source** for how CI maps **code paths → docs/config** without hand-maintained lists in `python scripts/axis.py check doc-drift`. Shared logic lives in [`scripts/axis_repo.py`](../../scripts/axis_repo.py). Agents **run the checks locally** before requesting review; CI runs the same commands inside **Doc drift** and **dotnet test**.
 
 ---
 
@@ -34,7 +34,7 @@
 
 ---
 
-## One command before push (layout + docs)
+## One command before review (layout + docs)
 
 When touching docs, scripts, repo layout, handlers, endpoints, or generated-contract surfaces:
 

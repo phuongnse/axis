@@ -60,7 +60,7 @@ Common seam categories:
 
 ## Verification Gate Honesty
 
-"Verification gate green" in a PR body is a factual claim that you ran the local Verification gate on this branch: `python scripts/axis.py verify` with the command matrix in [agent-checklist § Verification Gate](./agent-checklist.md#verification-gate--verify-before-push). Do not present unit-only output, a one-file test, or a partial command as the Verification gate.
+"Verification gate green" in a PR body is a factual claim that you ran the local Verification gate on this branch: `python scripts/axis.py verify` with the command matrix in [agent-checklist § Verification Gate](./agent-checklist.md#verification-gate--verify-before-pr-review). Do not present unit-only output, a one-file test, or a partial command as the Verification gate.
 
 The full suite is a separate claim: full local verification means full `dotnet test Axis.sln --nologo` plus the applicable frontend and drift checks. CI/branch protection is the authoritative full gate before merge.
 
@@ -117,7 +117,7 @@ an unmerged sibling owns?
 
 ---
 
-## Checklist before push (each slice)
+## Checklist before review (each slice)
 
 - [ ] Branch created from current `origin/main`, not from another feature branch
 - [ ] **Stands alone:** fresh checkout builds + `python scripts/axis.py verify` green

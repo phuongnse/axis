@@ -530,7 +530,7 @@ _ = Task.Run(async () =>
 
 - Never run `dotnet test --no-build` after editing test code — always let it recompile.
 - **Never hardcode environment configurations**: connection strings, API URLs, Docker endpoints, secret keys must use environment variables, `appsettings.json`, or `.testcontainers.properties`.
-- **Pre-push / CI**: local pre-push runs the fast gate (`python scripts/axis.py verify`), including unit test projects via `python scripts/axis.py test unit`. CI runs full `dotnet test Axis.sln`, including Testcontainers integration and API tests.
+- **Pre-push / CI**: local pre-push runs a quick policy/doc sanity gate (`python scripts/axis.py pre-push`) so ordinary pushes stay fast. Before requesting review, run the ready-PR gate (`python scripts/axis.py verify`), including unit test projects via `python scripts/axis.py test unit`. CI runs full `dotnet test Axis.sln`, including Testcontainers integration and API tests.
 
 ### Pattern — keep API isolation tests deterministic, test async provisioning separately
 

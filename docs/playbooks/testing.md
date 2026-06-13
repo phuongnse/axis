@@ -56,9 +56,9 @@ Testing playbook responsibility here is implementation technique:
 - keep path assertions deterministic (no timing-race assertions),
 - keep behavior assertions explicit enough to map back to the AC row.
 
-### Pre-commit gate
+### Ready-PR gate
 
-See [agent-checklist.md § Verification Gate](./agent-checklist.md#verification-gate--verify-before-push) and CLAUDE.md. When `src/` or `tests/` change:
+See [agent-checklist.md § Verification Gate](./agent-checklist.md#verification-gate--verify-before-pr-review) and CLAUDE.md. When `src/` or `tests/` change:
 
 ```bash
 dotnet build

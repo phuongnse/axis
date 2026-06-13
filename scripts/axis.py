@@ -1066,6 +1066,8 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
         [
             ('step("policy gate tests", lambda: check_policy_tests())', "local verify runs policy gate tests"),
             ('step("doc drift", lambda: check_doc_drift())', "local verify runs doc drift"),
+            ('def pre_push(args: argparse.Namespace) -> int:', "pre-push quick gate is implemented in Python"),
+            ('return verify(args)', "pre-push can opt into full verify with AXIS_PRE_PUSH_FULL"),
             ("for issue in governance_owner_boundary_issues():", "doc drift checks governance owner boundaries"),
             ("for issue in review_findings_registry_issues():", "doc drift checks review findings registry rows"),
             ("for issue in enforcement_truth_audit_issues():", "doc drift checks enforcement truth wiring"),
@@ -1074,7 +1076,7 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
     (
         Path("scripts/hooks/pre-push"),
         [
-            ('scripts/axis.py" verify', "pre-push delegates to scripts/axis.py verify"),
+            ('scripts/axis.py" pre-push', "pre-push delegates to scripts/axis.py pre-push"),
         ],
     ),
     (
@@ -1135,7 +1137,7 @@ def governance_owner_boundary_issues(*, root: Path | None = None) -> list[str]:
                 if command in line:
                     issues.append(
                         f"{normalized}:{idx}: governance doc restates `{command}`. "
-                        "Link to agent-checklist.md#verification-gate--verify-before-push instead."
+                        "Link to agent-checklist.md#verification-gate--verify-before-pr-review instead."
                     )
 
             if "Design Gate" not in line:
@@ -1485,6 +1487,56 @@ def verify(args: argparse.Namespace) -> int:
     return 1
 
 
+def pre_push(args: argparse.Namespace) -> int:
+    full = os.environ.get("AXIS_PRE_PUSH_FULL", "").lower() in {"1", "true", "yes", "on"}
+    if full:
+        print("pre-push: AXIS_PRE_PUSH_FULL is set; running full verify.")
+        return verify(args)
+
+    range_spec = diff_range()
+    paths = changed_paths(range_spec)
+    dotnet = not paths or any(
+        re.search(
+            r"^(src/|tests/|Directory[.]|Axis[.]sln$|global[.]json$|[.]editorconfig$|[.]github/workflows/build-and-test[.]yml$)",
+            p,
+        )
+        for p in paths
+    )
+    failed: list[str] = []
+
+    def step(name: str, fn: callable[[], int]) -> None:
+        print()
+        print(f"> {name}")
+        try:
+            rc = fn()
+        except CheckError as exc:
+            print(exc, file=sys.stderr)
+            rc = 1
+        if rc == 0:
+            print(f"OK {name}")
+        else:
+            print(f"FAIL {name}")
+            failed.append(name)
+
+    print("pre-push: quick gate")
+    print("  Runs cheap policy/doc checks before the network push.")
+    print("  Run `python scripts/axis.py verify` before marking a PR ready for review.")
+
+    if dotnet:
+        step(".NET test naming", lambda: check_test_naming())
+        step(".NET test project classification", lambda: check_test_project_classification())
+
+    step("policy gate tests", lambda: check_policy_tests())
+    step("doc drift", lambda: check_doc_drift())
+
+    print()
+    if not failed:
+        print("pre-push: PASS")
+        return 0
+    print(f"pre-push: FAIL - {len(failed)} step(s): {' '.join(failed)}", file=sys.stderr)
+    return 1
+
+
 def generate_api_contracts(_args: argparse.Namespace | None = None) -> int:
     commands = [
         ([exe("dotnet"), "build", "src/Axis.Api/Axis.Api.csproj", "--nologo"], ROOT, None),
@@ -1558,7 +1610,7 @@ def install_hooks(_args: argparse.Namespace | None = None) -> int:
     hook = ROOT / "scripts" / "hooks" / "pre-push"
     if os.name != "nt" and hook.exists():
         hook.chmod(hook.stat().st_mode | 0o111)
-    print("Installed: core.hooksPath = scripts/hooks (pre-push runs python scripts/axis.py verify).")
+    print("Installed: core.hooksPath = scripts/hooks (pre-push runs python scripts/axis.py pre-push).")
     return 0
 
 
@@ -1590,6 +1642,7 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("bootstrap").set_defaults(func=bootstrap)
     sub.add_parser("install-hooks").set_defaults(func=install_hooks)
+    sub.add_parser("pre-push").set_defaults(func=pre_push)
     sub.add_parser("verify").set_defaults(func=verify)
 
     check = sub.add_parser("check")
