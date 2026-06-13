@@ -4,7 +4,7 @@ namespace Axis.Api.Tests.Helpers;
 
 internal static class TestRegistrationPayload
 {
-    public const string AdminPassword = "TestPass1";
+    public const string AdminPassword = "maple river sunrise";
 
     public static string OrganizationContactEmail(string suffix) =>
         $"contact{suffix}@test.com";

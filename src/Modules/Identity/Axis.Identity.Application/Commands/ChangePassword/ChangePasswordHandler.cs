@@ -28,9 +28,13 @@ public sealed class ChangePasswordHandler(
         if (hasher.Verify(command.NewPassword, user.PasswordHash ?? string.Empty))
             return Result.Failure(ErrorCodes.BusinessRule, "New password must be different from your current password.");
 
-        if (!IsStrongPassword(command.NewPassword))
-            return Result.Failure(ErrorCodes.BusinessRule,
-                "Password must be at least 8 characters and contain at least one letter and one number.");
+        string? passwordError = PasswordPolicy.Validate(
+            command.NewPassword,
+            user.Email.Value,
+            user.FirstName,
+            user.LastName);
+        if (passwordError is not null)
+            return Result.Failure(ErrorCodes.BusinessRule, passwordError);
 
         user.SetPasswordHash(hasher.Hash(command.NewPassword));
         await uow.SaveChangesAsync(cancellationToken);
@@ -48,9 +52,4 @@ public sealed class ChangePasswordHandler(
 
         return Result.Success();
     }
-
-    private static bool IsStrongPassword(string password) =>
-        password.Length >= 8
-        && password.Any(char.IsLetter)
-        && password.Any(char.IsDigit);
 }

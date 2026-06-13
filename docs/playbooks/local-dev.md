@@ -40,7 +40,7 @@ First boot:
 
 - Infrastructure images pull (Postgres, Redis, Kafka, RabbitMQ, … — several hundred MB total).
 - **API** waits for Postgres, Redis, LocalStack, Kafka, Schema Registry, and RabbitMQ to be healthy, then runs `dotnet restore` and `dotnet watch run` — first restore ~1–2 min; NuGet cache lives in the `nuget_packages` volume.
-- **Web** runs `npm ci` then Vite — first install ~1 min; `node_modules` cache lives in `web_node_modules`.
+- **Web** syncs `npm ci` when `package-lock.json` changes, then starts Vite — first install ~1 min; `node_modules` cache lives in `web_node_modules`.
 
 Add `--build` only after changing [`frontend/Dockerfile.dev`](../../frontend/Dockerfile.dev) or the root [`Dockerfile`](../../Dockerfile) (production image).
 
@@ -110,7 +110,7 @@ Run from the repo root (or prefix with `wsl -- bash -lc "cd /path/to/axis && …
 | Stack | Triggers reload | Needs container restart |
 |---|---|---|
 | Backend (`api`) | Saving `.cs` under `src/` — `dotnet watch` rebuilds/restarts. | `Directory.Packages.props` or new `<PackageReference>` → `docker compose restart api`. |
-| Frontend (`web`) | Saving under `frontend/src/` — Vite HMR. | `vite.config.ts`, `package.json`, or new npm dep → `docker compose restart web`. |
+| Frontend (`web`) | Saving under `frontend/src/` — Vite HMR. | `vite.config.ts`, `package.json`, `package-lock.json`, or new npm dep → `docker compose restart web`; the container syncs `npm ci` automatically when the lockfile hash changes. |
 
 Polling is enabled (`DOTNET_USE_POLLING_FILE_WATCHER=1`, `VITE_USE_POLLING=1`) because inotify from Windows bind mounts through WSL is unreliable. Expect ~200–500 ms between save and reload.
 

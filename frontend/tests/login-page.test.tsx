@@ -26,10 +26,12 @@ describe('LoginPage', () => {
 
     expect(screen.getByLabelText('Email address')).toBeInTheDocument();
     expect(screen.getByLabelText('Password')).toBeInTheDocument();
+    expect(screen.getByText('Use the email tied to your account.')).toBeInTheDocument();
+    expect(screen.getByText('Enter the password for this account.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /forgot password/i })).toHaveAttribute(
       'href',
       '/forgot-password',
     );
-    expect(screen.getByRole('img', { name: 'Axis' })).toBeInTheDocument();
+    expect(screen.getByText('Language and theme preferences')).toBeInTheDocument();
   });
 });

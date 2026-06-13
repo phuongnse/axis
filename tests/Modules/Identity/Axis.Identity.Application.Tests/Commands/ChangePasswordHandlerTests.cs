@@ -35,11 +35,16 @@ public class ChangePasswordHandlerTests
     {
         User user = MakeUser();
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
-        _hasher.Verify("OldPass1", "old_hash").Returns(true);
-        _hasher.Hash("NewPass1").Returns("new_hash");
+        _hasher.Verify("old account passphrase", "old_hash").Returns(true);
+        _hasher.Hash("fresh account passphrase").Returns("new_hash");
 
         Result result = await CreateHandler().Handle(
-            new ChangePasswordCommand(user.Id, OrgId, "OldPass1", "NewPass1", "NewPass1"),
+            new ChangePasswordCommand(
+                user.Id,
+                OrgId,
+                "old account passphrase",
+                "fresh account passphrase",
+                "fresh account passphrase"),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -57,7 +62,12 @@ public class ChangePasswordHandlerTests
         _hasher.Verify("WrongOld", "old_hash").Returns(false);
 
         Result result = await CreateHandler().Handle(
-            new ChangePasswordCommand(user.Id, OrgId, "WrongOld", "NewPass1", "NewPass1"),
+            new ChangePasswordCommand(
+                user.Id,
+                OrgId,
+                "WrongOld",
+                "fresh account passphrase",
+                "fresh account passphrase"),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -70,10 +80,15 @@ public class ChangePasswordHandlerTests
     {
         User user = MakeUser();
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
-        _hasher.Verify("OldPass1", "old_hash").Returns(true);
+        _hasher.Verify("old account passphrase", "old_hash").Returns(true);
 
         Result result = await CreateHandler().Handle(
-            new ChangePasswordCommand(user.Id, OrgId, "OldPass1", "OldPass1", "OldPass1"),
+            new ChangePasswordCommand(
+                user.Id,
+                OrgId,
+                "old account passphrase",
+                "old account passphrase",
+                "old account passphrase"),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -86,10 +101,15 @@ public class ChangePasswordHandlerTests
     {
         User user = MakeUser();
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
-        _hasher.Verify("OldPass1", "old_hash").Returns(true);
+        _hasher.Verify("old account passphrase", "old_hash").Returns(true);
 
         Result result = await CreateHandler().Handle(
-            new ChangePasswordCommand(user.Id, OrgId, "OldPass1", "NewPass1", "Different1"),
+            new ChangePasswordCommand(
+                user.Id,
+                OrgId,
+                "old account passphrase",
+                "fresh account passphrase",
+                "different account passphrase"),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -102,10 +122,10 @@ public class ChangePasswordHandlerTests
     {
         User user = MakeUser();
         _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
-        _hasher.Verify("OldPass1", "old_hash").Returns(true);
+        _hasher.Verify("old account passphrase", "old_hash").Returns(true);
 
         Result result = await CreateHandler().Handle(
-            new ChangePasswordCommand(user.Id, OrgId, "OldPass1", "short", "short"),
+            new ChangePasswordCommand(user.Id, OrgId, "old account passphrase", "short", "short"),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -118,7 +138,12 @@ public class ChangePasswordHandlerTests
         _userRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).ReturnsNull();
 
         Result result = await CreateHandler().Handle(
-            new ChangePasswordCommand(Guid.NewGuid(), OrgId, "OldPass1", "NewPass1", "NewPass1"),
+            new ChangePasswordCommand(
+                Guid.NewGuid(),
+                OrgId,
+                "old account passphrase",
+                "fresh account passphrase",
+                "fresh account passphrase"),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -134,7 +159,12 @@ public class ChangePasswordHandlerTests
 
         Guid otherOrgId = Guid.NewGuid();
         Result result = await CreateHandler().Handle(
-            new ChangePasswordCommand(user.Id, otherOrgId, "OldPass1", "NewPass1", "NewPass1"),
+            new ChangePasswordCommand(
+                user.Id,
+                otherOrgId,
+                "old account passphrase",
+                "fresh account passphrase",
+                "fresh account passphrase"),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

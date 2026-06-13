@@ -13,21 +13,30 @@ function Export-ExcalidrawToSvg {
 
     $content = Get-Content $excalidrawPath -Raw -Encoding UTF8
     $body = [System.Text.Encoding]::UTF8.GetBytes($content)
+    $maxAttempts = 3
 
-    try {
-        Invoke-WebRequest `
-            -Uri "https://kroki.io/excalidraw/svg" `
-            -Method POST `
-            -Body $body `
-            -ContentType "text/plain; charset=utf-8" `
-            -TimeoutSec 60 `
-            -OutFile $svgPath
-        $size = [math]::Round((Get-Item $svgPath).Length / 1024, 1)
-        Write-Host "  OK  ($size KB) $([System.IO.Path]::GetFileName($svgPath))" -ForegroundColor Green
-        return $true
-    } catch {
-        Write-Host "  FAIL $([System.IO.Path]::GetFileName($excalidrawPath)): $_" -ForegroundColor Red
-        return $false
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        try {
+            Invoke-WebRequest `
+                -Uri "https://kroki.io/excalidraw/svg" `
+                -Method POST `
+                -Body $body `
+                -ContentType "text/plain; charset=utf-8" `
+                -TimeoutSec 60 `
+                -OutFile $svgPath
+            $size = [math]::Round((Get-Item $svgPath).Length / 1024, 1)
+            Write-Host "  OK  ($size KB) $([System.IO.Path]::GetFileName($svgPath))" -ForegroundColor Green
+            return $true
+        } catch {
+            if ($attempt -eq $maxAttempts) {
+                Write-Host "  FAIL $([System.IO.Path]::GetFileName($excalidrawPath)): $_" -ForegroundColor Red
+                return $false
+            }
+
+            $delaySeconds = 2 * $attempt
+            Write-Host "  RETRY $([System.IO.Path]::GetFileName($excalidrawPath)) after $delaySeconds s: $_" -ForegroundColor Yellow
+            Start-Sleep -Seconds $delaySeconds
+        }
     }
 }
 

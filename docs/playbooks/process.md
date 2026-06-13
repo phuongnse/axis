@@ -135,7 +135,7 @@ Repeat for every screen / feature area. **Never skip the wireframe step** — it
 
 | Step | Action | Output |
 |---|---|---|
-| 1 | Read use-case file ACs in full | Understand spec contract |
+| 1 | Read use-case file ACs in full and define the user goal, required decision, and minimum useful information | UX contract before visual design |
 | 2 | Create Excalidraw wireframe + run `generate-wireframes.ps1` | `docs/use-cases/{domain}/{slug}/{screen}.excalidraw` + `.svg` (shared kit only: `docs/wireframes/`) |
 | 3 | Add row to the use-case `## Wireframes` table | Wireframe linked from spec |
 | 4 | Define types from backend contract | `features/{name}/types.ts` |
@@ -153,3 +153,12 @@ Repeat for every screen / feature area. **Never skip the wireframe step** — it
 - If the full Frontend layer is done for the module: update `docs/PROGRESS.md`
 - If a new frontend pattern was established: add to `docs/playbooks/patterns.md`
 - If a library was added or changed: update `docs/TECH_STACK.md`
+
+**UX review before implementation and before PR:**
+
+- Does each visible element help the user understand the screen or complete the next action?
+- Is the copy user-facing, specific, and free of internal architecture terms?
+- Does the screen lead to a clear next action instead of explaining how the system works?
+- If content was removed, did the layout adapt instead of filling space with decorative or redundant text?
+- Are public/auth screens free of fake workspace data, fake metrics, tenant names, and operational status?
+- Can the primary action be found without reading decorative or explanatory content?

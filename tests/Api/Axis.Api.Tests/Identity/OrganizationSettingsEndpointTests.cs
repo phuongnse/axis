@@ -19,7 +19,7 @@ public class OrganizationSettingsEndpointTests(ApiTestFixture fixture)
     public async Task GetSettings_WhenViewerRole_Returns403()
     {
         const string viewerEmail = "viewerorgset1@test.com";
-        const string viewerPassword = "ViewerPass1";
+        const string viewerPassword = "viewer account passphrase";
 
         HttpClient admin = await AuthHelper.CreateAdminClientAsync(fixture, "orgset1");
         HttpResponseMessage meResp = await admin.GetAsync("/api/users/me");

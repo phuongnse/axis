@@ -74,17 +74,23 @@ Define user-facing localization and visual theme behavior for the SPA so each us
 > | Application | N/A |
 > | Infrastructure | N/A |
 > | API | N/A |
-> | Frontend | ⏳ |
+> | Frontend | ✅ |
 >
-> **Gaps vs spec:** use case not started.
+> **Gaps vs spec:** none for the current SPA foundation.
+>
+> **Implemented:**
+> - `PreferenceControls` supports `light`, `dark`, and `system` modes on public/auth screens and in the authenticated header.
+> - Theme preference persists in `localStorage` under `axis.theme`.
+> - `system` resolves from `prefers-color-scheme` and listens for OS preference changes while selected.
+> - `index.html` applies the stored/resolved theme before React mounts to avoid visible theme flash.
+> - Vitest covers immediate theme switching and preference persistence.
 >
 > **Decisions:**
 > - Theme mode uses class-based strategy (`light` / `dark`) with `system` resolution.
-> - Theme toggle must be available in authenticated shell and settings.
+> - Theme controls must be available in the authenticated shell; public/auth placement is allowed because users may choose a comfortable theme before signing in.
 
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

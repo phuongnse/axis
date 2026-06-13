@@ -12,7 +12,6 @@ import {
   hline,
   arrow,
   fieldLabelBlock,
-  inputField,
   inlineTextRow,
   inlineTextRowWidth,
   labelTextWidth,
@@ -24,10 +23,11 @@ import {
   componentContent,
 } from './components.mjs';
 
-import { buildAxisLogo, mergeExcalidrawFiles } from './logo.mjs';
+import { buildAxisLogo, buildAxisMark, mergeExcalidrawFiles } from './logo.mjs';
 
 export {
   buildAxisLogo,
+  buildAxisMark,
   AXIS_LOGO_SVG_PATH,
   axisLogoExcalidrawFiles,
   mergeExcalidrawFiles,
@@ -54,6 +54,19 @@ export const AUTH_HEADER_H_SUBTITLE = 136;
 export const AUTH_CARD_FOOTER_ZONE = 44;
 /** Gap below primary submit before footer divider. */
 export const AUTH_SUBMIT_AFTER_GAP = 16;
+
+// Low-fidelity wireframe palette. Keep product theme, dark/light mode, and
+// decorative polish in frontend components/screenshots, not in wireframes.
+export const AUTH_PAGE_BG = C.gray50;
+export const AUTH_PANEL = C.white;
+export const AUTH_BORDER = C.gray300;
+export const AUTH_BORDER_SOFT = C.gray300;
+export const AUTH_TEXT = C.gray900;
+export const AUTH_MUTED = C.gray700;
+export const AUTH_MUTED_SOFT = C.gray500;
+export const AUTH_INPUT = C.white;
+export const AUTH_ACCENT = C.gray700;
+export const AUTH_PRIMARY = C.gray700;
 
 /** Bottom edge of an Excalidraw element (for card height sync). */
 export function elementBottom(el) {
@@ -86,6 +99,47 @@ export function authScreenCanvasHeight(cardY, cardH, minHeight = 700) {
   return Math.max(minHeight, cardY + cardH + 24);
 }
 
+export function buildAuthPageFrame(prefix, screenW, screenH) {
+  const framePadX = 56;
+  const framePadY = 44;
+  return [
+    rect(`${prefix}_auth_bg`, 0, 0, screenW, screenH, AUTH_PAGE_BG, AUTH_PAGE_BG, 0, false),
+    rect(
+      `${prefix}_page_frame`,
+      framePadX,
+      framePadY,
+      screenW - framePadX * 2,
+      screenH - framePadY * 2,
+      AUTH_BORDER,
+      'transparent',
+      1,
+      false,
+      { strokeStyle: 'dashed', opacity: 45 },
+    ),
+  ];
+}
+
+export function buildAuthBrandHeader(prefix, cardX, cardY, cardW, label) {
+  const mark = buildAxisMark(prefix, cardX + AUTH_CARD_PAD_X, cardY + 22, 30);
+  return {
+    els: [
+      ...mark.els,
+      text(
+        `${prefix}_brand_label`,
+        cardX + AUTH_CARD_PAD_X + 44,
+        cardY + 29,
+        cardW - AUTH_CARD_PAD_X * 2 - 44,
+        16,
+        label.toUpperCase(),
+        11,
+        AUTH_MUTED,
+      ),
+      hline(`${prefix}_hdiv`, cardX + AUTH_CARD_PAD_X, cardY + 72, cardW - AUTH_CARD_PAD_X * 2, AUTH_BORDER_SOFT),
+    ],
+    files: mark.files,
+  };
+}
+
 // ─── External sign-in (Microsoft / Google / GitHub + or) ─────────────────────
 
 export function buildAuthExternalSignInBlock(yC) {
@@ -95,19 +149,19 @@ export function buildAuthExternalSignInBlock(yC) {
   const rowW = btnSize * 3 + gap * 2;
   const startX = 50 + Math.round((innerW - rowW) / 2);
   const providers = [
-    ['ext_ms', '⊞', '#2563eb', '#eff6ff'],
-    ['ext_go', 'G', '#dc2626', '#fef2f2'],
-    ['ext_gh', '⎇', '#1f2937', '#f3f4f6'],
+    ['ext_ms', '⊞'],
+    ['ext_go', 'G'],
+    ['ext_gh', '⎇'],
   ];
   const els = [];
 
   const iconFont = AUTH_PROVIDER_ICON_FONT;
   const iconY = yC + Math.round((btnSize - iconFont) / 2) - 1;
 
-  providers.forEach(([id, icon, stroke, bg], i) => {
+  providers.forEach(([id, icon], i) => {
     const bx = startX + i * (btnSize + gap);
-    els.push(rect(id, bx, yC, btnSize, btnSize, stroke, bg, 1, true));
-    els.push(text(`${id}_ic`, bx, iconY, btnSize, iconFont + 4, icon, iconFont, stroke, 'center'));
+    els.push(rect(id, bx, yC, btnSize, btnSize, AUTH_BORDER, AUTH_PANEL, 1, true));
+    els.push(text(`${id}_ic`, bx, iconY, btnSize, iconFont + 4, icon, iconFont, AUTH_MUTED, 'center'));
   });
 
   const yOr = yC + btnSize + 12;
@@ -128,27 +182,25 @@ export function placeAuthExternalSignIn(cardInnerLeftX, y) {
 
 /** Logo row + divider only (informational / error cards without a form title). */
 export function buildAuthCardBrandBar(prefix, cardX, cardY, cardW) {
-  const logo = buildAxisLogo(prefix, cardX, cardY + 16, cardW, 'auth');
+  const logo = buildAxisMark(prefix, cardX + AUTH_CARD_PAD_X, cardY + 18, 30);
   return {
     els: [
       ...logo.els,
-      hline(`${prefix}_hdiv`, cardX, cardY + 60, cardW, C.gray300),
+      hline(`${prefix}_hdiv`, cardX + AUTH_CARD_PAD_X, cardY + 64, cardW - AUTH_CARD_PAD_X * 2, AUTH_BORDER_SOFT),
     ],
     files: logo.files,
   };
 }
 
 export function buildAuthCardHeader(prefix, cardX, cardY, cardW, title, subtitle = null) {
-  const logo = buildAxisLogo(prefix, cardX, cardY + 16, cardW, 'auth');
+  const brand = buildAuthBrandHeader(prefix, cardX, cardY, cardW, title);
   const els = [
-    ...logo.els,
-    hline(`${prefix}_hdiv`, cardX, cardY + 60, cardW, C.gray300),
-    text(`${prefix}_title`, cardX + AUTH_CARD_PAD_X, cardY + 76, cardW - 48, 24, title, 17, C.gray900),
+    ...brand.els,
   ];
   if (subtitle) {
-    els.push(text(`${prefix}_sub`, cardX + AUTH_CARD_PAD_X, cardY + 104, cardW - 48, 18, subtitle, 13, C.gray700));
+    els.push(text(`${prefix}_sub`, cardX + AUTH_CARD_PAD_X, cardY + 88, cardW - 48, 18, subtitle, 13, AUTH_MUTED));
   }
-  return { els, files: logo.files };
+  return { els, files: brand.files };
 }
 
 /**
@@ -163,19 +215,19 @@ export function buildAuthCardFooter(prefix, cardX, cardY, cardW, cardH, footer) 
   const fontSize = 12;
   const forwardArrow = typeof footer === 'object' && footer.forwardArrow === true;
   const segments = typeof footer === 'string'
-    ? [{ text: footer, color: C.primary, link: true }]
+    ? [{ text: footer, color: AUTH_PRIMARY, link: true }]
     : [
-        ...(footer.lead ? [{ text: footer.lead, color: C.gray700 }] : []),
-        { text: footer.link, color: C.primary, link: true },
+        ...(footer.lead ? [{ text: footer.lead, color: AUTH_MUTED }] : []),
+        { text: footer.link, color: AUTH_PRIMARY, link: true },
       ];
   const textW = inlineTextRowWidth(segments, fontSize);
   const arrowSlot = forwardArrow ? 12 : 0;
   const totalW = textW + arrowSlot;
   const startX = cardX + Math.round((cardW - totalW) / 2);
   const { els: rowEls } = inlineTextRow(`${prefix}_footer`, startX, lineY, lineH, fontSize, segments);
-  const row = [hline(`${prefix}_fdiv`, cardX, footerY, cardW, C.gray300), ...rowEls];
+  const row = [hline(`${prefix}_fdiv`, cardX, footerY, cardW, AUTH_BORDER_SOFT), ...rowEls];
   if (forwardArrow) {
-    row.push(arrow(`${prefix}_fwd`, startX + textW + 2, lineY + 5, 8, 0, C.primary, 1.5));
+    row.push(arrow(`${prefix}_fwd`, startX + textW + 2, lineY + 5, 8, 0, AUTH_PRIMARY, 1.5));
   }
   return row;
 }
@@ -245,11 +297,11 @@ export function buildAuthCardBackFooter(prefix, cardX, cardY, cardW, cardH, link
   const totalW = iconSlot + iconGap + textW;
   const startX = cardX + Math.round((cardW - totalW) / 2);
   const textX = startX + iconSlot + iconGap;
-  const segments = [{ text: label, color: C.primary, link: true }];
+  const segments = [{ text: label, color: AUTH_PRIMARY, link: true }];
   const { els: rowEls } = inlineTextRow(`${prefix}_footer`, textX, lineY, lineH, fontSize, segments);
   return [
-    hline(`${prefix}_fdiv`, cardX, footerY, cardW, C.gray300),
-    arrow(`${prefix}_back_ic`, startX + 10, lineY + 5, -8, 0, C.primary, 1.5),
+    hline(`${prefix}_fdiv`, cardX, footerY, cardW, AUTH_BORDER_SOFT),
+    arrow(`${prefix}_back_ic`, startX + 10, lineY + 5, -8, 0, AUTH_PRIMARY, 1.5),
     ...rowEls,
   ];
 }
@@ -258,7 +310,8 @@ export function buildAuthCardBackFooter(prefix, cardX, cardY, cardW, cardH, link
 export function buildAuthSubmitButton(prefix, cardX, y, cardW, label) {
   const btnW = cardW - AUTH_CARD_PAD_X * 2;
   return [
-    rect(`${prefix}_sbtn`, cardX + AUTH_CARD_PAD_X, y, btnW, 36, C.accentDark, C.accent, 2, true),
+    rect(`${prefix}_sbtn`, cardX + AUTH_CARD_PAD_X, y, btnW, 36, AUTH_ACCENT, AUTH_ACCENT, 2, true),
+    text(`${prefix}_sbtn_ic`, cardX + AUTH_CARD_PAD_X + Math.round(btnW / 2) - 54, y + 10, 14, 16, '→', 13, C.white, 'center'),
     text(`${prefix}_sbtn_t`, cardX + AUTH_CARD_PAD_X, y + 10, btnW, 16, label, 13, C.white, 'center'),
   ];
 }
@@ -270,18 +323,14 @@ export const PASSWORD_CRITERIA_GAP = 8;
 
 /** Default checklist (happy path — all rules satisfied while typing). */
 export const PASSWORD_CRITERIA_MET = [
-  { label: 'At least 8 characters', met: true },
-  { label: 'Contains a letter', met: true },
-  { label: 'Contains a number', met: true },
-  { label: 'Contains a special character', met: true },
+  { label: 'At least 15 characters', met: true },
+  { label: 'Hard to guess', met: true },
 ];
 
 /** Checklist with some rules still unmet (validation / weak password states). */
 export const PASSWORD_CRITERIA_PARTIAL = [
-  { label: 'At least 8 characters', met: false },
-  { label: 'Contains a letter', met: true },
-  { label: 'Contains a number', met: false },
-  { label: 'Contains a special character', met: false },
+  { label: 'At least 15 characters', met: false },
+  { label: 'Hard to guess', met: false },
 ];
 
 export function passwordCriteriaBlock(prefix, x, y, innerW, criteria) {
@@ -303,11 +352,15 @@ export function authFormField(
   const innerW = cardW - AUTH_CARD_PAD_X * 2;
   const password = isPassword ?? isPasswordLabel(label);
   const valuePadR = password ? PASSWORD_INPUT_PAD_RIGHT : 24;
-  const { els: labelEls, inputY } = fieldLabelBlock(prefix, x, y, innerW, label, { required, helpText });
+  const { els: labelEls, inputY } = fieldLabelBlock(prefix, x, y, innerW, label, {
+    required,
+    helpText,
+    color: AUTH_MUTED,
+  });
   const els = [
     ...labelEls,
-    rect(`${prefix}_inp`, x, inputY, innerW, 40, errorMsg ? C.dangerBorder : C.gray300, C.white, 1, true),
-    text(`${prefix}_val`, x + 12, inputY + 11, innerW - 12 - valuePadR, 18, value, 13, C.gray900),
+    rect(`${prefix}_inp`, x, inputY, innerW, 40, errorMsg ? C.dangerBorder : AUTH_BORDER, AUTH_INPUT, 1, true),
+    text(`${prefix}_val`, x + 12, inputY + 11, innerW - 12 - valuePadR, 18, value, 13, AUTH_MUTED),
   ];
   if (password) {
     els.push(...passwordRevealToggle(`${prefix}_pw`, x, inputY, innerW));
@@ -321,7 +374,7 @@ export function authFormField(
     afterInputY = critY + critH;
   }
   if (errorMsg) {
-    els.push(text(`${prefix}_err`, x, afterInputY + 4, innerW, 14, errorMsg, 11, C.danger));
+    els.push(text(`${prefix}_err`, x, afterInputY + 4, innerW, 14, errorMsg, 11, C.dangerBorder));
     afterInputY += 18;
   }
   const blockH = afterInputY - y + AUTH_FIELD_STACK_GAP;
@@ -332,11 +385,15 @@ export function authReadOnlyValueField(
   prefix, cardX, y, cardW, label, value, required = false, helpText = null) {
   const x = cardX + AUTH_CARD_PAD_X;
   const innerW = cardW - AUTH_CARD_PAD_X * 2;
-  const { els: labelEls, inputY } = fieldLabelBlock(prefix, x, y, innerW, label, { required, helpText });
+  const { els: labelEls, inputY } = fieldLabelBlock(prefix, x, y, innerW, label, {
+    required,
+    helpText,
+    color: AUTH_MUTED,
+  });
   const els = [
     ...labelEls,
-    rect(`${prefix}_inp`, x, inputY, innerW, 40, C.gray300, C.gray50, 1, true),
-    text(`${prefix}_val`, x + 12, inputY + 11, innerW - 24, 18, value, 13, C.gray700),
+    rect(`${prefix}_inp`, x, inputY, innerW, 40, AUTH_BORDER, AUTH_INPUT, 1, true),
+    text(`${prefix}_val`, x + 12, inputY + 11, innerW - 24, 18, value, 13, AUTH_MUTED),
   ];
   const blockH = inputY + 48 - y + AUTH_FIELD_STACK_GAP;
   return { els, blockH };
@@ -348,16 +405,16 @@ export function authSlugPreviewField(
   const innerW = cardW - AUTH_CARD_PAD_X * 2;
   const slugHelp = helpText ?? 'Unique URL path; auto-generated from organization name.';
   const { els: labelEls, inputY } = fieldLabelBlock(
-    prefix, x, y, innerW, 'Organization URL slug', { required, helpText: slugHelp });
+    prefix, x, y, innerW, 'Organization URL slug', { required, helpText: slugHelp, color: AUTH_MUTED });
   const previewY = inputY + 44;
   const els = [
     ...labelEls,
-    rect(`${prefix}_inp`, x, inputY, innerW, 40, errorMsg ? C.dangerBorder : C.gray300, C.gray50, 1, true),
-    text(`${prefix}_val`, x + 12, inputY + 11, innerW - 24, 18, 'acme-corp', 13, C.gray700),
-    text(`${prefix}_hint`, x, previewY, innerW, 14, 'Preview: axis.app/acme-corp', 10, C.gray500),
+    rect(`${prefix}_inp`, x, inputY, innerW, 40, errorMsg ? C.dangerBorder : AUTH_BORDER, AUTH_INPUT, 1, true),
+    text(`${prefix}_val`, x + 12, inputY + 11, innerW - 24, 18, 'acme-corp', 13, AUTH_MUTED),
+    text(`${prefix}_hint`, x, previewY, innerW, 14, 'Preview: axis.app/acme-corp', 10, AUTH_MUTED_SOFT),
   ];
   if (errorMsg) {
-    els.push(text(`${prefix}_err`, x, previewY + 16, innerW, 14, errorMsg, 11, C.danger));
+    els.push(text(`${prefix}_err`, x, previewY + 16, innerW, 14, errorMsg, 11, C.dangerBorder));
   }
   const blockH = (errorMsg ? previewY + 30 : previewY + 14) - y + AUTH_FIELD_STACK_GAP;
   return { els, blockH };
@@ -373,20 +430,20 @@ export function authTermsRow(prefix, cardX, y, cardW, { checked = true, errorMsg
   const textX = x + chkSize + 8;
   const blockH = errorMsg ? 50 : 28;
   const { els: rowEls } = inlineTextRow(`${prefix}_terms`, textX, textY, lineH, fontSize, [
-    { text: 'I agree to the ', color: C.gray700 },
-    { text: 'Terms of Service', color: C.primary, link: true },
-    { text: ' and ', color: C.gray700 },
-    { text: 'Privacy Policy', color: C.primary, link: true },
+    { text: 'I agree to the ', color: AUTH_MUTED },
+    { text: 'Terms of Service', color: AUTH_PRIMARY, link: true },
+    { text: ' and ', color: AUTH_MUTED },
+    { text: 'Privacy Policy', color: AUTH_PRIMARY, link: true },
   ]);
   const els = [
-    rect(`${prefix}_chk`, x, y, chkSize, chkSize, checked ? C.primary : C.dangerBorder, C.white, 1, true),
+    rect(`${prefix}_chk`, x, y, chkSize, chkSize, checked ? AUTH_BORDER : C.dangerBorder, AUTH_INPUT, 1, true),
     ...rowEls,
   ];
   if (checked) {
-    els.push(text(`${prefix}_mark`, x + 4, y + 4, chkSize - 8, 12, '✓', 11, C.primary, 'center'));
+    els.push(text(`${prefix}_mark`, x + 4, y + 4, chkSize - 8, 12, '✓', 11, AUTH_PRIMARY, 'center'));
   }
   if (errorMsg) {
-    els.push(text(`${prefix}_err`, x, y + chkSize + 8, innerW, 14, errorMsg, 11, C.danger));
+    els.push(text(`${prefix}_err`, x, y + chkSize + 8, innerW, 14, errorMsg, 11, C.dangerBorder));
   }
   return { els, blockH };
 }
@@ -410,25 +467,33 @@ export function authCard(screenW, screenH, prefix, { title, subtitle = null, ite
   const header = buildAuthCardHeader(prefix, cardX, cardY, cardW, title, subtitle);
   const files = { ...header.files };
 
-  els.push(rect(`${prefix}_bg`, 0, 0, screenW, screenH, C.gray300, C.gray100, 1, false));
-  els.push(rect(`${prefix}_card`, cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
+  els.push(...buildAuthPageFrame(prefix, screenW, screenH));
+  els.push(rect(`${prefix}_card`, cardX, cardY, cardW, cardH, AUTH_BORDER, AUTH_PANEL, 1, true));
   els.push(...header.els);
 
   const fieldStartY = cardY + headerH;
   let fy = fieldStartY;
   items.forEach(({ label, placeholder, required = false, helpText = null, password = null }, i) => {
-    const x = cardX + AUTH_CARD_PAD_X;
-    const innerW = cardW - AUTH_CARD_PAD_X * 2;
     const isPw = password ?? isPasswordLabel(label);
-    const { els: labelEls, inputY } = fieldLabelBlock(`${prefix}_fl_${i}`, x, fy, innerW, label, { required, helpText });
-    els.push(...labelEls);
-    els.push(...inputField(`${prefix}_fi_${i}`, x, inputY, innerW, placeholder, { password: isPw }));
-    fy += helpText ? AUTH_FIELD_BLOCK_H_HELP : AUTH_FIELD_BLOCK_H;
+    const { els: fieldEls, blockH } = authFormField(
+      `${prefix}_f${i}`,
+      cardX,
+      fy,
+      cardW,
+      label,
+      placeholder,
+      null,
+      required,
+      helpText,
+      isPw,
+    );
+    els.push(...fieldEls);
+    fy += blockH;
   });
 
   const afterFieldsY = fy;
   if (extraLink) {
-    els.push(text(`${prefix}_xl`, cardX + AUTH_CARD_PAD_X, afterFieldsY + 6, cardW - 48, 16, extraLink, 12, C.primary, 'right'));
+    els.push(text(`${prefix}_xl`, cardX + AUTH_CARD_PAD_X, afterFieldsY + 6, cardW - 48, 16, extraLink, 12, AUTH_PRIMARY, 'right'));
   }
 
   const btnY = afterFieldsY + (extraLink ? 22 : 4);

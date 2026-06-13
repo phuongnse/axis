@@ -121,6 +121,16 @@ export function buildAxisLogo(prefix, slotX, y, slotW, variant = 'auth') {
   };
 }
 
+export function buildAxisMark(prefix, x, y, size = AXIS_MARK_AUTH_W) {
+  const files = axisLogoExcalidrawFiles();
+  return {
+    els: [imageElement(`${prefix}_brand_mark`, LOGO_FILE_ID, x, y, size, size)],
+    files,
+    width: size,
+    height: size,
+  };
+}
+
 export function mergeExcalidrawFiles(...maps) {
   return Object.assign({}, ...maps);
 }

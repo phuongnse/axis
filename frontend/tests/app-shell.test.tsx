@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { AppShell } from '../src/components/layout/AppShell';
@@ -17,9 +17,10 @@ describe('AppShell', () => {
       { path: '/dashboard' },
     );
 
-    expect(screen.getByRole('navigation', { name: /main navigation/i })).toBeInTheDocument();
-    expect(screen.getByText('Dashboard')).toBeInTheDocument();
-    expect(screen.getByText('Data Models')).toBeInTheDocument();
+    const sidebarNav = screen.getByRole('navigation', { name: /sidebar navigation/i });
+    expect(sidebarNav).toBeInTheDocument();
+    expect(within(sidebarNav).getByText('Dashboard')).toBeInTheDocument();
+    expect(within(sidebarNav).getByText('Data Models')).toBeInTheDocument();
     expect(screen.getByLabelText(/search/i)).toBeInTheDocument();
     expect(screen.getByText('Child content')).toBeInTheDocument();
   });

@@ -7,6 +7,8 @@ This playbook covers the wireframe generation system.
 - **Architecture & file map:** [`docs/wireframes/README.md`](../wireframes/README.md)
 - **Agents — spacing, blocks, MUST/MUST NOT:** [README § Agent contract](../wireframes/README.md#agent-contract)
 
+Wireframes are intentionally low-fidelity. They prove layout, flow, hierarchy, content intent, and states. They should not try to reproduce the final theme, decorative backdrop, dark/light styling, shadows, or exact visual polish; those live in the frontend component system and visual QA.
+
 ---
 
 ## Agent checklist
@@ -15,9 +17,10 @@ When you touch `docs/wireframes/**` or use-case `*.excalidraw`:
 
 - [ ] Read [Agent contract](../wireframes/README.md#agent-contract) — auth fields use `authFormField` / `blocks.mjs`, not manual `y + 18`.
 - [ ] Label/help/input spacing changed only in `fieldLabelBlock` (`components.mjs`); field stack gap only in `AUTH_FIELD_STACK_GAP` (`blocks.mjs`).
+- [ ] New wireframe output stays low-fidelity: grayscale structure plus semantic state colors only.
 - [ ] No new hardcoded px for auth layout (`6`, `8`, `12`, `440`, …).
-- [ ] SSO via `placeAuthExternalSignIn()` — not `component()` on headerless blocks.
-- [ ] Auth brand: `buildAxisLogo` / `buildAuthCardHeader` (mark + "Axis" wordmark); pass `files` to `write()`.
+- [ ] Provider entry points are rendered only when that use case is implemented; use shared blocks, never hand-draw provider buttons.
+- [ ] Auth brand: `buildAxisMark` / `buildAuthCardHeader`; pass embedded logo `files` to `write()`.
 - [ ] `node docs/wireframes/generate-screens.mjs` twice → empty `git diff` on second run.
 - [ ] Regenerated `.svg` for changed screens; [visual-artifact-checklist](./visual-artifact-checklist.md) satisfied.
 - [ ] Use-case `README.md` wireframes table / screen flow updated if screens added or renamed.
@@ -90,7 +93,7 @@ Reusable pattern for use cases with several UI steps and error variants. Keep ru
 | File | Purpose |
 |---|---|
 | `docs/wireframes/components.mjs` | Primitives, colors, `component()` / `componentContent()` |
-| `docs/wireframes/blocks.mjs` | **Reusable blocks** (auth, SSO, fields) — screens import this first |
+| `docs/wireframes/blocks.mjs` | **Reusable blocks** (auth page frame/card skeleton, optional provider block, fields) — screens import this first |
 | `docs/wireframes/generate-template.mjs` | Kit section builders S01–S37 (tables, canvas, modals, …) |
 | `docs/wireframes/generate-screens.mjs` | Screen layout — `blocks.mjs` + `component(buildXxx)` |
 | `docs/wireframes/README.md` | Kit layers, workflow, block inventory |
@@ -142,7 +145,7 @@ Shared spacing constants in `generate-screens.mjs`: `AUTH_CARD_PAD`, `AUTH_SHELL
 | Export | Type | Description |
 |---|---|---|
 | `rect`, `ellipse`, `text`, `hline`, `vline`, `arrow`, `sectionHeader` | functions | All primitive Excalidraw element builders |
-| `C` | object | Industrial Calm color palette |
+| `C` | object | Neutral + semantic wireframe color set |
 | `SB`, `HDR`, `CX`, `CY` | constants | Layout: sidebar 230px, header 60px |
 | `translate(els, dx, dy)` | function | Shift all elements by (dx, dy) |
 | `component(builderFn, x, y, contentDy?)` | function | Place a full template section (strips 2-line section header) |
@@ -163,8 +166,9 @@ import {
 } from './components.mjs';
 
 import {
-  placeAuthExternalSignIn,
+  buildAuthPageFrame,
   buildAuthCardHeader,
+  buildAuthSubmitButton,
   authFormField,
   authCard,
 } from './blocks.mjs';
@@ -239,7 +243,7 @@ const NAV = ['Data Models', 'Workflows', 'Forms', 'Executions', 'Settings'];
 
 **Dimensions guaranteed to match S18:**
 - Sidebar: `230×H`, `C.white` bg
-- Logo area: `230×60`, `C.gray50` bg, `'⬡  Axis'` 18px `C.primary` at `(30, 18)`
+- Logo area: `230×60`, `C.gray50` bg. Legacy S18 app-shell output still uses `'⬡  Axis'`; do not copy that placeholder into public/auth wireframes.
 - Nav items: `214×36`, `8px` x-inset, starting `y = 72`, spaced `44px`
 - Active item: `C.infoBg` bg + `C.infoBorder` stroke + 3px left accent bar + `C.primary` text
 - Header: from `x=230`, `h=60`, `C.white` bg
@@ -366,45 +370,37 @@ Subsequent sections start after the last control of the previous section, plus a
 
 ## Auth screen pattern (`authCard`)
 
-All standalone auth screens (no sidebar) use `authCard()` in `generate-screens.mjs`. **Never build auth cards by hand.**
+Standalone public auth screens (no sidebar) use `authCard()` from `blocks.mjs`. **Never build auth cards by hand.** Composite auth screens can assemble `buildAuthPageFrame`, `buildAuthCardHeader`, `authFormField`, `authTermsRow`, `buildAuthSubmitButton`, and footer helpers, but those pieces still come from `blocks.mjs`.
 
 ```js
-authCard(prefix, { title, subtitle?, items, extraLink? }, submitLabel, footerText)
+authCard(screenW, screenH, prefix, { title, subtitle?, items, extraLink? }, submitLabel, footerText)
 ```
 
 | Parameter | Type | Description |
 |---|---|---|
+| `screenW`, `screenH` | number | Canvas size used by the shared auth page frame |
 | `prefix` | string | ID prefix — must be unique per screen |
-| `title` | string | Heading inside the card |
+| `title` | string | Short card heading |
 | `subtitle` | string \| null | Secondary line below the title (optional) |
-| `items` | `{ label, placeholder, required? }[]` | Form fields — each is 72px tall; set `required: true` for a red `*` (`C.danger`) after the label |
+| `items` | `{ label, placeholder, required?, helpText? }[]` | Form fields; `helpText` renders the canonical help row above the input |
 | `extraLink` | string \| null | Right-aligned link above the submit button (e.g. `'Forgot password?'`) |
-| `submitLabel` | string | Text on the full-width primary button |
-| `footerText` | string | Centered link in the card footer |
+| `submitLabel` | string | Text on the full-width primary button; the button helper includes the command icon |
+| `footerText` | string \| `{ lead?: string, link: string }` | Centered footer link/copy |
 
 **Card geometry (auto-calculated — do not override):**
 
 ```text
 cardW   = 440
 headerH = subtitle ? 136 : 112    // space from card top to first field
-fieldH  = items.length × 72       // 72px per field: label(16) + gap(2) + input(40) + gap(14)
-cardH   = headerH + fieldH + (extraLink ? 22 : 4) + 36 + 12 + 32
+fieldH  = sum(item.helpText ? AUTH_FIELD_BLOCK_H_HELP : AUTH_FIELD_BLOCK_H)
+cardH   = headerH + fieldH + (extraLink ? 22 : 4) + 36 + 12 + AUTH_CARD_FOOTER_ZONE
 cardX   = Math.round((W - cardW) / 2)
 cardY   = Math.round((H - cardH) / 2)
 ```
 
-**Logo rule**: always `text(id, cardX, cardY+16, cardW, 28, '⬡  Axis', 18, C.primary, 'center')` — bounding box must span full `cardW` so `'center'` alignment works correctly. Never use a narrower bounding box.
+**Brand rule:** use the canonical SVG through `buildAxisMark` / `buildAuthCardHeader`; never draw placeholder logo text.
 
-**External sign-in:** import from `blocks.mjs` only:
-
-```js
-import { placeAuthExternalSignIn, AUTH_CARD_PAD_X, AUTH_EXTERNAL_SIGN_IN_BLOCK_H } from './blocks.mjs';
-
-contentEls.push(...placeAuthExternalSignIn(cardX + AUTH_CARD_PAD_X, y));
-y += AUTH_EXTERNAL_SIGN_IN_BLOCK_H;
-```
-
-`placeAuthExternalSignIn` wraps `componentContent` + `buildAuthExternalSignInBlock` — do not call `component()` on that block.
+**External sign-in/provider entry points:** do not show provider buttons in wireframes until the provider flow is implemented for that use case. When implemented, import shared provider blocks from `blocks.mjs` only and do not call `component()` on headerless block output.
 
 ---
 
@@ -418,7 +414,7 @@ When writing or editing any wireframe generator, verify against these values (fr
 | Header height | `HDR` | **60px** | S18 |
 | Sidebar bg | — | `C.white` | S18 |
 | Logo area height | — | **60px**, `C.gray50` bg | S18 |
-| Logo text | — | `'⬡  Axis'` 18px `C.primary` | S18 |
+| Legacy app-shell logo text | — | `'⬡  Axis'` 18px `C.primary`; do not copy this into public/auth screens | S18 |
 | Nav item | w×h | **214×36px** | S18 |
 | Nav item (active) | bg/stroke | `C.infoBg` / `C.infoBorder` + 3px left bar | S18 |
 | Nav item (active) text | color | `C.primary` (not white) | S18 |
@@ -444,7 +440,7 @@ When writing or editing any wireframe generator, verify against these values (fr
 1. Add a `genXxx()` function in `generate-screens.mjs`:
    - **Authenticated screen**: start with `appShell(prefix, W, H, NAV, activeIdx, pageTitle)`
    - **Auth screen** (login, register, etc.): use `authCard()` — never build the card by hand
-   - **Auth screen with SSO / many fields / help text**: compose from `blocks.mjs` (`authFormField`, `paintRegisterOrg*`, …) — see [Agent contract](../wireframes/README.md#agent-contract)
+   - **Auth screen with many fields / help text / provider entry points**: compose from `blocks.mjs` (`authFormField`, `paintRegisterOrg*`, …) — see [Agent contract](../wireframes/README.md#agent-contract)
    - Use `component(buildXxx, cx, cy)` for any element that matches a template section
    - Use `btn`, `inputField`, `badge`, etc. from `components.mjs` for individual controls
    - Use raw `rect`, `text`, etc. only for layout with no template equivalent

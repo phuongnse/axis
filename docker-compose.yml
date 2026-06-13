@@ -177,7 +177,7 @@ services:
     ports:
       - "8200:8200"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8200/v1/sys/health | grep -q '\"initialized\":true' || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8200/v1/sys/health | grep -q '\"initialized\":true' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -235,6 +235,7 @@ services:
     volumes:
       - ./src:/src/src
       - ./Axis.sln:/src/Axis.sln:ro
+      - ./.editorconfig:/src/.editorconfig:ro
       - ./Directory.Build.props:/src/Directory.Build.props:ro
       - ./Directory.Packages.props:/src/Directory.Packages.props:ro
       - nuget_packages:/root/.nuget/packages
@@ -256,6 +257,7 @@ services:
       VITE_API_PROXY_TARGET: "http://api:8080"
       # Vite chokidar polling — needed for file change events through WSL bind mounts.
       VITE_USE_POLLING: "1"
+    command: ["sh", "./scripts/docker-dev-entrypoint.sh"]
     ports:
       - "3000:3000"
     volumes:

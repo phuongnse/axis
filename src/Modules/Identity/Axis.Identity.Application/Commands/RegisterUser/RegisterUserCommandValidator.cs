@@ -1,3 +1,4 @@
+using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Legal;
 using FluentValidation;
 
@@ -28,10 +29,12 @@ public sealed class RegisterUserCommandValidator : AbstractValidator<RegisterUse
             .WithMessage("You must accept the current Privacy Policy.");
 
         RuleFor(x => x.Password)
-            .NotEmpty().WithMessage("Password is required.")
-            .MinimumLength(8).WithMessage("Password must be at least 8 characters.")
-            .Matches(@"[a-zA-Z]").WithMessage("Password must contain at least one letter.")
-            .Matches(@"\d").WithMessage("Password must contain at least one number.");
+            .Cascade(CascadeMode.Stop)
+            .NotEmpty().WithMessage(PasswordPolicy.RequiredMessage)
+            .Must((command, password) =>
+                PasswordPolicy.Validate(password, command.Email, command.FirstName, command.LastName) is null)
+            .WithMessage((command, password) =>
+                PasswordPolicy.Validate(password, command.Email, command.FirstName, command.LastName)!);
 
         RuleFor(x => x.PasswordConfirmation)
             .Equal(x => x.Password).WithMessage("Password confirmation must match password.");

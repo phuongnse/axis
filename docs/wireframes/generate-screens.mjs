@@ -4,7 +4,7 @@
  * Filter: node docs/wireframes/generate-screens.mjs identity-access/login,identity-access/register-user
  * Changed docs: node docs/wireframes/generate-screens.mjs --changed
  *
- * Reusable UI blocks: blocks.mjs (auth, fields, SSO). Large kit sections: generate-template.mjs via component().
+ * Reusable UI blocks: blocks.mjs (auth, fields, state blocks). Large kit sections: generate-template.mjs via component().
  * Primitives only in components.mjs. Do not duplicate block geometry in this file.
  *
  * Screen width W=1200 ensures 900px template components fit at cx=250
@@ -58,8 +58,11 @@ import {
   AUTH_CARD_FOOTER_ZONE,
   AUTH_FIELD_STACK_GAP,
   AUTH_SUBMIT_AFTER_GAP,
+  AUTH_BORDER,
+  AUTH_PANEL,
   measureAuthCardHeight,
   authScreenCanvasHeight,
+  buildAuthPageFrame,
   buildAxisLogo,
   buildAuthCardBrandBar,
   buildAuthCardHeader,
@@ -71,8 +74,6 @@ import {
   buildAuthSubmitButton,
   authFormField,
   authTermsRow,
-  placeAuthExternalSignIn,
-  AUTH_EXTERNAL_SIGN_IN_BLOCK_H,
   authCard,
   mergeExcalidrawFiles,
   REGISTER_ORG_ENTRY_FIELDS,
@@ -98,7 +99,6 @@ const cw = W - CX - PAD * 2;  // 930 — usable content width
 const NAV = ['Data Models', 'Workflows', 'Forms', 'Executions', 'Settings'];
 
 // platform-foundation auth outcome cards — shared shell + headline rhythm
-const AUTH_CARD_PAD = 20;
 const AUTH_SHELL_H = 36;       // mini logo + divider
 const AUTH_HEADLINE_H = 34;    // icon row + short underline
 const AUTH_BODY_GAP = 6;
@@ -751,7 +751,7 @@ function paintAuthSubmitButtonDisabled(prefix, cardX, y, cardW, label) {
 }
 
 /**
- * Paint verify-email outcome card (matches email-confirmation / provider-error auth style).
+ * Paint verify-email outcome card (matches email-confirmation / provider-error auth structure).
  */
 function paintVerifyEmailOutcomeCard(els, opts, wireAcc) {
   const {
@@ -1530,10 +1530,20 @@ function genSettingsOrgDeletionScheduled() {
 
 function genLogin() {
   const { els, files } = authCard(W, H, 'li', {
-    title: 'Sign in to Axis',
+    title: 'Sign in',
     items: [
-      { label: 'Email address', placeholder: 'you@company.com', required: true },
-      { label: 'Password',      placeholder: '••••••••', required: true },
+      {
+        label: 'Email address',
+        placeholder: 'you@company.com',
+        required: true,
+        helpText: 'Use the email tied to your account.',
+      },
+      {
+        label: 'Password',
+        placeholder: '••••••••',
+        required: true,
+        helpText: 'Enter the password for this account.',
+      },
     ],
     extraLink: 'Forgot password?',
   }, 'Sign in', { lead: "Don't have an account? ", link: 'Sign up' });
@@ -1543,38 +1553,56 @@ function genLogin() {
 /** email verification (tenant-registration) / unverified sign-in — unverified email blocks sign-in. */
 function genLoginUnverified() {
   const cardW = AUTH_CARD_W;
-  const cardH = 280;
+  const cardH = 500;
   const cardX = Math.round((W - cardW) / 2);
   const cardY = Math.round((H - cardH) / 2);
   const els = [];
-  els.push(rect('lu_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
-  els.push(rect('lu_card', cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true));
-  const luBrand = buildAxisLogo('lu', cardX, cardY + 16, cardW, 'auth');
-  els.push(...luBrand.els);
-  const wireFiles = luBrand.files;
-  els.push(hline('lu_hdiv', cardX, cardY + 60, cardW, C.gray300));
-  els.push(text('lu_title', cardX + 24, cardY + 76, cardW - 48, 24, 'Sign in to Axis', 17, C.gray900));
+  els.push(...buildAuthPageFrame('lu', W, H));
+  els.push(rect('lu_card', cardX, cardY, cardW, cardH, AUTH_BORDER, AUTH_PANEL, 1, true));
+  const header = buildAuthCardHeader('lu', cardX, cardY, cardW, 'Sign in');
+  els.push(...header.els);
+  const wireFiles = header.files;
 
-  const ix = cardX + AUTH_CARD_PAD;
-  const innerW = cardW - AUTH_CARD_PAD * 2;
-  let fy = cardY + 112;
+  const ix = cardX + AUTH_CARD_PAD_X;
+  const innerW = cardW - AUTH_CARD_PAD_X * 2;
+  let fy = cardY + AUTH_HEADER_H;
   [
-    { label: 'Email address', value: 'alex@company.com', required: true },
-    { label: 'Password', value: '••••••••', required: true },
+    {
+      label: 'Email address',
+      value: 'alex@company.com',
+      required: true,
+      helpText: 'Use the email tied to your account.',
+    },
+    {
+      label: 'Password',
+      value: '••••••••',
+      required: true,
+      helpText: 'Enter the password for this account.',
+    },
   ].forEach((f, i) => {
     const { els: fe, blockH } = authFormField(
-      `lu_f${i}`, cardX, fy, cardW, f.label, f.value, null, f.required === true);
+      `lu_f${i}`, cardX, fy, cardW, f.label, f.value, null, f.required === true, f.helpText);
     els.push(...fe);
     fy += blockH;
   });
 
-  const headY = fy + 8;
-  els.push(...stateHeadline('lu_blk', ix, headY, innerW, '✉', 'warning', 'Please verify your email before signing in.', 14));
-  els.push(text('lu_resend', ix, headY + AUTH_HEADLINE_H + 8, innerW, 16, 'Resend verification email →', 12, C.primary, 'center'));
+  const notice = authNoticeBanner(
+    'lu_verify',
+    ix,
+    fy + 4,
+    innerW,
+    {
+      title: 'Verify your email',
+      body: 'Check your inbox before signing in.',
+    },
+    'warning',
+  );
+  els.push(...notice.els);
+  els.push(text('lu_resend', ix, fy + notice.blockH + 18, innerW, 16, 'Resend verification email →', 12, C.primary, 'center'));
 
   const btnY = cardY + cardH - 68;
-  const btnW = cardW - 48;
-  els.push(rect('lu_sbtn', cardX + 24, btnY, btnW, 36, C.gray300, C.gray100, 1, true));
+  const btnW = cardW - AUTH_CARD_PAD_X * 2;
+  els.push(rect('lu_sbtn', cardX + AUTH_CARD_PAD_X, btnY, btnW, 36, AUTH_BORDER, AUTH_PANEL, 1, true));
   els.push(text('lu_sbtn_t', cardX + 24, btnY + 10, btnW, 16, 'Sign in', 13, C.gray300, 'center'));
 
   write('identity-access/login-unverified.excalidraw', els, wireFiles);
@@ -1593,29 +1621,36 @@ function genRegisterUser() {
     cardY,
     cardW,
     'Create your account',
-    'Use Axis on your own or join an organization later.',
   );
   contentEls.push(...header.els);
   wireFiles = mergeExcalidrawFiles(wireFiles, header.files);
 
-  let y = cardY + AUTH_HEADER_H + 24;
-  contentEls.push(...placeAuthExternalSignIn(cardX + AUTH_CARD_PAD_X, y));
-  y += AUTH_EXTERNAL_SIGN_IN_BLOCK_H + AUTH_FIELD_STACK_GAP;
+  let y = cardY + AUTH_HEADER_H;
 
   [
-    { label: 'Full name', value: 'Alex Brown', required: true, helpText: null },
+    {
+      label: 'Full name',
+      value: 'Alex Brown',
+      required: true,
+      helpText: 'This name will appear in your workspace.',
+    },
     {
       label: 'Email address',
       value: 'you@company.com',
       required: true,
-      helpText: 'Invite links may require this email to match.',
+      helpText: 'We will send a verification link to this address.',
     },
-    { label: 'Password', value: '••••••••', required: true, helpText: null },
+    {
+      label: 'Password',
+      value: '••••••••',
+      required: true,
+      helpText: 'Use a long phrase. Spaces are supported.',
+    },
     {
       label: 'Confirm password',
       value: '••••••••',
       required: true,
-      helpText: 'Must match the password above.',
+      helpText: 'Repeat the same password to avoid mistakes.',
     },
   ].forEach((field, i) => {
     const { els: fieldEls, blockH } = authFormField(
@@ -1645,8 +1680,8 @@ function genRegisterUser() {
   const cardH = measureAuthCardHeight(cardY, y, contentEls);
   const screenH = authScreenCanvasHeight(cardY, cardH, 980);
   const els = [
-    rect('ru_bg', 0, 0, W, screenH, C.gray300, C.gray100, 1, false),
-    rect('ru_card', cardX, cardY, cardW, cardH, C.gray300, C.white, 2, true),
+    ...buildAuthPageFrame('ru', W, screenH),
+    rect('ru_card', cardX, cardY, cardW, cardH, AUTH_BORDER, AUTH_PANEL, 1, true),
     ...contentEls,
     ...buildAuthCardFooter('ru', cardX, cardY, cardW, cardH, {
       lead: 'Already have an account? ',
@@ -1662,7 +1697,12 @@ function genForgotPassword() {
     title: 'Reset your password',
     subtitle: 'Enter your email and we will send you a reset link.',
     items: [
-      { label: 'Email address', placeholder: 'you@company.com', required: true },
+      {
+        label: 'Email address',
+        placeholder: 'you@company.com',
+        required: true,
+        helpText: 'Use the email linked to your account.',
+      },
     ],
   }, 'Send reset link', { lead: 'Remember your password? ', link: 'Sign in' });
   write('identity-access/forgot-password.excalidraw', els, files);

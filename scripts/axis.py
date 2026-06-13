@@ -504,6 +504,253 @@ def check_frontend_api_contracts(_args: argparse.Namespace | None = None) -> int
     return 0
 
 
+def frontend_radius_token_issues(root: Path = ROOT) -> list[str]:
+    issues: list[str] = []
+    index_css = root / "frontend" / "src" / "index.css"
+    if not index_css.is_file():
+        return [f"{rel(index_css) if root == ROOT else index_css}: missing radius token source"]
+
+    css = index_css.read_text(encoding="utf-8")
+    if "--radius: 0.5rem;" not in css:
+        issues.append("frontend/src/index.css: --radius must stay 0.5rem (8px panel token)")
+
+    src_root = root / "frontend" / "src"
+    if not src_root.exists():
+        return issues
+
+    oversized = re.compile(r"\brounded-(xl|2xl|3xl)\b")
+    arbitrary = re.compile(r"\brounded-\[([^\]]+)\]")
+    for path in iter_files(src_root, (".ts", ".tsx")):
+        normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
+        text = path.read_text(encoding="utf-8")
+        for idx, line in enumerate(text.splitlines(), 1):
+            if oversized.search(line):
+                issues.append(f"{normalized}:{idx}: avoid radius above 8px on core UI surfaces: {line.strip()}")
+            match = arbitrary.search(line)
+            if match and "var(--radius" not in match.group(1):
+                issues.append(f"{normalized}:{idx}: use shared radius tokens instead of arbitrary radius: {line.strip()}")
+    return issues
+
+
+def frontend_component_composition_issues(root: Path = ROOT) -> list[str]:
+    issues: list[str] = []
+    src_root = root / "frontend" / "src"
+    route_root = src_root / "routes"
+    ui_root = src_root / "components" / "ui"
+
+    if route_root.exists():
+        for path in iter_files(route_root, (".tsx",)):
+            normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
+            if normalized.endswith("routeTree.gen.ts"):
+                continue
+            text = path.read_text(encoding="utf-8")
+            for idx, line in enumerate(text.splitlines(), 1):
+                if "className=" in line:
+                    issues.append(
+                        f"{normalized}:{idx}: route files compose page components only; move styled UI into a component"
+                    )
+
+    if src_root.exists():
+        standard_control = re.compile(r"<\s*(button|input|label|select|textarea)\b")
+        button_block = re.compile(r"<Button\b(?P<attrs>[^>]*)>(?P<body>.*?)</Button>", re.DOTALL)
+        duplicated_flow_trace = re.compile(
+            r"(grid-cols-\[(28|34|40)px_1fr\]|bottom-\[-\d+px\]|h-\[calc\(100%)"
+        )
+        access_path_keys = (
+            "landing.signInStep",
+            "landing.verifyAccess",
+            "landing.openWorkspace",
+        )
+        action_surface_roots = (
+            "frontend/src/features/landing/",
+            "frontend/src/features/auth/",
+        )
+        for path in iter_files(src_root, (".tsx",)):
+            normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
+            if normalized.endswith("frontend/src/components/visual/FlowTrace.tsx"):
+                continue
+            text = path.read_text(encoding="utf-8")
+            in_ui_primitives = path.is_relative_to(ui_root) if hasattr(path, "is_relative_to") else False
+            if not in_ui_primitives:
+                for idx, line in enumerate(text.splitlines(), 1):
+                    if "@base-ui/react" in line:
+                        issues.append(
+                            f"{normalized}:{idx}: headless UI primitives belong in frontend/src/components/ui, not feature components"
+                        )
+                    for match in standard_control.finditer(line):
+                        issues.append(
+                            f"{normalized}:{idx}: standard UI control <{match.group(1)}> must use a shared shadcn/ui primitive from frontend/src/components/ui"
+                        )
+                for match in button_block.finditer(text):
+                    attrs = match.group("attrs")
+                    body = match.group("body")
+                    icon_only = re.search(r'\bsize=["\']icon', attrs) is not None
+                    segmented_toggle = "aria-pressed=" in attrs
+                    has_icon = re.search(r"<[A-Z][A-Za-z0-9.]*\b", body) is not None
+                    has_visible_label = bool(
+                        re.sub(r"<[^>]+>", "", body)
+                        .replace("{' '}", "")
+                        .replace('{" "}', "")
+                        .strip()
+                    )
+                    if has_visible_label and not has_icon and not icon_only and not segmented_toggle:
+                        idx = text.count("\n", 0, match.start()) + 1
+                        issues.append(
+                            f"{normalized}:{idx}: text Button must include an icon child so command actions stay consistent"
+                        )
+            if any(normalized.startswith(prefix) for prefix in action_surface_roots):
+                for match in re.finditer(
+                    r"<Link\b(?:(?!</Link>).)*?className=\"[^\"]*\binline-flex\b[^\"]*\"(?:(?!</Link>).)*?</Link>",
+                    text,
+                    flags=re.DOTALL,
+                ):
+                    idx = text.count("\n", 0, match.start()) + 1
+                    issues.append(
+                        f"{normalized}:{idx}: navigation CTA styling must use ActionLink so icon, spacing, and states stay consistent"
+                    )
+            for idx, line in enumerate(text.splitlines(), 1):
+                if duplicated_flow_trace.search(line):
+                    issues.append(
+                        f"{normalized}:{idx}: duplicated flow/timeline geometry; use FlowTrace instead"
+                    )
+                if (
+                    not normalized.endswith("frontend/src/components/visual/AccessPathTrace.tsx")
+                    and any(key in line for key in access_path_keys)
+                ):
+                    issues.append(
+                        f"{normalized}:{idx}: duplicated access path trace; use AccessPathTrace instead"
+                    )
+    return issues
+
+
+def check_frontend_component_composition(_args: argparse.Namespace | None = None) -> int:
+    issues = frontend_component_composition_issues()
+    if issues:
+        for issue in issues:
+            print(f"check-frontend-component-composition FAIL: {issue}", file=sys.stderr)
+        print("\nSee docs/playbooks/frontend.md#component-design", file=sys.stderr)
+        return 1
+    print("check-frontend-component-composition: OK")
+    return 0
+
+
+def frontend_tailwind_opacity_issues(root: Path = ROOT) -> list[str]:
+    issues: list[str] = []
+    src_root = root / "frontend" / "src"
+    if not src_root.exists():
+        return issues
+
+    allowed = {str(value) for value in range(0, 101, 5)}
+    opacity_token = re.compile(
+        r"\b(?:bg|text|border|from|via|to|ring|divide|placeholder|decoration|outline)-[A-Za-z0-9_-]+/(\d{1,3})\b"
+    )
+    opacity_utility = re.compile(r"\bopacity-(\d{1,3})\b")
+    for path in iter_files(src_root, (".ts", ".tsx")):
+        normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
+        text = path.read_text(encoding="utf-8")
+        for idx, line in enumerate(text.splitlines(), 1):
+            for match in opacity_token.finditer(line):
+                value = match.group(1)
+                if value not in allowed:
+                    issues.append(
+                        f"{normalized}:{idx}: unsupported Tailwind opacity /{value}; use 0,5,10...100 or bracket syntax like /[0.{value}]"
+                    )
+            for match in opacity_utility.finditer(line):
+                value = match.group(1)
+                if value not in allowed:
+                    issues.append(
+                        f"{normalized}:{idx}: unsupported Tailwind opacity-{value}; use opacity-0, opacity-5, opacity-10...opacity-100"
+                    )
+    return issues
+
+
+def frontend_style_issues(root: Path = ROOT) -> list[str]:
+    return [
+        *frontend_radius_token_issues(root),
+        *frontend_tailwind_opacity_issues(root),
+    ]
+
+
+def check_frontend_style(_args: argparse.Namespace | None = None) -> int:
+    issues = frontend_style_issues()
+    if issues:
+        for issue in issues:
+            print(f"check-frontend-style FAIL: {issue}", file=sys.stderr)
+        print("\nSee docs/playbooks/frontend.md#styling", file=sys.stderr)
+        return 1
+    print("check-frontend-style: OK")
+    return 0
+
+
+def frontend_form_schema_type_issues(root: Path = ROOT) -> list[str]:
+    issues: list[str] = []
+    features_root = root / "frontend" / "src" / "features"
+    if not features_root.exists():
+        return issues
+
+    form_values_interface = re.compile(r"\b(?:export\s+)?interface\s+([A-Za-z0-9_]*FormValues)\b")
+    form_values_type = re.compile(r"\b(?:export\s+)?type\s+([A-Za-z0-9_]*FormValues)\s*=")
+    for path in iter_files(features_root, (".ts", ".tsx")):
+        normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
+        if "/schemas/" not in normalized:
+            continue
+
+        text = path.read_text(encoding="utf-8")
+        for idx, line in enumerate(text.splitlines(), 1):
+            interface_match = form_values_interface.search(line)
+            if interface_match:
+                issues.append(
+                    f"{normalized}:{idx}: {interface_match.group(1)} must be inferred from the Zod schema, not hand-authored"
+                )
+                continue
+
+            type_match = form_values_type.search(line)
+            if type_match and "z.infer" not in line:
+                issues.append(
+                    f"{normalized}:{idx}: {type_match.group(1)} must use z.infer from the schema factory"
+                )
+    return issues
+
+
+def frontend_test_async_boundary_issues(root: Path = ROOT) -> list[str]:
+    issues: list[str] = []
+    test_roots = [
+        root / "frontend" / "src" / "test",
+        root / "frontend" / "tests",
+    ]
+    ignored_call = re.compile(r"\bvoid\s+[A-Za-z_$][A-Za-z0-9_$]*(?:[.(])")
+    for test_root in test_roots:
+        if not test_root.exists():
+            continue
+        for path in iter_files(test_root, (".ts", ".tsx")):
+            normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
+            text = path.read_text(encoding="utf-8")
+            for idx, line in enumerate(text.splitlines(), 1):
+                if ignored_call.search(line):
+                    issues.append(
+                        f"{normalized}:{idx}: test code must await/return async work instead of fire-and-forget `void` calls"
+                    )
+    return issues
+
+
+def frontend_quality_issues(root: Path = ROOT) -> list[str]:
+    return [
+        *frontend_form_schema_type_issues(root),
+        *frontend_test_async_boundary_issues(root),
+    ]
+
+
+def check_frontend_quality(_args: argparse.Namespace | None = None) -> int:
+    issues = frontend_quality_issues()
+    if issues:
+        for issue in issues:
+            print(f"check-frontend-quality FAIL: {issue}", file=sys.stderr)
+        print("\nSee docs/playbooks/frontend.md#state-management and #localization-and-theme-preferences", file=sys.stderr)
+        return 1
+    print("check-frontend-quality: OK")
+    return 0
+
+
 NAVIGATION_RE = re.compile(r"^> \*\*Navigation\*\*: .*\[[^\]]+\]\([^)]+\)")
 
 
@@ -1145,6 +1392,9 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         ("check-scripts-standard", check_scripts_standard),
         ("check-ef-domain-mapping", check_ef_domain_mapping),
         ("check-frontend-api-contracts", check_frontend_api_contracts),
+        ("check-frontend-style", check_frontend_style),
+        ("check-frontend-component-composition", check_frontend_component_composition),
+        ("check-frontend-quality", check_frontend_quality),
         ("check-use-case-docs.py", lambda _=None: run_module_check("check-use-case-docs.py", ["--check"])),
         ("check-doc-link-targets.py", lambda _=None: run_module_check("check-doc-link-targets.py", ["--check"])),
         ("check-doc-navigation", check_doc_navigation),
@@ -1353,6 +1603,9 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("vulnerable-packages").set_defaults(func=check_vulnerable_packages)
     check_sub.add_parser("ef-domain-mapping").set_defaults(func=check_ef_domain_mapping)
     check_sub.add_parser("frontend-api-contracts").set_defaults(func=check_frontend_api_contracts)
+    check_sub.add_parser("frontend-style").set_defaults(func=check_frontend_style)
+    check_sub.add_parser("frontend-component-composition").set_defaults(func=check_frontend_component_composition)
+    check_sub.add_parser("frontend-quality").set_defaults(func=check_frontend_quality)
     check_sub.add_parser("buf-modules").set_defaults(func=check_buf_modules)
     check_sub.add_parser("buf-breaking-against-base").set_defaults(func=check_buf_breaking_against_base)
     check_sub.add_parser("local-dev-docs").set_defaults(

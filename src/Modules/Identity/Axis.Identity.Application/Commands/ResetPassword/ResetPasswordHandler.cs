@@ -18,9 +18,9 @@ public sealed class ResetPasswordHandler(
         if (command.NewPassword != command.PasswordConfirmation)
             return Result.Failure(ErrorCodes.BusinessRule, "Passwords do not match.");
 
-        if (!IsStrongPassword(command.NewPassword))
-            return Result.Failure(ErrorCodes.BusinessRule,
-                "Password must be at least 8 characters and contain at least one letter and one number.");
+        string? passwordError = PasswordPolicy.Validate(command.NewPassword);
+        if (passwordError is not null)
+            return Result.Failure(ErrorCodes.BusinessRule, passwordError);
 
         string tokenHash = OpaqueTokenGenerator.Hash(command.Token);
 
@@ -38,9 +38,4 @@ public sealed class ResetPasswordHandler(
 
         return Result.Success();
     }
-
-    private static bool IsStrongPassword(string password) =>
-        password.Length >= 8
-        && password.Any(char.IsLetter)
-        && password.Any(char.IsDigit);
 }
