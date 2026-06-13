@@ -106,7 +106,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
             new FormUrlEncodedContent(new Dictionary<string, string>
             {
                 ["email"] = "nobody@test.com",
-                ["password"] = "TestPass1",
+                ["password"] = TestRegistrationPayload.AdminPassword,
                 ["return_url"] = "/connect/authorize",
             }));
 

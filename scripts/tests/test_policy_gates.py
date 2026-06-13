@@ -244,6 +244,77 @@ class TestFrontendComponentComposition(unittest.TestCase):
 
         self.assertEqual([], issues)
 
+    def test_rejects_native_standard_controls_outside_ui_primitives(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/features/auth/components/CustomForm.tsx": (
+                    "export function CustomForm() {\n"
+                    "  return <button type=\"button\"><input /></button>;\n"
+                    "}\n"
+                )
+            }
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("standard UI control <button> must use a shared shadcn/ui primitive", joined)
+        self.assertIn("standard UI control <input> must use a shared shadcn/ui primitive", joined)
+
+    def test_accepts_native_standard_controls_inside_ui_primitives(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/components/ui/custom-control.tsx": (
+                    "export function CustomControl() {\n"
+                    "  return <button type=\"button\"><input /></button>;\n"
+                    "}\n"
+                )
+            }
+        )
+
+        self.assertEqual([], issues)
+
+    def test_rejects_text_button_without_icon(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/features/auth/components/ForgotPasswordPage.tsx": (
+                    "import { Button } from '@/components/ui/button';\n"
+                    "export function ForgotPasswordPage() {\n"
+                    "  return <Button variant=\"cta\">Send reset link</Button>;\n"
+                    "}\n"
+                )
+            }
+        )
+
+        self.assertIn("text Button must include an icon child", "\n".join(issues))
+
+    def test_accepts_text_button_with_icon(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/features/auth/components/ForgotPasswordPage.tsx": (
+                    "import { Send } from 'lucide-react';\n"
+                    "import { Button } from '@/components/ui/button';\n"
+                    "export function ForgotPasswordPage() {\n"
+                    "  return <Button variant=\"cta\"><Send aria-hidden />Send reset link</Button>;\n"
+                    "}\n"
+                )
+            }
+        )
+
+        self.assertEqual([], issues)
+
+    def test_accepts_segmented_text_toggle_without_icon(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/features/preferences/components/PreferenceControls.tsx": (
+                    "import { Button } from '@/components/ui/button';\n"
+                    "export function PreferenceControls() {\n"
+                    "  return <Button type=\"button\" aria-pressed={true} size=\"xs\">EN</Button>;\n"
+                    "}\n"
+                )
+            }
+        )
+
+        self.assertEqual([], issues)
+
 
 class TestFrontendTailwindOpacity(unittest.TestCase):
     def issues_for_frontend(self, component_source: str) -> list[str]:

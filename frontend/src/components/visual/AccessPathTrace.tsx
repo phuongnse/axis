@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { FlowTrace, type FlowTraceStep } from '@/components/visual/FlowTrace';
 
-type AccessPathTraceSurface = 'default' | 'dark';
+type AccessPathTraceSurface = 'default' | 'dark' | 'adaptive';
 type AccessPathTraceSize = 'md' | 'lg';
 
 interface AccessPathTraceProps {
@@ -61,6 +61,26 @@ export function AccessPathTrace({
         stateClassName={{
           active: 'border-accent bg-accent text-accent-foreground',
           pending: 'border-white/15 bg-white/[0.06] text-white/55',
+        }}
+      />
+    );
+  }
+
+  if (surface === 'adaptive') {
+    return (
+      <FlowTrace
+        steps={steps}
+        size={size}
+        iconMode="provided"
+        className={className}
+        markerClassName="border-border bg-background/70 dark:border-white/15 dark:bg-white/[0.06]"
+        connectorClassName="bg-border dark:bg-white/30"
+        titleClassName="text-foreground dark:text-white"
+        metaClassName="mt-1 leading-5 text-muted-foreground dark:text-white/50"
+        stateClassName={{
+          active: 'border-accent bg-accent text-accent-foreground',
+          pending:
+            'border-border bg-background/70 text-muted-foreground dark:border-white/15 dark:bg-white/[0.06] dark:text-white/55',
         }}
       />
     );

@@ -28,7 +28,7 @@ public class AcceptInvitationHandlerTests
         new(_invitationRepo, _userRepo, _membershipRepo, _roleRepo, _hasher, _uow);
 
     private AcceptInvitationCommand ValidCommand(string token = "valid-token") =>
-        new(token, "Bob", "Jones", "NewPass1");
+        new(token, "Bob", "Jones", "fresh account passphrase");
 
     private Invitation MakePendingInvitation() =>
         Invitation.Create(InvitedEmail, OrgId, RoleId, InvitedById);
@@ -39,7 +39,7 @@ public class AcceptInvitationHandlerTests
         Invitation invitation = MakePendingInvitation();
         _invitationRepo.GetByTokenAsync("valid-token").Returns(invitation);
         _userRepo.EmailExistsPlatformWideAsync(InvitedEmail).Returns(false);
-        _hasher.Hash("NewPass1").Returns("hashed");
+        _hasher.Hash("fresh account passphrase").Returns("hashed");
         _roleRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), OrgId).Returns([]);
 
         Result<AcceptInvitationResult> result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);

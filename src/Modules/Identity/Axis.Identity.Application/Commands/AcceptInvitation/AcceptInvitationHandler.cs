@@ -23,6 +23,14 @@ public sealed class AcceptInvitationHandler(
         if (invitation is null)
             return Result.Failure<AcceptInvitationResult>(ErrorCodes.NotFound, "Invalid or unknown invitation token.");
 
+        string? passwordError = PasswordPolicy.Validate(
+            command.Password,
+            invitation.Email.Value,
+            command.FirstName,
+            command.LastName);
+        if (passwordError is not null)
+            return Result.Failure<AcceptInvitationResult>(ErrorCodes.BusinessRule, passwordError);
+
         try
         {
             invitation.Accept();

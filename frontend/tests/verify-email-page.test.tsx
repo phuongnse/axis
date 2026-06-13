@@ -98,5 +98,8 @@ describe('VerifyEmailPage', () => {
     expect(
       await screen.findByRole('heading', { name: /verification link expired/i }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText('Use the email that received the verification link.'),
+    ).toBeInTheDocument();
   });
 });

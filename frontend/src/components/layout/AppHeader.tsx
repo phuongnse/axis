@@ -1,8 +1,9 @@
 import { Link, useRouterState } from '@tanstack/react-router';
-import { Bell, Search } from 'lucide-react';
+import { Bell, LogOut, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { pageTitleKeyForPath, shellNavItems } from '@/components/layout/shell-nav';
+import { Button } from '@/components/ui/button';
 import { PreferenceControls } from '@/features/preferences';
 import { cn } from '@/lib/utils';
 
@@ -37,21 +38,26 @@ export function AppHeader({ onSignOut }: AppHeaderProps) {
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <PreferenceControls />
-          <button
+          <Button
             type="button"
-            className="hidden size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground sm:inline-flex"
+            variant="ghost"
+            size="icon-lg"
+            className="hidden text-muted-foreground sm:inline-flex"
             aria-label={t('shell.notificationsLabel')}
             disabled
           >
             <Bell className="size-4" />
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={onSignOut}
-            className="rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-primary hover:bg-muted"
+            variant="outline"
+            size="sm"
+            className="text-primary"
           >
+            <LogOut className="size-3.5" aria-hidden />
             {t('common.signOut')}
-          </button>
+          </Button>
         </div>
       </div>
 

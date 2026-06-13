@@ -53,7 +53,7 @@ This use case owns user identity onboarding. Axis is multi-tenant, but an organi
 
 *Validation & errors*
 - [ ] Email: required, valid email format, unique across Axis users.
-- [ ] Password path: password is required, minimum 8 characters, must contain at least one letter and one number.
+- [ ] Password path: password is required, minimum 15 characters, max 128 characters, and common or predictable passwords are rejected.
 - [ ] Password confirmation must match password exactly.
 - [ ] External provider path: duplicate provider account is rejected before persistence, not by surfacing a database unique-constraint failure.
 - [ ] Token organization mismatch is rejected; a user cannot use an invite/setup token for one organization to join another.
@@ -77,7 +77,7 @@ This use case owns user identity onboarding. Axis is multi-tenant, but an organi
 
 ## Wireframes
 
-User registration reuses the auth card system with external-provider entry points and email/password setup. Organization context is optional and should not be shown as a required field on the default registration screen.
+User registration reuses the auth card system with email/password setup and field-level help text. Organization context is optional and should not be shown as a required field on the default registration screen. External-provider registration remains in the use-case spec, but provider entry points should not appear in the wireframe until that implementation exists.
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

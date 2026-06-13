@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import type { TFunction } from 'i18next';
-import { AlertCircle, Database, Loader2, ShieldCheck, Workflow } from 'lucide-react';
+import { AlertCircle, Database, Loader2, RefreshCw, ShieldCheck, Workflow } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
@@ -181,6 +181,11 @@ export function WorkspaceProvisioningPage() {
                 disabled={retry.isPending}
                 onClick={() => void retry.mutateAsync().catch(() => {})}
               >
+                {retry.isPending ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                ) : (
+                  <RefreshCw className="size-4" aria-hidden />
+                )}
                 {retry.isPending ? t('provisioning.retrying') : t('provisioning.tryAgain')}
               </Button>
               <p>

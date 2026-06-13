@@ -1,15 +1,15 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from '@tanstack/react-router';
 import type { TFunction } from 'i18next';
-import { AlertCircle, CheckCircle2, Clock, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock, Loader2, Mail } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
+import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { AuthCard } from '@/features/auth/components/AuthCard';
 import { useResendVerification } from '@/features/auth/hooks/useResendVerification';
 import { useVerifyEmail } from '@/features/auth/hooks/useVerifyEmail';
@@ -112,26 +112,35 @@ function VerifyEmailOutcome({
             onSubmit={handleSubmit((values) => void onResend(values.email.trim()))}
             noValidate
           >
-            <div className="space-y-1.5">
-              <Label htmlFor="resend-email">{t('common.emailAddress')}</Label>
-              <Input
-                id="resend-email"
-                type="email"
-                autoComplete="email"
-                aria-invalid={errors.email ? true : undefined}
-                disabled={kind === 'rate_limited' || resendLoading}
-                {...registerResend('email')}
-              />
-              {errors.email ? (
-                <p className="text-xs text-destructive">{errors.email.message}</p>
-              ) : null}
-            </div>
+            <FormField
+              id="resend-email"
+              label={t('common.emailAddress')}
+              helpText={t('verifyEmail.resendEmailHelp')}
+              error={errors.email?.message}
+            >
+              {({ describedBy }) => (
+                <Input
+                  id="resend-email"
+                  type="email"
+                  autoComplete="email"
+                  aria-describedby={describedBy}
+                  aria-invalid={errors.email ? true : undefined}
+                  disabled={kind === 'rate_limited' || resendLoading}
+                  {...registerResend('email')}
+                />
+              )}
+            </FormField>
             <Button
               type="submit"
               variant="cta"
               className="w-full h-9"
               disabled={kind === 'rate_limited' || resendLoading}
             >
+              {resendLoading ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : (
+                <Mail className="size-4" aria-hidden />
+              )}
               {resendLoading ? t('verifyEmail.sending') : t('verifyEmail.resendVerificationEmail')}
             </Button>
           </form>

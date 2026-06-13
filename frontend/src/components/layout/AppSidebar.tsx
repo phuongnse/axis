@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import axisLogo from '@/assets/axis-logo.svg';
 import { shellNavItems } from '@/components/layout/shell-nav';
+import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/features/auth/auth-store';
 import { cn } from '@/lib/utils';
 
@@ -22,15 +23,16 @@ export function AppSidebar() {
             {t('common.controlPlane')}
           </p>
         </div>
-        <button
+        <Button
           type="button"
-          className="flex w-full items-center gap-2 rounded-md border border-white/10 bg-white/[0.06] px-3 py-2 text-left text-sm font-medium text-white"
+          variant="outline"
+          className="w-full justify-start border-white/10 bg-white/[0.06] px-3 text-left text-sm text-white hover:bg-white/[0.08] hover:text-white"
           disabled
           aria-label={t('shell.organizationLabel')}
         >
           <span className="truncate">{t('shell.organizationName')}</span>
           <ChevronDown className="ml-auto size-4 shrink-0 text-white/45" />
-        </button>
+        </Button>
       </div>
 
       <nav className="flex-1 space-y-1 px-3 py-4" aria-label={t('shell.sidebarNavigation')}>

@@ -64,7 +64,12 @@ public class UserEndpointTests(ApiTestFixture fixture)
     public async Task ChangePassword_WhenNoToken_Returns401()
     {
         HttpResponseMessage resp = await fixture.Client.PostAsJsonAsync("/api/users/me/change-password",
-            new { currentPassword = "TestPass1", newPassword = "NewPass2!", confirmPassword = "NewPass2!" }, Json);
+            new
+            {
+                currentPassword = TestRegistrationPayload.AdminPassword,
+                newPassword = "fresh account passphrase",
+                confirmPassword = "fresh account passphrase",
+            }, Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -77,8 +82,8 @@ public class UserEndpointTests(ApiTestFixture fixture)
         HttpResponseMessage resp = await client.PostAsJsonAsync("/api/users/me/change-password", new
         {
             currentPassword = "WrongPass99",
-            newPassword = "NewPass2!",
-            confirmPassword = "NewPass2!",
+            newPassword = "fresh account passphrase",
+            confirmPassword = "fresh account passphrase",
         }, Json);
 
         // Either 422 (validation) or 401 — must not be 200

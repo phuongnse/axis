@@ -30,6 +30,23 @@ public class BCryptPasswordHasherTests
     }
 
     [Fact]
+    public void Verify_WhenHashWasCreatedWithLegacyBCrypt_ReturnsTrue()
+    {
+        string hash = BCrypt.Net.BCrypt.HashPassword("legacy-password", workFactor: 4);
+
+        _sut.Verify("legacy-password", hash).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Verify_WhenPasswordDiffersAfterBCryptByteLimit_ReturnsFalse()
+    {
+        string sharedPrefix = new('a', 80);
+        string hash = _sut.Hash($"{sharedPrefix}-one");
+
+        _sut.Verify($"{sharedPrefix}-two", hash).Should().BeFalse();
+    }
+
+    [Fact]
     public void Verify_WhenPasswordIsWrong_ReturnsFalse()
     {
         string hash = _sut.Hash("correct-password");

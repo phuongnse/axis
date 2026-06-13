@@ -38,8 +38,8 @@ function mockLegalVersionsFetch() {
 async function fillRegisterForm(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText('Full name'), 'Alex Brown');
   await user.type(screen.getByLabelText('Email address'), 'alex@example.com');
-  await user.type(screen.getByLabelText('Password'), 'Passw0rd');
-  await user.type(screen.getByLabelText('Confirm password'), 'Passw0rd');
+  await user.type(screen.getByLabelText('Password'), 'maple river sunrise');
+  await user.type(screen.getByLabelText('Confirm password'), 'maple river sunrise');
   await user.click(screen.getByRole('checkbox', { name: /terms of service/i }));
 }
 
@@ -60,6 +60,11 @@ describe('RegisterPage', () => {
     const user = userEvent.setup();
     await renderWithRouter(<RegisterPage />, { path: '/register' });
 
+    expect(screen.getByText('This name will appear in your workspace.')).toBeInTheDocument();
+    expect(
+      screen.getByText('We will send a verification link to this address.'),
+    ).toBeInTheDocument();
+
     await user.click(screen.getByRole('button', { name: /create account/i }));
 
     expect(screen.getByText('Full name is required')).toBeInTheDocument();
@@ -69,6 +74,32 @@ describe('RegisterPage', () => {
     expect(
       screen.getByText('You must accept the Terms of Service and Privacy Policy'),
     ).toBeInTheDocument();
+  });
+
+  it('updates password criteria while typing', async () => {
+    const user = userEvent.setup();
+    await renderWithRouter(<RegisterPage />, { path: '/register' });
+
+    expect(
+      screen.getByRole('listitem', { name: 'Missing: At least 15 characters' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('listitem', { name: 'Missing: Hard to guess' })).toBeInTheDocument();
+
+    const passwordInput = screen.getByLabelText('Password');
+    await user.type(passwordInput, '1234567890123456790');
+
+    expect(
+      screen.getByRole('listitem', { name: 'Met: At least 15 characters' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('listitem', { name: 'Missing: Hard to guess' })).toBeInTheDocument();
+
+    await user.clear(passwordInput);
+    await user.type(passwordInput, 'maple river sunrise');
+
+    expect(
+      screen.getByRole('listitem', { name: 'Met: At least 15 characters' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('listitem', { name: 'Met: Hard to guess' })).toBeInTheDocument();
   });
 
   it('navigates to confirmation screen after successful submit', async () => {

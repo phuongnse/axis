@@ -89,6 +89,8 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 
 ## Wireframes
 
+Current public sign-in wireframes show the implemented email/password path only. External identity providers remain documented in the use-case spec, but provider buttons should not appear here until ADR-027 is implemented for sign-in.
+
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | login | [source](./login.excalidraw) | [preview](./login.svg) |

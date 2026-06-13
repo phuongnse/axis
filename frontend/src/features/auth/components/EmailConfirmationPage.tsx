@@ -3,33 +3,11 @@ import { Mail, UserPlus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { ActionLink } from '@/components/ui/action-link';
+import { Button } from '@/components/ui/button';
 import { AuthCard } from '@/features/auth/components/AuthCard';
+import { AuthNotice } from '@/features/auth/components/AuthNotice';
 import { useResendVerification } from '@/features/auth/hooks/useResendVerification';
 import { loadRegistrationContext } from '@/features/auth/registration-context';
-
-function NoticeBanner({
-  variant,
-  title,
-  body,
-}: {
-  variant: 'info' | 'success' | 'warning';
-  title: string;
-  body?: string;
-}) {
-  const styles =
-    variant === 'success'
-      ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400'
-      : variant === 'warning'
-        ? 'border-amber-500/30 bg-amber-500/5 text-amber-800 dark:text-amber-300'
-        : 'border-sky-500/30 bg-sky-500/5 text-sky-800 dark:text-sky-300';
-
-  return (
-    <div className={`rounded-lg border px-3 py-2 text-sm ${styles}`} role="status">
-      <p className="font-medium">{title}</p>
-      {body ? <p className="mt-1 text-xs opacity-90">{body}</p> : null}
-    </div>
-  );
-}
 
 export function EmailConfirmationPage() {
   const { t } = useTranslation();
@@ -75,48 +53,42 @@ export function EmailConfirmationPage() {
         </div>
 
         {state === 'sending' ? (
-          <NoticeBanner
-            variant="info"
-            title={t('emailConfirmation.sendingTitle')}
-            body={t('emailConfirmation.sendingBody')}
-          />
+          <AuthNotice variant="info" title={t('emailConfirmation.sendingTitle')}>
+            {t('emailConfirmation.sendingBody')}
+          </AuthNotice>
         ) : null}
 
         {state === 'success' ? (
-          <NoticeBanner
-            variant="success"
-            title={t('emailConfirmation.successTitle')}
-            body={t('emailConfirmation.successBody')}
-          />
+          <AuthNotice variant="success" title={t('emailConfirmation.successTitle')}>
+            {t('emailConfirmation.successBody')}
+          </AuthNotice>
         ) : null}
 
         {state === 'rate_limited' ? (
-          <NoticeBanner
-            variant="warning"
-            title={t('emailConfirmation.waitTitle')}
-            body={rateLimitMessage ?? t('emailConfirmation.waitBodyDefault')}
-          />
+          <AuthNotice variant="warning" title={t('emailConfirmation.waitTitle')}>
+            {rateLimitMessage ?? t('emailConfirmation.waitBodyDefault')}
+          </AuthNotice>
         ) : null}
 
         {state === 'error' ? (
-          <NoticeBanner
-            variant="warning"
-            title={t('emailConfirmation.errorTitle')}
-            body={t('emailConfirmation.errorBody')}
-          />
+          <AuthNotice variant="error" title={t('emailConfirmation.errorTitle')}>
+            {t('emailConfirmation.errorBody')}
+          </AuthNotice>
         ) : null}
 
         <div className="text-sm">
           <span className="text-muted-foreground">{t('emailConfirmation.didntReceive')} </span>
           {context?.email ? (
-            <button
+            <Button
               type="button"
-              className="font-medium text-primary hover:underline disabled:text-muted-foreground disabled:no-underline"
+              variant="link"
+              className="h-auto p-0 text-sm font-medium disabled:text-muted-foreground disabled:no-underline"
               disabled={state === 'sending' || state === 'rate_limited'}
               onClick={() => void handleResend()}
             >
+              <Mail className="size-3.5" aria-hidden />
               {t('emailConfirmation.resendEmail')}
-            </button>
+            </Button>
           ) : (
             <Link to="/register" className="font-medium text-primary hover:underline">
               {t('emailConfirmation.backToRegistration')}

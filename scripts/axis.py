@@ -536,6 +536,7 @@ def frontend_component_composition_issues(root: Path = ROOT) -> list[str]:
     issues: list[str] = []
     src_root = root / "frontend" / "src"
     route_root = src_root / "routes"
+    ui_root = src_root / "components" / "ui"
 
     if route_root.exists():
         for path in iter_files(route_root, (".tsx",)):
@@ -550,6 +551,8 @@ def frontend_component_composition_issues(root: Path = ROOT) -> list[str]:
                     )
 
     if src_root.exists():
+        standard_control = re.compile(r"<\s*(button|input|label|select|textarea)\b")
+        button_block = re.compile(r"<Button\b(?P<attrs>[^>]*)>(?P<body>.*?)</Button>", re.DOTALL)
         duplicated_flow_trace = re.compile(
             r"(grid-cols-\[(28|34|40)px_1fr\]|bottom-\[-\d+px\]|h-\[calc\(100%)"
         )
@@ -567,6 +570,34 @@ def frontend_component_composition_issues(root: Path = ROOT) -> list[str]:
             if normalized.endswith("frontend/src/components/visual/FlowTrace.tsx"):
                 continue
             text = path.read_text(encoding="utf-8")
+            in_ui_primitives = path.is_relative_to(ui_root) if hasattr(path, "is_relative_to") else False
+            if not in_ui_primitives:
+                for idx, line in enumerate(text.splitlines(), 1):
+                    if "@base-ui/react" in line:
+                        issues.append(
+                            f"{normalized}:{idx}: headless UI primitives belong in frontend/src/components/ui, not feature components"
+                        )
+                    for match in standard_control.finditer(line):
+                        issues.append(
+                            f"{normalized}:{idx}: standard UI control <{match.group(1)}> must use a shared shadcn/ui primitive from frontend/src/components/ui"
+                        )
+                for match in button_block.finditer(text):
+                    attrs = match.group("attrs")
+                    body = match.group("body")
+                    icon_only = re.search(r'\bsize=["\']icon', attrs) is not None
+                    segmented_toggle = "aria-pressed=" in attrs
+                    has_icon = re.search(r"<[A-Z][A-Za-z0-9.]*\b", body) is not None
+                    has_visible_label = bool(
+                        re.sub(r"<[^>]+>", "", body)
+                        .replace("{' '}", "")
+                        .replace('{" "}', "")
+                        .strip()
+                    )
+                    if has_visible_label and not has_icon and not icon_only and not segmented_toggle:
+                        idx = text.count("\n", 0, match.start()) + 1
+                        issues.append(
+                            f"{normalized}:{idx}: text Button must include an icon child so command actions stay consistent"
+                        )
             if any(normalized.startswith(prefix) for prefix in action_surface_roots):
                 for match in re.finditer(
                     r"<Link\b(?:(?!</Link>).)*?className=\"[^\"]*\binline-flex\b[^\"]*\"(?:(?!</Link>).)*?</Link>",

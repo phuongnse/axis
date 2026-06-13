@@ -4,7 +4,7 @@ import type { ComponentProps, ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
 
-type ActionLinkSurface = 'default' | 'inverted';
+type ActionLinkSurface = 'default' | 'inverted' | 'adaptive';
 type ActionLinkVariant = 'primary' | 'secondary';
 
 type RouterLinkProps = ComponentProps<typeof Link>;
@@ -27,6 +27,12 @@ const actionLinkClass: Record<ActionLinkSurface, Record<ActionLinkVariant, strin
   inverted: {
     primary: 'border-white bg-white text-[hsl(174_25%_12%)] hover:bg-white/90',
     secondary: 'border-white/20 bg-white/[0.06] text-white hover:bg-white/10',
+  },
+  adaptive: {
+    primary:
+      'border-[hsl(32_62%_40%)] bg-accent text-accent-foreground shadow-[0_1px_0_hsl(32_62%_32%)] hover:bg-accent/90 dark:border-white dark:bg-white dark:text-[hsl(174_25%_12%)] dark:hover:bg-white/90',
+    secondary:
+      'border-border bg-background text-foreground hover:bg-muted hover:text-foreground dark:border-white/20 dark:bg-white/[0.06] dark:text-white dark:hover:bg-white/10',
   },
 };
 

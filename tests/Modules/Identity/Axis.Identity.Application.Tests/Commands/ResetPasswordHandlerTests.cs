@@ -37,10 +37,13 @@ public class ResetPasswordHandlerTests
         User user = MakeUser();
         _tokenStore.FindUserIdByTokenHashAsync(Arg.Any<string>()).Returns(user.Id);
         _userRepo.GetByIdPlatformWideAsync(user.Id).Returns(user);
-        _hasher.Hash("NewPass1").Returns("new_hash");
+        _hasher.Hash("fresh account passphrase").Returns("new_hash");
 
         Result result = await CreateHandler().Handle(
-            new ResetPasswordCommand("valid-token", "NewPass1", "NewPass1"),
+            new ResetPasswordCommand(
+                "valid-token",
+                "fresh account passphrase",
+                "fresh account passphrase"),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -55,7 +58,10 @@ public class ResetPasswordHandlerTests
         _tokenStore.FindUserIdByTokenHashAsync(Arg.Any<string>()).ReturnsNull();
 
         Result result = await CreateHandler().Handle(
-            new ResetPasswordCommand("bad-token", "NewPass1", "NewPass1"),
+            new ResetPasswordCommand(
+                "bad-token",
+                "fresh account passphrase",
+                "fresh account passphrase"),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -67,7 +73,10 @@ public class ResetPasswordHandlerTests
     public async Task ResetPassword_WhenPasswordsDoNotMatch_ReturnsBusinessRuleFailure()
     {
         Result result = await CreateHandler().Handle(
-            new ResetPasswordCommand("valid-token", "NewPass1", "Different1"),
+            new ResetPasswordCommand(
+                "valid-token",
+                "fresh account passphrase",
+                "different account passphrase"),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

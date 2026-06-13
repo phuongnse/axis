@@ -83,7 +83,7 @@ Define user-facing localization and visual theme behavior for the SPA so each us
 > - `i18next` + `react-i18next` initialize key-based `en` / `vi` resources with English fallback.
 > - `PreferenceControls` is available on public/auth screens and in the authenticated header.
 > - Locale preference persists in `localStorage` under `axis.language`; `<html lang>` updates immediately.
-> - Current visible SPA strings in landing, auth, provisioning, app shell, topology background, and dashboard scaffold use locale keys.
+> - Current visible SPA strings in landing, auth, provisioning, app shell, and dashboard scaffold use locale keys. Decorative public/auth backgrounds do not carry user-facing text.
 > - Vitest covers immediate language switching and preference persistence.
 >
 > **Decisions:**

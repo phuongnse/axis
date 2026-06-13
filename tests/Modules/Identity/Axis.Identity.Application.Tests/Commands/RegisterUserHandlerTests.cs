@@ -45,8 +45,8 @@ public class RegisterUserHandlerTests
         FirstName: "Alice",
         LastName: "Smith",
         Email: "alice@example.com",
-        Password: "SecurePass1",
-        PasswordConfirmation: "SecurePass1",
+        Password: "maple river sunrise",
+        PasswordConfirmation: "maple river sunrise",
         AcceptedTermsVersion: WellKnownLegalDocuments.TermsVersion,
         AcceptedPrivacyVersion: WellKnownLegalDocuments.PrivacyVersion,
         IdempotencyKey: "idem-1");
@@ -58,12 +58,12 @@ public class RegisterUserHandlerTests
             .Returns(false);
         _idempotencyRepo.AcquireAsync("idem-1", Arg.Any<CancellationToken>())
             .Returns(RegistrationIdempotencyAcquireResult.Acquired);
-        _hasher.Hash("SecurePass1").Returns("hashed_password");
+        _hasher.Hash("maple river sunrise").Returns("hashed_password");
 
         Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        _hasher.Received(1).Hash("SecurePass1");
+        _hasher.Received(1).Hash("maple river sunrise");
         await _userRepo.Received(1).AddAsync(
             Arg.Is<User>(u =>
                 u.Email.Value == "alice@example.com"
@@ -97,7 +97,7 @@ public class RegisterUserHandlerTests
             .Returns(false);
         _idempotencyRepo.AcquireAsync("idem-1", Arg.Any<CancellationToken>())
             .Returns(RegistrationIdempotencyAcquireResult.Acquired);
-        _hasher.Hash("SecurePass1").Returns("hashed_password");
+        _hasher.Hash("maple river sunrise").Returns("hashed_password");
         _organizationTokenStore.ConsumeFirstUserSetupAsync(
                 setupTokenHash,
                 Arg.Any<Guid>(),
@@ -129,7 +129,7 @@ public class RegisterUserHandlerTests
             .Returns(false);
         _idempotencyRepo.AcquireAsync("idem-1", Arg.Any<CancellationToken>())
             .Returns(RegistrationIdempotencyAcquireResult.Acquired);
-        _hasher.Hash("SecurePass1").Returns("hashed_password");
+        _hasher.Hash("maple river sunrise").Returns("hashed_password");
         _organizationTokenStore.ConsumeFirstUserSetupAsync(
                 setupTokenHash,
                 Arg.Any<Guid>(),

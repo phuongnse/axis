@@ -1,6 +1,12 @@
 import type { TFunction } from 'i18next';
 import { z } from 'zod';
 
+import {
+  isPasswordHardToGuess,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+} from '@/features/auth/password-policy';
+
 export type RegisterFormValues = z.infer<ReturnType<typeof createRegisterSchema>>;
 
 export function createRegisterSchema(t: TFunction) {
@@ -11,9 +17,8 @@ export function createRegisterSchema(t: TFunction) {
       password: z
         .string()
         .min(1, t('validation.passwordRequired'))
-        .min(8, t('validation.passwordMin'))
-        .regex(/[a-zA-Z]/, t('validation.passwordLetter'))
-        .regex(/\d/, t('validation.passwordNumber')),
+        .min(PASSWORD_MIN_LENGTH, t('validation.passwordMin'))
+        .max(PASSWORD_MAX_LENGTH, t('validation.passwordMax')),
       passwordConfirmation: z.string().min(1, t('validation.passwordConfirmationRequired')),
       acceptedTerms: z.boolean().refine((value) => value === true, {
         message: t('validation.acceptTerms'),
@@ -37,6 +42,18 @@ export function createRegisterSchema(t: TFunction) {
           code: z.ZodIssueCode.custom,
           message: t('validation.firstLastName'),
           path: ['fullName'],
+        });
+      }
+
+      if (
+        values.password.length >= PASSWORD_MIN_LENGTH &&
+        values.password.length <= PASSWORD_MAX_LENGTH &&
+        !isPasswordHardToGuess(values.password, [values.email, values.fullName])
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: t('validation.passwordCommon'),
+          path: ['password'],
         });
       }
     });

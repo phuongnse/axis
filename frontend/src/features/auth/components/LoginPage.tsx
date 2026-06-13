@@ -1,9 +1,11 @@
 import { Link } from '@tanstack/react-router';
+import { LogIn } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
+import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { AuthCard } from '@/features/auth/components/AuthCard';
+import { AuthNotice } from '@/features/auth/components/AuthNotice';
 import { useLogin } from '@/features/auth/hooks/useLogin';
 
 export function LoginPage() {
@@ -28,46 +30,53 @@ export function LoginPage() {
       }
       banner={
         loginError ? (
-          <div
-            className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-            role="alert"
-          >
+          <AuthNotice variant="error">
             {loginError.message}
             {loginError.kind === 'unverified' ? (
               <p className="mt-2 text-center text-xs text-muted-foreground">
                 {t('auth.unverifiedHint')}
               </p>
             ) : null}
-          </div>
+          </AuthNotice>
         ) : null
       }
     >
       <form className="space-y-4" onSubmit={handleSubmit(submit)} noValidate>
-        <div className="space-y-1.5">
-          <Label htmlFor="email">{t('common.emailAddress')}</Label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="username"
-            aria-invalid={errors.email ? true : undefined}
-            {...register('email')}
-          />
-          {errors.email ? <p className="text-xs text-destructive">{errors.email.message}</p> : null}
-        </div>
+        <FormField
+          id="email"
+          label={t('common.emailAddress')}
+          helpText={t('login.emailHelp')}
+          error={errors.email?.message}
+        >
+          {({ describedBy }) => (
+            <Input
+              id="email"
+              type="email"
+              autoComplete="username"
+              aria-describedby={describedBy}
+              aria-invalid={errors.email ? true : undefined}
+              {...register('email')}
+            />
+          )}
+        </FormField>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="password">{t('common.password')}</Label>
-          <Input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            aria-invalid={errors.password ? true : undefined}
-            {...register('password')}
-          />
-          {errors.password ? (
-            <p className="text-xs text-destructive">{errors.password.message}</p>
-          ) : null}
-        </div>
+        <FormField
+          id="password"
+          label={t('common.password')}
+          helpText={t('login.passwordHelp')}
+          error={errors.password?.message}
+        >
+          {({ describedBy }) => (
+            <Input
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              aria-describedby={describedBy}
+              aria-invalid={errors.password ? true : undefined}
+              {...register('password')}
+            />
+          )}
+        </FormField>
 
         <div className="flex justify-end">
           <Link to="/forgot-password" className="text-xs text-primary hover:underline">
@@ -76,6 +85,7 @@ export function LoginPage() {
         </div>
 
         <Button type="submit" variant="cta" className="w-full h-9" disabled={loading}>
+          <LogIn className="size-4" aria-hidden />
           {loading ? t('login.signingIn') : t('common.signIn')}
         </Button>
       </form>

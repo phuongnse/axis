@@ -1,9 +1,10 @@
 import { Link } from '@tanstack/react-router';
+import { Send } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
+import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { AuthCard } from '@/features/auth/components/AuthCard';
 
 export function ForgotPasswordPage() {
@@ -23,11 +24,23 @@ export function ForgotPasswordPage() {
     >
       <p className="text-sm text-muted-foreground">{t('forgotPassword.body')}</p>
       <form className="space-y-4" onSubmit={(event) => event.preventDefault()}>
-        <div className="space-y-1.5">
-          <Label htmlFor="fp-email">{t('common.emailAddress')}</Label>
-          <Input id="fp-email" type="email" autoComplete="username" disabled />
-        </div>
+        <FormField
+          id="fp-email"
+          label={t('common.emailAddress')}
+          helpText={t('forgotPassword.emailHelp')}
+        >
+          {({ describedBy }) => (
+            <Input
+              id="fp-email"
+              type="email"
+              autoComplete="username"
+              disabled
+              aria-describedby={describedBy}
+            />
+          )}
+        </FormField>
         <Button variant="cta" className="h-9 w-full" disabled>
+          <Send className="size-4" aria-hidden />
           {t('forgotPassword.sendResetLink')}
         </Button>
       </form>
