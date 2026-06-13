@@ -191,7 +191,7 @@ No need to bulk-edit all use cases in one PR — update the use case you are alr
 > **Done:**
 > - Handler X; endpoint Y.
 >
-> **Deferred (PR #N follow-up):** Frontend-only gap (one line).
+> **Deferred follow-ups:** Frontend-only gap (one line).
 >
 > **Decisions:** …
 ```
@@ -199,7 +199,7 @@ No need to bulk-edit all use cases in one PR — update the use case you are alr
 Rules:
 
 - **One row per layer** — split `Domain + Application` into two rows.
-- **Blank blockquote line** (`>`) between **Gaps vs spec**, **Done**, **Deferred**, and **Decisions** — never glue `**Done:**` onto the same line as **Gaps vs spec**.
+- **Blank blockquote line** (`>`) between **Gaps vs spec**, **Done**, **Deferred follow-ups**, and **Decisions** — never glue `**Done:**` onto the same line as **Gaps vs spec**.
 - Use a **bullet list** under **Done** (or **Gaps vs spec**) when there are several semicolon-separated backend notes; keep a single sentence on one line when it is short.
 - **`Gaps vs spec`** lists remaining AC bullets; never write `pending API layer` when endpoints already exist — say what is missing (`403 test`, `date filter query param`, etc.).
 - **`API ✅`** on a US means in-scope REST/OpenAPI AC for that story are shipped; Frontend-only gaps do not downgrade API to ⚠️.

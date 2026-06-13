@@ -50,6 +50,12 @@ Ship first — tenant registration, isolation, and subscription plans are prereq
 | [Tenant resolution from JWT](tenant-from-jwt/) | Resolve the active tenant from the JWT on every request so that downstream code never needs to think about tenant… |
 | [Automatic tenant scoping on every request](tenant-scope/) | Every database query to be automatically scoped to the requesting tenant so that data isolation is enforced at the… |
 
+### Other
+
+| Use case | Summary |
+|---|---|
+| [# Use case - Open workspace start](workspace-start/) | Open the first authenticated workspace screen so that the user understands their account state, workspace access, and… |
+
 
 
 ---

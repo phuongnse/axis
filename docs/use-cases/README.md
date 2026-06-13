@@ -13,7 +13,7 @@ Use cases are the user-facing source of truth for behavior. **One markdown file 
 | Step | Source | What you learn |
 |------|--------|----------------|
 | 1 | Domain **Open work** in `docs/use-cases/{domain}/README.md` | Prioritized gaps (backend vs frontend) |
-| 2 | `docs/use-cases/{domain}/*.md` | Per-use-case ACs + `> **Implementation status**` + `Gaps vs spec` / `**Deferred:**` |
+| 2 | `docs/use-cases/{domain}/*.md` | Per-use-case ACs + `> **Implementation status**` + `Gaps vs spec` / `Deferred follow-ups` / `Decisions` |
 | 3 | `docs/PROGRESS.md` | Module layer summary; cross-cutting foundation phases |
 | 4 | `grep -rE "\\| Application \\| ⚠️\\|\\| Infrastructure \\| ⚠️\\|\\| API \\| ⚠️" docs/use-cases/` | Use cases with partial backend layers ([agent-checklist](../playbooks/agent-checklist.md)) |
 

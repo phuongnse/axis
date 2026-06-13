@@ -61,6 +61,14 @@ Each field in a model has a type that determines what data it stores, how it's v
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
+> **Gaps vs spec:**
+> - Frontend: "Add field" opens a type picker showing all 9 field types with icons and descriptions.
+> - Frontend: Selecting a type opens a config panel: field name, label, help text, required toggle, and type-specific options.
+> - Frontend: Saving the field adds it to the model and it is immediately available in the record form.
+>
+> **Deferred follow-ups:**
+> - Frontend field-builder flow: type picker, type-specific config panel, and save-to-record-form availability.
+>
 > **Decisions:** all 9 field types serialized to JSONB via custom `FieldDefinitionConverter` — polymorphic FieldConfig deserialized using the `type` discriminator in the JSON object.
 
 ## Wireframes
@@ -68,4 +76,3 @@ Each field in a model has a type that determines what data it stores, how it's v
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

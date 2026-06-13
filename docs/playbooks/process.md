@@ -80,7 +80,7 @@ For every `⚠️` found, decide explicitly:
 | Verdict | Action |
 |---|---|
 | Actually done, docs stale | Update callout to ✅ |
-| Deferred — depends on a later module (e.g. workflow-engine) | `Gaps vs spec` with `pending E0X` and/or `**Deferred (...):**` per agent-checklist deferred-callout rules (`**Deferred (PR #N follow-up):**`) |
+| Deferred — depends on a later module (e.g. workflow-engine) | `Gaps vs spec` with `pending E0X` and/or `**Deferred follow-ups:**` per agent-checklist deferred-callout rules (`**Deferred follow-ups:**`) |
 | Genuine miss | Fix it before proceeding |
 
 Also check cross-module Application dependencies: list every query or command the upcoming API layer will call from *other* modules' Application layers. If any are missing, add them now.

@@ -19,6 +19,18 @@ USE_CASES = ROOT / "docs" / "use-cases"
 SKIP_DIRS = set()
 
 REQUIRED_HEADINGS = ["## Wireframes"]
+IMPLEMENTATION_STATUS_HEADING = "> **Implementation status**"
+IMPLEMENTATION_STATUS_REQUIRED_MARKERS = (
+    ("> **Gaps vs spec:**", "gaps vs spec"),
+    ("> **Deferred follow-ups:**", "deferred follow-ups"),
+    ("> **Decisions:**", "decisions"),
+)
+LEGACY_DEFERRED_STATUS_RE = re.compile(r"^> \*\*Deferred(?: \([^)]*\))?:\*\*", re.MULTILINE)
+PENDING_STATUS_CODEPOINTS = {0x23F3, 0x26A0}
+GENERIC_STATUS_PROSE = (
+    "Open work remains in layers marked pending above.",
+    "Complete the open items listed in Gaps vs spec before marking this use case complete.",
+)
 
 LEGACY_DIAGRAM_TABLE_HEADER = "| Diagram | Source | Preview |"
 
@@ -46,6 +58,48 @@ TEMPLATE_MAIN_FLOW = (
 )
 
 
+def implementation_status_callout(text: str) -> str:
+    lines = text.splitlines()
+    for idx, line in enumerate(lines):
+        if line != IMPLEMENTATION_STATUS_HEADING:
+            continue
+        block: list[str] = []
+        for block_line in lines[idx:]:
+            if not block_line.startswith(">"):
+                break
+            block.append(block_line)
+        return "\n".join(block)
+    return ""
+
+
+def callout_has_pending_layer(callout: str) -> bool:
+    return any(
+        line.startswith("> |") and any(ord(ch) in PENDING_STATUS_CODEPOINTS for ch in line)
+        for line in callout.splitlines()
+    )
+
+
+def callout_section_content(callout: str, marker: str) -> list[str]:
+    lines = callout.splitlines()
+    for idx, line in enumerate(lines):
+        if not line.startswith(marker):
+            continue
+        content: list[str] = []
+        inline = line.removeprefix(marker).strip()
+        if inline:
+            content.append(inline)
+        for next_line in lines[idx + 1 :]:
+            if next_line.startswith("> **") and ":**" in next_line:
+                break
+            if next_line.startswith("> |"):
+                break
+            stripped = next_line.removeprefix(">").strip()
+            if stripped:
+                content.append(stripped)
+        return content
+    return []
+
+
 def iter_use_case_files() -> list[Path]:
     files: list[Path] = []
     for domain_dir in sorted(USE_CASES.iterdir()):
@@ -58,7 +112,7 @@ def iter_use_case_files() -> list[Path]:
     return files
 
 
-def check_file(path: Path) -> list[str]:
+def check_file(path: Path, *, strict_status: bool = True) -> list[str]:
     issues: list[str] = []
     text = path.read_text(encoding="utf-8")
     rel = path.relative_to(ROOT)
@@ -113,8 +167,31 @@ def check_file(path: Path) -> list[str]:
                 "(or omit ## Diagrams when there is no local diagram)",
             )
 
-    if "> **Implementation status**" not in text:
+    callout = implementation_status_callout(text)
+    if not callout:
         issues.append(f"{rel}: missing implementation status callout")
+    elif strict_status:
+        for marker, label in IMPLEMENTATION_STATUS_REQUIRED_MARKERS:
+            if marker not in callout:
+                issues.append(f"{rel}: missing implementation status {label} section")
+        if LEGACY_DEFERRED_STATUS_RE.search(callout):
+            issues.append(f"{rel}: legacy Deferred status heading found - use `Deferred follow-ups`")
+        for marker, label in IMPLEMENTATION_STATUS_REQUIRED_MARKERS:
+            content = callout_section_content(callout, marker)
+            if not content:
+                issues.append(f"{rel}: implementation status {label} section is empty")
+            if any(generic in line for generic in GENERIC_STATUS_PROSE for line in content):
+                issues.append(f"{rel}: implementation status {label} uses generic placeholder prose")
+        if callout_has_pending_layer(callout):
+            if any(
+                line in {
+                    "> **Gaps vs spec:** none",
+                    "> **Gaps vs spec:** none.",
+                    "> **Gaps vs spec:** none for the current documented scope.",
+                }
+                for line in callout.splitlines()
+            ):
+                issues.append(f"{rel}: pending layer cannot use `Gaps vs spec: none`")
 
     for placeholder in PURPOSE_PLACEHOLDERS:
         if placeholder in text:
@@ -133,8 +210,8 @@ def count_template_main_flow(files: list[Path]) -> int:
     return sum(1 for p in files if TEMPLATE_MAIN_FLOW in p.read_text(encoding="utf-8"))
 
 
-def changed_paths_against_base() -> list[Path]:
-    """Return changed paths for PR-style ratchets; fail closed without diff context."""
+def diff_range_against_base() -> str:
+    """Return the PR-style git range; fail closed without diff context."""
     base = os.environ.get("BASE_BRANCH", "main")
     candidates = [f"origin/{base}", base]
     range_spec: str | None = None
@@ -168,6 +245,12 @@ def changed_paths_against_base() -> list[Path]:
             f"(tried origin/{base}, {base}, and HEAD~1)"
         )
 
+    return range_spec
+
+
+def changed_paths_against_base() -> list[Path]:
+    """Return changed paths for PR-style ratchets; fail closed without diff context."""
+    range_spec = diff_range_against_base()
     result = subprocess.run(
         ["git", "diff", "--name-only", range_spec],
         cwd=ROOT,
@@ -186,8 +269,42 @@ def changed_paths_against_base() -> list[Path]:
     return paths
 
 
+def strip_implementation_status_callouts(text: str) -> str:
+    """Remove status callout blocks so ratchets can distinguish status-only edits."""
+    lines = text.splitlines()
+    out: list[str] = []
+    idx = 0
+    while idx < len(lines):
+        if lines[idx] == IMPLEMENTATION_STATUS_HEADING:
+            idx += 1
+            while idx < len(lines) and lines[idx].startswith(">"):
+                idx += 1
+            continue
+        out.append(lines[idx])
+        idx += 1
+    return "\n".join(out).strip()
+
+
+def changed_use_case_content_outside_status(path: Path, range_spec: str) -> bool:
+    base_ref = range_spec.split("...", 1)[0]
+    relative = path.relative_to(ROOT).as_posix()
+    result = subprocess.run(
+        ["git", "show", f"{base_ref}:{relative}"],
+        cwd=ROOT,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    previous = result.stdout if result.returncode == 0 else ""
+    current = path.read_text(encoding="utf-8")
+    return strip_implementation_status_callouts(previous) != strip_implementation_status_callouts(current)
+
+
 def check_changed_stock_main_flow(files: list[Path]) -> list[str]:
-    """Ratchet: existing stock flows are debt; touched use cases must replace them."""
+    """Ratchet: existing stock flows are debt; content edits must replace them."""
+    range_spec = diff_range_against_base()
     changed = set(changed_paths_against_base())
     if not changed:
         return []
@@ -199,9 +316,11 @@ def check_changed_stock_main_flow(files: list[Path]) -> list[str]:
             continue
         if TEMPLATE_MAIN_FLOW not in path.read_text(encoding="utf-8"):
             continue
+        if not changed_use_case_content_outside_status(path, range_spec):
+            continue
         rel = path.relative_to(ROOT)
         issues.append(
-            f"{rel}: changed use-case still has the stock Main flow — replace it with the real user/system flow"
+            f"{rel}: changed use-case content still has the stock Main flow — replace it with the real user/system flow"
         )
     return issues
 
@@ -273,8 +392,13 @@ def main() -> int:
 
     files = iter_use_case_files()
     issues: list[str] = []
+    changed_paths: set[Path] = set()
+    try:
+        changed_paths = set(changed_paths_against_base())
+    except RuntimeError as exc:
+        issues.append(str(exc))
     for path in files:
-        issues.extend(check_file(path))
+        issues.extend(check_file(path, strict_status=path.resolve() in changed_paths))
     try:
         issues.extend(check_changed_stock_main_flow(files))
     except RuntimeError as exc:

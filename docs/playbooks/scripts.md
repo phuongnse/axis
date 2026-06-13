@@ -8,6 +8,7 @@ Top-level maintenance scripts under `scripts/` should be Python only.
 ## Commands
 
 ```bash
+python scripts/axis.py doctor
 python scripts/axis.py verify
 python scripts/axis.py check policy-tests
 python scripts/axis.py check text-encoding

@@ -60,10 +60,13 @@ Users can create, read, update, and delete records against any model. Records ar
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** Relation display-field resolution (showing target record's display_field value instead of raw UUID) pending.
+>
+> **Deferred follow-ups:** Relation field columns display the target record's `display_field` value, not the raw UUID; if the target record was deleted, show "[Deleted record]".
+>
+> **Decisions:** N/A - no implementation-specific decision recorded for this slice.
 
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

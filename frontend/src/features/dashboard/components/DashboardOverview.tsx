@@ -1,261 +1,319 @@
-import { Activity, AlertTriangle, CheckCircle2, Database, Plus, Workflow, Zap } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import {
+  AlertCircle,
+  Building2,
+  CheckCircle2,
+  RefreshCw,
+  ShieldCheck,
+  Users,
+  Workflow,
+  Zap,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
-import { FlowTrace, type FlowTraceStep } from '@/components/visual/FlowTrace';
+import {
+  type OrganizationSettings,
+  type UsageStats,
+  useWorkspaceStart,
+} from '@/features/workspace';
 import { cn } from '@/lib/utils';
 
-const stats = [
-  {
-    labelKey: 'dashboard.stats.activeWorkflows',
-    value: '12',
-    signalKey: 'dashboard.stats.activeWorkflowsSignal',
-    tone: 'primary',
-  },
-  {
-    labelKey: 'dashboard.stats.runningExecutions',
-    value: '3',
-    signalKey: 'dashboard.stats.runningExecutionsSignal',
-    tone: 'cyan',
-  },
-  {
-    labelKey: 'dashboard.stats.pendingFormTasks',
-    value: '5',
-    signalKey: 'dashboard.stats.pendingFormTasksSignal',
-    tone: 'amber',
-  },
-  {
-    labelKey: 'dashboard.stats.recordsCreated',
-    value: '248',
-    signalKey: 'dashboard.stats.recordsCreatedSignal',
-    tone: 'coral',
-  },
-];
+interface UsageCardProps {
+  label: string;
+  value: string;
+  limit: string;
+  percent: number | null;
+  icon: LucideIcon;
+}
 
-const traceItems = [
-  {
-    labelKey: 'dashboard.trace.customerIntake',
-    metaKey: 'dashboard.trace.customerIntakeMeta',
-    state: 'complete',
-    icon: Database,
-  },
-  {
-    labelKey: 'dashboard.trace.eligibilityModel',
-    metaKey: 'dashboard.trace.eligibilityModelMeta',
-    state: 'complete',
-    icon: Workflow,
-  },
-  {
-    labelKey: 'dashboard.trace.orderProcessing',
-    metaKey: 'dashboard.trace.orderProcessingMeta',
-    state: 'active',
-    icon: Zap,
-  },
-  {
-    labelKey: 'dashboard.trace.fulfillmentSync',
-    metaKey: 'dashboard.trace.fulfillmentSyncMeta',
-    state: 'pending',
-    icon: Activity,
-  },
-] as const;
+function formatNumber(value: number | null | undefined): string {
+  return typeof value === 'number' ? new Intl.NumberFormat().format(value) : '-';
+}
 
-const modules = [
-  {
-    nameKey: 'dashboard.modules.identity',
-    stateKey: 'dashboard.modules.healthy',
-    valueKey: 'dashboard.modules.uptime',
-    tone: 'ok',
-    icon: CheckCircle2,
-  },
-  {
-    nameKey: 'dashboard.modules.dataModeling',
-    stateKey: 'dashboard.modules.syncing',
-    valueKey: 'dashboard.modules.modelCount',
-    tone: 'ok',
-    icon: Database,
-  },
-  {
-    nameKey: 'dashboard.modules.workflowEngine',
-    stateKey: 'dashboard.modules.running',
-    valueKey: 'dashboard.modules.activeCount',
-    tone: 'ok',
-    icon: Zap,
-  },
-  {
-    nameKey: 'dashboard.modules.formBuilder',
-    stateKey: 'dashboard.modules.attention',
-    valueKey: 'dashboard.modules.pendingCount',
-    tone: 'attention',
-    icon: AlertTriangle,
-  },
-];
+function formatLimit(limit: number | null | undefined, unlimitedLabel: string): string {
+  return typeof limit === 'number' ? new Intl.NumberFormat().format(limit) : unlimitedLabel;
+}
 
-const events = [
-  {
-    titleKey: 'dashboard.events.completed',
-    metaKey: 'dashboard.events.twoMinutesAgo',
-    kind: 'complete',
-  },
-  {
-    titleKey: 'dashboard.events.modelUpdated',
-    metaKey: 'dashboard.events.nineteenMinutesAgo',
-    kind: 'model',
-  },
-  {
-    titleKey: 'dashboard.events.taskAssigned',
-    metaKey: 'dashboard.events.oneHourAgo',
-    kind: 'task',
-  },
-  {
-    titleKey: 'dashboard.events.retryScheduled',
-    metaKey: 'dashboard.events.twoHoursAgo',
-    kind: 'retry',
-  },
-];
+function usagePercent(used: number | null | undefined, limit: number | null | undefined) {
+  if (typeof used !== 'number' || typeof limit !== 'number' || limit <= 0) return null;
+  return Math.min(100, Math.round((used / limit) * 100));
+}
 
-const toneClass: Record<string, string> = {
-  primary: 'bg-primary text-primary-foreground',
-  cyan: 'bg-[hsl(202_53%_43%)] text-white',
-  amber: 'bg-accent text-accent-foreground',
-  coral: 'bg-destructive text-destructive-foreground',
-};
+function usageCards(usage: UsageStats | undefined, unlimitedLabel: string): UsageCardProps[] {
+  return [
+    {
+      label: 'dashboard.usage.users',
+      value: formatNumber(usage?.usersUsed),
+      limit: formatLimit(usage?.usersLimit, unlimitedLabel),
+      percent: usagePercent(usage?.usersUsed, usage?.usersLimit),
+      icon: Users,
+    },
+    {
+      label: 'dashboard.usage.workflows',
+      value: formatNumber(usage?.workflowsUsed),
+      limit: formatLimit(usage?.workflowsLimit, unlimitedLabel),
+      percent: usagePercent(usage?.workflowsUsed, usage?.workflowsLimit),
+      icon: Workflow,
+    },
+    {
+      label: 'dashboard.usage.executions',
+      value: formatNumber(usage?.executionsUsedThisMonth),
+      limit: formatLimit(usage?.executionsPerMonthLimit, unlimitedLabel),
+      percent: usagePercent(usage?.executionsUsedThisMonth, usage?.executionsPerMonthLimit),
+      icon: Zap,
+    },
+  ];
+}
+
+function UsageCard({ label, value, limit, percent, icon: Icon }: UsageCardProps) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="rounded-lg border border-border bg-background/80 p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-medium text-foreground">{t(label)}</p>
+        <span className="inline-flex size-8 items-center justify-center rounded-md border border-primary/20 bg-primary/10 text-primary">
+          <Icon className="size-4" aria-hidden />
+        </span>
+      </div>
+      <p className="mt-4 text-2xl font-semibold text-foreground">{value}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{t('dashboard.usage.limit', { limit })}</p>
+      <progress
+        className={cn(
+          'mt-4 h-1.5 w-full overflow-hidden rounded-full bg-muted accent-primary [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-primary [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary',
+          percent === null && 'opacity-40',
+        )}
+        value={percent ?? 100}
+        max={100}
+        aria-label={t('dashboard.usage.progress', { label: t(label) })}
+      />
+    </div>
+  );
+}
+
+function WorkspaceSummary({
+  settings,
+  canReadSettings,
+  hasWorkspace,
+}: {
+  settings: OrganizationSettings | undefined;
+  canReadSettings: boolean;
+  hasWorkspace: boolean;
+}) {
+  const { t } = useTranslation();
+
+  const rows = [
+    {
+      label: t('dashboard.summary.workspace'),
+      value:
+        settings?.name ??
+        (hasWorkspace ? t('dashboard.summary.workspaceLinked') : t('dashboard.summary.none')),
+      icon: Building2,
+    },
+    {
+      label: t('dashboard.summary.status'),
+      value:
+        settings?.status ??
+        (hasWorkspace ? t('dashboard.summary.limited') : t('dashboard.summary.notLinked')),
+      icon: CheckCircle2,
+    },
+    {
+      label: t('dashboard.summary.plan'),
+      value:
+        settings?.planName ??
+        (canReadSettings ? t('dashboard.summary.loading') : t('dashboard.summary.unavailable')),
+      icon: ShieldCheck,
+    },
+  ];
+
+  return (
+    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <h2 className="text-sm font-semibold text-foreground">{t('dashboard.summary.title')}</h2>
+      <div className="mt-4 space-y-3">
+        {rows.map((row) => {
+          const Icon = row.icon;
+          return (
+            <div key={row.label} className="flex items-start gap-3">
+              <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-muted text-muted-foreground">
+                <Icon className="size-4" aria-hidden />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">{row.label}</p>
+                <p className="truncate text-sm font-medium text-foreground">{row.value}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function LoadingDashboard() {
+  return (
+    <div className="max-w-6xl space-y-6">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm sm:p-8">
+        <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+        <div className="mt-8 h-9 w-80 max-w-full animate-pulse rounded bg-muted" />
+        <div className="mt-4 h-4 w-[28rem] max-w-full animate-pulse rounded bg-muted" />
+        <div className="mt-8 grid gap-3 sm:grid-cols-3">
+          <div className="h-36 animate-pulse rounded-lg bg-muted" />
+          <div className="h-36 animate-pulse rounded-lg bg-muted" />
+          <div className="h-36 animate-pulse rounded-lg bg-muted" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ErrorDashboard({ onRetry }: { onRetry: () => void }) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="max-w-3xl rounded-lg border border-destructive/30 bg-card p-6 shadow-sm">
+      <div className="flex items-start gap-3">
+        <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-destructive/25 bg-destructive/10 text-destructive">
+          <AlertCircle className="size-4" aria-hidden />
+        </span>
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold text-foreground">{t('dashboard.errorTitle')}</h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">{t('dashboard.errorBody')}</p>
+          <Button type="button" variant="outline" className="mt-5" onClick={onRetry}>
+            <RefreshCw className="size-4" aria-hidden />
+            {t('dashboard.retry')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function DashboardOverview() {
   const { t } = useTranslation();
-  const trace: FlowTraceStep[] = traceItems.map((step) => ({
-    id: step.labelKey,
-    label: t(step.labelKey),
-    meta: t(step.metaKey),
-    state: step.state,
-    icon: step.icon,
-  }));
+  const { profileQuery, organizationSettingsQuery, canReadSettings, hasWorkspace } =
+    useWorkspaceStart();
+
+  if (profileQuery.isLoading) {
+    return <LoadingDashboard />;
+  }
+
+  if (profileQuery.isError) {
+    return <ErrorDashboard onRetry={() => void profileQuery.refetch()} />;
+  }
+
+  const profile = profileQuery.data;
+  const settings = organizationSettingsQuery.data;
+  const showUsage = hasWorkspace && canReadSettings && settings;
+  const title = settings?.name ?? t('dashboard.title');
+  const body = !hasWorkspace
+    ? t('dashboard.noWorkspaceBody', { email: profile?.email ?? t('shell.userFallback') })
+    : canReadSettings
+      ? t('dashboard.bodyWithSettings')
+      : t('dashboard.bodyLimited');
 
   return (
-    <div className="max-w-7xl space-y-6">
-      <section className="overflow-hidden rounded-lg border border-border bg-card/95 shadow-sm">
-        <div className="grid min-h-[320px] xl:grid-cols-[1.05fr_0.95fr]">
-          <div className="flex flex-col justify-between gap-8 p-6">
-            <div className="space-y-5">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="border border-primary/20 bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
-                  {t('dashboard.environment')}
+    <div className="max-w-6xl space-y-6">
+      <section className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_22rem]">
+          <div className="p-6 sm:p-8">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-md border border-primary/20 bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                {hasWorkspace ? t('dashboard.workspaceLinked') : t('dashboard.accountReady')}
+              </span>
+              {settings?.planName ? (
+                <span className="rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">
+                  {settings.planName}
                 </span>
-                <span className="border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">
-                  {t('shell.organizationName')}
-                </span>
-              </div>
-              <div className="space-y-2">
-                <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-                  {t('dashboard.title')}
-                </h1>
-                <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-                  {t('dashboard.body')}
-                </p>
-              </div>
+              ) : null}
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {stats.map((stat) => (
-                <div
-                  key={stat.labelKey}
-                  className="rounded-md border border-border bg-background/85 p-4"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs text-muted-foreground">{t(stat.labelKey)}</p>
-                    <span className={cn('size-2.5 rounded-sm', toneClass[stat.tone])} />
-                  </div>
-                  <p className="mt-3 text-2xl font-semibold text-foreground">{stat.value}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{t(stat.signalKey)}</p>
-                </div>
-              ))}
+            <div className="mt-8 max-w-3xl space-y-3">
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+                {title}
+              </h1>
+              <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{body}</p>
             </div>
           </div>
 
-          <div className="axis-grid-strong border-t border-border bg-background/80 p-6 xl:border-l xl:border-t-0">
-            <div className="mb-5 flex items-center justify-between">
+          <div className="border-t border-border bg-muted/30 p-6 sm:p-8 lg:border-l lg:border-t-0">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+              {t('dashboard.session.title')}
+            </p>
+            <div className="mt-6 space-y-4">
               <div>
-                <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                  {t('dashboard.workflowTrace')}
+                <p className="text-sm font-medium text-foreground">
+                  {profile?.fullName || profile?.email || t('shell.userFallback')}
                 </p>
-                <p className="mt-1 text-sm font-medium text-foreground">
-                  {t('dashboard.workflowName')}
+                {profile?.email ? (
+                  <p className="mt-1 text-xs text-muted-foreground">{profile.email}</p>
+                ) : null}
+              </div>
+              <div className="rounded-lg border border-border bg-background/75 p-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <CheckCircle2 className="size-4 text-primary" aria-hidden />
+                  {profile?.isActive
+                    ? t('dashboard.session.active')
+                    : t('dashboard.session.inactive')}
+                </div>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  {hasWorkspace
+                    ? t('dashboard.session.workspaceLinked')
+                    : t('dashboard.session.noWorkspace')}
                 </p>
               </div>
-              <Button variant="cta" size="sm" disabled>
-                <Plus className="size-3.5" aria-hidden />
-                {t('dashboard.newWorkflow')}
-              </Button>
             </div>
-            <FlowTrace steps={trace} />
           </div>
         </div>
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <section className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-          <div className="border-b border-border bg-muted/40 px-5 py-3">
-            <h2 className="text-sm font-medium text-foreground">{t('dashboard.moduleHealth')}</h2>
-          </div>
-          <div className="divide-y divide-border">
-            {modules.map((module) => {
-              const Icon = module.icon;
-              const attention = module.tone === 'attention';
-              return (
-                <div key={module.nameKey} className="flex items-center gap-3 px-5 py-4">
-                  <span
-                    className={cn(
-                      'inline-flex size-8 items-center justify-center rounded-md border',
-                      attention
-                        ? 'border-destructive/25 bg-destructive/10 text-destructive'
-                        : 'border-primary/20 bg-primary/10 text-primary',
-                    )}
-                  >
-                    <Icon className="size-4" aria-hidden />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-foreground">
-                      {t(module.nameKey)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{t(module.stateKey)}</p>
-                  </div>
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {t(module.valueKey)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-          <div className="border-b border-border bg-muted/40 px-5 py-3">
-            <h2 className="text-sm font-medium text-foreground">{t('dashboard.eventStream')}</h2>
-          </div>
-          <ul className="divide-y divide-border">
-            {events.map((event) => (
-              <li
-                key={event.titleKey}
-                className="grid grid-cols-[12px_1fr_auto] items-center gap-3 px-5 py-4"
+      {organizationSettingsQuery.isError ? (
+        <section className="rounded-lg border border-destructive/30 bg-card p-5 shadow-sm">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">
+                {t('dashboard.settingsErrorTitle')}
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {t('dashboard.settingsErrorBody')}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-4"
+                onClick={() => void organizationSettingsQuery.refetch()}
               >
-                <span
-                  className={cn(
-                    'size-2.5 rounded-sm',
-                    event.kind === 'complete' && 'bg-primary',
-                    event.kind === 'model' && 'bg-[hsl(202_53%_43%)]',
-                    event.kind === 'task' && 'bg-accent',
-                    event.kind === 'retry' && 'bg-destructive',
-                  )}
-                  aria-hidden
-                />
-                <span className="min-w-0 truncate text-sm text-foreground/90">
-                  {t(event.titleKey)}
-                </span>
-                <span className="text-xs text-muted-foreground">{t(event.metaKey)}</span>
-              </li>
-            ))}
-          </ul>
+                <RefreshCw className="size-3.5" aria-hidden />
+                {t('dashboard.retry')}
+              </Button>
+            </div>
+          </div>
         </section>
-      </div>
+      ) : null}
+
+      {showUsage ? (
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">
+              {t('dashboard.usage.title')}
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.usage.body')}</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {usageCards(settings.usage, t('dashboard.usage.unlimited')).map((card) => (
+              <UsageCard key={card.label} {...card} />
+            ))}
+          </div>
+        </section>
+      ) : (
+        <WorkspaceSummary
+          settings={settings}
+          canReadSettings={canReadSettings}
+          hasWorkspace={hasWorkspace}
+        />
+      )}
     </div>
   );
 }
