@@ -2,7 +2,7 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
 
-**Daily workflow.** Walk the Ready review, Docs review, and Retrospective review while implementing; run the Verification gate before push. Reflect outcomes in the [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) checkboxes. **PR description = Summary + Linked spec + Requirements only** — no review/check paste blocks, no commit list, no CI/Doc-drift status (GitHub Checks tab covers that).
+**Daily workflow.** Walk the Ready review, Docs review, and Retrospective review while implementing; run the Verification gate before marking a PR ready for review. Reflect outcomes in the [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) checkboxes. **PR description = Summary + Linked spec + Requirements only** — no review/check paste blocks, no commit list, no CI/Doc-drift status (GitHub Checks tab covers that).
 
 **Large use cases:** split into **genuinely isolated PRs** (each branch from `main`, each passing the two-sided isolation test). See [pr-slicing.md](./pr-slicing.md) — never stack slice B on slice A's branch, never claim the Verification gate is green when you did not run it, and assign one owner per shared seam.
 
@@ -60,7 +60,7 @@ Use-case files group ACs under **Happy path**, **Validation & errors**, **Edge c
 | Deferred? | `**Deferred (PR #N follow-up):**` names the **AC bullet** deferred, not a vague “later”. |
 | Out of scope? | Do not implement; do not mark ✅ as if done. |
 
-**Self-audit command** (after implementation, before push): re-read the use case in the use-case file and tick mentally each bullet against your AC map — same order as the spec (happy → validation → edge).
+**Self-audit command** (after implementation, before PR review): re-read the use case in the use-case file and tick mentally each bullet against your AC map — same order as the spec (happy → validation → edge).
 
 ### Anti-pattern: `Gaps vs spec: none` after happy path only
 
@@ -69,10 +69,10 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 | Wrong | Right |
 |-------|--------|
 | Ship the main CRUD/flow endpoints, then claim the layer ✅ | AC map row per bullet (happy, validation, edge) with file/test or explicit deferral |
-| Wait for the user to ask whether every AC is covered | Run the self-audit **before the first PR push** — that question is the agent’s job |
+| Wait for the user to ask whether every AC is covered | Run the self-audit **before the first review request** — that question is the agent’s job |
 | Fix gaps only in a follow-up commit after review | Same PR when possible; otherwise `**Deferred (PR #N):**` + **exact AC bullet text** in the feature callout |
 
-**Before push checklist (backend feature PRs):**
+**Before PR-ready checklist (backend feature PRs):**
 
 1. Re-read every in-scope `- [ ]` under the use case (all sections, not only *Happy path*).
 2. For each bullet: implemented + test, `N/A this PR — Frontend`, or named deferral.
@@ -85,7 +85,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
    - downstream dependency failure path where applicable (transport/storage/service unavailable).
    If a path does not apply to that surface, mark it `N/A` in the AC map instead of skipping it silently.
 
-**Why this matters:** "the main flow works" routinely hides missed validation, edge-case, and cross-cutting ACs — TTLs, rollback-on-failure, purge/cleanup jobs, cancel paths, isolation boundaries. These surface in spec review, not in a happy-path demo. Run the self-audit against every in-scope AC bullet **before** the first push, not after review.
+**Why this matters:** "the main flow works" routinely hides missed validation, edge-case, and cross-cutting ACs — TTLs, rollback-on-failure, purge/cleanup jobs, cancel paths, isolation boundaries. These surface in spec review, not in a happy-path demo. Run the self-audit against every in-scope AC bullet **before** the first review request, not after review.
 
 ---
 
@@ -98,7 +98,7 @@ Use the terms from [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md#enforcement-taxono
 | Item | Type | Action |
 |------|------|--------|
 | **Ready review** | Review-only | AC map + docs identified when shipping behavior |
-| **Verification gate** | Enforced | Local fast verification; CI/branch protection owns the full suite |
+| **Verification gate** | Enforced | Local ready-PR verification; CI/branch protection owns the full suite |
 | **Docs review** | Review-only | Docs walkthrough when behavior/spec/status changes |
 | **Retrospective review** | Review-only | Retrospective and REVIEW_FINDINGS update when a rule/finding repeats |
 
@@ -123,14 +123,18 @@ Use the terms from [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md#enforcement-taxono
 
 **Priority:** the Verification gate and CI-enforced checks block merge. Ready, Docs, and Retrospective reviews are review-only self-audits captured by the PR checklist.
 
-### Verification Gate — verify before push
+### Verification Gate — verify before PR review
 
-**One command:** `python scripts/axis.py verify` runs the fast local gate — build + vulnerable package scan + `dotnet format --verify` + **unit test projects only** + frontend `ci`/test + drift. It only runs the layers whose files changed (so doc-only and frontend-only work stays quick). Run `python scripts/axis.py bootstrap` once to install the committed **pre-push hook** explicitly (`core.hooksPath = scripts/hooks`); build commands must not mutate Git config. CI/branch protection remains the authoritative full gate and runs full `dotnet test` including Testcontainers before merge.
+**One command:** `python scripts/axis.py verify` runs the local ready-PR gate — build + vulnerable package scan + `dotnet format --verify` + **unit test projects only** + frontend `ci`/test + drift. It only runs the layers whose files changed (so doc-only and frontend-only work stays quick).
+
+Run `python scripts/axis.py bootstrap` once to install the committed **pre-push hook** explicitly (`core.hooksPath = scripts/hooks`); build commands must not mutate Git config. The hook runs `python scripts/axis.py pre-push`, a quick policy/doc sanity gate for ordinary network pushes. It intentionally does not run the full local Verification gate on every push. Set `AXIS_PRE_PUSH_FULL=1` when you explicitly want the hook to run `python scripts/axis.py verify` before pushing.
+
+CI/branch protection remains the authoritative full gate and runs full `dotnet test` including Testcontainers before merge.
 
 The .NET branch of `python scripts/axis.py verify` also runs the enforced
 `{Subject}_{Condition}_{ExpectedOutcome}` test-name check.
 
-**Development loop vs enforcement:** while implementing, run the narrow check for the surface you are changing; do not repeatedly run `python scripts/axis.py verify` after every small edit. The pre-push hook runs `python scripts/axis.py verify` once as the local enforcement point, and CI/branch protection runs the full suite before merge.
+**Development loop vs enforcement:** while implementing, run the narrow check for the surface you are changing; do not repeatedly run `python scripts/axis.py verify` after every small edit. The pre-push hook gives fast feedback before a network push; `python scripts/axis.py verify` is the local enforcement point before requesting review; CI/branch protection runs the full suite before merge.
 
 | During development | Prefer |
 |--------------------|--------|
@@ -138,7 +142,7 @@ The .NET branch of `python scripts/axis.py verify` also runs the enforced
 | Test change | `python scripts/axis.py check test-naming`; for project changes also run `python scripts/axis.py check test-project-classification` and `python scripts/axis.py test unit` |
 | Frontend change | `npm run ci` and/or `npm run test` |
 | Backend compile-sensitive change | `dotnet build` or the directly affected test project |
-| Review fix touching a rule/guard | The specific guard for that rule, then rely on pre-push for the full fast gate |
+| Review fix touching a rule/guard | The specific guard for that rule, then run `python scripts/axis.py verify` before requesting review |
 
 | Changed | Commands (all must pass when triggered) |
 |---------|----------------------------------------|
@@ -265,7 +269,7 @@ These expectations still matter, but do not call them CI gates unless [REVIEW_FI
 - Frontend screen → wireframe row in the owning use-case `## Wireframes` table when the screen changes.
 - Use-case diagram → row only if the `.excalidraw` lives **in that use-case folder**; link other use cases in `**Related:**` prose, not in `## Diagrams` table.
 - No test `Skip = ...`, weakened tests, or completed layer status when ACs are open. New test skips are enforced; weakened assertions/status honesty remain review-only.
-- **Full suite honesty:** local pre-push uses the fast Verification gate command matrix; CI/branch protection runs full `dotnet test Axis.sln`. If you claim the full suite ran locally, it must be full `Axis.sln` with integration/API tests, not a solution filter or unit-only run.
+- **Full suite honesty:** local `python scripts/axis.py verify` uses the ready-PR Verification gate command matrix; CI/branch protection runs full `dotnet test Axis.sln`. If you claim the full suite ran locally, it must be full `Axis.sln` with integration/API tests, not a solution filter or unit-only run.
 
 ---
 

@@ -78,7 +78,7 @@ example. Rows marked **Partial** must name the known gap. Rows marked
 
 The registry is only useful if its enforcement claims match committed repo
 wiring. Doc drift therefore checks the CI workflow, local pre-push hook,
-`scripts/axis.py verify`, analyzer settings, OpenAPI snapshot test, frontend
+`scripts/axis.py pre-push`, `scripts/axis.py verify`, analyzer settings, OpenAPI snapshot test, frontend
 API-type generation command, and solution membership for architecture tests.
 
 This audit covers committed files only. GitHub branch-protection settings live
@@ -116,7 +116,7 @@ Mechanism tiers, cheapest first: analyzer severity in [`.editorconfig`](../.edit
 | Python policy gates still fire | This file | Every PR that runs Doc drift | `python scripts/axis.py check policy-tests` | `scripts/tests/test_policy_gates.py` negative tests + CI `Doc drift` job | **Enforced** |
 | Governance owner-boundary drift | [Ownership boundaries](#ownership-boundaries) | `CLAUDE.md`, `CONTRIBUTING.md`, and PR template wording | `python scripts/axis.py check doc-drift` rejects policy command restatement and Design Gate machine-gate wording | `scripts/tests/test_policy_gates.py` negative tests scoped to entry governance docs | **Enforced** |
 | Review findings registry drift | [Rule registry contract](#rule-registry-contract) | `docs/REVIEW_FINDINGS.md` ledger rows | `python scripts/axis.py check doc-drift` validates owner, trigger, mechanism, proof/gap, and status fields | `scripts/tests/test_policy_gates.py` negative tests for missing owner/status and Partial rows without a known gap | **Enforced** |
-| Enforcement claim wiring drift | [Enforcement truth audit](#enforcement-truth-audit) | Committed CI workflow, pre-push hook, analyzer config, OpenAPI/frontend type wiring, and solution membership | `python scripts/axis.py check doc-drift` validates the wiring that registry Enforced rows rely on | `scripts/tests/test_policy_gates.py` negative tests for missing CI doc-drift, pre-push verify, analyzer warnings-as-errors, and OpenAPI CI trigger coverage | **Enforced** |
+| Enforcement claim wiring drift | [Enforcement truth audit](#enforcement-truth-audit) | Committed CI workflow, pre-push hook, analyzer config, OpenAPI/frontend type wiring, and solution membership | `python scripts/axis.py check doc-drift` validates the wiring that registry Enforced rows rely on | `scripts/tests/test_policy_gates.py` negative tests for missing CI doc-drift, pre-push quick-gate wiring, analyzer warnings-as-errors, and OpenAPI CI trigger coverage | **Enforced** |
 | Tracked text file encoding drift | [docs-style.md](./playbooks/docs-style.md) | Tracked text files | `python scripts/axis.py check text-encoding` | `scripts/tests/test_policy_gates.py` rejects BOM, CRLF, invalid UTF-8, and common mojibake markers | **Enforced** |
 | Frontend standard UI controls bypass shadcn/ui primitives | [frontend.md](./playbooks/frontend.md) | Frontend TSX outside `frontend/src/components/ui/` | `python scripts/axis.py check frontend-component-composition` rejects native `<button>`, `<input>`, `<label>`, `<select>`, and `<textarea>` outside the primitive layer | `scripts/tests/test_policy_gates.py` negative test for feature-local native controls | **Enforced** |
 | `CancellationToken` not forwarded to a callee that accepts one | [CLAUDE.md](../CLAUDE.md) | Build of `src/` or `tests/` touching async calls | `CA2016` escalated to `warning`, build fails via `TreatWarningsAsErrors` | Analyzer/compiler wiring in `.editorconfig` + `Directory.Build.props` | **Enforced** |

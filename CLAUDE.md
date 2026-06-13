@@ -63,8 +63,8 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 - Never bypass auth, skip an AC silently, or mark ✅ to avoid a hard gap.
 - Domain: zero external dependencies.
 - No implementation of a non-trivial change without producing the **Design Gate** review artifact ([design-gate.md](docs/playbooks/design-gate.md)); high-risk surfaces require user sign-off before code.
-- Never commit with a failing Verification gate; the command matrix and "full suite" honesty rules live in [agent-checklist.md](docs/playbooks/agent-checklist.md#verification-gate--verify-before-push).
-- Deterministic policy/doc checks must pass when triggered by touched paths; command ownership lives in [agent-checklist.md](docs/playbooks/agent-checklist.md#verification-gate--verify-before-push), enforcement status in [REVIEW_FINDINGS.md](docs/REVIEW_FINDINGS.md).
+- Never mark a PR ready with a failing Verification gate; the command matrix and "full suite" honesty rules live in [agent-checklist.md](docs/playbooks/agent-checklist.md#verification-gate--verify-before-pr-review).
+- Deterministic policy/doc checks must pass when triggered by touched paths; command ownership lives in [agent-checklist.md](docs/playbooks/agent-checklist.md#verification-gate--verify-before-pr-review), enforcement status in [REVIEW_FINDINGS.md](docs/REVIEW_FINDINGS.md).
 
 **P1 — confirm with user before deviating:**
 
@@ -156,7 +156,7 @@ Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, use-c
 | | .NET | Frontend |
 |---|------|----------|
 | Types | No `var` for locals (see `.editorconfig`); explicit types; keep files focused | `const`/`let`, no `var`; strict TS, no `any` |
-| Hygiene | Prefer `using` over inline FQCN; `dotnet format Axis.sln` before push (CI `--verify-no-changes`) | Biome via `npm run ci` |
+| Hygiene | Prefer `using` over inline FQCN; `dotnet format Axis.sln` before review (CI `--verify-no-changes`) | Biome via `npm run ci` |
 | Scope | Fix violation class in one PR, not one file | Feature folders; no cross-feature imports except `index.ts` |
 
 **Enforced C# rules** live in [`.editorconfig`](.editorconfig) at the repo root (naming, braces, file-scoped namespaces, analyzer severities). Do not restate style here — run `dotnet format` and follow the file. Architecture patterns: [`patterns.md`](docs/playbooks/patterns.md). Frontend: [`frontend.md`](docs/playbooks/frontend.md).
@@ -191,7 +191,7 @@ Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, use-c
 
 **Per layer / module:** all use-case callouts updated; domain README table; [`PROGRESS.md`](docs/PROGRESS.md) (layer summary only — not per-class detail).
 
-**Per PR before merge:** PR description = Summary + Linked spec + Requirements only (no CI status, no commit list — Checks tab covers that). Run the triggered Verification gate commands from [agent-checklist.md](docs/playbooks/agent-checklist.md#verification-gate--verify-before-push); CI/Doc drift enforcement status is tracked in [REVIEW_FINDINGS.md](docs/REVIEW_FINDINGS.md).
+**Per PR before merge:** PR description = Summary + Linked spec + Requirements only (no CI status, no commit list — Checks tab covers that). Run the triggered Verification gate commands from [agent-checklist.md](docs/playbooks/agent-checklist.md#verification-gate--verify-before-pr-review); CI/Doc drift enforcement status is tracked in [REVIEW_FINDINGS.md](docs/REVIEW_FINDINGS.md).
 
 Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` changes. Agents must pass [`docs/playbooks/visual-artifact-checklist.md`](docs/playbooks/visual-artifact-checklist.md) before commit.
 
