@@ -33,7 +33,7 @@ If a slice references something an **unmerged sibling owns** (a route it navigat
 | **No duplicate new files across siblings** | Adding the same new path in two open PRs is a slicing defect (add/add conflict on merge). Pick one owner. |
 | **One source for shared values/contracts** | A value or contract used by more than one slice is defined once and imported; never hardcode a second copy. |
 | **No "enable in a follow-up"** | Do not merge backend that breaks the current caller, or frontend that calls something absent on `main`. |
-| **Honest status callouts** | Update `> **Implementation status**` per slice; name intentionally-skipped bullets under `**Deferred (PR #N follow-up):**`. |
+| **Honest status callouts** | Update `> **Implementation status**` per slice; name intentionally-skipped bullets under `**Deferred follow-ups:**`. |
 | **Merge order documented + enforced** | State the order in the PR body and rebase remaining slices after **each** merge. |
 
 **Anti-pattern:** `feature-full` branched from `feature-part1` — merging "full" without "part1" breaks the tree; "full" is not isolated.
@@ -125,6 +125,6 @@ an unmerged sibling owns?
 - [ ] No route / endpoint / symbol / constant referenced that an unmerged sibling owns (or a compiling fallback is in place)
 - [ ] No new file path also added by another open PR
 - [ ] Shared values/contracts imported from their single owner, not re-hardcoded
-- [ ] Any partially-done spec bullet listed under `**Deferred (PR #N follow-up):**`
+- [ ] Any partially-done spec bullet listed under `**Deferred follow-ups:**`
 - [ ] `python scripts/axis.py check doc-drift` when `src/`, `tests/`, or `docs/use-cases/` change
 - [ ] "Verification gate green" in the PR body reflects commands you actually ran (anything skipped is stated)

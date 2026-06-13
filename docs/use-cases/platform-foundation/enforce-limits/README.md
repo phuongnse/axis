@@ -16,9 +16,9 @@ Enforce subscription plan limits at the API so that organizations cannot exceed 
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Tenant user starts an operation that consumes a plan-limited resource, such as creating a workflow, inviting a user, or starting an execution.
+2. API resolves the organization's plan and current usage from Redis, falling back to DB-backed counts when Redis is unavailable.
+3. System allows the operation when usage is within the plan limit, updates the relevant counter after the mutation, or returns HTTP 402 with limit details when the operation would exceed the plan.
 
 ## Alternate / error flows
 
@@ -46,13 +46,6 @@ Enforce subscription plan limits at the API so that organizations cannot exceed 
 *Out of scope*
 - Soft limits with grace period (allowing some overage before blocking).
 
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-
-
 > **Implementation status**
 >
 > | Layer | Status |
@@ -67,11 +60,12 @@ Enforce subscription plan limits at the API so that organizations cannot exceed 
 >
 > **Done (backend):** 402 on workflow/user/execution limits; Redis read-through + INCR/DECR; DB fallback; delete workflow decrements counter.
 >
-> **Deferred (PR #N follow-up):** execution counter race; fail-closed Redis for usage reads.
+> **Deferred follow-ups:** execution counter race; fail-closed Redis for usage reads.
+>
+> **Decisions:** Redis failure currently falls back to DB count + warning instead of failing closed; this keeps local/dev availability while the fail-closed production policy is unresolved.
 
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

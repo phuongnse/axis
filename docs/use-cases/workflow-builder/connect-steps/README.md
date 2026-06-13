@@ -61,7 +61,9 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 > - canvas edge drawing and cycle-block toast pending Frontend
 > - condition step label enforcement on connection pending Frontend.
 >
-> **Deferred:** Animated transitions showing flow direction — static arrows only.
+> **Deferred follow-ups:** Animated transitions showing flow direction — static arrows only.
+>
+> **Decisions:** Transitions remain static arrows for the current builder scope; animated direction is decorative and deferred until the core canvas UX is usable.
 
 ## Wireframes
 

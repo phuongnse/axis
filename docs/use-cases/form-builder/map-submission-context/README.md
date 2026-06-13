@@ -56,11 +56,18 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** context variable population after submission and context variable picker pending workflow-engine.
+> **Gaps vs spec:**
+> - Execution context stores all submitted field values under `{{context.{step_id}.{field_key}}}` automatically.
+> - Subsequent step config panels show the Form step's output fields and types in the context variable picker.
+>
+> **Deferred follow-ups:**
+> - WorkflowEngine context namespace population for submitted Form step values.
+> - Frontend context variable picker entries for Form step output fields.
+>
+> **Decisions:** N/A - no implementation-specific decision recorded for this slice.
 
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

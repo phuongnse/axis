@@ -10,15 +10,66 @@ The full dev stack runs from one `docker compose up -d`: **Postgres**, **Redis**
 
 ## Prerequisites
 
+- **Python 3** - repo maintenance commands run through `python scripts/axis.py ...`.
+  If a shell cannot resolve `python`, fix PATH before using repo scripts.
 - **Docker** — Docker Engine + Compose v2.
   - **Linux / macOS:** run commands from the repo root.
   - **Windows:** use the Docker endpoint available to your shell when `docker info` works. If it does not, but Docker Engine lives inside WSL2, run compose commands from WSL (`wsl -- bash -lc "cd /path/to/axis && …"`) or open a WSL shell and `cd` there.
+- **Windows PowerShell:** prefer `npm.cmd` over `npm` when execution policy blocks
+  `npm.ps1`.
 - Host ports free (default compose bindings):
 
   `3000`, `5280`, `5432`, `6379`, `1025`, `1080`, `4566`, `29092`, `8081`, `5672`, `15672`, `8200`
 
   Optional observability profile also uses `3001`, `4317`, `4318` — see [Observability (optional)](#observability-optional).
 - Do not run a host-side `dotnet build` against `src/` while the API container is up (they fight over `bin/obj`).
+
+---
+
+## One-time environment doctor
+
+Run the doctor before debugging local stack issues:
+
+```bash
+python scripts/axis.py doctor
+```
+
+It checks the repo root, Python launcher, Git, .NET SDK, Node, npm, Docker CLI,
+Docker Compose, the active Docker endpoint, WSL Docker, and the common WSL2 TCP
+daemon endpoint at `127.0.0.1:2375`.
+
+Use strict mode when you want the command to fail on blocking local-dev issues:
+
+```bash
+python scripts/axis.py doctor --strict
+```
+
+Windows with Docker Engine inside WSL2 usually needs one of these paths:
+
+```powershell
+# Current shell only
+$env:DOCKER_HOST = "tcp://127.0.0.1:2375"
+
+# Persist for future PowerShell sessions
+[Environment]::SetEnvironmentVariable("DOCKER_HOST", "tcp://127.0.0.1:2375", "User")
+```
+
+Only expose the Docker TCP daemon on `127.0.0.1`; do not bind it to a public
+interface.
+
+If Docker works in WSL but not in PowerShell, run compose through WSL:
+
+```powershell
+wsl.exe bash -lc "cd /path/to/axis && docker compose up -d"
+```
+
+If PowerShell blocks `npm.ps1`, use `npm.cmd`:
+
+```powershell
+cd frontend
+npm.cmd run ci
+npm.cmd run test
+```
 
 ---
 
@@ -33,7 +84,7 @@ docker compose up -d
 **Windows (WSL)** — same command inside WSL:
 
 ```powershell
-wsl -- bash -lc "cd /mnt/d/projects/axis && docker compose up -d"
+wsl -- bash -lc "cd /path/to/axis && docker compose up -d"
 ```
 
 First boot:
@@ -208,6 +259,7 @@ docker compose up -d
 | File | Role |
 |---|---|
 | [`docker-compose.yml`](../../docker-compose.yml) | Service graph, env vars, volumes, healthchecks — **port source of truth** |
+| `python scripts/axis.py doctor` | Local environment diagnostics for PATH, Docker, WSL, and npm shell issues |
 | `python scripts/axis.py check local-dev-docs` | CI/doc drift: verifies this file matches compose |
 | [`Dockerfile`](../../Dockerfile) | Production API image (not used by default compose dev) |
 | [`frontend/Dockerfile.dev`](../../frontend/Dockerfile.dev) | Node + Vite dev image |

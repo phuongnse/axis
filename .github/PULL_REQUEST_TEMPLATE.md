@@ -10,7 +10,7 @@
 
 <!-- Most important first. Tick what applies; mark N/A with a short reason. Order matches the review/check flow in docs/playbooks/agent-checklist.md. -->
 
-- [ ] **Spec → code** — changes match use-case file ACs (or gaps documented in `> **Implementation status**` callouts; deferred items have `**Deferred (PR #N follow-up):**` lines)
+- [ ] **Spec → code** — changes match use-case file ACs (or gaps documented in `> **Implementation status**` callouts; deferred items have `**Deferred follow-ups:**` lines)
 - [ ] **Ready review** — AC map complete; use-case/domain docs identified (when shipping behavior)
 - [ ] **Path coverage matrix** — for each touched implementation surface, happy/validation/auth/isolation/dependency paths are tested or explicitly marked `N/A` (see `docs/playbooks/agent-checklist.md` § AC coverage)
 - [ ] **Verification gate** — triggered checks from `docs/playbooks/agent-checklist.md` ran green for paths touched; CI full-gate expectations followed (N/A with reason)

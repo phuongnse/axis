@@ -58,13 +58,21 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** 
+> **Gaps vs spec:**
+> - Frontend: "My Tasks" page lists pending Form Tasks assigned to the current user.
+> - Frontend: each task shows form name, workflow name, assigned at, timeout/due time, and a direct link.
+> - Frontend: completed and expired task tabs are not shipped yet.
+> - WorkflowEngine/FormBuilder: tasks assigned by role appear for role members.
+> - WorkflowEngine/FormBuilder: a task submitted by another role member disappears within 60 seconds via polling or SignalR push.
 >
-> **Done:** `GetMyFormTasksQuery` + authenticated list endpoints. Role-assigned task aggregation (not only direct assignee), SignalR push, and "My Tasks" UI pending Frontend + workflow-engine.
+> **Done:** `GetMyFormTasksQuery` + authenticated list endpoints.
+>
+> **Deferred follow-ups:** none; unresolved work is tracked in Gaps vs spec.
+>
+> **Decisions:** N/A - no implementation-specific decision recorded for this slice.
 
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

@@ -57,7 +57,7 @@ Use-case files group ACs under **Happy path**, **Validation & errors**, **Edge c
 |-------|--------|
 | Map complete? | Every in-scope AC row has code + test (or explicit deferral). |
 | Callout honest? | `> **Implementation status**` lists remaining bullets under `Gaps vs spec` — never ✅ on a layer with open backend gaps. |
-| Deferred? | `**Deferred (PR #N follow-up):**` names the **AC bullet** deferred, not a vague “later”. |
+| Deferred? | `**Deferred follow-ups:**` names the **AC bullet** deferred, not a vague “later”. |
 | Out of scope? | Do not implement; do not mark ✅ as if done. |
 
 **Self-audit command** (after implementation, before PR review): re-read the use case in the use-case file and tick mentally each bullet against your AC map — same order as the spec (happy → validation → edge).
@@ -70,7 +70,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
 |-------|--------|
 | Ship the main CRUD/flow endpoints, then claim the layer ✅ | AC map row per bullet (happy, validation, edge) with file/test or explicit deferral |
 | Wait for the user to ask whether every AC is covered | Run the self-audit **before the first review request** — that question is the agent’s job |
-| Fix gaps only in a follow-up commit after review | Same PR when possible; otherwise `**Deferred (PR #N):**` + **exact AC bullet text** in the feature callout |
+| Fix gaps only in a follow-up commit after review | Same PR when possible; otherwise `**Deferred follow-ups:**` + **exact AC bullet text** in the feature callout |
 
 **Before PR-ready checklist (backend feature PRs):**
 
@@ -190,12 +190,12 @@ Docs review:
 - Program.cs host → patterns.md host section / not triggered
 - Stale code comment → same file / not triggered
 - Library rename → grep docs/ + src comments / not triggered
-- Deferred follow-up → `**Deferred (PR #N follow-up):**` on affected US + PROGRESS if cross-cutting / not triggered
+- Deferred follow-up → `**Deferred follow-ups:**` on affected US + PROGRESS if cross-cutting / not triggered
 - Host wiring (`*Endpoints.cs` / `Program.cs`) → `Map*Endpoints` sweep in process.md / not triggered
 - Repo layout (module, event, proto, domain README) → [repo-layout-discovery.md](./repo-layout-discovery.md) checklists A–E / not triggered
 ```
 
-**Deferred follow-ups (mandatory when leaving work open):** do not wait for the user. Any skipped review item, thin-endpoint refactor, or partial layer needs a named `**Deferred (...):**` line — full rules in [process.md § Deferred follow-up](process.md). Remove the line when fixed.
+**Deferred follow-ups (mandatory when leaving work open):** do not wait for the user. Any skipped review item, thin-endpoint refactor, or partial layer needs a named `**Deferred follow-ups:**` line — full rules in [process.md § Deferred follow-up](process.md). Remove the line when fixed.
 
 ### Review feedback (CodeRabbit / human)
 
@@ -205,7 +205,7 @@ Do **not** ship the first diff that only makes CI green or closes the thread. Fo
 
 1. **Is this already best practice** for this codebase (patterns, layer boundaries, siblings in the same module)?
 2. **Can I improve or enhance** beyond what the reviewer suggested (clearer ownership, fewer round-trips, one transaction boundary, consistent error handling)?
-3. If a better design is feasible but skipped, is that a deliberate **minimal diff** (user asked) or should it be **`**Deferred (...):**`**?
+3. If a better design is feasible but skipped, is that a deliberate **minimal diff** (user asked) or should it be **`**Deferred follow-ups:**`**?
 
 **Default:** prefer the design you would defend in review. **Exception:** user explicitly requests the smallest change — say so in the PR Summary.
 
@@ -248,7 +248,7 @@ Never ✅ and "pending …" in the same callout. Checkboxes in use-case files ar
 
 | Level | When | What to write |
 |-------|------|----------------|
-| **1 — Use case** | Any layer progress on a use case | `> **Implementation status**`, `Gaps vs spec`, optional `**Deferred (PR #N follow-up):**` in `docs/use-cases/{domain}/*.md` |
+| **1 — Use case** | Any layer progress on a use case | `> **Implementation status**`, `Gaps vs spec`, optional `**Deferred follow-ups:**` in `docs/use-cases/{domain}/*.md` |
 | **2 — Domain** | A layer is complete for the module | Domain `README.md` implementation table + **Open work (agents)** section (remove or reword items you closed) |
 | **3 — Platform** | Module-wide summary changed | `docs/PROGRESS.md` — layer status only |
 

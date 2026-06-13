@@ -80,6 +80,12 @@ def check_local_dev_doc() -> list[str]:
 
     doc_lower = doc.lower()
 
+    if "scripts/axis.py doctor" not in doc:
+        errors.append("local-dev.md should document the local environment doctor command")
+
+    if "npm.cmd" not in doc:
+        errors.append("local-dev.md should document using npm.cmd from Windows PowerShell")
+
     for host_port in sorted(mandatory_host_ports(services, optional)):
         if str(host_port) not in doc:
             errors.append(
