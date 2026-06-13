@@ -25,7 +25,7 @@ IMPLEMENTATION_STATUS_REQUIRED_MARKERS = (
     ("> **Deferred follow-ups:**", "deferred follow-ups"),
     ("> **Decisions:**", "decisions"),
 )
-LEGACY_DEFERRED_STATUS_RE = re.compile(r"^> \*\*Deferred(?: \([^)]*\))?:\*\*", re.MULTILINE)
+LEGACY_DEFERRED_INLINE_RE = re.compile(r"\*\*Deferred(?: \([^)]*\))?:\*\*")
 PENDING_STATUS_CODEPOINTS = {0x23F3, 0x26A0}
 GENERIC_STATUS_PROSE = (
     "Open work remains in layers marked pending above.",
@@ -124,6 +124,9 @@ def check_file(path: Path, *, strict_status: bool = True) -> list[str]:
         if heading not in text:
             issues.append(f"{rel}: missing required heading `{heading}`")
 
+    if LEGACY_DEFERRED_INLINE_RE.search(text):
+        issues.append(f"{rel}: legacy Deferred status heading found - use `Deferred follow-ups`")
+
     has_purpose = "## Purpose" in text
     has_actor = "## Primary actor" in text
     has_trigger = "## Trigger" in text
@@ -170,12 +173,11 @@ def check_file(path: Path, *, strict_status: bool = True) -> list[str]:
     callout = implementation_status_callout(text)
     if not callout:
         issues.append(f"{rel}: missing implementation status callout")
-    elif strict_status:
+
+    if callout and strict_status:
         for marker, label in IMPLEMENTATION_STATUS_REQUIRED_MARKERS:
             if marker not in callout:
                 issues.append(f"{rel}: missing implementation status {label} section")
-        if LEGACY_DEFERRED_STATUS_RE.search(callout):
-            issues.append(f"{rel}: legacy Deferred status heading found - use `Deferred follow-ups`")
         for marker, label in IMPLEMENTATION_STATUS_REQUIRED_MARKERS:
             content = callout_section_content(callout, marker)
             if not content:

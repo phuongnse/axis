@@ -57,7 +57,7 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 >
 > **Gaps vs spec:** canvas/list UI only (backend).
 >
-> **Deferred:** Workflow templates / starter library.
+> **Deferred follow-ups:** Workflow templates / starter library.
 >
 > **Done:** HTTP 402 on create when workflow plan limit reached (`CreateWorkflowHandler` + platform-foundation subscription plans).
 >

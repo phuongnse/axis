@@ -200,6 +200,59 @@ Ship user value.
         self.assertIn("missing implementation status deferred follow-ups section", joined)
         self.assertIn("legacy Deferred status heading found", joined)
 
+    def test_rejects_legacy_deferred_heading_even_when_status_is_not_strict(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = root / "docs" / "use-cases" / "example" / "sample" / "README.md"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                """# Sample use case
+
+## Purpose
+
+Ship user value.
+
+## Primary actor
+
+- User
+
+## Trigger
+
+- User starts the flow.
+
+## Main flow
+
+1. User starts.
+
+## Alternate / error flows
+
+- None.
+
+## Acceptance Criteria
+
+- [ ] Works.
+
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| N/A | N/A | N/A |
+
+> **Implementation status**
+>
+> **Deferred:** legacy wording.
+""",
+                encoding="utf-8",
+            )
+            original_root = check_use_case_docs.ROOT
+            check_use_case_docs.ROOT = root
+            try:
+                issues = check_use_case_docs.check_file(path, strict_status=False)
+            finally:
+                check_use_case_docs.ROOT = original_root
+
+        self.assertIn("legacy Deferred status heading found", "\n".join(issues))
+
     def test_rejects_pending_layer_with_empty_gap_and_deferred_status(self) -> None:
         issues = self.issues_for_use_case(
             """> **Implementation status**

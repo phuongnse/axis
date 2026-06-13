@@ -63,7 +63,7 @@ Organization admins can invite new members, manage their accounts, and deactivat
 >
 > **Gaps vs spec:** Admin self-invite check not implemented (compare invite email to `ICurrentUser` email).
 >
-> **Deferred:** Bulk invitation via CSV upload.
+> **Deferred follow-ups:** Bulk invitation via CSV upload.
 >
 > **Done:** HTTP 402 when user plan limit reached (`InviteUserHandler`, platform-foundation subscription plans).
 >

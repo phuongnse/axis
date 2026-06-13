@@ -4,6 +4,8 @@
 
 Use cases are the user-facing source of truth for behavior. **One markdown file = one use case** (flow, AC, wireframes, diagrams, implementation status). Domain `README.md` indexes all use cases in that area.
 
+Create a full use-case README only when the work is shipped, being implemented, or being specified for the next concrete slice. Distant product ideas belong in a lightweight roadmap/open-work note until they are ready for doc-first implementation. The checker rejects new/touched placeholder sections and stock Main flow text, so a committed use-case file must describe real behavior rather than act as a blank reservation.
+
 ---
 
 ## How agents find open work

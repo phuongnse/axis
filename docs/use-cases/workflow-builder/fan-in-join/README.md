@@ -59,7 +59,9 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 >
 > **Gaps vs spec:** AND/OR join execution, branch cancellation, and grace period pending workflow-engine.
 >
-> **Deferred:** "Wait for N of M" join type (e.g., wait for 2 of 3 branches).
+> **Deferred follow-ups:** "Wait for N of M" join type (e.g., wait for 2 of 3 branches).
+>
+> **Decisions:** Initial join semantics stay binary (`all`/`any`) so execution can be made correct before adding quorum joins.
 
 ## Wireframes
 

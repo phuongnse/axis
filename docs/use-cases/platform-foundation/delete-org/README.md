@@ -61,15 +61,19 @@ Allow organization admins to manage their organization's profile, settings, and 
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Deferred:**
-> - marketing-page redirect + forced sign-out after schedule (Frontend/session)
-> - abandon in-flight Wolverine step dispatch beyond execution + form-task cancel
+> **Gaps vs spec:**
+> - Frontend: marketing-page redirect + forced sign-out after schedule.
+> - Infrastructure: abandon in-flight Wolverine step dispatch beyond execution + form-task cancel.
+>
+> **Deferred follow-ups:**
 > - cross-module hard-delete steps via RabbitMQ commands when modules are extracted (see `docs/WORKAROUNDS.md#org-hard-delete-modulith-cancellers`).
 >
 > **Done:**
 > - schedule rollback when job queue fails
 > - hard-delete cancels executions + pending form tasks, drops tenant schemas, deletes logo S3 object, purges Identity platform rows (users, roles, invitations, provisioning)
 > - login returns org-not-found when org row removed.
+>
+> **Decisions:** Hard delete uses in-process modulith cancellers until modules are extracted; cross-module RabbitMQ hard-delete commands are deferred to the extraction boundary.
 
 ## Wireframes
 
