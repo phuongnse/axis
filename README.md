@@ -1,8 +1,8 @@
 # Axis
 
-Axis helps teams turn spreadsheet-heavy operations, email approvals, and one-off internal tools into governed business applications.
+Axis turns evolving business processes into governed, data-driven applications without requiring every change to become a custom software project.
 
-Teams can model the data behind their work, automate the handoffs around it, capture inputs through forms, and publish role-based pages without turning every process change into a software project.
+It brings data modeling, workflow logic, input capture, and role-based experiences into one low-code foundation, so applications can adapt as the business changes while staying consistent, auditable, and reusable.
 
 ## Quick links
 
