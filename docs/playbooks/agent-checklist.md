@@ -17,6 +17,7 @@ The paste-block templates below are for *your own* walk-through (agent reasoning
 - Read: domain README → use-case file → same-module code
 - Skim [`docs/WORKAROUNDS.md`](../WORKAROUNDS.md) for entries touching the same files/modules — known shortcuts may explain surprising code
 - Before API layer: `grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/use-cases/` — fix, defer with reason, or stop
+- If the use case crosses the SPA/API boundary or depends on local-dev services (auth, email, provisioning, storage, Redis, Kafka, RabbitMQ, MailDev), start the Docker local-dev stack from [local-dev.md](./local-dev.md) during Ready review and include a smoke path in the plan. Do not wait until PR wrap-up to discover compose-only failures.
 - End of PR: [process.md § PR wrap-up](process.md) — deferred lines, host wiring, callouts (no user reminder)
 
 ```markdown
@@ -50,6 +51,7 @@ Use-case files group ACs under **Happy path**, **Validation & errors**, **Edge c
 
 - [process.md § Per use case workflow](./process.md#per-use-case-workflow): Domain → Application → Infrastructure → API; tests green per layer before the next.
 - [testing.md § Required test coverage](./testing.md#required-test-coverage-for-integration-tests): integration tests need happy path **and** not-found/isolation **and** constraint violations where applicable — not one happy test per handler.
+- **Docker local-dev smoke:** when triggered by the Ready-review rule above, run the relevant end-to-end path through compose early enough to influence implementation. Minimum evidence is API `/health` + `/health/ready`, the SPA route or API endpoint under test, and the observable dependency effect (for example MailDev email, provisioning status, queue/topic side effect, or stored object). If host-side `.NET` build/test must run afterward, stop `api`/`web` first to avoid `dotnet watch` and host builds competing over `bin/obj`.
 
 **Before opening / updating the PR:**
 
@@ -163,6 +165,7 @@ Verification gate self-check:
 - unit test projects → ran / not triggered (reason)
 - dotnet format --verify-no-changes → ran / not triggered (reason)
 - npm run ci + npm run test → ran / not triggered (reason)
+- docker local-dev smoke → ran / not triggered (reason)
 - policy gate tests → ran / not triggered (reason)
 - python scripts/axis.py check text-encoding → ran / not triggered (reason)
 - python scripts/axis.py check doc-drift → ran / not triggered (reason)
