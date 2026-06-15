@@ -1,8 +1,8 @@
 # Axis
 
-Axis is a multi-tenant low-code SaaS platform for building data-driven workflow applications without end-user coding.
+Axis helps teams turn spreadsheet-heavy operations, email approvals, and one-off internal tools into governed business applications.
 
-At a high level, teams can model data, design workflows, collect inputs with forms, and expose experiences through UI pages.
+Teams can model the data behind their work, automate the handoffs around it, capture inputs through forms, and publish role-based pages without turning every process change into a software project.
 
 ## Quick links
 
@@ -32,4 +32,3 @@ Then open:
 
 For full local-dev operations, ports, troubleshooting, and observability profile, see:
 [docs/playbooks/local-dev.md](./docs/playbooks/local-dev.md)
-
