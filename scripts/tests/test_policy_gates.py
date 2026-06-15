@@ -6,6 +6,7 @@ import io
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -29,6 +30,7 @@ def load_script(script_name: str):
 
 
 check_pr = load_script("check-pr.py")
+check_use_case_docs = load_script("check-use-case-docs.py")
 
 
 class TestTestNamingGate(unittest.TestCase):
@@ -102,6 +104,316 @@ docs/use-cases/example/README.md
         self.assertEqual([], check_pr.validate("feat(example): improve gates", body))
 
 
+class TestUseCaseDocsGate(unittest.TestCase):
+    def issues_for_use_case(self, callout: str) -> list[str]:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = root / "docs" / "use-cases" / "example" / "sample" / "README.md"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                """# Sample use case
+
+## Purpose
+
+Ship user value.
+
+## Primary actor
+
+- User
+
+## Trigger
+
+- User starts the flow.
+
+## Main flow
+
+1. User starts.
+2. System responds.
+3. User completes the flow.
+
+## Alternate / error flows
+
+- None.
+
+## Acceptance Criteria
+
+*Happy path*
+- [ ] Works.
+
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| N/A | N/A | N/A |
+
+"""
+                + callout,
+                encoding="utf-8",
+            )
+            original_root = check_use_case_docs.ROOT
+            check_use_case_docs.ROOT = root
+            try:
+                return check_use_case_docs.check_file(path)
+            finally:
+                check_use_case_docs.ROOT = original_root
+
+    def test_rejects_missing_deferred_followups(self) -> None:
+        issues = self.issues_for_use_case(
+            """> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertIn("missing implementation status deferred follow-ups section", "\n".join(issues))
+
+    def test_rejects_legacy_deferred_heading(self) -> None:
+        issues = self.issues_for_use_case(
+            """> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred:** legacy wording.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("missing implementation status deferred follow-ups section", joined)
+        self.assertIn("legacy Deferred status heading found", joined)
+
+    def test_rejects_legacy_deferred_heading_even_when_status_is_not_strict(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = root / "docs" / "use-cases" / "example" / "sample" / "README.md"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                """# Sample use case
+
+## Purpose
+
+Ship user value.
+
+## Primary actor
+
+- User
+
+## Trigger
+
+- User starts the flow.
+
+## Main flow
+
+1. User starts.
+
+## Alternate / error flows
+
+- None.
+
+## Acceptance Criteria
+
+- [ ] Works.
+
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| N/A | N/A | N/A |
+
+> **Implementation status**
+>
+> **Deferred:** legacy wording.
+""",
+                encoding="utf-8",
+            )
+            original_root = check_use_case_docs.ROOT
+            check_use_case_docs.ROOT = root
+            try:
+                issues = check_use_case_docs.check_file(path, strict_status=False)
+            finally:
+                check_use_case_docs.ROOT = original_root
+
+        self.assertIn("legacy Deferred status heading found", "\n".join(issues))
+
+    def test_rejects_pending_layer_with_empty_gap_and_deferred_status(self) -> None:
+        issues = self.issues_for_use_case(
+            """> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | \u23f3 |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("pending layer cannot use `Gaps vs spec: none`", joined)
+
+    def test_rejects_generic_status_placeholder_prose(self) -> None:
+        issues = self.issues_for_use_case(
+            """> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | \u23f3 |
+>
+> **Gaps vs spec:** Open work remains in layers marked pending above.
+>
+> **Deferred follow-ups:** Complete the open items listed in Gaps vs spec before marking this use case complete.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("implementation status gaps vs spec uses generic placeholder prose", joined)
+        self.assertIn("implementation status deferred follow-ups uses generic placeholder prose", joined)
+
+    def test_rejects_empty_status_sections(self) -> None:
+        issues = self.issues_for_use_case(
+            """> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:**
+>
+> **Deferred follow-ups:**
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("implementation status gaps vs spec section is empty", joined)
+        self.assertIn("implementation status deferred follow-ups section is empty", joined)
+
+    def test_accepts_required_implementation_status_sections(self) -> None:
+        issues = self.issues_for_use_case(
+            """> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertEqual([], issues)
+
+    def test_strips_implementation_status_for_stock_flow_ratchet(self) -> None:
+        before = """# Sample
+
+## Main flow
+
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
+
+> **Implementation status**
+>
+> **Gaps vs spec:** old.
+
+## Wireframes
+"""
+        after = before.replace("> **Gaps vs spec:** old.", "> **Gaps vs spec:** new.\n>\n> **Deferred follow-ups:** N/A.")
+
+        self.assertEqual(
+            check_use_case_docs.strip_implementation_status_callouts(before),
+            check_use_case_docs.strip_implementation_status_callouts(after),
+        )
+
+    def test_changed_content_outside_status_uses_merge_base_for_three_dot_range(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = root / "docs" / "use-cases" / "example" / "sample" / "README.md"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            current = """# Sample
+
+## Main flow
+
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
+
+> **Implementation status**
+>
+> **Gaps vs spec:** new.
+"""
+            previous = current.replace("> **Gaps vs spec:** new.", "> **Gaps vs spec:** old.")
+            path.write_text(current, encoding="utf-8")
+            calls: list[list[str]] = []
+
+            def fake_run(args: list[str], **_kwargs):
+                calls.append(args)
+                if args[:2] == ["git", "merge-base"]:
+                    return check_use_case_docs.subprocess.CompletedProcess(args, 0, stdout="abc123\n")
+                if args[:2] == ["git", "show"]:
+                    self.assertEqual(args[2], "abc123:docs/use-cases/example/sample/README.md")
+                    return check_use_case_docs.subprocess.CompletedProcess(args, 0, stdout=previous)
+                raise AssertionError(f"unexpected subprocess call: {args}")
+
+            original_root = check_use_case_docs.ROOT
+            check_use_case_docs.ROOT = root
+            try:
+                with mock.patch.object(check_use_case_docs.subprocess, "run", side_effect=fake_run):
+                    changed = check_use_case_docs.changed_use_case_content_outside_status(
+                        path,
+                        "origin/main...HEAD",
+                    )
+            finally:
+                check_use_case_docs.ROOT = original_root
+
+        self.assertFalse(changed)
+        self.assertIn(["git", "merge-base", "origin/main", "HEAD"], calls)
+
+
 class TestDocDriftRatchets(unittest.TestCase):
     def issue_text(self, rows: list[tuple[str, str]]) -> str:
         return "\n".join(axis.doc_drift_added_line_issues(rows))
@@ -120,6 +432,18 @@ class TestDocDriftRatchets(unittest.TestCase):
 
     def test_ignores_todo_in_docs(self) -> None:
         issues = axis.doc_drift_added_line_issues([("docs/example.md", "TODO in docs is not this gate")])
+        self.assertEqual([], issues)
+
+    def test_rejects_machine_specific_paths_in_docs(self) -> None:
+        issues = self.issue_text([("docs/playbooks/local-dev.md", "cd /mnt/d/projects/axis && docker compose up -d")])
+        self.assertIn("Machine-specific local path introduced", issues)
+
+    def test_rejects_windows_user_paths_in_docs(self) -> None:
+        issues = self.issue_text([("docs/playbooks/local-dev.md", r"C:\Users\phuon\AppData\Local")])
+        self.assertIn("Machine-specific local path introduced", issues)
+
+    def test_accepts_placeholder_paths_in_docs(self) -> None:
+        issues = axis.doc_drift_added_line_issues([("docs/playbooks/local-dev.md", "cd /path/to/axis && docker compose up -d")])
         self.assertEqual([], issues)
 
 
@@ -431,7 +755,7 @@ class TestGovernanceOwnerBoundary(unittest.TestCase):
 
     def test_rejects_policy_command_restatement_in_entry_docs(self) -> None:
         issues = self.issues_for_doc(
-            "CLAUDE.md",
+            "AGENTS.md",
             "Run `python scripts/axis.py check policy-tests` before push.\n",
         )
 
@@ -449,7 +773,7 @@ class TestGovernanceOwnerBoundary(unittest.TestCase):
 
     def test_allows_design_gate_review_artifact_wording(self) -> None:
         issues = self.issues_for_doc(
-            "CLAUDE.md",
+            "AGENTS.md",
             "Design Gate is a required review artifact, not a machine-enforced CI gate.\n",
         )
 

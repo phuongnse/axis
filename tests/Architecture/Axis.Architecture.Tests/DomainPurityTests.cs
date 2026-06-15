@@ -5,7 +5,7 @@ using NetArchTest.Rules;
 namespace Axis.Architecture.Tests;
 
 /// <summary>
-/// Enforces CLAUDE.md P0 rule: <c>Domain: zero external dependencies</c>.
+/// Enforces AGENTS.md P0 rule: <c>Domain: zero external dependencies</c>.
 /// Domain projects must contain only entities, value objects, domain events,
 /// and pure C# — no EF Core, MediatR, Wolverine, ASP.NET, MailKit, AWS SDK,
 /// gRPC, Confluent, or any infrastructure namespace.
@@ -15,7 +15,7 @@ public class DomainPurityTests
     /// <summary>
     /// Infrastructure namespaces that must NEVER appear in any Domain assembly.
     /// Add new bans here when a new infra concern arrives; never narrow this list
-    /// without updating CLAUDE.md.
+    /// without updating AGENTS.md.
     /// </summary>
     private static readonly string[] BannedNamespaces =
     [
@@ -53,7 +53,7 @@ public class DomainPurityTests
             .GetResult();
 
         result.IsSuccessful.Should().BeTrue(
-            $"Axis.{module}.Domain must not depend on infrastructure namespaces (CLAUDE.md P0). " +
+            $"Axis.{module}.Domain must not depend on infrastructure namespaces (AGENTS.md P0). " +
             $"Offending types: {FormatFailingTypes(result)}");
     }
 
@@ -69,7 +69,7 @@ public class DomainPurityTests
             .GetResult();
 
         result.IsSuccessful.Should().BeTrue(
-            "Axis.Shared.Domain must not depend on infrastructure namespaces (ADR-017 + CLAUDE.md P0). " +
+            "Axis.Shared.Domain must not depend on infrastructure namespaces (ADR-017 + AGENTS.md P0). " +
             $"Offending types: {FormatFailingTypes(result)}");
     }
 

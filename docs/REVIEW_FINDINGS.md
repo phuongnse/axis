@@ -1,6 +1,6 @@
 # Review findings
 
-> **Navigation**: [<- docs/README.md](./README.md) . [<- CLAUDE.md](../CLAUDE.md)
+> **Navigation**: [<- docs/README.md](./README.md) . [<- AGENTS.md](../AGENTS.md)
 
 Recurring review finding classes and how each is prevented. A finding class
 should be explained once; after that it is either mechanized, kept explicitly
@@ -23,7 +23,7 @@ Use these labels consistently in docs, PR templates, and review comments:
 | **Guidance** | Useful convention or example, but not a defect class. | "prefer", "pattern", "example" |
 | **Not a rule** | Deliberately not enforced or reviewed. | Avoid rule language |
 
-P0/P1/P2 in [`CLAUDE.md`](../CLAUDE.md) describe severity and escalation, not
+P0/P1/P2 in [`AGENTS.md`](../AGENTS.md) describe severity and escalation, not
 automation. A P0 can still be **Review-only** if CI cannot decide it without
 intent. Conversely, a low-severity convention can be **Enforced** if a cheap,
 deterministic check exists. Use this file to decide wording before adding
@@ -41,7 +41,7 @@ Avoid duplicating rule text across docs. Each surface has one job:
 
 | Surface | Owns | Does not own |
 |---|---|---|
-| [`CLAUDE.md`](../CLAUDE.md) | Severity, architecture stops, escalation rules | Command matrices, proof that a rule is enforced |
+| [`AGENTS.md`](../AGENTS.md) | Severity, architecture stops, escalation rules | Command matrices, proof that a rule is enforced |
 | [`agent-checklist.md`](./playbooks/agent-checklist.md) | Workflow, AC/path coverage, Verification gate command matrix | Reclassifying review-only checks as gates |
 | This file | Enforcement status, known gaps, repeat finding classes, rule registry rows | Feature specs or implementation patterns |
 | [`WORKAROUNDS.md`](./WORKAROUNDS.md) | Intentional P0/P1 violations and cleanup triggers | General lessons or resolved history |
@@ -114,24 +114,24 @@ Mechanism tiers, cheapest first: analyzer severity in [`.editorconfig`](../.edit
 | FE/BE casing and wire-shape drift | [agent-checklist.md](./playbooks/agent-checklist.md) | API contract or `openapi.json` changes | `OpenApiDocumentTests` + frontend `gen:api-types` diff on `openapi.json` | CI .NET/frontend jobs run when API contract paths change | **Enforced** |
 | .NET test name convention | [testing.md](./playbooks/testing.md) | New or changed .NET test methods | `python scripts/axis.py check test-naming` | `scripts/tests/test_policy_gates.py` negative test + CI policy tests | **Enforced** |
 | Python policy gates still fire | This file | Every PR that runs Doc drift | `python scripts/axis.py check policy-tests` | `scripts/tests/test_policy_gates.py` negative tests + CI `Doc drift` job | **Enforced** |
-| Governance owner-boundary drift | [Ownership boundaries](#ownership-boundaries) | `CLAUDE.md`, `CONTRIBUTING.md`, and PR template wording | `python scripts/axis.py check doc-drift` rejects policy command restatement and Design Gate machine-gate wording | `scripts/tests/test_policy_gates.py` negative tests scoped to entry governance docs | **Enforced** |
+| Governance owner-boundary drift | [Ownership boundaries](#ownership-boundaries) | `AGENTS.md`, `CONTRIBUTING.md`, and PR template wording | `python scripts/axis.py check doc-drift` rejects policy command restatement and Design Gate machine-gate wording | `scripts/tests/test_policy_gates.py` negative tests scoped to entry governance docs | **Enforced** |
 | Review findings registry drift | [Rule registry contract](#rule-registry-contract) | `docs/REVIEW_FINDINGS.md` ledger rows | `python scripts/axis.py check doc-drift` validates owner, trigger, mechanism, proof/gap, and status fields | `scripts/tests/test_policy_gates.py` negative tests for missing owner/status and Partial rows without a known gap | **Enforced** |
 | Enforcement claim wiring drift | [Enforcement truth audit](#enforcement-truth-audit) | Committed CI workflow, pre-push hook, analyzer config, OpenAPI/frontend type wiring, and solution membership | `python scripts/axis.py check doc-drift` validates the wiring that registry Enforced rows rely on | `scripts/tests/test_policy_gates.py` negative tests for missing CI doc-drift, pre-push quick-gate wiring, analyzer warnings-as-errors, and OpenAPI CI trigger coverage | **Enforced** |
 | Tracked text file encoding drift | [docs-style.md](./playbooks/docs-style.md) | Tracked text files | `python scripts/axis.py check text-encoding` | `scripts/tests/test_policy_gates.py` rejects BOM, CRLF, invalid UTF-8, and common mojibake markers | **Enforced** |
 | Frontend standard UI controls bypass shadcn/ui primitives | [frontend.md](./playbooks/frontend.md) | Frontend TSX outside `frontend/src/components/ui/` | `python scripts/axis.py check frontend-component-composition` rejects native `<button>`, `<input>`, `<label>`, `<select>`, and `<textarea>` outside the primitive layer | `scripts/tests/test_policy_gates.py` negative test for feature-local native controls | **Enforced** |
-| `CancellationToken` not forwarded to a callee that accepts one | [CLAUDE.md](../CLAUDE.md) | Build of `src/` or `tests/` touching async calls | `CA2016` escalated to `warning`, build fails via `TreatWarningsAsErrors` | Analyzer/compiler wiring in `.editorconfig` + `Directory.Build.props` | **Enforced** |
-| New skipped tests | [CLAUDE.md](../CLAUDE.md) | Added lines under `tests/` | Added-line ratchet rejects `Skip =` under `tests/` | `scripts/tests/test_policy_gates.py` negative test | **Enforced** |
-| `EnsureCreated` reintroduced | [CLAUDE.md](../CLAUDE.md) | Added lines under `src/` or `tests/` | Added-line ratchet rejects `EnsureCreated` / `EnsureCreatedAsync` | `scripts/tests/test_policy_gates.py` negative test | **Enforced** |
+| `CancellationToken` not forwarded to a callee that accepts one | [AGENTS.md](../AGENTS.md) | Build of `src/` or `tests/` touching async calls | `CA2016` escalated to `warning`, build fails via `TreatWarningsAsErrors` | Analyzer/compiler wiring in `.editorconfig` + `Directory.Build.props` | **Enforced** |
+| New skipped tests | [AGENTS.md](../AGENTS.md) | Added lines under `tests/` | Added-line ratchet rejects `Skip =` under `tests/` | `scripts/tests/test_policy_gates.py` negative test | **Enforced** |
+| `EnsureCreated` reintroduced | [AGENTS.md](../AGENTS.md) | Added lines under `src/` or `tests/` | Added-line ratchet rejects `EnsureCreated` / `EnsureCreatedAsync` | `scripts/tests/test_policy_gates.py` negative test | **Enforced** |
 | New or modified Application handler without matching test file | [agent-checklist.md](./playbooks/agent-checklist.md) | Changed `Commands/*Handler.cs` or `Queries/*Handler.cs` files | Diff ratchet checks matching handler test files | `scripts/tests/test_policy_gates.py` negative test; known gap: untouched legacy handlers are not swept | **Partial** |
 | Endpoint returns `object`/anonymous JSON instead of an Application-layer DTO | [patterns.md](./playbooks/patterns.md) | Added endpoint return lines under `src/Axis.Api/Endpoints` | Added-line ratchet bans new `.Produces<object>` / `Results.Ok(new { ... })` | `scripts/tests/test_policy_gates.py` covers the ratchet class | **Enforced** |
 | Minimal-API endpoint orchestrates more than one mediator call | [patterns.md](./playbooks/patterns.md) | Named endpoint handler methods | Full-state guard counts `.Send(`/`.Publish(` in named endpoint handlers | CI `Doc drift`; known gap: inline lambdas are not parsed | **Partial** |
-| Cross-module in-process call / illegal project ref | [CLAUDE.md](../CLAUDE.md) | Project/type graph across modules | Architecture fitness tests + CodeRabbit path instruction | Tests catch project/type graph violations; known gap: runtime DI via `Contracts` still needs review | **Partial** |
-| Cross-module raw SQL | [CLAUDE.md](../CLAUDE.md) | Data access that appears to cross module ownership | CodeRabbit path instruction + review | Requires table ownership and intent judgment | **Review-only** |
+| Cross-module in-process call / illegal project ref | [AGENTS.md](../AGENTS.md) | Project/type graph across modules | Architecture fitness tests + CodeRabbit path instruction | Tests catch project/type graph violations; known gap: runtime DI via `Contracts` still needs review | **Partial** |
+| Cross-module raw SQL | [AGENTS.md](../AGENTS.md) | Data access that appears to cross module ownership | CodeRabbit path instruction + review | Requires table ownership and intent judgment | **Review-only** |
 | Auth/permission check before input validation | [agent-checklist.md](./playbooks/agent-checklist.md) | Endpoint changes with auth and validation ordering | CodeRabbit path instruction + review | Requires endpoint intent and failure-order judgment | **Review-only** |
 | Wrong status code on bad input | [patterns.md](./playbooks/patterns.md) | Endpoint error responses | CodeRabbit path instruction + review | Requires semantic assertion and error taxonomy judgment | **Review-only** |
 | Side effects committed before the DB transaction they depend on | [patterns.md](./playbooks/patterns.md) | Handlers, repositories, jobs, or consumers with side effects | CodeRabbit path instruction + review | Requires data-flow and transaction-boundary judgment | **Review-only** |
 | Test asserts something other than its name claims | [testing.md](./playbooks/testing.md) | Test changes with assertion/name mismatch risk | CodeRabbit path instruction; analyzer pilot only if it recurs | Green-but-wrong tests require assertion semantics | **Review-only** |
-| `Result`/`Result<T>` vs bespoke bool/tuple/throw for business failures | [CLAUDE.md](../CLAUDE.md) | Business failure modeling in Application/Domain | CodeRabbit path instruction + review | Design judgment; exceptions are valid for infrastructure faults | **Review-only** |
+| `Result`/`Result<T>` vs bespoke bool/tuple/throw for business failures | [AGENTS.md](../AGENTS.md) | Business failure modeling in Application/Domain | CodeRabbit path instruction + review | Design judgment; exceptions are valid for infrastructure faults | **Review-only** |
 | One public type per `.cs` file | None | C# file organization | None | Intentional groupings are common and valid | **Not a rule** |
 | Inline fully-qualified type names instead of `using` directives | [.editorconfig](../.editorconfig) | Style cleanup | IDE suggestions / `dotnet format` cleanup | Low defect value; keep as style guidance unless it becomes recurring review noise | **Guidance** |
 

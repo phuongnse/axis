@@ -1,6 +1,6 @@
 # Tech Stack
 
-> **Navigation**: [← docs/README.md](./README.md) · [← CLAUDE.md](../CLAUDE.md)
+> **Navigation**: [← docs/README.md](./README.md) · [← AGENTS.md](../AGENTS.md)
 
 ---
 

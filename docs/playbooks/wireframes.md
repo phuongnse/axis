@@ -1,6 +1,6 @@
 # Wireframe Playbook — Component Kit & Screen Wireframes
 
-> **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
+> **Navigation**: [← docs/README.md](../README.md) · [← AGENTS.md](../../AGENTS.md)
 
 This playbook covers the wireframe generation system.
 

@@ -1,4 +1,4 @@
-# Axis — Project Context for Claude
+# Axis — Project Context for Agents
 
 > **Agents:** [agent-checklist.md](docs/playbooks/agent-checklist.md) for gates/checkpoints during work; [PR template](.github/PULL_REQUEST_TEMPLATE.md) for description (**Summary + Linked spec + Requirements** only; enforced by CI job **PR body guard**).
 
@@ -87,7 +87,7 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 
 **Source of truth (highest first):** use-case file ACs → this file → playbooks → same-module code → agent guess (never invent IDs, events, endpoints, table names).
 
-**Integrity:** legacy code ≠ authority if it conflicts with docs; surface conflicts. Verify with grep before claiming "done". Document deferrals in callouts (`**Deferred (PR #N follow-up):**`), not as ✅ — **proactively**, without waiting for the user to ask ([process.md § Deferred follow-up](docs/playbooks/process.md)).
+**Integrity:** legacy code ≠ authority if it conflicts with docs; surface conflicts. Verify with grep before claiming "done". Document deferrals in callouts (`**Deferred follow-ups:**`), not as ✅ — **proactively**, without waiting for the user to ask ([process.md § Deferred follow-up](docs/playbooks/process.md)).
 
 **Workarounds:** intentional P0/P1 violations must follow [`docs/WORKAROUNDS.md`](docs/WORKAROUNDS.md): inventory entry, cleanup trigger, and site reference in the same PR. This file owns severity; WORKAROUNDS owns the workflow and current debt.
 
@@ -183,10 +183,18 @@ Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, use-c
 **Per US (any layer):** tests first and green; `> **Implementation status**` callout after *Out of scope*:
 
 ```markdown
-> **Implementation status** — Domain: ✅ | Application: ⚠️ | …
-> Gaps vs spec: …
-> **Deferred (PR #N follow-up):** … (omit line if none)
-> Decisions: …
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ⚠️ |
+>
+> **Gaps vs spec:** …
+>
+> **Deferred follow-ups:** … (use `N/A` if none)
+>
+> **Decisions:** …
 ```
 
 **Per layer / module:** all use-case callouts updated; domain README table; [`PROGRESS.md`](docs/PROGRESS.md) (layer summary only — not per-class detail).

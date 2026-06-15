@@ -64,7 +64,9 @@ A workflow must have at least one trigger before it can be published. Triggers d
 > - Wolverine event subscription wiring and filter expression evaluation pending workflow-engine
 > - event type registry and model-picker UI pending API + Frontend.
 >
-> **Deferred:** Custom platform events defined by users; listening to external-system events without a Webhook trigger.
+> **Deferred follow-ups:** Custom platform events defined by users; listening to external-system events without a Webhook trigger.
+>
+> **Decisions:** Event trigger scope is limited to platform-owned event types until custom event contracts have an approved registry model.
 
 ## Wireframes
 

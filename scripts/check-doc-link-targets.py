@@ -6,7 +6,7 @@ broken `![alt](./relative.svg)` image refs. This script is the explicit,
 file-by-file check that closes that gap.
 
 Rules:
-- Scan every `.md` under `docs/`, plus repo-root markdown (`CLAUDE.md`,
+- Scan every `.md` under `docs/`, plus repo-root markdown (`AGENTS.md`,
   `CONTRIBUTING.md`, `README.md`) and `.github/`.
 - For each `[text](path)` and `![alt](path)`:
   - Skip absolute URLs (`http://`, `https://`, `mailto:`).
@@ -34,7 +34,7 @@ SCAN_ROOTS = [
     ROOT / "docs",
     ROOT / ".github",
 ]
-SCAN_FILES_AT_ROOT = ["CLAUDE.md", "CONTRIBUTING.md", "README.md"]
+SCAN_FILES_AT_ROOT = ["AGENTS.md", "CONTRIBUTING.md", "README.md"]
 
 # Markdown link/image targets. Capture group 1 = target path/URL.
 # Matches both `[text](target)` and `![alt](target)`.

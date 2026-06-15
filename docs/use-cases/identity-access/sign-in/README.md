@@ -79,7 +79,7 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 >
 > **Gaps vs spec:** Email/password sign-in has login page + PKCE flow + app shell/dashboard scaffold partially implemented. **External identity providers (Microsoft/Google/GitHub, ADR-027) are spec'd but not yet implemented** — no provider registration in OpenIddict, no account-linking handler, no provider buttons on the sign-in page. BroadcastChannel multi-tab refresh, account lockout UI, and unverified-email screen polish also pending.
 >
-> **Deferred:** 2FA/MFA (TOTP or WebAuthn); enterprise SAML/SCIM federation and per-tenant IdP (ADR-027 enterprise scope).
+> **Deferred follow-ups:** 2FA/MFA (TOTP or WebAuthn); enterprise SAML/SCIM federation and per-tenant IdP (ADR-027 enterprise scope).
 >
 > **Decisions:**
 > - OpenIddict 5.x serves as the in-process OAuth2/OIDC server. `AuthenticateUserCommand` validates credentials

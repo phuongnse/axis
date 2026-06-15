@@ -1,8 +1,10 @@
 # Use Cases
 
-> **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
+> **Navigation**: [← docs/README.md](../README.md) · [← AGENTS.md](../../AGENTS.md)
 
 Use cases are the user-facing source of truth for behavior. **One markdown file = one use case** (flow, AC, wireframes, diagrams, implementation status). Domain `README.md` indexes all use cases in that area.
+
+Create a full use-case README only when the work is shipped, being implemented, or being specified for the next concrete slice. Distant product ideas belong in a lightweight roadmap/open-work note until they are ready for doc-first implementation. The checker rejects new/touched placeholder sections and stock Main flow text, so a committed use-case file must describe real behavior rather than act as a blank reservation.
 
 ---
 
@@ -13,7 +15,7 @@ Use cases are the user-facing source of truth for behavior. **One markdown file 
 | Step | Source | What you learn |
 |------|--------|----------------|
 | 1 | Domain **Open work** in `docs/use-cases/{domain}/README.md` | Prioritized gaps (backend vs frontend) |
-| 2 | `docs/use-cases/{domain}/*.md` | Per-use-case ACs + `> **Implementation status**` + `Gaps vs spec` / `**Deferred:**` |
+| 2 | `docs/use-cases/{domain}/*.md` | Per-use-case ACs + `> **Implementation status**` + `Gaps vs spec` / `Deferred follow-ups` / `Decisions` |
 | 3 | `docs/PROGRESS.md` | Module layer summary; cross-cutting foundation phases |
 | 4 | `grep -rE "\\| Application \\| ⚠️\\|\\| Infrastructure \\| ⚠️\\|\\| API \\| ⚠️" docs/use-cases/` | Use cases with partial backend layers ([agent-checklist](../playbooks/agent-checklist.md)) |
 

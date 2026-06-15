@@ -1,8 +1,8 @@
 # Architecture
 
-> **Navigation**: [← docs/README.md](./README.md) · [← CLAUDE.md](../CLAUDE.md)
+> **Navigation**: [← docs/README.md](./README.md) · [← AGENTS.md](../AGENTS.md)
 
-> **Scope:** Architectural shape — what containers exist, how tenancy and auth work end-to-end, where the modules sit. **Not** the source of truth for: library versions ([TECH_STACK.md](./TECH_STACK.md)), source tree ([CLAUDE.md](../CLAUDE.md) § Solution tree), feature behaviour (`docs/use-cases/`), implementation rules (`docs/playbooks/`).
+> **Scope:** Architectural shape — what containers exist, how tenancy and auth work end-to-end, where the modules sit. **Not** the source of truth for: library versions ([TECH_STACK.md](./TECH_STACK.md)), source tree ([AGENTS.md](../AGENTS.md) § Solution tree), feature behaviour (`docs/use-cases/`), implementation rules (`docs/playbooks/`).
 >
 > If two docs would disagree, this one defers.
 
@@ -48,7 +48,7 @@ Concrete versions in [TECH_STACK.md](./TECH_STACK.md).
 
 See [Module overview](./README.md#module-overview) in the docs index (Mermaid).
 
-Each module *is* a service contract — modulith mode collocates them as in-process targets, but the contract surface is identical to the extracted form. Source tree and project naming live in [CLAUDE.md § Solution tree](../CLAUDE.md#docs-index).
+Each module *is* a service contract — modulith mode collocates them as in-process targets, but the contract surface is identical to the extracted form. Source tree and project naming live in [AGENTS.md § Solution tree](../AGENTS.md#docs-index).
 
 ### Per-module layer convention
 
@@ -73,7 +73,7 @@ Each module *is* a service contract — modulith mode collocates them as in-proc
 
 Per-message transport selection follows the suffix convention in [ADR-025](./TECH_STACK.md#adr-025-transport-selection-rule-by-message-name-suffix): `*Command`/`*Job`/`*SagaStep` → RabbitMQ, `*Event`/`*Snapshot` → Kafka.
 
-Forbidden: shared `DbContext`, direct C# method calls into another module's Application services, cross-module SQL, in-process `IMediator` for cross-module dispatch. Architecture tests and CI enforce the structural subset; cross-module raw SQL and runtime DI gaps remain review-owned. See [CLAUDE.md § Service boundaries](../CLAUDE.md), [REVIEW_FINDINGS.md](./REVIEW_FINDINGS.md), and [playbooks/patterns.md § Cross-module communication](./playbooks/patterns.md#cross-module-communication-pattern).
+Forbidden: shared `DbContext`, direct C# method calls into another module's Application services, cross-module SQL, in-process `IMediator` for cross-module dispatch. Architecture tests and CI enforce the structural subset; cross-module raw SQL and runtime DI gaps remain review-owned. See [AGENTS.md § Service boundaries](../AGENTS.md), [REVIEW_FINDINGS.md](./REVIEW_FINDINGS.md), and [playbooks/patterns.md § Cross-module communication](./playbooks/patterns.md#cross-module-communication-pattern).
 
 ---
 

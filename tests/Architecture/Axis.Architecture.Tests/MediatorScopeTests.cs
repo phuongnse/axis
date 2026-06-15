@@ -5,7 +5,7 @@ using NetArchTest.Rules;
 namespace Axis.Architecture.Tests;
 
 /// <summary>
-/// Enforces CLAUDE.md P0 rule: <c>MediatR is intra-module only. Cross-module
+/// Enforces AGENTS.md P0 rule: <c>MediatR is intra-module only. Cross-module
 /// dispatch always goes through Wolverine</c>.
 ///
 /// <para>
@@ -20,7 +20,7 @@ public class MediatorScopeTests
     [Fact]
     public void MediatRScopeRule_WhenInspected_IsCoveredByModuleBoundaryTests()
     {
-        // This is a marker test, not a separate check. The CLAUDE.md rule
+        // This is a marker test, not a separate check. The AGENTS.md rule
         // "MediatR is intra-module only" is mechanically equivalent to
         // "no Axis.{ModuleA}.* assembly references Axis.{ModuleB}.Application",
         // which ModuleBoundaryTests already enforces (with the same allow-list).

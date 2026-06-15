@@ -1,6 +1,6 @@
 # Technical Patterns
 
-> **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
+> **Navigation**: [← docs/README.md](../README.md) · [← AGENTS.md](../../AGENTS.md)
 
 > **Start with [patterns-index.md](./patterns-index.md)** — one-page map to sections below. Open `patterns.md` only for the section you need. Skip both when the task is trivial.
 
@@ -848,7 +848,7 @@ if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
 }
 ```
 
-Every endpoint must be fully annotated — see CLAUDE.md API Layer section for required metadata.
+Every endpoint must be fully annotated — see AGENTS.md API Layer section for required metadata.
 
 ---
 
@@ -1581,7 +1581,7 @@ Run this checklist before every commit. Items are ordered from most to least lik
 
 ### 1. No inline fully-qualified type names
 
-CLAUDE.md rule: **always use `using` directives — never write the namespace inline**.
+AGENTS.md rule: **always use `using` directives — never write the namespace inline**.
 
 **Wrong:**
 ```csharp

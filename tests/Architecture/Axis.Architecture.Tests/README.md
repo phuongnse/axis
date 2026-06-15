@@ -1,14 +1,14 @@
 # Axis Architecture Fitness Tests
 
-> [← CLAUDE.md](../../../CLAUDE.md) · [← docs/TECH_STACK.md](../../../docs/TECH_STACK.md) · [← docs/WORKAROUNDS.md](../../../docs/WORKAROUNDS.md)
+> [← AGENTS.md](../../../AGENTS.md) · [← docs/TECH_STACK.md](../../../docs/TECH_STACK.md) · [← docs/WORKAROUNDS.md](../../../docs/WORKAROUNDS.md)
 
-Tests in this project run under `dotnet test` like any other and enforce **CLAUDE.md P0/P1 architectural rules** as automated checks. When one of these tests fails, an agent (human or AI) has introduced a regression that the design forbids — fix the code, not the test.
+Tests in this project run under `dotnet test` like any other and enforce **AGENTS.md P0/P1 architectural rules** as automated checks. When one of these tests fails, an agent (human or AI) has introduced a regression that the design forbids — fix the code, not the test.
 
 ## What this catches
 
 ### Structural rules
 
-| Test file | CLAUDE.md rule enforced |
+| Test file | AGENTS.md rule enforced |
 |---|---|
 | [DomainPurityTests](./DomainPurityTests.cs) | P0 — "Domain: zero external dependencies." Bans EF, MediatR, Wolverine, ASP.NET, etc. inside any `*.Domain` assembly. |
 | [ModuleBoundaryTests](./ModuleBoundaryTests.cs) | P0 — "No project reference from `Axis.{ModuleA}.*` to `Axis.{ModuleB}.*` except `Contracts`." Theory runs every (A,B,layer) tuple. Pre-existing violations are tracked in `KnownBoundaryWorkarounds` and must also appear in [`docs/WORKAROUNDS.md`](../../../docs/WORKAROUNDS.md). |
@@ -18,7 +18,7 @@ Tests in this project run under `dotnet test` like any other and enforce **CLAUD
 
 ### Convention rules
 
-These rules don't enforce a P0/P1 from CLAUDE.md directly — they encode the implementation conventions in `docs/playbooks/patterns.md` so a new agent writing a handler/repo/aggregate is forced into the same shape as existing code.
+These rules don't enforce a P0/P1 from AGENTS.md directly — they encode the implementation conventions in `docs/playbooks/patterns.md` so a new agent writing a handler/repo/aggregate is forced into the same shape as existing code.
 
 | Test file | Convention enforced |
 |---|---|
@@ -62,7 +62,7 @@ This way the test ratchets in one direction: the allow-list can only shrink. Nev
 ## Adding a new rule
 
 1. Decide whether the rule is structural (use NetArchTest here) or semantic (use code review / drift script).
-2. Add a new `*Tests.cs` file with a clear class-level docstring quoting the CLAUDE.md rule it enforces.
+2. Add a new `*Tests.cs` file with a clear class-level docstring quoting the AGENTS.md rule it enforces.
 3. Each test must fail with a message that tells the reader **what to fix and why** — never a bare assertion.
 4. Update the table at the top of this README.
 
@@ -78,10 +78,10 @@ This project is included in `Axis.sln`, so `dotnet test Axis.sln` runs it alongs
 
 ## Maintenance burden
 
-These tests should be **stable**: they encode rules that change rarely (every CLAUDE.md rewrite, not every feature). If a test starts to feel noisy or starts blocking legitimate work, the right response is:
+These tests should be **stable**: they encode rules that change rarely (every AGENTS.md rewrite, not every feature). If a test starts to feel noisy or starts blocking legitimate work, the right response is:
 
-1. Re-read CLAUDE.md — has the rule actually changed?
-2. If yes, update CLAUDE.md first, then the test, in the same PR.
+1. Re-read AGENTS.md — has the rule actually changed?
+2. If yes, update AGENTS.md first, then the test, in the same PR.
 3. If no, the code is violating the rule; fix the code.
 
-Never silence a test by adding the violating namespace to an allow-list without a corresponding CLAUDE.md change.
+Never silence a test by adding the violating namespace to an allow-list without a corresponding AGENTS.md change.

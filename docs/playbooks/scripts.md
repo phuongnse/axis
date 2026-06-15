@@ -1,6 +1,6 @@
 # Scripts
 
-> **Navigation**: [← docs/README.md](../README.md) · [← agent-checklist.md](./agent-checklist.md) · [← CLAUDE.md](../../CLAUDE.md)
+> **Navigation**: [← docs/README.md](../README.md) · [← agent-checklist.md](./agent-checklist.md) · [← AGENTS.md](../../AGENTS.md)
 
 `scripts/axis.py` is the source of truth for repository maintenance commands.
 Top-level maintenance scripts under `scripts/` should be Python only.
@@ -8,6 +8,7 @@ Top-level maintenance scripts under `scripts/` should be Python only.
 ## Commands
 
 ```bash
+python scripts/axis.py doctor
 python scripts/axis.py verify
 python scripts/axis.py check policy-tests
 python scripts/axis.py check text-encoding

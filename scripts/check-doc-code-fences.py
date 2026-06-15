@@ -37,7 +37,7 @@ SCAN_ROOTS = [
     ROOT / "docs",
     ROOT / ".github",
 ]
-SCAN_FILES_AT_ROOT = ["CLAUDE.md", "CONTRIBUTING.md", "README.md"]
+SCAN_FILES_AT_ROOT = ["AGENTS.md", "CONTRIBUTING.md", "README.md"]
 
 # Fenced code block opener: ``` or ~~~ (CommonMark allows up to 3 leading
 # spaces), capturing the fence marker and the info string (language).

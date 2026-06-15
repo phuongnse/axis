@@ -67,7 +67,7 @@ Define subscription plan tiers with feature limits and enforce those limits at t
 > - platform plan change 403 + audit log + cache refresh
 > - downgrade over limit blocks new creates via existing usage check (resources not deleted).
 >
-> **Deferred (PR #N follow-up):**
+> **Deferred follow-ups:**
 > - atomic check-and-consume for monthly execution starts (race can briefly exceed cap under concurrency)
 > - fail-closed when usage counter/Redis unavailable (today logs warning and treats usage as 0).
 >
@@ -78,4 +78,3 @@ Define subscription plan tiers with feature limits and enforce those limits at t
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

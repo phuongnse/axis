@@ -11,10 +11,14 @@ import argparse
 import importlib.util
 import json
 import os
+import platform
 import re
 import shutil
 import subprocess
 import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterable, TextIO
@@ -75,6 +79,18 @@ def run(
     if check and result.returncode != 0:
         raise CheckError(f"{' '.join(args)} failed with exit code {result.returncode}")
     return result
+
+
+def run_optional(
+    args: list[str],
+    *,
+    cwd: Path = ROOT,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str] | None:
+    try:
+        return run(args, cwd=cwd, capture=True, check=False, env=env)
+    except OSError:
+        return None
 
 
 def git(args: list[str], *, capture: bool = True, check: bool = True) -> str:
@@ -886,6 +902,13 @@ def fail(issues: list[str], message: str) -> None:
 
 DOC_DRIFT_ADDED_LINE_RULES = [
     (
+        r"(?:/mnt/[a-z]/(?:[^`\s]+/)*projects/|[A-Za-z]:\\(?:Users|projects)\\|/Users/[^`\s]+/|/home/[^`\s]+/)",
+        lambda p: (p.startswith("docs/") or p.startswith("scripts/"))
+        and not p.startswith("scripts/tests/")
+        and p.endswith((".md", ".py", ".ps1", ".sh", ".yml", ".yaml")),
+        "Machine-specific local path introduced - use a placeholder such as /path/to/axis",
+    ),
+    (
         r"GetAwaiter[(][)][.]GetResult[(][)]",
         lambda p: p.startswith("src/") and p.endswith(".cs"),
         "Sync-over-async introduced - make the caller async instead",
@@ -1014,7 +1037,7 @@ def check_workarounds(issues: list[str]) -> None:
 
 
 GOVERNANCE_ENTRY_DOCS = [
-    Path("CLAUDE.md"),
+    Path("AGENTS.md"),
     Path("CONTRIBUTING.md"),
     Path(".github/PULL_REQUEST_TEMPLATE.md"),
 ]
@@ -1361,7 +1384,7 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
 
     stale_rx = re.compile(r"feature file|see gaps below|^> \*\*Wireframe\*\*:|docs/epics/|_template-feature-us|\| Diagram \| Source \| Preview \|")
     stale_files = list((ROOT / "docs").rglob("*.md")) + list((ROOT / ".github").rglob("*.md"))
-    stale_files.extend(ROOT / name for name in ("CLAUDE.md", "CONTRIBUTING.md", "README.md"))
+    stale_files.extend(ROOT / name for name in ("AGENTS.md", "CONTRIBUTING.md", "README.md"))
     for path in stale_files:
         if not path.is_file():
             continue
@@ -1371,7 +1394,7 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
 
     lesson_rx = re.compile(r"\*\*Lesson|[Ll]esson [(]|[Ll]esson[)]")
     lesson_files = list((ROOT / "docs" / "playbooks").rglob("*.md"))
-    lesson_files.extend(ROOT / name for name in ("CLAUDE.md", "docs/ARCHITECTURE.md"))
+    lesson_files.extend(ROOT / name for name in ("AGENTS.md", "docs/ARCHITECTURE.md"))
     for path in lesson_files:
         if not path.is_file():
             continue
@@ -1614,6 +1637,150 @@ def install_hooks(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
+def _command_version(name: str, *version_args: str) -> tuple[str, str]:
+    command = exe(name)
+    resolved = shutil.which(command) or command
+    if shutil.which(command) is None and shutil.which(name) is None:
+        return "FAIL", f"{name} not found in PATH"
+
+    result = run_optional([command, *version_args])
+    if result is None:
+        return "FAIL", f"{name} not executable from PATH"
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()
+        return "FAIL", detail or f"{name} exited with {result.returncode}"
+
+    first_line = (result.stdout or result.stderr or "").strip().splitlines()
+    version = first_line[0] if first_line else "available"
+    return "OK", f"{version} ({resolved})"
+
+
+def _http_ok(url: str, timeout_seconds: float = 1.5) -> bool:
+    try:
+        with urllib.request.urlopen(url, timeout=timeout_seconds) as response:
+            return 200 <= response.status < 300
+    except (OSError, urllib.error.URLError):
+        return False
+
+
+def _docker_host_ping_ok(docker_host: str | None) -> bool:
+    if not docker_host:
+        return False
+
+    parsed = urllib.parse.urlparse(docker_host)
+    if parsed.scheme != "tcp" or not parsed.netloc:
+        return False
+
+    return _http_ok(f"http://{parsed.netloc}/_ping")
+
+
+def _docker_info_ok(env: dict[str, str] | None = None) -> bool:
+    if shutil.which(exe("docker")) is None and shutil.which("docker") is None:
+        return False
+    result = run_optional([exe("docker"), "info"], env=env)
+    return result is not None and result.returncode == 0
+
+
+def _docker_compose_ok() -> bool:
+    if shutil.which(exe("docker")) is None and shutil.which("docker") is None:
+        return False
+    result = run_optional([exe("docker"), "compose", "version"])
+    return result is not None and result.returncode == 0
+
+
+def _wsl_docker_ok() -> bool:
+    if os.name != "nt" or shutil.which("wsl.exe") is None:
+        return False
+    result = run_optional(["wsl.exe", "bash", "-lc", "docker info >/dev/null 2>&1"])
+    return result is not None and result.returncode == 0
+
+
+def doctor(args: argparse.Namespace) -> int:
+    rows: list[tuple[str, str, str]] = []
+
+    def record(status: str, label: str, detail: str) -> None:
+        rows.append((status, label, detail))
+
+    record("OK", "repo", str(ROOT))
+    record("OK", "os", f"{platform.system()} {platform.release()} ({platform.machine()})")
+    record("OK", "python", f"{platform.python_version()} ({sys.executable})")
+
+    python_in_path = shutil.which("python") or shutil.which("python3") or shutil.which("py")
+    if python_in_path:
+        record("OK", "python launcher", python_in_path)
+    else:
+        record("WARN", "python launcher", "not found in PATH; open a shell where Python 3 resolves before running repo scripts")
+
+    for name, version_args in (
+        ("git", ("--version",)),
+        ("dotnet", ("--version",)),
+        ("node", ("--version",)),
+        ("npm", ("--version",)),
+    ):
+        status, detail = _command_version(name, *version_args)
+        record(status, name, detail)
+
+    docker_status, docker_detail = _command_version("docker", "--version")
+    if docker_status == "FAIL":
+        record("WARN", "docker cli", f"{docker_detail}; compose can still run through WSL if Docker lives there")
+    else:
+        record(docker_status, "docker cli", docker_detail)
+
+    docker_current = _docker_info_ok()
+    docker_host = os.environ.get("DOCKER_HOST")
+    docker_host_ping = _docker_host_ping_ok(docker_host)
+    tcp_docker = _http_ok("http://127.0.0.1:2375/_ping") or _http_ok("http://localhost:2375/_ping")
+    wsl_docker = _wsl_docker_ok()
+
+    if docker_current:
+        record("OK", "docker endpoint", "docker info works in this shell")
+    elif docker_host and docker_host_ping:
+        record("OK", "docker endpoint", f"DOCKER_HOST={docker_host} responds; Testcontainers can use it")
+    elif docker_host:
+        record("FAIL", "docker endpoint", f"DOCKER_HOST={docker_host} is set, but the daemon did not respond")
+    elif tcp_docker:
+        record(
+            "WARN",
+            "docker endpoint",
+            'TCP daemon responds at 127.0.0.1:2375; set DOCKER_HOST="tcp://127.0.0.1:2375" in this shell',
+        )
+    elif wsl_docker:
+        record("WARN", "docker endpoint", "Docker works inside WSL; run compose through wsl.exe or expose a local TCP endpoint")
+    else:
+        record("FAIL", "docker endpoint", "docker info failed; no WSL Docker or 127.0.0.1:2375 TCP daemon detected")
+
+    if _docker_compose_ok():
+        record("OK", "docker compose", "docker compose version works")
+    elif wsl_docker:
+        record("WARN", "docker compose", 'use WSL: wsl.exe bash -lc "cd /path/to/axis && docker compose up -d"')
+    else:
+        record("FAIL", "docker compose", "Docker Compose v2 not available from this shell")
+
+    if os.name == "nt":
+        npm_cmd = shutil.which("npm.cmd")
+        npm_ps1 = shutil.which("npm.ps1")
+        if npm_cmd:
+            detail = f"use npm.cmd in PowerShell ({npm_cmd})"
+            if npm_ps1:
+                detail += f"; npm.ps1 also exists ({npm_ps1}) and may be blocked by execution policy"
+            record("OK", "windows npm", detail)
+
+    print("axis doctor")
+    for status, label, detail in rows:
+        print(f"[{status:<4}] {label}: {detail}")
+
+    failures = [label for status, label, _detail in rows if status == "FAIL"]
+    if failures and args.strict:
+        print(f"doctor: FAIL - {len(failures)} blocking issue(s): {', '.join(failures)}", file=sys.stderr)
+        return 1
+
+    if failures:
+        print("doctor: completed with blocking findings; rerun with --strict to fail on them")
+    else:
+        print("doctor: OK")
+    return 0
+
+
 def bootstrap(_args: argparse.Namespace | None = None) -> int:
     missing = [name for name in ("git", "dotnet", "node", "npm") if shutil.which(name) is None and shutil.which(f"{name}.cmd") is None]
     if missing:
@@ -1641,6 +1808,9 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("bootstrap").set_defaults(func=bootstrap)
+    doctor_parser = sub.add_parser("doctor")
+    doctor_parser.add_argument("--strict", action="store_true", help="Exit non-zero when required local-dev tools are unavailable")
+    doctor_parser.set_defaults(func=doctor)
     sub.add_parser("install-hooks").set_defaults(func=install_hooks)
     sub.add_parser("pre-push").set_defaults(func=pre_push)
     sub.add_parser("verify").set_defaults(func=verify)

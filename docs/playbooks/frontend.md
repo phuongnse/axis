@@ -1,8 +1,8 @@
 # Frontend Playbook
 
-> **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
+> **Navigation**: [← docs/README.md](../README.md) · [← AGENTS.md](../../AGENTS.md)
 
-> Full frontend rules. The non-negotiable enforcement rules are summarised in CLAUDE.md. This playbook covers patterns, examples, and rationale for TanStack Query, TypeScript, routing, component design, styling, security, and accessibility.
+> Full frontend rules. The non-negotiable enforcement rules are summarised in AGENTS.md. This playbook covers patterns, examples, and rationale for TanStack Query, TypeScript, routing, component design, styling, security, and accessibility.
 
 ---
 
@@ -11,7 +11,7 @@
 UI exists to help users complete work. Visual style matters, but it is secondary to clarity, usefulness, and efficient task completion.
 
 - Start every screen by naming the user goal, the decision the user must make, and the minimum information needed to make that decision.
-- Keep content honest. Do not show fake operational data, tenant names, metrics, event streams, or statuses on public or unauthenticated screens.
+- Keep content honest. Do not show fake operational data, tenant names, metrics, event streams, or statuses. Authenticated workspace screens may show workspace metrics only when they are backed by API data or a clearly labeled real product state.
 - Do not describe architecture to end users. Replace internal terms such as "surface", "boundary", "session", or "gateway" with user-facing language such as "sign in", "verify access", and "open workspace".
 - Every visible element must answer one of these questions: What is this? What can I do next? What do I need to know before acting? If not, remove it.
 - A screen should lead the user toward action, not feel like it is explaining the system. If the screen starts reading like an architecture note, simplify the copy and move the explanation out of the UI.

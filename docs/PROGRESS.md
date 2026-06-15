@@ -1,9 +1,9 @@
 # Implementation Progress
 
-> **Navigation**: [← docs/README.md](./README.md) · [← CLAUDE.md](../CLAUDE.md)
+> **Navigation**: [← docs/README.md](./README.md) · [← AGENTS.md](../AGENTS.md)
 
 > Updated each time a layer is completed. Source of truth for current implementation state.
-> When completing a layer, update this file — **not** CLAUDE.md.
+> When completing a layer, update this file — **not** AGENTS.md.
 
 ## Distributed-ready foundation rollout
 
@@ -13,7 +13,7 @@ Foundation phases (engineering rollout labels — not a product scope cut; each 
 
 | Phase | Status | Deliverable |
 |---|---|---|
-| **Phase 0 — Foundation decisions** | ✅ done | Rewrote ADR-001/002/009; added ADR-010..023; updated `ARCHITECTURE.md` + `CLAUDE.md` + `patterns.md`. |
+| **Phase 0 — Foundation decisions** | ✅ done | Rewrote ADR-001/002/009; added ADR-010..023; updated `ARCHITECTURE.md` + `AGENTS.md` + `patterns.md`. |
 | **Phase 1 — Infrastructure foundation** | ✅ done | Kafka/RabbitMQ (ADR-017), per-module DBs (ADR-011), Wolverine enroll (ADR-012), migrations (ADR-023), OpenTelemetry (ADR-018), **Avro + Schema Registry + CloudEvents** for WorkflowBuilder lifecycle events (ADR-019). |
 | **Phase 2 — Per-module HTTP/gRPC boundary** | ✅ done | All core modules have `Axis.{Module}.Contracts` + Kafka Avro events. Identity (`IdentityService`), FormBuilder (`FormModelReferenceService`), WorkflowBuilder (`WorkflowFormReferenceService`), and DataModeling (`DataModelCatalogService`) gRPC services are wired behind module boundaries. |
 | **Phase 3 — Per-module EF migrations** | ⚠️ in progress | Identity, DataModeling, FormBuilder, WorkflowBuilder, WorkflowEngine have migrations; tests use `MigrateAsync`. PageBuilder pending (module not started). |

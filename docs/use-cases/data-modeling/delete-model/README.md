@@ -62,11 +62,12 @@ Users can create custom data models within their organization. A model defines t
 > - form Relation Picker refs blocked/flagged via FormBuilder `ModelDeletedEvent` consumer ([model deletion guard](./README.md) (partial))
 > - 30-day purge background job pending.
 >
-> **Deferred (PR #N follow-up):** DataModeling relation fields on other models flagged broken when target model deleted. WorkflowBuilder `record.*` trigger broken flags shipped via `ModelDeletedHandler` (Kafka).
+> **Deferred follow-ups:** DataModeling relation fields on other models flagged broken when target model deleted. WorkflowBuilder `record.*` trigger broken flags shipped via `ModelDeletedHandler` (Kafka).
+>
+> **Decisions:** Model deletion remains soft-delete first; cross-module broken-reference handling is event-driven through module consumers.
 
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

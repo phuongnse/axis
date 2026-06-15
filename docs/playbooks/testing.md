@@ -1,8 +1,8 @@
 # Testing Playbook
 
-> **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
+> **Navigation**: [← docs/README.md](../README.md) · [← AGENTS.md](../../AGENTS.md)
 
-> Full testing rules for .NET and frontend. The non-negotiable gates (TDD mandatory, pre-commit scope table) live in CLAUDE.md. This playbook covers isolation strategies, naming conventions, file layout, and mocking rules.
+> Full testing rules for .NET and frontend. The non-negotiable gates (TDD mandatory, pre-commit scope table) live in AGENTS.md. This playbook covers isolation strategies, naming conventions, file layout, and mocking rules.
 
 ---
 
@@ -58,7 +58,7 @@ Testing playbook responsibility here is implementation technique:
 
 ### Ready-PR gate
 
-See [agent-checklist.md § Verification Gate](./agent-checklist.md#verification-gate--verify-before-pr-review) and CLAUDE.md. When `src/` or `tests/` change:
+See [agent-checklist.md § Verification Gate](./agent-checklist.md#verification-gate--verify-before-pr-review) and AGENTS.md. When `src/` or `tests/` change:
 
 ```bash
 dotnet build

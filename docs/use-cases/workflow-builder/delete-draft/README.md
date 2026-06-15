@@ -54,7 +54,9 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 >
 > **Gaps vs spec:** soft-delete only; restore-from-archive UI pending Frontend.
 >
-> **Deferred:** Hard delete / permanent purge; bulk delete.
+> **Deferred follow-ups:** Hard delete / permanent purge; bulk delete.
+>
+> **Decisions:** Draft deletion remains a soft-delete operation; no restore UI is exposed for deleted drafts.
 
 ## Wireframes
 

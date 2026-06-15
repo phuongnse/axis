@@ -1,6 +1,6 @@
 # Design Gate — mandatory reasoning before code
 
-> **Navigation**: [← docs/README.md](../README.md) · [← agent-checklist.md](./agent-checklist.md) · [← CLAUDE.md](../../CLAUDE.md)
+> **Navigation**: [← docs/README.md](../README.md) · [← agent-checklist.md](./agent-checklist.md) · [← AGENTS.md](../../AGENTS.md)
 
 Defects are **born before code is written** — when the agent edits a surface without first re-deriving the rules that govern it (the response is camelCase, the endpoint must go through Application, a required-field change touches every caller, a migration needs a paired Designer). Verification only *catches* what was already written; the Design Gate stops it being written.
 
@@ -39,13 +39,13 @@ Skip a row only with an explicit `N/A because …`.
 
 | If you touch… | Read & quote | Trace (blast radius) | Must pass |
 |---------------|--------------|----------------------|-----------|
-| **REST endpoint** (new/changed) | camelCase JSON policy (`Program.cs`); no-logic-in-endpoint → `mediator.Send` ([CLAUDE.md](../../CLAUDE.md) · [patterns.md](./patterns.md)); `.RequireAuthorization()`/`AllowAnonymous`; `Produces<T>`/`ProblemDetails` | the FE caller + its types; integration tests for the route | full `dotnet test` (incl. Testcontainers) + the endpoint's test |
+| **REST endpoint** (new/changed) | camelCase JSON policy (`Program.cs`); no-logic-in-endpoint → `mediator.Send` ([AGENTS.md](../../AGENTS.md) · [patterns.md](./patterns.md)); `.RequireAuthorization()`/`AllowAnonymous`; `Produces<T>`/`ProblemDetails` | the FE caller + its types; integration tests for the route | full `dotnet test` (incl. Testcontainers) + the endpoint's test |
 | **Contract / required field / response shape** | the validator + the DTO; FE↔BE type parity | **every** caller and test that builds that payload or reads that shape (`grep` the field) | full `dotnet test` + `npm run ci`/`npm test` |
 | **EF migration / schema** | [process.md § Infrastructure](./process.md) + [ADR-023](../TECH_STACK.md#adr-023-per-module-ef-core-migrations-only): `dotnet ef` only, paired `.Designer.cs`, snapshot, no `EnsureCreated` | other migrations' ordering; `ApiTestFixture` module DB ([testing.md](./testing.md)) | `dotnet build` + `dotnet format --verify-no-changes` + migration applies |
 | **New command/query handler** | [agent-checklist § AC coverage](./agent-checklist.md#ac-coverage--avoid-happy-path-only) | — | matching `*HandlerTests.cs` exists (drift) + tests green |
-| **Cross-module interaction** | boundaries: no cross-module SQL / shared `DbContext` / in-proc call ([CLAUDE.md](../../CLAUDE.md) · [patterns.md](./patterns.md)) | the event/gRPC contract + consumers | architecture fitness tests + drift |
+| **Cross-module interaction** | boundaries: no cross-module SQL / shared `DbContext` / in-proc call ([AGENTS.md](../../AGENTS.md) · [patterns.md](./patterns.md)) | the event/gRPC contract + consumers | architecture fitness tests + drift |
 | **Frontend data fetch / API client** | [frontend.md](./frontend.md); response casing must match the API (camelCase) | the hook + component consumers | `npm run ci` (tsc + Biome) + `npm test` |
-| **New library / public API surface** | tech-stack immutability ([CLAUDE.md](../../CLAUDE.md)) | — | **user approval first** (P0) |
+| **New library / public API surface** | tech-stack immutability ([AGENTS.md](../../AGENTS.md)) | — | **user approval first** (P0) |
 | **Slice of a multi-PR use case** | [pr-slicing.md](./pr-slicing.md): two-sided isolation, shared-seam ownership | siblings that share the seam | both sides of the isolation test |
 
 This table is a starting set, not exhaustive — if your change has a constraint not listed, find its owner doc and quote it anyway.

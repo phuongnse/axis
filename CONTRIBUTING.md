@@ -1,6 +1,6 @@
 # Contributing to Axis
 
-Docs-first development: feature specs in `docs/use-cases/` are the contract; code implements them. The full agent and human workflow lives in [CLAUDE.md](CLAUDE.md) and [docs/playbooks/agent-checklist.md](docs/playbooks/agent-checklist.md) - this file is the short pointer for first-time contributors.
+Docs-first development: feature specs in `docs/use-cases/` are the contract; code implements them. The full agent and human workflow lives in [AGENTS.md](AGENTS.md) and [docs/playbooks/agent-checklist.md](docs/playbooks/agent-checklist.md) - this file is the short pointer for first-time contributors.
 
 ---
 
@@ -53,7 +53,7 @@ When you change [`docker-compose.yml`](docker-compose.yml), update that playbook
 
 | Doc | Purpose |
 |-----|---------|
-| [CLAUDE.md](CLAUDE.md) | Architecture severity rules and P0 stops |
+| [AGENTS.md](AGENTS.md) | Architecture severity rules and P0 stops |
 | [docs/playbooks/agent-checklist.md](docs/playbooks/agent-checklist.md) | Daily workflow, Verification gate, and review checks |
 | [docs/playbooks/process.md](docs/playbooks/process.md) | Layer-by-layer implementation + deferred follow-ups |
 | [docs/playbooks/patterns-index.md](docs/playbooks/patterns-index.md) | Jump table into patterns |
