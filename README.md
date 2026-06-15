@@ -1,8 +1,8 @@
 # Axis
 
-Axis turns evolving business processes into governed, data-driven applications without requiring every change to become a custom software project.
+Axis is an open-source low-code application platform for building adaptable, data-driven workflow applications.
 
-It brings data modeling, workflow logic, input capture, and role-based experiences into one low-code foundation, so applications can adapt as the business changes while staying consistent, auditable, and reusable.
+It provides the core building blocks: custom data models, workflows, forms, and role-based pages, so applications can be assembled, extended, and governed from one place without starting from scratch.
 
 ## Quick links
 
