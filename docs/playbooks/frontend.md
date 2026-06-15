@@ -1,8 +1,8 @@
 # Frontend Playbook
 
-> **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
+> **Navigation**: [← docs/README.md](../README.md) · [← AGENTS.md](../../AGENTS.md)
 
-> Full frontend rules. The non-negotiable enforcement rules are summarised in CLAUDE.md. This playbook covers patterns, examples, and rationale for TanStack Query, TypeScript, routing, component design, styling, security, and accessibility.
+> Full frontend rules. The non-negotiable enforcement rules are summarised in AGENTS.md. This playbook covers patterns, examples, and rationale for TanStack Query, TypeScript, routing, component design, styling, security, and accessibility.
 
 ---
 

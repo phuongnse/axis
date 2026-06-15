@@ -6,6 +6,7 @@ import io
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -368,6 +369,50 @@ Ship user value.
             check_use_case_docs.strip_implementation_status_callouts(after),
         )
 
+    def test_changed_content_outside_status_uses_merge_base_for_three_dot_range(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = root / "docs" / "use-cases" / "example" / "sample" / "README.md"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            current = """# Sample
+
+## Main flow
+
+1. Actor satisfies the trigger.
+2. System performs the happy-path steps in Acceptance Criteria.
+3. Actor receives the expected outcome.
+
+> **Implementation status**
+>
+> **Gaps vs spec:** new.
+"""
+            previous = current.replace("> **Gaps vs spec:** new.", "> **Gaps vs spec:** old.")
+            path.write_text(current, encoding="utf-8")
+            calls: list[list[str]] = []
+
+            def fake_run(args: list[str], **_kwargs):
+                calls.append(args)
+                if args[:2] == ["git", "merge-base"]:
+                    return check_use_case_docs.subprocess.CompletedProcess(args, 0, stdout="abc123\n")
+                if args[:2] == ["git", "show"]:
+                    self.assertEqual(args[2], "abc123:docs/use-cases/example/sample/README.md")
+                    return check_use_case_docs.subprocess.CompletedProcess(args, 0, stdout=previous)
+                raise AssertionError(f"unexpected subprocess call: {args}")
+
+            original_root = check_use_case_docs.ROOT
+            check_use_case_docs.ROOT = root
+            try:
+                with mock.patch.object(check_use_case_docs.subprocess, "run", side_effect=fake_run):
+                    changed = check_use_case_docs.changed_use_case_content_outside_status(
+                        path,
+                        "origin/main...HEAD",
+                    )
+            finally:
+                check_use_case_docs.ROOT = original_root
+
+        self.assertFalse(changed)
+        self.assertIn(["git", "merge-base", "origin/main", "HEAD"], calls)
+
 
 class TestDocDriftRatchets(unittest.TestCase):
     def issue_text(self, rows: list[tuple[str, str]]) -> str:
@@ -710,7 +755,7 @@ class TestGovernanceOwnerBoundary(unittest.TestCase):
 
     def test_rejects_policy_command_restatement_in_entry_docs(self) -> None:
         issues = self.issues_for_doc(
-            "CLAUDE.md",
+            "AGENTS.md",
             "Run `python scripts/axis.py check policy-tests` before push.\n",
         )
 
@@ -728,7 +773,7 @@ class TestGovernanceOwnerBoundary(unittest.TestCase):
 
     def test_allows_design_gate_review_artifact_wording(self) -> None:
         issues = self.issues_for_doc(
-            "CLAUDE.md",
+            "AGENTS.md",
             "Design Gate is a required review artifact, not a machine-enforced CI gate.\n",
         )
 

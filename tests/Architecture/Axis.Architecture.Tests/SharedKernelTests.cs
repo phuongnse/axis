@@ -5,7 +5,7 @@ using NetArchTest.Rules;
 namespace Axis.Architecture.Tests;
 
 /// <summary>
-/// Enforces CLAUDE.md P0 rule per [ADR-017](../../docs/TECH_STACK.md):
+/// Enforces AGENTS.md P0 rule per [ADR-017](../../docs/TECH_STACK.md):
 /// <c>Axis.Shared.*</c> projects contain interfaces, primitives, and Result types —
 /// never UnitOfWork base classes, EF helpers, or repository bases.
 ///

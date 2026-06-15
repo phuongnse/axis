@@ -1037,7 +1037,7 @@ def check_workarounds(issues: list[str]) -> None:
 
 
 GOVERNANCE_ENTRY_DOCS = [
-    Path("CLAUDE.md"),
+    Path("AGENTS.md"),
     Path("CONTRIBUTING.md"),
     Path(".github/PULL_REQUEST_TEMPLATE.md"),
 ]
@@ -1384,7 +1384,7 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
 
     stale_rx = re.compile(r"feature file|see gaps below|^> \*\*Wireframe\*\*:|docs/epics/|_template-feature-us|\| Diagram \| Source \| Preview \|")
     stale_files = list((ROOT / "docs").rglob("*.md")) + list((ROOT / ".github").rglob("*.md"))
-    stale_files.extend(ROOT / name for name in ("CLAUDE.md", "CONTRIBUTING.md", "README.md"))
+    stale_files.extend(ROOT / name for name in ("AGENTS.md", "CONTRIBUTING.md", "README.md"))
     for path in stale_files:
         if not path.is_file():
             continue
@@ -1394,7 +1394,7 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
 
     lesson_rx = re.compile(r"\*\*Lesson|[Ll]esson [(]|[Ll]esson[)]")
     lesson_files = list((ROOT / "docs" / "playbooks").rglob("*.md"))
-    lesson_files.extend(ROOT / name for name in ("CLAUDE.md", "docs/ARCHITECTURE.md"))
+    lesson_files.extend(ROOT / name for name in ("AGENTS.md", "docs/ARCHITECTURE.md"))
     for path in lesson_files:
         if not path.is_file():
             continue

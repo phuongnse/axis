@@ -5,7 +5,7 @@ using NetArchTest.Rules;
 namespace Axis.Architecture.Tests;
 
 /// <summary>
-/// Enforces CLAUDE.md P0 at the REST gateway: <c>Axis.Api</c> must not take
+/// Enforces AGENTS.md P0 at the REST gateway: <c>Axis.Api</c> must not take
 /// in-process dependencies on another module's Application layer (repositories,
 /// services). Endpoints delegate via <c>ISender</c>; cross-module sync uses gRPC
 /// from consuming modules' Infrastructure (ADR-014).

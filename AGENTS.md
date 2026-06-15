@@ -1,4 +1,4 @@
-# Axis — Project Context for Claude
+# Axis — Project Context for Agents
 
 > **Agents:** [agent-checklist.md](docs/playbooks/agent-checklist.md) for gates/checkpoints during work; [PR template](.github/PULL_REQUEST_TEMPLATE.md) for description (**Summary + Linked spec + Requirements** only; enforced by CI job **PR body guard**).
 

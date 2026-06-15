@@ -5,7 +5,7 @@ using NetArchTest.Rules;
 namespace Axis.Architecture.Tests;
 
 /// <summary>
-/// Enforces CLAUDE.md P0 rules:
+/// Enforces AGENTS.md P0 rules:
 /// <list type="bullet">
 /// <item>No project reference from <c>Axis.{ModuleA}.*</c> to <c>Axis.{ModuleB}.*</c>
 /// except to <c>Axis.{ModuleB}.Contracts</c>.</item>
@@ -95,7 +95,7 @@ public class ModuleBoundaryTests
             unexpected.Should().BeEmpty(
                 $"Axis.{moduleA}.{aLayer} depends on {forbiddenNamespacePrefix} via NEW types " +
                 $"not in the WORKAROUNDS allow-list — cross-module references are only allowed " +
-                $"to Axis.{moduleB}.{ContractsLayer} (CLAUDE.md P0). " +
+                $"to Axis.{moduleB}.{ContractsLayer} (AGENTS.md P0). " +
                 $"Unexpected types: {string.Join(", ", unexpected)}. " +
                 "If this is intentional, add the type name to KnownBoundaryWorkarounds in " +
                 "ModuleBoundaryTests.cs AND record the workaround in docs/WORKAROUNDS.md.");

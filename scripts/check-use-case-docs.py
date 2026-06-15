@@ -287,8 +287,26 @@ def strip_implementation_status_callouts(text: str) -> str:
     return "\n".join(out).strip()
 
 
+def content_snapshot_ref(range_spec: str) -> str:
+    if "..." not in range_spec:
+        return range_spec
+
+    left_ref, right_ref = range_spec.split("...", 1)
+    result = subprocess.run(
+        ["git", "merge-base", left_ref, right_ref],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if result.returncode == 0 and result.stdout.strip():
+        return result.stdout.strip()
+    return left_ref
+
+
 def changed_use_case_content_outside_status(path: Path, range_spec: str) -> bool:
-    base_ref = range_spec.split("...", 1)[0]
+    base_ref = content_snapshot_ref(range_spec)
     relative = path.relative_to(ROOT).as_posix()
     result = subprocess.run(
         ["git", "show", f"{base_ref}:{relative}"],

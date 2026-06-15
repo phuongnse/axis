@@ -1,6 +1,6 @@
 # Architectural Workarounds Inventory
 
-> **Navigation**: [← docs/README.md](./README.md) · [← CLAUDE.md](../CLAUDE.md) · [← TECH_STACK.md](./TECH_STACK.md)
+> **Navigation**: [← docs/README.md](./README.md) · [← AGENTS.md](../AGENTS.md) · [← TECH_STACK.md](./TECH_STACK.md)
 
 ## Why this file exists
 
@@ -9,7 +9,7 @@ Every project accumulates **shortcuts** — code that knowingly violates a state
 This file makes workarounds visible. Every entry has:
 
 - **Where it lives** (file path + line, or assembly + class).
-- **Which rule it violates** (CLAUDE.md P0/P1, an ADR, or a feature spec).
+- **Which rule it violates** (AGENTS.md P0/P1, an ADR, or a feature spec).
 - **Why it exists** (the blocker).
 - **Cleanup trigger** (the specific event that enables proper fix).
 - **Owner** (optional — who knows the most about this).
@@ -48,7 +48,7 @@ When the cleanup trigger fires and you remove the workaround:
 ### <short-name-as-slug>
 
 - **Location**: `path/to/file.cs` (or `Axis.Foo.Infrastructure.SomeClass`)
-- **Violates**: CLAUDE.md P0 — quote the specific rule, or "ADR-NNN", or "F0N spec line"
+- **Violates**: AGENTS.md P0 — quote the specific rule, or "ADR-NNN", or "F0N spec line"
 - **Why it exists**: 1-3 sentences. What's the blocker?
 - **Cleanup trigger**: specific event — "when PR for workflow-builder Contracts lands", "when Kafka schema registry is provisioned in prod", "when feature flag X is removed"
 - **Owner**: GitHub handle (optional, but helpful)
@@ -62,6 +62,6 @@ When the cleanup trigger fires and you remove the workaround:
 ### org-hard-delete-modulith-cancellers
 
 - **Location**: `src/Modules/Identity/Axis.Identity.Infrastructure/Messaging/OrganizationHardDeleteHandler.cs`
-- **Violates**: CLAUDE.md P0 — cross-module work must use Kafka events or RabbitMQ commands, not in-process calls into another module's infrastructure
+- **Violates**: AGENTS.md P0 — cross-module work must use Kafka events or RabbitMQ commands, not in-process calls into another module's infrastructure
 - **Why it exists**: organization-management [organization deletion](./README.md) hard-delete must cancel Workflow Engine executions and Form Builder pending tasks before dropping tenant schemas. Modulith composition registers `IOrganizationExecutionCanceller` and `IOrganizationFormTaskCanceller` at `Axis.Api` startup; Identity invokes them synchronously inside the scheduled `OrganizationHardDeleteJob` handler. RabbitMQ command contracts and outbox handlers are not yet defined for these two steps.
 - **Cleanup trigger**: When Workflow Engine and Form Builder expose versioned `*Command` handlers for org-scoped cancellation (ADR-024/025) and module extraction wiring no longer shares a process, replace direct canceller calls with Wolverine `IMessageBus` publish and remove the shared canceller interfaces from the hard-delete path.

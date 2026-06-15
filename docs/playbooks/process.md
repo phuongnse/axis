@@ -1,6 +1,6 @@
 # Development Process
 
-> **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
+> **Navigation**: [← docs/README.md](../README.md) · [← AGENTS.md](../../AGENTS.md)
 
 > Step-by-step checklists for backend and frontend. Read this at the start of any new module or user story — before writing any code.
 
@@ -43,7 +43,7 @@ Repeat for every user story, in layer order: Domain → Application → Infrastr
 - Read the use-case file ACs in full
 - Check `docs/PROGRESS.md` for current layer status
 - Identify 2–3 key design decisions (aggregate boundaries, value objects, event names, query shape)
-- **Surface decisions to the user and confirm before writing any code** — see "Surface architectural decisions first" rule in `CLAUDE.md`
+- **Surface decisions to the user and confirm before writing any code** — see "Surface architectural decisions first" rule in `AGENTS.md`
 
 #### Step 2 — Domain layer (TDD)
 
@@ -141,7 +141,7 @@ Repeat for every screen / feature area. **Never skip the wireframe step** — it
 | 4 | Define types from backend contract | `features/{name}/types.ts` |
 | 5 | Define API functions + query key factory | `features/{name}/api.ts` |
 | 6 | Write tests first (TDD) — Vitest + Testing Library | Failing tests that define expected behaviour |
-| 7 | Implement components + hooks | Feature folder anatomy (see `CLAUDE.md`) |
+| 7 | Implement components + hooks | Feature folder anatomy (see `AGENTS.md`) |
 | 8 | Wire route — lazy-loaded, nested inside `_authenticated` | New file under `routes/` |
 | 9 | Run gates: `npm run ci` + `npm run test` | Both green |
 | 10 | Update docs (same PR — see breakdown below) | No stale docs |

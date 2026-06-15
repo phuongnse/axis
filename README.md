@@ -12,7 +12,7 @@ At a high level, teams can model data, design workflows, collect inputs with for
 - Tech stack and ADRs: [docs/TECH_STACK.md](./docs/TECH_STACK.md)
 - Use cases and implementation progress: [docs/use-cases/README.md](./docs/use-cases/README.md)
 - Contribution guide: [CONTRIBUTING.md](./CONTRIBUTING.md)
-- Agent/workflow rules: [CLAUDE.md](./CLAUDE.md)
+- Agent/workflow rules: [AGENTS.md](./AGENTS.md)
 
 ## Quick start (local dev)
 

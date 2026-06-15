@@ -1,6 +1,6 @@
 # Docs style
 
-> **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
+> **Navigation**: [← docs/README.md](../README.md) · [← AGENTS.md](../../AGENTS.md)
 
 Short anti-pattern checklist for everything under `docs/`. Read once; come back when adding a new file. Some items are CI-enforced, some are review-only guidance; the enforcement status lives in [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md). Do not call a docs convention a gate unless CI actually blocks it.
 
@@ -52,7 +52,7 @@ Reference and practice docs are **scanned, not read**. Optimize for a reader who
 
 | File class | Budget | Action when exceeded |
 |---|---|---|
-| Reference docs (`CLAUDE.md`, `ARCHITECTURE.md`, playbooks) | 300 lines | Split by topic, extract a sub-playbook, or move detail into an index + section pattern |
+| Reference docs (`AGENTS.md`, `ARCHITECTURE.md`, playbooks) | 300 lines | Split by topic, extract a sub-playbook, or move detail into an index + section pattern |
 | `patterns.md` | exempt | Use [`patterns-index.md`](./patterns-index.md) as the entry point; never read end-to-end |
 | Domain README | 200 lines | Move detail into per-use-case files |
 | Use-case file | no hard cap | Already scoped by AC list |
@@ -63,7 +63,7 @@ Reference and practice docs are **scanned, not read**. Optimize for a reader who
 
 ## Keep practice docs general
 
-Practice / reference docs (playbooks, `CLAUDE.md`, `ARCHITECTURE.md`) state the **general principle**. A concrete instance appears only as a clearly-labeled, linked **example** (`e.g.`, `Canonical example:`, `Reference screen:`) — never as the rule itself.
+Practice / reference docs (playbooks, `AGENTS.md`, `ARCHITECTURE.md`) state the **general principle**. A concrete instance appears only as a clearly-labeled, linked **example** (`e.g.`, `Canonical example:`, `Reference screen:`) — never as the rule itself.
 
 When you learn something from a specific incident:
 
@@ -220,7 +220,7 @@ Use case files should be self-contained and user-facing:
 6. Diagrams table (mapped to this use case; explicit N/A if not needed yet)
 7. Implementation status callout
 
-Avoid writing engineering process constraints as end-user use cases. Keep those in shared playbooks and gates (for example `frontend.md`, `agent-checklist.md`, `CLAUDE.md`).
+Avoid writing engineering process constraints as end-user use cases. Keep those in shared playbooks and gates (for example `frontend.md`, `agent-checklist.md`, `AGENTS.md`).
 
 ---
 

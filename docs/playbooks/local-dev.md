@@ -1,6 +1,6 @@
 # Local dev — `docker compose up`
 
-> **Navigation**: [← docs/README.md](../README.md) · [← CLAUDE.md](../../CLAUDE.md)
+> **Navigation**: [← docs/README.md](../README.md) · [← AGENTS.md](../../AGENTS.md)
 
 The full dev stack runs from one `docker compose up -d`: **Postgres**, **Redis**, **MailDev**, **LocalStack**, **Kafka** (KRaft), **Schema Registry**, **RabbitMQ**, **Vault** (dev mode), the **.NET API**, and the **Vite SPA**. Backend hot-reloads via `dotnet watch`; frontend hot-reloads via Vite. Source is bind-mounted — edit on the host, containers pick up changes.
 

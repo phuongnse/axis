@@ -1,6 +1,6 @@
 # Axis Platform — Documentation
 
-> **Navigation**: [← CLAUDE.md](../CLAUDE.md)
+> **Navigation**: [← AGENTS.md](../AGENTS.md)
 
 > A low-code SaaS platform for building data-driven workflow applications.
 
@@ -201,7 +201,7 @@ When two docs disagree, the **owner** wins. Update the owner first; everything e
 | Use-case layout (flow + AC + artifacts + status) | [use-cases/USE_CASE_TEMPLATE.md](./use-cases/USE_CASE_TEMPLATE.md) + [playbooks/docs-style.md](./playbooks/docs-style.md#use-case-files--wireframes--implementation-status) |
 | Product scope, target users, production requirements | [PRODUCT_VISION.md](./PRODUCT_VISION.md) |
 | Library versions and ADRs | [TECH_STACK.md](./TECH_STACK.md) |
-| Source tree and module boundaries | [../CLAUDE.md](../CLAUDE.md) |
+| Source tree and module boundaries | [../AGENTS.md](../AGENTS.md) |
 | Per-use-case ACs and current gaps | `docs/use-cases/{domain}/{short-slug}/README.md` |
 | Module-wide layer status | [PROGRESS.md](./PROGRESS.md) |
 | Daily agent workflow + gates | [playbooks/agent-checklist.md](./playbooks/agent-checklist.md) |
