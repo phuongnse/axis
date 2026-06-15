@@ -20,7 +20,7 @@ Register an organization on the Axis platform with an official organization cont
 2. Actor enters organization name, organization contact email, and accepts Terms of Service / Privacy Policy.
 3. System validates the organization details, reserves a unique organization slug, and sends a verification email to the organization contact email.
 4. Actor verifies the organization email link.
-5. System marks the organization verified, starts tenant provisioning, and issues a first-user setup link owned by [register-user](../../identity-access/register-user/).
+5. System marks the organization verified, starts tenant provisioning, and issues a first-user setup link for the `/register` handoff.
 6. Actor continues to user registration to create the first owner/admin identity.
 
 ## Alternate / error flows
@@ -32,7 +32,7 @@ Register an organization on the Axis platform with an official organization cont
 
 ## Context
 
-This use case is about organization onboarding, not user identity onboarding. The email collected here is an official organization contact email, such as `admin@company.com` or `it@company.com`; it is not a personal user login. Microsoft / Google / GitHub identity providers belong to [register-user](../../identity-access/register-user/) and [sign-in](../../identity-access/sign-in/), where they authenticate an individual user.
+This use case is about organization onboarding, not user identity onboarding. The email collected here is an official organization contact email, such as `admin@company.com` or `it@company.com`; it is not a personal user login. Microsoft / Google / GitHub identity providers belong to user identity sign-in and provider-linking flows, not to organization registration.
 
 Axis supports standalone user accounts. Registering an organization is required only when a user wants to create or join an organization workspace; it is not a prerequisite for normal user registration.
 
@@ -44,7 +44,7 @@ Axis supports standalone user accounts. Registering an organization is required 
 - [ ] An organization slug is auto-generated from the organization name, uniqueness-checked, and shown to the actor before submission.
 - [ ] On successful submission, a verification email is sent to the organization contact email and the actor sees a confirmation screen.
 - [ ] Clicking the verification link verifies the organization contact email and starts tenant provisioning.
-- [ ] After organization verification, the system creates a short-lived first-user setup token/link for [register-user](../../identity-access/register-user/); the organization is not usable until a user account is created and attached.
+- [ ] After organization verification, the system creates a short-lived first-user setup token/link for the `/register` handoff; the organization is not usable until a user account is created and attached.
 - [ ] Once tenant provisioning completes, the first registered owner/admin can access the workspace.
 
 *Validation & errors*
@@ -70,8 +70,8 @@ Axis supports standalone user accounts. Registering an organization is required 
 - [ ] If provisioning fails after all retries, the UI shows a failed state with **Try again** and support contact.
 
 *Out of scope*
-- User account registration, password setup, account linking, and Microsoft / Google / GitHub login; see [register-user](../../identity-access/register-user/).
 - Standalone user registration without organization context; see [register-user](../../identity-access/register-user/).
+- User account provider linking and Microsoft / Google / GitHub login; see [sign-in](../../identity-access/sign-in/) and ADR-027.
 - Enterprise SAML/SCIM federation and per-tenant IdP configuration.
 - CAPTCHA / bot protection on the organization registration form.
 - Automatic re-send of verification email after X minutes.
@@ -87,12 +87,18 @@ Axis supports standalone user accounts. Registering an organization is required 
 > | API | ✅ |
 > | Frontend | ⚠️ |
 >
-> **Gaps vs spec:** Backend/API now split organization onboarding from user identity registration: `POST /api/organizations` records organization facts + legal versions, sends org-contact verification, starts provisioning after verification, and issues a short-lived setup token for [register-user](../../identity-access/register-user/). Remaining work is the dedicated register-org frontend copy/validation and polished setup-token handoff UI.
+> **Gaps vs spec:** Backend/API now split organization onboarding from standalone user registration.
+> `POST /api/organizations` records organization facts + legal versions and sends org-contact verification; it only creates the pending organization record.
+> The org-email verification step starts provisioning and issues a short-lived setup token for the `/register` first-owner handoff. Remaining work is the dedicated register-org frontend copy/validation and polished setup-token handoff UI.
+>
+> **Deferred follow-ups:**
+> - Dedicated register-org frontend copy/validation.
+> - Polished first-owner setup-token handoff UI.
 >
 > **Decisions:**
 > - `register-org` owns organization facts only: organization name, organization contact email, legal acceptance, slug, verification, and tenant provisioning.
 > - Microsoft / Google / GitHub authenticate users, not organizations. Generic OAuth provider claims must not be used as proof that someone controls an organization.
-> - First owner/admin creation is a follow-up user-registration step using a short-lived setup token/link after organization verification.
+> - First owner/admin identity creation is a follow-up setup-token step after organization verification.
 > - Organization onboarding is optional from the product perspective: a user can register and use Axis without creating or joining an organization.
 
 ## Screen flow
@@ -103,7 +109,7 @@ Canonical order for this use case. Screens owned by another use case are linked 
 |------|--------|------|
 | 1 | `register-org` | Enter organization name, organization contact email, slug preview, and legal acceptance |
 | 2 | `email-confirmation` | After organization registration submit; tells actor to verify the organization email |
-| 3 | [register-user](../../identity-access/register-user/) | First owner/admin uses the setup token and creates a user identity after organization verification |
+| 3 | First-user setup handoff | First owner/admin uses the setup token and creates a user identity after organization verification |
 | 4 | `workspace-provisioning` | After user email verification when tenant setup is still running |
 
 **Error / reference screens** (not sequential steps):
@@ -119,14 +125,14 @@ Canonical order for this use case. Screens owned by another use case are linked 
 flowchart TD
   entry["1 · register-org"]
   confirm["2 · email-confirmation"]
-  user["3 · register-user"]
+  user["3 · first-user setup"]
   provision["4 · workspace-provisioning"]
   errEntry["register-org-states"]
   errEmail["email-confirmation-states"]
   errVerify["verify-email-states"]
 
   entry --> confirm
-  confirm -->|"verify org email + setup token"| user
+  confirm -->|"verify org email; issue setup token"| user
   user -->|"verify user email; tenant still provisioning"| provision
   entry -.-> errEntry
   confirm -.-> errEmail
@@ -135,7 +141,7 @@ flowchart TD
 
 ## Wireframes
 
-UI assets in this folder cover organization-owned screens. External-provider/user-identity screens are owned by [register-user](../../identity-access/register-user/), not this folder.
+UI assets in this folder cover organization-owned screens. Standalone user registration is owned by [register-user](../../identity-access/register-user/); external-provider/user-identity screens are not owned by this folder.
 
 | # | Screen | Role | Excalidraw | Preview |
 |---|--------|------|------------|---------|
@@ -150,7 +156,7 @@ UI assets in this folder cover organization-owned screens. External-provider/use
 
 ### register-org-journey
 
-Organization onboarding only. User identity setup continues in [register-user](../../identity-access/register-user/) only for users who are creating or joining an organization.
+Organization onboarding only. First-owner identity setup continues through the setup-token `/register` handoff for users who are creating an organization.
 
 ```mermaid
 %%{init: {'theme':'dark','themeVariables':{'background':'#0d1117','mainBkg':'#0d1117','primaryColor':'#161b22','primaryBorderColor':'#388bfd','primaryTextColor':'#e6edf3','secondaryColor':'#21262d','secondaryBorderColor':'#388bfd','secondaryTextColor':'#e6edf3','tertiaryColor':'#161b22','tertiaryTextColor':'#e6edf3','lineColor':'#58a6ff','textColor':'#e6edf3','nodeBorder':'#388bfd','clusterBkg':'#161b22','clusterBorder':'#388bfd','titleColor':'#e6edf3','edgeLabelBackground':'#161b22','actorBkg':'#161b22','actorBorder':'#388bfd','actorTextColor':'#e6edf3','signalColor':'#58a6ff','labelBoxBkgColor':'#161b22','labelBoxBorderColor':'#388bfd','noteBkgColor':'#161b22','noteBorderColor':'#388bfd','noteTextColor':'#c9d1d9','activationBkgColor':'#30363d'}}}%%
@@ -172,7 +178,7 @@ sequenceDiagram
   API->>Provisioning: Start tenant provisioning
   Provisioning-->>API: Module provisioning reports
   API-->>Web: Workspace provisioning status
-  Web-->>Rep: Continue to register-user setup link when ready
+  Web-->>Rep: Continue to `/register` first-owner setup link when ready
 ```
 
 ### tenant-provisioning
@@ -200,4 +206,4 @@ sequenceDiagram
   end
 ```
 
-**Related:** [register-user](../../identity-access/register-user/) owns standalone user registration, first owner/admin account setup, organization join context, and third-party identity providers.
+**Related:** [register-user](../../identity-access/register-user/) owns standalone user registration. First owner/admin setup-token polish remains part of this organization onboarding journey; third-party identity providers belong to user identity sign-in/provider-linking flows.

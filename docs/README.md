@@ -58,7 +58,7 @@ Use-case **sequence / entity** diagrams live in each use-case `README.md` under 
 | Diagram | Owner |
 |---|---|
 | Organization onboarding journey | [register-org § Diagrams](./use-cases/platform-foundation/register-org/README.md#diagrams) |
-| User registration journey | [register-user § Diagrams](./use-cases/identity-access/register-user/README.md#diagrams) |
+| Standalone user registration journey | [register-user § Diagrams](./use-cases/identity-access/register-user/README.md#diagrams) |
 | Auth flow | [sign-in § Diagrams](./use-cases/identity-access/sign-in/README.md#diagrams) |
 | Data model | [create-model § Diagrams](./use-cases/data-modeling/create-model/README.md#diagrams) |
 | Workflow model | [create-workflow § Diagrams](./use-cases/workflow-builder/create-workflow/README.md#diagrams) |
