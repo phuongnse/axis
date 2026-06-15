@@ -2,7 +2,7 @@
 
 Axis is an open-source low-code application platform for building adaptable, data-driven workflow applications.
 
-It provides the core building blocks: custom data models, workflows, forms, and role-based pages, so applications can be assembled, extended, and governed from one place without starting from scratch.
+It provides the core building blocks: custom data models, workflows, forms, and role-based pages, so applications can be assembled and extended on a consistent foundation.
 
 ## Quick links
 
