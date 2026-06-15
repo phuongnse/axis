@@ -83,7 +83,7 @@ Register & authenticate → Model data → Build workflows → Add forms
 
 **Implementation order** follows domain **Open work** and use-case **Gaps vs spec** — not a reduced feature phase. Deferred items in a use case are backlog within the same product scope, not excluded from the platform.
 
-**External user sign-in (required providers):** Microsoft (Entra ID / Microsoft account), Google, and GitHub — in addition to email/password. Details: [sign-in](./use-cases/identity-access/sign-in/README.md), [register-user](./use-cases/identity-access/register-user/README.md), [TECH_STACK § ADR-027](./TECH_STACK.md#adr-027-external-identity-providers-for-user-sign-in-and-registration). Organization onboarding uses an official organization contact email, not a generic third-party user identity.
+**External user sign-in (required providers):** Microsoft (Entra ID / Microsoft account), Google, and GitHub — in addition to email/password. Details: [sign-in](./use-cases/identity-access/sign-in/README.md) and [TECH_STACK § ADR-027](./TECH_STACK.md#adr-027-external-identity-providers-for-user-sign-in-and-registration). Provider registration/linking is a separate user-identity follow-up; [register-user](./use-cases/identity-access/register-user/README.md) covers standalone email/password registration. Organization onboarding uses an official organization contact email, not a generic third-party user identity.
 
 ---
 

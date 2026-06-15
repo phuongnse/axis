@@ -46,6 +46,37 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     // ── PKCE Flow ─────────────────────────────────────────────────────────────
 
     [Fact]
+    public async Task RegisterUser_WhenStandalonePayloadIsValid_VerifiesEmailAndStartsDashboardSession()
+    {
+        HttpClient client = fixture.CreateNewClient();
+        string suffix = "standalone_user1";
+        string email = TestRegistrationPayload.AdminEmail(suffix);
+
+        HttpResponseMessage registerResp = await client.PostAsJsonAsync(
+            "/api/users/register",
+            TestRegistrationPayload.CreateUser(suffix),
+            Json);
+
+        registerResp.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        string verifyToken = fixture.EmailCapture.GetVerificationToken(email)
+            ?? throw new InvalidOperationException($"No verification token captured for {email}.");
+
+        HttpResponseMessage verifyResp = await client.PostAsJsonAsync(
+            "/api/auth/verify-email",
+            new { token = verifyToken },
+            Json);
+
+        verifyResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement verifyBody = await verifyResp.Content.ReadFromJsonAsync<JsonElement>();
+        verifyBody.GetProperty("sessionEstablished").GetBoolean().Should().BeTrue();
+        verifyBody.GetProperty("nextStep").GetString().Should().Be("Dashboard");
+
+        string accessToken = await AuthHelper.CompletePkceFlowWithSessionAsync(client);
+        accessToken.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
     public async Task Authorize_WhenEmailIsVerified_ReturnsAccessToken()
     {
         string email = await AuthHelper.RegisterAndVerifyAdminAsync(fixture, "auth_pkce1");

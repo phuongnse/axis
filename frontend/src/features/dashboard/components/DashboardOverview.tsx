@@ -27,12 +27,16 @@ interface UsageCardProps {
   icon: LucideIcon;
 }
 
-function formatNumber(value: number | null | undefined): string {
-  return typeof value === 'number' ? new Intl.NumberFormat().format(value) : '-';
+function formatNumber(value: number | null | undefined, locale: string): string {
+  return typeof value === 'number' ? new Intl.NumberFormat(locale).format(value) : '-';
 }
 
-function formatLimit(limit: number | null | undefined, unlimitedLabel: string): string {
-  return typeof limit === 'number' ? new Intl.NumberFormat().format(limit) : unlimitedLabel;
+function formatLimit(
+  limit: number | null | undefined,
+  unlimitedLabel: string,
+  locale: string,
+): string {
+  return typeof limit === 'number' ? new Intl.NumberFormat(locale).format(limit) : unlimitedLabel;
 }
 
 function usagePercent(used: number | null | undefined, limit: number | null | undefined) {
@@ -40,26 +44,30 @@ function usagePercent(used: number | null | undefined, limit: number | null | un
   return Math.min(100, Math.round((used / limit) * 100));
 }
 
-function usageCards(usage: UsageStats | undefined, unlimitedLabel: string): UsageCardProps[] {
+function usageCards(
+  usage: UsageStats | undefined,
+  unlimitedLabel: string,
+  locale: string,
+): UsageCardProps[] {
   return [
     {
       label: 'dashboard.usage.users',
-      value: formatNumber(usage?.usersUsed),
-      limit: formatLimit(usage?.usersLimit, unlimitedLabel),
+      value: formatNumber(usage?.usersUsed, locale),
+      limit: formatLimit(usage?.usersLimit, unlimitedLabel, locale),
       percent: usagePercent(usage?.usersUsed, usage?.usersLimit),
       icon: Users,
     },
     {
       label: 'dashboard.usage.workflows',
-      value: formatNumber(usage?.workflowsUsed),
-      limit: formatLimit(usage?.workflowsLimit, unlimitedLabel),
+      value: formatNumber(usage?.workflowsUsed, locale),
+      limit: formatLimit(usage?.workflowsLimit, unlimitedLabel, locale),
       percent: usagePercent(usage?.workflowsUsed, usage?.workflowsLimit),
       icon: Workflow,
     },
     {
       label: 'dashboard.usage.executions',
-      value: formatNumber(usage?.executionsUsedThisMonth),
-      limit: formatLimit(usage?.executionsPerMonthLimit, unlimitedLabel),
+      value: formatNumber(usage?.executionsUsedThisMonth, locale),
+      limit: formatLimit(usage?.executionsPerMonthLimit, unlimitedLabel, locale),
       percent: usagePercent(usage?.executionsUsedThisMonth, usage?.executionsPerMonthLimit),
       icon: Zap,
     },
@@ -190,7 +198,7 @@ function ErrorDashboard({ onRetry }: { onRetry: () => void }) {
 }
 
 export function DashboardOverview() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { profileQuery, organizationSettingsQuery, canReadSettings, hasWorkspace } =
     useWorkspaceStart();
 
@@ -302,9 +310,11 @@ export function DashboardOverview() {
             <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.usage.body')}</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
-            {usageCards(settings.usage, t('dashboard.usage.unlimited')).map((card) => (
-              <UsageCard key={card.label} {...card} />
-            ))}
+            {usageCards(settings.usage, t('dashboard.usage.unlimited'), i18n.language).map(
+              (card) => (
+                <UsageCard key={card.label} {...card} />
+              ),
+            )}
           </div>
         </section>
       ) : (

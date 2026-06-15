@@ -62,7 +62,7 @@ Ship first — tenant registration, isolation, and subscription plans are prereq
 
 ## Diagrams
 
-Organization onboarding journey (org contact email → verify → provisioning): [register-org § Diagrams](./register-org/README.md#diagrams) (`register-org-journey`, `tenant-provisioning`). User identity setup continues in [identity-access/register-user](../identity-access/register-user/) only when the user is creating or joining an organization; standalone users can register without an organization.
+Organization onboarding journey (org contact email → verify → provisioning): [register-org § Diagrams](./register-org/README.md#diagrams) (`register-org-journey`, `tenant-provisioning`). First-owner identity setup is a separate setup-token handoff that continues at `/register` and is owned by `register-org`. Standalone users register through [identity-access/register-user](../identity-access/register-user/) without an organization.
 
 ---
 
@@ -82,7 +82,7 @@ Organization onboarding journey (org contact email → verify → provisioning):
 | Shared Domain | ✅ Done | `Entity`, `AggregateRoot`, `ValueObject`, `IDomainEvent`, `Result<T>` |
 | Shared Application | ✅ Done | `ICommand/IQuery`, `ICommandHandler/IQueryHandler`, `ValidationBehavior`, `ITenantContext` |
 | Shared Infrastructure | ✅ Done | `TenantSchemaInterceptor`, per-module `UnitOfWork` ([ADR-017](../../TECH_STACK.md#adr-017-axisshared-is-abstractions-only-no-shared-implementation)); **OpenTelemetry** host wiring on `Axis.Api` ([ADR-018](../../TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability), [patterns § OpenTelemetry](../../playbooks/patterns.md#opentelemetry-observability)) |
-| [Register org](register-org/) | ⚠️ Partial | Backend/API split is implemented: organization contact email + org verification + tenant provisioning stay here; first-user setup and standalone user registration move to [identity-access/register-user](../identity-access/register-user/). Dedicated register-org frontend remains. |
+| [Register org](register-org/) | ⚠️ Partial | Backend/API split is implemented: organization contact email + org verification + tenant provisioning stay here. Standalone user registration is complete in [identity-access/register-user](../identity-access/register-user/); first-user setup-token handoff polish and the dedicated register-org frontend remain here. |
 | [Subscription plans](view-plans/) | ✅ Done | `GET /api/plans`, pricing data, 402 limits — see [enforce limits](enforce-limits/). Frontend pricing UI ⏳ |
 | [Tenant isolation](tenant-scope/) | ✅ Done | `TenantSchemaInterceptor`, `TenantOrganizationAccessMiddleware`, cross-tenant API tests |
 | [Organization management](org-profile/) | ✅ Done | Profile, settings + usage, scheduled deletion + hard-delete job ✅. Frontend settings UI ⏳ |
