@@ -19,6 +19,9 @@ const LoginLazyRouteImport = createFileRoute('/login')()
 const ForgotPasswordLazyRouteImport = createFileRoute('/forgot-password')()
 const CallbackLazyRouteImport = createFileRoute('/callback')()
 const IndexLazyRouteImport = createFileRoute('/')()
+const RegisterOrganizationLazyRouteImport = createFileRoute(
+  '/register/organization',
+)()
 const RegisterConfirmationLazyRouteImport = createFileRoute(
   '/register/confirmation',
 )()
@@ -63,6 +66,14 @@ const IndexLazyRoute = IndexLazyRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/index.lazy').then((d) => d.Route))
+const RegisterOrganizationLazyRoute =
+  RegisterOrganizationLazyRouteImport.update({
+    id: '/organization',
+    path: '/organization',
+    getParentRoute: () => RegisterLazyRoute,
+  } as any).lazy(() =>
+    import('./routes/register/organization.lazy').then((d) => d.Route),
+  )
 const RegisterConfirmationLazyRoute =
   RegisterConfirmationLazyRouteImport.update({
     id: '/confirmation',
@@ -95,6 +106,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardLazyRoute
   '/auth/verify': typeof AuthVerifyLazyRoute
   '/register/confirmation': typeof RegisterConfirmationLazyRoute
+  '/register/organization': typeof RegisterOrganizationLazyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexLazyRoute
@@ -106,6 +118,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardLazyRoute
   '/auth/verify': typeof AuthVerifyLazyRoute
   '/register/confirmation': typeof RegisterConfirmationLazyRoute
+  '/register/organization': typeof RegisterOrganizationLazyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -119,6 +132,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardLazyRoute
   '/auth/verify': typeof AuthVerifyLazyRoute
   '/register/confirmation': typeof RegisterConfirmationLazyRoute
+  '/register/organization': typeof RegisterOrganizationLazyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -132,6 +146,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/auth/verify'
     | '/register/confirmation'
+    | '/register/organization'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -143,6 +158,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/auth/verify'
     | '/register/confirmation'
+    | '/register/organization'
   id:
     | '__root__'
     | '/'
@@ -155,6 +171,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/auth/verify'
     | '/register/confirmation'
+    | '/register/organization'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -219,6 +236,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexLazyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/register/organization': {
+      id: '/register/organization'
+      path: '/organization'
+      fullPath: '/register/organization'
+      preLoaderRoute: typeof RegisterOrganizationLazyRouteImport
+      parentRoute: typeof RegisterLazyRoute
+    }
     '/register/confirmation': {
       id: '/register/confirmation'
       path: '/confirmation'
@@ -257,10 +281,12 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 
 interface RegisterLazyRouteChildren {
   RegisterConfirmationLazyRoute: typeof RegisterConfirmationLazyRoute
+  RegisterOrganizationLazyRoute: typeof RegisterOrganizationLazyRoute
 }
 
 const RegisterLazyRouteChildren: RegisterLazyRouteChildren = {
   RegisterConfirmationLazyRoute: RegisterConfirmationLazyRoute,
+  RegisterOrganizationLazyRoute: RegisterOrganizationLazyRoute,
 }
 
 const RegisterLazyRouteWithChildren = RegisterLazyRoute._addFileChildren(

@@ -5,7 +5,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { type RenderOptions, type RenderResult, render } from '@testing-library/react';
+import { act, type RenderOptions, type RenderResult, render } from '@testing-library/react';
 import type { ReactElement } from 'react';
 
 import { PreferenceEffects } from '../src/features/preferences';
@@ -43,13 +43,19 @@ export async function renderWithRouter(
 
   await router.load();
 
-  const result = render(
-    <QueryClientProvider client={queryClient}>
-      <PreferenceEffects />
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-    renderOptions,
-  );
+  let result: RenderResult | undefined;
+  await act(async () => {
+    result = render(
+      <QueryClientProvider client={queryClient}>
+        <PreferenceEffects />
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+      renderOptions,
+    );
+  });
+  if (!result) {
+    throw new Error('Failed to render test route');
+  }
 
   return { router, ...result };
 }

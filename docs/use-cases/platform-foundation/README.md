@@ -82,11 +82,11 @@ Organization onboarding journey (org contact email → verify → provisioning):
 | Shared Domain | ✅ Done | `Entity`, `AggregateRoot`, `ValueObject`, `IDomainEvent`, `Result<T>` |
 | Shared Application | ✅ Done | `ICommand/IQuery`, `ICommandHandler/IQueryHandler`, `ValidationBehavior`, `ITenantContext` |
 | Shared Infrastructure | ✅ Done | `TenantSchemaInterceptor`, per-module `UnitOfWork` ([ADR-017](../../TECH_STACK.md#adr-017-axisshared-is-abstractions-only-no-shared-implementation)); **OpenTelemetry** host wiring on `Axis.Api` ([ADR-018](../../TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability), [patterns § OpenTelemetry](../../playbooks/patterns.md#opentelemetry-observability)) |
-| [Register org](register-org/) | ⚠️ Partial | Backend/API split is implemented: organization contact email + org verification + tenant provisioning stay here. Standalone user registration is complete in [identity-access/register-user](../identity-access/register-user/); first-user setup-token handoff polish and the dedicated register-org frontend remain here. |
+| [Register org](register-org/) | ✅ Done | Organization contact registration, org-email verification, tenant provisioning status/retry, and first-owner `/register` setup-token handoff are implemented. Standalone user registration remains complete in [identity-access/register-user](../identity-access/register-user/). |
 | [Subscription plans](view-plans/) | ✅ Done | `GET /api/plans`, pricing data, 402 limits — see [enforce limits](enforce-limits/). Frontend pricing UI ⏳ |
 | [Tenant isolation](tenant-scope/) | ✅ Done | `TenantSchemaInterceptor`, `TenantOrganizationAccessMiddleware`, cross-tenant API tests |
 | [Organization management](org-profile/) | ✅ Done | Profile, settings + usage, scheduled deletion + hard-delete job ✅. Frontend settings UI ⏳ |
-| Frontend | ⏳ Pending | Register-org journey (incl. verify screens), provisioning wait, settings, pricing |
+| Frontend | ⚠️ Partial | Register-org journey (incl. verify screens), provisioning wait, and first-owner setup-token handoff are shipped. Pricing and settings UIs remain pending. |
 
 ---
 
@@ -94,7 +94,7 @@ Organization onboarding journey (org contact email → verify → provisioning):
 
 | Priority | Item | Where |
 |----------|------|--------|
-| Frontend | [Register org](register-org/) organization onboarding, [pricing](view-plans/), [org settings](org-settings/) | see **Use Cases** table above |
+| Frontend | [pricing](view-plans/), [org settings](org-settings/) | see **Use Cases** table above |
 
 Domain-level checkboxes above remain spec-only; status is in use-case **Implementation status** callouts.
 

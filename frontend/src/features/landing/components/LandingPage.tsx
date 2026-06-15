@@ -1,4 +1,4 @@
-import { LockKeyhole, LogIn, UserPlus } from 'lucide-react';
+import { Building2, LockKeyhole, LogIn, UserPlus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { ActionLink } from '@/components/ui/action-link';
@@ -18,6 +18,14 @@ function LandingActions() {
       </ActionLink>
       <ActionLink to="/register" icon={UserPlus} surface="adaptive" variant="secondary">
         {t('common.createAccount')}
+      </ActionLink>
+      <ActionLink
+        to="/register/organization"
+        icon={Building2}
+        surface="adaptive"
+        variant="secondary"
+      >
+        {t('organizationRegistration.createWorkspace')}
       </ActionLink>
     </div>
   );

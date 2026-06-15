@@ -10,10 +10,15 @@ import { AuthCard } from '@/features/auth/components/AuthCard';
 import { AuthNotice } from '@/features/auth/components/AuthNotice';
 import { PasswordCriteria } from '@/features/auth/components/PasswordCriteria';
 import { useRegister } from '@/features/auth/hooks/useRegister';
+import { loadRegistrationContext } from '@/features/auth/registration-context';
+import { useQueryParam } from '@/features/auth/use-query-param';
 
 export function RegisterPage() {
   const { t } = useTranslation();
   const { form, loading, submit } = useRegister();
+  const organizationSetupToken = useQueryParam('setupToken');
+  const context = loadRegistrationContext();
+  const isFirstOwnerSetup = Boolean(organizationSetupToken);
   const {
     register,
     handleSubmit,
@@ -25,7 +30,16 @@ export function RegisterPage() {
 
   return (
     <AuthCard
-      title={t('register.title')}
+      title={isFirstOwnerSetup ? t('register.firstOwnerTitle') : t('register.title')}
+      banner={
+        isFirstOwnerSetup ? (
+          <AuthNotice variant="info" title={t('register.firstOwnerBannerTitle')}>
+            {t('register.firstOwnerBannerBody', {
+              organizationName: context?.organizationName ?? t('provisioning.organizationFallback'),
+            })}
+          </AuthNotice>
+        ) : undefined
+      }
       footer={
         <>
           {t('register.footerPrompt')}{' '}
@@ -39,7 +53,9 @@ export function RegisterPage() {
         <FormField
           id="fullName"
           label={t('register.fullName')}
-          helpText={t('register.fullNameHelp')}
+          helpText={
+            isFirstOwnerSetup ? t('register.firstOwnerNameHelp') : t('register.fullNameHelp')
+          }
           error={errors.fullName?.message}
         >
           {({ describedBy }) => (
@@ -56,7 +72,7 @@ export function RegisterPage() {
         <FormField
           id="email"
           label={t('common.emailAddress')}
-          helpText={t('register.emailHelp')}
+          helpText={isFirstOwnerSetup ? t('register.firstOwnerEmailHelp') : t('register.emailHelp')}
           error={errors.email?.message}
         >
           {({ describedBy }) => (
@@ -140,7 +156,11 @@ export function RegisterPage() {
 
         <Button type="submit" variant="cta" className="w-full h-9" disabled={loading}>
           <UserPlus className="size-4" aria-hidden />
-          {loading ? t('register.creatingAccount') : t('common.createAccount')}
+          {loading
+            ? t('register.creatingAccount')
+            : isFirstOwnerSetup
+              ? t('register.createOwnerAccount')
+              : t('common.createAccount')}
         </Button>
       </form>
     </AuthCard>

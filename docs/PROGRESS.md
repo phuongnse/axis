@@ -75,7 +75,7 @@ Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoi
 
 ## Platform Foundation (`platform-foundation`)
 
-**Tenant registration:** ⚠️ backend/API split implemented after process/design split. `register-org` owns organization contact email verification + tenant provisioning only. Standalone email/password user registration is complete in `identity-access/register-user`; first-user setup-token handoff polish stays with `register-org`, and third-party provider registration/linking remains a separate Identity follow-up. Reusable pieces: slug preview, legal versions, confirmation/resend, verify-email states, provisioning status UI. Remaining frontend: dedicated organization-contact registration screen/copy and polished setup-token handoff.
+**Tenant registration:** ✅ `register-org` owns organization contact email verification + tenant provisioning. Dedicated `/register/organization` frontend, slug preview, legal versions, confirmation/resend, verify-email states, provisioning status/retry UI, and first-owner `/register?setupToken=...` handoff are shipped. Standalone email/password user registration is complete in `identity-access/register-user`; third-party provider registration/linking remains a separate Identity follow-up.
 
 **Subscription plans (backend):** ✅ `GET /api/plans`, platform plan change, 402 limits (workflows / users / executions), Redis counters. Frontend pricing UI ⏳. **Deferred:** atomic execution counter under concurrency; fail-closed when Redis unavailable; bulk multi-workflow import limit AC until bulk endpoint exists.
 
@@ -87,7 +87,7 @@ Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoi
 
 ## Registration journey (cross-cutting)
 
-**Register org (sign-up → verify → provision):** spec in [register-org](./use-cases/platform-foundation/register-org/README.md). **Verify → async provision:** `User.VerifyEmail()` sets org `Provisioning`, seeds `tenant_module_provisions`, publishes `OrganizationVerifiedEvent` → each module provisions and reports via `TenantModuleProvisionReportEvent`; Identity coordinator retries (3×, exponential backoff) and logs critical alert on exhaustion; `GET /api/auth/provisioning-status?token=` for polling. **Frontend ⚠️:** `/register/confirmation`, `/auth/verify`, `/provisioning` screens shipped; auto sign-in after verify and manual retry UI **Deferred**.
+**Register org (sign-up → verify → provision):** spec in [register-org](./use-cases/platform-foundation/register-org/README.md). **Verify → async provision:** `User.VerifyEmail()` sets org `Provisioning`, seeds `tenant_module_provisions`, publishes `OrganizationVerifiedEvent` → each module provisions and reports via `TenantModuleProvisionReportEvent`; Identity coordinator retries (3×, exponential backoff) and logs critical alert on exhaustion; `GET /api/auth/provisioning-status?token=` for polling. **Frontend ✅:** `/register/organization`, `/register/confirmation`, `/auth/verify`, first-owner `/register?setupToken=...`, and `/provisioning` screens are shipped with retry support.
 
 ## Page Builder (`page-builder`)
 

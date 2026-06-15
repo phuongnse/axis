@@ -171,8 +171,15 @@ describe('RegisterPage', () => {
 
     await renderWithRouter(<RegisterPage />, { path: '/register?setupToken=setup-token' });
 
+    expect(
+      screen.getByRole('heading', { name: /create the first owner account/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Create the first owner account for your organization/i),
+    ).toBeInTheDocument();
+
     await fillRegisterForm(user);
-    await user.click(screen.getByRole('button', { name: /create account/i }));
+    await user.click(screen.getByRole('button', { name: /create owner account/i }));
 
     await waitFor(() => {
       expect(registerBody?.organizationSetupToken).toBe('setup-token');

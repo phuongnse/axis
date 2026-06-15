@@ -85,20 +85,18 @@ Axis supports standalone user accounts. Registering an organization is required 
 > | Application | ✅ |
 > | Infrastructure | ✅ |
 > | API | ✅ |
-> | Frontend | ⚠️ |
+> | Frontend | ✅ |
 >
-> **Gaps vs spec:** Backend/API now split organization onboarding from standalone user registration.
+> **Gaps vs spec:** None for the register-org baseline.
 > `POST /api/organizations` records organization facts + legal versions and sends org-contact verification; it only creates the pending organization record.
-> The org-email verification step starts provisioning and issues a short-lived setup token for the `/register` first-owner handoff. Remaining work is the dedicated register-org frontend copy/validation and polished setup-token handoff UI.
+> The org-email verification step starts provisioning and issues a short-lived setup token for the `/register` first-owner handoff.
 >
-> **Deferred follow-ups:**
-> - Dedicated register-org frontend copy/validation.
-> - Polished first-owner setup-token handoff UI.
+> **Deferred follow-ups:** N/A
 >
 > **Decisions:**
 > - `register-org` owns organization facts only: organization name, organization contact email, legal acceptance, slug, verification, and tenant provisioning.
 > - Microsoft / Google / GitHub authenticate users, not organizations. Generic OAuth provider claims must not be used as proof that someone controls an organization.
-> - First owner/admin identity creation is a follow-up setup-token step after organization verification.
+> - First owner/admin identity creation is a setup-token handoff after organization verification. The dedicated organization registration page is `/register/organization`; the first-owner account handoff continues through `/register?setupToken=...`.
 > - Organization onboarding is optional from the product perspective: a user can register and use Axis without creating or joining an organization.
 
 ## Screen flow
