@@ -60,12 +60,6 @@ describe('RegisterPage', () => {
     const user = userEvent.setup();
     await renderWithRouter(<RegisterPage />, { path: '/register' });
 
-    expect(screen.getByText('Personal account')).toBeInTheDocument();
-    expect(screen.getByText(/You can add a team account later/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /create a team account instead/i })).toHaveAttribute(
-      'href',
-      '/register/team',
-    );
     expect(screen.getByText('This name will appear in your workspace.')).toBeInTheDocument();
     expect(
       screen.getByText('We will send a verification link to this address.'),
@@ -147,7 +141,7 @@ describe('RegisterPage', () => {
     expect(stored).not.toContain('organizationName');
   });
 
-  it('includes setup token when registering the first team owner', async () => {
+  it('includes setup token when registering the first organization user', async () => {
     const user = userEvent.setup();
     let registerBody: Record<string, unknown> | undefined;
     vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
@@ -177,15 +171,8 @@ describe('RegisterPage', () => {
 
     await renderWithRouter(<RegisterPage />, { path: '/register?setupToken=setup-token' });
 
-    expect(
-      screen.getByRole('heading', { name: /create the first owner account/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Create the first owner account for your team account/i),
-    ).toBeInTheDocument();
-
     await fillRegisterForm(user);
-    await user.click(screen.getByRole('button', { name: /create owner account/i }));
+    await user.click(screen.getByRole('button', { name: /create account/i }));
 
     await waitFor(() => {
       expect(registerBody?.organizationSetupToken).toBe('setup-token');

@@ -33,22 +33,6 @@ describe('EmailConfirmationPage', () => {
     expect(screen.getByRole('button', { name: /resend email/i })).toBeInTheDocument();
   });
 
-  it('uses team account confirmation copy when registration context has a team name', async () => {
-    saveRegistrationContext({
-      email: 'admin@company.com',
-      organizationName: 'Acme Corp',
-    });
-
-    await renderWithRouter(<EmailConfirmationPage />, { path: '/register/confirmation' });
-
-    expect(screen.getByRole('heading', { name: /verify your team email/i })).toBeInTheDocument();
-    expect(screen.getByText(/Sent to admin@company.com for Acme Corp/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /create another team account/i })).toHaveAttribute(
-      'href',
-      '/register/team',
-    );
-  });
-
   it('shows success banner after resend succeeds', async () => {
     const user = userEvent.setup();
     vi.mocked(fetch).mockResolvedValueOnce({

@@ -48,35 +48,18 @@ internal sealed class MailKitEmailSender(IConfiguration configuration) : IEmailS
 
     private async Task SendAsync(string toEmail, string subject, string body, CancellationToken ct)
     {
-        IConfigurationSection email = configuration.GetSection("Email");
         IConfigurationSection smtp = configuration.GetSection("Email:Smtp");
-        string fromAddress = email["FromAddress"] ?? smtp["FromAddress"] ?? smtp["From"] ?? "noreply@axis.app";
-        string? fromName = email["FromName"] ?? smtp["FromName"];
-        string host = email["Host"] ?? smtp["Host"] ?? "localhost";
-        string portValue = email["Port"] ?? smtp["Port"] ?? "587";
-        string? username = email["Username"] ?? smtp["Username"];
-        string password = email["Password"] ?? smtp["Password"] ?? string.Empty;
-
-        if (!int.TryParse(portValue, out int port))
-        {
-            throw new InvalidOperationException("Email SMTP port must be an integer.");
-        }
-
         MimeMessage message = new MimeMessage();
-        message.From.Add(string.IsNullOrWhiteSpace(fromName)
-            ? MailboxAddress.Parse(fromAddress)
-            : new MailboxAddress(fromName, fromAddress));
+        message.From.Add(MailboxAddress.Parse(smtp["From"] ?? "noreply@axis.app"));
         message.To.Add(MailboxAddress.Parse(toEmail));
         message.Subject = subject;
         message.Body = new TextPart("plain") { Text = body };
 
         using SmtpClient client = new SmtpClient();
-        await client.ConnectAsync(host, port, cancellationToken: ct);
+        await client.ConnectAsync(smtp["Host"] ?? "localhost", int.Parse(smtp["Port"] ?? "587"), cancellationToken: ct);
 
-        if (!string.IsNullOrEmpty(username))
-        {
-            await client.AuthenticateAsync(username, password, ct);
-        }
+        if (!string.IsNullOrEmpty(smtp["Username"]))
+            await client.AuthenticateAsync(smtp["Username"]!, smtp["Password"] ?? string.Empty, ct);
 
         await client.SendAsync(message, ct);
         await client.DisconnectAsync(quit: true, ct);

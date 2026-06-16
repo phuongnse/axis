@@ -25,7 +25,7 @@ Ship first — tenant registration, isolation, and subscription plans are prereq
 | Use case | Summary |
 |---|---|
 | [Select a subscription plan during registration](plan-at-signup/) | Choose a subscription plan during registration so that I know what features and limits I have access to. |
-| [Create a team account](register-org/) | Create a team account on the Axis platform so one user can manage multiple users, roles, invitations, and tenant-scoped… |
+| [Register a new organization](register-org/) | Register an organization on the Axis platform with an official organization contact email, verify that contact channel… |
 
 ### Subscription plans
 
@@ -62,16 +62,16 @@ Ship first — tenant registration, isolation, and subscription plans are prereq
 
 ## Diagrams
 
-Team account onboarding journey (team contact email → verify → provisioning): [register-org § Diagrams](./register-org/README.md#diagrams) (`register-org-journey`, `tenant-provisioning`). First-owner identity setup is a separate setup-token handoff that continues at `/register` and is owned by `register-org`. Standalone users register through [identity-access/register-user](../identity-access/register-user/) without a team account.
+Organization onboarding journey (org contact email → verify → provisioning): [register-org § Diagrams](./register-org/README.md#diagrams) (`register-org-journey`, `tenant-provisioning`). First-owner identity setup is a separate setup-token handoff that continues at `/register` and is owned by `register-org`. Standalone users register through [identity-access/register-user](../identity-access/register-user/) without an organization.
 
 ---
 
 ## Acceptance Criteria (domain)
 
-- [ ] A new team account can register and be fully provisioned with isolated tenant schemas after team email verification.
+- [ ] A new organization can register and be fully provisioned with isolated tenant schemas after organization email verification.
 - [ ] No tenant can read or write data belonging to another tenant under any circumstances.
 - [ ] Tenant schema is automatically created and migrated on registration.
-- [ ] Team account can update its profile (name, logo, settings) without affecting other tenants.
+- [ ] Organization can update its profile (name, logo, settings) without affecting other tenants.
 
 ---
 
@@ -82,11 +82,11 @@ Team account onboarding journey (team contact email → verify → provisioning)
 | Shared Domain | ✅ Done | `Entity`, `AggregateRoot`, `ValueObject`, `IDomainEvent`, `Result<T>` |
 | Shared Application | ✅ Done | `ICommand/IQuery`, `ICommandHandler/IQueryHandler`, `ValidationBehavior`, `ITenantContext` |
 | Shared Infrastructure | ✅ Done | `TenantSchemaInterceptor`, per-module `UnitOfWork` ([ADR-017](../../TECH_STACK.md#adr-017-axisshared-is-abstractions-only-no-shared-implementation)); **OpenTelemetry** host wiring on `Axis.Api` ([ADR-018](../../TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability), [patterns § OpenTelemetry](../../playbooks/patterns.md#opentelemetry-observability)) |
-| [Register org](register-org/) | ✅ Done | Organization contact registration, org-email verification, tenant provisioning status/retry, and first-owner `/register` setup-token handoff are implemented. Standalone user registration remains complete in [identity-access/register-user](../identity-access/register-user/). |
+| [Register org](register-org/) | ⚠️ Partial | Backend/API split is implemented: organization contact email + org verification + tenant provisioning stay here. Standalone user registration is complete in [identity-access/register-user](../identity-access/register-user/); first-user setup-token handoff polish and the dedicated register-org frontend remain here. |
 | [Subscription plans](view-plans/) | ✅ Done | `GET /api/plans`, pricing data, 402 limits — see [enforce limits](enforce-limits/). Frontend pricing UI ⏳ |
 | [Tenant isolation](tenant-scope/) | ✅ Done | `TenantSchemaInterceptor`, `TenantOrganizationAccessMiddleware`, cross-tenant API tests |
 | [Organization management](org-profile/) | ✅ Done | Profile, settings + usage, scheduled deletion + hard-delete job ✅. Frontend settings UI ⏳ |
-| Frontend | ⚠️ Partial | Register-org journey (incl. verify screens), provisioning wait, and first-owner setup-token handoff are shipped. Pricing and settings UIs remain pending. |
+| Frontend | ⏳ Pending | Register-org journey (incl. verify screens), provisioning wait, settings, pricing |
 
 ---
 
@@ -94,7 +94,7 @@ Team account onboarding journey (team contact email → verify → provisioning)
 
 | Priority | Item | Where |
 |----------|------|--------|
-| Frontend | [pricing](view-plans/), [org settings](org-settings/) | see **Use Cases** table above |
+| Frontend | [Register org](register-org/) organization onboarding, [pricing](view-plans/), [org settings](org-settings/) | see **Use Cases** table above |
 
 Domain-level checkboxes above remain spec-only; status is in use-case **Implementation status** callouts.
 

@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { Mail, UserPlus, UsersRound } from 'lucide-react';
+import { Mail, UserPlus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { ActionLink } from '@/components/ui/action-link';
@@ -13,8 +13,6 @@ export function EmailConfirmationPage() {
   const { t } = useTranslation();
   const context = loadRegistrationContext();
   const { resend, state, rateLimitMessage, reset } = useResendVerification();
-  const isOrganizationRegistration = Boolean(context?.organizationName);
-  const RegisterAgainIcon = isOrganizationRegistration ? UsersRound : UserPlus;
 
   async function handleResend() {
     if (!context?.email || state === 'sending' || state === 'rate_limited') return;
@@ -28,11 +26,7 @@ export function EmailConfirmationPage() {
 
   return (
     <AuthCard
-      title={
-        isOrganizationRegistration
-          ? t('organizationRegistration.confirmationTitle')
-          : t('emailConfirmation.title')
-      }
+      title={t('emailConfirmation.title')}
       footer={
         <>
           {t('emailConfirmation.footerPrompt')}{' '}
@@ -48,24 +42,11 @@ export function EmailConfirmationPage() {
             <Mail className="h-4 w-4" aria-hidden />
           </div>
           <div className="space-y-2 text-sm text-muted-foreground">
-            <p>
-              {isOrganizationRegistration
-                ? t('organizationRegistration.confirmationIntro')
-                : t('emailConfirmation.intro')}
-            </p>
-            <p>
-              {isOrganizationRegistration
-                ? t('organizationRegistration.confirmationCheckInbox')
-                : t('emailConfirmation.checkInbox')}
-            </p>
+            <p>{t('emailConfirmation.intro')}</p>
+            <p>{t('emailConfirmation.checkInbox')}</p>
             {context?.email ? (
               <p className="text-xs text-muted-foreground/80">
-                {isOrganizationRegistration
-                  ? t('organizationRegistration.confirmationSentTo', {
-                      email: context.email,
-                      organizationName: context.organizationName,
-                    })
-                  : t('emailConfirmation.sentTo', { email: context.email })}
+                {t('emailConfirmation.sentTo', { email: context.email })}
               </p>
             ) : null}
           </div>
@@ -115,15 +96,8 @@ export function EmailConfirmationPage() {
           )}
         </div>
 
-        <ActionLink
-          to={isOrganizationRegistration ? '/register/team' : '/register'}
-          icon={RegisterAgainIcon}
-          variant="secondary"
-          className="w-full"
-        >
-          {isOrganizationRegistration
-            ? t('organizationRegistration.registerAnotherOrganization')
-            : t('emailConfirmation.registerAnotherAccount')}
+        <ActionLink to="/register" icon={UserPlus} variant="secondary" className="w-full">
+          {t('emailConfirmation.registerAnotherAccount')}
         </ActionLink>
       </div>
     </AuthCard>
