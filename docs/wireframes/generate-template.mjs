@@ -1,7 +1,7 @@
 /**
  * Axis UI kit section builders (S01–S37).
  * Import-only module — screens compose via component(buildXxx, x, y) in generate-screens.mjs.
- * Auth / register-team-account blocks: blocks.mjs.
+ * Auth / register-org blocks: blocks.mjs.
  *
  * TOC — 37 sections
  * ─── Foundations ─────────────────── S01 Color Palette
@@ -137,7 +137,7 @@ export function buildFormControls(y0) {
   // ── Col 1: Text input states (x=50) ──
   els.push(text('inp_req_note', 50, yC, 320, 14,
     `Required labels — * is ${REQUIRED_MARKER_GAP}px after label (C.danger)`, 10, C.gray500));
-  const inpHelpDemo = fieldLabelBlock('inp_help', 50, yC + 18, 280, 'Team account name', {
+  const inpHelpDemo = fieldLabelBlock('inp_help', 50, yC + 18, 280, 'Organization name', {
     required: true,
     helpText: '2–100 characters. Help text sits under the label; ? is the tooltip affordance.',
   });

@@ -18,7 +18,7 @@ namespace Axis.DataModeling.Infrastructure.Migrations
                     id = table.Column<Guid>(type: "uuid", nullable: false),
                     name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     description = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    team_account_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    organization_id = table.Column<Guid>(type: "uuid", nullable: false),
                     deleted_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
@@ -39,7 +39,7 @@ namespace Axis.DataModeling.Infrastructure.Migrations
                     description = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     icon = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
                     color = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
-                    team_account_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    organization_id = table.Column<Guid>(type: "uuid", nullable: false),
                     deleted_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
@@ -57,7 +57,7 @@ namespace Axis.DataModeling.Infrastructure.Migrations
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
                     model_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    team_account_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    organization_id = table.Column<Guid>(type: "uuid", nullable: false),
                     deleted_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
@@ -76,19 +76,19 @@ namespace Axis.DataModeling.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_data_classes_team_account_id_name",
+                name: "IX_data_classes_organization_id_name",
                 table: "data_classes",
-                columns: new[] { "team_account_id", "name" });
+                columns: new[] { "organization_id", "name" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_data_models_team_account_id_name",
+                name: "IX_data_models_organization_id_name",
                 table: "data_models",
-                columns: new[] { "team_account_id", "name" });
+                columns: new[] { "organization_id", "name" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_data_records_model_id_team_account_id",
+                name: "IX_data_records_model_id_organization_id",
                 table: "data_records",
-                columns: new[] { "model_id", "team_account_id" });
+                columns: new[] { "model_id", "organization_id" });
         }
 
         /// <inheritdoc />

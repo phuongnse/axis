@@ -10,7 +10,7 @@ public class DataRecordRepositoryTests(DataModelingDatabaseFixture db) : IAsyncL
     private DataModelingDbContext _ctx = null!;
     private DataRecordRepository _sut = null!;
 
-    private Guid _teamAccountId;
+    private Guid _orgId;
     private Guid _modelId;
     private const string UserId = "user-123";
 
@@ -18,15 +18,15 @@ public class DataRecordRepositoryTests(DataModelingDatabaseFixture db) : IAsyncL
     {
         _ctx = db.CreateContext();
         _sut = new DataRecordRepository(_ctx, db.TenantContext);
-        _teamAccountId = Guid.NewGuid();
-        _modelId = await SeedModelIdAsync(_teamAccountId);
+        _orgId = Guid.NewGuid();
+        _modelId = await SeedModelIdAsync(_orgId);
     }
 
     public async Task DisposeAsync() => await _ctx.DisposeAsync();
 
-    private async Task<Guid> SeedModelIdAsync(Guid teamAccountId)
+    private async Task<Guid> SeedModelIdAsync(Guid orgId)
     {
-        DataModel model = DataModel.Create("Test Model", null, null, null, teamAccountId, UserId);
+        DataModel model = DataModel.Create("Test Model", null, null, null, orgId, UserId);
         _ctx.DataModels.Add(model);
         await _ctx.SaveChangesAsync();
         return model.Id;
@@ -38,15 +38,15 @@ public class DataRecordRepositoryTests(DataModelingDatabaseFixture db) : IAsyncL
     public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
     {
         Dictionary<string, object?> data = new() { ["name"] = "Acme Corp", ["revenue"] = 1000000 };
-        DataRecord record = DataRecord.Create(_modelId, _teamAccountId, data, UserId);
+        DataRecord record = DataRecord.Create(_modelId, _orgId, data, UserId);
         await _sut.AddAsync(record);
         await _ctx.SaveChangesAsync();
 
-        DataRecord? loaded = await _sut.GetByIdAsync(record.Id, _modelId, _teamAccountId);
+        DataRecord? loaded = await _sut.GetByIdAsync(record.Id, _modelId, _orgId);
 
         loaded.Should().NotBeNull();
         loaded!.ModelId.Should().Be(_modelId);
-        loaded.TeamAccountId.Should().Be(_teamAccountId);
+        loaded.OrganizationId.Should().Be(_orgId);
         loaded.Data.Should().ContainKey("name");
     }
 
@@ -60,11 +60,11 @@ public class DataRecordRepositoryTests(DataModelingDatabaseFixture db) : IAsyncL
             ["flag"] = true,
             ["nothing"] = null
         };
-        DataRecord record = DataRecord.Create(_modelId, _teamAccountId, data, UserId);
+        DataRecord record = DataRecord.Create(_modelId, _orgId, data, UserId);
         await _sut.AddAsync(record);
         await _ctx.SaveChangesAsync();
 
-        DataRecord? loaded = await _sut.GetByIdAsync(record.Id, _modelId, _teamAccountId);
+        DataRecord? loaded = await _sut.GetByIdAsync(record.Id, _modelId, _orgId);
 
         loaded!.Data.Should().ContainKey("text");
         loaded.Data.Should().ContainKey("number");
@@ -77,15 +77,15 @@ public class DataRecordRepositoryTests(DataModelingDatabaseFixture db) : IAsyncL
     [Fact]
     public async Task GetAllAsync_WhenMultipleRecordsExist_ReturnsRecordsForModelExcludingDeleted()
     {
-        Guid teamAccountId = Guid.NewGuid();
-        Guid modelId = await SeedModelIdAsync(teamAccountId);
-        Guid otherModelId = await SeedModelIdAsync(teamAccountId);
+        Guid orgId = Guid.NewGuid();
+        Guid modelId = await SeedModelIdAsync(orgId);
+        Guid otherModelId = await SeedModelIdAsync(orgId);
 
-        DataRecord r1 = DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["x"] = 1 }, UserId);
-        DataRecord r2 = DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["x"] = 2 }, UserId);
-        DataRecord deleted = DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["x"] = 3 }, UserId);
+        DataRecord r1 = DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["x"] = 1 }, UserId);
+        DataRecord r2 = DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["x"] = 2 }, UserId);
+        DataRecord deleted = DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["x"] = 3 }, UserId);
         deleted.Delete();
-        DataRecord otherModel = DataRecord.Create(otherModelId, teamAccountId, new Dictionary<string, object?> { ["x"] = 4 }, UserId);
+        DataRecord otherModel = DataRecord.Create(otherModelId, orgId, new Dictionary<string, object?> { ["x"] = 4 }, UserId);
 
         await _sut.AddAsync(r1);
         await _sut.AddAsync(r2);
@@ -93,7 +93,7 @@ public class DataRecordRepositoryTests(DataModelingDatabaseFixture db) : IAsyncL
         await _sut.AddAsync(otherModel);
         await _ctx.SaveChangesAsync();
 
-        IReadOnlyList<DataRecord> result = await _sut.GetAllAsync(modelId, teamAccountId);
+        IReadOnlyList<DataRecord> result = await _sut.GetAllAsync(modelId, orgId);
 
         result.Should().HaveCount(2);
         result.Should().NotContain(r => r.DeletedAt.HasValue);
@@ -104,15 +104,15 @@ public class DataRecordRepositoryTests(DataModelingDatabaseFixture db) : IAsyncL
     [Fact]
     public async Task GetPagedAsync_WhenMultipleRecordsExist_ReturnsCorrectPageAndTotal()
     {
-        Guid teamAccountId = Guid.NewGuid();
-        Guid modelId = await SeedModelIdAsync(teamAccountId);
+        Guid orgId = Guid.NewGuid();
+        Guid modelId = await SeedModelIdAsync(orgId);
 
         for (int i = 1; i <= 5; i++)
-            await _sut.AddAsync(DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["i"] = i }, UserId));
+            await _sut.AddAsync(DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["i"] = i }, UserId));
         await _ctx.SaveChangesAsync();
 
-        (IReadOnlyList<DataRecord> page1, int total) = await _sut.GetPagedAsync(modelId, teamAccountId, 1, 3, null);
-        (IReadOnlyList<DataRecord> page2, int _) = await _sut.GetPagedAsync(modelId, teamAccountId, 2, 3, null);
+        (IReadOnlyList<DataRecord> page1, int total) = await _sut.GetPagedAsync(modelId, orgId, 1, 3, null);
+        (IReadOnlyList<DataRecord> page2, int _) = await _sut.GetPagedAsync(modelId, orgId, 2, 3, null);
 
         total.Should().Be(5);
         page1.Should().HaveCount(3);
@@ -122,15 +122,15 @@ public class DataRecordRepositoryTests(DataModelingDatabaseFixture db) : IAsyncL
     [Fact]
     public async Task GetPagedAsync_WhenSearchProvided_FiltersByJsonbText()
     {
-        Guid teamAccountId = Guid.NewGuid();
-        Guid modelId = await SeedModelIdAsync(teamAccountId);
+        Guid orgId = Guid.NewGuid();
+        Guid modelId = await SeedModelIdAsync(orgId);
 
-        await _sut.AddAsync(DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["company"] = "Acme Corp" }, UserId));
-        await _sut.AddAsync(DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["company"] = "Beta LLC" }, UserId));
-        await _sut.AddAsync(DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["company"] = "acme subsidiary" }, UserId));
+        await _sut.AddAsync(DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["company"] = "Acme Corp" }, UserId));
+        await _sut.AddAsync(DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["company"] = "Beta LLC" }, UserId));
+        await _sut.AddAsync(DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["company"] = "acme subsidiary" }, UserId));
         await _ctx.SaveChangesAsync();
 
-        (IReadOnlyList<DataRecord> results, int total) = await _sut.GetPagedAsync(modelId, teamAccountId, 1, 25, "acme");
+        (IReadOnlyList<DataRecord> results, int total) = await _sut.GetPagedAsync(modelId, orgId, 1, 25, "acme");
 
         total.Should().Be(2);
         results.Should().HaveCount(2);
@@ -142,16 +142,16 @@ public class DataRecordRepositoryTests(DataModelingDatabaseFixture db) : IAsyncL
     [Fact]
     public async Task GetPagedAsync_WhenEqFilterApplied_ReturnsOnlyMatchingRecords()
     {
-        Guid teamAccountId = Guid.NewGuid();
-        Guid modelId = await SeedModelIdAsync(teamAccountId);
+        Guid orgId = Guid.NewGuid();
+        Guid modelId = await SeedModelIdAsync(orgId);
 
-        await _sut.AddAsync(DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["status"] = "active" }, UserId));
-        await _sut.AddAsync(DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["status"] = "inactive" }, UserId));
-        await _sut.AddAsync(DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["status"] = "active" }, UserId));
+        await _sut.AddAsync(DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["status"] = "active" }, UserId));
+        await _sut.AddAsync(DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["status"] = "inactive" }, UserId));
+        await _sut.AddAsync(DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["status"] = "active" }, UserId));
         await _ctx.SaveChangesAsync();
 
         IReadOnlyList<RecordFilter> filters = [new RecordFilter("status", "eq", "active")];
-        (IReadOnlyList<DataRecord> results, int total) = await _sut.GetPagedAsync(modelId, teamAccountId, 1, 25, null, filters);
+        (IReadOnlyList<DataRecord> results, int total) = await _sut.GetPagedAsync(modelId, orgId, 1, 25, null, filters);
 
         total.Should().Be(2);
         results.Should().HaveCount(2);
@@ -161,15 +161,15 @@ public class DataRecordRepositoryTests(DataModelingDatabaseFixture db) : IAsyncL
     [Fact]
     public async Task GetPagedAsync_WhenContainsFilterApplied_ReturnsMatchingRecords()
     {
-        Guid teamAccountId = Guid.NewGuid();
-        Guid modelId = await SeedModelIdAsync(teamAccountId);
+        Guid orgId = Guid.NewGuid();
+        Guid modelId = await SeedModelIdAsync(orgId);
 
-        await _sut.AddAsync(DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["company"] = "Acme Corp" }, UserId));
-        await _sut.AddAsync(DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["company"] = "Beta LLC" }, UserId));
+        await _sut.AddAsync(DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["company"] = "Acme Corp" }, UserId));
+        await _sut.AddAsync(DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["company"] = "Beta LLC" }, UserId));
         await _ctx.SaveChangesAsync();
 
         IReadOnlyList<RecordFilter> filters = [new RecordFilter("company", "contains", "acme")];
-        (IReadOnlyList<DataRecord> results, int total) = await _sut.GetPagedAsync(modelId, teamAccountId, 1, 25, null, filters);
+        (IReadOnlyList<DataRecord> results, int total) = await _sut.GetPagedAsync(modelId, orgId, 1, 25, null, filters);
 
         total.Should().Be(1);
         results.Single().Data["company"]!.ToString().Should().Be("Acme Corp");
@@ -178,16 +178,16 @@ public class DataRecordRepositoryTests(DataModelingDatabaseFixture db) : IAsyncL
     [Fact]
     public async Task GetPagedAsync_WhenIsEmptyFilterApplied_ReturnsRecordsWithMissingOrEmptyField()
     {
-        Guid teamAccountId = Guid.NewGuid();
-        Guid modelId = await SeedModelIdAsync(teamAccountId);
+        Guid orgId = Guid.NewGuid();
+        Guid modelId = await SeedModelIdAsync(orgId);
 
-        await _sut.AddAsync(DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["notes"] = string.Empty }, UserId));
-        await _sut.AddAsync(DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["notes"] = "some note" }, UserId));
-        await _sut.AddAsync(DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["other"] = "x" }, UserId));
+        await _sut.AddAsync(DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["notes"] = string.Empty }, UserId));
+        await _sut.AddAsync(DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["notes"] = "some note" }, UserId));
+        await _sut.AddAsync(DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["other"] = "x" }, UserId));
         await _ctx.SaveChangesAsync();
 
         IReadOnlyList<RecordFilter> filters = [new RecordFilter("notes", "isempty", "")];
-        (IReadOnlyList<DataRecord> results, int total) = await _sut.GetPagedAsync(modelId, teamAccountId, 1, 25, null, filters);
+        (IReadOnlyList<DataRecord> results, int total) = await _sut.GetPagedAsync(modelId, orgId, 1, 25, null, filters);
 
         total.Should().Be(2);
     }
@@ -197,16 +197,16 @@ public class DataRecordRepositoryTests(DataModelingDatabaseFixture db) : IAsyncL
     [Fact]
     public async Task GetPagedAsync_WhenSortByJsonbField_ReturnsRecordsInCorrectOrder()
     {
-        Guid teamAccountId = Guid.NewGuid();
-        Guid modelId = await SeedModelIdAsync(teamAccountId);
+        Guid orgId = Guid.NewGuid();
+        Guid modelId = await SeedModelIdAsync(orgId);
 
-        await _sut.AddAsync(DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["name"] = "Zebra" }, UserId));
-        await _sut.AddAsync(DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["name"] = "Apple" }, UserId));
-        await _sut.AddAsync(DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["name"] = "Mango" }, UserId));
+        await _sut.AddAsync(DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["name"] = "Zebra" }, UserId));
+        await _sut.AddAsync(DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["name"] = "Apple" }, UserId));
+        await _sut.AddAsync(DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["name"] = "Mango" }, UserId));
         await _ctx.SaveChangesAsync();
 
         (IReadOnlyList<DataRecord> results, int _) = await _sut.GetPagedAsync(
-            modelId, teamAccountId, 1, 25, null, null, sortBy: "name", sortDir: "asc");
+            modelId, orgId, 1, 25, null, null, sortBy: "name", sortDir: "asc");
 
         results.Select(r => r.Data["name"]!.ToString()).Should().BeInAscendingOrder();
     }
@@ -216,19 +216,19 @@ public class DataRecordRepositoryTests(DataModelingDatabaseFixture db) : IAsyncL
     [Fact]
     public async Task BulkDeleteAsync_WhenRecordsExist_SoftDeletesThemAndReturnsCount()
     {
-        Guid teamAccountId = Guid.NewGuid();
-        Guid modelId = await SeedModelIdAsync(teamAccountId);
+        Guid orgId = Guid.NewGuid();
+        Guid modelId = await SeedModelIdAsync(orgId);
 
-        DataRecord r1 = DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["x"] = 1 }, UserId);
-        DataRecord r2 = DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["x"] = 2 }, UserId);
-        DataRecord r3 = DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["x"] = 3 }, UserId);
+        DataRecord r1 = DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["x"] = 1 }, UserId);
+        DataRecord r2 = DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["x"] = 2 }, UserId);
+        DataRecord r3 = DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["x"] = 3 }, UserId);
 
         await _sut.AddAsync(r1);
         await _sut.AddAsync(r2);
         await _sut.AddAsync(r3);
         await _ctx.SaveChangesAsync();
 
-        int deleted = await _sut.BulkDeleteAsync([r1.Id, r2.Id], modelId, teamAccountId);
+        int deleted = await _sut.BulkDeleteAsync([r1.Id, r2.Id], modelId, orgId);
 
         deleted.Should().Be(2);
 
@@ -248,15 +248,15 @@ public class DataRecordRepositoryTests(DataModelingDatabaseFixture db) : IAsyncL
     [Fact]
     public async Task BulkDeleteAsync_WhenIdsBelongToDifferentModel_DoesNotDeleteThem()
     {
-        Guid teamAccountId = Guid.NewGuid();
-        Guid modelId = await SeedModelIdAsync(teamAccountId);
-        Guid otherModelId = await SeedModelIdAsync(teamAccountId);
+        Guid orgId = Guid.NewGuid();
+        Guid modelId = await SeedModelIdAsync(orgId);
+        Guid otherModelId = await SeedModelIdAsync(orgId);
 
-        DataRecord r = DataRecord.Create(otherModelId, teamAccountId, new Dictionary<string, object?> { ["x"] = 1 }, UserId);
+        DataRecord r = DataRecord.Create(otherModelId, orgId, new Dictionary<string, object?> { ["x"] = 1 }, UserId);
         await _sut.AddAsync(r);
         await _ctx.SaveChangesAsync();
 
-        int deleted = await _sut.BulkDeleteAsync([r.Id], modelId, teamAccountId); // wrong modelId
+        int deleted = await _sut.BulkDeleteAsync([r.Id], modelId, orgId); // wrong modelId
 
         deleted.Should().Be(0);
     }
@@ -264,7 +264,7 @@ public class DataRecordRepositoryTests(DataModelingDatabaseFixture db) : IAsyncL
     [Fact]
     public async Task BulkDeleteAsync_WhenEmptyList_ReturnsZero()
     {
-        int deleted = await _sut.BulkDeleteAsync([], _modelId, _teamAccountId);
+        int deleted = await _sut.BulkDeleteAsync([], _modelId, _orgId);
         deleted.Should().Be(0);
     }
 
@@ -273,15 +273,15 @@ public class DataRecordRepositoryTests(DataModelingDatabaseFixture db) : IAsyncL
     [Fact]
     public async Task GetAllForExportAsync_WhenRecordsExist_StreamsAllMatchingRecords()
     {
-        Guid teamAccountId = Guid.NewGuid();
-        Guid modelId = await SeedModelIdAsync(teamAccountId);
+        Guid orgId = Guid.NewGuid();
+        Guid modelId = await SeedModelIdAsync(orgId);
 
         for (int i = 1; i <= 3; i++)
-            await _sut.AddAsync(DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["i"] = i }, UserId));
+            await _sut.AddAsync(DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["i"] = i }, UserId));
         await _ctx.SaveChangesAsync();
 
         List<DataRecord> exported = [];
-        await foreach (DataRecord r in _sut.GetAllForExportAsync(modelId, teamAccountId))
+        await foreach (DataRecord r in _sut.GetAllForExportAsync(modelId, orgId))
             exported.Add(r);
 
         exported.Should().HaveCount(3);
@@ -290,17 +290,17 @@ public class DataRecordRepositoryTests(DataModelingDatabaseFixture db) : IAsyncL
     [Fact]
     public async Task GetAllForExportAsync_WhenFilterApplied_StreamsOnlyMatchingRecords()
     {
-        Guid teamAccountId = Guid.NewGuid();
-        Guid modelId = await SeedModelIdAsync(teamAccountId);
+        Guid orgId = Guid.NewGuid();
+        Guid modelId = await SeedModelIdAsync(orgId);
 
-        await _sut.AddAsync(DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["type"] = "A" }, UserId));
-        await _sut.AddAsync(DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["type"] = "B" }, UserId));
-        await _sut.AddAsync(DataRecord.Create(modelId, teamAccountId, new Dictionary<string, object?> { ["type"] = "A" }, UserId));
+        await _sut.AddAsync(DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["type"] = "A" }, UserId));
+        await _sut.AddAsync(DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["type"] = "B" }, UserId));
+        await _sut.AddAsync(DataRecord.Create(modelId, orgId, new Dictionary<string, object?> { ["type"] = "A" }, UserId));
         await _ctx.SaveChangesAsync();
 
         IReadOnlyList<RecordFilter> filters = [new RecordFilter("type", "eq", "A")];
         List<DataRecord> exported = [];
-        await foreach (DataRecord r in _sut.GetAllForExportAsync(modelId, teamAccountId, filters: filters))
+        await foreach (DataRecord r in _sut.GetAllForExportAsync(modelId, orgId, filters: filters))
             exported.Add(r);
 
         exported.Should().HaveCount(2);

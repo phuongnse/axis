@@ -14,9 +14,9 @@ public sealed class GetMyFormTasksHandler(
         CancellationToken cancellationToken)
     {
         IReadOnlyList<FormSubmission> submissions = query.Status == Domain.Enums.FormSubmissionStatus.Pending
-            ? await submissionRepo.GetPendingForUserAsync(query.UserId, query.TeamAccountId, cancellationToken)
+            ? await submissionRepo.GetPendingForUserAsync(query.UserId, query.OrganizationId, cancellationToken)
             : await submissionRepo.GetByUserAndStatusAsync(
-                query.UserId, query.TeamAccountId, query.Status, cancellationToken);
+                query.UserId, query.OrganizationId, query.Status, cancellationToken);
 
         List<FormTaskSummaryDto> results = new(submissions.Count);
         Dictionary<Guid, string> formNameCache = new();
@@ -27,7 +27,7 @@ public sealed class GetMyFormTasksHandler(
             if (!formNameCache.ContainsKey(formDefinitionId))
             {
                 FormDefinition? form = await formRepo.GetByIdAsync(
-                    formDefinitionId, submission.TeamAccountId, cancellationToken);
+                    formDefinitionId, submission.OrganizationId, cancellationToken);
                 formNameCache[formDefinitionId] = form?.Name ?? "Unknown form";
             }
 

@@ -13,7 +13,7 @@ public sealed class InviteUserHandler(
     IUserRepository userRepo,
     IRoleRepository roleRepo,
     IInvitationRepository invitationRepo,
-    ITeamAccountRepository teamAccountRepo,
+    IOrganizationRepository orgRepo,
     IEmailSender emailSender,
     IUnitOfWork uow)
     : ICommandHandler<InviteUserCommand>
@@ -21,7 +21,7 @@ public sealed class InviteUserHandler(
     public async Task<Result> Handle(InviteUserCommand command, CancellationToken cancellationToken)
     {
         Result planCheck = await planLimitService.EnsureWithinLimitAsync(
-            command.TeamAccountId,
+            command.OrganizationId,
             PlanLimitResourceType.Users,
             increment: 1,
             cancellationToken);
@@ -35,36 +35,36 @@ public sealed class InviteUserHandler(
         Email email = emailResult.Value;
 
         // cannot invite existing member
-        User? existingMember = await userRepo.GetByEmailAsync(email, command.TeamAccountId, cancellationToken);
+        User? existingMember = await userRepo.GetByEmailAsync(email, command.OrganizationId, cancellationToken);
         if (existingMember is not null)
             return Result.Failure(ErrorCodes.Conflict, "This user is already a member.");
 
         // cannot invite email with pending invitation
         Invitation? existingInvitation = await invitationRepo.GetPendingByEmailAsync(
-            email, command.TeamAccountId, cancellationToken);
+            email, command.OrganizationId, cancellationToken);
         if (existingInvitation is not null)
             return Result.Failure(ErrorCodes.Conflict, "An invitation has already been sent to this address.");
 
-        // Validate role exists in this team account
-        Role? role = await roleRepo.GetByIdAsync(command.RoleId, command.TeamAccountId, cancellationToken);
+        // Validate role exists in this org
+        Role? role = await roleRepo.GetByIdAsync(command.RoleId, command.OrganizationId, cancellationToken);
         if (role is null)
-            return Result.Failure(ErrorCodes.NotFound, "The specified role was not found in this team account.");
+            return Result.Failure(ErrorCodes.NotFound, "The specified role was not found in this organization.");
 
-        TeamAccount? teamAccount = await teamAccountRepo.GetByIdAsync(command.TeamAccountId, cancellationToken);
-        if (teamAccount is null)
-            return Result.Failure(ErrorCodes.NotFound, "Team account not found.");
+        Organization? org = await orgRepo.GetByIdAsync(command.OrganizationId, cancellationToken);
+        if (org is null)
+            return Result.Failure(ErrorCodes.NotFound, "Organization not found.");
 
-        Invitation invitation = Invitation.Create(email, command.TeamAccountId, command.RoleId, command.InvitedById);
+        Invitation invitation = Invitation.Create(email, command.OrganizationId, command.RoleId, command.InvitedById);
         await invitationRepo.AddAsync(invitation, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);
         await planLimitService.RecordUsageDeltaAsync(
-            command.TeamAccountId,
+            command.OrganizationId,
             PlanLimitResourceType.Users,
             delta: 1,
             cancellationToken);
 
         await emailSender.SendInvitationEmailAsync(
-            email.Value, teamAccount.Name, invitation.Token, cancellationToken);
+            email.Value, org.Name, invitation.Token, cancellationToken);
 
         return Result.Success();
     }

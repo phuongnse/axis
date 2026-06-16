@@ -14,10 +14,10 @@ import type {
   LoginAttemptResult,
   LoginCredentials,
   MessageResponse,
+  OrganizationSlugPreviewResponse,
   ProvisioningStatusResponse,
-  RegisterTeamAccountRequest,
+  RegisterOrganizationRequest,
   RegisterUserRequest,
-  TeamAccountSlugPreviewResponse,
   VerifyEmailResponse,
 } from './types';
 
@@ -25,8 +25,7 @@ export const authKeys = {
   all: ['auth'] as const,
   provisioningStatus: (token: string) => [...authKeys.all, 'provisioning-status', token] as const,
   legalVersions: ['auth', 'legal-versions'] as const,
-  slugPreview: (teamAccountName: string) =>
-    [...authKeys.all, 'slug-preview', teamAccountName] as const,
+  slugPreview: (orgName: string) => [...authKeys.all, 'slug-preview', orgName] as const,
 };
 
 export function createRegisterIdempotencyKey(): string {
@@ -47,11 +46,11 @@ export function toAdminNameParts(fullName: string): { firstName: string; lastNam
   };
 }
 
-export async function registerTeamAccount(
-  payload: RegisterTeamAccountRequest,
+export async function registerOrganization(
+  payload: RegisterOrganizationRequest,
   idempotencyKey: string,
 ): Promise<MessageResponse> {
-  return fetchApi<MessageResponse>('/team-accounts', {
+  return fetchApi<MessageResponse>('/organizations', {
     method: 'POST',
     headers: {
       'Idempotency-Key': idempotencyKey,
@@ -77,12 +76,12 @@ export async function getLegalVersions(): Promise<LegalVersionsResponse> {
   return fetchApi<LegalVersionsResponse>('/legal/versions');
 }
 
-export async function getTeamAccountSlugPreview(
-  teamAccountName: string,
-): Promise<TeamAccountSlugPreviewResponse> {
-  const params = new URLSearchParams({ teamAccountName });
-  return fetchApi<TeamAccountSlugPreviewResponse>(
-    `/team-accounts/slug-preview?${params.toString()}`,
+export async function getOrganizationSlugPreview(
+  orgName: string,
+): Promise<OrganizationSlugPreviewResponse> {
+  const params = new URLSearchParams({ orgName });
+  return fetchApi<OrganizationSlugPreviewResponse>(
+    `/organizations/slug-preview?${params.toString()}`,
   );
 }
 

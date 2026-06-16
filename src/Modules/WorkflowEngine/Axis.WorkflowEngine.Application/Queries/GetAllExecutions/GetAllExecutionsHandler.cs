@@ -17,7 +17,7 @@ public sealed class GetAllExecutionsHandler(IExecutionRepository execRepo)
         int pageSize = Math.Clamp(query.PageSize, 1, MaxPageSize);
 
         (IReadOnlyList<ExecutionSummaryResponse> items, int total) = await execRepo.GetPagedAsync(
-            query.TeamAccountId, page, pageSize, query.Status, cancellationToken);
+            query.OrganizationId, page, pageSize, query.Status, cancellationToken);
 
         return new PagedResult<ExecutionSummaryResponse>(items, total, page, pageSize);
     }

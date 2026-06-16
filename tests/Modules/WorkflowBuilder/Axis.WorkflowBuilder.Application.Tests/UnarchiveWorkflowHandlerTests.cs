@@ -12,7 +12,7 @@ namespace Axis.WorkflowBuilder.Application.Tests;
 
 public class UnarchiveWorkflowHandlerTests
 {
-    private static readonly Guid TeamAccountId = Guid.NewGuid();
+    private static readonly Guid OrgId = Guid.NewGuid();
     private readonly IWorkflowRepository _repo = Substitute.For<IWorkflowRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly UnarchiveWorkflowHandler _handler;
@@ -23,9 +23,9 @@ public class UnarchiveWorkflowHandlerTests
     public async Task Handle_WhenWorkflowIsArchived_UnarchivesAndSaves()
     {
         WorkflowDefinition wf = CreateArchivedWorkflow();
-        _repo.GetByIdAsync(wf.Id, TeamAccountId, Arg.Any<CancellationToken>()).Returns(wf);
+        _repo.GetByIdAsync(wf.Id, OrgId, Arg.Any<CancellationToken>()).Returns(wf);
 
-        Result result = await _handler.Handle(new UnarchiveWorkflowCommand(wf.Id, TeamAccountId), CancellationToken.None);
+        Result result = await _handler.Handle(new UnarchiveWorkflowCommand(wf.Id, OrgId), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         wf.Status.Should().Be(WorkflowStatus.Active);
@@ -35,37 +35,37 @@ public class UnarchiveWorkflowHandlerTests
     [Fact]
     public async Task Handle_WhenWorkflowNotFound_ReturnsNotFound()
     {
-        _repo.GetByIdAsync(Arg.Any<Guid>(), TeamAccountId, Arg.Any<CancellationToken>()).Returns((WorkflowDefinition?)null);
+        _repo.GetByIdAsync(Arg.Any<Guid>(), OrgId, Arg.Any<CancellationToken>()).Returns((WorkflowDefinition?)null);
 
-        Result result = await _handler.Handle(new UnarchiveWorkflowCommand(Guid.NewGuid(), TeamAccountId), CancellationToken.None);
+        Result result = await _handler.Handle(new UnarchiveWorkflowCommand(Guid.NewGuid(), OrgId), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
     }
 
     [Fact]
-    public async Task Handle_WhenWorkflowBelongsToAnotherTeamAccount_ReturnsNotFound()
+    public async Task Handle_WhenWorkflowBelongsToAnotherOrg_ReturnsNotFound()
     {
         WorkflowDefinition wf = CreateArchivedWorkflow();
 
-        Guid otherTeamAccountId = Guid.NewGuid();
-        _repo.GetByIdAsync(wf.Id, otherTeamAccountId, Arg.Any<CancellationToken>())
+        Guid otherOrgId = Guid.NewGuid();
+        _repo.GetByIdAsync(wf.Id, otherOrgId, Arg.Any<CancellationToken>())
             .Returns((WorkflowDefinition?)null);
-        Result result = await _handler.Handle(new UnarchiveWorkflowCommand(wf.Id, otherTeamAccountId), CancellationToken.None);
+        Result result = await _handler.Handle(new UnarchiveWorkflowCommand(wf.Id, otherOrgId), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-        await _repo.Received(1).GetByIdAsync(wf.Id, otherTeamAccountId, Arg.Any<CancellationToken>());
+        await _repo.Received(1).GetByIdAsync(wf.Id, otherOrgId, Arg.Any<CancellationToken>());
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task Handle_WhenWorkflowIsNotArchived_ReturnsBusinessRuleError()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("Draft", null, TeamAccountId, "user");
-        _repo.GetByIdAsync(wf.Id, TeamAccountId, Arg.Any<CancellationToken>()).Returns(wf);
+        WorkflowDefinition wf = WorkflowDefinition.Create("Draft", null, OrgId, "user");
+        _repo.GetByIdAsync(wf.Id, OrgId, Arg.Any<CancellationToken>()).Returns(wf);
 
-        Result result = await _handler.Handle(new UnarchiveWorkflowCommand(wf.Id, TeamAccountId), CancellationToken.None);
+        Result result = await _handler.Handle(new UnarchiveWorkflowCommand(wf.Id, OrgId), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
@@ -73,7 +73,7 @@ public class UnarchiveWorkflowHandlerTests
 
     private static WorkflowDefinition CreateArchivedWorkflow()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, TeamAccountId, "user");
+        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, OrgId, "user");
         wf.AddTrigger(TriggerType.Manual, null);
         WorkflowStep step = wf.AddStep("Review", StepType.Form, null);
         WorkflowStep start = wf.Steps.Single(s => s.Type == StepType.Start);

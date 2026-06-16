@@ -7,7 +7,7 @@ namespace Axis.DataModeling.Application.Commands.AddFieldToDataClass;
 /// <summary>/039: Add a field to a data class (Relation, DataClass, File types are blocked by domain).</summary>
 public sealed record AddFieldToDataClassCommand(
     Guid DataClassId,
-    Guid TeamAccountId,
+    Guid OrganizationId,
     string Name,
     string Label,
     FieldType Type,

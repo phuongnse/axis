@@ -8,7 +8,7 @@ Drag form fields to reorder them so that the form flows naturally.
 
 ## Primary actor
 
-- Team account Member
+- Organization Member
 
 ## Trigger
 

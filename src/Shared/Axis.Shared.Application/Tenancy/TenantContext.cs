@@ -1,12 +1,12 @@
 namespace Axis.Shared.Application.Tenancy;
 
-public sealed class TenantContext(Guid teamAccountId)
+public sealed class TenantContext(Guid organizationId)
 {
-    public Guid TeamAccountId { get; } = teamAccountId;
+    public Guid OrganizationId { get; } = organizationId;
 
     /// <summary>
-    /// PostgreSQL schema name for this tenant. Uses team account ID (N format) so the
-    /// schema name is stable regardless of team account slug changes.
+    /// PostgreSQL schema name for this tenant. Uses org ID (N format) so the
+    /// schema name is stable regardless of org slug changes.
     /// </summary>
-    public string SchemaName => $"tenant_{TeamAccountId:N}";
+    public string SchemaName => $"tenant_{OrganizationId:N}";
 }

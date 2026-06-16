@@ -6,12 +6,12 @@ namespace Axis.WorkflowEngine.Domain.Tests;
 
 public class ExecutionStepTests
 {
-    private static readonly Guid TeamAccountId = Guid.NewGuid();
+    private static readonly Guid OrgId = Guid.NewGuid();
     private static readonly Guid ExecutionId = Guid.NewGuid();
     private static readonly Guid StepDefinitionId = Guid.NewGuid();
 
     private static ExecutionStep CreatePending(string name = "Send Email", StepType type = StepType.Notification, int order = 1) =>
-        ExecutionStep.Create(ExecutionId, TeamAccountId, StepDefinitionId, name, type, order);
+        ExecutionStep.Create(ExecutionId, OrgId, StepDefinitionId, name, type, order);
 
     private static IReadOnlyDictionary<string, object?> SomeContext() =>
         new Dictionary<string, object?> { ["key"] = "value" };
@@ -21,21 +21,21 @@ public class ExecutionStepTests
     [Fact]
     public void Create_WhenExecutionIdIsEmpty_Throws()
     {
-        Action act = () => ExecutionStep.Create(Guid.Empty, TeamAccountId, StepDefinitionId, "Name", StepType.Form, 0);
+        Action act = () => ExecutionStep.Create(Guid.Empty, OrgId, StepDefinitionId, "Name", StepType.Form, 0);
         act.Should().Throw<ArgumentException>().WithParameterName("executionId");
     }
 
     [Fact]
-    public void Create_WhenTeamAccountIdIsEmpty_Throws()
+    public void Create_WhenOrganizationIdIsEmpty_Throws()
     {
         Action act = () => ExecutionStep.Create(ExecutionId, Guid.Empty, StepDefinitionId, "Name", StepType.Form, 0);
-        act.Should().Throw<ArgumentException>().WithParameterName("teamAccountId");
+        act.Should().Throw<ArgumentException>().WithParameterName("organizationId");
     }
 
     [Fact]
     public void Create_WhenStepDefinitionIdIsEmpty_Throws()
     {
-        Action act = () => ExecutionStep.Create(ExecutionId, TeamAccountId, Guid.Empty, "Name", StepType.Form, 0);
+        Action act = () => ExecutionStep.Create(ExecutionId, OrgId, Guid.Empty, "Name", StepType.Form, 0);
         act.Should().Throw<ArgumentException>().WithParameterName("stepDefinitionId");
     }
 
@@ -44,14 +44,14 @@ public class ExecutionStepTests
     [InlineData("   ")]
     public void Create_WhenNameIsBlank_Throws(string name)
     {
-        Action act = () => ExecutionStep.Create(ExecutionId, TeamAccountId, StepDefinitionId, name, StepType.Form, 0);
+        Action act = () => ExecutionStep.Create(ExecutionId, OrgId, StepDefinitionId, name, StepType.Form, 0);
         act.Should().Throw<ArgumentException>().WithParameterName("name");
     }
 
     [Fact]
     public void Create_WhenDisplayOrderIsNegative_Throws()
     {
-        Action act = () => ExecutionStep.Create(ExecutionId, TeamAccountId, StepDefinitionId, "Name", StepType.Form, -1);
+        Action act = () => ExecutionStep.Create(ExecutionId, OrgId, StepDefinitionId, "Name", StepType.Form, -1);
         act.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("displayOrder");
     }
 
@@ -63,7 +63,7 @@ public class ExecutionStepTests
         ExecutionStep step = CreatePending("Approve Request", StepType.Form, 3);
 
         step.ExecutionId.Should().Be(ExecutionId);
-        step.TeamAccountId.Should().Be(TeamAccountId);
+        step.OrganizationId.Should().Be(OrgId);
         step.StepDefinitionId.Should().Be(StepDefinitionId);
         step.Name.Should().Be("Approve Request");
         step.StepType.Should().Be(StepType.Form);

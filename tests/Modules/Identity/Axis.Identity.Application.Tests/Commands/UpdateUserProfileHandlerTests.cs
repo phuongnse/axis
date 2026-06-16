@@ -17,7 +17,7 @@ public class UpdateUserProfileHandlerTests
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     private static readonly Guid UserId = Guid.NewGuid();
-    private static readonly Guid TeamAccountId = Guid.NewGuid();
+    private static readonly Guid OrgId = Guid.NewGuid();
 
     private UpdateUserProfileHandler CreateHandler() =>
         new(_userRepo, _avatarStorage, _uow);
@@ -34,9 +34,9 @@ public class UpdateUserProfileHandlerTests
     public async Task UpdateUserProfile_WhenNoAvatarProvided_UpdatesNameOnly()
     {
         User user = MakeUser();
-        _userRepo.GetByIdAsync(UserId, TeamAccountId).Returns(user);
+        _userRepo.GetByIdAsync(UserId, OrgId).Returns(user);
 
-        UpdateUserProfileCommand command = new(UserId, TeamAccountId, "Bob", "Jones", null, null);
+        UpdateUserProfileCommand command = new(UserId, OrgId, "Bob", "Jones", null, null);
         Result result = await CreateHandler().Handle(command, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -51,12 +51,12 @@ public class UpdateUserProfileHandlerTests
     public async Task UpdateUserProfile_WhenNoPreviousAvatar_UploadsNewAvatar()
     {
         User user = MakeUser(avatarUrl: null);
-        _userRepo.GetByIdAsync(UserId, TeamAccountId).Returns(user);
+        _userRepo.GetByIdAsync(UserId, OrgId).Returns(user);
         _avatarStorage.UploadAvatarAsync(UserId, Arg.Any<byte[]>(), "image/png")
             .Returns("https://storage/avatar.png");
 
         byte[] avatarBytes = new byte[512];
-        UpdateUserProfileCommand command = new(UserId, TeamAccountId, "Alice", "Smith", avatarBytes, "image/png");
+        UpdateUserProfileCommand command = new(UserId, OrgId, "Alice", "Smith", avatarBytes, "image/png");
         Result result = await CreateHandler().Handle(command, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -69,12 +69,12 @@ public class UpdateUserProfileHandlerTests
     public async Task UpdateUserProfile_WhenAvatarExists_ReplacesOldAndDeletesIt()
     {
         User user = MakeUser(avatarUrl: "https://storage/old-avatar.png");
-        _userRepo.GetByIdAsync(UserId, TeamAccountId).Returns(user);
+        _userRepo.GetByIdAsync(UserId, OrgId).Returns(user);
         _avatarStorage.UploadAvatarAsync(UserId, Arg.Any<byte[]>(), "image/jpeg")
             .Returns("https://storage/new-avatar.jpg");
 
         byte[] avatarBytes = new byte[512];
-        UpdateUserProfileCommand command = new(UserId, TeamAccountId, "Alice", "Smith", avatarBytes, "image/jpeg");
+        UpdateUserProfileCommand command = new(UserId, OrgId, "Alice", "Smith", avatarBytes, "image/jpeg");
         Result result = await CreateHandler().Handle(command, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -87,9 +87,9 @@ public class UpdateUserProfileHandlerTests
     [Fact]
     public async Task UpdateUserProfile_WhenUserNotFound_ReturnsNotFound()
     {
-        _userRepo.GetByIdAsync(UserId, TeamAccountId).ReturnsNull();
+        _userRepo.GetByIdAsync(UserId, OrgId).ReturnsNull();
 
-        UpdateUserProfileCommand command = new(UserId, TeamAccountId, "Bob", "Jones", null, null);
+        UpdateUserProfileCommand command = new(UserId, OrgId, "Bob", "Jones", null, null);
         Result result = await CreateHandler().Handle(command, CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -101,9 +101,9 @@ public class UpdateUserProfileHandlerTests
     public async Task UpdateUserProfile_WhenFullNameTooShort_ReturnsBusinessRuleFailure()
     {
         User user = MakeUser();
-        _userRepo.GetByIdAsync(UserId, TeamAccountId).Returns(user);
+        _userRepo.GetByIdAsync(UserId, OrgId).Returns(user);
 
-        UpdateUserProfileCommand command = new(UserId, TeamAccountId, "A", "", null, null);
+        UpdateUserProfileCommand command = new(UserId, OrgId, "A", "", null, null);
         Result result = await CreateHandler().Handle(command, CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -115,10 +115,10 @@ public class UpdateUserProfileHandlerTests
     public async Task UpdateUserProfile_WhenFullNameTooLong_ReturnsBusinessRuleFailure()
     {
         User user = MakeUser();
-        _userRepo.GetByIdAsync(UserId, TeamAccountId).Returns(user);
+        _userRepo.GetByIdAsync(UserId, OrgId).Returns(user);
 
         string longName = new('A', 101);
-        UpdateUserProfileCommand command = new(UserId, TeamAccountId, longName, "", null, null);
+        UpdateUserProfileCommand command = new(UserId, OrgId, longName, "", null, null);
         Result result = await CreateHandler().Handle(command, CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -130,10 +130,10 @@ public class UpdateUserProfileHandlerTests
     public async Task UpdateUserProfile_WhenAvatarContentTypeIsInvalid_ReturnsBusinessRuleFailure()
     {
         User user = MakeUser();
-        _userRepo.GetByIdAsync(UserId, TeamAccountId).Returns(user);
+        _userRepo.GetByIdAsync(UserId, OrgId).Returns(user);
 
         UpdateUserProfileCommand command = new(
-            UserId, TeamAccountId, "Alice", "Smith", new byte[100], "image/gif");
+            UserId, OrgId, "Alice", "Smith", new byte[100], "image/gif");
         Result result = await CreateHandler().Handle(command, CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -142,13 +142,13 @@ public class UpdateUserProfileHandlerTests
     }
 
     [Fact]
-    public async Task UpdateUserProfile_WhenUserBelongsToAnotherTeamAccount_ReturnsNotFound()
+    public async Task UpdateUserProfile_WhenUserBelongsToAnotherOrg_ReturnsNotFound()
     {
         User user = MakeUser();
-        _userRepo.GetByIdAsync(UserId, TeamAccountId).Returns(user);
+        _userRepo.GetByIdAsync(UserId, OrgId).Returns(user);
 
-        Guid otherTeamAccountId = Guid.NewGuid();
-        UpdateUserProfileCommand command = new(UserId, otherTeamAccountId, "Bob", "Jones", null, null);
+        Guid otherOrgId = Guid.NewGuid();
+        UpdateUserProfileCommand command = new(UserId, otherOrgId, "Bob", "Jones", null, null);
         Result result = await CreateHandler().Handle(command, CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -159,11 +159,11 @@ public class UpdateUserProfileHandlerTests
     public async Task UpdateUserProfile_WhenAvatarExceedsMaxSize_ReturnsBusinessRuleFailure()
     {
         User user = MakeUser();
-        _userRepo.GetByIdAsync(UserId, TeamAccountId).Returns(user);
+        _userRepo.GetByIdAsync(UserId, OrgId).Returns(user);
 
         byte[] oversized = new byte[1_048_577]; // 1 MB + 1 byte
         UpdateUserProfileCommand command = new(
-            UserId, TeamAccountId, "Alice", "Smith", oversized, "image/png");
+            UserId, OrgId, "Alice", "Smith", oversized, "image/png");
         Result result = await CreateHandler().Handle(command, CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

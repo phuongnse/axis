@@ -4,7 +4,7 @@
   "name": "TenantModuleProvisionReportEvent",
   "fields": [
     {
-      "name": "teamAccountId",
+      "name": "organizationId",
       "type": "string"
     },
     {

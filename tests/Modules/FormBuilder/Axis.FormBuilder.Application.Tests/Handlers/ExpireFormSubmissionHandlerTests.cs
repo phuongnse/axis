@@ -12,7 +12,7 @@ namespace Axis.FormBuilder.Application.Tests.Handlers;
 
 public class ExpireFormSubmissionHandlerTests
 {
-    private static readonly Guid TeamAccountId = Guid.NewGuid();
+    private static readonly Guid OrgId = Guid.NewGuid();
     private static readonly Guid FormId = Guid.NewGuid();
     private static readonly Guid ExecutionId = Guid.NewGuid();
     private static readonly Guid StepId = Guid.NewGuid();
@@ -32,10 +32,10 @@ public class ExpireFormSubmissionHandlerTests
     {
         Guid submissionId = Guid.NewGuid();
         _submissionRepo
-            .GetByIdAsync(submissionId, TeamAccountId, Arg.Any<CancellationToken>())
+            .GetByIdAsync(submissionId, OrgId, Arg.Any<CancellationToken>())
             .Returns((FormSubmission?)null);
 
-        await _handler.Handle(new ExpireFormSubmissionMessage(submissionId, TeamAccountId), CancellationToken.None);
+        await _handler.Handle(new ExpireFormSubmissionMessage(submissionId, OrgId), CancellationToken.None);
 
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
@@ -47,11 +47,11 @@ public class ExpireFormSubmissionHandlerTests
         submission.Submit(Guid.NewGuid(), new Dictionary<string, object?>());
 
         _submissionRepo
-            .GetByIdAsync(submission.Id, TeamAccountId, Arg.Any<CancellationToken>())
+            .GetByIdAsync(submission.Id, OrgId, Arg.Any<CancellationToken>())
             .Returns(submission);
 
         await _handler.Handle(
-            new ExpireFormSubmissionMessage(submission.Id, TeamAccountId),
+            new ExpireFormSubmissionMessage(submission.Id, OrgId),
             CancellationToken.None);
 
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
@@ -63,11 +63,11 @@ public class ExpireFormSubmissionHandlerTests
         FormSubmission submission = CreatePending(DateTimeOffset.UtcNow.AddMinutes(-5));
 
         _submissionRepo
-            .GetByIdAsync(submission.Id, TeamAccountId, Arg.Any<CancellationToken>())
+            .GetByIdAsync(submission.Id, OrgId, Arg.Any<CancellationToken>())
             .Returns(submission);
 
         await _handler.Handle(
-            new ExpireFormSubmissionMessage(submission.Id, TeamAccountId),
+            new ExpireFormSubmissionMessage(submission.Id, OrgId),
             CancellationToken.None);
 
         submission.Status.Should().Be(FormSubmissionStatus.Expired);
@@ -78,7 +78,7 @@ public class ExpireFormSubmissionHandlerTests
     {
         return FormSubmission.Create(
             FormId,
-            TeamAccountId,
+            OrgId,
             ExecutionId,
             StepId,
             Guid.NewGuid(),

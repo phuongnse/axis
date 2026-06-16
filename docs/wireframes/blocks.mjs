@@ -403,9 +403,9 @@ export function authSlugPreviewField(
   prefix, cardX, y, cardW, errorMsg = null, required = false, helpText = null) {
   const x = cardX + AUTH_CARD_PAD_X;
   const innerW = cardW - AUTH_CARD_PAD_X * 2;
-  const slugHelp = helpText ?? 'Unique URL path; auto-generated from team account name.';
+  const slugHelp = helpText ?? 'Unique URL path; auto-generated from organization name.';
   const { els: labelEls, inputY } = fieldLabelBlock(
-    prefix, x, y, innerW, 'Team account URL slug', { required, helpText: slugHelp, color: AUTH_MUTED });
+    prefix, x, y, innerW, 'Organization URL slug', { required, helpText: slugHelp, color: AUTH_MUTED });
   const previewY = inputY + 44;
   const els = [
     ...labelEls,
@@ -503,11 +503,11 @@ export function authCard(screenW, screenH, prefix, { title, subtitle = null, ite
   return { els, files };
 }
 
-/** Default register-team-account entry fields (team account onboarding only). */
-export const REGISTER_TEAM_ACCOUNT_ENTRY_FIELDS = [
+/** Default register-org entry fields (organization onboarding only). */
+export const REGISTER_ORG_ENTRY_FIELDS = [
   {
     kind: 'input',
-    label: 'Team account name',
+    label: 'Organization name',
     value: 'Acme Corp',
     err: null,
     required: true,
@@ -516,21 +516,21 @@ export const REGISTER_TEAM_ACCOUNT_ENTRY_FIELDS = [
   { kind: 'slug', err: null },
   {
     kind: 'input',
-    label: 'Team account contact email',
+    label: 'Organization contact email',
     value: 'admin@company.com',
     err: null,
     required: true,
-    helpText: 'Use an official team account mailbox. User sign-in is set up later.',
+    helpText: 'Use an official organization mailbox. User sign-in is set up later.',
   },
 ];
 
-export const REGISTER_TEAM_ACCOUNT_TEAM_ACCOUNT_NAME_HELP = '2–100 characters. Shown on invoices and in your workspace.';
+export const REGISTER_ORG_ORG_NAME_HELP = '2–100 characters. Shown on invoices and in your workspace.';
 
 /**
- * Paint register-team-account entry fields; returns y after last field block.
- * @param {object[]} fields — like REGISTER_TEAM_ACCOUNT_ENTRY_FIELDS
+ * Paint register-org entry fields; returns y after last field block.
+ * @param {object[]} fields — like REGISTER_ORG_ENTRY_FIELDS
  */
-export function paintRegisterTeamAccountEntryFields(els, idPrefix, cardX, y, cardW, fields) {
+export function paintRegisterOrgEntryFields(els, idPrefix, cardX, y, cardW, fields) {
   let fy = y;
   fields.forEach((f, i) => {
     if (f.kind === 'slug') {

@@ -8,9 +8,9 @@ namespace Axis.Shared.Infrastructure.Tests.Tenancy;
 
 public class HttpTenantContextTests
 {
-    private static IHttpContextAccessor BuildAccessor(Guid teamAccountId)
+    private static IHttpContextAccessor BuildAccessor(Guid orgId)
     {
-        Claim[] claims = new[] { new Claim("team_account_id", teamAccountId.ToString()) };
+        Claim[] claims = new[] { new Claim("org_id", orgId.ToString()) };
         ClaimsIdentity identity = new ClaimsIdentity(claims, "Bearer");
         ClaimsPrincipal principal = new ClaimsPrincipal(identity);
         DefaultHttpContext httpContext = new DefaultHttpContext { User = principal };
@@ -20,21 +20,21 @@ public class HttpTenantContextTests
     }
 
     [Fact]
-    public void HttpTenantContext_WhenTeamAccountIdClaimPresent_ReadsTeamAccountId()
+    public void HttpTenantContext_WhenOrgIdClaimPresent_ReadsOrganizationId()
     {
-        Guid teamAccountId = Guid.NewGuid();
-        HttpTenantContext sut = new HttpTenantContext(BuildAccessor(teamAccountId));
+        Guid orgId = Guid.NewGuid();
+        HttpTenantContext sut = new HttpTenantContext(BuildAccessor(orgId));
 
-        sut.TeamAccountId.Should().Be(teamAccountId);
+        sut.OrganizationId.Should().Be(orgId);
     }
 
     [Fact]
-    public void HttpTenantContext_WhenTeamAccountIdClaimPresent_DerivesSchemaName()
+    public void HttpTenantContext_WhenOrgIdClaimPresent_DerivesSchemaName()
     {
-        Guid teamAccountId = Guid.NewGuid();
-        HttpTenantContext sut = new HttpTenantContext(BuildAccessor(teamAccountId));
+        Guid orgId = Guid.NewGuid();
+        HttpTenantContext sut = new HttpTenantContext(BuildAccessor(orgId));
 
-        sut.SchemaName.Should().Be($"tenant_{teamAccountId:N}");
+        sut.SchemaName.Should().Be($"tenant_{orgId:N}");
     }
 
     [Fact]
@@ -44,14 +44,14 @@ public class HttpTenantContextTests
         accessor.HttpContext.Returns((HttpContext?)null);
         HttpTenantContext sut = new HttpTenantContext(accessor);
 
-        Func<Guid> act = () => _ = sut.TeamAccountId;
+        Func<Guid> act = () => _ = sut.OrganizationId;
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*HTTP context*");
     }
 
     [Fact]
-    public void HttpTenantContext_WhenTeamAccountIdClaimIsMissing_Throws()
+    public void HttpTenantContext_WhenOrgIdClaimIsMissing_Throws()
     {
         DefaultHttpContext httpContext = new DefaultHttpContext
         {
@@ -61,9 +61,9 @@ public class HttpTenantContextTests
         accessor.HttpContext.Returns(httpContext);
         HttpTenantContext sut = new HttpTenantContext(accessor);
 
-        Func<Guid> act = () => _ = sut.TeamAccountId;
+        Func<Guid> act = () => _ = sut.OrganizationId;
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*team_account_id*");
+            .WithMessage("*org_id*");
     }
 }

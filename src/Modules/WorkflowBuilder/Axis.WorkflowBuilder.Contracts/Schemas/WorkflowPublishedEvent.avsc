@@ -4,7 +4,7 @@
   "name": "WorkflowPublishedEvent",
   "fields": [
     { "name": "workflowId", "type": "string" },
-    { "name": "teamAccountId", "type": "string" },
+    { "name": "organizationId", "type": "string" },
     {
       "name": "referencedFormIds",
       "type": { "type": "array", "items": "string" },

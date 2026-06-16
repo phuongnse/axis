@@ -5,6 +5,6 @@ namespace Axis.FormBuilder.Domain.Events;
 public sealed record FormTaskExpired(
     Guid FormSubmissionId,
     Guid FormDefinitionId,
-    Guid TeamAccountId,
+    Guid OrganizationId,
     Guid ExecutionId,
     Guid ExecutionStepId) : IDomainEvent;

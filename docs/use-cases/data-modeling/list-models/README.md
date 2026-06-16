@@ -4,15 +4,15 @@
 
 ## Purpose
 
-See all models in my team account so that I can understand the data available to me.
+See all models in my organization so that I can understand the data available to me.
 
 ## Primary actor
 
-- Team account Member with `data_modeling:model:read`
+- Organization Member with `data_modeling:model:read`
 
 ## Trigger
 
-- User initiates: see all models in my team account
+- User initiates: see all models in my organization
 
 ## Main flow
 
@@ -26,7 +26,7 @@ See all models in my team account so that I can understand the data available to
 
 ## Context
 
-Users can create custom data models within their team account. A model defines the structure of a type of business object. All model metadata is stored in the tenant schema; actual records use a JSONB-backed storage strategy.
+Users can create custom data models within their organization. A model defines the structure of a type of business object. All model metadata is stored in the tenant schema; actual records use a JSONB-backed storage strategy.
 
 ## Acceptance Criteria
 
@@ -40,7 +40,7 @@ Users can create custom data models within their team account. A model defines t
 - [ ] Users without `data_modeling:model:read` who navigate to this URL are redirected to home with a permission error.
 
 *Edge cases*
-- [ ] If the team account has no models yet, the list shows an empty state with a "Create your first model" CTA.
+- [ ] If the org has no models yet, the list shows an empty state with a "Create your first model" CTA.
 - [ ] Record count may be slightly behind real-time (cached with 1-minute TTL) to avoid expensive COUNT queries on every list load.
 
 *Out of scope*

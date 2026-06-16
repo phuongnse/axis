@@ -20,7 +20,7 @@ function LandingActions() {
         {t('common.createAccount')}
       </ActionLink>
       <ActionLink to="/register/team" icon={UsersRound} surface="adaptive" variant="secondary">
-        {t('teamAccountRegistration.createWorkspace')}
+        {t('organizationRegistration.createWorkspace')}
       </ActionLink>
     </div>
   );

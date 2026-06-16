@@ -7,6 +7,6 @@ internal sealed class WorkflowPlanLimitUsageCounter(IWorkflowRepository workflow
 {
     public PlanLimitResourceType ResourceType => PlanLimitResourceType.Workflows;
 
-    public Task<int> GetCurrentUsageAsync(Guid teamAccountId, CancellationToken cancellationToken = default) =>
-        workflowRepo.CountByTeamAccountAsync(teamAccountId, cancellationToken);
+    public Task<int> GetCurrentUsageAsync(Guid organizationId, CancellationToken cancellationToken = default) =>
+        workflowRepo.CountByOrganizationAsync(organizationId, cancellationToken);
 }

@@ -66,7 +66,7 @@ describe('VerifyEmailPage', () => {
           JSON.stringify({
             sessionEstablished: false,
             nextStep: 'RegisterUser',
-            teamAccountSetupToken: 'setup-token',
+            organizationSetupToken: 'setup-token',
           }),
         ),
     } as unknown as Response);

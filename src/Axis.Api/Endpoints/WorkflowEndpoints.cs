@@ -43,7 +43,7 @@ public static class WorkflowEndpoints
         group.MapGet("/", GetWorkflows)
             .RequireAuthorization(Permissions.Workflow.DefinitionRead)
             .WithName("GetWorkflows")
-            .WithSummary("List workflow definitions for the team account (paginated)")
+            .WithSummary("List workflow definitions for the organization (paginated)")
             .WithTags("WorkflowBuilder")
             .Produces<PagedResult<WorkflowSummaryDto>>()
             .ProducesProblem(401)
@@ -267,7 +267,7 @@ public static class WorkflowEndpoints
         [FromQuery] int pageSize = 20)
     {
         PagedResult<WorkflowSummaryDto> result = await mediator.Send(
-            new GetWorkflowsQuery(currentUser.TeamAccountId, page, pageSize), ct);
+            new GetWorkflowsQuery(currentUser.OrgId, page, pageSize), ct);
         return Results.Ok(result);
     }
 
@@ -278,7 +278,7 @@ public static class WorkflowEndpoints
         CancellationToken ct)
     {
         Result<Guid> result = await mediator.Send(
-            new CreateWorkflowCommand(request.Name, request.Description, currentUser.TeamAccountId, currentUser.UserId.ToString()), ct);
+            new CreateWorkflowCommand(request.Name, request.Description, currentUser.OrgId, currentUser.UserId.ToString()), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.Created($"/api/workflows/{result.Value}", new CreatedResponse(result.Value));
     }
@@ -290,7 +290,7 @@ public static class WorkflowEndpoints
         CancellationToken ct)
     {
         WorkflowDetailDto? dto = await mediator.Send(
-            new GetWorkflowQuery(workflowId, currentUser.TeamAccountId), ct);
+            new GetWorkflowQuery(workflowId, currentUser.OrgId), ct);
         if (dto is null)
             return Results.Problem($"Workflow '{workflowId}' not found.", statusCode: StatusCodes.Status404NotFound);
         return Results.Ok(dto);
@@ -304,7 +304,7 @@ public static class WorkflowEndpoints
         CancellationToken ct)
     {
         Result result = await mediator.Send(
-            new UpdateWorkflowCommand(workflowId, currentUser.TeamAccountId, request.Name, request.Description), ct);
+            new UpdateWorkflowCommand(workflowId, currentUser.OrgId, request.Name, request.Description), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
@@ -316,7 +316,7 @@ public static class WorkflowEndpoints
         CancellationToken ct)
     {
         Result result = await mediator.Send(
-            new PublishWorkflowCommand(workflowId, currentUser.TeamAccountId), ct);
+            new PublishWorkflowCommand(workflowId, currentUser.OrgId), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
@@ -328,7 +328,7 @@ public static class WorkflowEndpoints
         CancellationToken ct)
     {
         Result result = await mediator.Send(
-            new ArchiveWorkflowCommand(workflowId, currentUser.TeamAccountId), ct);
+            new ArchiveWorkflowCommand(workflowId, currentUser.OrgId), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
@@ -340,7 +340,7 @@ public static class WorkflowEndpoints
         CancellationToken ct)
     {
         Result result = await mediator.Send(
-            new UnarchiveWorkflowCommand(workflowId, currentUser.TeamAccountId), ct);
+            new UnarchiveWorkflowCommand(workflowId, currentUser.OrgId), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
@@ -352,7 +352,7 @@ public static class WorkflowEndpoints
         CancellationToken ct)
     {
         Result result = await mediator.Send(
-            new DeleteWorkflowCommand(workflowId, currentUser.TeamAccountId), ct);
+            new DeleteWorkflowCommand(workflowId, currentUser.OrgId), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
@@ -364,7 +364,7 @@ public static class WorkflowEndpoints
         CancellationToken ct)
     {
         Result<Guid> result = await mediator.Send(
-            new DuplicateWorkflowCommand(workflowId, currentUser.TeamAccountId, currentUser.UserId.ToString()), ct);
+            new DuplicateWorkflowCommand(workflowId, currentUser.OrgId, currentUser.UserId.ToString()), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.Created($"/api/workflows/{result.Value}", new CreatedResponse(result.Value));
     }
@@ -376,7 +376,7 @@ public static class WorkflowEndpoints
         CancellationToken ct)
     {
         WorkflowExportDto? dto = await mediator.Send(
-            new ExportWorkflowQuery(workflowId, currentUser.TeamAccountId), ct);
+            new ExportWorkflowQuery(workflowId, currentUser.OrgId), ct);
         if (dto is null)
             return Results.Problem($"Workflow '{workflowId}' not found.", statusCode: StatusCodes.Status404NotFound);
 
@@ -399,7 +399,7 @@ public static class WorkflowEndpoints
         CancellationToken ct)
     {
         Result<Guid> result = await mediator.Send(
-            new ImportWorkflowCommand(currentUser.TeamAccountId, currentUser.UserId.ToString(), exportData), ct);
+            new ImportWorkflowCommand(currentUser.OrgId, currentUser.UserId.ToString(), exportData), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.Created($"/api/workflows/{result.Value}", new CreatedResponse(result.Value));
     }
@@ -410,7 +410,7 @@ public static class WorkflowEndpoints
         CancellationToken ct)
     {
         IReadOnlyList<WorkflowExportDto> workflows = await mediator.Send(
-            new BulkExportWorkflowsCommand(currentUser.TeamAccountId), ct);
+            new BulkExportWorkflowsCommand(currentUser.OrgId), ct);
 
         JsonSerializerOptions jsonOpts = new()
         {
@@ -450,7 +450,7 @@ public static class WorkflowEndpoints
         CancellationToken ct)
     {
         Result<Guid> result = await mediator.Send(
-            new AddStepCommand(workflowId, currentUser.TeamAccountId, request.Name, request.StepType, request.Config), ct);
+            new AddStepCommand(workflowId, currentUser.OrgId, request.Name, request.StepType, request.Config), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.Created($"/api/workflows/{workflowId}/steps/{result.Value}", new CreatedResponse(result.Value));
     }
@@ -464,7 +464,7 @@ public static class WorkflowEndpoints
         CancellationToken ct)
     {
         Result result = await mediator.Send(
-            new ConfigureStepCommand(workflowId, currentUser.TeamAccountId, stepId, request.Name, request.Config), ct);
+            new ConfigureStepCommand(workflowId, currentUser.OrgId, stepId, request.Name, request.Config), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
@@ -477,7 +477,7 @@ public static class WorkflowEndpoints
         CancellationToken ct)
     {
         Result result = await mediator.Send(
-            new RemoveStepCommand(workflowId, currentUser.TeamAccountId, stepId), ct);
+            new RemoveStepCommand(workflowId, currentUser.OrgId, stepId), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
@@ -490,7 +490,7 @@ public static class WorkflowEndpoints
         CancellationToken ct)
     {
         Result result = await mediator.Send(
-            new AddTransitionCommand(workflowId, currentUser.TeamAccountId, request.FromStepId, request.ToStepId, request.Label), ct);
+            new AddTransitionCommand(workflowId, currentUser.OrgId, request.FromStepId, request.ToStepId, request.Label), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
@@ -503,7 +503,7 @@ public static class WorkflowEndpoints
         CancellationToken ct)
     {
         Result result = await mediator.Send(
-            new RemoveTransitionCommand(workflowId, currentUser.TeamAccountId, request.FromStepId, request.ToStepId), ct);
+            new RemoveTransitionCommand(workflowId, currentUser.OrgId, request.FromStepId, request.ToStepId), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
@@ -516,7 +516,7 @@ public static class WorkflowEndpoints
         CancellationToken ct)
     {
         Result result = await mediator.Send(
-            new AddTriggerCommand(workflowId, currentUser.TeamAccountId, request.TriggerType, request.Config), ct);
+            new AddTriggerCommand(workflowId, currentUser.OrgId, request.TriggerType, request.Config), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
@@ -535,7 +535,7 @@ public static class WorkflowEndpoints
         }
 
         Result result = await mediator.Send(
-            new RemoveTriggerCommand(workflowId, currentUser.TeamAccountId, parsedType), ct);
+            new RemoveTriggerCommand(workflowId, currentUser.OrgId, parsedType), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }

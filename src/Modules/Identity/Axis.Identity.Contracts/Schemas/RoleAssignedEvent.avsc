@@ -4,7 +4,7 @@
   "name": "RoleAssignedEvent",
   "fields": [
     { "name": "userId", "type": "string" },
-    { "name": "teamAccountId", "type": "string" },
+    { "name": "organizationId", "type": "string" },
     { "name": "roleId", "type": "string" }
   ]
 }

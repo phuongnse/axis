@@ -11,7 +11,7 @@ public class GetExecutionHandlerTests
 {
     private readonly IExecutionRepository _execRepo = Substitute.For<IExecutionRepository>();
 
-    private static readonly Guid TeamAccountId = Guid.NewGuid();
+    private static readonly Guid OrgId = Guid.NewGuid();
     private static readonly Guid ExecId = Guid.NewGuid();
     private static readonly Guid WorkflowId = Guid.NewGuid();
 
@@ -26,10 +26,10 @@ public class GetExecutionHandlerTests
     public async Task GetExecution_WhenExecutionExists_ReturnsExecutionResponse()
     {
         ExecutionResponse expected = BuildResponse();
-        _execRepo.GetWithStepsAsync(ExecId, TeamAccountId).Returns(expected);
+        _execRepo.GetWithStepsAsync(ExecId, OrgId).Returns(expected);
 
         ExecutionResponse? result = await CreateHandler().Handle(
-            new GetExecutionQuery(ExecId, TeamAccountId), CancellationToken.None);
+            new GetExecutionQuery(ExecId, OrgId), CancellationToken.None);
 
         result.Should().NotBeNull();
         result!.Id.Should().Be(ExecId);
@@ -40,23 +40,23 @@ public class GetExecutionHandlerTests
     [Fact]
     public async Task GetExecution_WhenExecutionNotFound_ReturnsNull()
     {
-        _execRepo.GetWithStepsAsync(Arg.Any<Guid>(), TeamAccountId).ReturnsNull();
+        _execRepo.GetWithStepsAsync(Arg.Any<Guid>(), OrgId).ReturnsNull();
 
         ExecutionResponse? result = await CreateHandler().Handle(
-            new GetExecutionQuery(Guid.NewGuid(), TeamAccountId), CancellationToken.None);
+            new GetExecutionQuery(Guid.NewGuid(), OrgId), CancellationToken.None);
 
         result.Should().BeNull();
     }
 
     [Fact]
-    public async Task GetExecution_WhenExecutionBelongsToAnotherTeamAccount_ReturnsNull()
+    public async Task GetExecution_WhenExecutionBelongsToAnotherOrg_ReturnsNull()
     {
         ExecutionResponse expected = BuildResponse();
-        _execRepo.GetWithStepsAsync(ExecId, TeamAccountId).Returns(expected);
+        _execRepo.GetWithStepsAsync(ExecId, OrgId).Returns(expected);
 
-        Guid otherTeamAccountId = Guid.NewGuid();
+        Guid otherOrgId = Guid.NewGuid();
         ExecutionResponse? result = await CreateHandler().Handle(
-            new GetExecutionQuery(ExecId, otherTeamAccountId), CancellationToken.None);
+            new GetExecutionQuery(ExecId, otherOrgId), CancellationToken.None);
 
         result.Should().BeNull();
     }

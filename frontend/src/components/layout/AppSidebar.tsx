@@ -28,9 +28,9 @@ export function AppSidebar() {
           variant="outline"
           className="w-full justify-start border-white/10 bg-white/[0.06] px-3 text-left text-sm text-white hover:bg-white/[0.08] hover:text-white"
           disabled
-          aria-label={t('shell.teamAccountLabel')}
+          aria-label={t('shell.organizationLabel')}
         >
-          <span className="truncate">{t('shell.teamAccountName')}</span>
+          <span className="truncate">{t('shell.organizationName')}</span>
           <ChevronDown className="ml-auto size-4 shrink-0 text-white/45" />
         </Button>
       </div>

@@ -30,7 +30,7 @@ internal sealed class FormSubmissionConfiguration : IEntityTypeConfiguration<For
         builder.Property(s => s.Id).HasColumnName("id");
 
         builder.Property(s => s.FormDefinitionId).HasColumnName("form_definition_id").IsRequired();
-        builder.Property(s => s.TeamAccountId).HasColumnName("team_account_id").IsRequired();
+        builder.Property(s => s.OrganizationId).HasColumnName("organization_id").IsRequired();
         builder.Property(s => s.ExecutionId).HasColumnName("execution_id").IsRequired();
         builder.Property(s => s.ExecutionStepId).HasColumnName("execution_step_id").IsRequired();
         builder.Property(s => s.AssigneeUserId).HasColumnName("assignee_user_id");

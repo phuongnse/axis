@@ -8,7 +8,7 @@ Use a data class as a field type in a model so that I can embed structured neste
 
 ## Primary actor
 
-- Team account Member
+- Organization Member
 
 ## Trigger
 
@@ -31,7 +31,7 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] When adding a field of type `DataClass`, a searchable dropdown lists all data classes in the team account.
+- [ ] When adding a field of type `DataClass`, a searchable dropdown lists all data classes in the org.
 - [ ] After selection, the field is saved referencing the data class by its `id`.
 - [ ] In the record form, the data class field is rendered as a grouped sub-form with all its child fields.
 - [ ] In the record list, the data class field is displayed as a summary (e.g., the first text field of the data class).
@@ -45,7 +45,7 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 - [ ] Editing the data class definition (adding/removing fields) is reflected immediately in all models that use it, including the form rendering for those models.
 
 *Out of scope*
-- A field referencing a data class from another team account — tenant-isolated, not possible.
+- A field referencing a data class from another org — tenant-isolated, not possible.
 
 > **Implementation status**
 >

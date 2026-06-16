@@ -3,4 +3,4 @@ using Axis.WorkflowBuilder.Application.Queries.ExportWorkflow;
 
 namespace Axis.WorkflowBuilder.Application.Commands.BulkExportWorkflows;
 
-public sealed record BulkExportWorkflowsCommand(Guid TeamAccountId) : IQuery<IReadOnlyList<WorkflowExportDto>>;
+public sealed record BulkExportWorkflowsCommand(Guid OrganizationId) : IQuery<IReadOnlyList<WorkflowExportDto>>;

@@ -8,7 +8,7 @@ Add a step to the workflow canvas so that I can build my process visually.
 
 ## Primary actor
 
-- Team account Member with `workflow:definition:write`
+- Organization Member with `workflow:definition:write`
 
 ## Trigger
 

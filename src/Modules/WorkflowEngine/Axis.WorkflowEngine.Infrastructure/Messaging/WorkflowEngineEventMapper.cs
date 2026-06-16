@@ -15,7 +15,7 @@ internal static class WorkflowEngineEventMapper
                 executionId = reached.ExecutionId.ToString(),
                 executionStepId = reached.ExecutionStepId.ToString(),
                 workflowDefinitionId = reached.WorkflowDefinitionId.ToString(),
-                teamAccountId = reached.TeamAccountId.ToString(),
+                organizationId = reached.OrganizationId.ToString(),
                 formDefinitionId = reached.FormDefinitionId.ToString(),
                 assigneeExpression = reached.AssigneeExpression,
                 timeoutHours = reached.TimeoutHours,

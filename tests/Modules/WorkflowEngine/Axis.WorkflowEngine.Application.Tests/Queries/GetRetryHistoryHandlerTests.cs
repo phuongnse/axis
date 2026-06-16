@@ -10,7 +10,7 @@ public class GetRetryHistoryHandlerTests
 {
     private readonly IExecutionRepository _execRepo = Substitute.For<IExecutionRepository>();
 
-    private static readonly Guid TeamAccountId = Guid.NewGuid();
+    private static readonly Guid OrgId = Guid.NewGuid();
     private static readonly Guid OriginalExecId = Guid.NewGuid();
     private static readonly Guid WorkflowId = Guid.NewGuid();
 
@@ -28,10 +28,10 @@ public class GetRetryHistoryHandlerTests
             BuildSummary(OriginalExecId),
             BuildSummary(OriginalExecId),
         ];
-        _execRepo.GetRetriesAsync(OriginalExecId, TeamAccountId).Returns(retries);
+        _execRepo.GetRetriesAsync(OriginalExecId, OrgId).Returns(retries);
 
         IReadOnlyList<ExecutionSummaryResponse> result = await CreateHandler().Handle(
-            new GetRetryHistoryQuery(OriginalExecId, TeamAccountId), CancellationToken.None);
+            new GetRetryHistoryQuery(OriginalExecId, OrgId), CancellationToken.None);
 
         result.Should().HaveCount(2);
         result.Should().AllSatisfy(r => r.RetryOfExecutionId.Should().Be(OriginalExecId));
@@ -40,23 +40,23 @@ public class GetRetryHistoryHandlerTests
     [Fact]
     public async Task GetRetryHistory_WhenNoRetries_ReturnsEmptyList()
     {
-        _execRepo.GetRetriesAsync(OriginalExecId, TeamAccountId).Returns(new List<ExecutionSummaryResponse>());
+        _execRepo.GetRetriesAsync(OriginalExecId, OrgId).Returns(new List<ExecutionSummaryResponse>());
 
         IReadOnlyList<ExecutionSummaryResponse> result = await CreateHandler().Handle(
-            new GetRetryHistoryQuery(OriginalExecId, TeamAccountId), CancellationToken.None);
+            new GetRetryHistoryQuery(OriginalExecId, OrgId), CancellationToken.None);
 
         result.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task GetRetryHistory_WhenQueriedWithWrongTeamAccount_ReturnsEmptyList()
+    public async Task GetRetryHistory_WhenQueriedWithWrongOrg_ReturnsEmptyList()
     {
         List<ExecutionSummaryResponse> retries = [BuildSummary(OriginalExecId)];
-        _execRepo.GetRetriesAsync(OriginalExecId, TeamAccountId).Returns(retries);
+        _execRepo.GetRetriesAsync(OriginalExecId, OrgId).Returns(retries);
 
-        Guid otherTeamAccountId = Guid.NewGuid();
+        Guid otherOrgId = Guid.NewGuid();
         IReadOnlyList<ExecutionSummaryResponse> result = await CreateHandler().Handle(
-            new GetRetryHistoryQuery(OriginalExecId, otherTeamAccountId), CancellationToken.None);
+            new GetRetryHistoryQuery(OriginalExecId, otherOrgId), CancellationToken.None);
 
         result.Should().BeEmpty();
     }

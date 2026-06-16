@@ -10,21 +10,21 @@ namespace Axis.WorkflowBuilder.Application.Tests;
 
 public class BulkExportWorkflowsHandlerTests
 {
-    private static readonly Guid TeamAccountId = Guid.NewGuid();
+    private static readonly Guid OrgId = Guid.NewGuid();
     private readonly IWorkflowRepository _repo = Substitute.For<IWorkflowRepository>();
     private readonly BulkExportWorkflowsHandler _handler;
 
     public BulkExportWorkflowsHandlerTests() => _handler = new BulkExportWorkflowsHandler(_repo);
 
     [Fact]
-    public async Task Handle_WhenTeamAccountHasWorkflows_ReturnsExportDtoForEach()
+    public async Task Handle_WhenOrgHasWorkflows_ReturnsExportDtoForEach()
     {
-        WorkflowDefinition wf1 = WorkflowDefinition.Create("Workflow A", null, TeamAccountId, "user");
-        WorkflowDefinition wf2 = WorkflowDefinition.Create("Workflow B", null, TeamAccountId, "user");
-        _repo.GetAllAsync(TeamAccountId, Arg.Any<CancellationToken>()).Returns([wf1, wf2]);
+        WorkflowDefinition wf1 = WorkflowDefinition.Create("Workflow A", null, OrgId, "user");
+        WorkflowDefinition wf2 = WorkflowDefinition.Create("Workflow B", null, OrgId, "user");
+        _repo.GetAllAsync(OrgId, Arg.Any<CancellationToken>()).Returns([wf1, wf2]);
 
         IReadOnlyList<WorkflowExportDto> result = await _handler.Handle(
-            new BulkExportWorkflowsCommand(TeamAccountId), CancellationToken.None);
+            new BulkExportWorkflowsCommand(OrgId), CancellationToken.None);
 
         result.Should().HaveCount(2);
         result.Should().Contain(d => d.Name == "Workflow A");
@@ -32,12 +32,12 @@ public class BulkExportWorkflowsHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenTeamAccountHasNoWorkflows_ReturnsEmptyList()
+    public async Task Handle_WhenOrgHasNoWorkflows_ReturnsEmptyList()
     {
-        _repo.GetAllAsync(TeamAccountId, Arg.Any<CancellationToken>()).Returns([]);
+        _repo.GetAllAsync(OrgId, Arg.Any<CancellationToken>()).Returns([]);
 
         IReadOnlyList<WorkflowExportDto> result = await _handler.Handle(
-            new BulkExportWorkflowsCommand(TeamAccountId), CancellationToken.None);
+            new BulkExportWorkflowsCommand(OrgId), CancellationToken.None);
 
         result.Should().BeEmpty();
     }
@@ -45,13 +45,13 @@ public class BulkExportWorkflowsHandlerTests
     [Fact]
     public async Task Handle_WhenWorkflowHasSensitiveData_RedactsInAllExports()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("API Workflow", null, TeamAccountId, "user");
+        WorkflowDefinition wf = WorkflowDefinition.Create("API Workflow", null, OrgId, "user");
         wf.AddStep("HTTP", StepType.HttpRequest,
             new Dictionary<string, object?> { ["token"] = "secret", ["url"] = "https://example.com" });
-        _repo.GetAllAsync(TeamAccountId, Arg.Any<CancellationToken>()).Returns([wf]);
+        _repo.GetAllAsync(OrgId, Arg.Any<CancellationToken>()).Returns([wf]);
 
         IReadOnlyList<WorkflowExportDto> result = await _handler.Handle(
-            new BulkExportWorkflowsCommand(TeamAccountId), CancellationToken.None);
+            new BulkExportWorkflowsCommand(OrgId), CancellationToken.None);
 
         StepExportDto httpStep = result[0].Steps.Single(s => s.Name == "HTTP");
         httpStep.Config!["token"].Should().Be("[REDACTED]");

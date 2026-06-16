@@ -10,7 +10,7 @@ describe('WorkspaceProvisioningPage', () => {
     vi.stubGlobal('fetch', vi.fn());
     saveRegistrationContext({
       email: 'alex@example.com',
-      teamAccountName: 'Acme Corp',
+      organizationName: 'Acme Corp',
     });
   });
 
@@ -27,8 +27,8 @@ describe('WorkspaceProvisioningPage', () => {
       text: () =>
         Promise.resolve(
           JSON.stringify({
-            teamAccountId: '00000000-0000-0000-0000-000000000001',
-            teamAccountStatus: 'Provisioning',
+            organizationId: '00000000-0000-0000-0000-000000000001',
+            organizationStatus: 'Provisioning',
             isReady: false,
             modules: [
               { module: 'DataModeling', status: 'Pending', attemptCount: 0, lastError: null },
@@ -56,8 +56,8 @@ describe('WorkspaceProvisioningPage', () => {
       text: () =>
         Promise.resolve(
           JSON.stringify({
-            teamAccountId: '00000000-0000-0000-0000-000000000001',
-            teamAccountStatus: 'ProvisioningFailed',
+            organizationId: '00000000-0000-0000-0000-000000000001',
+            organizationStatus: 'ProvisioningFailed',
             isReady: false,
             modules: [
               { module: 'DataModeling', status: 'Failed', attemptCount: 3, lastError: 'timeout' },

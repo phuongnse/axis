@@ -8,7 +8,7 @@ Create a custom role with specific permissions so that I can grant exactly the r
 
 ## Primary actor
 
-- Team account Admin
+- Organization Admin
 
 ## Trigger
 
@@ -26,7 +26,7 @@ Create a custom role with specific permissions so that I can grant exactly the r
 
 ## Context
 
-Team account admins can create custom roles, assign permissions to each role, and assign roles to users. Default system roles (Admin, Editor, Viewer) are provided out-of-the-box and cannot be deleted or modified.
+Organization admins can create custom roles, assign permissions to each role, and assign roles to users. Default system roles (Admin, Editor, Viewer) are provided out-of-the-box and cannot be deleted or modified.
 
 ## Acceptance Criteria
 
@@ -36,7 +36,7 @@ Team account admins can create custom roles, assign permissions to each role, an
 - [ ] Success message confirms: "Role '{name}' created."
 
 *Validation & errors*
-- [ ] Role name: required, 2–50 characters, unique within the team account (case-insensitive). Duplicate name shows: "A role with this name already exists."
+- [ ] Role name: required, 2–50 characters, unique within the org (case-insensitive). Duplicate name shows: "A role with this name already exists."
 - [ ] At least one permission must be selected. Submitting with no permissions shows: "A role must have at least one permission."
 - [ ] A non-admin calling this API receives HTTP 403.
 
@@ -57,9 +57,9 @@ Team account admins can create custom roles, assign permissions to each role, an
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** 403 permission check requires JWT identity from API layer — pending. Case-insensitive name uniqueness check is done in handler against existing roles in team account.
+> **Gaps vs spec:** 403 permission check requires JWT identity from API layer — pending. Case-insensitive name uniqueness check is done in handler against existing roles in org.
 >
-> **Decisions:** `Role.CreateCustom(name, teamAccountId, permissions[])` factory method; minimum 1 permission enforced in domain.
+> **Decisions:** `Role.CreateCustom(name, orgId, permissions[])` factory method; minimum 1 permission enforced in domain.
 
 ## Wireframes
 

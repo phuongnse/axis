@@ -8,7 +8,7 @@ Undo and redo changes on the canvas so that I can recover from mistakes easily.
 
 ## Primary actor
 
-- Team account Member
+- Organization Member
 
 ## Trigger
 

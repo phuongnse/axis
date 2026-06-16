@@ -2,13 +2,13 @@ import type { components } from '@/lib/api-types';
 
 // Derived from the backend OpenAPI schema so request/response
 // shapes can never drift from the API. Regenerate with `npm run gen:api-types`.
-export type RegisterTeamAccountRequest = components['schemas']['RegisterTeamAccountRequest'];
+export type RegisterOrganizationRequest = components['schemas']['RegisterOrganizationRequest'];
 export type RegisterUserRequest = components['schemas']['RegisterUserRequest'];
 export type MessageResponse = components['schemas']['MessageResponse'];
 
 export type LegalVersionsResponse = components['schemas']['LegalVersionsDto'];
 
-export type TeamAccountSlugPreviewResponse = components['schemas']['TeamAccountSlugPreviewDto'];
+export type OrganizationSlugPreviewResponse = components['schemas']['OrganizationSlugPreviewDto'];
 
 export interface RegisterValidationErrorData {
   errors?: Record<string, string[]>;

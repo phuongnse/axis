@@ -6,7 +6,7 @@ internal static class TestRegistrationPayload
 {
     public const string AdminPassword = "maple river sunrise";
 
-    public static string TeamContactEmail(string suffix) =>
+    public static string OrganizationContactEmail(string suffix) =>
         $"contact{suffix}@test.com";
 
     public static string AdminEmail(string suffix) =>
@@ -14,13 +14,13 @@ internal static class TestRegistrationPayload
 
     public static object Create(string suffix) => new
     {
-        teamAccountName = $"TestTeamAccount{suffix}",
-        teamContactEmail = TeamContactEmail(suffix),
+        orgName = $"TestOrg{suffix}",
+        organizationContactEmail = OrganizationContactEmail(suffix),
         acceptedTermsVersion = WellKnownLegalDocuments.TermsVersion,
         acceptedPrivacyVersion = WellKnownLegalDocuments.PrivacyVersion,
     };
 
-    public static object CreateUser(string suffix, string? teamAccountSetupToken = null) => new
+    public static object CreateUser(string suffix, string? organizationSetupToken = null) => new
     {
         firstName = "Test",
         lastName = "Admin",
@@ -29,6 +29,6 @@ internal static class TestRegistrationPayload
         passwordConfirmation = AdminPassword,
         acceptedTermsVersion = WellKnownLegalDocuments.TermsVersion,
         acceptedPrivacyVersion = WellKnownLegalDocuments.PrivacyVersion,
-        teamAccountSetupToken,
+        organizationSetupToken,
     };
 }

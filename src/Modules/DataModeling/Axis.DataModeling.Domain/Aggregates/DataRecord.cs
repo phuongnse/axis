@@ -9,7 +9,7 @@ public sealed class DataRecord : AggregateRoot<Guid>
     private Dictionary<string, object?> _data;
 
     public Guid ModelId { get; private set; }
-    public Guid TeamAccountId { get; private set; }
+    public Guid OrganizationId { get; private set; }
     public DateTimeOffset? DeletedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -19,25 +19,25 @@ public sealed class DataRecord : AggregateRoot<Guid>
 
     private DataRecord() : base(default) { _data = []; CreatedBy = string.Empty; } // EF Core materialisation
 
-    private DataRecord(Guid id, Guid modelId, Guid teamAccountId,
+    private DataRecord(Guid id, Guid modelId, Guid organizationId,
         Dictionary<string, object?> data, string createdBy, DateTimeOffset createdAt)
         : base(id)
     {
         ModelId = modelId;
-        TeamAccountId = teamAccountId;
+        OrganizationId = organizationId;
         _data = data;
         CreatedBy = createdBy;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
     }
 
-    public static DataRecord Create(Guid modelId, Guid teamAccountId,
+    public static DataRecord Create(Guid modelId, Guid organizationId,
         IReadOnlyDictionary<string, object?> data, string createdBy)
     {
-        DataRecord record = new(Guid.NewGuid(), modelId, teamAccountId,
+        DataRecord record = new(Guid.NewGuid(), modelId, organizationId,
             new Dictionary<string, object?>(data), createdBy, DateTimeOffset.UtcNow);
 
-        record.RaiseDomainEvent(new DataRecordCreated(record.Id, modelId, teamAccountId));
+        record.RaiseDomainEvent(new DataRecordCreated(record.Id, modelId, organizationId));
         return record;
     }
 
@@ -57,6 +57,6 @@ public sealed class DataRecord : AggregateRoot<Guid>
             throw new InvalidOperationException("Record is already deleted.");
 
         DeletedAt = DateTimeOffset.UtcNow;
-        RaiseDomainEvent(new DataRecordDeleted(Id, ModelId, TeamAccountId));
+        RaiseDomainEvent(new DataRecordDeleted(Id, ModelId, OrganizationId));
     }
 }

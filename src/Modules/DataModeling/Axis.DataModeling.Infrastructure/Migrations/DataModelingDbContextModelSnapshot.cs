@@ -54,9 +54,9 @@ namespace Axis.DataModeling.Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
-                    b.Property<Guid>("TeamAccountId")
+                    b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")
-                        .HasColumnName("team_account_id");
+                        .HasColumnName("organization_id");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -69,7 +69,7 @@ namespace Axis.DataModeling.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TeamAccountId", "Name");
+                    b.HasIndex("OrganizationId", "Name");
 
                     b.ToTable("data_classes", (string)null);
                 });
@@ -116,9 +116,9 @@ namespace Axis.DataModeling.Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
-                    b.Property<Guid>("TeamAccountId")
+                    b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")
-                        .HasColumnName("team_account_id");
+                        .HasColumnName("organization_id");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -131,7 +131,7 @@ namespace Axis.DataModeling.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TeamAccountId", "Name");
+                    b.HasIndex("OrganizationId", "Name");
 
                     b.ToTable("data_models", (string)null);
                 });
@@ -161,9 +161,9 @@ namespace Axis.DataModeling.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("model_id");
 
-                    b.Property<Guid>("TeamAccountId")
+                    b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")
-                        .HasColumnName("team_account_id");
+                        .HasColumnName("organization_id");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -176,7 +176,7 @@ namespace Axis.DataModeling.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ModelId", "TeamAccountId");
+                    b.HasIndex("ModelId", "OrganizationId");
 
                     b.ToTable("data_records", (string)null);
                 });

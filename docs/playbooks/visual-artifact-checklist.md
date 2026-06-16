@@ -50,5 +50,5 @@ Use this checklist **before every commit** that changes visual artifacts:
 - [ ] Every **screen** `.excalidraw` in the use-case folder has a row in `## Wireframes` (error `*-states` included).
 - [ ] No sequence/entity diagram files (`*-flow`, `*-model`, `*-cases`) in the folder — those belong in `## Diagrams` as **Mermaid** in the README.
 - [ ] `## Diagrams` uses `### <slug>` + fenced `mermaid` blocks; other use cases linked in `**Related:**` prose only.
-- [ ] When >3 screens or branched flow: `## Screen flow` present and **row order** matches wireframes table ([docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--wireframes--implementation-status), example [register-team-account](../use-cases/platform-foundation/register-team-account/README.md)); pattern checklist [wireframes.md § Multi-screen journey](./wireframes.md#multi-screen-journey-pattern).
+- [ ] When >3 screens or branched flow: `## Screen flow` present and **row order** matches wireframes table ([docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--wireframes--implementation-status), example [register-org](../use-cases/platform-foundation/register-org/README.md)); pattern checklist [wireframes.md § Multi-screen journey](./wireframes.md#multi-screen-journey-pattern).
 

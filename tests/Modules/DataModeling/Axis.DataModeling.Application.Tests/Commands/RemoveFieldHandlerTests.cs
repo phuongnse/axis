@@ -15,7 +15,7 @@ public class RemoveFieldHandlerTests
 {
     private readonly IDataModelRepository _modelRepo = Substitute.For<IDataModelRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
-    private static readonly Guid TeamAccountId = Guid.NewGuid();
+    private static readonly Guid OrgId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     private RemoveFieldHandler CreateHandler() => new(_modelRepo, _uow);
@@ -23,12 +23,12 @@ public class RemoveFieldHandlerTests
     [Fact]
     public async Task RemoveField_WhenFieldExists_RemovesFieldAndSaves()
     {
-        DataModel model = DataModel.Create("My Model", null, null, null, TeamAccountId, UserId);
+        DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
         FieldDefinition field = model.AddField("notes", "Notes", FieldType.Text, false, new TextFieldConfig());
         int fieldCountBefore = model.Fields.Count;
-        _modelRepo.GetByIdAsync(model.Id, TeamAccountId).Returns(model);
+        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
 
-        Result result = await CreateHandler().Handle(new RemoveFieldCommand(model.Id, field.Id, TeamAccountId), CancellationToken.None);
+        Result result = await CreateHandler().Handle(new RemoveFieldCommand(model.Id, field.Id, OrgId), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         model.Fields.Should().HaveCount(fieldCountBefore - 1);
@@ -39,10 +39,10 @@ public class RemoveFieldHandlerTests
     [Fact]
     public async Task RemoveField_WhenModelNotFound_ReturnsNotFound()
     {
-        _modelRepo.GetByIdAsync(Arg.Any<Guid>(), TeamAccountId).Returns((DataModel?)null);
+        _modelRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).Returns((DataModel?)null);
 
         Result result = await CreateHandler().Handle(
-            new RemoveFieldCommand(Guid.NewGuid(), Guid.NewGuid(), TeamAccountId), CancellationToken.None);
+            new RemoveFieldCommand(Guid.NewGuid(), Guid.NewGuid(), OrgId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
@@ -50,15 +50,15 @@ public class RemoveFieldHandlerTests
     }
 
     [Fact]
-    public async Task RemoveField_WhenModelBelongsToAnotherTeamAccount_ReturnsNotFound()
+    public async Task RemoveField_WhenModelBelongsToAnotherOrg_ReturnsNotFound()
     {
-        DataModel model = DataModel.Create("My Model", null, null, null, TeamAccountId, UserId);
+        DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
         FieldDefinition field = model.AddField("notes", "Notes", FieldType.Text, false, new TextFieldConfig());
-        _modelRepo.GetByIdAsync(model.Id, TeamAccountId).Returns(model);
+        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
 
-        Guid otherTeamAccountId = Guid.NewGuid();
+        Guid otherOrgId = Guid.NewGuid();
         Result result = await CreateHandler().Handle(
-            new RemoveFieldCommand(model.Id, field.Id, otherTeamAccountId), CancellationToken.None);
+            new RemoveFieldCommand(model.Id, field.Id, otherOrgId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
@@ -67,12 +67,12 @@ public class RemoveFieldHandlerTests
     [Fact]
     public async Task RemoveField_WhenFieldIsSystem_ReturnsBusinessRuleFailure()
     {
-        DataModel model = DataModel.Create("My Model", null, null, null, TeamAccountId, UserId);
+        DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
         FieldDefinition sysField = model.Fields.First(f => f.IsSystem);
-        _modelRepo.GetByIdAsync(model.Id, TeamAccountId).Returns(model);
+        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
 
         Result result = await CreateHandler().Handle(
-            new RemoveFieldCommand(model.Id, sysField.Id, TeamAccountId), CancellationToken.None);
+            new RemoveFieldCommand(model.Id, sysField.Id, OrgId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);

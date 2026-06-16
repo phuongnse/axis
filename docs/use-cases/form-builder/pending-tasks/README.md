@@ -8,7 +8,7 @@ See a list of all form tasks assigned to me so that I don't miss any pending act
 
 ## Primary actor
 
-- Team account Member
+- Organization Member
 
 ## Trigger
 

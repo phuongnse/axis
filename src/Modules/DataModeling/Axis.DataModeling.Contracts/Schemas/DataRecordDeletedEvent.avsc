@@ -12,7 +12,7 @@
       "type": "string"
     },
     {
-      "name": "teamAccountId",
+      "name": "organizationId",
       "type": "string"
     }
   ]

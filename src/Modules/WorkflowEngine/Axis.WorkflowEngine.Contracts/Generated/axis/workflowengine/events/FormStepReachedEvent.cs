@@ -13,12 +13,12 @@ namespace axis.workflowengine.events
     public partial class FormStepReachedEvent : global::Avro.Specific.ISpecificRecord
     {
         public static global::Avro.Schema _SCHEMA = global::Avro.Schema.Parse(
-            @"{""type"":""record"",""name"":""FormStepReachedEvent"",""namespace"":""axis.workflowengine.events"",""fields"":[{""name"":""executionId"",""type"":""string""},{""name"":""executionStepId"",""type"":""string""},{""name"":""workflowDefinitionId"",""type"":""string""},{""name"":""teamAccountId"",""type"":""string""},{""name"":""formDefinitionId"",""type"":""string""},{""name"":""assigneeExpression"",""default"":null,""type"":[""null"",""string""]},{""name"":""timeoutHours"",""default"":null,""type"":[""null"",""int""]}]}");
+            @"{""type"":""record"",""name"":""FormStepReachedEvent"",""namespace"":""axis.workflowengine.events"",""fields"":[{""name"":""executionId"",""type"":""string""},{""name"":""executionStepId"",""type"":""string""},{""name"":""workflowDefinitionId"",""type"":""string""},{""name"":""organizationId"",""type"":""string""},{""name"":""formDefinitionId"",""type"":""string""},{""name"":""assigneeExpression"",""default"":null,""type"":[""null"",""string""]},{""name"":""timeoutHours"",""default"":null,""type"":[""null"",""int""]}]}");
 
         private string _executionId = string.Empty;
         private string _executionStepId = string.Empty;
         private string _workflowDefinitionId = string.Empty;
-        private string _teamAccountId = string.Empty;
+        private string _organizationId = string.Empty;
         private string _formDefinitionId = string.Empty;
         private string? _assigneeExpression;
         private int? _timeoutHours;
@@ -28,7 +28,7 @@ namespace axis.workflowengine.events
         public string executionId { get => _executionId; set => _executionId = value; }
         public string executionStepId { get => _executionStepId; set => _executionStepId = value; }
         public string workflowDefinitionId { get => _workflowDefinitionId; set => _workflowDefinitionId = value; }
-        public string teamAccountId { get => _teamAccountId; set => _teamAccountId = value; }
+        public string organizationId { get => _organizationId; set => _organizationId = value; }
         public string formDefinitionId { get => _formDefinitionId; set => _formDefinitionId = value; }
         public string? assigneeExpression { get => _assigneeExpression; set => _assigneeExpression = value; }
         public int? timeoutHours { get => _timeoutHours; set => _timeoutHours = value; }
@@ -38,7 +38,7 @@ namespace axis.workflowengine.events
             0 => executionId,
             1 => executionStepId,
             2 => workflowDefinitionId,
-            3 => teamAccountId,
+            3 => organizationId,
             4 => formDefinitionId,
             5 => assigneeExpression,
             6 => timeoutHours,
@@ -52,7 +52,7 @@ namespace axis.workflowengine.events
                 case 0: executionId = (string)fieldValue!; break;
                 case 1: executionStepId = (string)fieldValue!; break;
                 case 2: workflowDefinitionId = (string)fieldValue!; break;
-                case 3: teamAccountId = (string)fieldValue!; break;
+                case 3: organizationId = (string)fieldValue!; break;
                 case 4: formDefinitionId = (string)fieldValue!; break;
                 case 5: assigneeExpression = (string?)fieldValue; break;
                 case 6: timeoutHours = (int?)fieldValue; break;

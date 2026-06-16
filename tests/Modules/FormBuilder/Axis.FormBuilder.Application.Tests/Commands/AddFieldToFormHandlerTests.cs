@@ -11,7 +11,7 @@ namespace Axis.FormBuilder.Application.Tests.Commands;
 
 public class AddFieldToFormHandlerTests
 {
-    private static readonly Guid TeamAccountId = Guid.NewGuid();
+    private static readonly Guid OrgId = Guid.NewGuid();
     private readonly IFormRepository _repo = Substitute.For<IFormRepository>();
     private readonly IFormModelReferenceSync _formModelReferenceSync = Substitute.For<IFormModelReferenceSync>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
@@ -23,11 +23,11 @@ public class AddFieldToFormHandlerTests
     [Fact]
     public async Task Handle_WhenFormExists_AddsFieldAndReturnsFieldId()
     {
-        FormDefinition form = FormDefinition.Create("My Form", null, TeamAccountId, "user");
-        _repo.GetByIdAsync(form.Id, TeamAccountId, Arg.Any<CancellationToken>()).Returns(form);
+        FormDefinition form = FormDefinition.Create("My Form", null, OrgId, "user");
+        _repo.GetByIdAsync(form.Id, OrgId, Arg.Any<CancellationToken>()).Returns(form);
 
         Result<Guid> result = await _handler.Handle(
-            new AddFieldToFormCommand(form.Id, TeamAccountId, "full_name", "Full Name", FormFieldType.Text, true, null),
+            new AddFieldToFormCommand(form.Id, OrgId, "full_name", "Full Name", FormFieldType.Text, true, null),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -41,11 +41,11 @@ public class AddFieldToFormHandlerTests
     [Fact]
     public async Task Handle_WhenFormNotFound_ReturnsNotFound()
     {
-        _repo.GetByIdAsync(Arg.Any<Guid>(), TeamAccountId, Arg.Any<CancellationToken>())
+        _repo.GetByIdAsync(Arg.Any<Guid>(), OrgId, Arg.Any<CancellationToken>())
             .Returns((FormDefinition?)null);
 
         Result<Guid> result = await _handler.Handle(
-            new AddFieldToFormCommand(Guid.NewGuid(), TeamAccountId, "key", "Label", FormFieldType.Text, false, null),
+            new AddFieldToFormCommand(Guid.NewGuid(), OrgId, "key", "Label", FormFieldType.Text, false, null),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
@@ -55,12 +55,12 @@ public class AddFieldToFormHandlerTests
     [Fact]
     public async Task Handle_WhenDuplicateFieldKey_ReturnsBusinessRule()
     {
-        FormDefinition form = FormDefinition.Create("My Form", null, TeamAccountId, "user");
+        FormDefinition form = FormDefinition.Create("My Form", null, OrgId, "user");
         form.AddField("email", "Email", FormFieldType.Text, true, null);
-        _repo.GetByIdAsync(form.Id, TeamAccountId, Arg.Any<CancellationToken>()).Returns(form);
+        _repo.GetByIdAsync(form.Id, OrgId, Arg.Any<CancellationToken>()).Returns(form);
 
         Result<Guid> result = await _handler.Handle(
-            new AddFieldToFormCommand(form.Id, TeamAccountId, "email", "Email Again", FormFieldType.Text, false, null),
+            new AddFieldToFormCommand(form.Id, OrgId, "email", "Email Again", FormFieldType.Text, false, null),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
@@ -68,30 +68,30 @@ public class AddFieldToFormHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenFormBelongsToAnotherTeamAccount_ReturnsNotFound()
+    public async Task Handle_WhenFormBelongsToAnotherOrg_ReturnsNotFound()
     {
-        FormDefinition form = FormDefinition.Create("My Form", null, TeamAccountId, "user");
-        _repo.GetByIdAsync(form.Id, TeamAccountId, Arg.Any<CancellationToken>()).Returns(form);
+        FormDefinition form = FormDefinition.Create("My Form", null, OrgId, "user");
+        _repo.GetByIdAsync(form.Id, OrgId, Arg.Any<CancellationToken>()).Returns(form);
 
-        Guid otherTeamAccountId = Guid.NewGuid();
+        Guid otherOrgId = Guid.NewGuid();
         Result<Guid> result = await _handler.Handle(
-            new AddFieldToFormCommand(form.Id, otherTeamAccountId, "key", "Label", FormFieldType.Text, false, null),
+            new AddFieldToFormCommand(form.Id, otherOrgId, "key", "Label", FormFieldType.Text, false, null),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-        await _repo.Received(1).GetByIdAsync(form.Id, otherTeamAccountId, Arg.Any<CancellationToken>());
+        await _repo.Received(1).GetByIdAsync(form.Id, otherOrgId, Arg.Any<CancellationToken>());
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task Handle_WhenInvalidFieldKey_ReturnsBusinessRule()
     {
-        FormDefinition form = FormDefinition.Create("My Form", null, TeamAccountId, "user");
-        _repo.GetByIdAsync(form.Id, TeamAccountId, Arg.Any<CancellationToken>()).Returns(form);
+        FormDefinition form = FormDefinition.Create("My Form", null, OrgId, "user");
+        _repo.GetByIdAsync(form.Id, OrgId, Arg.Any<CancellationToken>()).Returns(form);
 
         Result<Guid> result = await _handler.Handle(
-            new AddFieldToFormCommand(form.Id, TeamAccountId, "123invalid", "Label", FormFieldType.Text, false, null),
+            new AddFieldToFormCommand(form.Id, OrgId, "123invalid", "Label", FormFieldType.Text, false, null),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();

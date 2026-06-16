@@ -8,7 +8,7 @@ Delete a form so that I can clean up unused forms.
 
 ## Primary actor
 
-- Team account Member with `form:definition:write`
+- Organization Member with `form:definition:write`
 
 ## Trigger
 

@@ -15,7 +15,7 @@ public sealed class CreateRecordHandler(
 {
     public async Task<Result<Guid>> Handle(CreateRecordCommand command, CancellationToken cancellationToken)
     {
-        DataModel? model = await modelRepo.GetByIdAsync(command.ModelId, command.TeamAccountId, cancellationToken);
+        DataModel? model = await modelRepo.GetByIdAsync(command.ModelId, command.OrganizationId, cancellationToken);
         if (model is null)
             return Result.Failure<Guid>(ErrorCodes.NotFound, "Model not found.");
 
@@ -23,7 +23,7 @@ public sealed class CreateRecordHandler(
         if (fieldErrors.Count > 0)
             return Result.FieldValidation<Guid>(fieldErrors);
 
-        DataRecord record = DataRecord.Create(command.ModelId, command.TeamAccountId, command.Data, command.CreatedBy);
+        DataRecord record = DataRecord.Create(command.ModelId, command.OrganizationId, command.Data, command.CreatedBy);
 
         await recordRepo.AddAsync(record, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);

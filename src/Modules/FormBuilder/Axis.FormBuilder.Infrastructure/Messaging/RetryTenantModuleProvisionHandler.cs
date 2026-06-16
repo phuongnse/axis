@@ -16,7 +16,7 @@ internal sealed class RetryTenantModuleProvisionHandler(
             return Task.CompletedTask;
 
         return TenantModuleProvisionAttempt.RunAsync(
-            message.TeamAccountId,
+            message.OrganizationId,
             message.Attempt,
             configuration,
             messageBus,

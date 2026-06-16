@@ -17,7 +17,7 @@ public class CreateRecordHandlerTests
     private readonly IDataRecordRepository _recordRepo = Substitute.For<IDataRecordRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private static readonly Guid TeamAccountId = Guid.NewGuid();
+    private static readonly Guid OrgId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     private CreateRecordHandler CreateHandler() => new(_modelRepo, _recordRepo, _uow);
@@ -25,13 +25,13 @@ public class CreateRecordHandlerTests
     [Fact]
     public async Task CreateRecord_WhenModelExists_CreatesRecordAndReturnsId()
     {
-        DataModel model = DataModel.Create("Invoice", null, null, null, TeamAccountId, UserId);
-        _modelRepo.GetByIdAsync(model.Id, TeamAccountId).Returns(model);
+        DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
+        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
 
         Dictionary<string, object?> data = new() { ["amount"] = 100 };
 
         Result<Guid> result = await CreateHandler().Handle(
-            new CreateRecordCommand(model.Id, TeamAccountId, data, UserId),
+            new CreateRecordCommand(model.Id, OrgId, data, UserId),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -43,10 +43,10 @@ public class CreateRecordHandlerTests
     [Fact]
     public async Task CreateRecord_WhenModelNotFound_ReturnsNotFound()
     {
-        _modelRepo.GetByIdAsync(Arg.Any<Guid>(), TeamAccountId).ReturnsNull();
+        _modelRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).ReturnsNull();
 
         Result<Guid> result = await CreateHandler().Handle(
-            new CreateRecordCommand(Guid.NewGuid(), TeamAccountId, new Dictionary<string, object?>(), UserId),
+            new CreateRecordCommand(Guid.NewGuid(), OrgId, new Dictionary<string, object?>(), UserId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -57,12 +57,12 @@ public class CreateRecordHandlerTests
     [Fact]
     public async Task CreateRecord_WhenRequiredFieldMissing_ReturnsFieldValidationError()
     {
-        DataModel model = DataModel.Create("Invoice", null, null, null, TeamAccountId, UserId);
+        DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         model.AddField("title", "Title", FieldType.Text, required: true, new TextFieldConfig());
-        _modelRepo.GetByIdAsync(model.Id, TeamAccountId).Returns(model);
+        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
 
         Result<Guid> result = await CreateHandler().Handle(
-            new CreateRecordCommand(model.Id, TeamAccountId, new Dictionary<string, object?>(), UserId),
+            new CreateRecordCommand(model.Id, OrgId, new Dictionary<string, object?>(), UserId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -74,26 +74,26 @@ public class CreateRecordHandlerTests
     [Fact]
     public async Task CreateRecord_WhenFieldDataValid_CreatesRecord()
     {
-        DataModel model = DataModel.Create("Invoice", null, null, null, TeamAccountId, UserId);
+        DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
         model.AddField("title", "Title", FieldType.Text, required: true, new TextFieldConfig(MaxLength: 100));
-        _modelRepo.GetByIdAsync(model.Id, TeamAccountId).Returns(model);
+        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
 
         Result<Guid> result = await CreateHandler().Handle(
-            new CreateRecordCommand(model.Id, TeamAccountId, new Dictionary<string, object?> { ["title"] = "Test Invoice" }, UserId),
+            new CreateRecordCommand(model.Id, OrgId, new Dictionary<string, object?> { ["title"] = "Test Invoice" }, UserId),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
     }
 
     [Fact]
-    public async Task CreateRecord_WhenModelBelongsToAnotherTeamAccount_ReturnsNotFound()
+    public async Task CreateRecord_WhenModelBelongsToAnotherOrg_ReturnsNotFound()
     {
-        DataModel model = DataModel.Create("Invoice", null, null, null, TeamAccountId, UserId);
-        _modelRepo.GetByIdAsync(model.Id, TeamAccountId).Returns(model);
+        DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
+        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
 
-        Guid otherTeamAccountId = Guid.NewGuid();
+        Guid otherOrgId = Guid.NewGuid();
         Result<Guid> result = await CreateHandler().Handle(
-            new CreateRecordCommand(model.Id, otherTeamAccountId, new Dictionary<string, object?>(), UserId),
+            new CreateRecordCommand(model.Id, otherOrgId, new Dictionary<string, object?>(), UserId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

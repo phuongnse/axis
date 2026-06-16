@@ -17,10 +17,10 @@ namespace Axis.WorkflowEngine.Infrastructure.Tests.Handlers;
 [Collection("WorkflowEngineDatabase")]
 public sealed class FormTaskSubmittedHandlerTests(WorkflowEngineDatabaseFixture fixture)
 {
-    private static readonly Guid TeamAccountId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid OrgId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private static WorkflowExecution CreateExecution()
-        => WorkflowExecution.Create(Guid.NewGuid(), TeamAccountId, TriggerType.Manual, null, new Dictionary<string, object?>());
+        => WorkflowExecution.Create(Guid.NewGuid(), OrgId, TriggerType.Manual, null, new Dictionary<string, object?>());
 
     private static StepDefinitionSnapshot FormStepDef(Guid formId) => new()
     {
@@ -74,7 +74,7 @@ public sealed class FormTaskSubmittedHandlerTests(WorkflowEngineDatabaseFixture 
         {
             formSubmissionId = Guid.NewGuid().ToString(),
             formDefinitionId = formId.ToString(),
-            teamAccountId = TeamAccountId.ToString(),
+            organizationId = OrgId.ToString(),
             executionId = execution.Id.ToString(),
             executionStepId = step.Id.ToString(),
             submittedDataJson = JsonSerializer.Serialize(submittedData),
@@ -117,7 +117,7 @@ public sealed class FormTaskSubmittedHandlerTests(WorkflowEngineDatabaseFixture 
         {
             formSubmissionId = Guid.NewGuid().ToString(),
             formDefinitionId = formId.ToString(),
-            teamAccountId = TeamAccountId.ToString(),
+            organizationId = OrgId.ToString(),
             executionId = execution.Id.ToString(),
             executionStepId = step.Id.ToString(),
             submittedDataJson = JsonSerializer.Serialize(new Dictionary<string, object?> { ["answer"] = "yes" }),
@@ -140,7 +140,7 @@ public sealed class FormTaskSubmittedHandlerTests(WorkflowEngineDatabaseFixture 
         {
             formSubmissionId = Guid.NewGuid().ToString(),
             formDefinitionId = Guid.NewGuid().ToString(),
-            teamAccountId = TeamAccountId.ToString(),
+            organizationId = OrgId.ToString(),
             executionId = Guid.NewGuid().ToString(),
             executionStepId = Guid.NewGuid().ToString(),
             submittedDataJson = "{}",

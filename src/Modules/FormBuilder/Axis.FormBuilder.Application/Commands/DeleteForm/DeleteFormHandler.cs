@@ -15,7 +15,7 @@ public sealed class DeleteFormHandler(
 {
     public async Task<Result> Handle(DeleteFormCommand command, CancellationToken cancellationToken)
     {
-        FormDefinition? form = await formRepo.GetByIdAsync(command.FormId, command.TeamAccountId, cancellationToken);
+        FormDefinition? form = await formRepo.GetByIdAsync(command.FormId, command.OrganizationId, cancellationToken);
         if (form is null)
             return Result.Failure(ErrorCodes.NotFound, "Form not found.");
 

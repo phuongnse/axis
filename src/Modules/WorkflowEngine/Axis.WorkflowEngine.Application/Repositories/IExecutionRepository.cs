@@ -7,25 +7,25 @@ namespace Axis.WorkflowEngine.Application.Repositories;
 public interface IExecutionRepository
 {
     Task AddAsync(WorkflowExecution execution, CancellationToken ct = default);
-    Task<WorkflowExecution?> GetByIdAsync(Guid id, Guid teamAccountId, CancellationToken ct = default);
+    Task<WorkflowExecution?> GetByIdAsync(Guid id, Guid organizationId, CancellationToken ct = default);
 
     /// <summary>Loads the execution with its steps for engine write operations. Returns a tracked entity.</summary>
-    Task<WorkflowExecution?> GetByIdWithStepsAsync(Guid id, Guid teamAccountId, CancellationToken ct = default);
+    Task<WorkflowExecution?> GetByIdWithStepsAsync(Guid id, Guid organizationId, CancellationToken ct = default);
 
-    Task<IReadOnlyList<WorkflowExecution>> GetAllAsync(Guid teamAccountId, CancellationToken ct = default);
-    Task<IReadOnlyList<WorkflowExecution>> GetByWorkflowAsync(Guid workflowId, Guid teamAccountId, CancellationToken ct = default);
+    Task<IReadOnlyList<WorkflowExecution>> GetAllAsync(Guid organizationId, CancellationToken ct = default);
+    Task<IReadOnlyList<WorkflowExecution>> GetByWorkflowAsync(Guid workflowId, Guid organizationId, CancellationToken ct = default);
 
-    Task<ExecutionResponse?> GetWithStepsAsync(Guid executionId, Guid teamAccountId, CancellationToken ct = default);
+    Task<ExecutionResponse?> GetWithStepsAsync(Guid executionId, Guid organizationId, CancellationToken ct = default);
     Task<(IReadOnlyList<ExecutionSummaryResponse> Items, int TotalCount)> GetPagedAsync(
-        Guid teamAccountId, int page, int pageSize, ExecutionStatus? status = null, CancellationToken ct = default);
+        Guid organizationId, int page, int pageSize, ExecutionStatus? status = null, CancellationToken ct = default);
     Task<(IReadOnlyList<ExecutionSummaryResponse> Items, int TotalCount)> GetPagedByWorkflowAsync(
-        Guid workflowId, Guid teamAccountId, int page, int pageSize, ExecutionStatus? status = null, CancellationToken ct = default);
+        Guid workflowId, Guid organizationId, int page, int pageSize, ExecutionStatus? status = null, CancellationToken ct = default);
     Task<IReadOnlyList<ExecutionSummaryResponse>> GetRetriesAsync(
-        Guid originalExecutionId, Guid teamAccountId, CancellationToken ct = default);
+        Guid originalExecutionId, Guid organizationId, CancellationToken ct = default);
 
-    Task<int> CountCreatedSinceUtcAsync(Guid teamAccountId, DateTime sinceUtc, CancellationToken ct = default);
+    Task<int> CountCreatedSinceUtcAsync(Guid organizationId, DateTime sinceUtc, CancellationToken ct = default);
 
-    Task<IReadOnlyList<WorkflowExecution>> GetCancellableByTeamAccountAsync(
-        Guid teamAccountId,
+    Task<IReadOnlyList<WorkflowExecution>> GetCancellableByOrganizationAsync(
+        Guid organizationId,
         CancellationToken ct = default);
 }

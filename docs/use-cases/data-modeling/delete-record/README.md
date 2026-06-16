@@ -8,7 +8,7 @@ Delete a record so that I can remove outdated or incorrect entries.
 
 ## Primary actor
 
-- Team account Member with `data_modeling:record:delete`
+- Organization Member with `data_modeling:record:delete`
 
 ## Trigger
 

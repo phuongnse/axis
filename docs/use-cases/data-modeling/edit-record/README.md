@@ -8,7 +8,7 @@ Edit an existing record so that I can update out-of-date information.
 
 ## Primary actor
 
-- Team account Member with `data_modeling:record:write`
+- Organization Member with `data_modeling:record:write`
 
 ## Trigger
 

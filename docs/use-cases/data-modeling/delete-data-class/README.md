@@ -8,7 +8,7 @@ Delete a data class that is no longer used by any model so that I can keep the t
 
 ## Primary actor
 
-- Team account member with `data_modeling:model:delete`
+- Organization member with `data_modeling:model:delete`
 
 ## Trigger
 
@@ -30,7 +30,7 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 
 ## Acceptance Criteria
 
-**As an** Team account Member with `data_modeling:model:delete`, **I want to** delete a data class that is no longer needed.
+**As an** Organization Member with `data_modeling:model:delete`, **I want to** delete a data class that is no longer needed.
 
 *Happy path*
 - [ ] Confirmation dialog requires typing the data class name.

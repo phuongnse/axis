@@ -12,10 +12,10 @@ namespace Axis.Identity.Application.Tests.Queries;
 public sealed class GetUserTokenClaimsHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
-    private readonly ITeamAccountMembershipRepository _membershipRepo = Substitute.For<ITeamAccountMembershipRepository>();
+    private readonly IOrganizationMembershipRepository _membershipRepo = Substitute.For<IOrganizationMembershipRepository>();
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
 
-    private static readonly Guid TeamAccountId = Guid.NewGuid();
+    private static readonly Guid OrgId = Guid.NewGuid();
 
     private GetUserTokenClaimsHandler CreateHandler() => new(_userRepo, _membershipRepo, _roleRepo);
 
@@ -26,7 +26,7 @@ public sealed class GetUserTokenClaimsHandlerTests
         _userRepo.GetByIdPlatformWideAsync(userId, Arg.Any<CancellationToken>()).ReturnsNull();
 
         Result<UserTokenClaimsDto> result = await CreateHandler().Handle(
-            new GetUserTokenClaimsQuery(userId, TeamAccountId),
+            new GetUserTokenClaimsQuery(userId, OrgId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -41,7 +41,7 @@ public sealed class GetUserTokenClaimsHandlerTests
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
 
         Result<UserTokenClaimsDto> result = await CreateHandler().Handle(
-            new GetUserTokenClaimsQuery(user.Id, TeamAccountId),
+            new GetUserTokenClaimsQuery(user.Id, OrgId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -49,35 +49,35 @@ public sealed class GetUserTokenClaimsHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenTeamAccountIdOmitted_UsesUserTeamAccount()
+    public async Task Handle_WhenOrganizationIdOmitted_UsesUserOrganization()
     {
         User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value);
-        Role role = Role.CreateSystem("Editor", TeamAccountId, ["workflow:definition:read"]);
-        TeamAccountMembership membership = TeamAccountMembership.Create(user.Id, TeamAccountId);
+        Role role = Role.CreateSystem("Editor", OrgId, ["workflow:definition:read"]);
+        OrganizationMembership membership = OrganizationMembership.Create(user.Id, OrgId);
         membership.AssignRole(role.Id);
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
         _membershipRepo.GetFirstActiveByUserIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(membership);
-        _roleRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), TeamAccountId, Arg.Any<CancellationToken>())
+        _roleRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), OrgId, Arg.Any<CancellationToken>())
             .Returns(new List<Role> { role });
 
         Result<UserTokenClaimsDto> result = await CreateHandler().Handle(
-            new GetUserTokenClaimsQuery(user.Id, TeamAccountId: null),
+            new GetUserTokenClaimsQuery(user.Id, OrganizationId: null),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        result.Value.TeamAccountId.Should().Be(TeamAccountId);
+        result.Value.OrganizationId.Should().Be(OrgId);
         result.Value.Permissions.Should().Contain("workflow:definition:read");
     }
 
     [Fact]
-    public async Task Handle_WhenTeamAccountIdMismatchesUser_ReturnsBusinessRuleFailure()
+    public async Task Handle_WhenOrganizationIdMismatchesUser_ReturnsBusinessRuleFailure()
     {
         User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value);
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
 
-        Guid otherTeamAccountId = Guid.NewGuid();
+        Guid otherOrgId = Guid.NewGuid();
         Result<UserTokenClaimsDto> result = await CreateHandler().Handle(
-            new GetUserTokenClaimsQuery(user.Id, otherTeamAccountId),
+            new GetUserTokenClaimsQuery(user.Id, otherOrgId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -92,16 +92,16 @@ public sealed class GetUserTokenClaimsHandlerTests
     public async Task Handle_WhenUserActive_ReturnsTokenClaims()
     {
         User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value);
-        Role editor = Role.CreateSystem("Editor", TeamAccountId, ["workflow:definition:read", "workflow:definition:write"]);
-        TeamAccountMembership membership = TeamAccountMembership.Create(user.Id, TeamAccountId);
+        Role editor = Role.CreateSystem("Editor", OrgId, ["workflow:definition:read", "workflow:definition:write"]);
+        OrganizationMembership membership = OrganizationMembership.Create(user.Id, OrgId);
         membership.AssignRole(editor.Id);
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
-        _membershipRepo.GetByUserAndTeamAccountAsync(user.Id, TeamAccountId, Arg.Any<CancellationToken>()).Returns(membership);
-        _roleRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), TeamAccountId, Arg.Any<CancellationToken>())
+        _membershipRepo.GetByUserAndOrganizationAsync(user.Id, OrgId, Arg.Any<CancellationToken>()).Returns(membership);
+        _roleRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), OrgId, Arg.Any<CancellationToken>())
             .Returns(new List<Role> { editor });
 
         Result<UserTokenClaimsDto> result = await CreateHandler().Handle(
-            new GetUserTokenClaimsQuery(user.Id, TeamAccountId),
+            new GetUserTokenClaimsQuery(user.Id, OrgId),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();

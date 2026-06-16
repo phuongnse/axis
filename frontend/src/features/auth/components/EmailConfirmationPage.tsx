@@ -13,8 +13,8 @@ export function EmailConfirmationPage() {
   const { t } = useTranslation();
   const context = loadRegistrationContext();
   const { resend, state, rateLimitMessage, reset } = useResendVerification();
-  const isTeamAccountRegistration = Boolean(context?.teamAccountName);
-  const RegisterAgainIcon = isTeamAccountRegistration ? UsersRound : UserPlus;
+  const isOrganizationRegistration = Boolean(context?.organizationName);
+  const RegisterAgainIcon = isOrganizationRegistration ? UsersRound : UserPlus;
 
   async function handleResend() {
     if (!context?.email || state === 'sending' || state === 'rate_limited') return;
@@ -29,8 +29,8 @@ export function EmailConfirmationPage() {
   return (
     <AuthCard
       title={
-        isTeamAccountRegistration
-          ? t('teamAccountRegistration.confirmationTitle')
+        isOrganizationRegistration
+          ? t('organizationRegistration.confirmationTitle')
           : t('emailConfirmation.title')
       }
       footer={
@@ -49,21 +49,21 @@ export function EmailConfirmationPage() {
           </div>
           <div className="space-y-2 text-sm text-muted-foreground">
             <p>
-              {isTeamAccountRegistration
-                ? t('teamAccountRegistration.confirmationIntro')
+              {isOrganizationRegistration
+                ? t('organizationRegistration.confirmationIntro')
                 : t('emailConfirmation.intro')}
             </p>
             <p>
-              {isTeamAccountRegistration
-                ? t('teamAccountRegistration.confirmationCheckInbox')
+              {isOrganizationRegistration
+                ? t('organizationRegistration.confirmationCheckInbox')
                 : t('emailConfirmation.checkInbox')}
             </p>
             {context?.email ? (
               <p className="text-xs text-muted-foreground/80">
-                {isTeamAccountRegistration
-                  ? t('teamAccountRegistration.confirmationSentTo', {
+                {isOrganizationRegistration
+                  ? t('organizationRegistration.confirmationSentTo', {
                       email: context.email,
-                      teamAccountName: context.teamAccountName,
+                      organizationName: context.organizationName,
                     })
                   : t('emailConfirmation.sentTo', { email: context.email })}
               </p>
@@ -116,13 +116,13 @@ export function EmailConfirmationPage() {
         </div>
 
         <ActionLink
-          to={isTeamAccountRegistration ? '/register/team' : '/register'}
+          to={isOrganizationRegistration ? '/register/team' : '/register'}
           icon={RegisterAgainIcon}
           variant="secondary"
           className="w-full"
         >
-          {isTeamAccountRegistration
-            ? t('teamAccountRegistration.registerAnotherTeamAccount')
+          {isOrganizationRegistration
+            ? t('organizationRegistration.registerAnotherOrganization')
             : t('emailConfirmation.registerAnotherAccount')}
         </ActionLink>
       </div>

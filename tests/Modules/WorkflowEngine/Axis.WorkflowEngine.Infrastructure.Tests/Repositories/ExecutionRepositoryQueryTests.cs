@@ -10,12 +10,12 @@ namespace Axis.WorkflowEngine.Infrastructure.Tests.Repositories;
 [Collection("WorkflowEngineDatabase")]
 public sealed class ExecutionRepositoryQueryTests(WorkflowEngineDatabaseFixture fixture)
 {
-    private static readonly Guid TeamAccountId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-    private static readonly Guid OtherTeamAccountId = Guid.Parse("00000000-0000-0000-0000-000000000099");
+    private static readonly Guid OrgId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid OtherOrgId = Guid.Parse("00000000-0000-0000-0000-000000000099");
 
-    private static WorkflowExecution CreateExecution(Guid? workflowId = null, Guid? teamAccountId = null)
+    private static WorkflowExecution CreateExecution(Guid? workflowId = null, Guid? orgId = null)
         => WorkflowExecution.Create(
-            workflowId ?? Guid.NewGuid(), teamAccountId ?? TeamAccountId,
+            workflowId ?? Guid.NewGuid(), orgId ?? OrgId,
             TriggerType.Manual, null,
             new Dictionary<string, object?> { ["key"] = "val" });
 
@@ -35,7 +35,7 @@ public sealed class ExecutionRepositoryQueryTests(WorkflowEngineDatabaseFixture 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new(readCtx);
         (IReadOnlyList<ExecutionSummaryResponse> items, int total) =
-            await readRepo.GetPagedAsync(TeamAccountId, 1, 10);
+            await readRepo.GetPagedAsync(OrgId, 1, 10);
 
         items.Should().HaveCountGreaterThanOrEqualTo(2);
         total.Should().BeGreaterThanOrEqualTo(2);
@@ -60,7 +60,7 @@ public sealed class ExecutionRepositoryQueryTests(WorkflowEngineDatabaseFixture 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new(readCtx);
         (IReadOnlyList<ExecutionSummaryResponse> items, int total) =
-            await readRepo.GetPagedAsync(TeamAccountId, 1, 100, ExecutionStatus.Failed);
+            await readRepo.GetPagedAsync(OrgId, 1, 100, ExecutionStatus.Failed);
 
         items.Should().AllSatisfy(i => i.Status.Should().Be("Failed"));
         total.Should().BeGreaterThanOrEqualTo(1);
@@ -80,9 +80,9 @@ public sealed class ExecutionRepositoryQueryTests(WorkflowEngineDatabaseFixture 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new(readCtx);
         (IReadOnlyList<ExecutionSummaryResponse> page1, int total1) =
-            await readRepo.GetPagedByWorkflowAsync(wfId, TeamAccountId, 1, 3);
+            await readRepo.GetPagedByWorkflowAsync(wfId, OrgId, 1, 3);
         (IReadOnlyList<ExecutionSummaryResponse> page2, int total2) =
-            await readRepo.GetPagedByWorkflowAsync(wfId, TeamAccountId, 2, 3);
+            await readRepo.GetPagedByWorkflowAsync(wfId, OrgId, 2, 3);
 
         page1.Should().HaveCount(3);
         page2.Should().HaveCount(2);
@@ -109,7 +109,7 @@ public sealed class ExecutionRepositoryQueryTests(WorkflowEngineDatabaseFixture 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new(readCtx);
         (IReadOnlyList<ExecutionSummaryResponse> items, int total) =
-            await readRepo.GetPagedByWorkflowAsync(wfA, TeamAccountId, 1, 10);
+            await readRepo.GetPagedByWorkflowAsync(wfA, OrgId, 1, 10);
 
         items.Should().HaveCount(2);
         total.Should().Be(2);
@@ -130,7 +130,7 @@ public sealed class ExecutionRepositoryQueryTests(WorkflowEngineDatabaseFixture 
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new(readCtx);
-        ExecutionResponse? response = await readRepo.GetWithStepsAsync(exec.Id, TeamAccountId);
+        ExecutionResponse? response = await readRepo.GetWithStepsAsync(exec.Id, OrgId);
 
         response.Should().NotBeNull();
         response!.Id.Should().Be(exec.Id);
@@ -152,7 +152,7 @@ public sealed class ExecutionRepositoryQueryTests(WorkflowEngineDatabaseFixture 
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new(readCtx);
-        ExecutionResponse? response = await readRepo.GetWithStepsAsync(exec.Id, TeamAccountId);
+        ExecutionResponse? response = await readRepo.GetWithStepsAsync(exec.Id, OrgId);
 
         response!.Steps.Should().HaveCount(2);
         response.Steps[0].Name.Should().Be("Step A");
@@ -162,7 +162,7 @@ public sealed class ExecutionRepositoryQueryTests(WorkflowEngineDatabaseFixture 
     }
 
     [Fact]
-    public async Task GetWithStepsAsync_WhenTeamAccountDoesNotMatch_ReturnsNull()
+    public async Task GetWithStepsAsync_WhenOrgDoesNotMatch_ReturnsNull()
     {
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
         ExecutionRepository repo = new(ctx);
@@ -173,7 +173,7 @@ public sealed class ExecutionRepositoryQueryTests(WorkflowEngineDatabaseFixture 
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new(readCtx);
-        ExecutionResponse? response = await readRepo.GetWithStepsAsync(exec.Id, OtherTeamAccountId);
+        ExecutionResponse? response = await readRepo.GetWithStepsAsync(exec.Id, OtherOrgId);
 
         response.Should().BeNull();
     }
@@ -205,7 +205,7 @@ public sealed class ExecutionRepositoryQueryTests(WorkflowEngineDatabaseFixture 
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new(readCtx);
-        IReadOnlyList<ExecutionSummaryResponse> retries = await readRepo.GetRetriesAsync(original.Id, TeamAccountId);
+        IReadOnlyList<ExecutionSummaryResponse> retries = await readRepo.GetRetriesAsync(original.Id, OrgId);
 
         retries.Should().HaveCount(2);
         retries.Should().AllSatisfy(r => r.RetryOfExecutionId.Should().Be(original.Id));
@@ -224,7 +224,7 @@ public sealed class ExecutionRepositoryQueryTests(WorkflowEngineDatabaseFixture 
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new(readCtx);
-        IReadOnlyList<ExecutionSummaryResponse> retries = await readRepo.GetRetriesAsync(exec.Id, TeamAccountId);
+        IReadOnlyList<ExecutionSummaryResponse> retries = await readRepo.GetRetriesAsync(exec.Id, OrgId);
 
         retries.Should().BeEmpty();
     }

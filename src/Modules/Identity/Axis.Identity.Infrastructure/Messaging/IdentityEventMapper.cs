@@ -10,30 +10,30 @@ internal static class IdentityEventMapper
     public static object? ToIntegrationEvent(IDomainEvent domainEvent) =>
         domainEvent switch
         {
-            TeamAccountVerified verified => new TeamAccountVerifiedEvent
+            OrganizationVerified verified => new OrganizationVerifiedEvent
             {
-                teamAccountId = verified.TeamAccountId.ToString(),
+                organizationId = verified.OrganizationId.ToString(),
             },
             UserDeactivated deactivated => new UserDeactivatedEvent
             {
                 userId = deactivated.UserId.ToString(),
-                teamAccountId = deactivated.TeamAccountId.ToString(),
+                organizationId = deactivated.OrganizationId.ToString(),
             },
             UserReactivated reactivated => new UserReactivatedEvent
             {
                 userId = reactivated.UserId.ToString(),
-                teamAccountId = reactivated.TeamAccountId.ToString(),
+                organizationId = reactivated.OrganizationId.ToString(),
             },
             RoleAssigned assigned => new RoleAssignedEvent
             {
                 userId = assigned.UserId.ToString(),
-                teamAccountId = assigned.TeamAccountId.ToString(),
+                organizationId = assigned.OrganizationId.ToString(),
                 roleId = assigned.RoleId.ToString(),
             },
             RoleRemoved removed => new RoleRemovedEvent
             {
                 userId = removed.UserId.ToString(),
-                teamAccountId = removed.TeamAccountId.ToString(),
+                organizationId = removed.OrganizationId.ToString(),
                 roleId = removed.RoleId.ToString(),
             },
             _ => null,

@@ -17,9 +17,9 @@ import { useQueryParam } from '@/features/auth/use-query-param';
 export function RegisterPage() {
   const { t } = useTranslation();
   const { form, loading, submit } = useRegister();
-  const teamAccountSetupToken = useQueryParam('setupToken');
+  const organizationSetupToken = useQueryParam('setupToken');
   const context = loadRegistrationContext();
-  const isFirstOwnerSetup = Boolean(teamAccountSetupToken);
+  const isFirstOwnerSetup = Boolean(organizationSetupToken);
   const {
     register,
     handleSubmit,
@@ -36,7 +36,7 @@ export function RegisterPage() {
         isFirstOwnerSetup ? (
           <AuthNotice variant="info" title={t('register.firstOwnerBannerTitle')}>
             {t('register.firstOwnerBannerBody', {
-              teamAccountName: context?.teamAccountName ?? t('provisioning.teamAccountFallback'),
+              organizationName: context?.organizationName ?? t('provisioning.organizationFallback'),
             })}
           </AuthNotice>
         ) : (
@@ -49,7 +49,7 @@ export function RegisterPage() {
                 variant="secondary"
                 className="h-8 w-full text-xs sm:w-auto"
               >
-                {t('register.teamAccountLink')}
+                {t('register.organizationLink')}
               </ActionLink>
             </div>
           </AuthNotice>

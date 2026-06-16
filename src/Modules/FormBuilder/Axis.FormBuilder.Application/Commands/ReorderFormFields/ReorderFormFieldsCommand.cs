@@ -4,5 +4,5 @@ namespace Axis.FormBuilder.Application.Commands.ReorderFormFields;
 
 public sealed record ReorderFormFieldsCommand(
     Guid FormId,
-    Guid TeamAccountId,
+    Guid OrganizationId,
     IReadOnlyList<Guid> OrderedFieldIds) : ICommand;

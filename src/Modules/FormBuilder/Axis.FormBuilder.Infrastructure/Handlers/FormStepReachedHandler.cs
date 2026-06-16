@@ -34,7 +34,7 @@ internal sealed class FormStepReachedHandler(
     {
         Guid executionId = @event.ExecutionId();
         Guid executionStepId = @event.ExecutionStepId();
-        Guid teamAccountId = @event.TeamAccountId();
+        Guid organizationId = @event.OrganizationId();
         Guid formDefinitionId = @event.FormDefinitionId();
 
         if (await submissionRepo.ExistsForExecutionStepAsync(executionId, executionStepId, ct))
@@ -46,13 +46,13 @@ internal sealed class FormStepReachedHandler(
             return;
         }
 
-        FormDefinition? form = await formRepo.GetByIdAsync(formDefinitionId, teamAccountId, ct);
+        FormDefinition? form = await formRepo.GetByIdAsync(formDefinitionId, organizationId, ct);
         if (form is null)
         {
             logger.LogError(
-                "FormStepReachedHandler: form {FormId} not found for team account {TeamAccountId}",
+                "FormStepReachedHandler: form {FormId} not found for org {OrgId}",
                 formDefinitionId,
-                teamAccountId);
+                organizationId);
             return;
         }
 
@@ -63,7 +63,7 @@ internal sealed class FormStepReachedHandler(
 
         FormSubmission submission = FormSubmission.Create(
             formDefinitionId,
-            teamAccountId,
+            organizationId,
             executionId,
             executionStepId,
             assigneeUserId,
@@ -92,7 +92,7 @@ internal sealed class FormStepReachedHandler(
             if (delay > TimeSpan.Zero)
             {
                 await messageBus.ScheduleAsync(
-                    new ExpireFormSubmissionMessage(submission.Id, submission.TeamAccountId),
+                    new ExpireFormSubmissionMessage(submission.Id, submission.OrganizationId),
                     expiresAt.Value);
             }
         }

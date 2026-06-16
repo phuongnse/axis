@@ -7,7 +7,7 @@ internal sealed class NullEmailSender : IEmailSender
     public Task SendVerificationEmailAsync(string toEmail, string verificationToken, CancellationToken ct = default) =>
         Task.CompletedTask;
 
-    public Task SendInvitationEmailAsync(string toEmail, string teamAccountName, string invitationToken, CancellationToken ct = default) =>
+    public Task SendInvitationEmailAsync(string toEmail, string orgName, string invitationToken, CancellationToken ct = default) =>
         Task.CompletedTask;
 
     public Task SendPasswordResetEmailAsync(string toEmail, string resetToken, CancellationToken ct = default) =>
@@ -16,9 +16,9 @@ internal sealed class NullEmailSender : IEmailSender
     public Task SendPasswordChangedNotificationAsync(string toEmail, CancellationToken ct = default) =>
         Task.CompletedTask;
 
-    public Task SendTeamAccountDeletionScheduledEmailAsync(
+    public Task SendOrganizationDeletionScheduledEmailAsync(
         string toEmail,
-        string teamAccountName,
+        string organizationName,
         CancellationToken ct = default) =>
         Task.CompletedTask;
 }

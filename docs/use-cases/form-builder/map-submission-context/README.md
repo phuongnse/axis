@@ -8,7 +8,7 @@ The data submitted in a form to be available to subsequent steps so that the res
 
 ## Primary actor
 
-- Team account Member
+- Organization Member
 
 ## Trigger
 

@@ -99,11 +99,11 @@ public static class ConnectEndpoints
                 AuthFailureReason.AccountLocked =>
                     $"Too many failed attempts. Try again after {result.Value.LockedUntil:HH:mm} UTC.",
                 AuthFailureReason.AccountDeactivated =>
-                    "Your account has been deactivated. Contact your teamAccount admin.",
+                    "Your account has been deactivated. Contact your organization admin.",
                 AuthFailureReason.EmailNotVerified =>
                     "Please verify your email before signing in.",
-                AuthFailureReason.TeamAccountDeleted =>
-                    "This teamAccount no longer exists.",
+                AuthFailureReason.OrganizationDeleted =>
+                    "This organization no longer exists.",
                 _ => "Incorrect email or password.",
             };
             return Results.Problem(detail: detail, statusCode: StatusCodes.Status401Unauthorized);
@@ -120,8 +120,8 @@ public static class ConnectEndpoints
             new(ClaimTypes.Email, auth.Email),
             new("name", auth.FullName),
         ];
-        if (auth.TeamAccountId is Guid teamAccountId)
-            claims.Add(new Claim("team_account_id", teamAccountId.ToString()));
+        if (auth.OrganizationId is Guid organizationId)
+            claims.Add(new Claim("org_id", organizationId.ToString()));
         foreach (string permission in auth.Permissions)
             claims.Add(new Claim("permissions", permission));
 
@@ -182,11 +182,11 @@ public static class ConnectEndpoints
                     [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
             }
 
-            string? teamAccountIdStr = result.Principal!.GetClaim("team_account_id");
-            Guid? teamAccountId = Guid.TryParse(teamAccountIdStr, out Guid parsedTeamAccountId) ? parsedTeamAccountId : null;
+            string? orgIdStr = result.Principal!.GetClaim("org_id");
+            Guid? orgId = Guid.TryParse(orgIdStr, out Guid parsedOrgId) ? parsedOrgId : null;
 
             Result<UserTokenClaimsDto> claimsResult = await mediator.Send(
-                new GetUserTokenClaimsQuery(userId, teamAccountId),
+                new GetUserTokenClaimsQuery(userId, orgId),
                 ct);
 
             if (claimsResult.IsFailure)
@@ -205,7 +205,7 @@ public static class ConnectEndpoints
             UserTokenClaimsDto claims = claimsResult.Value;
             ClaimsPrincipal principal = BuildUserPrincipal(
                 claims.UserId,
-                claims.TeamAccountId,
+                claims.OrganizationId,
                 claims.Email,
                 claims.FullName,
                 claims.Permissions.ToList(),
@@ -246,14 +246,14 @@ public static class ConnectEndpoints
         IEnumerable<string> scopes)
     {
         string sub = cookiePrincipal.FindFirstValue(ClaimTypes.NameIdentifier)!;
-        string? teamAccountId = cookiePrincipal.FindFirstValue("team_account_id");
+        string? orgId = cookiePrincipal.FindFirstValue("org_id");
         string? email = cookiePrincipal.FindFirstValue(ClaimTypes.Email);
         string? name = cookiePrincipal.FindFirstValue("name");
         IEnumerable<string> permissions = cookiePrincipal.FindAll("permissions").Select(c => c.Value);
 
         return BuildUserPrincipal(
             Guid.Parse(sub),
-            Guid.TryParse(teamAccountId, out Guid gTeamAccountId) ? gTeamAccountId : null,
+            Guid.TryParse(orgId, out Guid gOrgId) ? gOrgId : null,
             email ?? string.Empty,
             name ?? string.Empty,
             permissions.ToList(),
@@ -262,7 +262,7 @@ public static class ConnectEndpoints
 
     private static ClaimsPrincipal BuildUserPrincipal(
         Guid userId,
-        Guid? teamAccountId,
+        Guid? orgId,
         string email,
         string name,
         IReadOnlyList<string> permissions,
@@ -272,8 +272,8 @@ public static class ConnectEndpoints
         identity.AddClaim(new Claim(Claims.Subject, userId.ToString()));
         identity.AddClaim(new Claim(Claims.Email, email));
         identity.AddClaim(new Claim("name", name));
-        if (teamAccountId is Guid resolvedTeamAccountId)
-            identity.AddClaim(new Claim("team_account_id", resolvedTeamAccountId.ToString()));
+        if (orgId is Guid organizationId)
+            identity.AddClaim(new Claim("org_id", organizationId.ToString()));
 
         foreach (string permission in permissions)
             identity.AddClaim(new Claim("permissions", permission));

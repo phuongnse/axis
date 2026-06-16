@@ -8,7 +8,7 @@ Use the output of all parallel steps in subsequent steps so that I can combine r
 
 ## Primary actor
 
-- Team account Member
+- Organization Member
 
 ## Trigger
 

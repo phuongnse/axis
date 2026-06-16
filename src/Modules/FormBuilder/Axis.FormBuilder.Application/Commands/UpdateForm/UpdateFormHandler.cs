@@ -12,11 +12,11 @@ public sealed class UpdateFormHandler(IFormRepository formRepo, IUnitOfWork uow)
 {
     public async Task<Result> Handle(UpdateFormCommand command, CancellationToken cancellationToken)
     {
-        FormDefinition? form = await formRepo.GetByIdAsync(command.FormId, command.TeamAccountId, cancellationToken);
+        FormDefinition? form = await formRepo.GetByIdAsync(command.FormId, command.OrganizationId, cancellationToken);
         if (form is null)
             return Result.Failure(ErrorCodes.NotFound, "Form not found.");
 
-        if (await formRepo.NameExistsAsync(command.Name, command.TeamAccountId, command.FormId, cancellationToken))
+        if (await formRepo.NameExistsAsync(command.Name, command.OrganizationId, command.FormId, cancellationToken))
             return Result.Failure(ErrorCodes.Conflict, $"A form named '{command.Name}' already exists.");
 
         form.Update(command.Name, command.Description);

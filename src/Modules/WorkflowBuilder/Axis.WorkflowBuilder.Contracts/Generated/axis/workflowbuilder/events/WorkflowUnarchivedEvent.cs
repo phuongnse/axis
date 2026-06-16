@@ -16,9 +16,9 @@ namespace axis.workflowbuilder.events
 	[global::System.CodeDom.Compiler.GeneratedCodeAttribute("avrogen", "1.12.1+9110c693767c1dde2665b2b57939333478b12036")]
 	public partial class WorkflowUnarchivedEvent : global::Avro.Specific.ISpecificRecord
 	{
-		public static global::Avro.Schema _SCHEMA = global::Avro.Schema.Parse(@"{""type"":""record"",""name"":""WorkflowUnarchivedEvent"",""namespace"":""axis.workflowbuilder.events"",""fields"":[{""name"":""workflowId"",""type"":""string""},{""name"":""teamAccountId"",""type"":""string""},{""name"":""referencedFormIds"",""default"":[],""type"":{""type"":""array"",""items"":""string""}}]}");
+		public static global::Avro.Schema _SCHEMA = global::Avro.Schema.Parse(@"{""type"":""record"",""name"":""WorkflowUnarchivedEvent"",""namespace"":""axis.workflowbuilder.events"",""fields"":[{""name"":""workflowId"",""type"":""string""},{""name"":""organizationId"",""type"":""string""},{""name"":""referencedFormIds"",""default"":[],""type"":{""type"":""array"",""items"":""string""}}]}");
 		private string _workflowId;
-		private string _teamAccountId;
+		private string _organizationId;
 		private IList<System.String> _referencedFormIds;
 		public virtual global::Avro.Schema Schema
 		{
@@ -38,15 +38,15 @@ namespace axis.workflowbuilder.events
 				this._workflowId = value;
 			}
 		}
-		public string teamAccountId
+		public string organizationId
 		{
 			get
 			{
-				return this._teamAccountId;
+				return this._organizationId;
 			}
 			set
 			{
-				this._teamAccountId = value;
+				this._organizationId = value;
 			}
 		}
 		public IList<System.String> referencedFormIds
@@ -65,7 +65,7 @@ namespace axis.workflowbuilder.events
 			switch (fieldPos)
 			{
 			case 0: return this.workflowId;
-			case 1: return this.teamAccountId;
+			case 1: return this.organizationId;
 			case 2: return this.referencedFormIds;
 			default: throw new global::Avro.AvroRuntimeException("Bad index " + fieldPos + " in Get()");
 			};
@@ -75,7 +75,7 @@ namespace axis.workflowbuilder.events
 			switch (fieldPos)
 			{
 			case 0: this.workflowId = (System.String)fieldValue; break;
-			case 1: this.teamAccountId = (System.String)fieldValue; break;
+			case 1: this.organizationId = (System.String)fieldValue; break;
 			case 2: this.referencedFormIds = (IList<System.String>)fieldValue; break;
 			default: throw new global::Avro.AvroRuntimeException("Bad index " + fieldPos + " in Put()");
 			};

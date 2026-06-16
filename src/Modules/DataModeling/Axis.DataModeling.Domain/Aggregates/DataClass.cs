@@ -18,7 +18,7 @@ public sealed class DataClass : AggregateRoot<Guid>
 
     public string Name { get; private set; }
     public string? Description { get; private set; }
-    public Guid TeamAccountId { get; private set; }
+    public Guid OrganizationId { get; private set; }
     public DateTimeOffset? DeletedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -26,25 +26,25 @@ public sealed class DataClass : AggregateRoot<Guid>
 
     public IReadOnlyList<FieldDefinition> Fields => _fields.AsReadOnly();
 
-    private DataClass(Guid id, string name, string? description, Guid teamAccountId,
+    private DataClass(Guid id, string name, string? description, Guid organizationId,
         string createdBy, DateTimeOffset createdAt)
         : base(id)
     {
         Name = name;
         Description = description;
-        TeamAccountId = teamAccountId;
+        OrganizationId = organizationId;
         CreatedBy = createdBy;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
     }
 
-    public static DataClass Create(string name, string? description, Guid teamAccountId, string createdBy)
+    public static DataClass Create(string name, string? description, Guid organizationId, string createdBy)
     {
         ValidateName(name);
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        DataClass dc = new(Guid.NewGuid(), name.Trim(), description?.Trim(), teamAccountId, createdBy, now);
-        dc.RaiseDomainEvent(new DataClassCreated(dc.Id, teamAccountId, dc.Name));
+        DataClass dc = new(Guid.NewGuid(), name.Trim(), description?.Trim(), organizationId, createdBy, now);
+        dc.RaiseDomainEvent(new DataClassCreated(dc.Id, organizationId, dc.Name));
         return dc;
     }
 
@@ -101,7 +101,7 @@ public sealed class DataClass : AggregateRoot<Guid>
             throw new InvalidOperationException("Data class is already deleted.");
 
         DeletedAt = DateTimeOffset.UtcNow;
-        RaiseDomainEvent(new DataClassDeleted(Id, TeamAccountId));
+        RaiseDomainEvent(new DataClassDeleted(Id, OrganizationId));
     }
 
     private static void ValidateName(string name)

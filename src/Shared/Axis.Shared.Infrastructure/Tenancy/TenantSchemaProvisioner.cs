@@ -15,13 +15,13 @@ public static class TenantSchemaProvisioner
     public static async Task ProvisionAsync(
         string connectionString,
         string advisoryLockKey,
-        Guid teamAccountId,
+        Guid organizationId,
         Func<CancellationToken, Task> migrateTenantSchemaAsync,
         ILogger logger,
         string moduleName,
         CancellationToken cancellationToken)
     {
-        string schema = $"tenant_{teamAccountId:N}";
+        string schema = $"tenant_{organizationId:N}";
 
         await using NpgsqlConnection connection = new(connectionString);
         await connection.OpenAsync(cancellationToken);
@@ -67,7 +67,7 @@ public static class TenantSchemaProvisioner
 
     public static async Task MigrateWithFixedTenantAsync<TContext>(
         string connectionString,
-        Guid teamAccountId,
+        Guid organizationId,
         Func<DbContextOptions<TContext>, TContext> createContext,
         CancellationToken cancellationToken)
         where TContext : DbContext

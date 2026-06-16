@@ -1,6 +1,6 @@
 namespace Axis.Identity.Application.Repositories;
 
-/// <summary>Outcome of claiming an idempotency key for team account registration.</summary>
+/// <summary>Outcome of claiming an idempotency key for organization registration.</summary>
 public enum RegistrationIdempotencyAcquireResult
 {
     /// <summary>This request owns the key and should execute registration.</summary>

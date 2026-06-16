@@ -8,7 +8,7 @@ Write a small script step so that I can transform data that isn't possible with 
 
 ## Primary actor
 
-- Team account Member
+- Organization Member
 
 ## Trigger
 

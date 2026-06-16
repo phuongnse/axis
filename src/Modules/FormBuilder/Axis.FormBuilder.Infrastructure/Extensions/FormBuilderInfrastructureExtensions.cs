@@ -1,11 +1,11 @@
 using Axis.FormBuilder.Application.Repositories;
 using Axis.FormBuilder.Application.Services;
 using Axis.FormBuilder.Infrastructure.Grpc;
-using Axis.FormBuilder.Infrastructure.TeamAccounts;
+using Axis.FormBuilder.Infrastructure.Organizations;
 using Axis.FormBuilder.Infrastructure.Persistence;
 using Axis.FormBuilder.Infrastructure.Repositories;
 using Axis.FormBuilder.Infrastructure.Services;
-using Axis.Shared.Application.TeamAccounts;
+using Axis.Shared.Application.Organizations;
 using Axis.WorkflowBuilder.Contracts.Grpc;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
@@ -29,7 +29,7 @@ public static class FormBuilderInfrastructureExtensions
         services.AddScoped<IFormModelReferenceSync, FormModelReferenceSync>();
         services.AddScoped<IFormDeletionGuard, FormWorkflowDeletionGuard>();
         services.AddScoped<IUnitOfWork, FormBuilderUnitOfWork>();
-        services.AddScoped<ITeamAccountFormTaskCanceller, TeamAccountFormTaskCanceller>();
+        services.AddScoped<IOrganizationFormTaskCanceller, OrganizationFormTaskCanceller>();
 
         string? workflowBuilderGrpcUrl = configuration["Modules:WorkflowBuilder:GrpcUrl"];
         if (string.IsNullOrWhiteSpace(workflowBuilderGrpcUrl))

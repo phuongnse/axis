@@ -14,7 +14,7 @@ export function deriveProvisioningUiState(status: ProvisioningStatusResponse): P
   const maxAttempt = modules.reduce((max, module) => Math.max(max, module.attemptCount ?? 0), 0);
   const allModulesSucceeded =
     modules.length > 0 && modules.every((module) => module.status === 'Succeeded');
-  const failed = status.teamAccountStatus === 'ProvisioningFailed';
+  const failed = status.organizationStatus === 'ProvisioningFailed';
 
   if (failed) {
     return {

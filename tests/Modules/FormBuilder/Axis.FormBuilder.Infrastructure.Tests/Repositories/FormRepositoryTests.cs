@@ -12,7 +12,7 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
     private FormBuilderDbContext _ctx = null!;
     private FormRepository _sut = null!;
 
-    private static readonly Guid TeamAccountId = Guid.NewGuid();
+    private static readonly Guid OrgId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     public Task InitializeAsync()
@@ -24,8 +24,8 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
 
     public async Task DisposeAsync() => await _ctx.DisposeAsync();
 
-    private static FormDefinition MakeForm(string name, Guid? teamAccountId = null)
-        => FormDefinition.Create(name, null, teamAccountId ?? TeamAccountId, UserId);
+    private static FormDefinition MakeForm(string name, Guid? orgId = null)
+        => FormDefinition.Create(name, null, orgId ?? OrgId, UserId);
 
     [Fact]
     public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
@@ -34,28 +34,28 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
         await _sut.AddAsync(form);
         await _ctx.SaveChangesAsync();
 
-        FormDefinition? loaded = await _sut.GetByIdAsync(form.Id, TeamAccountId);
+        FormDefinition? loaded = await _sut.GetByIdAsync(form.Id, OrgId);
 
         loaded.Should().NotBeNull();
         loaded!.Name.Should().Be("Contact Form");
-        loaded.TeamAccountId.Should().Be(TeamAccountId);
+        loaded.OrganizationId.Should().Be(OrgId);
         loaded.DeletedAt.Should().BeNull();
     }
 
     [Fact]
-    public async Task GetAllAsync_WhenMultipleFormsExist_ExcludesDeletedAndOtherTeamAccounts()
+    public async Task GetAllAsync_WhenMultipleFormsExist_ExcludesDeletedAndOtherOrgs()
     {
-        Guid teamAccountId = Guid.NewGuid();
-        FormDefinition active = MakeForm("Active Form", teamAccountId);
-        FormDefinition deleted = MakeForm("Deleted Form", teamAccountId);
+        Guid orgId = Guid.NewGuid();
+        FormDefinition active = MakeForm("Active Form", orgId);
+        FormDefinition deleted = MakeForm("Deleted Form", orgId);
         deleted.Delete();
-        FormDefinition other = MakeForm("Other TeamAccount Form", Guid.NewGuid());
+        FormDefinition other = MakeForm("Other Org Form", Guid.NewGuid());
 
         await _sut.AddAsync(active);
         await _sut.AddAsync(deleted);
         await _sut.AddAsync(other);
         await _ctx.SaveChangesAsync();
-        IReadOnlyList<FormDefinition> result = await _sut.GetAllAsync(teamAccountId);
+        IReadOnlyList<FormDefinition> result = await _sut.GetAllAsync(orgId);
 
         result.Should().ContainSingle().Which.Name.Should().Be("Active Form");
     }
@@ -63,12 +63,12 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
     [Fact]
     public async Task GetByIdAsync_WhenFormIsDeleted_ReturnsNull()
     {
-        Guid teamAccountId = Guid.NewGuid();
-        FormDefinition form = MakeForm("To Delete", teamAccountId);
+        Guid orgId = Guid.NewGuid();
+        FormDefinition form = MakeForm("To Delete", orgId);
         form.Delete();
         await _sut.AddAsync(form);
         await _ctx.SaveChangesAsync();
-        FormDefinition? loaded = await _sut.GetByIdAsync(form.Id, teamAccountId);
+        FormDefinition? loaded = await _sut.GetByIdAsync(form.Id, orgId);
 
         loaded.Should().BeNull();
     }
@@ -76,22 +76,22 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
     [Fact]
     public async Task NameExistsAsync_WhenNameExists_IsCaseInsensitive()
     {
-        Guid teamAccountId = Guid.NewGuid();
-        await _sut.AddAsync(MakeForm("Feedback Form", teamAccountId));
+        Guid orgId = Guid.NewGuid();
+        await _sut.AddAsync(MakeForm("Feedback Form", orgId));
         await _ctx.SaveChangesAsync();
 
-        (await _sut.NameExistsAsync("feedback form", teamAccountId)).Should().BeTrue();
-        (await _sut.NameExistsAsync("FEEDBACK FORM", teamAccountId)).Should().BeTrue();
+        (await _sut.NameExistsAsync("feedback form", orgId)).Should().BeTrue();
+        (await _sut.NameExistsAsync("FEEDBACK FORM", orgId)).Should().BeTrue();
     }
 
     [Fact]
     public async Task NameExistsAsync_WhenExcludeIdProvided_ExcludesThatFormFromCheck()
     {
-        Guid teamAccountId = Guid.NewGuid();
-        FormDefinition form = MakeForm("Survey Form", teamAccountId);
+        Guid orgId = Guid.NewGuid();
+        FormDefinition form = MakeForm("Survey Form", orgId);
         await _sut.AddAsync(form);
         await _ctx.SaveChangesAsync();
-        bool exists = await _sut.NameExistsAsync("Survey Form", teamAccountId, excludeId: form.Id);
+        bool exists = await _sut.NameExistsAsync("Survey Form", orgId, excludeId: form.Id);
 
         exists.Should().BeFalse();
     }
@@ -112,7 +112,7 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
 
         await _sut.AddAsync(form);
         await _ctx.SaveChangesAsync();
-        FormDefinition? loaded = await _sut.GetByIdAsync(form.Id, TeamAccountId);
+        FormDefinition? loaded = await _sut.GetByIdAsync(form.Id, OrgId);
 
         loaded!.Fields.Should().HaveCount(5);
         loaded.Fields.Single(f => f.Key == "title").Config
@@ -142,7 +142,7 @@ public class FormRepositoryTests(FormBuilderDatabaseFixture db) : IAsyncLifetime
         FormDefinition form = MakeForm("Referenced Form");
         await _sut.AddAsync(form);
         _ctx.FormWorkflowReferences.Add(
-            FormWorkflowReference.Create(Guid.NewGuid(), form.Id, form.TeamAccountId));
+            FormWorkflowReference.Create(Guid.NewGuid(), form.Id, form.OrganizationId));
         await _ctx.SaveChangesAsync();
         bool referenced = await _sut.IsReferencedByWorkflowAsync(form.Id);
 

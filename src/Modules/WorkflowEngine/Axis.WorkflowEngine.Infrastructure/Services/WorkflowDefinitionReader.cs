@@ -8,16 +8,16 @@ namespace Axis.WorkflowEngine.Infrastructure.Services;
 internal sealed class WorkflowDefinitionReader(WorkflowEngineDbContext context) : IWorkflowDefinitionReader
 {
     public async Task<bool> IsActiveAsync(
-        Guid workflowDefinitionId, Guid teamAccountId, CancellationToken ct = default)
+        Guid workflowDefinitionId, Guid organizationId, CancellationToken ct = default)
         => await context.WorkflowActiveStatuses
             .AnyAsync(w => w.WorkflowId == workflowDefinitionId
-                        && w.TeamAccountId == teamAccountId
+                        && w.OrganizationId == organizationId
                         && w.IsActive, ct);
 
     public async Task<WorkflowSnapshot?> GetSnapshotAsync(
-        Guid workflowDefinitionId, Guid teamAccountId, CancellationToken ct = default)
+        Guid workflowDefinitionId, Guid organizationId, CancellationToken ct = default)
         => await context.WorkflowSnapshots
             .AsNoTracking()
             .FirstOrDefaultAsync(w => w.WorkflowId == workflowDefinitionId
-                                   && w.TeamAccountId == teamAccountId, ct);
+                                   && w.OrganizationId == organizationId, ct);
 }

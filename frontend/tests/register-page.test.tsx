@@ -144,7 +144,7 @@ describe('RegisterPage', () => {
     );
     const stored = sessionStorage.getItem('axis.registration-context');
     expect(stored).toContain('alex@example.com');
-    expect(stored).not.toContain('teamAccountName');
+    expect(stored).not.toContain('organizationName');
   });
 
   it('includes setup token when registering the first team owner', async () => {
@@ -188,7 +188,7 @@ describe('RegisterPage', () => {
     await user.click(screen.getByRole('button', { name: /create owner account/i }));
 
     await waitFor(() => {
-      expect(registerBody?.teamAccountSetupToken).toBe('setup-token');
+      expect(registerBody?.organizationSetupToken).toBe('setup-token');
     });
   });
 

@@ -12,35 +12,35 @@ internal sealed class ExecutionRepository(WorkflowEngineDbContext context) : IEx
     public async Task AddAsync(WorkflowExecution execution, CancellationToken ct = default)
         => await context.WorkflowExecutions.AddAsync(execution, ct);
 
-    public async Task<WorkflowExecution?> GetByIdAsync(Guid id, Guid teamAccountId, CancellationToken ct = default)
+    public async Task<WorkflowExecution?> GetByIdAsync(Guid id, Guid organizationId, CancellationToken ct = default)
         => await context.WorkflowExecutions
-            .FirstOrDefaultAsync(e => e.Id == id && e.TeamAccountId == teamAccountId, ct);
+            .FirstOrDefaultAsync(e => e.Id == id && e.OrganizationId == organizationId, ct);
 
-    public async Task<WorkflowExecution?> GetByIdWithStepsAsync(Guid id, Guid teamAccountId, CancellationToken ct = default)
+    public async Task<WorkflowExecution?> GetByIdWithStepsAsync(Guid id, Guid organizationId, CancellationToken ct = default)
         => await context.WorkflowExecutions
             .Include(e => e.Steps)
-            .FirstOrDefaultAsync(e => e.Id == id && e.TeamAccountId == teamAccountId, ct);
+            .FirstOrDefaultAsync(e => e.Id == id && e.OrganizationId == organizationId, ct);
 
-    public async Task<IReadOnlyList<WorkflowExecution>> GetAllAsync(Guid teamAccountId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<WorkflowExecution>> GetAllAsync(Guid organizationId, CancellationToken ct = default)
         => await context.WorkflowExecutions
-            .Where(e => e.TeamAccountId == teamAccountId)
+            .Where(e => e.OrganizationId == organizationId)
             .OrderByDescending(e => e.CreatedAt)
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<WorkflowExecution>> GetByWorkflowAsync(
-        Guid workflowId, Guid teamAccountId, CancellationToken ct = default)
+        Guid workflowId, Guid organizationId, CancellationToken ct = default)
         => await context.WorkflowExecutions
-            .Where(e => e.WorkflowDefinitionId == workflowId && e.TeamAccountId == teamAccountId)
+            .Where(e => e.WorkflowDefinitionId == workflowId && e.OrganizationId == organizationId)
             .OrderByDescending(e => e.CreatedAt)
             .ToListAsync(ct);
 
     public async Task<ExecutionResponse?> GetWithStepsAsync(
-        Guid executionId, Guid teamAccountId, CancellationToken ct = default)
+        Guid executionId, Guid organizationId, CancellationToken ct = default)
     {
         WorkflowExecution? execution = await context.WorkflowExecutions
             .AsNoTracking()
             .Include(e => e.Steps)
-            .FirstOrDefaultAsync(e => e.Id == executionId && e.TeamAccountId == teamAccountId, ct);
+            .FirstOrDefaultAsync(e => e.Id == executionId && e.OrganizationId == organizationId, ct);
 
         if (execution is null)
             return null;
@@ -78,11 +78,11 @@ internal sealed class ExecutionRepository(WorkflowEngineDbContext context) : IEx
     }
 
     public async Task<(IReadOnlyList<ExecutionSummaryResponse> Items, int TotalCount)> GetPagedAsync(
-        Guid teamAccountId, int page, int pageSize, ExecutionStatus? status = null, CancellationToken ct = default)
+        Guid organizationId, int page, int pageSize, ExecutionStatus? status = null, CancellationToken ct = default)
     {
         IQueryable<WorkflowExecution> query = context.WorkflowExecutions
             .AsNoTracking()
-            .Where(e => e.TeamAccountId == teamAccountId);
+            .Where(e => e.OrganizationId == organizationId);
 
         if (status.HasValue)
             query = query.Where(e => e.Status == status.Value);
@@ -110,11 +110,11 @@ internal sealed class ExecutionRepository(WorkflowEngineDbContext context) : IEx
     }
 
     public async Task<(IReadOnlyList<ExecutionSummaryResponse> Items, int TotalCount)> GetPagedByWorkflowAsync(
-        Guid workflowId, Guid teamAccountId, int page, int pageSize, ExecutionStatus? status = null, CancellationToken ct = default)
+        Guid workflowId, Guid organizationId, int page, int pageSize, ExecutionStatus? status = null, CancellationToken ct = default)
     {
         IQueryable<WorkflowExecution> query = context.WorkflowExecutions
             .AsNoTracking()
-            .Where(e => e.WorkflowDefinitionId == workflowId && e.TeamAccountId == teamAccountId);
+            .Where(e => e.WorkflowDefinitionId == workflowId && e.OrganizationId == organizationId);
 
         if (status.HasValue)
             query = query.Where(e => e.Status == status.Value);
@@ -142,10 +142,10 @@ internal sealed class ExecutionRepository(WorkflowEngineDbContext context) : IEx
     }
 
     public async Task<IReadOnlyList<ExecutionSummaryResponse>> GetRetriesAsync(
-        Guid originalExecutionId, Guid teamAccountId, CancellationToken ct = default)
+        Guid originalExecutionId, Guid organizationId, CancellationToken ct = default)
         => await context.WorkflowExecutions
             .AsNoTracking()
-            .Where(e => e.RetryOfExecutionId == originalExecutionId && e.TeamAccountId == teamAccountId)
+            .Where(e => e.RetryOfExecutionId == originalExecutionId && e.OrganizationId == organizationId)
             .OrderBy(e => e.CreatedAt)
             .Select(e => new ExecutionSummaryResponse(
                 e.Id,
@@ -160,16 +160,16 @@ internal sealed class ExecutionRepository(WorkflowEngineDbContext context) : IEx
                 e.CompletedAt))
             .ToListAsync(ct);
 
-    public Task<int> CountCreatedSinceUtcAsync(Guid teamAccountId, DateTime sinceUtc, CancellationToken ct = default) =>
+    public Task<int> CountCreatedSinceUtcAsync(Guid organizationId, DateTime sinceUtc, CancellationToken ct = default) =>
         context.WorkflowExecutions.CountAsync(
-            e => e.TeamAccountId == teamAccountId && e.CreatedAt >= sinceUtc,
+            e => e.OrganizationId == organizationId && e.CreatedAt >= sinceUtc,
             ct);
 
-    public async Task<IReadOnlyList<WorkflowExecution>> GetCancellableByTeamAccountAsync(
-        Guid teamAccountId,
+    public async Task<IReadOnlyList<WorkflowExecution>> GetCancellableByOrganizationAsync(
+        Guid organizationId,
         CancellationToken ct = default) =>
         await context.WorkflowExecutions
-            .Where(e => e.TeamAccountId == teamAccountId
+            .Where(e => e.OrganizationId == organizationId
                         && (e.Status == ExecutionStatus.Pending || e.Status == ExecutionStatus.Running))
             .ToListAsync(ct);
 }

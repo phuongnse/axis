@@ -8,5 +8,5 @@ public sealed record CreateModelCommand(
     string? Description,
     string? Icon,
     string? Color,
-    Guid TeamAccountId,
+    Guid OrganizationId,
     string CreatedBy) : ICommand<Guid>;

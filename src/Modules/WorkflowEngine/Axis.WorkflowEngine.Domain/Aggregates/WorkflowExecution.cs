@@ -14,7 +14,7 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
     private List<ExecutionStep> _steps = [];
 
     public Guid WorkflowDefinitionId { get; private set; }
-    public Guid TeamAccountId { get; private set; }
+    public Guid OrganizationId { get; private set; }
     public ExecutionStatus Status { get; private set; }
     public TriggerType TriggerType { get; private set; }
     public Guid? TriggeredByUserId { get; private set; }
@@ -34,7 +34,7 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
     private WorkflowExecution(
         Guid id,
         Guid workflowDefinitionId,
-        Guid teamAccountId,
+        Guid organizationId,
         TriggerType triggerType,
         Guid? triggeredByUserId,
         Guid? retryOfExecutionId,
@@ -43,7 +43,7 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
         : base(id)
     {
         WorkflowDefinitionId = workflowDefinitionId;
-        TeamAccountId = teamAccountId;
+        OrganizationId = organizationId;
         Status = ExecutionStatus.Pending;
         TriggerType = triggerType;
         TriggeredByUserId = triggeredByUserId;
@@ -54,17 +54,17 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
 
     public static WorkflowExecution Create(
         Guid workflowDefinitionId,
-        Guid teamAccountId,
+        Guid organizationId,
         TriggerType triggerType,
         Guid? triggeredByUserId,
         IReadOnlyDictionary<string, object?> input)
     {
         DateTime now = DateTime.UtcNow;
         WorkflowExecution exec = new WorkflowExecution(
-            Guid.NewGuid(), workflowDefinitionId, teamAccountId,
+            Guid.NewGuid(), workflowDefinitionId, organizationId,
             triggerType, triggeredByUserId, null, input, now);
 
-        exec.RaiseDomainEvent(new ExecutionStarted(exec.Id, workflowDefinitionId, teamAccountId));
+        exec.RaiseDomainEvent(new ExecutionStarted(exec.Id, workflowDefinitionId, organizationId));
         return exec;
     }
 
@@ -86,7 +86,7 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
 
         Status = ExecutionStatus.Completed;
         CompletedAt = DateTime.UtcNow;
-        RaiseDomainEvent(new ExecutionCompleted(Id, TeamAccountId));
+        RaiseDomainEvent(new ExecutionCompleted(Id, OrganizationId));
     }
 
     /// <summary>Transitions Running → Failed with error details.</summary>
@@ -98,7 +98,7 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
         Status = ExecutionStatus.Failed;
         ErrorMessage = errorMessage;
         CompletedAt = DateTime.UtcNow;
-        RaiseDomainEvent(new ExecutionFailed(Id, TeamAccountId, errorMessage));
+        RaiseDomainEvent(new ExecutionFailed(Id, OrganizationId, errorMessage));
     }
 
     /// <summary>Cancels a Pending or Running execution.</summary>
@@ -110,7 +110,7 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
 
         Status = ExecutionStatus.Cancelled;
         CompletedAt = DateTime.UtcNow;
-        RaiseDomainEvent(new ExecutionCancelled(Id, TeamAccountId));
+        RaiseDomainEvent(new ExecutionCancelled(Id, OrganizationId));
     }
 
     /// <summary>Merges step output into the running execution context.</summary>
@@ -123,7 +123,7 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
     public ExecutionStep AddStep(
         Guid stepDefinitionId, string name, StepType stepType, int displayOrder)
     {
-        ExecutionStep step = ExecutionStep.Create(Id, TeamAccountId, stepDefinitionId, name, stepType, displayOrder);
+        ExecutionStep step = ExecutionStep.Create(Id, OrganizationId, stepDefinitionId, name, stepType, displayOrder);
         _steps.Add(step);
         return step;
     }
@@ -139,7 +139,7 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
             throw new InvalidOperationException("Steps are already initialised for this execution.");
 
         foreach (StepDefinitionSnapshot stepDef in snapshotSteps.OrderBy(s => s.DisplayOrder))
-            _steps.Add(ExecutionStep.Create(Id, TeamAccountId, stepDef.Id, stepDef.Name, stepDef.StepType, stepDef.DisplayOrder));
+            _steps.Add(ExecutionStep.Create(Id, OrganizationId, stepDef.Id, stepDef.Name, stepDef.StepType, stepDef.DisplayOrder));
     }
 
     public void StartStep(Guid stepId, IReadOnlyDictionary<string, object?> inputSnapshot)
@@ -148,13 +148,13 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
     public void CompleteStep(Guid stepId, IReadOnlyDictionary<string, object?> output)
     {
         GetStep(stepId).Complete(output);
-        RaiseDomainEvent(new ExecutionStepCompleted(Id, stepId, TeamAccountId, output));
+        RaiseDomainEvent(new ExecutionStepCompleted(Id, stepId, OrganizationId, output));
     }
 
     public void FailStep(Guid stepId, string errorDetails)
     {
         GetStep(stepId).Fail(errorDetails);
-        RaiseDomainEvent(new ExecutionStepFailed(Id, stepId, TeamAccountId, errorDetails));
+        RaiseDomainEvent(new ExecutionStepFailed(Id, stepId, OrganizationId, errorDetails));
     }
 
     /// <summary>Transitions a Form step to Waiting and raises the FormStepReached event for cross-module dispatch.</summary>
@@ -166,7 +166,7 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
     {
         GetStep(stepId).Wait();
         RaiseDomainEvent(new FormStepReached(
-            Id, stepId, WorkflowDefinitionId, TeamAccountId,
+            Id, stepId, WorkflowDefinitionId, OrganizationId,
             formDefinitionId, assigneeExpression, timeoutHours));
     }
 
@@ -204,10 +204,10 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
 
         DateTime now = DateTime.UtcNow;
         WorkflowExecution retry = new WorkflowExecution(
-            Guid.NewGuid(), WorkflowDefinitionId, TeamAccountId,
+            Guid.NewGuid(), WorkflowDefinitionId, OrganizationId,
             TriggerType, retriedByUserId, Id, context, now);
 
-        retry.RaiseDomainEvent(new ExecutionStarted(retry.Id, WorkflowDefinitionId, TeamAccountId));
+        retry.RaiseDomainEvent(new ExecutionStarted(retry.Id, WorkflowDefinitionId, OrganizationId));
         return retry;
     }
 }

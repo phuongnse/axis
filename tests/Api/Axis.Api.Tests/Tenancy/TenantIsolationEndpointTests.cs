@@ -60,41 +60,41 @@ public sealed class TenantIsolationEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task GetModels_WhenTeamAccountIsArchived_Returns403()
+    public async Task GetModels_WhenOrganizationIsArchived_Returns403()
     {
         HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "iso-archived");
-        Guid teamAccountId = await GetTeamAccountIdForEmailAsync("adminiso-archived@test.com");
-        await SetTeamAccountStatusAsync(teamAccountId, TeamAccountStatus.Archived);
+        Guid organizationId = await GetOrganizationIdForEmailAsync("adminiso-archived@test.com");
+        await SetOrganizationStatusAsync(organizationId, OrganizationStatus.Archived);
 
         HttpResponseMessage resp = await client.GetAsync("/api/models");
 
         resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
-    private async Task<Guid> GetTeamAccountIdForEmailAsync(string emailAddress)
+    private async Task<Guid> GetOrganizationIdForEmailAsync(string emailAddress)
     {
         Email email = Email.Create(emailAddress).Value!;
         using IServiceScope scope = fixture.CreateScope();
         IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         User user = await db.Users.AsNoTracking().SingleAsync(u => u.Email == email);
-        TeamAccountMembership membership = await db.TeamAccountMemberships
+        OrganizationMembership membership = await db.OrganizationMemberships
             .AsNoTracking()
             .SingleAsync(m => m.UserId == user.Id);
-        return membership.TeamAccountId;
+        return membership.OrganizationId;
     }
 
-    private async Task SetTeamAccountStatusAsync(Guid teamAccountId, TeamAccountStatus status)
+    private async Task SetOrganizationStatusAsync(Guid organizationId, OrganizationStatus status)
     {
         using IServiceScope scope = fixture.CreateScope();
         IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        TeamAccount teamAccount = await db.TeamAccounts.SingleAsync(o => o.Id == teamAccountId);
+        Organization organization = await db.Organizations.SingleAsync(o => o.Id == organizationId);
 
         switch (status)
         {
-            case TeamAccountStatus.Archived:
-                if (teamAccount.Status == TeamAccountStatus.Provisioning)
-                    teamAccount.CompleteProvisioning();
-                teamAccount.Archive();
+            case OrganizationStatus.Archived:
+                if (organization.Status == OrganizationStatus.Provisioning)
+                    organization.CompleteProvisioning();
+                organization.Archive();
                 break;
             default:
                 throw new NotSupportedException($"Test helper does not set status {status}.");

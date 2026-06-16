@@ -2,7 +2,7 @@ const REGISTRATION_CONTEXT_KEY = 'axis.registration-context';
 
 export interface RegistrationContext {
   email: string;
-  teamAccountName?: string;
+  organizationName?: string;
 }
 
 export function saveRegistrationContext(context: RegistrationContext): void {
@@ -18,7 +18,7 @@ export function loadRegistrationContext(): RegistrationContext | null {
     if (typeof parsed.email !== 'string') {
       return null;
     }
-    if (parsed.teamAccountName !== undefined && typeof parsed.teamAccountName !== 'string') {
+    if (parsed.organizationName !== undefined && typeof parsed.organizationName !== 'string') {
       return null;
     }
     return parsed;

@@ -4,6 +4,6 @@ namespace Axis.Identity.Domain.Events;
 
 public record RoleCreated(
     Guid RoleId,
-    Guid TeamAccountId,
+    Guid OrganizationId,
     string Name,
     bool IsSystem) : IDomainEvent;

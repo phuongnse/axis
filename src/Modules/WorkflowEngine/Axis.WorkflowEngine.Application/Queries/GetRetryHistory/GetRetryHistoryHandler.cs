@@ -9,5 +9,5 @@ public sealed class GetRetryHistoryHandler(IExecutionRepository execRepo)
 {
     public async Task<IReadOnlyList<ExecutionSummaryResponse>> Handle(
         GetRetryHistoryQuery query, CancellationToken cancellationToken)
-        => await execRepo.GetRetriesAsync(query.OriginalExecutionId, query.TeamAccountId, cancellationToken);
+        => await execRepo.GetRetriesAsync(query.OriginalExecutionId, query.OrganizationId, cancellationToken);
 }

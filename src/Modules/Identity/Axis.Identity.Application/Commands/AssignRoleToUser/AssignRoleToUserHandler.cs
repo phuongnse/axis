@@ -8,31 +8,31 @@ namespace Axis.Identity.Application.Commands.AssignRoleToUser;
 
 /// <summary>
 /// Assigns or removes a role.
-/// Guards: role must exist in team account; user must retain at least one role; last admin cannot be stripped of Admin role.
+/// Guards: role must exist in org; user must retain at least one role; last admin cannot be stripped of Admin role.
 /// </summary>
 public sealed class AssignRoleToUserHandler(
     IUserRepository userRepo,
-    ITeamAccountMembershipRepository membershipRepo,
+    IOrganizationMembershipRepository membershipRepo,
     IRoleRepository roleRepo,
     IUnitOfWork uow)
     : ICommandHandler<AssignRoleToUserCommand>
 {
     public async Task<Result> Handle(AssignRoleToUserCommand command, CancellationToken cancellationToken)
     {
-        User? user = await userRepo.GetByIdAsync(command.UserId, command.TeamAccountId, cancellationToken);
+        User? user = await userRepo.GetByIdAsync(command.UserId, command.OrganizationId, cancellationToken);
         if (user is null)
             return Result.Failure(ErrorCodes.NotFound, "User not found.");
 
-        TeamAccountMembership? membership = await membershipRepo.GetByUserAndTeamAccountAsync(
+        OrganizationMembership? membership = await membershipRepo.GetByUserAndOrganizationAsync(
             command.UserId,
-            command.TeamAccountId,
+            command.OrganizationId,
             cancellationToken);
         if (membership is null)
             return Result.Failure(ErrorCodes.NotFound, "Membership not found.");
 
-        Role? role = await roleRepo.GetByIdAsync(command.RoleId, command.TeamAccountId, cancellationToken);
+        Role? role = await roleRepo.GetByIdAsync(command.RoleId, command.OrganizationId, cancellationToken);
         if (role is null)
-            return Result.Failure(ErrorCodes.NotFound, "The role was not found in this team account.");
+            return Result.Failure(ErrorCodes.NotFound, "The role was not found in this organization.");
 
         if (command.Action == RoleAction.Assign)
         {
@@ -44,13 +44,13 @@ public sealed class AssignRoleToUserHandler(
             if (membership.RoleIds.Count <= 1 && membership.RoleIds.Contains(command.RoleId))
                 return Result.Failure(ErrorCodes.BusinessRule, "User must have at least one role.");
 
-            // Last admin guard belongs to team account membership, not the user account.
+            // Last admin guard belongs to org membership, not the user account.
             if (role.IsSystem && role.Name == "Admin")
             {
                 int adminCount = await membershipRepo.CountAdminsAsync(
-                    command.TeamAccountId, command.RoleId, cancellationToken);
+                    command.OrganizationId, command.RoleId, cancellationToken);
                 if (adminCount <= 1)
-                    return Result.Failure(ErrorCodes.BusinessRule, "Cannot remove the last admin role from this team account.");
+                    return Result.Failure(ErrorCodes.BusinessRule, "Cannot remove the last admin role from this organization.");
             }
 
             membership.RemoveRole(command.RoleId);

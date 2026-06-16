@@ -10,7 +10,7 @@ public sealed record FormStepReached(
     Guid ExecutionId,
     Guid ExecutionStepId,
     Guid WorkflowDefinitionId,
-    Guid TeamAccountId,
+    Guid OrganizationId,
     Guid FormDefinitionId,
     string? AssigneeExpression,
     int? TimeoutHours) : IDomainEvent;

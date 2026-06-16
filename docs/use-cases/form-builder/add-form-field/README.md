@@ -8,7 +8,7 @@ Add a field to my form so that I can collect the data I need.
 
 ## Primary actor
 
-- Team account Member with `form:definition:write`
+- Organization Member with `form:definition:write`
 
 ## Trigger
 

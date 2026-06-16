@@ -8,7 +8,7 @@ Configure multiple steps to run in parallel so that independent tasks don't bloc
 
 ## Primary actor
 
-- Team account Member
+- Organization Member
 
 ## Trigger
 

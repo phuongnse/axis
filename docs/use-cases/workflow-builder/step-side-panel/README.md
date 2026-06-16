@@ -8,7 +8,7 @@ Click a step to open its configuration panel so that I can set it up without lea
 
 ## Primary actor
 
-- Team account Member
+- Organization Member
 
 ## Trigger
 

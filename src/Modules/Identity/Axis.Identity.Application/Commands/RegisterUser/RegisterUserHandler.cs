@@ -9,12 +9,12 @@ namespace Axis.Identity.Application.Commands.RegisterUser;
 
 public sealed class RegisterUserHandler(
     IUserRepository userRepo,
-    ITeamAccountRepository teamAccountRepo,
-    ITeamAccountMembershipRepository membershipRepo,
+    IOrganizationRepository organizationRepo,
+    IOrganizationMembershipRepository membershipRepo,
     IRoleRepository roleRepo,
     IRegistrationIdempotencyRepository idempotencyRepo,
     IEmailVerificationTokenStore verificationTokenStore,
-    ITeamAccountRegistrationTokenStore teamAccountTokenStore,
+    IOrganizationRegistrationTokenStore organizationTokenStore,
     IPasswordHasher hasher,
     IEmailSender emailSender,
     IUnitOfWork uow)
@@ -58,12 +58,12 @@ public sealed class RegisterUserHandler(
             user.SetPasswordHash(hasher.Hash(command.Password));
             user.RecordLegalAcceptance(command.AcceptedTermsVersion, command.AcceptedPrivacyVersion);
 
-            string? setupToken = string.IsNullOrWhiteSpace(command.TeamAccountSetupToken)
+            string? setupToken = string.IsNullOrWhiteSpace(command.OrganizationSetupToken)
                 ? null
-                : command.TeamAccountSetupToken.Trim();
+                : command.OrganizationSetupToken.Trim();
             if (setupToken is not null)
             {
-                Result attachResult = await AttachFirstUserToTeamAccountAsync(
+                Result attachResult = await AttachFirstUserToOrganizationAsync(
                     user,
                     setupToken,
                     cancellationToken);
@@ -121,14 +121,14 @@ public sealed class RegisterUserHandler(
             ? idempotencyRepo.MarkFailedAsync(idempotencyKey, cancellationToken)
             : Task.CompletedTask;
 
-    private async Task<Result> AttachFirstUserToTeamAccountAsync(
+    private async Task<Result> AttachFirstUserToOrganizationAsync(
         User user,
         string setupToken,
         CancellationToken cancellationToken)
     {
         string tokenHash = OpaqueTokenGenerator.Hash(setupToken);
         Result<Guid> setupResult =
-            await teamAccountTokenStore.ConsumeFirstUserSetupAsync(
+            await organizationTokenStore.ConsumeFirstUserSetupAsync(
                 tokenHash,
                 user.Id,
                 cancellationToken);
@@ -138,16 +138,16 @@ public sealed class RegisterUserHandler(
                 setupResult.ErrorCode ?? ErrorCodes.BusinessRule,
                 setupResult.Error);
 
-        Guid teamAccountId = setupResult.Value;
-        TeamAccount? teamAccount = await teamAccountRepo.GetByIdAsync(teamAccountId, cancellationToken);
-        if (teamAccount is null || !teamAccount.AllowsSignIn())
-            return Result.Failure(ErrorCodes.BusinessRule, "Team account is not ready for user setup.");
+        Guid organizationId = setupResult.Value;
+        Organization? organization = await organizationRepo.GetByIdAsync(organizationId, cancellationToken);
+        if (organization is null || !organization.AllowsSignIn())
+            return Result.Failure(ErrorCodes.BusinessRule, "Organization is not ready for user setup.");
 
-        Role? adminRole = await roleRepo.GetByNameAsync("Admin", teamAccount.Id, cancellationToken);
+        Role? adminRole = await roleRepo.GetByNameAsync("Admin", organization.Id, cancellationToken);
         if (adminRole is null)
-            return Result.Failure(ErrorCodes.BusinessRule, "Team account is missing the Admin role.");
+            return Result.Failure(ErrorCodes.BusinessRule, "Organization is missing the Admin role.");
 
-        TeamAccountMembership membership = TeamAccountMembership.Create(user.Id, teamAccount.Id);
+        OrganizationMembership membership = OrganizationMembership.Create(user.Id, organization.Id);
         membership.AssignRole(adminRole.Id);
         await membershipRepo.AddAsync(membership, cancellationToken);
 

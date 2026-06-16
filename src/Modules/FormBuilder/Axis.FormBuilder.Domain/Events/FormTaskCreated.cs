@@ -5,7 +5,7 @@ namespace Axis.FormBuilder.Domain.Events;
 public sealed record FormTaskCreated(
     Guid FormSubmissionId,
     Guid FormDefinitionId,
-    Guid TeamAccountId,
+    Guid OrganizationId,
     Guid ExecutionId,
     Guid? AssigneeUserId,
     Guid? AssigneeRoleId,

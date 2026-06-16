@@ -11,7 +11,7 @@ public class RoleRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     private IdentityDbContext _ctx = null!;
     private RoleRepository _sut = null!;
 
-    private static readonly Guid TeamAccountId = Guid.NewGuid();
+    private static readonly Guid OrgId = Guid.NewGuid();
 
     public Task InitializeAsync()
     {
@@ -23,7 +23,7 @@ public class RoleRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     public async Task DisposeAsync() => await _ctx.DisposeAsync();
 
     private static Role MakeRole(string name = "Editor") =>
-        Role.Create(name, null, TeamAccountId, ["data_modeling:model:read"]);
+        Role.Create(name, null, OrgId, ["data_modeling:model:read"]);
 
     [Fact]
     public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
@@ -31,7 +31,7 @@ public class RoleRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
         Role role = MakeRole("CustomRole-GetById");
         await _sut.AddAsync(role);
         await _ctx.SaveChangesAsync();
-        Role? loaded = await _sut.GetByIdAsync(role.Id, TeamAccountId);
+        Role? loaded = await _sut.GetByIdAsync(role.Id, OrgId);
 
         loaded.Should().NotBeNull();
         loaded!.Name.Should().Be("CustomRole-GetById");
@@ -45,33 +45,33 @@ public class RoleRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
         Role role = MakeRole("NamedRole-FindMe");
         await _sut.AddAsync(role);
         await _ctx.SaveChangesAsync();
-        Role? loaded = await _sut.GetByNameAsync("NamedRole-FindMe", TeamAccountId);
+        Role? loaded = await _sut.GetByNameAsync("NamedRole-FindMe", OrgId);
 
         loaded.Should().NotBeNull();
         loaded!.Id.Should().Be(role.Id);
     }
 
     [Fact]
-    public async Task GetAllAsync_WhenMultipleRolesExist_ReturnsAllRolesForTeamAccount()
+    public async Task GetAllAsync_WhenMultipleRolesExist_ReturnsAllRolesForOrg()
     {
         Role r1 = MakeRole($"BulkRole-A-{Guid.NewGuid():N}");
         Role r2 = MakeRole($"BulkRole-B-{Guid.NewGuid():N}");
         await _sut.AddAsync(r1);
         await _sut.AddAsync(r2);
         await _ctx.SaveChangesAsync();
-        IReadOnlyList<Role> all = await _sut.GetAllAsync(TeamAccountId);
+        IReadOnlyList<Role> all = await _sut.GetAllAsync(OrgId);
 
         all.Should().Contain(r => r.Id == r1.Id);
         all.Should().Contain(r => r.Id == r2.Id);
     }
 
     [Fact]
-    public async Task NameExistsAsync_WhenNameExistsInTeamAccount_ReturnsTrue()
+    public async Task NameExistsAsync_WhenNameExistsInOrg_ReturnsTrue()
     {
         Role role = MakeRole($"DupeName-{Guid.NewGuid():N}");
         await _sut.AddAsync(role);
         await _ctx.SaveChangesAsync();
-        bool exists = await _sut.NameExistsAsync(role.Name, TeamAccountId);
+        bool exists = await _sut.NameExistsAsync(role.Name, OrgId);
         exists.Should().BeTrue();
     }
 
@@ -82,14 +82,14 @@ public class RoleRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
         await _sut.AddAsync(role);
         await _ctx.SaveChangesAsync();
 
-        bool exists = await _sut.NameExistsAsync(role.Name, TeamAccountId, excludeRoleId: role.Id);
+        bool exists = await _sut.NameExistsAsync(role.Name, OrgId, excludeRoleId: role.Id);
         exists.Should().BeFalse();
     }
 
     [Fact]
-    public async Task GetByIdAsync_WhenRoleBelongsToDifferentTeamAccount_ReturnsNull()
+    public async Task GetByIdAsync_WhenRoleBelongsToDifferentOrg_ReturnsNull()
     {
-        Role role = MakeRole($"CrossTeamAccount-{Guid.NewGuid():N}");
+        Role role = MakeRole($"CrossOrg-{Guid.NewGuid():N}");
         await _sut.AddAsync(role);
         await _ctx.SaveChangesAsync();
 
@@ -99,25 +99,25 @@ public class RoleRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetByIdsAsync_WhenIdsProvided_ReturnsMatchingRolesForTeamAccount()
+    public async Task GetByIdsAsync_WhenIdsProvided_ReturnsMatchingRolesForOrg()
     {
-        Guid teamAccountId = Guid.NewGuid();
-        Role r1 = Role.Create($"GetByIds-A-{Guid.NewGuid():N}", null, teamAccountId, ["data_modeling:model:read"]);
-        Role r2 = Role.Create($"GetByIds-B-{Guid.NewGuid():N}", null, teamAccountId, ["data_modeling:model:read"]);
+        Guid orgId = Guid.NewGuid();
+        Role r1 = Role.Create($"GetByIds-A-{Guid.NewGuid():N}", null, orgId, ["data_modeling:model:read"]);
+        Role r2 = Role.Create($"GetByIds-B-{Guid.NewGuid():N}", null, orgId, ["data_modeling:model:read"]);
         await _sut.AddAsync(r1);
         await _sut.AddAsync(r2);
         await _ctx.SaveChangesAsync();
 
-        IReadOnlyList<Role> result = await _sut.GetByIdsAsync([r1.Id, r2.Id], teamAccountId);
+        IReadOnlyList<Role> result = await _sut.GetByIdsAsync([r1.Id, r2.Id], orgId);
 
         result.Should().HaveCount(2);
         result.Select(r => r.Id).Should().BeEquivalentTo(new[] { r1.Id, r2.Id });
     }
 
     [Fact]
-    public async Task GetByIdsAsync_WhenIdsBelongToDifferentTeamAccount_ReturnsEmpty()
+    public async Task GetByIdsAsync_WhenIdsBelongToDifferentOrg_ReturnsEmpty()
     {
-        Role role = MakeRole($"GetByIds-CrossTeamAccount-{Guid.NewGuid():N}");
+        Role role = MakeRole($"GetByIds-CrossOrg-{Guid.NewGuid():N}");
         await _sut.AddAsync(role);
         await _ctx.SaveChangesAsync();
 
@@ -129,14 +129,14 @@ public class RoleRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     [Fact]
     public async Task GetPagedAsync_WhenRolesExist_ReturnsPagedResult()
     {
-        Guid teamAccountId = Guid.NewGuid();
-        Role r1 = Role.Create($"Paged-A-{Guid.NewGuid():N}", null, teamAccountId, ["data_modeling:model:read"]);
-        Role r2 = Role.Create($"Paged-B-{Guid.NewGuid():N}", null, teamAccountId, ["data_modeling:model:read"]);
+        Guid orgId = Guid.NewGuid();
+        Role r1 = Role.Create($"Paged-A-{Guid.NewGuid():N}", null, orgId, ["data_modeling:model:read"]);
+        Role r2 = Role.Create($"Paged-B-{Guid.NewGuid():N}", null, orgId, ["data_modeling:model:read"]);
         await _sut.AddAsync(r1);
         await _sut.AddAsync(r2);
         await _ctx.SaveChangesAsync();
 
-        (IReadOnlyList<Role> items, int total) = await _sut.GetPagedAsync(teamAccountId, 1, 20);
+        (IReadOnlyList<Role> items, int total) = await _sut.GetPagedAsync(orgId, 1, 20);
 
         items.Should().HaveCount(2);
         total.Should().Be(2);

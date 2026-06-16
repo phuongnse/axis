@@ -21,12 +21,10 @@ SKIP_DIRS = set()
 GROUPS: dict[str, list[tuple[str, object]]] = {
     "platform-foundation": [
         ("Registration", lambda s: s in {
-            "register-team-account", "plan-at-signup",
+            "register-org", "plan-at-signup",
         }),
         ("Subscription plans", lambda s: s in {"view-plans", "enforce-limits", "admin-change-plan"}),
-        ("Team account settings", lambda s: s in {
-            "team-account-profile", "team-account-settings", "delete-team-account",
-        }),
+        ("Organization settings", lambda s: s in {"org-profile", "org-settings", "delete-org"}),
         ("Tenant isolation", lambda s: s in {"tenant-scope", "tenant-from-jwt"}),
     ],
     "identity-access": [
@@ -62,7 +60,7 @@ GROUPS: dict[str, list[tuple[str, object]]] = {
     "workflow-engine": [
         ("Execution lifecycle", lambda s: s in {"start-execution", "track-execution", "cancel-execution"}),
         ("History & detail", lambda s: s in {
-            "workflow-history", "execution-detail", "team-account-execution-history",
+            "workflow-history", "execution-detail", "org-execution-history",
         }),
         ("Errors & notifications", lambda s: s in {"error-detail", "failure-notify", "error-channels"}),
         ("Retry", lambda s: s in {"retry-execution", "retry-history", "retry-with-context"}),

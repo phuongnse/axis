@@ -54,10 +54,10 @@ public static class Permissions
         public const string Write = "roles:write";
     }
 
-    public static class TeamAccount
+    public static class Organization
     {
-        public const string SettingsRead = "team-account:settings:read";
-        public const string SettingsWrite = "team-account:settings:write";
-        public const string Delete = "team-account:delete";
+        public const string SettingsRead = "organization:settings:read";
+        public const string SettingsWrite = "organization:settings:write";
+        public const string Delete = "organization:delete";
     }
 }

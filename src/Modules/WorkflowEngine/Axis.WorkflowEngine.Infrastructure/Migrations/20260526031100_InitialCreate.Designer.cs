@@ -36,9 +36,9 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
-                    b.Property<Guid>("TeamAccountId")
+                    b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")
-                        .HasColumnName("team_account_id");
+                        .HasColumnName("organization_id");
 
                     b.HasKey("WorkflowId");
 
@@ -63,7 +63,7 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                     b.Property<string>("ErrorMessage")
                         .HasColumnType("text");
 
-                    b.Property<Guid>("TeamAccountId")
+                    b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid?>("RetryOfExecutionId")
@@ -103,9 +103,9 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("workflow_id");
 
-                    b.Property<Guid>("TeamAccountId")
+                    b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")
-                        .HasColumnName("team_account_id");
+                        .HasColumnName("organization_id");
 
                     b.Property<string>("Steps")
                         .IsRequired()
@@ -153,7 +153,7 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                                 .HasMaxLength(500)
                                 .HasColumnType("character varying(500)");
 
-                            b1.Property<Guid>("TeamAccountId")
+                            b1.Property<Guid>("OrganizationId")
                                 .HasColumnType("uuid");
 
                             b1.Property<string>("OutputSnapshot")
@@ -181,7 +181,7 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
 
                             b1.HasKey("Id");
 
-                            b1.HasIndex("ExecutionId", "TeamAccountId");
+                            b1.HasIndex("ExecutionId", "OrganizationId");
 
                             b1.ToTable("execution_steps", (string)null);
 

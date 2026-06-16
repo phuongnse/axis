@@ -16,7 +16,7 @@ public sealed class FormDefinition : AggregateRoot<Guid>
 
     public string Name { get; private set; }
     public string? Description { get; private set; }
-    public Guid TeamAccountId { get; private set; }
+    public Guid OrganizationId { get; private set; }
     public DateTimeOffset? DeletedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -26,25 +26,25 @@ public sealed class FormDefinition : AggregateRoot<Guid>
 
     private FormDefinition() : base(default) { Name = null!; CreatedBy = string.Empty; } // EF Core materialisation
 
-    private FormDefinition(Guid id, string name, string? description, Guid teamAccountId,
+    private FormDefinition(Guid id, string name, string? description, Guid organizationId,
         string createdBy, DateTimeOffset createdAt)
         : base(id)
     {
         Name = name;
         Description = description;
-        TeamAccountId = teamAccountId;
+        OrganizationId = organizationId;
         CreatedBy = createdBy;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
     }
 
-    public static FormDefinition Create(string name, string? description, Guid teamAccountId, string createdBy)
+    public static FormDefinition Create(string name, string? description, Guid organizationId, string createdBy)
     {
         ValidateName(name);
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        FormDefinition form = new(Guid.NewGuid(), name.Trim(), description?.Trim(), teamAccountId, createdBy, now);
-        form.RaiseDomainEvent(new FormCreated(form.Id, teamAccountId, form.Name));
+        FormDefinition form = new(Guid.NewGuid(), name.Trim(), description?.Trim(), organizationId, createdBy, now);
+        form.RaiseDomainEvent(new FormCreated(form.Id, organizationId, form.Name));
         return form;
     }
 
@@ -99,7 +99,7 @@ public sealed class FormDefinition : AggregateRoot<Guid>
             throw new InvalidOperationException("Form is already deleted.");
 
         DeletedAt = DateTimeOffset.UtcNow;
-        RaiseDomainEvent(new FormDeleted(Id, TeamAccountId));
+        RaiseDomainEvent(new FormDeleted(Id, OrganizationId));
     }
 
     // ─── Private helpers ──────────────────────────────────────────────────────

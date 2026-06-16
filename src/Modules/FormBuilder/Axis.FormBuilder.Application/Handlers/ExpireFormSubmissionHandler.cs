@@ -16,14 +16,14 @@ public sealed class ExpireFormSubmissionHandler(
     public async Task Handle(ExpireFormSubmissionMessage message, CancellationToken cancellationToken)
     {
         FormSubmission? submission = await submissionRepo.GetByIdAsync(
-            message.FormSubmissionId, message.TeamAccountId, cancellationToken);
+            message.FormSubmissionId, message.OrganizationId, cancellationToken);
 
         if (submission is null)
         {
             logger.LogWarning(
-                "ExpireFormSubmissionHandler: submission {SubmissionId} not found for team account {TeamAccountId}",
+                "ExpireFormSubmissionHandler: submission {SubmissionId} not found for org {OrgId}",
                 message.FormSubmissionId,
-                message.TeamAccountId);
+                message.OrganizationId);
             return;
         }
 

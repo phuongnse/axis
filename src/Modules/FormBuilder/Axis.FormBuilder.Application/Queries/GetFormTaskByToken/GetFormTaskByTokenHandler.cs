@@ -19,7 +19,7 @@ public sealed class GetFormTaskByTokenHandler(
             return null;
 
         FormDefinition? form = await formRepo.GetByIdAsync(
-            submission.FormDefinitionId, submission.TeamAccountId, cancellationToken);
+            submission.FormDefinitionId, submission.OrganizationId, cancellationToken);
         if (form is null)
             return null;
 

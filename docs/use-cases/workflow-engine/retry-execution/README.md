@@ -8,7 +8,7 @@ Retry a failed execution from the point of failure so that I don't have to re-ru
 
 ## Primary actor
 
-- Team account Member with `execution:retry`
+- Organization Member with `execution:retry`
 
 ## Trigger
 

@@ -17,22 +17,22 @@ internal static class TenantProvisioningCoordinator
 
     public static async Task HandleReportAsync(
         TenantModuleProvisionReportEvent report,
-        ITeamAccountRepository teamAccountRepo,
+        IOrganizationRepository organizationRepo,
         ITenantModuleProvisioningRepository provisioningRepo,
         IUnitOfWork uow,
         IMessageBus messageBus,
         IPlatformProvisioningAlert alert,
         CancellationToken cancellationToken)
     {
-        Guid teamAccountId = report.TeamAccountId();
+        Guid organizationId = report.OrganizationId();
         string module = report.module;
 
-        TenantModuleProvisioning? row = await provisioningRepo.GetAsync(teamAccountId, module, cancellationToken);
+        TenantModuleProvisioning? row = await provisioningRepo.GetAsync(organizationId, module, cancellationToken);
         if (row is null)
             return;
 
-        TeamAccount? teamAccount = await teamAccountRepo.GetByIdAsync(teamAccountId, cancellationToken);
-        if (teamAccount is null)
+        Organization? organization = await organizationRepo.GetByIdAsync(organizationId, cancellationToken);
+        if (organization is null)
             return;
 
         if (report.succeeded)
@@ -51,28 +51,28 @@ internal static class TenantProvisioningCoordinator
 
                 DateTimeOffset runAt = DateTimeOffset.UtcNow.Add(RetryDelay(report.attempt + 1));
                 await messageBus.ScheduleAsync(
-                    new RetryTenantModuleProvisionMessage(teamAccountId, module, report.attempt + 1),
+                    new RetryTenantModuleProvisionMessage(organizationId, module, report.attempt + 1),
                     runAt);
                 return;
             }
 
-            teamAccount.MarkProvisioningFailed();
+            organization.MarkProvisioningFailed();
             await alert.AlertProvisioningFailedAsync(
-                teamAccountId, module, report.attempt, error, cancellationToken);
+                organizationId, module, report.attempt, error, cancellationToken);
         }
 
         await uow.SaveChangesAsync(cancellationToken);
 
         IReadOnlyList<TenantModuleProvisioning> all =
-            await provisioningRepo.GetAllForTeamAccountAsync(teamAccountId, cancellationToken);
+            await provisioningRepo.GetAllForOrganizationAsync(organizationId, cancellationToken);
 
         if (TenantModuleNames.All.All(moduleName =>
                 all.Any(p =>
                     p.Module == moduleName
                     && p.Status == TenantModuleProvisioningStatus.Succeeded))
-            && teamAccount.Status == TeamAccountStatus.Provisioning)
+            && organization.Status == OrganizationStatus.Provisioning)
         {
-            teamAccount.CompleteProvisioning();
+            organization.CompleteProvisioning();
             await uow.SaveChangesAsync(cancellationToken);
         }
     }

@@ -12,7 +12,7 @@ namespace Axis.FormBuilder.Application.Tests.Commands;
 
 public class ReorderFormFieldsHandlerTests
 {
-    private static readonly Guid TeamAccountId = Guid.NewGuid();
+    private static readonly Guid OrgId = Guid.NewGuid();
     private readonly IFormRepository _repo = Substitute.For<IFormRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly ReorderFormFieldsHandler _handler;
@@ -22,14 +22,14 @@ public class ReorderFormFieldsHandlerTests
     [Fact]
     public async Task Handle_WhenIdsMatchAllFields_ReordersAndSaves()
     {
-        FormDefinition form = FormDefinition.Create("My Form", null, TeamAccountId, "user");
+        FormDefinition form = FormDefinition.Create("My Form", null, OrgId, "user");
         FormField f1 = form.AddField("field_a", "Field A", FormFieldType.Text, false, null);
         FormField f2 = form.AddField("field_b", "Field B", FormFieldType.Text, false, null);
         FormField f3 = form.AddField("field_c", "Field C", FormFieldType.Text, false, null);
-        _repo.GetByIdAsync(form.Id, TeamAccountId, Arg.Any<CancellationToken>()).Returns(form);
+        _repo.GetByIdAsync(form.Id, OrgId, Arg.Any<CancellationToken>()).Returns(form);
 
         Result result = await _handler.Handle(
-            new ReorderFormFieldsCommand(form.Id, TeamAccountId, [f3.Id, f1.Id, f2.Id]),
+            new ReorderFormFieldsCommand(form.Id, OrgId, [f3.Id, f1.Id, f2.Id]),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -42,11 +42,11 @@ public class ReorderFormFieldsHandlerTests
     [Fact]
     public async Task Handle_WhenFormNotFound_ReturnsNotFound()
     {
-        _repo.GetByIdAsync(Arg.Any<Guid>(), TeamAccountId, Arg.Any<CancellationToken>())
+        _repo.GetByIdAsync(Arg.Any<Guid>(), OrgId, Arg.Any<CancellationToken>())
             .Returns((FormDefinition?)null);
 
         Result result = await _handler.Handle(
-            new ReorderFormFieldsCommand(Guid.NewGuid(), TeamAccountId, [Guid.NewGuid()]),
+            new ReorderFormFieldsCommand(Guid.NewGuid(), OrgId, [Guid.NewGuid()]),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
@@ -54,32 +54,32 @@ public class ReorderFormFieldsHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenFormBelongsToAnotherTeamAccount_ReturnsNotFound()
+    public async Task Handle_WhenFormBelongsToAnotherOrg_ReturnsNotFound()
     {
-        FormDefinition form = FormDefinition.Create("My Form", null, TeamAccountId, "user");
+        FormDefinition form = FormDefinition.Create("My Form", null, OrgId, "user");
         FormField f1 = form.AddField("field_a", "Field A", FormFieldType.Text, false, null);
-        _repo.GetByIdAsync(form.Id, TeamAccountId, Arg.Any<CancellationToken>()).Returns(form);
+        _repo.GetByIdAsync(form.Id, OrgId, Arg.Any<CancellationToken>()).Returns(form);
 
-        Guid otherTeamAccountId = Guid.NewGuid();
+        Guid otherOrgId = Guid.NewGuid();
         Result result = await _handler.Handle(
-            new ReorderFormFieldsCommand(form.Id, otherTeamAccountId, [f1.Id]),
+            new ReorderFormFieldsCommand(form.Id, otherOrgId, [f1.Id]),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-        await _repo.Received(1).GetByIdAsync(form.Id, otherTeamAccountId, Arg.Any<CancellationToken>());
+        await _repo.Received(1).GetByIdAsync(form.Id, otherOrgId, Arg.Any<CancellationToken>());
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task Handle_WhenIdsMismatchFields_ReturnsBusinessRule()
     {
-        FormDefinition form = FormDefinition.Create("My Form", null, TeamAccountId, "user");
+        FormDefinition form = FormDefinition.Create("My Form", null, OrgId, "user");
         form.AddField("field_a", "Field A", FormFieldType.Text, false, null);
-        _repo.GetByIdAsync(form.Id, TeamAccountId, Arg.Any<CancellationToken>()).Returns(form);
+        _repo.GetByIdAsync(form.Id, OrgId, Arg.Any<CancellationToken>()).Returns(form);
 
         Result result = await _handler.Handle(
-            new ReorderFormFieldsCommand(form.Id, TeamAccountId, [Guid.NewGuid(), Guid.NewGuid()]),
+            new ReorderFormFieldsCommand(form.Id, OrgId, [Guid.NewGuid(), Guid.NewGuid()]),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();

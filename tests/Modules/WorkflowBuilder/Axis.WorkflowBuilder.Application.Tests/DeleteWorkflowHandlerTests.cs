@@ -13,7 +13,7 @@ namespace Axis.WorkflowBuilder.Application.Tests;
 
 public class DeleteWorkflowHandlerTests
 {
-    private static readonly Guid TeamAccountId = Guid.NewGuid();
+    private static readonly Guid OrgId = Guid.NewGuid();
     private readonly IPlanLimitService _planLimitService = Substitute.For<IPlanLimitService>();
     private readonly IWorkflowRepository _repo = Substitute.For<IWorkflowRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
@@ -24,15 +24,15 @@ public class DeleteWorkflowHandlerTests
     [Fact]
     public async Task Handle_WhenWorkflowIsDraft_DeletesAndSaves()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("Draft Flow", null, TeamAccountId, "user");
-        _repo.GetByIdAsync(wf.Id, TeamAccountId, Arg.Any<CancellationToken>()).Returns(wf);
+        WorkflowDefinition wf = WorkflowDefinition.Create("Draft Flow", null, OrgId, "user");
+        _repo.GetByIdAsync(wf.Id, OrgId, Arg.Any<CancellationToken>()).Returns(wf);
 
-        Result result = await _handler.Handle(new DeleteWorkflowCommand(wf.Id, TeamAccountId), CancellationToken.None);
+        Result result = await _handler.Handle(new DeleteWorkflowCommand(wf.Id, OrgId), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         wf.DeletedAt.Should().NotBeNull();
         await _planLimitService.Received(1).RecordUsageDeltaAsync(
-            TeamAccountId,
+            OrgId,
             PlanLimitResourceType.Workflows,
             -1,
             Arg.Any<CancellationToken>());
@@ -42,9 +42,9 @@ public class DeleteWorkflowHandlerTests
     [Fact]
     public async Task Handle_WhenWorkflowNotFound_ReturnsNotFound()
     {
-        _repo.GetByIdAsync(Arg.Any<Guid>(), TeamAccountId, Arg.Any<CancellationToken>()).Returns((WorkflowDefinition?)null);
+        _repo.GetByIdAsync(Arg.Any<Guid>(), OrgId, Arg.Any<CancellationToken>()).Returns((WorkflowDefinition?)null);
 
-        Result result = await _handler.Handle(new DeleteWorkflowCommand(Guid.NewGuid(), TeamAccountId), CancellationToken.None);
+        Result result = await _handler.Handle(new DeleteWorkflowCommand(Guid.NewGuid(), OrgId), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
@@ -60,9 +60,9 @@ public class DeleteWorkflowHandlerTests
     {
         WorkflowDefinition wf = CreatePublishableWorkflow();
         wf.Publish();
-        _repo.GetByIdAsync(wf.Id, TeamAccountId, Arg.Any<CancellationToken>()).Returns(wf);
+        _repo.GetByIdAsync(wf.Id, OrgId, Arg.Any<CancellationToken>()).Returns(wf);
 
-        Result result = await _handler.Handle(new DeleteWorkflowCommand(wf.Id, TeamAccountId), CancellationToken.None);
+        Result result = await _handler.Handle(new DeleteWorkflowCommand(wf.Id, OrgId), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
@@ -76,7 +76,7 @@ public class DeleteWorkflowHandlerTests
 
     private static WorkflowDefinition CreatePublishableWorkflow()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, TeamAccountId, "user");
+        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, OrgId, "user");
         wf.AddTrigger(TriggerType.Manual, null);
         WorkflowStep step = wf.AddStep("Review", StepType.Form, null);
         WorkflowStep start = wf.Steps.Single(s => s.Type == StepType.Start);

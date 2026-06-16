@@ -8,12 +8,12 @@ public static class TenantSchemaDropper
 {
     public static async Task DropAsync(
         string connectionString,
-        Guid teamAccountId,
+        Guid organizationId,
         ILogger logger,
         string moduleName,
         CancellationToken cancellationToken)
     {
-        string schema = $"tenant_{teamAccountId:N}";
+        string schema = $"tenant_{organizationId:N}";
 
         await using NpgsqlConnection connection = new(connectionString);
         await connection.OpenAsync(cancellationToken);

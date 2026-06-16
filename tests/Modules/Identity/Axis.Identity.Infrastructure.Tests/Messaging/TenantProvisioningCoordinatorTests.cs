@@ -15,7 +15,7 @@ namespace Axis.Identity.Infrastructure.Tests.Messaging;
 
 public sealed class TenantProvisioningCoordinatorTests
 {
-    private readonly ITeamAccountRepository _teamAccountRepository = Substitute.For<ITeamAccountRepository>();
+    private readonly IOrganizationRepository _organizationRepository = Substitute.For<IOrganizationRepository>();
     private readonly ITenantModuleProvisioningRepository _provisioningRepository =
         Substitute.For<ITenantModuleProvisioningRepository>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
@@ -25,28 +25,28 @@ public sealed class TenantProvisioningCoordinatorTests
     [Fact]
     public async Task HandleReportAsync_WhenProvisioningFailsBeforeMaxAttempt_SchedulesRetry()
     {
-        TeamAccount teamAccount = CreateProvisioningTeamAccount();
+        Organization organization = CreateProvisioningOrganization();
         TenantModuleProvisioning row = TenantModuleProvisioning.CreatePending(
-            teamAccount.Id,
+            organization.Id,
             TenantModuleNames.DataModeling);
         TenantModuleProvisionReportEvent report = TenantModuleProvisionReportEventFactory.Create(
-            teamAccount.Id,
+            organization.Id,
             TenantModuleNames.DataModeling,
             succeeded: false,
             attempt: 1,
             errorMessage: "db timeout");
 
-        _teamAccountRepository.GetByIdAsync(teamAccount.Id, Arg.Any<CancellationToken>())
-            .Returns(teamAccount);
+        _organizationRepository.GetByIdAsync(organization.Id, Arg.Any<CancellationToken>())
+            .Returns(organization);
         _provisioningRepository.GetAsync(
-                teamAccount.Id,
+                organization.Id,
                 TenantModuleNames.DataModeling,
                 Arg.Any<CancellationToken>())
             .Returns(row);
 
         await TenantProvisioningCoordinator.HandleReportAsync(
             report,
-            _teamAccountRepository,
+            _organizationRepository,
             _provisioningRepository,
             _unitOfWork,
             _messageBus,
@@ -58,7 +58,7 @@ public sealed class TenantProvisioningCoordinatorTests
         await _unitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
         await _messageBus.Received(1).PublishAsync(
             Arg.Is<RetryTenantModuleProvisionMessage>(message =>
-                message.TeamAccountId == teamAccount.Id
+                message.OrganizationId == organization.Id
                 && message.Module == TenantModuleNames.DataModeling
                 && message.Attempt == 2),
             Arg.Any<DeliveryOptions>());
@@ -71,39 +71,39 @@ public sealed class TenantProvisioningCoordinatorTests
     }
 
     [Fact]
-    public async Task HandleReportAsync_WhenAllModulesSucceeded_CompletesTeamAccountProvisioning()
+    public async Task HandleReportAsync_WhenAllModulesSucceeded_CompletesOrganizationProvisioning()
     {
-        TeamAccount teamAccount = CreateProvisioningTeamAccount();
+        Organization organization = CreateProvisioningOrganization();
         TenantModuleProvisioning row = TenantModuleProvisioning.CreatePending(
-            teamAccount.Id,
+            organization.Id,
             TenantModuleNames.DataModeling);
         List<TenantModuleProvisioning> allRows =
         [
             row,
-            CreateSucceededRow(teamAccount.Id, TenantModuleNames.FormBuilder),
-            CreateSucceededRow(teamAccount.Id, TenantModuleNames.WorkflowBuilder),
-            CreateSucceededRow(teamAccount.Id, TenantModuleNames.WorkflowEngine),
+            CreateSucceededRow(organization.Id, TenantModuleNames.FormBuilder),
+            CreateSucceededRow(organization.Id, TenantModuleNames.WorkflowBuilder),
+            CreateSucceededRow(organization.Id, TenantModuleNames.WorkflowEngine),
         ];
 
         TenantModuleProvisionReportEvent report = TenantModuleProvisionReportEventFactory.Create(
-            teamAccount.Id,
+            organization.Id,
             TenantModuleNames.DataModeling,
             succeeded: true,
             attempt: 1);
 
-        _teamAccountRepository.GetByIdAsync(teamAccount.Id, Arg.Any<CancellationToken>())
-            .Returns(teamAccount);
+        _organizationRepository.GetByIdAsync(organization.Id, Arg.Any<CancellationToken>())
+            .Returns(organization);
         _provisioningRepository.GetAsync(
-                teamAccount.Id,
+                organization.Id,
                 TenantModuleNames.DataModeling,
                 Arg.Any<CancellationToken>())
             .Returns(row);
-        _provisioningRepository.GetAllForTeamAccountAsync(teamAccount.Id, Arg.Any<CancellationToken>())
+        _provisioningRepository.GetAllForOrganizationAsync(organization.Id, Arg.Any<CancellationToken>())
             .Returns(allRows);
 
         await TenantProvisioningCoordinator.HandleReportAsync(
             report,
-            _teamAccountRepository,
+            _organizationRepository,
             _provisioningRepository,
             _unitOfWork,
             _messageBus,
@@ -111,37 +111,37 @@ public sealed class TenantProvisioningCoordinatorTests
             CancellationToken.None);
 
         row.Status.Should().Be(TenantModuleProvisioningStatus.Succeeded);
-        teamAccount.Status.Should().Be(TeamAccountStatus.Active);
+        organization.Status.Should().Be(OrganizationStatus.Active);
         await _unitOfWork.Received(2).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task HandleReportAsync_WhenProvisioningFailsAtMaxAttempt_MarksFailedAndAlerts()
     {
-        TeamAccount teamAccount = CreateProvisioningTeamAccount();
+        Organization organization = CreateProvisioningOrganization();
         TenantModuleProvisioning row = TenantModuleProvisioning.CreatePending(
-            teamAccount.Id,
+            organization.Id,
             TenantModuleNames.DataModeling);
         TenantModuleProvisionReportEvent report = TenantModuleProvisionReportEventFactory.Create(
-            teamAccount.Id,
+            organization.Id,
             TenantModuleNames.DataModeling,
             succeeded: false,
             attempt: TenantProvisioningCoordinator.MaxAttempts,
             errorMessage: "fatal");
 
-        _teamAccountRepository.GetByIdAsync(teamAccount.Id, Arg.Any<CancellationToken>())
-            .Returns(teamAccount);
+        _organizationRepository.GetByIdAsync(organization.Id, Arg.Any<CancellationToken>())
+            .Returns(organization);
         _provisioningRepository.GetAsync(
-                teamAccount.Id,
+                organization.Id,
                 TenantModuleNames.DataModeling,
                 Arg.Any<CancellationToken>())
             .Returns(row);
-        _provisioningRepository.GetAllForTeamAccountAsync(teamAccount.Id, Arg.Any<CancellationToken>())
+        _provisioningRepository.GetAllForOrganizationAsync(organization.Id, Arg.Any<CancellationToken>())
             .Returns([row]);
 
         await TenantProvisioningCoordinator.HandleReportAsync(
             report,
-            _teamAccountRepository,
+            _organizationRepository,
             _provisioningRepository,
             _unitOfWork,
             _messageBus,
@@ -150,29 +150,29 @@ public sealed class TenantProvisioningCoordinatorTests
 
         row.Status.Should().Be(TenantModuleProvisioningStatus.Failed);
         row.AttemptCount.Should().Be(TenantProvisioningCoordinator.MaxAttempts);
-        teamAccount.Status.Should().Be(TeamAccountStatus.ProvisioningFailed);
+        organization.Status.Should().Be(OrganizationStatus.ProvisioningFailed);
         await _alert.Received(1).AlertProvisioningFailedAsync(
-            teamAccount.Id,
+            organization.Id,
             TenantModuleNames.DataModeling,
             TenantProvisioningCoordinator.MaxAttempts,
             "fatal",
             Arg.Any<CancellationToken>());
     }
 
-    private static TeamAccount CreateProvisioningTeamAccount()
+    private static Organization CreateProvisioningOrganization()
     {
-        TeamAccount teamAccount = TeamAccount.Create(
+        Organization organization = Organization.Create(
             "Acme",
-            TeamAccountSlug.Create("acme").Value!,
+            OrganizationSlug.Create("acme").Value!,
             Email.Create("admin@acme.com").Value!,
             WellKnownSubscriptionPlans.FreeId);
-        teamAccount.BeginProvisioning();
-        return teamAccount;
+        organization.BeginProvisioning();
+        return organization;
     }
 
-    private static TenantModuleProvisioning CreateSucceededRow(Guid teamAccountId, string module)
+    private static TenantModuleProvisioning CreateSucceededRow(Guid organizationId, string module)
     {
-        TenantModuleProvisioning row = TenantModuleProvisioning.CreatePending(teamAccountId, module);
+        TenantModuleProvisioning row = TenantModuleProvisioning.CreatePending(organizationId, module);
         row.RecordSuccess();
         return row;
     }

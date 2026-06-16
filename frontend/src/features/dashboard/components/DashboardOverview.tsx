@@ -12,7 +12,11 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
-import { type TeamAccountSettings, type UsageStats, useWorkspaceStart } from '@/features/workspace';
+import {
+  type OrganizationSettings,
+  type UsageStats,
+  useWorkspaceStart,
+} from '@/features/workspace';
 import { cn } from '@/lib/utils';
 
 interface UsageCardProps {
@@ -101,7 +105,7 @@ function WorkspaceSummary({
   canReadSettings,
   hasWorkspace,
 }: {
-  settings: TeamAccountSettings | undefined;
+  settings: OrganizationSettings | undefined;
   canReadSettings: boolean;
   hasWorkspace: boolean;
 }) {
@@ -195,7 +199,7 @@ function ErrorDashboard({ onRetry }: { onRetry: () => void }) {
 
 export function DashboardOverview() {
   const { t, i18n } = useTranslation();
-  const { profileQuery, teamAccountSettingsQuery, canReadSettings, hasWorkspace } =
+  const { profileQuery, organizationSettingsQuery, canReadSettings, hasWorkspace } =
     useWorkspaceStart();
 
   if (profileQuery.isLoading) {
@@ -207,7 +211,7 @@ export function DashboardOverview() {
   }
 
   const profile = profileQuery.data;
-  const settings = teamAccountSettingsQuery.data;
+  const settings = organizationSettingsQuery.data;
   const showUsage = hasWorkspace && canReadSettings && settings;
   const title = settings?.name ?? t('dashboard.title');
   const body = !hasWorkspace
@@ -271,7 +275,7 @@ export function DashboardOverview() {
         </div>
       </section>
 
-      {teamAccountSettingsQuery.isError ? (
+      {organizationSettingsQuery.isError ? (
         <section className="rounded-lg border border-destructive/30 bg-card p-5 shadow-sm">
           <div className="flex items-start gap-3">
             <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
@@ -287,7 +291,7 @@ export function DashboardOverview() {
                 variant="outline"
                 size="sm"
                 className="mt-4"
-                onClick={() => void teamAccountSettingsQuery.refetch()}
+                onClick={() => void organizationSettingsQuery.refetch()}
               >
                 <RefreshCw className="size-3.5" aria-hidden />
                 {t('dashboard.retry')}

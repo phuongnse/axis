@@ -207,7 +207,7 @@ await _uow.SaveChangesAsync(ct);
 
 // ✅ option B — bulk update without loading entities (large sets)
 await _context.WorkflowDefinitions
-    .Where(w => w.TeamAccountId == teamAccountId && w.Status == WorkflowStatus.Active)
+    .Where(w => w.OrganizationId == orgId && w.Status == WorkflowStatus.Active)
     .ExecuteUpdateAsync(s => s.SetProperty(w => w.Status, WorkflowStatus.Archived), ct);
 ```
 
@@ -314,7 +314,7 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
     public void CompleteStep(Guid stepId, IReadOnlyDictionary<string, object?> output)
     {
         GetStep(stepId).Complete(output);           // delegate state change to entity
-        RaiseDomainEvent(new ExecutionStepCompleted(Id, stepId, TeamAccountId, output)); // event on root
+        RaiseDomainEvent(new ExecutionStepCompleted(Id, stepId, OrganizationId, output)); // event on root
     }
 }
 ```
@@ -374,7 +374,7 @@ builder.OwnsMany(e => e.Steps, stepBuilder =>
     stepBuilder.HasKey(s => s.Id);
     stepBuilder.Property(s => s.Name).IsRequired().HasMaxLength(500);
     // ... other properties
-    stepBuilder.HasIndex(s => new { s.ExecutionId, s.TeamAccountId });
+    stepBuilder.HasIndex(s => new { s.ExecutionId, s.OrganizationId });
 });
 ```
 
@@ -474,16 +474,16 @@ await _context.WorkflowDefinitions
 
 **Rule:** Avoid raw SQL in tenant-aware contexts. When raw SQL is unavoidable (e.g. performance-critical bulk ops, cross-module reads), always prefix the table with the tenant schema from `ITenantContext.Schema` and add soft-delete filter manually. Document why raw SQL was needed with a comment.
 
-### Tenant schema provisioning ([register-team-account § tenant-provisioning](../use-cases/platform-foundation/register-team-account/README.md#tenant-provisioning))
+### Tenant schema provisioning ([register-org § tenant-provisioning](../use-cases/platform-foundation/register-org/README.md#tenant-provisioning))
 
-After email verification, every **tenant-scoped** module provisions its own PostgreSQL schema for the team account. Identity stays on `public` and only publishes the verification event — it never touches another module's DB.
+After email verification, every **tenant-scoped** module provisions its own PostgreSQL schema for the organization. Identity stays on `public` and only publishes the verification event — it never touches another module's DB.
 
-- **Ownership**: each tenant-scoped module's Infrastructure project owns an `TeamAccountVerifiedHandler` (e.g. `Axis.DataModeling.Infrastructure.Messaging.TeamAccountVerifiedHandler`) that subscribes to Identity's `TeamAccountVerifiedEvent` Kafka topic. There is **no** central `ITenantSchemaProvisioner` — extraction of a module is a redeploy of its own handler ([ADR-010](../TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy)).
-- **Schema name**: `tenant_{teamAccountId:N}` (no slug — team account slug can change).
-- **Idempotency**: `CREATE SCHEMA IF NOT EXISTS` plus `Database.MigrateAsync()` per context; safe to call twice for the same team account (Kafka delivers at-least-once).
-- **Tenant context during migrate**: each handler constructs a `FixedTenantContext(teamAccountId)` from `Axis.Shared.Infrastructure.Tenancy` so `TenantSchemaInterceptor` targets the new schema for the `MigrateAsync` call.
-- **Trigger**: `User.VerifyEmail()` raises an `TeamAccountVerified` domain event; `IdentityUnitOfWork` maps it to `TeamAccountVerifiedEvent` (Avro) and publishes via Wolverine outbox → Kafka ([ADR-019](../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). Do **not** provision synchronously in the verify request handler.
-- **Schema + topic**: `Axis.Identity.Contracts/Schemas/TeamAccountVerifiedEvent.avsc` + topic `axis.identity.team account-verified` (see `IdentityKafkaTopics`).
+- **Ownership**: each tenant-scoped module's Infrastructure project owns an `OrganizationVerifiedHandler` (e.g. `Axis.DataModeling.Infrastructure.Messaging.OrganizationVerifiedHandler`) that subscribes to Identity's `OrganizationVerifiedEvent` Kafka topic. There is **no** central `ITenantSchemaProvisioner` — extraction of a module is a redeploy of its own handler ([ADR-010](../TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy)).
+- **Schema name**: `tenant_{organizationId:N}` (no slug — org slug can change).
+- **Idempotency**: `CREATE SCHEMA IF NOT EXISTS` plus `Database.MigrateAsync()` per context; safe to call twice for the same org (Kafka delivers at-least-once).
+- **Tenant context during migrate**: each handler constructs a `FixedTenantContext(organizationId)` from `Axis.Shared.Infrastructure.Tenancy` so `TenantSchemaInterceptor` targets the new schema for the `MigrateAsync` call.
+- **Trigger**: `User.VerifyEmail()` raises an `OrganizationVerified` domain event; `IdentityUnitOfWork` maps it to `OrganizationVerifiedEvent` (Avro) and publishes via Wolverine outbox → Kafka ([ADR-019](../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). Do **not** provision synchronously in the verify request handler.
+- **Schema + topic**: `Axis.Identity.Contracts/Schemas/OrganizationVerifiedEvent.avsc` + topic `axis.identity.organization-verified` (see `IdentityKafkaTopics`).
 
 ---
 
@@ -522,8 +522,8 @@ _ = Task.Run(async () =>
 - **No-args EF Core constructor**: when an aggregate's only constructor takes params EF Core can't bind (e.g. `IEnumerable<string>`), add a private no-args constructor: `private MyAggregate() : base(default) { RequiredField = null!; }`. Initialize all non-nullable reference-type fields to silence CS8618 — EF Core will never use these sentinel values because it always materialises via the real constructor path.
 - **Migrations strategy** ([ADR-023](../TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)): every environment uses `Database.MigrateAsync()` — production, dev bootstrap, tenant provisioning, and Testcontainers fixtures. One EF migration chain per `DbContext`; never `EnsureCreated`/`EnsureCreatedAsync`.
 - **Identity uses the global `public` schema** — `IdentityDbContext` is a plain `DbContext` with no `TenantSchemaInterceptor`. All other modules use `AxisDbContext` with `TenantSchemaInterceptor`.
-- **Tenant schema on every connection** — `TenantSchemaInterceptor` sets `search_path` to `tenant_{teamAccountId:N}, public` on every `ConnectionOpened` (including pooled reconnects), so a leased connection always targets the current request's tenant ([tenant isolation](../use-cases/platform-foundation/tenant-scope/) — schema-per-tenant).
-- **Schema name resolution** — `HttpTenantContext` derives `tenant_{teamAccountId:N}` from the JWT `team_account_id` claim (no DB/Redis lookup; immutable after provisioning). `TenantTeamAccountAccessMiddleware` on `Axis.Api` returns HTTP 403 when the team account is missing, archived/deleted, or still provisioning — tenant module routes only; Identity/settings routes are unchanged.
+- **Tenant schema on every connection** — `TenantSchemaInterceptor` sets `search_path` to `tenant_{orgId:N}, public` on every `ConnectionOpened` (including pooled reconnects), so a leased connection always targets the current request's tenant ([tenant isolation](../use-cases/platform-foundation/tenant-scope/) — schema-per-tenant).
+- **Schema name resolution** — `HttpTenantContext` derives `tenant_{orgId:N}` from the JWT `org_id` claim (no DB/Redis lookup; immutable after provisioning). `TenantOrganizationAccessMiddleware` on `Axis.Api` returns HTTP 403 when the org is missing, archived/deleted, or still provisioning — tenant module routes only; Identity/settings routes are unchanged.
 - **Cross-tenant proof** — `tests/Api/Axis.Api.Tests/Tenancy/TenantIsolationEndpointTests.cs` (DataModeling list/get by id).
 
 ## Testing rules
@@ -775,7 +775,7 @@ private static async Task<IResult> CreateWorkflow(
     CancellationToken ct)
 {
     Result<Guid> result = await mediator.Send(
-        new CreateWorkflowCommand(request.Name, request.Description, currentUser.TeamAccountId, currentUser.UserId.ToString()), ct);
+        new CreateWorkflowCommand(request.Name, request.Description, currentUser.OrgId, currentUser.UserId.ToString()), ct);
 
     return result.Match(
         id  => Results.Created($"/api/workflows/{id}", new { id }),
@@ -1116,7 +1116,7 @@ After `WebApplication` is built:
 ```csharp
 app.UseAxisOpenTelemetry(); // Prometheus scrape endpoint when enabled
 app.UseAuthentication();
-app.UseMiddleware<CorrelationIdMiddleware>(); // after auth so team_account_id → TenantId
+app.UseMiddleware<CorrelationIdMiddleware>(); // after auth so org_id → TenantId
 app.UseAuthorization();
 ```
 
@@ -1132,7 +1132,7 @@ Implementation lives in `Axis.Shared.Infrastructure/Observability/OpenTelemetryS
 
 - `CorrelationIdMiddleware` uses `X-Correlation-Id` when present, otherwise the active W3C `Activity.TraceId`, and echoes the value on the response.
 - Serilog enricher `TraceContextSerilogEnricher` adds `TraceId` / `SpanId` so Loki queries join logs to Tempo traces.
-- When the JWT contains `team_account_id`, logs include `TenantId` and the span tag `tenant.id`.
+- When the JWT contains `org_id`, logs include `TenantId` and the span tag `tenant.id`.
 
 ### Local Grafana stack
 
@@ -1240,7 +1240,7 @@ public sealed class FormWorkflowReference
     public Guid FormId { get; init; }
     public Guid WorkflowId { get; init; }
     public Guid StepId { get; init; }
-    public Guid TeamAccountId { get; init; }
+    public Guid OrganizationId { get; init; }
 }
 
 // FormBuilder.Infrastructure — Wolverine handler reads from the Kafka inbox
@@ -1261,7 +1261,7 @@ public sealed class FormStepAddedHandler(FormBuilderDbContext db)
             FormId = evt.FormId,
             WorkflowId = evt.WorkflowId,
             StepId = evt.StepId,
-            TeamAccountId = evt.TeamAccountId,   // always denormalise tenant
+            OrganizationId = evt.OrganizationId,   // always denormalise tenant
         });
         await db.SaveChangesAsync(ct);
     }
@@ -1272,9 +1272,9 @@ public sealed class FormStepAddedHandler(FormBuilderDbContext db)
 
 ```csharp
 // FormRepository.IsReferencedByWorkflowAsync — queries FormBuilder's own DB
-public async Task<bool> IsReferencedByWorkflowAsync(Guid formId, Guid teamAccountId, CancellationToken ct = default)
+public async Task<bool> IsReferencedByWorkflowAsync(Guid formId, Guid orgId, CancellationToken ct = default)
     => await context.FormWorkflowReferences.AnyAsync(
-           r => r.FormId == formId && r.TeamAccountId == teamAccountId, ct);
+           r => r.FormId == formId && r.OrganizationId == orgId, ct);
 ```
 
 ### ✅ Pattern 2: gRPC sync call (escape hatch)
@@ -1288,8 +1288,8 @@ Used only when a local read model is insufficient. Example: a workflow step need
 syntax = "proto3";
 package axis.identity.v1;
 
-// Tenant scoping: the server MUST derive team_account_id from the caller's
-// JWT `team_account_id` claim, never from a request field. Callers forward the inbound
+// Tenant scoping: the server MUST derive organization_id from the caller's
+// JWT `org_id` claim, never from a request field. Callers forward the inbound
 // `authorization` header on every call. See Step 3 below.
 service IdentityService {
     rpc GetUserPermissions(GetUserPermissionsRequest) returns (GetUserPermissionsResponse);
@@ -1379,7 +1379,7 @@ The gRPC channel is configured via `Modules:Identity:GrpcUrl` in `src/Axis.Api/a
 
 **Step 3 — Server side: derive tenant from JWT, not the request payload**
 
-The gRPC server **must** read `team_account_id` from the caller's JWT `team_account_id` claim, never from the request payload. Trusting an `team_account_id` field would let a caller authenticated as tenant A query tenant B's data by passing tenant B's id — every service-to-service hop would then need its own cross-tenant guard. JWT-derived scoping makes the guarantee structural.
+The gRPC server **must** read `organization_id` from the caller's JWT `org_id` claim, never from the request payload. Trusting an `organization_id` field would let a caller authenticated as tenant A query tenant B's data by passing tenant B's id — every service-to-service hop would then need its own cross-tenant guard. JWT-derived scoping makes the guarantee structural.
 
 ```csharp
 // src/Modules/DataModeling/Axis.DataModeling.Infrastructure/Grpc/DataModelCatalogGrpcService.cs
@@ -1392,9 +1392,9 @@ internal sealed class DataModelCatalogGrpcService(IDataModelRepository repo)
         if (!Guid.TryParse(request.ModelId, out Guid modelId))
             throw new RpcException(new Status(StatusCode.InvalidArgument, "model_id must be a valid GUID."));
 
-        Guid teamAccountId = ResolveCallerTeamAccountId(context);
+        Guid organizationId = ResolveCallerOrganizationId(context);
 
-        DataModel? model = await repo.GetByIdAsync(modelId, teamAccountId, context.CancellationToken);
+        DataModel? model = await repo.GetByIdAsync(modelId, organizationId, context.CancellationToken);
         return new GetModelSummaryResponse
         {
             Exists = model is not null,
@@ -1402,13 +1402,13 @@ internal sealed class DataModelCatalogGrpcService(IDataModelRepository repo)
         };
     }
 
-    private static Guid ResolveCallerTeamAccountId(ServerCallContext context)
+    private static Guid ResolveCallerOrganizationId(ServerCallContext context)
     {
-        Claim? claim = context.GetHttpContext().User.FindFirst("team_account_id");
-        if (claim is null || !Guid.TryParse(claim.Value, out Guid teamAccountId))
+        Claim? claim = context.GetHttpContext().User.FindFirst("org_id");
+        if (claim is null || !Guid.TryParse(claim.Value, out Guid organizationId))
             throw new RpcException(
-                new Status(StatusCode.Unauthenticated, "Caller JWT is missing a valid team_account_id claim."));
-        return teamAccountId;
+                new Status(StatusCode.Unauthenticated, "Caller JWT is missing a valid org_id claim."));
+        return organizationId;
     }
 }
 ```
@@ -1435,13 +1435,13 @@ grpcurl -plaintext \
   localhost:5280 axis.identity.v1.IdentityService/GetUserPermissions
 ```
 
-Replace `<access_token>` and `<user-guid>` with values from your tenant — the server reads the tenant from the JWT's `team_account_id` claim, so no `team_account_id` is sent in the payload. `Unauthenticated` / `PermissionDenied` means the token is missing, expired, or invalid — obtain a fresh token from `POST /connect/token` after PKCE login.
+Replace `<access_token>` and `<user-guid>` with values from your tenant — the server reads the tenant from the JWT's `org_id` claim, so no `organization_id` is sent in the payload. `Unauthenticated` / `PermissionDenied` means the token is missing, expired, or invalid — obtain a fresh token from `POST /connect/token` after PKCE login.
 
 ### ✅ Pattern 3: JWKS-only JWT validation in consuming modules
 
 **Rule:** modules other than Identity validate JWTs **locally via Identity's JWKS endpoint** — never by calling `IdentityDbContext` or any Identity service. Asking Identity "is this user real?" on every request defeats the purpose of stateless JWT and re-introduces the coupling we removed.
 
-Why: Identity issues short-lived JWTs (15 minutes per [sign-in](../use-cases/identity-access/sign-in/)) signed with a key whose public half is published at `/.well-known/jwks.json` (OpenIddict default). Any module that receives a Bearer token can verify the signature, claims (`sub`, `team account`, `permissions`), and expiry **without a network call to Identity for each request**. JWKS itself is cached locally by `Microsoft.AspNetCore.Authentication.JwtBearer`, so the network cost is once per key-rotation, not once per request.
+Why: Identity issues short-lived JWTs (15 minutes per [sign-in](../use-cases/identity-access/sign-in/)) signed with a key whose public half is published at `/.well-known/jwks.json` (OpenIddict default). Any module that receives a Bearer token can verify the signature, claims (`sub`, `org`, `permissions`), and expiry **without a network call to Identity for each request**. JWKS itself is cached locally by `Microsoft.AspNetCore.Authentication.JwtBearer`, so the network cost is once per key-rotation, not once per request.
 
 The escape hatch — when you need *fresh* permission state that the JWT's `permissions` claim cannot give you — is `IdentityService.GetUserPermissions` (gRPC), not a DB lookup.
 
@@ -1489,10 +1489,10 @@ This violates the Share Nothing principle (cross-module DB query), forces every 
 - The source module owns the event schema — define it in its `.Contracts` project's Avro file.
 - The consuming module owns the handler and the local read-model table — both in its Infrastructure layer.
 - Kafka handlers are idempotent: at-least-once delivery is the rule; design for replay.
-- **Cross-module handlers must filter by `TeamAccountId`** in addition to entity foreign keys. Tenant isolation is always explicit.
+- **Cross-module handlers must filter by `OrganizationId`** in addition to entity foreign keys. Tenant isolation is always explicit.
 - Sync RPC (gRPC) is the escape hatch only. If you reach for it more than once or twice per module, you probably need another local read model instead.
 - **JWT validation is JWKS-only.** Consuming modules verify JWTs against Identity's JWKS endpoint locally; never call `IdentityDbContext` or any Identity service per request just to authenticate a user.
-- **Cross-module gRPC services derive `team_account_id` from the caller's JWT `team_account_id` claim**, never from a request field. The proto must not declare an `team_account_id` input; the server reads `ServerCallContext.GetHttpContext().User.FindFirst("team_account_id")` and throws `Unauthenticated` when the claim is absent.
+- **Cross-module gRPC services derive `organization_id` from the caller's JWT `org_id` claim**, never from a request field. The proto must not declare an `organization_id` input; the server reads `ServerCallContext.GetHttpContext().User.FindFirst("org_id")` and throws `Unauthenticated` when the claim is absent.
 
 ### Pre-commit violation sweep
 
@@ -1513,11 +1513,11 @@ All Command handlers must be safe to retry without producing duplicate side effe
 ```csharp
 public async Task<Result<Guid>> Handle(CreateWorkflowCommand cmd, CancellationToken ct)
 {
-    bool exists = await _repo.ExistsByNameAsync(cmd.Name, cmd.TeamAccountId, ct);
+    bool exists = await _repo.ExistsByNameAsync(cmd.Name, cmd.OrganizationId, ct);
     if (exists)
         return Result.Failure<Guid>(Error.Conflict($"A workflow named '{cmd.Name}' already exists."));
 
-    WorkflowDefinition wf = WorkflowDefinition.Create(cmd.Name, cmd.TeamAccountId, cmd.CreatedByUserId);
+    WorkflowDefinition wf = WorkflowDefinition.Create(cmd.Name, cmd.OrganizationId, cmd.CreatedByUserId);
     await _repo.AddAsync(wf, ct);
     await _uow.SaveChangesAsync(ct);
     return Result.Success(wf.Id);
@@ -1544,7 +1544,7 @@ public async Task Handle(WorkflowPublished @event, CancellationToken ct)
 
     if (existing is null)
         context.WorkflowActiveStatuses.Add(
-            WorkflowActiveStatus.Activated(@event.WorkflowId, @event.TeamAccountId));
+            WorkflowActiveStatus.Activated(@event.WorkflowId, @event.OrganizationId));
     else
         existing.Reactivate();
 
@@ -1629,7 +1629,7 @@ When replacing `var` with an explicit type, if that type requires a new `using` 
 
 **Wrong** — chains `.Id` onto the query to avoid declaring an explicit type:
 ```csharp
-Guid itemId = ctx.Items.First(i => i.Name == "target" && i.TeamAccountId == teamAccountId).Id;
+Guid itemId = ctx.Items.First(i => i.Name == "target" && i.OrgId == orgId).Id;
 // … then uses itemId directly — the full object is discarded
 ```
 
@@ -1637,7 +1637,7 @@ Guid itemId = ctx.Items.First(i => i.Name == "target" && i.TeamAccountId == team
 ```csharp
 using My.Module.Domain.Aggregates;
 // …
-MyEntity item = ctx.Items.First(i => i.Name == "target" && i.TeamAccountId == teamAccountId);
+MyEntity item = ctx.Items.First(i => i.Name == "target" && i.OrgId == orgId);
 // … then uses item.Id, item.Name, etc. as needed
 ```
 

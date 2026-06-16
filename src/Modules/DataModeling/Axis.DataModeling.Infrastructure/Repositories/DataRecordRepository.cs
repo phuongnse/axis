@@ -20,25 +20,25 @@ internal sealed class DataRecordRepository(
     public async Task AddAsync(DataRecord record, CancellationToken ct = default)
         => await context.DataRecords.AddAsync(record, ct);
 
-    public async Task<DataRecord?> GetByIdAsync(Guid id, Guid modelId, Guid teamAccountId, CancellationToken ct = default)
+    public async Task<DataRecord?> GetByIdAsync(Guid id, Guid modelId, Guid organizationId, CancellationToken ct = default)
         => await context.DataRecords
-            .FirstOrDefaultAsync(r => r.Id == id && r.ModelId == modelId && r.TeamAccountId == teamAccountId, ct);
+            .FirstOrDefaultAsync(r => r.Id == id && r.ModelId == modelId && r.OrganizationId == organizationId, ct);
 
-    public async Task<IReadOnlyList<DataRecord>> GetAllAsync(Guid modelId, Guid teamAccountId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<DataRecord>> GetAllAsync(Guid modelId, Guid organizationId, CancellationToken ct = default)
         => await context.DataRecords
-            .Where(r => r.ModelId == modelId && r.TeamAccountId == teamAccountId)
+            .Where(r => r.ModelId == modelId && r.OrganizationId == organizationId)
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync(ct);
 
     public async Task<(IReadOnlyList<DataRecord> Records, int TotalCount)> GetPagedAsync(
-        Guid modelId, Guid teamAccountId,
+        Guid modelId, Guid organizationId,
         int page, int pageSize,
         string? search = null,
         IReadOnlyList<RecordFilter>? filters = null,
         string? sortBy = null, string? sortDir = null,
         CancellationToken ct = default)
     {
-        (string where, object[] parameters) = BuildWhere(modelId, teamAccountId, search, filters);
+        (string where, object[] parameters) = BuildWhere(modelId, organizationId, search, filters);
         string orderBy = BuildOrderBy(sortBy, sortDir);
         int offset = (page - 1) * pageSize;
         string table = SchemaTable();
@@ -78,7 +78,7 @@ internal sealed class DataRecordRepository(
     }
 
     public async Task<int> BulkDeleteAsync(
-        IReadOnlyList<Guid> ids, Guid modelId, Guid teamAccountId,
+        IReadOnlyList<Guid> ids, Guid modelId, Guid organizationId,
         CancellationToken ct = default)
     {
         if (ids.Count == 0) return 0;
@@ -90,20 +90,20 @@ internal sealed class DataRecordRepository(
                SET deleted_at = NOW()
              WHERE id = ANY({0})
                AND model_id = {1}
-               AND team_account_id = {2}
+               AND organization_id = {2}
                AND deleted_at IS NULL
             """;
-        return await context.Database.ExecuteSqlRawAsync(sql, [idArray, modelId, teamAccountId], ct);
+        return await context.Database.ExecuteSqlRawAsync(sql, [idArray, modelId, organizationId], ct);
     }
 
     public async IAsyncEnumerable<DataRecord> GetAllForExportAsync(
-        Guid modelId, Guid teamAccountId,
+        Guid modelId, Guid organizationId,
         string? search = null,
         IReadOnlyList<RecordFilter>? filters = null,
         string? sortBy = null, string? sortDir = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        (string where, object[] parameters) = BuildWhere(modelId, teamAccountId, search, filters);
+        (string where, object[] parameters) = BuildWhere(modelId, organizationId, search, filters);
         string orderBy = BuildOrderBy(sortBy, sortDir);
         string table = SchemaTable();
 
@@ -148,11 +148,11 @@ internal sealed class DataRecordRepository(
     /// reaches here despite the upstream RecordFilter.TryParse guard.
     /// </summary>
     private static (string Sql, object[] Parameters) BuildWhere(
-        Guid modelId, Guid teamAccountId,
+        Guid modelId, Guid organizationId,
         string? search, IReadOnlyList<RecordFilter>? filters)
     {
-        List<object> parameters = [modelId, teamAccountId];
-        StringBuilder sb = new("model_id = {0} AND team_account_id = {1} AND deleted_at IS NULL");
+        List<object> parameters = [modelId, organizationId];
+        StringBuilder sb = new("model_id = {0} AND organization_id = {1} AND deleted_at IS NULL");
         int idx = 2;
 
         if (!string.IsNullOrWhiteSpace(search))

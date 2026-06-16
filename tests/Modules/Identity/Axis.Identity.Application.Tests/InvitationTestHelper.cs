@@ -6,6 +6,6 @@ namespace Axis.Identity.Application.Tests;
 /// <summary>Exposes internal domain test factories to the Application test project.</summary>
 internal static class InvitationTestHelper
 {
-    public static Invitation CreateExpired(Email email, Guid teamAccountId, Guid roleId, Guid invitedByUserId) =>
-        Invitation.CreateExpired(email, teamAccountId, roleId, invitedByUserId);
+    public static Invitation CreateExpired(Email email, Guid organizationId, Guid roleId, Guid invitedByUserId) =>
+        Invitation.CreateExpired(email, organizationId, roleId, invitedByUserId);
 }

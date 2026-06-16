@@ -8,7 +8,7 @@ Create a data class so that I can define a reusable nested object structure.
 
 ## Primary actor
 
-- Team account Member with `data_modeling:model:write`
+- Organization Member with `data_modeling:model:write`
 
 ## Trigger
 
@@ -36,7 +36,7 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 - [ ] Data class fields use the same field type system as model fields, excluding `Relation`, `DataClass`, and `File` types (to prevent deep nesting and circular references).
 
 *Validation & errors*
-- [ ] Name: required, 2–100 characters, unique within the team account (case-insensitive). Duplicate shows: "A data class named '{name}' already exists."
+- [ ] Name: required, 2–100 characters, unique within the org (case-insensitive). Duplicate shows: "A data class named '{name}' already exists."
 - [ ] Attempting to add a `DataClass` or `Relation` field type inside a data class is blocked by hiding those options from the type picker.
 
 *Edge cases*

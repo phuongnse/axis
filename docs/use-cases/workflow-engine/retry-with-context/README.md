@@ -8,7 +8,7 @@ Modify the execution context before retrying so that I can fix data errors that 
 
 ## Primary actor
 
-- Team account Member with `execution:retry`
+- Organization Member with `execution:retry`
 
 ## Trigger
 

@@ -8,7 +8,7 @@ See the execution history for a specific workflow so that I can monitor its perf
 
 ## Primary actor
 
-- Team account Member with `execution:read`
+- Organization Member with `execution:read`
 
 ## Trigger
 

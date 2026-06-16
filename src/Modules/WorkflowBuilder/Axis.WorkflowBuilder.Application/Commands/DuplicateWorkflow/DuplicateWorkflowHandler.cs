@@ -16,7 +16,7 @@ public sealed class DuplicateWorkflowHandler(
     public async Task<Result<Guid>> Handle(DuplicateWorkflowCommand command, CancellationToken cancellationToken)
     {
         Result planCheck = await planLimitService.EnsureWithinLimitAsync(
-            command.TeamAccountId,
+            command.OrganizationId,
             PlanLimitResourceType.Workflows,
             increment: 1,
             cancellationToken);
@@ -28,7 +28,7 @@ public sealed class DuplicateWorkflowHandler(
         }
 
         WorkflowDefinition? original = await workflowRepo.GetByIdAsync(
-            command.WorkflowId, command.TeamAccountId, cancellationToken);
+            command.WorkflowId, command.OrganizationId, cancellationToken);
 
         if (original is null)
             return Result.Failure<Guid>(ErrorCodes.NotFound, "Workflow not found.");
@@ -36,7 +36,7 @@ public sealed class DuplicateWorkflowHandler(
         WorkflowDefinition copy = original.Duplicate();
 
         string resolvedName = await ResolveUniqueCopyNameAsync(
-            copy.Name, command.TeamAccountId, cancellationToken);
+            copy.Name, command.OrganizationId, cancellationToken);
 
         if (resolvedName != copy.Name)
             copy.Update(resolvedName, copy.Description);
@@ -44,7 +44,7 @@ public sealed class DuplicateWorkflowHandler(
         await workflowRepo.AddAsync(copy, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);
         await planLimitService.RecordUsageDeltaAsync(
-            command.TeamAccountId,
+            command.OrganizationId,
             PlanLimitResourceType.Workflows,
             delta: 1,
             cancellationToken);
@@ -52,15 +52,15 @@ public sealed class DuplicateWorkflowHandler(
     }
 
     private async Task<string> ResolveUniqueCopyNameAsync(
-        string baseName, Guid teamAccountId, CancellationToken cancellationToken)
+        string baseName, Guid organizationId, CancellationToken cancellationToken)
     {
-        if (!await workflowRepo.NameExistsAsync(baseName, teamAccountId, null, cancellationToken))
+        if (!await workflowRepo.NameExistsAsync(baseName, organizationId, null, cancellationToken))
             return baseName;
 
         for (int suffix = 2; suffix <= 50; suffix++)
         {
             string candidate = $"{baseName} ({suffix})";
-            if (!await workflowRepo.NameExistsAsync(candidate, teamAccountId, null, cancellationToken))
+            if (!await workflowRepo.NameExistsAsync(candidate, organizationId, null, cancellationToken))
                 return candidate;
         }
 

@@ -8,7 +8,7 @@ Configure a webhook trigger so that an external system can start my workflow by 
 
 ## Primary actor
 
-- Team account Member
+- Organization Member
 
 ## Trigger
 

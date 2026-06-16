@@ -8,7 +8,7 @@ Delete a Draft workflow so that I can permanently remove workflows I no longer n
 
 ## Primary actor
 
-- Team account Member with `workflow:definition:write`
+- Organization Member with `workflow:definition:write`
 
 ## Trigger
 

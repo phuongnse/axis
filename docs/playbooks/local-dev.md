@@ -232,7 +232,7 @@ docker compose up -d
 
 On the next boot, **Development only**, `IdentityDbContext.Database.MigrateAsync()` runs at startup ([`Program.cs`](../../src/Axis.Api/Program.cs)) before OpenIddict seeding.
 
-Per-tenant module schemas (`tenant_{team account-id}`) are provisioned on demand by each module's `TeamAccountVerifiedHandler` when Identity publishes `TeamAccountVerifiedEvent` over Kafka (e.g. [`TeamAccountVerifiedHandler`](../../src/Modules/DataModeling/Axis.DataModeling.Infrastructure/Messaging/TeamAccountVerifiedHandler.cs)). Only Identity's public schema migrates at API startup.
+Per-tenant module schemas (`tenant_{org-id}`) are provisioned on demand by each module's `OrganizationVerifiedHandler` when Identity publishes `OrganizationVerifiedEvent` over Kafka (e.g. [`OrganizationVerifiedHandler`](../../src/Modules/DataModeling/Axis.DataModeling.Infrastructure/Messaging/OrganizationVerifiedHandler.cs)). Only Identity's public schema migrates at API startup.
 
 Wipe Postgres only (keep npm/NuGet caches):
 
@@ -250,7 +250,7 @@ docker compose up -d
 - **`bin/` and `obj/` under `src/`** contain Linux artifacts from the container. Stop the API (`docker compose stop api`) before a host-side Windows/Rider build, or expect file-lock errors.
 - **MailDev health** — compose disables MailDev's baked-in healthcheck (`healthcheck: disable: true`); nothing waits on it.
 - **API startup order** — Kafka + Schema Registry + RabbitMQ must be healthy before the API starts; first boot can take ~60s on the API healthcheck `start_period`.
-- **Cross-module migrations** — tenant DbContexts migrate on first team account provisioning, not at API startup.
+- **Cross-module migrations** — tenant DbContexts migrate on first org provisioning, not at API startup.
 
 ---
 

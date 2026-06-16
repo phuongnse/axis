@@ -8,7 +8,7 @@ Edit a data class so that I can add or remove fields as requirements change.
 
 ## Primary actor
 
-- Team account Member with `data_modeling:model:write`
+- Organization Member with `data_modeling:model:write`
 
 ## Trigger
 

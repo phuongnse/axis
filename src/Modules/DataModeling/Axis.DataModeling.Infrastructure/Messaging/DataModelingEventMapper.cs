@@ -13,41 +13,41 @@ internal static class DataModelingEventMapper
             ModelCreated created => new ModelCreatedEvent
             {
                 modelId = created.ModelId.ToString(),
-                teamAccountId = created.TeamAccountId.ToString(),
+                organizationId = created.OrganizationId.ToString(),
                 name = created.Name,
             },
             ModelDeleted deleted => new ModelDeletedEvent
             {
                 modelId = deleted.ModelId.ToString(),
-                teamAccountId = deleted.TeamAccountId.ToString(),
+                organizationId = deleted.OrganizationId.ToString(),
             },
             DataClassCreated dataClassCreated => new DataClassCreatedEvent
             {
                 dataClassId = dataClassCreated.DataClassId.ToString(),
-                teamAccountId = dataClassCreated.TeamAccountId.ToString(),
+                organizationId = dataClassCreated.OrganizationId.ToString(),
                 name = dataClassCreated.Name,
             },
             DataClassDeleted dataClassDeleted => new DataClassDeletedEvent
             {
                 dataClassId = dataClassDeleted.DataClassId.ToString(),
-                teamAccountId = dataClassDeleted.TeamAccountId.ToString(),
+                organizationId = dataClassDeleted.OrganizationId.ToString(),
             },
             DataRecordCreated recordCreated => new DataRecordCreatedEvent
             {
                 recordId = recordCreated.RecordId.ToString(),
                 modelId = recordCreated.ModelId.ToString(),
-                teamAccountId = recordCreated.TeamAccountId.ToString(),
+                organizationId = recordCreated.OrganizationId.ToString(),
             },
             DataRecordDeleted recordDeleted => new DataRecordDeletedEvent
             {
                 recordId = recordDeleted.RecordId.ToString(),
                 modelId = recordDeleted.ModelId.ToString(),
-                teamAccountId = recordDeleted.TeamAccountId.ToString(),
+                organizationId = recordDeleted.OrganizationId.ToString(),
             },
             FieldAdded fieldAdded => new FieldAddedEvent
             {
                 modelId = fieldAdded.ModelId.ToString(),
-                teamAccountId = fieldAdded.TeamAccountId.ToString(),
+                organizationId = fieldAdded.OrganizationId.ToString(),
                 fieldId = fieldAdded.FieldId.ToString(),
                 fieldName = fieldAdded.FieldName,
                 fieldType = fieldAdded.FieldType.ToString(),
@@ -58,7 +58,7 @@ internal static class DataModelingEventMapper
             FieldUpdated fieldUpdated => new FieldUpdatedEvent
             {
                 modelId = fieldUpdated.ModelId.ToString(),
-                teamAccountId = fieldUpdated.TeamAccountId.ToString(),
+                organizationId = fieldUpdated.OrganizationId.ToString(),
                 fieldId = fieldUpdated.FieldId.ToString(),
                 fieldName = fieldUpdated.FieldName,
                 fieldType = fieldUpdated.FieldType.ToString(),
@@ -68,7 +68,7 @@ internal static class DataModelingEventMapper
             FieldRemoved fieldRemoved => new FieldRemovedEvent
             {
                 modelId = fieldRemoved.ModelId.ToString(),
-                teamAccountId = fieldRemoved.TeamAccountId.ToString(),
+                organizationId = fieldRemoved.OrganizationId.ToString(),
                 fieldId = fieldRemoved.FieldId.ToString(),
                 fieldName = fieldRemoved.FieldName,
             },

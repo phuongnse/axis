@@ -5,7 +5,7 @@ namespace Axis.DataModeling.Domain.Events;
 
 public sealed record FieldUpdated(
     Guid ModelId,
-    Guid TeamAccountId,
+    Guid OrganizationId,
     Guid FieldId,
     string FieldName,
     FieldType FieldType,

@@ -6,7 +6,7 @@ namespace Axis.DataModeling.Domain.Tests;
 
 public class DataRecordTests
 {
-    private static readonly Guid TeamAccountId = Guid.NewGuid();
+    private static readonly Guid OrgId = Guid.NewGuid();
     private static readonly Guid ModelId = Guid.NewGuid();
     private const string UserId = "user-123";
 
@@ -14,13 +14,13 @@ public class DataRecordTests
         new Dictionary<string, object?> { ["amount"] = 100, ["notes"] = "test" };
 
     [Fact]
-    public void DataRecord_WhenCreated_SetsModelIdTeamAccountIdAndData()
+    public void DataRecord_WhenCreated_SetsModelIdOrgIdAndData()
     {
         IReadOnlyDictionary<string, object?> data = SampleData();
-        DataRecord record = DataRecord.Create(ModelId, TeamAccountId, data, UserId);
+        DataRecord record = DataRecord.Create(ModelId, OrgId, data, UserId);
 
         record.ModelId.Should().Be(ModelId);
-        record.TeamAccountId.Should().Be(TeamAccountId);
+        record.OrganizationId.Should().Be(OrgId);
         record.Data.Should().ContainKey("amount").WhoseValue.Should().Be(100);
         record.DeletedAt.Should().BeNull();
     }
@@ -29,7 +29,7 @@ public class DataRecordTests
     public void DataRecord_WhenCreated_SetsCreatedByAndTimestamps()
     {
         DateTimeOffset before = DateTimeOffset.UtcNow;
-        DataRecord record = DataRecord.Create(ModelId, TeamAccountId, SampleData(), UserId);
+        DataRecord record = DataRecord.Create(ModelId, OrgId, SampleData(), UserId);
 
         record.CreatedBy.Should().Be(UserId);
         record.CreatedAt.Should().BeOnOrAfter(before);
@@ -39,7 +39,7 @@ public class DataRecordTests
     [Fact]
     public void DataRecord_WhenUpdated_ReplacesDataAndBumpsUpdatedAt()
     {
-        DataRecord record = DataRecord.Create(ModelId, TeamAccountId, SampleData(), UserId);
+        DataRecord record = DataRecord.Create(ModelId, OrgId, SampleData(), UserId);
         DateTimeOffset before = record.UpdatedAt;
         Dictionary<string, object?> newData = new Dictionary<string, object?> { ["amount"] = 200, ["notes"] = "updated" };
         record.Update(newData);
@@ -51,7 +51,7 @@ public class DataRecordTests
     [Fact]
     public void Delete_WhenCalled_SetsDeletedAtAndRaisesEvent()
     {
-        DataRecord record = DataRecord.Create(ModelId, TeamAccountId, SampleData(), UserId);
+        DataRecord record = DataRecord.Create(ModelId, OrgId, SampleData(), UserId);
         DateTimeOffset before = DateTimeOffset.UtcNow;
         record.Delete();
 
@@ -63,7 +63,7 @@ public class DataRecordTests
     [Fact]
     public void Delete_WhenAlreadyDeleted_Throws()
     {
-        DataRecord record = DataRecord.Create(ModelId, TeamAccountId, SampleData(), UserId);
+        DataRecord record = DataRecord.Create(ModelId, OrgId, SampleData(), UserId);
         record.Delete();
 
         Action act = () => record.Delete();

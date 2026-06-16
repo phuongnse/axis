@@ -11,7 +11,7 @@ public class GetRolesHandlerTests
 {
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
 
-    private static readonly Guid TeamAccountId = Guid.NewGuid();
+    private static readonly Guid OrgId = Guid.NewGuid();
 
     private GetRolesHandler CreateHandler() => new(_roleRepo);
 
@@ -20,17 +20,17 @@ public class GetRolesHandlerTests
     {
         List<Role> roles =
         [
-            Role.CreateSystem("Admin", TeamAccountId, ["users:read"]),
-            Role.CreateSystem("Editor", TeamAccountId, ["workflow:definition:read"]),
-            Role.CreateSystem("Viewer", TeamAccountId, ["workflow:definition:read"]),
-            Role.CreateSystem("End User", TeamAccountId, ["form:submit"]),
-            Role.Create("Manager", "Custom role", TeamAccountId, ["workflow:definition:read"]),
+            Role.CreateSystem("Admin", OrgId, ["users:read"]),
+            Role.CreateSystem("Editor", OrgId, ["workflow:definition:read"]),
+            Role.CreateSystem("Viewer", OrgId, ["workflow:definition:read"]),
+            Role.CreateSystem("End User", OrgId, ["form:submit"]),
+            Role.Create("Manager", "Custom role", OrgId, ["workflow:definition:read"]),
         ];
-        _roleRepo.GetPagedAsync(TeamAccountId, 1, 20, Arg.Any<CancellationToken>())
+        _roleRepo.GetPagedAsync(OrgId, 1, 20, Arg.Any<CancellationToken>())
             .Returns((roles, 5));
 
         PagedResult<RoleDto> result = await CreateHandler()
-            .Handle(new GetRolesQuery(TeamAccountId, 1, 20), CancellationToken.None);
+            .Handle(new GetRolesQuery(OrgId, 1, 20), CancellationToken.None);
 
         result.Items.Should().HaveCount(5);
         result.TotalCount.Should().Be(5);
@@ -39,13 +39,13 @@ public class GetRolesHandlerTests
     [Fact]
     public async Task GetRoles_RoleDto_ContainsCorrectFields()
     {
-        Role customRole = Role.Create("Manager", "Manages workflows", TeamAccountId,
+        Role customRole = Role.Create("Manager", "Manages workflows", OrgId,
             ["workflow:definition:read", "workflow:definition:write"]);
-        _roleRepo.GetPagedAsync(TeamAccountId, 1, 20, Arg.Any<CancellationToken>())
+        _roleRepo.GetPagedAsync(OrgId, 1, 20, Arg.Any<CancellationToken>())
             .Returns((new List<Role> { customRole }, 1));
 
         PagedResult<RoleDto> result = await CreateHandler()
-            .Handle(new GetRolesQuery(TeamAccountId, 1, 20), CancellationToken.None);
+            .Handle(new GetRolesQuery(OrgId, 1, 20), CancellationToken.None);
 
         RoleDto dto = result.Items.Single();
         dto.Name.Should().Be("Manager");
@@ -57,24 +57,24 @@ public class GetRolesHandlerTests
     [Fact]
     public async Task GetRoles_SystemRole_IsFlaggedCorrectly()
     {
-        Role adminRole = Role.CreateSystem("Admin", TeamAccountId, ["users:read"]);
-        _roleRepo.GetPagedAsync(TeamAccountId, 1, 20, Arg.Any<CancellationToken>())
+        Role adminRole = Role.CreateSystem("Admin", OrgId, ["users:read"]);
+        _roleRepo.GetPagedAsync(OrgId, 1, 20, Arg.Any<CancellationToken>())
             .Returns((new List<Role> { adminRole }, 1));
 
         PagedResult<RoleDto> result = await CreateHandler()
-            .Handle(new GetRolesQuery(TeamAccountId, 1, 20), CancellationToken.None);
+            .Handle(new GetRolesQuery(OrgId, 1, 20), CancellationToken.None);
 
         result.Items.Single().IsSystem.Should().BeTrue();
     }
 
     [Fact]
-    public async Task GetRoles_EmptyTeamAccount_ReturnsEmptyPage()
+    public async Task GetRoles_EmptyOrg_ReturnsEmptyPage()
     {
-        _roleRepo.GetPagedAsync(TeamAccountId, 1, 20, Arg.Any<CancellationToken>())
+        _roleRepo.GetPagedAsync(OrgId, 1, 20, Arg.Any<CancellationToken>())
             .Returns((new List<Role>(), 0));
 
         PagedResult<RoleDto> result = await CreateHandler()
-            .Handle(new GetRolesQuery(TeamAccountId, 1, 20), CancellationToken.None);
+            .Handle(new GetRolesQuery(OrgId, 1, 20), CancellationToken.None);
 
         result.Items.Should().BeEmpty();
         result.TotalCount.Should().Be(0);
@@ -83,12 +83,12 @@ public class GetRolesHandlerTests
     [Fact]
     public async Task GetRoles_PageSizeExceedsCap_ClampsTo100()
     {
-        _roleRepo.GetPagedAsync(TeamAccountId, 1, 100, Arg.Any<CancellationToken>())
+        _roleRepo.GetPagedAsync(OrgId, 1, 100, Arg.Any<CancellationToken>())
             .Returns((new List<Role>(), 0));
 
-        await CreateHandler().Handle(new GetRolesQuery(TeamAccountId, 1, 200), CancellationToken.None);
+        await CreateHandler().Handle(new GetRolesQuery(OrgId, 1, 200), CancellationToken.None);
 
         await _roleRepo.Received(1)
-            .GetPagedAsync(TeamAccountId, 1, 100, Arg.Any<CancellationToken>());
+            .GetPagedAsync(OrgId, 1, 100, Arg.Any<CancellationToken>());
     }
 }

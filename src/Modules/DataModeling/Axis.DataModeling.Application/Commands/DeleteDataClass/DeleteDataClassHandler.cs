@@ -14,7 +14,7 @@ public sealed class DeleteDataClassHandler(
 {
     public async Task<Result> Handle(DeleteDataClassCommand command, CancellationToken cancellationToken)
     {
-        DataClass? dc = await dataClassRepo.GetByIdAsync(command.DataClassId, command.TeamAccountId, cancellationToken);
+        DataClass? dc = await dataClassRepo.GetByIdAsync(command.DataClassId, command.OrganizationId, cancellationToken);
         if (dc is null)
             return Result.Failure(ErrorCodes.NotFound, "Data class not found.");
 

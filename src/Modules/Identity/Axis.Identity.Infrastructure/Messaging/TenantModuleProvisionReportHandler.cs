@@ -6,7 +6,7 @@ using Wolverine;
 namespace Axis.Identity.Infrastructure.Messaging;
 
 internal sealed class TenantModuleProvisionReportHandler(
-    ITeamAccountRepository teamAccountRepo,
+    IOrganizationRepository organizationRepo,
     ITenantModuleProvisioningRepository provisioningRepo,
     IUnitOfWork uow,
     IMessageBus messageBus,
@@ -15,7 +15,7 @@ internal sealed class TenantModuleProvisionReportHandler(
     public Task Handle(TenantModuleProvisionReportEvent report, CancellationToken cancellationToken)
         => TenantProvisioningCoordinator.HandleReportAsync(
             report,
-            teamAccountRepo,
+            organizationRepo,
             provisioningRepo,
             uow,
             messageBus,

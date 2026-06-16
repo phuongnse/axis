@@ -34,7 +34,7 @@ internal sealed class FormModelReferenceSync(FormBuilderDbContext context) : IFo
             if (row is null)
             {
                 context.FormModelReferences.Add(
-                    FormModelReference.Create(form.Id, field.Id, relation.TargetModelId, form.TeamAccountId));
+                    FormModelReference.Create(form.Id, field.Id, relation.TargetModelId, form.OrganizationId));
             }
             else if (row.ModelId != relation.TargetModelId)
                 row.Retarget(relation.TargetModelId);

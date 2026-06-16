@@ -11,7 +11,7 @@ public sealed class GetFormByIdHandler(
 {
     public async Task<FormDetailDto?> Handle(GetFormByIdQuery query, CancellationToken cancellationToken)
     {
-        FormDefinition? form = await formRepo.GetByIdAsync(query.FormId, query.TeamAccountId, cancellationToken);
+        FormDefinition? form = await formRepo.GetByIdAsync(query.FormId, query.OrganizationId, cancellationToken);
         if (form is null) return null;
 
         IReadOnlySet<Guid> brokenFieldIds = await formModelReferenceRepo.GetBrokenFieldIdsForFormAsync(

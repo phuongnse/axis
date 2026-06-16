@@ -8,7 +8,7 @@ Route my workflow down different paths based on a condition so that different sc
 
 ## Primary actor
 
-- Team account Member
+- Organization Member
 
 ## Trigger
 

@@ -6,4 +6,4 @@ namespace Axis.WorkflowEngine.Application.Queries.GetExecution;
 /// <summary>Returns execution detail with step timeline.</summary>
 public sealed record GetExecutionQuery(
     Guid ExecutionId,
-    Guid TeamAccountId) : IQuery<ExecutionResponse?>;
+    Guid OrganizationId) : IQuery<ExecutionResponse?>;

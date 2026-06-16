@@ -6,6 +6,6 @@ namespace Axis.WorkflowEngine.Application.Messages;
 public sealed record ExecuteHttpStepMessage(
     Guid ExecutionId,
     Guid StepId,
-    Guid TeamAccountId,
+    Guid OrganizationId,
     IReadOnlyDictionary<string, object?>? StepConfig,
     IReadOnlyDictionary<string, object?> Context);

@@ -13,7 +13,7 @@ public sealed class ReorderFieldsHandler(
 {
     public async Task<Result> Handle(ReorderFieldsCommand command, CancellationToken cancellationToken)
     {
-        DataModeling.Domain.Aggregates.DataModel? model = await modelRepo.GetByIdAsync(command.ModelId, command.TeamAccountId, cancellationToken);
+        DataModeling.Domain.Aggregates.DataModel? model = await modelRepo.GetByIdAsync(command.ModelId, command.OrganizationId, cancellationToken);
         if (model is null)
             return Result.Failure(ErrorCodes.NotFound, "Model not found.");
 

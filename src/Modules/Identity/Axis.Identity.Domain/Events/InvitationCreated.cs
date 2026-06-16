@@ -4,6 +4,6 @@ namespace Axis.Identity.Domain.Events;
 
 public record InvitationCreated(
     Guid InvitationId,
-    Guid TeamAccountId,
+    Guid OrganizationId,
     string Email,
     string Token) : IDomainEvent;

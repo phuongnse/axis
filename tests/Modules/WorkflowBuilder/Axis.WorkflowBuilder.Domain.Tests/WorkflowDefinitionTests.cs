@@ -9,19 +9,19 @@ namespace Axis.WorkflowBuilder.Domain.Tests;
 
 public class WorkflowDefinitionTests
 {
-    private static readonly Guid TeamAccountId = Guid.NewGuid();
+    private static readonly Guid OrgId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     // ─── Create ───────────────────────────────────────────────────────────────
 
     [Fact]
-    public void WorkflowDefinition_WhenCreated_SetsNameDescriptionTeamAccountIdAndDraftStatus()
+    public void WorkflowDefinition_WhenCreated_SetsNameDescriptionOrgIdAndDraftStatus()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", "Approves invoices", TeamAccountId, UserId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", "Approves invoices", OrgId, UserId);
 
         wf.Name.Should().Be("Invoice Approval");
         wf.Description.Should().Be("Approves invoices");
-        wf.TeamAccountId.Should().Be(TeamAccountId);
+        wf.OrganizationId.Should().Be(OrgId);
         wf.Status.Should().Be(WorkflowStatus.Draft);
         wf.DeletedAt.Should().BeNull();
     }
@@ -30,7 +30,7 @@ public class WorkflowDefinitionTests
     public void WorkflowDefinition_WhenCreated_SetsCreatedByAndTimestamps()
     {
         DateTimeOffset before = DateTimeOffset.UtcNow;
-        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, TeamAccountId, UserId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, OrgId, UserId);
 
         wf.CreatedBy.Should().Be(UserId);
         wf.CreatedAt.Should().BeOnOrAfter(before);
@@ -40,7 +40,7 @@ public class WorkflowDefinitionTests
     [Fact]
     public void WorkflowDefinition_WhenCreated_AddsStartAndEndNodesByDefault()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TeamAccountId, UserId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
 
         wf.Steps.Should().HaveCount(2);
         wf.Steps.Should().Contain(s => s.Type == StepType.Start);
@@ -50,7 +50,7 @@ public class WorkflowDefinitionTests
     [Fact]
     public void WorkflowDefinition_WhenCreated_RaisesWorkflowCreatedEvent()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TeamAccountId, UserId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
         wf.DomainEvents.Should().ContainSingle(e => e is WorkflowCreated);
     }
 
@@ -59,7 +59,7 @@ public class WorkflowDefinitionTests
     [InlineData("A")]   // too short (< 2)
     public void WorkflowDefinition_WhenNameTooShort_ThrowsArgumentException(string name)
     {
-        Func<WorkflowDefinition> act = () => WorkflowDefinition.Create(name, null, TeamAccountId, UserId);
+        Func<WorkflowDefinition> act = () => WorkflowDefinition.Create(name, null, OrgId, UserId);
         act.Should().Throw<ArgumentException>();
     }
 
@@ -67,7 +67,7 @@ public class WorkflowDefinitionTests
     public void WorkflowDefinition_WhenNameExceeds200Chars_ThrowsArgumentException()
     {
         string longName = new string('A', 201);
-        Func<WorkflowDefinition> act = () => WorkflowDefinition.Create(longName, null, TeamAccountId, UserId);
+        Func<WorkflowDefinition> act = () => WorkflowDefinition.Create(longName, null, OrgId, UserId);
         act.Should().Throw<ArgumentException>();
     }
 
@@ -76,7 +76,7 @@ public class WorkflowDefinitionTests
     [Fact]
     public void Publish_WhenWorkflowIsValid_TransitionsToActive()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, TeamAccountId, UserId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, OrgId, UserId);
         wf.AddTrigger(TriggerType.Manual, null);
         WorkflowStep formStep = wf.AddStep("Review", StepType.Form, null);
         WorkflowStep startStep = wf.Steps.Single(s => s.Type == StepType.Start);
@@ -93,7 +93,7 @@ public class WorkflowDefinitionTests
     [Fact]
     public void Publish_WhenNoTriggersConfigured_Throws()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, TeamAccountId, UserId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, OrgId, UserId);
 
         Action act = () => wf.Publish();
         act.Should().Throw<InvalidOperationException>().WithMessage("*trigger*");
@@ -102,7 +102,7 @@ public class WorkflowDefinitionTests
     [Fact]
     public void Publish_WhenNoStepsBeyondStartAndEnd_Throws()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, TeamAccountId, UserId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, OrgId, UserId);
         wf.AddTrigger(TriggerType.Manual, null);
 
         Action act = () => wf.Publish();
@@ -135,7 +135,7 @@ public class WorkflowDefinitionTests
     [Fact]
     public void Archive_WhenInDraftStatus_Throws()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TeamAccountId, UserId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
         Action act = () => wf.Archive();
         act.Should().Throw<InvalidOperationException>().WithMessage("*draft*");
     }
@@ -158,7 +158,7 @@ public class WorkflowDefinitionTests
     [Fact]
     public void Delete_WhenWorkflowIsDraft_SetsDeletedAt()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TeamAccountId, UserId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
         wf.Delete();
         wf.DeletedAt.Should().NotBeNull();
     }
@@ -177,7 +177,7 @@ public class WorkflowDefinitionTests
     [Fact]
     public void Update_WhenCalled_ChangesNameAndDescription()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("Old Name", null, TeamAccountId, UserId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("Old Name", null, OrgId, UserId);
         wf.Update("New Name", "Some description");
 
         wf.Name.Should().Be("New Name");
@@ -189,7 +189,7 @@ public class WorkflowDefinitionTests
     [Fact]
     public void AddStep_WhenCalled_AddsStepWithGivenType()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TeamAccountId, UserId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
         WorkflowStep step = wf.AddStep("Send Email", StepType.Notification, null);
 
         wf.Steps.Should().Contain(s => s.Id == step.Id && s.Type == StepType.Notification);
@@ -200,7 +200,7 @@ public class WorkflowDefinitionTests
     [InlineData(StepType.End)]
     public void AddStep_WhenAddingStartOrEndStep_Throws(StepType type)
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TeamAccountId, UserId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
         Func<WorkflowStep> act = () => wf.AddStep("Node", type, null);
         act.Should().Throw<InvalidOperationException>().WithMessage("*reserved*");
     }
@@ -210,7 +210,7 @@ public class WorkflowDefinitionTests
     [Fact]
     public void AddTransition_WhenStepsExist_ConnectsTwoSteps()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TeamAccountId, UserId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
         WorkflowStep startStep = wf.Steps.Single(s => s.Type == StepType.Start);
         WorkflowStep endStep = wf.Steps.Single(s => s.Type == StepType.End);
 
@@ -223,7 +223,7 @@ public class WorkflowDefinitionTests
     [Fact]
     public void AddTransition_WhenCreatingACycle_Throws()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TeamAccountId, UserId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
         WorkflowStep s1 = wf.AddStep("Step 1", StepType.Form, null);
         WorkflowStep s2 = wf.AddStep("Step 2", StepType.Form, null);
         wf.AddTransition(s1.Id, s2.Id, null);
@@ -260,7 +260,7 @@ public class WorkflowDefinitionTests
     [Fact]
     public void AddTrigger_WhenCalled_AddsTriggerToWorkflow()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TeamAccountId, UserId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
         wf.AddTrigger(TriggerType.Manual, null);
 
         wf.Triggers.Should().ContainSingle(t => t.Type == TriggerType.Manual);
@@ -271,7 +271,7 @@ public class WorkflowDefinitionTests
     [Fact]
     public void ConfigureStep_WhenStepExists_UpdatesNameAndConfig()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TeamAccountId, UserId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
         WorkflowStep step = wf.AddStep("Old Name", StepType.Form, null);
         Dictionary<string, object?> config = new Dictionary<string, object?> { ["form_id"] = Guid.NewGuid() };
 
@@ -284,7 +284,7 @@ public class WorkflowDefinitionTests
     [Fact]
     public void ConfigureStep_WhenStepNotFound_Throws()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TeamAccountId, UserId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
         Action act = () => wf.ConfigureStep(Guid.NewGuid(), "Name", null);
         act.Should().Throw<InvalidOperationException>().WithMessage("*not found*");
     }
@@ -294,7 +294,7 @@ public class WorkflowDefinitionTests
     [InlineData(StepType.End)]
     public void ConfigureStep_WhenReservedStep_Throws(StepType reservedType)
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TeamAccountId, UserId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
         WorkflowStep reserved = wf.Steps.Single(s => s.Type == reservedType);
 
         Action act = () => wf.ConfigureStep(reserved.Id, "New Name", null);
@@ -304,7 +304,7 @@ public class WorkflowDefinitionTests
     [Fact]
     public void ConfigureStep_WhenCalled_UpdatesUpdatedAt()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TeamAccountId, UserId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
         WorkflowStep step = wf.AddStep("Step", StepType.HttpRequest, null);
         DateTimeOffset before = DateTimeOffset.UtcNow;
 
@@ -318,7 +318,7 @@ public class WorkflowDefinitionTests
     [Fact]
     public void AddTrigger_WhenSameTypeAlreadyExists_Throws()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TeamAccountId, UserId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
         wf.AddTrigger(TriggerType.Manual, null);
 
         Action act = () => wf.AddTrigger(TriggerType.Manual, null);
@@ -328,7 +328,7 @@ public class WorkflowDefinitionTests
     [Fact]
     public void AddTrigger_WhenDifferentTypes_AddsBoth()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TeamAccountId, UserId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, OrgId, UserId);
         wf.AddTrigger(TriggerType.Manual, null);
         wf.AddTrigger(TriggerType.Webhook, null);
 
@@ -339,7 +339,7 @@ public class WorkflowDefinitionTests
 
     private static WorkflowDefinition CreatePublishableWorkflow()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, TeamAccountId, UserId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, OrgId, UserId);
         wf.AddTrigger(TriggerType.Manual, null);
         WorkflowStep formStep = wf.AddStep("Review", StepType.Form, null);
         WorkflowStep startStep = wf.Steps.Single(s => s.Type == StepType.Start);

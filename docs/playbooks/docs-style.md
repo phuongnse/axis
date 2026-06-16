@@ -82,9 +82,9 @@ Enforced by the incident/lesson-framing guard in `python scripts/axis.py check d
 
 Every `docs/use-cases/<domain>/<short-slug>/README.md` file uses these layouts so agents can scan status without parsing inline pipes.
 
-**Canonical example (multi-screen + diagrams):** [platform-foundation/register-team-account/README.md](../use-cases/platform-foundation/register-team-account/README.md). Copy that structure when refreshing older use cases.
+**Canonical example (multi-screen + diagrams):** [platform-foundation/register-org/README.md](../use-cases/platform-foundation/register-org/README.md). Copy that structure when refreshing older use cases.
 
-**Wireframe practice (generic):** [wireframes.md § Multi-screen journey pattern](./wireframes.md#multi-screen-journey-pattern) — happy path vs `*-states`, diagrams, generator habits; register-team-account is the concrete reference.
+**Wireframe practice (generic):** [wireframes.md § Multi-screen journey pattern](./wireframes.md#multi-screen-journey-pattern) — happy path vs `*-states`, diagrams, generator habits; register-org is the concrete reference.
 
 ### Section order (after AC, before implementation status)
 
@@ -135,7 +135,7 @@ Minimal table (few screens, no Screen flow):
 | login | [source](./login.excalidraw) | [preview](./login.svg) |
 ```
 
-Full table (see [register-team-account](../use-cases/platform-foundation/register-team-account/README.md#wireframes)):
+Full table (see [register-org](../use-cases/platform-foundation/register-org/README.md#wireframes)):
 
 ```markdown
 ## Wireframes

@@ -18,7 +18,7 @@ public class ExecuteFormStepHandlerTests
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly ILogger<ExecuteFormStepHandler> _logger = Substitute.For<ILogger<ExecuteFormStepHandler>>();
 
-    private static readonly Guid TeamAccountId = Guid.NewGuid();
+    private static readonly Guid OrgId = Guid.NewGuid();
     private static readonly Guid WorkflowId = Guid.NewGuid();
     private static readonly Guid FormId = Guid.NewGuid();
 
@@ -26,7 +26,7 @@ public class ExecuteFormStepHandlerTests
 
     private static (WorkflowExecution Execution, ExecutionStep Step) MakeRunningFormStep()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TeamAccountId, TriggerType.Manual, null, new Dictionary<string, object?>());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, null, new Dictionary<string, object?>());
         ExecutionStep step = exec.AddStep(Guid.NewGuid(), "Form", StepType.Form, 0);
         exec.Start();
         exec.StartStep(step.Id, exec.Context);
@@ -45,10 +45,10 @@ public class ExecuteFormStepHandlerTests
     public async Task HandleAsync_WithValidConfig_SetsStepWaitingAndRaisesFormStepReached()
     {
         (WorkflowExecution execution, ExecutionStep step) = MakeRunningFormStep();
-        _execRepo.GetByIdWithStepsAsync(execution.Id, TeamAccountId).Returns(execution);
+        _execRepo.GetByIdWithStepsAsync(execution.Id, OrgId).Returns(execution);
 
         await CreateHandler().HandleAsync(
-            new ExecuteFormStepMessage(execution.Id, step.Id, TeamAccountId, WorkflowId, ValidConfig(), execution.Context),
+            new ExecuteFormStepMessage(execution.Id, step.Id, OrgId, WorkflowId, ValidConfig(), execution.Context),
             CancellationToken.None);
 
         step.Status.Should().Be(StepExecutionStatus.Waiting);
@@ -60,7 +60,7 @@ public class ExecuteFormStepHandlerTests
     public async Task HandleAsync_WithMissingFormId_FailsStepAndExecution()
     {
         (WorkflowExecution execution, ExecutionStep step) = MakeRunningFormStep();
-        _execRepo.GetByIdWithStepsAsync(execution.Id, TeamAccountId).Returns(execution);
+        _execRepo.GetByIdWithStepsAsync(execution.Id, OrgId).Returns(execution);
 
         IReadOnlyDictionary<string, object?> badConfig = new Dictionary<string, object?>
         {
@@ -69,7 +69,7 @@ public class ExecuteFormStepHandlerTests
         };
 
         await CreateHandler().HandleAsync(
-            new ExecuteFormStepMessage(execution.Id, step.Id, TeamAccountId, WorkflowId, badConfig, execution.Context),
+            new ExecuteFormStepMessage(execution.Id, step.Id, OrgId, WorkflowId, badConfig, execution.Context),
             CancellationToken.None);
 
         step.Status.Should().Be(StepExecutionStatus.Failed);
@@ -83,10 +83,10 @@ public class ExecuteFormStepHandlerTests
         (WorkflowExecution execution, ExecutionStep step) = MakeRunningFormStep();
         // Put step in Waiting state
         execution.WaitStep(step.Id);
-        _execRepo.GetByIdWithStepsAsync(execution.Id, TeamAccountId).Returns(execution);
+        _execRepo.GetByIdWithStepsAsync(execution.Id, OrgId).Returns(execution);
 
         await CreateHandler().HandleAsync(
-            new ExecuteFormStepMessage(execution.Id, step.Id, TeamAccountId, WorkflowId, ValidConfig(), execution.Context),
+            new ExecuteFormStepMessage(execution.Id, step.Id, OrgId, WorkflowId, ValidConfig(), execution.Context),
             CancellationToken.None);
 
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
@@ -98,7 +98,7 @@ public class ExecuteFormStepHandlerTests
         _execRepo.GetByIdWithStepsAsync(Arg.Any<Guid>(), Arg.Any<Guid>()).ReturnsNull();
 
         await CreateHandler().HandleAsync(
-            new ExecuteFormStepMessage(Guid.NewGuid(), Guid.NewGuid(), TeamAccountId, WorkflowId, ValidConfig(), new Dictionary<string, object?>()),
+            new ExecuteFormStepMessage(Guid.NewGuid(), Guid.NewGuid(), OrgId, WorkflowId, ValidConfig(), new Dictionary<string, object?>()),
             CancellationToken.None);
 
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
@@ -110,12 +110,12 @@ public class ExecuteFormStepHandlerTests
         // FormBuilder will receive no FormStepReached event because UoW rolled back — the winning
         // worker already published it. This handler must exit without rethrowing.
         (WorkflowExecution execution, ExecutionStep step) = MakeRunningFormStep();
-        _execRepo.GetByIdWithStepsAsync(execution.Id, TeamAccountId).Returns(execution);
+        _execRepo.GetByIdWithStepsAsync(execution.Id, OrgId).Returns(execution);
         _uow.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(Task.FromException<int>(new ConcurrencyException()));
 
         Func<Task> act = () => CreateHandler().HandleAsync(
-            new ExecuteFormStepMessage(execution.Id, step.Id, TeamAccountId, WorkflowId, ValidConfig(), execution.Context),
+            new ExecuteFormStepMessage(execution.Id, step.Id, OrgId, WorkflowId, ValidConfig(), execution.Context),
             CancellationToken.None);
 
         await act.Should().NotThrowAsync();

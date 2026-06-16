@@ -36,7 +36,7 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 - [ ] Integration tests confirm that records created by Tenant A are not visible to Tenant B under any query path.
 
 *Validation & errors*
-- [ ] A request with a valid JWT but an `team_account_id` that references a non-existent or deleted team account returns HTTP 403.
+- [ ] A request with a valid JWT but an `org_id` that references a non-existent or deleted org returns HTTP 403.
 - [ ] A request that somehow bypasses tenant resolution (e.g., direct DB query without schema set) cannot read another tenant's data because schema isolation prevents it at the DB level.
 - [ ] Any query that targets the `public` schema for tenant-scoped data (models, records, workflows) fails with an application-level exception, not silently returning empty results.
 
@@ -62,10 +62,10 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 > - `TenantSchemaInterceptor` sets PostgreSQL `search_path` per connection for module `DbContext`s
 > - `TenantSchemaInterceptorTests` (two schemas, no cross-read). `HttpTenantContext` on `Axis.Api`
 > - `FixedTenantContext` in Wolverine provision handlers.
-> - cross-tenant API integration tests (`TenantIsolationEndpointTests` — DataModeling list/get by id and archived-team account 403)
+> - cross-tenant API integration tests (`TenantIsolationEndpointTests` — DataModeling list/get by id and archived-org 403)
 > - connection-pool safety documented in [patterns.md](../../../playbooks/patterns.md) (`search_path` set on every `ConnectionOpened`, including pooled reconnects).
 >
-> **Gaps vs spec:** none for backend schema-per-tenant isolation. Tenant-scoped data never lives in `public` by design (module tables only in `tenant_{teamAccountId:N}`); no separate runtime guard beyond schema isolation.
+> **Gaps vs spec:** none for backend schema-per-tenant isolation. Tenant-scoped data never lives in `public` by design (module tables only in `tenant_{orgId:N}`); no separate runtime guard beyond schema isolation.
 
 ## Wireframes
 

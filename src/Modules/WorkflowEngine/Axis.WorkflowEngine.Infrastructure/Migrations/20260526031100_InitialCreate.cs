@@ -16,7 +16,7 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                 columns: table => new
                 {
                     workflow_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    team_account_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    organization_id = table.Column<Guid>(type: "uuid", nullable: false),
                     is_active = table.Column<bool>(type: "boolean", nullable: false)
                 },
                 constraints: table =>
@@ -30,7 +30,7 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     WorkflowDefinitionId = table.Column<Guid>(type: "uuid", nullable: false),
-                    TeamAccountId = table.Column<Guid>(type: "uuid", nullable: false),
+                    OrganizationId = table.Column<Guid>(type: "uuid", nullable: false),
                     Status = table.Column<string>(type: "text", nullable: false),
                     TriggerType = table.Column<string>(type: "text", nullable: false),
                     TriggeredByUserId = table.Column<Guid>(type: "uuid", nullable: true),
@@ -52,7 +52,7 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                 columns: table => new
                 {
                     workflow_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    team_account_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    organization_id = table.Column<Guid>(type: "uuid", nullable: false),
                     steps = table.Column<string>(type: "jsonb", nullable: false),
                     transitions = table.Column<string>(type: "jsonb", nullable: false)
                 },
@@ -67,7 +67,7 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     ExecutionId = table.Column<Guid>(type: "uuid", nullable: false),
-                    TeamAccountId = table.Column<Guid>(type: "uuid", nullable: false),
+                    OrganizationId = table.Column<Guid>(type: "uuid", nullable: false),
                     StepDefinitionId = table.Column<Guid>(type: "uuid", nullable: false),
                     Name = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                     StepType = table.Column<string>(type: "text", nullable: false),
@@ -93,9 +93,9 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_execution_steps_ExecutionId_TeamAccountId",
+                name: "IX_execution_steps_ExecutionId_OrganizationId",
                 table: "execution_steps",
-                columns: new[] { "ExecutionId", "TeamAccountId" });
+                columns: new[] { "ExecutionId", "OrganizationId" });
         }
 
         /// <inheritdoc />

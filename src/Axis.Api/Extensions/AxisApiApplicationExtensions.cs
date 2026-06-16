@@ -36,7 +36,7 @@ internal static class AxisApiApplicationExtensions
         app.UseAuthentication();
         app.UseMiddleware<CorrelationIdMiddleware>();
         app.UseSerilogRequestLogging();
-        app.UseMiddleware<TenantTeamAccountAccessMiddleware>();
+        app.UseMiddleware<TenantOrganizationAccessMiddleware>();
         app.UseAuthorization();
 
         if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
@@ -66,9 +66,9 @@ internal static class AxisApiApplicationExtensions
         app.MapAuthEndpoints();
         app.MapLegalEndpoints();
         app.MapPlanEndpoints();
-        app.MapTeamAccountEndpoints();
-        app.MapTeamAccountSettingsEndpoints();
-        app.MapPlatformTeamAccountEndpoints();
+        app.MapOrganizationEndpoints();
+        app.MapOrganizationSettingsEndpoints();
+        app.MapPlatformOrganizationEndpoints();
         app.MapInvitationEndpoints();
         app.MapUserEndpoints();
         app.MapRoleEndpoints();

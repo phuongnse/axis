@@ -8,7 +8,7 @@ Create a new record for a model so that I can store business data.
 
 ## Primary actor
 
-- Team account Member with `data_modeling:record:write`
+- Organization Member with `data_modeling:record:write`
 
 ## Trigger
 

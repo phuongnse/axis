@@ -31,15 +31,15 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] JWT contains an `team_account_id` claim set at login time.
-- [ ] Middleware reads `team_account_id`, resolves the tenant schema name (from Redis cache or DB), and stores it in the scoped `ITenantContext`.
-- [ ] All downstream handlers access tenant info through `ITenantContext`; none read `team_account_id` directly from the JWT.
+- [ ] JWT contains an `org_id` claim set at login time.
+- [ ] Middleware reads `org_id`, resolves the tenant schema name (from Redis cache or DB), and stores it in the scoped `ITenantContext`.
+- [ ] All downstream handlers access tenant info through `ITenantContext`; none read `org_id` directly from the JWT.
 - [ ] Schema name resolution adds less than 5 ms to request latency (cache hit).
 
 *Validation & errors*
-- [ ] A JWT missing the `team_account_id` claim is rejected with HTTP 401.
-- [ ] A JWT with an `team_account_id` that maps to no known schema is rejected with HTTP 403 (not 404, to avoid enumeration).
-- [ ] A JWT with an `team_account_id` for a deleted or suspended team account is rejected with HTTP 403.
+- [ ] A JWT missing the `org_id` claim is rejected with HTTP 401.
+- [ ] A JWT with an `org_id` that maps to no known schema is rejected with HTTP 403 (not 404, to avoid enumeration).
+- [ ] A JWT with an `org_id` for a deleted or suspended org is rejected with HTTP 403.
 
 *Edge cases*
 - [ ] Redis cache miss (cold start, cache eviction): falls back to DB lookup, caches the result for 1 hour, and proceeds normally.
@@ -60,9 +60,9 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 > | Frontend | N/A |
 >
 > **Done:**
-> - `team_account_id` claim issued at login (`ConnectEndpoints`)
-> - handlers use `ITenantContext` / `ICurrentUser` — schema `tenant_{teamAccountId:N}` derived in `HttpTenantContext` (no separate DB lookup; Redis cache N/A — deterministic derivation satisfies the under-5 ms AC).
-> - `TenantTeamAccountAccessMiddleware` returns HTTP 403 for missing, archived/deleted, or not-ready team accounts on tenant module routes (`/api/models`, workflows, forms, etc.).
+> - `org_id` claim issued at login (`ConnectEndpoints`)
+> - handlers use `ITenantContext` / `ICurrentUser` — schema `tenant_{orgId:N}` derived in `HttpTenantContext` (no separate DB lookup; Redis cache N/A — deterministic derivation satisfies the under-5 ms AC).
+> - `TenantOrganizationAccessMiddleware` returns HTTP 403 for missing, archived/deleted, or not-ready orgs on tenant module routes (`/api/models`, workflows, forms, etc.).
 > - background jobs use `FixedTenantContext` in provision/cancel handlers (see [patterns.md](../../../playbooks/patterns.md)).
 >
 > **Gaps vs spec:** none for backend cross-tenant access prevention.

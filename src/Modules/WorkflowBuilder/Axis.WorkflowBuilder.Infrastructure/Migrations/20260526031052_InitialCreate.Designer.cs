@@ -57,9 +57,9 @@ namespace Axis.WorkflowBuilder.Infrastructure.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
-                    b.Property<Guid>("TeamAccountId")
+                    b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")
-                        .HasColumnName("team_account_id");
+                        .HasColumnName("organization_id");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -88,7 +88,7 @@ namespace Axis.WorkflowBuilder.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TeamAccountId", "Name")
+                    b.HasIndex("OrganizationId", "Name")
                         .IsUnique()
                         .HasFilter("deleted_at IS NULL");
 
@@ -113,15 +113,15 @@ namespace Axis.WorkflowBuilder.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_broken");
 
-                    b.Property<Guid>("TeamAccountId")
+                    b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")
-                        .HasColumnName("team_account_id");
+                        .HasColumnName("organization_id");
 
                     b.HasKey("WorkflowId", "StepId");
 
                     b.HasIndex("FormId");
 
-                    b.HasIndex("TeamAccountId", "FormId");
+                    b.HasIndex("OrganizationId", "FormId");
 
                     b.ToTable("workflow_form_references", (string)null);
                 });
@@ -140,15 +140,15 @@ namespace Axis.WorkflowBuilder.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_broken");
 
-                    b.Property<Guid>("TeamAccountId")
+                    b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")
-                        .HasColumnName("team_account_id");
+                        .HasColumnName("organization_id");
 
                     b.HasKey("WorkflowId", "ModelId");
 
                     b.HasIndex("ModelId");
 
-                    b.HasIndex("TeamAccountId", "ModelId");
+                    b.HasIndex("OrganizationId", "ModelId");
 
                     b.ToTable("workflow_model_references", (string)null);
                 });

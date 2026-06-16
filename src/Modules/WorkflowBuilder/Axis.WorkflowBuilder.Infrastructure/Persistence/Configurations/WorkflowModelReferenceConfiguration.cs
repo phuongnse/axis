@@ -13,10 +13,10 @@ internal sealed class WorkflowModelReferenceConfiguration : IEntityTypeConfigura
 
         builder.Property(r => r.WorkflowId).HasColumnName("workflow_id").IsRequired();
         builder.Property(r => r.ModelId).HasColumnName("model_id").IsRequired();
-        builder.Property(r => r.TeamAccountId).HasColumnName("team_account_id").IsRequired();
+        builder.Property(r => r.OrganizationId).HasColumnName("organization_id").IsRequired();
         builder.Property(r => r.IsBroken).HasColumnName("is_broken").IsRequired();
 
         builder.HasIndex(r => r.ModelId);
-        builder.HasIndex(r => new { r.TeamAccountId, r.ModelId });
+        builder.HasIndex(r => new { r.OrganizationId, r.ModelId });
     }
 }

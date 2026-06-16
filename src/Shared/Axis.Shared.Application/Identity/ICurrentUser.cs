@@ -7,5 +7,5 @@ namespace Axis.Shared.Application.Identity;
 public interface ICurrentUser
 {
     Guid? UserId { get; }
-    Guid? TeamAccountId { get; }
+    Guid? OrganizationId { get; }
 }

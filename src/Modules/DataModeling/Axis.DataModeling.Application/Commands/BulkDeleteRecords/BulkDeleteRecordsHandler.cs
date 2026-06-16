@@ -17,7 +17,7 @@ public sealed class BulkDeleteRecordsHandler(
         if (command.RecordIds.Count == 0)
             return Result<BulkDeleteResult>.Failure(ErrorCodes.BusinessRule, "Please select at least one record.");
 
-        DataModel? model = await modelRepo.GetByIdAsync(command.ModelId, command.TeamAccountId, cancellationToken);
+        DataModel? model = await modelRepo.GetByIdAsync(command.ModelId, command.OrganizationId, cancellationToken);
         if (model is null)
             return Result<BulkDeleteResult>.Failure(ErrorCodes.NotFound, "Model not found.");
 
@@ -27,7 +27,7 @@ public sealed class BulkDeleteRecordsHandler(
         // BulkDeleteAsync executes immediately via a single UPDATE statement (not through EF change tracking),
         // so SaveChangesAsync is intentionally omitted here.
         int deleted = await recordRepo.BulkDeleteAsync(
-            uniqueIds, command.ModelId, command.TeamAccountId, cancellationToken);
+            uniqueIds, command.ModelId, command.OrganizationId, cancellationToken);
 
         int notFound = uniqueIds.Count - deleted;
         return Result.Success(new BulkDeleteResult(deleted, notFound));

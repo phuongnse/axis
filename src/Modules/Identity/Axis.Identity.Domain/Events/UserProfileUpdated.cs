@@ -4,6 +4,6 @@ namespace Axis.Identity.Domain.Events;
 
 public record UserProfileUpdated(
     Guid UserId,
-    Guid TeamAccountId,
+    Guid OrganizationId,
     string FullName,
     string? AvatarUrl) : IDomainEvent;

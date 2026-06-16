@@ -19,7 +19,7 @@ public sealed class StepFailedHandler(
     public async Task HandleAsync(StepFailedMessage message, CancellationToken ct)
     {
         WorkflowExecution? execution = await execRepo.GetByIdWithStepsAsync(
-            message.ExecutionId, message.TeamAccountId, ct);
+            message.ExecutionId, message.OrganizationId, ct);
 
         if (execution is null)
         {

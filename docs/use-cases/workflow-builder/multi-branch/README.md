@@ -8,7 +8,7 @@ Add more than two branches from a Condition step so that I can handle multiple d
 
 ## Primary actor
 
-- Team account Member
+- Organization Member
 
 ## Trigger
 

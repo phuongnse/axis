@@ -2,4 +2,4 @@ using Axis.Shared.Application.CQRS;
 
 namespace Axis.FormBuilder.Application.Queries.GetFormById;
 
-public sealed record GetFormByIdQuery(Guid FormId, Guid TeamAccountId) : IQuery<FormDetailDto?>;
+public sealed record GetFormByIdQuery(Guid FormId, Guid OrganizationId) : IQuery<FormDetailDto?>;

@@ -18,11 +18,11 @@ namespace Axis.Identity.Application.Tests.Commands;
 public class VerifyEmailHandlerTests
 {
     private readonly IEmailVerificationTokenStore _tokenStore = Substitute.For<IEmailVerificationTokenStore>();
-    private readonly ITeamAccountRegistrationTokenStore _teamAccountTokenStore =
-        Substitute.For<ITeamAccountRegistrationTokenStore>();
+    private readonly IOrganizationRegistrationTokenStore _organizationTokenStore =
+        Substitute.For<IOrganizationRegistrationTokenStore>();
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
-    private readonly ITeamAccountMembershipRepository _membershipRepo = Substitute.For<ITeamAccountMembershipRepository>();
-    private readonly ITeamAccountRepository _teamAccountRepo = Substitute.For<ITeamAccountRepository>();
+    private readonly IOrganizationMembershipRepository _membershipRepo = Substitute.For<IOrganizationMembershipRepository>();
+    private readonly IOrganizationRepository _organizationRepo = Substitute.For<IOrganizationRepository>();
     private readonly ITenantModuleProvisioningRepository _provisioningRepo =
         Substitute.For<ITenantModuleProvisioningRepository>();
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
@@ -30,7 +30,7 @@ public class VerifyEmailHandlerTests
 
     public VerifyEmailHandlerTests()
     {
-        _teamAccountTokenStore.ResolveVerificationAsync(
+        _organizationTokenStore.ResolveVerificationAsync(
                 Arg.Any<string>(),
                 Arg.Any<CancellationToken>())
             .Returns(Result.Failure<Guid>(ErrorCodes.BusinessRule, "Invalid verification link."));
@@ -39,35 +39,35 @@ public class VerifyEmailHandlerTests
     private VerifyEmailHandler CreateHandler() =>
         new(
             _tokenStore,
-            _teamAccountTokenStore,
+            _organizationTokenStore,
             _userRepo,
             _membershipRepo,
-            _teamAccountRepo,
+            _organizationRepo,
             _provisioningRepo,
             _roleRepo,
             _uow);
 
-    private static (User User, TeamAccount TeamAccount, TeamAccountMembership Membership) MakeUnverifiedUserWithTeamAccount()
+    private static (User User, Organization Organization, OrganizationMembership Membership) MakeUnverifiedUserWithOrg()
     {
         Email email = Email.Create("alice@acme.com").Value!;
-        TeamAccount teamAccount = TeamAccount.RegisterForContactVerification(
+        Organization organization = Organization.RegisterForContactVerification(
             "Acme",
-            TeamAccountSlug.Create("acme").Value!,
+            OrganizationSlug.Create("acme").Value!,
             email,
             WellKnownSubscriptionPlans.FreeId,
             WellKnownLegalDocuments.TermsVersion,
             WellKnownLegalDocuments.PrivacyVersion);
         User user = User.Create("Alice", "Smith", email);
         user.SetPasswordHash("hashed");
-        TeamAccountMembership membership = TeamAccountMembership.Create(user.Id, teamAccount.Id);
-        return (user, teamAccount, membership);
+        OrganizationMembership membership = OrganizationMembership.Create(user.Id, organization.Id);
+        return (user, organization, membership);
     }
 
     [Fact]
     public async Task VerifyEmail_WhenTokenIsValid_VerifiesEmailAndRaisesDomainEvent()
     {
-        (User user, TeamAccount teamAccount, TeamAccountMembership membership) = MakeUnverifiedUserWithTeamAccount();
-        Role adminRole = Role.CreateSystem("Admin", teamAccount.Id, ["users:read"]);
+        (User user, Organization organization, OrganizationMembership membership) = MakeUnverifiedUserWithOrg();
+        Role adminRole = Role.CreateSystem("Admin", organization.Id, ["users:read"]);
         string rawToken = "valid-raw-token";
         string tokenHash = OpaqueTokenGenerator.Hash(rawToken);
 
@@ -75,8 +75,8 @@ public class VerifyEmailHandlerTests
             .Returns(new EmailVerificationTokenResolveResult(EmailVerificationTokenState.Valid, user.Id));
         _userRepo.GetByIdPlatformWideAsync(user.Id).Returns(user);
         _membershipRepo.GetFirstActiveByUserIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(membership);
-        _teamAccountRepo.GetByIdAsync(teamAccount.Id).Returns(teamAccount);
-        _roleRepo.GetByNameAsync("Admin", teamAccount.Id).Returns(adminRole);
+        _organizationRepo.GetByIdAsync(organization.Id).Returns(organization);
+        _roleRepo.GetByNameAsync("Admin", organization.Id).Returns(adminRole);
 
         Result<VerifyEmailSuccessDto> result = await CreateHandler().Handle(
             new VerifyEmailCommand(rawToken),
@@ -86,40 +86,40 @@ public class VerifyEmailHandlerTests
         result.Value.Email.Should().Be("alice@acme.com");
         result.Value.NextStep.Should().Be(VerifyEmailNextStep.WorkspaceProvisioning);
         user.IsEmailVerified.Should().BeTrue();
-        teamAccount.Status.Should().Be(TeamAccountStatus.Provisioning);
+        organization.Status.Should().Be(OrganizationStatus.Provisioning);
 
         await _provisioningRepo.Received(1).AddRangeAsync(
             Arg.Is<IEnumerable<TenantModuleProvisioning>>(rows => rows.Count() == TenantModuleNames.All.Count),
             Arg.Any<CancellationToken>());
 
-        teamAccount.DomainEvents.Should().ContainSingle(e => e is TeamAccountVerified)
-            .Which.Should().BeOfType<TeamAccountVerified>()
-            .Which.TeamAccountId.Should().Be(teamAccount.Id);
+        organization.DomainEvents.Should().ContainSingle(e => e is OrganizationVerified)
+            .Which.Should().BeOfType<OrganizationVerified>()
+            .Which.OrganizationId.Should().Be(organization.Id);
 
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
         await _tokenStore.DidNotReceive().InvalidateAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task VerifyEmail_WhenTeamAccountContactTokenIsValid_StartsProvisioningAndReturnsSetupToken()
+    public async Task VerifyEmail_WhenOrganizationContactTokenIsValid_StartsProvisioningAndReturnsSetupToken()
     {
         Email email = Email.Create("admin@acme.com").Value!;
-        TeamAccount teamAccount = TeamAccount.RegisterForContactVerification(
+        Organization organization = Organization.RegisterForContactVerification(
             "Acme",
-            TeamAccountSlug.Create("acme").Value!,
+            OrganizationSlug.Create("acme").Value!,
             email,
             WellKnownSubscriptionPlans.FreeId,
             WellKnownLegalDocuments.TermsVersion,
             WellKnownLegalDocuments.PrivacyVersion);
-        string rawToken = "team-account-contact-token";
+        string rawToken = "org-contact-token";
         string tokenHash = OpaqueTokenGenerator.Hash(rawToken);
 
         _tokenStore.ResolveForVerificationAsync(tokenHash, Arg.Any<CancellationToken>())
             .Returns(new EmailVerificationTokenResolveResult(EmailVerificationTokenState.NotFound, null));
-        _teamAccountTokenStore.ResolveVerificationAsync(tokenHash, Arg.Any<CancellationToken>())
-            .Returns(Result.Success(teamAccount.Id));
-        _teamAccountRepo.GetByIdAsync(teamAccount.Id, Arg.Any<CancellationToken>())
-            .Returns(teamAccount);
+        _organizationTokenStore.ResolveVerificationAsync(tokenHash, Arg.Any<CancellationToken>())
+            .Returns(Result.Success(organization.Id));
+        _organizationRepo.GetByIdAsync(organization.Id, Arg.Any<CancellationToken>())
+            .Returns(organization);
 
         Result<VerifyEmailSuccessDto> result = await CreateHandler().Handle(
             new VerifyEmailCommand(rawToken),
@@ -127,16 +127,16 @@ public class VerifyEmailHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value.UserId.Should().BeNull();
-        result.Value.TeamAccountId.Should().Be(teamAccount.Id);
+        result.Value.OrganizationId.Should().Be(organization.Id);
         result.Value.NextStep.Should().Be(VerifyEmailNextStep.RegisterUser);
-        result.Value.TeamAccountSetupToken.Should().NotBeNullOrWhiteSpace();
-        teamAccount.Status.Should().Be(TeamAccountStatus.Provisioning);
+        result.Value.OrganizationSetupToken.Should().NotBeNullOrWhiteSpace();
+        organization.Status.Should().Be(OrganizationStatus.Provisioning);
 
         await _provisioningRepo.Received(1).AddRangeAsync(
             Arg.Is<IEnumerable<TenantModuleProvisioning>>(rows => rows.Count() == TenantModuleNames.All.Count),
             Arg.Any<CancellationToken>());
-        await _teamAccountTokenStore.Received(1).CreateFirstUserSetupAsync(
-            teamAccount.Id,
+        await _organizationTokenStore.Received(1).CreateFirstUserSetupAsync(
+            organization.Id,
             Arg.Any<string>(),
             Arg.Any<DateTime>(),
             Arg.Any<CancellationToken>());
@@ -180,7 +180,7 @@ public class VerifyEmailHandlerTests
     [Fact]
     public async Task VerifyEmail_WhenTokenAlreadyUsed_ReturnsBusinessRuleFailure()
     {
-        (User user, TeamAccount _, TeamAccountMembership _) = MakeUnverifiedUserWithTeamAccount();
+        (User user, Organization _, OrganizationMembership _) = MakeUnverifiedUserWithOrg();
         string rawToken = "used-token";
         string tokenHash = OpaqueTokenGenerator.Hash(rawToken);
         _tokenStore.ResolveForVerificationAsync(tokenHash, Arg.Any<CancellationToken>())
@@ -199,7 +199,7 @@ public class VerifyEmailHandlerTests
     [Fact]
     public async Task VerifyEmail_WhenUserAlreadyVerified_ReturnsBusinessRuleFailure()
     {
-        (User user, TeamAccount _, TeamAccountMembership _) = MakeUnverifiedUserWithTeamAccount();
+        (User user, Organization _, OrganizationMembership _) = MakeUnverifiedUserWithOrg();
         user.VerifyEmail();
         user.ClearDomainEvents();
         string rawToken = "still-valid-token";

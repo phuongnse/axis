@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace Axis.Identity.Infrastructure.PlanLimits;
 
 public sealed class PlanLimitService(
-    ITeamAccountRepository teamAccountRepository,
+    IOrganizationRepository organizationRepository,
     ISubscriptionPlanRepository subscriptionPlanRepository,
     IEnumerable<IPlanLimitUsageCounter> usageCounters,
     PlanLimitRedisCache redisCache,
@@ -17,26 +17,26 @@ public sealed class PlanLimitService(
     ILogger<PlanLimitService> logger) : IPlanLimitService
 {
     public async Task<Result> EnsureWithinLimitAsync(
-        Guid teamAccountId,
+        Guid organizationId,
         PlanLimitResourceType resourceType,
         int increment = 1,
         CancellationToken cancellationToken = default)
     {
-        TeamAccount? teamAccount =
-            await teamAccountRepository.GetByIdAsync(teamAccountId, cancellationToken);
-        if (teamAccount is null)
-            return Result.Failure(ErrorCodes.NotFound, "Team account not found.");
+        Organization? organization =
+            await organizationRepository.GetByIdAsync(organizationId, cancellationToken);
+        if (organization is null)
+            return Result.Failure(ErrorCodes.NotFound, "Organization not found.");
 
         SubscriptionPlan? plan =
-            await subscriptionPlanRepository.GetByIdAsync(teamAccount.SubscriptionPlanId, cancellationToken);
+            await subscriptionPlanRepository.GetByIdAsync(organization.SubscriptionPlanId, cancellationToken);
         if (plan is null)
-            return Result.Failure(ErrorCodes.BusinessRule, "TeamAccount subscription plan is not configured.");
+            return Result.Failure(ErrorCodes.BusinessRule, "Organization subscription plan is not configured.");
 
         int? limit = GetLimit(plan, resourceType);
         if (!plan.HasLimit(limit))
             return Result.Success();
 
-        int current = await GetCurrentUsageAsync(teamAccountId, resourceType, cancellationToken);
+        int current = await GetCurrentUsageAsync(organizationId, resourceType, cancellationToken);
         if (plan.IsWithinLimit(limit, current, increment))
             return Result.Success();
 
@@ -52,11 +52,11 @@ public sealed class PlanLimitService(
         return Result.PlanLimitFailure(details);
     }
 
-    public Task RefreshCachedLimitsAsync(Guid teamAccountId, CancellationToken cancellationToken = default) =>
-        redisCache.TryInvalidateTeamAccountAsync(teamAccountId, cancellationToken);
+    public Task RefreshCachedLimitsAsync(Guid organizationId, CancellationToken cancellationToken = default) =>
+        redisCache.TryInvalidateOrganizationAsync(organizationId, cancellationToken);
 
     public Task RecordUsageDeltaAsync(
-        Guid teamAccountId,
+        Guid organizationId,
         PlanLimitResourceType resourceType,
         int delta,
         CancellationToken cancellationToken = default)
@@ -64,27 +64,27 @@ public sealed class PlanLimitService(
         if (delta == 0)
             return Task.CompletedTask;
 
-        return redisCache.TryAdjustUsageAsync(teamAccountId, resourceType, delta, cancellationToken);
+        return redisCache.TryAdjustUsageAsync(organizationId, resourceType, delta, cancellationToken);
     }
 
     public async Task<PlanLimitUsageSnapshot?> GetUsageSnapshotAsync(
-        Guid teamAccountId,
+        Guid organizationId,
         CancellationToken cancellationToken = default)
     {
-        TeamAccount? teamAccount =
-            await teamAccountRepository.GetByIdAsync(teamAccountId, cancellationToken);
-        if (teamAccount is null)
+        Organization? organization =
+            await organizationRepository.GetByIdAsync(organizationId, cancellationToken);
+        if (organization is null)
             return null;
 
         SubscriptionPlan? plan =
-            await subscriptionPlanRepository.GetByIdAsync(teamAccount.SubscriptionPlanId, cancellationToken);
+            await subscriptionPlanRepository.GetByIdAsync(organization.SubscriptionPlanId, cancellationToken);
         if (plan is null)
             return null;
 
-        int workflowsUsed = await GetCurrentUsageAsync(teamAccountId, PlanLimitResourceType.Workflows, cancellationToken);
+        int workflowsUsed = await GetCurrentUsageAsync(organizationId, PlanLimitResourceType.Workflows, cancellationToken);
         int executionsUsed =
-            await GetCurrentUsageAsync(teamAccountId, PlanLimitResourceType.ExecutionsPerMonth, cancellationToken);
-        int usersUsed = await GetCurrentUsageAsync(teamAccountId, PlanLimitResourceType.Users, cancellationToken);
+            await GetCurrentUsageAsync(organizationId, PlanLimitResourceType.ExecutionsPerMonth, cancellationToken);
+        int usersUsed = await GetCurrentUsageAsync(organizationId, PlanLimitResourceType.Users, cancellationToken);
 
         return new PlanLimitUsageSnapshot(
             workflowsUsed,
@@ -96,11 +96,11 @@ public sealed class PlanLimitService(
     }
 
     private async Task<int> GetCurrentUsageAsync(
-        Guid teamAccountId,
+        Guid organizationId,
         PlanLimitResourceType resourceType,
         CancellationToken cancellationToken)
     {
-        long? cached = await redisCache.TryGetCachedUsageAsync(teamAccountId, resourceType, cancellationToken);
+        long? cached = await redisCache.TryGetCachedUsageAsync(organizationId, resourceType, cancellationToken);
         if (cached is not null)
         {
             if (cached.Value >= int.MaxValue)
@@ -108,8 +108,8 @@ public sealed class PlanLimitService(
             if (cached.Value <= 0)
             {
                 logger.LogWarning(
-                    "Cached plan-limit usage is non-positive for team account {TeamAccountId} resource {ResourceType}: {CachedUsage}",
-                    teamAccountId,
+                    "Cached plan-limit usage is non-positive for org {OrganizationId} resource {ResourceType}: {CachedUsage}",
+                    organizationId,
                     resourceType,
                     cached.Value);
                 return 0;
@@ -130,28 +130,28 @@ public sealed class PlanLimitService(
         int usage;
         try
         {
-            usage = await counter.GetCurrentUsageAsync(teamAccountId, cancellationToken);
+            usage = await counter.GetCurrentUsageAsync(organizationId, cancellationToken);
         }
         catch (Exception ex)
         {
             logger.LogWarning(
                 ex,
-                "Plan limit usage counter failed for team account {TeamAccountId} resource {ResourceType}; treating usage as zero.",
-                teamAccountId,
+                "Plan limit usage counter failed for org {OrganizationId} resource {ResourceType}; treating usage as zero.",
+                organizationId,
                 resourceType);
             return 0;
         }
 
         bool cachedWrite = await redisCache.TrySetCachedUsageAsync(
-            teamAccountId,
+            organizationId,
             resourceType,
             usage,
             cancellationToken);
         if (!cachedWrite)
         {
             logger.LogWarning(
-                "Redis unavailable for plan limit cache (team account {TeamAccountId}, {ResourceType}); using database count {Usage}.",
-                teamAccountId,
+                "Redis unavailable for plan limit cache (org {OrganizationId}, {ResourceType}); using database count {Usage}.",
+                organizationId,
                 resourceType,
                 usage);
         }

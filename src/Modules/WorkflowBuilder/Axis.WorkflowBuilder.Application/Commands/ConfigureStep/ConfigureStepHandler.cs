@@ -15,7 +15,7 @@ public sealed class ConfigureStepHandler(
     public async Task<Result> Handle(ConfigureStepCommand command, CancellationToken cancellationToken)
     {
         WorkflowDefinition? workflow = await workflowRepo.GetByIdAsync(
-            command.WorkflowId, command.TeamAccountId, cancellationToken);
+            command.WorkflowId, command.OrganizationId, cancellationToken);
 
         if (workflow is null)
             return Result.Failure(ErrorCodes.NotFound, "Workflow not found.");

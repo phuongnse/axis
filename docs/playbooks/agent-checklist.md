@@ -183,7 +183,7 @@ Paste block format: header `Docs review:` then one `-` line per row (Retrospecti
 Docs review:
 - Library → TECH_STACK.md / not triggered
 - New pattern → patterns.md or REVIEW_FINDINGS.md / not triggered
-- Use-case layer callout → docs/use-cases/{domain}/… (layout per [docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--wireframes--implementation-status); multi-screen example [register-team-account](../use-cases/platform-foundation/register-team-account/README.md)) / not triggered
+- Use-case layer callout → docs/use-cases/{domain}/… (layout per [docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--wireframes--implementation-status); multi-screen example [register-org](../use-cases/platform-foundation/register-org/README.md)) / not triggered
 - Use-case wireframes/diagrams README → Screen flow + full wireframes inventory + Diagrams owned in-folder only ([docs-style](./docs-style.md#use-case-files--wireframes--implementation-status)) / not triggered
 - Domain README + PROGRESS → … / not triggered
 - Architecture rule → AGENTS.md / not triggered

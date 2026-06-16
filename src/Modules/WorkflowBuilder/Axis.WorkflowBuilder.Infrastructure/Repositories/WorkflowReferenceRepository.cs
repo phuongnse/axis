@@ -21,14 +21,14 @@ internal sealed class WorkflowReferenceRepository(WorkflowBuilderDbContext conte
 
     public async Task<int> CountBlockingFormReferencesAsync(
         Guid formId,
-        Guid teamAccountId,
+        Guid organizationId,
         CancellationToken cancellationToken = default)
     {
         return await (
             from reference in context.WorkflowFormReferences
             join workflow in context.WorkflowDefinitions on reference.WorkflowId equals workflow.Id
             where reference.FormId == formId
-                  && reference.TeamAccountId == teamAccountId
+                  && reference.OrganizationId == organizationId
                   && !reference.IsBroken
                   && workflow.DeletedAt == null
                   && workflow.Status != WorkflowStatus.Archived

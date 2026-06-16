@@ -22,11 +22,11 @@ internal sealed class ModelDeletedHandler(
 {
     public async Task Handle(ModelDeletedEvent @event, CancellationToken cancellationToken)
     {
-        Guid teamAccountId = @event.TeamAccountId();
+        Guid organizationId = @event.OrganizationId();
         Guid modelId = @event.ModelId();
 
         List<FormDefinition> forms = await context.FormDefinitions
-            .Where(f => f.DeletedAt == null && f.TeamAccountId == teamAccountId)
+            .Where(f => f.DeletedAt == null && f.OrganizationId == organizationId)
             .ToListAsync(cancellationToken);
 
         int flagged = 0;
@@ -47,7 +47,7 @@ internal sealed class ModelDeletedHandler(
                 if (existing is null)
                 {
                     context.FormModelReferences.Add(
-                        FormModelReference.Create(form.Id, field.Id, modelId, teamAccountId, isBroken: true));
+                        FormModelReference.Create(form.Id, field.Id, modelId, organizationId, isBroken: true));
                 }
                 else
                     existing.MarkBroken();
@@ -60,7 +60,7 @@ internal sealed class ModelDeletedHandler(
             await uow.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
-            "ModelDeletedHandler: flagged {Count} Relation Picker field(s) for deleted model {ModelId} team account {TeamAccountId}",
-            flagged, modelId, teamAccountId);
+            "ModelDeletedHandler: flagged {Count} Relation Picker field(s) for deleted model {ModelId} org {OrganizationId}",
+            flagged, modelId, organizationId);
     }
 }

@@ -6,5 +6,5 @@ namespace Axis.DataModeling.Application.Commands.UpdateRecord;
 public sealed record UpdateRecordCommand(
     Guid RecordId,
     Guid ModelId,
-    Guid TeamAccountId,
+    Guid OrganizationId,
     IReadOnlyDictionary<string, object?> Data) : ICommand;

@@ -8,7 +8,7 @@ Filter and search records so that I can find the specific data I need quickly.
 
 ## Primary actor
 
-- Team account Member with `data_modeling:record:read`
+- Organization Member with `data_modeling:record:read`
 
 ## Trigger
 

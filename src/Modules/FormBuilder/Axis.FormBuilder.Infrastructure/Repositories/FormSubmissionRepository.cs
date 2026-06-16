@@ -19,11 +19,11 @@ internal sealed class FormSubmissionRepository(FormBuilderDbContext context) : I
 
     public async Task<FormSubmission?> GetByIdAsync(
         Guid id,
-        Guid teamAccountId,
+        Guid organizationId,
         CancellationToken cancellationToken = default)
         => await context.FormSubmissions
             .FirstOrDefaultAsync(
-                s => s.Id == id && s.TeamAccountId == teamAccountId,
+                s => s.Id == id && s.OrganizationId == organizationId,
                 cancellationToken);
 
     public async Task<bool> ExistsForExecutionStepAsync(
@@ -37,10 +37,10 @@ internal sealed class FormSubmissionRepository(FormBuilderDbContext context) : I
 
     public async Task<IReadOnlyList<FormSubmission>> GetPendingForUserAsync(
         Guid userId,
-        Guid teamAccountId,
+        Guid organizationId,
         CancellationToken cancellationToken = default)
         => await context.FormSubmissions
-            .Where(s => s.TeamAccountId == teamAccountId
+            .Where(s => s.OrganizationId == organizationId
                 && s.Status == FormSubmissionStatus.Pending
                 && s.AssigneeUserId == userId)
             .OrderBy(s => s.CreatedAt)
@@ -48,11 +48,11 @@ internal sealed class FormSubmissionRepository(FormBuilderDbContext context) : I
 
     public async Task<IReadOnlyList<FormSubmission>> GetByUserAndStatusAsync(
         Guid userId,
-        Guid teamAccountId,
+        Guid organizationId,
         FormSubmissionStatus status,
         CancellationToken cancellationToken = default)
         => await context.FormSubmissions
-            .Where(s => s.TeamAccountId == teamAccountId
+            .Where(s => s.OrganizationId == organizationId
                 && s.Status == status
                 && (s.AssigneeUserId == userId || s.SubmittedByUserId == userId))
             .OrderByDescending(s => s.SubmittedAt ?? s.CreatedAt)

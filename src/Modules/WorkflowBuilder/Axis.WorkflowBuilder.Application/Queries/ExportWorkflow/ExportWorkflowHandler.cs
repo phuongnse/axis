@@ -18,7 +18,7 @@ public sealed class ExportWorkflowHandler(IWorkflowRepository workflowRepo)
     public async Task<WorkflowExportDto?> Handle(ExportWorkflowQuery query, CancellationToken cancellationToken)
     {
         WorkflowDefinition? workflow = await workflowRepo.GetByIdAsync(
-            query.WorkflowId, query.TeamAccountId, cancellationToken);
+            query.WorkflowId, query.OrganizationId, cancellationToken);
 
         if (workflow is null)
             return null;

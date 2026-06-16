@@ -8,7 +8,7 @@ Assign a role to a user so that they get the appropriate permissions.
 
 ## Primary actor
 
-- Team account Admin
+- Organization Admin
 
 ## Trigger
 
@@ -26,7 +26,7 @@ Assign a role to a user so that they get the appropriate permissions.
 
 ## Context
 
-Team account admins can create custom roles, assign permissions to each role, and assign roles to users. Default system roles (Admin, Editor, Viewer) are provided out-of-the-box and cannot be deleted or modified.
+Organization admins can create custom roles, assign permissions to each role, and assign roles to users. Default system roles (Admin, Editor, Viewer) are provided out-of-the-box and cannot be deleted or modified.
 
 ## Acceptance Criteria
 

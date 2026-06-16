@@ -48,9 +48,9 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("invited_by_user_id");
 
-                    b.Property<Guid>("TeamAccountId")
+                    b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")
-                        .HasColumnName("team_account_id");
+                        .HasColumnName("organization_id");
 
                     b.Property<Guid>("RoleId")
                         .HasColumnType("uuid")
@@ -75,7 +75,7 @@ namespace Axis.Identity.Infrastructure.Migrations
                     b.ToTable("invitations", (string)null);
                 });
 
-            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.TeamAccount", b =>
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.Organization", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -155,10 +155,10 @@ namespace Axis.Identity.Infrastructure.Migrations
 
                     b.HasIndex("SubscriptionPlanId");
 
-                    b.ToTable("team_accounts", (string)null);
+                    b.ToTable("organizations", (string)null);
                 });
 
-            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.TeamAccountMembership", b =>
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.OrganizationMembership", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -169,9 +169,9 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<Guid>("TeamAccountId")
+                    b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")
-                        .HasColumnName("team_account_id");
+                        .HasColumnName("organization_id");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -184,15 +184,15 @@ namespace Axis.Identity.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TeamAccountId");
+                    b.HasIndex("OrganizationId");
 
-                    b.HasIndex("UserId", "TeamAccountId")
+                    b.HasIndex("UserId", "OrganizationId")
                         .IsUnique();
 
-                    b.ToTable("team_account_memberships", (string)null);
+                    b.ToTable("organization_memberships", (string)null);
                 });
 
-            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.TeamAccountMembershipRole", b =>
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.OrganizationMembershipRole", b =>
                 {
                     b.Property<Guid>("MembershipId")
                         .HasColumnType("uuid")
@@ -210,7 +210,7 @@ namespace Axis.Identity.Infrastructure.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("team_account_membership_roles", (string)null);
+                    b.ToTable("organization_membership_roles", (string)null);
                 });
 
             modelBuilder.Entity("Axis.Identity.Domain.Aggregates.Role", b =>
@@ -239,9 +239,9 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
-                    b.Property<Guid>("TeamAccountId")
+                    b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")
-                        .HasColumnName("team_account_id");
+                        .HasColumnName("organization_id");
 
                     b.PrimitiveCollection<List<string>>("_permissions")
                         .IsRequired()
@@ -250,7 +250,7 @@ namespace Axis.Identity.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TeamAccountId", "Name")
+                    b.HasIndex("OrganizationId", "Name")
                         .IsUnique();
 
                     b.ToTable("roles", (string)null);
@@ -337,9 +337,9 @@ namespace Axis.Identity.Infrastructure.Migrations
 
             modelBuilder.Entity("Axis.Identity.Domain.Provisioning.TenantModuleProvisioning", b =>
                 {
-                    b.Property<Guid>("TeamAccountId")
+                    b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")
-                        .HasColumnName("team_account_id");
+                        .HasColumnName("organization_id");
 
                     b.Property<string>("Module")
                         .HasMaxLength(64)
@@ -364,7 +364,7 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
-                    b.HasKey("TeamAccountId", "Module");
+                    b.HasKey("OrganizationId", "Module");
 
                     b.ToTable("tenant_module_provisions", (string)null);
                 });
@@ -456,7 +456,7 @@ namespace Axis.Identity.Infrastructure.Migrations
                     b.ToTable("email_verification_tokens", (string)null);
                 });
 
-            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.TeamAccountPlanChangeLog", b =>
+            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.OrganizationPlanChangeLog", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -475,9 +475,9 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("new_plan_id");
 
-                    b.Property<Guid>("TeamAccountId")
+                    b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")
-                        .HasColumnName("team_account_id");
+                        .HasColumnName("organization_id");
 
                     b.Property<Guid>("PreviousPlanId")
                         .HasColumnType("uuid")
@@ -487,14 +487,14 @@ namespace Axis.Identity.Infrastructure.Migrations
 
                     b.HasIndex("NewPlanId");
 
-                    b.HasIndex("TeamAccountId");
+                    b.HasIndex("OrganizationId");
 
                     b.HasIndex("PreviousPlanId");
 
-                    b.ToTable("team_account_plan_change_logs", (string)null);
+                    b.ToTable("organization_plan_change_logs", (string)null);
                 });
 
-            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.TeamAccountRegistrationToken", b =>
+            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.OrganizationRegistrationToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
@@ -505,7 +505,7 @@ namespace Axis.Identity.Infrastructure.Migrations
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("TeamAccountId")
+                    b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Purpose")
@@ -529,9 +529,9 @@ namespace Axis.Identity.Infrastructure.Migrations
                     b.HasIndex("TokenHash")
                         .IsUnique();
 
-                    b.HasIndex("TeamAccountId", "Purpose");
+                    b.HasIndex("OrganizationId", "Purpose");
 
-                    b.ToTable("team_account_registration_tokens", (string)null);
+                    b.ToTable("organization_registration_tokens", (string)null);
                 });
 
             modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.PasswordResetToken", b =>
@@ -796,7 +796,7 @@ namespace Axis.Identity.Infrastructure.Migrations
                     b.ToTable("OpenIddictTokens", (string)null);
                 });
 
-            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.TeamAccount", b =>
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.Organization", b =>
                 {
                     b.HasOne("Axis.Identity.Domain.Subscriptions.SubscriptionPlan", null)
                         .WithMany()
@@ -805,9 +805,9 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.TeamAccountMembershipRole", b =>
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.OrganizationMembershipRole", b =>
                 {
-                    b.HasOne("Axis.Identity.Domain.Aggregates.TeamAccountMembership", null)
+                    b.HasOne("Axis.Identity.Domain.Aggregates.OrganizationMembership", null)
                         .WithMany("Roles")
                         .HasForeignKey("MembershipId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -823,7 +823,7 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.TeamAccountPlanChangeLog", b =>
+            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.OrganizationPlanChangeLog", b =>
                 {
                     b.HasOne("Axis.Identity.Domain.Subscriptions.SubscriptionPlan", null)
                         .WithMany()
@@ -831,9 +831,9 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Axis.Identity.Domain.Aggregates.TeamAccount", null)
+                    b.HasOne("Axis.Identity.Domain.Aggregates.Organization", null)
                         .WithMany()
-                        .HasForeignKey("TeamAccountId")
+                        .HasForeignKey("OrganizationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -844,11 +844,11 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.TeamAccountRegistrationToken", b =>
+            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.OrganizationRegistrationToken", b =>
                 {
-                    b.HasOne("Axis.Identity.Domain.Aggregates.TeamAccount", null)
+                    b.HasOne("Axis.Identity.Domain.Aggregates.Organization", null)
                         .WithMany()
-                        .HasForeignKey("TeamAccountId")
+                        .HasForeignKey("OrganizationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -886,7 +886,7 @@ namespace Axis.Identity.Infrastructure.Migrations
                     b.Navigation("Authorization");
                 });
 
-            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.TeamAccountMembership", b =>
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.OrganizationMembership", b =>
                 {
                     b.Navigation("Roles");
                 });

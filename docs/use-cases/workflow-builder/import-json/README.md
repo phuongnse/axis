@@ -8,7 +8,7 @@ Import a workflow from a JSON file so that I can quickly set up a workflow that 
 
 ## Primary actor
 
-- Team account Member with `workflow:definition:write`
+- Organization Member with `workflow:definition:write`
 
 ## Trigger
 
@@ -26,7 +26,7 @@ Import a workflow from a JSON file so that I can quickly set up a workflow that 
 
 ## Context
 
-Workflow definitions can be exported as portable JSON files and imported into any Axis team account, enabling template sharing, backups, and environment migration.
+Workflow definitions can be exported as portable JSON files and imported into any Axis organization, enabling template sharing, backups, and environment migration.
 
 ## Acceptance Criteria
 
@@ -42,9 +42,9 @@ Workflow definitions can be exported as portable JSON files and imported into an
 - [ ] Workflow name conflict: the user is prompted to rename the workflow before importing.
 
 *Edge cases*
-- [ ] A referenced form that doesn't exist in the target team account is created automatically during import (using the form definition embedded in the export). If a form with the same name already exists, the user is prompted: "A form named '{name}' already exists. Use existing or create new?"
+- [ ] A referenced form that doesn't exist in the target org is created automatically during import (using the form definition embedded in the export). If a form with the same name already exists, the user is prompted: "A form named '{name}' already exists. Use existing or create new?"
 - [ ] `[REDACTED]` credential values in the import are imported as-is; the user is shown a warning: "N HTTP step(s) have redacted credentials. Configure them after import."
-- [ ] Importing a workflow that references a model that doesn't exist in the target team account: the model definition is created (fields only, no records). If a model with the same name exists, user is prompted to map to it or create new.
+- [ ] Importing a workflow that references a model that doesn't exist in the target org: the model definition is created (fields only, no records). If a model with the same name exists, user is prompted to map to it or create new.
 - [ ] Import is transactional: if any part fails mid-import, no partial data is left behind.
 
 *Out of scope*

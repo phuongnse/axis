@@ -6,7 +6,7 @@ namespace Axis.WorkflowEngine.Domain.Aggregates;
 public sealed class ExecutionStep : Entity<Guid>
 {
     public Guid ExecutionId { get; private set; }
-    public Guid TeamAccountId { get; private set; }
+    public Guid OrganizationId { get; private set; }
     public Guid StepDefinitionId { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public StepType StepType { get; private set; }
@@ -29,14 +29,14 @@ public sealed class ExecutionStep : Entity<Guid>
     private ExecutionStep(
         Guid id,
         Guid executionId,
-        Guid teamAccountId,
+        Guid organizationId,
         Guid stepDefinitionId,
         string name,
         StepType stepType,
         int displayOrder) : base(id)
     {
         ExecutionId = executionId;
-        TeamAccountId = teamAccountId;
+        OrganizationId = organizationId;
         StepDefinitionId = stepDefinitionId;
         Name = name;
         StepType = stepType;
@@ -47,14 +47,14 @@ public sealed class ExecutionStep : Entity<Guid>
 
     public static ExecutionStep Create(
         Guid executionId,
-        Guid teamAccountId,
+        Guid organizationId,
         Guid stepDefinitionId,
         string name,
         StepType stepType,
         int displayOrder)
     {
         if (executionId == Guid.Empty) throw new ArgumentException("ExecutionId must not be empty.", nameof(executionId));
-        if (teamAccountId == Guid.Empty) throw new ArgumentException("TeamAccountId must not be empty.", nameof(teamAccountId));
+        if (organizationId == Guid.Empty) throw new ArgumentException("OrganizationId must not be empty.", nameof(organizationId));
         if (stepDefinitionId == Guid.Empty) throw new ArgumentException("StepDefinitionId must not be empty.", nameof(stepDefinitionId));
         if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Name must not be blank.", nameof(name));
         if (displayOrder < 0) throw new ArgumentOutOfRangeException(nameof(displayOrder), "DisplayOrder must be non-negative.");
@@ -62,7 +62,7 @@ public sealed class ExecutionStep : Entity<Guid>
         return new ExecutionStep(
             Guid.NewGuid(),
             executionId,
-            teamAccountId,
+            organizationId,
             stepDefinitionId,
             name,
             stepType,

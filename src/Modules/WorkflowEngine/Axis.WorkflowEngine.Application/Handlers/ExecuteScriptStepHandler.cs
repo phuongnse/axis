@@ -20,7 +20,7 @@ public sealed class ExecuteScriptStepHandler(
     public async Task HandleAsync(ExecuteScriptStepMessage message, CancellationToken ct)
     {
         WorkflowExecution? execution = await execRepo.GetByIdWithStepsAsync(
-            message.ExecutionId, message.TeamAccountId, ct);
+            message.ExecutionId, message.OrganizationId, ct);
 
         if (execution is null)
         {
@@ -57,7 +57,7 @@ public sealed class ExecuteScriptStepHandler(
                 message.StepId, message.ExecutionId);
 
             await dispatcher.PublishAsync(new StepCompletedMessage(
-                message.ExecutionId, message.StepId, message.TeamAccountId, output), ct);
+                message.ExecutionId, message.StepId, message.OrganizationId, output), ct);
         }
         catch (Exception ex)
         {
@@ -68,7 +68,7 @@ public sealed class ExecuteScriptStepHandler(
                 message.StepId, message.ExecutionId);
 
             await dispatcher.PublishAsync(new StepFailedMessage(
-                message.ExecutionId, message.StepId, message.TeamAccountId,
+                message.ExecutionId, message.StepId, message.OrganizationId,
                 ex.GetType().Name), ct);
         }
     }

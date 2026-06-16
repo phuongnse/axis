@@ -5,5 +5,5 @@ namespace Axis.FormBuilder.Domain.Events;
 public sealed record FormTaskCancelled(
     Guid FormSubmissionId,
     Guid FormDefinitionId,
-    Guid TeamAccountId,
+    Guid OrganizationId,
     Guid ExecutionId) : IDomainEvent;

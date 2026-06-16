@@ -8,7 +8,7 @@ namespace Axis.Shared.Infrastructure.Persistence;
 /// </summary>
 public sealed class DesignTimePublicSchemaTenantContext : ITenantContext
 {
-    public Guid TeamAccountId => Guid.Empty;
+    public Guid OrganizationId => Guid.Empty;
 
     public string SchemaName => "public";
 }

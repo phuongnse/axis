@@ -17,11 +17,11 @@ internal sealed class WorkflowUnarchivedHandler(
     public async Task Handle(WorkflowUnarchivedEvent @event, CancellationToken ct)
     {
         Guid workflowId = @event.WorkflowId();
-        Guid teamAccountId = @event.TeamAccountId();
+        Guid organizationId = @event.OrganizationId();
 
         WorkflowActiveStatus? existing = await context.WorkflowActiveStatuses
             .FirstOrDefaultAsync(w => w.WorkflowId == workflowId
-                                   && w.TeamAccountId == teamAccountId, ct);
+                                   && w.OrganizationId == organizationId, ct);
 
         if (existing is null)
         {

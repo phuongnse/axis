@@ -20,7 +20,7 @@ internal sealed class WorkflowSnapshotConfiguration : IEntityTypeConfiguration<W
         builder.ToTable("workflow_snapshots");
         builder.HasKey(w => w.WorkflowId);
         builder.Property(w => w.WorkflowId).HasColumnName("workflow_id");
-        builder.Property(w => w.TeamAccountId).HasColumnName("team_account_id").IsRequired();
+        builder.Property(w => w.OrganizationId).HasColumnName("organization_id").IsRequired();
 
         // Steps stored as JSONB
         ValueConverter<IReadOnlyList<StepDefinitionSnapshot>, string> stepsConverter = new(

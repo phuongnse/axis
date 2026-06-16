@@ -19,7 +19,7 @@ namespace Axis.WorkflowBuilder.Infrastructure.Migrations
                     name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     description = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    team_account_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    organization_id = table.Column<Guid>(type: "uuid", nullable: false),
                     deleted_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
@@ -40,7 +40,7 @@ namespace Axis.WorkflowBuilder.Infrastructure.Migrations
                     workflow_id = table.Column<Guid>(type: "uuid", nullable: false),
                     step_id = table.Column<Guid>(type: "uuid", nullable: false),
                     form_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    team_account_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    organization_id = table.Column<Guid>(type: "uuid", nullable: false),
                     is_broken = table.Column<bool>(type: "boolean", nullable: false)
                 },
                 constraints: table =>
@@ -54,7 +54,7 @@ namespace Axis.WorkflowBuilder.Infrastructure.Migrations
                 {
                     workflow_id = table.Column<Guid>(type: "uuid", nullable: false),
                     model_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    team_account_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    organization_id = table.Column<Guid>(type: "uuid", nullable: false),
                     is_broken = table.Column<bool>(type: "boolean", nullable: false)
                 },
                 constraints: table =>
@@ -63,9 +63,9 @@ namespace Axis.WorkflowBuilder.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_workflow_definitions_team_account_id_name",
+                name: "IX_workflow_definitions_organization_id_name",
                 table: "workflow_definitions",
-                columns: new[] { "team_account_id", "name" },
+                columns: new[] { "organization_id", "name" },
                 unique: true,
                 filter: "deleted_at IS NULL");
 
@@ -75,9 +75,9 @@ namespace Axis.WorkflowBuilder.Infrastructure.Migrations
                 column: "form_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_workflow_form_references_team_account_id_form_id",
+                name: "IX_workflow_form_references_organization_id_form_id",
                 table: "workflow_form_references",
-                columns: new[] { "team_account_id", "form_id" });
+                columns: new[] { "organization_id", "form_id" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_workflow_model_references_model_id",
@@ -85,9 +85,9 @@ namespace Axis.WorkflowBuilder.Infrastructure.Migrations
                 column: "model_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_workflow_model_references_team_account_id_model_id",
+                name: "IX_workflow_model_references_organization_id_model_id",
                 table: "workflow_model_references",
-                columns: new[] { "team_account_id", "model_id" });
+                columns: new[] { "organization_id", "model_id" });
         }
 
         /// <inheritdoc />

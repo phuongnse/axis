@@ -12,24 +12,24 @@ namespace axis.datamodeling.events
     public partial class FieldRemovedEvent : global::Avro.Specific.ISpecificRecord
     {
         public static global::Avro.Schema _SCHEMA = global::Avro.Schema.Parse(
-            @"{""type"":""record"",""name"":""FieldRemovedEvent"",""namespace"":""axis.datamodeling.events"",""fields"":[{""name"":""modelId"",""type"":""string""},{""name"":""teamAccountId"",""type"":""string""},{""name"":""fieldId"",""type"":""string""},{""name"":""fieldName"",""type"":""string""}]}");
+            @"{""type"":""record"",""name"":""FieldRemovedEvent"",""namespace"":""axis.datamodeling.events"",""fields"":[{""name"":""modelId"",""type"":""string""},{""name"":""organizationId"",""type"":""string""},{""name"":""fieldId"",""type"":""string""},{""name"":""fieldName"",""type"":""string""}]}");
 
         private string _modelId = string.Empty;
-        private string _teamAccountId = string.Empty;
+        private string _organizationId = string.Empty;
         private string _fieldId = string.Empty;
         private string _fieldName = string.Empty;
 
         public virtual global::Avro.Schema Schema => FieldRemovedEvent._SCHEMA;
 
         public string modelId { get => _modelId; set => _modelId = value; }
-        public string teamAccountId { get => _teamAccountId; set => _teamAccountId = value; }
+        public string organizationId { get => _organizationId; set => _organizationId = value; }
         public string fieldId { get => _fieldId; set => _fieldId = value; }
         public string fieldName { get => _fieldName; set => _fieldName = value; }
 
         public virtual object Get(int fieldPos) => fieldPos switch
         {
             0 => modelId,
-            1 => teamAccountId,
+            1 => organizationId,
             2 => fieldId,
             3 => fieldName,
             _ => throw new global::Avro.AvroRuntimeException("Bad index " + fieldPos + " in Get()"),
@@ -40,7 +40,7 @@ namespace axis.datamodeling.events
             switch (fieldPos)
             {
                 case 0: modelId = (string)fieldValue; break;
-                case 1: teamAccountId = (string)fieldValue; break;
+                case 1: organizationId = (string)fieldValue; break;
                 case 2: fieldId = (string)fieldValue; break;
                 case 3: fieldName = (string)fieldValue; break;
                 default: throw new global::Avro.AvroRuntimeException("Bad index " + fieldPos + " in Put()");

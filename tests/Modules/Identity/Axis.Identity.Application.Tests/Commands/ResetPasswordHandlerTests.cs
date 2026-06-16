@@ -17,7 +17,7 @@ public class ResetPasswordHandlerTests
     private readonly IPasswordHasher _hasher = Substitute.For<IPasswordHasher>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private static readonly Guid TeamAccountId = Guid.NewGuid();
+    private static readonly Guid OrgId = Guid.NewGuid();
     private static readonly Guid UserId = Guid.NewGuid();
 
     private ResetPasswordHandler CreateHandler() =>

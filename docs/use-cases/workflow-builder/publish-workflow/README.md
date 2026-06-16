@@ -8,7 +8,7 @@ Publish a workflow so that it can be triggered and executed.
 
 ## Primary actor
 
-- Team account Member with `workflow:definition:write`
+- Organization Member with `workflow:definition:write`
 
 ## Trigger
 
