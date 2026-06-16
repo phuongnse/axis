@@ -2943,7 +2943,7 @@
         "tags": [
           "Identity"
         ],
-        "summary": "Preview Tenant URL slug from a proposed name",
+        "summary": "Preview tenant URL slug from a proposed name",
         "operationId": "GetTenantSlugPreview",
         "parameters": [
           {

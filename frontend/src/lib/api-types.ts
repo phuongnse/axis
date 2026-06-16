@@ -551,7 +551,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Preview Tenant URL slug from a proposed name */
+        /** Preview tenant URL slug from a proposed name */
         get: operations["GetTenantSlugPreview"];
         put?: never;
         post?: never;
