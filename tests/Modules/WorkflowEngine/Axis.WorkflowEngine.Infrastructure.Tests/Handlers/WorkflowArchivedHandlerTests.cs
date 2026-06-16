@@ -12,7 +12,7 @@ namespace Axis.WorkflowEngine.Infrastructure.Tests.Handlers;
 [Collection("WorkflowEngineDatabase")]
 public sealed class WorkflowArchivedHandlerTests(WorkflowEngineDatabaseFixture fixture)
 {
-    private static readonly Guid OrgId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid TenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private static WorkflowArchivedHandler CreateHandler(WorkflowEngineDbContext ctx)
     {
@@ -29,12 +29,12 @@ public sealed class WorkflowArchivedHandlerTests(WorkflowEngineDatabaseFixture f
         Guid workflowId = Guid.NewGuid();
 
         await using WorkflowEngineDbContext setupCtx = fixture.CreateContext();
-        setupCtx.WorkflowActiveStatuses.Add(WorkflowActiveStatus.Activated(workflowId, OrgId));
+        setupCtx.WorkflowActiveStatuses.Add(WorkflowActiveStatus.Activated(workflowId, TenantId));
         await setupCtx.SaveChangesAsync();
 
         await using WorkflowEngineDbContext handlerCtx = fixture.CreateContext();
         await CreateHandler(handlerCtx).Handle(
-            new WorkflowArchivedEvent { workflowId = workflowId.ToString(), organizationId = OrgId.ToString() },
+            new WorkflowArchivedEvent { workflowId = workflowId.ToString(), tenantId = TenantId.ToString() },
             CancellationToken.None);
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
@@ -53,7 +53,7 @@ public sealed class WorkflowArchivedHandlerTests(WorkflowEngineDatabaseFixture f
             new WorkflowArchivedEvent
             {
                 workflowId = Guid.NewGuid().ToString(),
-                organizationId = OrgId.ToString(),
+                tenantId = TenantId.ToString(),
             },
             CancellationToken.None);
 
@@ -66,13 +66,13 @@ public sealed class WorkflowArchivedHandlerTests(WorkflowEngineDatabaseFixture f
         Guid workflowId = Guid.NewGuid();
 
         await using WorkflowEngineDbContext setupCtx = fixture.CreateContext();
-        setupCtx.WorkflowActiveStatuses.Add(WorkflowActiveStatus.Activated(workflowId, OrgId));
+        setupCtx.WorkflowActiveStatuses.Add(WorkflowActiveStatus.Activated(workflowId, TenantId));
         await setupCtx.SaveChangesAsync();
 
         WorkflowArchivedEvent @event = new()
         {
             workflowId = workflowId.ToString(),
-            organizationId = OrgId.ToString(),
+            tenantId = TenantId.ToString(),
         };
 
         await using WorkflowEngineDbContext ctx1 = fixture.CreateContext();

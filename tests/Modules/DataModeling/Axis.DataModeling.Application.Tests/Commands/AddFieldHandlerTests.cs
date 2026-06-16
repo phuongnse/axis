@@ -16,21 +16,21 @@ public class AddFieldHandlerTests
     private readonly IDataModelRepository _modelRepo = Substitute.For<IDataModelRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TenantId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     private AddFieldHandler CreateHandler() => new(_modelRepo, _uow);
 
-    private static DataModel MakeModel() => DataModel.Create("Invoice", null, null, null, OrgId, UserId);
+    private static DataModel MakeModel() => DataModel.Create("Invoice", null, null, null, TenantId, UserId);
 
     [Fact]
     public async Task AddField_WhenModelExists_AddsTextField()
     {
         DataModel model = MakeModel();
-        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
+        _modelRepo.GetByIdAsync(model.Id, TenantId).Returns(model);
 
         Result<Guid> result = await CreateHandler().Handle(
-            new AddFieldCommand(model.Id, OrgId, "amount", "Amount", FieldType.Text, false, new TextFieldConfig()),
+            new AddFieldCommand(model.Id, TenantId, "amount", "Amount", FieldType.Text, false, new TextFieldConfig()),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -41,10 +41,10 @@ public class AddFieldHandlerTests
     [Fact]
     public async Task AddField_WhenModelNotFound_ReturnsNotFound()
     {
-        _modelRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).ReturnsNull();
+        _modelRepo.GetByIdAsync(Arg.Any<Guid>(), TenantId).ReturnsNull();
 
         Result<Guid> result = await CreateHandler().Handle(
-            new AddFieldCommand(Guid.NewGuid(), OrgId, "amount", "Amount", FieldType.Text, false, new TextFieldConfig()),
+            new AddFieldCommand(Guid.NewGuid(), TenantId, "amount", "Amount", FieldType.Text, false, new TextFieldConfig()),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -53,14 +53,14 @@ public class AddFieldHandlerTests
     }
 
     [Fact]
-    public async Task AddField_WhenModelBelongsToAnotherOrg_ReturnsNotFound()
+    public async Task AddField_WhenModelBelongsToAnotherTenant_ReturnsNotFound()
     {
         DataModel model = MakeModel();
-        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
+        _modelRepo.GetByIdAsync(model.Id, TenantId).Returns(model);
 
-        Guid otherOrgId = Guid.NewGuid();
+        Guid otherTenantId = Guid.NewGuid();
         Result<Guid> result = await CreateHandler().Handle(
-            new AddFieldCommand(model.Id, otherOrgId, "amount", "Amount", FieldType.Text, false, new TextFieldConfig()),
+            new AddFieldCommand(model.Id, otherTenantId, "amount", "Amount", FieldType.Text, false, new TextFieldConfig()),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

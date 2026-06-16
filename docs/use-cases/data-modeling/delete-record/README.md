@@ -8,7 +8,7 @@ Delete a record so that I can remove outdated or incorrect entries.
 
 ## Primary actor
 
-- Organization Member with `data_modeling:record:delete`
+- Tenant Member with `data_modeling:record:delete`
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Delete a record so that I can remove outdated or incorrect entries.
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Delete a record flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -57,6 +57,15 @@ Users can create, read, update, and delete records against any model. Records ar
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** Relation broken-reference warning pending workflow-builder integration; 30-day purge pending background job scheduler.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

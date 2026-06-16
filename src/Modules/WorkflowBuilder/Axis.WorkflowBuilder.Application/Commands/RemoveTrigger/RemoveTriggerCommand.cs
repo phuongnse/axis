@@ -5,5 +5,5 @@ namespace Axis.WorkflowBuilder.Application.Commands.RemoveTrigger;
 
 public sealed record RemoveTriggerCommand(
     Guid WorkflowId,
-    Guid OrganizationId,
+    Guid tenantId,
     TriggerType TriggerType) : ICommand;

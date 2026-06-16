@@ -8,7 +8,7 @@ Add a field of any supported type to a model so that I can capture the data I ne
 
 ## Primary actor
 
-- Organization Member with `data_modeling:model:write`
+- Tenant Member with `data_modeling:model:write`
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Add a field of any supported type to a model so that I can capture the data I ne
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Add a field to a model flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -70,6 +70,9 @@ Each field in a model has a type that determines what data it stores, how it's v
 > - Frontend field-builder flow: type picker, type-specific config panel, and save-to-record-form availability.
 >
 > **Decisions:** all 9 field types serialized to JSONB via custom `FieldDefinitionConverter` — polymorphic FieldConfig deserialized using the `type` discriminator in the JSON object.
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

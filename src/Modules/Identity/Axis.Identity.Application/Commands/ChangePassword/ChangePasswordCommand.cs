@@ -4,7 +4,7 @@ namespace Axis.Identity.Application.Commands.ChangePassword;
 
 public record ChangePasswordCommand(
     Guid UserId,
-    Guid OrganizationId,
+    Guid tenantId,
     string CurrentPassword,
     string NewPassword,
     string PasswordConfirmation) : ICommand;

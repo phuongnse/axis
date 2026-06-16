@@ -8,7 +8,7 @@ Filter and search records so that I can find the specific data I need quickly.
 
 ## Primary actor
 
-- Organization Member with `data_modeling:record:read`
+- Tenant Member with `data_modeling:record:read`
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Filter and search records so that I can find the specific data I need quickly.
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Filter and search records flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -70,6 +70,12 @@ Users can create, read, update, and delete records against any model. Records ar
 > - multiple filters combined with AND
 > - sort via `?sortBy=field&sortDir=asc|desc`
 > - unknown/unsafe field names in sort fall back to `created_at DESC`.
+>
+> **Gaps vs spec:**
+> - Follow the layer status table; pending rows remain unfinished.
+>
+> **Deferred follow-ups:**
+> - N/A
 
 ## Wireframes
 

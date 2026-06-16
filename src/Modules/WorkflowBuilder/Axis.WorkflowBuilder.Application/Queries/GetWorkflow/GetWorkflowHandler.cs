@@ -14,7 +14,7 @@ public sealed class GetWorkflowHandler(
     public async Task<WorkflowDetailDto?> Handle(GetWorkflowQuery query, CancellationToken cancellationToken)
     {
         WorkflowDefinition? workflow = await workflowRepo.GetByIdAsync(
-            query.WorkflowId, query.OrganizationId, cancellationToken);
+            query.WorkflowId, query.tenantId, cancellationToken);
 
         if (workflow is null)
             return null;

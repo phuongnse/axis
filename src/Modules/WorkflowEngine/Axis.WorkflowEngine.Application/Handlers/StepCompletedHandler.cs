@@ -21,7 +21,7 @@ public sealed class StepCompletedHandler(
     public async Task HandleAsync(StepCompletedMessage message, CancellationToken ct)
     {
         WorkflowExecution? execution = await execRepo.GetByIdWithStepsAsync(
-            message.ExecutionId, message.OrganizationId, ct);
+            message.ExecutionId, message.tenantId, ct);
 
         if (execution is null)
         {
@@ -68,6 +68,6 @@ public sealed class StepCompletedHandler(
             "StepCompletedHandler: step {StepId} completed in execution {ExecutionId}, advancing",
             message.StepId, message.ExecutionId);
 
-        await dispatcher.PublishAsync(new ExecuteNextStepMessage(execution.Id, execution.OrganizationId), ct);
+        await dispatcher.PublishAsync(new ExecuteNextStepMessage(execution.Id, execution.tenantId), ct);
     }
 }

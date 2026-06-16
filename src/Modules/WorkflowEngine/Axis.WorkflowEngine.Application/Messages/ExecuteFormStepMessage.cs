@@ -7,7 +7,7 @@ namespace Axis.WorkflowEngine.Application.Messages;
 public sealed record ExecuteFormStepMessage(
     Guid ExecutionId,
     Guid StepId,
-    Guid OrganizationId,
+    Guid tenantId,
     Guid WorkflowDefinitionId,
     IReadOnlyDictionary<string, object?>? StepConfig,
     IReadOnlyDictionary<string, object?> Context);

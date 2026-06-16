@@ -7,7 +7,7 @@ namespace Axis.Identity.Application.Queries.GetUserTokenClaims;
 
 public sealed class GetUserTokenClaimsHandler(
     IUserRepository userRepo,
-    IOrganizationMembershipRepository membershipRepo,
+    ITenantMembershipRepository membershipRepo,
     IRoleRepository roleRepo)
     : IQueryHandler<GetUserTokenClaimsQuery, Result<UserTokenClaimsDto>>
 {
@@ -23,15 +23,15 @@ public sealed class GetUserTokenClaimsHandler(
                 "The account is no longer active.");
         }
 
-        OrganizationMembership? membership = query.OrganizationId is Guid organizationId
-            ? await membershipRepo.GetByUserAndOrganizationAsync(user.Id, organizationId, cancellationToken)
+        TenantMembership? membership = query.tenantId is Guid tenantId
+            ? await membershipRepo.GetByUserAndTenantAsync(user.Id, tenantId, cancellationToken)
             : await membershipRepo.GetFirstActiveByUserIdAsync(user.Id, cancellationToken);
 
-        if (query.OrganizationId.HasValue && membership is null)
+        if (query.tenantId.HasValue && membership is null)
         {
             return Result.Failure<UserTokenClaimsDto>(
                 ErrorCodes.BusinessRule,
-                "Invalid organization scope for this user.");
+                "Invalid Tenant scope for this user.");
         }
 
         if (membership is null)
@@ -46,7 +46,7 @@ public sealed class GetUserTokenClaimsHandler(
 
         IReadOnlyList<Role> roles = await roleRepo.GetByIdsAsync(
             membership.RoleIds,
-            membership.OrganizationId,
+            membership.tenantId,
             cancellationToken);
         List<string> permissions = roles
             .SelectMany(r => r.Permissions)
@@ -55,7 +55,7 @@ public sealed class GetUserTokenClaimsHandler(
 
         return Result.Success(new UserTokenClaimsDto(
             user.Id,
-            membership.OrganizationId,
+            membership.tenantId,
             user.Email.Value,
             $"{user.FirstName} {user.LastName}",
             permissions));

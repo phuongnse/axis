@@ -8,7 +8,7 @@ See all workflows so that I can find and manage them.
 
 ## Primary actor
 
-- Organization Member with `workflow:definition:read`
+- Tenant Member with `workflow:definition:read`
 
 ## Trigger
 
@@ -16,9 +16,9 @@ See all workflows so that I can find and manage them.
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — View workflows list flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -58,6 +58,12 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 > **Gaps vs spec:**
 > - status-tab filter and last-execution-date column pending
 > - execution date requires WorkflowEngine integration.
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

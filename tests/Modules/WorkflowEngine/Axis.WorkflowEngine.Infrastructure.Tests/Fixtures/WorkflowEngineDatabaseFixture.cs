@@ -40,7 +40,7 @@ public sealed class WorkflowEngineDatabaseFixture : IAsyncLifetime
         wfCmd.CommandText = $"""
             CREATE TABLE IF NOT EXISTS "{TestSchema}".workflow_definitions (
                 id UUID PRIMARY KEY,
-                organization_id UUID NOT NULL,
+                tenant_id UUID NOT NULL,
                 status TEXT NOT NULL DEFAULT 'Draft'
             );
             """;
@@ -60,6 +60,6 @@ public sealed class WorkflowEngineDatabaseFixture : IAsyncLifetime
 
 internal sealed class TestTenantContext(string schemaName) : ITenantContext
 {
-    public Guid OrganizationId => Guid.Parse("00000000-0000-0000-0000-000000000001");
+    public Guid tenantId => Guid.Parse("00000000-0000-0000-0000-000000000001");
     public string SchemaName => schemaName;
 }

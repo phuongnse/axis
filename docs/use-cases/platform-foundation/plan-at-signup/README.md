@@ -16,9 +16,9 @@ Choose a subscription plan during registration so that I know what features and 
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Select a subscription plan during registration flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -26,14 +26,14 @@ Choose a subscription plan during registration so that I know what features and 
 
 ## Context
 
-Self-service registration flow where a new organization signs up and is automatically provisioned with an isolated database schema and a default admin account. No manual intervention from the Axis team is required.
+Self-service registration flow where a new tenant signs up and is automatically provisioned with an isolated database schema and a default admin account. No manual intervention from the Axis team is required.
 
 ## Acceptance Criteria
 
 *Happy path*
 - [ ] Available plans are shown in a comparison table before the registration form.
 - [ ] A free/trial plan is always available with no payment required.
-- [ ] Selected plan is saved to the organization record during provisioning.
+- [ ] Selected plan is saved to the tenant record during provisioning.
 - [ ] After activation, the workspace header shows the current plan name.
 
 *Validation & errors*
@@ -58,16 +58,21 @@ Self-service registration flow where a new organization signs up and is automati
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:**
-> - pricing comparison table and workspace header plan name pending Frontend. **Done (backend):** `POST /api/organizations/` accepts optional `subscriptionPlanId`
+> - pricing comparison table and workspace header plan name pending Frontend. **Done (backend):** `POST /api/tenants/` accepts optional `subscriptionPlanId`
 > - invalid/unavailable plan ids fall back to Free
-> - org stores `subscription_plan_id`
+> - tenant stores `subscription_plan_id`
 > - subscription-plans enforces limits (402) after provisioning.
 >
 > **Decisions:** Paid plan selection uses normal `subscription_plan_id` assignment until billing integration; no trial-only flag column.
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

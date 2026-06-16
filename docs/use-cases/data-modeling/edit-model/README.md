@@ -8,7 +8,7 @@ Edit an existing model so that I can add, remove, or rename fields as requiremen
 
 ## Primary actor
 
-- Organization Member with `data_modeling:model:write`
+- Tenant Member with `data_modeling:model:write`
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Edit an existing model so that I can add, remove, or rename fields as requiremen
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Edit a model flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -26,7 +26,7 @@ Edit an existing model so that I can add, remove, or rename fields as requiremen
 
 ## Context
 
-Users can create custom data models within their organization. A model defines the structure of a type of business object. All model metadata is stored in the tenant schema; actual records use a JSONB-backed storage strategy.
+Users can create custom data models within their Tenant. A model defines the structure of a type of business object. All model metadata is stored in the tenant schema; actual records use a JSONB-backed storage strategy.
 
 ## Acceptance Criteria
 
@@ -61,6 +61,12 @@ Users can create custom data models within their organization. A model defines t
 > **Gaps vs spec:**
 > - HTTP 409 version-conflict check pending (updated_at comparison)
 > - active-workflow warning pending workflow-builder integration.
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

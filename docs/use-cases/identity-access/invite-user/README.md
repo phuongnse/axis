@@ -1,4 +1,4 @@
-# Use case — Invite a user to the organization
+# Use case — Invite a user to the Tenant
 
 > **Navigation**: [← Identity Access](../README.md) · [Use cases index](../README.md#use-cases)
 
@@ -8,7 +8,7 @@ Invite a team member by email so that they can join the workspace and start coll
 
 ## Primary actor
 
-- Organization Admin
+- Tenant Admin
 
 ## Trigger
 
@@ -26,7 +26,7 @@ Invite a team member by email so that they can join the workspace and start coll
 
 ## Context
 
-Organization admins can invite new members, manage their accounts, and deactivate users who should no longer have access.
+Tenant admins can invite new members, manage their accounts, and deactivate users who should no longer have access.
 
 ## Acceptance Criteria
 
@@ -38,14 +38,14 @@ Organization admins can invite new members, manage their accounts, and deactivat
 
 *Validation & errors*
 - [ ] Email must be a valid email format; invalid format shows an inline error before submission.
-- [ ] Inviting an email already belonging to an active member of the org returns: "This user is already a member."
+- [ ] Inviting an email already belonging to an active member of the tenant returns: "This user is already a member."
 - [ ] Inviting an email that has a pending invitation returns: "An invitation has already been sent to this address." with an option to resend.
 - [ ] Role selection is required; submitting without selecting a role shows an inline error.
 - [ ] If the email service fails to deliver the invitation, the pending invitation is still created and the admin is shown: "Invitation created, but the email could not be sent. Please resend manually."
 
 *Edge cases*
 - [ ] Inviting the same email address after cancelling a previous invitation creates a new invitation (old link is invalidated).
-- [ ] The user limit check is performed at invitation time, not at acceptance time. If the org is at its user limit, the invitation is blocked with an upgrade prompt.
+- [ ] The user limit check is performed at invitation time, not at acceptance time. If the tenant is at its user limit, the invitation is blocked with an upgrade prompt.
 - [ ] An admin cannot invite themselves (their own email address).
 
 *Out of scope*
@@ -68,6 +68,15 @@ Organization admins can invite new members, manage their accounts, and deactivat
 > **Done:** HTTP 402 when user plan limit reached (`InviteUserHandler`, platform-foundation subscription plans).
 >
 > **Decisions:** existing-member and pending-invitation checks throw `ValidationException` with specific messages matching AC wording.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

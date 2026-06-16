@@ -8,7 +8,7 @@ Group related fields under a section heading so that the form is easier to under
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Group related fields under a section heading so that the form is easier to under
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Add a section divider flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -58,6 +58,15 @@ Form fields define what data the form collects. Each field has a type, label, he
 > **Gaps vs spec:** section grouping visual rendering pending Frontend.
 >
 > **Decisions:** sections use `FormFieldType.Section` + `SectionFieldConfig` and flow through the same `AddFieldToFormCommand` as regular fields.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

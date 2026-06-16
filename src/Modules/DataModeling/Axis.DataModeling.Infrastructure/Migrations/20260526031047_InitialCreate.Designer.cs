@@ -57,9 +57,9 @@ namespace Axis.DataModeling.Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
-                    b.Property<Guid>("OrganizationId")
+                    b.Property<Guid>("tenantId")
                         .HasColumnType("uuid")
-                        .HasColumnName("organization_id");
+                        .HasColumnName("tenant_id");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -72,7 +72,7 @@ namespace Axis.DataModeling.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OrganizationId", "Name");
+                    b.HasIndex("tenantId", "Name");
 
                     b.ToTable("data_classes", (string)null);
                 });
@@ -119,9 +119,9 @@ namespace Axis.DataModeling.Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
-                    b.Property<Guid>("OrganizationId")
+                    b.Property<Guid>("tenantId")
                         .HasColumnType("uuid")
-                        .HasColumnName("organization_id");
+                        .HasColumnName("tenant_id");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -134,7 +134,7 @@ namespace Axis.DataModeling.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OrganizationId", "Name");
+                    b.HasIndex("tenantId", "Name");
 
                     b.ToTable("data_models", (string)null);
                 });
@@ -164,9 +164,9 @@ namespace Axis.DataModeling.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("model_id");
 
-                    b.Property<Guid>("OrganizationId")
+                    b.Property<Guid>("tenantId")
                         .HasColumnType("uuid")
-                        .HasColumnName("organization_id");
+                        .HasColumnName("tenant_id");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -179,7 +179,7 @@ namespace Axis.DataModeling.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ModelId", "OrganizationId");
+                    b.HasIndex("ModelId", "tenantId");
 
                     b.ToTable("data_records", (string)null);
                 });

@@ -17,7 +17,7 @@ public sealed class CapturingEmailSender : IEmailSender
         return Task.CompletedTask;
     }
 
-    public Task SendInvitationEmailAsync(string toEmail, string orgName, string invitationToken, CancellationToken ct = default) =>
+    public Task SendInvitationEmailAsync(string toEmail, string tenantName, string invitationToken, CancellationToken ct = default) =>
         Task.CompletedTask;
 
     public Task SendPasswordResetEmailAsync(string toEmail, string resetToken, CancellationToken ct = default) =>
@@ -26,9 +26,9 @@ public sealed class CapturingEmailSender : IEmailSender
     public Task SendPasswordChangedNotificationAsync(string toEmail, CancellationToken ct = default) =>
         Task.CompletedTask;
 
-    public Task SendOrganizationDeletionScheduledEmailAsync(
+    public Task SendTenantDeletionScheduledEmailAsync(
         string toEmail,
-        string organizationName,
+        string TenantName,
         CancellationToken ct = default) =>
         Task.CompletedTask;
 }

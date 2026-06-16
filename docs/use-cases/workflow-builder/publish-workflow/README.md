@@ -8,7 +8,7 @@ Publish a workflow so that it can be triggered and executed.
 
 ## Primary actor
 
-- Organization Member with `workflow:definition:write`
+- Tenant Member with `workflow:definition:write`
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Publish a workflow so that it can be triggered and executed.
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Publish a workflow flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -59,6 +59,12 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 > - cron job registration and webhook URL generation pending WorkflowEngine integration (workflow-engine)
 > - broken-step validation pending data-modeling/form-builder integration
 > - draft versioning on re-edit pending API design.
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

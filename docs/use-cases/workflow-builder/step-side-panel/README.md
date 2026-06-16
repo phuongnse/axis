@@ -8,7 +8,7 @@ Click a step to open its configuration panel so that I can set it up without lea
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Click a step to open its configuration panel so that I can set it up without lea
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Configure a step via side panel flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -60,6 +60,12 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 > **Gaps vs spec:**
 > - slide-over panel, inline error indicators, and auto-save pending Frontend
 > - step config stored as JSONB dict in `steps` column.
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

@@ -14,7 +14,7 @@ public sealed class RemoveFieldFromFormHandler(
 {
     public async Task<Result> Handle(RemoveFieldFromFormCommand command, CancellationToken cancellationToken)
     {
-        FormDefinition? form = await formRepo.GetByIdAsync(command.FormId, command.OrganizationId, cancellationToken);
+        FormDefinition? form = await formRepo.GetByIdAsync(command.FormId, command.tenantId, cancellationToken);
         if (form is null)
             return Result.Failure(ErrorCodes.NotFound, "Form not found.");
 

@@ -8,7 +8,7 @@ Diverged branches to merge back to a single step so that the workflow continues 
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Diverged branches to merge back to a single step so that the workflow continues 
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Merge branches back to a single path flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -56,6 +56,15 @@ Workflows can take different execution paths based on data values using Conditio
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** OR-merge deduplication (execute-once on first arrival) is an execution engine concern — pending workflow-engine.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

@@ -8,7 +8,7 @@ See a list of all form tasks assigned to me so that I don't miss any pending act
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -16,9 +16,9 @@ See a list of all form tasks assigned to me so that I don't miss any pending act
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — View pending form tasks flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -70,6 +70,12 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 > **Deferred follow-ups:** none; unresolved work is tracked in Gaps vs spec.
 >
 > **Decisions:** N/A - no implementation-specific decision recorded for this slice.
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

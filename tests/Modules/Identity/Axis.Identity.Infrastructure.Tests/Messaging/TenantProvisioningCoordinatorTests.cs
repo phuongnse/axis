@@ -15,7 +15,7 @@ namespace Axis.Identity.Infrastructure.Tests.Messaging;
 
 public sealed class TenantProvisioningCoordinatorTests
 {
-    private readonly IOrganizationRepository _organizationRepository = Substitute.For<IOrganizationRepository>();
+    private readonly ITenantRepository _TenantRepository = Substitute.For<ITenantRepository>();
     private readonly ITenantModuleProvisioningRepository _provisioningRepository =
         Substitute.For<ITenantModuleProvisioningRepository>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
@@ -25,28 +25,28 @@ public sealed class TenantProvisioningCoordinatorTests
     [Fact]
     public async Task HandleReportAsync_WhenProvisioningFailsBeforeMaxAttempt_SchedulesRetry()
     {
-        Organization organization = CreateProvisioningOrganization();
+        Tenant Tenant = CreateProvisioningTenant();
         TenantModuleProvisioning row = TenantModuleProvisioning.CreatePending(
-            organization.Id,
+            Tenant.Id,
             TenantModuleNames.DataModeling);
         TenantModuleProvisionReportEvent report = TenantModuleProvisionReportEventFactory.Create(
-            organization.Id,
+            Tenant.Id,
             TenantModuleNames.DataModeling,
             succeeded: false,
             attempt: 1,
             errorMessage: "db timeout");
 
-        _organizationRepository.GetByIdAsync(organization.Id, Arg.Any<CancellationToken>())
-            .Returns(organization);
+        _TenantRepository.GetByIdAsync(Tenant.Id, Arg.Any<CancellationToken>())
+            .Returns(Tenant);
         _provisioningRepository.GetAsync(
-                organization.Id,
+                Tenant.Id,
                 TenantModuleNames.DataModeling,
                 Arg.Any<CancellationToken>())
             .Returns(row);
 
         await TenantProvisioningCoordinator.HandleReportAsync(
             report,
-            _organizationRepository,
+            _TenantRepository,
             _provisioningRepository,
             _unitOfWork,
             _messageBus,
@@ -58,7 +58,7 @@ public sealed class TenantProvisioningCoordinatorTests
         await _unitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
         await _messageBus.Received(1).PublishAsync(
             Arg.Is<RetryTenantModuleProvisionMessage>(message =>
-                message.OrganizationId == organization.Id
+                message.tenantId == Tenant.Id
                 && message.Module == TenantModuleNames.DataModeling
                 && message.Attempt == 2),
             Arg.Any<DeliveryOptions>());
@@ -71,39 +71,39 @@ public sealed class TenantProvisioningCoordinatorTests
     }
 
     [Fact]
-    public async Task HandleReportAsync_WhenAllModulesSucceeded_CompletesOrganizationProvisioning()
+    public async Task HandleReportAsync_WhenAllModulesSucceeded_CompletesTenantProvisioning()
     {
-        Organization organization = CreateProvisioningOrganization();
+        Tenant Tenant = CreateProvisioningTenant();
         TenantModuleProvisioning row = TenantModuleProvisioning.CreatePending(
-            organization.Id,
+            Tenant.Id,
             TenantModuleNames.DataModeling);
         List<TenantModuleProvisioning> allRows =
         [
             row,
-            CreateSucceededRow(organization.Id, TenantModuleNames.FormBuilder),
-            CreateSucceededRow(organization.Id, TenantModuleNames.WorkflowBuilder),
-            CreateSucceededRow(organization.Id, TenantModuleNames.WorkflowEngine),
+            CreateSucceededRow(Tenant.Id, TenantModuleNames.FormBuilder),
+            CreateSucceededRow(Tenant.Id, TenantModuleNames.WorkflowBuilder),
+            CreateSucceededRow(Tenant.Id, TenantModuleNames.WorkflowEngine),
         ];
 
         TenantModuleProvisionReportEvent report = TenantModuleProvisionReportEventFactory.Create(
-            organization.Id,
+            Tenant.Id,
             TenantModuleNames.DataModeling,
             succeeded: true,
             attempt: 1);
 
-        _organizationRepository.GetByIdAsync(organization.Id, Arg.Any<CancellationToken>())
-            .Returns(organization);
+        _TenantRepository.GetByIdAsync(Tenant.Id, Arg.Any<CancellationToken>())
+            .Returns(Tenant);
         _provisioningRepository.GetAsync(
-                organization.Id,
+                Tenant.Id,
                 TenantModuleNames.DataModeling,
                 Arg.Any<CancellationToken>())
             .Returns(row);
-        _provisioningRepository.GetAllForOrganizationAsync(organization.Id, Arg.Any<CancellationToken>())
+        _provisioningRepository.GetAllForTenantAsync(Tenant.Id, Arg.Any<CancellationToken>())
             .Returns(allRows);
 
         await TenantProvisioningCoordinator.HandleReportAsync(
             report,
-            _organizationRepository,
+            _TenantRepository,
             _provisioningRepository,
             _unitOfWork,
             _messageBus,
@@ -111,37 +111,37 @@ public sealed class TenantProvisioningCoordinatorTests
             CancellationToken.None);
 
         row.Status.Should().Be(TenantModuleProvisioningStatus.Succeeded);
-        organization.Status.Should().Be(OrganizationStatus.Active);
+        Tenant.Status.Should().Be(TenantStatus.Active);
         await _unitOfWork.Received(2).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task HandleReportAsync_WhenProvisioningFailsAtMaxAttempt_MarksFailedAndAlerts()
     {
-        Organization organization = CreateProvisioningOrganization();
+        Tenant Tenant = CreateProvisioningTenant();
         TenantModuleProvisioning row = TenantModuleProvisioning.CreatePending(
-            organization.Id,
+            Tenant.Id,
             TenantModuleNames.DataModeling);
         TenantModuleProvisionReportEvent report = TenantModuleProvisionReportEventFactory.Create(
-            organization.Id,
+            Tenant.Id,
             TenantModuleNames.DataModeling,
             succeeded: false,
             attempt: TenantProvisioningCoordinator.MaxAttempts,
             errorMessage: "fatal");
 
-        _organizationRepository.GetByIdAsync(organization.Id, Arg.Any<CancellationToken>())
-            .Returns(organization);
+        _TenantRepository.GetByIdAsync(Tenant.Id, Arg.Any<CancellationToken>())
+            .Returns(Tenant);
         _provisioningRepository.GetAsync(
-                organization.Id,
+                Tenant.Id,
                 TenantModuleNames.DataModeling,
                 Arg.Any<CancellationToken>())
             .Returns(row);
-        _provisioningRepository.GetAllForOrganizationAsync(organization.Id, Arg.Any<CancellationToken>())
+        _provisioningRepository.GetAllForTenantAsync(Tenant.Id, Arg.Any<CancellationToken>())
             .Returns([row]);
 
         await TenantProvisioningCoordinator.HandleReportAsync(
             report,
-            _organizationRepository,
+            _TenantRepository,
             _provisioningRepository,
             _unitOfWork,
             _messageBus,
@@ -150,29 +150,29 @@ public sealed class TenantProvisioningCoordinatorTests
 
         row.Status.Should().Be(TenantModuleProvisioningStatus.Failed);
         row.AttemptCount.Should().Be(TenantProvisioningCoordinator.MaxAttempts);
-        organization.Status.Should().Be(OrganizationStatus.ProvisioningFailed);
+        Tenant.Status.Should().Be(TenantStatus.ProvisioningFailed);
         await _alert.Received(1).AlertProvisioningFailedAsync(
-            organization.Id,
+            Tenant.Id,
             TenantModuleNames.DataModeling,
             TenantProvisioningCoordinator.MaxAttempts,
             "fatal",
             Arg.Any<CancellationToken>());
     }
 
-    private static Organization CreateProvisioningOrganization()
+    private static Tenant CreateProvisioningTenant()
     {
-        Organization organization = Organization.Create(
+        Tenant Tenant = Tenant.Create(
             "Acme",
-            OrganizationSlug.Create("acme").Value!,
+            TenantSlug.Create("acme").Value!,
             Email.Create("admin@acme.com").Value!,
             WellKnownSubscriptionPlans.FreeId);
-        organization.BeginProvisioning();
-        return organization;
+        Tenant.BeginProvisioning();
+        return Tenant;
     }
 
-    private static TenantModuleProvisioning CreateSucceededRow(Guid organizationId, string module)
+    private static TenantModuleProvisioning CreateSucceededRow(Guid tenantId, string module)
     {
-        TenantModuleProvisioning row = TenantModuleProvisioning.CreatePending(organizationId, module);
+        TenantModuleProvisioning row = TenantModuleProvisioning.CreatePending(tenantId, module);
         row.RecordSuccess();
         return row;
     }

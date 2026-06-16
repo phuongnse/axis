@@ -5,7 +5,7 @@ package axis.datamodeling.v1;
 option csharp_namespace = "Axis.DataModeling.Contracts.Grpc";
 
 // Cross-module sync RPC (ADR-014). Used by other modules to look up data model summaries.
-// Tenant scoping: server derives organization_id from the caller's JWT `org_id` claim;
+// Tenant scoping: server derives tenant_id from the caller's JWT `tenant_id` claim;
 // callers MUST forward the inbound `authorization` header on every call.
 service DataModelCatalogService {
   rpc GetModelSummary(GetModelSummaryRequest) returns (GetModelSummaryResponse);

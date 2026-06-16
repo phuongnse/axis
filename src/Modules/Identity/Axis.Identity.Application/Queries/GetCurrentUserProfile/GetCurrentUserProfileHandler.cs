@@ -23,7 +23,7 @@ public sealed class GetCurrentUserProfileHandler(IUserRepository userRepository)
             $"{user.FirstName} {user.LastName}",
             user.AvatarUrl,
             user.Status == UserStatus.Active,
-            query.OrganizationId,
+            query.tenantId,
             query.Permissions);
     }
 }

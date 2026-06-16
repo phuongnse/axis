@@ -8,7 +8,7 @@ Add a field to my form so that I can collect the data I need.
 
 ## Primary actor
 
-- Organization Member with `form:definition:write`
+- Tenant Member with `form:definition:write`
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Add a field to my form so that I can collect the data I need.
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Add a field to a form flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -62,6 +62,15 @@ Form fields define what data the form collects. Each field has a type, label, he
 > **Gaps vs spec:** type picker UI, live preview update, and extension validation for File Upload pending Frontend + API layers.
 >
 > **Decisions:** `AddFieldToFormHandler` catches both `ArgumentException` (invalid key format) and `InvalidOperationException` (duplicate key) from the domain and returns `ErrorCodes.BusinessRule`. Field config polymorphism handled by FormFieldConverter using FormFieldType enum as discriminator.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

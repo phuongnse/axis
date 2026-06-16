@@ -12,10 +12,10 @@ public class RoleGrantPermissionsTests
     {
         Role role = Role.CreateSystem("Admin", Guid.NewGuid(), ["users:read"]);
 
-        bool changed = role.GrantMissingPermissions(["users:read", "organization:settings:read"]);
+        bool changed = role.GrantMissingPermissions(["users:read", "tenant:settings:read"]);
 
         changed.Should().BeTrue();
-        role.Permissions.Should().Contain("organization:settings:read");
+        role.Permissions.Should().Contain("tenant:settings:read");
         role.Permissions.Should().HaveCount(2);
     }
 
@@ -34,7 +34,7 @@ public class RoleGrantPermissionsTests
     {
         Role role = Role.CreateSystem("Viewer", Guid.NewGuid(), ["page:read"]);
 
-        Action act = () => role.GrantMissingPermissions(["organization:settings:read"]);
+        Action act = () => role.GrantMissingPermissions(["tenant:settings:read"]);
 
         act.Should().Throw<InvalidOperationException>();
     }

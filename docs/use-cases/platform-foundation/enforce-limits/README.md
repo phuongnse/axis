@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Enforce subscription plan limits at the API so that organizations cannot exceed their subscription without upgrading.
+Enforce subscription plan limits at the API so that Tenants cannot exceed their subscription without upgrading.
 
 ## Primary actor
 
@@ -17,7 +17,7 @@ Enforce subscription plan limits at the API so that organizations cannot exceed 
 ## Main flow
 
 1. Tenant user starts an operation that consumes a plan-limited resource, such as creating a workflow, inviting a user, or starting an execution.
-2. API resolves the organization's plan and current usage from Redis, falling back to DB-backed counts when Redis is unavailable.
+2. API resolves the Tenant's plan and current usage from Redis, falling back to DB-backed counts when Redis is unavailable.
 3. System allows the operation when usage is within the plan limit, updates the relevant counter after the mutation, or returns HTTP 402 with limit details when the operation would exceed the plan.
 
 ## Alternate / error flows
@@ -28,7 +28,7 @@ Enforce subscription plan limits at the API so that organizations cannot exceed 
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] When an org is within limits, all operations proceed normally with no noticeable overhead.
+- [ ] When a tenant is within limits, all operations proceed normally with no noticeable overhead.
 - [ ] Plan limit checks complete in under 10 ms (Redis-cached counters).
 
 *Validation & errors*
@@ -63,6 +63,15 @@ Enforce subscription plan limits at the API so that organizations cannot exceed 
 > **Deferred follow-ups:** execution counter race; fail-closed Redis for usage reads.
 >
 > **Decisions:** Redis failure currently falls back to DB count + warning instead of failing closed; this keeps local/dev availability while the fail-closed production policy is unresolved.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

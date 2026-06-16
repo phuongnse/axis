@@ -12,7 +12,7 @@ public class CreateModelHandlerTests
     private readonly IDataModelRepository _modelRepo = Substitute.For<IDataModelRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TenantId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     private CreateModelHandler CreateHandler() => new(_modelRepo, _uow);
@@ -20,17 +20,17 @@ public class CreateModelHandlerTests
     [Fact]
     public async Task CreateModel_WhenNameIsUnique_CreatesModelAndReturnsId()
     {
-        _modelRepo.NameExistsAsync("Invoice", OrgId).Returns(false);
+        _modelRepo.NameExistsAsync("Invoice", TenantId).Returns(false);
 
         Result<Guid> result = await CreateHandler().Handle(
-            new CreateModelCommand("Invoice", "Invoicing model", null, null, OrgId, UserId),
+            new CreateModelCommand("Invoice", "Invoicing model", null, null, TenantId, UserId),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeEmpty();
         await _modelRepo.Received(1).AddAsync(
             Arg.Is<Domain.Aggregates.DataModel>(m =>
-                m.Name == "Invoice" && m.OrganizationId == OrgId && m.CreatedBy == UserId),
+                m.Name == "Invoice" && m.tenantId == TenantId && m.CreatedBy == UserId),
             Arg.Any<CancellationToken>());
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
@@ -38,10 +38,10 @@ public class CreateModelHandlerTests
     [Fact]
     public async Task CreateModel_WhenNameIsDuplicate_ReturnsConflict()
     {
-        _modelRepo.NameExistsAsync("Invoice", OrgId).Returns(true);
+        _modelRepo.NameExistsAsync("Invoice", TenantId).Returns(true);
 
         Result<Guid> result = await CreateHandler().Handle(
-            new CreateModelCommand("Invoice", null, null, null, OrgId, UserId),
+            new CreateModelCommand("Invoice", null, null, null, TenantId, UserId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

@@ -8,7 +8,7 @@ Trigger a workflow automatically when a platform event occurs so that I don't ne
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -67,6 +67,12 @@ A workflow must have at least one trigger before it can be published. Triggers d
 > **Deferred follow-ups:** Custom platform events defined by users; listening to external-system events without a Webhook trigger.
 >
 > **Decisions:** Event trigger scope is limited to platform-owned event types until custom event contracts have an approved registry model.
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

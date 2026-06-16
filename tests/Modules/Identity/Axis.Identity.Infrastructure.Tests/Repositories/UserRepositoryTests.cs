@@ -12,7 +12,7 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     private IdentityDbContext _ctx = null!;
     private UserRepository _sut = null!;
 
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TenantId = Guid.NewGuid();
 
     public Task InitializeAsync()
     {
@@ -26,9 +26,9 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     private static User MakeUser(string email) =>
         User.Create("Jane", "Doe", Email.Create(email).Value);
 
-    private static OrganizationMembership MakeMembership(User user, Guid organizationId, params Guid[] roleIds)
+    private static TenantMembership MakeMembership(User user, Guid tenantId, params Guid[] roleIds)
     {
-        OrganizationMembership membership = OrganizationMembership.Create(user.Id, organizationId);
+        TenantMembership membership = TenantMembership.Create(user.Id, tenantId);
         foreach (Guid roleId in roleIds)
             membership.AssignRole(roleId);
         return membership;
@@ -39,9 +39,9 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     {
         User user = MakeUser("getbyid@example.com");
         await _sut.AddAsync(user);
-        await _ctx.OrganizationMemberships.AddAsync(MakeMembership(user, OrgId));
+        await _ctx.TenantMemberships.AddAsync(MakeMembership(user, TenantId));
         await _ctx.SaveChangesAsync();
-        User? loaded = await _sut.GetByIdAsync(user.Id, OrgId);
+        User? loaded = await _sut.GetByIdAsync(user.Id, TenantId);
 
         loaded.Should().NotBeNull();
         loaded!.Email.Value.Should().Be("getbyid@example.com");
@@ -50,34 +50,34 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetByEmailAsync_WhenEmailExistsInOrg_ReturnsUser()
+    public async Task GetByEmailAsync_WhenEmailExistsInTenant_ReturnsUser()
     {
         User user = MakeUser("byemail@example.com");
         await _sut.AddAsync(user);
-        await _ctx.OrganizationMemberships.AddAsync(MakeMembership(user, OrgId));
+        await _ctx.TenantMemberships.AddAsync(MakeMembership(user, TenantId));
         await _ctx.SaveChangesAsync();
         Email email = Email.Create("byemail@example.com").Value;
-        User? loaded = await _sut.GetByEmailAsync(email, OrgId);
+        User? loaded = await _sut.GetByEmailAsync(email, TenantId);
 
         loaded.Should().NotBeNull();
         loaded!.Id.Should().Be(user.Id);
     }
 
     [Fact]
-    public async Task GetByEmailAsync_WhenEmailBelongsToDifferentOrg_ReturnsNull()
+    public async Task GetByEmailAsync_WhenEmailBelongsToDifferentTenant_ReturnsNull()
     {
-        User user = MakeUser("difforg@example.com");
+        User user = MakeUser("diffTenant@example.com");
         await _sut.AddAsync(user);
-        await _ctx.OrganizationMemberships.AddAsync(MakeMembership(user, OrgId));
+        await _ctx.TenantMemberships.AddAsync(MakeMembership(user, TenantId));
         await _ctx.SaveChangesAsync();
-        Email email = Email.Create("difforg@example.com").Value;
+        Email email = Email.Create("diffTenant@example.com").Value;
         User? result = await _sut.GetByEmailAsync(email, Guid.NewGuid());
 
         result.Should().BeNull();
     }
 
     [Fact]
-    public async Task EmailExistsPlatformWideAsync_WhenEmailExistsInAnyOrg_ReturnsTrue()
+    public async Task EmailExistsPlatformWideAsync_WhenEmailExistsInAnyTenant_ReturnsTrue()
     {
         User user = MakeUser("platform@example.com");
         await _sut.AddAsync(user);
@@ -101,11 +101,11 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     {
         Guid roleId = Guid.NewGuid();
         User user = MakeUser("withrole@example.com");
-        OrganizationMembership membership = MakeMembership(user, OrgId, roleId);
+        TenantMembership membership = MakeMembership(user, TenantId, roleId);
         await _sut.AddAsync(user);
-        await _ctx.OrganizationMemberships.AddAsync(membership);
+        await _ctx.TenantMemberships.AddAsync(membership);
         await _ctx.SaveChangesAsync();
-        OrganizationMembership? loaded = await _ctx.OrganizationMemberships.FindAsync(membership.Id);
+        TenantMembership? loaded = await _ctx.TenantMemberships.FindAsync(membership.Id);
 
         loaded!.RoleIds.Should().ContainSingle().Which.Should().Be(roleId);
     }
@@ -116,9 +116,9 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
         User user = MakeUser("withhash@example.com");
         user.SetPasswordHash("$2a$12$fakehashvalue");
         await _sut.AddAsync(user);
-        await _ctx.OrganizationMemberships.AddAsync(MakeMembership(user, OrgId));
+        await _ctx.TenantMemberships.AddAsync(MakeMembership(user, TenantId));
         await _ctx.SaveChangesAsync();
-        User? loaded = await _sut.GetByIdAsync(user.Id, OrgId);
+        User? loaded = await _sut.GetByIdAsync(user.Id, TenantId);
 
         loaded!.PasswordHash.Should().Be("$2a$12$fakehashvalue");
     }
@@ -127,31 +127,31 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     public async Task CountAdminsAsync_WhenMultipleUsersExist_CountsOnlyUsersWithAdminRole()
     {
         Guid adminRoleId = Guid.NewGuid();
-        Guid adminOrgId = Guid.NewGuid();
+        Guid adminTenantId = Guid.NewGuid();
 
-        User admin1 = User.Create("A", "One", Email.Create($"admin1-{adminOrgId:N}@example.com").Value);
-        OrganizationMembership admin1Membership = MakeMembership(admin1, adminOrgId, adminRoleId);
-        User admin2 = User.Create("A", "Two", Email.Create($"admin2-{adminOrgId:N}@example.com").Value);
-        OrganizationMembership admin2Membership = MakeMembership(admin2, adminOrgId, adminRoleId);
-        User nonAdmin = User.Create("B", "One", Email.Create($"nonadmin-{adminOrgId:N}@example.com").Value);
-        OrganizationMembership nonAdminMembership = MakeMembership(nonAdmin, adminOrgId);
+        User admin1 = User.Create("A", "One", Email.Create($"admin1-{adminTenantId:N}@example.com").Value);
+        TenantMembership admin1Membership = MakeMembership(admin1, adminTenantId, adminRoleId);
+        User admin2 = User.Create("A", "Two", Email.Create($"admin2-{adminTenantId:N}@example.com").Value);
+        TenantMembership admin2Membership = MakeMembership(admin2, adminTenantId, adminRoleId);
+        User nonAdmin = User.Create("B", "One", Email.Create($"nonadmin-{adminTenantId:N}@example.com").Value);
+        TenantMembership nonAdminMembership = MakeMembership(nonAdmin, adminTenantId);
 
         await _sut.AddAsync(admin1);
         await _sut.AddAsync(admin2);
         await _sut.AddAsync(nonAdmin);
-        await _ctx.OrganizationMemberships.AddRangeAsync(admin1Membership, admin2Membership, nonAdminMembership);
+        await _ctx.TenantMemberships.AddRangeAsync(admin1Membership, admin2Membership, nonAdminMembership);
         await _ctx.SaveChangesAsync();
 
-        int count = await _sut.CountAdminsAsync(adminOrgId, adminRoleId);
+        int count = await _sut.CountAdminsAsync(adminTenantId, adminRoleId);
         count.Should().Be(2);
     }
 
     [Fact]
-    public async Task GetByIdAsync_WhenUserBelongsToDifferentOrg_ReturnsNull()
+    public async Task GetByIdAsync_WhenUserBelongsToDifferentTenant_ReturnsNull()
     {
-        User user = MakeUser($"crossorg-{Guid.NewGuid():N}@example.com");
+        User user = MakeUser($"crossTenant-{Guid.NewGuid():N}@example.com");
         await _sut.AddAsync(user);
-        await _ctx.OrganizationMemberships.AddAsync(MakeMembership(user, OrgId));
+        await _ctx.TenantMemberships.AddAsync(MakeMembership(user, TenantId));
         await _ctx.SaveChangesAsync();
 
         User? result = await _sut.GetByIdAsync(user.Id, Guid.NewGuid());
@@ -160,7 +160,7 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task FindByEmailGloballyAsync_WhenEmailExistsInAnyOrg_ReturnsUser()
+    public async Task FindByEmailGloballyAsync_WhenEmailExistsInAnyTenant_ReturnsUser()
     {
         User user = MakeUser($"global-{Guid.NewGuid():N}@example.com");
         await _sut.AddAsync(user);

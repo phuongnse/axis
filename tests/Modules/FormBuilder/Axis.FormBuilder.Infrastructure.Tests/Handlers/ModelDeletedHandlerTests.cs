@@ -17,7 +17,7 @@ namespace Axis.FormBuilder.Infrastructure.Tests.Handlers;
 [Collection("FormBuilderDb")]
 public sealed class ModelDeletedHandlerTests(FormBuilderDatabaseFixture fixture)
 {
-    private static readonly Guid OrgId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid TenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private static ModelDeletedHandler CreateHandler(FormBuilderDbContext ctx)
     {
@@ -32,14 +32,14 @@ public sealed class ModelDeletedHandlerTests(FormBuilderDatabaseFixture fixture)
         new()
         {
             modelId = modelId.ToString(),
-            organizationId = OrgId.ToString(),
+            tenantId = TenantId.ToString(),
         };
 
     [Fact]
     public async Task Handle_WhenRelationPickerTargetsDeletedModel_CreatesBrokenReference()
     {
         Guid targetModelId = Guid.NewGuid();
-        FormDefinition form = FormDefinition.Create($"Intake-{Guid.NewGuid():N}", null, OrgId, "user");
+        FormDefinition form = FormDefinition.Create($"Intake-{Guid.NewGuid():N}", null, TenantId, "user");
         FormField field = form.AddField(
             "company",
             "Company",
@@ -69,7 +69,7 @@ public sealed class ModelDeletedHandlerTests(FormBuilderDatabaseFixture fixture)
     public async Task Handle_WhenHealthyReferenceExists_MarksItBroken()
     {
         Guid targetModelId = Guid.NewGuid();
-        FormDefinition form = FormDefinition.Create($"Intake-{Guid.NewGuid():N}", null, OrgId, "user");
+        FormDefinition form = FormDefinition.Create($"Intake-{Guid.NewGuid():N}", null, TenantId, "user");
         FormField field = form.AddField(
             "company",
             "Company",
@@ -81,7 +81,7 @@ public sealed class ModelDeletedHandlerTests(FormBuilderDatabaseFixture fixture)
         {
             writeCtx.FormDefinitions.Add(form);
             writeCtx.FormModelReferences.Add(
-                FormModelReference.Create(form.Id, field.Id, targetModelId, OrgId, isBroken: false));
+                FormModelReference.Create(form.Id, field.Id, targetModelId, TenantId, isBroken: false));
             await writeCtx.SaveChangesAsync();
         }
 

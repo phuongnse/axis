@@ -13,7 +13,7 @@ public sealed class GetFormsHandler(IFormRepository formRepo)
         int effectivePage = Math.Max(1, query.Page);
         int effectivePageSize = Math.Min(Math.Max(1, query.PageSize), 100);
 
-        IReadOnlyList<FormDefinition> all = await formRepo.GetAllAsync(query.OrganizationId, cancellationToken);
+        IReadOnlyList<FormDefinition> all = await formRepo.GetAllAsync(query.tenantId, cancellationToken);
 
         int totalCount = all.Count;
         IReadOnlyList<FormSummaryDto> page = all

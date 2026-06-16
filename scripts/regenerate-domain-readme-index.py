@@ -21,10 +21,10 @@ SKIP_DIRS = set()
 GROUPS: dict[str, list[tuple[str, object]]] = {
     "platform-foundation": [
         ("Registration", lambda s: s in {
-            "register-org", "plan-at-signup",
+            "register-tenant", "plan-at-signup",
         }),
         ("Subscription plans", lambda s: s in {"view-plans", "enforce-limits", "admin-change-plan"}),
-        ("Organization settings", lambda s: s in {"org-profile", "org-settings", "delete-org"}),
+        ("Tenant settings", lambda s: s in {"tenant-profile", "tenant-settings", "delete-tenant"}),
         ("Tenant isolation", lambda s: s in {"tenant-scope", "tenant-from-jwt"}),
     ],
     "identity-access": [
@@ -60,7 +60,7 @@ GROUPS: dict[str, list[tuple[str, object]]] = {
     "workflow-engine": [
         ("Execution lifecycle", lambda s: s in {"start-execution", "track-execution", "cancel-execution"}),
         ("History & detail", lambda s: s in {
-            "workflow-history", "execution-detail", "org-execution-history",
+            "workflow-history", "execution-detail", "tenant-execution-history",
         }),
         ("Errors & notifications", lambda s: s in {"error-detail", "failure-notify", "error-channels"}),
         ("Retry", lambda s: s in {"retry-execution", "retry-history", "retry-with-context"}),
@@ -95,12 +95,12 @@ def _truncate_at_word(text: str, limit: int) -> str:
     last_space = cut.rfind(" ")
     if last_space > limit // 2:
         cut = cut[:last_space]
-    return cut.rstrip(" ,.;:") + "…"
+    return cut.rstrip(" ,.;:") + "\u2026"
 
 
 def summary_for(readme: Path) -> str:
     text = readme.read_text(encoding="utf-8")
-    title = text.splitlines()[0].removeprefix("# Use case — ").strip()
+    title = re.sub(r"^# Use case (?:\u2014|-)\s*", "", text.splitlines()[0]).strip()
     short = readme.parent.name
     m = re.search(r"^## Purpose\n\n(.+)$", text, re.MULTILINE)
     desc = (m.group(1).strip() if m else title)
@@ -180,7 +180,7 @@ def check_domain(domain_dir: Path) -> list[str]:
     if actual != expected:
         rel = readme.relative_to(ROOT)
         return [
-            f"{rel}: ## Use Cases table out of date — run "
+            f"{rel}: ## Use Cases table out of date - run "
             f"python3 scripts/regenerate-domain-readme-index.py"
         ]
     return []

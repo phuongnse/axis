@@ -11,7 +11,7 @@ namespace Axis.Api.Middleware;
 internal sealed class CorrelationIdMiddleware(RequestDelegate next)
 {
     private const string HeaderName = "X-Correlation-Id";
-    private const string TenantIdClaim = "org_id";
+    private const string TenantIdClaim = "tenant_id";
 
     public async Task InvokeAsync(HttpContext context)
     {

@@ -21,17 +21,17 @@ public class ExecuteNextStepHandlerTests
     private readonly IStepDispatcher _dispatcher = Substitute.For<IStepDispatcher>();
     private readonly ILogger<ExecuteNextStepHandler> _logger = Substitute.For<ILogger<ExecuteNextStepHandler>>();
 
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TenantId = Guid.NewGuid();
     private static readonly Guid WorkflowId = Guid.NewGuid();
 
     private ExecuteNextStepHandler CreateHandler() =>
         new(_execRepo, _workflowReader, _uow, _dispatcher, _logger);
 
     private static WorkflowExecution CreatePendingExecution()
-        => WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, null, new Dictionary<string, object?>());
+        => WorkflowExecution.Create(WorkflowId, TenantId, TriggerType.Manual, null, new Dictionary<string, object?>());
 
     private static WorkflowSnapshot MakeSnapshot(Guid stepDefId, StepType stepType)
-        => WorkflowSnapshot.Create(WorkflowId, OrgId,
+        => WorkflowSnapshot.Create(WorkflowId, TenantId,
             new List<StepDefinitionSnapshot>
             {
                 new() { Id = stepDefId, Name = "Step", StepType = stepType, DisplayOrder = 0, Config = null }
@@ -47,15 +47,15 @@ public class ExecuteNextStepHandlerTests
         Guid formDefId = Guid.NewGuid();
         execution.AddStep(formDefId, "Form", StepType.Form, 0);
 
-        _execRepo.GetByIdWithStepsAsync(execution.Id, OrgId).Returns(execution);
-        _workflowReader.GetSnapshotAsync(WorkflowId, OrgId).Returns(MakeSnapshot(formDefId, StepType.Form));
+        _execRepo.GetByIdWithStepsAsync(execution.Id, TenantId).Returns(execution);
+        _workflowReader.GetSnapshotAsync(WorkflowId, TenantId).Returns(MakeSnapshot(formDefId, StepType.Form));
 
         await CreateHandler().HandleAsync(
-            new ExecuteNextStepMessage(execution.Id, OrgId), CancellationToken.None);
+            new ExecuteNextStepMessage(execution.Id, TenantId), CancellationToken.None);
 
         await _dispatcher.Received(1).PublishAsync(
             Arg.Is<ExecuteFormStepMessage>(m =>
-                m.ExecutionId == execution.Id && m.OrganizationId == OrgId),
+                m.ExecutionId == execution.Id && m.tenantId == TenantId),
             Arg.Any<CancellationToken>());
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
@@ -67,11 +67,11 @@ public class ExecuteNextStepHandlerTests
         Guid httpDefId = Guid.NewGuid();
         execution.AddStep(httpDefId, "Http", StepType.HttpRequest, 0);
 
-        _execRepo.GetByIdWithStepsAsync(execution.Id, OrgId).Returns(execution);
-        _workflowReader.GetSnapshotAsync(WorkflowId, OrgId).Returns(MakeSnapshot(httpDefId, StepType.HttpRequest));
+        _execRepo.GetByIdWithStepsAsync(execution.Id, TenantId).Returns(execution);
+        _workflowReader.GetSnapshotAsync(WorkflowId, TenantId).Returns(MakeSnapshot(httpDefId, StepType.HttpRequest));
 
         await CreateHandler().HandleAsync(
-            new ExecuteNextStepMessage(execution.Id, OrgId), CancellationToken.None);
+            new ExecuteNextStepMessage(execution.Id, TenantId), CancellationToken.None);
 
         await _dispatcher.Received(1).PublishAsync(
             Arg.Is<ExecuteHttpStepMessage>(m => m.ExecutionId == execution.Id),
@@ -85,10 +85,10 @@ public class ExecuteNextStepHandlerTests
         Guid startDefId = Guid.NewGuid();
         execution.AddStep(startDefId, "Start", StepType.Start, 0);
 
-        _execRepo.GetByIdWithStepsAsync(execution.Id, OrgId).Returns(execution);
+        _execRepo.GetByIdWithStepsAsync(execution.Id, TenantId).Returns(execution);
 
         await CreateHandler().HandleAsync(
-            new ExecuteNextStepMessage(execution.Id, OrgId), CancellationToken.None);
+            new ExecuteNextStepMessage(execution.Id, TenantId), CancellationToken.None);
 
         execution.Steps[0].Status.Should().Be(StepExecutionStatus.Completed);
         await _dispatcher.Received(1).PublishAsync(
@@ -104,10 +104,10 @@ public class ExecuteNextStepHandlerTests
         Guid endDefId = Guid.NewGuid();
         execution.AddStep(endDefId, "End", StepType.End, 0);
 
-        _execRepo.GetByIdWithStepsAsync(execution.Id, OrgId).Returns(execution);
+        _execRepo.GetByIdWithStepsAsync(execution.Id, TenantId).Returns(execution);
 
         await CreateHandler().HandleAsync(
-            new ExecuteNextStepMessage(execution.Id, OrgId), CancellationToken.None);
+            new ExecuteNextStepMessage(execution.Id, TenantId), CancellationToken.None);
 
         execution.Steps[0].Status.Should().Be(StepExecutionStatus.Completed);
         execution.Status.Should().Be(ExecutionStatus.Completed);
@@ -129,10 +129,10 @@ public class ExecuteNextStepHandlerTests
         execution.StartStep(step.Id, execution.Context);
         execution.CompleteStep(step.Id, new Dictionary<string, object?>());
 
-        _execRepo.GetByIdWithStepsAsync(execution.Id, OrgId).Returns(execution);
+        _execRepo.GetByIdWithStepsAsync(execution.Id, TenantId).Returns(execution);
 
         await CreateHandler().HandleAsync(
-            new ExecuteNextStepMessage(execution.Id, OrgId), CancellationToken.None);
+            new ExecuteNextStepMessage(execution.Id, TenantId), CancellationToken.None);
 
         execution.Status.Should().Be(ExecutionStatus.Completed);
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
@@ -155,10 +155,10 @@ public class ExecuteNextStepHandlerTests
         else if (terminalStatus == ExecutionStatus.Failed) execution.Fail("err");
         else execution.Cancel();
 
-        _execRepo.GetByIdWithStepsAsync(execution.Id, OrgId).Returns(execution);
+        _execRepo.GetByIdWithStepsAsync(execution.Id, TenantId).Returns(execution);
 
         await CreateHandler().HandleAsync(
-            new ExecuteNextStepMessage(execution.Id, OrgId), CancellationToken.None);
+            new ExecuteNextStepMessage(execution.Id, TenantId), CancellationToken.None);
 
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
         await _dispatcher.DidNotReceive().PublishAsync(
@@ -173,7 +173,7 @@ public class ExecuteNextStepHandlerTests
         _execRepo.GetByIdWithStepsAsync(Arg.Any<Guid>(), Arg.Any<Guid>()).ReturnsNull();
 
         await CreateHandler().HandleAsync(
-            new ExecuteNextStepMessage(Guid.NewGuid(), OrgId), CancellationToken.None);
+            new ExecuteNextStepMessage(Guid.NewGuid(), TenantId), CancellationToken.None);
 
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
         await _dispatcher.DidNotReceive().PublishAsync(
@@ -190,12 +190,12 @@ public class ExecuteNextStepHandlerTests
         Guid startDefId = Guid.NewGuid();
         execution.AddStep(startDefId, "Start", StepType.Start, 0);
 
-        _execRepo.GetByIdWithStepsAsync(execution.Id, OrgId).Returns(execution);
+        _execRepo.GetByIdWithStepsAsync(execution.Id, TenantId).Returns(execution);
         _uow.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(Task.FromException<int>(new ConcurrencyException()));
 
         await CreateHandler().HandleAsync(
-            new ExecuteNextStepMessage(execution.Id, OrgId), CancellationToken.None);
+            new ExecuteNextStepMessage(execution.Id, TenantId), CancellationToken.None);
 
         // The losing worker must not dispatch a follow-up message.
         await _dispatcher.DidNotReceive().PublishAsync(
@@ -210,13 +210,13 @@ public class ExecuteNextStepHandlerTests
         Guid formDefId = Guid.NewGuid();
         execution.AddStep(formDefId, "Form", StepType.Form, 0);
 
-        _execRepo.GetByIdWithStepsAsync(execution.Id, OrgId).Returns(execution);
-        _workflowReader.GetSnapshotAsync(WorkflowId, OrgId).Returns(MakeSnapshot(formDefId, StepType.Form));
+        _execRepo.GetByIdWithStepsAsync(execution.Id, TenantId).Returns(execution);
+        _workflowReader.GetSnapshotAsync(WorkflowId, TenantId).Returns(MakeSnapshot(formDefId, StepType.Form));
         _uow.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(Task.FromException<int>(new ConcurrencyException()));
 
         await CreateHandler().HandleAsync(
-            new ExecuteNextStepMessage(execution.Id, OrgId), CancellationToken.None);
+            new ExecuteNextStepMessage(execution.Id, TenantId), CancellationToken.None);
 
         // The losing worker must not dispatch the typed handler message.
         await _dispatcher.DidNotReceive().PublishAsync(

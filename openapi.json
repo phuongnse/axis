@@ -10,7 +10,7 @@
         "tags": [
           "DataModeling"
         ],
-        "summary": "List all data models for the organization",
+        "summary": "List all data models for the tenant",
         "operationId": "GetModels",
         "parameters": [
           {
@@ -689,7 +689,7 @@
         "tags": [
           "DataModeling"
         ],
-        "summary": "List all data classes for the organization",
+        "summary": "List all data classes for the tenant",
         "operationId": "GetDataClasses",
         "parameters": [
           {
@@ -1822,7 +1822,7 @@
         "tags": [
           "FormBuilder"
         ],
-        "summary": "List all forms for the organization (paginated)",
+        "summary": "List all forms for the tenant (paginated)",
         "operationId": "GetForms",
         "parameters": [
           {
@@ -2938,16 +2938,16 @@
         }
       }
     },
-    "/api/organizations/slug-preview": {
+    "/api/tenants/slug-preview": {
       "get": {
         "tags": [
           "Identity"
         ],
-        "summary": "Preview organization URL slug from a proposed name",
-        "operationId": "GetOrganizationSlugPreview",
+        "summary": "Preview Tenant URL slug from a proposed name",
+        "operationId": "GetTenantSlugPreview",
         "parameters": [
           {
-            "name": "orgName",
+            "name": "tenantName",
             "in": "query",
             "required": true,
             "schema": {
@@ -2961,7 +2961,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrganizationSlugPreviewDto"
+                  "$ref": "#/components/schemas/TenantSlugPreviewDto"
                 }
               }
             }
@@ -2969,18 +2969,18 @@
         }
       }
     },
-    "/api/organizations": {
+    "/api/tenants": {
       "post": {
         "tags": [
           "Identity"
         ],
-        "summary": "Register a new organization contact for verification",
-        "operationId": "RegisterOrganization",
+        "summary": "Register a new tenant contact for verification",
+        "operationId": "RegisterTenant",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RegisterOrganizationRequest"
+                "$ref": "#/components/schemas/RegisterTenantRequest"
               }
             }
           },
@@ -3020,12 +3020,12 @@
         }
       }
     },
-    "/api/organizations/me/invitations": {
+    "/api/tenants/me/invitations": {
       "post": {
         "tags": [
           "Identity"
         ],
-        "summary": "Invite a user to the organization by email",
+        "summary": "Invite a user to the tenant by email",
         "operationId": "InviteUser",
         "requestBody": {
           "content": {
@@ -3106,20 +3106,20 @@
         ]
       }
     },
-    "/api/organizations/current/settings": {
+    "/api/tenants/current/settings": {
       "get": {
         "tags": [
           "Identity"
         ],
-        "summary": "Get organization settings and usage stats",
-        "operationId": "GetOrganizationSettings",
+        "summary": "Get Tenant settings and usage stats",
+        "operationId": "GetTenantSettings",
         "responses": {
           "200": {
             "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrganizationSettingsDto"
+                  "$ref": "#/components/schemas/TenantSettingsDto"
                 }
               }
             }
@@ -3162,18 +3162,18 @@
         ]
       }
     },
-    "/api/organizations/current/profile": {
+    "/api/tenants/current/profile": {
       "put": {
         "tags": [
           "Identity"
         ],
-        "summary": "Update organization profile (name, timezone, language, logo)",
-        "operationId": "UpdateOrganizationProfile",
+        "summary": "Update tenant profile (name, timezone, language, logo)",
+        "operationId": "UpdateTenantProfile",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateOrganizationProfileRequest"
+                "$ref": "#/components/schemas/UpdateTenantProfileRequest"
               }
             }
           },
@@ -3231,18 +3231,18 @@
         ]
       }
     },
-    "/api/organizations/current/deletion": {
+    "/api/tenants/current/deletion": {
       "post": {
         "tags": [
           "Identity"
         ],
-        "summary": "Schedule organization for deletion after a 30-day grace period",
-        "operationId": "ScheduleOrganizationDeletion",
+        "summary": "Schedule Tenant for deletion after a 30-day grace period",
+        "operationId": "ScheduleTenantDeletion",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ScheduleOrganizationDeletionRequest"
+                "$ref": "#/components/schemas/ScheduleTenantDeletionRequest"
               }
             }
           },
@@ -3293,8 +3293,8 @@
         "tags": [
           "Identity"
         ],
-        "summary": "Cancel a scheduled organization deletion",
-        "operationId": "CancelOrganizationDeletion",
+        "summary": "Cancel a scheduled Tenant deletion",
+        "operationId": "CancelTenantDeletion",
         "responses": {
           "204": {
             "description": "No Content"
@@ -3457,7 +3457,7 @@
         "tags": [
           "Identity"
         ],
-        "summary": "Register a user account standalone or with an organization setup token",
+        "summary": "Register a user account standalone or with a tenant setup token",
         "operationId": "RegisterUser",
         "requestBody": {
           "content": {
@@ -3935,7 +3935,7 @@
         "tags": [
           "Identity"
         ],
-        "summary": "List all roles for the organization",
+        "summary": "List all roles for the tenant",
         "operationId": "GetRoles",
         "parameters": [
           {
@@ -4177,16 +4177,16 @@
         }
       }
     },
-    "/api/platform/organizations/{organizationId}/plan": {
+    "/api/platform/tenants/{tenantId}/plan": {
       "put": {
         "tags": [
           "Platform"
         ],
-        "summary": "Platform admin: change an organization's subscription plan",
-        "operationId": "ChangeOrganizationPlan",
+        "summary": "Platform admin: change a tenant's subscription plan",
+        "operationId": "ChangeTenantPlan",
         "parameters": [
           {
-            "name": "organizationId",
+            "name": "tenantId",
             "in": "path",
             "required": true,
             "schema": {
@@ -4199,7 +4199,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ChangeOrganizationPlanRequest"
+                "$ref": "#/components/schemas/ChangeTenantPlanRequest"
               }
             }
           },
@@ -4259,7 +4259,7 @@
         "tags": [
           "WorkflowBuilder"
         ],
-        "summary": "List workflow definitions for the organization (paginated)",
+        "summary": "List workflow definitions for the tenant (paginated)",
         "operationId": "GetWorkflows",
         "parameters": [
           {
@@ -5653,7 +5653,7 @@
         "tags": [
           "WorkflowEngine"
         ],
-        "summary": "List workflow executions for the organization (paginated)",
+        "summary": "List workflow executions for the tenant (paginated)",
         "operationId": "GetAllExecutions",
         "parameters": [
           {
@@ -6423,7 +6423,7 @@
         },
         "additionalProperties": false
       },
-      "ChangeOrganizationPlanRequest": {
+      "ChangeTenantPlanRequest": {
         "type": "object",
         "properties": {
           "planId": {
@@ -6579,7 +6579,7 @@
           "isActive": {
             "type": "boolean"
           },
-          "orgId": {
+          "tenantId": {
             "type": "string",
             "format": "uuid",
             "nullable": true
@@ -7313,10 +7313,10 @@
         },
         "additionalProperties": false
       },
-      "OrganizationSettingsDto": {
+      "TenantSettingsDto": {
         "type": "object",
         "properties": {
-          "organizationId": {
+          "tenantId": {
             "type": "string",
             "format": "uuid"
           },
@@ -7359,7 +7359,7 @@
         },
         "additionalProperties": false
       },
-      "OrganizationSlugPreviewDto": {
+      "TenantSlugPreviewDto": {
         "type": "object",
         "properties": {
           "slug": {
@@ -7398,11 +7398,11 @@
       "ProvisioningStatusDto": {
         "type": "object",
         "properties": {
-          "organizationId": {
+          "tenantId": {
             "type": "string",
             "format": "uuid"
           },
-          "organizationStatus": {
+          "TenantStatus": {
             "type": "string"
           },
           "isReady": {
@@ -7473,13 +7473,13 @@
         },
         "additionalProperties": false
       },
-      "RegisterOrganizationRequest": {
+      "RegisterTenantRequest": {
         "type": "object",
         "properties": {
-          "orgName": {
+          "tenantName": {
             "type": "string"
           },
-          "organizationContactEmail": {
+          "TenantContactEmail": {
             "type": "string"
           },
           "acceptedTermsVersion": {
@@ -7520,7 +7520,7 @@
           "acceptedPrivacyVersion": {
             "type": "string"
           },
-          "organizationSetupToken": {
+          "TenantSetupToken": {
             "type": "string",
             "nullable": true
           }
@@ -7638,7 +7638,7 @@
         },
         "additionalProperties": false
       },
-      "ScheduleOrganizationDeletionRequest": {
+      "ScheduleTenantDeletionRequest": {
         "type": "object",
         "properties": {
           "confirmationName": {
@@ -7889,7 +7889,7 @@
         },
         "additionalProperties": false
       },
-      "UpdateOrganizationProfileRequest": {
+      "UpdateTenantProfileRequest": {
         "type": "object",
         "properties": {
           "name": {
@@ -8057,7 +8057,7 @@
           "nextStep": {
             "$ref": "#/components/schemas/VerifyEmailNextStep"
           },
-          "organizationSetupToken": {
+          "TenantSetupToken": {
             "type": "string",
             "nullable": true
           }

@@ -8,7 +8,7 @@ Reorder fields in a model so that the display order matches our team's mental mo
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Reorder fields in a model so that the display order matches our team's mental mo
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Reorder fields flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -58,6 +58,15 @@ Each field in a model has a type that determines what data it stores, how it's v
 > **Gaps vs spec:** drag-drop reorder UX and immediate-save endpoint pending Frontend layer.
 >
 > **Done:** `displayOrder` persisted in JSONB field list at Application + Infrastructure.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

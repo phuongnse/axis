@@ -1,21 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
-import { authKeys, getOrganizationSlugPreview } from '@/features/auth/api';
+import { authKeys, getTenantSlugPreview } from '@/features/auth/api';
 
 const DEBOUNCE_MS = 300;
 
-export function useSlugPreview(orgName: string) {
-  const [debouncedName, setDebouncedName] = useState(orgName.trim());
+export function useSlugPreview(tenantName: string) {
+  const [debouncedName, setDebouncedName] = useState(tenantName.trim());
 
   useEffect(() => {
-    const handle = window.setTimeout(() => setDebouncedName(orgName.trim()), DEBOUNCE_MS);
+    const handle = window.setTimeout(() => setDebouncedName(tenantName.trim()), DEBOUNCE_MS);
     return () => window.clearTimeout(handle);
-  }, [orgName]);
+  }, [tenantName]);
 
   const query = useQuery({
     queryKey: authKeys.slugPreview(debouncedName),
-    queryFn: () => getOrganizationSlugPreview(debouncedName),
+    queryFn: () => getTenantSlugPreview(debouncedName),
     enabled: debouncedName.length >= 2,
     staleTime: 30_000,
   });

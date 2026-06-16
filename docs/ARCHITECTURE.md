@@ -12,7 +12,7 @@
 
 See [System context](./README.md#system-context) in the docs index (Mermaid).
 
-The Axis platform serves four actor types: **Platform Admins** (Axis team), **Organization Admins**, **Organization Members**, and **End Users**. External systems include an email service for notifications, external APIs called by workflow HTTP steps, and webhook targets that receive workflow events.
+The Axis platform serves four actor types: **Platform Admins** (Axis team), **Tenant Admins**, **Tenant Members**, and **End Users**. External systems include an email service for notifications, external APIs called by workflow HTTP steps, and webhook targets that receive workflow events.
 
 ---
 
@@ -33,7 +33,7 @@ Axis runs as a **modulith with strict service boundaries** — each module is a 
 | **FormBuilder service** | Form definitions, form-task submissions. |
 | **PageBuilder service** | Visual page builder (module not started — see [PROGRESS.md](./PROGRESS.md)). |
 | **Per-module PostgreSQL** | One database per module (`axis_identity`, `axis_datamodeling`, …). Schema-per-tenant inside each ([ADR-011](./TECH_STACK.md#adr-011-per-module-database-with-schema-per-tenant-inside)). Per-module Wolverine outbox schema lives alongside ([ADR-012](./TECH_STACK.md#adr-012-per-module-wolverine-schema-in-the-modules-own-database)). |
-| **Apache Kafka + Schema Registry** | Cross-module **event** transport + event-sourced aggregate log. Topics partitioned by `organizationId`. Avro payloads with CloudEvents envelopes ([ADR-013](./TECH_STACK.md#adr-013-apache-kafka-for-cross-module-domain-events-and-event-sourced-aggregates), [ADR-019](./TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). |
+| **Apache Kafka + Schema Registry** | Cross-module **event** transport + event-sourced aggregate log. Topics partitioned by `tenantId`. Avro payloads with CloudEvents envelopes ([ADR-013](./TECH_STACK.md#adr-013-apache-kafka-for-cross-module-domain-events-and-event-sourced-aggregates), [ADR-019](./TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). |
 | **RabbitMQ** | Cross-module **command + job + saga** transport. Work-queue semantics (ACK, requeue, DLX, prefetch). Per-message routing rule in [ADR-025](./TECH_STACK.md#adr-025-transport-selection-rule-by-message-name-suffix). |
 | **Redis** | Session cache + distributed locks + per-tenant short-TTL caches (key-prefixed per module). |
 | **AWS S3** | File storage (attachments, exports). |
@@ -79,16 +79,16 @@ Forbidden: shared `DbContext`, direct C# method calls into another module's Appl
 
 ## Multi-Tenancy Strategy
 
-Each module owns its own PostgreSQL database. Tenant isolation inside a module is **schema-per-tenant** (`tenant_{orgId:N}`). Identity is the registry of organizations and operates entirely in its `public` schema; other modules never query Identity's DB directly — they receive tenant context via JWT claims.
+Each module owns its own PostgreSQL database. Tenant isolation inside a module is **schema-per-tenant** (`tenant_{TenantId:N}`). Identity is the registry of Tenants and operates entirely in its `public` schema; other modules never query Identity's DB directly — they receive tenant context via JWT claims.
 
 ```text
 axis_identity DB
-└── public schema                # organizations, users, roles, subscriptions, openiddict tables
+└── public schema                # Tenants, users, roles, subscriptions, openiddict tables
 
 axis_datamodeling DB
 ├── public schema                # module config, cross-tenant indexes
 ├── wolverine schema             # per-module envelope tables (outbox/inbox/scheduled/dead-letters)
-└── tenant_{orgId:N} schemas     # models, fields, records (per tenant)
+└── tenant_{TenantId:N} schemas     # models, fields, records (per tenant)
 
 axis_workflowbuilder DB           ← same shape
 axis_workflowengine DB            ← same shape
@@ -96,7 +96,7 @@ axis_formbuilder DB               ← same shape
 axis_pagebuilder DB               ← same shape (when PageBuilder module ships)
 ```
 
-**Tenant resolution:** every external request carries a JWT with an `org_id` claim. The gateway extracts it and propagates via gRPC metadata (sync calls) and CloudEvents `tenantid` extension (events). Each module restores it into a scoped `ITenantContext`. EF Core sets the per-connection `search_path` to the tenant schema via `TenantSchemaInterceptor`.
+**Tenant resolution:** every external request carries a JWT with an `tenant_id` claim. The gateway extracts it and propagates via gRPC metadata (sync calls) and CloudEvents `tenantid` extension (events). Each module restores it into a scoped `ITenantContext`. EF Core sets the per-connection `search_path` to the tenant schema via `TenantSchemaInterceptor`.
 
 Implementation details and pitfalls: [playbooks/patterns.md § Multi-tenancy](./playbooks/patterns.md#multi-tenancy-pitfalls).
 

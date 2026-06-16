@@ -15,7 +15,7 @@ public class RetryExecutionWithContextHandlerTests
     private readonly IExecutionRepository _execRepo = Substitute.For<IExecutionRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TenantId = Guid.NewGuid();
     private static readonly Guid WorkflowId = Guid.NewGuid();
     private static readonly Guid UserId = Guid.NewGuid();
 
@@ -24,7 +24,7 @@ public class RetryExecutionWithContextHandlerTests
     private static WorkflowExecution MakeFailedExecution()
     {
         WorkflowExecution exec = WorkflowExecution.Create(
-            WorkflowId, OrgId, TriggerType.Manual, null, new Dictionary<string, object?>());
+            WorkflowId, TenantId, TriggerType.Manual, null, new Dictionary<string, object?>());
         exec.Start();
         exec.Fail("original error");
         return exec;
@@ -37,10 +37,10 @@ public class RetryExecutionWithContextHandlerTests
     public async Task RetryWithContext_WhenExecutionHasFailed_CreatesRetryWithModifiedContextAndReturnsId()
     {
         WorkflowExecution failed = MakeFailedExecution();
-        _execRepo.GetByIdAsync(failed.Id, OrgId).Returns(failed);
+        _execRepo.GetByIdAsync(failed.Id, TenantId).Returns(failed);
 
         Result<Guid> result = await CreateHandler().Handle(
-            new RetryExecutionWithContextCommand(failed.Id, OrgId, UserId, ModifiedContext),
+            new RetryExecutionWithContextCommand(failed.Id, TenantId, UserId, ModifiedContext),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -56,10 +56,10 @@ public class RetryExecutionWithContextHandlerTests
     [Fact]
     public async Task RetryWithContext_WhenExecutionNotFound_ReturnsNotFound()
     {
-        _execRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).ReturnsNull();
+        _execRepo.GetByIdAsync(Arg.Any<Guid>(), TenantId).ReturnsNull();
 
         Result<Guid> result = await CreateHandler().Handle(
-            new RetryExecutionWithContextCommand(Guid.NewGuid(), OrgId, UserId, ModifiedContext),
+            new RetryExecutionWithContextCommand(Guid.NewGuid(), TenantId, UserId, ModifiedContext),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -70,12 +70,12 @@ public class RetryExecutionWithContextHandlerTests
     public async Task RetryWithContext_WhenExecutionIsNotFailed_ReturnsBusinessRuleFailure()
     {
         WorkflowExecution exec = WorkflowExecution.Create(
-            WorkflowId, OrgId, TriggerType.Manual, null, new Dictionary<string, object?>());
+            WorkflowId, TenantId, TriggerType.Manual, null, new Dictionary<string, object?>());
         exec.Start();
-        _execRepo.GetByIdAsync(exec.Id, OrgId).Returns(exec);
+        _execRepo.GetByIdAsync(exec.Id, TenantId).Returns(exec);
 
         Result<Guid> result = await CreateHandler().Handle(
-            new RetryExecutionWithContextCommand(exec.Id, OrgId, UserId, ModifiedContext),
+            new RetryExecutionWithContextCommand(exec.Id, TenantId, UserId, ModifiedContext),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -84,14 +84,14 @@ public class RetryExecutionWithContextHandlerTests
     }
 
     [Fact]
-    public async Task RetryWithContext_WhenExecutionBelongsToAnotherOrg_ReturnsNotFound()
+    public async Task RetryWithContext_WhenExecutionBelongsToAnotherTenant_ReturnsNotFound()
     {
         WorkflowExecution failed = MakeFailedExecution();
-        _execRepo.GetByIdAsync(failed.Id, OrgId).Returns(failed);
+        _execRepo.GetByIdAsync(failed.Id, TenantId).Returns(failed);
 
-        Guid otherOrgId = Guid.NewGuid();
+        Guid otherTenantId = Guid.NewGuid();
         Result<Guid> result = await CreateHandler().Handle(
-            new RetryExecutionWithContextCommand(failed.Id, otherOrgId, UserId, ModifiedContext),
+            new RetryExecutionWithContextCommand(failed.Id, otherTenantId, UserId, ModifiedContext),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

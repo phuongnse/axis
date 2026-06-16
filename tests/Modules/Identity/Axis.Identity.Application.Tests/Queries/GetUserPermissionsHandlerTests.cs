@@ -11,10 +11,10 @@ namespace Axis.Identity.Application.Tests.Queries;
 public sealed class GetUserPermissionsHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
-    private readonly IOrganizationMembershipRepository _membershipRepo = Substitute.For<IOrganizationMembershipRepository>();
+    private readonly ITenantMembershipRepository _membershipRepo = Substitute.For<ITenantMembershipRepository>();
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
 
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TenantId = Guid.NewGuid();
 
     private GetUserPermissionsHandler CreateHandler() => new(_userRepo, _membershipRepo, _roleRepo);
 
@@ -22,11 +22,11 @@ public sealed class GetUserPermissionsHandlerTests
     public async Task Handle_WhenUserNotFound_ReturnsNotFound()
     {
         Guid userId = Guid.NewGuid();
-        _userRepo.GetByIdAsync(userId, OrgId, Arg.Any<CancellationToken>())
+        _userRepo.GetByIdAsync(userId, TenantId, Arg.Any<CancellationToken>())
             .Returns((User?)null);
 
         Result<GetUserPermissionsResult> result = await CreateHandler()
-            .Handle(new GetUserPermissionsQuery(userId, OrgId), CancellationToken.None);
+            .Handle(new GetUserPermissionsQuery(userId, TenantId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
@@ -37,11 +37,11 @@ public sealed class GetUserPermissionsHandlerTests
     {
         User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value);
         user.Deactivate();
-        _userRepo.GetByIdAsync(user.Id, OrgId, Arg.Any<CancellationToken>())
+        _userRepo.GetByIdAsync(user.Id, TenantId, Arg.Any<CancellationToken>())
             .Returns(user);
 
         Result<GetUserPermissionsResult> result = await CreateHandler()
-            .Handle(new GetUserPermissionsQuery(user.Id, OrgId), CancellationToken.None);
+            .Handle(new GetUserPermissionsQuery(user.Id, TenantId), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Permissions.Should().BeEmpty();
@@ -52,21 +52,21 @@ public sealed class GetUserPermissionsHandlerTests
     public async Task Handle_WhenUserHasRoles_ReturnsDistinctPermissions()
     {
         User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value);
-        Role editor = Role.CreateSystem("Editor", OrgId, ["workflow:definition:read", "workflow:definition:write"]);
-        Role viewer = Role.CreateSystem("Viewer", OrgId, ["workflow:definition:read"]);
-        OrganizationMembership membership = OrganizationMembership.Create(user.Id, OrgId);
+        Role editor = Role.CreateSystem("Editor", TenantId, ["workflow:definition:read", "workflow:definition:write"]);
+        Role viewer = Role.CreateSystem("Viewer", TenantId, ["workflow:definition:read"]);
+        TenantMembership membership = TenantMembership.Create(user.Id, TenantId);
         membership.AssignRole(editor.Id);
         membership.AssignRole(viewer.Id);
 
-        _userRepo.GetByIdAsync(user.Id, OrgId, Arg.Any<CancellationToken>())
+        _userRepo.GetByIdAsync(user.Id, TenantId, Arg.Any<CancellationToken>())
             .Returns(user);
-        _membershipRepo.GetByUserAndOrganizationAsync(user.Id, OrgId, Arg.Any<CancellationToken>())
+        _membershipRepo.GetByUserAndTenantAsync(user.Id, TenantId, Arg.Any<CancellationToken>())
             .Returns(membership);
-        _roleRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), OrgId, Arg.Any<CancellationToken>())
+        _roleRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), TenantId, Arg.Any<CancellationToken>())
             .Returns(new List<Role> { editor, viewer });
 
         Result<GetUserPermissionsResult> result = await CreateHandler()
-            .Handle(new GetUserPermissionsQuery(user.Id, OrgId), CancellationToken.None);
+            .Handle(new GetUserPermissionsQuery(user.Id, TenantId), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Permissions.Should().BeEquivalentTo(

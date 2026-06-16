@@ -12,15 +12,15 @@ public class DataModelingEventMapperTests
     public void ToIntegrationEvent_WhenModelCreated_MapsToAvroEvent()
     {
         Guid modelId = Guid.NewGuid();
-        Guid orgId = Guid.NewGuid();
+        Guid TenantId = Guid.NewGuid();
 
         object? result = DataModelingEventMapper.ToIntegrationEvent(
-            new ModelCreated(modelId, orgId, "Invoice"));
+            new ModelCreated(modelId, TenantId, "Invoice"));
 
         result.Should().BeOfType<ModelCreatedEvent>();
         ModelCreatedEvent avro = (ModelCreatedEvent)result!;
         avro.modelId.Should().Be(modelId.ToString());
-        avro.organizationId.Should().Be(orgId.ToString());
+        avro.tenantId.Should().Be(TenantId.ToString());
         avro.name.Should().Be("Invoice");
     }
 
@@ -28,11 +28,11 @@ public class DataModelingEventMapperTests
     public void ToIntegrationEvent_WhenFieldAdded_MapsFieldMetadata()
     {
         Guid modelId = Guid.NewGuid();
-        Guid orgId = Guid.NewGuid();
+        Guid TenantId = Guid.NewGuid();
         Guid fieldId = Guid.NewGuid();
 
         object? result = DataModelingEventMapper.ToIntegrationEvent(
-            new FieldAdded(modelId, orgId, fieldId, "amount", FieldType.Number, "Amount", true, 3));
+            new FieldAdded(modelId, TenantId, fieldId, "amount", FieldType.Number, "Amount", true, 3));
 
         result.Should().BeOfType<FieldAddedEvent>();
         FieldAddedEvent avro = (FieldAddedEvent)result!;

@@ -8,7 +8,7 @@ Edit a data class so that I can add or remove fields as requirements change.
 
 ## Primary actor
 
-- Organization Member with `data_modeling:model:write`
+- Tenant Member with `data_modeling:model:write`
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Edit a data class so that I can add or remove fields as requirements change.
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Edit a data class flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -57,6 +57,12 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 > **Gaps vs spec:**
 > - "models affected" warning on field delete pending API/Frontend layer
 > - auto-downgrade-to-optional for required fields on existing-record models pending.
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

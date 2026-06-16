@@ -60,7 +60,7 @@ describe('RegisterPage', () => {
     const user = userEvent.setup();
     await renderWithRouter(<RegisterPage />, { path: '/register' });
 
-    expect(screen.getByText('This name will appear in your workspace.')).toBeInTheDocument();
+    expect(screen.getByText('This name will appear on your account.')).toBeInTheDocument();
     expect(
       screen.getByText('We will send a verification link to this address.'),
     ).toBeInTheDocument();
@@ -138,10 +138,10 @@ describe('RegisterPage', () => {
     );
     const stored = sessionStorage.getItem('axis.registration-context');
     expect(stored).toContain('alex@example.com');
-    expect(stored).not.toContain('organizationName');
+    expect(stored).not.toContain('TenantName');
   });
 
-  it('includes setup token when registering the first organization user', async () => {
+  it('includes setup token when registering the first Tenant user', async () => {
     const user = userEvent.setup();
     let registerBody: Record<string, unknown> | undefined;
     vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
@@ -175,7 +175,7 @@ describe('RegisterPage', () => {
     await user.click(screen.getByRole('button', { name: /create account/i }));
 
     await waitFor(() => {
-      expect(registerBody?.organizationSetupToken).toBe('setup-token');
+      expect(registerBody?.TenantSetupToken).toBe('setup-token');
     });
   });
 

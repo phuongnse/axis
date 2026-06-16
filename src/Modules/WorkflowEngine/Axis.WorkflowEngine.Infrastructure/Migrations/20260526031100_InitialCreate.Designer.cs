@@ -36,9 +36,9 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
-                    b.Property<Guid>("OrganizationId")
+                    b.Property<Guid>("tenantId")
                         .HasColumnType("uuid")
-                        .HasColumnName("organization_id");
+                        .HasColumnName("tenant_id");
 
                     b.HasKey("WorkflowId");
 
@@ -63,7 +63,7 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                     b.Property<string>("ErrorMessage")
                         .HasColumnType("text");
 
-                    b.Property<Guid>("OrganizationId")
+                    b.Property<Guid>("tenantId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid?>("RetryOfExecutionId")
@@ -103,9 +103,9 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("workflow_id");
 
-                    b.Property<Guid>("OrganizationId")
+                    b.Property<Guid>("tenantId")
                         .HasColumnType("uuid")
-                        .HasColumnName("organization_id");
+                        .HasColumnName("tenant_id");
 
                     b.Property<string>("Steps")
                         .IsRequired()
@@ -153,7 +153,7 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                                 .HasMaxLength(500)
                                 .HasColumnType("character varying(500)");
 
-                            b1.Property<Guid>("OrganizationId")
+                            b1.Property<Guid>("tenantId")
                                 .HasColumnType("uuid");
 
                             b1.Property<string>("OutputSnapshot")
@@ -181,7 +181,7 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
 
                             b1.HasKey("Id");
 
-                            b1.HasIndex("ExecutionId", "OrganizationId");
+                            b1.HasIndex("ExecutionId", "tenantId");
 
                             b1.ToTable("execution_steps", (string)null);
 

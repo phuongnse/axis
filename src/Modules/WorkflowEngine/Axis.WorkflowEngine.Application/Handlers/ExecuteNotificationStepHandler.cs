@@ -20,7 +20,7 @@ public sealed class ExecuteNotificationStepHandler(
     public async Task HandleAsync(ExecuteNotificationStepMessage message, CancellationToken ct)
     {
         WorkflowExecution? execution = await execRepo.GetByIdWithStepsAsync(
-            message.ExecutionId, message.OrganizationId, ct);
+            message.ExecutionId, message.tenantId, ct);
 
         if (execution is null)
         {
@@ -66,6 +66,6 @@ public sealed class ExecuteNotificationStepHandler(
             message.StepId, message.ExecutionId);
 
         await dispatcher.PublishAsync(new StepCompletedMessage(
-            message.ExecutionId, message.StepId, message.OrganizationId, deliveryResult), ct);
+            message.ExecutionId, message.StepId, message.tenantId, deliveryResult), ct);
     }
 }

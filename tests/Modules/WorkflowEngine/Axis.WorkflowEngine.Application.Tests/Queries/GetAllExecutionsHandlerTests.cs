@@ -12,7 +12,7 @@ public class GetAllExecutionsHandlerTests
 {
     private readonly IExecutionRepository _execRepo = Substitute.For<IExecutionRepository>();
 
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TenantId = Guid.NewGuid();
     private static readonly Guid WorkflowId = Guid.NewGuid();
 
     private GetAllExecutionsHandler CreateHandler() => new(_execRepo);
@@ -25,11 +25,11 @@ public class GetAllExecutionsHandlerTests
     public async Task GetAllExecutions_WhenExecutionsExist_ReturnsPagedResult()
     {
         List<ExecutionSummaryResponse> summaries = [BuildSummary(), BuildSummary(), BuildSummary()];
-        _execRepo.GetPagedAsync(OrgId, 1, 25, null, Arg.Any<CancellationToken>())
+        _execRepo.GetPagedAsync(TenantId, 1, 25, null, Arg.Any<CancellationToken>())
             .Returns((summaries, 3));
 
         PagedResult<ExecutionSummaryResponse> result = await CreateHandler().Handle(
-            new GetAllExecutionsQuery(OrgId), CancellationToken.None);
+            new GetAllExecutionsQuery(TenantId), CancellationToken.None);
 
         result.Items.Should().HaveCount(3);
         result.TotalCount.Should().Be(3);
@@ -38,26 +38,26 @@ public class GetAllExecutionsHandlerTests
     [Fact]
     public async Task GetAllExecutions_WithStatusFilter_PassesFilterToRepository()
     {
-        _execRepo.GetPagedAsync(OrgId, 1, 25, ExecutionStatus.Running, Arg.Any<CancellationToken>())
+        _execRepo.GetPagedAsync(TenantId, 1, 25, ExecutionStatus.Running, Arg.Any<CancellationToken>())
             .Returns((new List<ExecutionSummaryResponse>(), 0));
 
         await CreateHandler().Handle(
-            new GetAllExecutionsQuery(OrgId, Status: ExecutionStatus.Running),
+            new GetAllExecutionsQuery(TenantId, Status: ExecutionStatus.Running),
             CancellationToken.None);
 
         await _execRepo.Received(1).GetPagedAsync(
-            OrgId, 1, 25, ExecutionStatus.Running, Arg.Any<CancellationToken>());
+            TenantId, 1, 25, ExecutionStatus.Running, Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task GetAllExecutions_WhenPageIsZeroOrNegative_ClampsToOne()
     {
-        _execRepo.GetPagedAsync(OrgId, 1, 25, null, Arg.Any<CancellationToken>())
+        _execRepo.GetPagedAsync(TenantId, 1, 25, null, Arg.Any<CancellationToken>())
             .Returns((new List<ExecutionSummaryResponse>(), 0));
 
         await CreateHandler().Handle(
-            new GetAllExecutionsQuery(OrgId, Page: -5), CancellationToken.None);
+            new GetAllExecutionsQuery(TenantId, Page: -5), CancellationToken.None);
 
-        await _execRepo.Received(1).GetPagedAsync(OrgId, 1, 25, null, Arg.Any<CancellationToken>());
+        await _execRepo.Received(1).GetPagedAsync(TenantId, 1, 25, null, Arg.Any<CancellationToken>());
     }
 }

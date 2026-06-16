@@ -2,10 +2,10 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Identity.Domain.Provisioning;
 
-/// <summary>Tracks per-module tenant schema provisioning for an organization.</summary>
-public sealed class TenantModuleProvisioning : Entity<(Guid OrganizationId, string Module)>
+/// <summary>Tracks per-module tenant schema provisioning for a tenant.</summary>
+public sealed class TenantModuleProvisioning : Entity<(Guid tenantId, string Module)>
 {
-    public Guid OrganizationId { get; private set; }
+    public Guid tenantId { get; private set; }
     public string Module { get; private set; }
     public TenantModuleProvisioningStatus Status { get; private set; }
     public int AttemptCount { get; private set; }
@@ -15,15 +15,15 @@ public sealed class TenantModuleProvisioning : Entity<(Guid OrganizationId, stri
     private TenantModuleProvisioning() : base(default) { Module = null!; } // EF Core
 
     private TenantModuleProvisioning(
-        Guid organizationId,
+        Guid tenantId,
         string module,
         TenantModuleProvisioningStatus status,
         int attemptCount,
         string? lastError,
         DateTimeOffset updatedAt)
-        : base((organizationId, module))
+        : base((tenantId, module))
     {
-        OrganizationId = organizationId;
+        this.tenantId = tenantId;
         Module = module;
         Status = status;
         AttemptCount = attemptCount;
@@ -31,15 +31,15 @@ public sealed class TenantModuleProvisioning : Entity<(Guid OrganizationId, stri
         UpdatedAt = updatedAt;
     }
 
-    public static TenantModuleProvisioning CreatePending(Guid organizationId, string module)
+    public static TenantModuleProvisioning CreatePending(Guid tenantId, string module)
     {
-        if (organizationId == Guid.Empty)
-            throw new ArgumentException("Organization id is required.", nameof(organizationId));
+        if (tenantId == Guid.Empty)
+            throw new ArgumentException("Tenant id is required.", nameof(tenantId));
         if (string.IsNullOrWhiteSpace(module))
             throw new ArgumentException("Module name is required.", nameof(module));
 
         return new(
-            organizationId,
+            tenantId,
             module,
             TenantModuleProvisioningStatus.Pending,
             attemptCount: 0,

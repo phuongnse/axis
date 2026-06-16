@@ -9,7 +9,7 @@ using Axis.DataModeling.Application.Commands.CreateModel;
 using Axis.DataModeling.Infrastructure.Extensions;
 using Axis.FormBuilder.Application.Commands.CreateForm;
 using Axis.FormBuilder.Infrastructure.Extensions;
-using Axis.Identity.Application.Commands.RegisterOrganization;
+using Axis.Identity.Application.Commands.RegisterTenant;
 using Axis.Identity.Infrastructure.Extensions;
 using Axis.Shared.Application.Behaviors;
 using Axis.Shared.Application.Identity;
@@ -83,7 +83,7 @@ internal static class AxisApiServiceExtensions
         services.AddMediatR(cfg =>
         {
             cfg.RegisterServicesFromAssemblies(
-                typeof(RegisterOrganizationCommand).Assembly,
+                typeof(RegisterTenantCommand).Assembly,
                 typeof(CreateModelCommand).Assembly,
                 typeof(CreateWorkflowCommand).Assembly,
                 typeof(CreateFormCommand).Assembly,
@@ -93,7 +93,7 @@ internal static class AxisApiServiceExtensions
         });
 
         services.AddValidatorsFromAssemblies([
-            typeof(RegisterOrganizationCommand).Assembly,
+            typeof(RegisterTenantCommand).Assembly,
             typeof(CreateModelCommand).Assembly,
             typeof(CreateWorkflowCommand).Assembly,
             typeof(CreateFormCommand).Assembly,

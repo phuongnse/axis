@@ -60,6 +60,6 @@ public sealed class FormBuilderDatabaseFixture : IAsyncLifetime
 
 internal sealed class TestTenantContext(string schemaName) : ITenantContext
 {
-    public Guid OrganizationId => Guid.Parse("00000000-0000-0000-0000-000000000001");
+    public Guid tenantId => Guid.Parse("00000000-0000-0000-0000-000000000001");
     public string SchemaName => schemaName;
 }

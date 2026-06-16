@@ -1,0 +1,8 @@
+{
+  "namespace": "axis.identity.events",
+  "type": "record",
+  "name": "TenantVerifiedEvent",
+  "fields": [
+    { "name": "tenantId", "type": "string" }
+  ]
+}

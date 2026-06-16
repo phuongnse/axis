@@ -26,7 +26,7 @@ describe('Preferences', () => {
 
     expect(
       await screen.findByText(
-        'Thiết lập mô hình dữ liệu, quy trình và không gian làm việc trong một hệ thống thống nhất.',
+        'Thiết lập mô hình dữ liệu, quy trình và tài khoản trong một hệ thống thống nhất.',
       ),
     ).toBeInTheDocument();
     expect(document.documentElement.lang).toBe('vi');

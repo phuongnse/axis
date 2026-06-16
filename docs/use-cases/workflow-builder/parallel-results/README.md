@@ -8,7 +8,7 @@ Use the output of all parallel steps in subsequent steps so that I can combine r
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Use the output of all parallel steps in subsequent steps so that I can combine r
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Access results from parallel branches flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -57,6 +57,12 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 > **Gaps vs spec:**
 > - context namespacing by step ID and sibling-output blocking pending workflow-engine
 > - design-time duplicate output warning pending.
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

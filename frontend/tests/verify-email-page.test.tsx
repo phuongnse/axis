@@ -57,7 +57,7 @@ describe('VerifyEmailPage', () => {
     expect(navigateMock).not.toHaveBeenCalled();
   });
 
-  it('navigates to user registration when organization contact is verified', async () => {
+  it('navigates to user registration when Tenant contact is verified', async () => {
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -66,12 +66,12 @@ describe('VerifyEmailPage', () => {
           JSON.stringify({
             sessionEstablished: false,
             nextStep: 'RegisterUser',
-            organizationSetupToken: 'setup-token',
+            TenantSetupToken: 'setup-token',
           }),
         ),
     } as unknown as Response);
 
-    await renderWithRouter(<VerifyEmailPage />, { path: '/auth/verify?token=org-token' });
+    await renderWithRouter(<VerifyEmailPage />, { path: '/auth/verify?token=tenant-token' });
 
     await waitFor(() => {
       expect(navigateMock).toHaveBeenCalledWith({

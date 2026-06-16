@@ -17,11 +17,11 @@ public sealed class CreateRoleHandler(
         if (command.Permissions.Count == 0)
             return Result.Failure<Guid>(ErrorCodes.BusinessRule, "A role must have at least one permission.");
 
-        // unique name (case-insensitive) within org
-        if (await roleRepo.NameExistsAsync(command.Name, command.OrganizationId, null, cancellationToken))
+        // unique name (case-insensitive) within Tenant
+        if (await roleRepo.NameExistsAsync(command.Name, command.tenantId, null, cancellationToken))
             return Result.Failure<Guid>(ErrorCodes.Conflict, "A role with this name already exists.");
 
-        Role role = Role.Create(command.Name, command.Description, command.OrganizationId, command.Permissions);
+        Role role = Role.Create(command.Name, command.Description, command.tenantId, command.Permissions);
         await roleRepo.AddAsync(role, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);
 

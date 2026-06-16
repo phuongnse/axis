@@ -8,7 +8,7 @@ Select multiple records and perform bulk actions so that I can manage large data
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Select multiple records and perform bulk actions so that I can manage large data
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Bulk operations on records flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -65,6 +65,9 @@ Users can create, read, update, and delete records against any model. Records ar
 > - CSV export via `GET /api/models/{id}/records/export` (same filter/sort params as list)
 > - field names for export header taken from model's FieldDefinition labels
 > - CSV uses RFC 4180 escaping.
+>
+> **Deferred follow-ups:**
+> - N/A
 
 ## Wireframes
 

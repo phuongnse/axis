@@ -14,10 +14,10 @@ import type {
   LoginAttemptResult,
   LoginCredentials,
   MessageResponse,
-  OrganizationSlugPreviewResponse,
   ProvisioningStatusResponse,
-  RegisterOrganizationRequest,
+  RegisterTenantRequest,
   RegisterUserRequest,
+  TenantSlugPreviewResponse,
   VerifyEmailResponse,
 } from './types';
 
@@ -25,7 +25,7 @@ export const authKeys = {
   all: ['auth'] as const,
   provisioningStatus: (token: string) => [...authKeys.all, 'provisioning-status', token] as const,
   legalVersions: ['auth', 'legal-versions'] as const,
-  slugPreview: (orgName: string) => [...authKeys.all, 'slug-preview', orgName] as const,
+  slugPreview: (tenantName: string) => [...authKeys.all, 'slug-preview', tenantName] as const,
 };
 
 export function createRegisterIdempotencyKey(): string {
@@ -46,11 +46,11 @@ export function toAdminNameParts(fullName: string): { firstName: string; lastNam
   };
 }
 
-export async function registerOrganization(
-  payload: RegisterOrganizationRequest,
+export async function registerTenant(
+  payload: RegisterTenantRequest,
   idempotencyKey: string,
 ): Promise<MessageResponse> {
-  return fetchApi<MessageResponse>('/organizations', {
+  return fetchApi<MessageResponse>('/tenants', {
     method: 'POST',
     headers: {
       'Idempotency-Key': idempotencyKey,
@@ -76,13 +76,9 @@ export async function getLegalVersions(): Promise<LegalVersionsResponse> {
   return fetchApi<LegalVersionsResponse>('/legal/versions');
 }
 
-export async function getOrganizationSlugPreview(
-  orgName: string,
-): Promise<OrganizationSlugPreviewResponse> {
-  const params = new URLSearchParams({ orgName });
-  return fetchApi<OrganizationSlugPreviewResponse>(
-    `/organizations/slug-preview?${params.toString()}`,
-  );
+export async function getTenantSlugPreview(tenantName: string): Promise<TenantSlugPreviewResponse> {
+  const params = new URLSearchParams({ tenantName });
+  return fetchApi<TenantSlugPreviewResponse>(`/tenants/slug-preview?${params.toString()}`);
 }
 
 export class LoginRequestError extends Error {
@@ -223,6 +219,6 @@ export async function signOut(): Promise<void> {
   try {
     await fetch('/api/auth/signout', { method: 'POST', credentials: 'include' });
   } catch {
-    // Network failure — local cleanup is handled by the caller.
+    // Network failure - local cleanup is handled by the caller.
   }
 }

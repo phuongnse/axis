@@ -14,24 +14,24 @@ namespace Axis.Identity.Application.Tests.Commands;
 public class AuthenticateUserHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
-    private readonly IOrganizationMembershipRepository _membershipRepo = Substitute.For<IOrganizationMembershipRepository>();
-    private readonly IOrganizationRepository _orgRepo = Substitute.For<IOrganizationRepository>();
+    private readonly ITenantMembershipRepository _membershipRepo = Substitute.For<ITenantMembershipRepository>();
+    private readonly ITenantRepository _tenantRepo = Substitute.For<ITenantRepository>();
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
     private readonly IPasswordHasher _hasher = Substitute.For<IPasswordHasher>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TenantId = Guid.NewGuid();
     private static readonly Guid RoleId = Guid.NewGuid();
 
     private AuthenticateUserHandler CreateHandler()
     {
-        Organization organization = Organization.Create(
+        Tenant Tenant = Tenant.Create(
             "Acme",
-            OrganizationSlug.Create("acme").Value,
+            TenantSlug.Create("acme").Value,
             Email.Create("owner@acme.com").Value,
             WellKnownSubscriptionPlans.FreeId);
-        _orgRepo.GetByIdAsync(OrgId, Arg.Any<CancellationToken>()).Returns(organization);
-        return new(_userRepo, _membershipRepo, _orgRepo, _roleRepo, _hasher, _uow);
+        _tenantRepo.GetByIdAsync(TenantId, Arg.Any<CancellationToken>()).Returns(Tenant);
+        return new(_userRepo, _membershipRepo, _tenantRepo, _roleRepo, _hasher, _uow);
     }
 
     private static User MakeActiveUser(string email = "alice@acme.com")
@@ -42,51 +42,51 @@ public class AuthenticateUserHandlerTests
         return user;
     }
 
-    private static OrganizationMembership MakeMembership(User user)
+    private static TenantMembership MakeMembership(User user)
     {
-        OrganizationMembership membership = OrganizationMembership.Create(user.Id, OrgId);
+        TenantMembership membership = TenantMembership.Create(user.Id, TenantId);
         membership.AssignRole(RoleId);
         return membership;
     }
 
     private static Role MakeRole(string[] permissions) =>
-        Role.CreateSystem("Admin", OrgId, permissions);
+        Role.CreateSystem("Admin", TenantId, permissions);
 
     [Fact]
-    public async Task AuthenticateUser_WhenOrganizationDeleted_ReturnsOrganizationDeleted()
+    public async Task AuthenticateUser_WhenTenantDeleted_ReturnsTenantDeleted()
     {
         User user = MakeActiveUser();
-        Organization organization = Organization.Create(
+        Tenant Tenant = Tenant.Create(
             "Acme",
-            OrganizationSlug.Create("acme").Value,
+            TenantSlug.Create("acme").Value,
             Email.Create("owner@acme.com").Value,
             WellKnownSubscriptionPlans.FreeId);
-        organization.MarkDeleted();
-        OrganizationMembership membership = MakeMembership(user);
+        Tenant.MarkDeleted();
+        TenantMembership membership = MakeMembership(user);
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).Returns(user);
         _membershipRepo.GetFirstActiveByUserIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(membership);
-        _orgRepo.GetByIdAsync(OrgId, Arg.Any<CancellationToken>()).Returns(organization);
+        _tenantRepo.GetByIdAsync(TenantId, Arg.Any<CancellationToken>()).Returns(Tenant);
         _hasher.Verify("password123", "hashed").Returns(true);
 
-        AuthenticateUserHandler handler = new(_userRepo, _membershipRepo, _orgRepo, _roleRepo, _hasher, _uow);
+        AuthenticateUserHandler handler = new(_userRepo, _membershipRepo, _tenantRepo, _roleRepo, _hasher, _uow);
         Result<AuthenticationResult> result = await handler.Handle(
             new AuthenticateUserCommand("alice@acme.com", "password123"),
             CancellationToken.None);
 
         result.Value.Success.Should().BeFalse();
-        result.Value.FailureReason.Should().Be(AuthFailureReason.OrganizationDeleted);
+        result.Value.FailureReason.Should().Be(AuthFailureReason.TenantDeleted);
     }
 
     [Fact]
     public async Task AuthenticateUser_WhenCredentialsAreValid_ReturnsSuccessWithUserInfoAndPermissions()
     {
         User user = MakeActiveUser();
-        OrganizationMembership membership = MakeMembership(user);
+        TenantMembership membership = MakeMembership(user);
         Role role = MakeRole(["workflow:definition:read", "users:read"]);
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).Returns(user);
         _membershipRepo.GetFirstActiveByUserIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(membership);
         _hasher.Verify("password123", "hashed").Returns(true);
-        _roleRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), OrgId).Returns([role]);
+        _roleRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), TenantId).Returns([role]);
 
         Result<AuthenticationResult> result = await CreateHandler().Handle(
             new AuthenticateUserCommand("alice@acme.com", "password123"),
@@ -95,7 +95,7 @@ public class AuthenticateUserHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Success.Should().BeTrue();
         result.Value.UserId.Should().Be(user.Id);
-        result.Value.OrganizationId.Should().Be(OrgId);
+        result.Value.tenantId.Should().Be(TenantId);
         result.Value.Permissions.Should().Contain("workflow:definition:read");
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>()); // reset failed logins
     }

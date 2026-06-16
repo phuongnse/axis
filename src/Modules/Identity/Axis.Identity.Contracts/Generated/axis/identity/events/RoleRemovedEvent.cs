@@ -12,10 +12,10 @@ namespace axis.identity.events
     public partial class RoleRemovedEvent : global::Avro.Specific.ISpecificRecord
     {
         public static global::Avro.Schema _SCHEMA = global::Avro.Schema.Parse(
-            @"{""type"":""record"",""name"":""RoleRemovedEvent"",""namespace"":""axis.identity.events"",""fields"":[{""name"":""userId"",""type"":""string""},{""name"":""organizationId"",""type"":""string""},{""name"":""roleId"",""type"":""string""}]}");
+            @"{""type"":""record"",""name"":""RoleRemovedEvent"",""namespace"":""axis.identity.events"",""fields"":[{""name"":""userId"",""type"":""string""},{""name"":""tenantId"",""type"":""string""},{""name"":""roleId"",""type"":""string""}]}");
 
         private string _userId = string.Empty;
-        private string _organizationId = string.Empty;
+        private string _tenantId = string.Empty;
         private string _roleId = string.Empty;
 
         public virtual global::Avro.Schema Schema => RoleRemovedEvent._SCHEMA;
@@ -26,10 +26,10 @@ namespace axis.identity.events
             set => _userId = value;
         }
 
-        public string organizationId
+        public string tenantId
         {
-            get => _organizationId;
-            set => _organizationId = value;
+            get => _tenantId;
+            set => _tenantId = value;
         }
 
         public string roleId
@@ -41,7 +41,7 @@ namespace axis.identity.events
         public virtual object Get(int fieldPos) => fieldPos switch
         {
             0 => userId,
-            1 => organizationId,
+            1 => tenantId,
             2 => roleId,
             _ => throw new global::Avro.AvroRuntimeException("Bad index " + fieldPos + " in Get()"),
         };
@@ -51,7 +51,7 @@ namespace axis.identity.events
             switch (fieldPos)
             {
                 case 0: userId = (string)fieldValue; break;
-                case 1: organizationId = (string)fieldValue; break;
+                case 1: tenantId = (string)fieldValue; break;
                 case 2: roleId = (string)fieldValue; break;
                 default: throw new global::Avro.AvroRuntimeException("Bad index " + fieldPos + " in Put()");
             }

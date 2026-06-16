@@ -8,7 +8,7 @@ Edit an existing custom role so that I can adjust permissions as our needs chang
 
 ## Primary actor
 
-- Organization Admin
+- Tenant Admin
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Edit an existing custom role so that I can adjust permissions as our needs chang
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Edit a custom role flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -26,7 +26,7 @@ Edit an existing custom role so that I can adjust permissions as our needs chang
 
 ## Context
 
-Organization admins can create custom roles, assign permissions to each role, and assign roles to users. Default system roles (Admin, Editor, Viewer) are provided out-of-the-box and cannot be deleted or modified.
+Tenant admins can create custom roles, assign permissions to each role, and assign roles to users. Default system roles (Admin, Editor, Viewer) are provided out-of-the-box and cannot be deleted or modified.
 
 ## Acceptance Criteria
 
@@ -60,6 +60,15 @@ Organization admins can create custom roles, assign permissions to each role, an
 > **Gaps vs spec:** 403 check pending.
 >
 > **Done:** system role guard (cannot edit Admin/Editor/Viewer/End User) implemented in domain via `IsSystem` flag.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

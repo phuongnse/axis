@@ -12,7 +12,7 @@ namespace Axis.WorkflowEngine.Infrastructure.Tests.Handlers;
 [Collection("WorkflowEngineDatabase")]
 public sealed class WorkflowUnarchivedHandlerTests(WorkflowEngineDatabaseFixture fixture)
 {
-    private static readonly Guid OrgId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid TenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private static WorkflowUnarchivedHandler CreateHandler(WorkflowEngineDbContext ctx)
     {
@@ -29,7 +29,7 @@ public sealed class WorkflowUnarchivedHandlerTests(WorkflowEngineDatabaseFixture
         Guid workflowId = Guid.NewGuid();
 
         await using WorkflowEngineDbContext setupCtx = fixture.CreateContext();
-        WorkflowActiveStatus status = WorkflowActiveStatus.Activated(workflowId, OrgId);
+        WorkflowActiveStatus status = WorkflowActiveStatus.Activated(workflowId, TenantId);
         status.Deactivate();
         setupCtx.WorkflowActiveStatuses.Add(status);
         await setupCtx.SaveChangesAsync();
@@ -39,7 +39,7 @@ public sealed class WorkflowUnarchivedHandlerTests(WorkflowEngineDatabaseFixture
             new WorkflowUnarchivedEvent
             {
                 workflowId = workflowId.ToString(),
-                organizationId = OrgId.ToString(),
+                tenantId = TenantId.ToString(),
                 referencedFormIds = [],
             },
             CancellationToken.None);
@@ -60,7 +60,7 @@ public sealed class WorkflowUnarchivedHandlerTests(WorkflowEngineDatabaseFixture
             new WorkflowUnarchivedEvent
             {
                 workflowId = Guid.NewGuid().ToString(),
-                organizationId = OrgId.ToString(),
+                tenantId = TenantId.ToString(),
                 referencedFormIds = [],
             },
             CancellationToken.None);

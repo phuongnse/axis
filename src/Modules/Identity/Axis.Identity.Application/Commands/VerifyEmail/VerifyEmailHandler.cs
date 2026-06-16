@@ -10,10 +10,10 @@ namespace Axis.Identity.Application.Commands.VerifyEmail;
 
 public sealed class VerifyEmailHandler(
     IEmailVerificationTokenStore tokenStore,
-    IOrganizationRegistrationTokenStore organizationTokenStore,
+    ITenantRegistrationTokenStore TenantTokenStore,
     IUserRepository userRepo,
-    IOrganizationMembershipRepository membershipRepo,
-    IOrganizationRepository organizationRepo,
+    ITenantMembershipRepository membershipRepo,
+    ITenantRepository TenantRepo,
     ITenantModuleProvisioningRepository provisioningRepo,
     IRoleRepository roleRepo,
     IUnitOfWork uow)
@@ -35,7 +35,7 @@ public sealed class VerifyEmailHandler(
         return resolved.State switch
         {
             EmailVerificationTokenState.NotFound =>
-                await VerifyOrganizationContactAsync(tokenHash, cancellationToken),
+                await VerifyTenantContactAsync(tokenHash, cancellationToken),
             EmailVerificationTokenState.Expired =>
                 Result.Failure<VerifyEmailSuccessDto>(
                     ErrorCodes.BusinessRule,
@@ -51,45 +51,45 @@ public sealed class VerifyEmailHandler(
         };
     }
 
-    private async Task<Result<VerifyEmailSuccessDto>> VerifyOrganizationContactAsync(
+    private async Task<Result<VerifyEmailSuccessDto>> VerifyTenantContactAsync(
         string tokenHash,
         CancellationToken cancellationToken)
     {
         Result<Guid> resolved =
-            await organizationTokenStore.ResolveVerificationAsync(tokenHash, cancellationToken);
+            await TenantTokenStore.ResolveVerificationAsync(tokenHash, cancellationToken);
 
         return resolved.IsFailure
             ? Result.Failure<VerifyEmailSuccessDto>(
                 resolved.ErrorCode ?? ErrorCodes.BusinessRule,
                 resolved.Error)
-            : await VerifyOrganizationAsync(resolved.Value, cancellationToken);
+            : await VerifyTenantAsync(resolved.Value, cancellationToken);
     }
 
-    private async Task<Result<VerifyEmailSuccessDto>> VerifyOrganizationAsync(
-        Guid organizationId,
+    private async Task<Result<VerifyEmailSuccessDto>> VerifyTenantAsync(
+        Guid tenantId,
         CancellationToken cancellationToken)
     {
-        Organization? organization = await organizationRepo.GetByIdAsync(organizationId, cancellationToken);
-        if (organization is null)
+        Tenant? Tenant = await TenantRepo.GetByIdAsync(tenantId, cancellationToken);
+        if (Tenant is null)
             return Result.Failure<VerifyEmailSuccessDto>(ErrorCodes.BusinessRule, "Invalid verification link.");
 
-        if (organization.Status != OrganizationStatus.PendingVerification)
+        if (Tenant.Status != TenantStatus.PendingVerification)
         {
             return Result.Failure<VerifyEmailSuccessDto>(
                 ErrorCodes.BusinessRule,
                 "This link has already been used. Please sign in.");
         }
 
-        organization.BeginProvisioningAfterContactVerification();
+        Tenant.BeginProvisioningAfterContactVerification();
 
         List<TenantModuleProvisioning> pendingModules = TenantModuleNames.All
-            .Select(module => TenantModuleProvisioning.CreatePending(organization.Id, module))
+            .Select(module => TenantModuleProvisioning.CreatePending(Tenant.Id, module))
             .ToList();
         await provisioningRepo.AddRangeAsync(pendingModules, cancellationToken);
 
         (string rawSetupToken, string setupTokenHash) = OpaqueTokenGenerator.Create();
-        await organizationTokenStore.CreateFirstUserSetupAsync(
-            organization.Id,
+        await TenantTokenStore.CreateFirstUserSetupAsync(
+            Tenant.Id,
             setupTokenHash,
             DateTime.UtcNow.Add(FirstUserSetupTokenLifetime),
             cancellationToken);
@@ -98,9 +98,9 @@ public sealed class VerifyEmailHandler(
 
         return Result.Success(new VerifyEmailSuccessDto(
             null,
-            organization.Id,
-            organization.OwnerEmail.Value,
-            organization.Name,
+            Tenant.Id,
+            Tenant.OwnerEmail.Value,
+            Tenant.Name,
             [],
             VerifyEmailNextStep.RegisterUser,
             rawSetupToken));
@@ -121,7 +121,7 @@ public sealed class VerifyEmailHandler(
                 "This link has already been used. Please sign in.");
         }
 
-        OrganizationMembership? membership =
+        TenantMembership? membership =
             await membershipRepo.GetFirstActiveByUserIdAsync(user.Id, cancellationToken);
         if (membership is null)
         {
@@ -137,27 +137,27 @@ public sealed class VerifyEmailHandler(
                 VerifyEmailNextStep.Dashboard));
         }
 
-        Organization? organization = await organizationRepo.GetByIdAsync(membership.OrganizationId, cancellationToken);
-        if (organization is null)
+        Tenant? Tenant = await TenantRepo.GetByIdAsync(membership.tenantId, cancellationToken);
+        if (Tenant is null)
             return Result.Failure<VerifyEmailSuccessDto>(ErrorCodes.BusinessRule, "Invalid verification link.");
 
-        if (organization.Status == OrganizationStatus.PendingVerification)
+        if (Tenant.Status == TenantStatus.PendingVerification)
         {
-            organization.BeginProvisioningAfterOwnerVerification();
+            Tenant.BeginProvisioningAfterOwnerVerification();
 
             List<TenantModuleProvisioning> pendingModules = TenantModuleNames.All
-                .Select(module => TenantModuleProvisioning.CreatePending(organization.Id, module))
+                .Select(module => TenantModuleProvisioning.CreatePending(Tenant.Id, module))
                 .ToList();
             await provisioningRepo.AddRangeAsync(pendingModules, cancellationToken);
         }
-        else if (!organization.AllowsSignIn())
+        else if (!Tenant.AllowsSignIn())
         {
             return Result.Failure<VerifyEmailSuccessDto>(
                 ErrorCodes.BusinessRule,
-                "Organization is not ready for sign-in.");
+                "Tenant is not ready for sign-in.");
         }
 
-        Role? adminRole = await roleRepo.GetByNameAsync("Admin", organization.Id, cancellationToken);
+        Role? adminRole = await roleRepo.GetByNameAsync("Admin", Tenant.Id, cancellationToken);
         if (adminRole is not null && !membership.RoleIds.Contains(adminRole.Id))
             membership.AssignRole(adminRole.Id);
 
@@ -167,7 +167,7 @@ public sealed class VerifyEmailHandler(
         // from a single command result — no second round-trip that could fail after
         // the one-time link has already been consumed. Read before commit so any
         // failure leaves the verification token unused.
-        IReadOnlyList<Role> roles = await roleRepo.GetByIdsAsync(membership.RoleIds, organization.Id, cancellationToken);
+        IReadOnlyList<Role> roles = await roleRepo.GetByIdsAsync(membership.RoleIds, Tenant.Id, cancellationToken);
         List<string> permissions = roles
             .SelectMany(role => role.Permissions)
             .Distinct(StringComparer.Ordinal)
@@ -177,7 +177,7 @@ public sealed class VerifyEmailHandler(
 
         return Result.Success(new VerifyEmailSuccessDto(
             user.Id,
-            organization.Id,
+            Tenant.Id,
             user.Email.Value,
             user.FullName,
             permissions,

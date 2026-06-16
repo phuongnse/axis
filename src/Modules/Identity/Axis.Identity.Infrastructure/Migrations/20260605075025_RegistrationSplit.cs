@@ -13,30 +13,30 @@ namespace Axis.Identity.Infrastructure.Migrations
         {
             migrationBuilder.AddColumn<string>(
                 name: "accepted_privacy_version",
-                table: "organizations",
+                table: "Tenants",
                 type: "character varying(32)",
                 maxLength: 32,
                 nullable: true);
 
             migrationBuilder.AddColumn<string>(
                 name: "accepted_terms_version",
-                table: "organizations",
+                table: "Tenants",
                 type: "character varying(32)",
                 maxLength: 32,
                 nullable: true);
 
             migrationBuilder.AddColumn<DateTime>(
                 name: "legal_accepted_at",
-                table: "organizations",
+                table: "Tenants",
                 type: "timestamp with time zone",
                 nullable: true);
 
             migrationBuilder.CreateTable(
-                name: "organization_registration_tokens",
+                name: "Tenant_registration_tokens",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    OrganizationId = table.Column<Guid>(type: "uuid", nullable: false),
+                    tenantId = table.Column<Guid>(type: "uuid", nullable: false),
                     TokenHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                     Purpose = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
                     ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
@@ -46,23 +46,23 @@ namespace Axis.Identity.Infrastructure.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_organization_registration_tokens", x => x.Id);
+                    table.PrimaryKey("PK_Tenant_registration_tokens", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_organization_registration_tokens_organizations_Organization~",
-                        column: x => x.OrganizationId,
-                        principalTable: "organizations",
+                        name: "FK_Tenant_registration_tokens_Tenants_Tenant~",
+                        column: x => x.tenantId,
+                        principalTable: "Tenants",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_organization_registration_tokens_OrganizationId_Purpose",
-                table: "organization_registration_tokens",
-                columns: new[] { "OrganizationId", "Purpose" });
+                name: "IX_Tenant_registration_tokens_tenantId_Purpose",
+                table: "Tenant_registration_tokens",
+                columns: new[] { "tenantId", "Purpose" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_organization_registration_tokens_TokenHash",
-                table: "organization_registration_tokens",
+                name: "IX_Tenant_registration_tokens_TokenHash",
+                table: "Tenant_registration_tokens",
                 column: "TokenHash",
                 unique: true);
         }
@@ -71,19 +71,19 @@ namespace Axis.Identity.Infrastructure.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "organization_registration_tokens");
+                name: "Tenant_registration_tokens");
 
             migrationBuilder.DropColumn(
                 name: "accepted_privacy_version",
-                table: "organizations");
+                table: "Tenants");
 
             migrationBuilder.DropColumn(
                 name: "accepted_terms_version",
-                table: "organizations");
+                table: "Tenants");
 
             migrationBuilder.DropColumn(
                 name: "legal_accepted_at",
-                table: "organizations");
+                table: "Tenants");
         }
     }
 }

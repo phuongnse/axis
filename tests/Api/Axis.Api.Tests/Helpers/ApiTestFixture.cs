@@ -207,8 +207,8 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.AddSingleton<IEmailSender>(_emailCapture);
                 services.RemoveAll<IAvatarStorageService>();
                 services.AddScoped<IAvatarStorageService, NullAvatarStorageService>();
-                services.RemoveAll<IOrganizationLogoStorageService>();
-                services.AddScoped<IOrganizationLogoStorageService, NullOrganizationLogoStorageService>();
+                services.RemoveAll<ITenantLogoStorageService>();
+                services.AddScoped<ITenantLogoStorageService, NullTenantLogoStorageService>();
 
                 services.RemoveAll<IUnitOfWork>();
                 services.AddScoped<IUnitOfWork>(sp =>
@@ -280,7 +280,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
     {
         Email email = Email.Create(adminEmail).Value!;
 
-        Guid organizationId;
+        Guid tenantId;
         await using (IdentityDbContext identityContext = new(
                          new DbContextOptionsBuilder<IdentityDbContext>()
                              .UseNpgsql(_identityConnectionString)
@@ -289,50 +289,50 @@ public sealed class ApiTestFixture : IAsyncLifetime
         {
             User user = await identityContext.Users
                 .SingleAsync(u => u.Email == email);
-            OrganizationMembership membership = await identityContext.OrganizationMemberships
+            TenantMembership membership = await identityContext.TenantMemberships
                 .SingleAsync(m => m.UserId == user.Id);
-            organizationId = membership.OrganizationId;
+            tenantId = membership.tenantId;
         }
 
-        await EnsureModuleSchemasAsync(organizationId);
-        await EnsureDataModelingTablesAsync(organizationId);
+        await EnsureModuleSchemasAsync(tenantId);
+        await EnsureDataModelingTablesAsync(tenantId);
 
         await using IdentityDbContext finalizeContext = new(
             new DbContextOptionsBuilder<IdentityDbContext>()
                 .UseNpgsql(_identityConnectionString)
                 .UseOpenIddict()
                 .Options);
-        Organization organization = await finalizeContext.Organizations
-            .SingleAsync(o => o.Id == organizationId);
-        if (organization.Status == OrganizationStatus.Provisioning)
+        Tenant Tenant = await finalizeContext.Tenants
+            .SingleAsync(o => o.Id == tenantId);
+        if (Tenant.Status == TenantStatus.Provisioning)
         {
-            organization.CompleteProvisioning();
+            Tenant.CompleteProvisioning();
             await finalizeContext.SaveChangesAsync();
         }
     }
 
-    private async Task EnsureModuleSchemasAsync(Guid organizationId)
+    private async Task EnsureModuleSchemasAsync(Guid tenantId)
     {
-        string schema = $"tenant_{organizationId:N}";
+        string schema = $"tenant_{tenantId:N}";
         await EnsureTenantSchemaExistsAsync(_dataModelingConnectionString, schema);
         await PostgresModuleTestDatabase.MigrateAsync<DataModelingDbContext>(
             _dataModelingConnectionString,
-            opts => new DataModelingDbContext(opts, new FixedTenantContext(organizationId)));
+            opts => new DataModelingDbContext(opts, new FixedTenantContext(tenantId)));
 
         await EnsureTenantSchemaExistsAsync(_workflowBuilderConnectionString, schema);
         await PostgresModuleTestDatabase.MigrateAsync<WorkflowBuilderDbContext>(
             _workflowBuilderConnectionString,
-            opts => new WorkflowBuilderDbContext(opts, new FixedTenantContext(organizationId)));
+            opts => new WorkflowBuilderDbContext(opts, new FixedTenantContext(tenantId)));
 
         await EnsureTenantSchemaExistsAsync(_formBuilderConnectionString, schema);
         await PostgresModuleTestDatabase.MigrateAsync<FormBuilderDbContext>(
             _formBuilderConnectionString,
-            opts => new FormBuilderDbContext(opts, new FixedTenantContext(organizationId)));
+            opts => new FormBuilderDbContext(opts, new FixedTenantContext(tenantId)));
 
         await EnsureTenantSchemaExistsAsync(_workflowEngineConnectionString, schema);
         await PostgresModuleTestDatabase.MigrateAsync<WorkflowEngineDbContext>(
             _workflowEngineConnectionString,
-            opts => new WorkflowEngineDbContext(opts, new FixedTenantContext(organizationId)));
+            opts => new WorkflowEngineDbContext(opts, new FixedTenantContext(tenantId)));
     }
 
     private static async Task EnsureTenantSchemaExistsAsync(string connectionString, string schema)
@@ -344,9 +344,9 @@ public sealed class ApiTestFixture : IAsyncLifetime
         await createSchema.ExecuteNonQueryAsync();
     }
 
-    private async Task EnsureDataModelingTablesAsync(Guid organizationId)
+    private async Task EnsureDataModelingTablesAsync(Guid tenantId)
     {
-        string schema = $"tenant_{organizationId:N}";
+        string schema = $"tenant_{tenantId:N}";
         for (int attempt = 1; attempt <= 3; attempt++)
         {
             await using NpgsqlConnection connection = new(_dataModelingConnectionString);
@@ -365,7 +365,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
             if (scalar is bool exists && exists)
                 return;
 
-            await EnsureModuleSchemasAsync(organizationId);
+            await EnsureModuleSchemasAsync(tenantId);
         }
 
         throw new InvalidOperationException(
@@ -425,7 +425,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
 internal sealed class PublicSchemaTenantContext : ITenantContext
 {
-    public Guid OrganizationId => Guid.Empty;
+    public Guid tenantId => Guid.Empty;
     public string SchemaName => "public";
 }
 

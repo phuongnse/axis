@@ -14,13 +14,13 @@ public class UpdateRoleHandlerTests
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TenantId = Guid.NewGuid();
     private static readonly Guid RoleId = Guid.NewGuid();
 
     private UpdateRoleHandler CreateHandler() => new(_roleRepo, _uow);
 
     private static UpdateRoleCommand ValidCommand() => new(
-        RoleId, OrgId,
+        RoleId, TenantId,
         Name: "Senior Manager",
         Description: "Updated",
         Permissions: ["workflow:definition:read", "workflow:definition:write"]);
@@ -28,9 +28,9 @@ public class UpdateRoleHandlerTests
     [Fact]
     public async Task UpdateRole_WhenRequestIsValid_UpdatesRole()
     {
-        Role role = Role.Create("Manager", null, OrgId, ["workflow:definition:read"]);
-        _roleRepo.GetByIdAsync(RoleId, OrgId).Returns(role);
-        _roleRepo.NameExistsAsync("Senior Manager", OrgId, role.Id).Returns(false);
+        Role role = Role.Create("Manager", null, TenantId, ["workflow:definition:read"]);
+        _roleRepo.GetByIdAsync(RoleId, TenantId).Returns(role);
+        _roleRepo.NameExistsAsync("Senior Manager", TenantId, role.Id).Returns(false);
 
         Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
@@ -43,8 +43,8 @@ public class UpdateRoleHandlerTests
     [Fact]
     public async Task UpdateRole_WhenSystemRole_ReturnsBusinessRuleFailure()
     {
-        Role systemRole = Role.CreateSystem("Admin", OrgId, ["users:read"]);
-        _roleRepo.GetByIdAsync(RoleId, OrgId).Returns(systemRole);
+        Role systemRole = Role.CreateSystem("Admin", TenantId, ["users:read"]);
+        _roleRepo.GetByIdAsync(RoleId, TenantId).Returns(systemRole);
 
         Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
@@ -57,9 +57,9 @@ public class UpdateRoleHandlerTests
     [Fact]
     public async Task UpdateRole_WhenNameIsDuplicate_ReturnsConflict()
     {
-        Role role = Role.Create("Manager", null, OrgId, ["workflow:definition:read"]);
-        _roleRepo.GetByIdAsync(RoleId, OrgId).Returns(role);
-        _roleRepo.NameExistsAsync("Senior Manager", OrgId, role.Id).Returns(true);
+        Role role = Role.Create("Manager", null, TenantId, ["workflow:definition:read"]);
+        _roleRepo.GetByIdAsync(RoleId, TenantId).Returns(role);
+        _roleRepo.NameExistsAsync("Senior Manager", TenantId, role.Id).Returns(true);
 
         Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
@@ -71,7 +71,7 @@ public class UpdateRoleHandlerTests
     [Fact]
     public async Task UpdateRole_WhenRoleNotFound_ReturnsNotFound()
     {
-        _roleRepo.GetByIdAsync(RoleId, OrgId).ReturnsNull();
+        _roleRepo.GetByIdAsync(RoleId, TenantId).ReturnsNull();
 
         Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
@@ -81,13 +81,13 @@ public class UpdateRoleHandlerTests
     }
 
     [Fact]
-    public async Task UpdateRole_WhenRoleBelongsToAnotherOrg_ReturnsNotFound()
+    public async Task UpdateRole_WhenRoleBelongsToAnotherTenant_ReturnsNotFound()
     {
-        Role role = Role.Create("Manager", null, OrgId, ["workflow:definition:read"]);
-        _roleRepo.GetByIdAsync(RoleId, OrgId).Returns(role);
+        Role role = Role.Create("Manager", null, TenantId, ["workflow:definition:read"]);
+        _roleRepo.GetByIdAsync(RoleId, TenantId).Returns(role);
 
-        Guid otherOrgId = Guid.NewGuid();
-        UpdateRoleCommand command = ValidCommand() with { OrganizationId = otherOrgId };
+        Guid otherTenantId = Guid.NewGuid();
+        UpdateRoleCommand command = ValidCommand() with { tenantId = otherTenantId };
         Result result = await CreateHandler().Handle(command, CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

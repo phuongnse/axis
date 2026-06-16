@@ -14,10 +14,10 @@ public sealed class CreateDataClassHandler(
 {
     public async Task<Result<Guid>> Handle(CreateDataClassCommand command, CancellationToken cancellationToken)
     {
-        if (await dataClassRepo.NameExistsAsync(command.Name, command.OrganizationId, null, cancellationToken))
+        if (await dataClassRepo.NameExistsAsync(command.Name, command.tenantId, null, cancellationToken))
             return Result.Failure<Guid>(ErrorCodes.Conflict, $"A data class named '{command.Name}' already exists.");
 
-        DataClass dataClass = DataClass.Create(command.Name, command.Description, command.OrganizationId, command.CreatedBy);
+        DataClass dataClass = DataClass.Create(command.Name, command.Description, command.tenantId, command.CreatedBy);
 
         await dataClassRepo.AddAsync(dataClass, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);

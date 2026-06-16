@@ -6,6 +6,6 @@ namespace Axis.Shared.Application.Tenancy;
 /// </summary>
 public interface ITenantContext
 {
-    Guid OrganizationId { get; }
+    Guid tenantId { get; }
     string SchemaName { get; }
 }

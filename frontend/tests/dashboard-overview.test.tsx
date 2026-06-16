@@ -12,12 +12,12 @@ const profileWithWorkspace = {
   fullName: 'Admin User',
   avatarUrl: null,
   isActive: true,
-  orgId: '3cde5c59-d18b-464f-a021-5fce16b01118',
-  permissions: ['organization:settings:read'],
+  tenantId: '3cde5c59-d18b-464f-a021-5fce16b01118',
+  permissions: ['tenant:settings:read'],
 };
 
-const organizationSettings = {
-  organizationId: '3cde5c59-d18b-464f-a021-5fce16b01118',
+const TenantSettings = {
+  tenantId: '3cde5c59-d18b-464f-a021-5fce16b01118',
   name: 'Northwind Labs',
   slug: 'northwind-labs',
   logoUrl: null,
@@ -63,8 +63,8 @@ describe('DashboardOverview', () => {
         return Promise.resolve(jsonResponse(profileWithWorkspace));
       }
 
-      if (url.includes('/api/organizations/current/settings')) {
-        return Promise.resolve(jsonResponse(organizationSettings));
+      if (url.includes('/api/tenants/current/settings')) {
+        return Promise.resolve(jsonResponse(TenantSettings));
       }
 
       return Promise.reject(new Error(`Unexpected fetch: ${url}`));
@@ -84,7 +84,7 @@ describe('DashboardOverview', () => {
     expect(screen.queryByText('42 models')).not.toBeInTheDocument();
   });
 
-  it('does not request organization settings when the account has no workspace', async () => {
+  it('does not request Tenant settings when the account has no workspace', async () => {
     vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
 
@@ -92,7 +92,7 @@ describe('DashboardOverview', () => {
         return Promise.resolve(
           jsonResponse({
             ...profileWithWorkspace,
-            orgId: null,
+            tenantId: null,
             permissions: [],
           }),
         );
@@ -103,7 +103,7 @@ describe('DashboardOverview', () => {
 
     await renderWithRouter(<DashboardOverview />, { path: '/dashboard' });
 
-    expect(await screen.findByText(/not linked to a workspace yet/i)).toBeInTheDocument();
+    expect(await screen.findByText(/not linked to a shared account yet/i)).toBeInTheDocument();
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
   });
 });

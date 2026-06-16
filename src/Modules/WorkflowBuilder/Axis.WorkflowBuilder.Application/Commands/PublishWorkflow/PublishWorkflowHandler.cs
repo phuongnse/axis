@@ -16,7 +16,7 @@ public sealed class PublishWorkflowHandler(
     public async Task<Result> Handle(PublishWorkflowCommand command, CancellationToken cancellationToken)
     {
         WorkflowDefinition? workflow = await workflowRepo.GetByIdAsync(
-            command.WorkflowId, command.OrganizationId, cancellationToken);
+            command.WorkflowId, command.tenantId, cancellationToken);
         if (workflow is null)
             return Result.Failure(ErrorCodes.NotFound, "Workflow not found.");
 

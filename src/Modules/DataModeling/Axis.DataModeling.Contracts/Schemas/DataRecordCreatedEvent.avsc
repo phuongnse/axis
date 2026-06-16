@@ -12,7 +12,7 @@
       "type": "string"
     },
     {
-      "name": "organizationId",
+      "name": "tenantId",
       "type": "string"
     }
   ]

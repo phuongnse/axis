@@ -8,7 +8,7 @@ See all records for a model so that I can browse and find the data I need.
 
 ## Primary actor
 
-- Organization Member with `data_modeling:record:read`
+- Tenant Member with `data_modeling:record:read`
 
 ## Trigger
 
@@ -16,9 +16,9 @@ See all records for a model so that I can browse and find the data I need.
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — View records list flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -64,6 +64,15 @@ Users can create, read, update, and delete records against any model. Records ar
 > **Deferred follow-ups:** Relation field columns display the target record's `display_field` value, not the raw UUID; if the target record was deleted, show "[Deleted record]".
 >
 > **Decisions:** N/A - no implementation-specific decision recorded for this slice.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

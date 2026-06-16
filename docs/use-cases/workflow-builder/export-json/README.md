@@ -8,7 +8,7 @@ Export a workflow as a JSON file so that I can back it up or share it with anoth
 
 ## Primary actor
 
-- Organization Member with `workflow:definition:read`
+- Tenant Member with `workflow:definition:read`
 
 ## Trigger
 
@@ -17,12 +17,12 @@ Export a workflow as a JSON file so that I can back it up or share it with anoth
 ## Main flow
 
 1. Actor opens the workflow list context menu or workflow editor toolbar and selects **Export JSON**.
-2. System verifies the actor has `workflow:definition:read` for the workflow's organization.
+2. System verifies the actor has `workflow:definition:read` for the workflow's Tenant.
 3. System loads the workflow definition, step configurations, and trigger configuration.
 4. System removes sensitive credential values from exported step configuration fields.
 5. System serializes the export using the public API JSON contract casing (`camelCase`).
 6. System downloads `{workflow-slug}-{date}.json`.
-7. Actor can store the file as a backup or share it for import into another Axis organization.
+7. Actor can store the file as a backup or share it for import into another Axis Tenant.
 
 ## Alternate / error flows
 
@@ -30,7 +30,7 @@ Export a workflow as a JSON file so that I can back it up or share it with anoth
 
 ## Context
 
-Workflow definitions can be exported as portable JSON files and imported into any Axis organization, enabling template sharing, backups, and environment migration.
+Workflow definitions can be exported as portable JSON files and imported into any Axis Tenant, enabling template sharing, backups, and environment migration.
 
 ## Acceptance Criteria
 
@@ -69,6 +69,12 @@ Workflow definitions can be exported as portable JSON files and imported into an
 > **Deferred follow-ups:** Exporting execution history (definitions only today); export formats other than JSON (YAML, BPMN).
 >
 > **Decisions:** credential scrubbing in `ExportWorkflowHandler` — keys matching token/api_key/apikey/secret/password/authorization/auth_token/hmac_secret/client_secret/private_key/bearer/access_token/refresh_token replaced with `[REDACTED]` (OrdinalIgnoreCase).
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

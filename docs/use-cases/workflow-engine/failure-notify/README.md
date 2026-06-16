@@ -8,7 +8,7 @@ Be notified when a workflow execution fails so that I can investigate and take a
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Be notified when a workflow execution fails so that I can investigate and take a
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Receive error notification when a workflow fails flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -37,7 +37,7 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 
 *Validation & errors*
 - [ ] If the email notification itself fails to deliver, the failure is logged but does not create a cascading error (no retry for notification delivery).
-- [ ] If no notification channels are configured for the workflow, the failure notification is sent to all org Admins by default as a safety net.
+- [ ] If no notification channels are configured for the workflow, the failure notification is sent to all tenant Admins by default as a safety net.
 
 *Edge cases*
 - [ ] A workflow with multiple parallel branches: if one branch fails (AND join), a single failure notification is sent for the overall execution, not one per failed branch.
@@ -60,6 +60,12 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 > - no Application-layer notification dispatch handler
 > - `ExecutionFailed` domain event raised but notification channels not wired
 > - email/in-app/webhook dispatch and rate-limiting pending Application layer + a future cross-cutting notification service (outside WorkflowEngine Infrastructure, which is complete).
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

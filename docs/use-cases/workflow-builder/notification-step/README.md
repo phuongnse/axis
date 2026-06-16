@@ -8,7 +8,7 @@ Add a Notification step so that stakeholders are informed when a workflow reache
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Add a Notification step so that stakeholders are informed when a workflow reache
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Configure a Notification step flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -61,6 +61,15 @@ Each step has a type that determines what it does when executed. Users configure
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** email/webhook dispatch pending workflow-engine; configurable fail-on-error toggle not yet implemented in API layer.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

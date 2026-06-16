@@ -8,7 +8,7 @@ Configure a Manual trigger so that authorized users can start the workflow on de
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Configure a Manual trigger so that authorized users can start the workflow on de
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Configure a Manual trigger flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -62,6 +62,12 @@ A workflow must have at least one trigger before it can be published. Triggers d
 > **Decisions:**
 > - trigger config (input variable definitions) stored as JSONB in `triggers` column
 > - domain guards against duplicate trigger type per workflow (AddTrigger returns Conflict on second call for same type). `TriggerConfig` is a value object (no `id`, owned by `WorkflowDefinition`).
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
 
 ## Wireframes
 

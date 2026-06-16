@@ -59,9 +59,9 @@ When the cleanup trigger fires and you remove the workaround:
 
 ## Active workarounds
 
-### org-hard-delete-modulith-cancellers
+### tenant-hard-delete-modulith-cancellers
 
-- **Location**: `src/Modules/Identity/Axis.Identity.Infrastructure/Messaging/OrganizationHardDeleteHandler.cs`
+- **Location**: `src/Modules/Identity/Axis.Identity.Infrastructure/Messaging/TenantHardDeleteHandler.cs`
 - **Violates**: AGENTS.md P0 — cross-module work must use Kafka events or RabbitMQ commands, not in-process calls into another module's infrastructure
-- **Why it exists**: organization-management [organization deletion](./README.md) hard-delete must cancel Workflow Engine executions and Form Builder pending tasks before dropping tenant schemas. Modulith composition registers `IOrganizationExecutionCanceller` and `IOrganizationFormTaskCanceller` at `Axis.Api` startup; Identity invokes them synchronously inside the scheduled `OrganizationHardDeleteJob` handler. RabbitMQ command contracts and outbox handlers are not yet defined for these two steps.
-- **Cleanup trigger**: When Workflow Engine and Form Builder expose versioned `*Command` handlers for org-scoped cancellation (ADR-024/025) and module extraction wiring no longer shares a process, replace direct canceller calls with Wolverine `IMessageBus` publish and remove the shared canceller interfaces from the hard-delete path.
+- **Why it exists**: Tenant-management [Tenant deletion](./README.md) hard-delete must cancel Workflow Engine executions and Form Builder pending tasks before dropping tenant schemas. Modulith composition registers `ITenantExecutionCanceller` and `ITenantFormTaskCanceller` at `Axis.Api` startup; Identity invokes them synchronously inside the scheduled `TenantHardDeleteJob` handler. RabbitMQ command contracts and outbox handlers are not yet defined for these two steps.
+- **Cleanup trigger**: When Workflow Engine and Form Builder expose versioned `*Command` handlers for tenant-scoped cancellation (ADR-024/025) and module extraction wiring no longer shares a process, replace direct canceller calls with Wolverine `IMessageBus` publish and remove the shared canceller interfaces from the hard-delete path.

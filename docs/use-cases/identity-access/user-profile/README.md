@@ -16,9 +16,9 @@ Update my profile information so that my name and contact details are current.
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Manage user profile flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -26,7 +26,7 @@ Update my profile information so that my name and contact details are current.
 
 ## Context
 
-Organization admins can invite new members, manage their accounts, and deactivate users who should no longer have access.
+Tenant admins can invite new members, manage their accounts, and deactivate users who should no longer have access.
 
 ## Acceptance Criteria
 
@@ -44,7 +44,7 @@ Organization admins can invite new members, manage their accounts, and deactivat
 - [ ] If avatar upload fails mid-way, the old avatar remains unchanged and an error is shown.
 
 *Out of scope*
-- Public profile visibility — all profiles are private within the org.
+- Public profile visibility — all profiles are private within the tenant.
 
 > **Implementation status**
 >
@@ -59,6 +59,15 @@ Organization admins can invite new members, manage their accounts, and deactivat
 > **Gaps vs spec:** email change flow (password-security) not started.
 >
 > **Decisions:** name update is a direct property mutation on `User` aggregate with a `UserProfileUpdatedEvent`. Avatar upload fully wired in `UpdateUserProfileHandler` — validates type (PNG/JPG only) and size (max 1 MB), uploads to S3, deletes old file on replacement.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

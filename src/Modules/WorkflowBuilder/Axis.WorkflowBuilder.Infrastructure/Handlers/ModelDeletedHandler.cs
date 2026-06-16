@@ -18,11 +18,11 @@ internal sealed class ModelDeletedHandler(
 {
     public async Task Handle(ModelDeletedEvent @event, CancellationToken cancellationToken)
     {
-        Guid organizationId = @event.OrganizationId();
+        Guid tenantId = @event.tenantId();
         Guid modelId = @event.ModelId();
 
         List<WorkflowModelReference> references = await context.WorkflowModelReferences
-            .Where(r => r.OrganizationId == organizationId && r.ModelId == modelId)
+            .Where(r => r.tenantId == tenantId && r.ModelId == modelId)
             .ToListAsync(cancellationToken);
 
         int flagged = 0;
@@ -39,7 +39,7 @@ internal sealed class ModelDeletedHandler(
             await uow.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
-            "ModelDeletedHandler: flagged {Count} workflow model reference(s) for deleted model {ModelId} org {OrganizationId}",
-            flagged, modelId, organizationId);
+            "ModelDeletedHandler: flagged {Count} workflow model reference(s) for deleted model {ModelId} Tenant {tenantId}",
+            flagged, modelId, tenantId);
     }
 }

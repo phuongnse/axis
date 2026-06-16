@@ -14,8 +14,8 @@ public static class WorkflowEngineEventExtensions
     public static Guid WorkflowDefinitionId(this FormStepReachedEvent @event)
         => ParseRequiredGuid(@event.workflowDefinitionId, nameof(@event.workflowDefinitionId));
 
-    public static Guid OrganizationId(this FormStepReachedEvent @event)
-        => ParseRequiredGuid(@event.organizationId, nameof(@event.organizationId));
+    public static Guid tenantId(this FormStepReachedEvent @event)
+        => ParseRequiredGuid(@event.tenantId, nameof(@event.tenantId));
 
     public static Guid FormDefinitionId(this FormStepReachedEvent @event)
         => ParseRequiredGuid(@event.formDefinitionId, nameof(@event.formDefinitionId));

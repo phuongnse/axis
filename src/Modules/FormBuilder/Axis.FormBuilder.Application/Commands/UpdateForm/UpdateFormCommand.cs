@@ -4,6 +4,6 @@ namespace Axis.FormBuilder.Application.Commands.UpdateForm;
 
 public sealed record UpdateFormCommand(
     Guid FormId,
-    Guid OrganizationId,
+    Guid tenantId,
     string Name,
     string? Description) : ICommand;

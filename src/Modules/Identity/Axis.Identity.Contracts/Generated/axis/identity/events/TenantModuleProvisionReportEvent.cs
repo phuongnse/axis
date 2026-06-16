@@ -12,9 +12,9 @@ namespace axis.identity.events
     public partial class TenantModuleProvisionReportEvent : global::Avro.Specific.ISpecificRecord
     {
         public static global::Avro.Schema _SCHEMA = global::Avro.Schema.Parse(
-            @"{""type"":""record"",""name"":""TenantModuleProvisionReportEvent"",""namespace"":""axis.identity.events"",""fields"":[{""name"":""organizationId"",""type"":""string""},{""name"":""module"",""type"":""string""},{""name"":""succeeded"",""type"":""boolean""},{""name"":""attempt"",""type"":""int""},{""name"":""errorMessage"",""default"":null,""type"":[""null"",""string""]}]}");
+            @"{""type"":""record"",""name"":""TenantModuleProvisionReportEvent"",""namespace"":""axis.identity.events"",""fields"":[{""name"":""tenantId"",""type"":""string""},{""name"":""module"",""type"":""string""},{""name"":""succeeded"",""type"":""boolean""},{""name"":""attempt"",""type"":""int""},{""name"":""errorMessage"",""default"":null,""type"":[""null"",""string""]}]}");
 
-        private string _organizationId = string.Empty;
+        private string _tenantId = string.Empty;
         private string _module = string.Empty;
         private bool _succeeded;
         private int _attempt;
@@ -22,7 +22,7 @@ namespace axis.identity.events
 
         public virtual global::Avro.Schema Schema => TenantModuleProvisionReportEvent._SCHEMA;
 
-        public string organizationId { get => _organizationId; set => _organizationId = value; }
+        public string tenantId { get => _tenantId; set => _tenantId = value; }
         public string module { get => _module; set => _module = value; }
         public bool succeeded { get => _succeeded; set => _succeeded = value; }
         public int attempt { get => _attempt; set => _attempt = value; }
@@ -30,7 +30,7 @@ namespace axis.identity.events
 
         public virtual object Get(int fieldPos) => fieldPos switch
         {
-            0 => organizationId,
+            0 => tenantId,
             1 => module,
             2 => succeeded,
             3 => attempt,
@@ -42,7 +42,7 @@ namespace axis.identity.events
         {
             switch (fieldPos)
             {
-                case 0: organizationId = (string)fieldValue; break;
+                case 0: tenantId = (string)fieldValue; break;
                 case 1: module = (string)fieldValue; break;
                 case 2: succeeded = (bool)fieldValue; break;
                 case 3: attempt = (int)fieldValue; break;

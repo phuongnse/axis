@@ -14,11 +14,11 @@ public sealed class UpdateDataClassHandler(
 {
     public async Task<Result> Handle(UpdateDataClassCommand command, CancellationToken cancellationToken)
     {
-        DataClass? dc = await dataClassRepo.GetByIdAsync(command.DataClassId, command.OrganizationId, cancellationToken);
+        DataClass? dc = await dataClassRepo.GetByIdAsync(command.DataClassId, command.tenantId, cancellationToken);
         if (dc is null)
             return Result.Failure(ErrorCodes.NotFound, "Data class not found.");
 
-        if (await dataClassRepo.NameExistsAsync(command.Name, command.OrganizationId, command.DataClassId, cancellationToken))
+        if (await dataClassRepo.NameExistsAsync(command.Name, command.tenantId, command.DataClassId, cancellationToken))
             return Result.Failure(ErrorCodes.Conflict, $"A data class named '{command.Name}' already exists.");
 
         try

@@ -8,8 +8,8 @@ function makeStatus(
   overrides: Partial<ProvisioningStatusResponse> = {},
 ): ProvisioningStatusResponse {
   return {
-    organizationId: '00000000-0000-0000-0000-000000000001',
-    organizationStatus: 'Provisioning',
+    tenantId: '00000000-0000-0000-0000-000000000001',
+    TenantStatus: 'Provisioning',
     isReady: false,
     modules: [],
     ...overrides,

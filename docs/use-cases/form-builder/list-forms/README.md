@@ -4,21 +4,21 @@
 
 ## Purpose
 
-See all forms in my organization so that I can find existing forms to reuse.
+See all forms in my Tenant so that I can find existing forms to reuse.
 
 ## Primary actor
 
-- Organization Member with `form:definition:read`
+- Tenant Member with `form:definition:read`
 
 ## Trigger
 
-- User initiates: see all forms in my organization
+- User initiates: see all forms in my Tenant
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — View all forms flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -43,7 +43,7 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 - [ ] "Used in N workflow(s)" count includes both Draft and Active workflows, as both can reference forms.
 
 *Out of scope*
-- Folders/categories for organizing forms.
+- Folders/categories for arranging forms.
 
 > **Implementation status**
 >
@@ -60,6 +60,12 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 > - deferred to API/Frontend aggregation.
 >
 > **Decisions:** `GetFormsHandler` paginates in-memory (GetAllAsync + LINQ Skip/Take). This is an accepted trade-off at this scale: adding a `GetPagedAsync` repository method would push sorting/paging logic into Infrastructure without additional correctness benefit at this scale. `Page` and `PageSize` are clamped to ≥ 1 and ≤ 100 in the handler.
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

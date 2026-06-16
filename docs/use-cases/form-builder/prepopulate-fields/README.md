@@ -8,7 +8,7 @@ Pre-populate form fields with values from the workflow context so that assignees
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Pre-populate form fields with values from the workflow context so that assignees
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Pre-populate form fields from execution context flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -57,6 +57,15 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** context expression input UI and expression evaluation at execution time pending Frontend + workflow-engine.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

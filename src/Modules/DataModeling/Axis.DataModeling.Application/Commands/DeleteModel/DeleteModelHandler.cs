@@ -14,7 +14,7 @@ public sealed class DeleteModelHandler(
 {
     public async Task<Result> Handle(DeleteModelCommand command, CancellationToken cancellationToken)
     {
-        DataModeling.Domain.Aggregates.DataModel? model = await modelRepo.GetByIdAsync(command.ModelId, command.OrganizationId, cancellationToken);
+        DataModeling.Domain.Aggregates.DataModel? model = await modelRepo.GetByIdAsync(command.ModelId, command.tenantId, cancellationToken);
         if (model is null)
             return Result.Failure(ErrorCodes.NotFound, "Model not found.");
 

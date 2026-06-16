@@ -8,4 +8,4 @@ namespace Axis.DataModeling.Application.Queries.GetRecord;
 public sealed record GetRecordQuery(
     Guid RecordId,
     Guid ModelId,
-    Guid OrganizationId) : IQuery<Result<RecordDto>>;
+    Guid tenantId) : IQuery<Result<RecordDto>>;

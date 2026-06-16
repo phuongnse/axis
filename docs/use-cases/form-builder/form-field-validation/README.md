@@ -8,7 +8,7 @@ Set validation rules on each field so that users are guided to provide correct d
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Set validation rules on each field so that users are guided to provide correct d
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Configure validation rules on a field flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -62,6 +62,12 @@ Form fields define what data the form collects. Each field has a type, label, he
 > - no `UpdateFieldValidationCommand` handler — field validation config is part of `AddFieldToForm` (set on creation only)
 > - client-side validation (React Hook Form + Zod) pending Frontend
 > - HTTP 422 structured errors pending.
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

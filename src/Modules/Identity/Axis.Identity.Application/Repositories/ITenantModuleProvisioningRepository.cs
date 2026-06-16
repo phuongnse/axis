@@ -7,11 +7,11 @@ public interface ITenantModuleProvisioningRepository
     Task AddRangeAsync(IEnumerable<TenantModuleProvisioning> rows, CancellationToken cancellationToken = default);
 
     Task<TenantModuleProvisioning?> GetAsync(
-        Guid organizationId,
+        Guid tenantId,
         string module,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<TenantModuleProvisioning>> GetAllForOrganizationAsync(
-        Guid organizationId,
+    Task<IReadOnlyList<TenantModuleProvisioning>> GetAllForTenantAsync(
+        Guid tenantId,
         CancellationToken cancellationToken = default);
 }

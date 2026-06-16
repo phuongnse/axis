@@ -28,7 +28,7 @@ public static class ExecutionEndpoints
         executions.MapGet("/", GetAllExecutions)
             .RequireAuthorization(Permissions.Execution.Read)
             .WithName("GetAllExecutions")
-            .WithSummary("List workflow executions for the organization (paginated)")
+            .WithSummary("List workflow executions for the tenant (paginated)")
             .WithTags("WorkflowEngine")
             .Produces<PagedResult<ExecutionSummaryResponse>>()
             .ProducesProblem(401)
@@ -122,7 +122,7 @@ public static class ExecutionEndpoints
     {
 
         PagedResult<ExecutionSummaryResponse> result = await mediator.Send(
-            new GetAllExecutionsQuery(currentUser.OrgId, page, pageSize, status), ct);
+            new GetAllExecutionsQuery(currentUser.TenantId, page, pageSize, status), ct);
         return Results.Ok(result);
     }
 
@@ -137,7 +137,7 @@ public static class ExecutionEndpoints
     {
 
         PagedResult<ExecutionSummaryResponse> result = await mediator.Send(
-            new GetExecutionsByWorkflowQuery(workflowId, currentUser.OrgId, page, pageSize, status), ct);
+            new GetExecutionsByWorkflowQuery(workflowId, currentUser.TenantId, page, pageSize, status), ct);
         return Results.Ok(result);
     }
 
@@ -148,7 +148,7 @@ public static class ExecutionEndpoints
         CancellationToken ct)
     {
         ExecutionResponse? result = await mediator.Send(
-            new GetExecutionQuery(executionId, currentUser.OrgId), ct);
+            new GetExecutionQuery(executionId, currentUser.TenantId), ct);
         if (result is null) return Results.NotFound();
         return Results.Ok(result);
     }
@@ -162,7 +162,7 @@ public static class ExecutionEndpoints
     {
         Result<Guid> result = await mediator.Send(new StartExecutionCommand(
             workflowId,
-            currentUser.OrgId,
+            currentUser.TenantId,
             TriggerType.Manual,
             currentUser.UserId,
             request?.Input), ct);
@@ -178,7 +178,7 @@ public static class ExecutionEndpoints
         CancellationToken ct)
     {
         Result result = await mediator.Send(
-            new CancelExecutionCommand(executionId, currentUser.OrgId), ct);
+            new CancelExecutionCommand(executionId, currentUser.TenantId), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
@@ -190,7 +190,7 @@ public static class ExecutionEndpoints
         CancellationToken ct)
     {
         Result<Guid> result = await mediator.Send(new RetryExecutionCommand(
-            executionId, currentUser.OrgId, currentUser.UserId), ct);
+            executionId, currentUser.TenantId, currentUser.UserId), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.Created($"/api/executions/{result.Value}", new CreatedResponse(result.Value));
     }
@@ -204,7 +204,7 @@ public static class ExecutionEndpoints
     {
         Result<Guid> result = await mediator.Send(new RetryExecutionWithContextCommand(
             executionId,
-            currentUser.OrgId,
+            currentUser.TenantId,
             currentUser.UserId,
             request.ModifiedContext), ct);
         if (result.IsFailure) return result.ToProblemDetails();
@@ -218,7 +218,7 @@ public static class ExecutionEndpoints
         CancellationToken ct)
     {
         IReadOnlyList<ExecutionSummaryResponse> result = await mediator.Send(
-            new GetRetryHistoryQuery(executionId, currentUser.OrgId), ct);
+            new GetRetryHistoryQuery(executionId, currentUser.TenantId), ct);
         return Results.Ok(result);
     }
 }

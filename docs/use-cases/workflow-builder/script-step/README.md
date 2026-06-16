@@ -8,7 +8,7 @@ Write a small script step so that I can transform data that isn't possible with 
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Write a small script step so that I can transform data that isn't possible with 
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Configure a Script step flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -61,6 +61,15 @@ Each step has a type that determines what it does when executed. Users configure
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** JS sandbox execution, timeout enforcement, and "Run test" button pending workflow-engine + Frontend.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

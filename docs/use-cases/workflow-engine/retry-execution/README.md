@@ -8,7 +8,7 @@ Retry a failed execution from the point of failure so that I don't have to re-ru
 
 ## Primary actor
 
-- Organization Member with `execution:retry`
+- Tenant Member with `execution:retry`
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Retry a failed execution from the point of failure so that I don't have to re-ru
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Retry a failed execution flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -64,6 +64,12 @@ When a workflow execution fails at a step, users can manually retry from the fai
 > **Decisions:**
 > - `CreateRetry()` produces a new `WorkflowExecution` with `RetryOfExecutionId` set
 > - context is copied from original at time of retry.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
 
 ## Wireframes
 

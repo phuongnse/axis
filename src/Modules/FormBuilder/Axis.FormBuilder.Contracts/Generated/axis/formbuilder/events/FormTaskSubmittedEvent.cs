@@ -12,11 +12,11 @@ namespace axis.formbuilder.events
     public partial class FormTaskSubmittedEvent : global::Avro.Specific.ISpecificRecord
     {
         public static global::Avro.Schema _SCHEMA = global::Avro.Schema.Parse(
-            @"{""type"":""record"",""name"":""FormTaskSubmittedEvent"",""namespace"":""axis.formbuilder.events"",""fields"":[{""name"":""formSubmissionId"",""type"":""string""},{""name"":""formDefinitionId"",""type"":""string""},{""name"":""organizationId"",""type"":""string""},{""name"":""executionId"",""type"":""string""},{""name"":""executionStepId"",""type"":""string""},{""name"":""submittedDataJson"",""type"":""string""}]}");
+            @"{""type"":""record"",""name"":""FormTaskSubmittedEvent"",""namespace"":""axis.formbuilder.events"",""fields"":[{""name"":""formSubmissionId"",""type"":""string""},{""name"":""formDefinitionId"",""type"":""string""},{""name"":""tenantId"",""type"":""string""},{""name"":""executionId"",""type"":""string""},{""name"":""executionStepId"",""type"":""string""},{""name"":""submittedDataJson"",""type"":""string""}]}");
 
         private string _formSubmissionId = string.Empty;
         private string _formDefinitionId = string.Empty;
-        private string _organizationId = string.Empty;
+        private string _tenantId = string.Empty;
         private string _executionId = string.Empty;
         private string _executionStepId = string.Empty;
         private string _submittedDataJson = string.Empty;
@@ -25,7 +25,7 @@ namespace axis.formbuilder.events
 
         public string formSubmissionId { get => _formSubmissionId; set => _formSubmissionId = value; }
         public string formDefinitionId { get => _formDefinitionId; set => _formDefinitionId = value; }
-        public string organizationId { get => _organizationId; set => _organizationId = value; }
+        public string tenantId { get => _tenantId; set => _tenantId = value; }
         public string executionId { get => _executionId; set => _executionId = value; }
         public string executionStepId { get => _executionStepId; set => _executionStepId = value; }
         public string submittedDataJson { get => _submittedDataJson; set => _submittedDataJson = value; }
@@ -34,7 +34,7 @@ namespace axis.formbuilder.events
         {
             0 => formSubmissionId,
             1 => formDefinitionId,
-            2 => organizationId,
+            2 => tenantId,
             3 => executionId,
             4 => executionStepId,
             5 => submittedDataJson,
@@ -47,7 +47,7 @@ namespace axis.formbuilder.events
             {
                 case 0: formSubmissionId = (string)fieldValue; break;
                 case 1: formDefinitionId = (string)fieldValue; break;
-                case 2: organizationId = (string)fieldValue; break;
+                case 2: tenantId = (string)fieldValue; break;
                 case 3: executionId = (string)fieldValue; break;
                 case 4: executionStepId = (string)fieldValue; break;
                 case 5: submittedDataJson = (string)fieldValue; break;

@@ -7,8 +7,8 @@ function makeStatus(
   overrides: Partial<ProvisioningStatusResponse> = {},
 ): ProvisioningStatusResponse {
   return {
-    organizationId: '00000000-0000-0000-0000-000000000001',
-    organizationStatus: 'Provisioning',
+    tenantId: '00000000-0000-0000-0000-000000000001',
+    TenantStatus: 'Provisioning',
     isReady: false,
     modules: [
       { module: 'DataModeling', status: 'Pending', attemptCount: 0, lastError: null },
@@ -41,7 +41,7 @@ describe('deriveProvisioningUiState', () => {
   it('marks all steps complete when workspace is ready', () => {
     const ui = deriveProvisioningUiState(
       makeStatus({
-        organizationStatus: 'Active',
+        TenantStatus: 'Active',
         isReady: true,
         modules: [
           { module: 'DataModeling', status: 'Succeeded', attemptCount: 1, lastError: null },
@@ -55,7 +55,7 @@ describe('deriveProvisioningUiState', () => {
   it('shows failed state when provisioning exhausted retries', () => {
     const ui = deriveProvisioningUiState(
       makeStatus({
-        organizationStatus: 'ProvisioningFailed',
+        TenantStatus: 'ProvisioningFailed',
         modules: [
           { module: 'DataModeling', status: 'Failed', attemptCount: 3, lastError: 'timeout' },
         ],

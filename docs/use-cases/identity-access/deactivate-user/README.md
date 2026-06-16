@@ -8,7 +8,7 @@ Deactivate a user so that they can no longer access the workspace without deleti
 
 ## Primary actor
 
-- Organization Admin
+- Tenant Admin
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Deactivate a user so that they can no longer access the workspace without deleti
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Deactivate a user flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -26,7 +26,7 @@ Deactivate a user so that they can no longer access the workspace without deleti
 
 ## Context
 
-Organization admins can invite new members, manage their accounts, and deactivate users who should no longer have access.
+Tenant admins can invite new members, manage their accounts, and deactivate users who should no longer have access.
 
 ## Acceptance Criteria
 
@@ -38,12 +38,12 @@ Organization admins can invite new members, manage their accounts, and deactivat
 
 *Validation & errors*
 - [ ] An admin cannot deactivate themselves.
-- [ ] Deactivating the last Admin-role user is blocked: "You cannot deactivate the last admin of the organization."
+- [ ] Deactivating the last Admin-role user is blocked: "You cannot deactivate the last admin of the Tenant."
 - [ ] A non-admin who calls the deactivate API endpoint receives HTTP 403.
 
 *Edge cases*
 - [ ] Deactivated user's created content (workflows, models, records) is preserved and attributed to them.
-- [ ] A deactivated user who tries to sign in sees: "Your account has been deactivated. Contact your organization admin."
+- [ ] A deactivated user who tries to sign in sees: "Your account has been deactivated. Contact your Tenant admin."
 - [ ] A deactivated user with pending form tasks: those tasks are marked "Assignee deactivated" and the admin is notified.
 
 *Out of scope*
@@ -62,6 +62,15 @@ Organization admins can invite new members, manage their accounts, and deactivat
 > **Gaps vs spec:** session revocation (refresh token revoke + access token blacklist) not implemented — auth infrastructure polish pending. Self-deactivation guard and 403 check require current user identity from JWT — pending. Deactivated-user sign-in message handled at auth layer (pending).
 >
 > **Decisions:** "last admin" check queries `CountAdminsAsync` in the repository before deactivating — domain enforces via `ApplicationException` if violated.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 
