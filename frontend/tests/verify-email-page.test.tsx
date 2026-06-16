@@ -57,7 +57,7 @@ describe('VerifyEmailPage', () => {
     expect(navigateMock).not.toHaveBeenCalled();
   });
 
-  it('navigates to user registration when organization contact is verified', async () => {
+  it('navigates to user registration when team contact is verified', async () => {
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -71,7 +71,7 @@ describe('VerifyEmailPage', () => {
         ),
     } as unknown as Response);
 
-    await renderWithRouter(<VerifyEmailPage />, { path: '/auth/verify?token=org-token' });
+    await renderWithRouter(<VerifyEmailPage />, { path: '/auth/verify?token=team-token' });
 
     await waitFor(() => {
       expect(navigateMock).toHaveBeenCalledWith({

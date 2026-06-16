@@ -41,12 +41,12 @@ describe('WorkspaceProvisioningPage', () => {
       path: '/provisioning?token=poll-token',
     });
 
-    expect(await screen.findByText('Creating your workspace')).toBeInTheDocument();
+    expect(await screen.findByText('Creating team account')).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: /Setting up "Acme Corp" workspace/i }),
+      screen.getByRole('heading', { name: /Setting up "Acme Corp" team account/i }),
     ).toBeInTheDocument();
     expect(screen.getByText('Assigning admin role')).toBeInTheDocument();
-    expect(screen.getByText('Opening workspace')).toBeInTheDocument();
+    expect(screen.getByText('Opening dashboard')).toBeInTheDocument();
   });
 
   it('shows failed state when provisioning retries are exhausted', async () => {

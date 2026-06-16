@@ -38,8 +38,8 @@ function slugPreviewResponse(slug = 'o-brien-co'): Response {
 }
 
 async function fillOrganizationForm(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByLabelText('Organization name'), "O'Brien & Co.");
-  await user.type(screen.getByLabelText('Organization contact email'), 'admin@company.com');
+  await user.type(screen.getByLabelText('Team account name'), "O'Brien & Co.");
+  await user.type(screen.getByLabelText('Team contact email'), 'admin@company.com');
   await user.click(screen.getByRole('checkbox', { name: /terms of service/i }));
 }
 
@@ -65,23 +65,23 @@ describe('RegisterOrganizationPage', () => {
 
   it('shows inline validation errors when form is empty', async () => {
     const user = userEvent.setup();
-    await renderWithRouter(<RegisterOrganizationPage />, { path: '/register/organization' });
+    await renderWithRouter(<RegisterOrganizationPage />, { path: '/register/team' });
 
-    expect(screen.getByText('Organization onboarding')).toBeInTheDocument();
-    expect(screen.getByText('1. Organization')).toBeInTheDocument();
-    expect(screen.getByText('2. Verification')).toBeInTheDocument();
+    expect(screen.getByText('Team account setup')).toBeInTheDocument();
+    expect(screen.getByText('1. Team details')).toBeInTheDocument();
+    expect(screen.getByText('2. Verify email')).toBeInTheDocument();
     expect(screen.getByText('3. First owner')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /register organization/i }));
+    await user.click(screen.getByRole('button', { name: /create team account/i }));
 
-    expect(screen.getByText('Organization name is required')).toBeInTheDocument();
-    expect(screen.getByText('Organization contact email is required')).toBeInTheDocument();
+    expect(screen.getByText('Team account name is required')).toBeInTheDocument();
+    expect(screen.getByText('Team contact email is required')).toBeInTheDocument();
     expect(
       screen.getByText('You must accept the Terms of Service and Privacy Policy'),
     ).toBeInTheDocument();
   });
 
-  it('shows slug preview and submits the organization registration payload', async () => {
+  it('shows slug preview and submits the team account registration payload', async () => {
     const user = userEvent.setup();
     let registerBody: Record<string, unknown> | undefined;
     let registerHeaders: Record<string, string> | undefined;
@@ -102,7 +102,7 @@ describe('RegisterOrganizationPage', () => {
             Promise.resolve(
               JSON.stringify({
                 message:
-                  'Registration successful. Please check your email to verify your organization.',
+                  'Registration successful. Please check your email to verify your team email.',
               }),
             ),
         } as unknown as Response);
@@ -110,7 +110,7 @@ describe('RegisterOrganizationPage', () => {
       return Promise.reject(new Error(`Unexpected fetch: ${url}`));
     });
 
-    await renderWithRouter(<RegisterOrganizationPage />, { path: '/register/organization' });
+    await renderWithRouter(<RegisterOrganizationPage />, { path: '/register/team' });
 
     await fillOrganizationForm(user);
 
@@ -119,7 +119,7 @@ describe('RegisterOrganizationPage', () => {
       screen.getByText('This address will be reserved after email verification.'),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /register organization/i }));
+    await user.click(screen.getByRole('button', { name: /create team account/i }));
 
     await waitFor(() =>
       expect(navigateMock).toHaveBeenCalledWith({ to: '/register/confirmation' }),
@@ -137,7 +137,7 @@ describe('RegisterOrganizationPage', () => {
     expect(stored).toContain("O'Brien & Co.");
   });
 
-  it('maps backend validation errors to inline organization fields', async () => {
+  it('maps backend validation errors to inline team account fields', async () => {
     const user = userEvent.setup();
     vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString();
@@ -153,8 +153,8 @@ describe('RegisterOrganizationPage', () => {
           json: () =>
             Promise.resolve({
               errors: {
-                orgName: ['Organization name must be at least 2 characters.'],
-                organizationContactEmail: ['Enter a valid organization email.'],
+                orgName: ['Team account name must be at least 2 characters.'],
+                organizationContactEmail: ['Enter a valid team contact email.'],
               },
             }),
         } as unknown as Response);
@@ -162,19 +162,19 @@ describe('RegisterOrganizationPage', () => {
       return Promise.reject(new Error(`Unexpected fetch: ${url}`));
     });
 
-    await renderWithRouter(<RegisterOrganizationPage />, { path: '/register/organization' });
+    await renderWithRouter(<RegisterOrganizationPage />, { path: '/register/team' });
 
     await fillOrganizationForm(user);
-    await user.click(screen.getByRole('button', { name: /register organization/i }));
+    await user.click(screen.getByRole('button', { name: /create team account/i }));
 
     expect(
-      await screen.findByText('Organization name must be at least 2 characters.'),
+      await screen.findByText('Team account name must be at least 2 characters.'),
     ).toBeInTheDocument();
-    expect(screen.getByText('Enter a valid organization email.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /register organization/i })).toBeEnabled();
+    expect(screen.getByText('Enter a valid team contact email.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /create team account/i })).toBeEnabled();
   });
 
-  it('shows generic server error when organization registration fails', async () => {
+  it('shows generic server error when team account registration fails', async () => {
     const user = userEvent.setup();
     vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString();
@@ -193,14 +193,14 @@ describe('RegisterOrganizationPage', () => {
       return Promise.reject(new Error(`Unexpected fetch: ${url}`));
     });
 
-    await renderWithRouter(<RegisterOrganizationPage />, { path: '/register/organization' });
+    await renderWithRouter(<RegisterOrganizationPage />, { path: '/register/team' });
 
     await fillOrganizationForm(user);
-    await user.click(screen.getByRole('button', { name: /register organization/i }));
+    await user.click(screen.getByRole('button', { name: /create team account/i }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Something went wrong, please try again',
     );
-    expect(screen.getByRole('button', { name: /register organization/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /create team account/i })).toBeEnabled();
   });
 });

@@ -75,11 +75,11 @@ Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoi
 
 ## Platform Foundation (`platform-foundation`)
 
-**Tenant registration:** ✅ `register-org` owns organization contact email verification + tenant provisioning. Dedicated `/register/organization` frontend, slug preview, legal versions, confirmation/resend, verify-email states, provisioning status/retry UI, and first-owner `/register?setupToken=...` handoff are shipped. Standalone email/password user registration is complete in `identity-access/register-user`; third-party provider registration/linking remains a separate Identity follow-up.
+**Tenant registration:** ✅ `register-org` owns team account contact email verification + tenant provisioning. Dedicated `/register/team` frontend (`/register/organization` compatibility alias), address preview, legal versions, confirmation/resend, verify-email states, provisioning status/retry UI, and first-owner `/register?setupToken=...` handoff are shipped. Standalone email/password user registration is complete in `identity-access/register-user`; third-party provider registration/linking remains a separate Identity follow-up.
 
 **Subscription plans (backend):** ✅ `GET /api/plans`, platform plan change, 402 limits (workflows / users / executions), Redis counters. Frontend pricing UI ⏳. **Deferred:** atomic execution counter under concurrency; fail-closed when Redis unavailable; bulk multi-workflow import limit AC until bulk endpoint exists.
 
-**Organization management (backend):** ✅ profile API, settings + usage, scheduled deletion with 30-day hard-delete job. Frontend ⏳.
+**Team account management (backend):** ✅ profile API, settings + usage, scheduled deletion with 30-day hard-delete job. Frontend ⏳.
 
 **Tenant isolation:** ✅ `TenantSchemaInterceptor`, `TenantOrganizationAccessMiddleware` (403 for missing/archived/not-ready orgs), cross-tenant API integration tests — see [tenant isolation](./use-cases/platform-foundation/tenant-scope/).
 
@@ -87,7 +87,7 @@ Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoi
 
 ## Registration journey (cross-cutting)
 
-**Register org (sign-up → verify → provision):** spec in [register-org](./use-cases/platform-foundation/register-org/README.md). **Verify → async provision:** `User.VerifyEmail()` sets org `Provisioning`, seeds `tenant_module_provisions`, publishes `OrganizationVerifiedEvent` → each module provisions and reports via `TenantModuleProvisionReportEvent`; Identity coordinator retries (3×, exponential backoff) and logs critical alert on exhaustion; `GET /api/auth/provisioning-status?token=` for polling. **Frontend ✅:** `/register/organization`, `/register/confirmation`, `/auth/verify`, first-owner `/register?setupToken=...`, and `/provisioning` screens are shipped with retry support.
+**Create team account (sign-up → verify → provision):** spec in [register-org](./use-cases/platform-foundation/register-org/README.md). **Verify → async provision:** `User.VerifyEmail()` sets the internal tenant container to `Provisioning`, seeds `tenant_module_provisions`, publishes `OrganizationVerifiedEvent` → each module provisions and reports via `TenantModuleProvisionReportEvent`; Identity coordinator retries (3×, exponential backoff) and logs critical alert on exhaustion; `GET /api/auth/provisioning-status?token=` for polling. **Frontend ✅:** `/register/team`, `/register/confirmation`, `/auth/verify`, first-owner `/register?setupToken=...`, and `/provisioning` screens are shipped with retry support.
 
 ## Page Builder (`page-builder`)
 

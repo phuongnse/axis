@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { Building2, UserPlus } from 'lucide-react';
+import { UserPlus, UsersRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { ActionLink } from '@/components/ui/action-link';
@@ -44,8 +44,8 @@ export function RegisterPage() {
             <div className="space-y-2">
               <p>{t('register.personalBannerBody')}</p>
               <ActionLink
-                to="/register/organization"
-                icon={Building2}
+                to="/register/team"
+                icon={UsersRound}
                 variant="secondary"
                 className="h-8 w-full text-xs sm:w-auto"
               >

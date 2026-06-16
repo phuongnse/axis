@@ -38,7 +38,7 @@ describe('deriveProvisioningUiState', () => {
     expect(ui.attemptCount).toBe(2);
   });
 
-  it('marks all steps complete when workspace is ready', () => {
+  it('marks all steps complete when team account setup is ready', () => {
     const ui = deriveProvisioningUiState(
       makeStatus({
         organizationStatus: 'Active',

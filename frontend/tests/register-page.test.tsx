@@ -61,10 +61,10 @@ describe('RegisterPage', () => {
     await renderWithRouter(<RegisterPage />, { path: '/register' });
 
     expect(screen.getByText('Personal account')).toBeInTheDocument();
-    expect(screen.getByText(/It will not register an organization/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /register an organization instead/i })).toHaveAttribute(
+    expect(screen.getByText(/You can add a team account later/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /create a team account instead/i })).toHaveAttribute(
       'href',
-      '/register/organization',
+      '/register/team',
     );
     expect(screen.getByText('This name will appear in your workspace.')).toBeInTheDocument();
     expect(
@@ -147,7 +147,7 @@ describe('RegisterPage', () => {
     expect(stored).not.toContain('organizationName');
   });
 
-  it('includes setup token when registering the first organization user', async () => {
+  it('includes setup token when registering the first team owner', async () => {
     const user = userEvent.setup();
     let registerBody: Record<string, unknown> | undefined;
     vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
@@ -181,7 +181,7 @@ describe('RegisterPage', () => {
       screen.getByRole('heading', { name: /create the first owner account/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/Create the first owner account for your organization/i),
+      screen.getByText(/Create the first owner account for your team account/i),
     ).toBeInTheDocument();
 
     await fillRegisterForm(user);

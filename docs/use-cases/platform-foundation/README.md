@@ -25,7 +25,7 @@ Ship first — tenant registration, isolation, and subscription plans are prereq
 | Use case | Summary |
 |---|---|
 | [Select a subscription plan during registration](plan-at-signup/) | Choose a subscription plan during registration so that I know what features and limits I have access to. |
-| [Register a new organization](register-org/) | Register an organization on the Axis platform with an official organization contact email, verify that contact channel… |
+| [Create a team account](register-org/) | Create a team account on the Axis platform so one user can manage multiple users, roles, invitations, and tenant-scoped… |
 
 ### Subscription plans
 
@@ -62,16 +62,16 @@ Ship first — tenant registration, isolation, and subscription plans are prereq
 
 ## Diagrams
 
-Organization onboarding journey (org contact email → verify → provisioning): [register-org § Diagrams](./register-org/README.md#diagrams) (`register-org-journey`, `tenant-provisioning`). First-owner identity setup is a separate setup-token handoff that continues at `/register` and is owned by `register-org`. Standalone users register through [identity-access/register-user](../identity-access/register-user/) without an organization.
+Team account onboarding journey (team contact email → verify → provisioning): [register-org § Diagrams](./register-org/README.md#diagrams) (`register-org-journey`, `tenant-provisioning`). First-owner identity setup is a separate setup-token handoff that continues at `/register` and is owned by `register-org`. Standalone users register through [identity-access/register-user](../identity-access/register-user/) without a team account.
 
 ---
 
 ## Acceptance Criteria (domain)
 
-- [ ] A new organization can register and be fully provisioned with isolated tenant schemas after organization email verification.
+- [ ] A new team account can register and be fully provisioned with isolated tenant schemas after team email verification.
 - [ ] No tenant can read or write data belonging to another tenant under any circumstances.
 - [ ] Tenant schema is automatically created and migrated on registration.
-- [ ] Organization can update its profile (name, logo, settings) without affecting other tenants.
+- [ ] Team account can update its profile (name, logo, settings) without affecting other tenants.
 
 ---
 

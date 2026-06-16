@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { Building2, Mail, UserPlus } from 'lucide-react';
+import { Mail, UserPlus, UsersRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { ActionLink } from '@/components/ui/action-link';
@@ -14,7 +14,7 @@ export function EmailConfirmationPage() {
   const context = loadRegistrationContext();
   const { resend, state, rateLimitMessage, reset } = useResendVerification();
   const isOrganizationRegistration = Boolean(context?.organizationName);
-  const RegisterAgainIcon = isOrganizationRegistration ? Building2 : UserPlus;
+  const RegisterAgainIcon = isOrganizationRegistration ? UsersRound : UserPlus;
 
   async function handleResend() {
     if (!context?.email || state === 'sending' || state === 'rate_limited') return;
@@ -116,7 +116,7 @@ export function EmailConfirmationPage() {
         </div>
 
         <ActionLink
-          to={isOrganizationRegistration ? '/register/organization' : '/register'}
+          to={isOrganizationRegistration ? '/register/team' : '/register'}
           icon={RegisterAgainIcon}
           variant="secondary"
           className="w-full"

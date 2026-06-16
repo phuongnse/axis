@@ -33,7 +33,7 @@ describe('EmailConfirmationPage', () => {
     expect(screen.getByRole('button', { name: /resend email/i })).toBeInTheDocument();
   });
 
-  it('uses organization confirmation copy when registration context has an organization', async () => {
+  it('uses team account confirmation copy when registration context has a team name', async () => {
     saveRegistrationContext({
       email: 'admin@company.com',
       organizationName: 'Acme Corp',
@@ -41,13 +41,11 @@ describe('EmailConfirmationPage', () => {
 
     await renderWithRouter(<EmailConfirmationPage />, { path: '/register/confirmation' });
 
-    expect(
-      screen.getByRole('heading', { name: /verify your organization email/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /verify your team email/i })).toBeInTheDocument();
     expect(screen.getByText(/Sent to admin@company.com for Acme Corp/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /register another organization/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /create another team account/i })).toHaveAttribute(
       'href',
-      '/register/organization',
+      '/register/team',
     );
   });
 
