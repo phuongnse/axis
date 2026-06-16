@@ -94,7 +94,7 @@ public static class AuthHelper
             throw new InvalidOperationException($"Tenant verification failed: {verifyResp.StatusCode}");
 
         JsonElement verifyBody = await verifyResp.Content.ReadFromJsonAsync<JsonElement>(Json);
-        string? setupToken = verifyBody.GetProperty("TenantSetupToken").GetString();
+        string? setupToken = verifyBody.GetProperty("tenantSetupToken").GetString();
 
         return setupToken
             ?? throw new InvalidOperationException("No TenantSetupToken in verification response.");

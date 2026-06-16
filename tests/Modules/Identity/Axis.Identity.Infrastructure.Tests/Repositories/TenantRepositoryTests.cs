@@ -22,7 +22,7 @@ public class TenantRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
 
     public async Task DisposeAsync() => await _ctx.DisposeAsync();
 
-    private static Tenant MakeTenant(string slug = "test-Tenant") =>
+    private static Tenant MakeTenant(string slug = "test-tenant") =>
         Tenant.Create(
             "Test Tenant",
             TenantSlug.Create(slug).Value,
@@ -32,14 +32,14 @@ public class TenantRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     [Fact]
     public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
     {
-        Tenant Tenant = MakeTenant("Tenant-add-get");
-        await _sut.AddAsync(Tenant);
+        Tenant tenant = MakeTenant("tenant-add-get");
+        await _sut.AddAsync(tenant);
         await _ctx.SaveChangesAsync();
-        Tenant? loaded = await _sut.GetByIdAsync(Tenant.Id);
+        Tenant? loaded = await _sut.GetByIdAsync(tenant.Id);
 
         loaded.Should().NotBeNull();
-        loaded!.Name.Should().Be(Tenant.Name);
-        loaded.Slug.Value.Should().Be("Tenant-add-get");
+        loaded!.Name.Should().Be(tenant.Name);
+        loaded.Slug.Value.Should().Be("tenant-add-get");
         loaded.OwnerEmail.Value.Should().Be("owner@example.com");
         loaded.Status.Should().Be(TenantStatus.Active);
         loaded.SubscriptionPlanId.Should().Be(WellKnownSubscriptionPlans.FreeId);
@@ -48,14 +48,14 @@ public class TenantRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     [Fact]
     public async Task GetBySlugAsync_WhenSlugExists_ReturnsMatchingTenant()
     {
-        Tenant Tenant = MakeTenant("Tenant-by-slug");
-        await _sut.AddAsync(Tenant);
+        Tenant tenant = MakeTenant("tenant-by-slug");
+        await _sut.AddAsync(tenant);
         await _ctx.SaveChangesAsync();
-        TenantSlug slug = TenantSlug.Create("Tenant-by-slug").Value;
+        TenantSlug slug = TenantSlug.Create("tenant-by-slug").Value;
         Tenant? loaded = await _sut.GetBySlugAsync(slug);
 
         loaded.Should().NotBeNull();
-        loaded!.Id.Should().Be(Tenant.Id);
+        loaded!.Id.Should().Be(tenant.Id);
     }
 
     [Fact]
@@ -69,8 +69,8 @@ public class TenantRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     [Fact]
     public async Task SlugExistsAsync_WhenSlugIsTaken_ReturnsTrue()
     {
-        Tenant Tenant = MakeTenant("slug-exists-check");
-        await _sut.AddAsync(Tenant);
+        Tenant tenant = MakeTenant("slug-exists-check");
+        await _sut.AddAsync(tenant);
         await _ctx.SaveChangesAsync();
         bool exists = await _sut.SlugExistsAsync(TenantSlug.Create("slug-exists-check").Value);
         exists.Should().BeTrue();
