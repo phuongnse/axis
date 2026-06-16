@@ -2,7 +2,7 @@
 
 > **Navigation**: [← docs/README.md](./README.md) · [← AGENTS.md](../AGENTS.md)
 
-> **Scope:** Architectural shape — what containers exist, how tenancy and auth work end-to-end, where the modules sit. **Not** the source of truth for: library versions ([TECH_STACK.md](./TECH_STACK.md)), source tree ([AGENTS.md](../AGENTS.md) § Solution tree), feature behaviour (`docs/use-cases/`), implementation rules (`docs/playbooks/`).
+> **Scope:** Architectural shape — what containers exist, how workspace isolation and auth work end-to-end, where the modules sit. **Not** the source of truth for: library versions ([TECH_STACK.md](./TECH_STACK.md)), source tree ([AGENTS.md](../AGENTS.md) § Solution tree), feature behaviour (`docs/use-cases/`), implementation rules (`docs/playbooks/`).
 >
 > If two docs would disagree, this one defers.
 
@@ -12,7 +12,7 @@
 
 See [System context](./README.md#system-context) in the docs index (Mermaid).
 
-The Axis platform serves four actor types: **Platform Admins** (Axis team), **Tenant Admins**, **Tenant Members**, and **End Users**. External systems include an email service for notifications, external APIs called by workflow HTTP steps, and webhook targets that receive workflow events.
+The Axis platform serves four actor types: **Platform Admins** (Axis team), **Workspace Admins**, **Workspace Members**, and **End Users**. External systems include an email service for notifications, external APIs called by workflow HTTP steps, and webhook targets that receive workflow events.
 
 ---
 
@@ -27,15 +27,15 @@ Axis runs as a **modulith with strict service boundaries** — each module is a 
 | **Web Application (SPA)** | All user interactions: workflow builder, form builder, page builder, data management |
 | **API Gateway (`Axis.Api`)** | Thin REST/OpenAPI surface for the SPA. Validates JWT, routes to module gRPC clients (modulith mode: in-process; extracted mode: gRPC over network). |
 | **Identity service** | Issues JWTs (OAuth2 Authorization Code + PKCE, Client Credentials); exposes JWKS + user/role lookup via gRPC. Other modules treat it as remote ([ADR-015](./TECH_STACK.md#adr-015-identity-is-a-remote-dependency-from-day-1)). |
-| **DataModeling service** | Custom data models, fields, records (per-tenant). |
+| **DataModeling service** | Custom data models, fields, records (per-workspace). |
 | **WorkflowBuilder service** | Workflow definitions, steps, transitions, triggers. |
 | **WorkflowEngine service** | Execution lifecycle, step runtime, saga orchestrator. |
 | **FormBuilder service** | Form definitions, form-task submissions. |
 | **PageBuilder service** | Visual page builder (module not started — see [PROGRESS.md](./PROGRESS.md)). |
-| **Per-module PostgreSQL** | One database per module (`axis_identity`, `axis_datamodeling`, …). Schema-per-tenant inside each ([ADR-011](./TECH_STACK.md#adr-011-per-module-database-with-schema-per-tenant-inside)). Per-module Wolverine outbox schema lives alongside ([ADR-012](./TECH_STACK.md#adr-012-per-module-wolverine-schema-in-the-modules-own-database)). |
-| **Apache Kafka + Schema Registry** | Cross-module **event** transport + event-sourced aggregate log. Topics partitioned by `tenantId`. Avro payloads with CloudEvents envelopes ([ADR-013](./TECH_STACK.md#adr-013-apache-kafka-for-cross-module-domain-events-and-event-sourced-aggregates), [ADR-019](./TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). |
+| **Per-module PostgreSQL** | One database per module (`axis_identity`, `axis_datamodeling`, …). Schema-per-workspace inside each ([ADR-011](./TECH_STACK.md#adr-011-per-module-database-with-schema-per-workspace-inside)). Per-module Wolverine outbox schema lives alongside ([ADR-012](./TECH_STACK.md#adr-012-per-module-wolverine-schema-in-the-modules-own-database)). |
+| **Apache Kafka + Schema Registry** | Cross-module **event** transport + event-sourced aggregate log. Topics partitioned by `workspaceId`. Avro payloads with CloudEvents envelopes ([ADR-013](./TECH_STACK.md#adr-013-apache-kafka-for-cross-module-domain-events-and-event-sourced-aggregates), [ADR-019](./TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). |
 | **RabbitMQ** | Cross-module **command + job + saga** transport. Work-queue semantics (ACK, requeue, DLX, prefetch). Per-message routing rule in [ADR-025](./TECH_STACK.md#adr-025-transport-selection-rule-by-message-name-suffix). |
-| **Redis** | Session cache + distributed locks + per-tenant short-TTL caches (key-prefixed per module). |
+| **Redis** | Session cache + distributed locks + per-workspace short-TTL caches (key-prefixed per module). |
 | **AWS S3** | File storage (attachments, exports). |
 | **HashiCorp Vault** | Secrets management in production. Per-module policies + Vault Agent sidecar ([ADR-022](./TECH_STACK.md#adr-022-secrets-management-via-hashicorp-vault-in-production)). |
 | **Grafana Tempo / Loki / Mimir** | Observability backend — traces, logs, metrics. OpenTelemetry SDK in every module ([ADR-018](./TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability)). |
@@ -77,18 +77,18 @@ Forbidden: shared `DbContext`, direct C# method calls into another module's Appl
 
 ---
 
-## Multi-Tenancy Strategy
+## Multi-Workspace Isolation Strategy
 
-Each module owns its own PostgreSQL database. Tenant isolation inside a module is **schema-per-tenant** (`tenant_{TenantId:N}`). Identity is the registry of Tenants and operates entirely in its `public` schema; other modules never query Identity's DB directly — they receive tenant context via JWT claims.
+Each module owns its own PostgreSQL database. Workspace isolation inside a module is **schema-per-workspace** (`workspace_{WorkspaceId:N}`). Identity is the registry of Workspaces and operates entirely in its `public` schema; other modules never query Identity's DB directly — they receive workspace context via JWT claims.
 
 ```text
 axis_identity DB
-└── public schema                # Tenants, users, roles, subscriptions, openiddict tables
+└── public schema                # Workspaces, users, roles, subscriptions, openiddict tables
 
 axis_datamodeling DB
-├── public schema                # module config, cross-tenant indexes
+├── public schema                # module config, cross-workspace indexes
 ├── wolverine schema             # per-module envelope tables (outbox/inbox/scheduled/dead-letters)
-└── tenant_{TenantId:N} schemas     # models, fields, records (per tenant)
+└── workspace_{WorkspaceId:N} schemas     # models, fields, records (per workspace)
 
 axis_workflowbuilder DB           ← same shape
 axis_workflowengine DB            ← same shape
@@ -96,9 +96,9 @@ axis_formbuilder DB               ← same shape
 axis_pagebuilder DB               ← same shape (when PageBuilder module ships)
 ```
 
-**Tenant resolution:** every external request carries a JWT with an `tenant_id` claim. The gateway extracts it and propagates via gRPC metadata (sync calls) and CloudEvents `tenantid` extension (events). Each module restores it into a scoped `ITenantContext`. EF Core sets the per-connection `search_path` to the tenant schema via `TenantSchemaInterceptor`.
+**Workspace resolution:** every external request carries a JWT with an `workspace_id` claim. The gateway extracts it and propagates via gRPC metadata (sync calls) and CloudEvents `workspaceid` extension (events). Each module restores it into a scoped `IWorkspaceContext`. EF Core sets the per-connection `search_path` to the workspace schema via `WorkspaceSchemaInterceptor`.
 
-Implementation details and pitfalls: [playbooks/patterns.md § Multi-tenancy](./playbooks/patterns.md#multi-tenancy-pitfalls).
+Implementation details and pitfalls: [playbooks/patterns.md § Multi-workspace isolation](./playbooks/patterns.md#multi-workspace isolation-pitfalls).
 
 ---
 
@@ -119,7 +119,7 @@ Detailed flow, redirect URIs, and error states: [docs/use-cases/identity-access/
 
 - **Tracing**: OpenTelemetry SDK in every module. Trace IDs propagate through Wolverine envelopes and gRPC interceptors so a single request spans modules end-to-end. Backend: Grafana Tempo ([ADR-018](./TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability)).
 - **Metrics**: Prometheus scrapes each module's `/metrics`. Long-term storage in Grafana Mimir.
-- **Logs**: Serilog → OTEL exporter → Loki. Structured by trace ID + tenant ID + module.
+- **Logs**: Serilog → OTEL exporter → Loki. Structured by trace ID + workspace ID + module.
 - **Health checks**: `/health` (liveness) and `/health/ready` (readiness, includes DB + Kafka + downstream-module probes). Consumed by Kubernetes probes.
 - **Schema migrations**: per-module EF Core migrations; no `EnsureCreated` anywhere — see [ADR-023](./TECH_STACK.md#adr-023-per-module-ef-core-migrations-only). Migrations run as a separate CI step before pod rollout.
 - **Secrets**: HashiCorp Vault with per-module policies in production; `.env` files for development.

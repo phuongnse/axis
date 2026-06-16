@@ -2,4 +2,4 @@ using Axis.Shared.Application.CQRS;
 
 namespace Axis.WorkflowBuilder.Application.Commands.UnarchiveWorkflow;
 
-public sealed record UnarchiveWorkflowCommand(Guid WorkflowId, Guid tenantId) : ICommand;
+public sealed record UnarchiveWorkflowCommand(Guid WorkflowId, Guid workspaceId) : ICommand;

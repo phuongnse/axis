@@ -2,4 +2,4 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.WorkflowEngine.Domain.Events;
 
-public sealed record ExecutionCancelled(Guid ExecutionId, Guid tenantId) : IDomainEvent;
+public sealed record ExecutionCancelled(Guid ExecutionId, Guid workspaceId) : IDomainEvent;

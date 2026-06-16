@@ -6,13 +6,13 @@ namespace Axis.Identity.Application.Commands.VerifyEmail;
 public sealed record VerifyEmailSessionEstablishedDto(
     bool SessionEstablished,
     VerifyEmailNextStep NextStep,
-    string? TenantSetupToken = null)
+    string? WorkspaceSetupToken = null)
 {
     public static VerifyEmailSessionEstablishedDto From(VerifyEmailSuccessDto verification) =>
         new(
             verification.SessionEstablished,
             verification.NextStep,
-            verification.TenantSetupToken);
+            verification.WorkspaceSetupToken);
 }
 
 public enum VerifyEmailNextStep

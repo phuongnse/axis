@@ -12,7 +12,7 @@ namespace Axis.WorkflowBuilder.Application.Tests;
 
 public class RemoveTransitionHandlerTests
 {
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private readonly IWorkflowRepository _repo = Substitute.For<IWorkflowRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly RemoveTransitionHandler _handler;
@@ -22,14 +22,14 @@ public class RemoveTransitionHandlerTests
     [Fact]
     public async Task Handle_WhenTransitionExists_RemovesAndSaves()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TenantId, "user");
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, WorkspaceId, "user");
         WorkflowStep start = wf.Steps.Single(s => s.Type == StepType.Start);
         WorkflowStep end = wf.Steps.Single(s => s.Type == StepType.End);
         wf.AddTransition(start.Id, end.Id, null);
-        _repo.GetByIdAsync(wf.Id, TenantId, Arg.Any<CancellationToken>()).Returns(wf);
+        _repo.GetByIdAsync(wf.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(wf);
 
         Result result = await _handler.Handle(
-            new RemoveTransitionCommand(wf.Id, TenantId, start.Id, end.Id), CancellationToken.None);
+            new RemoveTransitionCommand(wf.Id, WorkspaceId, start.Id, end.Id), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         wf.Transitions.Should().BeEmpty();
@@ -39,10 +39,10 @@ public class RemoveTransitionHandlerTests
     [Fact]
     public async Task Handle_WhenWorkflowNotFound_ReturnsNotFound()
     {
-        _repo.GetByIdAsync(Arg.Any<Guid>(), TenantId, Arg.Any<CancellationToken>()).Returns((WorkflowDefinition?)null);
+        _repo.GetByIdAsync(Arg.Any<Guid>(), WorkspaceId, Arg.Any<CancellationToken>()).Returns((WorkflowDefinition?)null);
 
         Result result = await _handler.Handle(
-            new RemoveTransitionCommand(Guid.NewGuid(), TenantId, Guid.NewGuid(), Guid.NewGuid()),
+            new RemoveTransitionCommand(Guid.NewGuid(), WorkspaceId, Guid.NewGuid(), Guid.NewGuid()),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
@@ -50,22 +50,22 @@ public class RemoveTransitionHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenWorkflowBelongsToAnotherTenant_ReturnsNotFound()
+    public async Task Handle_WhenWorkflowBelongsToAnotherWorkspace_ReturnsNotFound()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TenantId, "user");
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, WorkspaceId, "user");
         WorkflowStep start = wf.Steps.Single(s => s.Type == StepType.Start);
         WorkflowStep end = wf.Steps.Single(s => s.Type == StepType.End);
         wf.AddTransition(start.Id, end.Id, null);
 
-        Guid otherTenantId = Guid.NewGuid();
-        _repo.GetByIdAsync(wf.Id, otherTenantId, Arg.Any<CancellationToken>())
+        Guid otherWorkspaceId = Guid.NewGuid();
+        _repo.GetByIdAsync(wf.Id, otherWorkspaceId, Arg.Any<CancellationToken>())
             .Returns((WorkflowDefinition?)null);
         Result result = await _handler.Handle(
-            new RemoveTransitionCommand(wf.Id, otherTenantId, start.Id, end.Id), CancellationToken.None);
+            new RemoveTransitionCommand(wf.Id, otherWorkspaceId, start.Id, end.Id), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-        await _repo.Received(1).GetByIdAsync(wf.Id, otherTenantId, Arg.Any<CancellationToken>());
+        await _repo.Received(1).GetByIdAsync(wf.Id, otherWorkspaceId, Arg.Any<CancellationToken>());
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 }

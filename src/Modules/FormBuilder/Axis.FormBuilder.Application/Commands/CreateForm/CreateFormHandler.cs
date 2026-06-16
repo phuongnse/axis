@@ -15,11 +15,11 @@ public sealed class CreateFormHandler(
 {
     public async Task<Result<Guid>> Handle(CreateFormCommand command, CancellationToken cancellationToken)
     {
-        if (await formRepo.NameExistsAsync(command.Name, command.tenantId, null, cancellationToken))
+        if (await formRepo.NameExistsAsync(command.Name, command.workspaceId, null, cancellationToken))
             return Result.Failure<Guid>(ErrorCodes.Conflict, $"A form named '{command.Name}' already exists.");
 
         FormDefinition form = FormDefinition.Create(
-            command.Name, command.Description, command.tenantId, command.CreatedBy);
+            command.Name, command.Description, command.workspaceId, command.CreatedBy);
 
         await formRepo.AddAsync(form, cancellationToken);
 

@@ -13,7 +13,7 @@ public sealed class RemoveFieldHandler(
 {
     public async Task<Result> Handle(RemoveFieldCommand command, CancellationToken cancellationToken)
     {
-        DataModeling.Domain.Aggregates.DataModel? model = await modelRepo.GetByIdAsync(command.ModelId, command.tenantId, cancellationToken);
+        DataModeling.Domain.Aggregates.DataModel? model = await modelRepo.GetByIdAsync(command.ModelId, command.workspaceId, cancellationToken);
         if (model is null)
             return Result.Failure(ErrorCodes.NotFound, "Model not found.");
 

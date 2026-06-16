@@ -7,7 +7,7 @@ internal sealed class ExecutionPlanLimitUsageCounter(IExecutionRepository execut
 {
     public PlanLimitResourceType ResourceType => PlanLimitResourceType.ExecutionsPerMonth;
 
-    public Task<int> GetCurrentUsageAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    public Task<int> GetCurrentUsageAsync(Guid workspaceId, CancellationToken cancellationToken = default)
     {
         DateTime monthStartUtc = new DateTime(
             DateTime.UtcNow.Year,
@@ -17,6 +17,6 @@ internal sealed class ExecutionPlanLimitUsageCounter(IExecutionRepository execut
             0,
             0,
             DateTimeKind.Utc);
-        return executionRepo.CountCreatedSinceUtcAsync(tenantId, monthStartUtc, cancellationToken);
+        return executionRepo.CountCreatedSinceUtcAsync(workspaceId, monthStartUtc, cancellationToken);
     }
 }

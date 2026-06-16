@@ -12,12 +12,12 @@ const profileWithWorkspace = {
   fullName: 'Admin User',
   avatarUrl: null,
   isActive: true,
-  tenantId: '3cde5c59-d18b-464f-a021-5fce16b01118',
-  permissions: ['tenant:settings:read'],
+  workspaceId: '3cde5c59-d18b-464f-a021-5fce16b01118',
+  permissions: ['workspace:settings:read'],
 };
 
-const TenantSettings = {
-  tenantId: '3cde5c59-d18b-464f-a021-5fce16b01118',
+const WorkspaceSettings = {
+  workspaceId: '3cde5c59-d18b-464f-a021-5fce16b01118',
   name: 'Northwind Labs',
   slug: 'northwind-labs',
   logoUrl: null,
@@ -63,8 +63,8 @@ describe('DashboardOverview', () => {
         return Promise.resolve(jsonResponse(profileWithWorkspace));
       }
 
-      if (url.includes('/api/tenants/current/settings')) {
-        return Promise.resolve(jsonResponse(TenantSettings));
+      if (url.includes('/api/workspaces/current/settings')) {
+        return Promise.resolve(jsonResponse(WorkspaceSettings));
       }
 
       return Promise.reject(new Error(`Unexpected fetch: ${url}`));
@@ -84,7 +84,7 @@ describe('DashboardOverview', () => {
     expect(screen.queryByText('42 models')).not.toBeInTheDocument();
   });
 
-  it('does not request Tenant settings when the account has no workspace', async () => {
+  it('does not request Workspace settings when the account has no workspace', async () => {
     vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
 
@@ -92,7 +92,7 @@ describe('DashboardOverview', () => {
         return Promise.resolve(
           jsonResponse({
             ...profileWithWorkspace,
-            tenantId: null,
+            workspaceId: null,
             permissions: [],
           }),
         );

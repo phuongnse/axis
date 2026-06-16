@@ -8,7 +8,7 @@ Click a step to open its configuration panel so that I can set it up without lea
 
 ## Primary actor
 
-- Tenant Member
+- Workspace Member
 
 ## Trigger
 
@@ -17,7 +17,7 @@ Click a step to open its configuration panel so that I can set it up without lea
 ## Main flow
 
 1. Actor starts the — Configure a step via side panel flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows

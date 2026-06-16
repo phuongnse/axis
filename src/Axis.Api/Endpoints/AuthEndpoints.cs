@@ -3,9 +3,10 @@ using Axis.Api.Extensions;
 using Axis.Api.Infrastructure;
 using Axis.Identity.Application.Commands.RequestPasswordReset;
 using Axis.Identity.Application.Commands.ResetPassword;
-using Axis.Identity.Application.Commands.RetryTenantProvisioning;
+using Axis.Identity.Application.Commands.RetryWorkspaceProvisioning;
 using Axis.Identity.Application.Commands.VerifyEmail;
 using Axis.Identity.Application.Queries.GetProvisioningStatus;
+using Axis.Identity.Application.Queries.GetUserTokenClaims;
 using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using MediatR;
@@ -30,6 +31,16 @@ public static class AuthEndpoints
             .Produces(204)
             .ProducesProblem(401);
 
+        group.MapPost("/switch-workspace", SwitchWorkspace)
+            .RequireAuthorization()
+            .WithName("SwitchWorkspace")
+            .WithSummary("Switch the active workspace for the next PKCE token exchange")
+            .WithTags("Identity")
+            .Produces(204)
+            .ProducesProblem(400)
+            .ProducesProblem(401)
+            .ProducesProblem(403);
+
         group.MapPost("/verify-email", VerifyEmail)
             .AllowAnonymous()
             .WithName("VerifyEmail")
@@ -41,15 +52,15 @@ public static class AuthEndpoints
         group.MapGet("/provisioning-status", GetProvisioningStatus)
             .AllowAnonymous()
             .WithName("GetProvisioningStatus")
-            .WithSummary("Poll tenant provisioning progress after email verification")
+            .WithSummary("Poll workspace provisioning progress after email verification")
             .WithTags("Identity")
             .Produces<ProvisioningStatusDto>()
             .Produces(404);
 
         group.MapPost("/retry-provisioning", RetryProvisioning)
             .AllowAnonymous()
-            .WithName("RetryTenantProvisioning")
-            .WithSummary("Manually re-queue tenant provisioning after automatic retries are exhausted")
+            .WithName("RetryWorkspaceProvisioning")
+            .WithSummary("Manually re-queue workspace provisioning after automatic retries are exhausted")
             .WithTags("Identity")
             .Produces(204)
             .ProducesProblem(400);
@@ -140,17 +151,62 @@ public static class AuthEndpoints
         return Results.Ok(VerifyEmailSessionEstablishedDto.From(result.Value));
     }
 
+    private static async Task<IResult> SwitchWorkspace(
+        [FromBody] SwitchWorkspaceRequest request,
+        CurrentUser currentUser,
+        ISender mediator,
+        HttpContext httpContext,
+        CancellationToken ct)
+    {
+        Result<UserTokenClaimsDto> result = await mediator.Send(
+            new GetUserTokenClaimsQuery(currentUser.UserId, request.WorkspaceId),
+            ct);
+        if (result.IsFailure)
+            return result.ToProblemDetails();
+
+        await SignInPkceSessionAsync(httpContext, result.Value);
+        return Results.NoContent();
+    }
+
     private static async Task SignInPkceSessionAsync(HttpContext httpContext, VerifyEmailSuccessDto claims)
+    {
+        await SignInPkceSessionAsync(
+            httpContext,
+            claims.UserId!.Value,
+            claims.workspaceId,
+            claims.Email,
+            claims.FullName,
+            claims.Permissions);
+    }
+
+    private static async Task SignInPkceSessionAsync(HttpContext httpContext, UserTokenClaimsDto claims)
+    {
+        await SignInPkceSessionAsync(
+            httpContext,
+            claims.UserId,
+            claims.workspaceId,
+            claims.Email,
+            claims.FullName,
+            claims.Permissions);
+    }
+
+    private static async Task SignInPkceSessionAsync(
+        HttpContext httpContext,
+        Guid userId,
+        Guid? workspaceId,
+        string email,
+        string fullName,
+        IReadOnlyList<string> permissions)
     {
         List<Claim> claimList =
         [
-            new(ClaimTypes.NameIdentifier, claims.UserId!.Value.ToString()),
-            new(ClaimTypes.Email, claims.Email),
-            new("name", claims.FullName),
+            new(ClaimTypes.NameIdentifier, userId.ToString()),
+            new(ClaimTypes.Email, email),
+            new("name", fullName),
         ];
-        if (claims.tenantId is Guid tenantId)
-            claimList.Add(new Claim("tenant_id", tenantId.ToString()));
-        foreach (string permission in claims.Permissions)
+        if (workspaceId is Guid resolvedWorkspaceId)
+            claimList.Add(new Claim("workspace_id", resolvedWorkspaceId.ToString()));
+        foreach (string permission in permissions)
             claimList.Add(new Claim("permissions", permission));
 
         ClaimsIdentity identity = new(claimList, CookieAuthenticationDefaults.AuthenticationScheme);
@@ -185,7 +241,7 @@ public static class AuthEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        Result result = await mediator.Send(new RetryTenantProvisioningCommand(request.Token), ct);
+        Result result = await mediator.Send(new RetryWorkspaceProvisioningCommand(request.Token), ct);
         if (result.IsFailure)
             return result.ToProblemDetails();
 

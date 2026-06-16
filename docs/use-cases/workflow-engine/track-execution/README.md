@@ -8,7 +8,7 @@ See the live status of a running execution so that I know where it is in the pro
 
 ## Primary actor
 
-- Tenant Member
+- Workspace Member
 
 ## Trigger
 
@@ -17,7 +17,7 @@ See the live status of a running execution so that I know where it is in the pro
 ## Main flow
 
 1. Actor starts the — Track execution status in real time flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
@@ -38,7 +38,7 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 
 *Validation & errors*
 - [ ] If the SignalR connection drops, the page falls back to polling (every 5 seconds) and shows a "Reconnecting…" indicator.
-- [ ] If the execution does not exist or belongs to a different tenant, the page returns a 404 error page.
+- [ ] If the execution does not exist or belongs to a different workspace, the page returns a 404 error page.
 
 *Edge cases*
 - [ ] For a Parallel Group, the timeline shows the group container and all parallel steps beneath it, each with their own status.

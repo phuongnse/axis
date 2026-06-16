@@ -14,14 +14,14 @@ internal sealed class InvitationRepository(IdentityDbContext context) : IInvitat
     public async Task<Invitation?> GetByTokenAsync(string token, CancellationToken ct = default) =>
         await context.Invitations.FirstOrDefaultAsync(i => i.Token == token, ct);
 
-    public async Task<Invitation?> GetPendingByEmailAsync(Email email, Guid tenantId, CancellationToken ct = default) =>
+    public async Task<Invitation?> GetPendingByEmailAsync(Email email, Guid workspaceId, CancellationToken ct = default) =>
         await context.Invitations
             .FirstOrDefaultAsync(i => i.Email == email
-                                   && i.tenantId == tenantId
+                                   && i.workspaceId == workspaceId
                                    && i.Status == InvitationStatus.Pending, ct);
 
-    public Task<int> CountPendingAsync(Guid tenantId, CancellationToken ct = default) =>
+    public Task<int> CountPendingAsync(Guid workspaceId, CancellationToken ct = default) =>
         context.Invitations.CountAsync(
-            i => i.tenantId == tenantId && i.Status == InvitationStatus.Pending,
+            i => i.workspaceId == workspaceId && i.Status == InvitationStatus.Pending,
             ct);
 }

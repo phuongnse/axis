@@ -8,7 +8,7 @@ Create a new form so that I can design a data collection interface.
 
 ## Primary actor
 
-- Tenant Member with `form:definition:write`
+- Workspace Member with `form:definition:write`
 
 ## Trigger
 
@@ -17,7 +17,7 @@ Create a new form so that I can design a data collection interface.
 ## Main flow
 
 1. Actor starts the — Create a form flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
@@ -36,7 +36,7 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 - [ ] A live preview panel on the right of the editor shows the form as it would appear to a user filling it in.
 
 *Validation & errors*
-- [ ] Name: required, 2–200 characters, unique within the tenant (case-insensitive). Duplicate shows: "A form named '{name}' already exists."
+- [ ] Name: required, 2–200 characters, unique within the workspace (case-insensitive). Duplicate shows: "A form named '{name}' already exists."
 
 *Edge cases*
 - [ ] Creating a form and immediately navigating away without adding fields: the empty form is saved and visible in the forms list.
@@ -88,7 +88,7 @@ erDiagram
   FormDefinition {
     uuid id
     string name
-    uuid tenantId
+    uuid workspaceId
   }
   FormFieldDefinition {
     uuid id

@@ -9,7 +9,7 @@ namespace Axis.FormBuilder.Application.Tests.Queries;
 
 public class GetMyFormTasksHandlerTests
 {
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private static readonly Guid UserId = Guid.NewGuid();
     private static readonly Guid FormId = Guid.NewGuid();
     private static readonly Guid ExecutionId = Guid.NewGuid();
@@ -26,17 +26,17 @@ public class GetMyFormTasksHandlerTests
     public async Task Handle_WhenPending_ReturnsSummariesFromPendingRepository()
     {
         FormSubmission submission = CreateSubmission(FormSubmissionStatus.Pending);
-        FormDefinition form = FormDefinition.Create("Leave Request", null, TenantId, "user");
+        FormDefinition form = FormDefinition.Create("Leave Request", null, WorkspaceId, "user");
 
         _submissionRepo
-            .GetPendingForUserAsync(UserId, TenantId, Arg.Any<CancellationToken>())
+            .GetPendingForUserAsync(UserId, WorkspaceId, Arg.Any<CancellationToken>())
             .Returns(new[] { submission });
         _formRepo
-            .GetByIdAsync(submission.FormDefinitionId, TenantId, Arg.Any<CancellationToken>())
+            .GetByIdAsync(submission.FormDefinitionId, WorkspaceId, Arg.Any<CancellationToken>())
             .Returns(form);
 
         IReadOnlyList<FormTaskSummaryDto> result = await _handler.Handle(
-            new GetMyFormTasksQuery(UserId, TenantId, FormSubmissionStatus.Pending),
+            new GetMyFormTasksQuery(UserId, WorkspaceId, FormSubmissionStatus.Pending),
             CancellationToken.None);
 
         result.Should().HaveCount(1);
@@ -55,14 +55,14 @@ public class GetMyFormTasksHandlerTests
         FormSubmission submission = CreateSubmission(FormSubmissionStatus.Submitted);
 
         _submissionRepo
-            .GetByUserAndStatusAsync(UserId, TenantId, FormSubmissionStatus.Submitted, Arg.Any<CancellationToken>())
+            .GetByUserAndStatusAsync(UserId, WorkspaceId, FormSubmissionStatus.Submitted, Arg.Any<CancellationToken>())
             .Returns(new[] { submission });
         _formRepo
-            .GetByIdAsync(submission.FormDefinitionId, TenantId, Arg.Any<CancellationToken>())
+            .GetByIdAsync(submission.FormDefinitionId, WorkspaceId, Arg.Any<CancellationToken>())
             .Returns((FormDefinition?)null);
 
         IReadOnlyList<FormTaskSummaryDto> result = await _handler.Handle(
-            new GetMyFormTasksQuery(UserId, TenantId, FormSubmissionStatus.Submitted),
+            new GetMyFormTasksQuery(UserId, WorkspaceId, FormSubmissionStatus.Submitted),
             CancellationToken.None);
 
         result.Should().HaveCount(1);
@@ -77,11 +77,11 @@ public class GetMyFormTasksHandlerTests
     public async Task Handle_WhenNoSubmissions_ReturnsEmptyList()
     {
         _submissionRepo
-            .GetPendingForUserAsync(UserId, TenantId, Arg.Any<CancellationToken>())
+            .GetPendingForUserAsync(UserId, WorkspaceId, Arg.Any<CancellationToken>())
             .Returns(Array.Empty<FormSubmission>());
 
         IReadOnlyList<FormTaskSummaryDto> result = await _handler.Handle(
-            new GetMyFormTasksQuery(UserId, TenantId, FormSubmissionStatus.Pending),
+            new GetMyFormTasksQuery(UserId, WorkspaceId, FormSubmissionStatus.Pending),
             CancellationToken.None);
 
         result.Should().BeEmpty();
@@ -91,7 +91,7 @@ public class GetMyFormTasksHandlerTests
     {
         FormSubmission submission = FormSubmission.Create(
             FormId,
-            TenantId,
+            WorkspaceId,
             ExecutionId,
             StepId,
             UserId,

@@ -13,7 +13,7 @@ public sealed class InviteUserHandler(
     IUserRepository userRepo,
     IRoleRepository roleRepo,
     IInvitationRepository invitationRepo,
-    ITenantRepository tenantRepo,
+    IWorkspaceRepository workspaceRepo,
     IEmailSender emailSender,
     IUnitOfWork uow)
     : ICommandHandler<InviteUserCommand>
@@ -21,7 +21,7 @@ public sealed class InviteUserHandler(
     public async Task<Result> Handle(InviteUserCommand command, CancellationToken cancellationToken)
     {
         Result planCheck = await planLimitService.EnsureWithinLimitAsync(
-            command.tenantId,
+            command.workspaceId,
             PlanLimitResourceType.Users,
             increment: 1,
             cancellationToken);
@@ -35,36 +35,36 @@ public sealed class InviteUserHandler(
         Email email = emailResult.Value;
 
         // cannot invite existing member
-        User? existingMember = await userRepo.GetByEmailAsync(email, command.tenantId, cancellationToken);
+        User? existingMember = await userRepo.GetByEmailAsync(email, command.workspaceId, cancellationToken);
         if (existingMember is not null)
             return Result.Failure(ErrorCodes.Conflict, "This user is already a member.");
 
         // cannot invite email with pending invitation
         Invitation? existingInvitation = await invitationRepo.GetPendingByEmailAsync(
-            email, command.tenantId, cancellationToken);
+            email, command.workspaceId, cancellationToken);
         if (existingInvitation is not null)
             return Result.Failure(ErrorCodes.Conflict, "An invitation has already been sent to this address.");
 
-        // Validate role exists in this Tenant
-        Role? role = await roleRepo.GetByIdAsync(command.RoleId, command.tenantId, cancellationToken);
+        // Validate role exists in this Workspace
+        Role? role = await roleRepo.GetByIdAsync(command.RoleId, command.workspaceId, cancellationToken);
         if (role is null)
-            return Result.Failure(ErrorCodes.NotFound, "The specified role was not found in this Tenant.");
+            return Result.Failure(ErrorCodes.NotFound, "The specified role was not found in this Workspace.");
 
-        Tenant? Tenant = await tenantRepo.GetByIdAsync(command.tenantId, cancellationToken);
-        if (Tenant is null)
-            return Result.Failure(ErrorCodes.NotFound, "Tenant not found.");
+        Workspace? Workspace = await workspaceRepo.GetByIdAsync(command.workspaceId, cancellationToken);
+        if (Workspace is null)
+            return Result.Failure(ErrorCodes.NotFound, "Workspace not found.");
 
-        Invitation invitation = Invitation.Create(email, command.tenantId, command.RoleId, command.InvitedById);
+        Invitation invitation = Invitation.Create(email, command.workspaceId, command.RoleId, command.InvitedById);
         await invitationRepo.AddAsync(invitation, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);
         await planLimitService.RecordUsageDeltaAsync(
-            command.tenantId,
+            command.workspaceId,
             PlanLimitResourceType.Users,
             delta: 1,
             cancellationToken);
 
         await emailSender.SendInvitationEmailAsync(
-            email.Value, Tenant.Name, invitation.Token, cancellationToken);
+            email.Value, Workspace.Name, invitation.Token, cancellationToken);
 
         return Result.Success();
     }

@@ -21,7 +21,7 @@ public class FormEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task GetForms_WhenTenantHasNoForms_ReturnsEmptyPagedResult()
+    public async Task GetForms_WhenWorkspaceHasNoForms_ReturnsEmptyPagedResult()
     {
         HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "fm1");
 

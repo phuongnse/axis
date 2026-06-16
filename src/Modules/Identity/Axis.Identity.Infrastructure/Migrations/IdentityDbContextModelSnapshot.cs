@@ -48,10 +48,6 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("invited_by_user_id");
 
-                    b.Property<Guid>("tenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
                     b.Property<Guid>("RoleId")
                         .HasColumnType("uuid")
                         .HasColumnName("role_id");
@@ -67,150 +63,16 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasColumnType("character varying(128)")
                         .HasColumnName("token");
 
+                    b.Property<Guid>("workspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Token")
                         .IsUnique();
 
                     b.ToTable("invitations", (string)null);
-                });
-
-            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.Tenant", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("AcceptedPrivacyVersion")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("accepted_privacy_version");
-
-                    b.Property<string>("AcceptedTermsVersion")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("accepted_terms_version");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("DefaultLanguage")
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("default_language");
-
-                    b.Property<DateTime?>("LegalAcceptedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("legal_accepted_at");
-
-                    b.Property<string>("LogoUrl")
-                        .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)")
-                        .HasColumnName("logo_url");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("name");
-
-                    b.Property<string>("OwnerEmail")
-                        .IsRequired()
-                        .HasMaxLength(320)
-                        .HasColumnType("character varying(320)")
-                        .HasColumnName("owner_email");
-
-                    b.Property<DateTime?>("ScheduledHardDeleteAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("scheduled_hard_delete_at");
-
-                    b.Property<string>("Slug")
-                        .IsRequired()
-                        .HasMaxLength(63)
-                        .HasColumnType("character varying(63)")
-                        .HasColumnName("slug");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("status");
-
-                    b.Property<Guid>("SubscriptionPlanId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValue(new Guid("11111111-1111-1111-1111-111111111101"))
-                        .HasColumnName("subscription_plan_id");
-
-                    b.Property<string>("TimeZoneId")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("time_zone_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Slug")
-                        .IsUnique();
-
-                    b.HasIndex("SubscriptionPlanId");
-
-                    b.ToTable("Tenants", (string)null);
-                });
-
-            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.TenantMembership", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid>("tenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("status");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("tenantId");
-
-                    b.HasIndex("UserId", "tenantId")
-                        .IsUnique();
-
-                    b.ToTable("Tenant_memberships", (string)null);
-                });
-
-            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.TenantMembershipRole", b =>
-                {
-                    b.Property<Guid>("MembershipId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("membership_id");
-
-                    b.Property<Guid>("RoleId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("role_id");
-
-                    b.Property<DateTime>("AssignedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("assigned_at");
-
-                    b.HasKey("MembershipId", "RoleId");
-
-                    b.HasIndex("RoleId");
-
-                    b.ToTable("Tenant_membership_roles", (string)null);
                 });
 
             modelBuilder.Entity("Axis.Identity.Domain.Aggregates.Role", b =>
@@ -239,18 +101,18 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
-                    b.Property<Guid>("tenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
                     b.PrimitiveCollection<List<string>>("_permissions")
                         .IsRequired()
                         .HasColumnType("text[]")
                         .HasColumnName("permissions");
 
+                    b.Property<Guid>("workspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("tenantId", "Name")
+                    b.HasIndex("workspaceId", "Name")
                         .IsUnique();
 
                     b.ToTable("roles", (string)null);
@@ -335,11 +197,162 @@ namespace Axis.Identity.Infrastructure.Migrations
                     b.ToTable("users", (string)null);
                 });
 
-            modelBuilder.Entity("Axis.Identity.Domain.Provisioning.TenantModuleProvisioning", b =>
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.Workspace", b =>
                 {
-                    b.Property<Guid>("tenantId")
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
+                        .HasColumnName("id");
+
+                    b.Property<string>("AcceptedPrivacyVersion")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("accepted_privacy_version");
+
+                    b.Property<string>("AcceptedTermsVersion")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("accepted_terms_version");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DefaultLanguage")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("default_language");
+
+                    b.Property<DateTime?>("LegalAcceptedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("legal_accepted_at");
+
+                    b.Property<string>("LogoUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("logo_url");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("OwnerEmail")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("owner_email");
+
+                    b.Property<Guid?>("OwnerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_user_id");
+
+                    b.Property<DateTime?>("ScheduledHardDeleteAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("scheduled_hard_delete_at");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)")
+                        .HasColumnName("slug");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("SubscriptionPlanId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValue(new Guid("11111111-1111-1111-1111-111111111101"))
+                        .HasColumnName("subscription_plan_id");
+
+                    b.Property<string>("TimeZoneId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("time_zone_id");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Slug")
+                        .IsUnique();
+
+                    b.HasIndex("SubscriptionPlanId");
+
+                    b.HasIndex("OwnerUserId", "Type")
+                        .IsUnique()
+                        .HasFilter("owner_user_id IS NOT NULL AND type = 'Personal'");
+
+                    b.ToTable("Workspaces", (string)null);
+                });
+
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.WorkspaceMembership", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<Guid>("workspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("workspaceId");
+
+                    b.HasIndex("UserId", "workspaceId")
+                        .IsUnique();
+
+                    b.ToTable("Workspace_memberships", (string)null);
+                });
+
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.WorkspaceMembershipRole", b =>
+                {
+                    b.Property<Guid>("MembershipId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("membership_id");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("role_id");
+
+                    b.Property<DateTime>("AssignedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("assigned_at");
+
+                    b.HasKey("MembershipId", "RoleId");
+
+                    b.HasIndex("RoleId");
+
+                    b.ToTable("Workspace_membership_roles", (string)null);
+                });
+
+            modelBuilder.Entity("Axis.Identity.Domain.Provisioning.WorkspaceModuleProvisioning", b =>
+                {
+                    b.Property<Guid>("workspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
 
                     b.Property<string>("Module")
                         .HasMaxLength(64)
@@ -364,9 +377,9 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
-                    b.HasKey("tenantId", "Module");
+                    b.HasKey("workspaceId", "Module");
 
-                    b.ToTable("tenant_module_provisions", (string)null);
+                    b.ToTable("workspace_module_provisions", (string)null);
                 });
 
             modelBuilder.Entity("Axis.Identity.Domain.Subscriptions.SubscriptionPlan", b =>
@@ -456,84 +469,6 @@ namespace Axis.Identity.Infrastructure.Migrations
                     b.ToTable("email_verification_tokens", (string)null);
                 });
 
-            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.TenantPlanChangeLog", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("ChangedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("changed_at");
-
-                    b.Property<Guid>("ChangedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("changed_by_user_id");
-
-                    b.Property<Guid>("NewPlanId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("new_plan_id");
-
-                    b.Property<Guid>("tenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<Guid>("PreviousPlanId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("previous_plan_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("NewPlanId");
-
-                    b.HasIndex("tenantId");
-
-                    b.HasIndex("PreviousPlanId");
-
-                    b.ToTable("Tenant_plan_change_logs", (string)null);
-                });
-
-            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.TenantRegistrationToken", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("tenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Purpose")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<string>("TokenHash")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<DateTime?>("UsedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("UsedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TokenHash")
-                        .IsUnique();
-
-                    b.HasIndex("tenantId", "Purpose");
-
-                    b.ToTable("Tenant_registration_tokens", (string)null);
-                });
-
             modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.PasswordResetToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -586,6 +521,85 @@ namespace Axis.Identity.Infrastructure.Migrations
                     b.HasKey("IdempotencyKey");
 
                     b.ToTable("registration_idempotency", (string)null);
+                });
+
+            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.WorkspacePlanChangeLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at");
+
+                    b.Property<Guid>("ChangedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("changed_by_user_id");
+
+                    b.Property<Guid>("NewPlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("new_plan_id");
+
+                    b.Property<Guid>("PreviousPlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("previous_plan_id");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NewPlanId");
+
+                    b.HasIndex("PreviousPlanId");
+
+                    b.HasIndex("WorkspaceId");
+
+                    b.ToTable("Workspace_plan_change_logs", (string)null);
+                });
+
+            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.WorkspaceRegistrationToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UsedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("WorkspaceId", "Purpose");
+
+                    b.ToTable("Workspace_registration_tokens", (string)null);
                 });
 
             modelBuilder.Entity("OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreApplication", b =>
@@ -796,7 +810,7 @@ namespace Axis.Identity.Infrastructure.Migrations
                     b.ToTable("OpenIddictTokens", (string)null);
                 });
 
-            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.Tenant", b =>
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.Workspace", b =>
                 {
                     b.HasOne("Axis.Identity.Domain.Subscriptions.SubscriptionPlan", null)
                         .WithMany()
@@ -805,9 +819,9 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.TenantMembershipRole", b =>
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.WorkspaceMembershipRole", b =>
                 {
-                    b.HasOne("Axis.Identity.Domain.Aggregates.TenantMembership", null)
+                    b.HasOne("Axis.Identity.Domain.Aggregates.WorkspaceMembership", null)
                         .WithMany("Roles")
                         .HasForeignKey("MembershipId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -823,7 +837,16 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.TenantPlanChangeLog", b =>
+            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.PasswordResetToken", b =>
+                {
+                    b.HasOne("Axis.Identity.Domain.Aggregates.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.WorkspacePlanChangeLog", b =>
                 {
                     b.HasOne("Axis.Identity.Domain.Subscriptions.SubscriptionPlan", null)
                         .WithMany()
@@ -831,33 +854,24 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Axis.Identity.Domain.Aggregates.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("tenantId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("Axis.Identity.Domain.Subscriptions.SubscriptionPlan", null)
                         .WithMany()
                         .HasForeignKey("PreviousPlanId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-                });
 
-            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.TenantRegistrationToken", b =>
-                {
-                    b.HasOne("Axis.Identity.Domain.Aggregates.Tenant", null)
+                    b.HasOne("Axis.Identity.Domain.Aggregates.Workspace", null)
                         .WithMany()
-                        .HasForeignKey("tenantId")
+                        .HasForeignKey("WorkspaceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.PasswordResetToken", b =>
+            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.WorkspaceRegistrationToken", b =>
                 {
-                    b.HasOne("Axis.Identity.Domain.Aggregates.User", null)
+                    b.HasOne("Axis.Identity.Domain.Aggregates.Workspace", null)
                         .WithMany()
-                        .HasForeignKey("UserId")
+                        .HasForeignKey("WorkspaceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -886,7 +900,7 @@ namespace Axis.Identity.Infrastructure.Migrations
                     b.Navigation("Authorization");
                 });
 
-            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.TenantMembership", b =>
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.WorkspaceMembership", b =>
                 {
                     b.Navigation("Roles");
                 });

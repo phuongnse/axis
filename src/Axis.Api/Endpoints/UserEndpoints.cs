@@ -28,7 +28,7 @@ public static class UserEndpoints
         publicGroup.MapPost("/register", Register)
             .AllowAnonymous()
             .WithName("RegisterUser")
-            .WithSummary("Register a user account standalone or with a tenant setup token")
+            .WithSummary("Register a user account standalone or with a workspace setup token")
             .WithTags("Identity")
             .Produces<MessageResponse>()
             .ProducesProblem(400)
@@ -124,7 +124,7 @@ public static class UserEndpoints
             request.PasswordConfirmation,
             request.AcceptedTermsVersion,
             request.AcceptedPrivacyVersion,
-            request.TenantSetupToken,
+            request.WorkspaceSetupToken,
             idempotencyKey), ct);
 
         if (result.IsFailure)
@@ -142,7 +142,7 @@ public static class UserEndpoints
         CurrentUserProfileDto? profile = await mediator.Send(
             new GetCurrentUserProfileQuery(
                 currentUser.UserId,
-                currentUser.TenantIdOrNull,
+                currentUser.WorkspaceIdOrNull,
                 currentUser.Permissions),
             ct);
         if (profile is null)
@@ -168,7 +168,7 @@ public static class UserEndpoints
 
         Result result = await mediator.Send(new UpdateUserProfileCommand(
             currentUser.UserId,
-            currentUser.TenantId,
+            currentUser.WorkspaceId,
             request.FirstName,
             request.LastName,
             avatarBytes,
@@ -186,7 +186,7 @@ public static class UserEndpoints
     {
         Result result = await mediator.Send(new ChangePasswordCommand(
             currentUser.UserId,
-            currentUser.TenantId,
+            currentUser.WorkspaceId,
             request.CurrentPassword,
             request.NewPassword,
             request.ConfirmPassword), ct);
@@ -257,7 +257,7 @@ public static class UserEndpoints
         if (!request.IsActive)
         {
             Result deactivateResult = await mediator.Send(
-                new DeactivateUserCommand(userId, currentUser.TenantId, currentUser.UserId),
+                new DeactivateUserCommand(userId, currentUser.WorkspaceId, currentUser.UserId),
                 ct);
 
             if (deactivateResult.IsFailure) return deactivateResult.ToProblemDetails();
@@ -281,7 +281,7 @@ public static class UserEndpoints
     {
         Result result = await mediator.Send(new AssignRoleToUserCommand(
             userId,
-            currentUser.TenantId,
+            currentUser.WorkspaceId,
             request.RoleId,
             request.Action == "assign" ? RoleAction.Assign : RoleAction.Remove), ct);
 

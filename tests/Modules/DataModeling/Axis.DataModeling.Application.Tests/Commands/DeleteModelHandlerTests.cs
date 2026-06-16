@@ -15,7 +15,7 @@ public class DeleteModelHandlerTests
     private readonly IModelDeletionGuard _deletionGuard = Substitute.For<IModelDeletionGuard>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     public DeleteModelHandlerTests()
@@ -29,10 +29,10 @@ public class DeleteModelHandlerTests
     [Fact]
     public async Task DeleteModel_WhenModelExists_SoftDeletesModel()
     {
-        DataModel model = DataModel.Create("Invoice", null, null, null, TenantId, UserId);
-        _modelRepo.GetByIdAsync(model.Id, TenantId).Returns(model);
+        DataModel model = DataModel.Create("Invoice", null, null, null, WorkspaceId, UserId);
+        _modelRepo.GetByIdAsync(model.Id, WorkspaceId).Returns(model);
 
-        Result result = await CreateHandler().Handle(new DeleteModelCommand(model.Id, TenantId), CancellationToken.None);
+        Result result = await CreateHandler().Handle(new DeleteModelCommand(model.Id, WorkspaceId), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         model.DeletedAt.Should().NotBeNull();
@@ -42,10 +42,10 @@ public class DeleteModelHandlerTests
     [Fact]
     public async Task DeleteModel_WhenModelNotFound_ReturnsNotFound()
     {
-        _modelRepo.GetByIdAsync(Arg.Any<Guid>(), TenantId).ReturnsNull();
+        _modelRepo.GetByIdAsync(Arg.Any<Guid>(), WorkspaceId).ReturnsNull();
 
         Result result = await CreateHandler().Handle(
-            new DeleteModelCommand(Guid.NewGuid(), TenantId), CancellationToken.None);
+            new DeleteModelCommand(Guid.NewGuid(), WorkspaceId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
@@ -53,14 +53,14 @@ public class DeleteModelHandlerTests
     }
 
     [Fact]
-    public async Task DeleteModel_WhenModelBelongsToAnotherTenant_ReturnsNotFound()
+    public async Task DeleteModel_WhenModelBelongsToAnotherWorkspace_ReturnsNotFound()
     {
-        DataModel model = DataModel.Create("Invoice", null, null, null, TenantId, UserId);
-        _modelRepo.GetByIdAsync(model.Id, TenantId).Returns(model);
+        DataModel model = DataModel.Create("Invoice", null, null, null, WorkspaceId, UserId);
+        _modelRepo.GetByIdAsync(model.Id, WorkspaceId).Returns(model);
 
-        Guid otherTenantId = Guid.NewGuid();
+        Guid otherWorkspaceId = Guid.NewGuid();
         Result result = await CreateHandler().Handle(
-            new DeleteModelCommand(model.Id, otherTenantId), CancellationToken.None);
+            new DeleteModelCommand(model.Id, otherWorkspaceId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
@@ -69,12 +69,12 @@ public class DeleteModelHandlerTests
     [Fact]
     public async Task DeleteModel_WhenGuardBlocksDeletion_ReturnsConflictWithoutDeleting()
     {
-        DataModel model = DataModel.Create("Invoice", null, null, null, TenantId, UserId);
-        _modelRepo.GetByIdAsync(model.Id, TenantId).Returns(model);
+        DataModel model = DataModel.Create("Invoice", null, null, null, WorkspaceId, UserId);
+        _modelRepo.GetByIdAsync(model.Id, WorkspaceId).Returns(model);
         _deletionGuard.ValidateCanDeleteAsync(model.Id, Arg.Any<CancellationToken>())
             .Returns(Result.Failure(ErrorCodes.Conflict, "This model is used by 2 form(s). Remove those references before deleting."));
 
-        Result result = await CreateHandler().Handle(new DeleteModelCommand(model.Id, TenantId), CancellationToken.None);
+        Result result = await CreateHandler().Handle(new DeleteModelCommand(model.Id, WorkspaceId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.Conflict);

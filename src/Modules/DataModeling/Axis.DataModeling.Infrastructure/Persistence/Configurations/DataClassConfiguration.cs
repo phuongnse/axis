@@ -35,8 +35,8 @@ internal sealed class DataClassConfiguration : IEntityTypeConfiguration<DataClas
             .HasColumnName("description")
             .HasMaxLength(500);
 
-        builder.Property(c => c.tenantId)
-            .HasColumnName("tenant_id")
+        builder.Property(c => c.workspaceId)
+            .HasColumnName("workspace_id")
             .IsRequired();
 
         builder.Property(c => c.DeletedAt)
@@ -67,6 +67,6 @@ internal sealed class DataClassConfiguration : IEntityTypeConfiguration<DataClas
 
         builder.Ignore(c => c.Fields);
 
-        builder.HasIndex(c => new { c.tenantId, c.Name });
+        builder.HasIndex(c => new { c.workspaceId, c.Name });
     }
 }

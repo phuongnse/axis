@@ -42,20 +42,20 @@ public sealed class CloudEventsEnvelopeRule : IEnvelopeRule
         envelope.Headers["ce-type"] = envelope.Message.GetType().FullName;
         envelope.Headers["ce-source"] = Source;
 
-        string? tenantId = ResolveTenantId(envelope.Message);
-        if (tenantId is not null)
-            envelope.Headers["tenantid"] = tenantId;
+        string? workspaceId = ResolveWorkspaceId(envelope.Message);
+        if (workspaceId is not null)
+            envelope.Headers["workspaceid"] = workspaceId;
 
         Activity? activity = Activity.Current;
         if (activity is not null)
             envelope.Headers["traceparent"] = activity.Id;
     }
 
-    private static string? ResolveTenantId(object message)
+    private static string? ResolveWorkspaceId(object message)
     {
-        PropertyInfo? property = message.GetType().GetProperty("tenantId");
-        if (property?.GetValue(message) is string tenantId && !string.IsNullOrWhiteSpace(tenantId))
-            return tenantId;
+        PropertyInfo? property = message.GetType().GetProperty("workspaceId");
+        if (property?.GetValue(message) is string workspaceId && !string.IsNullOrWhiteSpace(workspaceId))
+            return workspaceId;
 
         return null;
     }

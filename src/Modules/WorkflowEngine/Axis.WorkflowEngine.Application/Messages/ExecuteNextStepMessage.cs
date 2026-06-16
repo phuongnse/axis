@@ -6,4 +6,4 @@ namespace Axis.WorkflowEngine.Application.Messages;
 /// </summary>
 public sealed record ExecuteNextStepMessage(
     Guid ExecutionId,
-    Guid tenantId);
+    Guid workspaceId);

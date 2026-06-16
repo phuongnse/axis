@@ -54,10 +54,10 @@ public static class Permissions
         public const string Write = "roles:write";
     }
 
-    public static class Tenant
+    public static class Workspace
     {
-        public const string SettingsRead = "tenant:settings:read";
-        public const string SettingsWrite = "tenant:settings:write";
-        public const string Delete = "tenant:delete";
+        public const string SettingsRead = "workspace:settings:read";
+        public const string SettingsWrite = "workspace:settings:write";
+        public const string Delete = "workspace:delete";
     }
 }

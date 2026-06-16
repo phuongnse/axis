@@ -9,8 +9,8 @@ namespace Axis.Identity.Application.Commands.AuthenticateUser;
 
 public sealed class AuthenticateUserHandler(
     IUserRepository userRepo,
-    ITenantMembershipRepository membershipRepo,
-    ITenantRepository TenantRepo,
+    IWorkspaceMembershipRepository membershipRepo,
+    IWorkspaceRepository WorkspaceRepo,
     IRoleRepository roleRepo,
     IPasswordHasher hasher,
     IUnitOfWork uow)
@@ -33,7 +33,7 @@ public sealed class AuthenticateUserHandler(
         if (!user.IsEmailVerified)
             return AuthenticationResult.Fail(AuthFailureReason.EmailNotVerified);
 
-        TenantMembership? membership =
+        WorkspaceMembership? membership =
             await membershipRepo.GetFirstActiveByUserIdAsync(user.Id, cancellationToken);
 
         if (user.IsLockedOut)
@@ -55,13 +55,13 @@ public sealed class AuthenticateUserHandler(
                 user.Id, null, user.Email.Value, user.FullName, []);
         }
 
-        Tenant? Tenant = await TenantRepo.GetByIdAsync(membership.tenantId, cancellationToken);
-        if (Tenant is null || !Tenant.AllowsSignIn())
-            return AuthenticationResult.Fail(AuthFailureReason.TenantDeleted);
+        Workspace? Workspace = await WorkspaceRepo.GetByIdAsync(membership.workspaceId, cancellationToken);
+        if (Workspace is null || !Workspace.AllowsSignIn())
+            return AuthenticationResult.Fail(AuthFailureReason.WorkspaceDeleted);
 
         IReadOnlyList<Role> roles = await roleRepo.GetByIdsAsync(
             membership.RoleIds,
-            membership.tenantId,
+            membership.workspaceId,
             cancellationToken);
         List<string> permissions = roles
             .SelectMany(r => r.Permissions)
@@ -69,6 +69,6 @@ public sealed class AuthenticateUserHandler(
             .ToList();
 
         return AuthenticationResult.Ok(
-            user.Id, membership.tenantId, user.Email.Value, user.FullName, permissions);
+            user.Id, membership.workspaceId, user.Email.Value, user.FullName, permissions);
     }
 }

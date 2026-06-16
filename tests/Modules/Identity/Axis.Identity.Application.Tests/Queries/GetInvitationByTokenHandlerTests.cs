@@ -12,7 +12,7 @@ public sealed class GetInvitationByTokenHandlerTests
 {
     private readonly IInvitationRepository _invitationRepo = Substitute.For<IInvitationRepository>();
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private static readonly Guid RoleId = Guid.NewGuid();
     private static readonly Guid InvitedById = Guid.NewGuid();
 
@@ -35,7 +35,7 @@ public sealed class GetInvitationByTokenHandlerTests
     {
         Invitation invitation = Invitation.Create(
             Email.Create("invitee@acme.com").Value,
-            TenantId,
+            WorkspaceId,
             RoleId,
             InvitedById);
         _invitationRepo.GetByTokenAsync(invitation.Token, Arg.Any<CancellationToken>()).Returns(invitation);

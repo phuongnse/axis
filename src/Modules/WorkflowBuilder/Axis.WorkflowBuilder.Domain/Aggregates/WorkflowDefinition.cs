@@ -15,7 +15,7 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
     public string Name { get; private set; }
     public string? Description { get; private set; }
     public WorkflowStatus Status { get; private set; }
-    public Guid tenantId { get; private set; }
+    public Guid workspaceId { get; private set; }
     public DateTimeOffset? DeletedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -28,30 +28,30 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
     private WorkflowDefinition() : base(default) { Name = null!; CreatedBy = string.Empty; } // EF Core materialisation
 
     private WorkflowDefinition(Guid id, string name, string? description,
-        Guid tenantId, string createdBy, DateTimeOffset createdAt)
+        Guid workspaceId, string createdBy, DateTimeOffset createdAt)
         : base(id)
     {
         Name = name;
         Description = description;
         Status = WorkflowStatus.Draft;
-        this.tenantId = tenantId;
+        this.workspaceId = workspaceId;
         CreatedBy = createdBy;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
     }
 
-    public static WorkflowDefinition Create(string name, string? description, Guid tenantId, string createdBy)
+    public static WorkflowDefinition Create(string name, string? description, Guid workspaceId, string createdBy)
     {
         ValidateName(name);
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        WorkflowDefinition wf = new(Guid.NewGuid(), name.Trim(), description?.Trim(), tenantId, createdBy, now);
+        WorkflowDefinition wf = new(Guid.NewGuid(), name.Trim(), description?.Trim(), workspaceId, createdBy, now);
 
         // new workflow starts with a Start and End node
         wf._steps.Add(WorkflowStep.Create("Start", StepType.Start, null));
         wf._steps.Add(WorkflowStep.Create("End", StepType.End, null));
 
-        wf.RaiseDomainEvent(new WorkflowCreated(wf.Id, tenantId, wf.Name));
+        wf.RaiseDomainEvent(new WorkflowCreated(wf.Id, workspaceId, wf.Name));
         return wf;
     }
 
@@ -164,7 +164,7 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
         Status = WorkflowStatus.Active;
         UpdatedAt = DateTimeOffset.UtcNow;
         RaiseDomainEvent(new WorkflowPublished(
-            Id, tenantId,
+            Id, workspaceId,
             ExtractFormIds(),
             ExtractStepSnapshots(),
             ExtractTransitionSnapshots()));
@@ -181,7 +181,7 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
 
         Status = WorkflowStatus.Archived;
         UpdatedAt = DateTimeOffset.UtcNow;
-        RaiseDomainEvent(new WorkflowArchived(Id, tenantId));
+        RaiseDomainEvent(new WorkflowArchived(Id, workspaceId));
     }
 
     /// <summary>Soft-deletes a draft workflow.</summary>
@@ -202,13 +202,13 @@ public sealed class WorkflowDefinition : AggregateRoot<Guid>
 
         Status = WorkflowStatus.Active;
         UpdatedAt = DateTimeOffset.UtcNow;
-        RaiseDomainEvent(new WorkflowUnarchived(Id, tenantId, ExtractFormIds()));
+        RaiseDomainEvent(new WorkflowUnarchived(Id, workspaceId, ExtractFormIds()));
     }
 
     /// <summary>Creates a full copy as a new Draft. Webhook URLs are NOT copied.</summary>
     public WorkflowDefinition Duplicate()
     {
-        WorkflowDefinition copy = Create($"Copy of {Name}", Description, tenantId, CreatedBy);
+        WorkflowDefinition copy = Create($"Copy of {Name}", Description, workspaceId, CreatedBy);
         copy._triggers.AddRange(_triggers);
 
         // Map old step IDs to new step IDs

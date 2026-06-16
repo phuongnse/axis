@@ -34,7 +34,7 @@ internal sealed class FormStepReachedHandler(
     {
         Guid executionId = @event.ExecutionId();
         Guid executionStepId = @event.ExecutionStepId();
-        Guid tenantId = @event.tenantId();
+        Guid workspaceId = @event.workspaceId();
         Guid formDefinitionId = @event.FormDefinitionId();
 
         if (await submissionRepo.ExistsForExecutionStepAsync(executionId, executionStepId, ct))
@@ -46,13 +46,13 @@ internal sealed class FormStepReachedHandler(
             return;
         }
 
-        FormDefinition? form = await formRepo.GetByIdAsync(formDefinitionId, tenantId, ct);
+        FormDefinition? form = await formRepo.GetByIdAsync(formDefinitionId, workspaceId, ct);
         if (form is null)
         {
             logger.LogError(
-                "FormStepReachedHandler: form {FormId} not found for Tenant {TenantId}",
+                "FormStepReachedHandler: form {FormId} not found for Workspace {WorkspaceId}",
                 formDefinitionId,
-                tenantId);
+                workspaceId);
             return;
         }
 
@@ -63,7 +63,7 @@ internal sealed class FormStepReachedHandler(
 
         FormSubmission submission = FormSubmission.Create(
             formDefinitionId,
-            tenantId,
+            workspaceId,
             executionId,
             executionStepId,
             assigneeUserId,
@@ -92,7 +92,7 @@ internal sealed class FormStepReachedHandler(
             if (delay > TimeSpan.Zero)
             {
                 await messageBus.ScheduleAsync(
-                    new ExpireFormSubmissionMessage(submission.Id, submission.tenantId),
+                    new ExpireFormSubmissionMessage(submission.Id, submission.workspaceId),
                     expiresAt.Value);
             }
         }

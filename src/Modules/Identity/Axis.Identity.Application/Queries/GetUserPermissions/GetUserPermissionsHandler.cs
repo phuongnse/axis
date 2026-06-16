@@ -7,7 +7,7 @@ namespace Axis.Identity.Application.Queries.GetUserPermissions;
 
 public sealed class GetUserPermissionsHandler(
     IUserRepository userRepo,
-    ITenantMembershipRepository membershipRepo,
+    IWorkspaceMembershipRepository membershipRepo,
     IRoleRepository roleRepo)
     : IQueryHandler<GetUserPermissionsQuery, Result<GetUserPermissionsResult>>
 {
@@ -15,23 +15,23 @@ public sealed class GetUserPermissionsHandler(
         GetUserPermissionsQuery query,
         CancellationToken cancellationToken)
     {
-        User? user = await userRepo.GetByIdAsync(query.UserId, query.tenantId, cancellationToken);
+        User? user = await userRepo.GetByIdAsync(query.UserId, query.workspaceId, cancellationToken);
         if (user is null)
             return Result.Failure<GetUserPermissionsResult>(ErrorCodes.NotFound, "User not found.");
 
         if (user.Status == UserStatus.Inactive)
             return Result.Success(new GetUserPermissionsResult([]));
 
-        TenantMembership? membership =
-            await membershipRepo.GetByUserAndTenantAsync(
+        WorkspaceMembership? membership =
+            await membershipRepo.GetByUserAndWorkspaceAsync(
                 query.UserId,
-                query.tenantId,
+                query.workspaceId,
                 cancellationToken);
-        if (membership is null || membership.Status == TenantMembershipStatus.Inactive)
+        if (membership is null || membership.Status == WorkspaceMembershipStatus.Inactive)
             return Result.Success(new GetUserPermissionsResult([]));
 
         IReadOnlyList<Role> roles =
-            await roleRepo.GetByIdsAsync(membership.RoleIds, membership.tenantId, cancellationToken);
+            await roleRepo.GetByIdsAsync(membership.RoleIds, membership.workspaceId, cancellationToken);
 
         List<string> permissions = roles
             .SelectMany(r => r.Permissions)

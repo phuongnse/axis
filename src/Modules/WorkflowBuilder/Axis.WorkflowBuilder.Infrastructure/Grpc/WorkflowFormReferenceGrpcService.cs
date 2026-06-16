@@ -12,28 +12,28 @@ internal sealed class WorkflowFormReferenceGrpcService(IWorkflowReferenceReposit
         CountBlockingFormReferencesRequest request,
         ServerCallContext context)
     {
-        Guid tenantId = ResolveCallertenantId(context);
+        Guid workspaceId = ResolveCallerworkspaceId(context);
 
         if (!Guid.TryParse(request.FormId, out Guid formId))
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid form_id."));
 
         int count = await references.CountBlockingFormReferencesAsync(
             formId,
-            tenantId,
+            workspaceId,
             context.CancellationToken);
 
         return new CountBlockingFormReferencesResponse { BlockingReferenceCount = count };
     }
 
-    private static Guid ResolveCallertenantId(ServerCallContext context)
+    private static Guid ResolveCallerworkspaceId(ServerCallContext context)
     {
-        Claim? claim = context.GetHttpContext().User.FindFirst("tenant_id");
-        if (claim is null || !Guid.TryParse(claim.Value, out Guid tenantId))
+        Claim? claim = context.GetHttpContext().User.FindFirst("workspace_id");
+        if (claim is null || !Guid.TryParse(claim.Value, out Guid workspaceId))
         {
             throw new RpcException(
-                new Status(StatusCode.Unauthenticated, "Caller JWT is missing a valid tenant_id claim."));
+                new Status(StatusCode.Unauthenticated, "Caller JWT is missing a valid workspace_id claim."));
         }
 
-        return tenantId;
+        return workspaceId;
     }
 }

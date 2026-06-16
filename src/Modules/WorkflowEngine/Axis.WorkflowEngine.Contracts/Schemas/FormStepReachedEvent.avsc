@@ -6,7 +6,7 @@
     { "name": "executionId", "type": "string" },
     { "name": "executionStepId", "type": "string" },
     { "name": "workflowDefinitionId", "type": "string" },
-    { "name": "tenantId", "type": "string" },
+    { "name": "workspaceId", "type": "string" },
     { "name": "formDefinitionId", "type": "string" },
     { "name": "assigneeExpression", "type": ["null", "string"], "default": null },
     { "name": "timeoutHours", "type": ["null", "int"], "default": null }

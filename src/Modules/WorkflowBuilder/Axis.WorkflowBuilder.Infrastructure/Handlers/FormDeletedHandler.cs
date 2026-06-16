@@ -18,11 +18,11 @@ internal sealed class FormDeletedHandler(
 {
     public async Task Handle(FormDeletedEvent @event, CancellationToken cancellationToken)
     {
-        Guid tenantId = @event.tenantId();
+        Guid workspaceId = @event.workspaceId();
         Guid formId = @event.FormId();
 
         List<WorkflowFormReference> references = await context.WorkflowFormReferences
-            .Where(r => r.tenantId == tenantId && r.FormId == formId)
+            .Where(r => r.workspaceId == workspaceId && r.FormId == formId)
             .ToListAsync(cancellationToken);
 
         int flagged = 0;
@@ -39,7 +39,7 @@ internal sealed class FormDeletedHandler(
             await uow.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
-            "FormDeletedHandler: flagged {Count} workflow form reference(s) for deleted form {FormId} Tenant {tenantId}",
-            flagged, formId, tenantId);
+            "FormDeletedHandler: flagged {Count} workflow form reference(s) for deleted form {FormId} Workspace {workspaceId}",
+            flagged, formId, workspaceId);
     }
 }

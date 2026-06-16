@@ -21,7 +21,7 @@ public class ModelEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task GetModels_WhenTenantHasNoModels_ReturnsEmptyList()
+    public async Task GetModels_WhenWorkspaceHasNoModels_ReturnsEmptyList()
     {
         HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "mdl1");
 

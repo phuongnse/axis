@@ -1,0 +1,8 @@
+{
+  "namespace": "axis.identity.events",
+  "type": "record",
+  "name": "WorkspaceVerifiedEvent",
+  "fields": [
+    { "name": "workspaceId", "type": "string" }
+  ]
+}

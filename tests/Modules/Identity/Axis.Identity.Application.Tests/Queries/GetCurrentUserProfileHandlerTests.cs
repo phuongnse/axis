@@ -11,10 +11,16 @@ namespace Axis.Identity.Application.Tests.Queries;
 public sealed class GetCurrentUserProfileHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
+    private readonly IWorkspaceMembershipRepository _membershipRepo =
+        Substitute.For<IWorkspaceMembershipRepository>();
+    private readonly IWorkspaceRepository _workspaceRepo = Substitute.For<IWorkspaceRepository>();
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
 
-    private GetCurrentUserProfileHandler CreateHandler() => new(_userRepo);
+    private GetCurrentUserProfileHandler CreateHandler() => new(
+        _userRepo,
+        _membershipRepo,
+        _workspaceRepo);
 
     [Fact]
     public async Task Handle_WhenUserNotFound_ReturnsNull()
@@ -23,7 +29,7 @@ public sealed class GetCurrentUserProfileHandlerTests
         _userRepo.GetByIdPlatformWideAsync(userId, Arg.Any<CancellationToken>()).ReturnsNull();
 
         CurrentUserProfileDto? dto = await CreateHandler().Handle(
-            new GetCurrentUserProfileQuery(userId, TenantId, ["workflow:definition:read"]),
+            new GetCurrentUserProfileQuery(userId, WorkspaceId, ["workflow:definition:read"]),
             CancellationToken.None);
 
         dto.Should().BeNull();
@@ -33,11 +39,25 @@ public sealed class GetCurrentUserProfileHandlerTests
     public async Task Handle_WhenUserExists_ReturnsProfileWithJwtPermissions()
     {
         User user = User.Create("Ada", "Lovelace", Email.Create("ada@acme.com").Value);
+        Workspace workspace = Workspace.CreatePersonal(
+            "Ada Lovelace",
+            WorkspaceSlug.Create("ada-lovelace").Value,
+            user.Email,
+            user.Id,
+            Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        workspace.BeginProvisioningAfterOwnerVerification();
+        workspace.CompleteProvisioning();
+        WorkspaceMembership membership = WorkspaceMembership.Create(user.Id, workspace.Id);
+
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
+        _membershipRepo.GetByUserIdAsync(user.Id, Arg.Any<CancellationToken>())
+            .Returns([membership]);
+        _workspaceRepo.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>())
+            .Returns(workspace);
         IReadOnlyList<string> jwtPermissions = ["workflow:definition:read", "users:read"];
 
         CurrentUserProfileDto? dto = await CreateHandler().Handle(
-            new GetCurrentUserProfileQuery(user.Id, TenantId, jwtPermissions),
+            new GetCurrentUserProfileQuery(user.Id, workspace.Id, jwtPermissions),
             CancellationToken.None);
 
         dto.Should().NotBeNull();
@@ -45,7 +65,10 @@ public sealed class GetCurrentUserProfileHandlerTests
         dto.Email.Should().Be("ada@acme.com");
         dto.FullName.Should().Be("Ada Lovelace");
         dto.IsActive.Should().BeTrue();
-        dto.TenantId.Should().Be(TenantId);
+        dto.WorkspaceId.Should().Be(workspace.Id);
         dto.Permissions.Should().BeEquivalentTo(jwtPermissions);
+        dto.Workspaces.Should().ContainSingle();
+        dto.Workspaces[0].Type.Should().Be("Personal");
+        dto.Workspaces[0].IsCurrent.Should().BeTrue();
     }
 }

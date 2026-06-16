@@ -6,17 +6,17 @@ namespace Axis.Identity.Domain.Tests.Aggregates;
 
 public class RoleTests
 {
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
 
     [Fact]
     public void Role_WhenCreated_ProducesCustomRoleWithPermissions()
     {
         string[] permissions = new[] { "workflow:definition:read", "workflow:definition:write" };
-        Role role = Role.Create("Manager", "Can manage workflows", TenantId, permissions);
+        Role role = Role.Create("Manager", "Can manage workflows", WorkspaceId, permissions);
 
         role.Name.Should().Be("Manager");
         role.Description.Should().Be("Can manage workflows");
-        role.tenantId.Should().Be(TenantId);
+        role.workspaceId.Should().Be(WorkspaceId);
         role.IsSystem.Should().BeFalse();
         role.Permissions.Should().BeEquivalentTo(permissions);
     }
@@ -24,7 +24,7 @@ public class RoleTests
     [Fact]
     public void Role_WhenCreated_RaisesRoleCreatedEvent()
     {
-        Role role = Role.Create("Manager", null, TenantId, ["workflow:definition:read"]);
+        Role role = Role.Create("Manager", null, WorkspaceId, ["workflow:definition:read"]);
 
         role.DomainEvents.Should().ContainSingle()
             .Which.Should().BeOfType<RoleCreated>();
@@ -33,7 +33,7 @@ public class RoleTests
     [Fact]
     public void Role_WhenCreatedWithNoPermissions_Throws()
     {
-        Func<Role> act = () => Role.Create("Empty", null, TenantId, []);
+        Func<Role> act = () => Role.Create("Empty", null, WorkspaceId, []);
 
         act.Should().Throw<ArgumentException>()
             .WithMessage("*at least one permission*");
@@ -44,7 +44,7 @@ public class RoleTests
     [InlineData("  ")]
     public void Role_WhenCreatedWithEmptyName_Throws(string name)
     {
-        Func<Role> act = () => Role.Create(name, null, TenantId, ["workflow:definition:read"]);
+        Func<Role> act = () => Role.Create(name, null, WorkspaceId, ["workflow:definition:read"]);
 
         act.Should().Throw<ArgumentException>();
     }
@@ -52,7 +52,7 @@ public class RoleTests
     [Fact]
     public void Role_WhenUpdated_ChangesNameDescriptionAndPermissions()
     {
-        Role role = Role.Create("Manager", null, TenantId, ["workflow:definition:read"]);
+        Role role = Role.Create("Manager", null, WorkspaceId, ["workflow:definition:read"]);
         role.ClearDomainEvents();
 
         role.Update("Senior Manager", "Updated", ["workflow:definition:read", "workflow:definition:write"]);
@@ -67,7 +67,7 @@ public class RoleTests
     [Fact]
     public void Role_WhenSystemRoleUpdated_Throws()
     {
-        Role role = Role.CreateSystem("Admin", TenantId, ["users:read", "users:invite"]);
+        Role role = Role.CreateSystem("Admin", WorkspaceId, ["users:read", "users:invite"]);
 
         Action act = () => role.Update("Hacked", null, ["users:read"]);
 
@@ -78,7 +78,7 @@ public class RoleTests
     [Fact]
     public void Role_WhenCreatedAsSystem_IsMarkedAsSystemRole()
     {
-        Role role = Role.CreateSystem("Viewer", TenantId, ["workflow:definition:read"]);
+        Role role = Role.CreateSystem("Viewer", WorkspaceId, ["workflow:definition:read"]);
 
         role.IsSystem.Should().BeTrue();
     }
@@ -86,7 +86,7 @@ public class RoleTests
     [Fact]
     public void Role_WhenDuplicatePermissionsProvided_DeduplicatesPermissions()
     {
-        Role role = Role.Create("Manager", null, TenantId,
+        Role role = Role.Create("Manager", null, WorkspaceId,
                     ["workflow:definition:read", "workflow:definition:read"]);
 
         role.Permissions.Should().ContainSingle("workflow:definition:read");

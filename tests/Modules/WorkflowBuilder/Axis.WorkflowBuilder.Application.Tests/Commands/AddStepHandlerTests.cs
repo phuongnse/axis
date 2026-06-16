@@ -12,7 +12,7 @@ namespace Axis.WorkflowBuilder.Application.Tests;
 
 public class AddStepHandlerTests
 {
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private readonly IWorkflowRepository _repo = Substitute.For<IWorkflowRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly AddStepHandler _handler;
@@ -30,11 +30,11 @@ public class AddStepHandlerTests
     [Fact]
     public async Task Handle_WhenWorkflowExists_AddsStepAndReturnsId()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TenantId, "user");
-        _repo.GetByIdAsync(wf.Id, TenantId, Arg.Any<CancellationToken>()).Returns(wf);
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, WorkspaceId, "user");
+        _repo.GetByIdAsync(wf.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(wf);
 
         Result<Guid> result = await _handler.Handle(
-            new AddStepCommand(wf.Id, TenantId, "Send Email", StepType.Notification, null), CancellationToken.None);
+            new AddStepCommand(wf.Id, WorkspaceId, "Send Email", StepType.Notification, null), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         wf.Steps.Should().Contain(s => s.Id == result.Value && s.Name == "Send Email");
@@ -44,29 +44,29 @@ public class AddStepHandlerTests
     [Fact]
     public async Task Handle_WhenWorkflowNotFound_ReturnsNotFound()
     {
-        _repo.GetByIdAsync(Arg.Any<Guid>(), TenantId, Arg.Any<CancellationToken>()).Returns((WorkflowDefinition?)null);
+        _repo.GetByIdAsync(Arg.Any<Guid>(), WorkspaceId, Arg.Any<CancellationToken>()).Returns((WorkflowDefinition?)null);
 
         Result<Guid> result = await _handler.Handle(
-            new AddStepCommand(Guid.NewGuid(), TenantId, "Step", StepType.Form, null), CancellationToken.None);
+            new AddStepCommand(Guid.NewGuid(), WorkspaceId, "Step", StepType.Form, null), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
     }
 
     [Fact]
-    public async Task Handle_WhenWorkflowBelongsToAnotherTenant_ReturnsNotFound()
+    public async Task Handle_WhenWorkflowBelongsToAnotherWorkspace_ReturnsNotFound()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TenantId, "user");
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, WorkspaceId, "user");
 
-        Guid otherTenantId = Guid.NewGuid();
-        _repo.GetByIdAsync(wf.Id, otherTenantId, Arg.Any<CancellationToken>())
+        Guid otherWorkspaceId = Guid.NewGuid();
+        _repo.GetByIdAsync(wf.Id, otherWorkspaceId, Arg.Any<CancellationToken>())
             .Returns((WorkflowDefinition?)null);
         Result<Guid> result = await _handler.Handle(
-            new AddStepCommand(wf.Id, otherTenantId, "Step", StepType.Form, null), CancellationToken.None);
+            new AddStepCommand(wf.Id, otherWorkspaceId, "Step", StepType.Form, null), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-        await _repo.Received(1).GetByIdAsync(wf.Id, otherTenantId, Arg.Any<CancellationToken>());
+        await _repo.Received(1).GetByIdAsync(wf.Id, otherWorkspaceId, Arg.Any<CancellationToken>());
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
@@ -75,11 +75,11 @@ public class AddStepHandlerTests
     [InlineData(StepType.End)]
     public async Task Handle_WhenAddingReservedStepType_ReturnsBusinessRuleError(StepType type)
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TenantId, "user");
-        _repo.GetByIdAsync(wf.Id, TenantId, Arg.Any<CancellationToken>()).Returns(wf);
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, WorkspaceId, "user");
+        _repo.GetByIdAsync(wf.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(wf);
 
         Result<Guid> result = await _handler.Handle(
-            new AddStepCommand(wf.Id, TenantId, "Node", type, null), CancellationToken.None);
+            new AddStepCommand(wf.Id, WorkspaceId, "Node", type, null), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);

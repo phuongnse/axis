@@ -8,7 +8,7 @@ Modify the execution context before retrying so that I can fix data errors that 
 
 ## Primary actor
 
-- Tenant Member with `execution:retry`
+- Workspace Member with `execution:retry`
 
 ## Trigger
 
@@ -17,7 +17,7 @@ Modify the execution context before retrying so that I can fix data errors that 
 ## Main flow
 
 1. Actor starts the — Retry with modified input context flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows

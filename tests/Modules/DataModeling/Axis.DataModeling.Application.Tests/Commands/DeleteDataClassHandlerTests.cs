@@ -12,7 +12,7 @@ public class DeleteDataClassHandlerTests
 {
     private readonly IDataClassRepository _dcRepo = Substitute.For<IDataClassRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     private DeleteDataClassHandler CreateHandler() => new(_dcRepo, _uow);
@@ -20,11 +20,11 @@ public class DeleteDataClassHandlerTests
     [Fact]
     public async Task DeleteDataClass_WhenNotReferenced_DeletesAndSaves()
     {
-        DataClass dc = DataClass.Create("Address", null, TenantId, UserId);
-        _dcRepo.GetByIdAsync(dc.Id, TenantId).Returns(dc);
+        DataClass dc = DataClass.Create("Address", null, WorkspaceId, UserId);
+        _dcRepo.GetByIdAsync(dc.Id, WorkspaceId).Returns(dc);
         _dcRepo.IsReferencedByAnyModelAsync(dc.Id).Returns(false);
 
-        Result result = await CreateHandler().Handle(new DeleteDataClassCommand(dc.Id, TenantId), CancellationToken.None);
+        Result result = await CreateHandler().Handle(new DeleteDataClassCommand(dc.Id, WorkspaceId), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         dc.DeletedAt.Should().NotBeNull();
@@ -34,10 +34,10 @@ public class DeleteDataClassHandlerTests
     [Fact]
     public async Task DeleteDataClass_WhenNotFound_ReturnsNotFound()
     {
-        _dcRepo.GetByIdAsync(Arg.Any<Guid>(), TenantId).Returns((DataClass?)null);
+        _dcRepo.GetByIdAsync(Arg.Any<Guid>(), WorkspaceId).Returns((DataClass?)null);
 
         Result result = await CreateHandler().Handle(
-            new DeleteDataClassCommand(Guid.NewGuid(), TenantId), CancellationToken.None);
+            new DeleteDataClassCommand(Guid.NewGuid(), WorkspaceId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
@@ -45,14 +45,14 @@ public class DeleteDataClassHandlerTests
     }
 
     [Fact]
-    public async Task DeleteDataClass_WhenBelongsToAnotherTenant_ReturnsNotFound()
+    public async Task DeleteDataClass_WhenBelongsToAnotherWorkspace_ReturnsNotFound()
     {
-        DataClass dc = DataClass.Create("Address", null, TenantId, UserId);
-        _dcRepo.GetByIdAsync(dc.Id, TenantId).Returns(dc);
+        DataClass dc = DataClass.Create("Address", null, WorkspaceId, UserId);
+        _dcRepo.GetByIdAsync(dc.Id, WorkspaceId).Returns(dc);
 
-        Guid otherTenantId = Guid.NewGuid();
+        Guid otherWorkspaceId = Guid.NewGuid();
         Result result = await CreateHandler().Handle(
-            new DeleteDataClassCommand(dc.Id, otherTenantId), CancellationToken.None);
+            new DeleteDataClassCommand(dc.Id, otherWorkspaceId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
@@ -61,12 +61,12 @@ public class DeleteDataClassHandlerTests
     [Fact]
     public async Task DeleteDataClass_WhenReferencedByModel_ReturnsConflict()
     {
-        DataClass dc = DataClass.Create("Address", null, TenantId, UserId);
-        _dcRepo.GetByIdAsync(dc.Id, TenantId).Returns(dc);
+        DataClass dc = DataClass.Create("Address", null, WorkspaceId, UserId);
+        _dcRepo.GetByIdAsync(dc.Id, WorkspaceId).Returns(dc);
         _dcRepo.IsReferencedByAnyModelAsync(dc.Id).Returns(true);
 
         Result result = await CreateHandler().Handle(
-            new DeleteDataClassCommand(dc.Id, TenantId), CancellationToken.None);
+            new DeleteDataClassCommand(dc.Id, WorkspaceId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.Conflict);

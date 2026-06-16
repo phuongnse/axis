@@ -15,7 +15,7 @@ public sealed class RemoveTriggerHandler(
     public async Task<Result> Handle(RemoveTriggerCommand command, CancellationToken cancellationToken)
     {
         WorkflowDefinition? workflow = await workflowRepo.GetByIdAsync(
-            command.WorkflowId, command.tenantId, cancellationToken);
+            command.WorkflowId, command.workspaceId, cancellationToken);
 
         if (workflow is null)
             return Result.Failure(ErrorCodes.NotFound, "Workflow not found.");

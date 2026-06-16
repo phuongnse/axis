@@ -12,12 +12,27 @@ namespace Axis.Identity.Application.Tests.Queries;
 public sealed class GetUserTokenClaimsHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
-    private readonly ITenantMembershipRepository _membershipRepo = Substitute.For<ITenantMembershipRepository>();
+    private readonly IWorkspaceMembershipRepository _membershipRepo = Substitute.For<IWorkspaceMembershipRepository>();
+    private readonly IWorkspaceRepository _workspaceRepo = Substitute.For<IWorkspaceRepository>();
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
 
-    private GetUserTokenClaimsHandler CreateHandler() => new(_userRepo, _membershipRepo, _roleRepo);
+    private GetUserTokenClaimsHandler CreateHandler() => new(
+        _userRepo,
+        _membershipRepo,
+        _workspaceRepo,
+        _roleRepo);
+
+    private static Workspace ActiveWorkspace(Guid workspaceId)
+    {
+        Workspace workspace = Workspace.Create(
+            "Ada workspace",
+            WorkspaceSlug.Create($"workspace-{workspaceId:N}"[..20]).Value,
+            Email.Create("owner@example.com").Value,
+            Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        return workspace;
+    }
 
     [Fact]
     public async Task Handle_WhenUserNotFound_ReturnsNotFound()
@@ -26,7 +41,7 @@ public sealed class GetUserTokenClaimsHandlerTests
         _userRepo.GetByIdPlatformWideAsync(userId, Arg.Any<CancellationToken>()).ReturnsNull();
 
         Result<UserTokenClaimsDto> result = await CreateHandler().Handle(
-            new GetUserTokenClaimsQuery(userId, TenantId),
+            new GetUserTokenClaimsQuery(userId, WorkspaceId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -41,7 +56,7 @@ public sealed class GetUserTokenClaimsHandlerTests
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
 
         Result<UserTokenClaimsDto> result = await CreateHandler().Handle(
-            new GetUserTokenClaimsQuery(user.Id, TenantId),
+            new GetUserTokenClaimsQuery(user.Id, WorkspaceId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -49,35 +64,37 @@ public sealed class GetUserTokenClaimsHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhentenantIdOmitted_UsesUserTenant()
+    public async Task Handle_WhenworkspaceIdOmitted_UsesUserWorkspace()
     {
         User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value);
-        Role role = Role.CreateSystem("Editor", TenantId, ["workflow:definition:read"]);
-        TenantMembership membership = TenantMembership.Create(user.Id, TenantId);
+        Role role = Role.CreateSystem("Editor", WorkspaceId, ["workflow:definition:read"]);
+        WorkspaceMembership membership = WorkspaceMembership.Create(user.Id, WorkspaceId);
         membership.AssignRole(role.Id);
+        Workspace workspace = ActiveWorkspace(WorkspaceId);
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
         _membershipRepo.GetFirstActiveByUserIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(membership);
-        _roleRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), TenantId, Arg.Any<CancellationToken>())
+        _workspaceRepo.GetByIdAsync(WorkspaceId, Arg.Any<CancellationToken>()).Returns(workspace);
+        _roleRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), WorkspaceId, Arg.Any<CancellationToken>())
             .Returns(new List<Role> { role });
 
         Result<UserTokenClaimsDto> result = await CreateHandler().Handle(
-            new GetUserTokenClaimsQuery(user.Id, tenantId: null),
+            new GetUserTokenClaimsQuery(user.Id, workspaceId: null),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        result.Value.tenantId.Should().Be(TenantId);
+        result.Value.workspaceId.Should().Be(WorkspaceId);
         result.Value.Permissions.Should().Contain("workflow:definition:read");
     }
 
     [Fact]
-    public async Task Handle_WhentenantIdMismatchesUser_ReturnsBusinessRuleFailure()
+    public async Task Handle_WhenworkspaceIdMismatchesUser_ReturnsBusinessRuleFailure()
     {
         User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value);
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
 
-        Guid otherTenantId = Guid.NewGuid();
+        Guid otherWorkspaceId = Guid.NewGuid();
         Result<UserTokenClaimsDto> result = await CreateHandler().Handle(
-            new GetUserTokenClaimsQuery(user.Id, otherTenantId),
+            new GetUserTokenClaimsQuery(user.Id, otherWorkspaceId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -92,16 +109,18 @@ public sealed class GetUserTokenClaimsHandlerTests
     public async Task Handle_WhenUserActive_ReturnsTokenClaims()
     {
         User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value);
-        Role editor = Role.CreateSystem("Editor", TenantId, ["workflow:definition:read", "workflow:definition:write"]);
-        TenantMembership membership = TenantMembership.Create(user.Id, TenantId);
+        Role editor = Role.CreateSystem("Editor", WorkspaceId, ["workflow:definition:read", "workflow:definition:write"]);
+        WorkspaceMembership membership = WorkspaceMembership.Create(user.Id, WorkspaceId);
         membership.AssignRole(editor.Id);
+        Workspace workspace = ActiveWorkspace(WorkspaceId);
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
-        _membershipRepo.GetByUserAndTenantAsync(user.Id, TenantId, Arg.Any<CancellationToken>()).Returns(membership);
-        _roleRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), TenantId, Arg.Any<CancellationToken>())
+        _membershipRepo.GetByUserAndWorkspaceAsync(user.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(membership);
+        _workspaceRepo.GetByIdAsync(WorkspaceId, Arg.Any<CancellationToken>()).Returns(workspace);
+        _roleRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), WorkspaceId, Arg.Any<CancellationToken>())
             .Returns(new List<Role> { editor });
 
         Result<UserTokenClaimsDto> result = await CreateHandler().Handle(
-            new GetUserTokenClaimsQuery(user.Id, TenantId),
+            new GetUserTokenClaimsQuery(user.Id, WorkspaceId),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();

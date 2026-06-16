@@ -12,7 +12,7 @@ public sealed class GetDataClassHandler(IDataClassRepository dataClassRepo)
 {
     public async Task<Result<DataClassDetailDto>> Handle(GetDataClassQuery query, CancellationToken cancellationToken)
     {
-        DataClass? dc = await dataClassRepo.GetByIdAsync(query.DataClassId, query.tenantId, cancellationToken);
+        DataClass? dc = await dataClassRepo.GetByIdAsync(query.DataClassId, query.workspaceId, cancellationToken);
         if (dc is null)
             return Result.Failure<DataClassDetailDto>(ErrorCodes.NotFound, "Data class not found.");
 

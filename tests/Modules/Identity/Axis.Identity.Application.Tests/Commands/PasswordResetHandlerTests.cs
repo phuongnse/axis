@@ -18,7 +18,7 @@ public class RequestPasswordResetHandlerTests
     private readonly IEmailSender _emailSender = Substitute.For<IEmailSender>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
 
     private RequestPasswordResetHandler CreateHandler() =>
         new(_userRepo, _tokenStore, _emailSender, _uow);

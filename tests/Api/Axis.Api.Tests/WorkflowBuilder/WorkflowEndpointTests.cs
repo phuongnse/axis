@@ -21,7 +21,7 @@ public class WorkflowEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task GetWorkflows_WhenTenantHasNoWorkflows_ReturnsEmptyList()
+    public async Task GetWorkflows_WhenWorkspaceHasNoWorkflows_ReturnsEmptyList()
     {
         HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "wf1");
 

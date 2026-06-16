@@ -7,7 +7,7 @@ namespace Axis.FormBuilder.Domain.Tests;
 
 public class FormSubmissionTests
 {
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private static readonly Guid FormDefinitionId = Guid.NewGuid();
     private static readonly Guid ExecutionId = Guid.NewGuid();
     private static readonly Guid ExecutionStepId = Guid.NewGuid();
@@ -20,7 +20,7 @@ public class FormSubmissionTests
         DateTimeOffset? expiresAt = null) =>
         FormSubmission.Create(
             FormDefinitionId,
-            TenantId,
+            WorkspaceId,
             ExecutionId,
             ExecutionStepId,
             assigneeUserId ?? AssigneeUserId,
@@ -40,7 +40,7 @@ public class FormSubmissionTests
         FormSubmission submission = CreatePending(expiresAt: expiry);
 
         submission.FormDefinitionId.Should().Be(FormDefinitionId);
-        submission.tenantId.Should().Be(TenantId);
+        submission.workspaceId.Should().Be(WorkspaceId);
         submission.ExecutionId.Should().Be(ExecutionId);
         submission.ExecutionStepId.Should().Be(ExecutionStepId);
         submission.AssigneeUserId.Should().Be(AssigneeUserId);
@@ -95,7 +95,7 @@ public class FormSubmissionTests
         evt.AccessToken.Should().Be(submission.AccessToken);
         evt.FormSubmissionId.Should().Be(submission.Id);
         evt.FormDefinitionId.Should().Be(FormDefinitionId);
-        evt.tenantId.Should().Be(TenantId);
+        evt.workspaceId.Should().Be(WorkspaceId);
         evt.ExecutionId.Should().Be(ExecutionId);
     }
 
@@ -111,7 +111,7 @@ public class FormSubmissionTests
     {
         Guid roleId = Guid.NewGuid();
         FormSubmission submission = FormSubmission.Create(
-                    FormDefinitionId, TenantId, ExecutionId, ExecutionStepId,
+                    FormDefinitionId, WorkspaceId, ExecutionId, ExecutionStepId,
                     assigneeUserId: null, assigneeRoleId: roleId, expiresAt: null, CreatedBy);
 
         submission.AssigneeUserId.Should().BeNull();
@@ -146,7 +146,7 @@ public class FormSubmissionTests
         evt.FormSubmissionId.Should().Be(submission.Id);
         evt.ExecutionId.Should().Be(ExecutionId);
         evt.ExecutionStepId.Should().Be(ExecutionStepId);
-        evt.tenantId.Should().Be(TenantId);
+        evt.workspaceId.Should().Be(WorkspaceId);
         evt.SubmittedData.Should().BeEquivalentTo(data);
     }
 
@@ -184,7 +184,7 @@ public class FormSubmissionTests
         evt.FormSubmissionId.Should().Be(submission.Id);
         evt.ExecutionId.Should().Be(ExecutionId);
         evt.ExecutionStepId.Should().Be(ExecutionStepId);
-        evt.tenantId.Should().Be(TenantId);
+        evt.workspaceId.Should().Be(WorkspaceId);
     }
 
     [Theory]
@@ -220,7 +220,7 @@ public class FormSubmissionTests
         FormTaskCancelled evt = submission.DomainEvents.OfType<FormTaskCancelled>().Single();
         evt.FormSubmissionId.Should().Be(submission.Id);
         evt.ExecutionId.Should().Be(ExecutionId);
-        evt.tenantId.Should().Be(TenantId);
+        evt.workspaceId.Should().Be(WorkspaceId);
     }
 
     [Theory]
@@ -241,28 +241,28 @@ public class FormSubmissionTests
     [Fact]
     public void Create_WhenFormDefinitionIdIsEmpty_Throws()
     {
-        Action act = () => FormSubmission.Create(Guid.Empty, TenantId, ExecutionId, ExecutionStepId, null, null, null, CreatedBy);
+        Action act = () => FormSubmission.Create(Guid.Empty, WorkspaceId, ExecutionId, ExecutionStepId, null, null, null, CreatedBy);
         act.Should().Throw<ArgumentException>().WithParameterName("formDefinitionId");
     }
 
     [Fact]
-    public void Create_WhentenantIdIsEmpty_Throws()
+    public void Create_WhenworkspaceIdIsEmpty_Throws()
     {
         Action act = () => FormSubmission.Create(FormDefinitionId, Guid.Empty, ExecutionId, ExecutionStepId, null, null, null, CreatedBy);
-        act.Should().Throw<ArgumentException>().WithParameterName("tenantId");
+        act.Should().Throw<ArgumentException>().WithParameterName("workspaceId");
     }
 
     [Fact]
     public void Create_WhenExecutionIdIsEmpty_Throws()
     {
-        Action act = () => FormSubmission.Create(FormDefinitionId, TenantId, Guid.Empty, ExecutionStepId, null, null, null, CreatedBy);
+        Action act = () => FormSubmission.Create(FormDefinitionId, WorkspaceId, Guid.Empty, ExecutionStepId, null, null, null, CreatedBy);
         act.Should().Throw<ArgumentException>().WithParameterName("executionId");
     }
 
     [Fact]
     public void Create_WhenExecutionStepIdIsEmpty_Throws()
     {
-        Action act = () => FormSubmission.Create(FormDefinitionId, TenantId, ExecutionId, Guid.Empty, null, null, null, CreatedBy);
+        Action act = () => FormSubmission.Create(FormDefinitionId, WorkspaceId, ExecutionId, Guid.Empty, null, null, null, CreatedBy);
         act.Should().Throw<ArgumentException>().WithParameterName("executionStepId");
     }
 
@@ -271,7 +271,7 @@ public class FormSubmissionTests
     [InlineData("   ")]
     public void Create_WhenCreatedByIsBlank_Throws(string createdBy)
     {
-        Action act = () => FormSubmission.Create(FormDefinitionId, TenantId, ExecutionId, ExecutionStepId, null, null, null, createdBy);
+        Action act = () => FormSubmission.Create(FormDefinitionId, WorkspaceId, ExecutionId, ExecutionStepId, null, null, null, createdBy);
         act.Should().Throw<ArgumentException>().WithParameterName("createdBy");
     }
 

@@ -8,7 +8,7 @@ Assign a role to a user so that they get the appropriate permissions.
 
 ## Primary actor
 
-- Tenant Admin
+- Workspace Admin
 
 ## Trigger
 
@@ -17,7 +17,7 @@ Assign a role to a user so that they get the appropriate permissions.
 ## Main flow
 
 1. Actor starts the — Assign a role to a user flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
@@ -26,7 +26,7 @@ Assign a role to a user so that they get the appropriate permissions.
 
 ## Context
 
-Tenant admins can create custom roles, assign permissions to each role, and assign roles to users. Default system roles (Admin, Editor, Viewer) are provided out-of-the-box and cannot be deleted or modified.
+Workspace admins can create custom roles, assign permissions to each role, and assign roles to users. Default system roles (Admin, Editor, Viewer) are provided out-of-the-box and cannot be deleted or modified.
 
 ## Acceptance Criteria
 

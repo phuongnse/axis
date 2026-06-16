@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace Axis.Identity.Infrastructure.PlanLimits;
 
 public sealed class PlanLimitService(
-    ITenantRepository TenantRepository,
+    IWorkspaceRepository WorkspaceRepository,
     ISubscriptionPlanRepository subscriptionPlanRepository,
     IEnumerable<IPlanLimitUsageCounter> usageCounters,
     PlanLimitRedisCache redisCache,
@@ -17,26 +17,26 @@ public sealed class PlanLimitService(
     ILogger<PlanLimitService> logger) : IPlanLimitService
 {
     public async Task<Result> EnsureWithinLimitAsync(
-        Guid tenantId,
+        Guid workspaceId,
         PlanLimitResourceType resourceType,
         int increment = 1,
         CancellationToken cancellationToken = default)
     {
-        Tenant? Tenant =
-            await TenantRepository.GetByIdAsync(tenantId, cancellationToken);
-        if (Tenant is null)
-            return Result.Failure(ErrorCodes.NotFound, "Tenant not found.");
+        Workspace? Workspace =
+            await WorkspaceRepository.GetByIdAsync(workspaceId, cancellationToken);
+        if (Workspace is null)
+            return Result.Failure(ErrorCodes.NotFound, "Workspace not found.");
 
         SubscriptionPlan? plan =
-            await subscriptionPlanRepository.GetByIdAsync(Tenant.SubscriptionPlanId, cancellationToken);
+            await subscriptionPlanRepository.GetByIdAsync(Workspace.SubscriptionPlanId, cancellationToken);
         if (plan is null)
-            return Result.Failure(ErrorCodes.BusinessRule, "Tenant subscription plan is not configured.");
+            return Result.Failure(ErrorCodes.BusinessRule, "Workspace subscription plan is not configured.");
 
         int? limit = GetLimit(plan, resourceType);
         if (!plan.HasLimit(limit))
             return Result.Success();
 
-        int current = await GetCurrentUsageAsync(tenantId, resourceType, cancellationToken);
+        int current = await GetCurrentUsageAsync(workspaceId, resourceType, cancellationToken);
         if (plan.IsWithinLimit(limit, current, increment))
             return Result.Success();
 
@@ -52,11 +52,11 @@ public sealed class PlanLimitService(
         return Result.PlanLimitFailure(details);
     }
 
-    public Task RefreshCachedLimitsAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
-        redisCache.TryInvalidateTenantAsync(tenantId, cancellationToken);
+    public Task RefreshCachedLimitsAsync(Guid workspaceId, CancellationToken cancellationToken = default) =>
+        redisCache.TryInvalidateWorkspaceAsync(workspaceId, cancellationToken);
 
     public Task RecordUsageDeltaAsync(
-        Guid tenantId,
+        Guid workspaceId,
         PlanLimitResourceType resourceType,
         int delta,
         CancellationToken cancellationToken = default)
@@ -64,27 +64,27 @@ public sealed class PlanLimitService(
         if (delta == 0)
             return Task.CompletedTask;
 
-        return redisCache.TryAdjustUsageAsync(tenantId, resourceType, delta, cancellationToken);
+        return redisCache.TryAdjustUsageAsync(workspaceId, resourceType, delta, cancellationToken);
     }
 
     public async Task<PlanLimitUsageSnapshot?> GetUsageSnapshotAsync(
-        Guid tenantId,
+        Guid workspaceId,
         CancellationToken cancellationToken = default)
     {
-        Tenant? Tenant =
-            await TenantRepository.GetByIdAsync(tenantId, cancellationToken);
-        if (Tenant is null)
+        Workspace? Workspace =
+            await WorkspaceRepository.GetByIdAsync(workspaceId, cancellationToken);
+        if (Workspace is null)
             return null;
 
         SubscriptionPlan? plan =
-            await subscriptionPlanRepository.GetByIdAsync(Tenant.SubscriptionPlanId, cancellationToken);
+            await subscriptionPlanRepository.GetByIdAsync(Workspace.SubscriptionPlanId, cancellationToken);
         if (plan is null)
             return null;
 
-        int workflowsUsed = await GetCurrentUsageAsync(tenantId, PlanLimitResourceType.Workflows, cancellationToken);
+        int workflowsUsed = await GetCurrentUsageAsync(workspaceId, PlanLimitResourceType.Workflows, cancellationToken);
         int executionsUsed =
-            await GetCurrentUsageAsync(tenantId, PlanLimitResourceType.ExecutionsPerMonth, cancellationToken);
-        int usersUsed = await GetCurrentUsageAsync(tenantId, PlanLimitResourceType.Users, cancellationToken);
+            await GetCurrentUsageAsync(workspaceId, PlanLimitResourceType.ExecutionsPerMonth, cancellationToken);
+        int usersUsed = await GetCurrentUsageAsync(workspaceId, PlanLimitResourceType.Users, cancellationToken);
 
         return new PlanLimitUsageSnapshot(
             workflowsUsed,
@@ -96,11 +96,11 @@ public sealed class PlanLimitService(
     }
 
     private async Task<int> GetCurrentUsageAsync(
-        Guid tenantId,
+        Guid workspaceId,
         PlanLimitResourceType resourceType,
         CancellationToken cancellationToken)
     {
-        long? cached = await redisCache.TryGetCachedUsageAsync(tenantId, resourceType, cancellationToken);
+        long? cached = await redisCache.TryGetCachedUsageAsync(workspaceId, resourceType, cancellationToken);
         if (cached is not null)
         {
             if (cached.Value >= int.MaxValue)
@@ -108,8 +108,8 @@ public sealed class PlanLimitService(
             if (cached.Value <= 0)
             {
                 logger.LogWarning(
-                    "Cached plan-limit usage is non-positive for Tenant {tenantId} resource {ResourceType}: {CachedUsage}",
-                    tenantId,
+                    "Cached plan-limit usage is non-positive for Workspace {workspaceId} resource {ResourceType}: {CachedUsage}",
+                    workspaceId,
                     resourceType,
                     cached.Value);
                 return 0;
@@ -130,28 +130,28 @@ public sealed class PlanLimitService(
         int usage;
         try
         {
-            usage = await counter.GetCurrentUsageAsync(tenantId, cancellationToken);
+            usage = await counter.GetCurrentUsageAsync(workspaceId, cancellationToken);
         }
         catch (Exception ex)
         {
             logger.LogWarning(
                 ex,
-                "Plan limit usage counter failed for Tenant {tenantId} resource {ResourceType}; treating usage as zero.",
-                tenantId,
+                "Plan limit usage counter failed for Workspace {workspaceId} resource {ResourceType}; treating usage as zero.",
+                workspaceId,
                 resourceType);
             return 0;
         }
 
         bool cachedWrite = await redisCache.TrySetCachedUsageAsync(
-            tenantId,
+            workspaceId,
             resourceType,
             usage,
             cancellationToken);
         if (!cachedWrite)
         {
             logger.LogWarning(
-                "Redis unavailable for plan limit cache (Tenant {tenantId}, {ResourceType}); using database count {Usage}.",
-                tenantId,
+                "Redis unavailable for plan limit cache (Workspace {workspaceId}, {ResourceType}); using database count {Usage}.",
+                workspaceId,
                 resourceType,
                 usage);
         }

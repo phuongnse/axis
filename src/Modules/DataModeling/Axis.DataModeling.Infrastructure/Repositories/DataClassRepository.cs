@@ -10,21 +10,21 @@ internal sealed class DataClassRepository(DataModelingDbContext context) : IData
     public async Task AddAsync(DataClass dataClass, CancellationToken ct = default)
         => await context.DataClasses.AddAsync(dataClass, ct);
 
-    public async Task<DataClass?> GetByIdAsync(Guid id, Guid tenantId, CancellationToken ct = default)
+    public async Task<DataClass?> GetByIdAsync(Guid id, Guid workspaceId, CancellationToken ct = default)
         => await context.DataClasses
-            .FirstOrDefaultAsync(c => c.Id == id && c.tenantId == tenantId, ct);
+            .FirstOrDefaultAsync(c => c.Id == id && c.workspaceId == workspaceId, ct);
 
-    public async Task<IReadOnlyList<DataClass>> GetAllAsync(Guid tenantId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<DataClass>> GetAllAsync(Guid workspaceId, CancellationToken ct = default)
         => await context.DataClasses
-            .Where(c => c.tenantId == tenantId)
+            .Where(c => c.workspaceId == workspaceId)
             .OrderBy(c => c.Name)
             .ToListAsync(ct);
 
     public async Task<(IReadOnlyList<DataClass> Items, int TotalCount)> GetPagedAsync(
-        Guid tenantId, int page, int pageSize, CancellationToken ct = default)
+        Guid workspaceId, int page, int pageSize, CancellationToken ct = default)
     {
         IQueryable<DataClass> query = context.DataClasses
-            .Where(c => c.tenantId == tenantId)
+            .Where(c => c.workspaceId == workspaceId)
             .OrderBy(c => c.Name);
 
         int totalCount = await query.CountAsync(ct);
@@ -36,9 +36,9 @@ internal sealed class DataClassRepository(DataModelingDbContext context) : IData
         return (items, totalCount);
     }
 
-    public async Task<bool> NameExistsAsync(string name, Guid tenantId, Guid? excludeId = null, CancellationToken ct = default)
+    public async Task<bool> NameExistsAsync(string name, Guid workspaceId, Guid? excludeId = null, CancellationToken ct = default)
         => await context.DataClasses
-            .AnyAsync(c => c.tenantId == tenantId
+            .AnyAsync(c => c.workspaceId == workspaceId
                 && c.Name.ToLower() == name.ToLower()
                 && (excludeId == null || c.Id != excludeId), ct);
 

@@ -17,7 +17,7 @@ public class ResendVerificationEmailHandlerTests
     private readonly IEmailSender _emailSender = Substitute.For<IEmailSender>();
     private readonly IResendVerificationRateLimiter _rateLimiter = Substitute.For<IResendVerificationRateLimiter>();
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
 
     private ResendVerificationEmailHandler CreateHandler() =>
         new(_userRepo, _tokenStore, _emailSender, _rateLimiter);

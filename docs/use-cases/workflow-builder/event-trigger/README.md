@@ -8,7 +8,7 @@ Trigger a workflow automatically when a platform event occurs so that I don't ne
 
 ## Primary actor
 
-- Tenant Member
+- Workspace Member
 
 ## Trigger
 

@@ -9,7 +9,7 @@ public class RevokeSessionHandlerTests
     private readonly ISessionStore _sessionStore = Substitute.For<ISessionStore>();
 
     private static readonly Guid UserId = Guid.NewGuid();
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
 
     private RevokeSessionHandler CreateHandler() => new(_sessionStore);
 

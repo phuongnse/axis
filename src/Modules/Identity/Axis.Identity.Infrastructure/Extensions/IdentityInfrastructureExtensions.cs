@@ -35,18 +35,18 @@ public static class IdentityInfrastructureExtensions
                     .UseDbContext<IdentityDbContext>();
             });
 
-        services.AddScoped<ITenantRepository, TenantRepository>();
-        services.AddScoped<ITenantAccessService, TenantAccessService>();
+        services.AddScoped<IWorkspaceRepository, WorkspaceRepository>();
+        services.AddScoped<IWorkspaceAccessService, WorkspaceAccessService>();
         services.AddScoped<ISubscriptionPlanRepository, SubscriptionPlanRepository>();
-        services.AddScoped<ITenantPlanChangeLogRepository, TenantPlanChangeLogRepository>();
+        services.AddScoped<IWorkspacePlanChangeLogRepository, WorkspacePlanChangeLogRepository>();
         services.AddScoped<IPlatformAdminAuthorization, ConfigPlatformAdminAuthorization>();
         services.AddScoped<IPlanLimitUsageCounter, UserPlanLimitUsageCounter>();
         services.AddSingleton<PlanLimitRedisCache>();
         services.AddScoped<IPlanLimitService, PlanLimitService>();
-        services.AddScoped<ITenantModuleProvisioningRepository, TenantModuleProvisioningRepository>();
+        services.AddScoped<IWorkspaceModuleProvisioningRepository, WorkspaceModuleProvisioningRepository>();
         services.AddScoped<IPlatformProvisioningAlert, LoggingPlatformProvisioningAlert>();
         services.AddScoped<IUserRepository, UserRepository>();
-        services.AddScoped<ITenantMembershipRepository, TenantMembershipRepository>();
+        services.AddScoped<IWorkspaceMembershipRepository, WorkspaceMembershipRepository>();
         services.AddScoped<IRoleRepository, RoleRepository>();
         services.AddScoped<IInvitationRepository, InvitationRepository>();
         services.AddScoped<IRegistrationIdempotencyRepository, RegistrationIdempotencyRepository>();
@@ -57,21 +57,21 @@ public static class IdentityInfrastructureExtensions
         services.AddSingleton<IResendVerificationRateLimiter, RedisResendVerificationRateLimiter>();
         services.AddScoped<IPasswordResetTokenStore, PasswordResetTokenStore>();
         services.AddScoped<IEmailVerificationTokenStore, EmailVerificationTokenStore>();
-        services.AddScoped<ITenantRegistrationTokenStore, TenantRegistrationTokenStore>();
-        services.AddScoped<ITenantSlugGenerator, TenantSlugGenerator>();
+        services.AddScoped<IWorkspaceRegistrationTokenStore, WorkspaceRegistrationTokenStore>();
+        services.AddScoped<IWorkspaceSlugGenerator, WorkspaceSlugGenerator>();
         services.AddScoped<ISessionStore, SessionStoreService>();
 
         services.AddGrpc();
 
         services.AddHostedService<OpenIddictSeeder>();
         services.AddHostedService<SubscriptionPlanSeeder>();
-        services.AddHostedService<TenantSettingsPermissionSeeder>();
+        services.AddHostedService<WorkspaceSettingsPermissionSeeder>();
 
         services.AddAWSService<IAmazonS3>();
         services.AddScoped<IAvatarStorageService, S3AvatarStorageService>();
-        services.AddScoped<ITenantLogoStorageService, S3TenantLogoStorageService>();
-        services.AddScoped<ITenantDeletionScheduler, WolverineTenantDeletionScheduler>();
-        services.AddScoped<ItenantIdentityPurger, tenantIdentityPurger>();
+        services.AddScoped<IWorkspaceLogoStorageService, S3WorkspaceLogoStorageService>();
+        services.AddScoped<IWorkspaceDeletionScheduler, WolverineWorkspaceDeletionScheduler>();
+        services.AddScoped<IWorkspaceIdentityPurger, WorkspaceIdentityPurger>();
 
         return services;
     }

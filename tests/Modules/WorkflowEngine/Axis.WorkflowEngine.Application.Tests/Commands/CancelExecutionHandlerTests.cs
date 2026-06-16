@@ -15,14 +15,14 @@ public class CancelExecutionHandlerTests
     private readonly IExecutionRepository _execRepo = Substitute.For<IExecutionRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private static readonly Guid WorkflowId = Guid.NewGuid();
 
     private CancelExecutionHandler CreateHandler() => new(_execRepo, _uow);
 
     private static WorkflowExecution MakeRunningExecution()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TenantId, TriggerType.Manual, null, new Dictionary<string, object?>());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, WorkspaceId, TriggerType.Manual, null, new Dictionary<string, object?>());
         exec.Start();
         return exec;
     }
@@ -31,9 +31,9 @@ public class CancelExecutionHandlerTests
     public async Task CancelExecution_WhenExecutionIsRunning_CancelsExecution()
     {
         WorkflowExecution exec = MakeRunningExecution();
-        _execRepo.GetByIdAsync(exec.Id, TenantId).Returns(exec);
+        _execRepo.GetByIdAsync(exec.Id, WorkspaceId).Returns(exec);
 
-        Result result = await CreateHandler().Handle(new CancelExecutionCommand(exec.Id, TenantId), CancellationToken.None);
+        Result result = await CreateHandler().Handle(new CancelExecutionCommand(exec.Id, WorkspaceId), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         exec.Status.Should().Be(ExecutionStatus.Cancelled);
@@ -43,10 +43,10 @@ public class CancelExecutionHandlerTests
     [Fact]
     public async Task CancelExecution_WhenExecutionNotFound_ReturnsNotFound()
     {
-        _execRepo.GetByIdAsync(Arg.Any<Guid>(), TenantId).ReturnsNull();
+        _execRepo.GetByIdAsync(Arg.Any<Guid>(), WorkspaceId).ReturnsNull();
 
         Result result = await CreateHandler().Handle(
-            new CancelExecutionCommand(Guid.NewGuid(), TenantId), CancellationToken.None);
+            new CancelExecutionCommand(Guid.NewGuid(), WorkspaceId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
@@ -58,10 +58,10 @@ public class CancelExecutionHandlerTests
     {
         WorkflowExecution exec = MakeRunningExecution();
         exec.Complete();
-        _execRepo.GetByIdAsync(exec.Id, TenantId).Returns(exec);
+        _execRepo.GetByIdAsync(exec.Id, WorkspaceId).Returns(exec);
 
         Result result = await CreateHandler().Handle(
-            new CancelExecutionCommand(exec.Id, TenantId), CancellationToken.None);
+            new CancelExecutionCommand(exec.Id, WorkspaceId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
@@ -73,24 +73,24 @@ public class CancelExecutionHandlerTests
     {
         WorkflowExecution exec = MakeRunningExecution();
         exec.Fail("error");
-        _execRepo.GetByIdAsync(exec.Id, TenantId).Returns(exec);
+        _execRepo.GetByIdAsync(exec.Id, WorkspaceId).Returns(exec);
 
         Result result = await CreateHandler().Handle(
-            new CancelExecutionCommand(exec.Id, TenantId), CancellationToken.None);
+            new CancelExecutionCommand(exec.Id, WorkspaceId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
     }
 
     [Fact]
-    public async Task CancelExecution_WhenExecutionBelongsToAnotherTenant_ReturnsNotFound()
+    public async Task CancelExecution_WhenExecutionBelongsToAnotherWorkspace_ReturnsNotFound()
     {
         WorkflowExecution exec = MakeRunningExecution();
-        _execRepo.GetByIdAsync(exec.Id, TenantId).Returns(exec);
+        _execRepo.GetByIdAsync(exec.Id, WorkspaceId).Returns(exec);
 
-        Guid otherTenantId = Guid.NewGuid();
+        Guid otherWorkspaceId = Guid.NewGuid();
         Result result = await CreateHandler().Handle(
-            new CancelExecutionCommand(exec.Id, otherTenantId), CancellationToken.None);
+            new CancelExecutionCommand(exec.Id, otherWorkspaceId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);

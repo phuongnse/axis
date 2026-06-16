@@ -30,11 +30,11 @@ internal sealed class FormTaskSubmittedHandler(
     {
         Guid executionId = @event.ExecutionId();
         Guid executionStepId = @event.ExecutionStepId();
-        Guid tenantId = @event.tenantId();
+        Guid workspaceId = @event.workspaceId();
         IReadOnlyDictionary<string, object?> submittedData = @event.SubmittedData();
 
         WorkflowExecution? execution = await execRepo.GetByIdWithStepsAsync(
-            executionId, tenantId, ct);
+            executionId, workspaceId, ct);
 
         if (execution is null)
         {
@@ -82,6 +82,6 @@ internal sealed class FormTaskSubmittedHandler(
         }
 
         await dispatcher.PublishAsync(
-            new ExecuteNextStepMessage(executionId, tenantId), ct);
+            new ExecuteNextStepMessage(executionId, workspaceId), ct);
     }
 }

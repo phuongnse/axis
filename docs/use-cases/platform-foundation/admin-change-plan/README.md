@@ -1,10 +1,10 @@
-# Use case — Change tenant plan (admin override)
+# Use case — Change workspace plan (admin override)
 
 > **Navigation**: [← Platform Foundation](../README.md) · [Use cases index](../README.md#use-cases)
 
 ## Purpose
 
-Manually change a tenant's plan so that I can support early customers and testing without a billing integration.
+Manually change a workspace's plan so that I can support early customers and testing without a billing integration.
 
 ## Primary actor
 
@@ -12,12 +12,12 @@ Manually change a tenant's plan so that I can support early customers and testin
 
 ## Trigger
 
-- User initiates: manually change a tenant's plan
+- User initiates: manually change a workspace's plan
 
 ## Main flow
 
-1. Actor starts the — Change tenant plan (admin override) flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+1. Actor starts the — Change workspace plan (admin override) flow from the relevant Axis screen or API.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
@@ -31,19 +31,19 @@ Define subscription plan tiers with feature limits and enforce those limits at t
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] Platform Admin dashboard has a "Change plan" action per Tenant.
-- [ ] Selecting a new plan updates the tenant's plan immediately; new limits take effect on the next API request.
-- [ ] The tenant's limit counters in Redis are refreshed after a plan change.
+- [ ] Platform Admin dashboard has a "Change plan" action per Workspace.
+- [ ] Selecting a new plan updates the workspace's plan immediately; new limits take effect on the next API request.
+- [ ] The workspace's limit counters in Redis are refreshed after a plan change.
 
 *Validation & errors*
-- [ ] Downgrading to a lower plan when the tenant already exceeds the new limits: the change is allowed, but existing resources over the limit are not deleted. The tenant is flagged as "over limit" and blocked from creating additional resources until they are within the new limits.
+- [ ] Downgrading to a lower plan when the workspace already exceeds the new limits: the change is allowed, but existing resources over the limit are not deleted. The workspace is flagged as "over limit" and blocked from creating additional resources until they are within the new limits.
 - [ ] A non-Platform-Admin cannot reach this endpoint (HTTP 403).
 
 *Edge cases*
 - [ ] Plan change is logged in the platform audit log with: who changed, from what plan, to what plan, and at what time.
 
 *Out of scope*
-- tenant-initiated plan upgrade — part of the separate billing initiative (requires billing integration).
+- workspace-initiated plan upgrade — part of the separate billing initiative (requires billing integration).
 
 > **Implementation status**
 >
@@ -59,7 +59,7 @@ Define subscription plan tiers with feature limits and enforce those limits at t
 >
 > **Done (backend):**
 > - `GET /api/plans` with limits + `featureFlags` + `isAvailableForNewSignups`
-> - signed-in tenant on retired plan still sees that plan
+> - signed-in workspace on retired plan still sees that plan
 > - 402 on create/duplicate/import workflow, invite user, start execution
 > - Redis read-through cache + INCR/DECR on mutate + execution key TTL to month-end UTC
 > - DB fallback + warning when Redis write/read fails

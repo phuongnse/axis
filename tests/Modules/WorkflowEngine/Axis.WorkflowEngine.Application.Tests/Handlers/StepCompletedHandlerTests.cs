@@ -19,14 +19,14 @@ public class StepCompletedHandlerTests
     private readonly IStepDispatcher _dispatcher = Substitute.For<IStepDispatcher>();
     private readonly ILogger<StepCompletedHandler> _logger = Substitute.For<ILogger<StepCompletedHandler>>();
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private static readonly Guid WorkflowId = Guid.NewGuid();
 
     private StepCompletedHandler CreateHandler() => new(_execRepo, _uow, _dispatcher, _logger);
 
     private static (WorkflowExecution Execution, ExecutionStep Step) MakeRunningExecution()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TenantId, TriggerType.Manual, null, new Dictionary<string, object?>());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, WorkspaceId, TriggerType.Manual, null, new Dictionary<string, object?>());
         ExecutionStep step = exec.AddStep(Guid.NewGuid(), "Form", StepType.Form, 0);
         exec.Start();
         exec.StartStep(step.Id, exec.Context);
@@ -39,10 +39,10 @@ public class StepCompletedHandlerTests
         (WorkflowExecution execution, ExecutionStep step) = MakeRunningExecution();
         Dictionary<string, object?> output = new() { ["result"] = "done" };
 
-        _execRepo.GetByIdWithStepsAsync(execution.Id, TenantId).Returns(execution);
+        _execRepo.GetByIdWithStepsAsync(execution.Id, WorkspaceId).Returns(execution);
 
         await CreateHandler().HandleAsync(
-            new StepCompletedMessage(execution.Id, step.Id, TenantId, output),
+            new StepCompletedMessage(execution.Id, step.Id, WorkspaceId, output),
             CancellationToken.None);
 
         step.Status.Should().Be(StepExecutionStatus.Completed);
@@ -60,10 +60,10 @@ public class StepCompletedHandlerTests
         // Advance step to terminal
         execution.CompleteStep(step.Id, new Dictionary<string, object?>());
 
-        _execRepo.GetByIdWithStepsAsync(execution.Id, TenantId).Returns(execution);
+        _execRepo.GetByIdWithStepsAsync(execution.Id, WorkspaceId).Returns(execution);
 
         await CreateHandler().HandleAsync(
-            new StepCompletedMessage(execution.Id, step.Id, TenantId, new Dictionary<string, object?>()),
+            new StepCompletedMessage(execution.Id, step.Id, WorkspaceId, new Dictionary<string, object?>()),
             CancellationToken.None);
 
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
@@ -77,7 +77,7 @@ public class StepCompletedHandlerTests
         _execRepo.GetByIdWithStepsAsync(Arg.Any<Guid>(), Arg.Any<Guid>()).ReturnsNull();
 
         await CreateHandler().HandleAsync(
-            new StepCompletedMessage(Guid.NewGuid(), Guid.NewGuid(), TenantId, new Dictionary<string, object?>()),
+            new StepCompletedMessage(Guid.NewGuid(), Guid.NewGuid(), WorkspaceId, new Dictionary<string, object?>()),
             CancellationToken.None);
 
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
@@ -86,11 +86,11 @@ public class StepCompletedHandlerTests
     [Fact]
     public async Task HandleAsync_WhenStepNotFound_ReturnsWithoutAction()
     {
-        WorkflowExecution execution = WorkflowExecution.Create(WorkflowId, TenantId, TriggerType.Manual, null, new Dictionary<string, object?>());
-        _execRepo.GetByIdWithStepsAsync(execution.Id, TenantId).Returns(execution);
+        WorkflowExecution execution = WorkflowExecution.Create(WorkflowId, WorkspaceId, TriggerType.Manual, null, new Dictionary<string, object?>());
+        _execRepo.GetByIdWithStepsAsync(execution.Id, WorkspaceId).Returns(execution);
 
         await CreateHandler().HandleAsync(
-            new StepCompletedMessage(execution.Id, Guid.NewGuid(), TenantId, new Dictionary<string, object?>()),
+            new StepCompletedMessage(execution.Id, Guid.NewGuid(), WorkspaceId, new Dictionary<string, object?>()),
             CancellationToken.None);
 
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
@@ -102,12 +102,12 @@ public class StepCompletedHandlerTests
         // Simulates the losing Wolverine worker in a concurrent-duplicate delivery scenario.
         // The winning worker already committed — this one must exit without dispatching.
         (WorkflowExecution execution, ExecutionStep step) = MakeRunningExecution();
-        _execRepo.GetByIdWithStepsAsync(execution.Id, TenantId).Returns(execution);
+        _execRepo.GetByIdWithStepsAsync(execution.Id, WorkspaceId).Returns(execution);
         _uow.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(Task.FromException<int>(new ConcurrencyException()));
 
         await CreateHandler().HandleAsync(
-            new StepCompletedMessage(execution.Id, step.Id, TenantId, new Dictionary<string, object?>()),
+            new StepCompletedMessage(execution.Id, step.Id, WorkspaceId, new Dictionary<string, object?>()),
             CancellationToken.None);
 
         await _dispatcher.DidNotReceive().PublishAsync(

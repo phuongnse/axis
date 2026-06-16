@@ -5,7 +5,7 @@ option csharp_namespace = "Axis.Identity.Contracts.Grpc";
 package axis.identity.v1;
 
 // Cross-module sync RPC (ADR-014). Escape hatch when JWT claims / local read models are insufficient.
-// Tenant scoping: server derives tenant_id from the caller's JWT `tenant_id` claim;
+// Workspace scoping: server derives workspace_id from the caller's JWT `workspace_id` claim;
 // callers MUST forward the inbound `authorization` header on every call.
 service IdentityService {
   rpc GetUserPermissions(GetUserPermissionsRequest) returns (GetUserPermissionsResponse);
@@ -13,7 +13,6 @@ service IdentityService {
 
 message GetUserPermissionsRequest {
   reserved 2;
-  reserved "organization_id", "tenant_id";
 
   string user_id = 1;
 }

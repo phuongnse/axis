@@ -18,12 +18,12 @@ public sealed class HttpContextCurrentUser(IHttpContextAccessor accessor) : ICur
         }
     }
 
-    public Guid? tenantId
+    public Guid? workspaceId
     {
         get
         {
-            string? TenantId = Principal?.FindFirstValue("tenant_id");
-            return Guid.TryParse(TenantId, out Guid id) ? id : null;
+            string? WorkspaceId = Principal?.FindFirstValue("workspace_id");
+            return Guid.TryParse(WorkspaceId, out Guid id) ? id : null;
         }
     }
 }

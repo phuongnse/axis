@@ -1,7 +1,7 @@
 /**
  * Axis UI kit section builders (S01–S37).
  * Import-only module — screens compose via component(buildXxx, x, y) in generate-screens.mjs.
- * Auth / register-tenant blocks: blocks.mjs.
+ * Auth / register-workspace blocks: blocks.mjs.
  *
  * TOC — 37 sections
  * ─── Foundations ─────────────────── S01 Color Palette
@@ -137,7 +137,7 @@ export function buildFormControls(y0) {
   // ── Col 1: Text input states (x=50) ──
   els.push(text('inp_req_note', 50, yC, 320, 14,
     `Required labels — * is ${REQUIRED_MARKER_GAP}px after label (C.danger)`, 10, C.gray500));
-  const inpHelpDemo = fieldLabelBlock('inp_help', 50, yC + 18, 280, 'Tenant name', {
+  const inpHelpDemo = fieldLabelBlock('inp_help', 50, yC + 18, 280, 'Workspace name', {
     required: true,
     helpText: '2–100 characters. Help text sits under the label; ? is the tooltip affordance.',
   });
@@ -1504,7 +1504,7 @@ export function buildTooltipPopover(y0) {
 
   // ── Tooltip (dark + light) ──
   els.push(rect('ttp_dark_box', 50, yC, 180, 28, C.gray900, C.gray900, 1, true));
-  els.push(text('ttp_dark_t',   50, yC + 7, 180, 14, 'Publish to all tenants', 11, C.white, 'center'));
+  els.push(text('ttp_dark_t',   50, yC + 7, 180, 14, 'Publish to all workspaces', 11, C.white, 'center'));
   els.push(rect('ttp_dark_arr', 127, yC + 26, 8, 8, C.gray900, C.gray900, 0, false));
   els.push(rect('ttp_dark_btn', 80, yC + 44, 100, 30, C.gray300, C.gray50, 1, true));
   els.push(text('ttp_dark_btn_t', 80, yC + 52, 100, 14, '? Help', 12, C.gray700, 'center'));

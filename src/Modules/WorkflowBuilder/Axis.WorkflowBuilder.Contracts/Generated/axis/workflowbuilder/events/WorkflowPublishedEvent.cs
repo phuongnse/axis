@@ -16,9 +16,9 @@ namespace axis.workflowbuilder.events
 	[global::System.CodeDom.Compiler.GeneratedCodeAttribute("avrogen", "1.12.1+9110c693767c1dde2665b2b57939333478b12036")]
 	public partial class WorkflowPublishedEvent : global::Avro.Specific.ISpecificRecord
 	{
-		public static global::Avro.Schema _SCHEMA = global::Avro.Schema.Parse(@"{""type"":""record"",""name"":""WorkflowPublishedEvent"",""namespace"":""axis.workflowbuilder.events"",""fields"":[{""name"":""workflowId"",""type"":""string""},{""name"":""tenantId"",""type"":""string""},{""name"":""referencedFormIds"",""default"":[],""type"":{""type"":""array"",""items"":""string""}},{""name"":""steps"",""default"":[],""type"":{""type"":""array"",""items"":{""type"":""record"",""name"":""StepSnapshotRecord"",""namespace"":""axis.workflowbuilder.events"",""fields"":[{""name"":""id"",""type"":""string""},{""name"":""name"",""type"":""string""},{""name"":""stepType"",""type"":""string""},{""name"":""displayOrder"",""type"":""int""},{""name"":""configJson"",""default"":null,""type"":[""null"",""string""]}]}}},{""name"":""transitions"",""default"":[],""type"":{""type"":""array"",""items"":{""type"":""record"",""name"":""TransitionSnapshotRecord"",""namespace"":""axis.workflowbuilder.events"",""fields"":[{""name"":""fromStepId"",""type"":""string""},{""name"":""toStepId"",""type"":""string""},{""name"":""label"",""default"":null,""type"":[""null"",""string""]}]}}}]}");
+		public static global::Avro.Schema _SCHEMA = global::Avro.Schema.Parse(@"{""type"":""record"",""name"":""WorkflowPublishedEvent"",""namespace"":""axis.workflowbuilder.events"",""fields"":[{""name"":""workflowId"",""type"":""string""},{""name"":""workspaceId"",""type"":""string""},{""name"":""referencedFormIds"",""default"":[],""type"":{""type"":""array"",""items"":""string""}},{""name"":""steps"",""default"":[],""type"":{""type"":""array"",""items"":{""type"":""record"",""name"":""StepSnapshotRecord"",""namespace"":""axis.workflowbuilder.events"",""fields"":[{""name"":""id"",""type"":""string""},{""name"":""name"",""type"":""string""},{""name"":""stepType"",""type"":""string""},{""name"":""displayOrder"",""type"":""int""},{""name"":""configJson"",""default"":null,""type"":[""null"",""string""]}]}}},{""name"":""transitions"",""default"":[],""type"":{""type"":""array"",""items"":{""type"":""record"",""name"":""TransitionSnapshotRecord"",""namespace"":""axis.workflowbuilder.events"",""fields"":[{""name"":""fromStepId"",""type"":""string""},{""name"":""toStepId"",""type"":""string""},{""name"":""label"",""default"":null,""type"":[""null"",""string""]}]}}}]}");
 		private string _workflowId;
-		private string _tenantId;
+		private string _workspaceId;
 		private IList<System.String> _referencedFormIds;
 		private IList<axis.workflowbuilder.events.StepSnapshotRecord> _steps;
 		private IList<axis.workflowbuilder.events.TransitionSnapshotRecord> _transitions;
@@ -40,15 +40,15 @@ namespace axis.workflowbuilder.events
 				this._workflowId = value;
 			}
 		}
-		public string tenantId
+		public string workspaceId
 		{
 			get
 			{
-				return this._tenantId;
+				return this._workspaceId;
 			}
 			set
 			{
-				this._tenantId = value;
+				this._workspaceId = value;
 			}
 		}
 		public IList<System.String> referencedFormIds
@@ -89,7 +89,7 @@ namespace axis.workflowbuilder.events
 			switch (fieldPos)
 			{
 			case 0: return this.workflowId;
-			case 1: return this.tenantId;
+			case 1: return this.workspaceId;
 			case 2: return this.referencedFormIds;
 			case 3: return this.steps;
 			case 4: return this.transitions;
@@ -101,7 +101,7 @@ namespace axis.workflowbuilder.events
 			switch (fieldPos)
 			{
 			case 0: this.workflowId = (System.String)fieldValue; break;
-			case 1: this.tenantId = (System.String)fieldValue; break;
+			case 1: this.workspaceId = (System.String)fieldValue; break;
 			case 2: this.referencedFormIds = (IList<System.String>)fieldValue; break;
 			case 3: this.steps = (IList<axis.workflowbuilder.events.StepSnapshotRecord>)fieldValue; break;
 			case 4: this.transitions = (IList<axis.workflowbuilder.events.TransitionSnapshotRecord>)fieldValue; break;

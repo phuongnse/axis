@@ -9,7 +9,7 @@ using Axis.Identity.Domain.Aggregates;
 namespace Axis.Api.Tests.Helpers;
 
 /// <summary>
-/// Shared test helper that registers a tenant, verifies email, runs the full
+/// Shared test helper that registers a workspace, verifies email, runs the full
 /// Authorization Code + PKCE flow, and returns an authenticated HttpClient.
 /// </summary>
 public static class AuthHelper
@@ -21,14 +21,14 @@ public static class AuthHelper
     private const string ClientId = "axis_spa";
 
     /// <summary>
-    /// Registers a tenant with the given suffix, verifies email, completes the
+    /// Registers a workspace with the given suffix, verifies email, completes the
     /// Authorization Code + PKCE flow, and returns a pre-configured Bearer client.
     /// </summary>
     public static async Task<HttpClient> CreateAdminClientAsync(ApiTestFixture fixture, string suffix)
     {
         string email = await RegisterAndVerifyAdminAsync(fixture, suffix);
 
-        await fixture.EnsureTenantProvisionedAsync(email);
+        await fixture.EnsureWorkspaceProvisionedAsync(email);
 
         string accessToken = await CompletePkceFlowWithSessionAsync(fixture.Client);
 
@@ -61,7 +61,7 @@ public static class AuthHelper
         ApiTestFixture fixture,
         string suffix)
     {
-        string setupToken = await RegisterAndVerifyTenantAsync(fixture, suffix);
+        string setupToken = await RegisterAndVerifyWorkspaceAsync(fixture, suffix);
         string email = TestRegistrationPayload.AdminEmail(suffix);
 
         HttpResponseMessage userRegResp = await fixture.Client.PostAsJsonAsync(
@@ -72,14 +72,14 @@ public static class AuthHelper
         return email;
     }
 
-    public static async Task<string> RegisterAndVerifyTenantAsync(
+    public static async Task<string> RegisterAndVerifyWorkspaceAsync(
         ApiTestFixture fixture,
         string suffix)
     {
-        string contactEmail = TestRegistrationPayload.TenantContactEmail(suffix);
+        string contactEmail = TestRegistrationPayload.WorkspaceContactEmail(suffix);
 
         HttpResponseMessage regResp = await fixture.Client.PostAsJsonAsync(
-            "/api/tenants", TestRegistrationPayload.Create(suffix), Json);
+            "/api/workspaces", TestRegistrationPayload.Create(suffix), Json);
 
         if (!regResp.IsSuccessStatusCode)
             throw new InvalidOperationException($"Registration failed: {regResp.StatusCode}");
@@ -91,13 +91,13 @@ public static class AuthHelper
         HttpResponseMessage verifyResp = await fixture.Client.PostAsJsonAsync(
             "/api/auth/verify-email", new { token = verifyToken }, Json);
         if (verifyResp.StatusCode != HttpStatusCode.OK)
-            throw new InvalidOperationException($"Tenant verification failed: {verifyResp.StatusCode}");
+            throw new InvalidOperationException($"Workspace verification failed: {verifyResp.StatusCode}");
 
         JsonElement verifyBody = await verifyResp.Content.ReadFromJsonAsync<JsonElement>(Json);
-        string? setupToken = verifyBody.GetProperty("tenantSetupToken").GetString();
+        string? setupToken = verifyBody.GetProperty("workspaceSetupToken").GetString();
 
         return setupToken
-            ?? throw new InvalidOperationException("No TenantSetupToken in verification response.");
+            ?? throw new InvalidOperationException("No WorkspaceSetupToken in verification response.");
     }
 
     /// <summary>

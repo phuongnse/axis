@@ -17,11 +17,11 @@ internal sealed class WorkflowPublishedHandler(
     public async Task Handle(WorkflowPublishedEvent @event, CancellationToken ct)
     {
         Guid workflowId = @event.WorkflowId();
-        Guid tenantId = @event.tenantId();
+        Guid workspaceId = @event.workspaceId();
         IReadOnlyList<Guid> referencedFormIds = @event.ReferencedFormIds();
 
         List<FormWorkflowReference> existing = await context.FormWorkflowReferences
-            .Where(r => r.WorkflowId == workflowId && r.tenantId == tenantId)
+            .Where(r => r.WorkflowId == workflowId && r.workspaceId == workspaceId)
             .ToListAsync(ct);
 
         HashSet<Guid> newFormIds = [.. referencedFormIds];
@@ -39,7 +39,7 @@ internal sealed class WorkflowPublishedHandler(
             if (existingRef is null)
             {
                 context.FormWorkflowReferences.Add(
-                    FormWorkflowReference.Create(workflowId, formId, tenantId));
+                    FormWorkflowReference.Create(workflowId, formId, workspaceId));
                 addedCount++;
             }
             else

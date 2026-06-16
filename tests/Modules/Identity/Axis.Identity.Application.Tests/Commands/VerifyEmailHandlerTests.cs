@@ -18,19 +18,19 @@ namespace Axis.Identity.Application.Tests.Commands;
 public class VerifyEmailHandlerTests
 {
     private readonly IEmailVerificationTokenStore _tokenStore = Substitute.For<IEmailVerificationTokenStore>();
-    private readonly ITenantRegistrationTokenStore _TenantTokenStore =
-        Substitute.For<ITenantRegistrationTokenStore>();
+    private readonly IWorkspaceRegistrationTokenStore _WorkspaceTokenStore =
+        Substitute.For<IWorkspaceRegistrationTokenStore>();
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
-    private readonly ITenantMembershipRepository _membershipRepo = Substitute.For<ITenantMembershipRepository>();
-    private readonly ITenantRepository _TenantRepo = Substitute.For<ITenantRepository>();
-    private readonly ITenantModuleProvisioningRepository _provisioningRepo =
-        Substitute.For<ITenantModuleProvisioningRepository>();
+    private readonly IWorkspaceMembershipRepository _membershipRepo = Substitute.For<IWorkspaceMembershipRepository>();
+    private readonly IWorkspaceRepository _WorkspaceRepo = Substitute.For<IWorkspaceRepository>();
+    private readonly IWorkspaceModuleProvisioningRepository _provisioningRepo =
+        Substitute.For<IWorkspaceModuleProvisioningRepository>();
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     public VerifyEmailHandlerTests()
     {
-        _TenantTokenStore.ResolveVerificationAsync(
+        _WorkspaceTokenStore.ResolveVerificationAsync(
                 Arg.Any<string>(),
                 Arg.Any<CancellationToken>())
             .Returns(Result.Failure<Guid>(ErrorCodes.BusinessRule, "Invalid verification link."));
@@ -39,44 +39,44 @@ public class VerifyEmailHandlerTests
     private VerifyEmailHandler CreateHandler() =>
         new(
             _tokenStore,
-            _TenantTokenStore,
+            _WorkspaceTokenStore,
             _userRepo,
             _membershipRepo,
-            _TenantRepo,
+            _WorkspaceRepo,
             _provisioningRepo,
             _roleRepo,
             _uow);
 
-    private static (User User, Tenant Tenant, TenantMembership Membership) MakeUnverifiedUserWithTenant()
+    private static (User User, Workspace Workspace, WorkspaceMembership Membership) MakeUnverifiedUserWithWorkspace()
     {
         Email email = Email.Create("alice@acme.com").Value!;
-        Tenant Tenant = Tenant.RegisterForContactVerification(
+        Workspace Workspace = Workspace.RegisterTeamForContactVerification(
             "Acme",
-            TenantSlug.Create("acme").Value!,
+            WorkspaceSlug.Create("acme").Value!,
             email,
             WellKnownSubscriptionPlans.FreeId,
             WellKnownLegalDocuments.TermsVersion,
             WellKnownLegalDocuments.PrivacyVersion);
         User user = User.Create("Alice", "Smith", email);
         user.SetPasswordHash("hashed");
-        TenantMembership membership = TenantMembership.Create(user.Id, Tenant.Id);
-        return (user, Tenant, membership);
+        WorkspaceMembership membership = WorkspaceMembership.Create(user.Id, Workspace.Id);
+        return (user, Workspace, membership);
     }
 
     [Fact]
     public async Task VerifyEmail_WhenTokenIsValid_VerifiesEmailAndRaisesDomainEvent()
     {
-        (User user, Tenant Tenant, TenantMembership membership) = MakeUnverifiedUserWithTenant();
-        Role adminRole = Role.CreateSystem("Admin", Tenant.Id, ["users:read"]);
+        (User user, Workspace Workspace, WorkspaceMembership membership) = MakeUnverifiedUserWithWorkspace();
+        Role adminRole = Role.CreateSystem("Admin", Workspace.Id, ["users:read"]);
         string rawToken = "valid-raw-token";
         string tokenHash = OpaqueTokenGenerator.Hash(rawToken);
 
         _tokenStore.ResolveForVerificationAsync(tokenHash, Arg.Any<CancellationToken>())
             .Returns(new EmailVerificationTokenResolveResult(EmailVerificationTokenState.Valid, user.Id));
         _userRepo.GetByIdPlatformWideAsync(user.Id).Returns(user);
-        _membershipRepo.GetFirstActiveByUserIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(membership);
-        _TenantRepo.GetByIdAsync(Tenant.Id).Returns(Tenant);
-        _roleRepo.GetByNameAsync("Admin", Tenant.Id).Returns(adminRole);
+        _membershipRepo.GetByUserIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns([membership]);
+        _WorkspaceRepo.GetByIdAsync(Workspace.Id, Arg.Any<CancellationToken>()).Returns(Workspace);
+        _roleRepo.GetByNameAsync("Admin", Workspace.Id).Returns(adminRole);
 
         Result<VerifyEmailSuccessDto> result = await CreateHandler().Handle(
             new VerifyEmailCommand(rawToken),
@@ -86,40 +86,40 @@ public class VerifyEmailHandlerTests
         result.Value.Email.Should().Be("alice@acme.com");
         result.Value.NextStep.Should().Be(VerifyEmailNextStep.WorkspaceProvisioning);
         user.IsEmailVerified.Should().BeTrue();
-        Tenant.Status.Should().Be(TenantStatus.Provisioning);
+        Workspace.Status.Should().Be(WorkspaceStatus.Provisioning);
 
         await _provisioningRepo.Received(1).AddRangeAsync(
-            Arg.Is<IEnumerable<TenantModuleProvisioning>>(rows => rows.Count() == TenantModuleNames.All.Count),
+            Arg.Is<IEnumerable<WorkspaceModuleProvisioning>>(rows => rows.Count() == WorkspaceModuleNames.All.Count),
             Arg.Any<CancellationToken>());
 
-        Tenant.DomainEvents.Should().ContainSingle(e => e is TenantVerified)
-            .Which.Should().BeOfType<TenantVerified>()
-            .Which.tenantId.Should().Be(Tenant.Id);
+        Workspace.DomainEvents.Should().ContainSingle(e => e is WorkspaceVerified)
+            .Which.Should().BeOfType<WorkspaceVerified>()
+            .Which.workspaceId.Should().Be(Workspace.Id);
 
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
         await _tokenStore.DidNotReceive().InvalidateAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task VerifyEmail_WhenTenantContactTokenIsValid_StartsProvisioningAndReturnsSetupToken()
+    public async Task VerifyEmail_WhenWorkspaceContactTokenIsValid_StartsProvisioningAndReturnsSetupToken()
     {
         Email email = Email.Create("admin@acme.com").Value!;
-        Tenant Tenant = Tenant.RegisterForContactVerification(
+        Workspace Workspace = Workspace.RegisterTeamForContactVerification(
             "Acme",
-            TenantSlug.Create("acme").Value!,
+            WorkspaceSlug.Create("acme").Value!,
             email,
             WellKnownSubscriptionPlans.FreeId,
             WellKnownLegalDocuments.TermsVersion,
             WellKnownLegalDocuments.PrivacyVersion);
-        string rawToken = "Tenant-contact-token";
+        string rawToken = "Workspace-contact-token";
         string tokenHash = OpaqueTokenGenerator.Hash(rawToken);
 
         _tokenStore.ResolveForVerificationAsync(tokenHash, Arg.Any<CancellationToken>())
             .Returns(new EmailVerificationTokenResolveResult(EmailVerificationTokenState.NotFound, null));
-        _TenantTokenStore.ResolveVerificationAsync(tokenHash, Arg.Any<CancellationToken>())
-            .Returns(Result.Success(Tenant.Id));
-        _TenantRepo.GetByIdAsync(Tenant.Id, Arg.Any<CancellationToken>())
-            .Returns(Tenant);
+        _WorkspaceTokenStore.ResolveVerificationAsync(tokenHash, Arg.Any<CancellationToken>())
+            .Returns(Result.Success(Workspace.Id));
+        _WorkspaceRepo.GetByIdAsync(Workspace.Id, Arg.Any<CancellationToken>())
+            .Returns(Workspace);
 
         Result<VerifyEmailSuccessDto> result = await CreateHandler().Handle(
             new VerifyEmailCommand(rawToken),
@@ -127,16 +127,16 @@ public class VerifyEmailHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value.UserId.Should().BeNull();
-        result.Value.tenantId.Should().Be(Tenant.Id);
+        result.Value.workspaceId.Should().Be(Workspace.Id);
         result.Value.NextStep.Should().Be(VerifyEmailNextStep.RegisterUser);
-        result.Value.TenantSetupToken.Should().NotBeNullOrWhiteSpace();
-        Tenant.Status.Should().Be(TenantStatus.Provisioning);
+        result.Value.WorkspaceSetupToken.Should().NotBeNullOrWhiteSpace();
+        Workspace.Status.Should().Be(WorkspaceStatus.Provisioning);
 
         await _provisioningRepo.Received(1).AddRangeAsync(
-            Arg.Is<IEnumerable<TenantModuleProvisioning>>(rows => rows.Count() == TenantModuleNames.All.Count),
+            Arg.Is<IEnumerable<WorkspaceModuleProvisioning>>(rows => rows.Count() == WorkspaceModuleNames.All.Count),
             Arg.Any<CancellationToken>());
-        await _TenantTokenStore.Received(1).CreateFirstUserSetupAsync(
-            Tenant.Id,
+        await _WorkspaceTokenStore.Received(1).CreateFirstUserSetupAsync(
+            Workspace.Id,
             Arg.Any<string>(),
             Arg.Any<DateTime>(),
             Arg.Any<CancellationToken>());
@@ -180,7 +180,7 @@ public class VerifyEmailHandlerTests
     [Fact]
     public async Task VerifyEmail_WhenTokenAlreadyUsed_ReturnsBusinessRuleFailure()
     {
-        (User user, Tenant _, TenantMembership _) = MakeUnverifiedUserWithTenant();
+        (User user, Workspace _, WorkspaceMembership _) = MakeUnverifiedUserWithWorkspace();
         string rawToken = "used-token";
         string tokenHash = OpaqueTokenGenerator.Hash(rawToken);
         _tokenStore.ResolveForVerificationAsync(tokenHash, Arg.Any<CancellationToken>())
@@ -199,7 +199,7 @@ public class VerifyEmailHandlerTests
     [Fact]
     public async Task VerifyEmail_WhenUserAlreadyVerified_ReturnsBusinessRuleFailure()
     {
-        (User user, Tenant _, TenantMembership _) = MakeUnverifiedUserWithTenant();
+        (User user, Workspace _, WorkspaceMembership _) = MakeUnverifiedUserWithWorkspace();
         user.VerifyEmail();
         user.ClearDomainEvents();
         string rawToken = "still-valid-token";

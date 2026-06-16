@@ -4,7 +4,7 @@ namespace Axis.WorkflowBuilder.Application.Commands.AddTransition;
 
 public sealed record AddTransitionCommand(
     Guid WorkflowId,
-    Guid tenantId,
+    Guid workspaceId,
     Guid FromStepId,
     Guid ToStepId,
     string? Label) : ICommand;

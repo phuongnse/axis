@@ -8,7 +8,7 @@ Edit an existing record so that I can update out-of-date information.
 
 ## Primary actor
 
-- Tenant Member with `data_modeling:record:write`
+- Workspace Member with `data_modeling:record:write`
 
 ## Trigger
 
@@ -17,7 +17,7 @@ Edit an existing record so that I can update out-of-date information.
 ## Main flow
 
 1. Actor starts the — Edit a record flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
@@ -26,7 +26,7 @@ Edit an existing record so that I can update out-of-date information.
 
 ## Context
 
-Users can create, read, update, and delete records against any model. Records are stored as JSONB in the tenant schema.
+Users can create, read, update, and delete records against any model. Records are stored as JSONB in the workspace schema.
 
 ## Acceptance Criteria
 

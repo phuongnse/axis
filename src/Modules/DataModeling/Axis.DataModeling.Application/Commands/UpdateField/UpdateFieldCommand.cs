@@ -7,7 +7,7 @@ namespace Axis.DataModeling.Application.Commands.UpdateField;
 public sealed record UpdateFieldCommand(
     Guid ModelId,
     Guid FieldId,
-    Guid tenantId,
+    Guid workspaceId,
     string Label,
     string? HelpText,
     bool IsRequired,

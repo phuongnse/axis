@@ -8,7 +8,7 @@ Configure who gets notified when my workflow fails so that the right people are 
 
 ## Primary actor
 
-- Tenant Member with `workflow:definition:write`
+- Workspace Member with `workflow:definition:write`
 
 ## Trigger
 
@@ -17,7 +17,7 @@ Configure who gets notified when my workflow fails so that the right people are 
 ## Main flow
 
 1. Actor starts the — Configure error notification channels per workflow flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows

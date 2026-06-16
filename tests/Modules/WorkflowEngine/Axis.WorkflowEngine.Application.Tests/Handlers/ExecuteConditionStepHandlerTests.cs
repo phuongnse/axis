@@ -19,13 +19,13 @@ public class ExecuteConditionStepHandlerTests
     private readonly IStepDispatcher _dispatcher = Substitute.For<IStepDispatcher>();
     private readonly ILogger<ExecuteConditionStepHandler> _logger = Substitute.For<ILogger<ExecuteConditionStepHandler>>();
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private static readonly Guid WorkflowId = Guid.NewGuid();
 
     private ExecuteConditionStepHandler CreateHandler() => new(_execRepo, _uow, _dispatcher, _logger);
 
     private static WorkflowExecution CreatePendingExecution()
-        => WorkflowExecution.Create(WorkflowId, TenantId, TriggerType.Manual, null, new Dictionary<string, object?>());
+        => WorkflowExecution.Create(WorkflowId, WorkspaceId, TriggerType.Manual, null, new Dictionary<string, object?>());
 
     // Builds a simple branch list: one named branch + one condition expression
     private static IReadOnlyList<IReadOnlyDictionary<string, object?>> ApprovedBranches()
@@ -70,7 +70,7 @@ public class ExecuteConditionStepHandlerTests
         execution.Start();
         execution.StartStep(condStep.Id, execution.Context);
 
-        _execRepo.GetByIdWithStepsAsync(execution.Id, TenantId).Returns(execution);
+        _execRepo.GetByIdWithStepsAsync(execution.Id, WorkspaceId).Returns(execution);
 
         List<ConditionTransition> transitions = new()
         {
@@ -88,7 +88,7 @@ public class ExecuteConditionStepHandlerTests
 
         await CreateHandler().HandleAsync(
             new ExecuteConditionStepMessage(
-                execution.Id, condStep.Id, TenantId,
+                execution.Id, condStep.Id, WorkspaceId,
                 config, context,
                 new List<Guid> { condDefId, approvedDefId, rejectedDefId },
                 transitions),
@@ -117,14 +117,14 @@ public class ExecuteConditionStepHandlerTests
         execution.Start();
         execution.StartStep(condStep.Id, execution.Context);
 
-        _execRepo.GetByIdWithStepsAsync(execution.Id, TenantId).Returns(execution);
+        _execRepo.GetByIdWithStepsAsync(execution.Id, WorkspaceId).Returns(execution);
 
         // Empty config — no branches key
         IReadOnlyDictionary<string, object?> config = new Dictionary<string, object?>();
 
         await CreateHandler().HandleAsync(
             new ExecuteConditionStepMessage(
-                execution.Id, condStep.Id, TenantId,
+                execution.Id, condStep.Id, WorkspaceId,
                 config, execution.Context,
                 new List<Guid>(), new List<ConditionTransition>()),
             CancellationToken.None);
@@ -145,7 +145,7 @@ public class ExecuteConditionStepHandlerTests
         execution.Start();
         execution.StartStep(condStep.Id, execution.Context);
 
-        _execRepo.GetByIdWithStepsAsync(execution.Id, TenantId).Returns(execution);
+        _execRepo.GetByIdWithStepsAsync(execution.Id, WorkspaceId).Returns(execution);
 
         IReadOnlyDictionary<string, object?> config = new Dictionary<string, object?>
         {
@@ -157,7 +157,7 @@ public class ExecuteConditionStepHandlerTests
 
         await CreateHandler().HandleAsync(
             new ExecuteConditionStepMessage(
-                execution.Id, condStep.Id, TenantId,
+                execution.Id, condStep.Id, WorkspaceId,
                 config, context,
                 new List<Guid>(), new List<ConditionTransition>()),
             CancellationToken.None);
@@ -177,11 +177,11 @@ public class ExecuteConditionStepHandlerTests
         execution.StartStep(condStep.Id, execution.Context);
         execution.CompleteStep(condStep.Id, new Dictionary<string, object?>());
 
-        _execRepo.GetByIdWithStepsAsync(execution.Id, TenantId).Returns(execution);
+        _execRepo.GetByIdWithStepsAsync(execution.Id, WorkspaceId).Returns(execution);
 
         await CreateHandler().HandleAsync(
             new ExecuteConditionStepMessage(
-                execution.Id, condStep.Id, TenantId,
+                execution.Id, condStep.Id, WorkspaceId,
                 null, execution.Context,
                 new List<Guid>(), new List<ConditionTransition>()),
             CancellationToken.None);
@@ -198,7 +198,7 @@ public class ExecuteConditionStepHandlerTests
 
         await CreateHandler().HandleAsync(
             new ExecuteConditionStepMessage(
-                Guid.NewGuid(), Guid.NewGuid(), TenantId,
+                Guid.NewGuid(), Guid.NewGuid(), WorkspaceId,
                 null, new Dictionary<string, object?>(),
                 new List<Guid>(), new List<ConditionTransition>()),
             CancellationToken.None);
@@ -218,7 +218,7 @@ public class ExecuteConditionStepHandlerTests
         execution.Start();
         execution.StartStep(condStep.Id, execution.Context);
 
-        _execRepo.GetByIdWithStepsAsync(execution.Id, TenantId).Returns(execution);
+        _execRepo.GetByIdWithStepsAsync(execution.Id, WorkspaceId).Returns(execution);
         _uow.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(Task.FromException<int>(new ConcurrencyException()));
 
@@ -234,7 +234,7 @@ public class ExecuteConditionStepHandlerTests
 
         await CreateHandler().HandleAsync(
             new ExecuteConditionStepMessage(
-                execution.Id, condStep.Id, TenantId,
+                execution.Id, condStep.Id, WorkspaceId,
                 config, context,
                 new List<Guid> { condDefId, approvedDefId },
                 transitions),

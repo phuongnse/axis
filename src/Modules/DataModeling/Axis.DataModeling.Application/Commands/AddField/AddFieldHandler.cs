@@ -15,7 +15,7 @@ public sealed class AddFieldHandler(
 {
     public async Task<Result<Guid>> Handle(AddFieldCommand command, CancellationToken cancellationToken)
     {
-        DataModel? model = await modelRepo.GetByIdAsync(command.ModelId, command.tenantId, cancellationToken);
+        DataModel? model = await modelRepo.GetByIdAsync(command.ModelId, command.workspaceId, cancellationToken);
         if (model is null)
             return Result.Failure<Guid>(ErrorCodes.NotFound, "Model not found.");
 

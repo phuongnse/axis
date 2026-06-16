@@ -13,12 +13,12 @@ public sealed class UpdateWorkflowHandler(IWorkflowRepository workflowRepo, IUni
     public async Task<Result> Handle(UpdateWorkflowCommand command, CancellationToken cancellationToken)
     {
         WorkflowDefinition? workflow = await workflowRepo.GetByIdAsync(
-            command.WorkflowId, command.tenantId, cancellationToken);
+            command.WorkflowId, command.workspaceId, cancellationToken);
 
         if (workflow is null)
             return Result.Failure(ErrorCodes.NotFound, "Workflow not found.");
 
-        if (await workflowRepo.NameExistsAsync(command.Name, command.tenantId, command.WorkflowId, cancellationToken))
+        if (await workflowRepo.NameExistsAsync(command.Name, command.workspaceId, command.WorkflowId, cancellationToken))
             return Result.Failure(ErrorCodes.Conflict, $"A workflow named '{command.Name}' already exists.");
 
         workflow.Update(command.Name, command.Description);

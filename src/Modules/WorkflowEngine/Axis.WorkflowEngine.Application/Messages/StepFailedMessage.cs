@@ -7,5 +7,5 @@ namespace Axis.WorkflowEngine.Application.Messages;
 public sealed record StepFailedMessage(
     Guid ExecutionId,
     Guid StepId,
-    Guid tenantId,
+    Guid workspaceId,
     string ErrorDetails);

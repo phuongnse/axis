@@ -100,7 +100,7 @@ function applyRegisterValidationErrors(
 export function useRegister() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const tenantSetupToken = useQueryParam('setupToken');
+  const workspaceSetupToken = useQueryParam('setupToken');
   const {
     data: legalVersions,
     isError: legalVersionsError,
@@ -134,7 +134,7 @@ export function useRegister() {
           passwordConfirmation: values.passwordConfirmation,
           acceptedTermsVersion: legalVersions.termsVersion,
           acceptedPrivacyVersion: legalVersions.privacyVersion,
-          tenantSetupToken,
+          workspaceSetupToken,
         },
         idempotencyKeyRef.current,
       );

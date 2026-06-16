@@ -18,22 +18,22 @@ Open the first authenticated workspace screen so that the user understands their
 
 1. SPA route protection confirms an in-memory access token exists.
 2. Client loads the current user profile from `GET /api/users/me`.
-3. If the profile is linked to a tenant and has `tenant:settings:read`, client loads `GET /api/tenants/current/settings`.
+3. If the profile is linked to a workspace and has `workspace:settings:read`, client loads `GET /api/workspaces/current/settings`.
 4. Dashboard renders the current account, workspace state, and real usage values returned by the API.
 
 ## Alternate / error flows
 
 - Profile request is loading: show a skeleton rather than a blank screen.
 - Profile request fails: show an error message with retry.
-- Account has no Tenant: show an honest empty state and do not call Tenant settings.
-- Account is linked to a tenant but lacks settings permission: show workspace access as active without exposing settings or fake usage.
-- Tenant settings request fails: keep the signed-in account state visible and show a retryable settings error.
+- Account has no Workspace: show an honest empty state and do not call Workspace settings.
+- Account is linked to a workspace but lacks settings permission: show workspace access as active without exposing settings or fake usage.
+- Workspace settings request fails: keep the signed-in account state visible and show a retryable settings error.
 
 ## Acceptance Criteria
 
 *Happy path*
 - [ ] The dashboard loads the current profile from `/api/users/me`.
-- [ ] Users with `tenant:settings:read` see tenant name, status, plan, and usage values from `/api/tenants/current/settings`.
+- [ ] Users with `workspace:settings:read` see workspace name, status, plan, and usage values from `/api/workspaces/current/settings`.
 - [ ] Plan usage cards display users, workflows, and monthly executions using API values only.
 
 *Validation & errors*
@@ -42,12 +42,12 @@ Open the first authenticated workspace screen so that the user understands their
 - [ ] A settings load failure does not hide the signed-in account state.
 
 *Edge cases*
-- [ ] Accounts without a tenant do not request Tenant settings.
+- [ ] Accounts without a workspace do not request Workspace settings.
 - [ ] Accounts without settings permission do not show placeholder usage or fake operational status.
 
 *Out of scope*
 - Creating a workspace from this screen.
-- Editing Tenant settings.
+- Editing Workspace settings.
 - Showing workflow/model/event metrics before those backend endpoints exist.
 
 ## Wireframes

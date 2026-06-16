@@ -5,13 +5,13 @@ namespace Axis.Api.Middleware;
 
 /// <summary>
 /// Reads X-Correlation-Id from the request (or the active trace ID from OpenTelemetry),
-/// echoes it on the response, and pushes correlation + tenant fields into Serilog's
+/// echoes it on the response, and pushes correlation + workspace fields into Serilog's
 /// LogContext so every log entry in the request scope is queryable in Loki (ADR-018).
 /// </summary>
 internal sealed class CorrelationIdMiddleware(RequestDelegate next)
 {
     private const string HeaderName = "X-Correlation-Id";
-    private const string TenantIdClaim = "tenant_id";
+    private const string WorkspaceIdClaim = "workspace_id";
 
     public async Task InvokeAsync(HttpContext context)
     {
@@ -28,13 +28,13 @@ internal sealed class CorrelationIdMiddleware(RequestDelegate next)
         Activity? activity = Activity.Current;
         activity?.SetTag("correlation.id", correlationId);
 
-        string? tenantId = context.User.FindFirst(TenantIdClaim)?.Value;
-        if (tenantId is not null)
-            activity?.SetTag("tenant.id", tenantId);
+        string? workspaceId = context.User.FindFirst(WorkspaceIdClaim)?.Value;
+        if (workspaceId is not null)
+            activity?.SetTag("workspace.id", workspaceId);
 
         List<IDisposable> disposables = [LogContext.PushProperty("CorrelationId", correlationId)];
-        if (tenantId is not null)
-            disposables.Add(LogContext.PushProperty("TenantId", tenantId));
+        if (workspaceId is not null)
+            disposables.Add(LogContext.PushProperty("WorkspaceId", workspaceId));
 
         try
         {

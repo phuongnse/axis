@@ -19,7 +19,7 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
         """;
 
     public async Task<long?> TryGetCachedUsageAsync(
-        Guid tenantId,
+        Guid workspaceId,
         PlanLimitResourceType resourceType,
         CancellationToken cancellationToken)
     {
@@ -27,7 +27,7 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
         try
         {
             IDatabase db = redis.GetDatabase();
-            RedisValue value = await db.StringGetAsync(BuildKey(tenantId, resourceType));
+            RedisValue value = await db.StringGetAsync(BuildKey(workspaceId, resourceType));
             if (!value.HasValue)
                 return null;
 
@@ -40,7 +40,7 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
     }
 
     public async Task<bool> TrySetCachedUsageAsync(
-        Guid tenantId,
+        Guid workspaceId,
         PlanLimitResourceType resourceType,
         long usage,
         CancellationToken cancellationToken)
@@ -49,7 +49,7 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
         try
         {
             IDatabase db = redis.GetDatabase();
-            RedisKey key = BuildKey(tenantId, resourceType);
+            RedisKey key = BuildKey(workspaceId, resourceType);
             return await db.StringSetAsync(key, usage, GetExpiry(resourceType));
         }
         catch (RedisException)
@@ -59,7 +59,7 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
     }
 
     public async Task<bool> TryAdjustUsageAsync(
-        Guid tenantId,
+        Guid workspaceId,
         PlanLimitResourceType resourceType,
         int delta,
         CancellationToken cancellationToken)
@@ -68,7 +68,7 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
         try
         {
             IDatabase db = redis.GetDatabase();
-            string key = BuildKey(tenantId, resourceType);
+            string key = BuildKey(workspaceId, resourceType);
             if (delta >= 0)
             {
                 long count = await db.StringIncrementAsync(key, delta);
@@ -88,7 +88,7 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
         }
     }
 
-    public async Task TryInvalidateTenantAsync(Guid tenantId, CancellationToken cancellationToken)
+    public async Task TryInvalidateWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         try
@@ -96,9 +96,9 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
             IDatabase db = redis.GetDatabase();
             await db.KeyDeleteAsync(
             [
-                BuildKey(tenantId, PlanLimitResourceType.Workflows),
-                BuildKey(tenantId, PlanLimitResourceType.Users),
-                BuildKey(tenantId, PlanLimitResourceType.ExecutionsPerMonth),
+                BuildKey(workspaceId, PlanLimitResourceType.Workflows),
+                BuildKey(workspaceId, PlanLimitResourceType.Users),
+                BuildKey(workspaceId, PlanLimitResourceType.ExecutionsPerMonth),
             ]);
         }
         catch (RedisException)
@@ -107,14 +107,14 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
         }
     }
 
-    private static string BuildKey(Guid tenantId, PlanLimitResourceType resourceType) =>
+    private static string BuildKey(Guid workspaceId, PlanLimitResourceType resourceType) =>
         resourceType switch
         {
-            PlanLimitResourceType.Workflows => $"plan:{tenantId:N}:workflows",
-            PlanLimitResourceType.Users => $"plan:{tenantId:N}:users",
+            PlanLimitResourceType.Workflows => $"plan:{workspaceId:N}:workflows",
+            PlanLimitResourceType.Users => $"plan:{workspaceId:N}:users",
             PlanLimitResourceType.ExecutionsPerMonth =>
-                $"plan:{tenantId:N}:executions:{DateTime.UtcNow:yyyyMM}",
-            _ => $"plan:{tenantId:N}:{resourceType}",
+                $"plan:{workspaceId:N}:executions:{DateTime.UtcNow:yyyyMM}",
+            _ => $"plan:{workspaceId:N}:{resourceType}",
         };
 
     private static TimeSpan GetExpiry(PlanLimitResourceType resourceType)

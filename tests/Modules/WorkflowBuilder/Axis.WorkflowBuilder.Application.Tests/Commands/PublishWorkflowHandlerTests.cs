@@ -16,7 +16,7 @@ public class PublishWorkflowHandlerTests
     private readonly IWorkflowReferenceSync _referenceSync = Substitute.For<IWorkflowReferenceSync>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     public PublishWorkflowHandlerTests()
@@ -31,7 +31,7 @@ public class PublishWorkflowHandlerTests
 
     private static WorkflowDefinition MakePublishableWorkflow()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, TenantId, UserId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, WorkspaceId, UserId);
         wf.AddTrigger(TriggerType.Manual, null);
         Domain.Entities.WorkflowStep formStep = wf.AddStep("Review", StepType.Form, null);
         Domain.Entities.WorkflowStep startStep = wf.Steps.Single(s => s.Type == StepType.Start);
@@ -45,9 +45,9 @@ public class PublishWorkflowHandlerTests
     public async Task PublishWorkflow_WhenWorkflowIsValid_PublishesWorkflow()
     {
         WorkflowDefinition wf = MakePublishableWorkflow();
-        _workflowRepo.GetByIdAsync(wf.Id, TenantId).Returns(wf);
+        _workflowRepo.GetByIdAsync(wf.Id, WorkspaceId).Returns(wf);
 
-        Result result = await CreateHandler().Handle(new PublishWorkflowCommand(wf.Id, TenantId), CancellationToken.None);
+        Result result = await CreateHandler().Handle(new PublishWorkflowCommand(wf.Id, WorkspaceId), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         wf.Status.Should().Be(WorkflowStatus.Active);
@@ -57,10 +57,10 @@ public class PublishWorkflowHandlerTests
     [Fact]
     public async Task PublishWorkflow_WhenWorkflowNotFound_ReturnsNotFound()
     {
-        _workflowRepo.GetByIdAsync(Arg.Any<Guid>(), TenantId).ReturnsNull();
+        _workflowRepo.GetByIdAsync(Arg.Any<Guid>(), WorkspaceId).ReturnsNull();
 
         Result result = await CreateHandler().Handle(
-            new PublishWorkflowCommand(Guid.NewGuid(), TenantId),
+            new PublishWorkflowCommand(Guid.NewGuid(), WorkspaceId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -69,30 +69,30 @@ public class PublishWorkflowHandlerTests
     }
 
     [Fact]
-    public async Task PublishWorkflow_WhenWorkflowBelongsToAnotherTenant_ReturnsNotFound()
+    public async Task PublishWorkflow_WhenWorkflowBelongsToAnotherWorkspace_ReturnsNotFound()
     {
         WorkflowDefinition wf = MakePublishableWorkflow();
 
-        Guid otherTenantId = Guid.NewGuid();
-        _workflowRepo.GetByIdAsync(wf.Id, otherTenantId).Returns((WorkflowDefinition?)null);
+        Guid otherWorkspaceId = Guid.NewGuid();
+        _workflowRepo.GetByIdAsync(wf.Id, otherWorkspaceId).Returns((WorkflowDefinition?)null);
         Result result = await CreateHandler().Handle(
-            new PublishWorkflowCommand(wf.Id, otherTenantId), CancellationToken.None);
+            new PublishWorkflowCommand(wf.Id, otherWorkspaceId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-        await _workflowRepo.Received(1).GetByIdAsync(wf.Id, otherTenantId);
+        await _workflowRepo.Received(1).GetByIdAsync(wf.Id, otherWorkspaceId);
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task PublishWorkflow_WhenNoTriggersConfigured_ReturnsBusinessRuleFailure()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, TenantId, UserId);
+        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, WorkspaceId, UserId);
         wf.AddStep("Review", StepType.Form, null);
-        _workflowRepo.GetByIdAsync(wf.Id, TenantId).Returns(wf);
+        _workflowRepo.GetByIdAsync(wf.Id, WorkspaceId).Returns(wf);
 
         Result result = await CreateHandler().Handle(
-            new PublishWorkflowCommand(wf.Id, TenantId),
+            new PublishWorkflowCommand(wf.Id, WorkspaceId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -104,13 +104,13 @@ public class PublishWorkflowHandlerTests
     public async Task PublishWorkflow_WhenBrokenReferencesExist_ReturnsBusinessRuleFailure()
     {
         WorkflowDefinition wf = MakePublishableWorkflow();
-        _workflowRepo.GetByIdAsync(wf.Id, TenantId).Returns(wf);
+        _workflowRepo.GetByIdAsync(wf.Id, WorkspaceId).Returns(wf);
         _referenceSync
             .SyncAsync(wf, Arg.Any<CancellationToken>())
             .Returns(new WorkflowReferenceSyncResult(HasBrokenReferences: true));
 
         Result result = await CreateHandler().Handle(
-            new PublishWorkflowCommand(wf.Id, TenantId),
+            new PublishWorkflowCommand(wf.Id, WorkspaceId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

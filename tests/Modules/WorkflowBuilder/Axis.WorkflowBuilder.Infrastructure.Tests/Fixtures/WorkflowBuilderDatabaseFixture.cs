@@ -1,4 +1,4 @@
-using Axis.Shared.Application.Tenancy;
+using Axis.Shared.Application.Workspaces;
 using Axis.Testing;
 using Axis.WorkflowBuilder.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -29,10 +29,10 @@ public sealed class WorkflowBuilderDatabaseFixture : IAsyncLifetime
         command.CommandText = $"""CREATE SCHEMA IF NOT EXISTS "{TestSchema}";""";
         await command.ExecuteNonQueryAsync();
 
-        TestTenantContext tenantContext = new(TestSchema);
+        TestWorkspaceContext workspaceContext = new(TestSchema);
         await PostgresModuleTestDatabase.MigrateAsync<WorkflowBuilderDbContext>(
             ConnectionString,
-            opts => new WorkflowBuilderDbContext(opts, tenantContext));
+            opts => new WorkflowBuilderDbContext(opts, workspaceContext));
     }
 
     public async Task DisposeAsync() => await _postgres.DisposeAsync();
@@ -42,12 +42,12 @@ public sealed class WorkflowBuilderDatabaseFixture : IAsyncLifetime
         DbContextOptions<WorkflowBuilderDbContext> options = new DbContextOptionsBuilder<WorkflowBuilderDbContext>()
                     .UseNpgsql(ConnectionString)
                     .Options;
-        return new WorkflowBuilderDbContext(options, new TestTenantContext(TestSchema));
+        return new WorkflowBuilderDbContext(options, new TestWorkspaceContext(TestSchema));
     }
 }
 
-internal sealed class TestTenantContext(string schemaName) : ITenantContext
+internal sealed class TestWorkspaceContext(string schemaName) : IWorkspaceContext
 {
-    public Guid tenantId => Guid.Parse("00000000-0000-0000-0000-000000000001");
+    public Guid workspaceId => Guid.Parse("00000000-0000-0000-0000-000000000001");
     public string SchemaName => schemaName;
 }

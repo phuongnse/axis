@@ -13,7 +13,7 @@ public sealed class GetRecordsHandler(
 {
     public async Task<Result<RecordsPageDto>> Handle(GetRecordsQuery query, CancellationToken cancellationToken)
     {
-        DataModel? model = await modelRepo.GetByIdAsync(query.ModelId, query.tenantId, cancellationToken);
+        DataModel? model = await modelRepo.GetByIdAsync(query.ModelId, query.workspaceId, cancellationToken);
         if (model is null)
             return Result.Failure<RecordsPageDto>(ErrorCodes.NotFound, "Model not found.");
 
@@ -21,7 +21,7 @@ public sealed class GetRecordsHandler(
         int pageSize = Math.Clamp(query.PageSize, 1, 100);
 
         (IReadOnlyList<DataRecord> records, int total) = await recordRepo.GetPagedAsync(
-            query.ModelId, query.tenantId,
+            query.ModelId, query.workspaceId,
             page, pageSize,
             query.Search,
             query.Filters,

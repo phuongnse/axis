@@ -22,7 +22,9 @@ internal sealed class ExecutionConfiguration : IEntityTypeConfiguration<Workflow
         builder.HasKey(e => e.Id);
 
         builder.Property(e => e.WorkflowDefinitionId).IsRequired();
-        builder.Property(e => e.tenantId).IsRequired();
+        builder.Property(e => e.workspaceId)
+            .HasColumnName("workspace_id")
+            .IsRequired();
         builder.Property(e => e.Status).HasConversion<string>().IsRequired();
         builder.Property(e => e.TriggerType).HasConversion<string>().IsRequired();
         builder.Property(e => e.TriggeredByUserId);
@@ -78,7 +80,9 @@ internal sealed class ExecutionConfiguration : IEntityTypeConfiguration<Workflow
             stepBuilder.HasKey(s => s.Id);
 
             stepBuilder.Property(s => s.ExecutionId).IsRequired();
-            stepBuilder.Property(s => s.tenantId).IsRequired();
+            stepBuilder.Property(s => s.workspaceId)
+                .HasColumnName("workspace_id")
+                .IsRequired();
             stepBuilder.Property(s => s.StepDefinitionId).IsRequired();
             stepBuilder.Property(s => s.Name).IsRequired().HasMaxLength(500);
             stepBuilder.Property(s => s.DisplayOrder).IsRequired();
@@ -103,7 +107,7 @@ internal sealed class ExecutionConfiguration : IEntityTypeConfiguration<Workflow
                 .HasColumnType("jsonb")
                 .HasConversion(snapshotConverter, snapshotComparer);
 
-            stepBuilder.HasIndex(s => new { s.ExecutionId, s.tenantId });
+            stepBuilder.HasIndex(s => new { s.ExecutionId, s.workspaceId });
 
             // Optimistic concurrency via PostgreSQL xmin system column.
             // EF Core includes "WHERE xmin = @p" in UPDATEs so a concurrent write to the

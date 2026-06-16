@@ -14,7 +14,7 @@ namespace Axis.Architecture.Tests;
 /// <c>Axis.Shared.Application</c> contain zero references to EF Core, Wolverine,
 /// or persistence concerns. <c>Axis.Shared.Infrastructure</c> is allowed to
 /// reference infra (it owns genuinely cross-cutting interceptors like
-/// <c>TenantSchemaInterceptor</c>) but must not contain per-module concerns.
+/// <c>WorkspaceSchemaInterceptor</c>) but must not contain per-module concerns.
 /// </para>
 /// </summary>
 public class SharedKernelTests

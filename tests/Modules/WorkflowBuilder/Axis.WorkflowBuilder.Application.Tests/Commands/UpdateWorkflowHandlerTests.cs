@@ -10,7 +10,7 @@ namespace Axis.WorkflowBuilder.Application.Tests;
 
 public class UpdateWorkflowHandlerTests
 {
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private readonly IWorkflowRepository _repo = Substitute.For<IWorkflowRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly UpdateWorkflowHandler _handler;
@@ -20,12 +20,12 @@ public class UpdateWorkflowHandlerTests
     [Fact]
     public async Task Handle_WhenNameIsUnique_UpdatesWorkflowAndSaves()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("Old Name", null, TenantId, "user");
-        _repo.GetByIdAsync(wf.Id, TenantId, Arg.Any<CancellationToken>()).Returns(wf);
-        _repo.NameExistsAsync("New Name", TenantId, wf.Id, Arg.Any<CancellationToken>()).Returns(false);
+        WorkflowDefinition wf = WorkflowDefinition.Create("Old Name", null, WorkspaceId, "user");
+        _repo.GetByIdAsync(wf.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(wf);
+        _repo.NameExistsAsync("New Name", WorkspaceId, wf.Id, Arg.Any<CancellationToken>()).Returns(false);
 
         Result result = await _handler.Handle(
-            new UpdateWorkflowCommand(wf.Id, TenantId, "New Name", "Updated desc"), CancellationToken.None);
+            new UpdateWorkflowCommand(wf.Id, WorkspaceId, "New Name", "Updated desc"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         wf.Name.Should().Be("New Name");
@@ -36,41 +36,41 @@ public class UpdateWorkflowHandlerTests
     [Fact]
     public async Task Handle_WhenWorkflowNotFound_ReturnsNotFound()
     {
-        _repo.GetByIdAsync(Arg.Any<Guid>(), TenantId, Arg.Any<CancellationToken>()).Returns((WorkflowDefinition?)null);
+        _repo.GetByIdAsync(Arg.Any<Guid>(), WorkspaceId, Arg.Any<CancellationToken>()).Returns((WorkflowDefinition?)null);
 
         Result result = await _handler.Handle(
-            new UpdateWorkflowCommand(Guid.NewGuid(), TenantId, "Name", null), CancellationToken.None);
+            new UpdateWorkflowCommand(Guid.NewGuid(), WorkspaceId, "Name", null), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
     }
 
     [Fact]
-    public async Task Handle_WhenWorkflowBelongsToAnotherTenant_ReturnsNotFound()
+    public async Task Handle_WhenWorkflowBelongsToAnotherWorkspace_ReturnsNotFound()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("Old Name", null, TenantId, "user");
+        WorkflowDefinition wf = WorkflowDefinition.Create("Old Name", null, WorkspaceId, "user");
 
-        Guid otherTenantId = Guid.NewGuid();
-        _repo.GetByIdAsync(wf.Id, otherTenantId, Arg.Any<CancellationToken>())
+        Guid otherWorkspaceId = Guid.NewGuid();
+        _repo.GetByIdAsync(wf.Id, otherWorkspaceId, Arg.Any<CancellationToken>())
             .Returns((WorkflowDefinition?)null);
         Result result = await _handler.Handle(
-            new UpdateWorkflowCommand(wf.Id, otherTenantId, "New Name", null), CancellationToken.None);
+            new UpdateWorkflowCommand(wf.Id, otherWorkspaceId, "New Name", null), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-        await _repo.Received(1).GetByIdAsync(wf.Id, otherTenantId, Arg.Any<CancellationToken>());
+        await _repo.Received(1).GetByIdAsync(wf.Id, otherWorkspaceId, Arg.Any<CancellationToken>());
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task Handle_WhenNameConflictsWithAnotherWorkflow_ReturnsConflict()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("Old Name", null, TenantId, "user");
-        _repo.GetByIdAsync(wf.Id, TenantId, Arg.Any<CancellationToken>()).Returns(wf);
-        _repo.NameExistsAsync("Taken Name", TenantId, wf.Id, Arg.Any<CancellationToken>()).Returns(true);
+        WorkflowDefinition wf = WorkflowDefinition.Create("Old Name", null, WorkspaceId, "user");
+        _repo.GetByIdAsync(wf.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(wf);
+        _repo.NameExistsAsync("Taken Name", WorkspaceId, wf.Id, Arg.Any<CancellationToken>()).Returns(true);
 
         Result result = await _handler.Handle(
-            new UpdateWorkflowCommand(wf.Id, TenantId, "Taken Name", null), CancellationToken.None);
+            new UpdateWorkflowCommand(wf.Id, WorkspaceId, "Taken Name", null), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.Conflict);

@@ -9,7 +9,7 @@ public sealed class DataRecord : AggregateRoot<Guid>
     private Dictionary<string, object?> _data;
 
     public Guid ModelId { get; private set; }
-    public Guid tenantId { get; private set; }
+    public Guid workspaceId { get; private set; }
     public DateTimeOffset? DeletedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -19,25 +19,25 @@ public sealed class DataRecord : AggregateRoot<Guid>
 
     private DataRecord() : base(default) { _data = []; CreatedBy = string.Empty; } // EF Core materialisation
 
-    private DataRecord(Guid id, Guid modelId, Guid tenantId,
+    private DataRecord(Guid id, Guid modelId, Guid workspaceId,
         Dictionary<string, object?> data, string createdBy, DateTimeOffset createdAt)
         : base(id)
     {
         ModelId = modelId;
-        this.tenantId = tenantId;
+        this.workspaceId = workspaceId;
         _data = data;
         CreatedBy = createdBy;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
     }
 
-    public static DataRecord Create(Guid modelId, Guid tenantId,
+    public static DataRecord Create(Guid modelId, Guid workspaceId,
         IReadOnlyDictionary<string, object?> data, string createdBy)
     {
-        DataRecord record = new(Guid.NewGuid(), modelId, tenantId,
+        DataRecord record = new(Guid.NewGuid(), modelId, workspaceId,
             new Dictionary<string, object?>(data), createdBy, DateTimeOffset.UtcNow);
 
-        record.RaiseDomainEvent(new DataRecordCreated(record.Id, modelId, tenantId));
+        record.RaiseDomainEvent(new DataRecordCreated(record.Id, modelId, workspaceId));
         return record;
     }
 
@@ -57,6 +57,6 @@ public sealed class DataRecord : AggregateRoot<Guid>
             throw new InvalidOperationException("Record is already deleted.");
 
         DeletedAt = DateTimeOffset.UtcNow;
-        RaiseDomainEvent(new DataRecordDeleted(Id, ModelId, tenantId));
+        RaiseDomainEvent(new DataRecordDeleted(Id, ModelId, workspaceId));
     }
 }

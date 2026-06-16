@@ -18,7 +18,7 @@
 | Use-case `## Purpose` / new folder under domain | `python scripts/axis.py check domain-readme-index` | `python scripts/axis.py generate domain-readme-index` |
 | `docker-compose.yml` services / ports | `python scripts/axis.py check local-dev-docs` | Update [local-dev.md](./local-dev.md) |
 | Module folders under `src/Modules/` | [`Conventions.ModuleNames`](../../tests/Architecture/Axis.Architecture.Tests/Conventions.cs) at test run | Add module projects to architecture test csproj when layers exist |
-| `TenantVerifiedHandler` in a module | [`TenantProvisioningConventionTests`](../../tests/Architecture/Axis.Architecture.Tests/TenantProvisioningConventionTests.cs) vs `TenantModuleNames.All` | Add const + entry in `TenantModuleNames` ([`TenantProvisioningContracts.cs`](../../src/Modules/Identity/Axis.Identity.Contracts/TenantProvisioningContracts.cs)) |
+| `WorkspaceVerifiedHandler` in a module | [`WorkspaceProvisioningConventionTests`](../../tests/Architecture/Axis.Architecture.Tests/WorkspaceProvisioningConventionTests.cs) vs `WorkspaceModuleNames.All` | Add const + entry in `WorkspaceModuleNames` ([`WorkspaceProvisioningContracts.cs`](../../src/Modules/Identity/Axis.Identity.Contracts/WorkspaceProvisioningContracts.cs)) |
 
 **Slug override (rare):** when module folder name ≠ `docs/use-cases/` folder (only `Identity` → `identity-access` today), add one line to `MODULE_DOMAIN_SLUG_OVERRIDES` in [`axis_repo.py`](../../scripts/axis_repo.py).
 
@@ -28,7 +28,7 @@
 |------|-------------------|------------|
 | Topical **sections** in domain README (`GROUPS` in [`regenerate-domain-readme-index.py`](../../scripts/regenerate-domain-readme-index.py)) | Product grouping, not filesystem | Optional: add slug to `GROUPS`; **unlisted use cases appear under “Other”** (safe) |
 | `Program.cs` Wolverine `PublishAndListenWithAvro<T>` lines | Needs event **type** + serializer | Wire each new `*KafkaTopics` const (see check above) |
-| `TenantModuleNames` string ids | Kafka contract between modules | Add module slug when adding `TenantVerifiedHandler` |
+| `WorkspaceModuleNames` string ids | Kafka contract between modules | Add module slug when adding `WorkspaceVerifiedHandler` |
 | Architecture test **project references** | MSBuild needs explicit refs | Reference new `Axis.{Module}.*` projects in `Axis.Architecture.Tests.csproj` when testing that module |
 | Use-case **spec** content (AC, wireframes) | Source of truth | Follow [USE_CASE_TEMPLATE.md](../use-cases/USE_CASE_TEMPLATE.md) |
 
@@ -62,7 +62,7 @@ python scripts/axis.py check domain-readme-index
 
 - [ ] Create `docs/use-cases/{kebab-slug}/README.md` (or add override in `axis_repo.py` if slug ≠ `pascal-to-kebab(Module)`).
 - [ ] Add use-case folder(s) under that domain as specs are written.
-- [ ] If tenant provisioning: add `TenantVerifiedHandler` + update `TenantModuleNames` in Identity.Contracts.
+- [ ] If workspace provisioning: add `WorkspaceVerifiedHandler` + update `WorkspaceModuleNames` in Identity.Contracts.
 - [ ] If Kafka events: add `*Event.avsc`, `*KafkaTopics.cs` const, wire `Program.cs` (kafka check).
 - [ ] If gRPC: add `Contracts/Protos/*.proto`, run `python scripts/axis.py generate buf-yaml`, `buf lint`.
 - [ ] Reference module projects in `tests/Architecture/Axis.Architecture.Tests/Axis.Architecture.Tests.csproj` when fitness tests should load them.
@@ -105,7 +105,7 @@ python scripts/axis.py check domain-readme-index
 2. **Do** create or map the domain folder when adding a new module or endpoint group; discovery fails if the owning domain is missing.
 3. **Do** update owning docs in the same PR when behavior/spec/status changes. Pure refactor, style, dependency, and test-only changes do not need a token docs edit.
 4. **Do** run `python scripts/axis.py generate domain-readme-index` after changing use-case titles/Purpose or adding a use-case folder.
-5. **Do** treat `TenantModuleNames` and `Program.cs` Kafka wiring as contract edits — architecture + kafka checks must pass.
+5. **Do** treat `WorkspaceModuleNames` and `Program.cs` Kafka wiring as contract edits — architecture + kafka checks must pass.
 
 ---
 

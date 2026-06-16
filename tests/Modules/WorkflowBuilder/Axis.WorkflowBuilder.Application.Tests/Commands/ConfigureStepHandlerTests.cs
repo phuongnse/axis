@@ -12,7 +12,7 @@ namespace Axis.WorkflowBuilder.Application.Tests;
 
 public class ConfigureStepHandlerTests
 {
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private readonly IWorkflowRepository _repo = Substitute.For<IWorkflowRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly ConfigureStepHandler _handler;
@@ -30,13 +30,13 @@ public class ConfigureStepHandlerTests
     [Fact]
     public async Task Handle_WhenStepExists_UpdatesConfigAndSaves()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TenantId, "user");
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, WorkspaceId, "user");
         WorkflowStep step = wf.AddStep("Form Step", StepType.Form, null);
-        _repo.GetByIdAsync(wf.Id, TenantId, Arg.Any<CancellationToken>()).Returns(wf);
+        _repo.GetByIdAsync(wf.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(wf);
         Dictionary<string, object?> config = new() { ["form_id"] = Guid.NewGuid() };
 
         Result result = await _handler.Handle(
-            new ConfigureStepCommand(wf.Id, TenantId, step.Id, "Updated Form", config), CancellationToken.None);
+            new ConfigureStepCommand(wf.Id, WorkspaceId, step.Id, "Updated Form", config), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         wf.Steps.Single(s => s.Id == step.Id).Name.Should().Be("Updated Form");
@@ -47,41 +47,41 @@ public class ConfigureStepHandlerTests
     [Fact]
     public async Task Handle_WhenWorkflowNotFound_ReturnsNotFound()
     {
-        _repo.GetByIdAsync(Arg.Any<Guid>(), TenantId, Arg.Any<CancellationToken>()).Returns((WorkflowDefinition?)null);
+        _repo.GetByIdAsync(Arg.Any<Guid>(), WorkspaceId, Arg.Any<CancellationToken>()).Returns((WorkflowDefinition?)null);
 
         Result result = await _handler.Handle(
-            new ConfigureStepCommand(Guid.NewGuid(), TenantId, Guid.NewGuid(), "Name", null), CancellationToken.None);
+            new ConfigureStepCommand(Guid.NewGuid(), WorkspaceId, Guid.NewGuid(), "Name", null), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
     }
 
     [Fact]
-    public async Task Handle_WhenWorkflowBelongsToAnotherTenant_ReturnsNotFound()
+    public async Task Handle_WhenWorkflowBelongsToAnotherWorkspace_ReturnsNotFound()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TenantId, "user");
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, WorkspaceId, "user");
         WorkflowStep step = wf.AddStep("Form Step", StepType.Form, null);
 
-        Guid otherTenantId = Guid.NewGuid();
-        _repo.GetByIdAsync(wf.Id, otherTenantId, Arg.Any<CancellationToken>())
+        Guid otherWorkspaceId = Guid.NewGuid();
+        _repo.GetByIdAsync(wf.Id, otherWorkspaceId, Arg.Any<CancellationToken>())
             .Returns((WorkflowDefinition?)null);
         Result result = await _handler.Handle(
-            new ConfigureStepCommand(wf.Id, otherTenantId, step.Id, "Name", null), CancellationToken.None);
+            new ConfigureStepCommand(wf.Id, otherWorkspaceId, step.Id, "Name", null), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-        await _repo.Received(1).GetByIdAsync(wf.Id, otherTenantId, Arg.Any<CancellationToken>());
+        await _repo.Received(1).GetByIdAsync(wf.Id, otherWorkspaceId, Arg.Any<CancellationToken>());
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task Handle_WhenStepNotFound_ReturnsBusinessRuleError()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TenantId, "user");
-        _repo.GetByIdAsync(wf.Id, TenantId, Arg.Any<CancellationToken>()).Returns(wf);
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, WorkspaceId, "user");
+        _repo.GetByIdAsync(wf.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(wf);
 
         Result result = await _handler.Handle(
-            new ConfigureStepCommand(wf.Id, TenantId, Guid.NewGuid(), "Name", null), CancellationToken.None);
+            new ConfigureStepCommand(wf.Id, WorkspaceId, Guid.NewGuid(), "Name", null), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);

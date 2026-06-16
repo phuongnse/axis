@@ -99,11 +99,11 @@ public static class ConnectEndpoints
                 AuthFailureReason.AccountLocked =>
                     $"Too many failed attempts. Try again after {result.Value.LockedUntil:HH:mm} UTC.",
                 AuthFailureReason.AccountDeactivated =>
-                    "Your account has been deactivated. Contact your Tenant admin.",
+                    "Your account has been deactivated. Contact your Workspace admin.",
                 AuthFailureReason.EmailNotVerified =>
                     "Please verify your email before signing in.",
-                AuthFailureReason.TenantDeleted =>
-                    "This Tenant no longer exists.",
+                AuthFailureReason.WorkspaceDeleted =>
+                    "This Workspace no longer exists.",
                 _ => "Incorrect email or password.",
             };
             return Results.Problem(detail: detail, statusCode: StatusCodes.Status401Unauthorized);
@@ -120,8 +120,8 @@ public static class ConnectEndpoints
             new(ClaimTypes.Email, auth.Email),
             new("name", auth.FullName),
         ];
-        if (auth.tenantId is Guid tenantId)
-            claims.Add(new Claim("tenant_id", tenantId.ToString()));
+        if (auth.workspaceId is Guid workspaceId)
+            claims.Add(new Claim("workspace_id", workspaceId.ToString()));
         foreach (string permission in auth.Permissions)
             claims.Add(new Claim("permissions", permission));
 
@@ -182,11 +182,11 @@ public static class ConnectEndpoints
                     [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
             }
 
-            string? TenantIdStr = result.Principal!.GetClaim("tenant_id");
-            Guid? tenantId = Guid.TryParse(TenantIdStr, out Guid parsedTenantId) ? parsedTenantId : null;
+            string? WorkspaceIdStr = result.Principal!.GetClaim("workspace_id");
+            Guid? workspaceId = Guid.TryParse(WorkspaceIdStr, out Guid parsedWorkspaceId) ? parsedWorkspaceId : null;
 
             Result<UserTokenClaimsDto> claimsResult = await mediator.Send(
-                new GetUserTokenClaimsQuery(userId, tenantId),
+                new GetUserTokenClaimsQuery(userId, workspaceId),
                 ct);
 
             if (claimsResult.IsFailure)
@@ -205,7 +205,7 @@ public static class ConnectEndpoints
             UserTokenClaimsDto claims = claimsResult.Value;
             ClaimsPrincipal principal = BuildUserPrincipal(
                 claims.UserId,
-                claims.tenantId,
+                claims.workspaceId,
                 claims.Email,
                 claims.FullName,
                 claims.Permissions.ToList(),
@@ -246,14 +246,14 @@ public static class ConnectEndpoints
         IEnumerable<string> scopes)
     {
         string sub = cookiePrincipal.FindFirstValue(ClaimTypes.NameIdentifier)!;
-        string? TenantId = cookiePrincipal.FindFirstValue("tenant_id");
+        string? WorkspaceId = cookiePrincipal.FindFirstValue("workspace_id");
         string? email = cookiePrincipal.FindFirstValue(ClaimTypes.Email);
         string? name = cookiePrincipal.FindFirstValue("name");
         IEnumerable<string> permissions = cookiePrincipal.FindAll("permissions").Select(c => c.Value);
 
         return BuildUserPrincipal(
             Guid.Parse(sub),
-            Guid.TryParse(TenantId, out Guid gTenantId) ? gTenantId : null,
+            Guid.TryParse(WorkspaceId, out Guid gWorkspaceId) ? gWorkspaceId : null,
             email ?? string.Empty,
             name ?? string.Empty,
             permissions.ToList(),
@@ -262,7 +262,7 @@ public static class ConnectEndpoints
 
     private static ClaimsPrincipal BuildUserPrincipal(
         Guid userId,
-        Guid? tenantId,
+        Guid? workspaceId,
         string email,
         string name,
         IReadOnlyList<string> permissions,
@@ -272,8 +272,8 @@ public static class ConnectEndpoints
         identity.AddClaim(new Claim(Claims.Subject, userId.ToString()));
         identity.AddClaim(new Claim(Claims.Email, email));
         identity.AddClaim(new Claim("name", name));
-        if (tenantId is Guid resolvedTenantId)
-            identity.AddClaim(new Claim("tenant_id", resolvedTenantId.ToString()));
+        if (workspaceId is Guid resolvedWorkspaceId)
+            identity.AddClaim(new Claim("workspace_id", resolvedWorkspaceId.ToString()));
 
         foreach (string permission in permissions)
             identity.AddClaim(new Claim("permissions", permission));

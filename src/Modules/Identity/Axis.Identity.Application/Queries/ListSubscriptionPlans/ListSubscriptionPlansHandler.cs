@@ -7,7 +7,7 @@ namespace Axis.Identity.Application.Queries.ListSubscriptionPlans;
 
 public sealed class ListSubscriptionPlansHandler(
     ISubscriptionPlanRepository planRepo,
-    ITenantRepository tenantRepo)
+    IWorkspaceRepository workspaceRepo)
     : IQueryHandler<ListSubscriptionPlansQuery, IReadOnlyList<SubscriptionPlanDto>>
 {
     public async Task<IReadOnlyList<SubscriptionPlanDto>> Handle(
@@ -17,13 +17,13 @@ public sealed class ListSubscriptionPlansHandler(
         List<SubscriptionPlan> plans = (await planRepo.ListAvailableForNewSignupsAsync(cancellationToken)).ToList();
 
         Guid? currentPlanId = null;
-        if (query.CurrentTenantId is Guid tenantId)
+        if (query.CurrentWorkspaceId is Guid workspaceId)
         {
-            Tenant? tenant = await tenantRepo.GetByIdAsync(tenantId, cancellationToken);
-            currentPlanId = tenant?.SubscriptionPlanId;
+            Workspace? workspace = await workspaceRepo.GetByIdAsync(workspaceId, cancellationToken);
+            currentPlanId = workspace?.SubscriptionPlanId;
         }
 
-        // edge: retired plans stay visible to tenants still on that plan.
+        // edge: retired plans stay visible to workspaces still on that plan.
         if (currentPlanId is Guid planId && plans.All(p => p.Id != planId))
         {
             SubscriptionPlan? currentPlan = await planRepo.GetByIdAsync(planId, cancellationToken);

@@ -95,30 +95,30 @@ public sealed class DataModelingGrpcEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task GetModelSummary_WhenCrossTenantRequest_ReturnsExistsFalse()
+    public async Task GetModelSummary_WhenCrossWorkspaceRequest_ReturnsExistsFalse()
     {
-        HttpClient tenantAClient = await AuthHelper.CreateAdminClientAsync(fixture, "grpcdm6a");
-        HttpClient tenantBClient = await AuthHelper.CreateAdminClientAsync(fixture, "grpcdm6b");
-        string tenantBToken = GetBearerToken(tenantBClient);
+        HttpClient workspaceAClient = await AuthHelper.CreateAdminClientAsync(fixture, "grpcdm6a");
+        HttpClient workspaceBClient = await AuthHelper.CreateAdminClientAsync(fixture, "grpcdm6b");
+        string workspaceBToken = GetBearerToken(workspaceBClient);
 
-        HttpResponseMessage createResponse = await tenantAClient.PostAsJsonAsync("/api/models", new
+        HttpResponseMessage createResponse = await workspaceAClient.PostAsJsonAsync("/api/models", new
         {
-            name = "Tenant A Internal Model",
+            name = "Workspace A Internal Model",
             description = (string?)null,
             icon = (string?)null,
             color = (string?)null,
         }, Json);
         createResponse.EnsureSuccessStatusCode();
         JsonElement createBody = await createResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
-        string tenantAModelId = createBody.GetProperty("id").GetString()
+        string workspaceAModelId = createBody.GetProperty("id").GetString()
             ?? throw new InvalidOperationException("Create model response did not contain id.");
 
         DataModelCatalogService.DataModelCatalogServiceClient grpcClient = ResolveGrpcClient(out IServiceScope scope);
         using (scope)
         {
             GetModelSummaryResponse response = await grpcClient.GetModelSummaryAsync(
-                new GetModelSummaryRequest { ModelId = tenantAModelId },
-                headers: BuildAuthHeaders(tenantBToken)).ResponseAsync;
+                new GetModelSummaryRequest { ModelId = workspaceAModelId },
+                headers: BuildAuthHeaders(workspaceBToken)).ResponseAsync;
 
             response.Exists.Should().BeFalse();
             response.ModelName.Should().BeEmpty();

@@ -12,7 +12,7 @@ namespace Axis.WorkflowEngine.Infrastructure.Tests.Handlers;
 [Collection("WorkflowEngineDatabase")]
 public sealed class WorkflowPublishedHandlerTests(WorkflowEngineDatabaseFixture fixture)
 {
-    private static readonly Guid TenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid WorkspaceId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private static WorkflowPublishedEvent BuildEvent(Guid workflowId, string stepType = "Form")
     {
@@ -21,7 +21,7 @@ public sealed class WorkflowPublishedHandlerTests(WorkflowEngineDatabaseFixture 
         return new WorkflowPublishedEvent
         {
             workflowId = workflowId.ToString(),
-            tenantId = TenantId.ToString(),
+            workspaceId = WorkspaceId.ToString(),
             referencedFormIds = [],
             steps =
             [
@@ -63,7 +63,7 @@ public sealed class WorkflowPublishedHandlerTests(WorkflowEngineDatabaseFixture 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
 
         bool isActive = await readCtx.WorkflowActiveStatuses
-            .AnyAsync(w => w.WorkflowId == workflowId && w.tenantId == TenantId);
+            .AnyAsync(w => w.WorkflowId == workflowId && w.workspaceId == WorkspaceId);
         isActive.Should().BeTrue();
 
         WorkflowSnapshot? snapshot = await readCtx.WorkflowSnapshots
@@ -86,7 +86,7 @@ public sealed class WorkflowPublishedHandlerTests(WorkflowEngineDatabaseFixture 
         WorkflowPublishedEvent secondEvent = new()
         {
             workflowId = workflowId.ToString(),
-            tenantId = TenantId.ToString(),
+            workspaceId = WorkspaceId.ToString(),
             referencedFormIds = [],
             steps = [new StepSnapshotRecord { id = newStepId.ToString(), name = "Http", stepType = "HttpRequest", displayOrder = 0 }],
             transitions = [],

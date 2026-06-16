@@ -11,16 +11,16 @@ public sealed class CurrentUser(IHttpContextAccessor accessor)
         Principal?.GetClaim(OpenIddictConstants.Claims.Subject)
         ?? throw new InvalidOperationException("No sub claim"));
 
-    public Guid TenantId => Guid.Parse(
-        Principal?.FindFirstValue("tenant_id")
-        ?? throw new InvalidOperationException("No tenant_id claim"));
+    public Guid WorkspaceId => Guid.Parse(
+        Principal?.FindFirstValue("workspace_id")
+        ?? throw new InvalidOperationException("No workspace_id claim"));
 
-    public Guid? TenantIdOrNull
+    public Guid? WorkspaceIdOrNull
     {
         get
         {
-            string? TenantId = Principal?.FindFirstValue("tenant_id");
-            return Guid.TryParse(TenantId, out Guid id) ? id : null;
+            string? WorkspaceId = Principal?.FindFirstValue("workspace_id");
+            return Guid.TryParse(WorkspaceId, out Guid id) ? id : null;
         }
     }
 

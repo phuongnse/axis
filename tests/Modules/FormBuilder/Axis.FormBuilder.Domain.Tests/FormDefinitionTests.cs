@@ -9,19 +9,19 @@ namespace Axis.FormBuilder.Domain.Tests;
 
 public class FormDefinitionTests
 {
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     // ─── Create ───────────────────────────────────────────────────────────────
 
     [Fact]
-    public void FormDefinition_WhenCreated_SetsNameDescriptionAndTenantId()
+    public void FormDefinition_WhenCreated_SetsNameDescriptionAndWorkspaceId()
     {
-        FormDefinition form = FormDefinition.Create("Employee Intake", "New hire form", TenantId, UserId);
+        FormDefinition form = FormDefinition.Create("Employee Intake", "New hire form", WorkspaceId, UserId);
 
         form.Name.Should().Be("Employee Intake");
         form.Description.Should().Be("New hire form");
-        form.tenantId.Should().Be(TenantId);
+        form.workspaceId.Should().Be(WorkspaceId);
         form.DeletedAt.Should().BeNull();
         form.Fields.Should().BeEmpty();
     }
@@ -30,7 +30,7 @@ public class FormDefinitionTests
     public void FormDefinition_WhenCreated_SetsCreatedByAndTimestamps()
     {
         DateTimeOffset before = DateTimeOffset.UtcNow;
-        FormDefinition form = FormDefinition.Create("Employee Intake", null, TenantId, UserId);
+        FormDefinition form = FormDefinition.Create("Employee Intake", null, WorkspaceId, UserId);
 
         form.CreatedBy.Should().Be(UserId);
         form.CreatedAt.Should().BeOnOrAfter(before);
@@ -40,7 +40,7 @@ public class FormDefinitionTests
     [Fact]
     public void FormDefinition_WhenCreated_RaisesFormCreatedEvent()
     {
-        FormDefinition form = FormDefinition.Create("Employee Intake", null, TenantId, UserId);
+        FormDefinition form = FormDefinition.Create("Employee Intake", null, WorkspaceId, UserId);
         form.DomainEvents.Should().ContainSingle(e => e is FormCreated);
     }
 
@@ -50,7 +50,7 @@ public class FormDefinitionTests
     [InlineData("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")] // > 200
     public void FormDefinition_WhenNameLengthIsInvalid_ThrowsArgumentException(string name)
     {
-        Func<FormDefinition> act = () => FormDefinition.Create(name, null, TenantId, UserId);
+        Func<FormDefinition> act = () => FormDefinition.Create(name, null, WorkspaceId, UserId);
         act.Should().Throw<ArgumentException>();
     }
 
@@ -59,7 +59,7 @@ public class FormDefinitionTests
     [Fact]
     public void AddField_WhenFieldIsTextField_AddsFieldSuccessfully()
     {
-        FormDefinition form = FormDefinition.Create("Employee Intake", null, TenantId, UserId);
+        FormDefinition form = FormDefinition.Create("Employee Intake", null, WorkspaceId, UserId);
         FormField field = form.AddField("first_name", "First Name", FormFieldType.Text, required: true, null);
 
         form.Fields.Should().ContainSingle();
@@ -71,7 +71,7 @@ public class FormDefinitionTests
     [Fact]
     public void AddField_WhenKeyIsDuplicate_Throws()
     {
-        FormDefinition form = FormDefinition.Create("Employee Intake", null, TenantId, UserId);
+        FormDefinition form = FormDefinition.Create("Employee Intake", null, WorkspaceId, UserId);
         form.AddField("first_name", "First Name", FormFieldType.Text, false, null);
 
         Func<Entities.FormField> act = () => form.AddField("first_name", "First Name 2", FormFieldType.Text, false, null);
@@ -85,7 +85,7 @@ public class FormDefinitionTests
     [InlineData("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")] // 65 chars
     public void AddField_WhenKeyFormatIsInvalid_Throws(string key)
     {
-        FormDefinition form = FormDefinition.Create("Employee Intake", null, TenantId, UserId);
+        FormDefinition form = FormDefinition.Create("Employee Intake", null, WorkspaceId, UserId);
         Func<Entities.FormField> act = () => form.AddField(key, "Label", FormFieldType.Text, false, null);
         act.Should().Throw<ArgumentException>();
     }
@@ -93,7 +93,7 @@ public class FormDefinitionTests
     [Fact]
     public void AddField_WhenDropdownHasFewerThanTwoOptions_Throws()
     {
-        FormDefinition form = FormDefinition.Create("Employee Intake", null, TenantId, UserId);
+        FormDefinition form = FormDefinition.Create("Employee Intake", null, WorkspaceId, UserId);
         DropdownFieldConfig config = new DropdownFieldConfig([new DropdownOption("a", "A")]);
 
         Func<Entities.FormField> act = () => form.AddField("dept", "Department", FormFieldType.Dropdown, false, config);
@@ -103,7 +103,7 @@ public class FormDefinitionTests
     [Fact]
     public void AddField_WhenDropdownHasTwoOptions_AddsFieldSuccessfully()
     {
-        FormDefinition form = FormDefinition.Create("Employee Intake", null, TenantId, UserId);
+        FormDefinition form = FormDefinition.Create("Employee Intake", null, WorkspaceId, UserId);
         DropdownFieldConfig config = new DropdownFieldConfig(
                     [new DropdownOption("eng", "Engineering"), new DropdownOption("hr", "HR")]);
 
@@ -116,7 +116,7 @@ public class FormDefinitionTests
     [Fact]
     public void RemoveField_WhenFieldExists_RemovesField()
     {
-        FormDefinition form = FormDefinition.Create("Employee Intake", null, TenantId, UserId);
+        FormDefinition form = FormDefinition.Create("Employee Intake", null, WorkspaceId, UserId);
         FormField field = form.AddField("first_name", "First Name", FormFieldType.Text, false, null);
 
         form.RemoveField(field.Id);
@@ -127,7 +127,7 @@ public class FormDefinitionTests
     [Fact]
     public void RemoveField_WhenFieldNotFound_Throws()
     {
-        FormDefinition form = FormDefinition.Create("Employee Intake", null, TenantId, UserId);
+        FormDefinition form = FormDefinition.Create("Employee Intake", null, WorkspaceId, UserId);
         Action act = () => form.RemoveField(Guid.NewGuid());
         act.Should().Throw<InvalidOperationException>().WithMessage("*not found*");
     }
@@ -137,7 +137,7 @@ public class FormDefinitionTests
     [Fact]
     public void ReorderFields_WhenValidOrderProvided_UpdatesDisplayOrder()
     {
-        FormDefinition form = FormDefinition.Create("Employee Intake", null, TenantId, UserId);
+        FormDefinition form = FormDefinition.Create("Employee Intake", null, WorkspaceId, UserId);
         FormField f1 = form.AddField("first_name", "First Name", FormFieldType.Text, false, null);
         FormField f2 = form.AddField("last_name", "Last Name", FormFieldType.Text, false, null);
         FormField f3 = form.AddField("email", "Email", FormFieldType.Text, false, null);
@@ -154,7 +154,7 @@ public class FormDefinitionTests
     [Fact]
     public void Delete_WhenCalled_SetsDeletedAtAndRaisesEvent()
     {
-        FormDefinition form = FormDefinition.Create("Employee Intake", null, TenantId, UserId);
+        FormDefinition form = FormDefinition.Create("Employee Intake", null, WorkspaceId, UserId);
         DateTimeOffset before = DateTimeOffset.UtcNow;
         form.Delete();
 
@@ -166,7 +166,7 @@ public class FormDefinitionTests
     [Fact]
     public void Delete_WhenAlreadyDeleted_Throws()
     {
-        FormDefinition form = FormDefinition.Create("Employee Intake", null, TenantId, UserId);
+        FormDefinition form = FormDefinition.Create("Employee Intake", null, WorkspaceId, UserId);
         form.Delete();
 
         Action act = () => form.Delete();

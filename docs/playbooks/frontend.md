@@ -11,7 +11,7 @@
 UI exists to help users complete work. Visual style matters, but it is secondary to clarity, usefulness, and efficient task completion.
 
 - Start every screen by naming the user goal, the decision the user must make, and the minimum information needed to make that decision.
-- Keep content honest. Do not show fake operational data, tenant names, metrics, event streams, or statuses. Authenticated workspace screens may show workspace metrics only when they are backed by API data or a clearly labeled real product state.
+- Keep content honest. Do not show fake operational data, workspace names, metrics, event streams, or statuses. Authenticated workspace screens may show workspace metrics only when they are backed by API data or a clearly labeled real product state.
 - Do not describe architecture to end users. Replace internal terms such as "surface", "boundary", "session", or "gateway" with user-facing language such as "sign in", "verify access", and "open workspace".
 - Every visible element must answer one of these questions: What is this? What can I do next? What do I need to know before acting? If not, remove it.
 - A screen should lead the user toward action, not feel like it is explaining the system. If the screen starts reading like an architecture note, simplify the copy and move the explanation out of the UI.
@@ -69,7 +69,7 @@ features/{feature-name}/
 - User-facing text in migrated SPA screens comes from `frontend/src/features/preferences/i18n-resources.ts`. Do not add new hard-coded labels, helper text, empty states, or client-generated error messages in components.
 - Locale keys use `feature.section.key` naming and must have both `en` and `vi` entries. English is the fallback language.
 - Localization is product copy, not word-by-word translation. Vietnamese copy must read naturally in context, stay concise, and guide the user to the next action. Avoid literal English structure and avoid internal implementation terms in user-facing text.
-- Keep product terminology consistent in Vietnamese: `control plane` → "trung tâm vận hành", `data model` → "mô hình dữ liệu", `workflow` → "quy trình", `execution` → "lượt chạy", `form` → "biểu mẫu". Avoid exposing backend terms such as "tenant", "provisioning", "token", or "callback" unless the user genuinely needs that detail.
+- Keep product terminology consistent in Vietnamese: `control plane` → "trung tâm vận hành", `data model` → "mô hình dữ liệu", `workflow` → "quy trình", `execution` → "lượt chạy", `form` → "biểu mẫu". Avoid exposing backend terms such as "workspace", "provisioning", "token", or "callback" unless the user genuinely needs that detail.
 - Preference state is client-only and lives in Zustand. Persist only non-sensitive preferences (`axis.language`, `axis.theme`) in `localStorage`; never store auth tokens there.
 - Theme mode supports `light`, `dark`, and `system`. `system` resolves through `prefers-color-scheme` and should update when the OS preference changes.
 - Apply the initial theme before React mounts to avoid visible flash. Keep the inline bootstrap script in `frontend/index.html` in sync with the theme storage key.

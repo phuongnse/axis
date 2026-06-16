@@ -16,19 +16,19 @@
 
 ## What is Axis
 
-Multi-tenant low-code SaaS: custom data models, visual workflows, forms, and UI pages — no end-user coding. Architecture: **modulith with strict service boundaries** ([ADR-010](docs/TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy)) — each module is a service contract from day 1; modulith packaging is the deployment shape today, independent services tomorrow. Extraction is a redeploy, not a refactor.
+Multi-workspace low-code SaaS: custom data models, visual workflows, forms, and UI pages — no end-user coding. Architecture: **modulith with strict service boundaries** ([ADR-010](docs/TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy)) — each module is a service contract from day 1; modulith packaging is the deployment shape today, independent services tomorrow. Extraction is a redeploy, not a refactor.
 
 ---
 
 ## Tech stack & architecture
 
-Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md). Module list and per-module responsibilities are owned by [`docs/use-cases/README.md`](docs/use-cases/README.md). Architectural shape (containers, multi-tenancy, auth) is owned by [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). This file owns only the **rules** — the things below that must hold no matter which library version is in `Directory.Packages.props`.
+Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md). Module list and per-module responsibilities are owned by [`docs/use-cases/README.md`](docs/use-cases/README.md). Architectural shape (containers, multi-workspace isolation, auth) is owned by [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). This file owns only the **rules** — the things below that must hold no matter which library version is in `Directory.Packages.props`.
 
 **Enforcement language:** P0/P1/P2 describe severity, not whether a rule is machine-enforced. Enforcement status and allowed wording (`Enforced`, `Partial`, `Review-only`, `Guidance`, `Not a rule`) are owned by [`docs/REVIEW_FINDINGS.md`](docs/REVIEW_FINDINGS.md). Do not call a rule a "gate" unless CI/build/tooling can fail the PR for that class.
 
 **Shared kernel:** `Axis.Shared.Domain`, `Axis.Shared.Application` — **abstractions only**, no shared implementation ([ADR-017](docs/TECH_STACK.md#adr-017-axisshared-is-abstractions-only-no-shared-implementation)). `Axis.Shared.Infrastructure` exists only for genuinely cross-cutting infrastructure (e.g. common JSON policy), never for per-module concerns like UnitOfWork or repository base classes.
 
-**Per-module databases:** each module owns its own PostgreSQL database (`axis_identity`, `axis_datamodeling`, `axis_workflowbuilder`, `axis_workflowengine`, `axis_formbuilder`, `axis_pagebuilder`). Schema-per-tenant `tenant_{tenantId:N}` *inside* each module DB. Per-module Wolverine envelope schema (`wolverine`) lives in the same DB as the module. Identity's `public` schema is the only registry — other modules **never** SQL-query Identity.
+**Per-module databases:** each module owns its own PostgreSQL database (`axis_identity`, `axis_datamodeling`, `axis_workflowbuilder`, `axis_workflowengine`, `axis_formbuilder`, `axis_pagebuilder`). Schema-per-workspace `workspace_{workspaceId:N}` *inside* each module DB. Per-module Wolverine envelope schema (`wolverine`) lives in the same DB as the module. Identity's `public` schema is the only registry — other modules **never** SQL-query Identity.
 
 **Cross-module communication contract (P0):**
 
@@ -174,7 +174,7 @@ Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, use-c
 
 **Wireframes:** use-case assets under `docs/use-cases/{domain}/{use-case}/`; kit source in `docs/wireframes/*.mjs` (shared shell: `app-shell` only). Regenerate with `node docs/wireframes/generate-screens.mjs` + `docs/scripts/generate-wireframes.ps1`. **Agents:** [`wireframes/README.md` § Agent contract](docs/wireframes/README.md#agent-contract), [`wireframes.md`](docs/playbooks/wireframes.md).
 
-**Cross-cutting:** forward `CancellationToken`; audit fields in Application; soft-delete on tenant aggregates; Serilog without PII; rate limit auth endpoints; CORS before auth; `/health` + `/health/ready` anonymous.
+**Cross-cutting:** forward `CancellationToken`; audit fields in Application; soft-delete on workspace aggregates; Serilog without PII; rate limit auth endpoints; CORS before auth; `/health` + `/health/ready` anonymous.
 
 ---
 

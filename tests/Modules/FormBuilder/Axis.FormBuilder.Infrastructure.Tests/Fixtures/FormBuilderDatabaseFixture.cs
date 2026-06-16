@@ -1,5 +1,5 @@
 using Axis.FormBuilder.Infrastructure.Persistence;
-using Axis.Shared.Application.Tenancy;
+using Axis.Shared.Application.Workspaces;
 using Axis.Testing;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -30,10 +30,10 @@ public sealed class FormBuilderDatabaseFixture : IAsyncLifetime
         schemaCmd.CommandText = $"""CREATE SCHEMA IF NOT EXISTS "{TestSchema}";""";
         await schemaCmd.ExecuteNonQueryAsync();
 
-        TestTenantContext tenantContext = new(TestSchema);
+        TestWorkspaceContext workspaceContext = new(TestSchema);
         await PostgresModuleTestDatabase.MigrateAsync<FormBuilderDbContext>(
             ConnectionString,
-            opts => new FormBuilderDbContext(opts, tenantContext));
+            opts => new FormBuilderDbContext(opts, workspaceContext));
 
         // Create a minimal workflow_definitions table so IsReferencedByWorkflowAsync can query it
         await using NpgsqlCommand wfCmd = conn.CreateCommand();
@@ -54,12 +54,12 @@ public sealed class FormBuilderDatabaseFixture : IAsyncLifetime
         DbContextOptions<FormBuilderDbContext> options = new DbContextOptionsBuilder<FormBuilderDbContext>()
                     .UseNpgsql(ConnectionString)
                     .Options;
-        return new FormBuilderDbContext(options, new TestTenantContext(TestSchema));
+        return new FormBuilderDbContext(options, new TestWorkspaceContext(TestSchema));
     }
 }
 
-internal sealed class TestTenantContext(string schemaName) : ITenantContext
+internal sealed class TestWorkspaceContext(string schemaName) : IWorkspaceContext
 {
-    public Guid tenantId => Guid.Parse("00000000-0000-0000-0000-000000000001");
+    public Guid workspaceId => Guid.Parse("00000000-0000-0000-0000-000000000001");
     public string SchemaName => schemaName;
 }

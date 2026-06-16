@@ -13,7 +13,7 @@ public class BulkDeleteRecordsHandlerTests
     private readonly IDataModelRepository _modelRepo = Substitute.For<IDataModelRepository>();
     private readonly IDataRecordRepository _recordRepo = Substitute.For<IDataRecordRepository>();
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private static readonly Guid ModelId = Guid.NewGuid();
     private const string UserId = "user-123";
 
@@ -23,7 +23,7 @@ public class BulkDeleteRecordsHandlerTests
     public async Task BulkDelete_WhenNoIdsProvided_ReturnsBusinessRuleError()
     {
         Result<BulkDeleteResult> result = await CreateHandler().Handle(
-            new BulkDeleteRecordsCommand([], ModelId, TenantId),
+            new BulkDeleteRecordsCommand([], ModelId, WorkspaceId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -34,10 +34,10 @@ public class BulkDeleteRecordsHandlerTests
     [Fact]
     public async Task BulkDelete_WhenModelNotFound_ReturnsNotFound()
     {
-        _modelRepo.GetByIdAsync(ModelId, TenantId).ReturnsNull();
+        _modelRepo.GetByIdAsync(ModelId, WorkspaceId).ReturnsNull();
 
         Result<BulkDeleteResult> result = await CreateHandler().Handle(
-            new BulkDeleteRecordsCommand([Guid.NewGuid()], ModelId, TenantId),
+            new BulkDeleteRecordsCommand([Guid.NewGuid()], ModelId, WorkspaceId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -48,15 +48,15 @@ public class BulkDeleteRecordsHandlerTests
     [Fact]
     public async Task BulkDelete_WhenAllRecordsExist_ReturnsCorrectDeletedCount()
     {
-        DataModel model = DataModel.Create("Invoice", null, null, null, TenantId, UserId);
+        DataModel model = DataModel.Create("Invoice", null, null, null, WorkspaceId, UserId);
         IReadOnlyList<Guid> ids = [Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()];
 
-        _modelRepo.GetByIdAsync(ModelId, TenantId).Returns(model);
+        _modelRepo.GetByIdAsync(ModelId, WorkspaceId).Returns(model);
         _recordRepo.BulkDeleteAsync(
             Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(3);
 
         Result<BulkDeleteResult> result = await CreateHandler().Handle(
-            new BulkDeleteRecordsCommand(ids, ModelId, TenantId),
+            new BulkDeleteRecordsCommand(ids, ModelId, WorkspaceId),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -67,17 +67,17 @@ public class BulkDeleteRecordsHandlerTests
     [Fact]
     public async Task BulkDelete_WhenDuplicateIdsProvided_DeduplicatesBeforeRepositoryCall()
     {
-        DataModel model = DataModel.Create("Invoice", null, null, null, TenantId, UserId);
+        DataModel model = DataModel.Create("Invoice", null, null, null, WorkspaceId, UserId);
         Guid id = Guid.NewGuid();
         IReadOnlyList<Guid> idsWithDuplicates = [id, id, id]; // same ID 3 times
 
-        _modelRepo.GetByIdAsync(ModelId, TenantId).Returns(model);
+        _modelRepo.GetByIdAsync(ModelId, WorkspaceId).Returns(model);
         _recordRepo.BulkDeleteAsync(
             Arg.Is<IReadOnlyList<Guid>>(l => l.Count == 1),
-            Arg.Is(ModelId), Arg.Is(TenantId), Arg.Any<CancellationToken>()).Returns(1);
+            Arg.Is(ModelId), Arg.Is(WorkspaceId), Arg.Any<CancellationToken>()).Returns(1);
 
         Result<BulkDeleteResult> result = await CreateHandler().Handle(
-            new BulkDeleteRecordsCommand(idsWithDuplicates, ModelId, TenantId),
+            new BulkDeleteRecordsCommand(idsWithDuplicates, ModelId, WorkspaceId),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -85,18 +85,18 @@ public class BulkDeleteRecordsHandlerTests
         result.Value.NotFound.Should().Be(0); // not inflated by duplicates
         await _recordRepo.Received(1).BulkDeleteAsync(
             Arg.Is<IReadOnlyList<Guid>>(l => l.Count == 1),
-            Arg.Is(ModelId), Arg.Is(TenantId));
+            Arg.Is(ModelId), Arg.Is(WorkspaceId));
     }
 
     [Fact]
-    public async Task BulkDelete_WhenModelBelongsToAnotherTenant_ReturnsNotFound()
+    public async Task BulkDelete_WhenModelBelongsToAnotherWorkspace_ReturnsNotFound()
     {
-        DataModel model = DataModel.Create("Invoice", null, null, null, TenantId, UserId);
-        _modelRepo.GetByIdAsync(ModelId, TenantId).Returns(model);
+        DataModel model = DataModel.Create("Invoice", null, null, null, WorkspaceId, UserId);
+        _modelRepo.GetByIdAsync(ModelId, WorkspaceId).Returns(model);
 
-        Guid otherTenantId = Guid.NewGuid();
+        Guid otherWorkspaceId = Guid.NewGuid();
         Result<BulkDeleteResult> result = await CreateHandler().Handle(
-            new BulkDeleteRecordsCommand([Guid.NewGuid()], ModelId, otherTenantId),
+            new BulkDeleteRecordsCommand([Guid.NewGuid()], ModelId, otherWorkspaceId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -107,15 +107,15 @@ public class BulkDeleteRecordsHandlerTests
     [Fact]
     public async Task BulkDelete_WhenSomeRecordsNotFound_ReturnsPartialDeletedCount()
     {
-        DataModel model = DataModel.Create("Invoice", null, null, null, TenantId, UserId);
+        DataModel model = DataModel.Create("Invoice", null, null, null, WorkspaceId, UserId);
         IReadOnlyList<Guid> ids = [Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()];
 
-        _modelRepo.GetByIdAsync(ModelId, TenantId).Returns(model);
+        _modelRepo.GetByIdAsync(ModelId, WorkspaceId).Returns(model);
         _recordRepo.BulkDeleteAsync(
-            Arg.Any<IReadOnlyList<Guid>>(), Arg.Is(ModelId), Arg.Is(TenantId), Arg.Any<CancellationToken>()).Returns(2); // one not found or already deleted
+            Arg.Any<IReadOnlyList<Guid>>(), Arg.Is(ModelId), Arg.Is(WorkspaceId), Arg.Any<CancellationToken>()).Returns(2); // one not found or already deleted
 
         Result<BulkDeleteResult> result = await CreateHandler().Handle(
-            new BulkDeleteRecordsCommand(ids, ModelId, TenantId),
+            new BulkDeleteRecordsCommand(ids, ModelId, WorkspaceId),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();

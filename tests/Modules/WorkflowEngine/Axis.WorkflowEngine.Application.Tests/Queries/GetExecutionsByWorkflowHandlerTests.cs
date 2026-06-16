@@ -12,7 +12,7 @@ public class GetExecutionsByWorkflowHandlerTests
 {
     private readonly IExecutionRepository _execRepo = Substitute.For<IExecutionRepository>();
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private static readonly Guid WorkflowId = Guid.NewGuid();
 
     private GetExecutionsByWorkflowHandler CreateHandler() => new(_execRepo);
@@ -25,11 +25,11 @@ public class GetExecutionsByWorkflowHandlerTests
     public async Task GetExecutionsByWorkflow_WhenExecutionsExist_ReturnsPagedResult()
     {
         List<ExecutionSummaryResponse> summaries = [BuildSummary(Guid.NewGuid()), BuildSummary(Guid.NewGuid())];
-        _execRepo.GetPagedByWorkflowAsync(WorkflowId, TenantId, 1, 25, null, Arg.Any<CancellationToken>())
+        _execRepo.GetPagedByWorkflowAsync(WorkflowId, WorkspaceId, 1, 25, null, Arg.Any<CancellationToken>())
             .Returns((summaries, 2));
 
         PagedResult<ExecutionSummaryResponse> result = await CreateHandler().Handle(
-            new GetExecutionsByWorkflowQuery(WorkflowId, TenantId), CancellationToken.None);
+            new GetExecutionsByWorkflowQuery(WorkflowId, WorkspaceId), CancellationToken.None);
 
         result.Items.Should().HaveCount(2);
         result.TotalCount.Should().Be(2);
@@ -40,28 +40,28 @@ public class GetExecutionsByWorkflowHandlerTests
     [Fact]
     public async Task GetExecutionsByWorkflow_WithStatusFilter_PassesFilterToRepository()
     {
-        _execRepo.GetPagedByWorkflowAsync(WorkflowId, TenantId, 1, 25, ExecutionStatus.Failed, Arg.Any<CancellationToken>())
+        _execRepo.GetPagedByWorkflowAsync(WorkflowId, WorkspaceId, 1, 25, ExecutionStatus.Failed, Arg.Any<CancellationToken>())
             .Returns((new List<ExecutionSummaryResponse>(), 0));
 
         await CreateHandler().Handle(
-            new GetExecutionsByWorkflowQuery(WorkflowId, TenantId, Status: ExecutionStatus.Failed),
+            new GetExecutionsByWorkflowQuery(WorkflowId, WorkspaceId, Status: ExecutionStatus.Failed),
             CancellationToken.None);
 
         await _execRepo.Received(1).GetPagedByWorkflowAsync(
-            WorkflowId, TenantId, 1, 25, ExecutionStatus.Failed, Arg.Any<CancellationToken>());
+            WorkflowId, WorkspaceId, 1, 25, ExecutionStatus.Failed, Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task GetExecutionsByWorkflow_WhenPageSizeExceedsMax_ClampsToHundred()
     {
-        _execRepo.GetPagedByWorkflowAsync(WorkflowId, TenantId, 1, 100, null, Arg.Any<CancellationToken>())
+        _execRepo.GetPagedByWorkflowAsync(WorkflowId, WorkspaceId, 1, 100, null, Arg.Any<CancellationToken>())
             .Returns((new List<ExecutionSummaryResponse>(), 0));
 
         await CreateHandler().Handle(
-            new GetExecutionsByWorkflowQuery(WorkflowId, TenantId, PageSize: 9999),
+            new GetExecutionsByWorkflowQuery(WorkflowId, WorkspaceId, PageSize: 9999),
             CancellationToken.None);
 
         await _execRepo.Received(1).GetPagedByWorkflowAsync(
-            WorkflowId, TenantId, 1, 100, null, Arg.Any<CancellationToken>());
+            WorkflowId, WorkspaceId, 1, 100, null, Arg.Any<CancellationToken>());
     }
 }

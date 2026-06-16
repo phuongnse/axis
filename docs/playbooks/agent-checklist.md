@@ -38,7 +38,7 @@ Use-case files group ACs under **Happy path**, **Validation & errors**, **Edge c
 
 1. Copy **each** `- [ ]` line from the use case into an AC map row (one row per bullet, or one row per bullet group only when a single test proves all of them).
 2. Tag the row: `happy` | `validation` | `edge` | `out-of-scope` (skip implementation for `out-of-scope`; do not “forget” it — leave it in the map as N/A).
-3. Name the **test or handler** that will prove the row (`CreateWorkflow_WhenAtPlanLimit_Returns402`, integration test for wrong-tenant isolation, etc.). **No blank “File / test” cells** for in-scope rows.
+3. Name the **test or handler** that will prove the row (`CreateWorkflow_WhenAtPlanLimit_Returns402`, integration test for wrong-workspace isolation, etc.). **No blank “File / test” cells** for in-scope rows.
 4. If a bullet is **Frontend-only** while you are on backend (or the reverse), mark the row `N/A this PR — Frontend` / `N/A this PR — API` so it is not silently dropped.
 
 **Path coverage matrix template** (fill once per touched implementation surface):
@@ -83,7 +83,7 @@ Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because th
    - valid request/flow (happy path),
    - validation/constraint failure path,
    - authz/authn or permission boundary where applicable,
-   - not-found and tenant/isolation boundary where applicable (no data leak),
+   - not-found and workspace/isolation boundary where applicable (no data leak),
    - downstream dependency failure path where applicable (transport/storage/service unavailable).
    If a path does not apply to that surface, mark it `N/A` in the AC map instead of skipping it silently.
 
@@ -183,7 +183,7 @@ Paste block format: header `Docs review:` then one `-` line per row (Retrospecti
 Docs review:
 - Library → TECH_STACK.md / not triggered
 - New pattern → patterns.md or REVIEW_FINDINGS.md / not triggered
-- Use-case layer callout → docs/use-cases/{domain}/… (layout per [docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--wireframes--implementation-status); multi-screen example [register-tenant](../use-cases/platform-foundation/register-tenant/README.md)) / not triggered
+- Use-case layer callout → docs/use-cases/{domain}/… (layout per [docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--wireframes--implementation-status); multi-screen example [register-workspace](../use-cases/platform-foundation/register-workspace/README.md)) / not triggered
 - Use-case wireframes/diagrams README → Screen flow + full wireframes inventory + Diagrams owned in-folder only ([docs-style](./docs-style.md#use-case-files--wireframes--implementation-status)) / not triggered
 - Domain README + PROGRESS → … / not triggered
 - Architecture rule → AGENTS.md / not triggered
@@ -291,7 +291,7 @@ These expectations still matter, but do not call them CI gates unless [REVIEW_FI
 | Layer order, TDD, gap sweep, deferred docs, PR wrap-up | [process.md](./process.md) |
 | New module / event / proto / domain README — what to update & how CI checks | [repo-layout-discovery.md](./repo-layout-discovery.md) |
 | Find the right patterns section | [patterns-index.md](./patterns-index.md) |
-| EF, API, Wolverine, tenancy | [patterns.md](./patterns.md) |
+| EF, API, Wolverine, workspace isolation | [patterns.md](./patterns.md) |
 | React, Query, a11y | [frontend.md](./frontend.md) |
 | Tests, Testcontainers | [testing.md](./testing.md) |
 | Wireframe kit | [wireframes.md](./wireframes.md) · **Agent contract:** [wireframes/README § Agent contract](../wireframes/README.md#agent-contract) |

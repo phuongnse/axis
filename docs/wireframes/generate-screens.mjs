@@ -12,11 +12,11 @@
  *
  * Screens generated:
  *   app-shell (root)
- *   platform-foundation: register-tenant, register-tenant-states,
+ *   platform-foundation: register-workspace, register-workspace-states,
  *        email-confirmation, verify-email-states, workspace-provisioning,
- *        pricing, settings-tenant, settings-tenant-upload-states, settings-tenant-profile-states,
- *        settings-tenant-usage-error, settings-tenant-free-plan, settings-tenant-access-denied,
- *        settings-tenant-deletion-scheduled, settings-tenant-delete-modal, settings-tenant-delete-states
+ *        pricing, settings-workspace, settings-workspace-upload-states, settings-workspace-profile-states,
+ *        settings-workspace-usage-error, settings-workspace-free-plan, settings-workspace-access-denied,
+ *        settings-workspace-deletion-scheduled, settings-workspace-delete-modal, settings-workspace-delete-states
  *   identity-access: login, register-user, forgot-password, change-password,
  *        settings-users, settings-roles, settings-security, accept-invitation
  *   data-modeling: data-models, data-classes, records
@@ -76,9 +76,9 @@ import {
   authTermsRow,
   authCard,
   mergeExcalidrawFiles,
-  REGISTER_TENANT_ENTRY_FIELDS,
+  REGISTER_WORKSPACE_ENTRY_FIELDS,
   PASSWORD_CRITERIA_PARTIAL,
-  paintRegisterTenantEntryFields,
+  paintRegisterWorkspaceEntryFields,
 } from './blocks.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -115,38 +115,38 @@ function deterministicSeedForScreen(screenKey) {
 // Outputs land flat in docs/use-cases/{domain}/{use-case}/ (see patterns.md).
 
 const SCREEN_USE_CASE_OVERRIDES = {
-  'platform-foundation/register-tenant.excalidraw':
-    'platform-foundation/register-tenant/register-tenant.excalidraw',
-  'platform-foundation/register-tenant-states.excalidraw':
-    'platform-foundation/register-tenant/register-tenant-states.excalidraw',
+  'platform-foundation/register-workspace.excalidraw':
+    'platform-foundation/register-workspace/register-workspace.excalidraw',
+  'platform-foundation/register-workspace-states.excalidraw':
+    'platform-foundation/register-workspace/register-workspace-states.excalidraw',
   'platform-foundation/email-confirmation.excalidraw':
-    'platform-foundation/register-tenant/email-confirmation.excalidraw',
+    'platform-foundation/register-workspace/email-confirmation.excalidraw',
   'platform-foundation/email-confirmation-states.excalidraw':
-    'platform-foundation/register-tenant/email-confirmation-states.excalidraw',
+    'platform-foundation/register-workspace/email-confirmation-states.excalidraw',
   'platform-foundation/verify-email-states.excalidraw':
-    'platform-foundation/register-tenant/verify-email-states.excalidraw',
+    'platform-foundation/register-workspace/verify-email-states.excalidraw',
   'platform-foundation/workspace-provisioning.excalidraw':
-    'platform-foundation/register-tenant/workspace-provisioning.excalidraw',
+    'platform-foundation/register-workspace/workspace-provisioning.excalidraw',
   'platform-foundation/pricing.excalidraw':
     'platform-foundation/view-plans/pricing.excalidraw',
-  'platform-foundation/settings-tenant.excalidraw':
-    'platform-foundation/tenant-settings/settings-tenant.excalidraw',
-  'platform-foundation/settings-tenant-upload-states.excalidraw':
-    'platform-foundation/tenant-profile/settings-tenant-upload-states.excalidraw',
-  'platform-foundation/settings-tenant-profile-states.excalidraw':
-    'platform-foundation/tenant-profile/settings-tenant-profile-states.excalidraw',
-  'platform-foundation/settings-tenant-usage-error.excalidraw':
-    'platform-foundation/tenant-settings/settings-tenant-usage-error.excalidraw',
-  'platform-foundation/settings-tenant-free-plan.excalidraw':
-    'platform-foundation/tenant-settings/settings-tenant-free-plan.excalidraw',
-  'platform-foundation/settings-tenant-access-denied.excalidraw':
-    'platform-foundation/tenant-settings/settings-tenant-access-denied.excalidraw',
-  'platform-foundation/settings-tenant-deletion-scheduled.excalidraw':
-    'platform-foundation/delete-tenant/settings-tenant-deletion-scheduled.excalidraw',
-  'platform-foundation/settings-tenant-delete-modal.excalidraw':
-    'platform-foundation/delete-tenant/settings-tenant-delete-modal.excalidraw',
-  'platform-foundation/settings-tenant-delete-states.excalidraw':
-    'platform-foundation/delete-tenant/settings-tenant-delete-states.excalidraw',
+  'platform-foundation/settings-workspace.excalidraw':
+    'platform-foundation/workspace-settings/settings-workspace.excalidraw',
+  'platform-foundation/settings-workspace-upload-states.excalidraw':
+    'platform-foundation/workspace-profile/settings-workspace-upload-states.excalidraw',
+  'platform-foundation/settings-workspace-profile-states.excalidraw':
+    'platform-foundation/workspace-profile/settings-workspace-profile-states.excalidraw',
+  'platform-foundation/settings-workspace-usage-error.excalidraw':
+    'platform-foundation/workspace-settings/settings-workspace-usage-error.excalidraw',
+  'platform-foundation/settings-workspace-free-plan.excalidraw':
+    'platform-foundation/workspace-settings/settings-workspace-free-plan.excalidraw',
+  'platform-foundation/settings-workspace-access-denied.excalidraw':
+    'platform-foundation/workspace-settings/settings-workspace-access-denied.excalidraw',
+  'platform-foundation/settings-workspace-deletion-scheduled.excalidraw':
+    'platform-foundation/delete-workspace/settings-workspace-deletion-scheduled.excalidraw',
+  'platform-foundation/settings-workspace-delete-modal.excalidraw':
+    'platform-foundation/delete-workspace/settings-workspace-delete-modal.excalidraw',
+  'platform-foundation/settings-workspace-delete-states.excalidraw':
+    'platform-foundation/delete-workspace/settings-workspace-delete-states.excalidraw',
   'identity-access/login.excalidraw': 'identity-access/sign-in/login.excalidraw',
   'identity-access/login-unverified.excalidraw':
     'identity-access/sign-in/login-unverified.excalidraw',
@@ -177,7 +177,7 @@ const SCREEN_USE_CASE_OVERRIDES = {
   'form-builder/form-submission.excalidraw':
     'form-builder/create-form/form-submission.excalidraw',
   'workflow-engine/executions.excalidraw':
-    'workflow-engine/tenant-execution-history/executions.excalidraw',
+    'workflow-engine/workspace-execution-history/executions.excalidraw',
   'workflow-engine/execution-detail.excalidraw':
     'workflow-engine/isolated-steps/execution-detail.excalidraw',
 };
@@ -391,10 +391,10 @@ function genAppShell() {
 // ─── platform-foundation Platform Foundation ─────────────────────────────────────────────────
 
 /**
- * Register tenant — tenant onboarding only.
- * tenant contact email, auto-generated slug, Terms/Privacy acceptance.
+ * Register workspace — workspace onboarding only.
+ * workspace contact email, auto-generated slug, Terms/Privacy acceptance.
  */
-function genRegisterTenant() {
+function genRegisterWorkspace() {
   const cardW = AUTH_CARD_W;
   const cardX = Math.round((W - cardW) / 2);
   const cardY = 16;
@@ -405,16 +405,16 @@ function genRegisterTenant() {
   let y = cardY + headerH;
   const contentEls = [];
 
-  const header = buildAuthCardHeader('ro', cardX, cardY, cardW, 'Create your Tenant');
+  const header = buildAuthCardHeader('ro', cardX, cardY, cardW, 'Create your Workspace');
   contentEls.push(...header.els);
   wireFiles = mergeExcalidrawFiles(wireFiles, header.files);
-  y = paintRegisterTenantEntryFields(contentEls, 'ro', cardX, y, cardW, REGISTER_TENANT_ENTRY_FIELDS);
+  y = paintRegisterWorkspaceEntryFields(contentEls, 'ro', cardX, y, cardW, REGISTER_WORKSPACE_ENTRY_FIELDS);
 
   const { els: termsEls, blockH: termsH } = authTermsRow('ro_terms', cardX, y, cardW, { checked: true });
   contentEls.push(...termsEls);
   y += termsH + AUTH_FIELD_STACK_GAP;
 
-  contentEls.push(...buildAuthSubmitButton('ro', cardX, y, cardW, 'Create Tenant'));
+  contentEls.push(...buildAuthSubmitButton('ro', cardX, y, cardW, 'Create Workspace'));
   y += 36 + AUTH_SUBMIT_AFTER_GAP;
 
   const cardH = measureAuthCardHeight(cardY, y, contentEls);
@@ -428,7 +428,7 @@ function genRegisterTenant() {
     link: 'Sign in',
   }));
 
-  write('platform-foundation/register-tenant.excalidraw', els, wireFiles);
+  write('platform-foundation/register-workspace.excalidraw', els, wireFiles);
 }
 
 /** Dual-panel auth states: measure content, align card heights, paint back-to-front. */
@@ -442,12 +442,12 @@ function flushDualAuthStatePanels(els, panels) {
   return maxCardH;
 }
 
-function buildRegisterTenantStatePanel({ id, x, y0, panelW, lbl, lblColor, serverBanner, fields, terms }) {
+function buildRegisterWorkspaceStatePanel({ id, x, y0, panelW, lbl, lblColor, serverBanner, fields, terms }) {
   const cardY = y0 + 28;
   const prefix = `ros_${id}`;
   const contentEls = [];
 
-  const panelHeader = buildAuthCardHeader(prefix, x, cardY, panelW, 'Create your Tenant');
+  const panelHeader = buildAuthCardHeader(prefix, x, cardY, panelW, 'Create your Workspace');
   contentEls.push(...panelHeader.els);
 
   let fy = cardY + AUTH_HEADER_H;
@@ -459,7 +459,7 @@ function buildRegisterTenantStatePanel({ id, x, y0, panelW, lbl, lblColor, serve
     fy += 52;
   }
 
-  fy = paintRegisterTenantEntryFields(contentEls, prefix, x, fy, panelW, fields);
+  fy = paintRegisterWorkspaceEntryFields(contentEls, prefix, x, fy, panelW, fields);
 
   if (terms) {
     const { els: te, blockH: termsBlockH } = authTermsRow(`${prefix}_terms`, x, fy, panelW, terms);
@@ -467,7 +467,7 @@ function buildRegisterTenantStatePanel({ id, x, y0, panelW, lbl, lblColor, serve
     fy += termsBlockH + AUTH_FIELD_STACK_GAP;
   }
 
-  contentEls.push(...buildAuthSubmitButton(prefix, x, fy, panelW, 'Create Tenant'));
+  contentEls.push(...buildAuthSubmitButton(prefix, x, fy, panelW, 'Create Workspace'));
   fy += 36 + AUTH_SUBMIT_AFTER_GAP;
 
   const cardH = measureAuthCardHeight(cardY, fy, contentEls);
@@ -480,19 +480,19 @@ function buildRegisterTenantStatePanel({ id, x, y0, panelW, lbl, lblColor, serve
   };
 }
 
-const REGISTER_TENANT_STATE_FIELDS = REGISTER_TENANT_ENTRY_FIELDS.map((f) => ({
+const REGISTER_WORKSPACE_STATE_FIELDS = REGISTER_WORKSPACE_ENTRY_FIELDS.map((f) => ({
   ...f,
-  value: f.kind === 'input' && f.label === 'tenant name'
+  value: f.kind === 'input' && f.label === 'workspace name'
     ? "O'Brien & Co."
-    : f.kind === 'input' && f.label === 'tenant contact email'
+    : f.kind === 'input' && f.label === 'workspace contact email'
       ? 'admin@company.com'
       : f.value,
 }));
 
 /**
- * Register tenant states — inline validation, terms required, server error (5xx).
+ * Register workspace states — inline validation, terms required, server error (5xx).
  */
-function genRegisterTenantStates() {
+function genRegisterWorkspaceStates() {
   const els = [];
   let wireFiles = {};
   const panelW = 520;
@@ -502,7 +502,7 @@ function genRegisterTenantStates() {
   const cardY = y0 + 28;
 
   const panels = [
-    buildRegisterTenantStatePanel({
+    buildRegisterWorkspaceStatePanel({
       id: 'val',
       x: startX,
       y0,
@@ -511,19 +511,19 @@ function genRegisterTenantStates() {
       lblColor: C.danger,
       serverBanner: null,
       fields: [
-        { kind: 'input', label: 'tenant name', value: 'A', err: 'Must be between 2 and 100 characters.', required: true },
+        { kind: 'input', label: 'workspace name', value: 'A', err: 'Must be between 2 and 100 characters.', required: true },
         { kind: 'slug' },
         {
           kind: 'input',
-          label: 'tenant contact email',
+          label: 'workspace contact email',
           value: 'not-an-email',
-          err: 'Enter a valid tenant contact email.',
+          err: 'Enter a valid workspace contact email.',
           required: true,
         },
       ],
       terms: { checked: true },
     }),
-    buildRegisterTenantStatePanel({
+    buildRegisterWorkspaceStatePanel({
       id: 'srv',
       x: startX + panelW + gap,
       y0,
@@ -531,7 +531,7 @@ function genRegisterTenantStates() {
       lbl: 'Server error (5xx)',
       lblColor: C.danger,
       serverBanner: 'Something went wrong, please try again.',
-      fields: REGISTER_TENANT_STATE_FIELDS,
+      fields: REGISTER_WORKSPACE_STATE_FIELDS,
       terms: { checked: true },
     }),
   ];
@@ -546,11 +546,11 @@ function genRegisterTenantStates() {
     wireFiles = mergeExcalidrawFiles(wireFiles, p.files);
   }
 
-  write('platform-foundation/register-tenant-states.excalidraw', els, wireFiles);
+  write('platform-foundation/register-workspace-states.excalidraw', els, wireFiles);
 }
 
 const EMAIL_CONFIRMATION_BODY =
-  'If a tenant registration exists for this contact email, you will receive a verification link shortly.';
+  'If a workspace registration exists for this contact email, you will receive a verification link shortly.';
 
 /**
  * Paint email-confirmation card body (shared by happy path + resend state panels).
@@ -575,7 +575,7 @@ function paintEmailConfirmationCard(els, opts, wireAcc) {
   const ecInnerW = cardW - AUTH_CARD_PAD_X * 2;
   const ecX = cardX + AUTH_CARD_PAD_X;
   const ecHeadY = cardY + 68;
-  els.push(...stateHeadline(prefix, ecX, ecHeadY, ecInnerW, '✉', 'info', 'Check your tenant email', 16));
+  els.push(...stateHeadline(prefix, ecX, ecHeadY, ecInnerW, '✉', 'info', 'Check your workspace email', 16));
 
   let cy = ecHeadY + AUTH_HEADLINE_H + AUTH_BODY_GAP;
   const body1 = wrappedTextBlock(`${prefix}_body1`, ecX, cy, ecInnerW, EMAIL_CONFIRMATION_BODY, 13, C.gray700, 0.78);
@@ -671,7 +671,7 @@ function genEmailConfirmationStates() {
       notice: {
         variant: 'success',
         title: 'Verification email sent',
-        body: 'If a tenant registration exists for this contact email, check your inbox for a new link.',
+        body: 'If a workspace registration exists for this contact email, check your inbox for a new link.',
       },
       resend: {},
     },
@@ -918,13 +918,13 @@ function genVerifyEmailStates() {
   write('platform-foundation/verify-email-states.excalidraw', els, wireAcc.files);
 }
 
-/** User-facing checklist on workspace-provisioning (backend still provisions per module — see tenant-provisioning diagram). */
+/** User-facing checklist on workspace-provisioning (backend still provisions per module — see workspace-provisioning diagram). */
 const WP_UI_STEPS = [
-  { label: 'Creating your workspace', sub: "Preparing your tenant's data" },
+  { label: 'Creating your workspace', sub: "Preparing your workspace's data" },
 ];
 
-/** Wireframe placeholder — production UI uses tenant display name from registration context. */
-const WP_DEMO_TENANT_NAME = 'Acme Corp';
+/** Wireframe placeholder — production UI uses workspace display name from registration context. */
+const WP_DEMO_WORKSPACE_NAME = 'Acme Corp';
 
 /** Example in-progress retry line (live UI: max `attemptCount` across provisioning modules). */
 const WP_DEMO_ATTEMPT_LINE = 'Processing attempt 2 of 3';
@@ -954,7 +954,7 @@ function paintProvisioningChecklist(els, prefix, stepsX, stepsY, stepStates, row
 }
 
 /**
- * Workspace-Provisioning — setup status while tenant schemas provision (register-tenant AC).
+ * Workspace-Provisioning — setup status while workspace schemas provision (register-workspace AC).
  * Reference board: in progress | failed after 3 retries. UI shows aggregated steps only (no module names).
  */
 function genWorkspaceProvisioning() {
@@ -989,7 +989,7 @@ function genWorkspaceProvisioning() {
   els.push(ellipse('wp_l_spin', lMidX - 28, headerY + 26, 56, 56, C.infoBorder, C.infoBg, 2));
   els.push(text('wp_l_spin_t', lMidX - 28, headerY + 41, 56, 26, '↻', 18, C.primary, 'center'));
   els.push(text('wp_l_title', lX, headerY + 92, lW, 32,
-    `Setting up "${WP_DEMO_TENANT_NAME}" workspace…`, 17, C.gray900, 'center'));
+    `Setting up "${WP_DEMO_WORKSPACE_NAME}" workspace…`, 17, C.gray900, 'center'));
 
   const lStepsY = headerY + 148;
   const lEndY = paintProvisioningChecklist(
@@ -1037,21 +1037,21 @@ function genWorkspaceProvisioning() {
 }
 
 /**
- * Settings-tenant Delete Modal — Tenant deletion
- * Settings-tenant page (dimmed) + confirmation modal centred.
+ * Settings-workspace Delete Modal — Workspace deletion
+ * Settings-workspace page (dimmed) + confirmation modal centred.
  *
- * Modal: 480×280. Input to type tenant name. Delete button disabled (gray) until match.
+ * Modal: 480×280. Input to type workspace name. Delete button disabled (gray) until match.
  * mX=360, mY=210. Right edge=840, bottom=490.
  */
-function genSettingsTenantDeleteModal() {
+function genSettingsWorkspaceDeleteModal() {
   const navIdx = 4;
   const els    = [];
 
-  // ── Background: abbreviated settings-tenant (for context behind modal) ──────────
-  els.push(...appShell('sdm', W, H, NAV, navIdx, 'Settings — Tenant'));
-  els.push(text('sdm_bg_h',  cx,      cy,           300, 28, 'Tenant Profile', 20, C.gray900));
+  // ── Background: abbreviated settings-workspace (for context behind modal) ──────────
+  els.push(...appShell('sdm', W, H, NAV, navIdx, 'Settings — Workspace'));
+  els.push(text('sdm_bg_h',  cx,      cy,           300, 28, 'Workspace Profile', 20, C.gray900));
   els.push(rect('sdm_bg_dz', cx,      cy + 280, cw, 72, C.dangerBorder, C.dangerBg, 1, true));
-  els.push(text('sdm_bg_dt', cx + 16, cy + 296,     300, 18, 'Delete tenant',  14, C.danger));
+  els.push(text('sdm_bg_dt', cx + 16, cy + 296,     300, 18, 'Delete workspace',  14, C.danger));
 
   // Semi-transparent overlay
   els.push(rect('sdm_overlay', 0, 0, W, H, 'transparent', C.gray900, 0, false, { opacity: 40 }));
@@ -1065,7 +1065,7 @@ function genSettingsTenantDeleteModal() {
   els.push(rect('sdm_card', mX, mY, mW, mH, C.gray700, C.white, 2, true));
 
   // Header
-  els.push(text('sdm_title', mX + 20,      mY + 18, 380, 24, 'Delete tenant', 16, C.danger));
+  els.push(text('sdm_title', mX + 20,      mY + 18, 380, 24, 'Delete workspace', 16, C.danger));
   els.push(text('sdm_close', mX + mW - 40, mY + 16, 20,  20, '×',                   18, C.gray500));
   els.push(hline('sdm_hdiv', mX, mY + 52, mW, C.gray300));
 
@@ -1073,8 +1073,8 @@ function genSettingsTenantDeleteModal() {
   els.push(text('sdm_body', mX + 20, mY + 68, mW - 40, 52,
     'This action is permanent and cannot be undone.\nAll data will be deleted after a 30-day grace period.', 13, C.gray700));
 
-  // Confirm input (required — must match tenant name exactly)
-  els.push(...fieldLabel('sdm_inp_l', mX + 20, mY + 130, 'tenant name', { required: true }));
+  // Confirm input (required — must match workspace name exactly)
+  els.push(...fieldLabel('sdm_inp_l', mX + 20, mY + 130, 'workspace name', { required: true }));
   els.push(text('sdm_inp_hint', mX + 20, mY + 146, mW - 40, 14,
     "Type 'Acme Corp' to confirm (case-sensitive)", 10, C.gray500));
   els.push(...inputField('sdm_inp', mX + 20, mY + 162, mW - 40, 'Acme Corp'));
@@ -1083,7 +1083,7 @@ function genSettingsTenantDeleteModal() {
   els.push(hline('sdm_fdiv', mX, mY + mH - 56, mW, C.gray300));
 
   const cancelW = 'Cancel'.length * 8 + 32;             // 80
-  const delW    = 'Delete tenant'.length * 8 + 32; // 184
+  const delW    = 'Delete workspace'.length * 8 + 32; // 184
   const delBtnX    = mX + mW - 20 - delW;               // 636
   const cancelBtnX = delBtnX - 8 - cancelW;             // 548
 
@@ -1091,16 +1091,16 @@ function genSettingsTenantDeleteModal() {
 
   // Delete button — disabled state until input matches exactly
   els.push(rect('sdm_del',   delBtnX, mY + mH - 44, delW, 36, C.gray300, C.gray100, 1, true));
-  els.push(text('sdm_del_t', delBtnX, mY + mH - 34, delW, 16, 'Delete tenant', 13, C.gray300, 'center'));
+  els.push(text('sdm_del_t', delBtnX, mY + mH - 34, delW, 16, 'Delete workspace', 13, C.gray300, 'center'));
   els.push(text('sdm_hint',  mX + 20, mY + mH - 36, 240,  14, 'Enabled when name matches exactly', 10, C.gray300));
 
-  write('platform-foundation/settings-tenant-delete-modal.excalidraw', els);
+  write('platform-foundation/settings-workspace-delete-modal.excalidraw', els);
 }
 
 /**
- * Delete modal states — Tenant deletion enabled confirm + queue failure.
+ * Delete modal states — Workspace deletion enabled confirm + queue failure.
  */
-function genSettingsTenantDeleteStates() {
+function genSettingsWorkspaceDeleteStates() {
   const els = [];
   const panelW = 520;
   const panelH = 320;
@@ -1109,7 +1109,7 @@ function genSettingsTenantDeleteStates() {
   const y0 = 120;
 
   els.push(rect('sods_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
-  els.push(text('sods_pg', 0, 48, W, 20, 'Delete tenant — modal states', 13, C.gray500, 'center'));
+  els.push(text('sods_pg', 0, 48, W, 20, 'Delete workspace — modal states', 13, C.gray500, 'center'));
 
   const modals = [
     {
@@ -1141,28 +1141,28 @@ function genSettingsTenantDeleteStates() {
     const mX = x + Math.round((panelW - mW) / 2);
     const mCardY = mY + 30;
     els.push(rect(`sods_${id}_card`, mX, mCardY, mW, mH, C.gray700, C.white, 2, true));
-    els.push(text(`sods_${id}_ti`, mX + 20, mCardY + 18, mW - 40, 24, 'Delete tenant', 16, C.danger));
+    els.push(text(`sods_${id}_ti`, mX + 20, mCardY + 18, mW - 40, 24, 'Delete workspace', 16, C.danger));
     els.push(hline(`sods_${id}_hd`, mX, mCardY + 50, mW, C.gray300));
     if (err) {
       els.push(rect(`sods_${id}_ban`, mX + 20, mCardY + 62, mW - 40, 36, C.dangerBorder, C.dangerBg, 1, true));
       els.push(text(`sods_${id}_ban_t`, mX + 32, mCardY + 72, mW - 64, 16, err, 12, C.danger));
     }
     const inpY = err ? mCardY + 108 : mCardY + 68;
-    els.push(...fieldLabel(`sods_${id}_il`, mX + 20, inpY, 'tenant name', { required: true }));
+    els.push(...fieldLabel(`sods_${id}_il`, mX + 20, inpY, 'workspace name', { required: true }));
     els.push(text(`sods_${id}_ih`, mX + 20, inpY + 16, mW - 40, 14,
       "Type 'Acme Corp' to confirm (case-sensitive)", 10, C.gray500));
     els.push(...inputField(`sods_${id}_in`, mX + 20, inpY + 32, mW - 40, inp));
     const delY = mCardY + mH - 48;
     if (delEnabled) {
-      els.push(...btn(`sods_${id}_del`, mX + mW - 20 - 184, delY, 'Delete tenant', 'danger'));
+      els.push(...btn(`sods_${id}_del`, mX + mW - 20 - 184, delY, 'Delete workspace', 'danger'));
     } else {
       els.push(rect(`sods_${id}_del`, mX + mW - 20 - 184, delY, 184, 36, C.gray300, C.gray100, 1, true));
-      els.push(text(`sods_${id}_del_t`, mX + mW - 20 - 184, delY + 10, 184, 16, 'Delete tenant', 13, C.gray300, 'center'));
+      els.push(text(`sods_${id}_del_t`, mX + mW - 20 - 184, delY + 10, 184, 16, 'Delete workspace', 13, C.gray300, 'center'));
     }
     els.push(...btn(`sods_${id}_can`, mX + 20, delY, 'Cancel', 'ghost'));
   });
 
-  write('platform-foundation/settings-tenant-delete-states.excalidraw', els);
+  write('platform-foundation/settings-workspace-delete-states.excalidraw', els);
 }
 
 /**
@@ -1253,23 +1253,23 @@ function genPricing() {
 }
 
 /**
- * Settings-tenant — profile, usage, Tenant deletion
+ * Settings-workspace — profile, usage, Workspace deletion
  * App shell (Settings nav active). Three sections:
- *   1. Tenant Profile — name, logo, timezone, language, creation date
+ *   1. Workspace Profile — name, logo, timezone, language, creation date
  *   2. Usage — 3 metric cards (workflows, executions, users) + plan badge
- *   3. Danger Zone — delete Tenant with confirmation description
+ *   3. Danger Zone — delete Workspace with confirmation description
  *
  * Layout math (all y values from screen top):
  *   cy=80 → profY=124 → row2Y=212 → div1Y=302 → mY=354 → div2Y=442 → dboxY=494
  */
-function genSettingsTenant() {
+function genSettingsWorkspace() {
   const navIdx = 4;
   const els    = [];
 
-  els.push(...appShell('so', W, H, NAV, navIdx, 'Settings — Tenant'));
+  els.push(...appShell('so', W, H, NAV, navIdx, 'Settings — Workspace'));
 
-  // ── 1. Tenant Profile ───────────────────────────────────────────────────
-  els.push(...pageHeader('so_ph', cx, cy, cw, 'Tenant Profile', [
+  // ── 1. Workspace Profile ───────────────────────────────────────────────────
+  els.push(...pageHeader('so_ph', cx, cy, cw, 'Workspace Profile', [
     { label: 'Save changes', variant: 'primary' },
   ]));
 
@@ -1280,8 +1280,8 @@ function genSettingsTenant() {
   els.push(text('so_lgic',  cx,      profY + 24, 80,  32, '⬡',           20, C.primary, 'center'));
   els.push(text('so_lglnk', cx + 4,  profY + 62, 72,  14, 'Change logo', 10, C.primary, 'center'));
 
-  // tenant name (required); timezone / language optional
-  els.push(...fieldLabel('so_nm_l', cx + 96, profY + 12, 'tenant name', { required: true }));
+  // workspace name (required); timezone / language optional
+  els.push(...fieldLabel('so_nm_l', cx + 96, profY + 12, 'workspace name', { required: true }));
   els.push(...inputField('so_nm', cx + 96, profY + 30, 500, 'Acme Corp'));
 
   // Timezone + Language (row 2 — starts at profY+88 = 212)
@@ -1333,19 +1333,19 @@ function genSettingsTenant() {
   const dboxY = dangerY + 32;      // 494
   const dboxH = H - dboxY - PAD;   // 186
   els.push(rect('so_dbox', cx, dboxY, cw, dboxH, C.dangerBorder, C.dangerBg, 1, true));
-  els.push(text('so_dbox_t', cx + 16, dboxY + 16, 400, 18, 'Delete tenant', 14, C.danger));
+  els.push(text('so_dbox_t', cx + 16, dboxY + 16, 400, 18, 'Delete workspace', 14, C.danger));
   els.push(text('so_dbox_d', cx + 16, dboxY + 38, 620, 14,
-    'Permanently delete this Tenant and all its data. A 30-day grace period applies.', 12, C.gray700));
+    'Permanently delete this Workspace and all its data. A 30-day grace period applies.', 12, C.gray700));
 
   // Delete button right-aligned inside the danger box (danger variant)
-  const delLabel = 'Delete tenant';
+  const delLabel = 'Delete workspace';
   const delBtnX  = cx + cw - (delLabel.length * 8 + 32);  // 996
   els.push(...btn('so_del', delBtnX, dboxY + 12, delLabel, 'danger'));
 
-  write('platform-foundation/settings-tenant.excalidraw', els);
+  write('platform-foundation/settings-workspace.excalidraw', els);
 }
 
-function genSettingsTenantUploadStates() {
+function genSettingsWorkspaceUploadStates() {
   const els = [];
   els.push(rect('sou_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
   els.push(text('sou_t', 0, 48, W, 20, 'Logo upload states', 13, C.gray500, 'center'));
@@ -1372,16 +1372,16 @@ function genSettingsTenantUploadStates() {
     els.push(text(`sou_${s.id}_p`, x + 28, y + 151, cardW - 56, 16, i === 1 ? 'acme-logo.png' : 'Select a file…', 13, C.gray500));
   });
 
-  write('platform-foundation/settings-tenant-upload-states.excalidraw', els);
+  write('platform-foundation/settings-workspace-upload-states.excalidraw', els);
 }
 
 /**
  * Settings profile save states — profile settings inline validation, API error, success toast.
  */
-function genSettingsTenantProfileStates() {
+function genSettingsWorkspaceProfileStates() {
   const els = [];
   els.push(rect('sops_bg', 0, 0, W, H, C.gray300, C.gray100, 1, false));
-  els.push(text('sops_t', 0, 48, W, 20, 'Tenant profile — save states', 13, C.gray500, 'center'));
+  els.push(text('sops_t', 0, 48, W, 20, 'Workspace profile — save states', 13, C.gray500, 'center'));
 
   const cardW = 360;
   const cardH = 240;
@@ -1395,7 +1395,7 @@ function genSettingsTenantProfileStates() {
       title: 'Inline validation',
       stroke: C.dangerBorder,
       bg: C.dangerBg,
-      msg: 'tenant name must be between 2 and 100 characters.',
+      msg: 'workspace name must be between 2 and 100 characters.',
       msgColor: C.danger,
       fieldErr: true,
       toast: null,
@@ -1418,7 +1418,7 @@ function genSettingsTenantProfileStates() {
       msg: 'Changes saved — reflected in header without reload.',
       msgColor: C.success,
       fieldErr: false,
-      toast: 'Tenant profile saved',
+      toast: 'Workspace profile saved',
     },
   ];
 
@@ -1428,7 +1428,7 @@ function genSettingsTenantProfileStates() {
     els.push(text(`sops_${s.id}_h`, x + 16, y + 16, cardW - 32, 20, s.title, 14, C.gray900));
     els.push(rect(`sops_${s.id}_a`, x + 16, y + 44, cardW - 32, 48, s.stroke, s.bg, 1, true));
     els.push(text(`sops_${s.id}_m`, x + 26, y + 58, cardW - 52, 32, s.msg, 12, s.msgColor));
-    els.push(...fieldLabel(`sops_${s.id}_nl`, x + 16, y + 108, 'tenant name', { required: true }));
+    els.push(...fieldLabel(`sops_${s.id}_nl`, x + 16, y + 108, 'workspace name', { required: true }));
     const inpStroke = s.fieldErr ? C.dangerBorder : C.gray300;
     els.push(rect(`sops_${s.id}_inp`, x + 16, y + 126, cardW - 32, 40, inpStroke, C.white, 1, true));
     els.push(text(`sops_${s.id}_v`, x + 28, y + 137, cardW - 56, 18, 'Acme Corp', 13, C.gray900));
@@ -1442,12 +1442,12 @@ function genSettingsTenantProfileStates() {
     }
   });
 
-  write('platform-foundation/settings-tenant-profile-states.excalidraw', els);
+  write('platform-foundation/settings-workspace-profile-states.excalidraw', els);
 }
 
-function genSettingsTenantUsageError() {
+function genSettingsWorkspaceUsageError() {
   const els = [];
-  els.push(...appShell('sue', W, H, NAV, 4, 'Settings — Tenant'));
+  els.push(...appShell('sue', W, H, NAV, 4, 'Settings — Workspace'));
   els.push(text('sue_h', cx, cy, 300, 28, 'Usage', 20, C.gray900));
   els.push(text('sue_sub', cx, cy + 30, 420, 16, 'Usage stats are temporarily unavailable.', 12, C.gray700));
 
@@ -1461,14 +1461,14 @@ function genSettingsTenantUsageError() {
     els.push(...btn(`sue_r_${i}`, x + 12, mY + 60, 'Retry', 'ghost'));
   });
 
-  write('platform-foundation/settings-tenant-usage-error.excalidraw', els);
+  write('platform-foundation/settings-workspace-usage-error.excalidraw', els);
 }
 
 /** usage settings edge case — free plan usage without denominator limits. */
-function genSettingsTenantFreePlan() {
+function genSettingsWorkspaceFreePlan() {
   const navIdx = 4;
   const els = [];
-  els.push(...appShell('sofp', W, H, NAV, navIdx, 'Settings — Tenant'));
+  els.push(...appShell('sofp', W, H, NAV, navIdx, 'Settings — Workspace'));
   els.push(text('sofp_h', cx, cy, 400, 28, 'Usage (Free plan — no configured limits)', 18, C.gray900));
 
   const usageY = cy + 40;
@@ -1489,11 +1489,11 @@ function genSettingsTenantFreePlan() {
     els.push(text(`sofp_ms_${i}`, x + 12, mY + 54, mW - 24, 14, 'no limit configured', 11, C.gray300));
   });
 
-  write('platform-foundation/settings-tenant-free-plan.excalidraw', els);
+  write('platform-foundation/settings-workspace-free-plan.excalidraw', els);
 }
 
 /** usage settings — non-admin receives 403 (redirect target shown as message). */
-function genSettingsTenantAccessDenied() {
+function genSettingsWorkspaceAccessDenied() {
   const navIdx = 4;
   const els = [];
   els.push(...appShell('soad', W, H, NAV, navIdx, 'Settings'));
@@ -1503,27 +1503,27 @@ function genSettingsTenantAccessDenied() {
   els.push(rect('soad_box', boxX, boxY, boxW, 160, C.gray300, C.white, 2, true));
   els.push(...stateHeadline('soad', boxX + 24, boxY + 24, boxW - 48, '✕', 'danger', 'Access denied', 16));
   els.push(text('soad_body', boxX + 24, boxY + 88, boxW - 48, 40,
-    'You need the Admin role to view Tenant settings.\nRedirecting to dashboard…', 13, C.gray700));
+    'You need the Admin role to view Workspace settings.\nRedirecting to dashboard…', 13, C.gray700));
   els.push(...btn('soad_home', boxX + 24, boxY + 116, 'Go to dashboard', 'secondary'));
 
-  write('platform-foundation/settings-tenant-access-denied.excalidraw', els);
+  write('platform-foundation/settings-workspace-access-denied.excalidraw', els);
 }
 
-function genSettingsTenantDeletionScheduled() {
+function genSettingsWorkspaceDeletionScheduled() {
   const els = [];
-  els.push(...appShell('sds', W, H, NAV, 4, 'Settings — Tenant'));
+  els.push(...appShell('sds', W, H, NAV, 4, 'Settings — Workspace'));
 
   const by = cy;
   els.push(rect('sds_b', cx, by, cw, 88, C.warningBorder, C.warningBg, 1, true));
-  els.push(text('sds_t', cx + 16, by + 14, cw - 220, 20, 'Your Tenant is scheduled for deletion', 14, C.warning));
+  els.push(text('sds_t', cx + 16, by + 14, cw - 220, 20, 'Your Workspace is scheduled for deletion', 14, C.warning));
   els.push(text('sds_d', cx + 16, by + 36, cw - 220, 32, 'All data will be permanently removed on Feb 14, 2026.\nYou can cancel deletion during the grace period.', 12, C.gray700));
   els.push(...btn('sds_cancel', cx + cw - 180, by + 26, 'Cancel deletion', 'secondary'));
 
-  els.push(text('sds_stub', cx, by + 120, 400, 20, 'Tenant Profile', 16, C.gray900));
+  els.push(text('sds_stub', cx, by + 120, 400, 20, 'Workspace Profile', 16, C.gray900));
   els.push(rect('sds_stub_card', cx, by + 150, cw, 170, C.gray300, C.white, 1, true));
   els.push(text('sds_stub_txt', cx + 20, by + 222, cw - 40, 16, 'Settings content continues below…', 12, C.gray500, 'center'));
 
-  write('platform-foundation/settings-tenant-deletion-scheduled.excalidraw', els);
+  write('platform-foundation/settings-workspace-deletion-scheduled.excalidraw', els);
 }
 
 // ─── identity-access Identity & Access — Auth screens (no sidebar) ───────────────────────
@@ -1550,7 +1550,7 @@ function genLogin() {
   write('identity-access/login.excalidraw', els, files);
 }
 
-/** email verification (tenant-registration) / unverified sign-in — unverified email blocks sign-in. */
+/** email verification (workspace-registration) / unverified sign-in — unverified email blocks sign-in. */
 function genLoginUnverified() {
   const cardW = AUTH_CARD_W;
   const cardH = 500;
@@ -1725,7 +1725,7 @@ function genAcceptInvitation() {
     title: 'You have been invited',
     subtitle: 'Join Acme Corp on Axis',
     items: [
-      { label: 'Tenant',      placeholder: 'Acme Corp', required: false },
+      { label: 'Workspace',      placeholder: 'Acme Corp', required: false },
       { label: 'Choose a password', placeholder: '••••••••', required: true },
     ],
   }, 'Accept Invitation', { lead: 'Already have an account? ', link: 'Sign in' });
@@ -2241,22 +2241,22 @@ function genExecutionDetail() {
 const SCREENS = [
   ['app-shell', genAppShell],
 
-  ['platform-foundation/register-tenant', genRegisterTenant],
-  ['platform-foundation/register-tenant-states', genRegisterTenantStates],
+  ['platform-foundation/register-workspace', genRegisterWorkspace],
+  ['platform-foundation/register-workspace-states', genRegisterWorkspaceStates],
   ['platform-foundation/email-confirmation', genEmailConfirmation],
   ['platform-foundation/email-confirmation-states', genEmailConfirmationStates],
   ['platform-foundation/verify-email-states', genVerifyEmailStates],
   ['platform-foundation/workspace-provisioning', genWorkspaceProvisioning],
   ['platform-foundation/pricing', genPricing],
-  ['platform-foundation/settings-tenant', genSettingsTenant],
-  ['platform-foundation/settings-tenant-upload-states', genSettingsTenantUploadStates],
-  ['platform-foundation/settings-tenant-profile-states', genSettingsTenantProfileStates],
-  ['platform-foundation/settings-tenant-usage-error', genSettingsTenantUsageError],
-  ['platform-foundation/settings-tenant-free-plan', genSettingsTenantFreePlan],
-  ['platform-foundation/settings-tenant-access-denied', genSettingsTenantAccessDenied],
-  ['platform-foundation/settings-tenant-deletion-scheduled', genSettingsTenantDeletionScheduled],
-  ['platform-foundation/settings-tenant-delete-modal', genSettingsTenantDeleteModal],
-  ['platform-foundation/settings-tenant-delete-states', genSettingsTenantDeleteStates],
+  ['platform-foundation/settings-workspace', genSettingsWorkspace],
+  ['platform-foundation/settings-workspace-upload-states', genSettingsWorkspaceUploadStates],
+  ['platform-foundation/settings-workspace-profile-states', genSettingsWorkspaceProfileStates],
+  ['platform-foundation/settings-workspace-usage-error', genSettingsWorkspaceUsageError],
+  ['platform-foundation/settings-workspace-free-plan', genSettingsWorkspaceFreePlan],
+  ['platform-foundation/settings-workspace-access-denied', genSettingsWorkspaceAccessDenied],
+  ['platform-foundation/settings-workspace-deletion-scheduled', genSettingsWorkspaceDeletionScheduled],
+  ['platform-foundation/settings-workspace-delete-modal', genSettingsWorkspaceDeleteModal],
+  ['platform-foundation/settings-workspace-delete-states', genSettingsWorkspaceDeleteStates],
 
   ['identity-access/login', genLogin],
   ['identity-access/login-unverified', genLoginUnverified],

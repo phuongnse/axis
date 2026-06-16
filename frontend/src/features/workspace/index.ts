@@ -1,2 +1,2 @@
-export type { CurrentUserProfile, TenantSettings, UsageStats } from './api';
+export type { CurrentUserProfile, UsageStats, WorkspaceSettings } from './api';
 export { useWorkspaceStart } from './hooks/useWorkspaceStart';

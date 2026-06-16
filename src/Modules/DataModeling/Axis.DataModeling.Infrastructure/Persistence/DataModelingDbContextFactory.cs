@@ -15,7 +15,7 @@ internal sealed class DataModelingDbContextFactory : IDesignTimeDbContextFactory
 
         DbContextOptionsBuilder<DataModelingDbContext> builder = new();
         builder.UseNpgsql(connectionString);
-        return new DataModelingDbContext(builder.Options, new DesignTimePublicSchemaTenantContext());
+        return new DataModelingDbContext(builder.Options, new DesignTimePublicSchemaWorkspaceContext());
     }
 
     private static string RequireConnectionString(params string[] envVarNames)

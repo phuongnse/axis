@@ -15,7 +15,7 @@ public class RetryExecutionHandlerTests
     private readonly IExecutionRepository _execRepo = Substitute.For<IExecutionRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private static readonly Guid WorkflowId = Guid.NewGuid();
     private static readonly Guid UserId = Guid.NewGuid();
 
@@ -23,7 +23,7 @@ public class RetryExecutionHandlerTests
 
     private static WorkflowExecution MakeFailedExecution()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TenantId, TriggerType.Manual, null, new Dictionary<string, object?>());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, WorkspaceId, TriggerType.Manual, null, new Dictionary<string, object?>());
         exec.Start();
         exec.Fail("network timeout");
         return exec;
@@ -33,10 +33,10 @@ public class RetryExecutionHandlerTests
     public async Task RetryExecution_WhenExecutionHasFailed_CreatesRetryExecutionAndReturnsId()
     {
         WorkflowExecution failed = MakeFailedExecution();
-        _execRepo.GetByIdAsync(failed.Id, TenantId).Returns(failed);
+        _execRepo.GetByIdAsync(failed.Id, WorkspaceId).Returns(failed);
 
         Result<Guid> result = await CreateHandler().Handle(
-            new RetryExecutionCommand(failed.Id, TenantId, UserId),
+            new RetryExecutionCommand(failed.Id, WorkspaceId, UserId),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -52,10 +52,10 @@ public class RetryExecutionHandlerTests
     [Fact]
     public async Task RetryExecution_WhenExecutionNotFound_ReturnsNotFound()
     {
-        _execRepo.GetByIdAsync(Arg.Any<Guid>(), TenantId).ReturnsNull();
+        _execRepo.GetByIdAsync(Arg.Any<Guid>(), WorkspaceId).ReturnsNull();
 
         Result<Guid> result = await CreateHandler().Handle(
-            new RetryExecutionCommand(Guid.NewGuid(), TenantId, UserId), CancellationToken.None);
+            new RetryExecutionCommand(Guid.NewGuid(), WorkspaceId, UserId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
@@ -65,12 +65,12 @@ public class RetryExecutionHandlerTests
     [Fact]
     public async Task RetryExecution_WhenExecutionIsNotFailed_ReturnsBusinessRuleFailure()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TenantId, TriggerType.Manual, null, new Dictionary<string, object?>());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, WorkspaceId, TriggerType.Manual, null, new Dictionary<string, object?>());
         exec.Start();
-        _execRepo.GetByIdAsync(exec.Id, TenantId).Returns(exec);
+        _execRepo.GetByIdAsync(exec.Id, WorkspaceId).Returns(exec);
 
         Result<Guid> result = await CreateHandler().Handle(
-            new RetryExecutionCommand(exec.Id, TenantId, UserId), CancellationToken.None);
+            new RetryExecutionCommand(exec.Id, WorkspaceId, UserId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
@@ -78,14 +78,14 @@ public class RetryExecutionHandlerTests
     }
 
     [Fact]
-    public async Task RetryExecution_WhenExecutionBelongsToAnotherTenant_ReturnsNotFound()
+    public async Task RetryExecution_WhenExecutionBelongsToAnotherWorkspace_ReturnsNotFound()
     {
         WorkflowExecution failed = MakeFailedExecution();
-        _execRepo.GetByIdAsync(failed.Id, TenantId).Returns(failed);
+        _execRepo.GetByIdAsync(failed.Id, WorkspaceId).Returns(failed);
 
-        Guid otherTenantId = Guid.NewGuid();
+        Guid otherWorkspaceId = Guid.NewGuid();
         Result<Guid> result = await CreateHandler().Handle(
-            new RetryExecutionCommand(failed.Id, otherTenantId, UserId), CancellationToken.None);
+            new RetryExecutionCommand(failed.Id, otherWorkspaceId, UserId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);

@@ -15,7 +15,7 @@ namespace Axis.WorkflowBuilder.Infrastructure.Tests.Handlers;
 [Collection("WorkflowBuilderDb")]
 public sealed class FormDeletedHandlerTests(WorkflowBuilderDatabaseFixture fixture)
 {
-    private static readonly Guid TenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid WorkspaceId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private static FormDeletedHandler CreateHandler(WorkflowBuilderDbContext ctx)
     {
@@ -30,14 +30,14 @@ public sealed class FormDeletedHandlerTests(WorkflowBuilderDatabaseFixture fixtu
         new()
         {
             formId = formId.ToString(),
-            tenantId = TenantId.ToString(),
+            workspaceId = WorkspaceId.ToString(),
         };
 
     [Fact]
     public async Task Handle_WhenFormStepReferencesDeletedForm_MarksReferenceBroken()
     {
         Guid formId = Guid.NewGuid();
-        WorkflowDefinition workflow = WorkflowDefinition.Create($"Flow-{Guid.NewGuid():N}", null, TenantId, "user");
+        WorkflowDefinition workflow = WorkflowDefinition.Create($"Flow-{Guid.NewGuid():N}", null, WorkspaceId, "user");
         workflow.AddStep("Intake", StepType.Form, new Dictionary<string, object?> { ["formId"] = formId });
         Guid stepId = workflow.Steps.Single(s => s.Type == StepType.Form).Id;
 
@@ -45,7 +45,7 @@ public sealed class FormDeletedHandlerTests(WorkflowBuilderDatabaseFixture fixtu
         {
             writeCtx.WorkflowDefinitions.Add(workflow);
             writeCtx.WorkflowFormReferences.Add(
-                WorkflowFormReference.Create(workflow.Id, stepId, formId, TenantId, isBroken: false));
+                WorkflowFormReference.Create(workflow.Id, stepId, formId, WorkspaceId, isBroken: false));
             await writeCtx.SaveChangesAsync();
         }
 

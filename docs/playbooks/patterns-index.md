@@ -15,7 +15,7 @@ One-page map into [`patterns.md`](./patterns.md). Open only the section you need
 | Fixing EF tracking / migrations | [EF Core common pitfalls](./patterns.md#ef-core-common-pitfalls) |
 | Modeling aggregates / owned entities | [DDD pitfalls](./patterns.md#ddd--aggregate-design-pitfalls) · [OwnsMany](./patterns.md#ef-core-ownsmany-pattern) |
 | Wiring DI / scoped services | [Dependency Injection pitfalls](./patterns.md#dependency-injection-pitfalls) |
-| Tenant schema / raw SQL | [Multi-tenancy pitfalls](./patterns.md#multi-tenancy-pitfalls) |
+| Workspace schema / raw SQL | [Multi-workspace isolation pitfalls](./patterns.md#multi-workspace isolation-pitfalls) |
 | `Task.Run` / fire-and-forget | [Async fire-and-forget pitfalls](./patterns.md#async-fire-and-forget-pitfalls) |
 | New `IEntityTypeConfiguration` | [EF aggregate mapping patterns](./patterns.md#ef-core-aggregate-mapping-patterns) |
 | Writing unit tests | [Testing rules](./patterns.md#testing-rules) · [testing.md](./testing.md) |
@@ -50,7 +50,7 @@ One-page map into [`patterns.md`](./patterns.md). Open only the section you need
 | 6 | [DDD / aggregate pitfalls](./patterns.md#ddd--aggregate-design-pitfalls) |
 | 7 | [EF OwnsMany](./patterns.md#ef-core-ownsmany-pattern) |
 | 8 | [DI pitfalls](./patterns.md#dependency-injection-pitfalls) |
-| 9 | [Multi-tenancy](./patterns.md#multi-tenancy-pitfalls) |
+| 9 | [Multi-workspace isolation](./patterns.md#multi-workspace isolation-pitfalls) |
 | 10 | [Async fire-and-forget](./patterns.md#async-fire-and-forget-pitfalls) |
 | 11 | [EF aggregate mapping](./patterns.md#ef-core-aggregate-mapping-patterns) |
 | 12 | [Testing rules](./patterns.md#testing-rules) |

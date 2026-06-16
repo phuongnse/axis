@@ -7,7 +7,7 @@ namespace Axis.DataModeling.Application.Commands.AddField;
 /// <summary>Add a field of any supported type to a model.</summary>
 public sealed record AddFieldCommand(
     Guid ModelId,
-    Guid tenantId,
+    Guid workspaceId,
     string Name,
     string Label,
     FieldType Type,

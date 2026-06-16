@@ -119,7 +119,7 @@ public static class RecordEndpoints
         if (filterError is not null) return filterError;
 
         Result<RecordsPageDto> result = await mediator.Send(
-            new GetRecordsQuery(modelId, currentUser.TenantId, page, pageSize, search, parsedFilters, sortBy, sortDir),
+            new GetRecordsQuery(modelId, currentUser.WorkspaceId, page, pageSize, search, parsedFilters, sortBy, sortDir),
             ct);
 
         if (result.IsFailure) return result.ToProblemDetails();
@@ -137,7 +137,7 @@ public static class RecordEndpoints
         IReadOnlyList<Guid> ids = request.Ids ?? [];
 
         Result<BulkDeleteResult> result = await mediator.Send(
-            new BulkDeleteRecordsCommand(ids, modelId, currentUser.TenantId), ct);
+            new BulkDeleteRecordsCommand(ids, modelId, currentUser.WorkspaceId), ct);
 
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.Ok(result.Value);
@@ -157,7 +157,7 @@ public static class RecordEndpoints
         if (filterError is not null) return filterError;
 
         Result<CsvExportDto> result = await mediator.Send(
-            new ExportRecordsCsvQuery(modelId, currentUser.TenantId, search, parsedFilters, sortBy, sortDir),
+            new ExportRecordsCsvQuery(modelId, currentUser.WorkspaceId, search, parsedFilters, sortBy, sortDir),
             ct);
 
         if (result.IsFailure) return result.ToProblemDetails();
@@ -177,7 +177,7 @@ public static class RecordEndpoints
         CancellationToken ct)
     {
         Result<Guid> result = await mediator.Send(
-            new CreateRecordCommand(modelId, currentUser.TenantId, data, currentUser.UserId.ToString()), ct);
+            new CreateRecordCommand(modelId, currentUser.WorkspaceId, data, currentUser.UserId.ToString()), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.Created($"/api/models/{modelId}/records/{result.Value}", new CreatedResponse(result.Value));
     }
@@ -190,7 +190,7 @@ public static class RecordEndpoints
         CancellationToken ct)
     {
         Result<RecordDto> result = await mediator.Send(
-            new GetRecordQuery(recordId, modelId, currentUser.TenantId), ct);
+            new GetRecordQuery(recordId, modelId, currentUser.WorkspaceId), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.Ok(result.Value);
     }
@@ -204,7 +204,7 @@ public static class RecordEndpoints
         CancellationToken ct)
     {
         Result result = await mediator.Send(
-            new UpdateRecordCommand(recordId, modelId, currentUser.TenantId, data), ct);
+            new UpdateRecordCommand(recordId, modelId, currentUser.WorkspaceId, data), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
@@ -217,7 +217,7 @@ public static class RecordEndpoints
         CancellationToken ct)
     {
         Result result = await mediator.Send(
-            new DeleteRecordCommand(recordId, modelId, currentUser.TenantId), ct);
+            new DeleteRecordCommand(recordId, modelId, currentUser.WorkspaceId), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }

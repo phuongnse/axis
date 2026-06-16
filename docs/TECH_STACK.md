@@ -13,7 +13,7 @@
 | **Modulith with strict service boundaries** | — | Architecture pattern | Per-module DB + broker + gRPC + JWT from day 1; extraction = redeploy. See [ADR-010](#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy). |
 | **CQRS via MediatR** | 12.x | Intra-module command/query separation | Within a module only; cross-module communication uses Kafka + gRPC, never MediatR. |
 | **Entity Framework Core** | 9.x | ORM (per module) | Each module owns a DbContext + database. Migrations mandatory ([ADR-023](#adr-023-per-module-ef-core-migrations-only)). |
-| **Npgsql** | 9.x | PostgreSQL driver | Per-module database; per-module Wolverine schema ([ADR-011](#adr-011-per-module-database-with-schema-per-tenant-inside), [ADR-012](#adr-012-per-module-wolverine-schema-in-the-modules-own-database)). |
+| **Npgsql** | 9.x | PostgreSQL driver | Per-module database; per-module Wolverine schema ([ADR-011](#adr-011-per-module-database-with-schema-per-workspace-inside), [ADR-012](#adr-012-per-module-wolverine-schema-in-the-modules-own-database)). |
 | **Wolverine** | 5.x | In-module orchestration + outbox + saga runtime | Handlers, scheduled jobs, durable outbox (per-module schema), saga state. Cross-module transports are Kafka + RabbitMQ ([ADR-013](#adr-013-apache-kafka-for-cross-module-domain-events-and-event-sourced-aggregates), [ADR-024](#adr-024-rabbitmq-for-commands-background-jobs-and-saga-orchestration)). |
 | **Apache Kafka** | 3.x | Cross-module event transport + event-sourced aggregate log | Durable log + replay for events; Confluent Schema Registry for Avro payloads ([ADR-013](#adr-013-apache-kafka-for-cross-module-domain-events-and-event-sourced-aggregates), [ADR-019](#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). Routing rule per [ADR-025](#adr-025-transport-selection-rule-by-message-name-suffix). |
 | **WolverineFx.Kafka** | 5.x | Kafka transport for Wolverine | Bridges Wolverine envelopes to/from Kafka topics. |
@@ -64,8 +64,8 @@
 
 | Technology | Role | Rationale |
 |---|---|---|
-| **PostgreSQL 16** | Per-module databases (`axis_identity`, `axis_datamodeling`, …) | One database per module; schema-per-tenant inside each ([ADR-011](#adr-011-per-module-database-with-schema-per-tenant-inside)). JSONB for dynamic fields. |
-| **Apache Kafka 3.x** | Cross-module event broker + event-sourced aggregate log | KRaft mode (no ZooKeeper). Topics partitioned by `tenantId`. ([ADR-013](#adr-013-apache-kafka-for-cross-module-domain-events-and-event-sourced-aggregates)) |
+| **PostgreSQL 16** | Per-module databases (`axis_identity`, `axis_datamodeling`, …) | One database per module; schema-per-workspace inside each ([ADR-011](#adr-011-per-module-database-with-schema-per-workspace-inside)). JSONB for dynamic fields. |
+| **Apache Kafka 3.x** | Cross-module event broker + event-sourced aggregate log | KRaft mode (no ZooKeeper). Topics partitioned by `workspaceId`. ([ADR-013](#adr-013-apache-kafka-for-cross-module-domain-events-and-event-sourced-aggregates)) |
 | **RabbitMQ 3.x** | Cross-module command + job + saga broker | Single-node in dev; classic queues with DLX. Management UI on `:15672`. ([ADR-024](#adr-024-rabbitmq-for-commands-background-jobs-and-saga-orchestration)) |
 | **Confluent Schema Registry** | Event-schema evolution | Avro schemas with backward-compatibility rules. |
 | **Redis 7** | Cache + distributed lock | Session cache, prevent duplicate job execution. Per-module key prefixes. |
@@ -88,14 +88,14 @@
 
 **Why superseded:** "Extract later" turned out to mean "refactor later" — single shared DB, in-process Wolverine, shared kernel implementation, in-process auth lookups all create extraction debt. ADR-010 commits to a stronger contract: each module is a service from day 1; deployment is the only thing that changes when extracting.
 
-### ADR-002: Schema-per-Tenant
+### ADR-002: Schema-per-Workspace
 
-**Status:** Superseded by [ADR-011](#adr-011-per-module-database-with-schema-per-tenant-inside).
+**Status:** Superseded by [ADR-011](#adr-011-per-module-database-with-schema-per-workspace-inside).
 
-**Original decision:** Each Tenant gets its own PostgreSQL schema.
-**Original reason:** Strong data isolation, no risk of data leakage between tenants. Simplifies backups and restores per tenant. Performance is acceptable at target scale.
+**Original decision:** Each Workspace gets its own PostgreSQL schema.
+**Original reason:** Strong data isolation, no risk of data leakage between workspaces. Simplifies backups and restores per workspace. Performance is acceptable at target scale.
 
-**Why superseded:** The original ADR placed all tenant schemas in a single shared database, which couples module data lifecycles together and prevents clean extraction. ADR-011 keeps schema-per-tenant but moves each module to its own database.
+**Why superseded:** The original ADR placed all workspace schemas in a single shared database, which couples module data lifecycles together and prevents clean extraction. ADR-011 keeps schema-per-workspace but moves each module to its own database.
 
 ### ADR-003: Wolverine over Hangfire
 **Decision:** Use Wolverine for background jobs and intra-module messaging.
@@ -160,29 +160,29 @@
 - "We'll add the broker later" — the broker is part of the Phase 1 foundation.
 - "Tests can skip the network hops" — tests run with the same broker (Testcontainers) so failure modes match production.
 
-### ADR-011: Per-module database with schema-per-tenant inside
+### ADR-011: Per-module database with schema-per-workspace inside
 
-**Decision:** Each module owns its own PostgreSQL database (e.g. `axis_identity`, `axis_datamodeling`, `axis_workflowbuilder`, …). Tenant isolation within a module is **schema-per-tenant** (`tenant_{TenantId:N}`) inside that module's database. Identity remains the only module that operates entirely in `public` (it has no tenant data of its own — only tenant *metadata*).
+**Decision:** Each module owns its own PostgreSQL database (e.g. `axis_identity`, `axis_datamodeling`, `axis_workflowbuilder`, …). Workspace isolation within a module is **schema-per-workspace** (`workspace_{WorkspaceId:N}`) inside that module's database. Identity remains the only module that operates entirely in `public` (it has no workspace data of its own — only workspace *metadata*).
 
 **Reason:**
 
 - **Per-module DB is the prerequisite for [ADR-010](#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy).** A module cannot be extracted without its data; if data is shared, extraction means manual table-by-table copy + dual-write transition periods. Separate databases make extraction a connection-string change.
-- **Schema-per-tenant kept inside each module.** Three multitenancy models were evaluated:
-  - **Database-per-tenant:** strongest isolation but explodes operations (`N modules × M tenants` databases). Rejected for cost at production scale, can be revisited per-module if a large tenant needs it.
-  - **Row-level with Postgres RLS:** scales best with many small tenants but requires RLS discipline on every query and complicates per-tenant backups. Rejected because Axis prefers strong-isolation defaults.
-  - **Schema-per-tenant inside the module DB:** preserves existing `tenant_{TenantId:N}` shape, isolates tenants strongly, and extracts cleanly. **Chosen.**
-- **`public` schema in each module DB** holds module-level metadata (e.g. cross-tenant indexes, configuration). Identity's `public` is special: it owns Tenants, users, and roles — the registry that all other modules reference via JWT claims, never via SQL.
+- **Schema-per-workspace kept inside each module.** Three multi-workspace isolation models were evaluated:
+  - **Database-per-workspace:** strongest isolation but explodes operations (`N modules × M workspaces` databases). Rejected for cost at production scale, can be revisited per-module if a large workspace needs it.
+  - **Row-level with Postgres RLS:** scales best with many small workspaces but requires RLS discipline on every query and complicates per-workspace backups. Rejected because Axis prefers strong-isolation defaults.
+  - **Schema-per-workspace inside the module DB:** preserves existing `workspace_{WorkspaceId:N}` shape, isolates workspaces strongly, and extracts cleanly. **Chosen.**
+- **`public` schema in each module DB** holds module-level metadata (e.g. cross-workspace indexes, configuration). Identity's `public` is special: it owns Workspaces, users, and roles — the registry that all other modules reference via JWT claims, never via SQL.
 - **Connection-string convention.** `appsettings.json` carries a connection string per module (`ConnectionStrings:Identity`, `ConnectionStrings:DataModeling`, …) pointing to its database. In the modulith mode all these strings may point to the same Postgres host; in extracted mode they point to per-module hosts.
 
 **Anti-patterns rejected:**
 
-- Sharing a single `axis` database across modules (the original [ADR-002](#adr-002-schema-per-tenant) layout).
+- Sharing a single `axis` database across modules (the original [ADR-002](#adr-002-schema-per-workspace) layout).
 - Cross-module `DbContext` queries via a shared connection.
-- Cross-tenant queries inside a module via `search_path` tricks — these always go through events instead.
+- Cross-workspace queries inside a module via `search_path` tricks — these always go through events instead.
 
 ### ADR-012: Per-module Wolverine schema in the module's own database
 
-**Decision:** Each module has its own Wolverine envelope schema (`wolverine`) inside the module's database (per [ADR-011](#adr-011-per-module-database-with-schema-per-tenant-inside)). Outbox writes commit in the same transaction as the module's aggregate save, exactly as the original [ADR-009](#adr-009-wolverine-durable-inboxoutbox-in-a-dedicated-wolverine-schema) intended, but localised so each module owns its envelope history.
+**Decision:** Each module has its own Wolverine envelope schema (`wolverine`) inside the module's database (per [ADR-011](#adr-011-per-module-database-with-schema-per-workspace-inside)). Outbox writes commit in the same transaction as the module's aggregate save, exactly as the original [ADR-009](#adr-009-wolverine-durable-inboxoutbox-in-a-dedicated-wolverine-schema) intended, but localised so each module owns its envelope history.
 
 **Reason:**
 
@@ -199,7 +199,7 @@
 
 - **Log-based replay is mandatory for event sourcing.** Event-sourced aggregates rebuild state by replaying their event log; Kafka's durable, ordered, partitioned log is the canonical store. RabbitMQ classic queues delete messages on consumption; RabbitMQ streams can replay but its ecosystem around event-sourcing is weaker.
 - **Cross-module integration events are facts.** A `WorkflowExecutionCompleted` event is published once, consumed by many — possibly years later by a new analytics consumer that didn't exist when the event was emitted. Kafka's retention + replay model fits; RabbitMQ's "consume and forget" doesn't.
-- **Partitioning matches the tenancy model.** Topics partitioned by `tenantId` preserve per-tenant ordering, allow per-tenant scaling, and keep tenants isolated within the message bus.
+- **Partitioning matches the workspace isolation model.** Topics partitioned by `workspaceId` preserve per-workspace ordering, allow per-workspace scaling, and keep workspaces isolated within the message bus.
 - **Industry standard for event-driven systems.** Kafka pairs naturally with schema registries ([ADR-019](#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)), event-lake / analytics tooling, and standard observability stacks.
 - **Operational cost accepted for events only.** Kafka has heavier ops than RabbitMQ (broker tuning, partition planning, KRaft config). Scoping Kafka to events + event sourcing rather than "everything" keeps the surface bounded — work-queue traffic goes through RabbitMQ which is operationally lighter.
 
@@ -258,13 +258,13 @@
 
 ### ADR-017: Axis.Shared is abstractions only, no shared implementation
 
-**Decision:** The shared kernel projects (`Axis.Shared.Domain`, `Axis.Shared.Application`, `Axis.Shared.Infrastructure`) contain **only**: domain primitives (Result, Error, value-object base types), application interfaces (`IUnitOfWork`, `ICurrentUser`, `ITenantContext`), and infrastructure abstractions that *every* module needs identically (e.g. envelope serialisers). Concrete implementations live inside the module that uses them.
+**Decision:** The shared kernel projects (`Axis.Shared.Domain`, `Axis.Shared.Application`, `Axis.Shared.Infrastructure`) contain **only**: domain primitives (Result, Error, value-object base types), application interfaces (`IUnitOfWork`, `ICurrentUser`, `IWorkspaceContext`), and infrastructure abstractions that *every* module needs identically (e.g. envelope serialisers). Concrete implementations live inside the module that uses them.
 
 **Reason:**
 
 - **Shared implementation is hidden coupling.** When `Axis.Shared.Infrastructure.Persistence.UnitOfWork` defines how SaveChanges interacts with Wolverine, every module is locked to that pattern. Extracting one module means either dragging Shared.Infrastructure (with all its dependencies) or rewriting that module's UoW from scratch. Either is friction.
 - **Abstractions are not coupling.** An interface in `Axis.Shared` is a contract — modules implement it however they like. Multiple implementations can coexist (one per module) without conflict.
-- **`Axis.Shared.Infrastructure` either disappears or shrinks dramatically.** Most of its current content (UnitOfWork base class, Wolverine middleware, tenant-schema interceptor) becomes per-module. What remains is genuinely cross-cutting: e.g. a common JSON-serialisation policy.
+- **`Axis.Shared.Infrastructure` either disappears or shrinks dramatically.** Most of its current content (UnitOfWork base class, Wolverine middleware, workspace-schema interceptor) becomes per-module. What remains is genuinely cross-cutting: e.g. a common JSON-serialisation policy.
 
 **Anti-patterns rejected:**
 
@@ -280,17 +280,17 @@
 - **OpenTelemetry is vendor-neutral.** Switching backends (e.g. to Honeycomb, Datadog, Lightstep) requires only the exporter change, not application code changes.
 - **Grafana stack is self-hostable and free.** Suits a solo or small team building everything themselves. Commercial vendors (Datadog, Honeycomb) are excellent but lock in cost trajectory; deferring that choice keeps options open.
 - **Cross-service tracing is non-negotiable for distributed-ready.** Without OTEL, debugging a slow workflow across Identity → Workflow → Form modules requires correlating timestamps by hand. Trace IDs propagated by Wolverine + gRPC interceptors give a single timeline per request.
-- **Logs as a query target, not a tail.** Loki + LogQL gives structured-log search by trace ID, tenant ID, etc. Serilog continues to emit JSON; OTEL log exporter ships them to Loki.
+- **Logs as a query target, not a tail.** Loki + LogQL gives structured-log search by trace ID, workspace ID, etc. Serilog continues to emit JSON; OTEL log exporter ships them to Loki.
 
 ### ADR-019: Avro and Schema Registry for event payloads with CloudEvents envelope
 
-**Decision:** Cross-module event payloads are serialised as **Apache Avro** with schemas registered in **Confluent Schema Registry**. Each event is wrapped in a **CloudEvents** envelope (CE spec 1.0) so envelope-level metadata (event ID, source, time, type, correlation ID, tenant ID) is uniformly accessible regardless of payload format.
+**Decision:** Cross-module event payloads are serialised as **Apache Avro** with schemas registered in **Confluent Schema Registry**. Each event is wrapped in a **CloudEvents** envelope (CE spec 1.0) so envelope-level metadata (event ID, source, time, type, correlation ID, workspace ID) is uniformly accessible regardless of payload format.
 
 **Reason:**
 
 - **Schema evolution is enforced.** Confluent Schema Registry rejects breaking schema changes by default; producers cannot ship an incompatible event without explicit allowlist. Consumers degrade gracefully (forward compatibility) when new optional fields appear.
 - **Smaller payloads than JSON.** Avro's binary format pays off at Kafka's volumes; over the lifetime of a high-traffic topic this matters for storage and network costs.
-- **CloudEvents envelope decouples routing from payload.** Wolverine middleware reads the envelope to dispatch handlers without parsing the Avro body; cross-cutting concerns (tracing, idempotency, tenant context) live in well-known envelope fields.
+- **CloudEvents envelope decouples routing from payload.** Wolverine middleware reads the envelope to dispatch handlers without parsing the Avro body; cross-cutting concerns (tracing, idempotency, workspace context) live in well-known envelope fields.
 - **Interop with future polyglot services.** If a future module is built in Go, Rust, or Python, Avro+Schema-Registry+CloudEvents are first-class everywhere; JSON Schema is similar but lacks Schema Registry's compatibility-rule enforcement.
 
 **Anti-patterns rejected:**
@@ -332,7 +332,7 @@
 
 ### ADR-023: Per-module EF Core migrations only
 
-**Decision:** Every module manages its database schema (both `public` and tenant schemas) via **EF Core migrations**. `Database.EnsureCreated()` is not used anywhere — not in production, not in development, not in tests. The integration-test fixture applies the same migrations production uses.
+**Decision:** Every module manages its database schema (both `public` and workspace schemas) via **EF Core migrations**. `Database.EnsureCreated()` is not used anywhere — not in production, not in development, not in tests. The integration-test fixture applies the same migrations production uses.
 
 **Reason:**
 
@@ -353,8 +353,8 @@
 **Reason:**
 
 - **Work-queue semantics are RabbitMQ's sweet spot.** Per-message ACK, requeue, dead-letter exchange, prefetch count, retry-with-backoff via TTL — these are first-class in RabbitMQ and require non-trivial workarounds in Kafka (retry topics, DLQ topics, manual offset commits, …).
-- **Latency is lower for synchronous-ish flows.** A `ProvisionTenantCommand` round-trip through RabbitMQ is milliseconds; the equivalent through Kafka with consumer poll cycles is meaningfully slower.
-- **Wolverine + RabbitMQ pairing is mature.** Saga state in Postgres + RabbitMQ for messages is the canonical Wolverine pattern; long-running orchestrators (e.g. tenant provisioning with retry/backoff/alert per [register-tenant § tenant-provisioning](use-cases/platform-foundation/register-tenant/README.md#tenant-provisioning)) fit naturally.
+- **Latency is lower for synchronous-ish flows.** A `ProvisionWorkspaceCommand` round-trip through RabbitMQ is milliseconds; the equivalent through Kafka with consumer poll cycles is meaningfully slower.
+- **Wolverine + RabbitMQ pairing is mature.** Saga state in Postgres + RabbitMQ for messages is the canonical Wolverine pattern; long-running orchestrators (e.g. workspace provisioning with retry/backoff/alert per [register-workspace § workspace-provisioning](use-cases/platform-foundation/register-workspace/README.md#workspace-provisioning)) fit naturally.
 - **Ops cost is low.** Single-node RabbitMQ runs in a few hundred MB, clusters are well-understood, the management UI is excellent for debugging stuck queues.
 - **Replay semantics are absent — that's a feature.** A command consumed should NOT be replayable; the action's already been taken. RabbitMQ's "consume and forget" matches command semantics. Use Kafka when you want to replay.
 
@@ -384,7 +384,7 @@
 
 **Reason:**
 
-- **Suffix convention is self-enforcing.** A new contributor naming a class `ProvisionTenantEvent` will route it to Kafka — even if their intent was actually a command, the code review catches "this isn't a past-tense fact, rename to `ProvisionTenantCommand`."
+- **Suffix convention is self-enforcing.** A new contributor naming a class `ProvisionWorkspaceEvent` will route it to Kafka — even if their intent was actually a command, the code review catches "this isn't a past-tense fact, rename to `ProvisionWorkspaceCommand`."
 - **Wolverine config stays declarative.** `opts.PublishMessage<T>().ToRabbitExchange(…)` for each `*Command`/`*Job`; `opts.PublishMessage<T>().ToKafkaTopic(…)` for each `*Event`. The Program.cs section reads top-to-bottom as "this kind of message goes here."
 - **Grep-able in CI.** A lint step can fail the PR if a `*Event` is routed to RabbitMQ or a `*Command` is routed to Kafka. Mismatch = explicit override required in code with a comment explaining why.
 
@@ -396,16 +396,16 @@
 **Anti-patterns rejected:**
 
 - "Same message goes to both transports" — pick one based on semantics. Duplicating writes doubles failure modes.
-- Suffix-less message names (just `ProvisionTenant`) — ambiguous routing; pre-commit hook should reject.
+- Suffix-less message names (just `ProvisionWorkspace`) — ambiguous routing; pre-commit hook should reject.
 
 ### ADR-027: External identity providers for user sign-in and registration
 
-**Decision:** Support **Microsoft** (Entra ID / Microsoft account), **Google**, and **GitHub** as external providers for user sign-in and provider registration/linking alongside email/password. They are wired into the OpenIddict server (ADR-004) via the ASP.NET Core external-authentication handlers; OpenIddict remains the only token issuer — external providers authenticate the user, Axis still mints its own access/refresh tokens. External providers do **not** create Tenants; tenant onboarding is owned by [register-tenant](./use-cases/platform-foundation/register-tenant/README.md) and uses an official tenant contact email. Standalone email/password registration is tracked in [register-user](./use-cases/identity-access/register-user/README.md).
+**Decision:** Support **Microsoft** (Entra ID / Microsoft account), **Google**, and **GitHub** as external providers for user sign-in and provider registration/linking alongside email/password. They are wired into the OpenIddict server (ADR-004) via the ASP.NET Core external-authentication handlers; OpenIddict remains the only token issuer — external providers authenticate the user, Axis still mints its own access/refresh tokens. External providers do **not** create Workspaces; workspace onboarding is owned by [register-workspace](./use-cases/platform-foundation/register-workspace/README.md) and uses an official workspace contact email. Standalone email/password registration is tracked in [register-user](./use-cases/identity-access/register-user/README.md).
 
-**Reason:** Low-friction user sign-up and sign-in are required for onboarding. Users expect to use the corporate or developer identity they already have, and password-only auth raises abandonment at account setup. However, a generic Microsoft / Google / GitHub user identity does not prove authority over a tenant, so tenant registration remains a separate flow based on tenant contact verification. Routing all user providers through OpenIddict keeps a single token format, a single JWKS, and one RBAC mapping regardless of how the user authenticated.
+**Reason:** Low-friction user sign-up and sign-in are required for onboarding. Users expect to use the corporate or developer identity they already have, and password-only auth raises abandonment at account setup. However, a generic Microsoft / Google / GitHub user identity does not prove authority over a workspace, so workspace registration remains a separate flow based on workspace contact verification. Routing all user providers through OpenIddict keeps a single token format, a single JWKS, and one RBAC mapping regardless of how the user authenticated.
 
 **Configuration:** per-provider `client_id` / `client_secret` stored in HashiCorp Vault in production ([ADR-022](#adr-022-secrets-management-via-hashicorp-vault-in-production)) and `.env` in development. Redirect URIs are registered per environment. A provider can be disabled per deployment without code changes.
 
-**Registration:** an external sign-in either creates a new Tenant (the register-tenant flow) or signs into an existing one. Accounts are linked to an existing Axis user by **verified email** — a provider login whose email matches a verified local account attaches to it rather than creating a duplicate.
+**Registration:** an external sign-in either creates a new Workspace (the register-workspace flow) or signs into an existing one. Accounts are linked to an existing Axis user by **verified email** — a provider login whose email matches a verified local account attaches to it rather than creating a duplicate.
 
-**Rejected:** full enterprise SSO federation (SAML, SCIM provisioning, per-tenant IdP) is deferred — it is a separate initiative driven by enterprise-tenant demand, not part of the baseline product scope in use-case specs.
+**Rejected:** full enterprise SSO federation (SAML, SCIM provisioning, per-workspace IdP) is deferred — it is a separate initiative driven by enterprise-workspace demand, not part of the baseline product scope in use-case specs.

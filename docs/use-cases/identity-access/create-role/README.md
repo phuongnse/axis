@@ -8,7 +8,7 @@ Create a custom role with specific permissions so that I can grant exactly the r
 
 ## Primary actor
 
-- Tenant Admin
+- Workspace Admin
 
 ## Trigger
 
@@ -17,7 +17,7 @@ Create a custom role with specific permissions so that I can grant exactly the r
 ## Main flow
 
 1. Actor starts the — Create a custom role flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
@@ -26,7 +26,7 @@ Create a custom role with specific permissions so that I can grant exactly the r
 
 ## Context
 
-Tenant admins can create custom roles, assign permissions to each role, and assign roles to users. Default system roles (Admin, Editor, Viewer) are provided out-of-the-box and cannot be deleted or modified.
+Workspace admins can create custom roles, assign permissions to each role, and assign roles to users. Default system roles (Admin, Editor, Viewer) are provided out-of-the-box and cannot be deleted or modified.
 
 ## Acceptance Criteria
 
@@ -36,7 +36,7 @@ Tenant admins can create custom roles, assign permissions to each role, and assi
 - [ ] Success message confirms: "Role '{name}' created."
 
 *Validation & errors*
-- [ ] Role name: required, 2–50 characters, unique within the tenant (case-insensitive). Duplicate name shows: "A role with this name already exists."
+- [ ] Role name: required, 2–50 characters, unique within the workspace (case-insensitive). Duplicate name shows: "A role with this name already exists."
 - [ ] At least one permission must be selected. Submitting with no permissions shows: "A role must have at least one permission."
 - [ ] A non-admin calling this API receives HTTP 403.
 
@@ -57,9 +57,9 @@ Tenant admins can create custom roles, assign permissions to each role, and assi
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** 403 permission check requires JWT identity from API layer — pending. Case-insensitive name uniqueness check is done in handler against existing roles in tenant.
+> **Gaps vs spec:** 403 permission check requires JWT identity from API layer — pending. Case-insensitive name uniqueness check is done in handler against existing roles in workspace.
 >
-> **Decisions:** `Role.CreateCustom(name, TenantId, permissions[])` factory method; minimum 1 permission enforced in domain.
+> **Decisions:** `Role.CreateCustom(name, WorkspaceId, permissions[])` factory method; minimum 1 permission enforced in domain.
 >
 > **Gaps vs spec:**
 > - N/A

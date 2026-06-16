@@ -1,7 +1,7 @@
 using Axis.FormBuilder.Domain.Aggregates;
 using Axis.FormBuilder.Domain.ReadModels;
 using Axis.FormBuilder.Infrastructure.Persistence.Configurations;
-using Axis.Shared.Application.Tenancy;
+using Axis.Shared.Application.Workspaces;
 using Axis.Shared.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,7 +9,7 @@ namespace Axis.FormBuilder.Infrastructure.Persistence;
 
 internal sealed class FormBuilderDbContext(
     DbContextOptions<FormBuilderDbContext> options,
-    ITenantContext tenantContext) : DbContext(options)
+    IWorkspaceContext workspaceContext) : DbContext(options)
 {
     public DbSet<FormDefinition> FormDefinitions => Set<FormDefinition>();
     public DbSet<FormWorkflowReference> FormWorkflowReferences => Set<FormWorkflowReference>();
@@ -19,7 +19,7 @@ internal sealed class FormBuilderDbContext(
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         // Per ADR-017: interceptor wiring inlined per module.
-        optionsBuilder.AddInterceptors(new TenantSchemaInterceptor(tenantContext));
+        optionsBuilder.AddInterceptors(new WorkspaceSchemaInterceptor(workspaceContext));
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

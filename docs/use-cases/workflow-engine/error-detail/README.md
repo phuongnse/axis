@@ -8,7 +8,7 @@ See the full error details of a failed step so that I can understand what went w
 
 ## Primary actor
 
-- Tenant Member with `execution:read`
+- Workspace Member with `execution:read`
 
 ## Trigger
 
@@ -17,7 +17,7 @@ See the full error details of a failed step so that I can understand what went w
 ## Main flow
 
 1. Actor starts the — View detailed error information flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows

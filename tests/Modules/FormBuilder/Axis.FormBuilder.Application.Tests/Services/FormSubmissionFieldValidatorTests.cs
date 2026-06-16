@@ -8,12 +8,12 @@ namespace Axis.FormBuilder.Application.Tests.Services;
 
 public class FormSubmissionFieldValidatorTests
 {
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
 
     [Fact]
     public void Validate_WhenRequiredFieldMissing_ReturnsError()
     {
-        FormDefinition form = FormDefinition.Create("Test Form", null, TenantId, "user");
+        FormDefinition form = FormDefinition.Create("Test Form", null, WorkspaceId, "user");
         form.AddField("email", "Email", FormFieldType.Text, true, null);
 
         Dictionary<string, string[]> errors = FormSubmissionFieldValidator.Validate(
@@ -27,7 +27,7 @@ public class FormSubmissionFieldValidatorTests
     [Fact]
     public void Validate_WhenTextExceedsMaxLength_ReturnsError()
     {
-        FormDefinition form = FormDefinition.Create("Test Form", null, TenantId, "user");
+        FormDefinition form = FormDefinition.Create("Test Form", null, WorkspaceId, "user");
         form.AddField("code", "Code", FormFieldType.Text, false, new TextFormFieldConfig(MaxLength: 3));
 
         Dictionary<string, string[]> errors = FormSubmissionFieldValidator.Validate(
@@ -40,7 +40,7 @@ public class FormSubmissionFieldValidatorTests
     [Fact]
     public void Validate_WhenSectionField_SkipsValidation()
     {
-        FormDefinition form = FormDefinition.Create("Test Form", null, TenantId, "user");
+        FormDefinition form = FormDefinition.Create("Test Form", null, WorkspaceId, "user");
         form.AddField("hdr", "Header", FormFieldType.Section, false, new SectionFieldConfig());
 
         Dictionary<string, string[]> errors = FormSubmissionFieldValidator.Validate(

@@ -12,7 +12,7 @@ internal sealed class FormWorkflowReferenceConfiguration : IEntityTypeConfigurat
         builder.HasKey(r => new { r.WorkflowId, r.FormId });
         builder.Property(r => r.WorkflowId).HasColumnName("workflow_id");
         builder.Property(r => r.FormId).HasColumnName("form_id");
-        builder.Property(r => r.tenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(r => r.workspaceId).HasColumnName("workspace_id").IsRequired();
         builder.Property(r => r.IsActive).HasColumnName("is_active").IsRequired();
         builder.HasIndex(r => r.FormId);
     }

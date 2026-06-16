@@ -1,5 +1,5 @@
 using Axis.DataModeling.Infrastructure.Persistence;
-using Axis.Shared.Application.Tenancy;
+using Axis.Shared.Application.Workspaces;
 using Axis.Testing;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -16,7 +16,7 @@ public sealed class DataModelingDatabaseFixture : IAsyncLifetime
     private const string TestSchema = "test_data_modeling";
     private string _connectionString = null!;
 
-    public ITenantContext TenantContext { get; } = new TestTenantContext(TestSchema);
+    public IWorkspaceContext WorkspaceContext { get; } = new TestWorkspaceContext(TestSchema);
 
     public async Task InitializeAsync()
     {
@@ -33,7 +33,7 @@ public sealed class DataModelingDatabaseFixture : IAsyncLifetime
 
         await PostgresModuleTestDatabase.MigrateAsync<DataModelingDbContext>(
             _connectionString,
-            opts => new DataModelingDbContext(opts, TenantContext));
+            opts => new DataModelingDbContext(opts, WorkspaceContext));
     }
 
     public async Task DisposeAsync() => await _postgres.DisposeAsync();
@@ -43,12 +43,12 @@ public sealed class DataModelingDatabaseFixture : IAsyncLifetime
         DbContextOptions<DataModelingDbContext> options = new DbContextOptionsBuilder<DataModelingDbContext>()
             .UseNpgsql(_connectionString)
             .Options;
-        return new DataModelingDbContext(options, TenantContext);
+        return new DataModelingDbContext(options, WorkspaceContext);
     }
 }
 
-internal sealed class TestTenantContext(string schemaName) : ITenantContext
+internal sealed class TestWorkspaceContext(string schemaName) : IWorkspaceContext
 {
-    public Guid tenantId => Guid.Parse("00000000-0000-0000-0000-000000000001");
+    public Guid workspaceId => Guid.Parse("00000000-0000-0000-0000-000000000001");
     public string SchemaName => schemaName;
 }

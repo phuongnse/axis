@@ -12,24 +12,24 @@ namespace axis.datamodeling.events
     public partial class FieldRemovedEvent : global::Avro.Specific.ISpecificRecord
     {
         public static global::Avro.Schema _SCHEMA = global::Avro.Schema.Parse(
-            @"{""type"":""record"",""name"":""FieldRemovedEvent"",""namespace"":""axis.datamodeling.events"",""fields"":[{""name"":""modelId"",""type"":""string""},{""name"":""tenantId"",""type"":""string""},{""name"":""fieldId"",""type"":""string""},{""name"":""fieldName"",""type"":""string""}]}");
+            @"{""type"":""record"",""name"":""FieldRemovedEvent"",""namespace"":""axis.datamodeling.events"",""fields"":[{""name"":""modelId"",""type"":""string""},{""name"":""workspaceId"",""type"":""string""},{""name"":""fieldId"",""type"":""string""},{""name"":""fieldName"",""type"":""string""}]}");
 
         private string _modelId = string.Empty;
-        private string _tenantId = string.Empty;
+        private string _workspaceId = string.Empty;
         private string _fieldId = string.Empty;
         private string _fieldName = string.Empty;
 
         public virtual global::Avro.Schema Schema => FieldRemovedEvent._SCHEMA;
 
         public string modelId { get => _modelId; set => _modelId = value; }
-        public string tenantId { get => _tenantId; set => _tenantId = value; }
+        public string workspaceId { get => _workspaceId; set => _workspaceId = value; }
         public string fieldId { get => _fieldId; set => _fieldId = value; }
         public string fieldName { get => _fieldName; set => _fieldName = value; }
 
         public virtual object Get(int fieldPos) => fieldPos switch
         {
             0 => modelId,
-            1 => tenantId,
+            1 => workspaceId,
             2 => fieldId,
             3 => fieldName,
             _ => throw new global::Avro.AvroRuntimeException("Bad index " + fieldPos + " in Get()"),
@@ -40,7 +40,7 @@ namespace axis.datamodeling.events
             switch (fieldPos)
             {
                 case 0: modelId = (string)fieldValue; break;
-                case 1: tenantId = (string)fieldValue; break;
+                case 1: workspaceId = (string)fieldValue; break;
                 case 2: fieldId = (string)fieldValue; break;
                 case 3: fieldName = (string)fieldValue; break;
                 default: throw new global::Avro.AvroRuntimeException("Bad index " + fieldPos + " in Put()");

@@ -11,7 +11,7 @@ public class GetExecutionHandlerTests
 {
     private readonly IExecutionRepository _execRepo = Substitute.For<IExecutionRepository>();
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private static readonly Guid ExecId = Guid.NewGuid();
     private static readonly Guid WorkflowId = Guid.NewGuid();
 
@@ -26,10 +26,10 @@ public class GetExecutionHandlerTests
     public async Task GetExecution_WhenExecutionExists_ReturnsExecutionResponse()
     {
         ExecutionResponse expected = BuildResponse();
-        _execRepo.GetWithStepsAsync(ExecId, TenantId).Returns(expected);
+        _execRepo.GetWithStepsAsync(ExecId, WorkspaceId).Returns(expected);
 
         ExecutionResponse? result = await CreateHandler().Handle(
-            new GetExecutionQuery(ExecId, TenantId), CancellationToken.None);
+            new GetExecutionQuery(ExecId, WorkspaceId), CancellationToken.None);
 
         result.Should().NotBeNull();
         result!.Id.Should().Be(ExecId);
@@ -40,23 +40,23 @@ public class GetExecutionHandlerTests
     [Fact]
     public async Task GetExecution_WhenExecutionNotFound_ReturnsNull()
     {
-        _execRepo.GetWithStepsAsync(Arg.Any<Guid>(), TenantId).ReturnsNull();
+        _execRepo.GetWithStepsAsync(Arg.Any<Guid>(), WorkspaceId).ReturnsNull();
 
         ExecutionResponse? result = await CreateHandler().Handle(
-            new GetExecutionQuery(Guid.NewGuid(), TenantId), CancellationToken.None);
+            new GetExecutionQuery(Guid.NewGuid(), WorkspaceId), CancellationToken.None);
 
         result.Should().BeNull();
     }
 
     [Fact]
-    public async Task GetExecution_WhenExecutionBelongsToAnotherTenant_ReturnsNull()
+    public async Task GetExecution_WhenExecutionBelongsToAnotherWorkspace_ReturnsNull()
     {
         ExecutionResponse expected = BuildResponse();
-        _execRepo.GetWithStepsAsync(ExecId, TenantId).Returns(expected);
+        _execRepo.GetWithStepsAsync(ExecId, WorkspaceId).Returns(expected);
 
-        Guid otherTenantId = Guid.NewGuid();
+        Guid otherWorkspaceId = Guid.NewGuid();
         ExecutionResponse? result = await CreateHandler().Handle(
-            new GetExecutionQuery(ExecId, otherTenantId), CancellationToken.None);
+            new GetExecutionQuery(ExecId, otherWorkspaceId), CancellationToken.None);
 
         result.Should().BeNull();
     }

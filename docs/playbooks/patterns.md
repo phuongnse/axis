@@ -4,7 +4,7 @@
 
 > **Start with [patterns-index.md](./patterns-index.md)** — one-page map to sections below. Open `patterns.md` only for the section you need. Skip both when the task is trivial.
 
-> Read this file when the task involves any of: adding/updating NuGet packages, EF Core aggregate or JSONB mapping, Minimal API endpoint wiring, writing tests, implementing a list/query endpoint, adding async methods, defining response DTOs, writing repository methods, adding domain methods to an aggregate, working with multi-tenant raw SQL, Wolverine handlers or jobs, implementing a new step or field type, adding a cross-cutting concern, or any design decision about where logic should live. Skip otherwise.
+> Read this file when the task involves any of: adding/updating NuGet packages, EF Core aggregate or JSONB mapping, Minimal API endpoint wiring, writing tests, implementing a list/query endpoint, adding async methods, defining response DTOs, writing repository methods, adding domain methods to an aggregate, working with multi-workspace raw SQL, Wolverine handlers or jobs, implementing a new step or field type, adding a cross-cutting concern, or any design decision about where logic should live. Skip otherwise.
 
 > **Contributing a new entry:** before adding a new section, check whether an existing section can absorb it. Write the *principle* first — the WHY and the class of problems it solves — then show one concrete example. A rule written only at the incident level ("when X happened, do Y") won't help a reader facing a different manifestation of the same problem.
 
@@ -21,7 +21,7 @@
 - [DDD / Aggregate design pitfalls](#ddd--aggregate-design-pitfalls)
 - [EF Core OwnsMany pattern](#ef-core-ownsmany-pattern)
 - [Dependency Injection pitfalls](#dependency-injection-pitfalls)
-- [Multi-tenancy pitfalls](#multi-tenancy-pitfalls)
+- [Multi-workspace isolation pitfalls](#multi-workspace isolation-pitfalls)
 - [Async fire-and-forget pitfalls](#async-fire-and-forget-pitfalls)
 - [EF Core aggregate mapping patterns](#ef-core-aggregate-mapping-patterns)
 - [Testing rules](#testing-rules)
@@ -207,7 +207,7 @@ await _uow.SaveChangesAsync(ct);
 
 // ✅ option B — bulk update without loading entities (large sets)
 await _context.WorkflowDefinitions
-    .Where(w => w.tenantId == TenantId && w.Status == WorkflowStatus.Active)
+    .Where(w => w.workspaceId == WorkspaceId && w.Status == WorkflowStatus.Active)
     .ExecuteUpdateAsync(s => s.SetProperty(w => w.Status, WorkflowStatus.Archived), ct);
 ```
 
@@ -314,7 +314,7 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
     public void CompleteStep(Guid stepId, IReadOnlyDictionary<string, object?> output)
     {
         GetStep(stepId).Complete(output);           // delegate state change to entity
-        RaiseDomainEvent(new ExecutionStepCompleted(Id, stepId, tenantId, output)); // event on root
+        RaiseDomainEvent(new ExecutionStepCompleted(Id, stepId, workspaceId, output)); // event on root
     }
 }
 ```
@@ -374,7 +374,7 @@ builder.OwnsMany(e => e.Steps, stepBuilder =>
     stepBuilder.HasKey(s => s.Id);
     stepBuilder.Property(s => s.Name).IsRequired().HasMaxLength(500);
     // ... other properties
-    stepBuilder.HasIndex(s => new { s.ExecutionId, s.tenantId });
+    stepBuilder.HasIndex(s => new { s.ExecutionId, s.workspaceId });
 });
 ```
 
@@ -394,13 +394,13 @@ builder.OwnsMany(e => e.Steps, stepBuilder =>
 
 ### Captive dependency — scoped service inside a singleton
 
-A singleton that captures a scoped service holds it for the application lifetime. The scoped service (e.g. `DbContext`, `ITenantContext`) was designed to be created per-request — holding it in a singleton causes tenant context bleed across requests and DbContext reuse across threads.
+A singleton that captures a scoped service holds it for the application lifetime. The scoped service (e.g. `DbContext`, `IWorkspaceContext`) was designed to be created per-request — holding it in a singleton causes workspace context bleed across requests and DbContext reuse across threads.
 
 ```csharp
-// ❌ wrong — ITenantContext is scoped; singleton captures it at startup
-public class MyCache(ITenantContext tenantContext) // singleton captures scoped
+// ❌ wrong — IWorkspaceContext is scoped; singleton captures it at startup
+public class MyCache(IWorkspaceContext workspaceContext) // singleton captures scoped
 {
-    public string GetKey() => $"cache:{tenantContext.Schema}"; // wrong tenant after first request
+    public string GetKey() => $"cache:{workspaceContext.Schema}"; // wrong workspace after first request
 }
 
 // ✅ correct — inject IServiceScopeFactory and resolve per-operation
@@ -409,8 +409,8 @@ public class MyCache(IServiceScopeFactory scopeFactory)
     public async Task<string> GetKeyAsync()
     {
         await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
-        ITenantContext tenant = scope.ServiceProvider.GetRequiredService<ITenantContext>();
-        return $"cache:{tenant.Schema}";
+        IWorkspaceContext workspace = scope.ServiceProvider.GetRequiredService<IWorkspaceContext>();
+        return $"cache:{workspace.Schema}";
     }
 }
 ```
@@ -445,24 +445,24 @@ public static IServiceCollection AddWorkflowBuilderInfrastructure(
 
 ---
 
-## Multi-tenancy pitfalls
+## Multi-workspace isolation pitfalls
 
-### Raw SQL bypassing global query filters — tenant data leakage
+### Raw SQL bypassing global query filters — workspace data leakage
 
-EF Core global query filters (`HasQueryFilter`) automatically inject `WHERE tenant_id = X` and `WHERE deleted_at IS NULL` into every LINQ query. Raw SQL via `FromSqlRaw`, `ExecuteSqlRawAsync`, or `Dapper` bypasses these filters entirely — the query runs against all tenants.
+EF Core global query filters (`HasQueryFilter`) automatically inject `WHERE workspace_id = X` and `WHERE deleted_at IS NULL` into every LINQ query. Raw SQL via `FromSqlRaw`, `ExecuteSqlRawAsync`, or `Dapper` bypasses these filters entirely — the query runs against all workspaces.
 
 ```csharp
-// ❌ wrong — returns rows from ALL tenants
+// ❌ wrong — returns rows from ALL workspaces
 List<WorkflowDefinition> all = await _context.WorkflowDefinitions
     .FromSqlRaw("SELECT * FROM workflow_definitions")
     .ToListAsync(ct);
 
-// ❌ wrong — deletes across ALL tenants
+// ❌ wrong — deletes across ALL workspaces
 await _context.Database.ExecuteSqlRawAsync(
     "DELETE FROM workflow_definitions WHERE status = 'Archived'", ct);
 
-// ✅ correct — always add tenant filter explicitly for raw SQL
-string schema = _tenantContext.Schema;
+// ✅ correct — always add workspace filter explicitly for raw SQL
+string schema = _workspaceContext.Schema;
 await _context.Database.ExecuteSqlRawAsync(
     $"DELETE FROM {schema}.workflow_definitions WHERE status = 'Archived'", ct);
 
@@ -472,18 +472,18 @@ await _context.WorkflowDefinitions
     .ExecuteDeleteAsync(ct);
 ```
 
-**Rule:** Avoid raw SQL in tenant-aware contexts. When raw SQL is unavoidable (e.g. performance-critical bulk ops, cross-module reads), always prefix the table with the tenant schema from `ITenantContext.Schema` and add soft-delete filter manually. Document why raw SQL was needed with a comment.
+**Rule:** Avoid raw SQL in workspace-aware contexts. When raw SQL is unavoidable (e.g. performance-critical bulk ops, cross-module reads), always prefix the table with the workspace schema from `IWorkspaceContext.Schema` and add soft-delete filter manually. Document why raw SQL was needed with a comment.
 
-### Tenant schema provisioning ([register-tenant § tenant-provisioning](../use-cases/platform-foundation/register-tenant/README.md#tenant-provisioning))
+### Workspace schema provisioning ([register-workspace § workspace-provisioning](../use-cases/platform-foundation/register-workspace/README.md#workspace-provisioning))
 
-After email verification, every **tenant-scoped** module provisions its own PostgreSQL schema for the Tenant. Identity stays on `public` and only publishes the verification event — it never touches another module's DB.
+After email verification, every **workspace-scoped** module provisions its own PostgreSQL schema for the Workspace. Identity stays on `public` and only publishes the verification event — it never touches another module's DB.
 
-- **Ownership**: each tenant-scoped module's Infrastructure project owns an `TenantVerifiedHandler` (e.g. `Axis.DataModeling.Infrastructure.Messaging.TenantVerifiedHandler`) that subscribes to Identity's `TenantVerifiedEvent` Kafka topic. There is **no** central `ITenantSchemaProvisioner` — extraction of a module is a redeploy of its own handler ([ADR-010](../TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy)).
-- **Schema name**: `tenant_{tenantId:N}` (no slug — tenant slug can change).
-- **Idempotency**: `CREATE SCHEMA IF NOT EXISTS` plus `Database.MigrateAsync()` per context; safe to call twice for the same tenant (Kafka delivers at-least-once).
-- **Tenant context during migrate**: each handler constructs a `FixedTenantContext(tenantId)` from `Axis.Shared.Infrastructure.Tenancy` so `TenantSchemaInterceptor` targets the new schema for the `MigrateAsync` call.
-- **Trigger**: `User.VerifyEmail()` raises an `TenantVerified` domain event; `IdentityUnitOfWork` maps it to `TenantVerifiedEvent` (Avro) and publishes via Wolverine outbox → Kafka ([ADR-019](../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). Do **not** provision synchronously in the verify request handler.
-- **Schema + topic**: `Axis.Identity.Contracts/Schemas/TenantVerifiedEvent.avsc` + topic `axis.identity.tenant-verified` (see `IdentityKafkaTopics`).
+- **Ownership**: each workspace-scoped module's Infrastructure project owns an `WorkspaceVerifiedHandler` (e.g. `Axis.DataModeling.Infrastructure.Messaging.WorkspaceVerifiedHandler`) that subscribes to Identity's `WorkspaceVerifiedEvent` Kafka topic. There is **no** central `IWorkspaceSchemaProvisioner` — extraction of a module is a redeploy of its own handler ([ADR-010](../TECH_STACK.md#adr-010-modulith-with-strict-service-boundaries-so-extraction-is-a-redeploy)).
+- **Schema name**: `workspace_{workspaceId:N}` (no slug — workspace slug can change).
+- **Idempotency**: `CREATE SCHEMA IF NOT EXISTS` plus `Database.MigrateAsync()` per context; safe to call twice for the same workspace (Kafka delivers at-least-once).
+- **Workspace context during migrate**: each handler constructs a `FixedWorkspaceContext(workspaceId)` from `Axis.Shared.Infrastructure.Workspaces` so `WorkspaceSchemaInterceptor` targets the new schema for the `MigrateAsync` call.
+- **Trigger**: `User.VerifyEmail()` raises an `WorkspaceVerified` domain event; `IdentityUnitOfWork` maps it to `WorkspaceVerifiedEvent` (Avro) and publishes via Wolverine outbox → Kafka ([ADR-019](../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). Do **not** provision synchronously in the verify request handler.
+- **Schema + topic**: `Axis.Identity.Contracts/Schemas/WorkspaceVerifiedEvent.avsc` + topic `axis.identity.workspace-verified` (see `IdentityKafkaTopics`).
 
 ---
 
@@ -520,11 +520,11 @@ _ = Task.Run(async () =>
 - **Domain relationships are tables, not primitive id arrays**: do not store relationship ids in `PrimitiveCollection<List<Guid>>` or query private fields with `EF.Property(..., "_field")`. Model the relationship explicitly as an entity/join table so invariants, indexes, and future metadata stay visible.
 - **Private backing fields for owned value state**: backing fields are fine for aggregate-owned value/child state (for example form fields, workflow steps, role permission strings) when repositories do not query them by magic string. Use `HasField(...)`/field access for encapsulation, but expose relationship queries through named entities and repositories.
 - **No-args EF Core constructor**: when an aggregate's only constructor takes params EF Core can't bind (e.g. `IEnumerable<string>`), add a private no-args constructor: `private MyAggregate() : base(default) { RequiredField = null!; }`. Initialize all non-nullable reference-type fields to silence CS8618 — EF Core will never use these sentinel values because it always materialises via the real constructor path.
-- **Migrations strategy** ([ADR-023](../TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)): every environment uses `Database.MigrateAsync()` — production, dev bootstrap, tenant provisioning, and Testcontainers fixtures. One EF migration chain per `DbContext`; never `EnsureCreated`/`EnsureCreatedAsync`.
-- **Identity uses the global `public` schema** — `IdentityDbContext` is a plain `DbContext` with no `TenantSchemaInterceptor`. All other modules use `AxisDbContext` with `TenantSchemaInterceptor`.
-- **Tenant schema on every connection** — `TenantSchemaInterceptor` sets `search_path` to `tenant_{TenantId:N}, public` on every `ConnectionOpened` (including pooled reconnects), so a leased connection always targets the current request's tenant ([tenant isolation](../use-cases/platform-foundation/tenant-scope/) — schema-per-tenant).
-- **Schema name resolution** — `HttpTenantContext` derives `tenant_{TenantId:N}` from the JWT `tenant_id` claim (no DB/Redis lookup; immutable after provisioning). `TenantAccessMiddleware` on `Axis.Api` returns HTTP 403 when the tenant is missing, archived/deleted, or still provisioning — tenant module routes only; Identity/settings routes are unchanged.
-- **Cross-tenant proof** — `tests/Api/Axis.Api.Tests/Tenancy/TenantIsolationEndpointTests.cs` (DataModeling list/get by id).
+- **Migrations strategy** ([ADR-023](../TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)): every environment uses `Database.MigrateAsync()` — production, dev bootstrap, workspace provisioning, and Testcontainers fixtures. One EF migration chain per `DbContext`; never `EnsureCreated`/`EnsureCreatedAsync`.
+- **Identity uses the global `public` schema** — `IdentityDbContext` is a plain `DbContext` with no `WorkspaceSchemaInterceptor`. All other modules use `AxisDbContext` with `WorkspaceSchemaInterceptor`.
+- **Workspace schema on every connection** — `WorkspaceSchemaInterceptor` sets `search_path` to `workspace_{WorkspaceId:N}, public` on every `ConnectionOpened` (including pooled reconnects), so a leased connection always targets the current request's workspace ([workspace isolation](../use-cases/platform-foundation/workspace-scope/) — schema-per-workspace).
+- **Schema name resolution** — `HttpWorkspaceContext` derives `workspace_{WorkspaceId:N}` from the JWT `workspace_id` claim (no DB/Redis lookup; immutable after provisioning). `WorkspaceAccessMiddleware` on `Axis.Api` returns HTTP 403 when the workspace is missing, archived/deleted, or still provisioning — workspace module routes only; Identity/settings routes are unchanged.
+- **Cross-workspace proof** — `tests/Api/Axis.Api.Tests/Workspaces/WorkspaceIsolationEndpointTests.cs` (DataModeling list/get by id).
 
 ## Testing rules
 
@@ -534,9 +534,9 @@ _ = Task.Run(async () =>
 
 ### Pattern — keep API isolation tests deterministic, test async provisioning separately
 
-Tenant data-isolation API tests and tenant-provisioning event-pipeline tests have different failure modes and should not share the same precondition mechanism.
+Workspace data-isolation API tests and workspace-provisioning event-pipeline tests have different failure modes and should not share the same precondition mechanism.
 
-- **API isolation tests** (e.g., cross-tenant 404/403 behavior) should use deterministic setup: create/verify tenant schema readiness in fixture code and verify required tables exist before requests.
+- **API isolation tests** (e.g., cross-workspace 404/403 behavior) should use deterministic setup: create/verify workspace schema readiness in fixture code and verify required tables exist before requests.
 - **Async provisioning tests** (Kafka/Wolverine coordinator paths) should validate retry/backoff/exhaustion/completion logic in dedicated messaging/infrastructure tests.
 - Avoid helper-level long polling for eventual consistency in shared auth/setup helpers; a single timing hiccup can fan out into dozens of unrelated API test failures and CI timeout/cancel behavior.
 
@@ -704,7 +704,7 @@ app.MapGet("/api/workflows", async (
         : result.ToProblemDetails();
 })
 .WithName("GetWorkflows")
-.WithSummary("List workflow definitions for the current tenant")
+.WithSummary("List workflow definitions for the current workspace")
 .WithTags("WorkflowBuilder")
 .Produces<PagedResult<WorkflowSummaryDto>>()
 .ProducesProblem(StatusCodes.Status401Unauthorized)
@@ -775,7 +775,7 @@ private static async Task<IResult> CreateWorkflow(
     CancellationToken ct)
 {
     Result<Guid> result = await mediator.Send(
-        new CreateWorkflowCommand(request.Name, request.Description, currentUser.TenantId, currentUser.UserId.ToString()), ct);
+        new CreateWorkflowCommand(request.Name, request.Description, currentUser.WorkspaceId, currentUser.UserId.ToString()), ct);
 
     return result.Match(
         id  => Results.Created($"/api/workflows/{id}", new { id }),
@@ -856,7 +856,7 @@ Every endpoint must be fully annotated — see AGENTS.md API Layer section for r
 
 ### Host setup (ADR-012 — per-module `wolverine` schema)
 
-Each module owns a `wolverine` schema **inside its own PostgreSQL database** ([ADR-011](../TECH_STACK.md#adr-011-per-module-database-with-schema-per-tenant-inside), [ADR-012](../TECH_STACK.md#adr-012-per-module-wolverine-schema-in-the-modules-own-database)). There is **no** `ConnectionStrings:Wolverine` — persistence is wired from each module's connection string.
+Each module owns a `wolverine` schema **inside its own PostgreSQL database** ([ADR-011](../TECH_STACK.md#adr-011-per-module-database-with-schema-per-workspace-inside), [ADR-012](../TECH_STACK.md#adr-012-per-module-wolverine-schema-in-the-modules-own-database)). There is **no** `ConnectionStrings:Wolverine` — persistence is wired from each module's connection string.
 
 ```csharp
 // Axis.Api/Program.cs — excerpt
@@ -1116,7 +1116,7 @@ After `WebApplication` is built:
 ```csharp
 app.UseAxisOpenTelemetry(); // Prometheus scrape endpoint when enabled
 app.UseAuthentication();
-app.UseMiddleware<CorrelationIdMiddleware>(); // after auth so tenant_id → TenantId
+app.UseMiddleware<CorrelationIdMiddleware>(); // after auth so workspace_id → WorkspaceId
 app.UseAuthorization();
 ```
 
@@ -1128,11 +1128,11 @@ Implementation lives in `Axis.Shared.Infrastructure/Observability/OpenTelemetryS
 | Metrics | Prometheus scrape at `Prometheus:ScrapeEndpointPath` (default `/metrics`) + optional OTLP | Prometheus → Mimir |
 | Logs | Serilog console + `ILogger` → OTLP when `ExportLogs` is true | Grafana Loki |
 
-### Correlation and tenancy
+### Correlation and workspace isolation
 
 - `CorrelationIdMiddleware` uses `X-Correlation-Id` when present, otherwise the active W3C `Activity.TraceId`, and echoes the value on the response.
 - Serilog enricher `TraceContextSerilogEnricher` adds `TraceId` / `SpanId` so Loki queries join logs to Tempo traces.
-- When the JWT contains `tenant_id`, logs include `TenantId` and the span tag `tenant.id`.
+- When the JWT contains `workspace_id`, logs include `WorkspaceId` and the span tag `workspace.id`.
 
 ### Local Grafana stack
 
@@ -1240,7 +1240,7 @@ public sealed class FormWorkflowReference
     public Guid FormId { get; init; }
     public Guid WorkflowId { get; init; }
     public Guid StepId { get; init; }
-    public Guid tenantId { get; init; }
+    public Guid workspaceId { get; init; }
 }
 
 // FormBuilder.Infrastructure — Wolverine handler reads from the Kafka inbox
@@ -1261,7 +1261,7 @@ public sealed class FormStepAddedHandler(FormBuilderDbContext db)
             FormId = evt.FormId,
             WorkflowId = evt.WorkflowId,
             StepId = evt.StepId,
-            tenantId = evt.tenantId,   // always denormalise tenant
+            workspaceId = evt.workspaceId,   // always denormalise workspace
         });
         await db.SaveChangesAsync(ct);
     }
@@ -1272,9 +1272,9 @@ public sealed class FormStepAddedHandler(FormBuilderDbContext db)
 
 ```csharp
 // FormRepository.IsReferencedByWorkflowAsync — queries FormBuilder's own DB
-public async Task<bool> IsReferencedByWorkflowAsync(Guid formId, Guid TenantId, CancellationToken ct = default)
+public async Task<bool> IsReferencedByWorkflowAsync(Guid formId, Guid WorkspaceId, CancellationToken ct = default)
     => await context.FormWorkflowReferences.AnyAsync(
-           r => r.FormId == formId && r.tenantId == TenantId, ct);
+           r => r.FormId == formId && r.workspaceId == WorkspaceId, ct);
 ```
 
 ### ✅ Pattern 2: gRPC sync call (escape hatch)
@@ -1288,8 +1288,8 @@ Used only when a local read model is insufficient. Example: a workflow step need
 syntax = "proto3";
 package axis.identity.v1;
 
-// Tenant scoping: the server MUST derive tenant_id from the caller's
-// JWT `tenant_id` claim, never from a request field. Callers forward the inbound
+// Workspace scoping: the server MUST derive workspace_id from the caller's
+// JWT `workspace_id` claim, never from a request field. Callers forward the inbound
 // `authorization` header on every call. See Step 3 below.
 service IdentityService {
     rpc GetUserPermissions(GetUserPermissionsRequest) returns (GetUserPermissionsResponse);
@@ -1377,9 +1377,9 @@ public sealed class PermissionGate(
 
 The gRPC channel is configured via `Modules:Identity:GrpcUrl` in `src/Axis.Api/appsettings.json` (see [ADR-016](../TECH_STACK.md#adr-016-service-discovery-via-config-in-modulith-mode-and-k8s-dns-in-production)) — `http://localhost:5280` on the modulith host in development, module service DNS in production when extracted.
 
-**Step 3 — Server side: derive tenant from JWT, not the request payload**
+**Step 3 — Server side: derive workspace from JWT, not the request payload**
 
-The gRPC server **must** read `tenant_id` from the caller's JWT `tenant_id` claim, never from the request payload. Trusting an `tenant_id` field would let a caller authenticated as tenant A query tenant B's data by passing tenant B's id — every service-to-service hop would then need its own cross-tenant guard. JWT-derived scoping makes the guarantee structural.
+The gRPC server **must** read `workspace_id` from the caller's JWT `workspace_id` claim, never from the request payload. Trusting an `workspace_id` field would let a caller authenticated as workspace A query workspace B's data by passing workspace B's id — every service-to-service hop would then need its own cross-workspace guard. JWT-derived scoping makes the guarantee structural.
 
 ```csharp
 // src/Modules/DataModeling/Axis.DataModeling.Infrastructure/Grpc/DataModelCatalogGrpcService.cs
@@ -1392,9 +1392,9 @@ internal sealed class DataModelCatalogGrpcService(IDataModelRepository repo)
         if (!Guid.TryParse(request.ModelId, out Guid modelId))
             throw new RpcException(new Status(StatusCode.InvalidArgument, "model_id must be a valid GUID."));
 
-        Guid tenantId = ResolveCallertenantId(context);
+        Guid workspaceId = ResolveCallerworkspaceId(context);
 
-        DataModel? model = await repo.GetByIdAsync(modelId, tenantId, context.CancellationToken);
+        DataModel? model = await repo.GetByIdAsync(modelId, workspaceId, context.CancellationToken);
         return new GetModelSummaryResponse
         {
             Exists = model is not null,
@@ -1402,13 +1402,13 @@ internal sealed class DataModelCatalogGrpcService(IDataModelRepository repo)
         };
     }
 
-    private static Guid ResolveCallertenantId(ServerCallContext context)
+    private static Guid ResolveCallerworkspaceId(ServerCallContext context)
     {
-        Claim? claim = context.GetHttpContext().User.FindFirst("tenant_id");
-        if (claim is null || !Guid.TryParse(claim.Value, out Guid tenantId))
+        Claim? claim = context.GetHttpContext().User.FindFirst("workspace_id");
+        if (claim is null || !Guid.TryParse(claim.Value, out Guid workspaceId))
             throw new RpcException(
-                new Status(StatusCode.Unauthenticated, "Caller JWT is missing a valid tenant_id claim."));
-        return tenantId;
+                new Status(StatusCode.Unauthenticated, "Caller JWT is missing a valid workspace_id claim."));
+        return workspaceId;
     }
 }
 ```
@@ -1435,13 +1435,13 @@ grpcurl -plaintext \
   localhost:5280 axis.identity.v1.IdentityService/GetUserPermissions
 ```
 
-Replace `<access_token>` and `<user-guid>` with values from your tenant — the server reads the tenant from the JWT's `tenant_id` claim, so no `tenant_id` is sent in the payload. `Unauthenticated` / `PermissionDenied` means the token is missing, expired, or invalid — obtain a fresh token from `POST /connect/token` after PKCE login.
+Replace `<access_token>` and `<user-guid>` with values from your workspace — the server reads the workspace from the JWT's `workspace_id` claim, so no `workspace_id` is sent in the payload. `Unauthenticated` / `PermissionDenied` means the token is missing, expired, or invalid — obtain a fresh token from `POST /connect/token` after PKCE login.
 
 ### ✅ Pattern 3: JWKS-only JWT validation in consuming modules
 
 **Rule:** modules other than Identity validate JWTs **locally via Identity's JWKS endpoint** — never by calling `IdentityDbContext` or any Identity service. Asking Identity "is this user real?" on every request defeats the purpose of stateless JWT and re-introduces the coupling we removed.
 
-Why: Identity issues short-lived JWTs (15 minutes per [sign-in](../use-cases/identity-access/sign-in/)) signed with a key whose public half is published at `/.well-known/jwks.json` (OpenIddict default). Any module that receives a Bearer token can verify the signature, claims (`sub`, `tenant`, `permissions`), and expiry **without a network call to Identity for each request**. JWKS itself is cached locally by `Microsoft.AspNetCore.Authentication.JwtBearer`, so the network cost is once per key-rotation, not once per request.
+Why: Identity issues short-lived JWTs (15 minutes per [sign-in](../use-cases/identity-access/sign-in/)) signed with a key whose public half is published at `/.well-known/jwks.json` (OpenIddict default). Any module that receives a Bearer token can verify the signature, claims (`sub`, `workspace`, `permissions`), and expiry **without a network call to Identity for each request**. JWKS itself is cached locally by `Microsoft.AspNetCore.Authentication.JwtBearer`, so the network cost is once per key-rotation, not once per request.
 
 The escape hatch — when you need *fresh* permission state that the JWT's `permissions` claim cannot give you — is `IdentityService.GetUserPermissions` (gRPC), not a DB lookup.
 
@@ -1489,10 +1489,10 @@ This violates the Share Nothing principle (cross-module DB query), forces every 
 - The source module owns the event schema — define it in its `.Contracts` project's Avro file.
 - The consuming module owns the handler and the local read-model table — both in its Infrastructure layer.
 - Kafka handlers are idempotent: at-least-once delivery is the rule; design for replay.
-- **Cross-module handlers must filter by `tenantId`** in addition to entity foreign keys. Tenant isolation is always explicit.
+- **Cross-module handlers must filter by `workspaceId`** in addition to entity foreign keys. Workspace isolation is always explicit.
 - Sync RPC (gRPC) is the escape hatch only. If you reach for it more than once or twice per module, you probably need another local read model instead.
 - **JWT validation is JWKS-only.** Consuming modules verify JWTs against Identity's JWKS endpoint locally; never call `IdentityDbContext` or any Identity service per request just to authenticate a user.
-- **Cross-module gRPC services derive `tenant_id` from the caller's JWT `tenant_id` claim**, never from a request field. The proto must not declare an `tenant_id` input; the server reads `ServerCallContext.GetHttpContext().User.FindFirst("tenant_id")` and throws `Unauthenticated` when the claim is absent.
+- **Cross-module gRPC services derive `workspace_id` from the caller's JWT `workspace_id` claim**, never from a request field. The proto must not declare an `workspace_id` input; the server reads `ServerCallContext.GetHttpContext().User.FindFirst("workspace_id")` and throws `Unauthenticated` when the claim is absent.
 
 ### Pre-commit violation sweep
 
@@ -1513,11 +1513,11 @@ All Command handlers must be safe to retry without producing duplicate side effe
 ```csharp
 public async Task<Result<Guid>> Handle(CreateWorkflowCommand cmd, CancellationToken ct)
 {
-    bool exists = await _repo.ExistsByNameAsync(cmd.Name, cmd.tenantId, ct);
+    bool exists = await _repo.ExistsByNameAsync(cmd.Name, cmd.workspaceId, ct);
     if (exists)
         return Result.Failure<Guid>(Error.Conflict($"A workflow named '{cmd.Name}' already exists."));
 
-    WorkflowDefinition wf = WorkflowDefinition.Create(cmd.Name, cmd.tenantId, cmd.CreatedByUserId);
+    WorkflowDefinition wf = WorkflowDefinition.Create(cmd.Name, cmd.workspaceId, cmd.CreatedByUserId);
     await _repo.AddAsync(wf, ct);
     await _uow.SaveChangesAsync(ct);
     return Result.Success(wf.Id);
@@ -1544,7 +1544,7 @@ public async Task Handle(WorkflowPublished @event, CancellationToken ct)
 
     if (existing is null)
         context.WorkflowActiveStatuses.Add(
-            WorkflowActiveStatus.Activated(@event.WorkflowId, @event.tenantId));
+            WorkflowActiveStatus.Activated(@event.WorkflowId, @event.workspaceId));
     else
         existing.Reactivate();
 
@@ -1629,7 +1629,7 @@ When replacing `var` with an explicit type, if that type requires a new `using` 
 
 **Wrong** — chains `.Id` onto the query to avoid declaring an explicit type:
 ```csharp
-Guid itemId = ctx.Items.First(i => i.Name == "target" && i.TenantId == TenantId).Id;
+Guid itemId = ctx.Items.First(i => i.Name == "target" && i.WorkspaceId == WorkspaceId).Id;
 // … then uses itemId directly — the full object is discarded
 ```
 
@@ -1637,7 +1637,7 @@ Guid itemId = ctx.Items.First(i => i.Name == "target" && i.TenantId == TenantId)
 ```csharp
 using My.Module.Domain.Aggregates;
 // …
-MyEntity item = ctx.Items.First(i => i.Name == "target" && i.TenantId == TenantId);
+MyEntity item = ctx.Items.First(i => i.Name == "target" && i.WorkspaceId == WorkspaceId);
 // … then uses item.Id, item.Name, etc. as needed
 ```
 
@@ -1645,7 +1645,7 @@ The restructured version hides what type is being worked with, discards future f
 
 ### 3. Verify `!` is actually needed before adding it
 
-Before using the null-ftenantiving operator `!` to suppress a nullable annotation, check whether the assignment compiles without it. If the existing codebase already uses the same API without `!`, adding it is a workaround — not a fix.
+Before using the null-fworkspaceiving operator `!` to suppress a nullable annotation, check whether the assignment compiles without it. If the existing codebase already uses the same API without `!`, adding it is a workaround — not a fix.
 
 **Wrong** — `!` added without verifying it is necessary:
 ```csharp

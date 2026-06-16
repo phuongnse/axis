@@ -44,8 +44,8 @@ def module_to_domain_slug(module_name: str) -> str:
     return slug
 
 
-def module_to_tenant_slug(module_name: str) -> str:
-    """Tenant provisioning id (``TenantModuleNames`` values)."""
+def module_to_workspace_slug(module_name: str) -> str:
+    """Workspace provisioning id (``WorkspaceModuleNames`` values)."""
     return module_name.lower()
 
 
@@ -76,13 +76,13 @@ def iter_kafka_topics() -> list[str]:
     return sorted(set(topics))
 
 
-def modules_with_tenant_verified_handler() -> list[str]:
-    """Modules that provision tenant schema on TenantVerifiedEvent."""
+def modules_with_workspace_verified_handler() -> list[str]:
+    """Modules that provision workspace schema on WorkspaceVerifiedEvent."""
     found: list[str] = []
     for module in iter_module_names():
         if module == "Identity":
             continue
-        if list(MODULES_DIR.glob(f"{module}/**/TenantVerifiedHandler.cs")):
+        if list(MODULES_DIR.glob(f"{module}/**/WorkspaceVerifiedHandler.cs")):
             found.append(module)
     return sorted(found)
 

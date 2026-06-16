@@ -11,7 +11,7 @@ public class RoleRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     private IdentityDbContext _ctx = null!;
     private RoleRepository _sut = null!;
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
 
     public Task InitializeAsync()
     {
@@ -23,7 +23,7 @@ public class RoleRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     public async Task DisposeAsync() => await _ctx.DisposeAsync();
 
     private static Role MakeRole(string name = "Editor") =>
-        Role.Create(name, null, TenantId, ["data_modeling:model:read"]);
+        Role.Create(name, null, WorkspaceId, ["data_modeling:model:read"]);
 
     [Fact]
     public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
@@ -31,7 +31,7 @@ public class RoleRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
         Role role = MakeRole("CustomRole-GetById");
         await _sut.AddAsync(role);
         await _ctx.SaveChangesAsync();
-        Role? loaded = await _sut.GetByIdAsync(role.Id, TenantId);
+        Role? loaded = await _sut.GetByIdAsync(role.Id, WorkspaceId);
 
         loaded.Should().NotBeNull();
         loaded!.Name.Should().Be("CustomRole-GetById");
@@ -45,33 +45,33 @@ public class RoleRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
         Role role = MakeRole("NamedRole-FindMe");
         await _sut.AddAsync(role);
         await _ctx.SaveChangesAsync();
-        Role? loaded = await _sut.GetByNameAsync("NamedRole-FindMe", TenantId);
+        Role? loaded = await _sut.GetByNameAsync("NamedRole-FindMe", WorkspaceId);
 
         loaded.Should().NotBeNull();
         loaded!.Id.Should().Be(role.Id);
     }
 
     [Fact]
-    public async Task GetAllAsync_WhenMultipleRolesExist_ReturnsAllRolesForTenant()
+    public async Task GetAllAsync_WhenMultipleRolesExist_ReturnsAllRolesForWorkspace()
     {
         Role r1 = MakeRole($"BulkRole-A-{Guid.NewGuid():N}");
         Role r2 = MakeRole($"BulkRole-B-{Guid.NewGuid():N}");
         await _sut.AddAsync(r1);
         await _sut.AddAsync(r2);
         await _ctx.SaveChangesAsync();
-        IReadOnlyList<Role> all = await _sut.GetAllAsync(TenantId);
+        IReadOnlyList<Role> all = await _sut.GetAllAsync(WorkspaceId);
 
         all.Should().Contain(r => r.Id == r1.Id);
         all.Should().Contain(r => r.Id == r2.Id);
     }
 
     [Fact]
-    public async Task NameExistsAsync_WhenNameExistsInTenant_ReturnsTrue()
+    public async Task NameExistsAsync_WhenNameExistsInWorkspace_ReturnsTrue()
     {
         Role role = MakeRole($"DupeName-{Guid.NewGuid():N}");
         await _sut.AddAsync(role);
         await _ctx.SaveChangesAsync();
-        bool exists = await _sut.NameExistsAsync(role.Name, TenantId);
+        bool exists = await _sut.NameExistsAsync(role.Name, WorkspaceId);
         exists.Should().BeTrue();
     }
 
@@ -82,14 +82,14 @@ public class RoleRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
         await _sut.AddAsync(role);
         await _ctx.SaveChangesAsync();
 
-        bool exists = await _sut.NameExistsAsync(role.Name, TenantId, excludeRoleId: role.Id);
+        bool exists = await _sut.NameExistsAsync(role.Name, WorkspaceId, excludeRoleId: role.Id);
         exists.Should().BeFalse();
     }
 
     [Fact]
-    public async Task GetByIdAsync_WhenRoleBelongsToDifferentTenant_ReturnsNull()
+    public async Task GetByIdAsync_WhenRoleBelongsToDifferentWorkspace_ReturnsNull()
     {
-        Role role = MakeRole($"CrossTenant-{Guid.NewGuid():N}");
+        Role role = MakeRole($"CrossWorkspace-{Guid.NewGuid():N}");
         await _sut.AddAsync(role);
         await _ctx.SaveChangesAsync();
 
@@ -99,25 +99,25 @@ public class RoleRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetByIdsAsync_WhenIdsProvided_ReturnsMatchingRolesForTenant()
+    public async Task GetByIdsAsync_WhenIdsProvided_ReturnsMatchingRolesForWorkspace()
     {
-        Guid TenantId = Guid.NewGuid();
-        Role r1 = Role.Create($"GetByIds-A-{Guid.NewGuid():N}", null, TenantId, ["data_modeling:model:read"]);
-        Role r2 = Role.Create($"GetByIds-B-{Guid.NewGuid():N}", null, TenantId, ["data_modeling:model:read"]);
+        Guid WorkspaceId = Guid.NewGuid();
+        Role r1 = Role.Create($"GetByIds-A-{Guid.NewGuid():N}", null, WorkspaceId, ["data_modeling:model:read"]);
+        Role r2 = Role.Create($"GetByIds-B-{Guid.NewGuid():N}", null, WorkspaceId, ["data_modeling:model:read"]);
         await _sut.AddAsync(r1);
         await _sut.AddAsync(r2);
         await _ctx.SaveChangesAsync();
 
-        IReadOnlyList<Role> result = await _sut.GetByIdsAsync([r1.Id, r2.Id], TenantId);
+        IReadOnlyList<Role> result = await _sut.GetByIdsAsync([r1.Id, r2.Id], WorkspaceId);
 
         result.Should().HaveCount(2);
         result.Select(r => r.Id).Should().BeEquivalentTo(new[] { r1.Id, r2.Id });
     }
 
     [Fact]
-    public async Task GetByIdsAsync_WhenIdsBelongToDifferentTenant_ReturnsEmpty()
+    public async Task GetByIdsAsync_WhenIdsBelongToDifferentWorkspace_ReturnsEmpty()
     {
-        Role role = MakeRole($"GetByIds-CrossTenant-{Guid.NewGuid():N}");
+        Role role = MakeRole($"GetByIds-CrossWorkspace-{Guid.NewGuid():N}");
         await _sut.AddAsync(role);
         await _ctx.SaveChangesAsync();
 
@@ -129,14 +129,14 @@ public class RoleRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     [Fact]
     public async Task GetPagedAsync_WhenRolesExist_ReturnsPagedResult()
     {
-        Guid TenantId = Guid.NewGuid();
-        Role r1 = Role.Create($"Paged-A-{Guid.NewGuid():N}", null, TenantId, ["data_modeling:model:read"]);
-        Role r2 = Role.Create($"Paged-B-{Guid.NewGuid():N}", null, TenantId, ["data_modeling:model:read"]);
+        Guid WorkspaceId = Guid.NewGuid();
+        Role r1 = Role.Create($"Paged-A-{Guid.NewGuid():N}", null, WorkspaceId, ["data_modeling:model:read"]);
+        Role r2 = Role.Create($"Paged-B-{Guid.NewGuid():N}", null, WorkspaceId, ["data_modeling:model:read"]);
         await _sut.AddAsync(r1);
         await _sut.AddAsync(r2);
         await _ctx.SaveChangesAsync();
 
-        (IReadOnlyList<Role> items, int total) = await _sut.GetPagedAsync(TenantId, 1, 20);
+        (IReadOnlyList<Role> items, int total) = await _sut.GetPagedAsync(WorkspaceId, 1, 20);
 
         items.Should().HaveCount(2);
         total.Should().Be(2);

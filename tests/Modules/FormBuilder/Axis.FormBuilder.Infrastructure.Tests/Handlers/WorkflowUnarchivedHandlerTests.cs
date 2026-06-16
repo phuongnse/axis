@@ -12,7 +12,7 @@ namespace Axis.FormBuilder.Infrastructure.Tests.Handlers;
 [Collection("FormBuilderDb")]
 public sealed class WorkflowUnarchivedHandlerTests(FormBuilderDatabaseFixture fixture)
 {
-    private static readonly Guid TenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid WorkspaceId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private static WorkflowUnarchivedHandler CreateHandler(FormBuilderDbContext ctx)
     {
@@ -25,7 +25,7 @@ public sealed class WorkflowUnarchivedHandlerTests(FormBuilderDatabaseFixture fi
 
     private async Task SeedInactiveRef(Guid workflowId, Guid formId, FormBuilderDbContext ctx)
     {
-        FormWorkflowReference r = FormWorkflowReference.Create(workflowId, formId, TenantId);
+        FormWorkflowReference r = FormWorkflowReference.Create(workflowId, formId, WorkspaceId);
         r.Deactivate();
         ctx.FormWorkflowReferences.Add(r);
         await ctx.SaveChangesAsync();
@@ -49,7 +49,7 @@ public sealed class WorkflowUnarchivedHandlerTests(FormBuilderDatabaseFixture fi
             new WorkflowUnarchivedEvent
             {
                 workflowId = workflowId.ToString(),
-                tenantId = TenantId.ToString(),
+                workspaceId = WorkspaceId.ToString(),
                 referencedFormIds = [],
             },
             CancellationToken.None);
@@ -71,7 +71,7 @@ public sealed class WorkflowUnarchivedHandlerTests(FormBuilderDatabaseFixture fi
             new WorkflowUnarchivedEvent
             {
                 workflowId = Guid.NewGuid().ToString(),
-                tenantId = TenantId.ToString(),
+                workspaceId = WorkspaceId.ToString(),
                 referencedFormIds = [],
             },
             CancellationToken.None);

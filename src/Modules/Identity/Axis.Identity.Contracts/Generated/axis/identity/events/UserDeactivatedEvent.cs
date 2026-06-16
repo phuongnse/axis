@@ -12,10 +12,10 @@ namespace axis.identity.events
     public partial class UserDeactivatedEvent : global::Avro.Specific.ISpecificRecord
     {
         public static global::Avro.Schema _SCHEMA = global::Avro.Schema.Parse(
-            @"{""type"":""record"",""name"":""UserDeactivatedEvent"",""namespace"":""axis.identity.events"",""fields"":[{""name"":""userId"",""type"":""string""},{""name"":""tenantId"",""type"":""string""}]}");
+            @"{""type"":""record"",""name"":""UserDeactivatedEvent"",""namespace"":""axis.identity.events"",""fields"":[{""name"":""userId"",""type"":""string""},{""name"":""workspaceId"",""type"":""string""}]}");
 
         private string _userId = string.Empty;
-        private string _tenantId = string.Empty;
+        private string _workspaceId = string.Empty;
 
         public virtual global::Avro.Schema Schema => UserDeactivatedEvent._SCHEMA;
 
@@ -25,16 +25,16 @@ namespace axis.identity.events
             set => _userId = value;
         }
 
-        public string tenantId
+        public string workspaceId
         {
-            get => _tenantId;
-            set => _tenantId = value;
+            get => _workspaceId;
+            set => _workspaceId = value;
         }
 
         public virtual object Get(int fieldPos) => fieldPos switch
         {
             0 => userId,
-            1 => tenantId,
+            1 => workspaceId,
             _ => throw new global::Avro.AvroRuntimeException("Bad index " + fieldPos + " in Get()"),
         };
 
@@ -43,7 +43,7 @@ namespace axis.identity.events
             switch (fieldPos)
             {
                 case 0: userId = (string)fieldValue; break;
-                case 1: tenantId = (string)fieldValue; break;
+                case 1: workspaceId = (string)fieldValue; break;
                 default: throw new global::Avro.AvroRuntimeException("Bad index " + fieldPos + " in Put()");
             }
         }

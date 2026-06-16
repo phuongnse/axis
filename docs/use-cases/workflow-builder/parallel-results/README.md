@@ -8,7 +8,7 @@ Use the output of all parallel steps in subsequent steps so that I can combine r
 
 ## Primary actor
 
-- Tenant Member
+- Workspace Member
 
 ## Trigger
 
@@ -17,7 +17,7 @@ Use the output of all parallel steps in subsequent steps so that I can combine r
 ## Main flow
 
 1. Actor starts the — Access results from parallel branches flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows

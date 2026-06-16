@@ -9,7 +9,7 @@ public sealed class FormModelReference
     public Guid FormId { get; private set; }
     public Guid FormFieldId { get; private set; }
     public Guid ModelId { get; private set; }
-    public Guid tenantId { get; private set; }
+    public Guid workspaceId { get; private set; }
     public bool IsBroken { get; private set; }
 
     private FormModelReference() { } // EF Core materialisation
@@ -18,14 +18,14 @@ public sealed class FormModelReference
         Guid formId,
         Guid formFieldId,
         Guid modelId,
-        Guid tenantId,
+        Guid workspaceId,
         bool isBroken = false)
         => new()
         {
             FormId = formId,
             FormFieldId = formFieldId,
             ModelId = modelId,
-            tenantId = tenantId,
+            workspaceId = workspaceId,
             IsBroken = isBroken,
         };
 

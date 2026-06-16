@@ -1,8 +1,8 @@
 namespace Axis.Identity.Application.Queries.GetProvisioningStatus;
 
 public sealed record ProvisioningStatusDto(
-    Guid tenantId,
-    string TenantStatus,
+    Guid workspaceId,
+    string WorkspaceStatus,
     bool IsReady,
     IReadOnlyList<ModuleProvisioningStatusDto> Modules);
 

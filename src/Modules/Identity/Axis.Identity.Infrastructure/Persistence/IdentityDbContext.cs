@@ -9,35 +9,35 @@ namespace Axis.Identity.Infrastructure.Persistence;
 
 public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> options) : DbContext(options)
 {
-    public DbSet<Tenant> Tenants => Set<Tenant>();
+    public DbSet<Workspace> Workspaces => Set<Workspace>();
     public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
-    public DbSet<TenantModuleProvisioning> TenantModuleProvisions => Set<TenantModuleProvisioning>();
+    public DbSet<WorkspaceModuleProvisioning> WorkspaceModuleProvisions => Set<WorkspaceModuleProvisioning>();
     public DbSet<User> Users => Set<User>();
-    public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
+    public DbSet<WorkspaceMembership> WorkspaceMemberships => Set<WorkspaceMembership>();
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Invitation> Invitations => Set<Invitation>();
     internal DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     internal DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
-    internal DbSet<TenantRegistrationToken> TenantRegistrationTokens =>
-        Set<TenantRegistrationToken>();
+    internal DbSet<WorkspaceRegistrationToken> WorkspaceRegistrationTokens =>
+        Set<WorkspaceRegistrationToken>();
     internal DbSet<RegistrationIdempotencyRecord> RegistrationIdempotencyRecords =>
         Set<RegistrationIdempotencyRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.ApplyConfiguration(new TenantConfiguration());
+        modelBuilder.ApplyConfiguration(new WorkspaceConfiguration());
         modelBuilder.ApplyConfiguration(new SubscriptionPlanConfiguration());
-        modelBuilder.ApplyConfiguration(new TenantPlanChangeLogConfiguration());
+        modelBuilder.ApplyConfiguration(new WorkspacePlanChangeLogConfiguration());
         modelBuilder.ApplyConfiguration(new RegistrationIdempotencyRecordConfiguration());
-        modelBuilder.ApplyConfiguration(new TenantModuleProvisioningConfiguration());
+        modelBuilder.ApplyConfiguration(new WorkspaceModuleProvisioningConfiguration());
         modelBuilder.ApplyConfiguration(new UserConfiguration());
-        modelBuilder.ApplyConfiguration(new TenantMembershipConfiguration());
-        modelBuilder.ApplyConfiguration(new TenantMembershipRoleConfiguration());
+        modelBuilder.ApplyConfiguration(new WorkspaceMembershipConfiguration());
+        modelBuilder.ApplyConfiguration(new WorkspaceMembershipRoleConfiguration());
         modelBuilder.ApplyConfiguration(new RoleConfiguration());
         modelBuilder.ApplyConfiguration(new InvitationConfiguration());
         modelBuilder.ApplyConfiguration(new PasswordResetTokenConfiguration());
         modelBuilder.ApplyConfiguration(new EmailVerificationTokenConfiguration());
-        modelBuilder.ApplyConfiguration(new TenantRegistrationTokenConfiguration());
+        modelBuilder.ApplyConfiguration(new WorkspaceRegistrationTokenConfiguration());
 
         // Register OpenIddict entity model (Applications, Authorizations, Scopes, Tokens)
         modelBuilder.UseOpenIddict();

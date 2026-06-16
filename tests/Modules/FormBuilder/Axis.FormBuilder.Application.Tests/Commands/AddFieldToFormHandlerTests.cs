@@ -11,7 +11,7 @@ namespace Axis.FormBuilder.Application.Tests.Commands;
 
 public class AddFieldToFormHandlerTests
 {
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private readonly IFormRepository _repo = Substitute.For<IFormRepository>();
     private readonly IFormModelReferenceSync _formModelReferenceSync = Substitute.For<IFormModelReferenceSync>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
@@ -23,11 +23,11 @@ public class AddFieldToFormHandlerTests
     [Fact]
     public async Task Handle_WhenFormExists_AddsFieldAndReturnsFieldId()
     {
-        FormDefinition form = FormDefinition.Create("My Form", null, TenantId, "user");
-        _repo.GetByIdAsync(form.Id, TenantId, Arg.Any<CancellationToken>()).Returns(form);
+        FormDefinition form = FormDefinition.Create("My Form", null, WorkspaceId, "user");
+        _repo.GetByIdAsync(form.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(form);
 
         Result<Guid> result = await _handler.Handle(
-            new AddFieldToFormCommand(form.Id, TenantId, "full_name", "Full Name", FormFieldType.Text, true, null),
+            new AddFieldToFormCommand(form.Id, WorkspaceId, "full_name", "Full Name", FormFieldType.Text, true, null),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -41,11 +41,11 @@ public class AddFieldToFormHandlerTests
     [Fact]
     public async Task Handle_WhenFormNotFound_ReturnsNotFound()
     {
-        _repo.GetByIdAsync(Arg.Any<Guid>(), TenantId, Arg.Any<CancellationToken>())
+        _repo.GetByIdAsync(Arg.Any<Guid>(), WorkspaceId, Arg.Any<CancellationToken>())
             .Returns((FormDefinition?)null);
 
         Result<Guid> result = await _handler.Handle(
-            new AddFieldToFormCommand(Guid.NewGuid(), TenantId, "key", "Label", FormFieldType.Text, false, null),
+            new AddFieldToFormCommand(Guid.NewGuid(), WorkspaceId, "key", "Label", FormFieldType.Text, false, null),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
@@ -55,12 +55,12 @@ public class AddFieldToFormHandlerTests
     [Fact]
     public async Task Handle_WhenDuplicateFieldKey_ReturnsBusinessRule()
     {
-        FormDefinition form = FormDefinition.Create("My Form", null, TenantId, "user");
+        FormDefinition form = FormDefinition.Create("My Form", null, WorkspaceId, "user");
         form.AddField("email", "Email", FormFieldType.Text, true, null);
-        _repo.GetByIdAsync(form.Id, TenantId, Arg.Any<CancellationToken>()).Returns(form);
+        _repo.GetByIdAsync(form.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(form);
 
         Result<Guid> result = await _handler.Handle(
-            new AddFieldToFormCommand(form.Id, TenantId, "email", "Email Again", FormFieldType.Text, false, null),
+            new AddFieldToFormCommand(form.Id, WorkspaceId, "email", "Email Again", FormFieldType.Text, false, null),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
@@ -68,30 +68,30 @@ public class AddFieldToFormHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenFormBelongsToAnotherTenant_ReturnsNotFound()
+    public async Task Handle_WhenFormBelongsToAnotherWorkspace_ReturnsNotFound()
     {
-        FormDefinition form = FormDefinition.Create("My Form", null, TenantId, "user");
-        _repo.GetByIdAsync(form.Id, TenantId, Arg.Any<CancellationToken>()).Returns(form);
+        FormDefinition form = FormDefinition.Create("My Form", null, WorkspaceId, "user");
+        _repo.GetByIdAsync(form.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(form);
 
-        Guid otherTenantId = Guid.NewGuid();
+        Guid otherWorkspaceId = Guid.NewGuid();
         Result<Guid> result = await _handler.Handle(
-            new AddFieldToFormCommand(form.Id, otherTenantId, "key", "Label", FormFieldType.Text, false, null),
+            new AddFieldToFormCommand(form.Id, otherWorkspaceId, "key", "Label", FormFieldType.Text, false, null),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-        await _repo.Received(1).GetByIdAsync(form.Id, otherTenantId, Arg.Any<CancellationToken>());
+        await _repo.Received(1).GetByIdAsync(form.Id, otherWorkspaceId, Arg.Any<CancellationToken>());
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task Handle_WhenInvalidFieldKey_ReturnsBusinessRule()
     {
-        FormDefinition form = FormDefinition.Create("My Form", null, TenantId, "user");
-        _repo.GetByIdAsync(form.Id, TenantId, Arg.Any<CancellationToken>()).Returns(form);
+        FormDefinition form = FormDefinition.Create("My Form", null, WorkspaceId, "user");
+        _repo.GetByIdAsync(form.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(form);
 
         Result<Guid> result = await _handler.Handle(
-            new AddFieldToFormCommand(form.Id, TenantId, "123invalid", "Label", FormFieldType.Text, false, null),
+            new AddFieldToFormCommand(form.Id, WorkspaceId, "123invalid", "Label", FormFieldType.Text, false, null),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();

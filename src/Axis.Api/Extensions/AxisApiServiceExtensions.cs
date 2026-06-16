@@ -9,13 +9,13 @@ using Axis.DataModeling.Application.Commands.CreateModel;
 using Axis.DataModeling.Infrastructure.Extensions;
 using Axis.FormBuilder.Application.Commands.CreateForm;
 using Axis.FormBuilder.Infrastructure.Extensions;
-using Axis.Identity.Application.Commands.RegisterTenant;
+using Axis.Identity.Application.Commands.RegisterWorkspace;
 using Axis.Identity.Infrastructure.Extensions;
 using Axis.Shared.Application.Behaviors;
 using Axis.Shared.Application.Identity;
-using Axis.Shared.Application.Tenancy;
+using Axis.Shared.Application.Workspaces;
 using Axis.Shared.Infrastructure.Observability;
-using Axis.Shared.Infrastructure.Tenancy;
+using Axis.Shared.Infrastructure.Workspaces;
 using Axis.WorkflowBuilder.Application.Commands.CreateWorkflow;
 using Axis.WorkflowBuilder.Infrastructure.Extensions;
 using Axis.WorkflowEngine.Application.Commands.CancelExecution;
@@ -83,7 +83,7 @@ internal static class AxisApiServiceExtensions
         services.AddMediatR(cfg =>
         {
             cfg.RegisterServicesFromAssemblies(
-                typeof(RegisterTenantCommand).Assembly,
+                typeof(RegisterWorkspaceCommand).Assembly,
                 typeof(CreateModelCommand).Assembly,
                 typeof(CreateWorkflowCommand).Assembly,
                 typeof(CreateFormCommand).Assembly,
@@ -93,7 +93,7 @@ internal static class AxisApiServiceExtensions
         });
 
         services.AddValidatorsFromAssemblies([
-            typeof(RegisterTenantCommand).Assembly,
+            typeof(RegisterWorkspaceCommand).Assembly,
             typeof(CreateModelCommand).Assembly,
             typeof(CreateWorkflowCommand).Assembly,
             typeof(CreateFormCommand).Assembly,
@@ -283,7 +283,7 @@ internal static class AxisApiServiceExtensions
         services.AddHttpContextAccessor();
         services.AddScoped<CurrentUser>();
         services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
-        services.AddScoped<ITenantContext, HttpTenantContext>();
+        services.AddScoped<IWorkspaceContext, HttpWorkspaceContext>();
     }
 
     private static void AddAxisCors(

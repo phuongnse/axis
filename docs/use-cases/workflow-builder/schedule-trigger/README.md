@@ -8,7 +8,7 @@ Schedule a workflow so that it runs automatically at defined intervals.
 
 ## Primary actor
 
-- Tenant Member
+- Workspace Member
 
 ## Trigger
 
@@ -17,7 +17,7 @@ Schedule a workflow so that it runs automatically at defined intervals.
 ## Main flow
 
 1. Actor starts the — Configure a Schedule trigger flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
@@ -32,7 +32,7 @@ A workflow must have at least one trigger before it can be published. Triggers d
 
 *Happy path*
 - [ ] Cron expression input field with a human-readable preview below it (e.g., "Every Monday at 9:00 AM UTC").
-- [ ] Timezone selector (IANA timezone list, searchable) defaults to the Tenant's configured timezone.
+- [ ] Timezone selector (IANA timezone list, searchable) defaults to the Workspace's configured timezone.
 - [ ] "Max concurrent runs" field (default: 1) controls how many executions of this workflow may run at the same time.
 - [ ] Schedule is registered with Wolverine on workflow publish; deregistered on archive.
 

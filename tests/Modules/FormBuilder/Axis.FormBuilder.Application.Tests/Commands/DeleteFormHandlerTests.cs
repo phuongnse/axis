@@ -15,7 +15,7 @@ public class DeleteFormHandlerTests
     private readonly IFormDeletionGuard _formDeletionGuard = Substitute.For<IFormDeletionGuard>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     private DeleteFormHandler CreateHandler() => new(_formRepo, _formDeletionGuard, _uow);
@@ -23,12 +23,12 @@ public class DeleteFormHandlerTests
     [Fact]
     public async Task DeleteForm_WhenFormNotReferenced_SoftDeletesForm()
     {
-        FormDefinition form = FormDefinition.Create("Employee Intake", null, TenantId, UserId);
-        _formRepo.GetByIdAsync(form.Id, TenantId).Returns(form);
+        FormDefinition form = FormDefinition.Create("Employee Intake", null, WorkspaceId, UserId);
+        _formRepo.GetByIdAsync(form.Id, WorkspaceId).Returns(form);
         _formDeletionGuard.ValidateCanDeleteAsync(form.Id, Arg.Any<CancellationToken>())
             .Returns(Result.Success());
 
-        Result result = await CreateHandler().Handle(new DeleteFormCommand(form.Id, TenantId), CancellationToken.None);
+        Result result = await CreateHandler().Handle(new DeleteFormCommand(form.Id, WorkspaceId), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         form.DeletedAt.Should().NotBeNull();
@@ -38,13 +38,13 @@ public class DeleteFormHandlerTests
     [Fact]
     public async Task DeleteForm_WhenReferencedByActiveWorkflow_ReturnsBusinessRuleFailure()
     {
-        FormDefinition form = FormDefinition.Create("Employee Intake", null, TenantId, UserId);
-        _formRepo.GetByIdAsync(form.Id, TenantId).Returns(form);
+        FormDefinition form = FormDefinition.Create("Employee Intake", null, WorkspaceId, UserId);
+        _formRepo.GetByIdAsync(form.Id, WorkspaceId).Returns(form);
         _formDeletionGuard.ValidateCanDeleteAsync(form.Id, Arg.Any<CancellationToken>())
             .Returns(Result.Failure(ErrorCodes.BusinessRule,
                 "This form is referenced by one or more active workflow steps. Remove those references before deleting."));
 
-        Result result = await CreateHandler().Handle(new DeleteFormCommand(form.Id, TenantId), CancellationToken.None);
+        Result result = await CreateHandler().Handle(new DeleteFormCommand(form.Id, WorkspaceId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
@@ -54,10 +54,10 @@ public class DeleteFormHandlerTests
     [Fact]
     public async Task DeleteForm_WhenFormNotFound_ReturnsNotFound()
     {
-        _formRepo.GetByIdAsync(Arg.Any<Guid>(), TenantId).ReturnsNull();
+        _formRepo.GetByIdAsync(Arg.Any<Guid>(), WorkspaceId).ReturnsNull();
 
         Result result = await CreateHandler().Handle(
-            new DeleteFormCommand(Guid.NewGuid(), TenantId), CancellationToken.None);
+            new DeleteFormCommand(Guid.NewGuid(), WorkspaceId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
@@ -65,18 +65,18 @@ public class DeleteFormHandlerTests
     }
 
     [Fact]
-    public async Task DeleteForm_WhenFormBelongsToAnotherTenant_ReturnsNotFound()
+    public async Task DeleteForm_WhenFormBelongsToAnotherWorkspace_ReturnsNotFound()
     {
-        FormDefinition form = FormDefinition.Create("Employee Intake", null, TenantId, UserId);
-        _formRepo.GetByIdAsync(form.Id, TenantId).Returns(form);
+        FormDefinition form = FormDefinition.Create("Employee Intake", null, WorkspaceId, UserId);
+        _formRepo.GetByIdAsync(form.Id, WorkspaceId).Returns(form);
 
-        Guid otherTenantId = Guid.NewGuid();
+        Guid otherWorkspaceId = Guid.NewGuid();
         Result result = await CreateHandler().Handle(
-            new DeleteFormCommand(form.Id, otherTenantId), CancellationToken.None);
+            new DeleteFormCommand(form.Id, otherWorkspaceId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-        await _formRepo.Received(1).GetByIdAsync(form.Id, otherTenantId);
+        await _formRepo.Received(1).GetByIdAsync(form.Id, otherWorkspaceId);
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 }

@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Accept my invitation and set up my account so that I can access the Tenant.
+Accept my invitation and set up my account so that I can access the Workspace.
 
 ## Primary actor
 
@@ -17,7 +17,7 @@ Accept my invitation and set up my account so that I can access the Tenant.
 ## Main flow
 
 1. Actor starts the — Accept an invitation flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
@@ -26,27 +26,27 @@ Accept my invitation and set up my account so that I can access the Tenant.
 
 ## Context
 
-Tenant admins can invite new members, manage their accounts, and deactivate users who should no longer have access.
+Workspace admins can invite new members, manage their accounts, and deactivate users who should no longer have access.
 
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] Clicking the invitation link opens a page with the Tenant name shown, prompting the user to set their full name and password.
+- [ ] Clicking the invitation link opens a page with the Workspace name shown, prompting the user to set their full name and password.
 - [ ] On submit, the account is created, the user is signed in, and they are redirected to the workspace dashboard.
 
 *Validation & errors*
 - [ ] Expired invitation link (> 48 hours): "This invitation has expired. Please ask your admin to send a new one."
 - [ ] Already-accepted invitation link: "This invitation has already been used. Please sign in."
-- [ ] If the invited email already has a platform account (from another tenant): the user is prompted to sign in with their existing credentials rather than setting a new password.
+- [ ] If the invited email already has a platform account (from another workspace): the user is prompted to sign in with their existing credentials rather than setting a new password.
 - [ ] Password must meet the same rules as registration (min 8 chars, letter + number).
 
 *Edge cases*
 - [ ] Accepting an invitation on a different device than where the email was opened works correctly.
 - [ ] If the inviting admin deactivated the invitation before the user accepted, the link shows: "This invitation has been cancelled."
-- [ ] If the tenant was deleted before the user accepted, the link shows: "This Tenant no longer exists."
+- [ ] If the workspace was deleted before the user accepted, the link shows: "This Workspace no longer exists."
 
 *Out of scope*
-- Inviting users who already have accounts on other tenants to join a second tenant simultaneously — each user belongs to one tenant.
+- Inviting users who already have accounts on other workspaces to join a second workspace simultaneously — each user belongs to one workspace.
 
 > **Implementation status**
 >

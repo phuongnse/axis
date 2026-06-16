@@ -12,20 +12,20 @@ namespace axis.formbuilder.events
     public partial class FormDeletedEvent : global::Avro.Specific.ISpecificRecord
     {
         public static global::Avro.Schema _SCHEMA = global::Avro.Schema.Parse(
-            @"{""type"":""record"",""name"":""FormDeletedEvent"",""namespace"":""axis.formbuilder.events"",""fields"":[{""name"":""formId"",""type"":""string""},{""name"":""tenantId"",""type"":""string""}]}");
+            @"{""type"":""record"",""name"":""FormDeletedEvent"",""namespace"":""axis.formbuilder.events"",""fields"":[{""name"":""formId"",""type"":""string""},{""name"":""workspaceId"",""type"":""string""}]}");
 
         private string _formId = string.Empty;
-        private string _tenantId = string.Empty;
+        private string _workspaceId = string.Empty;
 
         public virtual global::Avro.Schema Schema => FormDeletedEvent._SCHEMA;
 
         public string formId { get => _formId; set => _formId = value; }
-        public string tenantId { get => _tenantId; set => _tenantId = value; }
+        public string workspaceId { get => _workspaceId; set => _workspaceId = value; }
 
         public virtual object Get(int fieldPos) => fieldPos switch
         {
             0 => formId,
-            1 => tenantId,
+            1 => workspaceId,
             _ => throw new global::Avro.AvroRuntimeException("Bad index " + fieldPos + " in Get()"),
         };
 
@@ -34,7 +34,7 @@ namespace axis.formbuilder.events
             switch (fieldPos)
             {
                 case 0: formId = (string)fieldValue; break;
-                case 1: tenantId = (string)fieldValue; break;
+                case 1: workspaceId = (string)fieldValue; break;
                 default: throw new global::Avro.AvroRuntimeException("Bad index " + fieldPos + " in Put()");
             }
         }

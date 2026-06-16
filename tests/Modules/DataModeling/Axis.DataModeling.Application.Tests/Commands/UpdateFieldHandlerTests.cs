@@ -15,7 +15,7 @@ public class UpdateFieldHandlerTests
 {
     private readonly IDataModelRepository _modelRepo = Substitute.For<IDataModelRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     private UpdateFieldHandler CreateHandler() => new(_modelRepo, _uow);
@@ -23,12 +23,12 @@ public class UpdateFieldHandlerTests
     [Fact]
     public async Task UpdateField_WhenFieldExists_UpdatesLabelAndSaves()
     {
-        DataModel model = DataModel.Create("My Model", null, null, null, TenantId, UserId);
+        DataModel model = DataModel.Create("My Model", null, null, null, WorkspaceId, UserId);
         FieldDefinition field = model.AddField("price", "Price", FieldType.Number, false, new NumberFieldConfig());
-        _modelRepo.GetByIdAsync(model.Id, TenantId).Returns(model);
+        _modelRepo.GetByIdAsync(model.Id, WorkspaceId).Returns(model);
 
         Result result = await CreateHandler().Handle(
-            new UpdateFieldCommand(model.Id, field.Id, TenantId, "Unit Price", "help", true, new NumberFieldConfig(Min: 0)),
+            new UpdateFieldCommand(model.Id, field.Id, WorkspaceId, "Unit Price", "help", true, new NumberFieldConfig(Min: 0)),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -41,10 +41,10 @@ public class UpdateFieldHandlerTests
     [Fact]
     public async Task UpdateField_WhenModelNotFound_ReturnsNotFound()
     {
-        _modelRepo.GetByIdAsync(Arg.Any<Guid>(), TenantId).Returns((DataModel?)null);
+        _modelRepo.GetByIdAsync(Arg.Any<Guid>(), WorkspaceId).Returns((DataModel?)null);
 
         Result result = await CreateHandler().Handle(
-            new UpdateFieldCommand(Guid.NewGuid(), Guid.NewGuid(), TenantId, "L", null, false, new TextFieldConfig()),
+            new UpdateFieldCommand(Guid.NewGuid(), Guid.NewGuid(), WorkspaceId, "L", null, false, new TextFieldConfig()),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -53,32 +53,32 @@ public class UpdateFieldHandlerTests
     }
 
     [Fact]
-    public async Task UpdateField_WhenModelBelongsToAnotherTenant_ReturnsNotFound()
+    public async Task UpdateField_WhenModelBelongsToAnotherWorkspace_ReturnsNotFound()
     {
-        DataModel model = DataModel.Create("My Model", null, null, null, TenantId, UserId);
+        DataModel model = DataModel.Create("My Model", null, null, null, WorkspaceId, UserId);
         FieldDefinition field = model.AddField("price", "Price", FieldType.Number, false, new NumberFieldConfig());
-        _modelRepo.GetByIdAsync(model.Id, TenantId).Returns(model);
+        _modelRepo.GetByIdAsync(model.Id, WorkspaceId).Returns(model);
 
-        Guid otherTenantId = Guid.NewGuid();
+        Guid otherWorkspaceId = Guid.NewGuid();
         Result result = await CreateHandler().Handle(
-            new UpdateFieldCommand(model.Id, field.Id, otherTenantId, "New Label", null, false, new NumberFieldConfig()),
+            new UpdateFieldCommand(model.Id, field.Id, otherWorkspaceId, "New Label", null, false, new NumberFieldConfig()),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-        await _modelRepo.Received(1).GetByIdAsync(model.Id, otherTenantId);
+        await _modelRepo.Received(1).GetByIdAsync(model.Id, otherWorkspaceId);
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task UpdateField_WhenFieldIsSystem_ReturnsBusinessRuleFailure()
     {
-        DataModel model = DataModel.Create("My Model", null, null, null, TenantId, UserId);
+        DataModel model = DataModel.Create("My Model", null, null, null, WorkspaceId, UserId);
         FieldDefinition systemField = model.Fields.First(f => f.IsSystem);
-        _modelRepo.GetByIdAsync(model.Id, TenantId).Returns(model);
+        _modelRepo.GetByIdAsync(model.Id, WorkspaceId).Returns(model);
 
         Result result = await CreateHandler().Handle(
-            new UpdateFieldCommand(model.Id, systemField.Id, TenantId, "Bad", null, false, new TextFieldConfig()),
+            new UpdateFieldCommand(model.Id, systemField.Id, WorkspaceId, "Bad", null, false, new TextFieldConfig()),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

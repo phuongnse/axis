@@ -12,7 +12,7 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
-import { type TenantSettings, type UsageStats, useWorkspaceStart } from '@/features/workspace';
+import { type UsageStats, useWorkspaceStart, type WorkspaceSettings } from '@/features/workspace';
 import { cn } from '@/lib/utils';
 
 interface UsageCardProps {
@@ -101,7 +101,7 @@ function WorkspaceSummary({
   canReadSettings,
   hasWorkspace,
 }: {
-  settings: TenantSettings | undefined;
+  settings: WorkspaceSettings | undefined;
   canReadSettings: boolean;
   hasWorkspace: boolean;
 }) {
@@ -195,7 +195,8 @@ function ErrorDashboard({ onRetry }: { onRetry: () => void }) {
 
 export function DashboardOverview() {
   const { t, i18n } = useTranslation();
-  const { profileQuery, tenantSettingsQuery, canReadSettings, hasWorkspace } = useWorkspaceStart();
+  const { profileQuery, workspaceSettingsQuery, canReadSettings, hasWorkspace } =
+    useWorkspaceStart();
 
   if (profileQuery.isLoading) {
     return <LoadingDashboard />;
@@ -206,7 +207,7 @@ export function DashboardOverview() {
   }
 
   const profile = profileQuery.data;
-  const settings = tenantSettingsQuery.data;
+  const settings = workspaceSettingsQuery.data;
   const showUsage = hasWorkspace && canReadSettings && settings;
   const title = settings?.name ?? t('dashboard.title');
   const body = !hasWorkspace
@@ -270,7 +271,7 @@ export function DashboardOverview() {
         </div>
       </section>
 
-      {tenantSettingsQuery.isError ? (
+      {workspaceSettingsQuery.isError ? (
         <section className="rounded-lg border border-destructive/30 bg-card p-5 shadow-sm">
           <div className="flex items-start gap-3">
             <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
@@ -286,7 +287,7 @@ export function DashboardOverview() {
                 variant="outline"
                 size="sm"
                 className="mt-4"
-                onClick={() => void tenantSettingsQuery.refetch()}
+                onClick={() => void workspaceSettingsQuery.refetch()}
               >
                 <RefreshCw className="size-3.5" aria-hidden />
                 {t('dashboard.retry')}

@@ -18,7 +18,7 @@ public class SubmitFormByTokenHandlerTests
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private static readonly Guid FormId = Guid.NewGuid();
     private static readonly Guid ExecutionId = Guid.NewGuid();
     private static readonly Guid StepId = Guid.NewGuid();
@@ -30,7 +30,7 @@ public class SubmitFormByTokenHandlerTests
     {
         FormSubmission submission = FormSubmission.Create(
             FormId,
-            TenantId,
+            WorkspaceId,
             ExecutionId,
             StepId,
             AssigneeId,
@@ -98,14 +98,14 @@ public class SubmitFormByTokenHandlerTests
         FormSubmission submission = CreatePendingSubmission();
         Dictionary<string, object?> data = new() { ["name"] = "Jane" };
 
-        FormDefinition form = FormDefinition.Create("Test Form", null, TenantId, "user");
+        FormDefinition form = FormDefinition.Create("Test Form", null, WorkspaceId, "user");
         form.AddField("name", "Name", FormFieldType.Text, true, null);
 
         _submissionRepo
             .GetByAccessTokenAsync(submission.AccessToken, Arg.Any<CancellationToken>())
             .Returns(submission);
         _formRepo
-            .GetByIdAsync(FormId, TenantId, Arg.Any<CancellationToken>())
+            .GetByIdAsync(FormId, WorkspaceId, Arg.Any<CancellationToken>())
             .Returns(form);
 
         _currentUser.UserId.Returns(AssigneeId);
@@ -143,14 +143,14 @@ public class SubmitFormByTokenHandlerTests
     public async Task SubmitFormByToken_WhenRequiredFieldMissing_ReturnsFieldValidation()
     {
         FormSubmission submission = CreatePendingSubmission();
-        FormDefinition form = FormDefinition.Create("Test Form", null, TenantId, "user");
+        FormDefinition form = FormDefinition.Create("Test Form", null, WorkspaceId, "user");
         form.AddField("name", "Name", FormFieldType.Text, true, null);
 
         _submissionRepo
             .GetByAccessTokenAsync(submission.AccessToken, Arg.Any<CancellationToken>())
             .Returns(submission);
         _formRepo
-            .GetByIdAsync(FormId, TenantId, Arg.Any<CancellationToken>())
+            .GetByIdAsync(FormId, WorkspaceId, Arg.Any<CancellationToken>())
             .Returns(form);
 
         Result result = await CreateHandler().Handle(

@@ -2,7 +2,7 @@ const REGISTRATION_CONTEXT_KEY = 'axis.registration-context';
 
 export interface RegistrationContext {
   email: string;
-  TenantName?: string;
+  WorkspaceName?: string;
 }
 
 export function saveRegistrationContext(context: RegistrationContext): void {
@@ -18,7 +18,7 @@ export function loadRegistrationContext(): RegistrationContext | null {
     if (typeof parsed.email !== 'string') {
       return null;
     }
-    if (parsed.TenantName !== undefined && typeof parsed.TenantName !== 'string') {
+    if (parsed.WorkspaceName !== undefined && typeof parsed.WorkspaceName !== 'string') {
       return null;
     }
     return parsed;

@@ -6,5 +6,5 @@ namespace Axis.FormBuilder.Application.Commands.CreateForm;
 public sealed record CreateFormCommand(
     string Name,
     string? Description,
-    Guid tenantId,
+    Guid workspaceId,
     string CreatedBy) : ICommand<Guid>;
