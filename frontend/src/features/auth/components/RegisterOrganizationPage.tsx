@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { Building2, Loader2 } from 'lucide-react';
+import { Building2, CheckCircle2, Globe2, Loader2, Mail, UserPlus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,23 @@ import { useSlugPreview } from '@/features/auth/hooks/useSlugPreview';
 export function RegisterOrganizationPage() {
   const { t } = useTranslation();
   const { form, loading, submit } = useRegisterOrganization();
+  const onboardingSteps = [
+    {
+      icon: Building2,
+      title: t('organizationRegistration.stepOrganizationTitle'),
+      body: t('organizationRegistration.stepOrganizationBody'),
+    },
+    {
+      icon: Mail,
+      title: t('organizationRegistration.stepVerificationTitle'),
+      body: t('organizationRegistration.stepVerificationBody'),
+    },
+    {
+      icon: UserPlus,
+      title: t('organizationRegistration.stepOwnerTitle'),
+      body: t('organizationRegistration.stepOwnerBody'),
+    },
+  ];
   const {
     register,
     handleSubmit,
@@ -36,7 +53,30 @@ export function RegisterOrganizationPage() {
         </>
       }
     >
-      <form className="space-y-4" onSubmit={handleSubmit(submit)} noValidate>
+      <div className="space-y-4">
+        <AuthNotice variant="info" title={t('organizationRegistration.bannerTitle')}>
+          {t('organizationRegistration.bannerBody')}
+        </AuthNotice>
+
+        <ol className="space-y-2" aria-label={t('organizationRegistration.stepsLabel')}>
+          {onboardingSteps.map((step) => {
+            const StepIcon = step.icon;
+            return (
+              <li key={step.title} className="grid grid-cols-[1.5rem_1fr] gap-2 text-sm">
+                <span className="mt-0.5 flex size-5 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <StepIcon className="size-3.5" aria-hidden />
+                </span>
+                <span>
+                  <span className="block font-medium text-foreground">{step.title}</span>
+                  <span className="block text-xs text-muted-foreground">{step.body}</span>
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+
+      <form className="mt-5 space-y-4" onSubmit={handleSubmit(submit)} noValidate>
         <FormField
           id="orgName"
           label={t('organizationRegistration.orgName')}
@@ -54,17 +94,27 @@ export function RegisterOrganizationPage() {
           )}
         </FormField>
 
-        <div className="rounded-md border border-border bg-muted/35 px-3 py-2 text-sm">
-          <p className="text-xs font-medium uppercase text-muted-foreground">
+        <div className="border-l-2 border-primary/45 pl-3 text-sm">
+          <p className="inline-flex items-center gap-1 text-xs font-medium uppercase text-muted-foreground">
+            <Globe2 className="size-3.5" aria-hidden />
             {t('organizationRegistration.slugPreviewLabel')}
           </p>
-          <p className="mt-1 font-medium text-foreground" aria-live="polite">
+          <p
+            className="mt-1 break-all rounded-md bg-muted/50 px-3 py-2 font-mono text-[13px] font-medium text-foreground"
+            aria-live="polite"
+          >
             {slugPreview.loading
               ? t('organizationRegistration.slugPreviewLoading')
               : slugPreview.slug
                 ? t('organizationRegistration.slugPreviewValue', { slug: slugPreview.slug })
                 : t('organizationRegistration.slugPreviewHelp')}
           </p>
+          {slugPreview.slug ? (
+            <p className="mt-1 inline-flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400">
+              <CheckCircle2 className="size-3.5" aria-hidden />
+              {t('organizationRegistration.slugPreviewReady')}
+            </p>
+          ) : null}
         </div>
 
         <FormField

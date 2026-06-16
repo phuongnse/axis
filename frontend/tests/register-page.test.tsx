@@ -60,6 +60,12 @@ describe('RegisterPage', () => {
     const user = userEvent.setup();
     await renderWithRouter(<RegisterPage />, { path: '/register' });
 
+    expect(screen.getByText('Personal account')).toBeInTheDocument();
+    expect(screen.getByText(/It will not register an organization/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /register an organization instead/i })).toHaveAttribute(
+      'href',
+      '/register/organization',
+    );
     expect(screen.getByText('This name will appear in your workspace.')).toBeInTheDocument();
     expect(
       screen.getByText('We will send a verification link to this address.'),

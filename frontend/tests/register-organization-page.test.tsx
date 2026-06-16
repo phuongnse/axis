@@ -67,6 +67,11 @@ describe('RegisterOrganizationPage', () => {
     const user = userEvent.setup();
     await renderWithRouter(<RegisterOrganizationPage />, { path: '/register/organization' });
 
+    expect(screen.getByText('Organization onboarding')).toBeInTheDocument();
+    expect(screen.getByText('1. Organization')).toBeInTheDocument();
+    expect(screen.getByText('2. Verification')).toBeInTheDocument();
+    expect(screen.getByText('3. First owner')).toBeInTheDocument();
+
     await user.click(screen.getByRole('button', { name: /register organization/i }));
 
     expect(screen.getByText('Organization name is required')).toBeInTheDocument();
@@ -110,6 +115,9 @@ describe('RegisterOrganizationPage', () => {
     await fillOrganizationForm(user);
 
     expect(await screen.findByText('o-brien-co.axis.app')).toBeInTheDocument();
+    expect(
+      screen.getByText('This address will be reserved after email verification.'),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /register organization/i }));
 

@@ -1,7 +1,8 @@
 import { Link } from '@tanstack/react-router';
-import { UserPlus } from 'lucide-react';
+import { Building2, UserPlus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { ActionLink } from '@/components/ui/action-link';
 import { Button } from '@/components/ui/button';
 import { CheckboxField } from '@/components/ui/checkbox-field';
 import { FormField } from '@/components/ui/form-field';
@@ -38,7 +39,21 @@ export function RegisterPage() {
               organizationName: context?.organizationName ?? t('provisioning.organizationFallback'),
             })}
           </AuthNotice>
-        ) : undefined
+        ) : (
+          <AuthNotice variant="info" title={t('register.personalBannerTitle')}>
+            <div className="space-y-2">
+              <p>{t('register.personalBannerBody')}</p>
+              <ActionLink
+                to="/register/organization"
+                icon={Building2}
+                variant="secondary"
+                className="h-8 w-full text-xs sm:w-auto"
+              >
+                {t('register.organizationLink')}
+              </ActionLink>
+            </div>
+          </AuthNotice>
+        )
       }
       footer={
         <>
