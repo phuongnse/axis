@@ -4,6 +4,6 @@
   "name": "UserDeactivatedEvent",
   "fields": [
     { "name": "userId", "type": "string" },
-    { "name": "organizationId", "type": "string" }
+    { "name": "teamAccountId", "type": "string" }
   ]
 }

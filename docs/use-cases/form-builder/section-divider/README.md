@@ -8,7 +8,7 @@ Group related fields under a section heading so that the form is easier to under
 
 ## Primary actor
 
-- Organization Member
+- Team account Member
 
 ## Trigger
 

@@ -7,7 +7,7 @@ public sealed class WorkflowModelReference
 {
     public Guid WorkflowId { get; private set; }
     public Guid ModelId { get; private set; }
-    public Guid OrganizationId { get; private set; }
+    public Guid TeamAccountId { get; private set; }
     public bool IsBroken { get; private set; }
 
     private WorkflowModelReference() { } // EF Core materialisation
@@ -15,13 +15,13 @@ public sealed class WorkflowModelReference
     public static WorkflowModelReference Create(
         Guid workflowId,
         Guid modelId,
-        Guid organizationId,
+        Guid teamAccountId,
         bool isBroken = false)
         => new()
         {
             WorkflowId = workflowId,
             ModelId = modelId,
-            OrganizationId = organizationId,
+            TeamAccountId = teamAccountId,
             IsBroken = isBroken,
         };
 

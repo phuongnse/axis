@@ -7,7 +7,7 @@ namespace Axis.Identity.Application.Queries.ListSubscriptionPlans;
 
 public sealed class ListSubscriptionPlansHandler(
     ISubscriptionPlanRepository planRepo,
-    IOrganizationRepository orgRepo)
+    ITeamAccountRepository teamAccountRepo)
     : IQueryHandler<ListSubscriptionPlansQuery, IReadOnlyList<SubscriptionPlanDto>>
 {
     public async Task<IReadOnlyList<SubscriptionPlanDto>> Handle(
@@ -17,13 +17,13 @@ public sealed class ListSubscriptionPlansHandler(
         List<SubscriptionPlan> plans = (await planRepo.ListAvailableForNewSignupsAsync(cancellationToken)).ToList();
 
         Guid? currentPlanId = null;
-        if (query.CurrentOrganizationId is Guid orgId)
+        if (query.CurrentTeamAccountId is Guid teamAccountId)
         {
-            Organization? org = await orgRepo.GetByIdAsync(orgId, cancellationToken);
-            currentPlanId = org?.SubscriptionPlanId;
+            TeamAccount? teamAccount = await teamAccountRepo.GetByIdAsync(teamAccountId, cancellationToken);
+            currentPlanId = teamAccount?.SubscriptionPlanId;
         }
 
-        // edge: retired plans stay visible to orgs still on that plan.
+        // edge: retired plans stay visible to team accounts still on that plan.
         if (currentPlanId is Guid planId && plans.All(p => p.Id != planId))
         {
             SubscriptionPlan? currentPlan = await planRepo.GetByIdAsync(planId, cancellationToken);

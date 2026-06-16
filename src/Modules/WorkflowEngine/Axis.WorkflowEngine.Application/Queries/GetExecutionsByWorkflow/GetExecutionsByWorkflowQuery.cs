@@ -8,7 +8,7 @@ namespace Axis.WorkflowEngine.Application.Queries.GetExecutionsByWorkflow;
 /// <summary>Paginated execution history for a specific workflow.</summary>
 public sealed record GetExecutionsByWorkflowQuery(
     Guid WorkflowDefinitionId,
-    Guid OrganizationId,
+    Guid TeamAccountId,
     int Page = 1,
     int PageSize = 25,
     ExecutionStatus? Status = null) : IQuery<PagedResult<ExecutionSummaryResponse>>;

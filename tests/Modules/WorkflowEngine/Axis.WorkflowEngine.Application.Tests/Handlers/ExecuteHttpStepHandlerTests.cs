@@ -19,21 +19,21 @@ public class ExecuteHttpStepHandlerTests
     private readonly IStepDispatcher _dispatcher = Substitute.For<IStepDispatcher>();
     private readonly ILogger<ExecuteHttpStepHandler> _logger = Substitute.For<ILogger<ExecuteHttpStepHandler>>();
 
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TeamAccountId = Guid.NewGuid();
     private static readonly Guid WorkflowId = Guid.NewGuid();
 
     private ExecuteHttpStepHandler CreateHandler() => new(_execRepo, _executor, _dispatcher, _logger);
 
     private static (WorkflowExecution Execution, ExecutionStep Step) MakePendingStep()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, null, new Dictionary<string, object?>());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TeamAccountId, TriggerType.Manual, null, new Dictionary<string, object?>());
         ExecutionStep step = exec.AddStep(Guid.NewGuid(), "Http", StepType.HttpRequest, 0);
         exec.Start();
         return (exec, step);
     }
 
     private static ExecuteHttpStepMessage MakeMessage(WorkflowExecution exec, ExecutionStep step)
-        => new(exec.Id, step.Id, OrgId, null, exec.Context);
+        => new(exec.Id, step.Id, TeamAccountId, null, exec.Context);
 
     [Fact]
     public async Task HandleAsync_WhenExecutorSucceeds_DispatchesStepCompletedMessage()
@@ -41,7 +41,7 @@ public class ExecuteHttpStepHandlerTests
         (WorkflowExecution execution, ExecutionStep step) = MakePendingStep();
         Dictionary<string, object?> output = new() { ["status_code"] = 200 };
 
-        _execRepo.GetByIdWithStepsAsync(execution.Id, OrgId).Returns(execution);
+        _execRepo.GetByIdWithStepsAsync(execution.Id, TeamAccountId).Returns(execution);
         _executor.ExecuteAsync(Arg.Any<IReadOnlyDictionary<string, object?>?>(),
                 Arg.Any<IReadOnlyDictionary<string, object?>>(), Arg.Any<CancellationToken>())
             .Returns(output);
@@ -61,7 +61,7 @@ public class ExecuteHttpStepHandlerTests
     {
         (WorkflowExecution execution, ExecutionStep step) = MakePendingStep();
 
-        _execRepo.GetByIdWithStepsAsync(execution.Id, OrgId).Returns(execution);
+        _execRepo.GetByIdWithStepsAsync(execution.Id, TeamAccountId).Returns(execution);
         _executor.ExecuteAsync(
                 Arg.Any<IReadOnlyDictionary<string, object?>?>(),
                 Arg.Any<IReadOnlyDictionary<string, object?>>(),
@@ -87,7 +87,7 @@ public class ExecuteHttpStepHandlerTests
         execution.StartStep(step.Id, execution.Context);
         execution.CompleteStep(step.Id, new Dictionary<string, object?>());
 
-        _execRepo.GetByIdWithStepsAsync(execution.Id, OrgId).Returns(execution);
+        _execRepo.GetByIdWithStepsAsync(execution.Id, TeamAccountId).Returns(execution);
 
         await CreateHandler().HandleAsync(MakeMessage(execution, step), CancellationToken.None);
 
@@ -108,7 +108,7 @@ public class ExecuteHttpStepHandlerTests
         execution.StartStep(step.Id, execution.Context);
 
         Dictionary<string, object?> output = new() { ["status_code"] = 200 };
-        _execRepo.GetByIdWithStepsAsync(execution.Id, OrgId).Returns(execution);
+        _execRepo.GetByIdWithStepsAsync(execution.Id, TeamAccountId).Returns(execution);
         _executor.ExecuteAsync(Arg.Any<IReadOnlyDictionary<string, object?>?>(),
                 Arg.Any<IReadOnlyDictionary<string, object?>>(), Arg.Any<CancellationToken>())
             .Returns(output);
@@ -126,7 +126,7 @@ public class ExecuteHttpStepHandlerTests
         _execRepo.GetByIdWithStepsAsync(Arg.Any<Guid>(), Arg.Any<Guid>()).ReturnsNull();
 
         await CreateHandler().HandleAsync(
-            new ExecuteHttpStepMessage(Guid.NewGuid(), Guid.NewGuid(), OrgId, null, new Dictionary<string, object?>()),
+            new ExecuteHttpStepMessage(Guid.NewGuid(), Guid.NewGuid(), TeamAccountId, null, new Dictionary<string, object?>()),
             CancellationToken.None);
 
         await _dispatcher.DidNotReceive().PublishAsync(

@@ -8,7 +8,7 @@ Set validation rules on each field so that users are guided to provide correct d
 
 ## Primary actor
 
-- Organization Member
+- Team account Member
 
 ## Trigger
 

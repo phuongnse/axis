@@ -11,7 +11,7 @@ public sealed class GetModelHandler(IDataModelRepository modelRepo)
 {
     public async Task<Result<ModelDetailDto>> Handle(GetModelQuery query, CancellationToken cancellationToken)
     {
-        DataModel? model = await modelRepo.GetByIdAsync(query.ModelId, query.OrganizationId, cancellationToken);
+        DataModel? model = await modelRepo.GetByIdAsync(query.ModelId, query.TeamAccountId, cancellationToken);
         if (model is null)
             return Result.Failure<ModelDetailDto>(ErrorCodes.NotFound, "Model not found.");
 

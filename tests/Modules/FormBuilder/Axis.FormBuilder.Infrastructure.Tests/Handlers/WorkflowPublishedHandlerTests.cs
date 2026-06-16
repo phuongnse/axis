@@ -12,7 +12,7 @@ namespace Axis.FormBuilder.Infrastructure.Tests.Handlers;
 [Collection("FormBuilderDb")]
 public sealed class WorkflowPublishedHandlerTests(FormBuilderDatabaseFixture fixture)
 {
-    private static readonly Guid OrgId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid TeamAccountId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private static WorkflowPublishedHandler CreateHandler(FormBuilderDbContext ctx)
     {
@@ -27,7 +27,7 @@ public sealed class WorkflowPublishedHandlerTests(FormBuilderDatabaseFixture fix
         new()
         {
             workflowId = workflowId.ToString(),
-            organizationId = OrgId.ToString(),
+            teamAccountId = TeamAccountId.ToString(),
             referencedFormIds = formIds.Select(id => id.ToString()).ToList(),
             steps = [],
             transitions = [],

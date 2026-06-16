@@ -12,7 +12,7 @@ public class DeleteRecordHandlerTests
 {
     private readonly IDataRecordRepository _recordRepo = Substitute.For<IDataRecordRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TeamAccountId = Guid.NewGuid();
     private static readonly Guid ModelId = Guid.NewGuid();
     private const string UserId = "user-123";
 
@@ -21,11 +21,11 @@ public class DeleteRecordHandlerTests
     [Fact]
     public async Task DeleteRecord_WhenRecordExists_SoftDeletesAndSaves()
     {
-        DataRecord record = DataRecord.Create(ModelId, OrgId, new Dictionary<string, object?> { ["x"] = 1 }, UserId);
-        _recordRepo.GetByIdAsync(record.Id, ModelId, OrgId).Returns(record);
+        DataRecord record = DataRecord.Create(ModelId, TeamAccountId, new Dictionary<string, object?> { ["x"] = 1 }, UserId);
+        _recordRepo.GetByIdAsync(record.Id, ModelId, TeamAccountId).Returns(record);
 
         Result result = await CreateHandler().Handle(
-            new DeleteRecordCommand(record.Id, ModelId, OrgId),
+            new DeleteRecordCommand(record.Id, ModelId, TeamAccountId),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -36,10 +36,10 @@ public class DeleteRecordHandlerTests
     [Fact]
     public async Task DeleteRecord_WhenRecordNotFound_ReturnsNotFound()
     {
-        _recordRepo.GetByIdAsync(Arg.Any<Guid>(), ModelId, OrgId).Returns((DataRecord?)null);
+        _recordRepo.GetByIdAsync(Arg.Any<Guid>(), ModelId, TeamAccountId).Returns((DataRecord?)null);
 
         Result result = await CreateHandler().Handle(
-            new DeleteRecordCommand(Guid.NewGuid(), ModelId, OrgId),
+            new DeleteRecordCommand(Guid.NewGuid(), ModelId, TeamAccountId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -48,14 +48,14 @@ public class DeleteRecordHandlerTests
     }
 
     [Fact]
-    public async Task DeleteRecord_WhenRecordBelongsToAnotherOrg_ReturnsNotFound()
+    public async Task DeleteRecord_WhenRecordBelongsToAnotherTeamAccount_ReturnsNotFound()
     {
-        DataRecord record = DataRecord.Create(ModelId, OrgId, new Dictionary<string, object?> { ["x"] = 1 }, UserId);
-        _recordRepo.GetByIdAsync(record.Id, ModelId, OrgId).Returns(record);
+        DataRecord record = DataRecord.Create(ModelId, TeamAccountId, new Dictionary<string, object?> { ["x"] = 1 }, UserId);
+        _recordRepo.GetByIdAsync(record.Id, ModelId, TeamAccountId).Returns(record);
 
-        Guid otherOrgId = Guid.NewGuid();
+        Guid otherTeamAccountId = Guid.NewGuid();
         Result result = await CreateHandler().Handle(
-            new DeleteRecordCommand(record.Id, ModelId, otherOrgId),
+            new DeleteRecordCommand(record.Id, ModelId, otherTeamAccountId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

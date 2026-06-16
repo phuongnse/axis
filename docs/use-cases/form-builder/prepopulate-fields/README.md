@@ -8,7 +8,7 @@ Pre-populate form fields with values from the workflow context so that assignees
 
 ## Primary actor
 
-- Organization Member
+- Team account Member
 
 ## Trigger
 

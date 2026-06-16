@@ -8,7 +8,7 @@ Configure an HTTP Request step so that my workflow can integrate with external s
 
 ## Primary actor
 
-- Organization Member
+- Team account Member
 
 ## Trigger
 

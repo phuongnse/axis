@@ -6,7 +6,7 @@
 
 ## Overview
 
-Establish the multi-tenant SaaS foundation that all other modules depend on. This domain covers tenant provisioning, organization lifecycle management, and the data isolation strategy that keeps each tenant's data completely separate.
+Establish the multi-tenant SaaS foundation that all other modules depend on. This domain covers tenant provisioning, team account lifecycle management, and the data isolation strategy that keeps each tenant's data completely separate.
 
 ## Business Value
 
@@ -25,23 +25,23 @@ Ship first — tenant registration, isolation, and subscription plans are prereq
 | Use case | Summary |
 |---|---|
 | [Select a subscription plan during registration](plan-at-signup/) | Choose a subscription plan during registration so that I know what features and limits I have access to. |
-| [Create a team account](register-org/) | Create a team account on the Axis platform so one user can manage multiple users, roles, invitations, and tenant-scoped… |
+| [Create a team account](register-team-account/) | Create a team account on the Axis platform so one user can manage multiple users, roles, invitations, and tenant-scoped… |
 
 ### Subscription plans
 
 | Use case | Summary |
 |---|---|
-| [Change organization plan (admin override)](admin-change-plan/) | Manually change an organization's plan so that I can support early customers and testing without a billing integration. |
-| [Enforce plan limits at the API](enforce-limits/) | Enforce subscription plan limits at the API so that organizations cannot exceed their subscription without upgrading. |
+| [Change team account plan (admin override)](admin-change-plan/) | Manually change a team account's plan so that I can support early customers and testing without a billing integration. |
+| [Enforce plan limits at the API](enforce-limits/) | Enforce subscription plan limits at the API so that team accounts cannot exceed their subscription without upgrading. |
 | [View available plans](view-plans/) | Compare available subscription plans so that I can choose the one that fits my needs. |
 
-### Organization settings
+### Team account settings
 
 | Use case | Summary |
 |---|---|
-| [Delete organization](delete-org/) | Permanently delete my organization so that all our data is removed from the platform. |
-| [Update organization profile](org-profile/) | Update my organization's name and logo so that the platform reflects our brand. |
-| [View organization settings](org-settings/) | View all organization settings in one place so that I have full visibility into the configuration. |
+| [Delete team account](delete-team-account/) | Permanently delete my team account so that all our data is removed from the platform. |
+| [Update team account profile](team-account-profile/) | Update my team account's name and logo so that the platform reflects our brand. |
+| [View team account settings](team-account-settings/) | View all team account settings in one place so that I have full visibility into the configuration. |
 
 ### Tenant isolation
 
@@ -62,7 +62,7 @@ Ship first — tenant registration, isolation, and subscription plans are prereq
 
 ## Diagrams
 
-Team account onboarding journey (team contact email → verify → provisioning): [register-org § Diagrams](./register-org/README.md#diagrams) (`register-org-journey`, `tenant-provisioning`). First-owner identity setup is a separate setup-token handoff that continues at `/register` and is owned by `register-org`. Standalone users register through [identity-access/register-user](../identity-access/register-user/) without a team account.
+Team account onboarding journey (team contact email → verify → provisioning): [register-team-account § Diagrams](./register-team-account/README.md#diagrams) (`register-team-account-journey`, `tenant-provisioning`). First-owner identity setup is a separate setup-token handoff that continues at `/register` and is owned by `register-team-account`. Standalone users register through [identity-access/register-user](../identity-access/register-user/) without a team account.
 
 ---
 
@@ -82,11 +82,11 @@ Team account onboarding journey (team contact email → verify → provisioning)
 | Shared Domain | ✅ Done | `Entity`, `AggregateRoot`, `ValueObject`, `IDomainEvent`, `Result<T>` |
 | Shared Application | ✅ Done | `ICommand/IQuery`, `ICommandHandler/IQueryHandler`, `ValidationBehavior`, `ITenantContext` |
 | Shared Infrastructure | ✅ Done | `TenantSchemaInterceptor`, per-module `UnitOfWork` ([ADR-017](../../TECH_STACK.md#adr-017-axisshared-is-abstractions-only-no-shared-implementation)); **OpenTelemetry** host wiring on `Axis.Api` ([ADR-018](../../TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability), [patterns § OpenTelemetry](../../playbooks/patterns.md#opentelemetry-observability)) |
-| [Register org](register-org/) | ✅ Done | Organization contact registration, org-email verification, tenant provisioning status/retry, and first-owner `/register` setup-token handoff are implemented. Standalone user registration remains complete in [identity-access/register-user](../identity-access/register-user/). |
+| [Register team account](register-team-account/) | ✅ Done | Team account contact registration, team account-email verification, tenant provisioning status/retry, and first-owner `/register` setup-token handoff are implemented. Standalone user registration remains complete in [identity-access/register-user](../identity-access/register-user/). |
 | [Subscription plans](view-plans/) | ✅ Done | `GET /api/plans`, pricing data, 402 limits — see [enforce limits](enforce-limits/). Frontend pricing UI ⏳ |
-| [Tenant isolation](tenant-scope/) | ✅ Done | `TenantSchemaInterceptor`, `TenantOrganizationAccessMiddleware`, cross-tenant API tests |
-| [Organization management](org-profile/) | ✅ Done | Profile, settings + usage, scheduled deletion + hard-delete job ✅. Frontend settings UI ⏳ |
-| Frontend | ⚠️ Partial | Register-org journey (incl. verify screens), provisioning wait, and first-owner setup-token handoff are shipped. Pricing and settings UIs remain pending. |
+| [Tenant isolation](tenant-scope/) | ✅ Done | `TenantSchemaInterceptor`, `TenantTeamAccountAccessMiddleware`, cross-tenant API tests |
+| [Team account management](team-account-profile/) | ✅ Done | Profile, settings + usage, scheduled deletion + hard-delete job ✅. Frontend settings UI ⏳ |
+| Frontend | ⚠️ Partial | Register-team account journey (incl. verify screens), provisioning wait, and first-owner setup-token handoff are shipped. Pricing and settings UIs remain pending. |
 
 ---
 
@@ -94,7 +94,7 @@ Team account onboarding journey (team contact email → verify → provisioning)
 
 | Priority | Item | Where |
 |----------|------|--------|
-| Frontend | [pricing](view-plans/), [org settings](org-settings/) | see **Use Cases** table above |
+| Frontend | [pricing](view-plans/), [team account settings](team-account-settings/) | see **Use Cases** table above |
 
 Domain-level checkboxes above remain spec-only; status is in use-case **Implementation status** callouts.
 

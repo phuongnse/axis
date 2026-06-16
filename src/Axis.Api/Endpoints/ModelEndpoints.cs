@@ -29,7 +29,7 @@ public static class ModelEndpoints
         group.MapGet("/", GetModels)
             .RequireAuthorization(Permissions.DataModeling.ModelRead)
             .WithName("GetModels")
-            .WithSummary("List all data models for the organization")
+            .WithSummary("List all data models for the team account")
             .WithTags("DataModeling")
             .Produces<IReadOnlyList<ModelSummaryDto>>()
             .ProducesProblem(401)
@@ -132,7 +132,7 @@ public static class ModelEndpoints
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        PagedResult<ModelSummaryDto> result = await mediator.Send(new GetModelsQuery(currentUser.OrgId, page, pageSize), ct);
+        PagedResult<ModelSummaryDto> result = await mediator.Send(new GetModelsQuery(currentUser.TeamAccountId, page, pageSize), ct);
         return Results.Ok(result);
     }
 
@@ -147,7 +147,7 @@ public static class ModelEndpoints
             request.Description,
             request.Icon,
             request.Color,
-            currentUser.OrgId,
+            currentUser.TeamAccountId,
             currentUser.UserId.ToString()), ct);
 
         if (result.IsFailure) return result.ToProblemDetails();
@@ -160,7 +160,7 @@ public static class ModelEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        Result<ModelDetailDto> result = await mediator.Send(new GetModelQuery(modelId, currentUser.OrgId), ct);
+        Result<ModelDetailDto> result = await mediator.Send(new GetModelQuery(modelId, currentUser.TeamAccountId), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.Ok(result.Value);
     }
@@ -174,7 +174,7 @@ public static class ModelEndpoints
     {
         Result result = await mediator.Send(new UpdateModelCommand(
             modelId,
-            currentUser.OrgId,
+            currentUser.TeamAccountId,
             request.Name,
             request.Description,
             request.Icon,
@@ -190,7 +190,7 @@ public static class ModelEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        Result result = await mediator.Send(new DeleteModelCommand(modelId, currentUser.OrgId), ct);
+        Result result = await mediator.Send(new DeleteModelCommand(modelId, currentUser.TeamAccountId), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
@@ -204,7 +204,7 @@ public static class ModelEndpoints
     {
         Result<Guid> result = await mediator.Send(new AddFieldCommand(
             modelId,
-            currentUser.OrgId,
+            currentUser.TeamAccountId,
             request.Name,
             request.Label,
             request.Type,
@@ -226,7 +226,7 @@ public static class ModelEndpoints
         Result result = await mediator.Send(new UpdateFieldCommand(
             modelId,
             fieldId,
-            currentUser.OrgId,
+            currentUser.TeamAccountId,
             request.Label,
             request.HelpText,
             request.IsRequired,
@@ -243,7 +243,7 @@ public static class ModelEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        Result result = await mediator.Send(new RemoveFieldCommand(modelId, fieldId, currentUser.OrgId), ct);
+        Result result = await mediator.Send(new RemoveFieldCommand(modelId, fieldId, currentUser.TeamAccountId), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
@@ -255,7 +255,7 @@ public static class ModelEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        Result result = await mediator.Send(new ReorderFieldsCommand(modelId, currentUser.OrgId, request.FieldIds), ct);
+        Result result = await mediator.Send(new ReorderFieldsCommand(modelId, currentUser.TeamAccountId, request.FieldIds), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }

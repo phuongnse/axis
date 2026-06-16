@@ -15,7 +15,7 @@ public class ExportRecordsCsvHandlerTests
     private readonly IDataModelRepository _modelRepo = Substitute.For<IDataModelRepository>();
     private readonly IDataRecordRepository _recordRepo = Substitute.For<IDataRecordRepository>();
 
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TeamAccountId = Guid.NewGuid();
     private static readonly Guid ModelId = Guid.NewGuid();
     private const string UserId = "user-123";
 
@@ -24,10 +24,10 @@ public class ExportRecordsCsvHandlerTests
     [Fact]
     public async Task Export_WhenModelNotFound_ReturnsNotFound()
     {
-        _modelRepo.GetByIdAsync(ModelId, OrgId).ReturnsNull();
+        _modelRepo.GetByIdAsync(ModelId, TeamAccountId).ReturnsNull();
 
         Result<CsvExportDto> result = await CreateHandler().Handle(
-            new ExportRecordsCsvQuery(ModelId, OrgId), CancellationToken.None);
+            new ExportRecordsCsvQuery(ModelId, TeamAccountId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
@@ -36,19 +36,19 @@ public class ExportRecordsCsvHandlerTests
     [Fact]
     public async Task Export_WhenModelHasRecords_ReturnsCsvWithHeaderAndRows()
     {
-        DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
+        DataModel model = DataModel.Create("Invoice", null, null, null, TeamAccountId, UserId);
         model.AddField("company", "Company", FieldType.Text, required: false, new TextFieldConfig());
         model.AddField("amount", "Amount", FieldType.Number, required: false, new NumberFieldConfig());
 
-        DataRecord record = DataRecord.Create(ModelId, OrgId,
+        DataRecord record = DataRecord.Create(ModelId, TeamAccountId,
             new Dictionary<string, object?> { ["company"] = "Acme Corp", ["amount"] = 1500 }, UserId);
 
-        _modelRepo.GetByIdAsync(ModelId, OrgId).Returns(model);
-        _recordRepo.GetAllForExportAsync(ModelId, OrgId, null, null, null, null)
+        _modelRepo.GetByIdAsync(ModelId, TeamAccountId).Returns(model);
+        _recordRepo.GetAllForExportAsync(ModelId, TeamAccountId, null, null, null, null)
             .Returns(AsyncEnumerableOf(record));
 
         Result<CsvExportDto> result = await CreateHandler().Handle(
-            new ExportRecordsCsvQuery(ModelId, OrgId), CancellationToken.None);
+            new ExportRecordsCsvQuery(ModelId, TeamAccountId), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Content.Should().Contain("\"Company\"");
@@ -62,18 +62,18 @@ public class ExportRecordsCsvHandlerTests
     [Fact]
     public async Task Export_WhenValueContainsDoubleQuotes_EscapesCorrectly()
     {
-        DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
+        DataModel model = DataModel.Create("Invoice", null, null, null, TeamAccountId, UserId);
         model.AddField("notes", "Notes", FieldType.Text, required: false, new TextFieldConfig());
 
-        DataRecord record = DataRecord.Create(ModelId, OrgId,
+        DataRecord record = DataRecord.Create(ModelId, TeamAccountId,
             new Dictionary<string, object?> { ["notes"] = "He said \"hello\"" }, UserId);
 
-        _modelRepo.GetByIdAsync(ModelId, OrgId).Returns(model);
-        _recordRepo.GetAllForExportAsync(ModelId, OrgId, null, null, null, null)
+        _modelRepo.GetByIdAsync(ModelId, TeamAccountId).Returns(model);
+        _recordRepo.GetAllForExportAsync(ModelId, TeamAccountId, null, null, null, null)
             .Returns(AsyncEnumerableOf(record));
 
         Result<CsvExportDto> result = await CreateHandler().Handle(
-            new ExportRecordsCsvQuery(ModelId, OrgId), CancellationToken.None);
+            new ExportRecordsCsvQuery(ModelId, TeamAccountId), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         // RFC 4180: double-quotes inside a quoted field are doubled
@@ -87,18 +87,18 @@ public class ExportRecordsCsvHandlerTests
     [InlineData("@SUM(1+1)")]
     public async Task Export_WhenValueStartsWithFormulaChar_PrefixesSingleQuote(string formulaValue)
     {
-        DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
+        DataModel model = DataModel.Create("Invoice", null, null, null, TeamAccountId, UserId);
         model.AddField("notes", "Notes", FieldType.Text, required: false, new TextFieldConfig());
 
-        DataRecord record = DataRecord.Create(ModelId, OrgId,
+        DataRecord record = DataRecord.Create(ModelId, TeamAccountId,
             new Dictionary<string, object?> { ["notes"] = formulaValue }, UserId);
 
-        _modelRepo.GetByIdAsync(ModelId, OrgId).Returns(model);
-        _recordRepo.GetAllForExportAsync(ModelId, OrgId, null, null, null, null)
+        _modelRepo.GetByIdAsync(ModelId, TeamAccountId).Returns(model);
+        _recordRepo.GetAllForExportAsync(ModelId, TeamAccountId, null, null, null, null)
             .Returns(AsyncEnumerableOf(record));
 
         Result<CsvExportDto> result = await CreateHandler().Handle(
-            new ExportRecordsCsvQuery(ModelId, OrgId), CancellationToken.None);
+            new ExportRecordsCsvQuery(ModelId, TeamAccountId), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         // Value is prefixed with ' to neutralise spreadsheet formula execution
@@ -108,15 +108,15 @@ public class ExportRecordsCsvHandlerTests
     [Fact]
     public async Task Export_WhenNoRecords_ReturnsCsvWithHeaderOnly()
     {
-        DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
+        DataModel model = DataModel.Create("Invoice", null, null, null, TeamAccountId, UserId);
         model.AddField("company", "Company", FieldType.Text, required: false, new TextFieldConfig());
 
-        _modelRepo.GetByIdAsync(ModelId, OrgId).Returns(model);
-        _recordRepo.GetAllForExportAsync(ModelId, OrgId, null, null, null, null)
+        _modelRepo.GetByIdAsync(ModelId, TeamAccountId).Returns(model);
+        _recordRepo.GetAllForExportAsync(ModelId, TeamAccountId, null, null, null, null)
             .Returns(AsyncEnumerableOf<DataRecord>());
 
         Result<CsvExportDto> result = await CreateHandler().Handle(
-            new ExportRecordsCsvQuery(ModelId, OrgId), CancellationToken.None);
+            new ExportRecordsCsvQuery(ModelId, TeamAccountId), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Content.Should().Contain("\"Company\"");

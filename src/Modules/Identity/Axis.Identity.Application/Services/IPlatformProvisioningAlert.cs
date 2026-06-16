@@ -4,7 +4,7 @@ namespace Axis.Identity.Application.Services;
 public interface IPlatformProvisioningAlert
 {
     Task AlertProvisioningFailedAsync(
-        Guid organizationId,
+        Guid teamAccountId,
         string module,
         int attemptCount,
         string lastError,

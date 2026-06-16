@@ -41,7 +41,7 @@ One sentence about user value.
 
 ## Screen flow
 
-Add this section when the use case has **more than three** wireframe screens, **branched** happy paths, or non-obvious error screens. Otherwise delete it. Rules: [docs-style § Use-case visual artifacts](../playbooks/docs-style.md#use-case-files--wireframes--implementation-status). Example: [register-org](./platform-foundation/register-org/README.md#screen-flow).
+Add this section when the use case has **more than three** wireframe screens, **branched** happy paths, or non-obvious error screens. Otherwise delete it. Rules: [docs-style § Use-case visual artifacts](../playbooks/docs-style.md#use-case-files--wireframes--implementation-status). Example: [register-team-account](./platform-foundation/register-team-account/README.md#screen-flow).
 
 Canonical order for this use case. **The wireframes table below uses the same row order.**
 
@@ -67,7 +67,7 @@ flowchart TD
 
 ## Wireframes
 
-If `## Screen flow` exists, use the full table and inventory note from [register-org](./platform-foundation/register-org/README.md#wireframes). Otherwise use the minimal table below.
+If `## Screen flow` exists, use the full table and inventory note from [register-team-account](./platform-foundation/register-team-account/README.md#wireframes). Otherwise use the minimal table below.
 
 All UI assets in this folder (<N> screens). Row order matches [Screen flow](#screen-flow) above. Sequence/architecture drawings are under [Diagrams](#diagrams).
 
@@ -75,7 +75,7 @@ All UI assets in this folder (<N> screens). Row order matches [Screen flow](#scr
 |---|--------|------|------------|---------|
 | 1 | `<screen-slug>` | Happy path — … | `/<screen-slug>.excalidraw` | `/<screen-slug>.svg` |
 
-Replace path placeholders with real `[source](./…)` / `[preview](./…)` links when implementing (see [register-org](./platform-foundation/register-org/README.md#wireframes) for a filled-in table including error rows).
+Replace path placeholders with real `[source](./…)` / `[preview](./…)` links when implementing (see [register-team-account](./platform-foundation/register-team-account/README.md#wireframes) for a filled-in table including error rows).
 
 Minimal (delete `#` / `Role` columns and the inventory note when Screen flow is omitted):
 
@@ -100,7 +100,7 @@ sequenceDiagram
 \`\`\`
 ```
 
-See [register-org § Diagrams](./platform-foundation/register-org/README.md#diagrams). **Related (next use case):** optional prose link after the diagrams — do not duplicate another use case’s diagram here.
+See [register-team-account § Diagrams](./platform-foundation/register-team-account/README.md#diagrams). **Related (next use case):** optional prose link after the diagrams — do not duplicate another use case’s diagram here.
 
 Omit this section (or note “N/A”) when the use case has no local diagram.
 

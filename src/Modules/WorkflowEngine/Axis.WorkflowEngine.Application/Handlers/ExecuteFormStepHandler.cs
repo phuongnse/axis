@@ -23,7 +23,7 @@ public sealed class ExecuteFormStepHandler(
     public async Task HandleAsync(ExecuteFormStepMessage message, CancellationToken ct)
     {
         WorkflowExecution? execution = await execRepo.GetByIdWithStepsAsync(
-            message.ExecutionId, message.OrganizationId, ct);
+            message.ExecutionId, message.TeamAccountId, ct);
 
         if (execution is null)
         {

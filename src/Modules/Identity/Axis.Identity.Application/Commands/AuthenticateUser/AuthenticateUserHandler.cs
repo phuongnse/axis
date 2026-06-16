@@ -9,8 +9,8 @@ namespace Axis.Identity.Application.Commands.AuthenticateUser;
 
 public sealed class AuthenticateUserHandler(
     IUserRepository userRepo,
-    IOrganizationMembershipRepository membershipRepo,
-    IOrganizationRepository organizationRepo,
+    ITeamAccountMembershipRepository membershipRepo,
+    ITeamAccountRepository teamAccountRepo,
     IRoleRepository roleRepo,
     IPasswordHasher hasher,
     IUnitOfWork uow)
@@ -33,7 +33,7 @@ public sealed class AuthenticateUserHandler(
         if (!user.IsEmailVerified)
             return AuthenticationResult.Fail(AuthFailureReason.EmailNotVerified);
 
-        OrganizationMembership? membership =
+        TeamAccountMembership? membership =
             await membershipRepo.GetFirstActiveByUserIdAsync(user.Id, cancellationToken);
 
         if (user.IsLockedOut)
@@ -55,13 +55,13 @@ public sealed class AuthenticateUserHandler(
                 user.Id, null, user.Email.Value, user.FullName, []);
         }
 
-        Organization? organization = await organizationRepo.GetByIdAsync(membership.OrganizationId, cancellationToken);
-        if (organization is null || !organization.AllowsSignIn())
-            return AuthenticationResult.Fail(AuthFailureReason.OrganizationDeleted);
+        TeamAccount? teamAccount = await teamAccountRepo.GetByIdAsync(membership.TeamAccountId, cancellationToken);
+        if (teamAccount is null || !teamAccount.AllowsSignIn())
+            return AuthenticationResult.Fail(AuthFailureReason.TeamAccountDeleted);
 
         IReadOnlyList<Role> roles = await roleRepo.GetByIdsAsync(
             membership.RoleIds,
-            membership.OrganizationId,
+            membership.TeamAccountId,
             cancellationToken);
         List<string> permissions = roles
             .SelectMany(r => r.Permissions)
@@ -69,6 +69,6 @@ public sealed class AuthenticateUserHandler(
             .ToList();
 
         return AuthenticationResult.Ok(
-            user.Id, membership.OrganizationId, user.Email.Value, user.FullName, permissions);
+            user.Id, membership.TeamAccountId, user.Email.Value, user.FullName, permissions);
     }
 }

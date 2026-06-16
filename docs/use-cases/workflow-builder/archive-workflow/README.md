@@ -8,7 +8,7 @@ Archive a workflow so that it is disabled but its history is preserved.
 
 ## Primary actor
 
-- Organization Member with `workflow:definition:write`
+- Team account Member with `workflow:definition:write`
 
 ## Trigger
 

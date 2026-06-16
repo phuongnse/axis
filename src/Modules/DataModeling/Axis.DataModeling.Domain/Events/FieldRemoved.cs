@@ -4,6 +4,6 @@ namespace Axis.DataModeling.Domain.Events;
 
 public sealed record FieldRemoved(
     Guid ModelId,
-    Guid OrganizationId,
+    Guid TeamAccountId,
     Guid FieldId,
     string FieldName) : IDomainEvent;

@@ -9,7 +9,7 @@ using Axis.Identity.Domain.Aggregates;
 namespace Axis.Api.Tests.Helpers;
 
 /// <summary>
-/// Shared test helper that registers an org, verifies email, runs the full
+/// Shared test helper that registers a team account, verifies email, runs the full
 /// Authorization Code + PKCE flow, and returns an authenticated HttpClient.
 /// </summary>
 public static class AuthHelper
@@ -21,7 +21,7 @@ public static class AuthHelper
     private const string ClientId = "axis_spa";
 
     /// <summary>
-    /// Registers an org with the given suffix, verifies email, completes the
+    /// Registers a team account with the given suffix, verifies email, completes the
     /// Authorization Code + PKCE flow, and returns a pre-configured Bearer client.
     /// </summary>
     public static async Task<HttpClient> CreateAdminClientAsync(ApiTestFixture fixture, string suffix)
@@ -61,7 +61,7 @@ public static class AuthHelper
         ApiTestFixture fixture,
         string suffix)
     {
-        string setupToken = await RegisterAndVerifyOrganizationAsync(fixture, suffix);
+        string setupToken = await RegisterAndVerifyTeamAccountAsync(fixture, suffix);
         string email = TestRegistrationPayload.AdminEmail(suffix);
 
         HttpResponseMessage userRegResp = await fixture.Client.PostAsJsonAsync(
@@ -72,14 +72,14 @@ public static class AuthHelper
         return email;
     }
 
-    public static async Task<string> RegisterAndVerifyOrganizationAsync(
+    public static async Task<string> RegisterAndVerifyTeamAccountAsync(
         ApiTestFixture fixture,
         string suffix)
     {
-        string contactEmail = TestRegistrationPayload.OrganizationContactEmail(suffix);
+        string contactEmail = TestRegistrationPayload.TeamContactEmail(suffix);
 
         HttpResponseMessage regResp = await fixture.Client.PostAsJsonAsync(
-            "/api/organizations", TestRegistrationPayload.Create(suffix), Json);
+            "/api/team-accounts", TestRegistrationPayload.Create(suffix), Json);
 
         if (!regResp.IsSuccessStatusCode)
             throw new InvalidOperationException($"Registration failed: {regResp.StatusCode}");
@@ -91,13 +91,13 @@ public static class AuthHelper
         HttpResponseMessage verifyResp = await fixture.Client.PostAsJsonAsync(
             "/api/auth/verify-email", new { token = verifyToken }, Json);
         if (verifyResp.StatusCode != HttpStatusCode.OK)
-            throw new InvalidOperationException($"Organization verification failed: {verifyResp.StatusCode}");
+            throw new InvalidOperationException($"TeamAccount verification failed: {verifyResp.StatusCode}");
 
         JsonElement verifyBody = await verifyResp.Content.ReadFromJsonAsync<JsonElement>(Json);
-        string? setupToken = verifyBody.GetProperty("organizationSetupToken").GetString();
+        string? setupToken = verifyBody.GetProperty("teamAccountSetupToken").GetString();
 
         return setupToken
-            ?? throw new InvalidOperationException("No organizationSetupToken in verification response.");
+            ?? throw new InvalidOperationException("No teamAccountSetupToken in verification response.");
     }
 
     /// <summary>

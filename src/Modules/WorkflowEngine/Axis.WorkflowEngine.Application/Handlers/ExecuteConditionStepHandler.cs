@@ -26,7 +26,7 @@ public sealed class ExecuteConditionStepHandler(
     public async Task HandleAsync(ExecuteConditionStepMessage message, CancellationToken ct)
     {
         WorkflowExecution? execution = await execRepo.GetByIdWithStepsAsync(
-            message.ExecutionId, message.OrganizationId, ct);
+            message.ExecutionId, message.TeamAccountId, ct);
 
         if (execution is null)
         {
@@ -60,7 +60,7 @@ public sealed class ExecuteConditionStepHandler(
                 "ExecuteConditionStepHandler: step {StepId} has no branches configured — failing execution {ExecutionId}",
                 message.StepId, message.ExecutionId);
             await dispatcher.PublishAsync(new StepFailedMessage(
-                message.ExecutionId, message.StepId, message.OrganizationId,
+                message.ExecutionId, message.StepId, message.TeamAccountId,
                 "Condition step has no branches configured."), ct);
             return;
         }
@@ -73,7 +73,7 @@ public sealed class ExecuteConditionStepHandler(
                 "ExecuteConditionStepHandler: no branch matched context for step {StepId} in execution {ExecutionId} — failing",
                 message.StepId, message.ExecutionId);
             await dispatcher.PublishAsync(new StepFailedMessage(
-                message.ExecutionId, message.StepId, message.OrganizationId,
+                message.ExecutionId, message.StepId, message.TeamAccountId,
                 "No condition branch matched and no default branch is configured."), ct);
             return;
         }
@@ -100,7 +100,7 @@ public sealed class ExecuteConditionStepHandler(
                 "ExecuteConditionStepHandler: no transition for branch '{Label}' from step {StepId} — failing execution {ExecutionId}",
                 selectedLabel, message.StepId, message.ExecutionId);
             await dispatcher.PublishAsync(new StepFailedMessage(
-                message.ExecutionId, message.StepId, message.OrganizationId,
+                message.ExecutionId, message.StepId, message.TeamAccountId,
                 $"No transition found for selected branch '{selectedLabel}'."), ct);
             return;
         }
@@ -148,7 +148,7 @@ public sealed class ExecuteConditionStepHandler(
             message.StepId, message.ExecutionId, selectedLabel);
 
         await dispatcher.PublishAsync(new StepCompletedMessage(
-            message.ExecutionId, message.StepId, message.OrganizationId, output), ct);
+            message.ExecutionId, message.StepId, message.TeamAccountId, output), ct);
     }
 
     private static HashSet<Guid> GetReachable(Guid startId, IReadOnlyList<ConditionTransition> transitions)

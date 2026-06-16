@@ -1,8 +1,0 @@
-{
-  "namespace": "axis.identity.events",
-  "type": "record",
-  "name": "OrganizationVerifiedEvent",
-  "fields": [
-    { "name": "organizationId", "type": "string" }
-  ]
-}

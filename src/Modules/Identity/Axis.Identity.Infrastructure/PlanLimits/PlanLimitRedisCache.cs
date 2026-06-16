@@ -19,7 +19,7 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
         """;
 
     public async Task<long?> TryGetCachedUsageAsync(
-        Guid organizationId,
+        Guid teamAccountId,
         PlanLimitResourceType resourceType,
         CancellationToken cancellationToken)
     {
@@ -27,7 +27,7 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
         try
         {
             IDatabase db = redis.GetDatabase();
-            RedisValue value = await db.StringGetAsync(BuildKey(organizationId, resourceType));
+            RedisValue value = await db.StringGetAsync(BuildKey(teamAccountId, resourceType));
             if (!value.HasValue)
                 return null;
 
@@ -40,7 +40,7 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
     }
 
     public async Task<bool> TrySetCachedUsageAsync(
-        Guid organizationId,
+        Guid teamAccountId,
         PlanLimitResourceType resourceType,
         long usage,
         CancellationToken cancellationToken)
@@ -49,7 +49,7 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
         try
         {
             IDatabase db = redis.GetDatabase();
-            RedisKey key = BuildKey(organizationId, resourceType);
+            RedisKey key = BuildKey(teamAccountId, resourceType);
             return await db.StringSetAsync(key, usage, GetExpiry(resourceType));
         }
         catch (RedisException)
@@ -59,7 +59,7 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
     }
 
     public async Task<bool> TryAdjustUsageAsync(
-        Guid organizationId,
+        Guid teamAccountId,
         PlanLimitResourceType resourceType,
         int delta,
         CancellationToken cancellationToken)
@@ -68,7 +68,7 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
         try
         {
             IDatabase db = redis.GetDatabase();
-            string key = BuildKey(organizationId, resourceType);
+            string key = BuildKey(teamAccountId, resourceType);
             if (delta >= 0)
             {
                 long count = await db.StringIncrementAsync(key, delta);
@@ -88,7 +88,7 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
         }
     }
 
-    public async Task TryInvalidateOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
+    public async Task TryInvalidateTeamAccountAsync(Guid teamAccountId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         try
@@ -96,9 +96,9 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
             IDatabase db = redis.GetDatabase();
             await db.KeyDeleteAsync(
             [
-                BuildKey(organizationId, PlanLimitResourceType.Workflows),
-                BuildKey(organizationId, PlanLimitResourceType.Users),
-                BuildKey(organizationId, PlanLimitResourceType.ExecutionsPerMonth),
+                BuildKey(teamAccountId, PlanLimitResourceType.Workflows),
+                BuildKey(teamAccountId, PlanLimitResourceType.Users),
+                BuildKey(teamAccountId, PlanLimitResourceType.ExecutionsPerMonth),
             ]);
         }
         catch (RedisException)
@@ -107,14 +107,14 @@ public sealed class PlanLimitRedisCache(IConnectionMultiplexer redis)
         }
     }
 
-    private static string BuildKey(Guid organizationId, PlanLimitResourceType resourceType) =>
+    private static string BuildKey(Guid teamAccountId, PlanLimitResourceType resourceType) =>
         resourceType switch
         {
-            PlanLimitResourceType.Workflows => $"plan:{organizationId:N}:workflows",
-            PlanLimitResourceType.Users => $"plan:{organizationId:N}:users",
+            PlanLimitResourceType.Workflows => $"plan:{teamAccountId:N}:workflows",
+            PlanLimitResourceType.Users => $"plan:{teamAccountId:N}:users",
             PlanLimitResourceType.ExecutionsPerMonth =>
-                $"plan:{organizationId:N}:executions:{DateTime.UtcNow:yyyyMM}",
-            _ => $"plan:{organizationId:N}:{resourceType}",
+                $"plan:{teamAccountId:N}:executions:{DateTime.UtcNow:yyyyMM}",
+            _ => $"plan:{teamAccountId:N}:{resourceType}",
         };
 
     private static TimeSpan GetExpiry(PlanLimitResourceType resourceType)

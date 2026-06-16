@@ -12,7 +12,7 @@ namespace Axis.DataModeling.Application.Tests.Queries;
 public class GetModelHandlerTests
 {
     private readonly IDataModelRepository _modelRepo = Substitute.For<IDataModelRepository>();
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TeamAccountId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     private GetModelHandler CreateHandler() => new(_modelRepo);
@@ -20,11 +20,11 @@ public class GetModelHandlerTests
     [Fact]
     public async Task GetModel_WhenModelExists_ReturnsModelDetailWithAllFields()
     {
-        DataModel model = DataModel.Create("Invoice", "desc", null, null, OrgId, UserId);
+        DataModel model = DataModel.Create("Invoice", "desc", null, null, TeamAccountId, UserId);
         model.AddField("amount", "Amount", FieldType.Number, true, new NumberFieldConfig(Min: 0));
-        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
+        _modelRepo.GetByIdAsync(model.Id, TeamAccountId).Returns(model);
 
-        Result<ModelDetailDto> result = await CreateHandler().Handle(new GetModelQuery(model.Id, OrgId), CancellationToken.None);
+        Result<ModelDetailDto> result = await CreateHandler().Handle(new GetModelQuery(model.Id, TeamAccountId), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Name.Should().Be("Invoice");
@@ -36,10 +36,10 @@ public class GetModelHandlerTests
     [Fact]
     public async Task GetModel_WhenModelDoesNotExist_ReturnsNotFound()
     {
-        _modelRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).Returns((DataModel?)null);
+        _modelRepo.GetByIdAsync(Arg.Any<Guid>(), TeamAccountId).Returns((DataModel?)null);
 
         Result<ModelDetailDto> result = await CreateHandler().Handle(
-            new GetModelQuery(Guid.NewGuid(), OrgId), CancellationToken.None);
+            new GetModelQuery(Guid.NewGuid(), TeamAccountId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);

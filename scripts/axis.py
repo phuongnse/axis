@@ -1120,8 +1120,8 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
         [
             ("OpenApiDocument_WhenGeneratedFromRunningApi_MatchesCommittedSnapshot", "OpenAPI snapshot test exists"),
             ("openapi.json drifted from the API", "OpenAPI test fails on committed contract drift"),
-            ('fresh.Should().Contain("\\"orgName\\"");', "OpenAPI test asserts camelCase wire shape"),
-            ('fresh.Should().NotContain("\\"org_name\\"");', "OpenAPI test rejects snake_case wire drift"),
+            ('fresh.Should().Contain("\\"teamAccountName\\"");', "OpenAPI test asserts camelCase wire shape"),
+            ('fresh.Should().NotContain("\\"team_account_name\\"");', "OpenAPI test rejects snake_case wire drift"),
         ],
     ),
     (

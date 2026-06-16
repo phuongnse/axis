@@ -39,7 +39,7 @@ public sealed class RegisterUserCommandValidator : AbstractValidator<RegisterUse
         RuleFor(x => x.PasswordConfirmation)
             .Equal(x => x.Password).WithMessage("Password confirmation must match password.");
 
-        RuleFor(x => x.OrganizationSetupToken)
+        RuleFor(x => x.TeamAccountSetupToken)
             .MaximumLength(512);
     }
 }

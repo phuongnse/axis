@@ -11,7 +11,7 @@ namespace Axis.FormBuilder.Application.Tests.Queries;
 
 public class GetFormByIdHandlerTests
 {
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TeamAccountId = Guid.NewGuid();
     private readonly IFormRepository _repo = Substitute.For<IFormRepository>();
     private readonly IFormModelReferenceRepository _formModelReferenceRepo = Substitute.For<IFormModelReferenceRepository>();
     private readonly GetFormByIdHandler _handler;
@@ -26,12 +26,12 @@ public class GetFormByIdHandlerTests
     [Fact]
     public async Task Handle_WhenFormExists_ReturnsDetailDto()
     {
-        FormDefinition form = FormDefinition.Create("Employee Intake", "desc", OrgId, "user");
+        FormDefinition form = FormDefinition.Create("Employee Intake", "desc", TeamAccountId, "user");
         form.AddField("first_name", "First Name", FormFieldType.Text, true, null);
-        _repo.GetByIdAsync(form.Id, OrgId, Arg.Any<CancellationToken>()).Returns(form);
+        _repo.GetByIdAsync(form.Id, TeamAccountId, Arg.Any<CancellationToken>()).Returns(form);
 
         FormDetailDto? dto = await _handler.Handle(
-            new GetFormByIdQuery(form.Id, OrgId), CancellationToken.None);
+            new GetFormByIdQuery(form.Id, TeamAccountId), CancellationToken.None);
 
         dto.Should().NotBeNull();
         dto!.Id.Should().Be(form.Id);
@@ -48,11 +48,11 @@ public class GetFormByIdHandlerTests
     [Fact]
     public async Task Handle_WhenFormNotFound_ReturnsNull()
     {
-        _repo.GetByIdAsync(Arg.Any<Guid>(), OrgId, Arg.Any<CancellationToken>())
+        _repo.GetByIdAsync(Arg.Any<Guid>(), TeamAccountId, Arg.Any<CancellationToken>())
             .Returns((FormDefinition?)null);
 
         FormDetailDto? dto = await _handler.Handle(
-            new GetFormByIdQuery(Guid.NewGuid(), OrgId), CancellationToken.None);
+            new GetFormByIdQuery(Guid.NewGuid(), TeamAccountId), CancellationToken.None);
 
         dto.Should().BeNull();
     }
@@ -60,24 +60,24 @@ public class GetFormByIdHandlerTests
     [Fact]
     public async Task Handle_WhenFormHasNoFields_ReturnsEmptyFieldList()
     {
-        FormDefinition form = FormDefinition.Create("Empty Form", null, OrgId, "user");
-        _repo.GetByIdAsync(form.Id, OrgId, Arg.Any<CancellationToken>()).Returns(form);
+        FormDefinition form = FormDefinition.Create("Empty Form", null, TeamAccountId, "user");
+        _repo.GetByIdAsync(form.Id, TeamAccountId, Arg.Any<CancellationToken>()).Returns(form);
 
         FormDetailDto? dto = await _handler.Handle(
-            new GetFormByIdQuery(form.Id, OrgId), CancellationToken.None);
+            new GetFormByIdQuery(form.Id, TeamAccountId), CancellationToken.None);
 
         dto!.Fields.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task Handle_WhenFormBelongsToAnotherOrg_ReturnsNull()
+    public async Task Handle_WhenFormBelongsToAnotherTeamAccount_ReturnsNull()
     {
-        FormDefinition form = FormDefinition.Create("Employee Intake", null, OrgId, "user");
-        _repo.GetByIdAsync(form.Id, OrgId, Arg.Any<CancellationToken>()).Returns(form);
+        FormDefinition form = FormDefinition.Create("Employee Intake", null, TeamAccountId, "user");
+        _repo.GetByIdAsync(form.Id, TeamAccountId, Arg.Any<CancellationToken>()).Returns(form);
 
-        Guid otherOrgId = Guid.NewGuid();
+        Guid otherTeamAccountId = Guid.NewGuid();
         FormDetailDto? dto = await _handler.Handle(
-            new GetFormByIdQuery(form.Id, otherOrgId), CancellationToken.None);
+            new GetFormByIdQuery(form.Id, otherTeamAccountId), CancellationToken.None);
 
         dto.Should().BeNull();
     }
@@ -85,19 +85,19 @@ public class GetFormByIdHandlerTests
     [Fact]
     public async Task Handle_WhenFieldIsBroken_MarksDtoAsBroken()
     {
-        FormDefinition form = FormDefinition.Create("My Form", null, OrgId, "user");
+        FormDefinition form = FormDefinition.Create("My Form", null, TeamAccountId, "user");
         FormField field = form.AddField(
             "company",
             "Company",
             FormFieldType.RelationPicker,
             false,
             new RelationPickerFieldConfig(Guid.NewGuid()));
-        _repo.GetByIdAsync(form.Id, OrgId, Arg.Any<CancellationToken>()).Returns(form);
+        _repo.GetByIdAsync(form.Id, TeamAccountId, Arg.Any<CancellationToken>()).Returns(form);
         _formModelReferenceRepo.GetBrokenFieldIdsForFormAsync(form.Id, Arg.Any<CancellationToken>())
             .Returns(new HashSet<Guid> { field.Id });
 
         FormDetailDto? dto = await _handler.Handle(
-            new GetFormByIdQuery(form.Id, OrgId), CancellationToken.None);
+            new GetFormByIdQuery(form.Id, TeamAccountId), CancellationToken.None);
 
         dto!.Fields.Should().ContainSingle();
         dto.Fields[0].IsBroken.Should().BeTrue();

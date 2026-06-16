@@ -17,10 +17,10 @@ namespace axis.workflowbuilder.events
 	public partial class WorkflowArchivedEvent : global::Avro.Specific.ISpecificRecord
 	{
 		public static global::Avro.Schema _SCHEMA = global::Avro.Schema.Parse("{\"type\":\"record\",\"name\":\"WorkflowArchivedEvent\",\"namespace\":\"axis.workflowbuilder" +
-				".events\",\"fields\":[{\"name\":\"workflowId\",\"type\":\"string\"},{\"name\":\"organizationId" +
+				".events\",\"fields\":[{\"name\":\"workflowId\",\"type\":\"string\"},{\"name\":\"teamAccountId" +
 				"\",\"type\":\"string\"}]}");
 		private string _workflowId;
-		private string _organizationId;
+		private string _teamAccountId;
 		public virtual global::Avro.Schema Schema
 		{
 			get
@@ -39,15 +39,15 @@ namespace axis.workflowbuilder.events
 				this._workflowId = value;
 			}
 		}
-		public string organizationId
+		public string teamAccountId
 		{
 			get
 			{
-				return this._organizationId;
+				return this._teamAccountId;
 			}
 			set
 			{
-				this._organizationId = value;
+				this._teamAccountId = value;
 			}
 		}
 		public virtual object Get(int fieldPos)
@@ -55,7 +55,7 @@ namespace axis.workflowbuilder.events
 			switch (fieldPos)
 			{
 			case 0: return this.workflowId;
-			case 1: return this.organizationId;
+			case 1: return this.teamAccountId;
 			default: throw new global::Avro.AvroRuntimeException("Bad index " + fieldPos + " in Get()");
 			};
 		}
@@ -64,7 +64,7 @@ namespace axis.workflowbuilder.events
 			switch (fieldPos)
 			{
 			case 0: this.workflowId = (System.String)fieldValue; break;
-			case 1: this.organizationId = (System.String)fieldValue; break;
+			case 1: this.teamAccountId = (System.String)fieldValue; break;
 			default: throw new global::Avro.AvroRuntimeException("Bad index " + fieldPos + " in Put()");
 			};
 		}

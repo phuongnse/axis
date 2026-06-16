@@ -11,7 +11,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List all data models for the organization */
+        /** List all data models for the team account */
         get: operations["GetModels"];
         put?: never;
         /** Create a new data model */
@@ -100,7 +100,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List all data classes for the organization */
+        /** List all data classes for the team account */
         get: operations["GetDataClasses"];
         put?: never;
         /** Create a new data class */
@@ -242,7 +242,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List all forms for the organization (paginated) */
+        /** List all forms for the team account (paginated) */
         get: operations["GetForms"];
         put?: never;
         /** Create a new form definition */
@@ -544,15 +544,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/organizations/slug-preview": {
+    "/api/team-accounts/slug-preview": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Preview organization URL slug from a proposed name */
-        get: operations["GetOrganizationSlugPreview"];
+        /** Preview team account URL slug from a proposed name */
+        get: operations["GetTeamAccountSlugPreview"];
         put?: never;
         post?: never;
         delete?: never;
@@ -561,7 +561,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/organizations": {
+    "/api/team-accounts": {
         parameters: {
             query?: never;
             header?: never;
@@ -570,15 +570,15 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register a new organization contact for verification */
-        post: operations["RegisterOrganization"];
+        /** Register a new team account contact for verification */
+        post: operations["RegisterTeamAccount"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/organizations/me/invitations": {
+    "/api/team-accounts/me/invitations": {
         parameters: {
             query?: never;
             header?: never;
@@ -587,7 +587,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Invite a user to the organization by email */
+        /** Invite a user to the team account by email */
         post: operations["InviteUser"];
         delete?: never;
         options?: never;
@@ -595,15 +595,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/organizations/current/settings": {
+    "/api/team-accounts/current/settings": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get organization settings and usage stats */
-        get: operations["GetOrganizationSettings"];
+        /** Get team account settings and usage stats */
+        get: operations["GetTeamAccountSettings"];
         put?: never;
         post?: never;
         delete?: never;
@@ -612,7 +612,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/organizations/current/profile": {
+    "/api/team-accounts/current/profile": {
         parameters: {
             query?: never;
             header?: never;
@@ -620,8 +620,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Update organization profile (name, timezone, language, logo) */
-        put: operations["UpdateOrganizationProfile"];
+        /** Update team account profile (name, timezone, language, logo) */
+        put: operations["UpdateTeamAccountProfile"];
         post?: never;
         delete?: never;
         options?: never;
@@ -629,7 +629,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/organizations/current/deletion": {
+    "/api/team-accounts/current/deletion": {
         parameters: {
             query?: never;
             header?: never;
@@ -638,10 +638,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Schedule organization for deletion after a 30-day grace period */
-        post: operations["ScheduleOrganizationDeletion"];
-        /** Cancel a scheduled organization deletion */
-        delete: operations["CancelOrganizationDeletion"];
+        /** Schedule team account for deletion after a 30-day grace period */
+        post: operations["ScheduleTeamAccountDeletion"];
+        /** Cancel a scheduled team account deletion */
+        delete: operations["CancelTeamAccountDeletion"];
         options?: never;
         head?: never;
         patch?: never;
@@ -690,7 +690,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register a user account standalone or with an organization setup token */
+        /** Register a user account standalone or with a team account setup token */
         post: operations["RegisterUser"];
         delete?: never;
         options?: never;
@@ -809,7 +809,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List all roles for the organization */
+        /** List all roles for the team account */
         get: operations["GetRoles"];
         put?: never;
         /** Create a new role */
@@ -854,7 +854,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/platform/organizations/{organizationId}/plan": {
+    "/api/platform/team-accounts/{teamAccountId}/plan": {
         parameters: {
             query?: never;
             header?: never;
@@ -862,8 +862,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Platform admin: change an organization's subscription plan */
-        put: operations["ChangeOrganizationPlan"];
+        /** Platform admin: change a team account's subscription plan */
+        put: operations["ChangeTeamAccountPlan"];
         post?: never;
         delete?: never;
         options?: never;
@@ -878,7 +878,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List workflow definitions for the organization (paginated) */
+        /** List workflow definitions for the team account (paginated) */
         get: operations["GetWorkflows"];
         put?: never;
         /** Create a new workflow definition in Draft status */
@@ -1121,7 +1121,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List workflow executions for the organization (paginated) */
+        /** List workflow executions for the team account (paginated) */
         get: operations["GetAllExecutions"];
         put?: never;
         post?: never;
@@ -1298,7 +1298,7 @@ export interface components {
             /** Format: int32 */
             notFound?: number;
         };
-        ChangeOrganizationPlanRequest: {
+        ChangeTeamAccountPlanRequest: {
             /** Format: uuid */
             planId?: string;
         };
@@ -1350,7 +1350,7 @@ export interface components {
             avatarUrl?: string | null;
             isActive?: boolean;
             /** Format: uuid */
-            orgId?: string | null;
+            teamAccountId?: string | null;
             permissions?: string[];
         };
         DataClassDetailDto: {
@@ -1614,9 +1614,9 @@ export interface components {
             attemptCount?: number;
             lastError?: string | null;
         };
-        OrganizationSettingsDto: {
+        TeamAccountSettingsDto: {
             /** Format: uuid */
-            organizationId?: string;
+            teamAccountId?: string;
             name?: string;
             slug?: string;
             logoUrl?: string | null;
@@ -1630,7 +1630,7 @@ export interface components {
             scheduledHardDeleteAt?: string | null;
             usage?: components["schemas"]["UsageStatsDto"];
         };
-        OrganizationSlugPreviewDto: {
+        TeamAccountSlugPreviewDto: {
             slug?: string;
         };
         ProblemDetails: {
@@ -1645,8 +1645,8 @@ export interface components {
         };
         ProvisioningStatusDto: {
             /** Format: uuid */
-            organizationId?: string;
-            organizationStatus?: string;
+            teamAccountId?: string;
+            teamAccountStatus?: string;
             isReady?: boolean;
             modules?: components["schemas"]["ModuleProvisioningStatusDto"][];
         };
@@ -1674,9 +1674,9 @@ export interface components {
             /** Format: int32 */
             totalPages?: number;
         };
-        RegisterOrganizationRequest: {
-            orgName?: string;
-            organizationContactEmail?: string;
+        RegisterTeamAccountRequest: {
+            teamAccountName?: string;
+            teamContactEmail?: string;
             acceptedTermsVersion?: string;
             acceptedPrivacyVersion?: string;
             /** Format: uuid */
@@ -1690,7 +1690,7 @@ export interface components {
             passwordConfirmation?: string;
             acceptedTermsVersion?: string;
             acceptedPrivacyVersion?: string;
-            organizationSetupToken?: string | null;
+            teamAccountSetupToken?: string | null;
         };
         RemoveTransitionRequest: {
             /** Format: uuid */
@@ -1728,7 +1728,7 @@ export interface components {
             isSystem?: boolean;
             permissions?: string[];
         };
-        ScheduleOrganizationDeletionRequest: {
+        ScheduleTeamAccountDeletionRequest: {
             confirmationName?: string;
         };
         StartExecutionRequest: {
@@ -1814,7 +1814,7 @@ export interface components {
             icon?: string | null;
             color?: string | null;
         };
-        UpdateOrganizationProfileRequest: {
+        UpdateTeamAccountProfileRequest: {
             name?: string;
             timeZoneId?: string | null;
             defaultLanguage?: string | null;
@@ -1870,7 +1870,7 @@ export interface components {
         VerifyEmailSessionEstablishedDto: {
             sessionEstablished?: boolean;
             nextStep?: components["schemas"]["VerifyEmailNextStep"];
-            organizationSetupToken?: string | null;
+            teamAccountSetupToken?: string | null;
         };
         WorkflowDetailDto: {
             /** Format: uuid */
@@ -4097,10 +4097,10 @@ export interface operations {
             };
         };
     };
-    GetOrganizationSlugPreview: {
+    GetTeamAccountSlugPreview: {
         parameters: {
             query: {
-                orgName: string;
+                teamAccountName: string;
             };
             header?: never;
             path?: never;
@@ -4114,12 +4114,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OrganizationSlugPreviewDto"];
+                    "application/json": components["schemas"]["TeamAccountSlugPreviewDto"];
                 };
             };
         };
     };
-    RegisterOrganization: {
+    RegisterTeamAccount: {
         parameters: {
             query?: never;
             header?: never;
@@ -4128,7 +4128,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RegisterOrganizationRequest"];
+                "application/json": components["schemas"]["RegisterTeamAccountRequest"];
             };
         };
         responses: {
@@ -4230,7 +4230,7 @@ export interface operations {
             };
         };
     };
-    GetOrganizationSettings: {
+    GetTeamAccountSettings: {
         parameters: {
             query?: never;
             header?: never;
@@ -4245,7 +4245,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OrganizationSettingsDto"];
+                    "application/json": components["schemas"]["TeamAccountSettingsDto"];
                 };
             };
             /** @description Unauthorized */
@@ -4277,7 +4277,7 @@ export interface operations {
             };
         };
     };
-    UpdateOrganizationProfile: {
+    UpdateTeamAccountProfile: {
         parameters: {
             query?: never;
             header?: never;
@@ -4286,7 +4286,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["UpdateOrganizationProfileRequest"];
+                "application/json": components["schemas"]["UpdateTeamAccountProfileRequest"];
             };
         };
         responses: {
@@ -4335,7 +4335,7 @@ export interface operations {
             };
         };
     };
-    ScheduleOrganizationDeletion: {
+    ScheduleTeamAccountDeletion: {
         parameters: {
             query?: never;
             header?: never;
@@ -4344,7 +4344,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ScheduleOrganizationDeletionRequest"];
+                "application/json": components["schemas"]["ScheduleTeamAccountDeletionRequest"];
             };
         };
         responses: {
@@ -4384,7 +4384,7 @@ export interface operations {
             };
         };
     };
-    CancelOrganizationDeletion: {
+    CancelTeamAccountDeletion: {
         parameters: {
             query?: never;
             header?: never;
@@ -5084,18 +5084,18 @@ export interface operations {
             };
         };
     };
-    ChangeOrganizationPlan: {
+    ChangeTeamAccountPlan: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                organizationId: string;
+                teamAccountId: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ChangeOrganizationPlanRequest"];
+                "application/json": components["schemas"]["ChangeTeamAccountPlanRequest"];
             };
         };
         responses: {

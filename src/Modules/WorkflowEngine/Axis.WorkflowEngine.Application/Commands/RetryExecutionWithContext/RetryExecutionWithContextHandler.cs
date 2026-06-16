@@ -14,7 +14,7 @@ public sealed class RetryExecutionWithContextHandler(
     public async Task<Result<Guid>> Handle(RetryExecutionWithContextCommand command, CancellationToken cancellationToken)
     {
         WorkflowExecution? original = await execRepo.GetByIdAsync(
-            command.ExecutionId, command.OrganizationId, cancellationToken);
+            command.ExecutionId, command.TeamAccountId, cancellationToken);
         if (original is null)
             return Result.Failure<Guid>(ErrorCodes.NotFound, "Execution not found.");
 

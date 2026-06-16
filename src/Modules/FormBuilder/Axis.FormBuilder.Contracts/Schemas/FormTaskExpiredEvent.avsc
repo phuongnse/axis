@@ -5,7 +5,7 @@
   "fields": [
     { "name": "formSubmissionId", "type": "string" },
     { "name": "formDefinitionId", "type": "string" },
-    { "name": "organizationId", "type": "string" },
+    { "name": "teamAccountId", "type": "string" },
     { "name": "executionId", "type": "string" },
     { "name": "executionStepId", "type": "string" }
   ]

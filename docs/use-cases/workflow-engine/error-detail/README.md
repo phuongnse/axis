@@ -8,7 +8,7 @@ See the full error details of a failed step so that I can understand what went w
 
 ## Primary actor
 
-- Organization Member with `execution:read`
+- Team account Member with `execution:read`
 
 ## Trigger
 

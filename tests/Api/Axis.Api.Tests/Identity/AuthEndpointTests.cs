@@ -24,7 +24,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     public async Task Register_WhenPayloadIsValid_Returns200()
     {
         HttpResponseMessage resp = await _client.PostAsJsonAsync(
-            "/api/organizations", RegisterPayload("auth_reg1"), Json);
+            "/api/team-accounts", RegisterPayload("auth_reg1"), Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -32,10 +32,10 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task Register_WhenPayloadIsInvalid_Returns400WithErrors()
     {
-        HttpResponseMessage resp = await _client.PostAsJsonAsync("/api/organizations", new
+        HttpResponseMessage resp = await _client.PostAsJsonAsync("/api/team-accounts", new
         {
-            orgName = "A",          // too short
-            organizationContactEmail = "not-an-email",
+            teamAccountName = "A",          // too short
+            teamContactEmail = "not-an-email",
         }, Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);

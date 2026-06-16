@@ -50,7 +50,7 @@ public sealed class SubmitFormByTokenHandler(
                 "This workflow has been cancelled.");
 
         FormDefinition? form = await formRepo.GetByIdAsync(
-            submission.FormDefinitionId, submission.OrganizationId, cancellationToken);
+            submission.FormDefinitionId, submission.TeamAccountId, cancellationToken);
         if (form is null)
             return Result.Failure(ErrorCodes.NotFound, "Form task not found.");
 

@@ -8,7 +8,7 @@ See all workflows so that I can find and manage them.
 
 ## Primary actor
 
-- Organization Member with `workflow:definition:read`
+- Team account Member with `workflow:definition:read`
 
 ## Trigger
 

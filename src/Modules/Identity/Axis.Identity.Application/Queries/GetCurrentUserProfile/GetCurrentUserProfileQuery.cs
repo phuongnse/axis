@@ -2,7 +2,7 @@ using Axis.Shared.Application.CQRS;
 
 namespace Axis.Identity.Application.Queries.GetCurrentUserProfile;
 
-public sealed record GetCurrentUserProfileQuery(Guid UserId, Guid? OrganizationId, IReadOnlyList<string> Permissions)
+public sealed record GetCurrentUserProfileQuery(Guid UserId, Guid? TeamAccountId, IReadOnlyList<string> Permissions)
     : IQuery<CurrentUserProfileDto?>;
 
 public sealed record CurrentUserProfileDto(
@@ -13,5 +13,5 @@ public sealed record CurrentUserProfileDto(
     string FullName,
     string? AvatarUrl,
     bool IsActive,
-    Guid? OrgId,
+    Guid? TeamAccountId,
     IReadOnlyList<string> Permissions);

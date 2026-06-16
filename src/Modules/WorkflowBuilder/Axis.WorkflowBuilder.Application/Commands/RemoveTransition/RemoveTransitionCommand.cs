@@ -4,6 +4,6 @@ namespace Axis.WorkflowBuilder.Application.Commands.RemoveTransition;
 
 public sealed record RemoveTransitionCommand(
     Guid WorkflowId,
-    Guid OrganizationId,
+    Guid TeamAccountId,
     Guid FromStepId,
     Guid ToStepId) : ICommand;

@@ -23,7 +23,7 @@ public class StartExecutionHandlerTests
     private readonly ILogger<StartExecutionHandler> _logger = Substitute.For<ILogger<StartExecutionHandler>>();
     private readonly IPlanLimitService _planLimitService = Substitute.For<IPlanLimitService>();
 
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TeamAccountId = Guid.NewGuid();
     private static readonly Guid WorkflowId = Guid.NewGuid();
     private static readonly Guid UserId = Guid.NewGuid();
 
@@ -35,7 +35,7 @@ public class StartExecutionHandlerTests
     }
 
     private static WorkflowSnapshot MakeSnapshot() => WorkflowSnapshot.Create(
-        WorkflowId, OrgId,
+        WorkflowId, TeamAccountId,
         new List<StepDefinitionSnapshot>
         {
             new() { Id = Guid.NewGuid(), Name = "Start", StepType = StepType.Start, DisplayOrder = 0 },
@@ -47,11 +47,11 @@ public class StartExecutionHandlerTests
     public async Task StartExecution_WhenWorkflowIsActive_InitialisesStepsAndDispatchesNextStep()
     {
         WorkflowSnapshot snapshot = MakeSnapshot();
-        _workflowReader.IsActiveAsync(WorkflowId, OrgId).Returns(true);
-        _workflowReader.GetSnapshotAsync(WorkflowId, OrgId).Returns(snapshot);
+        _workflowReader.IsActiveAsync(WorkflowId, TeamAccountId).Returns(true);
+        _workflowReader.GetSnapshotAsync(WorkflowId, TeamAccountId).Returns(snapshot);
 
         Result<Guid> result = await CreateHandler().Handle(
-            new StartExecutionCommand(WorkflowId, OrgId, TriggerType.Manual, UserId, new Dictionary<string, object?>()),
+            new StartExecutionCommand(WorkflowId, TeamAccountId, TriggerType.Manual, UserId, new Dictionary<string, object?>()),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -64,17 +64,17 @@ public class StartExecutionHandlerTests
             Arg.Any<CancellationToken>());
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
         await _dispatcher.Received(1).PublishAsync(
-            Arg.Is<ExecuteNextStepMessage>(m => m.OrganizationId == OrgId),
+            Arg.Is<ExecuteNextStepMessage>(m => m.TeamAccountId == TeamAccountId),
             Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task StartExecution_WhenWorkflowIsNotActive_ReturnsBusinessRuleFailure()
     {
-        _workflowReader.IsActiveAsync(WorkflowId, OrgId).Returns(false);
+        _workflowReader.IsActiveAsync(WorkflowId, TeamAccountId).Returns(false);
 
         Result<Guid> result = await CreateHandler().Handle(
-            new StartExecutionCommand(WorkflowId, OrgId, TriggerType.Manual, UserId, new Dictionary<string, object?>()),
+            new StartExecutionCommand(WorkflowId, TeamAccountId, TriggerType.Manual, UserId, new Dictionary<string, object?>()),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -86,11 +86,11 @@ public class StartExecutionHandlerTests
     public async Task StartExecution_WhenInputIsNull_DefaultsToEmptyDictionary()
     {
         WorkflowSnapshot snapshot = MakeSnapshot();
-        _workflowReader.IsActiveAsync(WorkflowId, OrgId).Returns(true);
-        _workflowReader.GetSnapshotAsync(WorkflowId, OrgId).Returns(snapshot);
+        _workflowReader.IsActiveAsync(WorkflowId, TeamAccountId).Returns(true);
+        _workflowReader.GetSnapshotAsync(WorkflowId, TeamAccountId).Returns(snapshot);
 
         Result<Guid> result = await CreateHandler().Handle(
-            new StartExecutionCommand(WorkflowId, OrgId, TriggerType.Manual, UserId, null),
+            new StartExecutionCommand(WorkflowId, TeamAccountId, TriggerType.Manual, UserId, null),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -102,11 +102,11 @@ public class StartExecutionHandlerTests
     [Fact]
     public async Task StartExecution_WhenSnapshotNotFound_ReturnsBusinessRuleFailure()
     {
-        _workflowReader.IsActiveAsync(WorkflowId, OrgId).Returns(true);
-        _workflowReader.GetSnapshotAsync(WorkflowId, OrgId).ReturnsNull();
+        _workflowReader.IsActiveAsync(WorkflowId, TeamAccountId).Returns(true);
+        _workflowReader.GetSnapshotAsync(WorkflowId, TeamAccountId).ReturnsNull();
 
         Result<Guid> result = await CreateHandler().Handle(
-            new StartExecutionCommand(WorkflowId, OrgId, TriggerType.Manual, UserId, new Dictionary<string, object?>()),
+            new StartExecutionCommand(WorkflowId, TeamAccountId, TriggerType.Manual, UserId, new Dictionary<string, object?>()),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -124,7 +124,7 @@ public class StartExecutionHandlerTests
             "/pricing",
             "Execution limit reached.");
         _planLimitService.EnsureWithinLimitAsync(
-                OrgId,
+                TeamAccountId,
                 PlanLimitResourceType.ExecutionsPerMonth,
                 1,
                 Arg.Any<CancellationToken>())
@@ -132,7 +132,7 @@ public class StartExecutionHandlerTests
 
         StartExecutionHandler handler = new(_planLimitService, _execRepo, _workflowReader, _uow, _dispatcher, _logger);
         Result<Guid> result = await handler.Handle(
-            new StartExecutionCommand(WorkflowId, OrgId, TriggerType.Manual, UserId, new Dictionary<string, object?>()),
+            new StartExecutionCommand(WorkflowId, TeamAccountId, TriggerType.Manual, UserId, new Dictionary<string, object?>()),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

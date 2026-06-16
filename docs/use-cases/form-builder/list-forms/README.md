@@ -4,15 +4,15 @@
 
 ## Purpose
 
-See all forms in my organization so that I can find existing forms to reuse.
+See all forms in my team account so that I can find existing forms to reuse.
 
 ## Primary actor
 
-- Organization Member with `form:definition:read`
+- Team account Member with `form:definition:read`
 
 ## Trigger
 
-- User initiates: see all forms in my organization
+- User initiates: see all forms in my team account
 
 ## Main flow
 

@@ -8,7 +8,7 @@ Diverged branches to merge back to a single step so that the workflow continues 
 
 ## Primary actor
 
-- Organization Member
+- Team account Member
 
 ## Trigger
 

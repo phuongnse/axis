@@ -8,7 +8,7 @@ Configure validation rules on a field so that data quality is enforced at input 
 
 ## Primary actor
 
-- Organization Member
+- Team account Member
 
 ## Trigger
 

@@ -8,7 +8,7 @@ Add a Notification step so that stakeholders are informed when a workflow reache
 
 ## Primary actor
 
-- Organization Member
+- Team account Member
 
 ## Trigger
 

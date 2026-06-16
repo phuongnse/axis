@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 
 import {
-  canReadOrganizationSettings,
-  getCurrentOrganizationSettings,
+  canReadTeamAccountSettings,
+  getCurrentTeamAccountSettings,
   getCurrentUserProfile,
   workspaceQueryKeys,
 } from '../api';
@@ -14,23 +14,23 @@ export function useCurrentUserProfileQuery() {
   });
 }
 
-export function useCurrentOrganizationSettingsQuery(enabled: boolean) {
+export function useCurrentTeamAccountSettingsQuery(enabled: boolean) {
   return useQuery({
-    queryKey: workspaceQueryKeys.currentOrganizationSettings(),
-    queryFn: getCurrentOrganizationSettings,
+    queryKey: workspaceQueryKeys.currentTeamAccountSettings(),
+    queryFn: getCurrentTeamAccountSettings,
     enabled,
   });
 }
 
 export function useWorkspaceStart() {
   const profileQuery = useCurrentUserProfileQuery();
-  const canReadSettings = canReadOrganizationSettings(profileQuery.data);
-  const organizationSettingsQuery = useCurrentOrganizationSettingsQuery(canReadSettings);
+  const canReadSettings = canReadTeamAccountSettings(profileQuery.data);
+  const teamAccountSettingsQuery = useCurrentTeamAccountSettingsQuery(canReadSettings);
 
   return {
     profileQuery,
-    organizationSettingsQuery,
+    teamAccountSettingsQuery,
     canReadSettings,
-    hasWorkspace: Boolean(profileQuery.data?.orgId),
+    hasWorkspace: Boolean(profileQuery.data?.teamAccountId),
   };
 }

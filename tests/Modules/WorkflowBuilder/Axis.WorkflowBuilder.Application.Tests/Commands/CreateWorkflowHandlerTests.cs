@@ -16,7 +16,7 @@ public class CreateWorkflowHandlerTests
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly IPlanLimitService _planLimitService = Substitute.For<IPlanLimitService>();
 
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TeamAccountId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     private CreateWorkflowHandler CreateHandler()
@@ -30,10 +30,10 @@ public class CreateWorkflowHandlerTests
     [Fact]
     public async Task CreateWorkflow_WhenNameIsUnique_CreatesDraftWorkflowAndReturnsId()
     {
-        _workflowRepo.NameExistsAsync("Invoice Approval", OrgId).Returns(false);
+        _workflowRepo.NameExistsAsync("Invoice Approval", TeamAccountId).Returns(false);
 
         Result<Guid> result = await CreateHandler().Handle(
-            new CreateWorkflowCommand("Invoice Approval", "Approves invoices", OrgId, UserId),
+            new CreateWorkflowCommand("Invoice Approval", "Approves invoices", TeamAccountId, UserId),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -45,12 +45,12 @@ public class CreateWorkflowHandlerTests
                 w.CreatedBy == UserId),
             Arg.Any<CancellationToken>());
         await _planLimitService.Received(1).EnsureWithinLimitAsync(
-            OrgId,
+            TeamAccountId,
             PlanLimitResourceType.Workflows,
             1,
             Arg.Any<CancellationToken>());
         await _planLimitService.Received(1).RecordUsageDeltaAsync(
-            OrgId,
+            TeamAccountId,
             PlanLimitResourceType.Workflows,
             1,
             Arg.Any<CancellationToken>());
@@ -60,10 +60,10 @@ public class CreateWorkflowHandlerTests
     [Fact]
     public async Task CreateWorkflow_WhenNameIsDuplicate_ReturnsConflict()
     {
-        _workflowRepo.NameExistsAsync("Invoice Approval", OrgId).Returns(true);
+        _workflowRepo.NameExistsAsync("Invoice Approval", TeamAccountId).Returns(true);
 
         Result<Guid> result = await CreateHandler().Handle(
-            new CreateWorkflowCommand("Invoice Approval", null, OrgId, UserId),
+            new CreateWorkflowCommand("Invoice Approval", null, TeamAccountId, UserId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

@@ -76,13 +76,13 @@ def iter_kafka_topics() -> list[str]:
     return sorted(set(topics))
 
 
-def modules_with_organization_verified_handler() -> list[str]:
-    """Modules that provision tenant schema on OrganizationVerifiedEvent."""
+def modules_with_team_account_verified_handler() -> list[str]:
+    """Modules that provision tenant schema on TeamAccountVerifiedEvent."""
     found: list[str] = []
     for module in iter_module_names():
         if module == "Identity":
             continue
-        if list(MODULES_DIR.glob(f"{module}/**/OrganizationVerifiedHandler.cs")):
+        if list(MODULES_DIR.glob(f"{module}/**/TeamAccountVerifiedHandler.cs")):
             found.append(module)
     return sorted(found)
 

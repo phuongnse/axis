@@ -6,7 +6,7 @@ namespace Axis.FormBuilder.Application.Commands.AddFieldToForm;
 
 public sealed record AddFieldToFormCommand(
     Guid FormId,
-    Guid OrganizationId,
+    Guid TeamAccountId,
     string Key,
     string Label,
     FormFieldType Type,

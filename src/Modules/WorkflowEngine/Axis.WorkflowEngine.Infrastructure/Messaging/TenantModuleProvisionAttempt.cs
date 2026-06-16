@@ -11,7 +11,7 @@ namespace Axis.WorkflowEngine.Infrastructure.Messaging;
 internal static class TenantModuleProvisionAttempt
 {
     public static async Task RunAsync(
-        Guid organizationId,
+        Guid teamAccountId,
         int attempt,
         IConfiguration configuration,
         IMessageBus messageBus,
@@ -25,13 +25,13 @@ internal static class TenantModuleProvisionAttempt
         {
             await TenantSchemaProvisioner.ProvisionAsync(
                 connectionString,
-                $"axis.tenant.workflowengine:{organizationId:N}",
-                organizationId,
+                $"axis.tenant.workflowengine:{teamAccountId:N}",
+                teamAccountId,
                 ct => TenantSchemaProvisioner.MigrateWithFixedTenantAsync(
                     connectionString,
-                    organizationId,
+                    teamAccountId,
                     (DbContextOptions<WorkflowEngineDbContext> options) =>
-                        new WorkflowEngineDbContext(options, new FixedTenantContext(organizationId)),
+                        new WorkflowEngineDbContext(options, new FixedTenantContext(teamAccountId)),
                     ct),
                 logger,
                 TenantModuleNames.WorkflowEngine,
@@ -40,7 +40,7 @@ internal static class TenantModuleProvisionAttempt
             cancellationToken.ThrowIfCancellationRequested();
             await messageBus.PublishAsync(
                 TenantModuleProvisionReportEventFactory.Create(
-                    organizationId, TenantModuleNames.WorkflowEngine, succeeded: true, attempt));
+                    teamAccountId, TenantModuleNames.WorkflowEngine, succeeded: true, attempt));
         }
         catch (Exception ex)
         {
@@ -52,7 +52,7 @@ internal static class TenantModuleProvisionAttempt
             cancellationToken.ThrowIfCancellationRequested();
             await messageBus.PublishAsync(
                 TenantModuleProvisionReportEventFactory.Create(
-                    organizationId,
+                    teamAccountId,
                     TenantModuleNames.WorkflowEngine,
                     succeeded: false,
                     attempt,

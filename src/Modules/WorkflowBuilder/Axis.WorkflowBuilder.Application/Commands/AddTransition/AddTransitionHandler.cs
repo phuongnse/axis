@@ -12,7 +12,7 @@ public sealed class AddTransitionHandler(IWorkflowRepository workflowRepo, IUnit
     public async Task<Result> Handle(AddTransitionCommand command, CancellationToken cancellationToken)
     {
         WorkflowDefinition? workflow = await workflowRepo.GetByIdAsync(
-            command.WorkflowId, command.OrganizationId, cancellationToken);
+            command.WorkflowId, command.TeamAccountId, cancellationToken);
 
         if (workflow is null)
             return Result.Failure(ErrorCodes.NotFound, "Workflow not found.");

@@ -17,9 +17,9 @@ internal sealed class FormModelReferenceRepository(FormBuilderDbContext context)
 
     public async Task<int> CountActiveReferencesToModelAsync(
         Guid modelId,
-        Guid organizationId,
+        Guid teamAccountId,
         CancellationToken ct = default)
         => await context.FormModelReferences
-            .Where(r => r.ModelId == modelId && r.OrganizationId == organizationId && !r.IsBroken)
+            .Where(r => r.ModelId == modelId && r.TeamAccountId == teamAccountId && !r.IsBroken)
             .CountAsync(ct);
 }

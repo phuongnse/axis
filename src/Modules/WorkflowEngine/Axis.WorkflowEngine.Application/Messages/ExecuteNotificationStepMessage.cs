@@ -6,6 +6,6 @@ namespace Axis.WorkflowEngine.Application.Messages;
 public sealed record ExecuteNotificationStepMessage(
     Guid ExecutionId,
     Guid StepId,
-    Guid OrganizationId,
+    Guid TeamAccountId,
     IReadOnlyDictionary<string, object?>? StepConfig,
     IReadOnlyDictionary<string, object?> Context);

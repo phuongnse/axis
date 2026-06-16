@@ -8,7 +8,7 @@
       "type": "string"
     },
     {
-      "name": "organizationId",
+      "name": "teamAccountId",
       "type": "string"
     },
     {

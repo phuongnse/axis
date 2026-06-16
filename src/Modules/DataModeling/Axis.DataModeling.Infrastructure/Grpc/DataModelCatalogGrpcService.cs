@@ -13,7 +13,7 @@ internal sealed class DataModelCatalogGrpcService(IDataModelRepository dataModel
         GetModelSummaryRequest request,
         ServerCallContext context)
     {
-        Guid organizationId = ResolveCallerOrganizationId(context);
+        Guid teamAccountId = ResolveCallerTeamAccountId(context);
 
         if (!Guid.TryParse(request.ModelId, out Guid modelId))
         {
@@ -23,7 +23,7 @@ internal sealed class DataModelCatalogGrpcService(IDataModelRepository dataModel
 
         DataModel? model = await dataModelRepository.GetByIdAsync(
             modelId,
-            organizationId,
+            teamAccountId,
             context.CancellationToken);
 
         return new GetModelSummaryResponse
@@ -33,15 +33,15 @@ internal sealed class DataModelCatalogGrpcService(IDataModelRepository dataModel
         };
     }
 
-    private static Guid ResolveCallerOrganizationId(ServerCallContext context)
+    private static Guid ResolveCallerTeamAccountId(ServerCallContext context)
     {
-        Claim? claim = context.GetHttpContext().User.FindFirst("org_id");
-        if (claim is null || !Guid.TryParse(claim.Value, out Guid organizationId))
+        Claim? claim = context.GetHttpContext().User.FindFirst("team_account_id");
+        if (claim is null || !Guid.TryParse(claim.Value, out Guid teamAccountId))
         {
             throw new RpcException(
-                new Status(StatusCode.Unauthenticated, "Caller JWT is missing a valid org_id claim."));
+                new Status(StatusCode.Unauthenticated, "Caller JWT is missing a valid team_account_id claim."));
         }
 
-        return organizationId;
+        return teamAccountId;
     }
 }

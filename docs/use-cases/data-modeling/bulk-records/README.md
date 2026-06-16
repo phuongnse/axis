@@ -8,7 +8,7 @@ Select multiple records and perform bulk actions so that I can manage large data
 
 ## Primary actor
 
-- Organization Member
+- Team account Member
 
 ## Trigger
 

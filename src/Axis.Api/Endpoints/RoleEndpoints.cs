@@ -20,7 +20,7 @@ public static class RoleEndpoints
         group.MapGet("/", GetRoles)
             .RequireAuthorization(Permissions.Roles.Read)
             .WithName("GetRoles")
-            .WithSummary("List all roles for the organization")
+            .WithSummary("List all roles for the team account")
             .WithTags("Identity")
             .Produces<IReadOnlyList<RoleDto>>()
             .ProducesProblem(401)
@@ -58,7 +58,7 @@ public static class RoleEndpoints
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        PagedResult<RoleDto> result = await mediator.Send(new GetRolesQuery(currentUser.OrgId, page, pageSize), ct);
+        PagedResult<RoleDto> result = await mediator.Send(new GetRolesQuery(currentUser.TeamAccountId, page, pageSize), ct);
         return Results.Ok(result);
     }
 
@@ -69,7 +69,7 @@ public static class RoleEndpoints
         CancellationToken ct)
     {
         Result<Guid> result = await mediator.Send(new CreateRoleCommand(
-            currentUser.OrgId,
+            currentUser.TeamAccountId,
             request.Name,
             request.Description,
             request.Permissions), ct);
@@ -87,7 +87,7 @@ public static class RoleEndpoints
     {
         Result result = await mediator.Send(new UpdateRoleCommand(
             roleId,
-            currentUser.OrgId,
+            currentUser.TeamAccountId,
             request.Name,
             request.Description,
             request.Permissions), ct);

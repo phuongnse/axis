@@ -25,15 +25,15 @@ internal sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
             .HasColumnName("is_system")
             .IsRequired();
 
-        builder.Property(r => r.OrganizationId)
-            .HasColumnName("organization_id")
+        builder.Property(r => r.TeamAccountId)
+            .HasColumnName("team_account_id")
             .IsRequired();
 
         builder.Property(r => r.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
 
-        builder.HasIndex(r => new { r.OrganizationId, r.Name }).IsUnique();
+        builder.HasIndex(r => new { r.TeamAccountId, r.Name }).IsUnique();
 
         // Map private backing field _permissions as a text[] column
         builder.PrimitiveCollection<List<string>>("_permissions")

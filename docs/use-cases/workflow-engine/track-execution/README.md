@@ -8,7 +8,7 @@ See the live status of a running execution so that I know where it is in the pro
 
 ## Primary actor
 
-- Organization Member
+- Team account Member
 
 ## Trigger
 

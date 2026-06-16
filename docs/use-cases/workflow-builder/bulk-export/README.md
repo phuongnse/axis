@@ -8,7 +8,7 @@ Export all workflows as a ZIP archive so that I have a complete backup.
 
 ## Primary actor
 
-- Organization Admin
+- Team account Admin
 
 ## Trigger
 
@@ -26,20 +26,20 @@ Export all workflows as a ZIP archive so that I have a complete backup.
 
 ## Context
 
-Workflow definitions can be exported as portable JSON files and imported into any Axis organization, enabling template sharing, backups, and environment migration.
+Workflow definitions can be exported as portable JSON files and imported into any Axis team account, enabling template sharing, backups, and environment migration.
 
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] "Export all" option on the workflows list triggers a download of a ZIP named `{org-slug}-workflows-{date}.zip`.
+- [ ] "Export all" option on the workflows list triggers a download of a ZIP named `{team account-slug}-workflows-{date}.zip`.
 - [ ] ZIP contains one JSON file per workflow.
-- [ ] For orgs with many workflows (> 20), the ZIP is generated asynchronously and the user receives an in-app notification with a download link when ready (link valid for 24 hours).
+- [ ] For team accounts with many workflows (> 20), the ZIP is generated asynchronously and the user receives an in-app notification with a download link when ready (link valid for 24 hours).
 
 *Validation & errors*
 - [ ] If the ZIP generation fails, the user receives an error notification and can retry.
 
 *Edge cases*
-- [ ] An org with 0 workflows: export downloads an empty ZIP with a README.txt explaining the format.
+- [ ] A team account with 0 workflows: export downloads an empty ZIP with a README.txt explaining the format.
 
 *Out of scope*
 - Scheduled automatic backups.
@@ -55,8 +55,8 @@ Workflow definitions can be exported as portable JSON files and imported into an
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:**
-> - async notification for large exports (> 20 workflows) and org-slug prefix in ZIP filename pending API
-> - empty-org README.txt and file-picker UI pending Frontend.
+> - async notification for large exports (> 20 workflows) and team account-slug prefix in ZIP filename pending API
+> - empty-team account README.txt and file-picker UI pending Frontend.
 
 ## Wireframes
 

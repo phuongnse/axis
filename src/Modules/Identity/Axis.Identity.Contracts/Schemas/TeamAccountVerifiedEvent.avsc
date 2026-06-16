@@ -1,0 +1,8 @@
+{
+  "namespace": "axis.identity.events",
+  "type": "record",
+  "name": "TeamAccountVerifiedEvent",
+  "fields": [
+    { "name": "teamAccountId", "type": "string" }
+  ]
+}

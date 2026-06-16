@@ -15,7 +15,7 @@ public class UpdateFieldHandlerTests
 {
     private readonly IDataModelRepository _modelRepo = Substitute.For<IDataModelRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TeamAccountId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     private UpdateFieldHandler CreateHandler() => new(_modelRepo, _uow);
@@ -23,12 +23,12 @@ public class UpdateFieldHandlerTests
     [Fact]
     public async Task UpdateField_WhenFieldExists_UpdatesLabelAndSaves()
     {
-        DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
+        DataModel model = DataModel.Create("My Model", null, null, null, TeamAccountId, UserId);
         FieldDefinition field = model.AddField("price", "Price", FieldType.Number, false, new NumberFieldConfig());
-        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
+        _modelRepo.GetByIdAsync(model.Id, TeamAccountId).Returns(model);
 
         Result result = await CreateHandler().Handle(
-            new UpdateFieldCommand(model.Id, field.Id, OrgId, "Unit Price", "help", true, new NumberFieldConfig(Min: 0)),
+            new UpdateFieldCommand(model.Id, field.Id, TeamAccountId, "Unit Price", "help", true, new NumberFieldConfig(Min: 0)),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -41,10 +41,10 @@ public class UpdateFieldHandlerTests
     [Fact]
     public async Task UpdateField_WhenModelNotFound_ReturnsNotFound()
     {
-        _modelRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).Returns((DataModel?)null);
+        _modelRepo.GetByIdAsync(Arg.Any<Guid>(), TeamAccountId).Returns((DataModel?)null);
 
         Result result = await CreateHandler().Handle(
-            new UpdateFieldCommand(Guid.NewGuid(), Guid.NewGuid(), OrgId, "L", null, false, new TextFieldConfig()),
+            new UpdateFieldCommand(Guid.NewGuid(), Guid.NewGuid(), TeamAccountId, "L", null, false, new TextFieldConfig()),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -53,32 +53,32 @@ public class UpdateFieldHandlerTests
     }
 
     [Fact]
-    public async Task UpdateField_WhenModelBelongsToAnotherOrg_ReturnsNotFound()
+    public async Task UpdateField_WhenModelBelongsToAnotherTeamAccount_ReturnsNotFound()
     {
-        DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
+        DataModel model = DataModel.Create("My Model", null, null, null, TeamAccountId, UserId);
         FieldDefinition field = model.AddField("price", "Price", FieldType.Number, false, new NumberFieldConfig());
-        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
+        _modelRepo.GetByIdAsync(model.Id, TeamAccountId).Returns(model);
 
-        Guid otherOrgId = Guid.NewGuid();
+        Guid otherTeamAccountId = Guid.NewGuid();
         Result result = await CreateHandler().Handle(
-            new UpdateFieldCommand(model.Id, field.Id, otherOrgId, "New Label", null, false, new NumberFieldConfig()),
+            new UpdateFieldCommand(model.Id, field.Id, otherTeamAccountId, "New Label", null, false, new NumberFieldConfig()),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-        await _modelRepo.Received(1).GetByIdAsync(model.Id, otherOrgId);
+        await _modelRepo.Received(1).GetByIdAsync(model.Id, otherTeamAccountId);
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task UpdateField_WhenFieldIsSystem_ReturnsBusinessRuleFailure()
     {
-        DataModel model = DataModel.Create("My Model", null, null, null, OrgId, UserId);
+        DataModel model = DataModel.Create("My Model", null, null, null, TeamAccountId, UserId);
         FieldDefinition systemField = model.Fields.First(f => f.IsSystem);
-        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
+        _modelRepo.GetByIdAsync(model.Id, TeamAccountId).Returns(model);
 
         Result result = await CreateHandler().Handle(
-            new UpdateFieldCommand(model.Id, systemField.Id, OrgId, "Bad", null, false, new TextFieldConfig()),
+            new UpdateFieldCommand(model.Id, systemField.Id, TeamAccountId, "Bad", null, false, new TextFieldConfig()),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

@@ -10,10 +10,10 @@ namespace Axis.Identity.Application.Commands.VerifyEmail;
 
 public sealed class VerifyEmailHandler(
     IEmailVerificationTokenStore tokenStore,
-    IOrganizationRegistrationTokenStore organizationTokenStore,
+    ITeamAccountRegistrationTokenStore teamAccountTokenStore,
     IUserRepository userRepo,
-    IOrganizationMembershipRepository membershipRepo,
-    IOrganizationRepository organizationRepo,
+    ITeamAccountMembershipRepository membershipRepo,
+    ITeamAccountRepository teamAccountRepo,
     ITenantModuleProvisioningRepository provisioningRepo,
     IRoleRepository roleRepo,
     IUnitOfWork uow)
@@ -35,7 +35,7 @@ public sealed class VerifyEmailHandler(
         return resolved.State switch
         {
             EmailVerificationTokenState.NotFound =>
-                await VerifyOrganizationContactAsync(tokenHash, cancellationToken),
+                await VerifyTeamAccountContactAsync(tokenHash, cancellationToken),
             EmailVerificationTokenState.Expired =>
                 Result.Failure<VerifyEmailSuccessDto>(
                     ErrorCodes.BusinessRule,
@@ -51,45 +51,45 @@ public sealed class VerifyEmailHandler(
         };
     }
 
-    private async Task<Result<VerifyEmailSuccessDto>> VerifyOrganizationContactAsync(
+    private async Task<Result<VerifyEmailSuccessDto>> VerifyTeamAccountContactAsync(
         string tokenHash,
         CancellationToken cancellationToken)
     {
         Result<Guid> resolved =
-            await organizationTokenStore.ResolveVerificationAsync(tokenHash, cancellationToken);
+            await teamAccountTokenStore.ResolveVerificationAsync(tokenHash, cancellationToken);
 
         return resolved.IsFailure
             ? Result.Failure<VerifyEmailSuccessDto>(
                 resolved.ErrorCode ?? ErrorCodes.BusinessRule,
                 resolved.Error)
-            : await VerifyOrganizationAsync(resolved.Value, cancellationToken);
+            : await VerifyTeamAccountAsync(resolved.Value, cancellationToken);
     }
 
-    private async Task<Result<VerifyEmailSuccessDto>> VerifyOrganizationAsync(
-        Guid organizationId,
+    private async Task<Result<VerifyEmailSuccessDto>> VerifyTeamAccountAsync(
+        Guid teamAccountId,
         CancellationToken cancellationToken)
     {
-        Organization? organization = await organizationRepo.GetByIdAsync(organizationId, cancellationToken);
-        if (organization is null)
+        TeamAccount? teamAccount = await teamAccountRepo.GetByIdAsync(teamAccountId, cancellationToken);
+        if (teamAccount is null)
             return Result.Failure<VerifyEmailSuccessDto>(ErrorCodes.BusinessRule, "Invalid verification link.");
 
-        if (organization.Status != OrganizationStatus.PendingVerification)
+        if (teamAccount.Status != TeamAccountStatus.PendingVerification)
         {
             return Result.Failure<VerifyEmailSuccessDto>(
                 ErrorCodes.BusinessRule,
                 "This link has already been used. Please sign in.");
         }
 
-        organization.BeginProvisioningAfterContactVerification();
+        teamAccount.BeginProvisioningAfterContactVerification();
 
         List<TenantModuleProvisioning> pendingModules = TenantModuleNames.All
-            .Select(module => TenantModuleProvisioning.CreatePending(organization.Id, module))
+            .Select(module => TenantModuleProvisioning.CreatePending(teamAccount.Id, module))
             .ToList();
         await provisioningRepo.AddRangeAsync(pendingModules, cancellationToken);
 
         (string rawSetupToken, string setupTokenHash) = OpaqueTokenGenerator.Create();
-        await organizationTokenStore.CreateFirstUserSetupAsync(
-            organization.Id,
+        await teamAccountTokenStore.CreateFirstUserSetupAsync(
+            teamAccount.Id,
             setupTokenHash,
             DateTime.UtcNow.Add(FirstUserSetupTokenLifetime),
             cancellationToken);
@@ -98,9 +98,9 @@ public sealed class VerifyEmailHandler(
 
         return Result.Success(new VerifyEmailSuccessDto(
             null,
-            organization.Id,
-            organization.OwnerEmail.Value,
-            organization.Name,
+            teamAccount.Id,
+            teamAccount.OwnerEmail.Value,
+            teamAccount.Name,
             [],
             VerifyEmailNextStep.RegisterUser,
             rawSetupToken));
@@ -121,7 +121,7 @@ public sealed class VerifyEmailHandler(
                 "This link has already been used. Please sign in.");
         }
 
-        OrganizationMembership? membership =
+        TeamAccountMembership? membership =
             await membershipRepo.GetFirstActiveByUserIdAsync(user.Id, cancellationToken);
         if (membership is null)
         {
@@ -137,27 +137,27 @@ public sealed class VerifyEmailHandler(
                 VerifyEmailNextStep.Dashboard));
         }
 
-        Organization? organization = await organizationRepo.GetByIdAsync(membership.OrganizationId, cancellationToken);
-        if (organization is null)
+        TeamAccount? teamAccount = await teamAccountRepo.GetByIdAsync(membership.TeamAccountId, cancellationToken);
+        if (teamAccount is null)
             return Result.Failure<VerifyEmailSuccessDto>(ErrorCodes.BusinessRule, "Invalid verification link.");
 
-        if (organization.Status == OrganizationStatus.PendingVerification)
+        if (teamAccount.Status == TeamAccountStatus.PendingVerification)
         {
-            organization.BeginProvisioningAfterOwnerVerification();
+            teamAccount.BeginProvisioningAfterOwnerVerification();
 
             List<TenantModuleProvisioning> pendingModules = TenantModuleNames.All
-                .Select(module => TenantModuleProvisioning.CreatePending(organization.Id, module))
+                .Select(module => TenantModuleProvisioning.CreatePending(teamAccount.Id, module))
                 .ToList();
             await provisioningRepo.AddRangeAsync(pendingModules, cancellationToken);
         }
-        else if (!organization.AllowsSignIn())
+        else if (!teamAccount.AllowsSignIn())
         {
             return Result.Failure<VerifyEmailSuccessDto>(
                 ErrorCodes.BusinessRule,
-                "Organization is not ready for sign-in.");
+                "Team account is not ready for sign-in.");
         }
 
-        Role? adminRole = await roleRepo.GetByNameAsync("Admin", organization.Id, cancellationToken);
+        Role? adminRole = await roleRepo.GetByNameAsync("Admin", teamAccount.Id, cancellationToken);
         if (adminRole is not null && !membership.RoleIds.Contains(adminRole.Id))
             membership.AssignRole(adminRole.Id);
 
@@ -167,7 +167,7 @@ public sealed class VerifyEmailHandler(
         // from a single command result — no second round-trip that could fail after
         // the one-time link has already been consumed. Read before commit so any
         // failure leaves the verification token unused.
-        IReadOnlyList<Role> roles = await roleRepo.GetByIdsAsync(membership.RoleIds, organization.Id, cancellationToken);
+        IReadOnlyList<Role> roles = await roleRepo.GetByIdsAsync(membership.RoleIds, teamAccount.Id, cancellationToken);
         List<string> permissions = roles
             .SelectMany(role => role.Permissions)
             .Distinct(StringComparer.Ordinal)
@@ -177,7 +177,7 @@ public sealed class VerifyEmailHandler(
 
         return Result.Success(new VerifyEmailSuccessDto(
             user.Id,
-            organization.Id,
+            teamAccount.Id,
             user.Email.Value,
             user.FullName,
             permissions,

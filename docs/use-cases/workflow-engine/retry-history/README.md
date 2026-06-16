@@ -8,7 +8,7 @@ See the retry history of a failed execution so that I can track how many times i
 
 ## Primary actor
 
-- Organization Member with `execution:read`
+- Team account Member with `execution:read`
 
 ## Trigger
 

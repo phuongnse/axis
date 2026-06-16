@@ -8,7 +8,7 @@ See the full detail of a specific execution so that I can understand exactly wha
 
 ## Primary actor
 
-- Organization Member with `execution:read`
+- Team account Member with `execution:read`
 
 ## Trigger
 

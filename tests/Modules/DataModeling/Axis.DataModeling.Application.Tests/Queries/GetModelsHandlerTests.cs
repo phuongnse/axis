@@ -11,7 +11,7 @@ public class GetModelsHandlerTests
 {
     private readonly IDataModelRepository _modelRepo = Substitute.For<IDataModelRepository>();
 
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TeamAccountId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     private GetModelsHandler CreateHandler() => new(_modelRepo);
@@ -21,14 +21,14 @@ public class GetModelsHandlerTests
     {
         List<DataModel> models =
         [
-            DataModel.Create("Invoice", "Billing", null, null, OrgId, UserId),
-            DataModel.Create("Contact", null, null, null, OrgId, UserId),
+            DataModel.Create("Invoice", "Billing", null, null, TeamAccountId, UserId),
+            DataModel.Create("Contact", null, null, null, TeamAccountId, UserId),
         ];
-        _modelRepo.GetPagedAsync(OrgId, 1, 20, Arg.Any<CancellationToken>())
+        _modelRepo.GetPagedAsync(TeamAccountId, 1, 20, Arg.Any<CancellationToken>())
             .Returns((models, 2));
 
         PagedResult<ModelSummaryDto> result = await CreateHandler()
-            .Handle(new GetModelsQuery(OrgId, 1, 20), CancellationToken.None);
+            .Handle(new GetModelsQuery(TeamAccountId, 1, 20), CancellationToken.None);
 
         result.Items.Should().HaveCount(2);
         result.TotalCount.Should().Be(2);
@@ -40,25 +40,25 @@ public class GetModelsHandlerTests
     [Fact]
     public async Task GetModels_WithModels_EachDtoContainsCorrectFieldCount()
     {
-        DataModel model = DataModel.Create("Invoice", null, null, null, OrgId, UserId);
-        _modelRepo.GetPagedAsync(OrgId, 1, 20, Arg.Any<CancellationToken>())
+        DataModel model = DataModel.Create("Invoice", null, null, null, TeamAccountId, UserId);
+        _modelRepo.GetPagedAsync(TeamAccountId, 1, 20, Arg.Any<CancellationToken>())
             .Returns((new List<DataModel> { model }, 1));
 
         PagedResult<ModelSummaryDto> result = await CreateHandler()
-            .Handle(new GetModelsQuery(OrgId, 1, 20), CancellationToken.None);
+            .Handle(new GetModelsQuery(TeamAccountId, 1, 20), CancellationToken.None);
 
         // 3 system fields auto-created
         result.Items.Single().FieldCount.Should().Be(3);
     }
 
     [Fact]
-    public async Task GetModels_EmptyOrg_ReturnsEmptyPage()
+    public async Task GetModels_EmptyTeamAccount_ReturnsEmptyPage()
     {
-        _modelRepo.GetPagedAsync(OrgId, 1, 20, Arg.Any<CancellationToken>())
+        _modelRepo.GetPagedAsync(TeamAccountId, 1, 20, Arg.Any<CancellationToken>())
             .Returns((new List<DataModel>(), 0));
 
         PagedResult<ModelSummaryDto> result = await CreateHandler()
-            .Handle(new GetModelsQuery(OrgId, 1, 20), CancellationToken.None);
+            .Handle(new GetModelsQuery(TeamAccountId, 1, 20), CancellationToken.None);
 
         result.Items.Should().BeEmpty();
         result.TotalCount.Should().Be(0);
@@ -67,12 +67,12 @@ public class GetModelsHandlerTests
     [Fact]
     public async Task GetModels_PageSizeExceedsCap_ClampsTo100()
     {
-        _modelRepo.GetPagedAsync(OrgId, 1, 100, Arg.Any<CancellationToken>())
+        _modelRepo.GetPagedAsync(TeamAccountId, 1, 100, Arg.Any<CancellationToken>())
             .Returns((new List<DataModel>(), 0));
 
-        await CreateHandler().Handle(new GetModelsQuery(OrgId, 1, 999), CancellationToken.None);
+        await CreateHandler().Handle(new GetModelsQuery(TeamAccountId, 1, 999), CancellationToken.None);
 
         await _modelRepo.Received(1)
-            .GetPagedAsync(OrgId, 1, 100, Arg.Any<CancellationToken>());
+            .GetPagedAsync(TeamAccountId, 1, 100, Arg.Any<CancellationToken>());
     }
 }

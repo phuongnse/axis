@@ -8,7 +8,7 @@ Draw connections between steps so that the workflow knows the execution order.
 
 ## Primary actor
 
-- Organization Member
+- Team account Member
 
 ## Trigger
 

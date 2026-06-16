@@ -8,7 +8,7 @@ Configure how the workflow continues after parallel steps complete so that I can
 
 ## Primary actor
 
-- Organization Member
+- Team account Member
 
 ## Trigger
 

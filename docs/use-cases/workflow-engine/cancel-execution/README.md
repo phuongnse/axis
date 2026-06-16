@@ -8,7 +8,7 @@ Cancel a running execution so that I can stop a process that is no longer needed
 
 ## Primary actor
 
-- Organization Member with `execution:cancel`
+- Team account Member with `execution:cancel`
 
 ## Trigger
 

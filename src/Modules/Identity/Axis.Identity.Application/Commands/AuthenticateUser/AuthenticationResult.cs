@@ -8,7 +8,7 @@ public record AuthenticationResult
 
     // Populated on success
     public Guid UserId { get; init; }
-    public Guid? OrganizationId { get; init; }
+    public Guid? TeamAccountId { get; init; }
     public string Email { get; init; } = string.Empty;
     public string FullName { get; init; } = string.Empty;
     public IReadOnlyList<string> Permissions { get; init; } = [];
@@ -17,12 +17,12 @@ public record AuthenticationResult
         new() { Success = false, FailureReason = reason, LockedUntil = lockedUntil };
 
     public static AuthenticationResult Ok(
-        Guid userId, Guid? orgId, string email, string fullName, IReadOnlyList<string> permissions) =>
+        Guid userId, Guid? teamAccountId, string email, string fullName, IReadOnlyList<string> permissions) =>
         new()
         {
             Success = true,
             UserId = userId,
-            OrganizationId = orgId,
+            TeamAccountId = teamAccountId,
             Email = email,
             FullName = fullName,
             Permissions = permissions,

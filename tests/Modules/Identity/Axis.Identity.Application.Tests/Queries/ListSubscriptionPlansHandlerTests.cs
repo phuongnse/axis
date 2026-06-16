@@ -11,10 +11,10 @@ namespace Axis.Identity.Application.Tests.Queries;
 public class ListSubscriptionPlansHandlerTests
 {
     private readonly ISubscriptionPlanRepository _planRepo = Substitute.For<ISubscriptionPlanRepository>();
-    private readonly IOrganizationRepository _orgRepo = Substitute.For<IOrganizationRepository>();
+    private readonly ITeamAccountRepository _teamAccountRepo = Substitute.For<ITeamAccountRepository>();
 
     [Fact]
-    public async Task ListSubscriptionPlans_WhenOrgOnRetiredPlan_IncludesCurrentPlanInResults()
+    public async Task ListSubscriptionPlans_WhenTeamAccountOnRetiredPlan_IncludesCurrentPlanInResults()
     {
         SubscriptionPlan free = SubscriptionPlan.Create(
             WellKnownSubscriptionPlans.FreeId, "Free", "free", 0, 3, 1_000, 3, 500, true, true);
@@ -33,16 +33,16 @@ public class ListSubscriptionPlansHandlerTests
         _planRepo.ListAvailableForNewSignupsAsync(Arg.Any<CancellationToken>())
             .Returns(new List<SubscriptionPlan> { free });
 
-        Organization org = Organization.Create(
+        TeamAccount teamAccount = TeamAccount.Create(
             "Acme",
-            OrganizationSlug.Create("acme").Value!,
+            TeamAccountSlug.Create("acme").Value!,
             Email.Create("a@acme.com").Value!,
             WellKnownSubscriptionPlans.EnterpriseId);
-        _orgRepo.GetByIdAsync(org.Id).Returns(org);
+        _teamAccountRepo.GetByIdAsync(teamAccount.Id).Returns(teamAccount);
         _planRepo.GetByIdAsync(WellKnownSubscriptionPlans.EnterpriseId).Returns(enterprise);
 
-        IReadOnlyList<SubscriptionPlanDto> result = await new ListSubscriptionPlansHandler(_planRepo, _orgRepo)
-            .Handle(new ListSubscriptionPlansQuery(org.Id), CancellationToken.None);
+        IReadOnlyList<SubscriptionPlanDto> result = await new ListSubscriptionPlansHandler(_planRepo, _teamAccountRepo)
+            .Handle(new ListSubscriptionPlansQuery(teamAccount.Id), CancellationToken.None);
 
         result.Should().HaveCount(2);
         result.Should().Contain(p => p.Slug == "enterprise" && p.IsCurrent && !p.IsAvailableForNewSignups);

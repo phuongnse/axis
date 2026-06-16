@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Accept my invitation and set up my account so that I can access the organization.
+Accept my invitation and set up my account so that I can access the team account.
 
 ## Primary actor
 
@@ -26,27 +26,27 @@ Accept my invitation and set up my account so that I can access the organization
 
 ## Context
 
-Organization admins can invite new members, manage their accounts, and deactivate users who should no longer have access.
+Team account admins can invite new members, manage their accounts, and deactivate users who should no longer have access.
 
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] Clicking the invitation link opens a page with the organization name shown, prompting the user to set their full name and password.
+- [ ] Clicking the invitation link opens a page with the team account name shown, prompting the user to set their full name and password.
 - [ ] On submit, the account is created, the user is signed in, and they are redirected to the workspace dashboard.
 
 *Validation & errors*
 - [ ] Expired invitation link (> 48 hours): "This invitation has expired. Please ask your admin to send a new one."
 - [ ] Already-accepted invitation link: "This invitation has already been used. Please sign in."
-- [ ] If the invited email already has a platform account (from another org): the user is prompted to sign in with their existing credentials rather than setting a new password.
+- [ ] If the invited email already has a platform account (from another team account): the user is prompted to sign in with their existing credentials rather than setting a new password.
 - [ ] Password must meet the same rules as registration (min 8 chars, letter + number).
 
 *Edge cases*
 - [ ] Accepting an invitation on a different device than where the email was opened works correctly.
 - [ ] If the inviting admin deactivated the invitation before the user accepted, the link shows: "This invitation has been cancelled."
-- [ ] If the org was deleted before the user accepted, the link shows: "This organization no longer exists."
+- [ ] If the team account was deleted before the user accepted, the link shows: "This team account no longer exists."
 
 *Out of scope*
-- Inviting users who already have accounts on other orgs to join a second org simultaneously — each user belongs to one org.
+- Inviting users who already have accounts on other team accounts to join a second team account simultaneously — each user belongs to one team account.
 
 > **Implementation status**
 >

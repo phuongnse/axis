@@ -10,15 +10,15 @@ namespace Axis.WorkflowEngine.Infrastructure.Tests.Repositories;
 [Collection("WorkflowEngineDatabase")]
 public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixture)
 {
-    private static readonly Guid OrgId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-    private static readonly Guid OtherOrgId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+    private static readonly Guid TeamAccountId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid OtherTeamAccountId = Guid.Parse("00000000-0000-0000-0000-000000000002");
 
     private static WorkflowExecution CreateExecution(
-        Guid? workflowId = null, Guid? orgId = null,
+        Guid? workflowId = null, Guid? teamAccountId = null,
         TriggerType trigger = TriggerType.Manual)
         => WorkflowExecution.Create(
             workflowId ?? Guid.NewGuid(),
-            orgId ?? OrgId,
+            teamAccountId ?? TeamAccountId,
             trigger,
             null,
             new Dictionary<string, object?> { ["key"] = "value" });
@@ -34,7 +34,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new ExecutionRepository(readCtx);
-        WorkflowExecution? loaded = await readRepo.GetByIdAsync(execution.Id, OrgId);
+        WorkflowExecution? loaded = await readRepo.GetByIdAsync(execution.Id, TeamAccountId);
 
         loaded.Should().NotBeNull();
         loaded!.Id.Should().Be(execution.Id);
@@ -43,23 +43,23 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     }
 
     [Fact]
-    public async Task GetByIdAsync_WhenOrgDoesNotMatch_ReturnsNull()
+    public async Task GetByIdAsync_WhenTeamAccountDoesNotMatch_ReturnsNull()
     {
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
         ExecutionRepository repo = new ExecutionRepository(ctx);
-        WorkflowExecution execution = CreateExecution(orgId: OrgId);
+        WorkflowExecution execution = CreateExecution(teamAccountId: TeamAccountId);
         await repo.AddAsync(execution);
         await ctx.SaveChangesAsync();
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new ExecutionRepository(readCtx);
-        WorkflowExecution? result = await readRepo.GetByIdAsync(execution.Id, OtherOrgId);
+        WorkflowExecution? result = await readRepo.GetByIdAsync(execution.Id, OtherTeamAccountId);
 
         result.Should().BeNull();
     }
 
     [Fact]
-    public async Task GetAllAsync_WhenMultipleExecutionsExist_ReturnsOnlyOrgExecutionsOrderedNewestFirst()
+    public async Task GetAllAsync_WhenMultipleExecutionsExist_ReturnsOnlyTeamAccountExecutionsOrderedNewestFirst()
     {
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
         ExecutionRepository repo = new ExecutionRepository(ctx);
@@ -67,7 +67,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
         WorkflowExecution first = CreateExecution(workflowId: wfId);
         await Task.Delay(5); // ensure distinct CreatedAt
         WorkflowExecution second = CreateExecution(workflowId: wfId);
-        WorkflowExecution other = CreateExecution(orgId: OtherOrgId);
+        WorkflowExecution other = CreateExecution(teamAccountId: OtherTeamAccountId);
 
         await repo.AddAsync(first);
         await repo.AddAsync(second);
@@ -76,15 +76,15 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new ExecutionRepository(readCtx);
-        IReadOnlyList<WorkflowExecution> results = await readRepo.GetAllAsync(OrgId);
+        IReadOnlyList<WorkflowExecution> results = await readRepo.GetAllAsync(TeamAccountId);
 
         results.Should().HaveCountGreaterThanOrEqualTo(2);
-        results.Should().OnlyContain(e => e.OrganizationId == OrgId);
+        results.Should().OnlyContain(e => e.TeamAccountId == TeamAccountId);
         results.Select(e => e.CreatedAt).Should().BeInDescendingOrder();
     }
 
     [Fact]
-    public async Task GetByWorkflowAsync_WhenFilteredByWorkflowAndOrg_ReturnsMatchingExecutions()
+    public async Task GetByWorkflowAsync_WhenFilteredByWorkflowAndTeamAccount_ReturnsMatchingExecutions()
     {
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
         ExecutionRepository repo = new ExecutionRepository(ctx);
@@ -92,16 +92,16 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
         Guid otherWfId = Guid.NewGuid();
         WorkflowExecution match = CreateExecution(workflowId: wfId);
         WorkflowExecution wrongWf = CreateExecution(workflowId: otherWfId);
-        WorkflowExecution wrongOrg = CreateExecution(workflowId: wfId, orgId: OtherOrgId);
+        WorkflowExecution wrongTeamAccount = CreateExecution(workflowId: wfId, teamAccountId: OtherTeamAccountId);
 
         await repo.AddAsync(match);
         await repo.AddAsync(wrongWf);
-        await repo.AddAsync(wrongOrg);
+        await repo.AddAsync(wrongTeamAccount);
         await ctx.SaveChangesAsync();
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new ExecutionRepository(readCtx);
-        IReadOnlyList<WorkflowExecution> results = await readRepo.GetByWorkflowAsync(wfId, OrgId);
+        IReadOnlyList<WorkflowExecution> results = await readRepo.GetByWorkflowAsync(wfId, TeamAccountId);
 
         results.Should().ContainSingle();
         results[0].Id.Should().Be(match.Id);
@@ -113,7 +113,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
         ExecutionRepository repo = new ExecutionRepository(ctx);
         WorkflowExecution execution = WorkflowExecution.Create(
-                    Guid.NewGuid(), OrgId, TriggerType.Webhook, null,
+                    Guid.NewGuid(), TeamAccountId, TriggerType.Webhook, null,
                     new Dictionary<string, object?> { ["input_name"] = "Alice", ["input_count"] = 42 });
 
         await repo.AddAsync(execution);
@@ -121,7 +121,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new ExecutionRepository(readCtx);
-        WorkflowExecution? loaded = await readRepo.GetByIdAsync(execution.Id, OrgId);
+        WorkflowExecution? loaded = await readRepo.GetByIdAsync(execution.Id, TeamAccountId);
 
         loaded!.Context.Should().ContainKey("input_name");
         loaded.Context.Should().ContainKey("input_count");
@@ -142,7 +142,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new ExecutionRepository(readCtx);
-        WorkflowExecution? loaded = await readRepo.GetByIdAsync(execution.Id, OrgId);
+        WorkflowExecution? loaded = await readRepo.GetByIdAsync(execution.Id, TeamAccountId);
 
         loaded!.Status.Should().Be(ExecutionStatus.Completed);
         loaded.StartedAt.Should().NotBeNull();
@@ -155,10 +155,10 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
         Guid wfId = Guid.NewGuid();
 
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
-        ctx.WorkflowActiveStatuses.Add(WorkflowActiveStatus.Activated(wfId, OrgId));
+        ctx.WorkflowActiveStatuses.Add(WorkflowActiveStatus.Activated(wfId, TeamAccountId));
         await ctx.SaveChangesAsync();
         WorkflowDefinitionReader reader = new WorkflowDefinitionReader(ctx);
-        bool result = await reader.IsActiveAsync(wfId, OrgId);
+        bool result = await reader.IsActiveAsync(wfId, TeamAccountId);
 
         result.Should().BeTrue();
     }
@@ -171,7 +171,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
         // Workflow never published → no row in workflow_active_statuses → false
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
         WorkflowDefinitionReader reader = new WorkflowDefinitionReader(ctx);
-        bool result = await reader.IsActiveAsync(wfId, OrgId);
+        bool result = await reader.IsActiveAsync(wfId, TeamAccountId);
 
         result.Should().BeFalse();
     }
@@ -185,7 +185,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
         ExecutionRepository repo = new(ctx);
 
-        WorkflowExecution execution = WorkflowExecution.Create(wfId, OrgId, TriggerType.Manual, null, new Dictionary<string, object?>());
+        WorkflowExecution execution = WorkflowExecution.Create(wfId, TeamAccountId, TriggerType.Manual, null, new Dictionary<string, object?>());
         execution.AddStep(stepDefId, "Form", StepType.Form, 0);
         execution.AddStep(Guid.NewGuid(), "End", StepType.End, 1);
 
@@ -194,7 +194,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new(readCtx);
-        WorkflowExecution? loaded = await readRepo.GetByIdWithStepsAsync(execution.Id, OrgId);
+        WorkflowExecution? loaded = await readRepo.GetByIdWithStepsAsync(execution.Id, TeamAccountId);
 
         loaded.Should().NotBeNull();
         loaded!.Steps.Should().HaveCount(2);
@@ -202,7 +202,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     }
 
     [Fact]
-    public async Task GetByIdWithStepsAsync_WhenOrgDoesNotMatch_ReturnsNull()
+    public async Task GetByIdWithStepsAsync_WhenTeamAccountDoesNotMatch_ReturnsNull()
     {
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
         ExecutionRepository repo = new(ctx);
@@ -213,7 +213,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new(readCtx);
-        WorkflowExecution? result = await readRepo.GetByIdWithStepsAsync(execution.Id, OtherOrgId);
+        WorkflowExecution? result = await readRepo.GetByIdWithStepsAsync(execution.Id, OtherTeamAccountId);
 
         result.Should().BeNull();
     }
@@ -236,12 +236,12 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
         };
 
         await using WorkflowEngineDbContext setupCtx = fixture.CreateContext();
-        setupCtx.WorkflowSnapshots.Add(WorkflowSnapshot.Create(wfId, OrgId, steps, transitions));
+        setupCtx.WorkflowSnapshots.Add(WorkflowSnapshot.Create(wfId, TeamAccountId, steps, transitions));
         await setupCtx.SaveChangesAsync();
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         WorkflowDefinitionReader reader = new(readCtx);
-        WorkflowSnapshot? snapshot = await reader.GetSnapshotAsync(wfId, OrgId);
+        WorkflowSnapshot? snapshot = await reader.GetSnapshotAsync(wfId, TeamAccountId);
 
         snapshot.Should().NotBeNull();
         snapshot!.Steps.Should().HaveCount(2);
@@ -254,7 +254,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     {
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
         WorkflowDefinitionReader reader = new(ctx);
-        WorkflowSnapshot? result = await reader.GetSnapshotAsync(Guid.NewGuid(), OrgId);
+        WorkflowSnapshot? result = await reader.GetSnapshotAsync(Guid.NewGuid(), TeamAccountId);
 
         result.Should().BeNull();
     }

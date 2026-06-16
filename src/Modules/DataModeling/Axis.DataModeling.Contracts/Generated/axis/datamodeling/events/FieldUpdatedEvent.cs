@@ -12,10 +12,10 @@ namespace axis.datamodeling.events
     public partial class FieldUpdatedEvent : global::Avro.Specific.ISpecificRecord
     {
         public static global::Avro.Schema _SCHEMA = global::Avro.Schema.Parse(
-            @"{""type"":""record"",""name"":""FieldUpdatedEvent"",""namespace"":""axis.datamodeling.events"",""fields"":[{""name"":""modelId"",""type"":""string""},{""name"":""organizationId"",""type"":""string""},{""name"":""fieldId"",""type"":""string""},{""name"":""fieldName"",""type"":""string""},{""name"":""fieldType"",""type"":""string""},{""name"":""label"",""type"":""string""},{""name"":""isRequired"",""type"":""boolean""}]}");
+            @"{""type"":""record"",""name"":""FieldUpdatedEvent"",""namespace"":""axis.datamodeling.events"",""fields"":[{""name"":""modelId"",""type"":""string""},{""name"":""teamAccountId"",""type"":""string""},{""name"":""fieldId"",""type"":""string""},{""name"":""fieldName"",""type"":""string""},{""name"":""fieldType"",""type"":""string""},{""name"":""label"",""type"":""string""},{""name"":""isRequired"",""type"":""boolean""}]}");
 
         private string _modelId = string.Empty;
-        private string _organizationId = string.Empty;
+        private string _teamAccountId = string.Empty;
         private string _fieldId = string.Empty;
         private string _fieldName = string.Empty;
         private string _fieldType = string.Empty;
@@ -25,7 +25,7 @@ namespace axis.datamodeling.events
         public virtual global::Avro.Schema Schema => FieldUpdatedEvent._SCHEMA;
 
         public string modelId { get => _modelId; set => _modelId = value; }
-        public string organizationId { get => _organizationId; set => _organizationId = value; }
+        public string teamAccountId { get => _teamAccountId; set => _teamAccountId = value; }
         public string fieldId { get => _fieldId; set => _fieldId = value; }
         public string fieldName { get => _fieldName; set => _fieldName = value; }
         public string fieldType { get => _fieldType; set => _fieldType = value; }
@@ -35,7 +35,7 @@ namespace axis.datamodeling.events
         public virtual object Get(int fieldPos) => fieldPos switch
         {
             0 => modelId,
-            1 => organizationId,
+            1 => teamAccountId,
             2 => fieldId,
             3 => fieldName,
             4 => fieldType,
@@ -49,7 +49,7 @@ namespace axis.datamodeling.events
             switch (fieldPos)
             {
                 case 0: modelId = (string)fieldValue; break;
-                case 1: organizationId = (string)fieldValue; break;
+                case 1: teamAccountId = (string)fieldValue; break;
                 case 2: fieldId = (string)fieldValue; break;
                 case 3: fieldName = (string)fieldValue; break;
                 case 4: fieldType = (string)fieldValue; break;

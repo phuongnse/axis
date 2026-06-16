@@ -148,8 +148,8 @@ public static class AuthEndpoints
             new(ClaimTypes.Email, claims.Email),
             new("name", claims.FullName),
         ];
-        if (claims.OrganizationId is Guid organizationId)
-            claimList.Add(new Claim("org_id", organizationId.ToString()));
+        if (claims.TeamAccountId is Guid teamAccountId)
+            claimList.Add(new Claim("team_account_id", teamAccountId.ToString()));
         foreach (string permission in claims.Permissions)
             claimList.Add(new Claim("permissions", permission));
 

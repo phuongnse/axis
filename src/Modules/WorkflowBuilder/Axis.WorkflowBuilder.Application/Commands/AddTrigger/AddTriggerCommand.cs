@@ -5,6 +5,6 @@ namespace Axis.WorkflowBuilder.Application.Commands.AddTrigger;
 
 public sealed record AddTriggerCommand(
     Guid WorkflowId,
-    Guid OrganizationId,
+    Guid TeamAccountId,
     TriggerType TriggerType,
     IReadOnlyDictionary<string, object?>? Config) : ICommand;

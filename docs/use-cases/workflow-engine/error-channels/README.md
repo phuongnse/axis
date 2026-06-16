@@ -8,7 +8,7 @@ Configure who gets notified when my workflow fails so that the right people are 
 
 ## Primary actor
 
-- Organization Member with `workflow:definition:write`
+- Team account Member with `workflow:definition:write`
 
 ## Trigger
 

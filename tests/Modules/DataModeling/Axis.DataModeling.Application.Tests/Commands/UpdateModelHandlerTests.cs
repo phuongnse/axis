@@ -12,23 +12,23 @@ public class UpdateModelHandlerTests
 {
     private readonly IDataModelRepository _modelRepo = Substitute.For<IDataModelRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TeamAccountId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     private UpdateModelHandler CreateHandler() => new(_modelRepo, _uow);
 
     private static DataModel BuildModel() =>
-        DataModel.Create("Invoice", null, null, null, OrgId, UserId);
+        DataModel.Create("Invoice", null, null, null, TeamAccountId, UserId);
 
     [Fact]
     public async Task UpdateModel_WhenRequestIsValid_UpdatesModelAndSaves()
     {
         DataModel model = BuildModel();
-        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
-        _modelRepo.NameExistsAsync("Updated Invoice", OrgId, model.Id).Returns(false);
+        _modelRepo.GetByIdAsync(model.Id, TeamAccountId).Returns(model);
+        _modelRepo.NameExistsAsync("Updated Invoice", TeamAccountId, model.Id).Returns(false);
 
         Result result = await CreateHandler().Handle(
-            new UpdateModelCommand(model.Id, OrgId, "Updated Invoice", "desc", null, null),
+            new UpdateModelCommand(model.Id, TeamAccountId, "Updated Invoice", "desc", null, null),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -39,10 +39,10 @@ public class UpdateModelHandlerTests
     [Fact]
     public async Task UpdateModel_WhenModelNotFound_ReturnsNotFound()
     {
-        _modelRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).Returns((DataModel?)null);
+        _modelRepo.GetByIdAsync(Arg.Any<Guid>(), TeamAccountId).Returns((DataModel?)null);
 
         Result result = await CreateHandler().Handle(
-            new UpdateModelCommand(Guid.NewGuid(), OrgId, "X", null, null, null),
+            new UpdateModelCommand(Guid.NewGuid(), TeamAccountId, "X", null, null, null),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -51,19 +51,19 @@ public class UpdateModelHandlerTests
     }
 
     [Fact]
-    public async Task UpdateModel_WhenModelBelongsToAnotherOrg_ReturnsNotFound()
+    public async Task UpdateModel_WhenModelBelongsToAnotherTeamAccount_ReturnsNotFound()
     {
         DataModel model = BuildModel();
-        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
+        _modelRepo.GetByIdAsync(model.Id, TeamAccountId).Returns(model);
 
-        Guid otherOrgId = Guid.NewGuid();
+        Guid otherTeamAccountId = Guid.NewGuid();
         Result result = await CreateHandler().Handle(
-            new UpdateModelCommand(model.Id, otherOrgId, "Updated Invoice", null, null, null),
+            new UpdateModelCommand(model.Id, otherTeamAccountId, "Updated Invoice", null, null, null),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-        await _modelRepo.Received(1).GetByIdAsync(model.Id, otherOrgId);
+        await _modelRepo.Received(1).GetByIdAsync(model.Id, otherTeamAccountId);
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
@@ -71,11 +71,11 @@ public class UpdateModelHandlerTests
     public async Task UpdateModel_WhenNameIsDuplicate_ReturnsConflict()
     {
         DataModel model = BuildModel();
-        _modelRepo.GetByIdAsync(model.Id, OrgId).Returns(model);
-        _modelRepo.NameExistsAsync("Other", OrgId, model.Id).Returns(true);
+        _modelRepo.GetByIdAsync(model.Id, TeamAccountId).Returns(model);
+        _modelRepo.NameExistsAsync("Other", TeamAccountId, model.Id).Returns(true);
 
         Result result = await CreateHandler().Handle(
-            new UpdateModelCommand(model.Id, OrgId, "Other", null, null, null),
+            new UpdateModelCommand(model.Id, TeamAccountId, "Other", null, null, null),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

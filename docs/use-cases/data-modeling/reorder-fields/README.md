@@ -8,7 +8,7 @@ Reorder fields in a model so that the display order matches our team's mental mo
 
 ## Primary actor
 
-- Organization Member
+- Team account Member
 
 ## Trigger
 

@@ -11,7 +11,7 @@ internal sealed class WorkflowActiveStatusConfiguration : IEntityTypeConfigurati
         builder.ToTable("workflow_active_statuses");
         builder.HasKey(w => w.WorkflowId);
         builder.Property(w => w.WorkflowId).HasColumnName("workflow_id");
-        builder.Property(w => w.OrganizationId).HasColumnName("organization_id").IsRequired();
+        builder.Property(w => w.TeamAccountId).HasColumnName("team_account_id").IsRequired();
         builder.Property(w => w.IsActive).HasColumnName("is_active").IsRequired();
     }
 }

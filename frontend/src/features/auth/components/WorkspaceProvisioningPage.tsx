@@ -46,7 +46,7 @@ export function WorkspaceProvisioningPage() {
   const { t } = useTranslation();
   const token = useQueryParam('token');
   const context = loadRegistrationContext();
-  const organizationName = context?.organizationName ?? t('provisioning.organizationFallback');
+  const teamAccountName = context?.teamAccountName ?? t('provisioning.teamAccountFallback');
   const { status, uiState, loading, error } = useProvisioningStatus(token);
   const retry = useRetryProvisioning(token);
 
@@ -66,7 +66,7 @@ export function WorkspaceProvisioningPage() {
 
   if (loading && !status) {
     return (
-      <AuthCard title={t('provisioning.loadingTitle', { organizationName })}>
+      <AuthCard title={t('provisioning.loadingTitle', { teamAccountName })}>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           <span>{t('provisioning.loadingStatus')}</span>
@@ -115,7 +115,7 @@ export function WorkspaceProvisioningPage() {
               <h1 className="text-2xl font-semibold tracking-tight text-foreground">
                 {failed
                   ? t('provisioning.failedTitle')
-                  : t('provisioning.loadingTitle', { organizationName })}
+                  : t('provisioning.loadingTitle', { teamAccountName })}
               </h1>
               <p className="text-sm text-muted-foreground">
                 {failed ? t('provisioning.failedBody') : t('provisioning.activeBody')}
@@ -149,7 +149,7 @@ export function WorkspaceProvisioningPage() {
               <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
                 {t('provisioning.trace')}
               </p>
-              <p className="mt-1 text-sm font-medium text-foreground">{organizationName}</p>
+              <p className="mt-1 text-sm font-medium text-foreground">{teamAccountName}</p>
             </div>
             <span
               className={cn(

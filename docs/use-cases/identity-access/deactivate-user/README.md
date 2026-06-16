@@ -8,7 +8,7 @@ Deactivate a user so that they can no longer access the workspace without deleti
 
 ## Primary actor
 
-- Organization Admin
+- Team account Admin
 
 ## Trigger
 
@@ -26,7 +26,7 @@ Deactivate a user so that they can no longer access the workspace without deleti
 
 ## Context
 
-Organization admins can invite new members, manage their accounts, and deactivate users who should no longer have access.
+Team account admins can invite new members, manage their accounts, and deactivate users who should no longer have access.
 
 ## Acceptance Criteria
 
@@ -38,12 +38,12 @@ Organization admins can invite new members, manage their accounts, and deactivat
 
 *Validation & errors*
 - [ ] An admin cannot deactivate themselves.
-- [ ] Deactivating the last Admin-role user is blocked: "You cannot deactivate the last admin of the organization."
+- [ ] Deactivating the last Admin-role user is blocked: "You cannot deactivate the last admin of the team account."
 - [ ] A non-admin who calls the deactivate API endpoint receives HTTP 403.
 
 *Edge cases*
 - [ ] Deactivated user's created content (workflows, models, records) is preserved and attributed to them.
-- [ ] A deactivated user who tries to sign in sees: "Your account has been deactivated. Contact your organization admin."
+- [ ] A deactivated user who tries to sign in sees: "Your account has been deactivated. Contact your team account admin."
 - [ ] A deactivated user with pending form tasks: those tasks are marked "Assignee deactivated" and the admin is notified.
 
 *Out of scope*

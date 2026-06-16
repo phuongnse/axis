@@ -35,10 +35,10 @@ public static class IdentityInfrastructureExtensions
                     .UseDbContext<IdentityDbContext>();
             });
 
-        services.AddScoped<IOrganizationRepository, OrganizationRepository>();
-        services.AddScoped<ITenantOrganizationAccessService, TenantOrganizationAccessService>();
+        services.AddScoped<ITeamAccountRepository, TeamAccountRepository>();
+        services.AddScoped<ITenantTeamAccountAccessService, TenantTeamAccountAccessService>();
         services.AddScoped<ISubscriptionPlanRepository, SubscriptionPlanRepository>();
-        services.AddScoped<IOrganizationPlanChangeLogRepository, OrganizationPlanChangeLogRepository>();
+        services.AddScoped<ITeamAccountPlanChangeLogRepository, TeamAccountPlanChangeLogRepository>();
         services.AddScoped<IPlatformAdminAuthorization, ConfigPlatformAdminAuthorization>();
         services.AddScoped<IPlanLimitUsageCounter, UserPlanLimitUsageCounter>();
         services.AddSingleton<PlanLimitRedisCache>();
@@ -46,7 +46,7 @@ public static class IdentityInfrastructureExtensions
         services.AddScoped<ITenantModuleProvisioningRepository, TenantModuleProvisioningRepository>();
         services.AddScoped<IPlatformProvisioningAlert, LoggingPlatformProvisioningAlert>();
         services.AddScoped<IUserRepository, UserRepository>();
-        services.AddScoped<IOrganizationMembershipRepository, OrganizationMembershipRepository>();
+        services.AddScoped<ITeamAccountMembershipRepository, TeamAccountMembershipRepository>();
         services.AddScoped<IRoleRepository, RoleRepository>();
         services.AddScoped<IInvitationRepository, InvitationRepository>();
         services.AddScoped<IRegistrationIdempotencyRepository, RegistrationIdempotencyRepository>();
@@ -57,21 +57,21 @@ public static class IdentityInfrastructureExtensions
         services.AddSingleton<IResendVerificationRateLimiter, RedisResendVerificationRateLimiter>();
         services.AddScoped<IPasswordResetTokenStore, PasswordResetTokenStore>();
         services.AddScoped<IEmailVerificationTokenStore, EmailVerificationTokenStore>();
-        services.AddScoped<IOrganizationRegistrationTokenStore, OrganizationRegistrationTokenStore>();
-        services.AddScoped<IOrganizationSlugGenerator, OrganizationSlugGenerator>();
+        services.AddScoped<ITeamAccountRegistrationTokenStore, TeamAccountRegistrationTokenStore>();
+        services.AddScoped<ITeamAccountSlugGenerator, TeamAccountSlugGenerator>();
         services.AddScoped<ISessionStore, SessionStoreService>();
 
         services.AddGrpc();
 
         services.AddHostedService<OpenIddictSeeder>();
         services.AddHostedService<SubscriptionPlanSeeder>();
-        services.AddHostedService<OrganizationSettingsPermissionSeeder>();
+        services.AddHostedService<TeamAccountSettingsPermissionSeeder>();
 
         services.AddAWSService<IAmazonS3>();
         services.AddScoped<IAvatarStorageService, S3AvatarStorageService>();
-        services.AddScoped<IOrganizationLogoStorageService, S3OrganizationLogoStorageService>();
-        services.AddScoped<IOrganizationDeletionScheduler, WolverineOrganizationDeletionScheduler>();
-        services.AddScoped<IOrganizationIdentityPurger, OrganizationIdentityPurger>();
+        services.AddScoped<ITeamAccountLogoStorageService, S3TeamAccountLogoStorageService>();
+        services.AddScoped<ITeamAccountDeletionScheduler, WolverineTeamAccountDeletionScheduler>();
+        services.AddScoped<ITeamAccountIdentityPurger, TeamAccountIdentityPurger>();
 
         return services;
     }

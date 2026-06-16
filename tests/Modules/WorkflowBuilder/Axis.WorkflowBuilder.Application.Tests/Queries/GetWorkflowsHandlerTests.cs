@@ -12,7 +12,7 @@ public class GetWorkflowsHandlerTests
 {
     private readonly IWorkflowRepository _workflowRepo = Substitute.For<IWorkflowRepository>();
 
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TeamAccountId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     private GetWorkflowsHandler CreateHandler() => new(_workflowRepo);
@@ -22,14 +22,14 @@ public class GetWorkflowsHandlerTests
     {
         List<WorkflowDefinition> workflows =
         [
-            WorkflowDefinition.Create("Invoice Approval", null, OrgId, UserId),
-            WorkflowDefinition.Create("Onboarding", "New hire flow", OrgId, UserId),
+            WorkflowDefinition.Create("Invoice Approval", null, TeamAccountId, UserId),
+            WorkflowDefinition.Create("Onboarding", "New hire flow", TeamAccountId, UserId),
         ];
-        _workflowRepo.GetPagedAsync(OrgId, 1, 20, Arg.Any<CancellationToken>())
+        _workflowRepo.GetPagedAsync(TeamAccountId, 1, 20, Arg.Any<CancellationToken>())
             .Returns((workflows, 2));
 
         PagedResult<WorkflowSummaryDto> result = await CreateHandler()
-            .Handle(new GetWorkflowsQuery(OrgId, 1, 20), CancellationToken.None);
+            .Handle(new GetWorkflowsQuery(TeamAccountId, 1, 20), CancellationToken.None);
 
         result.Items.Should().HaveCount(2);
         result.TotalCount.Should().Be(2);
@@ -37,13 +37,13 @@ public class GetWorkflowsHandlerTests
     }
 
     [Fact]
-    public async Task GetWorkflows_EmptyOrg_ReturnsEmptyPage()
+    public async Task GetWorkflows_EmptyTeamAccount_ReturnsEmptyPage()
     {
-        _workflowRepo.GetPagedAsync(OrgId, 1, 20, Arg.Any<CancellationToken>())
+        _workflowRepo.GetPagedAsync(TeamAccountId, 1, 20, Arg.Any<CancellationToken>())
             .Returns((new List<WorkflowDefinition>(), 0));
 
         PagedResult<WorkflowSummaryDto> result = await CreateHandler()
-            .Handle(new GetWorkflowsQuery(OrgId, 1, 20), CancellationToken.None);
+            .Handle(new GetWorkflowsQuery(TeamAccountId, 1, 20), CancellationToken.None);
 
         result.Items.Should().BeEmpty();
         result.TotalCount.Should().Be(0);
@@ -52,12 +52,12 @@ public class GetWorkflowsHandlerTests
     [Fact]
     public async Task GetWorkflows_PageSizeExceedsCap_ClampsTo100()
     {
-        _workflowRepo.GetPagedAsync(OrgId, 1, 100, Arg.Any<CancellationToken>())
+        _workflowRepo.GetPagedAsync(TeamAccountId, 1, 100, Arg.Any<CancellationToken>())
             .Returns((new List<WorkflowDefinition>(), 0));
 
-        await CreateHandler().Handle(new GetWorkflowsQuery(OrgId, 1, 999), CancellationToken.None);
+        await CreateHandler().Handle(new GetWorkflowsQuery(TeamAccountId, 1, 999), CancellationToken.None);
 
         await _workflowRepo.Received(1)
-            .GetPagedAsync(OrgId, 1, 100, Arg.Any<CancellationToken>());
+            .GetPagedAsync(TeamAccountId, 1, 100, Arg.Any<CancellationToken>());
     }
 }

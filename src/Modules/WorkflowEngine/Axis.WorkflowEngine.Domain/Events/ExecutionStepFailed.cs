@@ -5,5 +5,5 @@ namespace Axis.WorkflowEngine.Domain.Events;
 public sealed record ExecutionStepFailed(
     Guid ExecutionId,
     Guid StepId,
-    Guid OrganizationId,
+    Guid TeamAccountId,
     string ErrorDetails) : IDomainEvent;

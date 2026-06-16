@@ -43,7 +43,7 @@ When a new module appears under `src/Modules/{NewModule}/`:
 
 1. ~~Add `"NewModule"` to `Conventions.ModuleNames`~~ — **automatic** (folder discovery in [`Conventions.cs`](./Conventions.cs)).
 2. Add `<ProjectReference>` entries for the new module's layers in [`Axis.Architecture.Tests.csproj`](./Axis.Architecture.Tests.csproj) so the DLLs ship into our bin folder.
-3. If the module provisions tenant schema: add `OrganizationVerifiedHandler` and update `TenantModuleNames` — see [`TenantProvisioningConventionTests`](./TenantProvisioningConventionTests.cs) and [repo-layout-discovery.md § A](../../../docs/playbooks/repo-layout-discovery.md).
+3. If the module provisions tenant schema: add `TeamAccountVerifiedHandler` and update `TenantModuleNames` — see [`TenantProvisioningConventionTests`](./TenantProvisioningConventionTests.cs) and [repo-layout-discovery.md § A](../../../docs/playbooks/repo-layout-discovery.md).
 4. Run `dotnet test` against this project — all theory tests will now generate cases for the new module automatically.
 5. Full agent checklist (docs, Kafka, buf): [repo-layout-discovery.md](../../../docs/playbooks/repo-layout-discovery.md).
 

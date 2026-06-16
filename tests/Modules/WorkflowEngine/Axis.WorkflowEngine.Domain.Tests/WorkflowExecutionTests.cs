@@ -7,7 +7,7 @@ namespace Axis.WorkflowEngine.Domain.Tests;
 
 public class WorkflowExecutionTests
 {
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TeamAccountId = Guid.NewGuid();
     private static readonly Guid WorkflowId = Guid.NewGuid();
     private static readonly Guid TriggeredBy = Guid.NewGuid();
     private static readonly Guid StepDefId = Guid.NewGuid();
@@ -21,12 +21,12 @@ public class WorkflowExecutionTests
     // ─── Create ───────────────────────────────────────────────────────────────
 
     [Fact]
-    public void WorkflowExecution_WhenCreated_SetsWorkflowOrgTriggerAndPendingStatus()
+    public void WorkflowExecution_WhenCreated_SetsWorkflowTeamAccountTriggerAndPendingStatus()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TeamAccountId, TriggerType.Manual, TriggeredBy, EmptyInput());
 
         exec.WorkflowDefinitionId.Should().Be(WorkflowId);
-        exec.OrganizationId.Should().Be(OrgId);
+        exec.TeamAccountId.Should().Be(TeamAccountId);
         exec.TriggerType.Should().Be(TriggerType.Manual);
         exec.TriggeredByUserId.Should().Be(TriggeredBy);
         exec.Status.Should().Be(ExecutionStatus.Pending);
@@ -36,7 +36,7 @@ public class WorkflowExecutionTests
     [Fact]
     public void WorkflowExecution_WhenCreated_RaisesExecutionStartedEvent()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TeamAccountId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.DomainEvents.Should().ContainSingle(e => e is ExecutionStarted);
     }
 
@@ -45,7 +45,7 @@ public class WorkflowExecutionTests
     [Fact]
     public void Start_WhenExecutionIsPending_TransitionsToRunning()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TeamAccountId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.Start();
 
         exec.Status.Should().Be(ExecutionStatus.Running);
@@ -55,7 +55,7 @@ public class WorkflowExecutionTests
     [Fact]
     public void Start_WhenNotInPendingStatus_Throws()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TeamAccountId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.Start();
 
         Action act = () => exec.Start();
@@ -67,7 +67,7 @@ public class WorkflowExecutionTests
     [Fact]
     public void Complete_WhenExecutionIsRunning_TransitionsToCompleted()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TeamAccountId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.Start();
         exec.Complete();
 
@@ -79,7 +79,7 @@ public class WorkflowExecutionTests
     [Fact]
     public void Complete_WhenNotRunning_Throws()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TeamAccountId, TriggerType.Manual, TriggeredBy, EmptyInput());
         Action act = () => exec.Complete();
         act.Should().Throw<InvalidOperationException>().WithMessage("*running*");
     }
@@ -89,7 +89,7 @@ public class WorkflowExecutionTests
     [Fact]
     public void Fail_WhenExecutionIsRunning_TransitionsToFailedWithErrorMessage()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TeamAccountId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.Start();
         exec.Fail("Step X: connection timeout");
 
@@ -103,7 +103,7 @@ public class WorkflowExecutionTests
     [Fact]
     public void Cancel_WhenRunning_TransitionsToCancelled()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TeamAccountId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.Start();
         exec.Cancel();
 
@@ -114,7 +114,7 @@ public class WorkflowExecutionTests
     [Fact]
     public void Cancel_WhenPending_TransitionsToCancelled()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TeamAccountId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.Cancel();
         exec.Status.Should().Be(ExecutionStatus.Cancelled);
     }
@@ -125,7 +125,7 @@ public class WorkflowExecutionTests
     [InlineData(ExecutionStatus.Cancelled)]
     public void Cancel_WhenExecutionIsInTerminalState_Throws(ExecutionStatus terminal)
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TeamAccountId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.Start();
 
         // Bring to terminal state
@@ -142,7 +142,7 @@ public class WorkflowExecutionTests
     [Fact]
     public void AddStep_WhenStepIsValid_AddsStepToCollection()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TeamAccountId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.AddStep(StepDefId, "Send Email", StepType.Notification, 0);
 
         exec.Steps.Should().HaveCount(1);
@@ -154,7 +154,7 @@ public class WorkflowExecutionTests
     [Fact]
     public void StartStep_WhenStepIsPending_TransitionsStepToRunning()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TeamAccountId, TriggerType.Manual, TriggeredBy, EmptyInput());
         ExecutionStep step = exec.AddStep(StepDefId, "Send Email", StepType.Notification, 0);
         exec.StartStep(step.Id, SomeData());
 
@@ -164,7 +164,7 @@ public class WorkflowExecutionTests
     [Fact]
     public void CompleteStep_WhenStepIsRunning_TransitionsStepToCompletedAndRaisesEvent()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TeamAccountId, TriggerType.Manual, TriggeredBy, EmptyInput());
         ExecutionStep step = exec.AddStep(StepDefId, "Send Email", StepType.Notification, 0);
         exec.StartStep(step.Id, SomeData());
         exec.ClearDomainEvents();
@@ -176,14 +176,14 @@ public class WorkflowExecutionTests
         ExecutionStepCompleted evt = exec.DomainEvents.OfType<ExecutionStepCompleted>().Single();
         evt.ExecutionId.Should().Be(exec.Id);
         evt.StepId.Should().Be(step.Id);
-        evt.OrganizationId.Should().Be(OrgId);
+        evt.TeamAccountId.Should().Be(TeamAccountId);
         evt.Output.Should().BeEquivalentTo(output);
     }
 
     [Fact]
     public void FailStep_WhenStepIsRunning_TransitionsStepToFailedAndRaisesEvent()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TeamAccountId, TriggerType.Manual, TriggeredBy, EmptyInput());
         ExecutionStep step = exec.AddStep(StepDefId, "Send Email", StepType.Notification, 0);
         exec.StartStep(step.Id, SomeData());
         exec.ClearDomainEvents();
@@ -194,14 +194,14 @@ public class WorkflowExecutionTests
         ExecutionStepFailed evt = exec.DomainEvents.OfType<ExecutionStepFailed>().Single();
         evt.ExecutionId.Should().Be(exec.Id);
         evt.StepId.Should().Be(step.Id);
-        evt.OrganizationId.Should().Be(OrgId);
+        evt.TeamAccountId.Should().Be(TeamAccountId);
         evt.ErrorDetails.Should().Be("Connection timeout");
     }
 
     [Fact]
     public void WaitStep_WhenStepIsRunning_TransitionsStepToWaiting()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TeamAccountId, TriggerType.Manual, TriggeredBy, EmptyInput());
         ExecutionStep step = exec.AddStep(StepDefId, "Approval", StepType.Form, 0);
         exec.StartStep(step.Id, SomeData());
         exec.WaitStep(step.Id);
@@ -212,7 +212,7 @@ public class WorkflowExecutionTests
     [Fact]
     public void SkipStep_WhenStepIsPending_TransitionsStepToSkipped()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TeamAccountId, TriggerType.Manual, TriggeredBy, EmptyInput());
         ExecutionStep step = exec.AddStep(StepDefId, "Condition Branch", StepType.Condition, 0);
         exec.SkipStep(step.Id, "Branch not taken");
 
@@ -223,7 +223,7 @@ public class WorkflowExecutionTests
     [Fact]
     public void CancelStep_WhenStepIsRunning_TransitionsStepToCancelled()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TeamAccountId, TriggerType.Manual, TriggeredBy, EmptyInput());
         ExecutionStep step = exec.AddStep(StepDefId, "Send Email", StepType.Notification, 0);
         exec.StartStep(step.Id, SomeData());
         exec.CancelStep(step.Id);
@@ -234,7 +234,7 @@ public class WorkflowExecutionTests
     [Fact]
     public void StepOperation_WhenStepIdNotFound_Throws()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TeamAccountId, TriggerType.Manual, TriggeredBy, EmptyInput());
         Guid missing = Guid.NewGuid();
 
         Action act = () => exec.StartStep(missing, SomeData());
@@ -247,7 +247,7 @@ public class WorkflowExecutionTests
     [Fact]
     public void CreateRetry_WhenExecutionHasFailed_CreatesNewExecutionLinkedToOriginal()
     {
-        WorkflowExecution original = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution original = WorkflowExecution.Create(WorkflowId, TeamAccountId, TriggerType.Manual, TriggeredBy, EmptyInput());
         original.Start();
         original.Fail("error");
         WorkflowExecution retry = original.CreateRetry(TriggeredBy);
@@ -260,7 +260,7 @@ public class WorkflowExecutionTests
     [Fact]
     public void CreateRetry_WhenExecutionIsNotFailed_Throws()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, TriggeredBy, EmptyInput());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TeamAccountId, TriggerType.Manual, TriggeredBy, EmptyInput());
         exec.Start();
 
         Func<WorkflowExecution> act = () => exec.CreateRetry(TriggeredBy);

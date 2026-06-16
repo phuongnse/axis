@@ -16,7 +16,7 @@ public sealed class ExportRecordsCsvHandler(
     public async Task<Result<CsvExportDto>> Handle(
         ExportRecordsCsvQuery query, CancellationToken cancellationToken)
     {
-        DataModel? model = await modelRepo.GetByIdAsync(query.ModelId, query.OrganizationId, cancellationToken);
+        DataModel? model = await modelRepo.GetByIdAsync(query.ModelId, query.TeamAccountId, cancellationToken);
         if (model is null)
             return Result.Failure<CsvExportDto>(ErrorCodes.NotFound, "Model not found.");
 
@@ -33,7 +33,7 @@ public sealed class ExportRecordsCsvHandler(
 
         // Data rows — streamed to avoid loading all records at once
         await foreach (DataRecord record in recordRepo.GetAllForExportAsync(
-            query.ModelId, query.OrganizationId,
+            query.ModelId, query.TeamAccountId,
             query.Search, query.Filters,
             query.SortBy, query.SortDir,
             cancellationToken))

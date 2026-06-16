@@ -8,13 +8,13 @@ namespace Axis.WorkflowEngine.Domain.Aggregates;
 public sealed class WorkflowActiveStatus
 {
     public Guid WorkflowId { get; private set; }
-    public Guid OrganizationId { get; private set; }
+    public Guid TeamAccountId { get; private set; }
     public bool IsActive { get; private set; }
 
     private WorkflowActiveStatus() { } // EF Core materialisation
 
-    public static WorkflowActiveStatus Activated(Guid workflowId, Guid organizationId)
-        => new() { WorkflowId = workflowId, OrganizationId = organizationId, IsActive = true };
+    public static WorkflowActiveStatus Activated(Guid workflowId, Guid teamAccountId)
+        => new() { WorkflowId = workflowId, TeamAccountId = teamAccountId, IsActive = true };
 
     public void Deactivate() => IsActive = false;
 

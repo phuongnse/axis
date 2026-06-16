@@ -4,5 +4,5 @@ namespace Axis.WorkflowBuilder.Application.Commands.RemoveStep;
 
 public sealed record RemoveStepCommand(
     Guid WorkflowId,
-    Guid OrganizationId,
+    Guid TeamAccountId,
     Guid StepId) : ICommand;

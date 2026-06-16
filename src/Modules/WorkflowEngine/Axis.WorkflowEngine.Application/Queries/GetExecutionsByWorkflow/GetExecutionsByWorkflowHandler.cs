@@ -17,7 +17,7 @@ public sealed class GetExecutionsByWorkflowHandler(IExecutionRepository execRepo
         int pageSize = Math.Clamp(query.PageSize, 1, MaxPageSize);
 
         (IReadOnlyList<ExecutionSummaryResponse> items, int total) = await execRepo.GetPagedByWorkflowAsync(
-            query.WorkflowDefinitionId, query.OrganizationId, page, pageSize, query.Status, cancellationToken);
+            query.WorkflowDefinitionId, query.TeamAccountId, page, pageSize, query.Status, cancellationToken);
 
         return new PagedResult<ExecutionSummaryResponse>(items, total, page, pageSize);
     }

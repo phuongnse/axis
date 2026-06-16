@@ -8,7 +8,7 @@ Select a form when configuring a Form step so that the right form is presented t
 
 ## Primary actor
 
-- Organization Member
+- Team account Member
 
 ## Trigger
 
@@ -31,7 +31,7 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] Form step config panel shows a searchable dropdown of all forms in the org.
+- [ ] Form step config panel shows a searchable dropdown of all forms in the team account.
 - [ ] Selecting a form shows a compact preview of its fields in the panel (field names and types listed).
 - [ ] The step node on the canvas shows the selected form name as a summary.
 
@@ -58,7 +58,7 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 >
 > **Gaps vs spec:** broken-step indicator pending Frontend + API.
 >
-> **Decisions:** `GetFormPickerQuery` returns all forms for the org as a flat list (Id, Name, FieldCount) ordered by name — used by the API form-step picker dropdown. `IsReferencedByWorkflowAsync` query supports the reference check.
+> **Decisions:** `GetFormPickerQuery` returns all forms for the team account as a flat list (Id, Name, FieldCount) ordered by name — used by the API form-step picker dropdown. `IsReferencedByWorkflowAsync` query supports the reference check.
 
 ## Wireframes
 

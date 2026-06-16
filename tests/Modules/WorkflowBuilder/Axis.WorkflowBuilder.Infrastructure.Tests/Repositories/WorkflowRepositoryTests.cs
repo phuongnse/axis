@@ -11,7 +11,7 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     private WorkflowBuilderDbContext _ctx = null!;
     private WorkflowRepository _sut = null!;
 
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TeamAccountId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     public Task InitializeAsync()
@@ -23,8 +23,8 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
 
     public async Task DisposeAsync() => await _ctx.DisposeAsync();
 
-    private static WorkflowDefinition MakeWorkflow(string name, Guid? orgId = null)
-        => WorkflowDefinition.Create(name, null, orgId ?? OrgId, UserId);
+    private static WorkflowDefinition MakeWorkflow(string name, Guid? teamAccountId = null)
+        => WorkflowDefinition.Create(name, null, teamAccountId ?? TeamAccountId, UserId);
 
     [Fact]
     public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
@@ -32,27 +32,27 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
         WorkflowDefinition wf = MakeWorkflow("Order Approval");
         await _sut.AddAsync(wf);
         await _ctx.SaveChangesAsync();
-        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, OrgId);
+        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, TeamAccountId);
 
         loaded.Should().NotBeNull();
         loaded!.Name.Should().Be("Order Approval");
-        loaded.OrganizationId.Should().Be(OrgId);
+        loaded.TeamAccountId.Should().Be(TeamAccountId);
         loaded.Status.Should().Be(WorkflowStatus.Draft);
     }
 
     [Fact]
-    public async Task GetAllAsync_WhenMultipleWorkflowsExist_ReturnsOnlyOrgWorkflows()
+    public async Task GetAllAsync_WhenMultipleWorkflowsExist_ReturnsOnlyTeamAccountWorkflows()
     {
-        Guid orgId = Guid.NewGuid();
-        WorkflowDefinition w1 = MakeWorkflow("WF-A", orgId);
-        WorkflowDefinition w2 = MakeWorkflow("WF-B", orgId);
+        Guid teamAccountId = Guid.NewGuid();
+        WorkflowDefinition w1 = MakeWorkflow("WF-A", teamAccountId);
+        WorkflowDefinition w2 = MakeWorkflow("WF-B", teamAccountId);
         WorkflowDefinition other = MakeWorkflow("WF-Other", Guid.NewGuid());
 
         await _sut.AddAsync(w1);
         await _sut.AddAsync(w2);
         await _sut.AddAsync(other);
         await _ctx.SaveChangesAsync();
-        IReadOnlyList<WorkflowDefinition> result = await _sut.GetAllAsync(orgId);
+        IReadOnlyList<WorkflowDefinition> result = await _sut.GetAllAsync(teamAccountId);
 
         result.Should().HaveCount(2);
         result.Select(w => w.Name).Should().BeEquivalentTo(["WF-A", "WF-B"]);
@@ -61,22 +61,22 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     [Fact]
     public async Task NameExistsAsync_WhenNameExists_IsCaseInsensitive()
     {
-        Guid orgId = Guid.NewGuid();
-        await _sut.AddAsync(MakeWorkflow("Employee Onboarding", orgId));
+        Guid teamAccountId = Guid.NewGuid();
+        await _sut.AddAsync(MakeWorkflow("Employee Onboarding", teamAccountId));
         await _ctx.SaveChangesAsync();
 
-        (await _sut.NameExistsAsync("employee onboarding", orgId)).Should().BeTrue();
-        (await _sut.NameExistsAsync("EMPLOYEE ONBOARDING", orgId)).Should().BeTrue();
+        (await _sut.NameExistsAsync("employee onboarding", teamAccountId)).Should().BeTrue();
+        (await _sut.NameExistsAsync("EMPLOYEE ONBOARDING", teamAccountId)).Should().BeTrue();
     }
 
     [Fact]
     public async Task NameExistsAsync_WhenExcludeIdProvided_ExcludesThatWorkflowFromCheck()
     {
-        Guid orgId = Guid.NewGuid();
-        WorkflowDefinition wf = MakeWorkflow("Invoice Review", orgId);
+        Guid teamAccountId = Guid.NewGuid();
+        WorkflowDefinition wf = MakeWorkflow("Invoice Review", teamAccountId);
         await _sut.AddAsync(wf);
         await _ctx.SaveChangesAsync();
-        bool exists = await _sut.NameExistsAsync("Invoice Review", orgId, excludeId: wf.Id);
+        bool exists = await _sut.NameExistsAsync("Invoice Review", teamAccountId, excludeId: wf.Id);
 
         exists.Should().BeFalse();
     }
@@ -91,7 +91,7 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
 
         await _sut.AddAsync(wf);
         await _ctx.SaveChangesAsync();
-        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, OrgId);
+        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, TeamAccountId);
 
         loaded!.Steps.Should().HaveCount(3); // Start + Review + End
         loaded.Steps.Should().Contain(s => s.Name == "Review" && s.Type == StepType.Form);
@@ -108,7 +108,7 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
 
         await _sut.AddAsync(wf);
         await _ctx.SaveChangesAsync();
-        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, OrgId);
+        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, TeamAccountId);
 
         loaded!.Triggers.Should().HaveCount(2);
         loaded.Triggers.Should().Contain(t => t.Type == TriggerType.Schedule);
@@ -126,7 +126,7 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
         await _sut.AddAsync(wf);
         await _ctx.SaveChangesAsync();
 
-        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, OrgId);
+        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, TeamAccountId);
 
         loaded!.Status.Should().Be(WorkflowStatus.Active);
     }
@@ -134,30 +134,30 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     [Fact]
     public async Task AddStep_WhenMutatedAfterReload_IsPersisted()
     {
-        Guid orgId = Guid.NewGuid();
-        WorkflowDefinition wf = MakeWorkflow("Mutation Test", orgId);
+        Guid teamAccountId = Guid.NewGuid();
+        WorkflowDefinition wf = MakeWorkflow("Mutation Test", teamAccountId);
         await _sut.AddAsync(wf);
         await _ctx.SaveChangesAsync();
 
         // Load then mutate in the same tracked context — without a ValueComparer EF Core
         // uses reference equality on the list and silently skips the UPDATE.
-        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, orgId);
+        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, teamAccountId);
         loaded!.AddStep("Extra Step", StepType.Notification, null);
         await _ctx.SaveChangesAsync();
 
         // Verify with a fresh context to bypass the first-level cache
         await using WorkflowBuilderDbContext freshCtx = db.CreateContext();
         WorkflowRepository freshRepo = new(freshCtx);
-        WorkflowDefinition? reloaded = await freshRepo.GetByIdAsync(wf.Id, orgId);
+        WorkflowDefinition? reloaded = await freshRepo.GetByIdAsync(wf.Id, teamAccountId);
 
         reloaded!.Steps.Should().HaveCount(3, "Start + End + Extra Step must all be persisted");
         reloaded.Steps.Should().Contain(s => s.Name == "Extra Step");
     }
 
     [Fact]
-    public async Task GetByIdAsync_WhenWorkflowBelongsToDifferentOrg_ReturnsNull()
+    public async Task GetByIdAsync_WhenWorkflowBelongsToDifferentTeamAccount_ReturnsNull()
     {
-        WorkflowDefinition wf = MakeWorkflow("Cross-Org Check");
+        WorkflowDefinition wf = MakeWorkflow("Cross-Team-Account Check");
         await _sut.AddAsync(wf);
         await _ctx.SaveChangesAsync();
 
@@ -169,12 +169,12 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     [Fact]
     public async Task GetPagedAsync_WhenWorkflowsExist_ReturnsPagedResult()
     {
-        Guid orgId = Guid.NewGuid();
-        await _sut.AddAsync(MakeWorkflow($"Paged-WF-A-{Guid.NewGuid():N}", orgId));
-        await _sut.AddAsync(MakeWorkflow($"Paged-WF-B-{Guid.NewGuid():N}", orgId));
+        Guid teamAccountId = Guid.NewGuid();
+        await _sut.AddAsync(MakeWorkflow($"Paged-WF-A-{Guid.NewGuid():N}", teamAccountId));
+        await _sut.AddAsync(MakeWorkflow($"Paged-WF-B-{Guid.NewGuid():N}", teamAccountId));
         await _ctx.SaveChangesAsync();
 
-        (IReadOnlyList<WorkflowDefinition> items, int total) = await _sut.GetPagedAsync(orgId, 1, 20);
+        (IReadOnlyList<WorkflowDefinition> items, int total) = await _sut.GetPagedAsync(teamAccountId, 1, 20);
 
         items.Should().HaveCount(2);
         total.Should().Be(2);
@@ -183,18 +183,18 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     [Fact]
     public async Task AddTrigger_WhenMutatedAfterReload_IsPersisted()
     {
-        Guid orgId = Guid.NewGuid();
-        WorkflowDefinition wf = MakeWorkflow("Trigger Mutation Test", orgId);
+        Guid teamAccountId = Guid.NewGuid();
+        WorkflowDefinition wf = MakeWorkflow("Trigger Mutation Test", teamAccountId);
         await _sut.AddAsync(wf);
         await _ctx.SaveChangesAsync();
 
-        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, orgId);
+        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, teamAccountId);
         loaded!.AddTrigger(TriggerType.Manual, null);
         await _ctx.SaveChangesAsync();
 
         await using WorkflowBuilderDbContext freshCtx = db.CreateContext();
         WorkflowRepository freshRepo = new(freshCtx);
-        WorkflowDefinition? reloaded = await freshRepo.GetByIdAsync(wf.Id, orgId);
+        WorkflowDefinition? reloaded = await freshRepo.GetByIdAsync(wf.Id, teamAccountId);
 
         reloaded!.Triggers.Should().HaveCount(1);
         reloaded.Triggers.Should().Contain(t => t.Type == TriggerType.Manual);

@@ -8,7 +8,7 @@ Delete a model so that I can clean up unused data structures.
 
 ## Primary actor
 
-- Organization Member with `data_modeling:model:delete`
+- Team account Member with `data_modeling:model:delete`
 
 ## Trigger
 
@@ -26,7 +26,7 @@ Delete a model so that I can clean up unused data structures.
 
 ## Context
 
-Users can create custom data models within their organization. A model defines the structure of a type of business object. All model metadata is stored in the tenant schema; actual records use a JSONB-backed storage strategy.
+Users can create custom data models within their team account. A model defines the structure of a type of business object. All model metadata is stored in the tenant schema; actual records use a JSONB-backed storage strategy.
 
 ## Acceptance Criteria
 

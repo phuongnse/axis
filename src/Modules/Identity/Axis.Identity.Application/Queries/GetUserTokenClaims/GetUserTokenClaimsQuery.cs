@@ -3,12 +3,12 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Identity.Application.Queries.GetUserTokenClaims;
 
-public sealed record GetUserTokenClaimsQuery(Guid UserId, Guid? OrganizationId)
+public sealed record GetUserTokenClaimsQuery(Guid UserId, Guid? TeamAccountId)
     : IQuery<Result<UserTokenClaimsDto>>;
 
 public sealed record UserTokenClaimsDto(
     Guid UserId,
-    Guid? OrganizationId,
+    Guid? TeamAccountId,
     string Email,
     string FullName,
     IReadOnlyList<string> Permissions);

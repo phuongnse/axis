@@ -19,14 +19,14 @@ public class ExecuteScriptStepHandlerTests
     private readonly IStepDispatcher _dispatcher = Substitute.For<IStepDispatcher>();
     private readonly ILogger<ExecuteScriptStepHandler> _logger = Substitute.For<ILogger<ExecuteScriptStepHandler>>();
 
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TeamAccountId = Guid.NewGuid();
     private static readonly Guid WorkflowId = Guid.NewGuid();
 
     private ExecuteScriptStepHandler CreateHandler() => new(_execRepo, _executor, _dispatcher, _logger);
 
     private static (WorkflowExecution Execution, ExecutionStep Step) MakePendingStep()
     {
-        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, OrgId, TriggerType.Manual, null, new Dictionary<string, object?>());
+        WorkflowExecution exec = WorkflowExecution.Create(WorkflowId, TeamAccountId, TriggerType.Manual, null, new Dictionary<string, object?>());
         ExecutionStep step = exec.AddStep(Guid.NewGuid(), "Script", StepType.Script, 0);
         exec.Start();
         return (exec, step);
@@ -38,13 +38,13 @@ public class ExecuteScriptStepHandlerTests
         (WorkflowExecution execution, ExecutionStep step) = MakePendingStep();
         Dictionary<string, object?> output = new() { ["computed"] = 42 };
 
-        _execRepo.GetByIdWithStepsAsync(execution.Id, OrgId).Returns(execution);
+        _execRepo.GetByIdWithStepsAsync(execution.Id, TeamAccountId).Returns(execution);
         _executor.ExecuteAsync(Arg.Any<IReadOnlyDictionary<string, object?>?>(),
                 Arg.Any<IReadOnlyDictionary<string, object?>>(), Arg.Any<CancellationToken>())
             .Returns(output);
 
         await CreateHandler().HandleAsync(
-            new ExecuteScriptStepMessage(execution.Id, step.Id, OrgId, null, execution.Context),
+            new ExecuteScriptStepMessage(execution.Id, step.Id, TeamAccountId, null, execution.Context),
             CancellationToken.None);
 
         await _dispatcher.Received(1).PublishAsync(
@@ -57,7 +57,7 @@ public class ExecuteScriptStepHandlerTests
     {
         (WorkflowExecution execution, ExecutionStep step) = MakePendingStep();
 
-        _execRepo.GetByIdWithStepsAsync(execution.Id, OrgId).Returns(execution);
+        _execRepo.GetByIdWithStepsAsync(execution.Id, TeamAccountId).Returns(execution);
         _executor.ExecuteAsync(
                 Arg.Any<IReadOnlyDictionary<string, object?>?>(),
                 Arg.Any<IReadOnlyDictionary<string, object?>>(),
@@ -65,7 +65,7 @@ public class ExecuteScriptStepHandlerTests
             .ThrowsAsync(new InvalidOperationException("Script error"));
 
         await CreateHandler().HandleAsync(
-            new ExecuteScriptStepMessage(execution.Id, step.Id, OrgId, null, execution.Context),
+            new ExecuteScriptStepMessage(execution.Id, step.Id, TeamAccountId, null, execution.Context),
             CancellationToken.None);
 
         await _dispatcher.Received(1).PublishAsync(
@@ -80,10 +80,10 @@ public class ExecuteScriptStepHandlerTests
         execution.StartStep(step.Id, execution.Context);
         execution.CompleteStep(step.Id, new Dictionary<string, object?>());
 
-        _execRepo.GetByIdWithStepsAsync(execution.Id, OrgId).Returns(execution);
+        _execRepo.GetByIdWithStepsAsync(execution.Id, TeamAccountId).Returns(execution);
 
         await CreateHandler().HandleAsync(
-            new ExecuteScriptStepMessage(execution.Id, step.Id, OrgId, null, execution.Context),
+            new ExecuteScriptStepMessage(execution.Id, step.Id, TeamAccountId, null, execution.Context),
             CancellationToken.None);
 
         await _executor.DidNotReceive().ExecuteAsync(
@@ -98,7 +98,7 @@ public class ExecuteScriptStepHandlerTests
         _execRepo.GetByIdWithStepsAsync(Arg.Any<Guid>(), Arg.Any<Guid>()).ReturnsNull();
 
         await CreateHandler().HandleAsync(
-            new ExecuteScriptStepMessage(Guid.NewGuid(), Guid.NewGuid(), OrgId, null, new Dictionary<string, object?>()),
+            new ExecuteScriptStepMessage(Guid.NewGuid(), Guid.NewGuid(), TeamAccountId, null, new Dictionary<string, object?>()),
             CancellationToken.None);
 
         await _dispatcher.DidNotReceive().PublishAsync(

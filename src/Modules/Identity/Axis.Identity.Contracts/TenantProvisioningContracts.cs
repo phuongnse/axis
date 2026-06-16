@@ -18,4 +18,4 @@ public static class TenantModuleNames
 }
 
 /// <summary>Scheduled retry for a single module's tenant schema provisioning (RabbitMQ / Wolverine).</summary>
-public sealed record RetryTenantModuleProvisionMessage(Guid OrganizationId, string Module, int Attempt);
+public sealed record RetryTenantModuleProvisionMessage(Guid TeamAccountId, string Module, int Attempt);

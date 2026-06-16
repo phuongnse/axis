@@ -27,7 +27,7 @@ public static class DataClassEndpoints
         group.MapGet("/", GetDataClasses)
             .RequireAuthorization(Permissions.DataModeling.ModelRead)
             .WithName("GetDataClasses")
-            .WithSummary("List all data classes for the organization")
+            .WithSummary("List all data classes for the team account")
             .WithTags("DataModeling")
             .Produces<IReadOnlyList<DataClassSummaryDto>>()
             .ProducesProblem(401)
@@ -108,7 +108,7 @@ public static class DataClassEndpoints
         [FromQuery] int pageSize = 20)
     {
         PagedResult<DataClassSummaryDto> result = await mediator.Send(
-            new GetDataClassesQuery(currentUser.OrgId, page, pageSize), ct);
+            new GetDataClassesQuery(currentUser.TeamAccountId, page, pageSize), ct);
         return Results.Ok(result);
     }
 
@@ -121,7 +121,7 @@ public static class DataClassEndpoints
         Result<Guid> result = await mediator.Send(new CreateDataClassCommand(
             request.Name,
             request.Description,
-            currentUser.OrgId,
+            currentUser.TeamAccountId,
             currentUser.UserId.ToString()), ct);
 
         if (result.IsFailure) return result.ToProblemDetails();
@@ -135,7 +135,7 @@ public static class DataClassEndpoints
         CancellationToken ct)
     {
         Result<DataClassDetailDto> result = await mediator.Send(
-            new GetDataClassQuery(dataClassId, currentUser.OrgId), ct);
+            new GetDataClassQuery(dataClassId, currentUser.TeamAccountId), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.Ok(result.Value);
     }
@@ -149,7 +149,7 @@ public static class DataClassEndpoints
     {
         Result result = await mediator.Send(new UpdateDataClassCommand(
             dataClassId,
-            currentUser.OrgId,
+            currentUser.TeamAccountId,
             request.Name,
             request.Description), ct);
 
@@ -163,7 +163,7 @@ public static class DataClassEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        Result result = await mediator.Send(new DeleteDataClassCommand(dataClassId, currentUser.OrgId), ct);
+        Result result = await mediator.Send(new DeleteDataClassCommand(dataClassId, currentUser.TeamAccountId), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
@@ -177,7 +177,7 @@ public static class DataClassEndpoints
     {
         Result<Guid> result = await mediator.Send(new AddFieldToDataClassCommand(
             dataClassId,
-            currentUser.OrgId,
+            currentUser.TeamAccountId,
             request.Name,
             request.Label,
             request.Type,
@@ -196,7 +196,7 @@ public static class DataClassEndpoints
         CancellationToken ct)
     {
         Result result = await mediator.Send(
-            new RemoveFieldFromDataClassCommand(dataClassId, fieldId, currentUser.OrgId), ct);
+            new RemoveFieldFromDataClassCommand(dataClassId, fieldId, currentUser.TeamAccountId), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }

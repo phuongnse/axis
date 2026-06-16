@@ -57,7 +57,7 @@ Use-case **sequence / entity** diagrams live in each use-case `README.md` under 
 
 | Diagram | Owner |
 |---|---|
-| Organization onboarding journey | [register-org § Diagrams](./use-cases/platform-foundation/register-org/README.md#diagrams) |
+| Team account onboarding journey | [register-team-account § Diagrams](./use-cases/platform-foundation/register-team-account/README.md#diagrams) |
 | Standalone user registration journey | [register-user § Diagrams](./use-cases/identity-access/register-user/README.md#diagrams) |
 | Auth flow | [sign-in § Diagrams](./use-cases/identity-access/sign-in/README.md#diagrams) |
 | Data model | [create-model § Diagrams](./use-cases/data-modeling/create-model/README.md#diagrams) |
@@ -73,8 +73,8 @@ External actors and the Axis platform boundary. Detail: [ARCHITECTURE.md § Syst
 %%{init: {'theme':'dark','themeVariables':{'background':'#0d1117','mainBkg':'#0d1117','primaryColor':'#161b22','primaryBorderColor':'#388bfd','primaryTextColor':'#e6edf3','secondaryColor':'#21262d','secondaryBorderColor':'#388bfd','secondaryTextColor':'#e6edf3','tertiaryColor':'#161b22','tertiaryTextColor':'#e6edf3','lineColor':'#58a6ff','textColor':'#e6edf3','nodeBorder':'#388bfd','clusterBkg':'#161b22','clusterBorder':'#388bfd','titleColor':'#e6edf3','edgeLabelBackground':'#161b22','actorBkg':'#161b22','actorBorder':'#388bfd','actorTextColor':'#e6edf3','signalColor':'#58a6ff','labelBoxBkgColor':'#161b22','labelBoxBorderColor':'#388bfd','noteBkgColor':'#161b22','noteBorderColor':'#388bfd','noteTextColor':'#c9d1d9','activationBkgColor':'#30363d'}}}%%
 flowchart LR
   PA[Platform Admin]
-  OA[Org Admin]
-  OM[Org Member]
+  OA[Team account Admin]
+  OM[Team account Member]
   EU[End User]
 
   subgraph Axis["Axis Platform"]
@@ -186,7 +186,7 @@ Screen wireframes use Excalidraw (`.excalidraw` + `.svg`). Each use case lists i
 
 | Use case | Why open this |
 |----------|----------------|
-| [register-org § Wireframes](./use-cases/platform-foundation/register-org/README.md#wireframes) | Multi-screen organization onboarding path, error `*-states`, links to Mermaid diagrams |
+| [register-team-account § Wireframes](./use-cases/platform-foundation/register-team-account/README.md#wireframes) | Multi-screen team account onboarding path, error `*-states`, links to Mermaid diagrams |
 
 Regenerate screen `.svg` after `.excalidraw` changes: `node docs/wireframes/generate-screens.mjs` and Kroki (see [wireframes.md](./playbooks/wireframes.md)).
 

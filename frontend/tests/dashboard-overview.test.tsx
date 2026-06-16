@@ -12,12 +12,12 @@ const profileWithWorkspace = {
   fullName: 'Admin User',
   avatarUrl: null,
   isActive: true,
-  orgId: '3cde5c59-d18b-464f-a021-5fce16b01118',
-  permissions: ['organization:settings:read'],
+  teamAccountId: '3cde5c59-d18b-464f-a021-5fce16b01118',
+  permissions: ['team-account:settings:read'],
 };
 
-const organizationSettings = {
-  organizationId: '3cde5c59-d18b-464f-a021-5fce16b01118',
+const teamAccountSettings = {
+  teamAccountId: '3cde5c59-d18b-464f-a021-5fce16b01118',
   name: 'Northwind Labs',
   slug: 'northwind-labs',
   logoUrl: null,
@@ -63,8 +63,8 @@ describe('DashboardOverview', () => {
         return Promise.resolve(jsonResponse(profileWithWorkspace));
       }
 
-      if (url.includes('/api/organizations/current/settings')) {
-        return Promise.resolve(jsonResponse(organizationSettings));
+      if (url.includes('/api/team-accounts/current/settings')) {
+        return Promise.resolve(jsonResponse(teamAccountSettings));
       }
 
       return Promise.reject(new Error(`Unexpected fetch: ${url}`));
@@ -84,7 +84,7 @@ describe('DashboardOverview', () => {
     expect(screen.queryByText('42 models')).not.toBeInTheDocument();
   });
 
-  it('does not request organization settings when the account has no workspace', async () => {
+  it('does not request team account settings when the account has no workspace', async () => {
     vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
 
@@ -92,7 +92,7 @@ describe('DashboardOverview', () => {
         return Promise.resolve(
           jsonResponse({
             ...profileWithWorkspace,
-            orgId: null,
+            teamAccountId: null,
             permissions: [],
           }),
         );

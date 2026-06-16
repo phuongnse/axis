@@ -12,20 +12,20 @@ namespace axis.datamodeling.events
     public partial class DataClassDeletedEvent : global::Avro.Specific.ISpecificRecord
     {
         public static global::Avro.Schema _SCHEMA = global::Avro.Schema.Parse(
-            @"{""type"":""record"",""name"":""DataClassDeletedEvent"",""namespace"":""axis.datamodeling.events"",""fields"":[{""name"":""dataClassId"",""type"":""string""},{""name"":""organizationId"",""type"":""string""}]}");
+            @"{""type"":""record"",""name"":""DataClassDeletedEvent"",""namespace"":""axis.datamodeling.events"",""fields"":[{""name"":""dataClassId"",""type"":""string""},{""name"":""teamAccountId"",""type"":""string""}]}");
 
         private string _dataClassId = string.Empty;
-        private string _organizationId = string.Empty;
+        private string _teamAccountId = string.Empty;
 
         public virtual global::Avro.Schema Schema => DataClassDeletedEvent._SCHEMA;
 
         public string dataClassId { get => _dataClassId; set => _dataClassId = value; }
-        public string organizationId { get => _organizationId; set => _organizationId = value; }
+        public string teamAccountId { get => _teamAccountId; set => _teamAccountId = value; }
 
         public virtual object Get(int fieldPos) => fieldPos switch
         {
             0 => dataClassId,
-            1 => organizationId,
+            1 => teamAccountId,
             _ => throw new global::Avro.AvroRuntimeException("Bad index " + fieldPos + " in Get()"),
         };
 
@@ -34,7 +34,7 @@ namespace axis.datamodeling.events
             switch (fieldPos)
             {
                 case 0: dataClassId = (string)fieldValue; break;
-                case 1: organizationId = (string)fieldValue; break;
+                case 1: teamAccountId = (string)fieldValue; break;
                 default: throw new global::Avro.AvroRuntimeException("Bad index " + fieldPos + " in Put()");
             }
         }

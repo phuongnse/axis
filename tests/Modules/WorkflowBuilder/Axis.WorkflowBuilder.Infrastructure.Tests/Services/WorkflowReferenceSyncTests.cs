@@ -10,13 +10,13 @@ namespace Axis.WorkflowBuilder.Infrastructure.Tests.Services;
 [Collection("WorkflowBuilderDb")]
 public sealed class WorkflowReferenceSyncTests(WorkflowBuilderDatabaseFixture fixture)
 {
-    private static readonly Guid OrgId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid TeamAccountId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     [Fact]
     public async Task SyncAsync_WhenReferenceIsBroken_ReturnsHasBrokenWithoutSave()
     {
         Guid formId = Guid.NewGuid();
-        WorkflowDefinition workflow = WorkflowDefinition.Create($"Flow-{Guid.NewGuid():N}", null, OrgId, "user");
+        WorkflowDefinition workflow = WorkflowDefinition.Create($"Flow-{Guid.NewGuid():N}", null, TeamAccountId, "user");
         workflow.AddStep("Intake", StepType.Form, new Dictionary<string, object?> { ["formId"] = formId });
         Guid stepId = workflow.Steps.Single(s => s.Type == StepType.Form).Id;
 
@@ -24,7 +24,7 @@ public sealed class WorkflowReferenceSyncTests(WorkflowBuilderDatabaseFixture fi
         {
             seedCtx.WorkflowDefinitions.Add(workflow);
             seedCtx.WorkflowFormReferences.Add(
-                WorkflowFormReference.Create(workflow.Id, stepId, formId, OrgId, isBroken: true));
+                WorkflowFormReference.Create(workflow.Id, stepId, formId, TeamAccountId, isBroken: true));
             await seedCtx.SaveChangesAsync();
         }
 

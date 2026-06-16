@@ -10,7 +10,7 @@ public sealed class Role : AggregateRoot<Guid>
     public string Name { get; private set; }
     public string? Description { get; private set; }
     public bool IsSystem { get; private set; }
-    public Guid OrganizationId { get; private set; }
+    public Guid TeamAccountId { get; private set; }
     public DateTime CreatedAt { get; private set; }
 
     public IReadOnlyList<string> Permissions => _permissions.AsReadOnly();
@@ -18,19 +18,19 @@ public sealed class Role : AggregateRoot<Guid>
     private Role() : base(default) { Name = null!; } // EF Core materialisation
 
     private Role(Guid id, string name, string? description, bool isSystem,
-        Guid organizationId, IEnumerable<string> permissions, DateTime createdAt)
+        Guid teamAccountId, IEnumerable<string> permissions, DateTime createdAt)
         : base(id)
     {
         Name = name;
         Description = description;
         IsSystem = isSystem;
-        OrganizationId = organizationId;
+        TeamAccountId = teamAccountId;
         CreatedAt = createdAt;
         _permissions.AddRange(permissions.Distinct());
     }
 
     /// <summary>Creates a custom role. Requires at least one permission.</summary>
-    public static Role Create(string name, string? description, Guid organizationId,
+    public static Role Create(string name, string? description, Guid teamAccountId,
         IEnumerable<string> permissions)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -41,19 +41,19 @@ public sealed class Role : AggregateRoot<Guid>
             throw new ArgumentException("A role must have at least one permission.", nameof(permissions));
 
         Role role = new Role(Guid.NewGuid(), name.Trim(), description?.Trim(), false,
-            organizationId, permList, DateTime.UtcNow);
+            teamAccountId, permList, DateTime.UtcNow);
 
-        role.RaiseDomainEvent(new RoleCreated(role.Id, organizationId, role.Name, false));
+        role.RaiseDomainEvent(new RoleCreated(role.Id, teamAccountId, role.Name, false));
         return role;
     }
 
     /// <summary>Creates a system role (Admin, Editor, Viewer, EndUser). Cannot be updated.</summary>
-    public static Role CreateSystem(string name, Guid organizationId, IEnumerable<string> permissions)
+    public static Role CreateSystem(string name, Guid teamAccountId, IEnumerable<string> permissions)
     {
         Role role = new Role(Guid.NewGuid(), name, null, true,
-            organizationId, permissions, DateTime.UtcNow);
+            teamAccountId, permissions, DateTime.UtcNow);
 
-        role.RaiseDomainEvent(new RoleCreated(role.Id, organizationId, name, true));
+        role.RaiseDomainEvent(new RoleCreated(role.Id, teamAccountId, name, true));
         return role;
     }
 
@@ -74,7 +74,7 @@ public sealed class Role : AggregateRoot<Guid>
         _permissions.Clear();
         _permissions.AddRange(permList);
 
-        RaiseDomainEvent(new RoleUpdated(Id, OrganizationId, Name));
+        RaiseDomainEvent(new RoleUpdated(Id, TeamAccountId, Name));
     }
 
     public bool HasPermission(string permission) =>

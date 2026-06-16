@@ -14,10 +14,10 @@ public sealed class CreateModelHandler(
 {
     public async Task<Result<Guid>> Handle(CreateModelCommand command, CancellationToken cancellationToken)
     {
-        if (await modelRepo.NameExistsAsync(command.Name, command.OrganizationId, null, cancellationToken))
+        if (await modelRepo.NameExistsAsync(command.Name, command.TeamAccountId, null, cancellationToken))
             return Result.Failure<Guid>(ErrorCodes.Conflict, $"A model named '{command.Name}' already exists.");
 
-        DataModel model = DataModel.Create(command.Name, command.Description, command.Icon, command.Color, command.OrganizationId, command.CreatedBy);
+        DataModel model = DataModel.Create(command.Name, command.Description, command.Icon, command.Color, command.TeamAccountId, command.CreatedBy);
 
         await modelRepo.AddAsync(model, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);

@@ -36,7 +36,7 @@ describe('EmailConfirmationPage', () => {
   it('uses team account confirmation copy when registration context has a team name', async () => {
     saveRegistrationContext({
       email: 'admin@company.com',
-      organizationName: 'Acme Corp',
+      teamAccountName: 'Acme Corp',
     });
 
     await renderWithRouter(<EmailConfirmationPage />, { path: '/register/confirmation' });

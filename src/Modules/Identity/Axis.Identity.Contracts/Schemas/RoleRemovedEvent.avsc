@@ -4,7 +4,7 @@
   "name": "RoleRemovedEvent",
   "fields": [
     { "name": "userId", "type": "string" },
-    { "name": "organizationId", "type": "string" },
+    { "name": "teamAccountId", "type": "string" },
     { "name": "roleId", "type": "string" }
   ]
 }

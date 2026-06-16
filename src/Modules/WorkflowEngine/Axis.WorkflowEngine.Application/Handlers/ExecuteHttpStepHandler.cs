@@ -20,7 +20,7 @@ public sealed class ExecuteHttpStepHandler(
     public async Task HandleAsync(ExecuteHttpStepMessage message, CancellationToken ct)
     {
         WorkflowExecution? execution = await execRepo.GetByIdWithStepsAsync(
-            message.ExecutionId, message.OrganizationId, ct);
+            message.ExecutionId, message.TeamAccountId, ct);
 
         if (execution is null)
         {
@@ -58,7 +58,7 @@ public sealed class ExecuteHttpStepHandler(
                 message.StepId, message.ExecutionId);
 
             await dispatcher.PublishAsync(new StepCompletedMessage(
-                message.ExecutionId, message.StepId, message.OrganizationId, output), ct);
+                message.ExecutionId, message.StepId, message.TeamAccountId, output), ct);
         }
         catch (Exception ex)
         {
@@ -69,7 +69,7 @@ public sealed class ExecuteHttpStepHandler(
                 message.StepId, message.ExecutionId);
 
             await dispatcher.PublishAsync(new StepFailedMessage(
-                message.ExecutionId, message.StepId, message.OrganizationId,
+                message.ExecutionId, message.StepId, message.TeamAccountId,
                 ex.GetType().Name), ct);
         }
     }

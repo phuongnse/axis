@@ -8,7 +8,7 @@ See all records for a model so that I can browse and find the data I need.
 
 ## Primary actor
 
-- Organization Member with `data_modeling:record:read`
+- Team account Member with `data_modeling:record:read`
 
 ## Trigger
 

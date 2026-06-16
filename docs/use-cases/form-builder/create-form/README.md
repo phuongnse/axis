@@ -8,7 +8,7 @@ Create a new form so that I can design a data collection interface.
 
 ## Primary actor
 
-- Organization Member with `form:definition:write`
+- Team account Member with `form:definition:write`
 
 ## Trigger
 
@@ -36,7 +36,7 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 - [ ] A live preview panel on the right of the editor shows the form as it would appear to a user filling it in.
 
 *Validation & errors*
-- [ ] Name: required, 2–200 characters, unique within the org (case-insensitive). Duplicate shows: "A form named '{name}' already exists."
+- [ ] Name: required, 2–200 characters, unique within the team account (case-insensitive). Duplicate shows: "A form named '{name}' already exists."
 
 *Edge cases*
 - [ ] Creating a form and immediately navigating away without adding fields: the empty form is saved and visible in the forms list.
@@ -79,7 +79,7 @@ erDiagram
   FormDefinition {
     uuid id
     string name
-    uuid organizationId
+    uuid teamAccountId
   }
   FormFieldDefinition {
     uuid id

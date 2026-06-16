@@ -12,7 +12,7 @@ namespace Axis.DataModeling.Infrastructure.Messaging;
 internal static class TenantModuleProvisionAttempt
 {
     public static async Task RunAsync(
-        Guid organizationId,
+        Guid teamAccountId,
         int attempt,
         IConfiguration configuration,
         IMessageBus messageBus,
@@ -26,13 +26,13 @@ internal static class TenantModuleProvisionAttempt
         {
             await TenantSchemaProvisioner.ProvisionAsync(
                 connectionString,
-                $"axis.tenant.datamodeling:{organizationId:N}",
-                organizationId,
+                $"axis.tenant.datamodeling:{teamAccountId:N}",
+                teamAccountId,
                 ct => TenantSchemaProvisioner.MigrateWithFixedTenantAsync(
                     connectionString,
-                    organizationId,
+                    teamAccountId,
                     (DbContextOptions<DataModelingDbContext> options) =>
-                        new DataModelingDbContext(options, new FixedTenantContext(organizationId)),
+                        new DataModelingDbContext(options, new FixedTenantContext(teamAccountId)),
                     ct),
                 logger,
                 TenantModuleNames.DataModeling,
@@ -41,7 +41,7 @@ internal static class TenantModuleProvisionAttempt
             cancellationToken.ThrowIfCancellationRequested();
             await messageBus.PublishAsync(
                 TenantModuleProvisionReportEventFactory.Create(
-                    organizationId, TenantModuleNames.DataModeling, succeeded: true, attempt));
+                    teamAccountId, TenantModuleNames.DataModeling, succeeded: true, attempt));
         }
         catch (Exception ex)
         {
@@ -53,7 +53,7 @@ internal static class TenantModuleProvisionAttempt
             cancellationToken.ThrowIfCancellationRequested();
             await messageBus.PublishAsync(
                 TenantModuleProvisionReportEventFactory.Create(
-                    organizationId,
+                    teamAccountId,
                     TenantModuleNames.DataModeling,
                     succeeded: false,
                     attempt,

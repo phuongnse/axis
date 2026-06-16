@@ -8,7 +8,7 @@ Edit an existing custom role so that I can adjust permissions as our needs chang
 
 ## Primary actor
 
-- Organization Admin
+- Team account Admin
 
 ## Trigger
 
@@ -26,7 +26,7 @@ Edit an existing custom role so that I can adjust permissions as our needs chang
 
 ## Context
 
-Organization admins can create custom roles, assign permissions to each role, and assign roles to users. Default system roles (Admin, Editor, Viewer) are provided out-of-the-box and cannot be deleted or modified.
+Team account admins can create custom roles, assign permissions to each role, and assign roles to users. Default system roles (Admin, Editor, Viewer) are provided out-of-the-box and cannot be deleted or modified.
 
 ## Acceptance Criteria
 

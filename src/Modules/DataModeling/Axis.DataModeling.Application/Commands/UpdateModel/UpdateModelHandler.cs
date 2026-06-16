@@ -13,11 +13,11 @@ public sealed class UpdateModelHandler(
 {
     public async Task<Result> Handle(UpdateModelCommand command, CancellationToken cancellationToken)
     {
-        DataModeling.Domain.Aggregates.DataModel? model = await modelRepo.GetByIdAsync(command.ModelId, command.OrganizationId, cancellationToken);
+        DataModeling.Domain.Aggregates.DataModel? model = await modelRepo.GetByIdAsync(command.ModelId, command.TeamAccountId, cancellationToken);
         if (model is null)
             return Result.Failure(ErrorCodes.NotFound, "Model not found.");
 
-        if (await modelRepo.NameExistsAsync(command.Name, command.OrganizationId, command.ModelId, cancellationToken))
+        if (await modelRepo.NameExistsAsync(command.Name, command.TeamAccountId, command.ModelId, cancellationToken))
             return Result.Failure(ErrorCodes.Conflict, $"A model named '{command.Name}' already exists.");
 
         try

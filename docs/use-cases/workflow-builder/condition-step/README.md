@@ -8,7 +8,7 @@ Add a Condition step so that my workflow can take different paths based on data 
 
 ## Primary actor
 
-- Organization Member
+- Team account Member
 
 ## Trigger
 

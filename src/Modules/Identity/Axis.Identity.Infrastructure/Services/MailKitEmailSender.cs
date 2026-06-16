@@ -14,9 +14,9 @@ internal sealed class MailKitEmailSender(IConfiguration configuration) : IEmailS
         await SendAsync(toEmail, subject, body, ct);
     }
 
-    public async Task SendInvitationEmailAsync(string toEmail, string orgName, string invitationToken, CancellationToken ct = default)
+    public async Task SendInvitationEmailAsync(string toEmail, string teamAccountName, string invitationToken, CancellationToken ct = default)
     {
-        string subject = $"You've been invited to join {orgName} on Axis";
+        string subject = $"You've been invited to join {teamAccountName} on Axis";
         string body = $"Click the link to accept your invitation: {GetBaseUrl()}/invitations/accept?token={invitationToken}";
         await SendAsync(toEmail, subject, body, ct);
     }
@@ -35,14 +35,14 @@ internal sealed class MailKitEmailSender(IConfiguration configuration) : IEmailS
         await SendAsync(toEmail, subject, body, ct);
     }
 
-    public async Task SendOrganizationDeletionScheduledEmailAsync(
+    public async Task SendTeamAccountDeletionScheduledEmailAsync(
         string toEmail,
-        string organizationName,
+        string teamAccountName,
         CancellationToken ct = default)
     {
-        string subject = $"Deletion scheduled for {organizationName}";
+        string subject = $"Deletion scheduled for {teamAccountName}";
         string body =
-            "Your organization has been scheduled for deletion. All data will be permanently removed in 30 days.";
+            "Your team account has been scheduled for deletion. All data will be permanently removed in 30 days.";
         await SendAsync(toEmail, subject, body, ct);
     }
 

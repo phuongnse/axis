@@ -4,15 +4,15 @@
 
 ## Purpose
 
-See all roles in my organization so that I can understand who has what level of access.
+See all roles in my team account so that I can understand who has what level of access.
 
 ## Primary actor
 
-- Organization Admin
+- Team account Admin
 
 ## Trigger
 
-- User initiates: see all roles in my organization
+- User initiates: see all roles in my team account
 
 ## Main flow
 
@@ -26,7 +26,7 @@ See all roles in my organization so that I can understand who has what level of 
 
 ## Context
 
-Organization admins can create custom roles, assign permissions to each role, and assign roles to users. Default system roles (Admin, Editor, Viewer) are provided out-of-the-box and cannot be deleted or modified.
+Team account admins can create custom roles, assign permissions to each role, and assign roles to users. Default system roles (Admin, Editor, Viewer) are provided out-of-the-box and cannot be deleted or modified.
 
 ## Acceptance Criteria
 
@@ -39,7 +39,7 @@ Organization admins can create custom roles, assign permissions to each role, an
 - [ ] Users without `roles:read` permission who navigate to this URL are redirected to the home page with a permission error.
 
 *Edge cases*
-- [ ] If an org has no custom roles yet, the list shows only the 4 default system roles with a prompt to create a custom role.
+- [ ] If a team account has no custom roles yet, the list shows only the 4 default system roles with a prompt to create a custom role.
 
 *Out of scope*
 - Role hierarchy / role inheritance — flat role model only.

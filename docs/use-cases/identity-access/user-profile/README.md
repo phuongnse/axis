@@ -26,7 +26,7 @@ Update my profile information so that my name and contact details are current.
 
 ## Context
 
-Organization admins can invite new members, manage their accounts, and deactivate users who should no longer have access.
+Team account admins can invite new members, manage their accounts, and deactivate users who should no longer have access.
 
 ## Acceptance Criteria
 
@@ -44,7 +44,7 @@ Organization admins can invite new members, manage their accounts, and deactivat
 - [ ] If avatar upload fails mid-way, the old avatar remains unchanged and an error is shown.
 
 *Out of scope*
-- Public profile visibility — all profiles are private within the org.
+- Public profile visibility — all profiles are private within the team account.
 
 > **Implementation status**
 >

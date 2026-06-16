@@ -6,13 +6,13 @@
 
 ## Overview
 
-**Axis** is a multi-tenant SaaS low-code platform that enables organizations to build data-driven workflow applications without writing code. Users can model their own data, design automated workflows, create interactive forms, and build custom UI pages — all within a unified visual environment.
+**Axis** is a multi-tenant SaaS low-code platform that enables team accounts to build data-driven workflow applications without writing code. Users can model their own data, design automated workflows, create interactive forms, and build custom UI pages — all within a unified visual environment.
 
 ---
 
 ## Problem Statement
 
-Organizations of all sizes need to digitize and automate their business processes. Custom software development is expensive, slow, and requires dedicated engineering teams. Existing low-code tools are either too rigid (can't model custom data), too complex (require DevOps expertise), or too generic (lack workflow depth).
+Team accounts of all sizes need to digitize and automate their business processes. Custom software development is expensive, slow, and requires dedicated engineering teams. Existing low-code tools are either too rigid (can't model custom data), too complex (require DevOps expertise), or too generic (lack workflow depth).
 
 **Core pain points:**
 
@@ -38,8 +38,8 @@ Axis provides a unified platform where non-technical users can:
 
 | Role | Who They Are | Primary Goals |
 |---|---|---|
-| **Organization Admin** | Business owner or ops lead of a tenant org | Configure the platform, manage users, build workflows |
-| **Organization Member** | Employees within the org | Execute workflows, manage records, fill forms |
+| **Team account Admin** | Business owner or ops lead of a tenant team account | Configure the platform, manage users, build workflows |
+| **Team account Member** | Employees within the team account | Execute workflows, manage records, fill forms |
 | **End User** | Customers or external stakeholders | Submit forms, view published pages |
 | **Platform Admin** | Axis internal team | Manage tenants, monitor platform health |
 
@@ -50,7 +50,7 @@ Axis provides a unified platform where non-technical users can:
 - **Custom data modeling** — Users define their own schemas; no pre-built rigid data structures.
 - **Deep workflow engine** — Branching, parallel steps, multiple trigger types (manual, schedule, webhook, event).
 - **Form-workflow integration** — Forms are first-class workflow steps, not afterthoughts.
-- **Multi-tenancy by design** — Each organization is fully isolated with its own database schema.
+- **Multi-tenancy by design** — Each team account is fully isolated with its own database schema.
 - **Developer-friendly import/export** — Workflows and models can be imported/exported as JSON.
 
 ---
@@ -68,7 +68,7 @@ Register & authenticate → Model data → Build workflows → Add forms
 
 | Capability | In scope |
 |---|---|
-| Multi-tenant organization management (registration, slug, provisioning, plans) | Yes |
+| Multi-tenant team account management (registration, slug, provisioning, plans) | Yes |
 | Authentication (email/password + Microsoft, Google, GitHub) & RBAC | Yes |
 | Legal acceptance (Terms of Service, Privacy Policy) at registration | Yes |
 | Custom data modeling | Yes |
@@ -83,7 +83,7 @@ Register & authenticate → Model data → Build workflows → Add forms
 
 **Implementation order** follows domain **Open work** and use-case **Gaps vs spec** — not a reduced feature phase. Deferred items in a use case are backlog within the same product scope, not excluded from the platform.
 
-**External user sign-in (required providers):** Microsoft (Entra ID / Microsoft account), Google, and GitHub — in addition to email/password. Details: [sign-in](./use-cases/identity-access/sign-in/README.md) and [TECH_STACK § ADR-027](./TECH_STACK.md#adr-027-external-identity-providers-for-user-sign-in-and-registration). Provider registration/linking is a separate user-identity follow-up; [register-user](./use-cases/identity-access/register-user/README.md) covers standalone email/password registration. Organization onboarding uses an official organization contact email, not a generic third-party user identity.
+**External user sign-in (required providers):** Microsoft (Entra ID / Microsoft account), Google, and GitHub — in addition to email/password. Details: [sign-in](./use-cases/identity-access/sign-in/README.md) and [TECH_STACK § ADR-027](./TECH_STACK.md#adr-027-external-identity-providers-for-user-sign-in-and-registration). Provider registration/linking is a separate user-identity follow-up; [register-user](./use-cases/identity-access/register-user/README.md) covers standalone email/password registration. Team account onboarding uses an official team account contact email, not a generic third-party user identity.
 
 ---
 

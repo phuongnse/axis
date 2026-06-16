@@ -30,7 +30,7 @@ public sealed class UpdateUserProfileHandler(
                 return Result.Failure(ErrorCodes.BusinessRule, "Avatar must not exceed 1 MB.");
         }
 
-        User? user = await userRepo.GetByIdAsync(command.UserId, command.OrganizationId, cancellationToken);
+        User? user = await userRepo.GetByIdAsync(command.UserId, command.TeamAccountId, cancellationToken);
         if (user is null)
             return Result.Failure(ErrorCodes.NotFound, "User not found.");
 

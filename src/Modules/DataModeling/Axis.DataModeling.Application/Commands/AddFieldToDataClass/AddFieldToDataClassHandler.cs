@@ -15,7 +15,7 @@ public sealed class AddFieldToDataClassHandler(
 {
     public async Task<Result<Guid>> Handle(AddFieldToDataClassCommand command, CancellationToken cancellationToken)
     {
-        DataClass? dc = await dataClassRepo.GetByIdAsync(command.DataClassId, command.OrganizationId, cancellationToken);
+        DataClass? dc = await dataClassRepo.GetByIdAsync(command.DataClassId, command.TeamAccountId, cancellationToken);
         if (dc is null)
             return Result.Failure<Guid>(ErrorCodes.NotFound, "Data class not found.");
 

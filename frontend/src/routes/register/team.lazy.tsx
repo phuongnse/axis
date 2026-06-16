@@ -1,7 +1,7 @@
 import { createLazyFileRoute } from '@tanstack/react-router';
 
-import { RegisterOrganizationPage } from '@/features/auth/components/RegisterOrganizationPage';
+import { RegisterTeamAccountPage } from '@/features/auth/components/RegisterTeamAccountPage';
 
 export const Route = createLazyFileRoute('/register/team')({
-  component: RegisterOrganizationPage,
+  component: RegisterTeamAccountPage,
 });

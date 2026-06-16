@@ -12,7 +12,7 @@ public sealed class GetCurrentUserProfileHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
 
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TeamAccountId = Guid.NewGuid();
 
     private GetCurrentUserProfileHandler CreateHandler() => new(_userRepo);
 
@@ -23,7 +23,7 @@ public sealed class GetCurrentUserProfileHandlerTests
         _userRepo.GetByIdPlatformWideAsync(userId, Arg.Any<CancellationToken>()).ReturnsNull();
 
         CurrentUserProfileDto? dto = await CreateHandler().Handle(
-            new GetCurrentUserProfileQuery(userId, OrgId, ["workflow:definition:read"]),
+            new GetCurrentUserProfileQuery(userId, TeamAccountId, ["workflow:definition:read"]),
             CancellationToken.None);
 
         dto.Should().BeNull();
@@ -37,7 +37,7 @@ public sealed class GetCurrentUserProfileHandlerTests
         IReadOnlyList<string> jwtPermissions = ["workflow:definition:read", "users:read"];
 
         CurrentUserProfileDto? dto = await CreateHandler().Handle(
-            new GetCurrentUserProfileQuery(user.Id, OrgId, jwtPermissions),
+            new GetCurrentUserProfileQuery(user.Id, TeamAccountId, jwtPermissions),
             CancellationToken.None);
 
         dto.Should().NotBeNull();
@@ -45,7 +45,7 @@ public sealed class GetCurrentUserProfileHandlerTests
         dto.Email.Should().Be("ada@acme.com");
         dto.FullName.Should().Be("Ada Lovelace");
         dto.IsActive.Should().BeTrue();
-        dto.OrgId.Should().Be(OrgId);
+        dto.TeamAccountId.Should().Be(TeamAccountId);
         dto.Permissions.Should().BeEquivalentTo(jwtPermissions);
     }
 }

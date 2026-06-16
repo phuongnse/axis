@@ -12,7 +12,7 @@ namespace Axis.FormBuilder.Infrastructure.Tests.Handlers;
 [Collection("FormBuilderDb")]
 public sealed class WorkflowArchivedHandlerTests(FormBuilderDatabaseFixture fixture)
 {
-    private static readonly Guid OrgId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid TeamAccountId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private static WorkflowArchivedHandler CreateHandler(FormBuilderDbContext ctx)
     {
@@ -25,7 +25,7 @@ public sealed class WorkflowArchivedHandlerTests(FormBuilderDatabaseFixture fixt
 
     private async Task SeedActiveRef(Guid workflowId, Guid formId, FormBuilderDbContext ctx)
     {
-        ctx.FormWorkflowReferences.Add(FormWorkflowReference.Create(workflowId, formId, OrgId));
+        ctx.FormWorkflowReferences.Add(FormWorkflowReference.Create(workflowId, formId, TeamAccountId));
         await ctx.SaveChangesAsync();
     }
 
@@ -44,7 +44,7 @@ public sealed class WorkflowArchivedHandlerTests(FormBuilderDatabaseFixture fixt
 
         await using FormBuilderDbContext handlerCtx = fixture.CreateContext();
         await CreateHandler(handlerCtx).Handle(
-            new WorkflowArchivedEvent { workflowId = workflowId.ToString(), organizationId = OrgId.ToString() },
+            new WorkflowArchivedEvent { workflowId = workflowId.ToString(), teamAccountId = TeamAccountId.ToString() },
             CancellationToken.None);
 
         await using FormBuilderDbContext readCtx = fixture.CreateContext();
@@ -64,7 +64,7 @@ public sealed class WorkflowArchivedHandlerTests(FormBuilderDatabaseFixture fixt
             new WorkflowArchivedEvent
             {
                 workflowId = Guid.NewGuid().ToString(),
-                organizationId = OrgId.ToString(),
+                teamAccountId = TeamAccountId.ToString(),
             },
             CancellationToken.None);
 

@@ -29,7 +29,7 @@ public static class FormEndpoints
         group.MapGet("/", GetForms)
             .RequireAuthorization(Permissions.Form.DefinitionRead)
             .WithName("GetForms")
-            .WithSummary("List all forms for the organization (paginated)")
+            .WithSummary("List all forms for the team account (paginated)")
             .WithTags("FormBuilder")
             .Produces<PagedResult<FormSummaryDto>>()
             .ProducesProblem(401)
@@ -133,7 +133,7 @@ public static class FormEndpoints
         [FromQuery] int pageSize = 20)
     {
         PagedResult<FormSummaryDto> result = await mediator.Send(
-            new GetFormsQuery(currentUser.OrgId, page, pageSize), ct);
+            new GetFormsQuery(currentUser.TeamAccountId, page, pageSize), ct);
         return Results.Ok(result);
     }
 
@@ -146,7 +146,7 @@ public static class FormEndpoints
         Result<Guid> result = await mediator.Send(new CreateFormCommand(
             request.Name,
             request.Description,
-            currentUser.OrgId,
+            currentUser.TeamAccountId,
             currentUser.UserId.ToString()), ct);
 
         if (result.IsFailure) return result.ToProblemDetails();
@@ -159,7 +159,7 @@ public static class FormEndpoints
         CancellationToken ct)
     {
         IReadOnlyList<GetFormPickerDto> result = await mediator.Send(
-            new GetFormPickerQuery(currentUser.OrgId), ct);
+            new GetFormPickerQuery(currentUser.TeamAccountId), ct);
         return Results.Ok(result);
     }
 
@@ -170,7 +170,7 @@ public static class FormEndpoints
         CancellationToken ct)
     {
         FormDetailDto? result = await mediator.Send(
-            new GetFormByIdQuery(formId, currentUser.OrgId), ct);
+            new GetFormByIdQuery(formId, currentUser.TeamAccountId), ct);
         if (result is null) return Results.NotFound();
         return Results.Ok(result);
     }
@@ -184,7 +184,7 @@ public static class FormEndpoints
     {
         Result result = await mediator.Send(new UpdateFormCommand(
             formId,
-            currentUser.OrgId,
+            currentUser.TeamAccountId,
             request.Name,
             request.Description), ct);
 
@@ -198,7 +198,7 @@ public static class FormEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        Result result = await mediator.Send(new DeleteFormCommand(formId, currentUser.OrgId), ct);
+        Result result = await mediator.Send(new DeleteFormCommand(formId, currentUser.TeamAccountId), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
@@ -212,7 +212,7 @@ public static class FormEndpoints
     {
         Result<Guid> result = await mediator.Send(new AddFieldToFormCommand(
             formId,
-            currentUser.OrgId,
+            currentUser.TeamAccountId,
             request.Key,
             request.Label,
             request.Type,
@@ -231,7 +231,7 @@ public static class FormEndpoints
         CancellationToken ct)
     {
         Result result = await mediator.Send(
-            new RemoveFieldFromFormCommand(formId, currentUser.OrgId, fieldId), ct);
+            new RemoveFieldFromFormCommand(formId, currentUser.TeamAccountId, fieldId), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }
@@ -244,7 +244,7 @@ public static class FormEndpoints
         CancellationToken ct)
     {
         Result result = await mediator.Send(
-            new ReorderFormFieldsCommand(formId, currentUser.OrgId, request.FieldIds), ct);
+            new ReorderFormFieldsCommand(formId, currentUser.TeamAccountId, request.FieldIds), ct);
         if (result.IsFailure) return result.ToProblemDetails();
         return Results.NoContent();
     }

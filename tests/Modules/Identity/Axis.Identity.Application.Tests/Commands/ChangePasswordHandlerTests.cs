@@ -17,7 +17,7 @@ public class ChangePasswordHandlerTests
     private readonly IEmailSender _emailSender = Substitute.For<IEmailSender>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TeamAccountId = Guid.NewGuid();
 
     private ChangePasswordHandler CreateHandler() =>
         new(_userRepo, _hasher, _emailSender, _uow);
@@ -34,14 +34,14 @@ public class ChangePasswordHandlerTests
     public async Task ChangePassword_WhenCurrentPasswordIsCorrect_ChangesPasswordAndSendsNotification()
     {
         User user = MakeUser();
-        _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
+        _userRepo.GetByIdAsync(user.Id, TeamAccountId).Returns(user);
         _hasher.Verify("old account passphrase", "old_hash").Returns(true);
         _hasher.Hash("fresh account passphrase").Returns("new_hash");
 
         Result result = await CreateHandler().Handle(
             new ChangePasswordCommand(
                 user.Id,
-                OrgId,
+                TeamAccountId,
                 "old account passphrase",
                 "fresh account passphrase",
                 "fresh account passphrase"),
@@ -58,13 +58,13 @@ public class ChangePasswordHandlerTests
     public async Task ChangePassword_WhenCurrentPasswordIsWrong_ReturnsBusinessRuleFailure()
     {
         User user = MakeUser();
-        _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
+        _userRepo.GetByIdAsync(user.Id, TeamAccountId).Returns(user);
         _hasher.Verify("WrongOld", "old_hash").Returns(false);
 
         Result result = await CreateHandler().Handle(
             new ChangePasswordCommand(
                 user.Id,
-                OrgId,
+                TeamAccountId,
                 "WrongOld",
                 "fresh account passphrase",
                 "fresh account passphrase"),
@@ -79,13 +79,13 @@ public class ChangePasswordHandlerTests
     public async Task ChangePassword_WhenNewPasswordSameAsCurrent_ReturnsBusinessRuleFailure()
     {
         User user = MakeUser();
-        _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
+        _userRepo.GetByIdAsync(user.Id, TeamAccountId).Returns(user);
         _hasher.Verify("old account passphrase", "old_hash").Returns(true);
 
         Result result = await CreateHandler().Handle(
             new ChangePasswordCommand(
                 user.Id,
-                OrgId,
+                TeamAccountId,
                 "old account passphrase",
                 "old account passphrase",
                 "old account passphrase"),
@@ -100,13 +100,13 @@ public class ChangePasswordHandlerTests
     public async Task ChangePassword_WhenConfirmationDoesNotMatch_ReturnsBusinessRuleFailure()
     {
         User user = MakeUser();
-        _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
+        _userRepo.GetByIdAsync(user.Id, TeamAccountId).Returns(user);
         _hasher.Verify("old account passphrase", "old_hash").Returns(true);
 
         Result result = await CreateHandler().Handle(
             new ChangePasswordCommand(
                 user.Id,
-                OrgId,
+                TeamAccountId,
                 "old account passphrase",
                 "fresh account passphrase",
                 "different account passphrase"),
@@ -121,11 +121,11 @@ public class ChangePasswordHandlerTests
     public async Task ChangePassword_WhenNewPasswordIsWeak_ReturnsBusinessRuleFailure()
     {
         User user = MakeUser();
-        _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
+        _userRepo.GetByIdAsync(user.Id, TeamAccountId).Returns(user);
         _hasher.Verify("old account passphrase", "old_hash").Returns(true);
 
         Result result = await CreateHandler().Handle(
-            new ChangePasswordCommand(user.Id, OrgId, "old account passphrase", "short", "short"),
+            new ChangePasswordCommand(user.Id, TeamAccountId, "old account passphrase", "short", "short"),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -135,12 +135,12 @@ public class ChangePasswordHandlerTests
     [Fact]
     public async Task ChangePassword_WhenUserNotFound_ReturnsNotFound()
     {
-        _userRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).ReturnsNull();
+        _userRepo.GetByIdAsync(Arg.Any<Guid>(), TeamAccountId).ReturnsNull();
 
         Result result = await CreateHandler().Handle(
             new ChangePasswordCommand(
                 Guid.NewGuid(),
-                OrgId,
+                TeamAccountId,
                 "old account passphrase",
                 "fresh account passphrase",
                 "fresh account passphrase"),
@@ -152,16 +152,16 @@ public class ChangePasswordHandlerTests
     }
 
     [Fact]
-    public async Task ChangePassword_WhenUserBelongsToAnotherOrg_ReturnsNotFound()
+    public async Task ChangePassword_WhenUserBelongsToAnotherTeamAccount_ReturnsNotFound()
     {
         User user = MakeUser();
-        _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
+        _userRepo.GetByIdAsync(user.Id, TeamAccountId).Returns(user);
 
-        Guid otherOrgId = Guid.NewGuid();
+        Guid otherTeamAccountId = Guid.NewGuid();
         Result result = await CreateHandler().Handle(
             new ChangePasswordCommand(
                 user.Id,
-                otherOrgId,
+                otherTeamAccountId,
                 "old account passphrase",
                 "fresh account passphrase",
                 "fresh account passphrase"),

@@ -25,9 +25,9 @@ When you touch `docs/wireframes/**` or use-case `*.excalidraw`:
 - [ ] Regenerated `.svg` for changed screens; [visual-artifact-checklist](./visual-artifact-checklist.md) satisfied.
 - [ ] Use-case `README.md` wireframes table / screen flow updated if screens added or renamed.
 
-**Reference screen:** [register-org](../use-cases/platform-foundation/register-org/README.md) (full block kit usage).
+**Reference screen:** [register-team-account](../use-cases/platform-foundation/register-team-account/README.md) (full block kit usage).
 
-**Multi-screen journeys:** [Multi-screen journey pattern](#multi-screen-journey-pattern) below — generic checklist; use register-org as the worked example.
+**Multi-screen journeys:** [Multi-screen journey pattern](#multi-screen-journey-pattern) below — generic checklist; use register-team-account as the worked example.
 
 ---
 
@@ -35,7 +35,7 @@ When you touch `docs/wireframes/**` or use-case `*.excalidraw`:
 
 Reusable pattern for use cases with several UI steps and error variants. Keep rules here generic; product copy and APIs stay in the use-case README.
 
-**Worked example:** [register-org](../use-cases/platform-foundation/register-org/README.md) (screen flow, wireframes table, diagrams). **README layout rules:** [docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--wireframes--implementation-status).
+**Worked example:** [register-team-account](../use-cases/platform-foundation/register-team-account/README.md) (screen flow, wireframes table, diagrams). **README layout rules:** [docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--wireframes--implementation-status).
 
 ### Documentation (use-case `README.md`)
 
@@ -77,7 +77,7 @@ Reusable pattern for use cases with several UI steps and error variants. Keep ru
 | Layer | File |
 |-------|------|
 | Primitives | `components.mjs` |
-| **Reusable blocks** | **`blocks.mjs`** ← auth / register-org; compose here first |
+| **Reusable blocks** | **`blocks.mjs`** ← auth / register-team-account; compose here first |
 | Kit sections | `generate-template.mjs` (S01–S37 builders, import-only) |
 | Screen outputs | `generate-screens.mjs` → `docs/use-cases/.../*.excalidraw` |
 | Shared shell | `docs/wireframes/app-shell.excalidraw` (+ `.svg`) |
@@ -109,9 +109,9 @@ node docs/wireframes/generate-screens.mjs
 docs/scripts/generate-wireframes.ps1
 
 # One use-case folder only (optional)
-$env:SCREEN_FILTER = "register-org"
+$env:SCREEN_FILTER = "register-team-account"
 node docs/wireframes/generate-screens.mjs
-docs/scripts/generate-wireframes.ps1 -Filter register-org
+docs/scripts/generate-wireframes.ps1 -Filter register-team-account
 ```
 
 ---
@@ -440,7 +440,7 @@ When writing or editing any wireframe generator, verify against these values (fr
 1. Add a `genXxx()` function in `generate-screens.mjs`:
    - **Authenticated screen**: start with `appShell(prefix, W, H, NAV, activeIdx, pageTitle)`
    - **Auth screen** (login, register, etc.): use `authCard()` — never build the card by hand
-   - **Auth screen with many fields / help text / provider entry points**: compose from `blocks.mjs` (`authFormField`, `paintRegisterOrg*`, …) — see [Agent contract](../wireframes/README.md#agent-contract)
+   - **Auth screen with many fields / help text / provider entry points**: compose from `blocks.mjs` (`authFormField`, `paintRegisterTeamAccount*`, …) — see [Agent contract](../wireframes/README.md#agent-contract)
    - Use `component(buildXxx, cx, cy)` for any element that matches a template section
    - Use `btn`, `inputField`, `badge`, etc. from `components.mjs` for individual controls
    - Use raw `rect`, `text`, etc. only for layout with no template equivalent
@@ -449,7 +449,7 @@ When writing or editing any wireframe generator, verify against these values (fr
 3. Add the output path to the screen inventory table in this playbook
 4. Run `node docs/wireframes/generate-screens.mjs` — **verify output has no `NaN` positions** (element count must be > 0)
 5. Run `docs/scripts/generate-wireframes.ps1` to regenerate SVGs
-6. Update the use-case `README.md`: add a `## Wireframes` row (and `## Screen flow` when >3 screens) per [docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--wireframes--implementation-status) — see [register-org](../use-cases/platform-foundation/register-org/README.md) for the full layout
+6. Update the use-case `README.md`: add a `## Wireframes` row (and `## Screen flow` when >3 screens) per [docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--wireframes--implementation-status) — see [register-team-account](../use-cases/platform-foundation/register-team-account/README.md) for the full layout
 
 **Pre-commit checks for screen wireframes:**
 - [ ] [Agent checklist](#agent-checklist) (spacing contract, blocks, regen twice)

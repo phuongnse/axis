@@ -26,15 +26,15 @@ public static class PlanEndpoints
         ISender mediator,
         CancellationToken ct)
     {
-        Guid? orgId = null;
+        Guid? teamAccountId = null;
         if (httpContext.User.Identity?.IsAuthenticated == true)
         {
-            string? orgClaim = httpContext.User.FindFirst("org_id")?.Value;
-            if (orgClaim is not null && Guid.TryParse(orgClaim, out Guid parsedOrgId))
-                orgId = parsedOrgId;
+            string? teamAccountClaim = httpContext.User.FindFirst("team_account_id")?.Value;
+            if (teamAccountClaim is not null && Guid.TryParse(teamAccountClaim, out Guid parsedTeamAccountId))
+                teamAccountId = parsedTeamAccountId;
         }
         IReadOnlyList<SubscriptionPlanDto> plans = await mediator.Send(
-            new ListSubscriptionPlansQuery(orgId),
+            new ListSubscriptionPlansQuery(teamAccountId),
             ct);
         return Results.Ok(plans);
     }

@@ -13,20 +13,20 @@ namespace Axis.Identity.Application.Tests.Commands;
 public class AssignRoleToUserHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
-    private readonly IOrganizationMembershipRepository _membershipRepo = Substitute.For<IOrganizationMembershipRepository>();
+    private readonly ITeamAccountMembershipRepository _membershipRepo = Substitute.For<ITeamAccountMembershipRepository>();
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TeamAccountId = Guid.NewGuid();
     private static readonly Guid AdminRoleId = Guid.NewGuid();
     private static readonly Guid EditorRoleId = Guid.NewGuid();
 
     private AssignRoleToUserHandler CreateHandler() => new(_userRepo, _membershipRepo, _roleRepo, _uow);
 
-    private static (User User, OrganizationMembership Membership) MakeUserWithMembership(string email = "user@acme.com")
+    private static (User User, TeamAccountMembership Membership) MakeUserWithMembership(string email = "user@acme.com")
     {
         User u = User.Create("Test", "User", Email.Create(email).Value);
-        OrganizationMembership membership = OrganizationMembership.Create(u.Id, OrgId);
+        TeamAccountMembership membership = TeamAccountMembership.Create(u.Id, TeamAccountId);
         membership.AssignRole(EditorRoleId);
         return (u, membership);
     }
@@ -34,14 +34,14 @@ public class AssignRoleToUserHandlerTests
     [Fact]
     public async Task AssignRoleToUser_WhenRoleIsValid_AddsRoleToUser()
     {
-        (User user, OrganizationMembership membership) = MakeUserWithMembership();
-        Role newRole = Role.Create("Manager", null, OrgId, ["workflow:definition:read"]);
-        _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
-        _membershipRepo.GetByUserAndOrganizationAsync(user.Id, OrgId).Returns(membership);
-        _roleRepo.GetByIdAsync(newRole.Id, OrgId).Returns(newRole);
+        (User user, TeamAccountMembership membership) = MakeUserWithMembership();
+        Role newRole = Role.Create("Manager", null, TeamAccountId, ["workflow:definition:read"]);
+        _userRepo.GetByIdAsync(user.Id, TeamAccountId).Returns(user);
+        _membershipRepo.GetByUserAndTeamAccountAsync(user.Id, TeamAccountId).Returns(membership);
+        _roleRepo.GetByIdAsync(newRole.Id, TeamAccountId).Returns(newRole);
 
         Result result = await CreateHandler().Handle(
-            new AssignRoleToUserCommand(user.Id, OrgId, newRole.Id, Action: RoleAction.Assign),
+            new AssignRoleToUserCommand(user.Id, TeamAccountId, newRole.Id, Action: RoleAction.Assign),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -52,15 +52,15 @@ public class AssignRoleToUserHandlerTests
     [Fact]
     public async Task AssignRoleToUser_WhenActionIsRemove_RemovesRoleFromUser()
     {
-        (User user, OrganizationMembership membership) = MakeUserWithMembership();
-        Role editorRole = Role.Create("Editor", null, OrgId, ["workflow:definition:read"]);
-        _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
-        _membershipRepo.GetByUserAndOrganizationAsync(user.Id, OrgId).Returns(membership);
-        _roleRepo.GetByIdAsync(EditorRoleId, OrgId).Returns(editorRole);
+        (User user, TeamAccountMembership membership) = MakeUserWithMembership();
+        Role editorRole = Role.Create("Editor", null, TeamAccountId, ["workflow:definition:read"]);
+        _userRepo.GetByIdAsync(user.Id, TeamAccountId).Returns(user);
+        _membershipRepo.GetByUserAndTeamAccountAsync(user.Id, TeamAccountId).Returns(membership);
+        _roleRepo.GetByIdAsync(EditorRoleId, TeamAccountId).Returns(editorRole);
         membership.AssignRole(AdminRoleId); // give another role so we can remove editor
 
         Result result = await CreateHandler().Handle(
-            new AssignRoleToUserCommand(user.Id, OrgId, EditorRoleId, Action: RoleAction.Remove),
+            new AssignRoleToUserCommand(user.Id, TeamAccountId, EditorRoleId, Action: RoleAction.Remove),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -71,14 +71,14 @@ public class AssignRoleToUserHandlerTests
     public async Task AssignRoleToUser_WhenRemovingLastRole_ReturnsBusinessRuleFailure()
     {
         // User has only EditorRoleId
-        (User user, OrganizationMembership membership) = MakeUserWithMembership();
-        Role editorRole = Role.Create("Editor", null, OrgId, ["workflow:definition:read"]);
-        _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
-        _membershipRepo.GetByUserAndOrganizationAsync(user.Id, OrgId).Returns(membership);
-        _roleRepo.GetByIdAsync(EditorRoleId, OrgId).Returns(editorRole);
+        (User user, TeamAccountMembership membership) = MakeUserWithMembership();
+        Role editorRole = Role.Create("Editor", null, TeamAccountId, ["workflow:definition:read"]);
+        _userRepo.GetByIdAsync(user.Id, TeamAccountId).Returns(user);
+        _membershipRepo.GetByUserAndTeamAccountAsync(user.Id, TeamAccountId).Returns(membership);
+        _roleRepo.GetByIdAsync(EditorRoleId, TeamAccountId).Returns(editorRole);
 
         Result result = await CreateHandler().Handle(
-            new AssignRoleToUserCommand(user.Id, OrgId, EditorRoleId, Action: RoleAction.Remove),
+            new AssignRoleToUserCommand(user.Id, TeamAccountId, EditorRoleId, Action: RoleAction.Remove),
             CancellationToken.None);
 
         // a user must always have at least one role
@@ -90,16 +90,16 @@ public class AssignRoleToUserHandlerTests
     [Fact]
     public async Task AssignRoleToUser_WhenRemovingAdminRoleFromLastAdmin_ReturnsBusinessRuleFailure()
     {
-        (User user, OrganizationMembership membership) = MakeUserWithMembership();
+        (User user, TeamAccountMembership membership) = MakeUserWithMembership();
         membership.AssignRole(AdminRoleId);
-        Role adminRole = Role.CreateSystem("Admin", OrgId, ["users:read"]);
-        _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
-        _membershipRepo.GetByUserAndOrganizationAsync(user.Id, OrgId).Returns(membership);
-        _roleRepo.GetByIdAsync(AdminRoleId, OrgId).Returns(adminRole);
-        _membershipRepo.CountAdminsAsync(OrgId, AdminRoleId).Returns(1); // last admin
+        Role adminRole = Role.CreateSystem("Admin", TeamAccountId, ["users:read"]);
+        _userRepo.GetByIdAsync(user.Id, TeamAccountId).Returns(user);
+        _membershipRepo.GetByUserAndTeamAccountAsync(user.Id, TeamAccountId).Returns(membership);
+        _roleRepo.GetByIdAsync(AdminRoleId, TeamAccountId).Returns(adminRole);
+        _membershipRepo.CountAdminsAsync(TeamAccountId, AdminRoleId).Returns(1); // last admin
 
         Result result = await CreateHandler().Handle(
-            new AssignRoleToUserCommand(user.Id, OrgId, AdminRoleId, Action: RoleAction.Remove),
+            new AssignRoleToUserCommand(user.Id, TeamAccountId, AdminRoleId, Action: RoleAction.Remove),
             CancellationToken.None);
 
         // last admin guard
@@ -109,15 +109,15 @@ public class AssignRoleToUserHandlerTests
     }
 
     [Fact]
-    public async Task AssignRoleToUser_WhenRoleNotFoundInOrg_ReturnsNotFound()
+    public async Task AssignRoleToUser_WhenRoleNotFoundInTeamAccount_ReturnsNotFound()
     {
-        (User user, OrganizationMembership membership) = MakeUserWithMembership();
-        _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
-        _membershipRepo.GetByUserAndOrganizationAsync(user.Id, OrgId).Returns(membership);
-        _roleRepo.GetByIdAsync(Arg.Any<Guid>(), OrgId).ReturnsNull();
+        (User user, TeamAccountMembership membership) = MakeUserWithMembership();
+        _userRepo.GetByIdAsync(user.Id, TeamAccountId).Returns(user);
+        _membershipRepo.GetByUserAndTeamAccountAsync(user.Id, TeamAccountId).Returns(membership);
+        _roleRepo.GetByIdAsync(Arg.Any<Guid>(), TeamAccountId).ReturnsNull();
 
         Result result = await CreateHandler().Handle(
-            new AssignRoleToUserCommand(user.Id, OrgId, Guid.NewGuid(), Action: RoleAction.Assign),
+            new AssignRoleToUserCommand(user.Id, TeamAccountId, Guid.NewGuid(), Action: RoleAction.Assign),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -126,14 +126,14 @@ public class AssignRoleToUserHandlerTests
     }
 
     [Fact]
-    public async Task AssignRoleToUser_WhenUserBelongsToAnotherOrg_ReturnsNotFound()
+    public async Task AssignRoleToUser_WhenUserBelongsToAnotherTeamAccount_ReturnsNotFound()
     {
         (User user, _) = MakeUserWithMembership();
-        _userRepo.GetByIdAsync(user.Id, OrgId).Returns(user);
+        _userRepo.GetByIdAsync(user.Id, TeamAccountId).Returns(user);
 
-        Guid otherOrgId = Guid.NewGuid();
+        Guid otherTeamAccountId = Guid.NewGuid();
         Result result = await CreateHandler().Handle(
-            new AssignRoleToUserCommand(user.Id, otherOrgId, EditorRoleId, Action: RoleAction.Assign),
+            new AssignRoleToUserCommand(user.Id, otherTeamAccountId, EditorRoleId, Action: RoleAction.Assign),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

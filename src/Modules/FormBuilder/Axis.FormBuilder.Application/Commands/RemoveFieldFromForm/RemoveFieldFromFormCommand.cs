@@ -4,5 +4,5 @@ namespace Axis.FormBuilder.Application.Commands.RemoveFieldFromForm;
 
 public sealed record RemoveFieldFromFormCommand(
     Guid FormId,
-    Guid OrganizationId,
+    Guid TeamAccountId,
     Guid FieldId) : ICommand;

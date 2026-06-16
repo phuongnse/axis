@@ -9,10 +9,10 @@ namespace Axis.Identity.Application.Queries.GetProvisioningStatus;
 
 public sealed class GetProvisioningStatusHandler(
     IEmailVerificationTokenStore verificationTokenStore,
-    IOrganizationRegistrationTokenStore organizationTokenStore,
+    ITeamAccountRegistrationTokenStore teamAccountTokenStore,
     IUserRepository userRepo,
-    IOrganizationMembershipRepository membershipRepo,
-    IOrganizationRepository organizationRepo,
+    ITeamAccountMembershipRepository membershipRepo,
+    ITeamAccountRepository teamAccountRepo,
     ITenantModuleProvisioningRepository provisioningRepo)
     : IQueryHandler<GetProvisioningStatusQuery, ProvisioningStatusDto?>
 {
@@ -24,11 +24,11 @@ public sealed class GetProvisioningStatusHandler(
             return null;
 
         string tokenHash = OpaqueTokenGenerator.Hash(query.Token.Trim());
-        Guid? organizationId = await organizationTokenStore.ResolveOrganizationIdForProvisioningPollAsync(
+        Guid? teamAccountId = await teamAccountTokenStore.ResolveTeamAccountIdForProvisioningPollAsync(
             tokenHash,
             cancellationToken);
-        if (organizationId is Guid resolvedOrganizationId)
-            return await BuildStatusAsync(resolvedOrganizationId, cancellationToken);
+        if (teamAccountId is Guid resolvedTeamAccountId)
+            return await BuildStatusAsync(resolvedTeamAccountId, cancellationToken);
 
         Guid? userId = await verificationTokenStore.ResolveUserIdForProvisioningPollAsync(
             tokenHash,
@@ -40,34 +40,34 @@ public sealed class GetProvisioningStatusHandler(
         if (user is null || !user.IsEmailVerified)
             return null;
 
-        OrganizationMembership? membership =
+        TeamAccountMembership? membership =
             await membershipRepo.GetFirstActiveByUserIdAsync(user.Id, cancellationToken);
         if (membership is null)
             return null;
 
-        return await BuildStatusAsync(membership.OrganizationId, cancellationToken);
+        return await BuildStatusAsync(membership.TeamAccountId, cancellationToken);
     }
 
     private async Task<ProvisioningStatusDto?> BuildStatusAsync(
-        Guid organizationId,
+        Guid teamAccountId,
         CancellationToken cancellationToken)
     {
-        Organization? organization = await organizationRepo.GetByIdAsync(organizationId, cancellationToken);
-        if (organization is null)
+        TeamAccount? teamAccount = await teamAccountRepo.GetByIdAsync(teamAccountId, cancellationToken);
+        if (teamAccount is null)
             return null;
 
         IReadOnlyList<TenantModuleProvisioning> modules =
-            await provisioningRepo.GetAllForOrganizationAsync(organizationId, cancellationToken);
+            await provisioningRepo.GetAllForTeamAccountAsync(teamAccountId, cancellationToken);
 
-        bool isReady = organization.Status == OrganizationStatus.Active
+        bool isReady = teamAccount.Status == TeamAccountStatus.Active
             && TenantModuleNames.All.All(moduleName =>
                 modules.Any(m =>
                     m.Module == moduleName
                     && m.Status == TenantModuleProvisioningStatus.Succeeded));
 
         return new ProvisioningStatusDto(
-            organization.Id,
-            organization.Status.ToString(),
+            teamAccount.Id,
+            teamAccount.Status.ToString(),
             isReady,
             modules.Select(m => new ModuleProvisioningStatusDto(
                 m.Module,

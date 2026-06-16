@@ -8,7 +8,7 @@ Pan and zoom the workflow canvas so that I can work comfortably with large workf
 
 ## Primary actor
 
-- Organization Member
+- Team account Member
 
 ## Trigger
 

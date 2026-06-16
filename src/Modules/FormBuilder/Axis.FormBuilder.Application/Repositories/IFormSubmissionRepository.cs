@@ -11,7 +11,7 @@ public interface IFormSubmissionRepository
 
     Task<FormSubmission?> GetByIdAsync(
         Guid id,
-        Guid organizationId,
+        Guid teamAccountId,
         CancellationToken cancellationToken = default);
 
     Task<bool> ExistsForExecutionStepAsync(
@@ -21,12 +21,12 @@ public interface IFormSubmissionRepository
 
     Task<IReadOnlyList<FormSubmission>> GetPendingForUserAsync(
         Guid userId,
-        Guid organizationId,
+        Guid teamAccountId,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<FormSubmission>> GetByUserAndStatusAsync(
         Guid userId,
-        Guid organizationId,
+        Guid teamAccountId,
         FormSubmissionStatus status,
         CancellationToken cancellationToken = default);
 }

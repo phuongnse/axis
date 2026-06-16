@@ -6,20 +6,20 @@ namespace Axis.Shared.Application.Tests;
 public class TenantContextTests
 {
     [Fact]
-    public void TenantContext_WhenCreatedWithOrgId_DerivesSchemaNameFromOrgId()
+    public void TenantContext_WhenCreatedWithTeamAccountId_DerivesSchemaNameFromTeamAccountId()
     {
-        Guid orgId = Guid.NewGuid();
-        TenantContext context = new TenantContext(orgId);
+        Guid teamAccountId = Guid.NewGuid();
+        TenantContext context = new TenantContext(teamAccountId);
 
-        context.SchemaName.Should().Be($"tenant_{orgId:N}");
+        context.SchemaName.Should().Be($"tenant_{teamAccountId:N}");
     }
 
     [Fact]
-    public void TenantContext_WhenCreatedWithOrgId_ExposesOrganizationId()
+    public void TenantContext_WhenCreatedWithTeamAccountId_ExposesTeamAccountId()
     {
-        Guid orgId = Guid.NewGuid();
-        TenantContext context = new TenantContext(orgId);
+        Guid teamAccountId = Guid.NewGuid();
+        TenantContext context = new TenantContext(teamAccountId);
 
-        context.OrganizationId.Should().Be(orgId);
+        context.TeamAccountId.Should().Be(teamAccountId);
     }
 }

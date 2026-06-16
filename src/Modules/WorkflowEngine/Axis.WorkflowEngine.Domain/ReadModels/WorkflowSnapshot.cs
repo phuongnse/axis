@@ -8,7 +8,7 @@ namespace Axis.WorkflowEngine.Domain.ReadModels;
 public sealed class WorkflowSnapshot
 {
     public Guid WorkflowId { get; private set; }
-    public Guid OrganizationId { get; private set; }
+    public Guid TeamAccountId { get; private set; }
     public IReadOnlyList<StepDefinitionSnapshot> Steps { get; private set; } = [];
     public IReadOnlyList<TransitionSnapshot> Transitions { get; private set; } = [];
 
@@ -16,13 +16,13 @@ public sealed class WorkflowSnapshot
 
     public static WorkflowSnapshot Create(
         Guid workflowId,
-        Guid organizationId,
+        Guid teamAccountId,
         IReadOnlyList<StepDefinitionSnapshot> steps,
         IReadOnlyList<TransitionSnapshot> transitions)
         => new()
         {
             WorkflowId = workflowId,
-            OrganizationId = organizationId,
+            TeamAccountId = teamAccountId,
             Steps = steps,
             Transitions = transitions
         };

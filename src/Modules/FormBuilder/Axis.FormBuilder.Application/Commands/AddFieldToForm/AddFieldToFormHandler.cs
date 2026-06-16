@@ -15,7 +15,7 @@ public sealed class AddFieldToFormHandler(
 {
     public async Task<Result<Guid>> Handle(AddFieldToFormCommand command, CancellationToken cancellationToken)
     {
-        FormDefinition? form = await formRepo.GetByIdAsync(command.FormId, command.OrganizationId, cancellationToken);
+        FormDefinition? form = await formRepo.GetByIdAsync(command.FormId, command.TeamAccountId, cancellationToken);
         if (form is null)
             return Result.Failure<Guid>(ErrorCodes.NotFound, "Form not found.");
 

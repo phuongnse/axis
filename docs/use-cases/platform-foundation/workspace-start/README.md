@@ -18,22 +18,22 @@ Open the first authenticated workspace screen so that the user understands their
 
 1. SPA route protection confirms an in-memory access token exists.
 2. Client loads the current user profile from `GET /api/users/me`.
-3. If the profile is linked to an organization and has `organization:settings:read`, client loads `GET /api/organizations/current/settings`.
+3. If the profile is linked to a team account and has `team-account:settings:read`, client loads `GET /api/team-accounts/current/settings`.
 4. Dashboard renders the current account, workspace state, and real usage values returned by the API.
 
 ## Alternate / error flows
 
 - Profile request is loading: show a skeleton rather than a blank screen.
 - Profile request fails: show an error message with retry.
-- Account has no organization: show an honest empty state and do not call organization settings.
-- Account is linked to an organization but lacks settings permission: show workspace access as active without exposing settings or fake usage.
-- Organization settings request fails: keep the signed-in account state visible and show a retryable settings error.
+- Account has no team-account: show an honest empty state and do not call team account settings.
+- Account is linked to a team account but lacks settings permission: show workspace access as active without exposing settings or fake usage.
+- Team account settings request fails: keep the signed-in account state visible and show a retryable settings error.
 
 ## Acceptance Criteria
 
 *Happy path*
 - [ ] The dashboard loads the current profile from `/api/users/me`.
-- [ ] Users with `organization:settings:read` see organization name, status, plan, and usage values from `/api/organizations/current/settings`.
+- [ ] Users with `team-account:settings:read` see team account name, status, plan, and usage values from `/api/team-accounts/current/settings`.
 - [ ] Plan usage cards display users, workflows, and monthly executions using API values only.
 
 *Validation & errors*
@@ -42,12 +42,12 @@ Open the first authenticated workspace screen so that the user understands their
 - [ ] A settings load failure does not hide the signed-in account state.
 
 *Edge cases*
-- [ ] Accounts without an organization do not request organization settings.
+- [ ] Accounts without a team account do not request team account settings.
 - [ ] Accounts without settings permission do not show placeholder usage or fake operational status.
 
 *Out of scope*
 - Creating a workspace from this screen.
-- Editing organization settings.
+- Editing team account settings.
 - Showing workflow/model/event metrics before those backend endpoints exist.
 
 ## Wireframes

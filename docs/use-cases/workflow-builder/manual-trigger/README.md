@@ -8,7 +8,7 @@ Configure a Manual trigger so that authorized users can start the workflow on de
 
 ## Primary actor
 
-- Organization Member
+- Team account Member
 
 ## Trigger
 

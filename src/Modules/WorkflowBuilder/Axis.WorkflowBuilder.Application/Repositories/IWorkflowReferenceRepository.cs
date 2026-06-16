@@ -7,7 +7,7 @@ public interface IWorkflowReferenceRepository
 
     Task<int> CountBlockingFormReferencesAsync(
         Guid formId,
-        Guid organizationId,
+        Guid teamAccountId,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlySet<Guid>> GetBrokenStepIdsAsync(

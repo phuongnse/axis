@@ -6,5 +6,5 @@ namespace Axis.FormBuilder.Application.Queries.GetMyFormTasks;
 /// <summary>List form tasks assigned to the current user.</summary>
 public sealed record GetMyFormTasksQuery(
     Guid UserId,
-    Guid OrganizationId,
+    Guid TeamAccountId,
     FormSubmissionStatus Status) : IQuery<IReadOnlyList<FormTaskSummaryDto>>;

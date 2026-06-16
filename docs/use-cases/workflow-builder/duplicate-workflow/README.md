@@ -8,7 +8,7 @@ Duplicate an existing workflow so that I can use it as a starting point for a si
 
 ## Primary actor
 
-- Organization Member with `workflow:definition:write`
+- Team account Member with `workflow:definition:write`
 
 ## Trigger
 
@@ -44,7 +44,7 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 - [ ] Webhook URLs are NOT copied; the duplicate generates a new unique webhook URL when published.
 
 *Out of scope*
-- Cross-org workflow duplication (copy to another org) — handled by Import/Export in import-export.
+- Cross-team account workflow duplication (copy to another team account) — handled by Import/Export in import-export.
 
 > **Implementation status**
 >

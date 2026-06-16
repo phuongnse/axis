@@ -23,7 +23,7 @@ public sealed class DataModel : AggregateRoot<Guid>
     public string? Description { get; private set; }
     public string? Icon { get; private set; }
     public string? Color { get; private set; }
-    public Guid OrganizationId { get; private set; }
+    public Guid TeamAccountId { get; private set; }
     public DateTimeOffset? DeletedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -32,34 +32,34 @@ public sealed class DataModel : AggregateRoot<Guid>
     public IReadOnlyList<FieldDefinition> Fields => _fields.AsReadOnly();
 
     private DataModel(Guid id, string name, string? description, string? icon, string? color,
-        Guid organizationId, string createdBy, DateTimeOffset createdAt)
+        Guid teamAccountId, string createdBy, DateTimeOffset createdAt)
         : base(id)
     {
         Name = name;
         Description = description;
         Icon = icon;
         Color = color;
-        OrganizationId = organizationId;
+        TeamAccountId = teamAccountId;
         CreatedBy = createdBy;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
     }
 
     public static DataModel Create(string name, string? description, string? icon, string? color,
-        Guid organizationId, string createdBy)
+        Guid teamAccountId, string createdBy)
     {
         ValidateName(name);
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
         DataModel model = new(Guid.NewGuid(), name.Trim(), description?.Trim(), icon, color,
-            organizationId, createdBy, now);
+            teamAccountId, createdBy, now);
 
         // Auto-generate system fields
         model._fields.Add(FieldDefinition.Create("id", "ID", FieldType.Text, true, 0, new TextFieldConfig(), isSystem: true));
         model._fields.Add(FieldDefinition.Create("created_at", "Created At", FieldType.Date, true, 1, new DateFieldConfig(IncludeTime: true), isSystem: true));
         model._fields.Add(FieldDefinition.Create("updated_at", "Updated At", FieldType.Date, true, 2, new DateFieldConfig(IncludeTime: true), isSystem: true));
 
-        model.RaiseDomainEvent(new ModelCreated(model.Id, organizationId, model.Name));
+        model.RaiseDomainEvent(new ModelCreated(model.Id, teamAccountId, model.Name));
         return model;
     }
 
@@ -86,7 +86,7 @@ public sealed class DataModel : AggregateRoot<Guid>
         _fields.Add(field);
         UpdatedAt = DateTimeOffset.UtcNow;
         RaiseDomainEvent(new FieldAdded(
-            Id, OrganizationId, field.Id, field.Name, field.Type, field.Label, field.IsRequired, field.DisplayOrder));
+            Id, TeamAccountId, field.Id, field.Name, field.Type, field.Label, field.IsRequired, field.DisplayOrder));
         return field;
     }
 
@@ -100,7 +100,7 @@ public sealed class DataModel : AggregateRoot<Guid>
         field.Update(label, helpText, isRequired, config);
         UpdatedAt = DateTimeOffset.UtcNow;
         RaiseDomainEvent(new FieldUpdated(
-            Id, OrganizationId, field.Id, field.Name, field.Type, field.Label, field.IsRequired));
+            Id, TeamAccountId, field.Id, field.Name, field.Type, field.Label, field.IsRequired));
     }
 
     public void RemoveField(Guid fieldId)
@@ -111,7 +111,7 @@ public sealed class DataModel : AggregateRoot<Guid>
         if (field.IsSystem)
             throw new InvalidOperationException("Cannot remove a system field.");
 
-        RaiseDomainEvent(new FieldRemoved(Id, OrganizationId, field.Id, field.Name));
+        RaiseDomainEvent(new FieldRemoved(Id, TeamAccountId, field.Id, field.Name));
         _fields.Remove(field);
         UpdatedAt = DateTimeOffset.UtcNow;
         RecalculateOrder();
@@ -139,7 +139,7 @@ public sealed class DataModel : AggregateRoot<Guid>
             throw new InvalidOperationException("Model is already deleted.");
 
         DeletedAt = DateTimeOffset.UtcNow;
-        RaiseDomainEvent(new ModelDeleted(Id, OrganizationId));
+        RaiseDomainEvent(new ModelDeleted(Id, TeamAccountId));
     }
 
     // ─── Private helpers ──────────────────────────────────────────────────────

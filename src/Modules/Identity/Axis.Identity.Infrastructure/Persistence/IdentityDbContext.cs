@@ -9,35 +9,35 @@ namespace Axis.Identity.Infrastructure.Persistence;
 
 public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> options) : DbContext(options)
 {
-    public DbSet<Organization> Organizations => Set<Organization>();
+    public DbSet<TeamAccount> TeamAccounts => Set<TeamAccount>();
     public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
     public DbSet<TenantModuleProvisioning> TenantModuleProvisions => Set<TenantModuleProvisioning>();
     public DbSet<User> Users => Set<User>();
-    public DbSet<OrganizationMembership> OrganizationMemberships => Set<OrganizationMembership>();
+    public DbSet<TeamAccountMembership> TeamAccountMemberships => Set<TeamAccountMembership>();
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Invitation> Invitations => Set<Invitation>();
     internal DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     internal DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
-    internal DbSet<OrganizationRegistrationToken> OrganizationRegistrationTokens =>
-        Set<OrganizationRegistrationToken>();
+    internal DbSet<TeamAccountRegistrationToken> TeamAccountRegistrationTokens =>
+        Set<TeamAccountRegistrationToken>();
     internal DbSet<RegistrationIdempotencyRecord> RegistrationIdempotencyRecords =>
         Set<RegistrationIdempotencyRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.ApplyConfiguration(new OrganizationConfiguration());
+        modelBuilder.ApplyConfiguration(new TeamAccountConfiguration());
         modelBuilder.ApplyConfiguration(new SubscriptionPlanConfiguration());
-        modelBuilder.ApplyConfiguration(new OrganizationPlanChangeLogConfiguration());
+        modelBuilder.ApplyConfiguration(new TeamAccountPlanChangeLogConfiguration());
         modelBuilder.ApplyConfiguration(new RegistrationIdempotencyRecordConfiguration());
         modelBuilder.ApplyConfiguration(new TenantModuleProvisioningConfiguration());
         modelBuilder.ApplyConfiguration(new UserConfiguration());
-        modelBuilder.ApplyConfiguration(new OrganizationMembershipConfiguration());
-        modelBuilder.ApplyConfiguration(new OrganizationMembershipRoleConfiguration());
+        modelBuilder.ApplyConfiguration(new TeamAccountMembershipConfiguration());
+        modelBuilder.ApplyConfiguration(new TeamAccountMembershipRoleConfiguration());
         modelBuilder.ApplyConfiguration(new RoleConfiguration());
         modelBuilder.ApplyConfiguration(new InvitationConfiguration());
         modelBuilder.ApplyConfiguration(new PasswordResetTokenConfiguration());
         modelBuilder.ApplyConfiguration(new EmailVerificationTokenConfiguration());
-        modelBuilder.ApplyConfiguration(new OrganizationRegistrationTokenConfiguration());
+        modelBuilder.ApplyConfiguration(new TeamAccountRegistrationTokenConfiguration());
 
         // Register OpenIddict entity model (Applications, Authorizations, Scopes, Tokens)
         modelBuilder.UseOpenIddict();

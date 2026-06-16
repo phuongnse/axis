@@ -8,7 +8,7 @@ Add a field of any supported type to a model so that I can capture the data I ne
 
 ## Primary actor
 
-- Organization Member with `data_modeling:model:write`
+- Team account Member with `data_modeling:model:write`
 
 ## Trigger
 

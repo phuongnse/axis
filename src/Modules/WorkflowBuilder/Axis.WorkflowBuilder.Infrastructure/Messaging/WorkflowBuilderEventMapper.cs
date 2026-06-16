@@ -26,7 +26,7 @@ internal static class WorkflowBuilderEventMapper
         new()
         {
             workflowId = published.WorkflowId.ToString(),
-            organizationId = published.OrganizationId.ToString(),
+            teamAccountId = published.TeamAccountId.ToString(),
             referencedFormIds = published.ReferencedFormIds.Select(id => id.ToString()).ToList(),
             steps = published.Steps.Select(MapStep).ToList(),
             transitions = published.Transitions.Select(MapTransition).ToList(),
@@ -36,14 +36,14 @@ internal static class WorkflowBuilderEventMapper
         new()
         {
             workflowId = archived.WorkflowId.ToString(),
-            organizationId = archived.OrganizationId.ToString(),
+            teamAccountId = archived.TeamAccountId.ToString(),
         };
 
     private static WorkflowUnarchivedEvent MapUnarchived(WorkflowUnarchived unarchived) =>
         new()
         {
             workflowId = unarchived.WorkflowId.ToString(),
-            organizationId = unarchived.OrganizationId.ToString(),
+            teamAccountId = unarchived.TeamAccountId.ToString(),
             referencedFormIds = unarchived.ReferencedFormIds.Select(id => id.ToString()).ToList(),
         };
 

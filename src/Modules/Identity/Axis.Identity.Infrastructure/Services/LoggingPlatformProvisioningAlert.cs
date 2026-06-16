@@ -8,7 +8,7 @@ internal sealed class LoggingPlatformProvisioningAlert(ILogger<LoggingPlatformPr
     : IPlatformProvisioningAlert
 {
     public Task AlertProvisioningFailedAsync(
-        Guid organizationId,
+        Guid teamAccountId,
         string module,
         int attemptCount,
         string lastError,

@@ -8,7 +8,7 @@ Edit an existing form so that I can update its fields as requirements change.
 
 ## Primary actor
 
-- Organization Member with `form:definition:write`
+- Team account Member with `form:definition:write`
 
 ## Trigger
 
@@ -58,8 +58,8 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 > **Gaps vs spec:** live-workflow warning banner (informational) and definition snapshot for in-progress tasks pending API + workflow-engine.
 >
 > **Decisions:**
-> - `UpdateFormHandler` checks name uniqueness via `NameExistsAsync(name, orgId, excludeId)` before calling `form.Update()`
-> - TOCTOU race requires a unique DB index on `(name, org_id)` at Infrastructure layer.
+> - `UpdateFormHandler` checks name uniqueness via `NameExistsAsync(name, teamAccountId, excludeId)` before calling `form.Update()`
+> - TOCTOU race requires a unique DB index on `(name, team_account_id)` at Infrastructure layer.
 
 ## Wireframes
 

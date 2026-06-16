@@ -12,7 +12,7 @@ public sealed class GetRecordHandler(IDataRecordRepository recordRepo)
 {
     public async Task<Result<RecordDto>> Handle(GetRecordQuery query, CancellationToken cancellationToken)
     {
-        DataRecord? record = await recordRepo.GetByIdAsync(query.RecordId, query.ModelId, query.OrganizationId, cancellationToken);
+        DataRecord? record = await recordRepo.GetByIdAsync(query.RecordId, query.ModelId, query.TeamAccountId, cancellationToken);
         if (record is null)
             return Result.Failure<RecordDto>(ErrorCodes.NotFound, "Record not found.");
 
