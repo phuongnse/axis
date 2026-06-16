@@ -3111,7 +3111,7 @@
         "tags": [
           "Identity"
         ],
-        "summary": "Get Tenant settings and usage stats",
+        "summary": "Get tenant settings and usage stats",
         "operationId": "GetTenantSettings",
         "responses": {
           "200": {
@@ -3236,7 +3236,7 @@
         "tags": [
           "Identity"
         ],
-        "summary": "Schedule Tenant for deletion after a 30-day grace period",
+        "summary": "Schedule tenant for deletion after a 30-day grace period",
         "operationId": "ScheduleTenantDeletion",
         "requestBody": {
           "content": {
@@ -3293,7 +3293,7 @@
         "tags": [
           "Identity"
         ],
-        "summary": "Cancel a scheduled Tenant deletion",
+        "summary": "Cancel a scheduled tenant deletion",
         "operationId": "CancelTenantDeletion",
         "responses": {
           "204": {

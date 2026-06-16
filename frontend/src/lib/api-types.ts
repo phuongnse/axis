@@ -602,7 +602,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Tenant settings and usage stats */
+        /** Get tenant settings and usage stats */
         get: operations["GetTenantSettings"];
         put?: never;
         post?: never;
@@ -638,9 +638,9 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Schedule Tenant for deletion after a 30-day grace period */
+        /** Schedule tenant for deletion after a 30-day grace period */
         post: operations["ScheduleTenantDeletion"];
-        /** Cancel a scheduled Tenant deletion */
+        /** Cancel a scheduled tenant deletion */
         delete: operations["CancelTenantDeletion"];
         options?: never;
         head?: never;
