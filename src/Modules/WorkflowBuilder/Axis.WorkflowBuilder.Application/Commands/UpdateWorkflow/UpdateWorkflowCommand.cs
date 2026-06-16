@@ -4,6 +4,6 @@ namespace Axis.WorkflowBuilder.Application.Commands.UpdateWorkflow;
 
 public sealed record UpdateWorkflowCommand(
     Guid WorkflowId,
-    Guid OrganizationId,
+    Guid tenantId,
     string Name,
     string? Description) : ICommand;

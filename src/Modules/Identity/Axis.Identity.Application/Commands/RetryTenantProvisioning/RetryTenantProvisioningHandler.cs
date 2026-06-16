@@ -11,10 +11,10 @@ public sealed record RetryTenantProvisioningCommand(string Token) : ICommand;
 
 public sealed class RetryTenantProvisioningHandler(
     IEmailVerificationTokenStore verificationTokenStore,
-    IOrganizationRegistrationTokenStore organizationTokenStore,
+    ITenantRegistrationTokenStore TenantTokenStore,
     IUserRepository userRepo,
-    IOrganizationMembershipRepository membershipRepo,
-    IOrganizationRepository organizationRepo,
+    ITenantMembershipRepository membershipRepo,
+    ITenantRepository TenantRepo,
     ITenantModuleProvisioningRepository provisioningRepo,
     IUnitOfWork uow)
     : ICommandHandler<RetryTenantProvisioningCommand>
@@ -25,11 +25,11 @@ public sealed class RetryTenantProvisioningHandler(
             return Result.Failure(ErrorCodes.BusinessRule, "Invalid verification token.");
 
         string tokenHash = OpaqueTokenGenerator.Hash(command.Token.Trim());
-        Guid? organizationId = await organizationTokenStore.ResolveOrganizationIdForProvisioningPollAsync(
+        Guid? tenantId = await TenantTokenStore.ResolvetenantIdForProvisioningPollAsync(
             tokenHash,
             cancellationToken);
-        if (organizationId is Guid resolvedOrganizationId)
-            return await RetryForOrganizationAsync(resolvedOrganizationId, cancellationToken);
+        if (tenantId is Guid resolvedtenantId)
+            return await RetryForTenantAsync(resolvedtenantId, cancellationToken);
 
         Guid? userId = await verificationTokenStore.ResolveUserIdForProvisioningPollAsync(
             tokenHash,
@@ -41,27 +41,27 @@ public sealed class RetryTenantProvisioningHandler(
         if (user is null || !user.IsEmailVerified)
             return Result.Failure(ErrorCodes.BusinessRule, "Account is not ready for provisioning retry.");
 
-        OrganizationMembership? membership =
+        TenantMembership? membership =
             await membershipRepo.GetFirstActiveByUserIdAsync(user.Id, cancellationToken);
         if (membership is null)
-            return Result.Failure(ErrorCodes.NotFound, "Organization not found.");
+            return Result.Failure(ErrorCodes.NotFound, "Tenant not found.");
 
-        return await RetryForOrganizationAsync(membership.OrganizationId, cancellationToken);
+        return await RetryForTenantAsync(membership.tenantId, cancellationToken);
     }
 
-    private async Task<Result> RetryForOrganizationAsync(
-        Guid organizationId,
+    private async Task<Result> RetryForTenantAsync(
+        Guid tenantId,
         CancellationToken cancellationToken)
     {
-        Organization? organization = await organizationRepo.GetByIdAsync(organizationId, cancellationToken);
-        if (organization is null)
-            return Result.Failure(ErrorCodes.NotFound, "Organization not found.");
+        Tenant? Tenant = await TenantRepo.GetByIdAsync(tenantId, cancellationToken);
+        if (Tenant is null)
+            return Result.Failure(ErrorCodes.NotFound, "Tenant not found.");
 
-        if (organization.Status != OrganizationStatus.ProvisioningFailed)
+        if (Tenant.Status != TenantStatus.ProvisioningFailed)
             return Result.Success();
 
         IReadOnlyList<TenantModuleProvisioning> modules =
-            await provisioningRepo.GetAllForOrganizationAsync(organizationId, cancellationToken);
+            await provisioningRepo.GetAllForTenantAsync(tenantId, cancellationToken);
 
         foreach (TenantModuleProvisioning module in modules)
         {
@@ -69,7 +69,7 @@ public sealed class RetryTenantProvisioningHandler(
                 module.ResetForManualRetry();
         }
 
-        organization.RetryProvisioning();
+        Tenant.RetryProvisioning();
         await uow.SaveChangesAsync(cancellationToken);
 
         return Result.Success();

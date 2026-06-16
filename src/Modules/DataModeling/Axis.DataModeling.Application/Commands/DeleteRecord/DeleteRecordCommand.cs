@@ -6,4 +6,4 @@ namespace Axis.DataModeling.Application.Commands.DeleteRecord;
 public sealed record DeleteRecordCommand(
     Guid RecordId,
     Guid ModelId,
-    Guid OrganizationId) : ICommand;
+    Guid tenantId) : ICommand;

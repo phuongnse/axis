@@ -13,9 +13,9 @@ internal sealed class FormModelReferenceConfiguration : IEntityTypeConfiguration
         builder.Property(r => r.FormId).HasColumnName("form_id");
         builder.Property(r => r.FormFieldId).HasColumnName("form_field_id");
         builder.Property(r => r.ModelId).HasColumnName("model_id").IsRequired();
-        builder.Property(r => r.OrganizationId).HasColumnName("organization_id").IsRequired();
+        builder.Property(r => r.tenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(r => r.IsBroken).HasColumnName("is_broken").IsRequired();
-        builder.HasIndex(r => new { r.ModelId, r.OrganizationId });
+        builder.HasIndex(r => new { r.ModelId, r.tenantId });
         builder.HasIndex(r => r.FormId);
     }
 }

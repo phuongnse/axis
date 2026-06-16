@@ -8,7 +8,7 @@ Draw connections between steps so that the workflow knows the execution order.
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -64,6 +64,12 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 > **Deferred follow-ups:** Animated transitions showing flow direction — static arrows only.
 >
 > **Decisions:** Transitions remain static arrows for the current builder scope; animated direction is decorative and deferred until the core canvas UX is usable.
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

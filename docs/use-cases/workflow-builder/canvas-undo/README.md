@@ -8,7 +8,7 @@ Undo and redo changes on the canvas so that I can recover from mistakes easily.
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Undo and redo changes on the canvas so that I can recover from mistakes easily.
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Undo and redo canvas actions flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -55,6 +55,15 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 > | Frontend | ⏳ |
 >
 > Undo/redo is in-memory client state only; no server round-trip required.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

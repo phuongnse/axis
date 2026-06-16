@@ -8,7 +8,7 @@ Pan and zoom the workflow canvas so that I can work comfortably with large workf
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Pan and zoom the workflow canvas so that I can work comfortably with large workf
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Navigate and zoom the canvas flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -54,6 +54,15 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 > | Frontend | ⏳ |
 >
 > No backend domain or infrastructure work; canvas navigation is a pure client-side concern.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

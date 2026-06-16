@@ -8,7 +8,7 @@ See the full error details of a failed step so that I can understand what went w
 
 ## Primary actor
 
-- Organization Member with `execution:read`
+- Tenant Member with `execution:read`
 
 ## Trigger
 
@@ -16,9 +16,9 @@ See the full error details of a failed step so that I can understand what went w
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — View detailed error information flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -60,6 +60,12 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 > **Gaps vs spec:**
 > - `GetExecutionQuery` (returning step-level error details) not yet implemented
 > - error detail UI (stack trace, redacted fields) pending Frontend + API.
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

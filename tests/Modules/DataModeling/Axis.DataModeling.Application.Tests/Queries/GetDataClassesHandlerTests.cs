@@ -11,7 +11,7 @@ public class GetDataClassesHandlerTests
 {
     private readonly IDataClassRepository _dataClassRepo = Substitute.For<IDataClassRepository>();
 
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TenantId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     private GetDataClassesHandler CreateHandler() => new(_dataClassRepo);
@@ -21,14 +21,14 @@ public class GetDataClassesHandlerTests
     {
         List<DataClass> classes =
         [
-            DataClass.Create("Address", "Reusable address type", OrgId, UserId),
-            DataClass.Create("Contact", null, OrgId, UserId),
+            DataClass.Create("Address", "Reusable address type", TenantId, UserId),
+            DataClass.Create("Contact", null, TenantId, UserId),
         ];
-        _dataClassRepo.GetPagedAsync(OrgId, 1, 20, Arg.Any<CancellationToken>())
+        _dataClassRepo.GetPagedAsync(TenantId, 1, 20, Arg.Any<CancellationToken>())
             .Returns((classes, 2));
 
         PagedResult<DataClassSummaryDto> result = await CreateHandler()
-            .Handle(new GetDataClassesQuery(OrgId, 1, 20), CancellationToken.None);
+            .Handle(new GetDataClassesQuery(TenantId, 1, 20), CancellationToken.None);
 
         result.Items.Should().HaveCount(2);
         result.TotalCount.Should().Be(2);
@@ -36,13 +36,13 @@ public class GetDataClassesHandlerTests
     }
 
     [Fact]
-    public async Task GetDataClasses_EmptyOrg_ReturnsEmptyPage()
+    public async Task GetDataClasses_EmptyTenant_ReturnsEmptyPage()
     {
-        _dataClassRepo.GetPagedAsync(OrgId, 1, 20, Arg.Any<CancellationToken>())
+        _dataClassRepo.GetPagedAsync(TenantId, 1, 20, Arg.Any<CancellationToken>())
             .Returns((new List<DataClass>(), 0));
 
         PagedResult<DataClassSummaryDto> result = await CreateHandler()
-            .Handle(new GetDataClassesQuery(OrgId, 1, 20), CancellationToken.None);
+            .Handle(new GetDataClassesQuery(TenantId, 1, 20), CancellationToken.None);
 
         result.Items.Should().BeEmpty();
         result.TotalCount.Should().Be(0);
@@ -51,12 +51,12 @@ public class GetDataClassesHandlerTests
     [Fact]
     public async Task GetDataClasses_PageSizeExceedsCap_ClampsTo100()
     {
-        _dataClassRepo.GetPagedAsync(OrgId, 1, 100, Arg.Any<CancellationToken>())
+        _dataClassRepo.GetPagedAsync(TenantId, 1, 100, Arg.Any<CancellationToken>())
             .Returns((new List<DataClass>(), 0));
 
-        await CreateHandler().Handle(new GetDataClassesQuery(OrgId, 1, 500), CancellationToken.None);
+        await CreateHandler().Handle(new GetDataClassesQuery(TenantId, 1, 500), CancellationToken.None);
 
         await _dataClassRepo.Received(1)
-            .GetPagedAsync(OrgId, 1, 100, Arg.Any<CancellationToken>());
+            .GetPagedAsync(TenantId, 1, 100, Arg.Any<CancellationToken>());
     }
 }

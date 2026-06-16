@@ -8,7 +8,7 @@ Create a new model so that I can start defining the data structure for my busine
 
 ## Primary actor
 
-- Organization Member with `data_modeling:model:write`
+- Tenant Member with `data_modeling:model:write`
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Create a new model so that I can start defining the data structure for my busine
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Create a model flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -26,7 +26,7 @@ Create a new model so that I can start defining the data structure for my busine
 
 ## Context
 
-Users can create custom data models within their organization. A model defines the structure of a type of business object. All model metadata is stored in the tenant schema; actual records use a JSONB-backed storage strategy.
+Users can create custom data models within their Tenant. A model defines the structure of a type of business object. All model metadata is stored in the tenant schema; actual records use a JSONB-backed storage strategy.
 
 ## Acceptance Criteria
 
@@ -37,7 +37,7 @@ Users can create custom data models within their organization. A model defines t
 
 *Validation & errors*
 - [ ] Name: required, 2–100 characters. Allows letters, numbers, spaces, and hyphens. Blocks special characters like `/ \ < > " ;`.
-- [ ] Name must be unique within the org (case-insensitive). Duplicate name shows: "A model named '{name}' already exists."
+- [ ] Name must be unique within the tenant (case-insensitive). Duplicate name shows: "A model named '{name}' already exists."
 - [ ] If the plan's model limit is reached, creation returns HTTP 402 with an upgrade prompt instead of a form error.
 
 *Edge cases*
@@ -45,7 +45,7 @@ Users can create custom data models within their organization. A model defines t
 - [ ] Model creation is atomic: if any part of the creation fails (e.g., inserting system fields), the entire model is rolled back and nothing is left in a partial state.
 
 *Out of scope*
-- Importing a model from another org or from a JSON file directly — covered in [workflow-builder import-export Import/Export](../../workflow-builder/).
+- Importing a model from another tenant or from a JSON file directly — covered in [workflow-builder import-export Import/Export](../../workflow-builder/).
 
 > **Implementation status**
 >
@@ -62,6 +62,15 @@ Users can create custom data models within their organization. A model defines t
 > **Done:** name format validation enforced in Application handler.
 >
 > **Decisions:** system fields (id, created_at, updated_at) injected by domain factory; atomicity guaranteed by UnitOfWork.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

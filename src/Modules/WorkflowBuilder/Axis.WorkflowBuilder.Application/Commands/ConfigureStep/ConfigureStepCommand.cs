@@ -4,7 +4,7 @@ namespace Axis.WorkflowBuilder.Application.Commands.ConfigureStep;
 
 public sealed record ConfigureStepCommand(
     Guid WorkflowId,
-    Guid OrganizationId,
+    Guid tenantId,
     Guid StepId,
     string Name,
     IReadOnlyDictionary<string, object?>? Config) : ICommand;

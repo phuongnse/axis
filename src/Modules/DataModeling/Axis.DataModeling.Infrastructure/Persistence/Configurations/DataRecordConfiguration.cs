@@ -34,8 +34,8 @@ internal sealed class DataRecordConfiguration : IEntityTypeConfiguration<DataRec
             .HasColumnName("model_id")
             .IsRequired();
 
-        builder.Property(r => r.OrganizationId)
-            .HasColumnName("organization_id")
+        builder.Property(r => r.tenantId)
+            .HasColumnName("tenant_id")
             .IsRequired();
 
         builder.Property(r => r.DeletedAt)
@@ -66,7 +66,7 @@ internal sealed class DataRecordConfiguration : IEntityTypeConfiguration<DataRec
 
         builder.Ignore(r => r.Data);
 
-        builder.HasIndex(r => new { r.ModelId, r.OrganizationId });
+        builder.HasIndex(r => new { r.ModelId, r.tenantId });
 
         builder.HasOne<DataModel>()
             .WithMany()

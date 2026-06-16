@@ -5,5 +5,5 @@ public interface IPlanLimitUsageCounter
 {
     PlanLimitResourceType ResourceType { get; }
 
-    Task<int> GetCurrentUsageAsync(Guid organizationId, CancellationToken cancellationToken = default);
+    Task<int> GetCurrentUsageAsync(Guid tenantId, CancellationToken cancellationToken = default);
 }

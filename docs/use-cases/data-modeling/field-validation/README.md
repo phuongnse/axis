@@ -8,7 +8,7 @@ Configure validation rules on a field so that data quality is enforced at input 
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Configure validation rules on a field so that data quality is enforced at input 
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Configure field validation rules flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -59,6 +59,15 @@ Each field in a model has a type that determines what data it stores, how it's v
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** server-side per-field validation on record create/update is in Application handlers but HTTP 422 structured errors pending.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

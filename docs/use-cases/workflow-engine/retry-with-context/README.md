@@ -8,7 +8,7 @@ Modify the execution context before retrying so that I can fix data errors that 
 
 ## Primary actor
 
-- Organization Member with `execution:retry`
+- Tenant Member with `execution:retry`
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Modify the execution context before retrying so that I can fix data errors that 
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Retry with modified input context flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -60,6 +60,15 @@ When a workflow execution fails at a step, users can manually retry from the fai
 > **Gaps vs spec:** `POST /api/executions/{id}/retry-with-context` ✅. JSON context editor UI and modified-context flag pending Frontend.
 >
 > **Decisions:** `CreateRetryWithModifiedContext` added to domain as private `CreateRetryCore` delegation — shares validation logic with `CreateRetry`.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

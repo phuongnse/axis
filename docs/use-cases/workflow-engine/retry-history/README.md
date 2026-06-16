@@ -8,7 +8,7 @@ See the retry history of a failed execution so that I can track how many times i
 
 ## Primary actor
 
-- Organization Member with `execution:read`
+- Tenant Member with `execution:read`
 
 ## Trigger
 
@@ -16,9 +16,9 @@ See the retry history of a failed execution so that I can track how many times i
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — View retry history flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -57,6 +57,15 @@ When a workflow execution fails at a step, users can manually retry from the fai
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** `GET /api/executions/{id}/retry-history` ✅. Retry history UI and interlinked execution chain navigation pending Frontend.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

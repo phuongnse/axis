@@ -8,4 +8,4 @@ public sealed record RegisterUserRequest(
     string PasswordConfirmation,
     string AcceptedTermsVersion,
     string AcceptedPrivacyVersion,
-    string? OrganizationSetupToken = null);
+    string? TenantSetupToken = null);

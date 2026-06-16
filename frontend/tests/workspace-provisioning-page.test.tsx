@@ -10,7 +10,7 @@ describe('WorkspaceProvisioningPage', () => {
     vi.stubGlobal('fetch', vi.fn());
     saveRegistrationContext({
       email: 'alex@example.com',
-      organizationName: 'Acme Corp',
+      TenantName: 'Acme Corp',
     });
   });
 
@@ -27,8 +27,8 @@ describe('WorkspaceProvisioningPage', () => {
       text: () =>
         Promise.resolve(
           JSON.stringify({
-            organizationId: '00000000-0000-0000-0000-000000000001',
-            organizationStatus: 'Provisioning',
+            tenantId: '00000000-0000-0000-0000-000000000001',
+            tenantStatus: 'Provisioning',
             isReady: false,
             modules: [
               { module: 'DataModeling', status: 'Pending', attemptCount: 0, lastError: null },
@@ -41,12 +41,12 @@ describe('WorkspaceProvisioningPage', () => {
       path: '/provisioning?token=poll-token',
     });
 
-    expect(await screen.findByText('Creating your workspace')).toBeInTheDocument();
+    expect(await screen.findByText('Creating shared account')).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: /Setting up "Acme Corp" workspace/i }),
+      screen.getByRole('heading', { name: /Setting up "Acme Corp" shared account/i }),
     ).toBeInTheDocument();
     expect(screen.getByText('Assigning admin role')).toBeInTheDocument();
-    expect(screen.getByText('Opening workspace')).toBeInTheDocument();
+    expect(screen.getByText('Opening shared account')).toBeInTheDocument();
   });
 
   it('shows failed state when provisioning retries are exhausted', async () => {
@@ -56,8 +56,8 @@ describe('WorkspaceProvisioningPage', () => {
       text: () =>
         Promise.resolve(
           JSON.stringify({
-            organizationId: '00000000-0000-0000-0000-000000000001',
-            organizationStatus: 'ProvisioningFailed',
+            tenantId: '00000000-0000-0000-0000-000000000001',
+            tenantStatus: 'ProvisioningFailed',
             isReady: false,
             modules: [
               { module: 'DataModeling', status: 'Failed', attemptCount: 3, lastError: 'timeout' },

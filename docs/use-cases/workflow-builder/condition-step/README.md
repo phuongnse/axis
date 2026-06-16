@@ -8,7 +8,7 @@ Add a Condition step so that my workflow can take different paths based on data 
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -63,6 +63,15 @@ Each step has a type that determines what it does when executed. Users configure
 > **Deferred follow-ups:** Raw expression editing (code-only interface) — visual builder only.
 >
 > **Decisions:** Condition branches are stored in step config JSONB until the visual branch editor needs a dedicated persistence model.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

@@ -17,10 +17,10 @@ internal sealed class WorkflowArchivedHandler(
     public async Task Handle(WorkflowArchivedEvent @event, CancellationToken ct)
     {
         Guid workflowId = @event.WorkflowId();
-        Guid organizationId = @event.OrganizationId();
+        Guid tenantId = @event.tenantId();
 
         List<FormWorkflowReference> refs = await context.FormWorkflowReferences
-            .Where(r => r.WorkflowId == workflowId && r.OrganizationId == organizationId && r.IsActive)
+            .Where(r => r.WorkflowId == workflowId && r.tenantId == tenantId && r.IsActive)
             .ToListAsync(ct);
 
         if (refs.Count == 0)

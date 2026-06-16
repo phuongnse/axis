@@ -14,10 +14,10 @@ internal sealed class WorkflowFormReferenceConfiguration : IEntityTypeConfigurat
         builder.Property(r => r.WorkflowId).HasColumnName("workflow_id").IsRequired();
         builder.Property(r => r.StepId).HasColumnName("step_id").IsRequired();
         builder.Property(r => r.FormId).HasColumnName("form_id").IsRequired();
-        builder.Property(r => r.OrganizationId).HasColumnName("organization_id").IsRequired();
+        builder.Property(r => r.tenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(r => r.IsBroken).HasColumnName("is_broken").IsRequired();
 
         builder.HasIndex(r => r.FormId);
-        builder.HasIndex(r => new { r.OrganizationId, r.FormId });
+        builder.HasIndex(r => new { r.tenantId, r.FormId });
     }
 }

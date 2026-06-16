@@ -57,9 +57,9 @@ namespace Axis.FormBuilder.Infrastructure.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
-                    b.Property<Guid>("OrganizationId")
+                    b.Property<Guid>("tenantId")
                         .HasColumnType("uuid")
-                        .HasColumnName("organization_id");
+                        .HasColumnName("tenant_id");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -72,7 +72,7 @@ namespace Axis.FormBuilder.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OrganizationId", "Name")
+                    b.HasIndex("tenantId", "Name")
                         .IsUnique()
                         .HasFilter("deleted_at IS NULL");
 
@@ -124,9 +124,9 @@ namespace Axis.FormBuilder.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("form_definition_id");
 
-                    b.Property<Guid>("OrganizationId")
+                    b.Property<Guid>("tenantId")
                         .HasColumnType("uuid")
-                        .HasColumnName("organization_id");
+                        .HasColumnName("tenant_id");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -177,15 +177,15 @@ namespace Axis.FormBuilder.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("model_id");
 
-                    b.Property<Guid>("OrganizationId")
+                    b.Property<Guid>("tenantId")
                         .HasColumnType("uuid")
-                        .HasColumnName("organization_id");
+                        .HasColumnName("tenant_id");
 
                     b.HasKey("FormId", "FormFieldId");
 
                     b.HasIndex("FormId");
 
-                    b.HasIndex("ModelId", "OrganizationId");
+                    b.HasIndex("ModelId", "tenantId");
 
                     b.ToTable("form_model_references", (string)null);
                 });
@@ -204,9 +204,9 @@ namespace Axis.FormBuilder.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
-                    b.Property<Guid>("OrganizationId")
+                    b.Property<Guid>("tenantId")
                         .HasColumnType("uuid")
-                        .HasColumnName("organization_id");
+                        .HasColumnName("tenant_id");
 
                     b.HasKey("WorkflowId", "FormId");
 

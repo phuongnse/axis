@@ -16,7 +16,7 @@ namespace Axis.WorkflowBuilder.Infrastructure.Tests.Handlers;
 [Collection("WorkflowBuilderDb")]
 public sealed class ModelDeletedHandlerTests(WorkflowBuilderDatabaseFixture fixture)
 {
-    private static readonly Guid OrgId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid TenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private static ModelDeletedHandler CreateHandler(WorkflowBuilderDbContext ctx)
     {
@@ -31,14 +31,14 @@ public sealed class ModelDeletedHandlerTests(WorkflowBuilderDatabaseFixture fixt
         new()
         {
             modelId = modelId.ToString(),
-            organizationId = OrgId.ToString(),
+            tenantId = TenantId.ToString(),
         };
 
     [Fact]
     public async Task Handle_WhenEventTriggerReferencesDeletedModel_MarksReferenceBroken()
     {
         Guid modelId = Guid.NewGuid();
-        WorkflowDefinition workflow = WorkflowDefinition.Create($"Flow-{Guid.NewGuid():N}", null, OrgId, "user");
+        WorkflowDefinition workflow = WorkflowDefinition.Create($"Flow-{Guid.NewGuid():N}", null, TenantId, "user");
         workflow.AddTrigger(
             TriggerType.Event,
             new Dictionary<string, object?> { ["eventType"] = "record.created", ["modelId"] = modelId });
@@ -47,7 +47,7 @@ public sealed class ModelDeletedHandlerTests(WorkflowBuilderDatabaseFixture fixt
         {
             writeCtx.WorkflowDefinitions.Add(workflow);
             writeCtx.WorkflowModelReferences.Add(
-                WorkflowModelReference.Create(workflow.Id, modelId, OrgId, isBroken: false));
+                WorkflowModelReference.Create(workflow.Id, modelId, TenantId, isBroken: false));
             await writeCtx.SaveChangesAsync();
         }
 

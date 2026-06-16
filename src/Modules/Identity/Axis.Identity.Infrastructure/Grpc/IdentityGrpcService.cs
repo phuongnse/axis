@@ -13,7 +13,7 @@ internal sealed class IdentityGrpcService(IMediator mediator) : IdentityService.
         GetUserPermissionsRequest request,
         ServerCallContext context)
     {
-        Guid organizationId = ResolveCallerOrganizationId(context);
+        Guid tenantId = ResolveCallertenantId(context);
 
         if (!Guid.TryParse(request.UserId, out Guid userId))
         {
@@ -22,7 +22,7 @@ internal sealed class IdentityGrpcService(IMediator mediator) : IdentityService.
         }
 
         Result<GetUserPermissionsResult> result = await mediator.Send(
-            new GetUserPermissionsQuery(userId, organizationId),
+            new GetUserPermissionsQuery(userId, tenantId),
             context.CancellationToken);
 
         if (result.IsFailure)
@@ -42,15 +42,15 @@ internal sealed class IdentityGrpcService(IMediator mediator) : IdentityService.
         return response;
     }
 
-    private static Guid ResolveCallerOrganizationId(ServerCallContext context)
+    private static Guid ResolveCallertenantId(ServerCallContext context)
     {
-        Claim? claim = context.GetHttpContext().User.FindFirst("org_id");
-        if (claim is null || !Guid.TryParse(claim.Value, out Guid organizationId))
+        Claim? claim = context.GetHttpContext().User.FindFirst("tenant_id");
+        if (claim is null || !Guid.TryParse(claim.Value, out Guid tenantId))
         {
             throw new RpcException(
-                new Status(StatusCode.Unauthenticated, "Caller JWT is missing a valid org_id claim."));
+                new Status(StatusCode.Unauthenticated, "Caller JWT is missing a valid tenant_id claim."));
         }
 
-        return organizationId;
+        return tenantId;
     }
 }

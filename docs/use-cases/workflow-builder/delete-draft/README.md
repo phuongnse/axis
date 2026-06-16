@@ -8,7 +8,7 @@ Delete a Draft workflow so that I can permanently remove workflows I no longer n
 
 ## Primary actor
 
-- Organization Member with `workflow:definition:write`
+- Tenant Member with `workflow:definition:write`
 
 ## Trigger
 
@@ -57,6 +57,15 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 > **Deferred follow-ups:** Hard delete / permanent purge; bulk delete.
 >
 > **Decisions:** Draft deletion remains a soft-delete operation; no restore UI is exposed for deleted drafts.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

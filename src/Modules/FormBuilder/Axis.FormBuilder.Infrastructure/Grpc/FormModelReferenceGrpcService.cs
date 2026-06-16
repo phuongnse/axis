@@ -12,7 +12,7 @@ internal sealed class FormModelReferenceGrpcService(IFormModelReferenceRepositor
         CountActiveModelReferencesRequest request,
         ServerCallContext context)
     {
-        Guid organizationId = ResolveCallerOrganizationId(context);
+        Guid tenantId = ResolveCallertenantId(context);
 
         if (!Guid.TryParse(request.ModelId, out Guid modelId))
         {
@@ -21,20 +21,20 @@ internal sealed class FormModelReferenceGrpcService(IFormModelReferenceRepositor
         }
 
         int count = await references.CountActiveReferencesToModelAsync(
-            modelId, organizationId, context.CancellationToken);
+            modelId, tenantId, context.CancellationToken);
 
         return new CountActiveModelReferencesResponse { ActiveReferenceCount = count };
     }
 
-    private static Guid ResolveCallerOrganizationId(ServerCallContext context)
+    private static Guid ResolveCallertenantId(ServerCallContext context)
     {
-        Claim? claim = context.GetHttpContext().User.FindFirst("org_id");
-        if (claim is null || !Guid.TryParse(claim.Value, out Guid organizationId))
+        Claim? claim = context.GetHttpContext().User.FindFirst("tenant_id");
+        if (claim is null || !Guid.TryParse(claim.Value, out Guid tenantId))
         {
             throw new RpcException(
-                new Status(StatusCode.Unauthenticated, "Caller JWT is missing a valid org_id claim."));
+                new Status(StatusCode.Unauthenticated, "Caller JWT is missing a valid tenant_id claim."));
         }
 
-        return organizationId;
+        return tenantId;
     }
 }

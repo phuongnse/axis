@@ -8,7 +8,7 @@ See the full detail of a specific execution so that I can understand exactly wha
 
 ## Primary actor
 
-- Organization Member with `execution:read`
+- Tenant Member with `execution:read`
 
 ## Trigger
 
@@ -16,9 +16,9 @@ See the full detail of a specific execution so that I can understand exactly wha
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — View execution detail and step timeline flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -60,6 +60,15 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 > **Gaps vs spec:** Step timeline UI, context snapshot display, and parallel group rendering pending Frontend.
 >
 > **Done:** `GET /api/executions/{id}` returns execution + steps.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

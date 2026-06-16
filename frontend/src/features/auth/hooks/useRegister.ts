@@ -12,9 +12,25 @@ import {
   createRegisterSchema,
   type RegisterFormValues,
 } from '@/features/auth/schemas/register-schema';
-import type { RegisterValidationErrorData } from '@/features/auth/types';
+import type { LegalVersionsResponse, RegisterValidationErrorData } from '@/features/auth/types';
 import { useQueryParam } from '@/features/auth/use-query-param';
 import { ApiError } from '@/lib/api';
+
+type LoadedLegalVersions = LegalVersionsResponse & {
+  termsVersion: string;
+  privacyVersion: string;
+};
+
+interface RegisterMutationInput {
+  values: RegisterFormValues;
+  legalVersions: LoadedLegalVersions;
+}
+
+function hasLegalVersions(
+  legalVersions: LegalVersionsResponse | undefined,
+): legalVersions is LoadedLegalVersions {
+  return Boolean(legalVersions?.termsVersion && legalVersions.privacyVersion);
+}
 
 function pickFirstError(
   errors: Record<string, string[]> | undefined,
@@ -84,11 +100,16 @@ function applyRegisterValidationErrors(
 export function useRegister() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const organizationSetupToken = useQueryParam('setupToken');
-  const { data: legalVersions } = useLegalVersions();
+  const tenantSetupToken = useQueryParam('setupToken');
+  const {
+    data: legalVersions,
+    isError: legalVersionsError,
+    isLoading: legalVersionsLoading,
+  } = useLegalVersions();
   const idempotencyKeyRef = useRef(createRegisterIdempotencyKey());
   const registerSchema = useMemo(() => createRegisterSchema(t), [t]);
   const genericSubmitError = t('validation.genericSubmit');
+  const legalVersionsMissingError = t('validation.legalVersionsMissing');
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -102,11 +123,7 @@ export function useRegister() {
   });
 
   const mutation = useMutation({
-    mutationFn: async (values: RegisterFormValues) => {
-      if (!legalVersions) {
-        throw new Error(t('validation.legalVersionsMissing'));
-      }
-
+    mutationFn: async ({ values, legalVersions }: RegisterMutationInput) => {
       const names = toAdminNameParts(values.fullName);
       return registerUser(
         {
@@ -117,12 +134,12 @@ export function useRegister() {
           passwordConfirmation: values.passwordConfirmation,
           acceptedTermsVersion: legalVersions.termsVersion,
           acceptedPrivacyVersion: legalVersions.privacyVersion,
-          organizationSetupToken,
+          tenantSetupToken,
         },
         idempotencyKeyRef.current,
       );
     },
-    onSuccess: (_data, values) => {
+    onSuccess: (_data, { values }) => {
       saveRegistrationContext({
         email: values.email.trim(),
       });
@@ -148,8 +165,16 @@ export function useRegister() {
 
   async function submit(values: RegisterFormValues) {
     form.clearErrors('root');
+    if (legalVersionsLoading || legalVersionsError || !hasLegalVersions(legalVersions)) {
+      form.setError('root', {
+        type: 'server',
+        message: legalVersionsMissingError,
+      });
+      return;
+    }
+
     try {
-      await mutation.mutateAsync(values);
+      await mutation.mutateAsync({ values, legalVersions });
     } catch {
       // Field and submit errors are applied in mutation.onError.
     }
@@ -157,7 +182,7 @@ export function useRegister() {
 
   return {
     form,
-    loading: mutation.isPending,
+    loading: mutation.isPending || legalVersionsLoading,
     submit,
     legalVersions,
   };

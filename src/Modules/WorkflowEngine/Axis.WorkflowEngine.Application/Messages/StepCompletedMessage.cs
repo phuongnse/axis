@@ -7,5 +7,5 @@ namespace Axis.WorkflowEngine.Application.Messages;
 public sealed record StepCompletedMessage(
     Guid ExecutionId,
     Guid StepId,
-    Guid OrganizationId,
+    Guid tenantId,
     IReadOnlyDictionary<string, object?> Output);

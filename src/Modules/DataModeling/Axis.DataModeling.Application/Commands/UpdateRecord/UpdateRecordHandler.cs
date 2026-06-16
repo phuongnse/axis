@@ -15,12 +15,12 @@ public sealed class UpdateRecordHandler(
 {
     public async Task<Result> Handle(UpdateRecordCommand command, CancellationToken cancellationToken)
     {
-        DataModel? model = await modelRepo.GetByIdAsync(command.ModelId, command.OrganizationId, cancellationToken);
+        DataModel? model = await modelRepo.GetByIdAsync(command.ModelId, command.tenantId, cancellationToken);
         if (model is null)
             return Result.Failure(ErrorCodes.NotFound, "Model not found.");
 
         DataRecord? record = await recordRepo.GetByIdAsync(
-            command.RecordId, command.ModelId, command.OrganizationId, cancellationToken);
+            command.RecordId, command.ModelId, command.tenantId, cancellationToken);
         if (record is null)
             return Result.Failure(ErrorCodes.NotFound, "Record not found.");
 

@@ -6,5 +6,5 @@ namespace Axis.DataModeling.Application.Commands.CreateDataClass;
 public sealed record CreateDataClassCommand(
     string Name,
     string? Description,
-    Guid OrganizationId,
+    Guid tenantId,
     string CreatedBy) : ICommand<Guid>;

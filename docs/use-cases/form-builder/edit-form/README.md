@@ -8,7 +8,7 @@ Edit an existing form so that I can update its fields as requirements change.
 
 ## Primary actor
 
-- Organization Member with `form:definition:write`
+- Tenant Member with `form:definition:write`
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Edit an existing form so that I can update its fields as requirements change.
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Edit a form flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -58,8 +58,14 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 > **Gaps vs spec:** live-workflow warning banner (informational) and definition snapshot for in-progress tasks pending API + workflow-engine.
 >
 > **Decisions:**
-> - `UpdateFormHandler` checks name uniqueness via `NameExistsAsync(name, orgId, excludeId)` before calling `form.Update()`
-> - TOCTOU race requires a unique DB index on `(name, org_id)` at Infrastructure layer.
+> - `UpdateFormHandler` checks name uniqueness via `NameExistsAsync(name, TenantId, excludeId)` before calling `form.Update()`
+> - TOCTOU race requires a unique DB index on `(name, tenant_id)` at Infrastructure layer.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
 
 ## Wireframes
 

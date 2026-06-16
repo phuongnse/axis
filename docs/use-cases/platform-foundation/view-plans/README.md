@@ -8,7 +8,7 @@ Compare available subscription plans so that I can choose the one that fits my n
 
 ## Primary actor
 
-- Prospective customer (or signed-in org admin viewing pricing)
+- Prospective customer (or signed-in tenant admin viewing pricing)
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Compare available subscription plans so that I can choose the one that fits my n
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — View available plans flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -36,7 +36,7 @@ Compare available subscription plans so that I can choose the one that fits my n
 - [ ] If the pricing page fails to load plan data, it shows a static fallback with a "Pricing may be outdated" notice rather than a blank page.
 
 *Edge cases*
-- [ ] A plan that has been retired (no longer available for new signups) is not shown on the public pricing page but remains visible to existing orgs still on that plan.
+- [ ] A plan that has been retired (no longer available for new signups) is not shown on the public pricing page but remains visible to existing tenants still on that plan.
 
 *Out of scope*
 - Monthly vs annual billing toggle — part of the separate billing initiative.
@@ -61,7 +61,16 @@ Compare available subscription plans so that I can choose the one that fits my n
 >
 > **Gaps vs spec:** public pricing page UI, static fallback on load failure, "Current plan" badge (Frontend only).
 >
-> **Decisions:** retired plans hidden on public page; orgs on retired plans still resolve plan via API when signed in.
+> **Decisions:** retired plans hidden on public page; tenants on retired plans still resolve plan via API when signed in.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

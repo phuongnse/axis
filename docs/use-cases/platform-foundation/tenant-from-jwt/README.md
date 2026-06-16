@@ -16,9 +16,9 @@ Resolve the active tenant from the JWT on every request so that downstream code 
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Tenant resolution from JWT flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -31,15 +31,15 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] JWT contains an `org_id` claim set at login time.
-- [ ] Middleware reads `org_id`, resolves the tenant schema name (from Redis cache or DB), and stores it in the scoped `ITenantContext`.
-- [ ] All downstream handlers access tenant info through `ITenantContext`; none read `org_id` directly from the JWT.
+- [ ] JWT contains an `tenant_id` claim set at login time.
+- [ ] Middleware reads `tenant_id`, resolves the tenant schema name (from Redis cache or DB), and stores it in the scoped `ITenantContext`.
+- [ ] All downstream handlers access tenant info through `ITenantContext`; none read `tenant_id` directly from the JWT.
 - [ ] Schema name resolution adds less than 5 ms to request latency (cache hit).
 
 *Validation & errors*
-- [ ] A JWT missing the `org_id` claim is rejected with HTTP 401.
-- [ ] A JWT with an `org_id` that maps to no known schema is rejected with HTTP 403 (not 404, to avoid enumeration).
-- [ ] A JWT with an `org_id` for a deleted or suspended org is rejected with HTTP 403.
+- [ ] A JWT missing the `tenant_id` claim is rejected with HTTP 401.
+- [ ] A JWT with an `tenant_id` that maps to no known schema is rejected with HTTP 403 (not 404, to avoid enumeration).
+- [ ] A JWT with an `tenant_id` for a deleted or suspended tenant is rejected with HTTP 403.
 
 *Edge cases*
 - [ ] Redis cache miss (cold start, cache eviction): falls back to DB lookup, caches the result for 1 hour, and proceeds normally.
@@ -60,12 +60,21 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 > | Frontend | N/A |
 >
 > **Done:**
-> - `org_id` claim issued at login (`ConnectEndpoints`)
-> - handlers use `ITenantContext` / `ICurrentUser` — schema `tenant_{orgId:N}` derived in `HttpTenantContext` (no separate DB lookup; Redis cache N/A — deterministic derivation satisfies the under-5 ms AC).
-> - `TenantOrganizationAccessMiddleware` returns HTTP 403 for missing, archived/deleted, or not-ready orgs on tenant module routes (`/api/models`, workflows, forms, etc.).
+> - `tenant_id` claim issued at login (`ConnectEndpoints`)
+> - handlers use `ITenantContext` / `ICurrentUser` — schema `tenant_{TenantId:N}` derived in `HttpTenantContext` (no separate DB lookup; Redis cache N/A — deterministic derivation satisfies the under-5 ms AC).
+> - `TenantAccessMiddleware` returns HTTP 403 for missing, archived/deleted, or not-ready tenants on tenant module routes (`/api/models`, workflows, forms, etc.).
 > - background jobs use `FixedTenantContext` in provision/cancel handlers (see [patterns.md](../../../playbooks/patterns.md)).
 >
 > **Gaps vs spec:** none for backend cross-tenant access prevention.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

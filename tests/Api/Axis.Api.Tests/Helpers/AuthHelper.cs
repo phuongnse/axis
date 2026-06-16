@@ -9,19 +9,19 @@ using Axis.Identity.Domain.Aggregates;
 namespace Axis.Api.Tests.Helpers;
 
 /// <summary>
-/// Shared test helper that registers an org, verifies email, runs the full
+/// Shared test helper that registers a tenant, verifies email, runs the full
 /// Authorization Code + PKCE flow, and returns an authenticated HttpClient.
 /// </summary>
 public static class AuthHelper
 {
     private static readonly JsonSerializerOptions Json = ApiTestFixture.JsonOptions;
 
-    // Test redirect URI — must match a registered RedirectUri in the SPA client seed
+    // Test redirect URI - must match a registered RedirectUri in the SPA client seed
     private const string RedirectUri = "http://localhost/callback";
     private const string ClientId = "axis_spa";
 
     /// <summary>
-    /// Registers an org with the given suffix, verifies email, completes the
+    /// Registers a tenant with the given suffix, verifies email, completes the
     /// Authorization Code + PKCE flow, and returns a pre-configured Bearer client.
     /// </summary>
     public static async Task<HttpClient> CreateAdminClientAsync(ApiTestFixture fixture, string suffix)
@@ -61,7 +61,7 @@ public static class AuthHelper
         ApiTestFixture fixture,
         string suffix)
     {
-        string setupToken = await RegisterAndVerifyOrganizationAsync(fixture, suffix);
+        string setupToken = await RegisterAndVerifyTenantAsync(fixture, suffix);
         string email = TestRegistrationPayload.AdminEmail(suffix);
 
         HttpResponseMessage userRegResp = await fixture.Client.PostAsJsonAsync(
@@ -72,14 +72,14 @@ public static class AuthHelper
         return email;
     }
 
-    public static async Task<string> RegisterAndVerifyOrganizationAsync(
+    public static async Task<string> RegisterAndVerifyTenantAsync(
         ApiTestFixture fixture,
         string suffix)
     {
-        string contactEmail = TestRegistrationPayload.OrganizationContactEmail(suffix);
+        string contactEmail = TestRegistrationPayload.TenantContactEmail(suffix);
 
         HttpResponseMessage regResp = await fixture.Client.PostAsJsonAsync(
-            "/api/organizations", TestRegistrationPayload.Create(suffix), Json);
+            "/api/tenants", TestRegistrationPayload.Create(suffix), Json);
 
         if (!regResp.IsSuccessStatusCode)
             throw new InvalidOperationException($"Registration failed: {regResp.StatusCode}");
@@ -91,13 +91,13 @@ public static class AuthHelper
         HttpResponseMessage verifyResp = await fixture.Client.PostAsJsonAsync(
             "/api/auth/verify-email", new { token = verifyToken }, Json);
         if (verifyResp.StatusCode != HttpStatusCode.OK)
-            throw new InvalidOperationException($"Organization verification failed: {verifyResp.StatusCode}");
+            throw new InvalidOperationException($"Tenant verification failed: {verifyResp.StatusCode}");
 
         JsonElement verifyBody = await verifyResp.Content.ReadFromJsonAsync<JsonElement>(Json);
-        string? setupToken = verifyBody.GetProperty("organizationSetupToken").GetString();
+        string? setupToken = verifyBody.GetProperty("tenantSetupToken").GetString();
 
         return setupToken
-            ?? throw new InvalidOperationException("No organizationSetupToken in verification response.");
+            ?? throw new InvalidOperationException("No TenantSetupToken in verification response.");
     }
 
     /// <summary>
@@ -182,13 +182,13 @@ public static class AuthHelper
             "&scope=", Uri.EscapeDataString("openid email profile offline_access permissions"),
             "&state=", Uri.EscapeDataString(state));
 
-        // Step A: GET /connect/authorize → 302 to /connect/login
+        // Step A: GET /connect/authorize -> 302 to /connect/login
         HttpResponseMessage authResp = await client.GetAsync(authorizeQuery);
         if (authResp.StatusCode != HttpStatusCode.Redirect)
             throw new InvalidOperationException(
                 $"Expected 302 from /connect/authorize, got {authResp.StatusCode}");
 
-        // Step B: POST /connect/login → 302 back to /connect/authorize (with session cookie set)
+        // Step B: POST /connect/login -> 302 back to /connect/authorize (with session cookie set)
         string loginUrl = authResp.Headers.Location?.ToString()
             ?? "/connect/login?return_url=" + Uri.EscapeDataString(authorizeQuery);
 
@@ -210,7 +210,7 @@ public static class AuthHelper
                 $"Login failed ({loginResp.StatusCode}). " +
                 $"Body: {await loginResp.Content.ReadAsStringAsync()}");
 
-        // Step C: GET /connect/authorize again (cookie is now set) → 302 to redirect_uri?code=...
+        // Step C: GET /connect/authorize again (cookie is now set) -> 302 to redirect_uri?code=...
         HttpResponseMessage authResp2 = await client.GetAsync(authorizeQuery);
         if (authResp2.StatusCode != HttpStatusCode.Redirect)
             throw new InvalidOperationException(
@@ -225,7 +225,7 @@ public static class AuthHelper
             throw new InvalidOperationException(
                 $"Authorization code not found in redirect: {callbackUri}");
 
-        // Step D: POST /connect/token — exchange code for tokens
+        // Step D: POST /connect/token - exchange code for tokens
         HttpResponseMessage tokenResp = await client.PostAsync("/connect/token",
             new FormUrlEncodedContent(new Dictionary<string, string>
             {
@@ -250,7 +250,7 @@ public static class AuthHelper
             ?? throw new InvalidOperationException("No access_token in token response.");
     }
 
-    // ── PKCE helpers ──────────────────────────────────────────────────────────
+    // -- PKCE helpers ----------------------------------------------------------
 
     private static string GenerateCodeVerifier()
     {

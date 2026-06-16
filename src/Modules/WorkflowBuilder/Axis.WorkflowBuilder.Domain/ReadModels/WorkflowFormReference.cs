@@ -8,7 +8,7 @@ public sealed class WorkflowFormReference
     public Guid WorkflowId { get; private set; }
     public Guid StepId { get; private set; }
     public Guid FormId { get; private set; }
-    public Guid OrganizationId { get; private set; }
+    public Guid tenantId { get; private set; }
     public bool IsBroken { get; private set; }
 
     private WorkflowFormReference() { } // EF Core materialisation
@@ -17,14 +17,14 @@ public sealed class WorkflowFormReference
         Guid workflowId,
         Guid stepId,
         Guid formId,
-        Guid organizationId,
+        Guid tenantId,
         bool isBroken = false)
         => new()
         {
             WorkflowId = workflowId,
             StepId = stepId,
             FormId = formId,
-            OrganizationId = organizationId,
+            tenantId = tenantId,
             IsBroken = isBroken,
         };
 

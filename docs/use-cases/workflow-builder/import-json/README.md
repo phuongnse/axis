@@ -8,7 +8,7 @@ Import a workflow from a JSON file so that I can quickly set up a workflow that 
 
 ## Primary actor
 
-- Organization Member with `workflow:definition:write`
+- Tenant Member with `workflow:definition:write`
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Import a workflow from a JSON file so that I can quickly set up a workflow that 
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Import a workflow from JSON flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -26,7 +26,7 @@ Import a workflow from a JSON file so that I can quickly set up a workflow that 
 
 ## Context
 
-Workflow definitions can be exported as portable JSON files and imported into any Axis organization, enabling template sharing, backups, and environment migration.
+Workflow definitions can be exported as portable JSON files and imported into any Axis Tenant, enabling template sharing, backups, and environment migration.
 
 ## Acceptance Criteria
 
@@ -42,9 +42,9 @@ Workflow definitions can be exported as portable JSON files and imported into an
 - [ ] Workflow name conflict: the user is prompted to rename the workflow before importing.
 
 *Edge cases*
-- [ ] A referenced form that doesn't exist in the target org is created automatically during import (using the form definition embedded in the export). If a form with the same name already exists, the user is prompted: "A form named '{name}' already exists. Use existing or create new?"
+- [ ] A referenced form that doesn't exist in the target tenant is created automatically during import (using the form definition embedded in the export). If a form with the same name already exists, the user is prompted: "A form named '{name}' already exists. Use existing or create new?"
 - [ ] `[REDACTED]` credential values in the import are imported as-is; the user is shown a warning: "N HTTP step(s) have redacted credentials. Configure them after import."
-- [ ] Importing a workflow that references a model that doesn't exist in the target org: the model definition is created (fields only, no records). If a model with the same name exists, user is prompted to map to it or create new.
+- [ ] Importing a workflow that references a model that doesn't exist in the target tenant: the model definition is created (fields only, no records). If a model with the same name exists, user is prompted to map to it or create new.
 - [ ] Import is transactional: if any part fails mid-import, no partial data is left behind.
 
 *Out of scope*
@@ -63,6 +63,12 @@ Workflow definitions can be exported as portable JSON files and imported into an
 > **Gaps vs spec:**
 > - import preview dialog, form/model resolution (auto-create or prompt), and file-picker UI pending Frontend
 > - handler skips invalid transitions/triggers rather than stopping — full transactional rollback not yet implemented in the API layer.
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

@@ -7,4 +7,4 @@ namespace Axis.DataModeling.Application.Commands.BulkDeleteRecords;
 public sealed record BulkDeleteRecordsCommand(
     IReadOnlyList<Guid> RecordIds,
     Guid ModelId,
-    Guid OrganizationId) : ICommand<BulkDeleteResult>;
+    Guid tenantId) : ICommand<BulkDeleteResult>;

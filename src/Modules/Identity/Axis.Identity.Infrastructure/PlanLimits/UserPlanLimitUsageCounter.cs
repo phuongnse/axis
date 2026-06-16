@@ -10,10 +10,10 @@ internal sealed class UserPlanLimitUsageCounter(
 {
     public PlanLimitResourceType ResourceType => PlanLimitResourceType.Users;
 
-    public async Task<int> GetCurrentUsageAsync(Guid organizationId, CancellationToken cancellationToken = default)
+    public async Task<int> GetCurrentUsageAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
-        int activeUsers = await userRepo.CountActiveUsersAsync(organizationId, cancellationToken);
-        int pendingInvites = await invitationRepo.CountPendingAsync(organizationId, cancellationToken);
+        int activeUsers = await userRepo.CountActiveUsersAsync(tenantId, cancellationToken);
+        int pendingInvites = await invitationRepo.CountPendingAsync(tenantId, cancellationToken);
         return activeUsers + pendingInvites;
     }
 }

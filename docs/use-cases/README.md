@@ -30,7 +30,7 @@ Create a full use-case README only when the work is shipped, being implemented, 
 
 When you ship code, update **use-case callout → domain README → PROGRESS** in the same PR. Never mark ✅ while `**Gaps vs spec**` still lists backend work for that layer.
 
-**Use-case file layout:** Purpose/Actor/Trigger, flow sections, AC, optional **Screen flow**, wireframes table, diagrams table, implementation status — see [docs-style § Use-case visual artifacts](../playbooks/docs-style.md#use-case-files--wireframes--implementation-status). Multi-screen reference: [register-org](./platform-foundation/register-org/README.md).
+**Use-case file layout:** Purpose/Actor/Trigger, flow sections, AC, optional **Screen flow**, wireframes table, diagrams table, implementation status — see [docs-style § Use-case visual artifacts](../playbooks/docs-style.md#use-case-files--wireframes--implementation-status). Multi-screen reference: [register-tenant](./platform-foundation/register-tenant/README.md).
 
 ---
 
@@ -38,7 +38,7 @@ When you ship code, update **use-case callout → domain README → PROGRESS** i
 
 | Domain | Scope |
 |--------|--------|
-| [platform-foundation](./platform-foundation/README.md) | Tenant registration, org management, isolation, subscription plans |
+| [platform-foundation](./platform-foundation/README.md) | Tenant registration, tenant management, isolation, subscription plans |
 | [identity-access](./identity-access/README.md) | Authentication, users, roles, permissions, security, i18n/theming |
 | [data-modeling](./data-modeling/README.md) | Models, field types, data classes, record CRUD |
 | [workflow-builder](./workflow-builder/README.md) | Canvas, steps, triggers, branching, parallel, import/export |

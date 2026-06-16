@@ -9,9 +9,9 @@ internal sealed class TenantModuleProvisioningConfiguration : IEntityTypeConfigu
     public void Configure(EntityTypeBuilder<TenantModuleProvisioning> builder)
     {
         builder.ToTable("tenant_module_provisions");
-        builder.HasKey(p => new { p.OrganizationId, p.Module });
+        builder.HasKey(p => new { p.tenantId, p.Module });
 
-        builder.Property(p => p.OrganizationId).HasColumnName("organization_id").IsRequired();
+        builder.Property(p => p.tenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(p => p.Module).HasColumnName("module").HasMaxLength(64).IsRequired();
         builder.Property(p => p.Status)
             .HasColumnName("status")

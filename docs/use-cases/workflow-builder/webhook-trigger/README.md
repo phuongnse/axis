@@ -8,7 +8,7 @@ Configure a webhook trigger so that an external system can start my workflow by 
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Configure a webhook trigger so that an external system can start my workflow by 
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Configure a Webhook trigger flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -60,6 +60,15 @@ A workflow must have at least one trigger before it can be published. Triggers d
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** unique webhook URL generation, HMAC verification, and payload mapping pending workflow-engine + API layer.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

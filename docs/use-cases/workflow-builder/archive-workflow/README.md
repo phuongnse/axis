@@ -8,7 +8,7 @@ Archive a workflow so that it is disabled but its history is preserved.
 
 ## Primary actor
 
-- Organization Member with `workflow:definition:write`
+- Tenant Member with `workflow:definition:write`
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Archive a workflow so that it is disabled but its history is preserved.
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Archive a workflow flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -58,6 +58,12 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 > **Gaps vs spec:**
 > - trigger deactivation on archive pending workflow-engine integration
 > - HTTP 422 on archived-workflow trigger pending.
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

@@ -8,7 +8,7 @@ Configure multiple steps to run in parallel so that independent tasks don't bloc
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Configure multiple steps to run in parallel so that independent tasks don't bloc
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Create a parallel step group flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -61,6 +61,12 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 > **Gaps vs spec:**
 > - canvas container node rendering and step nesting UI pending Frontend
 > - parallel group represented via step config in existing JSONB storage. `ParallelGroup` and `JoinType` are not yet implemented — shown as planned (dashed) in diagram.
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

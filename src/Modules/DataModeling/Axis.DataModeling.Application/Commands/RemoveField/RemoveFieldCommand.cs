@@ -6,4 +6,4 @@ namespace Axis.DataModeling.Application.Commands.RemoveField;
 public sealed record RemoveFieldCommand(
     Guid ModelId,
     Guid FieldId,
-    Guid OrganizationId) : ICommand;
+    Guid tenantId) : ICommand;

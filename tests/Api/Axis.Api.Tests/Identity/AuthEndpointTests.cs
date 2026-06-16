@@ -18,13 +18,13 @@ public class AuthEndpointTests(ApiTestFixture fixture)
 
     private static object RegisterPayload(string suffix) => TestRegistrationPayload.Create(suffix);
 
-    // ── Registration ──────────────────────────────────────────────────────────
+    // -- Registration ----------------------------------------------------------
 
     [Fact]
     public async Task Register_WhenPayloadIsValid_Returns200()
     {
         HttpResponseMessage resp = await _client.PostAsJsonAsync(
-            "/api/organizations", RegisterPayload("auth_reg1"), Json);
+            "/api/tenants", RegisterPayload("auth_reg1"), Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -32,10 +32,10 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task Register_WhenPayloadIsInvalid_Returns400WithErrors()
     {
-        HttpResponseMessage resp = await _client.PostAsJsonAsync("/api/organizations", new
+        HttpResponseMessage resp = await _client.PostAsJsonAsync("/api/tenants", new
         {
-            orgName = "A",          // too short
-            organizationContactEmail = "not-an-email",
+            tenantName = "A",          // too short
+            TenantContactEmail = "not-an-email",
         }, Json);
 
         resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -43,7 +43,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
         body.GetProperty("errors").ValueKind.Should().Be(JsonValueKind.Object);
     }
 
-    // ── PKCE Flow ─────────────────────────────────────────────────────────────
+    // -- PKCE Flow -------------------------------------------------------------
 
     [Fact]
     public async Task RegisterUser_WhenStandalonePayloadIsValid_VerifiesEmailAndStartsDashboardSession()
@@ -94,7 +94,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
     {
         await AuthHelper.RegisterFirstAdminWithoutUserVerificationAsync(fixture, "auth_noverify1");
 
-        // POST /connect/login directly — should fail because email is not verified
+        // POST /connect/login directly - should fail because email is not verified
         HttpClient pkceClient = fixture.CreateNewClient();
         HttpResponseMessage loginResp = await pkceClient.PostAsync("/connect/login",
             new FormUrlEncodedContent(new Dictionary<string, string>
@@ -146,7 +146,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
         body.GetProperty("detail").GetString().Should().Contain("Incorrect email");
     }
 
-    // ── Sign Out ──────────────────────────────────────────────────────────────
+    // -- Sign Out --------------------------------------------------------------
 
     [Fact]
     public async Task Signout_WhenNoToken_Returns401()
@@ -178,7 +178,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
         afterSignout.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
-    // ── Password Reset ────────────────────────────────────────────────────────
+    // -- Password Reset --------------------------------------------------------
 
     [Fact]
     public async Task ForgotPassword_WhenEmailIsAny_AlwaysReturnsOk()
@@ -265,12 +265,12 @@ public class AuthEndpointTests(ApiTestFixture fixture)
         body.GetProperty("detail").GetString().Should().Contain("expired");
     }
 
-    // ── Token Refresh ─────────────────────────────────────────────────────────
+    // -- Token Refresh ---------------------------------------------------------
 
     [Fact]
     public async Task RefreshToken_WhenCookieIsPresent_ReturnsNewAccessToken()
     {
-        // Complete PKCE flow — refresh token is set as httpOnly cookie on the client
+        // Complete PKCE flow - refresh token is set as httpOnly cookie on the client
         HttpClient pkceClient = fixture.CreateNewClient();
 
         string email = await AuthHelper.RegisterAndVerifyAdminAsync(fixture, "auth_refresh1");
@@ -280,13 +280,13 @@ public class AuthEndpointTests(ApiTestFixture fixture)
             pkceClient, email, TestRegistrationPayload.AdminPassword);
         firstAccessToken.Should().NotBeNullOrEmpty();
 
-        // Refresh — the cookie is automatically sent by pkceClient
+        // Refresh - the cookie is automatically sent by pkceClient
         HttpResponseMessage refreshResp = await pkceClient.PostAsync("/connect/token",
             new FormUrlEncodedContent(new Dictionary<string, string>
             {
                 ["grant_type"] = "refresh_token",
                 ["client_id"] = "axis_spa",
-                // refresh_token is in the httpOnly cookie — not in the body
+                // refresh_token is in the httpOnly cookie - not in the body
             }));
 
         refreshResp.StatusCode.Should().Be(HttpStatusCode.OK);

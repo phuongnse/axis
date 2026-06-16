@@ -7,7 +7,7 @@ namespace Axis.WorkflowBuilder.Domain.Events;
 /// <param name="Transitions">Snapshot of all transitions at publish time.</param>
 public sealed record WorkflowPublished(
     Guid WorkflowId,
-    Guid OrganizationId,
+    Guid tenantId,
     IReadOnlyList<Guid> ReferencedFormIds,
     IReadOnlyList<StepSnapshot> Steps,
     IReadOnlyList<TransitionSnapshot> Transitions) : IDomainEvent;

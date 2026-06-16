@@ -5,29 +5,29 @@ namespace Axis.Identity.Contracts;
 /// <summary>Typed accessors for Avro-generated event payloads (string UUID fields).</summary>
 public static class IdentityEventExtensions
 {
-    public static Guid OrganizationId(this OrganizationVerifiedEvent @event)
-        => ParseRequiredGuid(@event.organizationId, nameof(@event.organizationId));
+    public static Guid tenantId(this TenantVerifiedEvent @event)
+        => ParseRequiredGuid(@event.tenantId, nameof(@event.tenantId));
 
-    public static Guid OrganizationId(this TenantModuleProvisionReportEvent @event)
-        => ParseRequiredGuid(@event.organizationId, nameof(@event.organizationId));
+    public static Guid tenantId(this TenantModuleProvisionReportEvent @event)
+        => ParseRequiredGuid(@event.tenantId, nameof(@event.tenantId));
 
     public static Guid UserId(this UserDeactivatedEvent @event)
         => ParseRequiredGuid(@event.userId, nameof(@event.userId));
 
-    public static Guid OrganizationId(this UserDeactivatedEvent @event)
-        => ParseRequiredGuid(@event.organizationId, nameof(@event.organizationId));
+    public static Guid tenantId(this UserDeactivatedEvent @event)
+        => ParseRequiredGuid(@event.tenantId, nameof(@event.tenantId));
 
     public static Guid UserId(this UserReactivatedEvent @event)
         => ParseRequiredGuid(@event.userId, nameof(@event.userId));
 
-    public static Guid OrganizationId(this UserReactivatedEvent @event)
-        => ParseRequiredGuid(@event.organizationId, nameof(@event.organizationId));
+    public static Guid tenantId(this UserReactivatedEvent @event)
+        => ParseRequiredGuid(@event.tenantId, nameof(@event.tenantId));
 
     public static Guid UserId(this RoleAssignedEvent @event)
         => ParseRequiredGuid(@event.userId, nameof(@event.userId));
 
-    public static Guid OrganizationId(this RoleAssignedEvent @event)
-        => ParseRequiredGuid(@event.organizationId, nameof(@event.organizationId));
+    public static Guid tenantId(this RoleAssignedEvent @event)
+        => ParseRequiredGuid(@event.tenantId, nameof(@event.tenantId));
 
     public static Guid RoleId(this RoleAssignedEvent @event)
         => ParseRequiredGuid(@event.roleId, nameof(@event.roleId));
@@ -35,8 +35,8 @@ public static class IdentityEventExtensions
     public static Guid UserId(this RoleRemovedEvent @event)
         => ParseRequiredGuid(@event.userId, nameof(@event.userId));
 
-    public static Guid OrganizationId(this RoleRemovedEvent @event)
-        => ParseRequiredGuid(@event.organizationId, nameof(@event.organizationId));
+    public static Guid tenantId(this RoleRemovedEvent @event)
+        => ParseRequiredGuid(@event.tenantId, nameof(@event.tenantId));
 
     public static Guid RoleId(this RoleRemovedEvent @event)
         => ParseRequiredGuid(@event.roleId, nameof(@event.roleId));

@@ -9,7 +9,7 @@ namespace Axis.FormBuilder.Application.Tests.Queries;
 
 public class GetFormTaskByTokenHandlerTests
 {
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TenantId = Guid.NewGuid();
     private static readonly Guid FormId = Guid.NewGuid();
     private static readonly Guid ExecutionId = Guid.NewGuid();
     private static readonly Guid StepId = Guid.NewGuid();
@@ -43,7 +43,7 @@ public class GetFormTaskByTokenHandlerTests
             .GetByAccessTokenAsync(submission.AccessToken, Arg.Any<CancellationToken>())
             .Returns(submission);
         _formRepo
-            .GetByIdAsync(submission.FormDefinitionId, submission.OrganizationId, Arg.Any<CancellationToken>())
+            .GetByIdAsync(submission.FormDefinitionId, submission.tenantId, Arg.Any<CancellationToken>())
             .Returns((FormDefinition?)null);
 
         FormTaskByTokenDto? dto = await _handler.Handle(
@@ -57,7 +57,7 @@ public class GetFormTaskByTokenHandlerTests
     {
         FormSubmission submission = CreatePendingSubmission();
 
-        FormDefinition form = FormDefinition.Create("Onboarding", "desc", OrgId, "user");
+        FormDefinition form = FormDefinition.Create("Onboarding", "desc", TenantId, "user");
         form.AddField("last_name", "Last Name", FormFieldType.Text, true, null);
         form.AddField("first_name", "First Name", FormFieldType.Text, true, null);
 
@@ -65,7 +65,7 @@ public class GetFormTaskByTokenHandlerTests
             .GetByAccessTokenAsync(submission.AccessToken, Arg.Any<CancellationToken>())
             .Returns(submission);
         _formRepo
-            .GetByIdAsync(submission.FormDefinitionId, submission.OrganizationId, Arg.Any<CancellationToken>())
+            .GetByIdAsync(submission.FormDefinitionId, submission.tenantId, Arg.Any<CancellationToken>())
             .Returns(form);
 
         FormTaskByTokenDto? dto = await _handler.Handle(
@@ -86,7 +86,7 @@ public class GetFormTaskByTokenHandlerTests
     {
         return FormSubmission.Create(
             FormId,
-            OrgId,
+            TenantId,
             ExecutionId,
             StepId,
             AssigneeId,

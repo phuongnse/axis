@@ -12,18 +12,18 @@ internal sealed class TenantModuleProvisioningRepository(IdentityDbContext conte
         => await context.TenantModuleProvisions.AddRangeAsync(rows, cancellationToken);
 
     public async Task<TenantModuleProvisioning?> GetAsync(
-        Guid organizationId,
+        Guid tenantId,
         string module,
         CancellationToken cancellationToken = default)
         => await context.TenantModuleProvisions
             .FirstOrDefaultAsync(
-                p => p.OrganizationId == organizationId && p.Module == module,
+                p => p.tenantId == tenantId && p.Module == module,
                 cancellationToken);
 
-    public async Task<IReadOnlyList<TenantModuleProvisioning>> GetAllForOrganizationAsync(
-        Guid organizationId,
+    public async Task<IReadOnlyList<TenantModuleProvisioning>> GetAllForTenantAsync(
+        Guid tenantId,
         CancellationToken cancellationToken = default)
         => await context.TenantModuleProvisions
-            .Where(p => p.OrganizationId == organizationId)
+            .Where(p => p.tenantId == tenantId)
             .ToListAsync(cancellationToken);
 }

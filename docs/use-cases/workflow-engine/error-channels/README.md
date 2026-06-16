@@ -8,7 +8,7 @@ Configure who gets notified when my workflow fails so that the right people are 
 
 ## Primary actor
 
-- Organization Member with `workflow:definition:write`
+- Tenant Member with `workflow:definition:write`
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Configure who gets notified when my workflow fails so that the right people are 
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Configure error notification channels per workflow flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -61,6 +61,12 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 > - error notification channel config is not modeled in the domain (no channel list on `WorkflowExecution`)
 > - no `UpdateErrorNotificationChannelsCommand` handler
 > - notification channel configuration UI and per-workflow channel storage pending API + Frontend.
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

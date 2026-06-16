@@ -4,21 +4,21 @@
 
 ## Purpose
 
-See all models in my organization so that I can understand the data available to me.
+See all models in my Tenant so that I can understand the data available to me.
 
 ## Primary actor
 
-- Organization Member with `data_modeling:model:read`
+- Tenant Member with `data_modeling:model:read`
 
 ## Trigger
 
-- User initiates: see all models in my organization
+- User initiates: see all models in my Tenant
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — View all models flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -26,7 +26,7 @@ See all models in my organization so that I can understand the data available to
 
 ## Context
 
-Users can create custom data models within their organization. A model defines the structure of a type of business object. All model metadata is stored in the tenant schema; actual records use a JSONB-backed storage strategy.
+Users can create custom data models within their Tenant. A model defines the structure of a type of business object. All model metadata is stored in the tenant schema; actual records use a JSONB-backed storage strategy.
 
 ## Acceptance Criteria
 
@@ -40,11 +40,11 @@ Users can create custom data models within their organization. A model defines t
 - [ ] Users without `data_modeling:model:read` who navigate to this URL are redirected to home with a permission error.
 
 *Edge cases*
-- [ ] If the org has no models yet, the list shows an empty state with a "Create your first model" CTA.
+- [ ] If the tenant has no models yet, the list shows an empty state with a "Create your first model" CTA.
 - [ ] Record count may be slightly behind real-time (cached with 1-minute TTL) to avoid expensive COUNT queries on every list load.
 
 *Out of scope*
-- Folders or categories for organizing models.
+- Folders or categories for arranging models.
 
 > **Implementation status**
 >
@@ -59,6 +59,15 @@ Users can create custom data models within their organization. A model defines t
 > **Gaps vs spec:** record count column pending denormalized counter or API-layer aggregation.
 >
 > **Done:** field count is derived from `Fields.Count` at query time.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

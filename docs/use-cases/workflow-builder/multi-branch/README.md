@@ -8,7 +8,7 @@ Add more than two branches from a Condition step so that I can handle multiple d
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Add more than two branches from a Condition step so that I can handle multiple d
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Add a multi-branch condition flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -59,6 +59,15 @@ Workflows can take different execution paths based on data values using Conditio
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** branch drag-to-reorder UI and default-branch validation at publish pending Frontend + API.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

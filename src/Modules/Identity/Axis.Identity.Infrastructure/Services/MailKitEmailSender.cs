@@ -14,9 +14,9 @@ internal sealed class MailKitEmailSender(IConfiguration configuration) : IEmailS
         await SendAsync(toEmail, subject, body, ct);
     }
 
-    public async Task SendInvitationEmailAsync(string toEmail, string orgName, string invitationToken, CancellationToken ct = default)
+    public async Task SendInvitationEmailAsync(string toEmail, string tenantName, string invitationToken, CancellationToken ct = default)
     {
-        string subject = $"You've been invited to join {orgName} on Axis";
+        string subject = $"You've been invited to join {tenantName} on Axis";
         string body = $"Click the link to accept your invitation: {GetBaseUrl()}/invitations/accept?token={invitationToken}";
         await SendAsync(toEmail, subject, body, ct);
     }
@@ -35,31 +35,61 @@ internal sealed class MailKitEmailSender(IConfiguration configuration) : IEmailS
         await SendAsync(toEmail, subject, body, ct);
     }
 
-    public async Task SendOrganizationDeletionScheduledEmailAsync(
+    public async Task SendTenantDeletionScheduledEmailAsync(
         string toEmail,
-        string organizationName,
+        string TenantName,
         CancellationToken ct = default)
     {
-        string subject = $"Deletion scheduled for {organizationName}";
+        string subject = $"Deletion scheduled for {TenantName}";
         string body =
-            "Your organization has been scheduled for deletion. All data will be permanently removed in 30 days.";
+            "Your Tenant has been scheduled for deletion. All data will be permanently removed in 30 days.";
         await SendAsync(toEmail, subject, body, ct);
     }
 
     private async Task SendAsync(string toEmail, string subject, string body, CancellationToken ct)
     {
-        IConfigurationSection smtp = configuration.GetSection("Email:Smtp");
+        IConfigurationSection email = configuration.GetSection("Email");
+        IConfigurationSection smtp = email.GetSection("Smtp");
+
+        static string? FirstConfigured(params string?[] values)
+        {
+            foreach (string? value in values)
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                    return value;
+            }
+
+            return null;
+        }
+
+        static string FirstConfiguredOrDefault(string defaultValue, params string?[] values) =>
+            FirstConfigured(values) ?? defaultValue;
+
+        string fromAddress = FirstConfiguredOrDefault(
+            "noreply@axis.app",
+            email["FromAddress"],
+            smtp["FromAddress"],
+            smtp["From"],
+            email["From"]);
+        string? fromName = FirstConfigured(email["FromName"], smtp["FromName"]);
+        string host = FirstConfiguredOrDefault("localhost", email["Host"], smtp["Host"]);
+        string portValue = FirstConfiguredOrDefault("587", email["Port"], smtp["Port"]);
+        string? username = FirstConfigured(email["Username"], smtp["Username"]);
+        string password = FirstConfigured(email["Password"], smtp["Password"]) ?? string.Empty;
+
         MimeMessage message = new MimeMessage();
-        message.From.Add(MailboxAddress.Parse(smtp["From"] ?? "noreply@axis.app"));
+        message.From.Add(string.IsNullOrWhiteSpace(fromName)
+            ? MailboxAddress.Parse(fromAddress)
+            : new MailboxAddress(fromName, fromAddress));
         message.To.Add(MailboxAddress.Parse(toEmail));
         message.Subject = subject;
         message.Body = new TextPart("plain") { Text = body };
 
         using SmtpClient client = new SmtpClient();
-        await client.ConnectAsync(smtp["Host"] ?? "localhost", int.Parse(smtp["Port"] ?? "587"), cancellationToken: ct);
+        await client.ConnectAsync(host, int.Parse(portValue), cancellationToken: ct);
 
-        if (!string.IsNullOrEmpty(smtp["Username"]))
-            await client.AuthenticateAsync(smtp["Username"]!, smtp["Password"] ?? string.Empty, ct);
+        if (username is not null)
+            await client.AuthenticateAsync(username, password, ct);
 
         await client.SendAsync(message, ct);
         await client.DisconnectAsync(quit: true, ct);

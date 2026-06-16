@@ -11,7 +11,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List all data models for the organization */
+        /** List all data models for the tenant */
         get: operations["GetModels"];
         put?: never;
         /** Create a new data model */
@@ -100,7 +100,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List all data classes for the organization */
+        /** List all data classes for the tenant */
         get: operations["GetDataClasses"];
         put?: never;
         /** Create a new data class */
@@ -242,7 +242,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List all forms for the organization (paginated) */
+        /** List all forms for the tenant (paginated) */
         get: operations["GetForms"];
         put?: never;
         /** Create a new form definition */
@@ -544,15 +544,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/organizations/slug-preview": {
+    "/api/tenants/slug-preview": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Preview organization URL slug from a proposed name */
-        get: operations["GetOrganizationSlugPreview"];
+        /** Preview tenant URL slug from a proposed name */
+        get: operations["GetTenantSlugPreview"];
         put?: never;
         post?: never;
         delete?: never;
@@ -561,7 +561,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/organizations": {
+    "/api/tenants": {
         parameters: {
             query?: never;
             header?: never;
@@ -570,15 +570,15 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register a new organization contact for verification */
-        post: operations["RegisterOrganization"];
+        /** Register a new tenant contact for verification */
+        post: operations["RegisterTenant"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/organizations/me/invitations": {
+    "/api/tenants/me/invitations": {
         parameters: {
             query?: never;
             header?: never;
@@ -587,7 +587,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Invite a user to the organization by email */
+        /** Invite a user to the tenant by email */
         post: operations["InviteUser"];
         delete?: never;
         options?: never;
@@ -595,15 +595,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/organizations/current/settings": {
+    "/api/tenants/current/settings": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get organization settings and usage stats */
-        get: operations["GetOrganizationSettings"];
+        /** Get tenant settings and usage stats */
+        get: operations["GetTenantSettings"];
         put?: never;
         post?: never;
         delete?: never;
@@ -612,7 +612,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/organizations/current/profile": {
+    "/api/tenants/current/profile": {
         parameters: {
             query?: never;
             header?: never;
@@ -620,8 +620,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Update organization profile (name, timezone, language, logo) */
-        put: operations["UpdateOrganizationProfile"];
+        /** Update tenant profile (name, timezone, language, logo) */
+        put: operations["UpdateTenantProfile"];
         post?: never;
         delete?: never;
         options?: never;
@@ -629,7 +629,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/organizations/current/deletion": {
+    "/api/tenants/current/deletion": {
         parameters: {
             query?: never;
             header?: never;
@@ -638,10 +638,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Schedule organization for deletion after a 30-day grace period */
-        post: operations["ScheduleOrganizationDeletion"];
-        /** Cancel a scheduled organization deletion */
-        delete: operations["CancelOrganizationDeletion"];
+        /** Schedule tenant for deletion after a 30-day grace period */
+        post: operations["ScheduleTenantDeletion"];
+        /** Cancel a scheduled tenant deletion */
+        delete: operations["CancelTenantDeletion"];
         options?: never;
         head?: never;
         patch?: never;
@@ -690,7 +690,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register a user account standalone or with an organization setup token */
+        /** Register a user account standalone or with a tenant setup token */
         post: operations["RegisterUser"];
         delete?: never;
         options?: never;
@@ -809,7 +809,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List all roles for the organization */
+        /** List all roles for the tenant */
         get: operations["GetRoles"];
         put?: never;
         /** Create a new role */
@@ -854,7 +854,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/platform/organizations/{organizationId}/plan": {
+    "/api/platform/tenants/{tenantId}/plan": {
         parameters: {
             query?: never;
             header?: never;
@@ -862,8 +862,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Platform admin: change an organization's subscription plan */
-        put: operations["ChangeOrganizationPlan"];
+        /** Platform admin: change a tenant's subscription plan */
+        put: operations["ChangeTenantPlan"];
         post?: never;
         delete?: never;
         options?: never;
@@ -878,7 +878,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List workflow definitions for the organization (paginated) */
+        /** List workflow definitions for the tenant (paginated) */
         get: operations["GetWorkflows"];
         put?: never;
         /** Create a new workflow definition in Draft status */
@@ -1121,7 +1121,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List workflow executions for the organization (paginated) */
+        /** List workflow executions for the tenant (paginated) */
         get: operations["GetAllExecutions"];
         put?: never;
         post?: never;
@@ -1298,14 +1298,14 @@ export interface components {
             /** Format: int32 */
             notFound?: number;
         };
-        ChangeOrganizationPlanRequest: {
-            /** Format: uuid */
-            planId?: string;
-        };
         ChangePasswordRequest: {
             currentPassword?: string;
             newPassword?: string;
             confirmPassword?: string;
+        };
+        ChangeTenantPlanRequest: {
+            /** Format: uuid */
+            planId?: string;
         };
         ConfigureStepRequest: {
             name?: string;
@@ -1350,7 +1350,7 @@ export interface components {
             avatarUrl?: string | null;
             isActive?: boolean;
             /** Format: uuid */
-            orgId?: string | null;
+            tenantId?: string | null;
             permissions?: string[];
         };
         DataClassDetailDto: {
@@ -1614,25 +1614,6 @@ export interface components {
             attemptCount?: number;
             lastError?: string | null;
         };
-        OrganizationSettingsDto: {
-            /** Format: uuid */
-            organizationId?: string;
-            name?: string;
-            slug?: string;
-            logoUrl?: string | null;
-            planName?: string;
-            status?: string;
-            /** Format: date-time */
-            createdAt?: string;
-            timeZoneId?: string | null;
-            defaultLanguage?: string | null;
-            /** Format: date-time */
-            scheduledHardDeleteAt?: string | null;
-            usage?: components["schemas"]["UsageStatsDto"];
-        };
-        OrganizationSlugPreviewDto: {
-            slug?: string;
-        };
         ProblemDetails: {
             type?: string | null;
             title?: string | null;
@@ -1645,8 +1626,8 @@ export interface components {
         };
         ProvisioningStatusDto: {
             /** Format: uuid */
-            organizationId?: string;
-            organizationStatus?: string;
+            tenantId?: string;
+            tenantStatus?: string;
             isReady?: boolean;
             modules?: components["schemas"]["ModuleProvisioningStatusDto"][];
         };
@@ -1674,9 +1655,9 @@ export interface components {
             /** Format: int32 */
             totalPages?: number;
         };
-        RegisterOrganizationRequest: {
-            orgName?: string;
-            organizationContactEmail?: string;
+        RegisterTenantRequest: {
+            tenantName?: string;
+            tenantContactEmail?: string;
             acceptedTermsVersion?: string;
             acceptedPrivacyVersion?: string;
             /** Format: uuid */
@@ -1690,7 +1671,7 @@ export interface components {
             passwordConfirmation?: string;
             acceptedTermsVersion?: string;
             acceptedPrivacyVersion?: string;
-            organizationSetupToken?: string | null;
+            tenantSetupToken?: string | null;
         };
         RemoveTransitionRequest: {
             /** Format: uuid */
@@ -1728,7 +1709,7 @@ export interface components {
             isSystem?: boolean;
             permissions?: string[];
         };
-        ScheduleOrganizationDeletionRequest: {
+        ScheduleTenantDeletionRequest: {
             confirmationName?: string;
         };
         StartExecutionRequest: {
@@ -1778,6 +1759,25 @@ export interface components {
             isCurrent?: boolean;
             isAvailableForNewSignups?: boolean;
         };
+        TenantSettingsDto: {
+            /** Format: uuid */
+            tenantId?: string;
+            name?: string;
+            slug?: string;
+            logoUrl?: string | null;
+            planName?: string;
+            status?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            timeZoneId?: string | null;
+            defaultLanguage?: string | null;
+            /** Format: date-time */
+            scheduledHardDeleteAt?: string | null;
+            usage?: components["schemas"]["UsageStatsDto"];
+        };
+        TenantSlugPreviewDto: {
+            slug?: string;
+        };
         TransitionExportDto: {
             /** Format: uuid */
             fromStepId?: string;
@@ -1814,13 +1814,6 @@ export interface components {
             icon?: string | null;
             color?: string | null;
         };
-        UpdateOrganizationProfileRequest: {
-            name?: string;
-            timeZoneId?: string | null;
-            defaultLanguage?: string | null;
-            logoBase64?: string | null;
-            logoContentType?: string | null;
-        };
         UpdateProfileRequest: {
             firstName?: string;
             lastName?: string;
@@ -1834,6 +1827,13 @@ export interface components {
         };
         UpdateStatusRequest: {
             isActive?: boolean;
+        };
+        UpdateTenantProfileRequest: {
+            name?: string;
+            timeZoneId?: string | null;
+            defaultLanguage?: string | null;
+            logoBase64?: string | null;
+            logoContentType?: string | null;
         };
         UpdateWorkflowRequest: {
             name?: string;
@@ -1870,7 +1870,7 @@ export interface components {
         VerifyEmailSessionEstablishedDto: {
             sessionEstablished?: boolean;
             nextStep?: components["schemas"]["VerifyEmailNextStep"];
-            organizationSetupToken?: string | null;
+            tenantSetupToken?: string | null;
         };
         WorkflowDetailDto: {
             /** Format: uuid */
@@ -4097,10 +4097,10 @@ export interface operations {
             };
         };
     };
-    GetOrganizationSlugPreview: {
+    GetTenantSlugPreview: {
         parameters: {
             query: {
-                orgName: string;
+                tenantName: string;
             };
             header?: never;
             path?: never;
@@ -4114,12 +4114,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OrganizationSlugPreviewDto"];
+                    "application/json": components["schemas"]["TenantSlugPreviewDto"];
                 };
             };
         };
     };
-    RegisterOrganization: {
+    RegisterTenant: {
         parameters: {
             query?: never;
             header?: never;
@@ -4128,7 +4128,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RegisterOrganizationRequest"];
+                "application/json": components["schemas"]["RegisterTenantRequest"];
             };
         };
         responses: {
@@ -4230,7 +4230,7 @@ export interface operations {
             };
         };
     };
-    GetOrganizationSettings: {
+    GetTenantSettings: {
         parameters: {
             query?: never;
             header?: never;
@@ -4245,7 +4245,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OrganizationSettingsDto"];
+                    "application/json": components["schemas"]["TenantSettingsDto"];
                 };
             };
             /** @description Unauthorized */
@@ -4277,7 +4277,7 @@ export interface operations {
             };
         };
     };
-    UpdateOrganizationProfile: {
+    UpdateTenantProfile: {
         parameters: {
             query?: never;
             header?: never;
@@ -4286,7 +4286,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["UpdateOrganizationProfileRequest"];
+                "application/json": components["schemas"]["UpdateTenantProfileRequest"];
             };
         };
         responses: {
@@ -4335,7 +4335,7 @@ export interface operations {
             };
         };
     };
-    ScheduleOrganizationDeletion: {
+    ScheduleTenantDeletion: {
         parameters: {
             query?: never;
             header?: never;
@@ -4344,7 +4344,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ScheduleOrganizationDeletionRequest"];
+                "application/json": components["schemas"]["ScheduleTenantDeletionRequest"];
             };
         };
         responses: {
@@ -4384,7 +4384,7 @@ export interface operations {
             };
         };
     };
-    CancelOrganizationDeletion: {
+    CancelTenantDeletion: {
         parameters: {
             query?: never;
             header?: never;
@@ -5084,18 +5084,18 @@ export interface operations {
             };
         };
     };
-    ChangeOrganizationPlan: {
+    ChangeTenantPlan: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                organizationId: string;
+                tenantId: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ChangeOrganizationPlanRequest"];
+                "application/json": components["schemas"]["ChangeTenantPlanRequest"];
             };
         };
         responses: {

@@ -86,7 +86,7 @@ public static class FormTaskEndpoints
         CancellationToken ct)
     {
         IReadOnlyList<FormTaskSummaryDto> result = await mediator.Send(
-            new GetMyFormTasksQuery(currentUser.UserId, currentUser.OrgId, FormSubmissionStatus.Pending), ct);
+            new GetMyFormTasksQuery(currentUser.UserId, currentUser.TenantId, FormSubmissionStatus.Pending), ct);
         return Results.Ok(result);
     }
 
@@ -96,7 +96,7 @@ public static class FormTaskEndpoints
         CancellationToken ct)
     {
         IReadOnlyList<FormTaskSummaryDto> result = await mediator.Send(
-            new GetMyFormTasksQuery(currentUser.UserId, currentUser.OrgId, FormSubmissionStatus.Submitted), ct);
+            new GetMyFormTasksQuery(currentUser.UserId, currentUser.TenantId, FormSubmissionStatus.Submitted), ct);
         return Results.Ok(result);
     }
 }

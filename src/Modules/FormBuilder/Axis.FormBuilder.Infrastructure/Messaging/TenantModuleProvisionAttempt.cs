@@ -11,7 +11,7 @@ namespace Axis.FormBuilder.Infrastructure.Messaging;
 internal static class TenantModuleProvisionAttempt
 {
     public static async Task RunAsync(
-        Guid organizationId,
+        Guid tenantId,
         int attempt,
         IConfiguration configuration,
         IMessageBus messageBus,
@@ -25,13 +25,13 @@ internal static class TenantModuleProvisionAttempt
         {
             await TenantSchemaProvisioner.ProvisionAsync(
                 connectionString,
-                $"axis.tenant.formbuilder:{organizationId:N}",
-                organizationId,
+                $"axis.tenant.formbuilder:{tenantId:N}",
+                tenantId,
                 ct => TenantSchemaProvisioner.MigrateWithFixedTenantAsync(
                     connectionString,
-                    organizationId,
+                    tenantId,
                     (DbContextOptions<FormBuilderDbContext> options) =>
-                        new FormBuilderDbContext(options, new FixedTenantContext(organizationId)),
+                        new FormBuilderDbContext(options, new FixedTenantContext(tenantId)),
                     ct),
                 logger,
                 TenantModuleNames.FormBuilder,
@@ -40,7 +40,7 @@ internal static class TenantModuleProvisionAttempt
             cancellationToken.ThrowIfCancellationRequested();
             await messageBus.PublishAsync(
                 TenantModuleProvisionReportEventFactory.Create(
-                    organizationId, TenantModuleNames.FormBuilder, succeeded: true, attempt));
+                    tenantId, TenantModuleNames.FormBuilder, succeeded: true, attempt));
         }
         catch (Exception ex)
         {
@@ -52,7 +52,7 @@ internal static class TenantModuleProvisionAttempt
             cancellationToken.ThrowIfCancellationRequested();
             await messageBus.PublishAsync(
                 TenantModuleProvisionReportEventFactory.Create(
-                    organizationId,
+                    tenantId,
                     TenantModuleNames.FormBuilder,
                     succeeded: false,
                     attempt,

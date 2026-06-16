@@ -65,7 +65,7 @@
 | Technology | Role | Rationale |
 |---|---|---|
 | **PostgreSQL 16** | Per-module databases (`axis_identity`, `axis_datamodeling`, …) | One database per module; schema-per-tenant inside each ([ADR-011](#adr-011-per-module-database-with-schema-per-tenant-inside)). JSONB for dynamic fields. |
-| **Apache Kafka 3.x** | Cross-module event broker + event-sourced aggregate log | KRaft mode (no ZooKeeper). Topics partitioned by `organizationId`. ([ADR-013](#adr-013-apache-kafka-for-cross-module-domain-events-and-event-sourced-aggregates)) |
+| **Apache Kafka 3.x** | Cross-module event broker + event-sourced aggregate log | KRaft mode (no ZooKeeper). Topics partitioned by `tenantId`. ([ADR-013](#adr-013-apache-kafka-for-cross-module-domain-events-and-event-sourced-aggregates)) |
 | **RabbitMQ 3.x** | Cross-module command + job + saga broker | Single-node in dev; classic queues with DLX. Management UI on `:15672`. ([ADR-024](#adr-024-rabbitmq-for-commands-background-jobs-and-saga-orchestration)) |
 | **Confluent Schema Registry** | Event-schema evolution | Avro schemas with backward-compatibility rules. |
 | **Redis 7** | Cache + distributed lock | Session cache, prevent duplicate job execution. Per-module key prefixes. |
@@ -92,7 +92,7 @@
 
 **Status:** Superseded by [ADR-011](#adr-011-per-module-database-with-schema-per-tenant-inside).
 
-**Original decision:** Each organization gets its own PostgreSQL schema.
+**Original decision:** Each Tenant gets its own PostgreSQL schema.
 **Original reason:** Strong data isolation, no risk of data leakage between tenants. Simplifies backups and restores per tenant. Performance is acceptable at target scale.
 
 **Why superseded:** The original ADR placed all tenant schemas in a single shared database, which couples module data lifecycles together and prevents clean extraction. ADR-011 keeps schema-per-tenant but moves each module to its own database.
@@ -162,7 +162,7 @@
 
 ### ADR-011: Per-module database with schema-per-tenant inside
 
-**Decision:** Each module owns its own PostgreSQL database (e.g. `axis_identity`, `axis_datamodeling`, `axis_workflowbuilder`, …). Tenant isolation within a module is **schema-per-tenant** (`tenant_{orgId:N}`) inside that module's database. Identity remains the only module that operates entirely in `public` (it has no tenant data of its own — only tenant *metadata*).
+**Decision:** Each module owns its own PostgreSQL database (e.g. `axis_identity`, `axis_datamodeling`, `axis_workflowbuilder`, …). Tenant isolation within a module is **schema-per-tenant** (`tenant_{TenantId:N}`) inside that module's database. Identity remains the only module that operates entirely in `public` (it has no tenant data of its own — only tenant *metadata*).
 
 **Reason:**
 
@@ -170,8 +170,8 @@
 - **Schema-per-tenant kept inside each module.** Three multitenancy models were evaluated:
   - **Database-per-tenant:** strongest isolation but explodes operations (`N modules × M tenants` databases). Rejected for cost at production scale, can be revisited per-module if a large tenant needs it.
   - **Row-level with Postgres RLS:** scales best with many small tenants but requires RLS discipline on every query and complicates per-tenant backups. Rejected because Axis prefers strong-isolation defaults.
-  - **Schema-per-tenant inside the module DB:** preserves existing `tenant_{orgId:N}` shape, isolates tenants strongly, and extracts cleanly. **Chosen.**
-- **`public` schema in each module DB** holds module-level metadata (e.g. cross-tenant indexes, configuration). Identity's `public` is special: it owns organizations, users, and roles — the registry that all other modules reference via JWT claims, never via SQL.
+  - **Schema-per-tenant inside the module DB:** preserves existing `tenant_{TenantId:N}` shape, isolates tenants strongly, and extracts cleanly. **Chosen.**
+- **`public` schema in each module DB** holds module-level metadata (e.g. cross-tenant indexes, configuration). Identity's `public` is special: it owns Tenants, users, and roles — the registry that all other modules reference via JWT claims, never via SQL.
 - **Connection-string convention.** `appsettings.json` carries a connection string per module (`ConnectionStrings:Identity`, `ConnectionStrings:DataModeling`, …) pointing to its database. In the modulith mode all these strings may point to the same Postgres host; in extracted mode they point to per-module hosts.
 
 **Anti-patterns rejected:**
@@ -199,7 +199,7 @@
 
 - **Log-based replay is mandatory for event sourcing.** Event-sourced aggregates rebuild state by replaying their event log; Kafka's durable, ordered, partitioned log is the canonical store. RabbitMQ classic queues delete messages on consumption; RabbitMQ streams can replay but its ecosystem around event-sourcing is weaker.
 - **Cross-module integration events are facts.** A `WorkflowExecutionCompleted` event is published once, consumed by many — possibly years later by a new analytics consumer that didn't exist when the event was emitted. Kafka's retention + replay model fits; RabbitMQ's "consume and forget" doesn't.
-- **Partitioning matches the tenancy model.** Topics partitioned by `organizationId` preserve per-tenant ordering, allow per-tenant scaling, and keep tenants isolated within the message bus.
+- **Partitioning matches the tenancy model.** Topics partitioned by `tenantId` preserve per-tenant ordering, allow per-tenant scaling, and keep tenants isolated within the message bus.
 - **Industry standard for event-driven systems.** Kafka pairs naturally with schema registries ([ADR-019](#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)), event-lake / analytics tooling, and standard observability stacks.
 - **Operational cost accepted for events only.** Kafka has heavier ops than RabbitMQ (broker tuning, partition planning, KRaft config). Scoping Kafka to events + event sourcing rather than "everything" keeps the surface bounded — work-queue traffic goes through RabbitMQ which is operationally lighter.
 
@@ -354,7 +354,7 @@
 
 - **Work-queue semantics are RabbitMQ's sweet spot.** Per-message ACK, requeue, dead-letter exchange, prefetch count, retry-with-backoff via TTL — these are first-class in RabbitMQ and require non-trivial workarounds in Kafka (retry topics, DLQ topics, manual offset commits, …).
 - **Latency is lower for synchronous-ish flows.** A `ProvisionTenantCommand` round-trip through RabbitMQ is milliseconds; the equivalent through Kafka with consumer poll cycles is meaningfully slower.
-- **Wolverine + RabbitMQ pairing is mature.** Saga state in Postgres + RabbitMQ for messages is the canonical Wolverine pattern; long-running orchestrators (e.g. tenant provisioning with retry/backoff/alert per [register-org § tenant-provisioning](use-cases/platform-foundation/register-org/README.md#tenant-provisioning)) fit naturally.
+- **Wolverine + RabbitMQ pairing is mature.** Saga state in Postgres + RabbitMQ for messages is the canonical Wolverine pattern; long-running orchestrators (e.g. tenant provisioning with retry/backoff/alert per [register-tenant § tenant-provisioning](use-cases/platform-foundation/register-tenant/README.md#tenant-provisioning)) fit naturally.
 - **Ops cost is low.** Single-node RabbitMQ runs in a few hundred MB, clusters are well-understood, the management UI is excellent for debugging stuck queues.
 - **Replay semantics are absent — that's a feature.** A command consumed should NOT be replayable; the action's already been taken. RabbitMQ's "consume and forget" matches command semantics. Use Kafka when you want to replay.
 
@@ -400,12 +400,12 @@
 
 ### ADR-027: External identity providers for user sign-in and registration
 
-**Decision:** Support **Microsoft** (Entra ID / Microsoft account), **Google**, and **GitHub** as external providers for user sign-in and provider registration/linking alongside email/password. They are wired into the OpenIddict server (ADR-004) via the ASP.NET Core external-authentication handlers; OpenIddict remains the only token issuer — external providers authenticate the user, Axis still mints its own access/refresh tokens. External providers do **not** create organizations; organization onboarding is owned by [register-org](./use-cases/platform-foundation/register-org/README.md) and uses an official organization contact email. Standalone email/password registration is tracked in [register-user](./use-cases/identity-access/register-user/README.md).
+**Decision:** Support **Microsoft** (Entra ID / Microsoft account), **Google**, and **GitHub** as external providers for user sign-in and provider registration/linking alongside email/password. They are wired into the OpenIddict server (ADR-004) via the ASP.NET Core external-authentication handlers; OpenIddict remains the only token issuer — external providers authenticate the user, Axis still mints its own access/refresh tokens. External providers do **not** create Tenants; tenant onboarding is owned by [register-tenant](./use-cases/platform-foundation/register-tenant/README.md) and uses an official tenant contact email. Standalone email/password registration is tracked in [register-user](./use-cases/identity-access/register-user/README.md).
 
-**Reason:** Low-friction user sign-up and sign-in are required for onboarding. Users expect to use the corporate or developer identity they already have, and password-only auth raises abandonment at account setup. However, a generic Microsoft / Google / GitHub user identity does not prove authority over an organization, so organization registration remains a separate flow based on organization contact verification. Routing all user providers through OpenIddict keeps a single token format, a single JWKS, and one RBAC mapping regardless of how the user authenticated.
+**Reason:** Low-friction user sign-up and sign-in are required for onboarding. Users expect to use the corporate or developer identity they already have, and password-only auth raises abandonment at account setup. However, a generic Microsoft / Google / GitHub user identity does not prove authority over a tenant, so tenant registration remains a separate flow based on tenant contact verification. Routing all user providers through OpenIddict keeps a single token format, a single JWKS, and one RBAC mapping regardless of how the user authenticated.
 
 **Configuration:** per-provider `client_id` / `client_secret` stored in HashiCorp Vault in production ([ADR-022](#adr-022-secrets-management-via-hashicorp-vault-in-production)) and `.env` in development. Redirect URIs are registered per environment. A provider can be disabled per deployment without code changes.
 
-**Registration:** an external sign-in either creates a new organization (the register-org flow) or signs into an existing one. Accounts are linked to an existing Axis user by **verified email** — a provider login whose email matches a verified local account attaches to it rather than creating a duplicate.
+**Registration:** an external sign-in either creates a new Tenant (the register-tenant flow) or signs into an existing one. Accounts are linked to an existing Axis user by **verified email** — a provider login whose email matches a verified local account attaches to it rather than creating a duplicate.
 
 **Rejected:** full enterprise SSO federation (SAML, SCIM provisioning, per-tenant IdP) is deferred — it is a separate initiative driven by enterprise-tenant demand, not part of the baseline product scope in use-case specs.

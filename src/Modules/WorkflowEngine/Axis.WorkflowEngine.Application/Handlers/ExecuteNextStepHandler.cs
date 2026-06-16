@@ -25,13 +25,13 @@ public sealed class ExecuteNextStepHandler(
     public async Task HandleAsync(ExecuteNextStepMessage message, CancellationToken ct)
     {
         WorkflowExecution? execution = await execRepo.GetByIdWithStepsAsync(
-            message.ExecutionId, message.OrganizationId, ct);
+            message.ExecutionId, message.tenantId, ct);
 
         if (execution is null)
         {
             logger.LogWarning(
-                "ExecuteNextStepHandler: execution {ExecutionId} not found for org {OrganizationId}",
-                message.ExecutionId, message.OrganizationId);
+                "ExecuteNextStepHandler: execution {ExecutionId} not found for Tenant {tenantId}",
+                message.ExecutionId, message.tenantId);
             return;
         }
 
@@ -90,7 +90,7 @@ public sealed class ExecuteNextStepHandler(
                 nextStep.StepType, nextStep.Id, execution.Id);
 
             if (nextStep.StepType != StepType.End)
-                await dispatcher.PublishAsync(new ExecuteNextStepMessage(execution.Id, execution.OrganizationId), ct);
+                await dispatcher.PublishAsync(new ExecuteNextStepMessage(execution.Id, execution.tenantId), ct);
 
             return;
         }
@@ -100,7 +100,7 @@ public sealed class ExecuteNextStepHandler(
         if (nextStep.StepType == StepType.Condition)
         {
             snapshot = await workflowReader.GetSnapshotAsync(
-                execution.WorkflowDefinitionId, execution.OrganizationId, ct);
+                execution.WorkflowDefinitionId, execution.tenantId, ct);
         }
 
         // For non-Condition steps, config comes from the snapshot (loaded at start, stored in context if needed)
@@ -114,7 +114,7 @@ public sealed class ExecuteNextStepHandler(
         if (nextStep.StepType is not StepType.Condition && snapshot is null)
         {
             snapshot = await workflowReader.GetSnapshotAsync(
-                execution.WorkflowDefinitionId, execution.OrganizationId, ct);
+                execution.WorkflowDefinitionId, execution.tenantId, ct);
             stepDef = snapshot?.Steps.FirstOrDefault(s => s.Id == nextStep.StepDefinitionId);
             config = stepDef?.Config;
         }
@@ -151,13 +151,13 @@ public sealed class ExecuteNextStepHandler(
         {
             case StepType.Form:
                 await dispatcher.PublishAsync(new ExecuteFormStepMessage(
-                    execution.Id, step.Id, execution.OrganizationId,
+                    execution.Id, step.Id, execution.tenantId,
                     execution.WorkflowDefinitionId, config, execution.Context), ct);
                 break;
 
             case StepType.HttpRequest:
                 await dispatcher.PublishAsync(new ExecuteHttpStepMessage(
-                    execution.Id, step.Id, execution.OrganizationId, config, execution.Context), ct);
+                    execution.Id, step.Id, execution.tenantId, config, execution.Context), ct);
                 break;
 
             case StepType.Condition:
@@ -168,18 +168,18 @@ public sealed class ExecuteNextStepHandler(
                     .Select(s => s.Id)
                     .ToList() ?? [];
                 await dispatcher.PublishAsync(new ExecuteConditionStepMessage(
-                    execution.Id, step.Id, execution.OrganizationId,
+                    execution.Id, step.Id, execution.tenantId,
                     config, execution.Context, allStepDefIds, transitions), ct);
                 break;
 
             case StepType.Script:
                 await dispatcher.PublishAsync(new ExecuteScriptStepMessage(
-                    execution.Id, step.Id, execution.OrganizationId, config, execution.Context), ct);
+                    execution.Id, step.Id, execution.tenantId, config, execution.Context), ct);
                 break;
 
             case StepType.Notification:
                 await dispatcher.PublishAsync(new ExecuteNotificationStepMessage(
-                    execution.Id, step.Id, execution.OrganizationId, config, execution.Context), ct);
+                    execution.Id, step.Id, execution.tenantId, config, execution.Context), ct);
                 break;
         }
     }

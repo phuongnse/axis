@@ -60,12 +60,12 @@ describe('RegisterPage', () => {
     const user = userEvent.setup();
     await renderWithRouter(<RegisterPage />, { path: '/register' });
 
-    expect(screen.getByText('This name will appear in your workspace.')).toBeInTheDocument();
+    expect(screen.getByText('This name will appear on your account.')).toBeInTheDocument();
     expect(
       screen.getByText('We will send a verification link to this address.'),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /create account/i }));
+    await user.click(await screen.findByRole('button', { name: /create account/i }));
 
     expect(screen.getByText('Full name is required')).toBeInTheDocument();
     expect(screen.getByText('Email address is required')).toBeInTheDocument();
@@ -138,10 +138,39 @@ describe('RegisterPage', () => {
     );
     const stored = sessionStorage.getItem('axis.registration-context');
     expect(stored).toContain('alex@example.com');
-    expect(stored).not.toContain('organizationName');
+    expect(stored).not.toContain('TenantName');
   });
 
-  it('includes setup token when registering the first organization user', async () => {
+  it('shows a specific error when legal versions are unavailable', async () => {
+    const user = userEvent.setup();
+    let registerAttempted = false;
+    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/legal/versions')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(JSON.stringify({})),
+        } as unknown as Response);
+      }
+      if (url.includes('/api/users/register') && init?.method === 'POST') {
+        registerAttempted = true;
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
+
+    await renderWithRouter(<RegisterPage />, { path: '/register' });
+
+    await fillRegisterForm(user);
+    await user.click(screen.getByRole('button', { name: /create account/i }));
+
+    expect(
+      await screen.findByText('Legal document versions are not loaded yet.'),
+    ).toBeInTheDocument();
+    expect(registerAttempted).toBe(false);
+  });
+
+  it('includes setup token when registering the first Tenant user', async () => {
     const user = userEvent.setup();
     let registerBody: Record<string, unknown> | undefined;
     vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
@@ -175,7 +204,7 @@ describe('RegisterPage', () => {
     await user.click(screen.getByRole('button', { name: /create account/i }));
 
     await waitFor(() => {
-      expect(registerBody?.organizationSetupToken).toBe('setup-token');
+      expect(registerBody?.tenantSetupToken).toBe('setup-token');
     });
   });
 

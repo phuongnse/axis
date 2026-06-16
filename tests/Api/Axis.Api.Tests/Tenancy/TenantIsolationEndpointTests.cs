@@ -60,41 +60,41 @@ public sealed class TenantIsolationEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task GetModels_WhenOrganizationIsArchived_Returns403()
+    public async Task GetModels_WhenTenantIsArchived_Returns403()
     {
         HttpClient client = await AuthHelper.CreateAdminClientAsync(fixture, "iso-archived");
-        Guid organizationId = await GetOrganizationIdForEmailAsync("adminiso-archived@test.com");
-        await SetOrganizationStatusAsync(organizationId, OrganizationStatus.Archived);
+        Guid tenantId = await GettenantIdForEmailAsync("adminiso-archived@test.com");
+        await SetTenantStatusAsync(tenantId, TenantStatus.Archived);
 
         HttpResponseMessage resp = await client.GetAsync("/api/models");
 
         resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
-    private async Task<Guid> GetOrganizationIdForEmailAsync(string emailAddress)
+    private async Task<Guid> GettenantIdForEmailAsync(string emailAddress)
     {
         Email email = Email.Create(emailAddress).Value!;
         using IServiceScope scope = fixture.CreateScope();
         IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         User user = await db.Users.AsNoTracking().SingleAsync(u => u.Email == email);
-        OrganizationMembership membership = await db.OrganizationMemberships
+        TenantMembership membership = await db.TenantMemberships
             .AsNoTracking()
             .SingleAsync(m => m.UserId == user.Id);
-        return membership.OrganizationId;
+        return membership.tenantId;
     }
 
-    private async Task SetOrganizationStatusAsync(Guid organizationId, OrganizationStatus status)
+    private async Task SetTenantStatusAsync(Guid tenantId, TenantStatus status)
     {
         using IServiceScope scope = fixture.CreateScope();
         IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        Organization organization = await db.Organizations.SingleAsync(o => o.Id == organizationId);
+        Tenant Tenant = await db.Tenants.SingleAsync(o => o.Id == tenantId);
 
         switch (status)
         {
-            case OrganizationStatus.Archived:
-                if (organization.Status == OrganizationStatus.Provisioning)
-                    organization.CompleteProvisioning();
-                organization.Archive();
+            case TenantStatus.Archived:
+                if (Tenant.Status == TenantStatus.Provisioning)
+                    Tenant.CompleteProvisioning();
+                Tenant.Archive();
                 break;
             default:
                 throw new NotSupportedException($"Test helper does not set status {status}.");

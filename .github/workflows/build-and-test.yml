@@ -262,7 +262,7 @@ jobs:
 
   # Secret scanning via TruffleHog. Free, open-source, no license required
   # for any account type (gitleaks-action v2 broke this — its breaking
-  # update added a paid GITLEAKS_LICENSE requirement for org and personal
+  # update added a paid GITLEAKS_LICENSE requirement for repository and personal
   # accounts alike, see https://github.com/gitleaks/gitleaks-action#-announcement).
   #
   # `--only-verified` cuts down false positives by querying the alleged

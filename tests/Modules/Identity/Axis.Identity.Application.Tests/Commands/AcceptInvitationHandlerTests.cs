@@ -14,12 +14,12 @@ public class AcceptInvitationHandlerTests
 {
     private readonly IInvitationRepository _invitationRepo = Substitute.For<IInvitationRepository>();
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
-    private readonly IOrganizationMembershipRepository _membershipRepo = Substitute.For<IOrganizationMembershipRepository>();
+    private readonly ITenantMembershipRepository _membershipRepo = Substitute.For<ITenantMembershipRepository>();
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
     private readonly IPasswordHasher _hasher = Substitute.For<IPasswordHasher>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private static readonly Guid OrgId = Guid.NewGuid();
+    private static readonly Guid TenantId = Guid.NewGuid();
     private static readonly Guid RoleId = Guid.NewGuid();
     private static readonly Guid InvitedById = Guid.NewGuid();
     private static readonly Email InvitedEmail = Email.Create("new@acme.com").Value;
@@ -31,7 +31,7 @@ public class AcceptInvitationHandlerTests
         new(token, "Bob", "Jones", "fresh account passphrase");
 
     private Invitation MakePendingInvitation() =>
-        Invitation.Create(InvitedEmail, OrgId, RoleId, InvitedById);
+        Invitation.Create(InvitedEmail, TenantId, RoleId, InvitedById);
 
     [Fact]
     public async Task AcceptInvitation_WhenTokenIsValid_CreatesUserAndAssignsRole()
@@ -40,13 +40,13 @@ public class AcceptInvitationHandlerTests
         _invitationRepo.GetByTokenAsync("valid-token").Returns(invitation);
         _userRepo.EmailExistsPlatformWideAsync(InvitedEmail).Returns(false);
         _hasher.Hash("fresh account passphrase").Returns("hashed");
-        _roleRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), OrgId).Returns([]);
+        _roleRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), TenantId).Returns([]);
 
         Result<AcceptInvitationResult> result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.UserId.Should().NotBeEmpty();
-        result.Value.OrganizationId.Should().Be(OrgId);
+        result.Value.tenantId.Should().Be(TenantId);
         result.Value.Email.Should().Be("new@acme.com");
         await _userRepo.Received(1).AddAsync(
             Arg.Is<User>(u =>
@@ -56,8 +56,8 @@ public class AcceptInvitationHandlerTests
                 u.PasswordHash == "hashed"),
             Arg.Any<CancellationToken>());
         await _membershipRepo.Received(1).AddAsync(
-            Arg.Is<OrganizationMembership>(m =>
-                m.OrganizationId == OrgId &&
+            Arg.Is<TenantMembership>(m =>
+                m.tenantId == TenantId &&
                 m.RoleIds.Contains(RoleId)),
             Arg.Any<CancellationToken>());
 
@@ -94,7 +94,7 @@ public class AcceptInvitationHandlerTests
     [Fact]
     public async Task AcceptInvitation_WhenInvitationIsExpired_ReturnsBusinessRuleFailure()
     {
-        Invitation expired = InvitationTestHelper.CreateExpired(InvitedEmail, OrgId, RoleId, InvitedById);
+        Invitation expired = InvitationTestHelper.CreateExpired(InvitedEmail, TenantId, RoleId, InvitedById);
         _invitationRepo.GetByTokenAsync("valid-token").Returns(expired);
 
         Result<AcceptInvitationResult> result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);

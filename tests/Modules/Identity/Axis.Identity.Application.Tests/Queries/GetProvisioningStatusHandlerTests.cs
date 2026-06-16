@@ -18,17 +18,17 @@ public sealed class GetProvisioningStatusHandlerTests
 
     private readonly IEmailVerificationTokenStore _verificationTokenStore =
         Substitute.For<IEmailVerificationTokenStore>();
-    private readonly IOrganizationRegistrationTokenStore _organizationTokenStore =
-        Substitute.For<IOrganizationRegistrationTokenStore>();
+    private readonly ITenantRegistrationTokenStore _TenantTokenStore =
+        Substitute.For<ITenantRegistrationTokenStore>();
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
-    private readonly IOrganizationMembershipRepository _membershipRepo = Substitute.For<IOrganizationMembershipRepository>();
-    private readonly IOrganizationRepository _organizationRepo = Substitute.For<IOrganizationRepository>();
+    private readonly ITenantMembershipRepository _membershipRepo = Substitute.For<ITenantMembershipRepository>();
+    private readonly ITenantRepository _TenantRepo = Substitute.For<ITenantRepository>();
     private readonly ITenantModuleProvisioningRepository _provisioningRepo =
         Substitute.For<ITenantModuleProvisioningRepository>();
 
     public GetProvisioningStatusHandlerTests()
     {
-        _organizationTokenStore.ResolveOrganizationIdForProvisioningPollAsync(
+        _TenantTokenStore.ResolvetenantIdForProvisioningPollAsync(
                 Arg.Any<string>(),
                 Arg.Any<CancellationToken>())
             .Returns((Guid?)null);
@@ -37,10 +37,10 @@ public sealed class GetProvisioningStatusHandlerTests
     private GetProvisioningStatusHandler CreateHandler() =>
         new(
             _verificationTokenStore,
-            _organizationTokenStore,
+            _TenantTokenStore,
             _userRepo,
             _membershipRepo,
-            _organizationRepo,
+            _TenantRepo,
             _provisioningRepo);
 
     private void StubProvisioningPollForUser(User user)
@@ -50,18 +50,18 @@ public sealed class GetProvisioningStatusHandlerTests
             .Returns(user.Id);
     }
 
-    private static (User User, Organization Organization, OrganizationMembership Membership) MakeVerifiedUserWithOrg()
+    private static (User User, Tenant Tenant, TenantMembership Membership) MakeVerifiedUserWithTenant()
     {
         Email email = Email.Create("alice@acme.com").Value!;
-        Organization organization = Organization.Create(
+        Tenant Tenant = Tenant.Create(
             "Acme",
-            OrganizationSlug.Create("acme").Value!,
+            TenantSlug.Create("acme").Value!,
             email,
             WellKnownSubscriptionPlans.FreeId);
         User user = User.Create("Alice", "Smith", email);
         user.VerifyEmail();
-        OrganizationMembership membership = OrganizationMembership.Create(user.Id, organization.Id);
-        return (user, organization, membership);
+        TenantMembership membership = TenantMembership.Create(user.Id, Tenant.Id);
+        return (user, Tenant, membership);
     }
 
     [Fact]
@@ -98,9 +98,9 @@ public sealed class GetProvisioningStatusHandlerTests
     public async Task Handle_WhenEmailNotVerified_ReturnsNull()
     {
         Email email = Email.Create("bob@acme.com").Value!;
-        Organization organization = Organization.Create(
+        Tenant Tenant = Tenant.Create(
             "Acme",
-            OrganizationSlug.Create("acme").Value!,
+            TenantSlug.Create("acme").Value!,
             email,
             WellKnownSubscriptionPlans.FreeId);
         User user = User.Create("Bob", "Smith", email);
@@ -115,13 +115,13 @@ public sealed class GetProvisioningStatusHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenAllModulesSucceededAndOrgActive_ReturnsReady()
+    public async Task Handle_WhenAllModulesSucceededAndTenantActive_ReturnsReady()
     {
-        (User user, Organization organization, OrganizationMembership membership) = MakeVerifiedUserWithOrg();
+        (User user, Tenant Tenant, TenantMembership membership) = MakeVerifiedUserWithTenant();
         IReadOnlyList<TenantModuleProvisioning> modules = TenantModuleNames.All
             .Select(m =>
             {
-                TenantModuleProvisioning row = TenantModuleProvisioning.CreatePending(organization.Id, m);
+                TenantModuleProvisioning row = TenantModuleProvisioning.CreatePending(Tenant.Id, m);
                 row.RecordSuccess();
                 return row;
             })
@@ -130,8 +130,8 @@ public sealed class GetProvisioningStatusHandlerTests
         StubProvisioningPollForUser(user);
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
         _membershipRepo.GetFirstActiveByUserIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(membership);
-        _organizationRepo.GetByIdAsync(organization.Id, Arg.Any<CancellationToken>()).Returns(organization);
-        _provisioningRepo.GetAllForOrganizationAsync(organization.Id, Arg.Any<CancellationToken>())
+        _TenantRepo.GetByIdAsync(Tenant.Id, Arg.Any<CancellationToken>()).Returns(Tenant);
+        _provisioningRepo.GetAllForTenantAsync(Tenant.Id, Arg.Any<CancellationToken>())
             .Returns(modules);
 
         ProvisioningStatusDto? dto = await CreateHandler().Handle(
@@ -140,34 +140,34 @@ public sealed class GetProvisioningStatusHandlerTests
 
         dto.Should().NotBeNull();
         dto!.IsReady.Should().BeTrue();
-        dto.OrganizationStatus.Should().Be(nameof(OrganizationStatus.Active));
+        dto.TenantStatus.Should().Be(nameof(TenantStatus.Active));
         dto.Modules.Should().HaveCount(TenantModuleNames.All.Count);
         dto.Modules.Should().OnlyContain(m => m.Status == nameof(TenantModuleProvisioningStatus.Succeeded));
     }
 
     [Fact]
-    public async Task Handle_WhenOrganizationVerificationTokenResolves_ReturnsOrganizationStatus()
+    public async Task Handle_WhenTenantVerificationTokenResolves_ReturnsTenantStatus()
     {
         Email email = Email.Create("admin@acme.com").Value!;
-        Organization organization = Organization.Create(
+        Tenant Tenant = Tenant.Create(
             "Acme",
-            OrganizationSlug.Create("acme").Value!,
+            TenantSlug.Create("acme").Value!,
             email,
             WellKnownSubscriptionPlans.FreeId);
-        organization.BeginProvisioning();
+        Tenant.BeginProvisioning();
         IReadOnlyList<TenantModuleProvisioning> modules =
         [
-            TenantModuleProvisioning.CreatePending(organization.Id, TenantModuleNames.DataModeling),
+            TenantModuleProvisioning.CreatePending(Tenant.Id, TenantModuleNames.DataModeling),
         ];
 
         string tokenHash = OpaqueTokenGenerator.Hash(PollToken);
-        _organizationTokenStore.ResolveOrganizationIdForProvisioningPollAsync(
+        _TenantTokenStore.ResolvetenantIdForProvisioningPollAsync(
                 tokenHash,
                 Arg.Any<CancellationToken>())
-            .Returns(organization.Id);
-        _organizationRepo.GetByIdAsync(organization.Id, Arg.Any<CancellationToken>())
-            .Returns(organization);
-        _provisioningRepo.GetAllForOrganizationAsync(organization.Id, Arg.Any<CancellationToken>())
+            .Returns(Tenant.Id);
+        _TenantRepo.GetByIdAsync(Tenant.Id, Arg.Any<CancellationToken>())
+            .Returns(Tenant);
+        _provisioningRepo.GetAllForTenantAsync(Tenant.Id, Arg.Any<CancellationToken>())
             .Returns(modules);
 
         ProvisioningStatusDto? dto = await CreateHandler().Handle(
@@ -175,8 +175,8 @@ public sealed class GetProvisioningStatusHandlerTests
             CancellationToken.None);
 
         dto.Should().NotBeNull();
-        dto!.OrganizationId.Should().Be(organization.Id);
-        dto.OrganizationStatus.Should().Be(nameof(OrganizationStatus.Provisioning));
+        dto!.tenantId.Should().Be(Tenant.Id);
+        dto.TenantStatus.Should().Be(nameof(TenantStatus.Provisioning));
         await _verificationTokenStore.DidNotReceive().ResolveUserIdForProvisioningPollAsync(
             Arg.Any<string>(),
             Arg.Any<CancellationToken>());
@@ -185,9 +185,9 @@ public sealed class GetProvisioningStatusHandlerTests
     [Fact]
     public async Task Handle_WhenOnlySubsetOfModulesSucceeded_ReturnsNotReady()
     {
-        (User user, Organization organization, OrganizationMembership membership) = MakeVerifiedUserWithOrg();
+        (User user, Tenant Tenant, TenantMembership membership) = MakeVerifiedUserWithTenant();
         TenantModuleProvisioning succeeded = TenantModuleProvisioning.CreatePending(
-            organization.Id,
+            Tenant.Id,
             TenantModuleNames.DataModeling);
         succeeded.RecordSuccess();
         IReadOnlyList<TenantModuleProvisioning> modules = [succeeded];
@@ -195,8 +195,8 @@ public sealed class GetProvisioningStatusHandlerTests
         StubProvisioningPollForUser(user);
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
         _membershipRepo.GetFirstActiveByUserIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(membership);
-        _organizationRepo.GetByIdAsync(organization.Id, Arg.Any<CancellationToken>()).Returns(organization);
-        _provisioningRepo.GetAllForOrganizationAsync(organization.Id, Arg.Any<CancellationToken>())
+        _TenantRepo.GetByIdAsync(Tenant.Id, Arg.Any<CancellationToken>()).Returns(Tenant);
+        _provisioningRepo.GetAllForTenantAsync(Tenant.Id, Arg.Any<CancellationToken>())
             .Returns(modules);
 
         ProvisioningStatusDto? dto = await CreateHandler().Handle(
@@ -208,20 +208,20 @@ public sealed class GetProvisioningStatusHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenOrganizationStillProvisioning_ReturnsNotReady()
+    public async Task Handle_WhenTenantStillProvisioning_ReturnsNotReady()
     {
-        (User user, Organization organization, OrganizationMembership membership) = MakeVerifiedUserWithOrg();
-        organization.BeginProvisioning();
+        (User user, Tenant Tenant, TenantMembership membership) = MakeVerifiedUserWithTenant();
+        Tenant.BeginProvisioning();
         IReadOnlyList<TenantModuleProvisioning> modules =
         [
-            TenantModuleProvisioning.CreatePending(organization.Id, TenantModuleNames.DataModeling),
+            TenantModuleProvisioning.CreatePending(Tenant.Id, TenantModuleNames.DataModeling),
         ];
 
         StubProvisioningPollForUser(user);
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
         _membershipRepo.GetFirstActiveByUserIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(membership);
-        _organizationRepo.GetByIdAsync(organization.Id, Arg.Any<CancellationToken>()).Returns(organization);
-        _provisioningRepo.GetAllForOrganizationAsync(organization.Id, Arg.Any<CancellationToken>())
+        _TenantRepo.GetByIdAsync(Tenant.Id, Arg.Any<CancellationToken>()).Returns(Tenant);
+        _provisioningRepo.GetAllForTenantAsync(Tenant.Id, Arg.Any<CancellationToken>())
             .Returns(modules);
 
         ProvisioningStatusDto? dto = await CreateHandler().Handle(
@@ -230,6 +230,6 @@ public sealed class GetProvisioningStatusHandlerTests
 
         dto.Should().NotBeNull();
         dto!.IsReady.Should().BeFalse();
-        dto.OrganizationStatus.Should().Be(nameof(OrganizationStatus.Provisioning));
+        dto.TenantStatus.Should().Be(nameof(TenantStatus.Provisioning));
     }
 }

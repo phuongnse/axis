@@ -8,7 +8,7 @@ Configure a Form step with a specific form and assignee so that the right person
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -31,7 +31,7 @@ Each step has a type that determines what it does when executed. Users configure
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] Form picker shows a searchable list of all forms in the org.
+- [ ] Form picker shows a searchable list of all forms in the tenant.
 - [ ] Assignee field accepts: a specific user (by name/email search), a role name (all members of that role are notified), or a context expression like `{{context.step_id.submitted_by}}`.
 - [ ] Optional timeout field accepts a number of hours (1–720). When set, the step auto-fails if not submitted within that period.
 - [ ] Step node on the canvas shows the selected form name and assignee as a summary.
@@ -64,6 +64,15 @@ Each step has a type that determines what it does when executed. Users configure
 > **Deferred follow-ups:** Multiple assignees on one Form step (assign to all, first response wins).
 >
 > **Decisions:** step config (formId, assignee, timeout) stored as JSONB dict in `steps` column. `StepType` enum includes `Start` and `End` values.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

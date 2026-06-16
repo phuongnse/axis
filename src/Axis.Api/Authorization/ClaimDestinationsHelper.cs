@@ -46,7 +46,7 @@ public static class ClaimDestinationsHelper
                 yield break;
 
             // Custom claims for Axis — always access token only
-            case "org_id":
+            case "tenant_id":
             case "permissions":
                 yield return Destinations.AccessToken;
                 yield break;

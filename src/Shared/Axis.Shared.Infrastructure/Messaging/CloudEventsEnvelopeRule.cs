@@ -53,9 +53,9 @@ public sealed class CloudEventsEnvelopeRule : IEnvelopeRule
 
     private static string? ResolveTenantId(object message)
     {
-        PropertyInfo? property = message.GetType().GetProperty("organizationId");
-        if (property?.GetValue(message) is string organizationId && !string.IsNullOrWhiteSpace(organizationId))
-            return organizationId;
+        PropertyInfo? property = message.GetType().GetProperty("tenantId");
+        if (property?.GetValue(message) is string tenantId && !string.IsNullOrWhiteSpace(tenantId))
+            return tenantId;
 
         return null;
     }

@@ -8,7 +8,7 @@ Configure how the workflow continues after parallel steps complete so that I can
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -62,6 +62,15 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 > **Deferred follow-ups:** "Wait for N of M" join type (e.g., wait for 2 of 3 branches).
 >
 > **Decisions:** Initial join semantics stay binary (`all`/`any`) so execution can be made correct before adding quorum joins.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

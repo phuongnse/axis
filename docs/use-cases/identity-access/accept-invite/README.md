@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Accept my invitation and set up my account so that I can access the organization.
+Accept my invitation and set up my account so that I can access the Tenant.
 
 ## Primary actor
 
@@ -16,9 +16,9 @@ Accept my invitation and set up my account so that I can access the organization
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Accept an invitation flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -26,27 +26,27 @@ Accept my invitation and set up my account so that I can access the organization
 
 ## Context
 
-Organization admins can invite new members, manage their accounts, and deactivate users who should no longer have access.
+Tenant admins can invite new members, manage their accounts, and deactivate users who should no longer have access.
 
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] Clicking the invitation link opens a page with the organization name shown, prompting the user to set their full name and password.
+- [ ] Clicking the invitation link opens a page with the Tenant name shown, prompting the user to set their full name and password.
 - [ ] On submit, the account is created, the user is signed in, and they are redirected to the workspace dashboard.
 
 *Validation & errors*
 - [ ] Expired invitation link (> 48 hours): "This invitation has expired. Please ask your admin to send a new one."
 - [ ] Already-accepted invitation link: "This invitation has already been used. Please sign in."
-- [ ] If the invited email already has a platform account (from another org): the user is prompted to sign in with their existing credentials rather than setting a new password.
+- [ ] If the invited email already has a platform account (from another tenant): the user is prompted to sign in with their existing credentials rather than setting a new password.
 - [ ] Password must meet the same rules as registration (min 8 chars, letter + number).
 
 *Edge cases*
 - [ ] Accepting an invitation on a different device than where the email was opened works correctly.
 - [ ] If the inviting admin deactivated the invitation before the user accepted, the link shows: "This invitation has been cancelled."
-- [ ] If the org was deleted before the user accepted, the link shows: "This organization no longer exists."
+- [ ] If the tenant was deleted before the user accepted, the link shows: "This Tenant no longer exists."
 
 *Out of scope*
-- Inviting users who already have accounts on other orgs to join a second org simultaneously — each user belongs to one org.
+- Inviting users who already have accounts on other tenants to join a second tenant simultaneously — each user belongs to one tenant.
 
 > **Implementation status**
 >
@@ -61,6 +61,15 @@ Organization admins can invite new members, manage their accounts, and deactivat
 > **Gaps vs spec:** session sign-in after accept is an API/auth concern, pending.
 >
 > **Decisions:** expired/accepted/cancelled invitation states enforced in `Invitation.Accept()` domain method, wrapped as `ValidationException` in handler. Platform-wide email check runs after invitation validation — throws `ValidationException` directing user to sign in with existing credentials. `AcceptInvitationHandler` calls `user.VerifyEmail()` — the invitation link proves mailbox ownership (no separate verification email).
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

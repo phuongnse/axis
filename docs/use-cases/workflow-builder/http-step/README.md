@@ -8,7 +8,7 @@ Configure an HTTP Request step so that my workflow can integrate with external s
 
 ## Primary actor
 
-- Organization Member
+- Tenant Member
 
 ## Trigger
 
@@ -16,9 +16,9 @@ Configure an HTTP Request step so that my workflow can integrate with external s
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — Configure an HTTP Request step flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -63,6 +63,12 @@ Each step has a type that determines what it does when executed. Users configure
 > **Gaps vs spec:**
 > - HTTP execution and Test request button pending workflow-engine + Frontend
 > - credential storage redaction is enforced at export (keys matching token/api_key/secret/password/authorization/etc. replaced with `[REDACTED]` in `ExportWorkflowHandler`).
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

@@ -5,12 +5,12 @@ namespace Axis.Architecture.Tests;
 
 /// <summary>
 /// Keeps <see cref="TenantModuleNames"/> in sync with modules that ship
-/// <c>OrganizationVerifiedHandler</c> (tenant schema provisioning).
+/// <c>TenantVerifiedHandler</c> (tenant schema provisioning).
 /// </summary>
 public sealed class TenantProvisioningConventionTests
 {
     [Fact]
-    public void TenantModuleNames_WhenEnumerated_MatchModulesWithOrganizationVerifiedHandler()
+    public void TenantModuleNames_WhenEnumerated_MatchModulesWithTenantVerifiedHandler()
     {
         string[] expected = DiscoverProvisioningModuleSlugs();
         TenantModuleNames.All.Should().BeEquivalentTo(expected);
@@ -30,7 +30,7 @@ public sealed class TenantProvisioningConventionTests
             }
 
             bool hasHandler = Directory
-                .EnumerateFiles(moduleDir, "OrganizationVerifiedHandler.cs", SearchOption.AllDirectories)
+                .EnumerateFiles(moduleDir, "TenantVerifiedHandler.cs", SearchOption.AllDirectories)
                 .Any();
 
             if (hasHandler)

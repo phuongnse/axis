@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 
 import {
-  canReadOrganizationSettings,
-  getCurrentOrganizationSettings,
+  canReadTenantSettings,
+  getCurrentTenantSettings,
   getCurrentUserProfile,
   workspaceQueryKeys,
 } from '../api';
@@ -14,23 +14,23 @@ export function useCurrentUserProfileQuery() {
   });
 }
 
-export function useCurrentOrganizationSettingsQuery(enabled: boolean) {
+export function useCurrentTenantSettingsQuery(enabled: boolean) {
   return useQuery({
-    queryKey: workspaceQueryKeys.currentOrganizationSettings(),
-    queryFn: getCurrentOrganizationSettings,
+    queryKey: workspaceQueryKeys.currentTenantSettings(),
+    queryFn: getCurrentTenantSettings,
     enabled,
   });
 }
 
 export function useWorkspaceStart() {
   const profileQuery = useCurrentUserProfileQuery();
-  const canReadSettings = canReadOrganizationSettings(profileQuery.data);
-  const organizationSettingsQuery = useCurrentOrganizationSettingsQuery(canReadSettings);
+  const canReadSettings = canReadTenantSettings(profileQuery.data);
+  const tenantSettingsQuery = useCurrentTenantSettingsQuery(canReadSettings);
 
   return {
     profileQuery,
-    organizationSettingsQuery,
+    tenantSettingsQuery,
     canReadSettings,
-    hasWorkspace: Boolean(profileQuery.data?.orgId),
+    hasWorkspace: Boolean(profileQuery.data?.tenantId),
   };
 }

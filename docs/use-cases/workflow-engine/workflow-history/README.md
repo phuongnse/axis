@@ -8,7 +8,7 @@ See the execution history for a specific workflow so that I can monitor its perf
 
 ## Primary actor
 
-- Organization Member with `execution:read`
+- Tenant Member with `execution:read`
 
 ## Trigger
 
@@ -16,9 +16,9 @@ See the execution history for a specific workflow so that I can monitor its perf
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Actor starts the — View execution history for a workflow flow from the relevant Axis screen or API.
+2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
 
@@ -60,6 +60,15 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 > **Gaps vs spec:** `GET /api/executions` and per-workflow paged list ✅. Filter UI, date/trigger query params, and running-first sort pending API + Frontend.
 >
 > **Decisions:** `GetExecutionsByWorkflowHandler` and `GetAllExecutionsHandler` use `IExecutionRepository.GetPagedByWorkflowAsync`/`GetPagedAsync` — server-side pagination with `pageSize` clamped to 100. Status filter forwarded to repository. Date range filter and trigger type filter deferred to API layer query parameters.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 

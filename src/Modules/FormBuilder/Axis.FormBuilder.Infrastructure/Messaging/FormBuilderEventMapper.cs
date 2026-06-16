@@ -20,7 +20,7 @@ internal static class FormBuilderEventMapper
             {
                 formSubmissionId = submitted.FormSubmissionId.ToString(),
                 formDefinitionId = submitted.FormDefinitionId.ToString(),
-                organizationId = submitted.OrganizationId.ToString(),
+                tenantId = submitted.tenantId.ToString(),
                 executionId = submitted.ExecutionId.ToString(),
                 executionStepId = submitted.ExecutionStepId.ToString(),
                 // SubmittedData is an arbitrary key/value map; Avro lacks a native
@@ -32,14 +32,14 @@ internal static class FormBuilderEventMapper
             {
                 formSubmissionId = expired.FormSubmissionId.ToString(),
                 formDefinitionId = expired.FormDefinitionId.ToString(),
-                organizationId = expired.OrganizationId.ToString(),
+                tenantId = expired.tenantId.ToString(),
                 executionId = expired.ExecutionId.ToString(),
                 executionStepId = expired.ExecutionStepId.ToString(),
             },
             FormDeleted deleted => new FormDeletedEvent
             {
                 formId = deleted.FormId.ToString(),
-                organizationId = deleted.OrganizationId.ToString(),
+                tenantId = deleted.tenantId.ToString(),
             },
             _ => null,
         };

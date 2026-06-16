@@ -16,7 +16,7 @@ public sealed class AddStepHandler(
     public async Task<Result<Guid>> Handle(AddStepCommand command, CancellationToken cancellationToken)
     {
         WorkflowDefinition? workflow = await workflowRepo.GetByIdAsync(
-            command.WorkflowId, command.OrganizationId, cancellationToken);
+            command.WorkflowId, command.tenantId, cancellationToken);
 
         if (workflow is null)
             return Result.Failure<Guid>(ErrorCodes.NotFound, "Workflow not found.");
