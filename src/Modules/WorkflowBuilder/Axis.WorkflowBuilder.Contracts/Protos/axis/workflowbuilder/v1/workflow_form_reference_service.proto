@@ -14,7 +14,7 @@ service WorkflowFormReferenceService {
 
 message CountBlockingFormReferencesRequest {
   reserved 2;
-  reserved "tenant_id";
+  reserved "organization_id", "tenant_id";
 
   string form_id = 1;
 }
