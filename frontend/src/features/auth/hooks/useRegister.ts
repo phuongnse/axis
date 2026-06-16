@@ -84,7 +84,7 @@ function applyRegisterValidationErrors(
 export function useRegister() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const TenantSetupToken = useQueryParam('setupToken');
+  const tenantSetupToken = useQueryParam('setupToken');
   const { data: legalVersions } = useLegalVersions();
   const idempotencyKeyRef = useRef(createRegisterIdempotencyKey());
   const registerSchema = useMemo(() => createRegisterSchema(t), [t]);
@@ -117,7 +117,7 @@ export function useRegister() {
           passwordConfirmation: values.passwordConfirmation,
           acceptedTermsVersion: legalVersions.termsVersion,
           acceptedPrivacyVersion: legalVersions.privacyVersion,
-          TenantSetupToken,
+          tenantSetupToken,
         },
         idempotencyKeyRef.current,
       );

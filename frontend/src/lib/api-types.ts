@@ -1298,14 +1298,14 @@ export interface components {
             /** Format: int32 */
             notFound?: number;
         };
-        ChangeTenantPlanRequest: {
-            /** Format: uuid */
-            planId?: string;
-        };
         ChangePasswordRequest: {
             currentPassword?: string;
             newPassword?: string;
             confirmPassword?: string;
+        };
+        ChangeTenantPlanRequest: {
+            /** Format: uuid */
+            planId?: string;
         };
         ConfigureStepRequest: {
             name?: string;
@@ -1614,25 +1614,6 @@ export interface components {
             attemptCount?: number;
             lastError?: string | null;
         };
-        TenantSettingsDto: {
-            /** Format: uuid */
-            tenantId?: string;
-            name?: string;
-            slug?: string;
-            logoUrl?: string | null;
-            planName?: string;
-            status?: string;
-            /** Format: date-time */
-            createdAt?: string;
-            timeZoneId?: string | null;
-            defaultLanguage?: string | null;
-            /** Format: date-time */
-            scheduledHardDeleteAt?: string | null;
-            usage?: components["schemas"]["UsageStatsDto"];
-        };
-        TenantSlugPreviewDto: {
-            slug?: string;
-        };
         ProblemDetails: {
             type?: string | null;
             title?: string | null;
@@ -1646,7 +1627,7 @@ export interface components {
         ProvisioningStatusDto: {
             /** Format: uuid */
             tenantId?: string;
-            TenantStatus?: string;
+            tenantStatus?: string;
             isReady?: boolean;
             modules?: components["schemas"]["ModuleProvisioningStatusDto"][];
         };
@@ -1676,7 +1657,7 @@ export interface components {
         };
         RegisterTenantRequest: {
             tenantName?: string;
-            TenantContactEmail?: string;
+            tenantContactEmail?: string;
             acceptedTermsVersion?: string;
             acceptedPrivacyVersion?: string;
             /** Format: uuid */
@@ -1690,7 +1671,7 @@ export interface components {
             passwordConfirmation?: string;
             acceptedTermsVersion?: string;
             acceptedPrivacyVersion?: string;
-            TenantSetupToken?: string | null;
+            tenantSetupToken?: string | null;
         };
         RemoveTransitionRequest: {
             /** Format: uuid */
@@ -1778,6 +1759,25 @@ export interface components {
             isCurrent?: boolean;
             isAvailableForNewSignups?: boolean;
         };
+        TenantSettingsDto: {
+            /** Format: uuid */
+            tenantId?: string;
+            name?: string;
+            slug?: string;
+            logoUrl?: string | null;
+            planName?: string;
+            status?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            timeZoneId?: string | null;
+            defaultLanguage?: string | null;
+            /** Format: date-time */
+            scheduledHardDeleteAt?: string | null;
+            usage?: components["schemas"]["UsageStatsDto"];
+        };
+        TenantSlugPreviewDto: {
+            slug?: string;
+        };
         TransitionExportDto: {
             /** Format: uuid */
             fromStepId?: string;
@@ -1814,13 +1814,6 @@ export interface components {
             icon?: string | null;
             color?: string | null;
         };
-        UpdateTenantProfileRequest: {
-            name?: string;
-            timeZoneId?: string | null;
-            defaultLanguage?: string | null;
-            logoBase64?: string | null;
-            logoContentType?: string | null;
-        };
         UpdateProfileRequest: {
             firstName?: string;
             lastName?: string;
@@ -1834,6 +1827,13 @@ export interface components {
         };
         UpdateStatusRequest: {
             isActive?: boolean;
+        };
+        UpdateTenantProfileRequest: {
+            name?: string;
+            timeZoneId?: string | null;
+            defaultLanguage?: string | null;
+            logoBase64?: string | null;
+            logoContentType?: string | null;
         };
         UpdateWorkflowRequest: {
             name?: string;
@@ -1870,7 +1870,7 @@ export interface components {
         VerifyEmailSessionEstablishedDto: {
             sessionEstablished?: boolean;
             nextStep?: components["schemas"]["VerifyEmailNextStep"];
-            TenantSetupToken?: string | null;
+            tenantSetupToken?: string | null;
         };
         WorkflowDetailDto: {
             /** Format: uuid */

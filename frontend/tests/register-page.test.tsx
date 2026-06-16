@@ -175,7 +175,7 @@ describe('RegisterPage', () => {
     await user.click(screen.getByRole('button', { name: /create account/i }));
 
     await waitFor(() => {
-      expect(registerBody?.TenantSetupToken).toBe('setup-token');
+      expect(registerBody?.tenantSetupToken).toBe('setup-token');
     });
   });
 

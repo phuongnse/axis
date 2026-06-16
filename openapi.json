@@ -6423,16 +6423,6 @@
         },
         "additionalProperties": false
       },
-      "ChangeTenantPlanRequest": {
-        "type": "object",
-        "properties": {
-          "planId": {
-            "type": "string",
-            "format": "uuid"
-          }
-        },
-        "additionalProperties": false
-      },
       "ChangePasswordRequest": {
         "type": "object",
         "properties": {
@@ -6444,6 +6434,16 @@
           },
           "confirmPassword": {
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ChangeTenantPlanRequest": {
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "additionalProperties": false
@@ -7313,61 +7313,6 @@
         },
         "additionalProperties": false
       },
-      "TenantSettingsDto": {
-        "type": "object",
-        "properties": {
-          "tenantId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "slug": {
-            "type": "string"
-          },
-          "logoUrl": {
-            "type": "string",
-            "nullable": true
-          },
-          "planName": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "timeZoneId": {
-            "type": "string",
-            "nullable": true
-          },
-          "defaultLanguage": {
-            "type": "string",
-            "nullable": true
-          },
-          "scheduledHardDeleteAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "usage": {
-            "$ref": "#/components/schemas/UsageStatsDto"
-          }
-        },
-        "additionalProperties": false
-      },
-      "TenantSlugPreviewDto": {
-        "type": "object",
-        "properties": {
-          "slug": {
-            "type": "string"
-          }
-        },
-        "additionalProperties": false
-      },
       "ProblemDetails": {
         "type": "object",
         "properties": {
@@ -7402,7 +7347,7 @@
             "type": "string",
             "format": "uuid"
           },
-          "TenantStatus": {
+          "tenantStatus": {
             "type": "string"
           },
           "isReady": {
@@ -7479,7 +7424,7 @@
           "tenantName": {
             "type": "string"
           },
-          "TenantContactEmail": {
+          "tenantContactEmail": {
             "type": "string"
           },
           "acceptedTermsVersion": {
@@ -7520,7 +7465,7 @@
           "acceptedPrivacyVersion": {
             "type": "string"
           },
-          "TenantSetupToken": {
+          "tenantSetupToken": {
             "type": "string",
             "nullable": true
           }
@@ -7777,6 +7722,61 @@
         },
         "additionalProperties": false
       },
+      "TenantSettingsDto": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "logoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "planName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "timeZoneId": {
+            "type": "string",
+            "nullable": true
+          },
+          "defaultLanguage": {
+            "type": "string",
+            "nullable": true
+          },
+          "scheduledHardDeleteAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "usage": {
+            "$ref": "#/components/schemas/UsageStatsDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TenantSlugPreviewDto": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "TransitionExportDto": {
         "type": "object",
         "properties": {
@@ -7889,31 +7889,6 @@
         },
         "additionalProperties": false
       },
-      "UpdateTenantProfileRequest": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "timeZoneId": {
-            "type": "string",
-            "nullable": true
-          },
-          "defaultLanguage": {
-            "type": "string",
-            "nullable": true
-          },
-          "logoBase64": {
-            "type": "string",
-            "nullable": true
-          },
-          "logoContentType": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
       "UpdateProfileRequest": {
         "type": "object",
         "properties": {
@@ -7958,6 +7933,31 @@
         "properties": {
           "isActive": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateTenantProfileRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "timeZoneId": {
+            "type": "string",
+            "nullable": true
+          },
+          "defaultLanguage": {
+            "type": "string",
+            "nullable": true
+          },
+          "logoBase64": {
+            "type": "string",
+            "nullable": true
+          },
+          "logoContentType": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -8057,7 +8057,7 @@
           "nextStep": {
             "$ref": "#/components/schemas/VerifyEmailNextStep"
           },
-          "TenantSetupToken": {
+          "tenantSetupToken": {
             "type": "string",
             "nullable": true
           }

@@ -9,7 +9,7 @@ function makeStatus(
 ): ProvisioningStatusResponse {
   return {
     tenantId: '00000000-0000-0000-0000-000000000001',
-    TenantStatus: 'Provisioning',
+    tenantStatus: 'Provisioning',
     isReady: false,
     modules: [],
     ...overrides,

@@ -28,7 +28,7 @@ describe('WorkspaceProvisioningPage', () => {
         Promise.resolve(
           JSON.stringify({
             tenantId: '00000000-0000-0000-0000-000000000001',
-            TenantStatus: 'Provisioning',
+            tenantStatus: 'Provisioning',
             isReady: false,
             modules: [
               { module: 'DataModeling', status: 'Pending', attemptCount: 0, lastError: null },
@@ -57,7 +57,7 @@ describe('WorkspaceProvisioningPage', () => {
         Promise.resolve(
           JSON.stringify({
             tenantId: '00000000-0000-0000-0000-000000000001',
-            TenantStatus: 'ProvisioningFailed',
+            tenantStatus: 'ProvisioningFailed',
             isReady: false,
             modules: [
               { module: 'DataModeling', status: 'Failed', attemptCount: 3, lastError: 'timeout' },
