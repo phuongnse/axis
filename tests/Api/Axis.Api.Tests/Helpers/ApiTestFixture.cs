@@ -15,6 +15,7 @@ using Axis.WorkflowBuilder.Contracts.Grpc;
 using Axis.WorkflowBuilder.Infrastructure.Persistence;
 using Axis.WorkflowEngine.Infrastructure.Persistence;
 using Grpc.Net.ClientFactory;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -53,6 +54,9 @@ public sealed class ApiTestFixture : IAsyncLifetime
     private readonly RabbitMqContainer _rabbitMq = new RabbitMqBuilder()
         .WithImage("rabbitmq:3.13-management-alpine")
         .Build();
+
+    private readonly DirectoryInfo _dataProtectionKeysDirectory = new(
+        Path.Combine(Path.GetTempPath(), "axis-api-tests", Guid.NewGuid().ToString("N"), "data-protection-keys"));
 
     private string? _previousIdentityConnectionStringEnv;
     private string? _previousDataModelingConnectionStringEnv;
@@ -147,6 +151,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", _rabbitMq.GetConnectionString());
 
         AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
+        _dataProtectionKeysDirectory.Create();
 
         WebApplicationFactory<Program> factory = null!;
         Lazy<HttpMessageHandler> grpcTestServerHandler =
@@ -174,6 +179,10 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
             builder.ConfigureTestServices(services =>
             {
+                services.AddDataProtection()
+                    .PersistKeysToFileSystem(_dataProtectionKeysDirectory)
+                    .SetApplicationName("Axis.Api.Tests");
+
                 services.RemoveAll<FormModelReferenceService.FormModelReferenceServiceClient>();
                 services.AddGrpcClient<FormModelReferenceService.FormModelReferenceServiceClient>(options =>
                 {
@@ -253,6 +262,11 @@ public sealed class ApiTestFixture : IAsyncLifetime
         if (_factory is not null)
         {
             await _factory.DisposeAsync();
+        }
+
+        if (_dataProtectionKeysDirectory.Exists)
+        {
+            _dataProtectionKeysDirectory.Delete(recursive: true);
         }
 
         await _postgres.DisposeAsync();

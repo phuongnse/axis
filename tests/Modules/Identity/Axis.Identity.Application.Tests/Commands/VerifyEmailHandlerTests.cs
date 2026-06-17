@@ -101,6 +101,50 @@ public class VerifyEmailHandlerTests
     }
 
     [Fact]
+    public async Task VerifyEmail_WhenStandalonePersonalWorkspaceIsPendingVerification_RoutesToDashboard()
+    {
+        Email email = Email.Create("solo@example.com").Value!;
+        User user = User.Create("Solo", "User", email);
+        user.SetPasswordHash("hashed");
+        Workspace personalWorkspace = Workspace.CreatePersonal(
+            "Solo User",
+            WorkspaceSlug.Create("solo-user").Value!,
+            email,
+            user.Id,
+            WellKnownSubscriptionPlans.FreeId);
+        WorkspaceMembership membership = WorkspaceMembership.Create(user.Id, personalWorkspace.Id);
+        Role adminRole = Role.CreateSystem("Admin", personalWorkspace.Id, ["users:read"]);
+        string rawToken = "valid-standalone-token";
+        string tokenHash = OpaqueTokenGenerator.Hash(rawToken);
+
+        _tokenStore.ResolveForVerificationAsync(tokenHash, Arg.Any<CancellationToken>())
+            .Returns(new EmailVerificationTokenResolveResult(EmailVerificationTokenState.Valid, user.Id));
+        _userRepo.GetByIdPlatformWideAsync(user.Id).Returns(user);
+        _membershipRepo.GetByUserIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns([membership]);
+        _WorkspaceRepo.GetByIdAsync(personalWorkspace.Id, Arg.Any<CancellationToken>())
+            .Returns(personalWorkspace);
+        _roleRepo.GetByNameAsync("Admin", personalWorkspace.Id, Arg.Any<CancellationToken>())
+            .Returns(adminRole);
+        _roleRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), personalWorkspace.Id, Arg.Any<CancellationToken>())
+            .Returns([adminRole]);
+
+        Result<VerifyEmailSuccessDto> result = await CreateHandler().Handle(
+            new VerifyEmailCommand(rawToken),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.workspaceId.Should().Be(personalWorkspace.Id);
+        result.Value.NextStep.Should().Be(VerifyEmailNextStep.Dashboard);
+        user.IsEmailVerified.Should().BeTrue();
+        personalWorkspace.Status.Should().Be(WorkspaceStatus.Provisioning);
+
+        await _provisioningRepo.Received(1).AddRangeAsync(
+            Arg.Is<IEnumerable<WorkspaceModuleProvisioning>>(rows => rows.Count() == WorkspaceModuleNames.All.Count),
+            Arg.Any<CancellationToken>());
+        await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task VerifyEmail_WhenWorkspaceContactTokenIsValid_StartsProvisioningAndReturnsSetupToken()
     {
         Email email = Email.Create("admin@acme.com").Value!;

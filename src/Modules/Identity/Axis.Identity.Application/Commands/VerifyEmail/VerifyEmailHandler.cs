@@ -185,7 +185,7 @@ public sealed class VerifyEmailHandler(
             user.Email.Value,
             user.FullName,
             permissions,
-            primaryWorkspace.Status == WorkspaceStatus.Active
+            primaryWorkspace.Type == WorkspaceType.Personal || primaryWorkspace.Status == WorkspaceStatus.Active
                 ? VerifyEmailNextStep.Dashboard
                 : VerifyEmailNextStep.WorkspaceProvisioning));
     }
