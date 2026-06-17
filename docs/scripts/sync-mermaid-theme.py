@@ -15,7 +15,7 @@ sys.path.insert(0, str(REPO_ROOT))
 from docs.diagrams.mermaid_theme import MERMAID_INIT  # noqa: E402
 
 SKIP_FILES = {"playbooks/mermaid.md"}
-INIT_RE = re.compile(r"^%%\{init:[\s\S]*?\}%%[ \t]*(?:\r?\n[ \t]*)*")
+INIT_RE = re.compile(r"%%\{init:[\s\S]*?\}%%[ \t]*(?:\r?\n[ \t]*)*")
 FENCE_RE = re.compile(r"```mermaid\n([\s\S]*?)```")
 
 
@@ -26,8 +26,9 @@ def sync_mermaid_blocks(content: str) -> tuple[str, bool]:
         nonlocal changed
         body = match.group(1)
         stripped = body.lstrip()
-        if INIT_RE.match(stripped):
-            next_body = INIT_RE.sub(f"{MERMAID_INIT}\n", stripped, count=1)
+        if INIT_RE.search(stripped):
+            without_init = INIT_RE.sub("", stripped, count=1)
+            next_body = f"{MERMAID_INIT}\n{without_init.lstrip(chr(10))}"
         else:
             next_body = f"{MERMAID_INIT}\n{body.lstrip(chr(10))}"
 

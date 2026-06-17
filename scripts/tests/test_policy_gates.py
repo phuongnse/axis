@@ -20,10 +20,14 @@ import doc_drift_domains  # noqa: E402
 
 def load_script(script_name: str):
     path = SCRIPTS / script_name
-    module_name = f"_test_{script_name.replace('-', '_').replace('.', '_')}"
+    return load_python_file(path)
+
+
+def load_python_file(path: Path):
+    module_name = f"_test_{path.name.replace('-', '_').replace('.', '_')}"
     spec = importlib.util.spec_from_file_location(module_name, path)
     if spec is None or spec.loader is None:
-        raise AssertionError(f"Cannot load {script_name}")
+        raise AssertionError(f"Cannot load {path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -31,6 +35,29 @@ def load_script(script_name: str):
 
 check_pr = load_script("check-pr.py")
 check_use_case_docs = load_script("check-use-case-docs.py")
+sync_mermaid_theme = load_python_file(ROOT / "docs" / "scripts" / "sync-mermaid-theme.py")
+
+
+class TestSyncMermaidTheme(unittest.TestCase):
+    def test_moves_existing_init_after_banner_to_canonical_first_line(self) -> None:
+        old_init = '%%{init: {"theme": "neutral"}}%%'
+        content = (
+            "```mermaid\n"
+            "%% existing banner\n"
+            f"{old_init}\n"
+            "flowchart TD\n"
+            "    A --> B\n"
+            "```\n"
+        )
+
+        synced, changed = sync_mermaid_theme.sync_mermaid_blocks(content)
+
+        self.assertTrue(changed)
+        self.assertEqual(1, synced.count("%%{init:"))
+        self.assertIn(
+            f"```mermaid\n{sync_mermaid_theme.MERMAID_INIT}\n%% existing banner\nflowchart TD\n",
+            synced,
+        )
 
 
 class TestTestNamingGate(unittest.TestCase):
