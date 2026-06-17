@@ -63,9 +63,6 @@ A workflow must have at least one trigger before it can be published. Triggers d
 > - trigger config (input variable definitions) stored as JSONB in `triggers` column
 > - domain guards against duplicate trigger type per workflow (AddTrigger returns Conflict on second call for same type). `TriggerConfig` is a value object (no `id`, owned by `WorkflowDefinition`).
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
 > - N/A
 

@@ -61,9 +61,6 @@ A workflow must have at least one trigger before it can be published. Triggers d
 >
 > **Gaps vs spec:** unique webhook URL generation, HMAC verification, and payload mapping pending workflow-engine + API layer.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
 > - N/A
 >

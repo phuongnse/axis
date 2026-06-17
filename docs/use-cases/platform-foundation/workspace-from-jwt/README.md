@@ -67,9 +67,6 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 >
 > **Gaps vs spec:** none for backend cross-workspace access prevention.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
 > - N/A
 >

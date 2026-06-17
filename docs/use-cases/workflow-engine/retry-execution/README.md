@@ -65,9 +65,6 @@ When a workflow execution fails at a step, users can manually retry from the fai
 > - `CreateRetry()` produces a new `WorkflowExecution` with `RetryOfExecutionId` set
 > - context is copied from original at time of retry.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
 > - N/A
 

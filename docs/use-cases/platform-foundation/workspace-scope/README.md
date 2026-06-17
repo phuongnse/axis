@@ -67,9 +67,6 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 >
 > **Gaps vs spec:** none for backend schema-per-workspace isolation. Workspace-scoped data never lives in `public` by design (module tables only in `workspace_{WorkspaceId:N}`); no separate runtime guard beyond schema isolation.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
 > - N/A
 >

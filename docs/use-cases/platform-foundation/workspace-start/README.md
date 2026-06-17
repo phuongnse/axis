@@ -74,11 +74,3 @@ The current screen reuses the authenticated app shell and dashboard composition.
 >
 > **Decisions:** Dashboard is a workspace start surface, not a fake operational console. It may show only account/workspace state and API-backed usage until the workflow/data-model modules ship their own endpoints.
 >
-> **Gaps vs spec:**
-> - N/A
->
-> **Deferred follow-ups:**
-> - N/A
->
-> **Decisions:**
-> - N/A

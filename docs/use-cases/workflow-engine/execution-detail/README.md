@@ -61,9 +61,6 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 >
 > **Done:** `GET /api/executions/{id}` returns execution + steps.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
 > - N/A
 >

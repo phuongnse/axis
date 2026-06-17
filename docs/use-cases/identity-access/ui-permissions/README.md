@@ -16,13 +16,16 @@ The UI to hide or disable features I don't have access to so that I'm not confus
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. After sign-in or token refresh, client loads the current user's effective permissions.
+2. Client stores permissions in UI state and hides restricted navigation items, buttons, and menu actions.
+3. User sees only the features they can attempt, while API permission checks remain authoritative.
 
 ## Alternate / error flows
 
-- Validation failures and edge cases in Acceptance Criteria.
+- Permission load failure falls back to the most restrictive UI and shows a banner.
+- Direct navigation to a restricted route redirects home with an access-denied toast.
+- Mid-session role changes appear after token refresh or the next permissions refresh.
+- Frontend checks never replace API enforcement.
 
 ## Context
 
@@ -57,10 +60,15 @@ A resource-based permission system where each permission grants the ability to p
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** all ACs are frontend + API concerns — no Application-layer handler needed. Pending API layer for policy middleware and Frontend for UI hiding logic.
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

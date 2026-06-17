@@ -62,9 +62,6 @@ Each step has a type that determines what it does when executed. Users configure
 >
 > **Gaps vs spec:** email/webhook dispatch pending workflow-engine; configurable fail-on-error toggle not yet implemented in API layer.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
 > - N/A
 >

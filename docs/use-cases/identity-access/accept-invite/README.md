@@ -62,13 +62,7 @@ Workspace admins can invite new members, manage their accounts, and deactivate u
 >
 > **Decisions:** expired/accepted/cancelled invitation states enforced in `Invitation.Accept()` domain method, wrapped as `ValidationException` in handler. Platform-wide email check runs after invitation validation — throws `ValidationException` directing user to sign in with existing credentials. `AcceptInvitationHandler` calls `user.VerifyEmail()` — the invitation link proves mailbox ownership (no separate verification email).
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
-> - N/A
->
-> **Decisions:**
 > - N/A
 
 ## Wireframes

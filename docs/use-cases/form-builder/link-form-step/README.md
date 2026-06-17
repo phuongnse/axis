@@ -60,13 +60,7 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 >
 > **Decisions:** `GetFormPickerQuery` returns all forms for the workspace as a flat list (Id, Name, FieldCount) ordered by name — used by the API form-step picker dropdown. `IsReferencedByWorkflowAsync` query supports the reference check.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
-> - N/A
->
-> **Decisions:**
 > - N/A
 
 ## Wireframes

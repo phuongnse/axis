@@ -87,11 +87,6 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 > - `/connect/authorize` issues the authorization code
 > - `/connect/token` exchanges it for access + refresh tokens. Refresh token stored as an opaque reference in DB (OpenIddict `OpenIddictTokens` table) and delivered as an httpOnly `Secure SameSite=Strict` cookie at `/connect` path via `ApplyRefreshTokenCookieHandler`.
 >
-> **Gaps vs spec:**
-> - N/A
->
-> **Deferred follow-ups:**
-> - N/A
 
 ## Wireframes
 

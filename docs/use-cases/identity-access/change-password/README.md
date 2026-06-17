@@ -16,13 +16,16 @@ Change my password while signed in so that I can keep my account secure.
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Signed-in user opens Security settings and submits current password, new password, and confirmation.
+2. System validates the current password and new password policy.
+3. System changes the password, revokes other active refresh tokens, keeps the current session active, and sends a confirmation email.
 
 ## Alternate / error flows
 
-- Validation failures and edge cases in Acceptance Criteria.
+- Incorrect current password highlights the current-password field and clears new-password fields.
+- Repeated current-password failures lock the change-password form temporarily.
+- Confirmation email failure is logged but does not roll back the password change.
+- A stale form in another tab fails because the current password has already changed.
 
 ## Context
 
@@ -61,10 +64,12 @@ Allow users to reset forgotten passwords, change their current password, and man
 > **Gaps vs spec:** failed-attempt lockout for change-password form (3 attempts / 15 min) pending. Revoking other-device sessions after change pending (OpenIddict token revocation).
 >
 > **Decisions:** notification email failure is swallowed at handler level and logged separately at Infrastructure — password change still succeeds per [password-security](../README.md) acceptance criteria.
+>
+> **Deferred follow-ups:**
+> - N/A
 
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | change-password | [source](./change-password.excalidraw) | [preview](./change-password.svg) |
-

@@ -65,14 +65,6 @@ Each step has a type that determines what it does when executed. Users configure
 >
 > **Decisions:** step config (formId, assignee, timeout) stored as JSONB dict in `steps` column. `StepType` enum includes `Start` and `End` values.
 >
-> **Gaps vs spec:**
-> - N/A
->
-> **Deferred follow-ups:**
-> - N/A
->
-> **Decisions:**
-> - N/A
 
 ## Wireframes
 

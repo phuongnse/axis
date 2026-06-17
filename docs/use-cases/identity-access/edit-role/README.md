@@ -61,9 +61,6 @@ Workspace admins can create custom roles, assign permissions to each role, and a
 >
 > **Done:** system role guard (cannot edit Admin/Editor/Viewer/End User) implemented in domain via `IsSystem` flag.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
 > - N/A
 >

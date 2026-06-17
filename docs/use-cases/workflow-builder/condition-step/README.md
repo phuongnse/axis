@@ -64,14 +64,6 @@ Each step has a type that determines what it does when executed. Users configure
 >
 > **Decisions:** Condition branches are stored in step config JSONB until the visual branch editor needs a dedicated persistence model.
 >
-> **Gaps vs spec:**
-> - N/A
->
-> **Deferred follow-ups:**
-> - N/A
->
-> **Decisions:**
-> - N/A
 
 ## Wireframes
 

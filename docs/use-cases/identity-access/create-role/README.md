@@ -61,13 +61,7 @@ Workspace admins can create custom roles, assign permissions to each role, and a
 >
 > **Decisions:** `Role.CreateCustom(name, WorkspaceId, permissions[])` factory method; minimum 1 permission enforced in domain.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
-> - N/A
->
-> **Decisions:**
 > - N/A
 
 ## Wireframes

@@ -59,9 +59,6 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 >
 > **Gaps vs spec:** canvas drag-drop UI and 1-second debounce auto-save pending Frontend.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
 > - N/A
 >

@@ -58,9 +58,6 @@ Users can create, read, update, and delete records against any model. Records ar
 >
 > **Gaps vs spec:** HTTP 409 optimistic concurrency (updated_at comparison) pending.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
 > - N/A
 >

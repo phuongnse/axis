@@ -89,6 +89,9 @@ Define user-facing localization and visual theme behavior for the SPA so each us
 > **Decisions:**
 > - Translation is key-based (`feature.section.key`) with English fallback.
 > - New user-facing strings in migrated screens must come from locale files.
+>
+> **Deferred follow-ups:**
+> - N/A
 
 ## Wireframes
 

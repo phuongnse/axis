@@ -101,9 +101,6 @@ Axis supports standalone user accounts. Registering a workspace is required only
 > - First owner/admin identity creation is a follow-up setup-token step after workspace verification.
 > - Workspace onboarding is optional from the product perspective: a user can register and use Axis without creating or joining a workspace.
 >
-> **Gaps vs spec:**
-> - N/A
-
 ## Screen flow
 
 Canonical order for this use case. Screens owned by another use case are linked inline.

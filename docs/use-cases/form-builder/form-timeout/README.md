@@ -16,13 +16,16 @@ Configure a timeout on a Form step so that the workflow doesn't wait indefinitel
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Workflow designer configures a Form step timeout in hours.
+2. When the workflow reaches the Form step, system creates the Form Task and schedules an expiry job.
+3. If the Form Task is still pending when the timeout expires, system marks it expired and fails the workflow step.
 
 ## Alternate / error flows
 
-- Validation failures and edge cases in Acceptance Criteria.
+- A Form step without a timeout waits indefinitely.
+- Submitting before the timeout cancels or neutralizes the expiry path.
+- Duplicate expiry delivery is idempotent.
+- Cancelling the workflow marks the pending Form Task cancelled and makes the form link unusable.
 
 ## Context
 
@@ -58,14 +61,20 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** 
+> - N/A
 >
 > **Done:**
 > - `ExpireFormSubmissionMessage` scheduled from `FormStepReachedHandler`
 > - `ExpireFormSubmissionHandler` marks submission expired. Workflow execution → `Failed` + error notification on expiry pending workflow-engine coordination.
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

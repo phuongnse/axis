@@ -16,13 +16,15 @@ Be notified when a form is waiting for my input so that I know I have an action 
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Workflow execution reaches a Form step and creates a pending Form Task for the configured assignee.
+2. System resolves the assignee user or role members and sends the form task link by email and in-app notification.
+3. Assignee opens the unique form task URL with enough context to understand the workflow, form, and due time.
 
 ## Alternate / error flows
 
-- Validation failures and edge cases in Acceptance Criteria.
+- Email delivery failure is logged on the execution detail; the Form Task remains pending.
+- A role with no active members fails the step immediately.
+- A deactivated assignee fails the step immediately.
 
 ## Context
 
@@ -69,10 +71,12 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 > - `Submitted` used instead of `Completed` to name the action clearly. `AccessToken` is a `Guid` (unique URL key, not JWT)
 > - expiry enforced via `ExpiresAt` + `Expire()` domain method
 > - `Expire()` is non-idempotent by design — idempotency handled at the caller level.
+>
+> **Deferred follow-ups:**
+> - N/A
 
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

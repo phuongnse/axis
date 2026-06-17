@@ -65,11 +65,6 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 > - new workflow initialised with Start + End nodes by domain factory
 > - all data stored in single `workflow_definitions` table.
 >
-> **Gaps vs spec:**
-> - N/A
->
-> **Deferred follow-ups:**
-> - N/A
 
 ## Wireframes
 

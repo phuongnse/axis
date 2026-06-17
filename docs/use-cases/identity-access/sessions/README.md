@@ -16,13 +16,16 @@ See where I'm currently signed in so that I can revoke access from devices I no 
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Signed-in user opens the active sessions page.
+2. System lists active refresh-token sessions with device, approximate location, last activity, and current-session marker.
+3. User revokes another session or signs out everywhere.
 
 ## Alternate / error flows
 
-- Validation failures and edge cases in Acceptance Criteria.
+- Sessions load failure shows a retryable error.
+- Revoking an already-ended session shows a terminal message.
+- Missing IP geolocation renders as "Unknown."
+- The current session cannot be revoked from this page; user must use Sign Out.
 
 ## Context
 
@@ -65,10 +68,12 @@ Allow users to reset forgotten passwords, change their current password, and man
 > **Decisions:**
 > - sessions are modelled as OpenIddict refresh tokens
 > - `ISessionStore` wraps `IOpenIddictTokenManager` at Infrastructure layer. `RevokeSessionCommand(sessionId: null)` triggers "revoke all" via `RevokeAllAsync`.
+>
+> **Deferred follow-ups:**
+> - N/A
 
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

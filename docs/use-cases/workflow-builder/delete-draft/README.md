@@ -58,14 +58,6 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 >
 > **Decisions:** Draft deletion remains a soft-delete operation; no restore UI is exposed for deleted drafts.
 >
-> **Gaps vs spec:**
-> - N/A
->
-> **Deferred follow-ups:**
-> - N/A
->
-> **Decisions:**
-> - N/A
 
 ## Wireframes
 

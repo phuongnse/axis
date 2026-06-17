@@ -71,15 +71,10 @@ Users can create, read, update, and delete records against any model. Records ar
 > - sort via `?sortBy=field&sortDir=asc|desc`
 > - unknown/unsafe field names in sort fall back to `created_at DESC`.
 >
-> **Gaps vs spec:**
-> - Follow the layer status table; pending rows remain unfinished.
->
 > **Deferred follow-ups:**
 > - N/A
-
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

@@ -60,13 +60,7 @@ Workflows can take different execution paths based on data values using Conditio
 >
 > **Decisions:** cycle detection implemented in domain (DFS reachability check in AddTransition). `Transition` is a value object (only `fromStepId`, `toStepId`, `condition` — no identity or ordering fields).
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
-> - N/A
->
-> **Decisions:**
 > - N/A
 
 ## Wireframes

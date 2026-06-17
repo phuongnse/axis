@@ -60,9 +60,6 @@ Workflows can take different execution paths based on data values using Conditio
 >
 > **Gaps vs spec:** branch drag-to-reorder UI and default-branch validation at publish pending Frontend + API.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
 > - N/A
 >
