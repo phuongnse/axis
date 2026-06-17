@@ -165,22 +165,7 @@ Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, use-c
 
 ## Definition of done
 
-**Per US (any layer):** tests first and green; `> **Implementation status**` callout after *Out of scope*:
-
-```markdown
-> **Implementation status**
->
-> | Layer | Status |
-> |-------|--------|
-> | Domain | ✅ |
-> | Application | ⚠️ |
->
-> **Gaps vs spec:** …
->
-> **Deferred follow-ups:** … (use `N/A` if none)
->
-> **Decisions:** …
-```
+**Per US (any layer):** tests first and green; update the `> **Implementation status**` callout after *Out of scope*. Format and status rules live in [docs-style.md](docs/playbooks/docs-style.md#implementation-status-after-each-us-ac-block).
 
 **Per layer / module:** all use-case callouts updated; domain README table; [`PROGRESS.md`](docs/PROGRESS.md) (layer summary only — not per-class detail).
 

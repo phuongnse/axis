@@ -32,7 +32,8 @@ One-page map into [`patterns.md`](./patterns.md). Open only the section you need
 | Idempotent command / migration | [Command idempotency](./patterns.md#command-idempotency-pattern) |
 | Pre-commit hygiene grep | [Code hygiene checklist](./patterns.md#code-hygiene-checklist) |
 | New module / Kafka / proto / domain README index | [Repo layout discovery](./repo-layout-discovery.md) |
-| React / TanStack Query screen | [Frontend Patterns](./patterns.md#frontend-patterns) · [frontend.md](./frontend.md) |
+| React / TanStack Query screen | [frontend.md](./frontend.md) · [Frontend pointers](./patterns.md#frontend-patterns) |
+| Wireframe or visual docs | [wireframes.md](./wireframes.md) · [Wireframe pointers](./patterns.md#wireframe-convention) |
 | Where logic belongs (handler vs aggregate) | [Axis layering](./patterns.md#axis-layering-srp-at-a-glance) · [Key patterns](./patterns.md#key-patterns) |
 | Business failure vs exception | [Result vs exceptions](./patterns.md#result-pattern-vs-exceptions--when-to-use-what) |
 
@@ -69,7 +70,8 @@ One-page map into [`patterns.md`](./patterns.md). Open only the section you need
 | 24a | [Buf breaking rules + counterexample lesson](./patterns.md#buf-breaking-rules--whats-actually-configured-and-the-gotcha) |
 | 25 | [Command idempotency](./patterns.md#command-idempotency-pattern) |
 | 26 | [Code hygiene](./patterns.md#code-hygiene-checklist) |
-| 27 | [Frontend patterns](./patterns.md#frontend-patterns) |
+| 27 | [Frontend pointers](./patterns.md#frontend-patterns) |
+| 28 | [Wireframe pointers](./patterns.md#wireframe-convention) |
 
 ---
 

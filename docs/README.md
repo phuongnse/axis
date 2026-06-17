@@ -174,21 +174,13 @@ flowchart TB
 
 ## Wireframes
 
-Screen wireframes use Excalidraw (`.excalidraw` + `.svg`). Each use case lists its screens under `## Wireframes` in that use case’s README.
+Screen wireframes live with their owning use case. This hub is navigation only; rules live in [wireframes.md](./playbooks/wireframes.md), [docs-style.md](./playbooks/docs-style.md#use-case-files--wireframes--implementation-status), and [visual-artifact-checklist.md](./playbooks/visual-artifact-checklist.md).
 
 | What | Where |
 |------|--------|
 | Browse by domain | [use-cases](./use-cases/README.md) → domain `README.md` → use-case `README.md` → `## Wireframes` |
-| Shared app shell | [wireframes/app-shell](./wireframes/app-shell.excalidraw) (kit under [wireframes/](./wireframes/), generators in [wireframes.md](./playbooks/wireframes.md)) |
-| Use-case layout rules | [USE_CASE_TEMPLATE](./use-cases/USE_CASE_TEMPLATE.md) · [docs-style § Wireframes](./playbooks/docs-style.md#wireframes-content-rules) |
-
-**Example use cases** (full wireframe table + screen flow):
-
-| Use case | Why open this |
-|----------|----------------|
-| [register-workspace § Wireframes](./use-cases/platform-foundation/register-workspace/README.md#wireframes) | Multi-screen Workspace onboarding path, error `*-states`, links to Mermaid diagrams |
-
-Regenerate screen `.svg` after `.excalidraw` changes: `python scripts/axis.py generate wireframes` (see [wireframes.md](./playbooks/wireframes.md)).
+| Shared app shell | [wireframes/app-shell](./wireframes/app-shell.excalidraw) |
+| Canonical multi-screen example | [register-workspace § Wireframes](./use-cases/platform-foundation/register-workspace/README.md#wireframes) |
 
 ---
 

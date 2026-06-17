@@ -53,11 +53,11 @@ Reference and practice docs are **scanned, not read**. Optimize for a reader who
 | File class | Budget | Action when exceeded |
 |---|---|---|
 | Reference docs (`AGENTS.md`, `ARCHITECTURE.md`, playbooks) | 300 lines | Split by topic, extract a sub-playbook, or move detail into an index + section pattern |
-| `patterns.md` | exempt | Use [`patterns-index.md`](./patterns-index.md) as the entry point; never read end-to-end |
+| `patterns.md` | temporary outlier | Use [`patterns-index.md`](./patterns-index.md) as the entry point; split or link out duplicated owner sections |
 | Domain README | 200 lines | Move detail into per-use-case files |
 | Use-case file | no hard cap | Already scoped by AC list |
 
-`patterns.md` is the only intentional outlier — its size is mitigated by the lazy-load index pattern. Don't replicate that escape hatch elsewhere without the same mitigation.
+`patterns.md` is the only tolerated outlier while older patterns are being split or linked out. Do not add broad new sections there when a focused owner doc already exists.
 
 ---
 
