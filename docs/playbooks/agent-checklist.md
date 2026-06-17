@@ -22,16 +22,11 @@
 
 ### AC coverage — avoid happy-path-only
 
-Use-case files group ACs under **Happy path**, **Validation & errors**, **Edge cases**, and **Out of scope**. Agents must cover **every bullet in scope for the layer you are shipping**, not only the first block.
+Use-case files group ACs under **Happy path**, **Validation & errors**, **Edge cases**, and **Out of scope**. Cover every in-scope bullet for the layer you are shipping, not only the happy path.
 
 **Ownership note (single source):** This file is the source of truth for AC/path coverage expectations. Other playbooks should link here instead of re-stating these rules.
 
-**Before writing code (per use case):**
-
-1. Copy **each** `- [ ]` line from the use case into an AC map row (one row per bullet, or one row per bullet group only when a single test proves all of them).
-2. Tag the row: `happy` | `validation` | `edge` | `out-of-scope` (skip implementation for `out-of-scope`; do not “forget” it — leave it in the map as N/A).
-3. Name the **test or handler** that will prove the row (`CreateWorkflow_WhenAtPlanLimit_Returns402`, integration test for wrong-workspace isolation, etc.). **No blank “File / test” cells** for in-scope rows.
-4. If a bullet is **Frontend-only** while you are on backend (or the reverse), mark the row `N/A this PR — Frontend` / `N/A this PR — API` so it is not silently dropped.
+**AC map:** before code, copy each `- [ ]` AC bullet into a row, tag it `happy` / `validation` / `edge` / `out-of-scope`, and name the proving test or handler. Mark cross-layer bullets explicitly (`N/A this PR — Frontend` / `N/A this PR — API`). No blank in-scope file/test cells.
 
 **Path coverage matrix template** (fill once per touched implementation surface):
 
@@ -39,47 +34,20 @@ Use-case files group ACs under **Happy path**, **Validation & errors**, **Edge c
 |---|---|---|---|---|---|---|
 | `...` | `test: ...` | `test: ...` | `test: ...` / `N/A` | `test: ...` / `N/A` | `test: ...` / `N/A` | deferral if any |
 
-**While implementing (TDD):**
+**During implementation:**
 
 - [process.md § Per use case workflow](./process.md#per-use-case-workflow): Domain → Application → Infrastructure → API; tests green per layer before the next.
 - [testing.md § Required test coverage](./testing.md#required-test-coverage-for-integration-tests): integration tests need happy path **and** not-found/isolation **and** constraint violations where applicable — not one happy test per handler.
-- **Docker local-dev smoke:** when triggered by the Ready-review rule above, run the relevant end-to-end path through compose early enough to influence implementation. Minimum evidence is API `/health` + `/health/ready`, the SPA route or API endpoint under test, and the observable dependency effect (for example MailDev email, provisioning status, queue/topic side effect, or stored object). If host-side `.NET` build/test must run afterward, stop `api`/`web` first to avoid `dotnet watch` and host builds competing over `bin/obj`.
-
-**Before opening / updating the PR:**
+- **Docker local-dev smoke:** when triggered by the Ready-review rule above, run compose early enough to influence implementation. Minimum evidence: `/health`, `/health/ready`, the route/endpoint under test, and the observable dependency effect.
 
 | Check | Action |
 |-------|--------|
-| Map complete? | Every in-scope AC row has code + test (or explicit deferral). |
-| Callout honest? | `> **Implementation status**` lists remaining bullets under `Gaps vs spec` — never ✅ on a layer with open backend gaps. |
-| Deferred? | `**Deferred follow-ups:**` names the **AC bullet** deferred, not a vague “later”. |
-| Out of scope? | Do not implement; do not mark ✅ as if done. |
+| Map complete? | Every in-scope AC row has code + test or an exact deferral. |
+| Path matrix complete? | Each touched endpoint/handler/repo/job/consumer covers happy, validation, auth/permission, not-found/isolation, and dependency-failure paths, or marks `N/A`. |
+| Callout honest? | `> **Implementation status**` lists remaining bullets under `Gaps vs spec`; never mark a layer ✅ with open in-scope gaps. |
+| Deferred? | `**Deferred follow-ups:**` names the exact AC bullet deferred, not a vague “later”. |
 
-**Self-audit command** (after implementation, before PR review): re-read the use case in the use-case file and tick mentally each bullet against your AC map — same order as the spec (happy → validation → edge).
-
-### Anti-pattern: `Gaps vs spec: none` after happy path only
-
-Do **not** mark a layer ✅ or write `Gaps vs spec: none for backend` because the main API flow works. That is not Ready review complete.
-
-| Wrong | Right |
-|-------|--------|
-| Ship the main CRUD/flow endpoints, then claim the layer ✅ | AC map row per bullet (happy, validation, edge) with file/test or explicit deferral |
-| Wait for the user to ask whether every AC is covered | Run the self-audit **before the first review request** — that question is the agent’s job |
-| Fix gaps only in a follow-up commit after review | Same PR when possible; otherwise `**Deferred follow-ups:**` + **exact AC bullet text** in the feature callout |
-
-**Before PR-ready checklist (backend feature PRs):**
-
-1. Re-read every in-scope `- [ ]` under the use case (all sections, not only *Happy path*).
-2. For each bullet: implemented + test, `N/A this PR — Frontend`, or named deferral.
-3. Only then set `Gaps vs spec: none for backend` (or list what remains).
-4. For **every implementation surface** touched in this PR (API endpoint, application handler, gRPC method, repository, background job, consumer), verify path coverage is explicit:
-   - valid request/flow (happy path),
-   - validation/constraint failure path,
-   - authz/authn or permission boundary where applicable,
-   - not-found and workspace/isolation boundary where applicable (no data leak),
-   - downstream dependency failure path where applicable (transport/storage/service unavailable).
-   If a path does not apply to that surface, mark it `N/A` in the AC map instead of skipping it silently.
-
-**Why this matters:** "the main flow works" routinely hides missed validation, edge-case, and cross-cutting ACs — TTLs, rollback-on-failure, purge/cleanup jobs, cancel paths, isolation boundaries. These surface in spec review, not in a happy-path demo. Run the self-audit against every in-scope AC bullet **before** the first review request, not after review.
+Self-audit before review: re-read the use case and tick each in-scope bullet against the AC map in spec order.
 
 ---
 
