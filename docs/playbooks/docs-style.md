@@ -82,9 +82,9 @@ Enforced by the incident/lesson-framing guard in `python scripts/axis.py check d
 
 Every `docs/use-cases/<domain>/<short-slug>/README.md` file uses these layouts so agents can scan status without parsing inline pipes.
 
-**Canonical example (multi-screen + diagrams):** [platform-foundation/register-tenant/README.md](../use-cases/platform-foundation/register-tenant/README.md). Copy that structure when refreshing older use cases.
+**Canonical example (multi-screen + diagrams):** [platform-foundation/register-workspace/README.md](../use-cases/platform-foundation/register-workspace/README.md). Copy that structure when refreshing older use cases.
 
-**Wireframe practice (generic):** [wireframes.md § Multi-screen journey pattern](./wireframes.md#multi-screen-journey-pattern) — happy path vs `*-states`, diagrams, generator habits; register-tenant is the concrete reference.
+**Wireframe practice (generic):** [wireframes.md § Multi-screen journey pattern](./wireframes.md#multi-screen-journey-pattern) — happy path vs `*-states`, diagrams, generator habits; register-workspace is the concrete reference.
 
 ### Section order (after AC, before implementation status)
 
@@ -123,7 +123,7 @@ Do **not** duplicate Excalidraw links here; links live only in `## Wireframes`.
 - **Inventory:** every `*.excalidraw` **UI screen** in this folder must have a row. Include error/reference variants (`*-states`). Use `N/A` only when the use case truly has no wireframes.
 - **Columns:** minimum `| Screen | Excalidraw | Preview |`. When `## Screen flow` exists, use `| # | Screen | Role | Excalidraw | Preview |` — `#` matches flow steps (`1`, `2a`, `—` for non-step error screens); `Role` = short happy-path / error label.
 - **Row order:** happy-path screens first (same order as Screen flow), then error/reference screens (same order as the error table in Screen flow).
-- **Do not** list diagrams here (e.g. `*-flow`, `tenant-provisioning`, entity models) — those are not UI screens; sequence/architecture diagrams belong under `## Diagrams` as Mermaid, not in this table.
+- **Do not** list diagrams here (e.g. `*-flow`, `workspace-provisioning`, entity models) — those are not UI screens; sequence/architecture diagrams belong under `## Diagrams` as Mermaid, not in this table.
 
 Minimal table (few screens, no Screen flow):
 
@@ -135,7 +135,7 @@ Minimal table (few screens, no Screen flow):
 | login | [source](./login.excalidraw) | [preview](./login.svg) |
 ```
 
-Full table (see [register-tenant](../use-cases/platform-foundation/register-tenant/README.md#wireframes)):
+Full table (see [register-workspace](../use-cases/platform-foundation/register-workspace/README.md#wireframes)):
 
 ```markdown
 ## Wireframes
@@ -157,8 +157,8 @@ Sequence/architecture drawings are under [Diagrams](#diagrams).
   - **Zero or one** `### <slug>-cases` `sequenceDiagram` — dev/QA map of API responses to `*-states` wireframes. Skip when there are few error screens.
   - **Do not** add a second happy-path sequence (e.g. avoid both `*-flow` and `*-journey` for the same story).
 - Platform-wide architecture diagrams live in [docs/README.md § Key Diagrams](../README.md#key-diagrams), not duplicated here.
-- **Related use cases:** prefer **one use-case folder** for a single actor journey (e.g. register → verify → provisioning wait). Add extra `###` diagram sections (`tenant-provisioning`, …) instead of a second README. Link out only when the story is truly a different actor/domain. Do not paste another use case’s Mermaid in a separate folder if it is the same journey.
-- After diagrams, optional **APIs** or **Related** line — anchors within the same README (`#tenant-provisioning`), not duplicate folders.
+- **Related use cases:** prefer **one use-case folder** for a single actor journey (e.g. register → verify → provisioning wait). Add extra `###` diagram sections (`workspace-provisioning`, …) instead of a second README. Link out only when the story is truly a different actor/domain. Do not paste another use case’s Mermaid in a separate folder if it is the same journey.
+- After diagrams, optional **APIs** or **Related** line — anchors within the same README (`#workspace-provisioning`), not duplicate folders.
 - Omit `## Diagrams` when this use case has no local diagram.
 
 ### Adopting this layout on existing use cases

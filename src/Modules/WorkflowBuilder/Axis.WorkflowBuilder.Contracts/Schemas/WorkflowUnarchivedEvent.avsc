@@ -4,7 +4,7 @@
   "name": "WorkflowUnarchivedEvent",
   "fields": [
     { "name": "workflowId", "type": "string" },
-    { "name": "tenantId", "type": "string" },
+    { "name": "workspaceId", "type": "string" },
     {
       "name": "referencedFormIds",
       "type": { "type": "array", "items": "string" },

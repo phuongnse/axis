@@ -8,7 +8,7 @@ Cancel a running execution so that I can stop a process that is no longer needed
 
 ## Primary actor
 
-- Tenant Member with `execution:cancel`
+- Workspace Member with `execution:cancel`
 
 ## Trigger
 
@@ -17,7 +17,7 @@ Cancel a running execution so that I can stop a process that is no longer needed
 ## Main flow
 
 1. Actor starts the — Cancel a running execution flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows

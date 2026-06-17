@@ -8,14 +8,14 @@ internal sealed class LoggingPlatformProvisioningAlert(ILogger<LoggingPlatformPr
     : IPlatformProvisioningAlert
 {
     public Task AlertProvisioningFailedAsync(
-        Guid tenantId,
+        Guid workspaceId,
         string module,
         int attemptCount,
         string lastError,
         CancellationToken cancellationToken = default)
     {
         logger.LogCritical(
-            "Tenant provisioning failed for module {Module} after {AttemptCount} attempts. Last error: {LastError}",
+            "Workspace provisioning failed for module {Module} after {AttemptCount} attempts. Last error: {LastError}",
             module,
             attemptCount,
             lastError);

@@ -5,7 +5,7 @@ namespace Axis.WorkflowBuilder.Application.Commands.AddStep;
 
 public sealed record AddStepCommand(
     Guid WorkflowId,
-    Guid tenantId,
+    Guid workspaceId,
     string Name,
     StepType StepType,
     IReadOnlyDictionary<string, object?>? Config) : ICommand<Guid>;

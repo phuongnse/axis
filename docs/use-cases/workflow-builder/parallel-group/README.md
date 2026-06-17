@@ -8,7 +8,7 @@ Configure multiple steps to run in parallel so that independent tasks don't bloc
 
 ## Primary actor
 
-- Tenant Member
+- Workspace Member
 
 ## Trigger
 
@@ -17,7 +17,7 @@ Configure multiple steps to run in parallel so that independent tasks don't bloc
 ## Main flow
 
 1. Actor starts the — Create a parallel step group flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows

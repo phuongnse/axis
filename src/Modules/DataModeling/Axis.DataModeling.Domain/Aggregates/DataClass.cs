@@ -18,7 +18,7 @@ public sealed class DataClass : AggregateRoot<Guid>
 
     public string Name { get; private set; }
     public string? Description { get; private set; }
-    public Guid tenantId { get; private set; }
+    public Guid workspaceId { get; private set; }
     public DateTimeOffset? DeletedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -26,25 +26,25 @@ public sealed class DataClass : AggregateRoot<Guid>
 
     public IReadOnlyList<FieldDefinition> Fields => _fields.AsReadOnly();
 
-    private DataClass(Guid id, string name, string? description, Guid tenantId,
+    private DataClass(Guid id, string name, string? description, Guid workspaceId,
         string createdBy, DateTimeOffset createdAt)
         : base(id)
     {
         Name = name;
         Description = description;
-        this.tenantId = tenantId;
+        this.workspaceId = workspaceId;
         CreatedBy = createdBy;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
     }
 
-    public static DataClass Create(string name, string? description, Guid tenantId, string createdBy)
+    public static DataClass Create(string name, string? description, Guid workspaceId, string createdBy)
     {
         ValidateName(name);
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        DataClass dc = new(Guid.NewGuid(), name.Trim(), description?.Trim(), tenantId, createdBy, now);
-        dc.RaiseDomainEvent(new DataClassCreated(dc.Id, tenantId, dc.Name));
+        DataClass dc = new(Guid.NewGuid(), name.Trim(), description?.Trim(), workspaceId, createdBy, now);
+        dc.RaiseDomainEvent(new DataClassCreated(dc.Id, workspaceId, dc.Name));
         return dc;
     }
 
@@ -101,7 +101,7 @@ public sealed class DataClass : AggregateRoot<Guid>
             throw new InvalidOperationException("Data class is already deleted.");
 
         DeletedAt = DateTimeOffset.UtcNow;
-        RaiseDomainEvent(new DataClassDeleted(Id, tenantId));
+        RaiseDomainEvent(new DataClassDeleted(Id, workspaceId));
     }
 
     private static void ValidateName(string name)

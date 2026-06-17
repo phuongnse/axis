@@ -14,29 +14,37 @@ namespace Axis.Identity.Application.Tests.Commands;
 public class RegisterUserHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
-    private readonly ITenantRepository _TenantRepo = Substitute.For<ITenantRepository>();
-    private readonly ITenantMembershipRepository _membershipRepo =
-        Substitute.For<ITenantMembershipRepository>();
+    private readonly IWorkspaceRepository _WorkspaceRepo = Substitute.For<IWorkspaceRepository>();
+    private readonly IWorkspaceMembershipRepository _membershipRepo =
+        Substitute.For<IWorkspaceMembershipRepository>();
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
     private readonly IRegistrationIdempotencyRepository _idempotencyRepo =
         Substitute.For<IRegistrationIdempotencyRepository>();
     private readonly IEmailVerificationTokenStore _verificationTokenStore =
         Substitute.For<IEmailVerificationTokenStore>();
-    private readonly ITenantRegistrationTokenStore _TenantTokenStore =
-        Substitute.For<ITenantRegistrationTokenStore>();
+    private readonly IWorkspaceRegistrationTokenStore _WorkspaceTokenStore =
+        Substitute.For<IWorkspaceRegistrationTokenStore>();
+    private readonly IWorkspaceSlugGenerator _slugGenerator = Substitute.For<IWorkspaceSlugGenerator>();
     private readonly IPasswordHasher _hasher = Substitute.For<IPasswordHasher>();
     private readonly IEmailSender _emailSender = Substitute.For<IEmailSender>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
+    public RegisterUserHandlerTests()
+    {
+        _slugGenerator.GenerateUniqueSlugAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(WorkspaceSlug.Create("alice-smith").Value!);
+    }
+
     private RegisterUserHandler CreateHandler() =>
         new(
             _userRepo,
-            _TenantRepo,
+            _WorkspaceRepo,
             _membershipRepo,
             _roleRepo,
             _idempotencyRepo,
             _verificationTokenStore,
-            _TenantTokenStore,
+            _WorkspaceTokenStore,
+            _slugGenerator,
             _hasher,
             _emailSender,
             _uow);
@@ -71,6 +79,17 @@ public class RegisterUserHandlerTests
                 && u.AcceptedTermsVersion == WellKnownLegalDocuments.TermsVersion
                 && u.AcceptedPrivacyVersion == WellKnownLegalDocuments.PrivacyVersion),
             Arg.Any<CancellationToken>());
+        await _WorkspaceRepo.Received(1).AddAsync(
+            Arg.Is<Workspace>(w =>
+                w.Type == WorkspaceType.Personal
+                && w.OwnerUserId.HasValue
+                && w.OwnerEmail.Value == "alice@example.com"
+                && w.Status == WorkspaceStatus.PendingVerification),
+            Arg.Any<CancellationToken>());
+        await _membershipRepo.Received(1).AddAsync(
+            Arg.Is<WorkspaceMembership>(m =>
+                m.RoleIds.Count == 1),
+            Arg.Any<CancellationToken>());
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
         await _verificationTokenStore.Received(1).CreateAsync(
             Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
@@ -80,42 +99,42 @@ public class RegisterUserHandlerTests
     }
 
     [Fact]
-    public async Task RegisterUser_WhenSetupTokenIsValid_AttachesUserAsTenantAdmin()
+    public async Task RegisterUser_WhenSetupTokenIsValid_AttachesUserAsWorkspaceAdmin()
     {
-        Guid tenantId = Guid.NewGuid();
+        Guid workspaceId = Guid.NewGuid();
         string setupToken = "setup-token";
         string setupTokenHash = OpaqueTokenGenerator.Hash(setupToken);
-        Tenant Tenant = Tenant.Create(
+        Workspace Workspace = Workspace.Create(
             "Acme",
-            TenantSlug.Create("acme").Value!,
+            WorkspaceSlug.Create("acme").Value!,
             Email.Create("admin@acme.com").Value!,
             WellKnownSubscriptionPlans.FreeId);
-        Tenant.BeginProvisioning();
-        Role adminRole = Role.CreateSystem("Admin", Tenant.Id, ["users:read"]);
+        Workspace.BeginProvisioning();
+        Role adminRole = Role.CreateSystem("Admin", Workspace.Id, ["users:read"]);
 
         _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>(), Arg.Any<CancellationToken>())
             .Returns(false);
         _idempotencyRepo.AcquireAsync("idem-1", Arg.Any<CancellationToken>())
             .Returns(RegistrationIdempotencyAcquireResult.Acquired);
         _hasher.Hash("maple river sunrise").Returns("hashed_password");
-        _TenantTokenStore.ConsumeFirstUserSetupAsync(
+        _WorkspaceTokenStore.ConsumeFirstUserSetupAsync(
                 setupTokenHash,
                 Arg.Any<Guid>(),
                 Arg.Any<CancellationToken>())
-            .Returns(Result.Success(tenantId));
-        _TenantRepo.GetByIdAsync(tenantId, Arg.Any<CancellationToken>())
-            .Returns(Tenant);
-        _roleRepo.GetByNameAsync("Admin", Tenant.Id, Arg.Any<CancellationToken>())
+            .Returns(Result.Success(workspaceId));
+        _WorkspaceRepo.GetByIdAsync(workspaceId, Arg.Any<CancellationToken>())
+            .Returns(Workspace);
+        _roleRepo.GetByNameAsync("Admin", Workspace.Id, Arg.Any<CancellationToken>())
             .Returns(adminRole);
 
         Result result = await CreateHandler().Handle(
-            ValidCommand() with { TenantSetupToken = setupToken },
+            ValidCommand() with { WorkspaceSetupToken = setupToken },
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         await _membershipRepo.Received(1).AddAsync(
-            Arg.Is<TenantMembership>(m =>
-                m.tenantId == Tenant.Id
+            Arg.Is<WorkspaceMembership>(m =>
+                m.workspaceId == Workspace.Id
                 && m.RoleIds.Contains(adminRole.Id)),
             Arg.Any<CancellationToken>());
     }
@@ -130,23 +149,23 @@ public class RegisterUserHandlerTests
         _idempotencyRepo.AcquireAsync("idem-1", Arg.Any<CancellationToken>())
             .Returns(RegistrationIdempotencyAcquireResult.Acquired);
         _hasher.Hash("maple river sunrise").Returns("hashed_password");
-        _TenantTokenStore.ConsumeFirstUserSetupAsync(
+        _WorkspaceTokenStore.ConsumeFirstUserSetupAsync(
                 setupTokenHash,
                 Arg.Any<Guid>(),
                 Arg.Any<CancellationToken>())
             .Returns(Result.Failure<Guid>(
                 ErrorCodes.BusinessRule,
-                "This Tenant setup link has expired. Please request a new setup link."));
+                "This Workspace setup link has expired. Please request a new setup link."));
 
         Result result = await CreateHandler().Handle(
-            ValidCommand() with { TenantSetupToken = setupToken },
+            ValidCommand() with { WorkspaceSetupToken = setupToken },
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
         await _userRepo.DidNotReceive().AddAsync(Arg.Any<User>(), Arg.Any<CancellationToken>());
         await _membershipRepo.DidNotReceive().AddAsync(
-            Arg.Any<TenantMembership>(),
+            Arg.Any<WorkspaceMembership>(),
             Arg.Any<CancellationToken>());
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
         await _idempotencyRepo.Received(1).MarkFailedAsync("idem-1", Arg.Any<CancellationToken>());

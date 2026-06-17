@@ -6,7 +6,7 @@ namespace Axis.WorkflowEngine.Domain.Aggregates;
 public sealed class ExecutionStep : Entity<Guid>
 {
     public Guid ExecutionId { get; private set; }
-    public Guid tenantId { get; private set; }
+    public Guid workspaceId { get; private set; }
     public Guid StepDefinitionId { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public StepType StepType { get; private set; }
@@ -29,14 +29,14 @@ public sealed class ExecutionStep : Entity<Guid>
     private ExecutionStep(
         Guid id,
         Guid executionId,
-        Guid tenantId,
+        Guid workspaceId,
         Guid stepDefinitionId,
         string name,
         StepType stepType,
         int displayOrder) : base(id)
     {
         ExecutionId = executionId;
-        this.tenantId = tenantId;
+        this.workspaceId = workspaceId;
         StepDefinitionId = stepDefinitionId;
         Name = name;
         StepType = stepType;
@@ -47,14 +47,14 @@ public sealed class ExecutionStep : Entity<Guid>
 
     public static ExecutionStep Create(
         Guid executionId,
-        Guid tenantId,
+        Guid workspaceId,
         Guid stepDefinitionId,
         string name,
         StepType stepType,
         int displayOrder)
     {
         if (executionId == Guid.Empty) throw new ArgumentException("ExecutionId must not be empty.", nameof(executionId));
-        if (tenantId == Guid.Empty) throw new ArgumentException("tenantId must not be empty.", nameof(tenantId));
+        if (workspaceId == Guid.Empty) throw new ArgumentException("workspaceId must not be empty.", nameof(workspaceId));
         if (stepDefinitionId == Guid.Empty) throw new ArgumentException("StepDefinitionId must not be empty.", nameof(stepDefinitionId));
         if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Name must not be blank.", nameof(name));
         if (displayOrder < 0) throw new ArgumentOutOfRangeException(nameof(displayOrder), "DisplayOrder must be non-negative.");
@@ -62,7 +62,7 @@ public sealed class ExecutionStep : Entity<Guid>
         return new ExecutionStep(
             Guid.NewGuid(),
             executionId,
-            tenantId,
+            workspaceId,
             stepDefinitionId,
             name,
             stepType,

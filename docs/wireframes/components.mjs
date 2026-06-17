@@ -158,7 +158,7 @@ export function appShell(prefix, W, H, navItems, activeIdx, pageTitle) {
   const sbW = 240;
   els.push(rect(`${prefix}_sidebar`, 0, 0, sbW, H, C.gray300, C.white, 1, false));
 
-  // Workspace / Tenant Header
+  // Workspace / Workspace Header
   els.push(text(`${prefix}_logo`, 20, 20, 24, 24, '⬡', 20, C.primary));
   els.push(text(`${prefix}_ws_name`, 54, 23, 100, 18, 'Acme Corp', 14, C.gray900));
   els.push(text(`${prefix}_ws_arr`, 158, 23, 16, 16, '▾', 14, C.gray500));

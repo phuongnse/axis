@@ -8,7 +8,7 @@ Create a data class so that I can define a reusable nested object structure.
 
 ## Primary actor
 
-- Tenant Member with `data_modeling:model:write`
+- Workspace Member with `data_modeling:model:write`
 
 ## Trigger
 
@@ -17,7 +17,7 @@ Create a data class so that I can define a reusable nested object structure.
 ## Main flow
 
 1. Actor starts the — Create a data class flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
@@ -36,7 +36,7 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 - [ ] Data class fields use the same field type system as model fields, excluding `Relation`, `DataClass`, and `File` types (to prevent deep nesting and circular references).
 
 *Validation & errors*
-- [ ] Name: required, 2–100 characters, unique within the tenant (case-insensitive). Duplicate shows: "A data class named '{name}' already exists."
+- [ ] Name: required, 2–100 characters, unique within the workspace (case-insensitive). Duplicate shows: "A data class named '{name}' already exists."
 - [ ] Attempting to add a `DataClass` or `Relation` field type inside a data class is blocked by hiding those options from the type picker.
 
 *Edge cases*

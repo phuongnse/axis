@@ -18,7 +18,7 @@ public sealed class CreateWorkflowHandler(
     public async Task<Result<Guid>> Handle(CreateWorkflowCommand command, CancellationToken cancellationToken)
     {
         Result planCheck = await planLimitService.EnsureWithinLimitAsync(
-            command.tenantId,
+            command.workspaceId,
             PlanLimitResourceType.Workflows,
             increment: 1,
             cancellationToken);
@@ -29,11 +29,11 @@ public sealed class CreateWorkflowHandler(
             return Result.Failure<Guid>(planCheck.ErrorCode!, planCheck.Error);
         }
 
-        if (await workflowRepo.NameExistsAsync(command.Name, command.tenantId, null, cancellationToken))
+        if (await workflowRepo.NameExistsAsync(command.Name, command.workspaceId, null, cancellationToken))
             return Result.Failure<Guid>(ErrorCodes.Conflict, $"A workflow named '{command.Name}' already exists.");
 
         WorkflowDefinition workflow = WorkflowDefinition.Create(
-            command.Name, command.Description, command.tenantId, command.CreatedBy);
+            command.Name, command.Description, command.workspaceId, command.CreatedBy);
 
         await workflowRepo.AddAsync(workflow, cancellationToken);
 
@@ -47,7 +47,7 @@ public sealed class CreateWorkflowHandler(
         }
 
         await planLimitService.RecordUsageDeltaAsync(
-            command.tenantId,
+            command.workspaceId,
             PlanLimitResourceType.Workflows,
             delta: 1,
             cancellationToken);

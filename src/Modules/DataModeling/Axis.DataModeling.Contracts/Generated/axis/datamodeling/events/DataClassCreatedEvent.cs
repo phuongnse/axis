@@ -12,22 +12,22 @@ namespace axis.datamodeling.events
     public partial class DataClassCreatedEvent : global::Avro.Specific.ISpecificRecord
     {
         public static global::Avro.Schema _SCHEMA = global::Avro.Schema.Parse(
-            @"{""type"":""record"",""name"":""DataClassCreatedEvent"",""namespace"":""axis.datamodeling.events"",""fields"":[{""name"":""dataClassId"",""type"":""string""},{""name"":""tenantId"",""type"":""string""},{""name"":""name"",""type"":""string""}]}");
+            @"{""type"":""record"",""name"":""DataClassCreatedEvent"",""namespace"":""axis.datamodeling.events"",""fields"":[{""name"":""dataClassId"",""type"":""string""},{""name"":""workspaceId"",""type"":""string""},{""name"":""name"",""type"":""string""}]}");
 
         private string _dataClassId = string.Empty;
-        private string _tenantId = string.Empty;
+        private string _workspaceId = string.Empty;
         private string _name = string.Empty;
 
         public virtual global::Avro.Schema Schema => DataClassCreatedEvent._SCHEMA;
 
         public string dataClassId { get => _dataClassId; set => _dataClassId = value; }
-        public string tenantId { get => _tenantId; set => _tenantId = value; }
+        public string workspaceId { get => _workspaceId; set => _workspaceId = value; }
         public string name { get => _name; set => _name = value; }
 
         public virtual object Get(int fieldPos) => fieldPos switch
         {
             0 => dataClassId,
-            1 => tenantId,
+            1 => workspaceId,
             2 => name,
             _ => throw new global::Avro.AvroRuntimeException("Bad index " + fieldPos + " in Get()"),
         };
@@ -37,7 +37,7 @@ namespace axis.datamodeling.events
             switch (fieldPos)
             {
                 case 0: dataClassId = (string)fieldValue; break;
-                case 1: tenantId = (string)fieldValue; break;
+                case 1: workspaceId = (string)fieldValue; break;
                 case 2: name = (string)fieldValue; break;
                 default: throw new global::Avro.AvroRuntimeException("Bad index " + fieldPos + " in Put()");
             }

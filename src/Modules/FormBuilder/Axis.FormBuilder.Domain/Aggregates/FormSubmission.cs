@@ -7,7 +7,7 @@ namespace Axis.FormBuilder.Domain.Aggregates;
 public sealed class FormSubmission : AggregateRoot<Guid>
 {
     public Guid FormDefinitionId { get; private set; }
-    public Guid tenantId { get; private set; }
+    public Guid workspaceId { get; private set; }
     public Guid ExecutionId { get; private set; }
     public Guid ExecutionStepId { get; private set; }
     public Guid? AssigneeUserId { get; private set; }
@@ -27,7 +27,7 @@ public sealed class FormSubmission : AggregateRoot<Guid>
     private FormSubmission(
         Guid id,
         Guid formDefinitionId,
-        Guid tenantId,
+        Guid workspaceId,
         Guid executionId,
         Guid executionStepId,
         Guid? assigneeUserId,
@@ -36,7 +36,7 @@ public sealed class FormSubmission : AggregateRoot<Guid>
         string createdBy) : base(id)
     {
         FormDefinitionId = formDefinitionId;
-        this.tenantId = tenantId;
+        this.workspaceId = workspaceId;
         ExecutionId = executionId;
         ExecutionStepId = executionStepId;
         AssigneeUserId = assigneeUserId;
@@ -50,7 +50,7 @@ public sealed class FormSubmission : AggregateRoot<Guid>
 
     public static FormSubmission Create(
         Guid formDefinitionId,
-        Guid tenantId,
+        Guid workspaceId,
         Guid executionId,
         Guid executionStepId,
         Guid? assigneeUserId,
@@ -59,7 +59,7 @@ public sealed class FormSubmission : AggregateRoot<Guid>
         string createdBy)
     {
         if (formDefinitionId == Guid.Empty) throw new ArgumentException("FormDefinitionId must not be empty.", nameof(formDefinitionId));
-        if (tenantId == Guid.Empty) throw new ArgumentException("tenantId must not be empty.", nameof(tenantId));
+        if (workspaceId == Guid.Empty) throw new ArgumentException("workspaceId must not be empty.", nameof(workspaceId));
         if (executionId == Guid.Empty) throw new ArgumentException("ExecutionId must not be empty.", nameof(executionId));
         if (executionStepId == Guid.Empty) throw new ArgumentException("ExecutionStepId must not be empty.", nameof(executionStepId));
         if (string.IsNullOrWhiteSpace(createdBy)) throw new ArgumentException("CreatedBy must not be blank.", nameof(createdBy));
@@ -67,7 +67,7 @@ public sealed class FormSubmission : AggregateRoot<Guid>
         FormSubmission submission = new(
             Guid.NewGuid(),
             formDefinitionId,
-            tenantId,
+            workspaceId,
             executionId,
             executionStepId,
             assigneeUserId,
@@ -78,7 +78,7 @@ public sealed class FormSubmission : AggregateRoot<Guid>
         submission.RaiseDomainEvent(new FormTaskCreated(
             submission.Id,
             formDefinitionId,
-            tenantId,
+            workspaceId,
             executionId,
             assigneeUserId,
             assigneeRoleId,
@@ -103,7 +103,7 @@ public sealed class FormSubmission : AggregateRoot<Guid>
         RaiseDomainEvent(new FormTaskSubmitted(
             Id,
             FormDefinitionId,
-            tenantId,
+            workspaceId,
             ExecutionId,
             ExecutionStepId,
             snapshot));
@@ -119,7 +119,7 @@ public sealed class FormSubmission : AggregateRoot<Guid>
         RaiseDomainEvent(new FormTaskExpired(
             Id,
             FormDefinitionId,
-            tenantId,
+            workspaceId,
             ExecutionId,
             ExecutionStepId));
     }
@@ -134,7 +134,7 @@ public sealed class FormSubmission : AggregateRoot<Guid>
         RaiseDomainEvent(new FormTaskCancelled(
             Id,
             FormDefinitionId,
-            tenantId,
+            workspaceId,
             ExecutionId));
     }
 }

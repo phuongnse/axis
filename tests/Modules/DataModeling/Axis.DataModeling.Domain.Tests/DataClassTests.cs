@@ -9,17 +9,17 @@ namespace Axis.DataModeling.Domain.Tests;
 
 public class DataClassTests
 {
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     [Fact]
-    public void DataClass_WhenCreated_SetsNameDescriptionAndTenantId()
+    public void DataClass_WhenCreated_SetsNameDescriptionAndWorkspaceId()
     {
-        DataClass dc = DataClass.Create("Address", "Postal address structure", TenantId, UserId);
+        DataClass dc = DataClass.Create("Address", "Postal address structure", WorkspaceId, UserId);
 
         dc.Name.Should().Be("Address");
         dc.Description.Should().Be("Postal address structure");
-        dc.tenantId.Should().Be(TenantId);
+        dc.workspaceId.Should().Be(WorkspaceId);
         dc.DeletedAt.Should().BeNull();
     }
 
@@ -27,7 +27,7 @@ public class DataClassTests
     public void DataClass_WhenCreated_SetsCreatedByAndTimestamps()
     {
         DateTimeOffset before = DateTimeOffset.UtcNow;
-        DataClass dc = DataClass.Create("Address", null, TenantId, UserId);
+        DataClass dc = DataClass.Create("Address", null, WorkspaceId, UserId);
 
         dc.CreatedBy.Should().Be(UserId);
         dc.CreatedAt.Should().BeOnOrAfter(before);
@@ -37,7 +37,7 @@ public class DataClassTests
     [Fact]
     public void DataClass_WhenCreated_RaisesDataClassCreatedEvent()
     {
-        DataClass dc = DataClass.Create("Address", null, TenantId, UserId);
+        DataClass dc = DataClass.Create("Address", null, WorkspaceId, UserId);
         dc.DomainEvents.Should().ContainSingle(e => e is DataClassCreated);
     }
 
@@ -47,7 +47,7 @@ public class DataClassTests
     [InlineData("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")] // > 100
     public void DataClass_WhenNameLengthIsInvalid_ThrowsArgumentException(string name)
     {
-        Func<DataClass> act = () => DataClass.Create(name, null, TenantId, UserId);
+        Func<DataClass> act = () => DataClass.Create(name, null, WorkspaceId, UserId);
         act.Should().Throw<ArgumentException>();
     }
 
@@ -56,7 +56,7 @@ public class DataClassTests
     [Fact]
     public void DataClass_WhenUpdated_ChangesNameAndBumpsUpdatedAt()
     {
-        DataClass dc = DataClass.Create("Address", null, TenantId, UserId);
+        DataClass dc = DataClass.Create("Address", null, WorkspaceId, UserId);
         DateTimeOffset before = dc.UpdatedAt;
 
         dc.Update("Home Address", "Residential address");
@@ -71,7 +71,7 @@ public class DataClassTests
     [Fact]
     public void AddField_WhenFieldTypeIsAllowed_AddsFieldSuccessfully()
     {
-        DataClass dc = DataClass.Create("Address", null, TenantId, UserId);
+        DataClass dc = DataClass.Create("Address", null, WorkspaceId, UserId);
 
         dc.AddField("street", "Street", FieldType.Text, false, new TextFieldConfig());
         dc.AddField("zip_code", "Zip", FieldType.Number, false, new NumberFieldConfig());
@@ -87,7 +87,7 @@ public class DataClassTests
     [InlineData(FieldType.File)]
     public void AddField_WhenFieldTypeIsDisallowed_Throws(FieldType type)
     {
-        DataClass dc = DataClass.Create("Address", null, TenantId, UserId);
+        DataClass dc = DataClass.Create("Address", null, WorkspaceId, UserId);
         Func<Entities.FieldDefinition> act = () => dc.AddField("field1", "Field", type, false, new TextFieldConfig());
         act.Should().Throw<InvalidOperationException>().WithMessage("*not allowed*");
     }
@@ -95,7 +95,7 @@ public class DataClassTests
     [Fact]
     public void AddField_WhenNameIsDuplicate_Throws()
     {
-        DataClass dc = DataClass.Create("Address", null, TenantId, UserId);
+        DataClass dc = DataClass.Create("Address", null, WorkspaceId, UserId);
         dc.AddField("street", "Street", FieldType.Text, false, new TextFieldConfig());
 
         Func<Entities.FieldDefinition> act = () => dc.AddField("Street", "Street 2", FieldType.Text, false, new TextFieldConfig());
@@ -107,7 +107,7 @@ public class DataClassTests
     [Fact]
     public void RemoveField_WhenFieldExists_RemovesField()
     {
-        DataClass dc = DataClass.Create("Address", null, TenantId, UserId);
+        DataClass dc = DataClass.Create("Address", null, WorkspaceId, UserId);
         FieldDefinition field = dc.AddField("street", "Street", FieldType.Text, false, new TextFieldConfig());
 
         dc.RemoveField(field.Id);
@@ -119,7 +119,7 @@ public class DataClassTests
     [Fact]
     public void Delete_WhenCalled_SetsDeletedAtAndRaisesEvent()
     {
-        DataClass dc = DataClass.Create("Address", null, TenantId, UserId);
+        DataClass dc = DataClass.Create("Address", null, WorkspaceId, UserId);
         DateTimeOffset before = DateTimeOffset.UtcNow;
         dc.Delete();
 
@@ -131,7 +131,7 @@ public class DataClassTests
     [Fact]
     public void Delete_WhenAlreadyDeleted_Throws()
     {
-        DataClass dc = DataClass.Create("Address", null, TenantId, UserId);
+        DataClass dc = DataClass.Create("Address", null, WorkspaceId, UserId);
         dc.Delete();
 
         Action act = () => dc.Delete();

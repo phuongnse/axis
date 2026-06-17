@@ -10,19 +10,19 @@ internal sealed class FormRepository(FormBuilderDbContext context) : IFormReposi
     public async Task AddAsync(FormDefinition form, CancellationToken ct = default)
         => await context.FormDefinitions.AddAsync(form, ct);
 
-    public async Task<FormDefinition?> GetByIdAsync(Guid id, Guid tenantId, CancellationToken ct = default)
+    public async Task<FormDefinition?> GetByIdAsync(Guid id, Guid workspaceId, CancellationToken ct = default)
         => await context.FormDefinitions
-            .FirstOrDefaultAsync(f => f.Id == id && f.tenantId == tenantId, ct);
+            .FirstOrDefaultAsync(f => f.Id == id && f.workspaceId == workspaceId, ct);
 
-    public async Task<IReadOnlyList<FormDefinition>> GetAllAsync(Guid tenantId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<FormDefinition>> GetAllAsync(Guid workspaceId, CancellationToken ct = default)
         => await context.FormDefinitions
-            .Where(f => f.tenantId == tenantId)
+            .Where(f => f.workspaceId == workspaceId)
             .OrderBy(f => f.Name)
             .ToListAsync(ct);
 
-    public async Task<bool> NameExistsAsync(string name, Guid tenantId, Guid? excludeId = null, CancellationToken ct = default)
+    public async Task<bool> NameExistsAsync(string name, Guid workspaceId, Guid? excludeId = null, CancellationToken ct = default)
         => await context.FormDefinitions
-            .AnyAsync(f => f.tenantId == tenantId
+            .AnyAsync(f => f.workspaceId == workspaceId
                 && f.Name.ToLower() == name.ToLower()
                 && (excludeId == null || f.Id != excludeId), ct);
 

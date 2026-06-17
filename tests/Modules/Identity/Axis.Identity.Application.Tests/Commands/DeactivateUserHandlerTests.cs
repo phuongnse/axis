@@ -13,18 +13,18 @@ namespace Axis.Identity.Application.Tests.Commands;
 public class DeactivateUserHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
-    private readonly ITenantMembershipRepository _membershipRepo = Substitute.For<ITenantMembershipRepository>();
+    private readonly IWorkspaceMembershipRepository _membershipRepo = Substitute.For<IWorkspaceMembershipRepository>();
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
     private readonly ISessionStore _sessionStore = Substitute.For<ISessionStore>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private static readonly Guid RequesterId = Guid.NewGuid();
-    private readonly Role _adminRole = Role.CreateSystem("Admin", TenantId, ["users:deactivate"]);
+    private readonly Role _adminRole = Role.CreateSystem("Admin", WorkspaceId, ["users:deactivate"]);
 
     public DeactivateUserHandlerTests()
     {
-        _roleRepo.GetByNameAsync("Admin", TenantId, Arg.Any<CancellationToken>()).Returns(_adminRole);
+        _roleRepo.GetByNameAsync("Admin", WorkspaceId, Arg.Any<CancellationToken>()).Returns(_adminRole);
     }
 
     private DeactivateUserHandler CreateHandler() =>
@@ -33,9 +33,9 @@ public class DeactivateUserHandlerTests
     private static User MakeUser(string email = "user@acme.com") =>
         User.Create("Test", "User", Email.Create(email).Value);
 
-    private static TenantMembership MakeMembership(Guid userId, params Guid[] roleIds)
+    private static WorkspaceMembership MakeMembership(Guid userId, params Guid[] roleIds)
     {
-        TenantMembership membership = TenantMembership.Create(userId, TenantId);
+        WorkspaceMembership membership = WorkspaceMembership.Create(userId, WorkspaceId);
         foreach (Guid roleId in roleIds)
             membership.AssignRole(roleId);
         return membership;
@@ -45,17 +45,17 @@ public class DeactivateUserHandlerTests
     public async Task DeactivateUser_WhenRequestIsValid_DeactivatesUserAndRevokesSessions()
     {
         User target = MakeUser();
-        TenantMembership membership = MakeMembership(target.Id, _adminRole.Id);
-        _userRepo.GetByIdAsync(target.Id, TenantId).Returns(target);
-        _membershipRepo.GetByUserAndTenantAsync(target.Id, TenantId).Returns(membership);
-        _membershipRepo.CountAdminsAsync(TenantId, _adminRole.Id).Returns(2);
+        WorkspaceMembership membership = MakeMembership(target.Id, _adminRole.Id);
+        _userRepo.GetByIdAsync(target.Id, WorkspaceId).Returns(target);
+        _membershipRepo.GetByUserAndWorkspaceAsync(target.Id, WorkspaceId).Returns(membership);
+        _membershipRepo.CountAdminsAsync(WorkspaceId, _adminRole.Id).Returns(2);
 
         Result result = await CreateHandler().Handle(
-            new DeactivateUserCommand(target.Id, TenantId, RequesterId),
+            new DeactivateUserCommand(target.Id, WorkspaceId, RequesterId),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        membership.Status.Should().Be(TenantMembershipStatus.Inactive);
+        membership.Status.Should().Be(WorkspaceMembershipStatus.Inactive);
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
         await _sessionStore.Received(1).RevokeAllAsync(target.Id, Arg.Any<CancellationToken>());
     }
@@ -64,10 +64,10 @@ public class DeactivateUserHandlerTests
     public async Task DeactivateUser_WhenSelfDeactivation_ReturnsBusinessRuleFailure()
     {
         User user = MakeUser();
-        _userRepo.GetByIdAsync(user.Id, TenantId).Returns(user);
+        _userRepo.GetByIdAsync(user.Id, WorkspaceId).Returns(user);
 
         Result result = await CreateHandler().Handle(
-            new DeactivateUserCommand(user.Id, TenantId, user.Id),
+            new DeactivateUserCommand(user.Id, WorkspaceId, user.Id),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -79,13 +79,13 @@ public class DeactivateUserHandlerTests
     public async Task DeactivateUser_WhenLastAdmin_ReturnsBusinessRuleFailure()
     {
         User target = MakeUser();
-        TenantMembership membership = MakeMembership(target.Id, _adminRole.Id);
-        _userRepo.GetByIdAsync(target.Id, TenantId).Returns(target);
-        _membershipRepo.GetByUserAndTenantAsync(target.Id, TenantId).Returns(membership);
-        _membershipRepo.CountAdminsAsync(TenantId, _adminRole.Id).Returns(1);
+        WorkspaceMembership membership = MakeMembership(target.Id, _adminRole.Id);
+        _userRepo.GetByIdAsync(target.Id, WorkspaceId).Returns(target);
+        _membershipRepo.GetByUserAndWorkspaceAsync(target.Id, WorkspaceId).Returns(membership);
+        _membershipRepo.CountAdminsAsync(WorkspaceId, _adminRole.Id).Returns(1);
 
         Result result = await CreateHandler().Handle(
-            new DeactivateUserCommand(target.Id, TenantId, RequesterId),
+            new DeactivateUserCommand(target.Id, WorkspaceId, RequesterId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -96,10 +96,10 @@ public class DeactivateUserHandlerTests
     [Fact]
     public async Task DeactivateUser_WhenUserNotFound_ReturnsNotFound()
     {
-        _userRepo.GetByIdAsync(Arg.Any<Guid>(), TenantId).ReturnsNull();
+        _userRepo.GetByIdAsync(Arg.Any<Guid>(), WorkspaceId).ReturnsNull();
 
         Result result = await CreateHandler().Handle(
-            new DeactivateUserCommand(Guid.NewGuid(), TenantId, RequesterId),
+            new DeactivateUserCommand(Guid.NewGuid(), WorkspaceId, RequesterId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -111,13 +111,13 @@ public class DeactivateUserHandlerTests
     public async Task DeactivateUser_WhenAdminRoleMissing_ReturnsNotFound()
     {
         User target = MakeUser();
-        TenantMembership membership = MakeMembership(target.Id);
-        _userRepo.GetByIdAsync(target.Id, TenantId).Returns(target);
-        _membershipRepo.GetByUserAndTenantAsync(target.Id, TenantId).Returns(membership);
-        _roleRepo.GetByNameAsync("Admin", TenantId, Arg.Any<CancellationToken>()).Returns((Role?)null);
+        WorkspaceMembership membership = MakeMembership(target.Id);
+        _userRepo.GetByIdAsync(target.Id, WorkspaceId).Returns(target);
+        _membershipRepo.GetByUserAndWorkspaceAsync(target.Id, WorkspaceId).Returns(membership);
+        _roleRepo.GetByNameAsync("Admin", WorkspaceId, Arg.Any<CancellationToken>()).Returns((Role?)null);
 
         Result result = await CreateHandler().Handle(
-            new DeactivateUserCommand(target.Id, TenantId, RequesterId),
+            new DeactivateUserCommand(target.Id, WorkspaceId, RequesterId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -126,14 +126,14 @@ public class DeactivateUserHandlerTests
     }
 
     [Fact]
-    public async Task DeactivateUser_WhenUserBelongsToAnotherTenant_ReturnsNotFound()
+    public async Task DeactivateUser_WhenUserBelongsToAnotherWorkspace_ReturnsNotFound()
     {
         User target = MakeUser();
-        _userRepo.GetByIdAsync(target.Id, TenantId).Returns(target);
+        _userRepo.GetByIdAsync(target.Id, WorkspaceId).Returns(target);
 
-        Guid otherTenantId = Guid.NewGuid();
+        Guid otherWorkspaceId = Guid.NewGuid();
         Result result = await CreateHandler().Handle(
-            new DeactivateUserCommand(target.Id, otherTenantId, RequesterId),
+            new DeactivateUserCommand(target.Id, otherWorkspaceId, RequesterId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

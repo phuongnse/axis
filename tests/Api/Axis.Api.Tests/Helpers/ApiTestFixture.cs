@@ -8,13 +8,14 @@ using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.ValueObjects;
 using Axis.Identity.Infrastructure.Persistence;
 using Axis.Identity.Infrastructure.Services;
-using Axis.Shared.Application.Tenancy;
-using Axis.Shared.Infrastructure.Tenancy;
+using Axis.Shared.Application.Workspaces;
+using Axis.Shared.Infrastructure.Workspaces;
 using Axis.Testing;
 using Axis.WorkflowBuilder.Contracts.Grpc;
 using Axis.WorkflowBuilder.Infrastructure.Persistence;
 using Axis.WorkflowEngine.Infrastructure.Persistence;
 using Grpc.Net.ClientFactory;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -53,6 +54,9 @@ public sealed class ApiTestFixture : IAsyncLifetime
     private readonly RabbitMqContainer _rabbitMq = new RabbitMqBuilder()
         .WithImage("rabbitmq:3.13-management-alpine")
         .Build();
+
+    private readonly DirectoryInfo _dataProtectionKeysDirectory = new(
+        Path.Combine(Path.GetTempPath(), "axis-api-tests", Guid.NewGuid().ToString("N"), "data-protection-keys"));
 
     private string? _previousIdentityConnectionStringEnv;
     private string? _previousDataModelingConnectionStringEnv;
@@ -128,16 +132,16 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
         await PostgresModuleTestDatabase.MigrateAsync<DataModelingDbContext>(
             _dataModelingConnectionString,
-            opts => new DataModelingDbContext(opts, new PublicSchemaTenantContext()));
+            opts => new DataModelingDbContext(opts, new PublicSchemaWorkspaceContext()));
         await PostgresModuleTestDatabase.MigrateAsync<WorkflowBuilderDbContext>(
             _workflowBuilderConnectionString,
-            opts => new WorkflowBuilderDbContext(opts, new PublicSchemaTenantContext()));
+            opts => new WorkflowBuilderDbContext(opts, new PublicSchemaWorkspaceContext()));
         await PostgresModuleTestDatabase.MigrateAsync<FormBuilderDbContext>(
             _formBuilderConnectionString,
-            opts => new FormBuilderDbContext(opts, new PublicSchemaTenantContext()));
+            opts => new FormBuilderDbContext(opts, new PublicSchemaWorkspaceContext()));
         await PostgresModuleTestDatabase.MigrateAsync<WorkflowEngineDbContext>(
             _workflowEngineConnectionString,
-            opts => new WorkflowEngineDbContext(opts, new PublicSchemaTenantContext()));
+            opts => new WorkflowEngineDbContext(opts, new PublicSchemaWorkspaceContext()));
 
         await _redis.StartAsync();
         await _rabbitMq.StartAsync();
@@ -147,6 +151,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", _rabbitMq.GetConnectionString());
 
         AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
+        _dataProtectionKeysDirectory.Create();
 
         WebApplicationFactory<Program> factory = null!;
         Lazy<HttpMessageHandler> grpcTestServerHandler =
@@ -174,6 +179,10 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
             builder.ConfigureTestServices(services =>
             {
+                services.AddDataProtection()
+                    .PersistKeysToFileSystem(_dataProtectionKeysDirectory)
+                    .SetApplicationName("Axis.Api.Tests");
+
                 services.RemoveAll<FormModelReferenceService.FormModelReferenceServiceClient>();
                 services.AddGrpcClient<FormModelReferenceService.FormModelReferenceServiceClient>(options =>
                 {
@@ -207,8 +216,8 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.AddSingleton<IEmailSender>(_emailCapture);
                 services.RemoveAll<IAvatarStorageService>();
                 services.AddScoped<IAvatarStorageService, NullAvatarStorageService>();
-                services.RemoveAll<ITenantLogoStorageService>();
-                services.AddScoped<ITenantLogoStorageService, NullTenantLogoStorageService>();
+                services.RemoveAll<IWorkspaceLogoStorageService>();
+                services.AddScoped<IWorkspaceLogoStorageService, NullWorkspaceLogoStorageService>();
 
                 services.RemoveAll<IUnitOfWork>();
                 services.AddScoped<IUnitOfWork>(sp =>
@@ -255,6 +264,11 @@ public sealed class ApiTestFixture : IAsyncLifetime
             await _factory.DisposeAsync();
         }
 
+        if (_dataProtectionKeysDirectory.Exists)
+        {
+            _dataProtectionKeysDirectory.Delete(recursive: true);
+        }
+
         await _postgres.DisposeAsync();
         await _redis.DisposeAsync();
         await _kafka.DisposeAsync();
@@ -276,11 +290,11 @@ public sealed class ApiTestFixture : IAsyncLifetime
         AllowAutoRedirect = false,
     });
 
-    public async Task EnsureTenantProvisionedAsync(string adminEmail)
+    public async Task EnsureWorkspaceProvisionedAsync(string adminEmail)
     {
         Email email = Email.Create(adminEmail).Value!;
 
-        Guid tenantId;
+        Guid workspaceId;
         await using (IdentityDbContext identityContext = new(
                          new DbContextOptionsBuilder<IdentityDbContext>()
                              .UseNpgsql(_identityConnectionString)
@@ -289,53 +303,56 @@ public sealed class ApiTestFixture : IAsyncLifetime
         {
             User user = await identityContext.Users
                 .SingleAsync(u => u.Email == email);
-            TenantMembership membership = await identityContext.TenantMemberships
-                .SingleAsync(m => m.UserId == user.Id);
-            tenantId = membership.tenantId;
+            workspaceId = await (
+                from membership in identityContext.WorkspaceMemberships
+                join workspace in identityContext.Workspaces on membership.workspaceId equals workspace.Id
+                where membership.UserId == user.Id && workspace.Type == WorkspaceType.Team
+                select workspace.Id)
+                .SingleAsync();
         }
 
-        await EnsureModuleSchemasAsync(tenantId);
-        await EnsureDataModelingTablesAsync(tenantId);
+        await EnsureModuleSchemasAsync(workspaceId);
+        await EnsureDataModelingTablesAsync(workspaceId);
 
         await using IdentityDbContext finalizeContext = new(
             new DbContextOptionsBuilder<IdentityDbContext>()
                 .UseNpgsql(_identityConnectionString)
                 .UseOpenIddict()
                 .Options);
-        Tenant Tenant = await finalizeContext.Tenants
-            .SingleAsync(o => o.Id == tenantId);
-        if (Tenant.Status == TenantStatus.Provisioning)
+        Workspace Workspace = await finalizeContext.Workspaces
+            .SingleAsync(o => o.Id == workspaceId);
+        if (Workspace.Status == WorkspaceStatus.Provisioning)
         {
-            Tenant.CompleteProvisioning();
+            Workspace.CompleteProvisioning();
             await finalizeContext.SaveChangesAsync();
         }
     }
 
-    private async Task EnsureModuleSchemasAsync(Guid tenantId)
+    private async Task EnsureModuleSchemasAsync(Guid workspaceId)
     {
-        string schema = $"tenant_{tenantId:N}";
-        await EnsureTenantSchemaExistsAsync(_dataModelingConnectionString, schema);
+        string schema = $"workspace_{workspaceId:N}";
+        await EnsureWorkspaceSchemaExistsAsync(_dataModelingConnectionString, schema);
         await PostgresModuleTestDatabase.MigrateAsync<DataModelingDbContext>(
             _dataModelingConnectionString,
-            opts => new DataModelingDbContext(opts, new FixedTenantContext(tenantId)));
+            opts => new DataModelingDbContext(opts, new FixedWorkspaceContext(workspaceId)));
 
-        await EnsureTenantSchemaExistsAsync(_workflowBuilderConnectionString, schema);
+        await EnsureWorkspaceSchemaExistsAsync(_workflowBuilderConnectionString, schema);
         await PostgresModuleTestDatabase.MigrateAsync<WorkflowBuilderDbContext>(
             _workflowBuilderConnectionString,
-            opts => new WorkflowBuilderDbContext(opts, new FixedTenantContext(tenantId)));
+            opts => new WorkflowBuilderDbContext(opts, new FixedWorkspaceContext(workspaceId)));
 
-        await EnsureTenantSchemaExistsAsync(_formBuilderConnectionString, schema);
+        await EnsureWorkspaceSchemaExistsAsync(_formBuilderConnectionString, schema);
         await PostgresModuleTestDatabase.MigrateAsync<FormBuilderDbContext>(
             _formBuilderConnectionString,
-            opts => new FormBuilderDbContext(opts, new FixedTenantContext(tenantId)));
+            opts => new FormBuilderDbContext(opts, new FixedWorkspaceContext(workspaceId)));
 
-        await EnsureTenantSchemaExistsAsync(_workflowEngineConnectionString, schema);
+        await EnsureWorkspaceSchemaExistsAsync(_workflowEngineConnectionString, schema);
         await PostgresModuleTestDatabase.MigrateAsync<WorkflowEngineDbContext>(
             _workflowEngineConnectionString,
-            opts => new WorkflowEngineDbContext(opts, new FixedTenantContext(tenantId)));
+            opts => new WorkflowEngineDbContext(opts, new FixedWorkspaceContext(workspaceId)));
     }
 
-    private static async Task EnsureTenantSchemaExistsAsync(string connectionString, string schema)
+    private static async Task EnsureWorkspaceSchemaExistsAsync(string connectionString, string schema)
     {
         await using NpgsqlConnection connection = new(connectionString);
         await connection.OpenAsync();
@@ -344,9 +361,9 @@ public sealed class ApiTestFixture : IAsyncLifetime
         await createSchema.ExecuteNonQueryAsync();
     }
 
-    private async Task EnsureDataModelingTablesAsync(Guid tenantId)
+    private async Task EnsureDataModelingTablesAsync(Guid workspaceId)
     {
-        string schema = $"tenant_{tenantId:N}";
+        string schema = $"workspace_{workspaceId:N}";
         for (int attempt = 1; attempt <= 3; attempt++)
         {
             await using NpgsqlConnection connection = new(_dataModelingConnectionString);
@@ -365,11 +382,11 @@ public sealed class ApiTestFixture : IAsyncLifetime
             if (scalar is bool exists && exists)
                 return;
 
-            await EnsureModuleSchemasAsync(tenantId);
+            await EnsureModuleSchemasAsync(workspaceId);
         }
 
         throw new InvalidOperationException(
-            $"Tenant schema '{schema}' is missing data_records table after repeated migration attempts.");
+            $"Workspace schema '{schema}' is missing data_records table after repeated migration attempts.");
     }
 
     private static async Task SeedTestOpenIddictClientsAsync(IServiceProvider services)
@@ -423,9 +440,9 @@ public sealed class ApiTestFixture : IAsyncLifetime
     }
 }
 
-internal sealed class PublicSchemaTenantContext : ITenantContext
+internal sealed class PublicSchemaWorkspaceContext : IWorkspaceContext
 {
-    public Guid tenantId => Guid.Empty;
+    public Guid workspaceId => Guid.Empty;
     public string SchemaName => "public";
 }
 

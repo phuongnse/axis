@@ -4,20 +4,20 @@
 
 ## Purpose
 
-See all models in my Tenant so that I can understand the data available to me.
+See all models in my Workspace so that I can understand the data available to me.
 
 ## Primary actor
 
-- Tenant Member with `data_modeling:model:read`
+- Workspace Member with `data_modeling:model:read`
 
 ## Trigger
 
-- User initiates: see all models in my Tenant
+- User initiates: see all models in my Workspace
 
 ## Main flow
 
 1. Actor starts the — View all models flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
@@ -26,7 +26,7 @@ See all models in my Tenant so that I can understand the data available to me.
 
 ## Context
 
-Users can create custom data models within their Tenant. A model defines the structure of a type of business object. All model metadata is stored in the tenant schema; actual records use a JSONB-backed storage strategy.
+Users can create custom data models within their Workspace. A model defines the structure of a type of business object. All model metadata is stored in the workspace schema; actual records use a JSONB-backed storage strategy.
 
 ## Acceptance Criteria
 
@@ -40,7 +40,7 @@ Users can create custom data models within their Tenant. A model defines the str
 - [ ] Users without `data_modeling:model:read` who navigate to this URL are redirected to home with a permission error.
 
 *Edge cases*
-- [ ] If the tenant has no models yet, the list shows an empty state with a "Create your first model" CTA.
+- [ ] If the workspace has no models yet, the list shows an empty state with a "Create your first model" CTA.
 - [ ] Record count may be slightly behind real-time (cached with 1-minute TTL) to avoid expensive COUNT queries on every list load.
 
 *Out of scope*

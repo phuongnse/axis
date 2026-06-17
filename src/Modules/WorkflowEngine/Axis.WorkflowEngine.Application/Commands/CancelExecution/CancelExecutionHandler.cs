@@ -15,7 +15,7 @@ public sealed class CancelExecutionHandler(
     public async Task<Result> Handle(CancelExecutionCommand command, CancellationToken cancellationToken)
     {
         WorkflowExecution? execution = await execRepo.GetByIdAsync(
-            command.ExecutionId, command.tenantId, cancellationToken);
+            command.ExecutionId, command.workspaceId, cancellationToken);
         if (execution is null)
             return Result.Failure(ErrorCodes.NotFound, "Execution not found.");
 

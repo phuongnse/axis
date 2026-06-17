@@ -14,9 +14,9 @@ internal sealed class MailKitEmailSender(IConfiguration configuration) : IEmailS
         await SendAsync(toEmail, subject, body, ct);
     }
 
-    public async Task SendInvitationEmailAsync(string toEmail, string tenantName, string invitationToken, CancellationToken ct = default)
+    public async Task SendInvitationEmailAsync(string toEmail, string workspaceName, string invitationToken, CancellationToken ct = default)
     {
-        string subject = $"You've been invited to join {tenantName} on Axis";
+        string subject = $"You've been invited to join {workspaceName} on Axis";
         string body = $"Click the link to accept your invitation: {GetBaseUrl()}/invitations/accept?token={invitationToken}";
         await SendAsync(toEmail, subject, body, ct);
     }
@@ -35,14 +35,14 @@ internal sealed class MailKitEmailSender(IConfiguration configuration) : IEmailS
         await SendAsync(toEmail, subject, body, ct);
     }
 
-    public async Task SendTenantDeletionScheduledEmailAsync(
+    public async Task SendWorkspaceDeletionScheduledEmailAsync(
         string toEmail,
-        string TenantName,
+        string WorkspaceName,
         CancellationToken ct = default)
     {
-        string subject = $"Deletion scheduled for {TenantName}";
+        string subject = $"Deletion scheduled for {WorkspaceName}";
         string body =
-            "Your Tenant has been scheduled for deletion. All data will be permanently removed in 30 days.";
+            "Your Workspace has been scheduled for deletion. All data will be permanently removed in 30 days.";
         await SendAsync(toEmail, subject, body, ct);
     }
 

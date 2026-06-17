@@ -8,7 +8,7 @@ Route my workflow down different paths based on a condition so that different sc
 
 ## Primary actor
 
-- Tenant Member
+- Workspace Member
 
 ## Trigger
 
@@ -17,7 +17,7 @@ Route my workflow down different paths based on a condition so that different sc
 ## Main flow
 
 1. Actor starts the — Add an if/else branch flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows

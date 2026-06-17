@@ -8,5 +8,5 @@ public sealed class GetExecutionHandler(IExecutionRepository execRepo)
     : IQueryHandler<GetExecutionQuery, ExecutionResponse?>
 {
     public async Task<ExecutionResponse?> Handle(GetExecutionQuery query, CancellationToken cancellationToken)
-        => await execRepo.GetWithStepsAsync(query.ExecutionId, query.tenantId, cancellationToken);
+        => await execRepo.GetWithStepsAsync(query.ExecutionId, query.workspaceId, cancellationToken);
 }

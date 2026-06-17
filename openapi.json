@@ -10,7 +10,7 @@
         "tags": [
           "DataModeling"
         ],
-        "summary": "List all data models for the tenant",
+        "summary": "List all data models for the workspace",
         "operationId": "GetModels",
         "parameters": [
           {
@@ -689,7 +689,7 @@
         "tags": [
           "DataModeling"
         ],
-        "summary": "List all data classes for the tenant",
+        "summary": "List all data classes for the workspace",
         "operationId": "GetDataClasses",
         "parameters": [
           {
@@ -1822,7 +1822,7 @@
         "tags": [
           "FormBuilder"
         ],
-        "summary": "List all forms for the tenant (paginated)",
+        "summary": "List all forms for the workspace (paginated)",
         "operationId": "GetForms",
         "parameters": [
           {
@@ -2710,6 +2710,65 @@
         ]
       }
     },
+    "/api/auth/switch-workspace": {
+      "post": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Switch the active workspace for the next PKCE token exchange",
+        "operationId": "SwitchWorkspace",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SwitchWorkspaceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
     "/api/auth/verify-email": {
       "post": {
         "tags": [
@@ -2756,7 +2815,7 @@
         "tags": [
           "Identity"
         ],
-        "summary": "Poll tenant provisioning progress after email verification",
+        "summary": "Poll workspace provisioning progress after email verification",
         "operationId": "GetProvisioningStatus",
         "parameters": [
           {
@@ -2790,8 +2849,8 @@
         "tags": [
           "Identity"
         ],
-        "summary": "Manually re-queue tenant provisioning after automatic retries are exhausted",
-        "operationId": "RetryTenantProvisioning",
+        "summary": "Manually re-queue workspace provisioning after automatic retries are exhausted",
+        "operationId": "RetryWorkspaceProvisioning",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2938,16 +2997,16 @@
         }
       }
     },
-    "/api/tenants/slug-preview": {
+    "/api/workspaces/slug-preview": {
       "get": {
         "tags": [
           "Identity"
         ],
-        "summary": "Preview tenant URL slug from a proposed name",
-        "operationId": "GetTenantSlugPreview",
+        "summary": "Preview workspace URL slug from a proposed name",
+        "operationId": "GetWorkspaceSlugPreview",
         "parameters": [
           {
-            "name": "tenantName",
+            "name": "workspaceName",
             "in": "query",
             "required": true,
             "schema": {
@@ -2961,7 +3020,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TenantSlugPreviewDto"
+                  "$ref": "#/components/schemas/WorkspaceSlugPreviewDto"
                 }
               }
             }
@@ -2969,18 +3028,18 @@
         }
       }
     },
-    "/api/tenants": {
+    "/api/workspaces": {
       "post": {
         "tags": [
           "Identity"
         ],
-        "summary": "Register a new tenant contact for verification",
-        "operationId": "RegisterTenant",
+        "summary": "Register a new workspace contact for verification",
+        "operationId": "RegisterWorkspace",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RegisterTenantRequest"
+                "$ref": "#/components/schemas/RegisterWorkspaceRequest"
               }
             }
           },
@@ -3020,12 +3079,12 @@
         }
       }
     },
-    "/api/tenants/me/invitations": {
+    "/api/workspaces/me/invitations": {
       "post": {
         "tags": [
           "Identity"
         ],
-        "summary": "Invite a user to the tenant by email",
+        "summary": "Invite a user to the workspace by email",
         "operationId": "InviteUser",
         "requestBody": {
           "content": {
@@ -3106,20 +3165,20 @@
         ]
       }
     },
-    "/api/tenants/current/settings": {
+    "/api/workspaces/current/settings": {
       "get": {
         "tags": [
           "Identity"
         ],
-        "summary": "Get tenant settings and usage stats",
-        "operationId": "GetTenantSettings",
+        "summary": "Get workspace settings and usage stats",
+        "operationId": "GetWorkspaceSettings",
         "responses": {
           "200": {
             "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TenantSettingsDto"
+                  "$ref": "#/components/schemas/WorkspaceSettingsDto"
                 }
               }
             }
@@ -3162,18 +3221,18 @@
         ]
       }
     },
-    "/api/tenants/current/profile": {
+    "/api/workspaces/current/profile": {
       "put": {
         "tags": [
           "Identity"
         ],
-        "summary": "Update tenant profile (name, timezone, language, logo)",
-        "operationId": "UpdateTenantProfile",
+        "summary": "Update workspace profile (name, timezone, language, logo)",
+        "operationId": "UpdateWorkspaceProfile",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateTenantProfileRequest"
+                "$ref": "#/components/schemas/UpdateWorkspaceProfileRequest"
               }
             }
           },
@@ -3231,18 +3290,18 @@
         ]
       }
     },
-    "/api/tenants/current/deletion": {
+    "/api/workspaces/current/deletion": {
       "post": {
         "tags": [
           "Identity"
         ],
-        "summary": "Schedule tenant for deletion after a 30-day grace period",
-        "operationId": "ScheduleTenantDeletion",
+        "summary": "Schedule workspace for deletion after a 30-day grace period",
+        "operationId": "ScheduleWorkspaceDeletion",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ScheduleTenantDeletionRequest"
+                "$ref": "#/components/schemas/ScheduleWorkspaceDeletionRequest"
               }
             }
           },
@@ -3293,8 +3352,8 @@
         "tags": [
           "Identity"
         ],
-        "summary": "Cancel a scheduled tenant deletion",
-        "operationId": "CancelTenantDeletion",
+        "summary": "Cancel a scheduled workspace deletion",
+        "operationId": "CancelWorkspaceDeletion",
         "responses": {
           "204": {
             "description": "No Content"
@@ -3457,7 +3516,7 @@
         "tags": [
           "Identity"
         ],
-        "summary": "Register a user account standalone or with a tenant setup token",
+        "summary": "Register a user account standalone or with a workspace setup token",
         "operationId": "RegisterUser",
         "requestBody": {
           "content": {
@@ -3935,7 +3994,7 @@
         "tags": [
           "Identity"
         ],
-        "summary": "List all roles for the tenant",
+        "summary": "List all roles for the workspace",
         "operationId": "GetRoles",
         "parameters": [
           {
@@ -4177,16 +4236,16 @@
         }
       }
     },
-    "/api/platform/tenants/{tenantId}/plan": {
+    "/api/platform/workspaces/{workspaceId}/plan": {
       "put": {
         "tags": [
           "Platform"
         ],
-        "summary": "Platform admin: change a tenant's subscription plan",
-        "operationId": "ChangeTenantPlan",
+        "summary": "Platform admin: change a workspace's subscription plan",
+        "operationId": "ChangeWorkspacePlan",
         "parameters": [
           {
-            "name": "tenantId",
+            "name": "workspaceId",
             "in": "path",
             "required": true,
             "schema": {
@@ -4199,7 +4258,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ChangeTenantPlanRequest"
+                "$ref": "#/components/schemas/ChangeWorkspacePlanRequest"
               }
             }
           },
@@ -4259,7 +4318,7 @@
         "tags": [
           "WorkflowBuilder"
         ],
-        "summary": "List workflow definitions for the tenant (paginated)",
+        "summary": "List workflow definitions for the workspace (paginated)",
         "operationId": "GetWorkflows",
         "parameters": [
           {
@@ -5653,7 +5712,7 @@
         "tags": [
           "WorkflowEngine"
         ],
-        "summary": "List workflow executions for the tenant (paginated)",
+        "summary": "List workflow executions for the workspace (paginated)",
         "operationId": "GetAllExecutions",
         "parameters": [
           {
@@ -6438,7 +6497,7 @@
         },
         "additionalProperties": false
       },
-      "ChangeTenantPlanRequest": {
+      "ChangeWorkspacePlanRequest": {
         "type": "object",
         "properties": {
           "planId": {
@@ -6579,7 +6638,7 @@
           "isActive": {
             "type": "boolean"
           },
-          "tenantId": {
+          "workspaceId": {
             "type": "string",
             "format": "uuid",
             "nullable": true
@@ -6588,6 +6647,12 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "workspaces": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserWorkspaceDto"
             }
           }
         },
@@ -7343,11 +7408,11 @@
       "ProvisioningStatusDto": {
         "type": "object",
         "properties": {
-          "tenantId": {
+          "workspaceId": {
             "type": "string",
             "format": "uuid"
           },
-          "tenantStatus": {
+          "workspaceStatus": {
             "type": "string"
           },
           "isReady": {
@@ -7418,29 +7483,6 @@
         },
         "additionalProperties": false
       },
-      "RegisterTenantRequest": {
-        "type": "object",
-        "properties": {
-          "tenantName": {
-            "type": "string"
-          },
-          "tenantContactEmail": {
-            "type": "string"
-          },
-          "acceptedTermsVersion": {
-            "type": "string"
-          },
-          "acceptedPrivacyVersion": {
-            "type": "string"
-          },
-          "subscriptionPlanId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
       "RegisterUserRequest": {
         "type": "object",
         "properties": {
@@ -7465,8 +7507,31 @@
           "acceptedPrivacyVersion": {
             "type": "string"
           },
-          "tenantSetupToken": {
+          "workspaceSetupToken": {
             "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RegisterWorkspaceRequest": {
+        "type": "object",
+        "properties": {
+          "workspaceName": {
+            "type": "string"
+          },
+          "workspaceContactEmail": {
+            "type": "string"
+          },
+          "acceptedTermsVersion": {
+            "type": "string"
+          },
+          "acceptedPrivacyVersion": {
+            "type": "string"
+          },
+          "subscriptionPlanId": {
+            "type": "string",
+            "format": "uuid",
             "nullable": true
           }
         },
@@ -7583,7 +7648,7 @@
         },
         "additionalProperties": false
       },
-      "ScheduleTenantDeletionRequest": {
+      "ScheduleWorkspaceDeletionRequest": {
         "type": "object",
         "properties": {
           "confirmationName": {
@@ -7722,57 +7787,12 @@
         },
         "additionalProperties": false
       },
-      "TenantSettingsDto": {
+      "SwitchWorkspaceRequest": {
         "type": "object",
         "properties": {
-          "tenantId": {
+          "workspaceId": {
             "type": "string",
             "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "slug": {
-            "type": "string"
-          },
-          "logoUrl": {
-            "type": "string",
-            "nullable": true
-          },
-          "planName": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "timeZoneId": {
-            "type": "string",
-            "nullable": true
-          },
-          "defaultLanguage": {
-            "type": "string",
-            "nullable": true
-          },
-          "scheduledHardDeleteAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "usage": {
-            "$ref": "#/components/schemas/UsageStatsDto"
-          }
-        },
-        "additionalProperties": false
-      },
-      "TenantSlugPreviewDto": {
-        "type": "object",
-        "properties": {
-          "slug": {
-            "type": "string"
           }
         },
         "additionalProperties": false
@@ -7937,7 +7957,20 @@
         },
         "additionalProperties": false
       },
-      "UpdateTenantProfileRequest": {
+      "UpdateWorkflowRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateWorkspaceProfileRequest": {
         "type": "object",
         "properties": {
           "name": {
@@ -7956,19 +7989,6 @@
             "nullable": true
           },
           "logoContentType": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "UpdateWorkflowRequest": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "description": {
             "type": "string",
             "nullable": true
           }
@@ -8031,6 +8051,28 @@
         },
         "additionalProperties": false
       },
+      "UserWorkspaceDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "isCurrent": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "VerifyEmailNextStep": {
         "enum": [
           "Dashboard",
@@ -8057,7 +8099,7 @@
           "nextStep": {
             "$ref": "#/components/schemas/VerifyEmailNextStep"
           },
-          "tenantSetupToken": {
+          "workspaceSetupToken": {
             "type": "string",
             "nullable": true
           }
@@ -8249,6 +8291,61 @@
           },
           "isBroken": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkspaceSettingsDto": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "logoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "planName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "timeZoneId": {
+            "type": "string",
+            "nullable": true
+          },
+          "defaultLanguage": {
+            "type": "string",
+            "nullable": true
+          },
+          "scheduledHardDeleteAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "usage": {
+            "$ref": "#/components/schemas/UsageStatsDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkspaceSlugPreviewDto": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
           }
         },
         "additionalProperties": false

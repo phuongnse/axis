@@ -12,7 +12,7 @@ public sealed class BulkExportWorkflowsHandler(IWorkflowRepository workflowRepo)
         BulkExportWorkflowsCommand command, CancellationToken cancellationToken)
     {
         IReadOnlyList<WorkflowDefinition> workflows =
-            await workflowRepo.GetAllAsync(command.tenantId, cancellationToken);
+            await workflowRepo.GetAllAsync(command.workspaceId, cancellationToken);
 
         return workflows.Select(ExportWorkflowHandler.ToExportDto).ToList();
     }

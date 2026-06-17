@@ -4,5 +4,5 @@ namespace Axis.Identity.Domain.Events;
 
 public record RoleUpdated(
     Guid RoleId,
-    Guid tenantId,
+    Guid workspaceId,
     string Name) : IDomainEvent;

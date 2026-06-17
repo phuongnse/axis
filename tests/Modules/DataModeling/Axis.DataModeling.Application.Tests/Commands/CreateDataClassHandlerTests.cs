@@ -12,7 +12,7 @@ public class CreateDataClassHandlerTests
     private readonly IDataClassRepository _dataClassRepo = Substitute.For<IDataClassRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     private CreateDataClassHandler CreateHandler() => new(_dataClassRepo, _uow);
@@ -20,10 +20,10 @@ public class CreateDataClassHandlerTests
     [Fact]
     public async Task CreateDataClass_WhenNameIsUnique_CreatesDataClassAndReturnsId()
     {
-        _dataClassRepo.NameExistsAsync("Address", TenantId).Returns(false);
+        _dataClassRepo.NameExistsAsync("Address", WorkspaceId).Returns(false);
 
         Result<Guid> result = await CreateHandler().Handle(
-            new CreateDataClassCommand("Address", "Postal address", TenantId, UserId),
+            new CreateDataClassCommand("Address", "Postal address", WorkspaceId, UserId),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -38,10 +38,10 @@ public class CreateDataClassHandlerTests
     [Fact]
     public async Task CreateDataClass_WhenNameIsDuplicate_ReturnsConflict()
     {
-        _dataClassRepo.NameExistsAsync("Address", TenantId).Returns(true);
+        _dataClassRepo.NameExistsAsync("Address", WorkspaceId).Returns(true);
 
         Result<Guid> result = await CreateHandler().Handle(
-            new CreateDataClassCommand("Address", null, TenantId, UserId),
+            new CreateDataClassCommand("Address", null, WorkspaceId, UserId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

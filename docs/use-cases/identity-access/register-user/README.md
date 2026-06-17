@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Register my standalone user identity with email/password so that I can use Axis as an individual before creating or joining a tenant.
+Register my standalone user identity with email/password so that I can use Axis as an individual before creating or joining a team workspace.
 
 ## Primary actor
 
@@ -12,14 +12,14 @@ Register my standalone user identity with email/password so that I can use Axis 
 
 ## Trigger
 
-- User opens self-service registration without a tenant context.
+- User opens self-service registration without a workspace context.
 
 ## Main flow
 
 1. User opens the registration page.
 2. User enters full name, email, password, password confirmation, and accepts the current user-level Terms of Service / Privacy Policy.
 3. System verifies that the user identity is unique and the password satisfies the policy.
-4. System creates the standalone user account with no Tenant membership and sends an email verification link.
+4. System creates the standalone user account, creates the user's personal workspace membership, and sends an email verification link.
 5. User opens the verification link.
 6. System verifies the user email, establishes the Axis/OpenIddict sign-in session, and routes the user to the dashboard.
 
@@ -31,18 +31,18 @@ Register my standalone user identity with email/password so that I can use Axis 
 
 ## Context
 
-This use case owns the smallest complete user identity onboarding path: a person creates a standalone Axis account with email/password, verifies the email address, and reaches their dashboard without any Tenant context.
+This use case owns the smallest complete user identity onboarding path: a person creates a standalone Axis account with email/password, gets a personal workspace, verifies the email address, and reaches their dashboard without any team or setup-token context.
 
-Tenant membership is intentionally outside this use case. A user can later create or join a tenant through Tenant-specific flows. First-owner setup after [register-tenant](../../platform-foundation/register-tenant/) is a separate setup-token handoff owned by the tenant onboarding journey, not by this standalone registration definition.
+Team membership is intentionally outside this use case. A user can later create or join a team workspace through Workspace-specific flows. First-owner setup after [register-workspace](../../platform-foundation/register-workspace/) is a separate setup-token handoff owned by the team workspace onboarding journey, not by this standalone registration definition.
 
-Third-party identity providers authenticate an individual user and can be linked to that user account in a separate provider-registration/linking use case. They do not prove ownership of a tenant; tenant onboarding remains in [register-tenant](../../platform-foundation/register-tenant/).
+Third-party identity providers authenticate an individual user and can be linked to that user account in a separate provider-registration/linking use case. They do not prove ownership of a workspace; workspace onboarding remains in [register-workspace](../../platform-foundation/register-workspace/).
 
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] User registration can be started without any Tenant context.
+- [ ] User registration can be started without any team/setup context.
 - [ ] User can register with email/password.
-- [ ] A standalone registration creates a `User` without requiring a tenant membership.
+- [ ] A standalone registration creates a `User` with a personal workspace membership and without requiring a team workspace membership.
 - [ ] Registration sends an email verification link.
 - [ ] After successful email verification, the user is signed in through Axis/OpenIddict and redirected to the dashboard.
 
@@ -50,7 +50,7 @@ Third-party identity providers authenticate an individual user and can be linked
 - [ ] Email: required, valid email format, unique across Axis users.
 - [ ] Password path: password is required, minimum 15 characters, max 128 characters, and common or predictable passwords are rejected.
 - [ ] Password confirmation must match password exactly.
-- [ ] Missing Tenant context is accepted for standalone registration.
+- [ ] Missing team/setup context is accepted for standalone registration.
 - [ ] All field-level errors are shown inline, not as a global toast.
 - [ ] If the API returns a server error (5xx), the form shows a generic "Something went wrong, please try again" message and the submit button re-enables.
 - [ ] Expired, invalid, rate-limited, and already-used verification links show clear user-facing states.
@@ -58,19 +58,19 @@ Third-party identity providers authenticate an individual user and can be linked
 *Edge cases*
 - [ ] Multiple rapid submissions are deduplicated with an idempotency key.
 - [ ] Pasting a password with leading/trailing spaces is accepted as-is.
-- [ ] A standalone user can later create or join a tenant without re-registering.
+- [ ] A standalone user can later create or join a team workspace without re-registering.
 
 *Out of scope*
-- Creating a new Tenant; see [register-tenant](../../platform-foundation/register-tenant/).
-- Registering from a first-owner setup token; that handoff belongs to [register-tenant](../../platform-foundation/register-tenant/).
-- Invitation-token registration / joining a tenant; see [accept-invite](../accept-invite/) and [invite-user](../invite-user/).
+- Creating a new team workspace; see [register-workspace](../../platform-foundation/register-workspace/).
+- Registering from a first-owner setup token; that handoff belongs to [register-workspace](../../platform-foundation/register-workspace/).
+- Invitation-token registration / joining a workspace; see [accept-invite](../accept-invite/) and [invite-user](../invite-user/).
 - Microsoft / Google / GitHub registration and account linking ([ADR-027](../../../TECH_STACK.md#adr-027-external-identity-providers-for-user-sign-in-and-registration)).
-- Enterprise SAML/SCIM federation and per-tenant IdP configuration.
+- Enterprise SAML/SCIM federation and per-workspace IdP configuration.
 - CAPTCHA / bot protection.
 
 ## Wireframes
 
-User registration reuses the auth card system with email/password setup and field-level help text. Tenant context is not shown as a required field on the standalone registration screen.
+User registration reuses the auth card system with email/password setup and field-level help text. Team/setup context is not shown as a required field on the standalone registration screen.
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
@@ -90,7 +90,7 @@ sequenceDiagram
   User->>Web: Open standalone registration
   User->>Web: Submit email + password + legal acceptance
   Web->>API: POST /api/users/register
-  API->>API: Create standalone user
+  API->>API: Create standalone user + personal workspace
   API-->>Web: Check your email
   Web-->>User: Confirmation screen
   User->>Web: Open verification link
@@ -110,19 +110,13 @@ sequenceDiagram
 > | API | Done |
 > | Frontend | Done |
 >
-> **Implemented:** Email/password standalone registration is implemented at `POST /api/users/register`, including idempotency, current legal-version acceptance, email verification, post-verification PKCE session establishment, confirmation/resend states, and dashboard routing.
+> **Implemented:** Email/password standalone registration is implemented at `POST /api/users/register`, including idempotency, current legal-version acceptance, personal workspace creation, email verification, post-verification PKCE session establishment, confirmation/resend states, and dashboard routing. Personal workspace provisioning may run in the background, but the standalone user path never routes to the provisioning page.
 >
 > **Gaps vs spec:** none for standalone email/password registration.
 >
 > **Deferred follow-ups:**
 > - Microsoft / Google / GitHub providers are a separate provider registration/linking use case.
 > - Invitation-token registration belongs to invitation acceptance/join flows.
-> - Polished Tenant setup-token handoff remains with [register-tenant](../../platform-foundation/register-tenant/).
+> - Polished Workspace setup-token handoff remains with [register-workspace](../../platform-foundation/register-workspace/).
 >
-> **Decisions:** Providers belong to user identity only; they must never create a tenant directly. First-owner setup is part of tenant onboarding, not standalone registration.
->
-> **Gaps vs spec:**
-> - N/A
->
-> **Decisions:**
-> - N/A
+> **Decisions:** Providers belong to user identity only; they must never create a team workspace directly. First-owner setup is part of team workspace onboarding, not standalone registration.

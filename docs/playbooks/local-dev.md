@@ -2,7 +2,7 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← AGENTS.md](../../AGENTS.md)
 
-The full dev stack runs from one `docker compose up -d`: **Postgres**, **Redis**, **MailDev**, **LocalStack**, **Kafka** (KRaft), **Schema Registry**, **RabbitMQ**, **Vault** (dev mode), the **.NET API**, and the **Vite SPA**. Backend hot-reloads via `dotnet watch`; frontend hot-reloads via Vite. Source is bind-mounted — edit on the host, containers pick up changes.
+The full dev stack runs from one `docker compose up -d`: **Postgres**, **Redis**, **MailDev**, **LocalStack**, **Kafka** (KRaft), **Schema Registry**, **RabbitMQ**, **Vault** (dev mode), the **.NET API**, and the **Vite SPA**. The API runs in Docker via `dotnet run`; restart the `api` service after backend changes. Frontend hot-reloads via Vite. Source is bind-mounted — edit on the host, containers pick up changes.
 
 **Canonical port list:** [`docker-compose.yml`](../../docker-compose.yml) is the source of truth; this doc explains how to use it. CI runs `python scripts/axis.py check local-dev-docs` to catch drift.
 
@@ -22,7 +22,7 @@ The full dev stack runs from one `docker compose up -d`: **Postgres**, **Redis**
   `3000`, `5280`, `5432`, `6379`, `1025`, `1080`, `4566`, `29092`, `8081`, `5672`, `15672`, `8200`
 
   Optional observability profile also uses `3001`, `4317`, `4318` — see [Observability (optional)](#observability-optional).
-- Do not run a host-side `dotnet build` against `src/` while the API container is up (they fight over `bin/obj`).
+- The API container writes .NET build artifacts to `/tmp/axis-artifacts`, so host-side `dotnet build` no longer shares `bin/obj` with the container.
 
 ---
 
@@ -90,7 +90,7 @@ wsl -- bash -lc "cd /path/to/axis && docker compose up -d"
 First boot:
 
 - Infrastructure images pull (Postgres, Redis, Kafka, RabbitMQ, … — several hundred MB total).
-- **API** waits for Postgres, Redis, LocalStack, Kafka, Schema Registry, and RabbitMQ to be healthy, then runs `dotnet restore` and `dotnet watch run` — first restore ~1–2 min; NuGet cache lives in the `nuget_packages` volume.
+- **API** waits for Postgres, Redis, LocalStack, Kafka, Schema Registry, and RabbitMQ to be healthy, then runs `dotnet restore` and `dotnet run` with container artifacts under `/tmp/axis-artifacts` — first restore ~1–2 min; NuGet cache lives in the `nuget_packages` volume.
 - **Web** syncs `npm ci` when `package-lock.json` changes, then starts Vite — first install ~1 min; `node_modules` cache lives in `web_node_modules`.
 
 Add `--build` only after changing [`frontend/Dockerfile.dev`](../../frontend/Dockerfile.dev) or the root [`Dockerfile`](../../Dockerfile) (production image).
@@ -107,7 +107,7 @@ Add `--build` only after changing [`frontend/Dockerfile.dev`](../../frontend/Doc
 | API ready | <http://localhost:5280/health/ready> | Includes Postgres + Redis probes. |
 | Scalar / Swagger | <http://localhost:5280/scalar/v1> | OpenAPI explorer (Development / Staging only). |
 | MailDev UI | <http://localhost:1080> | Outbound email (SMTP `:1025`) lands here. |
-| Postgres | `localhost:5432` | User `axis` / password `axis_dev_pass`. Module DBs created on first cluster init via [`infra/postgres/init.d/`](../../infra/postgres/init.d/): `axis_identity`, `axis_datamodeling`, `axis_workflowbuilder`, `axis_formbuilder`, `axis_workflowengine`, `axis_pagebuilder` (PageBuilder module not started yet — DB reserved). |
+| Postgres | `localhost:5432` | User `axis` / password `axis_dev_pass`. API startup creates and migrates active module DBs in Development: `axis_identity`, `axis_datamodeling`, `axis_workflowbuilder`, `axis_formbuilder`, `axis_workflowengine`. |
 | Redis | `localhost:6379` | No auth. |
 | LocalStack | <http://localhost:4566> | S3 only (avatars). |
 | Kafka (KRaft) | `localhost:29092` | Host listener for local `dotnet run`. Containers use `kafka:9092` on the compose network (not host-published). Carries `*Event` / `*Snapshot` ([ADR-025](../TECH_STACK.md#adr-025-transport-selection-rule-by-message-name-suffix)). |
@@ -160,10 +160,10 @@ Run from the repo root (or prefix with `wsl -- bash -lc "cd /path/to/axis && …
 
 | Stack | Triggers reload | Needs container restart |
 |---|---|---|
-| Backend (`api`) | Saving `.cs` under `src/` — `dotnet watch` rebuilds/restarts. | `Directory.Packages.props` or new `<PackageReference>` → `docker compose restart api`. |
+| Backend (`api`) | Restart `api` after saving `.cs` under `src/`. | Any backend code, `Directory.Packages.props`, or new `<PackageReference>` → `docker compose restart api`. |
 | Frontend (`web`) | Saving under `frontend/src/` — Vite HMR. | `vite.config.ts`, `package.json`, `package-lock.json`, or new npm dep → `docker compose restart web`; the container syncs `npm ci` automatically when the lockfile hash changes. |
 
-Polling is enabled (`DOTNET_USE_POLLING_FILE_WATCHER=1`, `VITE_USE_POLLING=1`) because inotify from Windows bind mounts through WSL is unreliable. Expect ~200–500 ms between save and reload.
+Vite polling is enabled (`VITE_USE_POLLING=1`) because inotify from Windows bind mounts through WSL is unreliable. Expect ~200–500 ms between frontend save and reload.
 
 ---
 
@@ -217,7 +217,7 @@ dotnet ef migrations add InitialCreate \
   --startup-project src/Modules/Identity/Axis.Identity.Infrastructure/Axis.Identity.Infrastructure.csproj
 ```
 
-Each migration ships **both** `{timestamp}_{Name}.cs` and `{timestamp}_{Name}.Designer.cs`. Tenant modules use `*DbContextFactory` + `DesignTimePublicSchemaTenantContext` (`public` schema at design time).
+Each migration ships **both** `{timestamp}_{Name}.cs` and `{timestamp}_{Name}.Designer.cs`. Workspace modules use `*DbContextFactory` + `DesignTimePublicSchemaWorkspaceContext` (`public` schema at design time).
 
 ---
 
@@ -232,7 +232,7 @@ docker compose up -d
 
 On the next boot, **Development only**, `IdentityDbContext.Database.MigrateAsync()` runs at startup ([`Program.cs`](../../src/Axis.Api/Program.cs)) before OpenIddict seeding.
 
-Per-tenant module schemas (`tenant_{tenant-id}`) are provisioned on demand by each module's `TenantVerifiedHandler` when Identity publishes `TenantVerifiedEvent` over Kafka (e.g. [`TenantVerifiedHandler`](../../src/Modules/DataModeling/Axis.DataModeling.Infrastructure/Messaging/TenantVerifiedHandler.cs)). Only Identity's public schema migrates at API startup.
+Per-workspace module schemas (`workspace_{workspace-id}`) are provisioned on demand by each module's `WorkspaceVerifiedHandler` when Identity publishes `WorkspaceVerifiedEvent` over Kafka (e.g. [`WorkspaceVerifiedHandler`](../../src/Modules/DataModeling/Axis.DataModeling.Infrastructure/Messaging/WorkspaceVerifiedHandler.cs)). Only Identity's public schema migrates at API startup.
 
 Wipe Postgres only (keep npm/NuGet caches):
 
@@ -246,11 +246,11 @@ docker compose up -d
 
 ## Gotchas
 
-- **`launchSettings.json` is ignored** in the container. Compose passes `--no-launch-profile` to `dotnet watch`; without it, the launch profile's `applicationUrl` can override `ASPNETCORE_URLS` and bind only inside the container — "connection reset" on `:5280` from the host.
-- **`bin/` and `obj/` under `src/`** contain Linux artifacts from the container. Stop the API (`docker compose stop api`) before a host-side Windows/Rider build, or expect file-lock errors.
+- **`launchSettings.json` is ignored** in the container. Compose passes `--no-launch-profile` to `dotnet run`; without it, the launch profile's `applicationUrl` can override `ASPNETCORE_URLS` and bind only inside the container — "connection reset" on `:5280` from the host.
+- **Container build artifacts stay outside the bind mount.** The API compose command passes `--artifacts-path /tmp/axis-artifacts` to `dotnet restore` and `dotnet run`, so Linux `bin/obj` outputs do not overwrite host-side Windows/Rider assets.
 - **MailDev health** — compose disables MailDev's baked-in healthcheck (`healthcheck: disable: true`); nothing waits on it.
 - **API startup order** — Kafka + Schema Registry + RabbitMQ must be healthy before the API starts; first boot can take ~60s on the API healthcheck `start_period`.
-- **Cross-module migrations** — tenant DbContexts migrate on first tenant provisioning, not at API startup.
+- **Module vs workspace migrations** — API startup migrates each module's public schema in Development; workspace schemas migrate on first workspace provisioning.
 
 ---
 

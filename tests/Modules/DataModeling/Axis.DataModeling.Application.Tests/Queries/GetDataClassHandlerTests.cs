@@ -11,7 +11,7 @@ namespace Axis.DataModeling.Application.Tests.Queries;
 
 public class GetDataClassHandlerTests
 {
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private readonly IDataClassRepository _dataClassRepo = Substitute.For<IDataClassRepository>();
 
     private GetDataClassHandler CreateHandler() => new(_dataClassRepo);
@@ -19,12 +19,12 @@ public class GetDataClassHandlerTests
     [Fact]
     public async Task Handle_WhenDataClassExists_ReturnsFieldDetails()
     {
-        DataClass dataClass = DataClass.Create("Address", "Postal address", TenantId, "user-123");
+        DataClass dataClass = DataClass.Create("Address", "Postal address", WorkspaceId, "user-123");
         dataClass.AddField("street", "Street", FieldType.Text, true, new TextFieldConfig());
-        _dataClassRepo.GetByIdAsync(dataClass.Id, TenantId, Arg.Any<CancellationToken>()).Returns(dataClass);
+        _dataClassRepo.GetByIdAsync(dataClass.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(dataClass);
 
         Result<DataClassDetailDto> result = await CreateHandler().Handle(
-            new GetDataClassQuery(dataClass.Id, TenantId),
+            new GetDataClassQuery(dataClass.Id, WorkspaceId),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -35,11 +35,11 @@ public class GetDataClassHandlerTests
     [Fact]
     public async Task Handle_WhenDataClassDoesNotExist_ReturnsNotFound()
     {
-        _dataClassRepo.GetByIdAsync(Arg.Any<Guid>(), TenantId, Arg.Any<CancellationToken>())
+        _dataClassRepo.GetByIdAsync(Arg.Any<Guid>(), WorkspaceId, Arg.Any<CancellationToken>())
             .Returns((DataClass?)null);
 
         Result<DataClassDetailDto> result = await CreateHandler().Handle(
-            new GetDataClassQuery(Guid.NewGuid(), TenantId),
+            new GetDataClassQuery(Guid.NewGuid(), WorkspaceId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

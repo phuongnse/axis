@@ -1,4 +1,4 @@
-using Axis.Shared.Application.Tenancy;
+using Axis.Shared.Application.Workspaces;
 using Axis.Shared.Infrastructure.Persistence;
 using Axis.WorkflowBuilder.Domain.Aggregates;
 using Axis.WorkflowBuilder.Domain.ReadModels;
@@ -9,7 +9,7 @@ namespace Axis.WorkflowBuilder.Infrastructure.Persistence;
 
 internal sealed class WorkflowBuilderDbContext(
     DbContextOptions<WorkflowBuilderDbContext> options,
-    ITenantContext tenantContext) : DbContext(options)
+    IWorkspaceContext workspaceContext) : DbContext(options)
 {
     public DbSet<WorkflowDefinition> WorkflowDefinitions => Set<WorkflowDefinition>();
     public DbSet<WorkflowFormReference> WorkflowFormReferences => Set<WorkflowFormReference>();
@@ -18,7 +18,7 @@ internal sealed class WorkflowBuilderDbContext(
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         // Per ADR-017: interceptor wiring inlined per module.
-        optionsBuilder.AddInterceptors(new TenantSchemaInterceptor(tenantContext));
+        optionsBuilder.AddInterceptors(new WorkspaceSchemaInterceptor(workspaceContext));
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

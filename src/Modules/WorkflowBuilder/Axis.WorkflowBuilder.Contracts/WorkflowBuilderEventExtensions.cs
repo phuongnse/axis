@@ -8,8 +8,8 @@ public static class WorkflowBuilderEventExtensions
     public static Guid WorkflowId(this WorkflowPublishedEvent @event)
         => ParseRequiredGuid(@event.workflowId, nameof(@event.workflowId));
 
-    public static Guid tenantId(this WorkflowPublishedEvent @event)
-        => ParseRequiredGuid(@event.tenantId, nameof(@event.tenantId));
+    public static Guid workspaceId(this WorkflowPublishedEvent @event)
+        => ParseRequiredGuid(@event.workspaceId, nameof(@event.workspaceId));
 
     public static IReadOnlyList<Guid> ReferencedFormIds(this WorkflowPublishedEvent @event)
         => ParseReferencedFormIds(@event.referencedFormIds);
@@ -17,14 +17,14 @@ public static class WorkflowBuilderEventExtensions
     public static Guid WorkflowId(this WorkflowArchivedEvent @event)
         => ParseRequiredGuid(@event.workflowId, nameof(@event.workflowId));
 
-    public static Guid tenantId(this WorkflowArchivedEvent @event)
-        => ParseRequiredGuid(@event.tenantId, nameof(@event.tenantId));
+    public static Guid workspaceId(this WorkflowArchivedEvent @event)
+        => ParseRequiredGuid(@event.workspaceId, nameof(@event.workspaceId));
 
     public static Guid WorkflowId(this WorkflowUnarchivedEvent @event)
         => ParseRequiredGuid(@event.workflowId, nameof(@event.workflowId));
 
-    public static Guid tenantId(this WorkflowUnarchivedEvent @event)
-        => ParseRequiredGuid(@event.tenantId, nameof(@event.tenantId));
+    public static Guid workspaceId(this WorkflowUnarchivedEvent @event)
+        => ParseRequiredGuid(@event.workspaceId, nameof(@event.workspaceId));
 
     public static IReadOnlyList<Guid> ReferencedFormIds(this WorkflowUnarchivedEvent @event)
         => ParseReferencedFormIds(@event.referencedFormIds);

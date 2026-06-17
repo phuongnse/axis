@@ -8,7 +8,7 @@ Select a form when configuring a Form step so that the right form is presented t
 
 ## Primary actor
 
-- Tenant Member
+- Workspace Member
 
 ## Trigger
 
@@ -17,7 +17,7 @@ Select a form when configuring a Form step so that the right form is presented t
 ## Main flow
 
 1. Actor starts the — Link a form to a workflow Form step flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
@@ -31,7 +31,7 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] Form step config panel shows a searchable dropdown of all forms in the tenant.
+- [ ] Form step config panel shows a searchable dropdown of all forms in the workspace.
 - [ ] Selecting a form shows a compact preview of its fields in the panel (field names and types listed).
 - [ ] The step node on the canvas shows the selected form name as a summary.
 
@@ -58,7 +58,7 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 >
 > **Gaps vs spec:** broken-step indicator pending Frontend + API.
 >
-> **Decisions:** `GetFormPickerQuery` returns all forms for the tenant as a flat list (Id, Name, FieldCount) ordered by name — used by the API form-step picker dropdown. `IsReferencedByWorkflowAsync` query supports the reference check.
+> **Decisions:** `GetFormPickerQuery` returns all forms for the workspace as a flat list (Id, Name, FieldCount) ordered by name — used by the API form-step picker dropdown. `IsReferencedByWorkflowAsync` query supports the reference check.
 >
 > **Gaps vs spec:**
 > - N/A

@@ -5,7 +5,7 @@ namespace Axis.DataModeling.Application.Commands.UpdateModel;
 /// <summary>Update a model's name, description, icon, and color.</summary>
 public sealed record UpdateModelCommand(
     Guid ModelId,
-    Guid tenantId,
+    Guid workspaceId,
     string Name,
     string? Description,
     string? Icon,

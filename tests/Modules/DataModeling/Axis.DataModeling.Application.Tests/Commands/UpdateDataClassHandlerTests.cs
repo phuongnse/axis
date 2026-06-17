@@ -10,7 +10,7 @@ namespace Axis.DataModeling.Application.Tests.Commands;
 
 public class UpdateDataClassHandlerTests
 {
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private readonly IDataClassRepository _dataClassRepo = Substitute.For<IDataClassRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
@@ -19,13 +19,13 @@ public class UpdateDataClassHandlerTests
     [Fact]
     public async Task Handle_WhenNameIsUnique_UpdatesDataClass()
     {
-        DataClass dataClass = DataClass.Create("Address", null, TenantId, "user-123");
-        _dataClassRepo.GetByIdAsync(dataClass.Id, TenantId, Arg.Any<CancellationToken>()).Returns(dataClass);
-        _dataClassRepo.NameExistsAsync("Billing Address", TenantId, dataClass.Id, Arg.Any<CancellationToken>())
+        DataClass dataClass = DataClass.Create("Address", null, WorkspaceId, "user-123");
+        _dataClassRepo.GetByIdAsync(dataClass.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(dataClass);
+        _dataClassRepo.NameExistsAsync("Billing Address", WorkspaceId, dataClass.Id, Arg.Any<CancellationToken>())
             .Returns(false);
 
         Result result = await CreateHandler().Handle(
-            new UpdateDataClassCommand(dataClass.Id, TenantId, "Billing Address", "Postal destination"),
+            new UpdateDataClassCommand(dataClass.Id, WorkspaceId, "Billing Address", "Postal destination"),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -37,13 +37,13 @@ public class UpdateDataClassHandlerTests
     [Fact]
     public async Task Handle_WhenNameAlreadyExists_ReturnsConflict()
     {
-        DataClass dataClass = DataClass.Create("Address", null, TenantId, "user-123");
-        _dataClassRepo.GetByIdAsync(dataClass.Id, TenantId, Arg.Any<CancellationToken>()).Returns(dataClass);
-        _dataClassRepo.NameExistsAsync("Billing Address", TenantId, dataClass.Id, Arg.Any<CancellationToken>())
+        DataClass dataClass = DataClass.Create("Address", null, WorkspaceId, "user-123");
+        _dataClassRepo.GetByIdAsync(dataClass.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(dataClass);
+        _dataClassRepo.NameExistsAsync("Billing Address", WorkspaceId, dataClass.Id, Arg.Any<CancellationToken>())
             .Returns(true);
 
         Result result = await CreateHandler().Handle(
-            new UpdateDataClassCommand(dataClass.Id, TenantId, "Billing Address", null),
+            new UpdateDataClassCommand(dataClass.Id, WorkspaceId, "Billing Address", null),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

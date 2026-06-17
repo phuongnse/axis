@@ -1,5 +1,5 @@
 using Axis.Shared.Application.PlanLimits;
-using Axis.Shared.Application.Tenants;
+using Axis.Shared.Application.Workspaces;
 using Axis.WorkflowEngine.Application.Repositories;
 using Axis.WorkflowEngine.Application.Services;
 using Axis.WorkflowEngine.Infrastructure.Persistence;
@@ -7,7 +7,7 @@ using Axis.WorkflowEngine.Infrastructure.PlanLimits;
 using Axis.WorkflowEngine.Infrastructure.Repositories;
 using Axis.WorkflowEngine.Infrastructure.Services;
 using Axis.WorkflowEngine.Infrastructure.Services.StepExecutors;
-using Axis.WorkflowEngine.Infrastructure.Tenants;
+using Axis.WorkflowEngine.Infrastructure.Workspaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,7 +27,7 @@ public static class WorkflowEngineInfrastructureExtensions
         services.AddScoped<IWorkflowDefinitionReader, WorkflowDefinitionReader>();
         services.AddScoped<IUnitOfWork, WorkflowEngineUnitOfWork>();
         services.AddScoped<IPlanLimitUsageCounter, ExecutionPlanLimitUsageCounter>();
-        services.AddScoped<ITenantExecutionCanceller, TenantExecutionCanceller>();
+        services.AddScoped<IWorkspaceExecutionCanceller, WorkspaceExecutionCanceller>();
 
         // Step executor services (Infrastructure implements Application interfaces)
         services.AddScoped<IHttpStepExecutor, HttpStepExecutor>();

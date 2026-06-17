@@ -14,13 +14,13 @@ public class UpdateRoleHandlerTests
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private static readonly Guid RoleId = Guid.NewGuid();
 
     private UpdateRoleHandler CreateHandler() => new(_roleRepo, _uow);
 
     private static UpdateRoleCommand ValidCommand() => new(
-        RoleId, TenantId,
+        RoleId, WorkspaceId,
         Name: "Senior Manager",
         Description: "Updated",
         Permissions: ["workflow:definition:read", "workflow:definition:write"]);
@@ -28,9 +28,9 @@ public class UpdateRoleHandlerTests
     [Fact]
     public async Task UpdateRole_WhenRequestIsValid_UpdatesRole()
     {
-        Role role = Role.Create("Manager", null, TenantId, ["workflow:definition:read"]);
-        _roleRepo.GetByIdAsync(RoleId, TenantId).Returns(role);
-        _roleRepo.NameExistsAsync("Senior Manager", TenantId, role.Id).Returns(false);
+        Role role = Role.Create("Manager", null, WorkspaceId, ["workflow:definition:read"]);
+        _roleRepo.GetByIdAsync(RoleId, WorkspaceId).Returns(role);
+        _roleRepo.NameExistsAsync("Senior Manager", WorkspaceId, role.Id).Returns(false);
 
         Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
@@ -43,8 +43,8 @@ public class UpdateRoleHandlerTests
     [Fact]
     public async Task UpdateRole_WhenSystemRole_ReturnsBusinessRuleFailure()
     {
-        Role systemRole = Role.CreateSystem("Admin", TenantId, ["users:read"]);
-        _roleRepo.GetByIdAsync(RoleId, TenantId).Returns(systemRole);
+        Role systemRole = Role.CreateSystem("Admin", WorkspaceId, ["users:read"]);
+        _roleRepo.GetByIdAsync(RoleId, WorkspaceId).Returns(systemRole);
 
         Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
@@ -57,9 +57,9 @@ public class UpdateRoleHandlerTests
     [Fact]
     public async Task UpdateRole_WhenNameIsDuplicate_ReturnsConflict()
     {
-        Role role = Role.Create("Manager", null, TenantId, ["workflow:definition:read"]);
-        _roleRepo.GetByIdAsync(RoleId, TenantId).Returns(role);
-        _roleRepo.NameExistsAsync("Senior Manager", TenantId, role.Id).Returns(true);
+        Role role = Role.Create("Manager", null, WorkspaceId, ["workflow:definition:read"]);
+        _roleRepo.GetByIdAsync(RoleId, WorkspaceId).Returns(role);
+        _roleRepo.NameExistsAsync("Senior Manager", WorkspaceId, role.Id).Returns(true);
 
         Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
@@ -71,7 +71,7 @@ public class UpdateRoleHandlerTests
     [Fact]
     public async Task UpdateRole_WhenRoleNotFound_ReturnsNotFound()
     {
-        _roleRepo.GetByIdAsync(RoleId, TenantId).ReturnsNull();
+        _roleRepo.GetByIdAsync(RoleId, WorkspaceId).ReturnsNull();
 
         Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
@@ -81,13 +81,13 @@ public class UpdateRoleHandlerTests
     }
 
     [Fact]
-    public async Task UpdateRole_WhenRoleBelongsToAnotherTenant_ReturnsNotFound()
+    public async Task UpdateRole_WhenRoleBelongsToAnotherWorkspace_ReturnsNotFound()
     {
-        Role role = Role.Create("Manager", null, TenantId, ["workflow:definition:read"]);
-        _roleRepo.GetByIdAsync(RoleId, TenantId).Returns(role);
+        Role role = Role.Create("Manager", null, WorkspaceId, ["workflow:definition:read"]);
+        _roleRepo.GetByIdAsync(RoleId, WorkspaceId).Returns(role);
 
-        Guid otherTenantId = Guid.NewGuid();
-        UpdateRoleCommand command = ValidCommand() with { tenantId = otherTenantId };
+        Guid otherWorkspaceId = Guid.NewGuid();
+        UpdateRoleCommand command = ValidCommand() with { workspaceId = otherWorkspaceId };
         Result result = await CreateHandler().Handle(command, CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

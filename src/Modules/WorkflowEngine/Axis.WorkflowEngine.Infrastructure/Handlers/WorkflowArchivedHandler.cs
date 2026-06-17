@@ -17,11 +17,11 @@ internal sealed class WorkflowArchivedHandler(
     public async Task Handle(WorkflowArchivedEvent @event, CancellationToken ct)
     {
         Guid workflowId = @event.WorkflowId();
-        Guid tenantId = @event.tenantId();
+        Guid workspaceId = @event.workspaceId();
 
         WorkflowActiveStatus? existing = await context.WorkflowActiveStatuses
             .FirstOrDefaultAsync(w => w.WorkflowId == workflowId
-                                   && w.tenantId == tenantId, ct);
+                                   && w.workspaceId == workspaceId, ct);
 
         if (existing is null)
         {
@@ -46,7 +46,7 @@ internal sealed class WorkflowArchivedHandler(
         }
 
         logger.LogInformation(
-            "WorkflowArchivedHandler: workflow {WorkflowId} deactivated for Tenant {tenantId}",
-            workflowId, tenantId);
+            "WorkflowArchivedHandler: workflow {WorkflowId} deactivated for Workspace {workspaceId}",
+            workflowId, workspaceId);
     }
 }

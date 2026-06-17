@@ -9,7 +9,7 @@ namespace Axis.FormBuilder.Application.Tests.Queries;
 
 public class GetFormPickerHandlerTests
 {
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private readonly IFormRepository _formRepo = Substitute.For<IFormRepository>();
 
     private GetFormPickerHandler CreateHandler() => new(_formRepo);
@@ -17,13 +17,13 @@ public class GetFormPickerHandlerTests
     [Fact]
     public async Task Handle_WhenFormsExist_ReturnsAlphabetizedPickerItems()
     {
-        FormDefinition beta = FormDefinition.Create("Beta Form", null, TenantId, "user-123");
-        FormDefinition alpha = FormDefinition.Create("Alpha Form", null, TenantId, "user-123");
+        FormDefinition beta = FormDefinition.Create("Beta Form", null, WorkspaceId, "user-123");
+        FormDefinition alpha = FormDefinition.Create("Alpha Form", null, WorkspaceId, "user-123");
         alpha.AddField("name", "Name", FormFieldType.Text, true, null);
-        _formRepo.GetAllAsync(TenantId, Arg.Any<CancellationToken>()).Returns([beta, alpha]);
+        _formRepo.GetAllAsync(WorkspaceId, Arg.Any<CancellationToken>()).Returns([beta, alpha]);
 
         IReadOnlyList<GetFormPickerDto> result = await CreateHandler().Handle(
-            new GetFormPickerQuery(TenantId),
+            new GetFormPickerQuery(WorkspaceId),
             CancellationToken.None);
 
         result.Select(item => item.Name).Should().Equal("Alpha Form", "Beta Form");
@@ -33,10 +33,10 @@ public class GetFormPickerHandlerTests
     [Fact]
     public async Task Handle_WhenNoFormsExist_ReturnsEmptyList()
     {
-        _formRepo.GetAllAsync(TenantId, Arg.Any<CancellationToken>()).Returns([]);
+        _formRepo.GetAllAsync(WorkspaceId, Arg.Any<CancellationToken>()).Returns([]);
 
         IReadOnlyList<GetFormPickerDto> result = await CreateHandler().Handle(
-            new GetFormPickerQuery(TenantId),
+            new GetFormPickerQuery(WorkspaceId),
             CancellationToken.None);
 
         result.Should().BeEmpty();

@@ -12,7 +12,7 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     private DataModelingDbContext _ctx = null!;
     private DataModelRepository _sut = null!;
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     public Task InitializeAsync()
@@ -25,7 +25,7 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     public async Task DisposeAsync() => await _ctx.DisposeAsync();
 
     private static DataModel MakeModel(string name) =>
-        DataModel.Create(name, null, null, null, TenantId, UserId);
+        DataModel.Create(name, null, null, null, WorkspaceId, UserId);
 
     [Fact]
     public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
@@ -34,39 +34,39 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
         await _sut.AddAsync(model);
         await _ctx.SaveChangesAsync();
 
-        DataModel? loaded = await _sut.GetByIdAsync(model.Id, TenantId);
+        DataModel? loaded = await _sut.GetByIdAsync(model.Id, WorkspaceId);
 
         loaded.Should().NotBeNull();
         loaded!.Name.Should().Be("Customer");
-        loaded.tenantId.Should().Be(TenantId);
+        loaded.workspaceId.Should().Be(WorkspaceId);
     }
 
     [Fact]
-    public async Task GetAllAsync_WhenMultipleModelsExist_ReturnsOnlyTenantModelsExcludingDeleted()
+    public async Task GetAllAsync_WhenMultipleModelsExist_ReturnsOnlyWorkspaceModelsExcludingDeleted()
     {
-        Guid TenantId = Guid.NewGuid();
-        DataModel active = DataModel.Create("Active", null, null, null, TenantId, UserId);
-        DataModel deleted = DataModel.Create("Deleted", null, null, null, TenantId, UserId);
+        Guid WorkspaceId = Guid.NewGuid();
+        DataModel active = DataModel.Create("Active", null, null, null, WorkspaceId, UserId);
+        DataModel deleted = DataModel.Create("Deleted", null, null, null, WorkspaceId, UserId);
         deleted.Delete();
-        DataModel otherTenant = DataModel.Create("Other", null, null, null, Guid.NewGuid(), UserId);
+        DataModel otherWorkspace = DataModel.Create("Other", null, null, null, Guid.NewGuid(), UserId);
 
         await _sut.AddAsync(active);
         await _sut.AddAsync(deleted);
-        await _sut.AddAsync(otherTenant);
+        await _sut.AddAsync(otherWorkspace);
         await _ctx.SaveChangesAsync();
-        IReadOnlyList<DataModel> result = await _sut.GetAllAsync(TenantId);
+        IReadOnlyList<DataModel> result = await _sut.GetAllAsync(WorkspaceId);
 
         result.Should().ContainSingle().Which.Name.Should().Be("Active");
     }
 
     [Fact]
-    public async Task NameExistsAsync_WhenNameExistsInTenant_ReturnsTrueCaseInsensitive()
+    public async Task NameExistsAsync_WhenNameExistsInWorkspace_ReturnsTrueCaseInsensitive()
     {
-        Guid TenantId = Guid.NewGuid();
-        await _sut.AddAsync(DataModel.Create("Invoice", null, null, null, TenantId, UserId));
+        Guid WorkspaceId = Guid.NewGuid();
+        await _sut.AddAsync(DataModel.Create("Invoice", null, null, null, WorkspaceId, UserId));
         await _ctx.SaveChangesAsync();
 
-        bool exists = await _sut.NameExistsAsync("invoice", TenantId); // case-insensitive
+        bool exists = await _sut.NameExistsAsync("invoice", WorkspaceId); // case-insensitive
 
         exists.Should().BeTrue();
     }
@@ -74,12 +74,12 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     [Fact]
     public async Task NameExistsAsync_WhenExcludeIdProvided_ExcludesThatModelFromCheck()
     {
-        Guid TenantId = Guid.NewGuid();
-        DataModel model = DataModel.Create("Project", null, null, null, TenantId, UserId);
+        Guid WorkspaceId = Guid.NewGuid();
+        DataModel model = DataModel.Create("Project", null, null, null, WorkspaceId, UserId);
         await _sut.AddAsync(model);
         await _ctx.SaveChangesAsync();
 
-        bool exists = await _sut.NameExistsAsync("Project", TenantId, excludeId: model.Id);
+        bool exists = await _sut.NameExistsAsync("Project", WorkspaceId, excludeId: model.Id);
 
         exists.Should().BeFalse();
     }
@@ -90,7 +90,7 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
         DataModel model = MakeModel("Order");
         await _sut.AddAsync(model);
         await _ctx.SaveChangesAsync();
-        DataModel? loaded = await _sut.GetByIdAsync(model.Id, TenantId);
+        DataModel? loaded = await _sut.GetByIdAsync(model.Id, WorkspaceId);
 
         loaded!.Fields.Should().HaveCount(3); // id, created_at, updated_at
         loaded.Fields.Should().Contain(f => f.Name == "id" && f.IsSystem);
@@ -114,7 +114,7 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
 
         await _sut.AddAsync(model);
         await _ctx.SaveChangesAsync();
-        DataModel? loaded = await _sut.GetByIdAsync(model.Id, TenantId);
+        DataModel? loaded = await _sut.GetByIdAsync(model.Id, WorkspaceId);
         List<FieldDefinition> customFields = loaded!.Fields.Where(f => !f.IsSystem).ToList();
 
         customFields.Should().HaveCount(4);
@@ -134,7 +134,7 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
         await _sut.AddAsync(model);
         await _ctx.SaveChangesAsync();
 
-        DataModel? loaded = await _sut.GetByIdAsync(model.Id, TenantId);
+        DataModel? loaded = await _sut.GetByIdAsync(model.Id, WorkspaceId);
 
         loaded.Should().BeNull();
     }
@@ -142,14 +142,14 @@ public class DataModelRepositoryTests(DataModelingDatabaseFixture db) : IAsyncLi
     [Fact]
     public async Task GetPagedAsync_WhenModelsExist_ReturnsPagedResult()
     {
-        Guid TenantId = Guid.NewGuid();
-        DataModel m1 = DataModel.Create($"Paged-Model-A-{Guid.NewGuid():N}", null, null, null, TenantId, UserId);
-        DataModel m2 = DataModel.Create($"Paged-Model-B-{Guid.NewGuid():N}", null, null, null, TenantId, UserId);
+        Guid WorkspaceId = Guid.NewGuid();
+        DataModel m1 = DataModel.Create($"Paged-Model-A-{Guid.NewGuid():N}", null, null, null, WorkspaceId, UserId);
+        DataModel m2 = DataModel.Create($"Paged-Model-B-{Guid.NewGuid():N}", null, null, null, WorkspaceId, UserId);
         await _sut.AddAsync(m1);
         await _sut.AddAsync(m2);
         await _ctx.SaveChangesAsync();
 
-        (IReadOnlyList<DataModel> items, int total) = await _sut.GetPagedAsync(TenantId, 1, 20);
+        (IReadOnlyList<DataModel> items, int total) = await _sut.GetPagedAsync(WorkspaceId, 1, 20);
 
         items.Should().HaveCount(2);
         total.Should().Be(2);

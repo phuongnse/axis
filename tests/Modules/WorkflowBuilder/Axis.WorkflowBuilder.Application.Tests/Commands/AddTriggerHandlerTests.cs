@@ -11,7 +11,7 @@ namespace Axis.WorkflowBuilder.Application.Tests;
 
 public class AddTriggerHandlerTests
 {
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private readonly IWorkflowRepository _repo = Substitute.For<IWorkflowRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly AddTriggerHandler _handler;
@@ -29,11 +29,11 @@ public class AddTriggerHandlerTests
     [Fact]
     public async Task Handle_WhenTriggerTypeIsNew_AddsTriggerAndSaves()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TenantId, "user");
-        _repo.GetByIdAsync(wf.Id, TenantId, Arg.Any<CancellationToken>()).Returns(wf);
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, WorkspaceId, "user");
+        _repo.GetByIdAsync(wf.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(wf);
 
         Result result = await _handler.Handle(
-            new AddTriggerCommand(wf.Id, TenantId, TriggerType.Manual, null), CancellationToken.None);
+            new AddTriggerCommand(wf.Id, WorkspaceId, TriggerType.Manual, null), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         wf.Triggers.Should().ContainSingle(t => t.Type == TriggerType.Manual);
@@ -43,41 +43,41 @@ public class AddTriggerHandlerTests
     [Fact]
     public async Task Handle_WhenWorkflowNotFound_ReturnsNotFound()
     {
-        _repo.GetByIdAsync(Arg.Any<Guid>(), TenantId, Arg.Any<CancellationToken>()).Returns((WorkflowDefinition?)null);
+        _repo.GetByIdAsync(Arg.Any<Guid>(), WorkspaceId, Arg.Any<CancellationToken>()).Returns((WorkflowDefinition?)null);
 
         Result result = await _handler.Handle(
-            new AddTriggerCommand(Guid.NewGuid(), TenantId, TriggerType.Manual, null), CancellationToken.None);
+            new AddTriggerCommand(Guid.NewGuid(), WorkspaceId, TriggerType.Manual, null), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
     }
 
     [Fact]
-    public async Task Handle_WhenWorkflowBelongsToAnotherTenant_ReturnsNotFound()
+    public async Task Handle_WhenWorkflowBelongsToAnotherWorkspace_ReturnsNotFound()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TenantId, "user");
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, WorkspaceId, "user");
 
-        Guid otherTenantId = Guid.NewGuid();
-        _repo.GetByIdAsync(wf.Id, otherTenantId, Arg.Any<CancellationToken>())
+        Guid otherWorkspaceId = Guid.NewGuid();
+        _repo.GetByIdAsync(wf.Id, otherWorkspaceId, Arg.Any<CancellationToken>())
             .Returns((WorkflowDefinition?)null);
         Result result = await _handler.Handle(
-            new AddTriggerCommand(wf.Id, otherTenantId, TriggerType.Manual, null), CancellationToken.None);
+            new AddTriggerCommand(wf.Id, otherWorkspaceId, TriggerType.Manual, null), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-        await _repo.Received(1).GetByIdAsync(wf.Id, otherTenantId, Arg.Any<CancellationToken>());
+        await _repo.Received(1).GetByIdAsync(wf.Id, otherWorkspaceId, Arg.Any<CancellationToken>());
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task Handle_WhenTriggerTypeAlreadyExists_ReturnsConflict()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, TenantId, "user");
+        WorkflowDefinition wf = WorkflowDefinition.Create("My Workflow", null, WorkspaceId, "user");
         wf.AddTrigger(TriggerType.Manual, null);
-        _repo.GetByIdAsync(wf.Id, TenantId, Arg.Any<CancellationToken>()).Returns(wf);
+        _repo.GetByIdAsync(wf.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(wf);
 
         Result result = await _handler.Handle(
-            new AddTriggerCommand(wf.Id, TenantId, TriggerType.Manual, null), CancellationToken.None);
+            new AddTriggerCommand(wf.Id, WorkspaceId, TriggerType.Manual, null), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.Conflict);

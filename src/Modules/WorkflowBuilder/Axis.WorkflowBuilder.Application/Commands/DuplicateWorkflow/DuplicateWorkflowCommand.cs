@@ -4,5 +4,5 @@ namespace Axis.WorkflowBuilder.Application.Commands.DuplicateWorkflow;
 
 public sealed record DuplicateWorkflowCommand(
     Guid WorkflowId,
-    Guid tenantId,
+    Guid workspaceId,
     string CreatedBy) : ICommand<Guid>;

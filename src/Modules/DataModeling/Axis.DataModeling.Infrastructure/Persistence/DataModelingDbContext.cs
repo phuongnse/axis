@@ -1,6 +1,6 @@
 using Axis.DataModeling.Domain.Aggregates;
 using Axis.DataModeling.Infrastructure.Persistence.Configurations;
-using Axis.Shared.Application.Tenancy;
+using Axis.Shared.Application.Workspaces;
 using Axis.Shared.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,7 +8,7 @@ namespace Axis.DataModeling.Infrastructure.Persistence;
 
 internal sealed class DataModelingDbContext(
     DbContextOptions<DataModelingDbContext> options,
-    ITenantContext tenantContext) : DbContext(options)
+    IWorkspaceContext workspaceContext) : DbContext(options)
 {
     public DbSet<DataModel> DataModels => Set<DataModel>();
     public DbSet<DataClass> DataClasses => Set<DataClass>();
@@ -17,9 +17,9 @@ internal sealed class DataModelingDbContext(
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         // Per ADR-017: interceptor wiring inlined here rather than inherited
-        // from a shared AxisDbContext base. TenantSchemaInterceptor stays in
+        // from a shared AxisDbContext base. WorkspaceSchemaInterceptor stays in
         // Axis.Shared.Infrastructure because every module needs it identically.
-        optionsBuilder.AddInterceptors(new TenantSchemaInterceptor(tenantContext));
+        optionsBuilder.AddInterceptors(new WorkspaceSchemaInterceptor(workspaceContext));
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

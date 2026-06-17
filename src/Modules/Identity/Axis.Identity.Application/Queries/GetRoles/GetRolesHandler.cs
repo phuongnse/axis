@@ -5,7 +5,7 @@ using Axis.Shared.Application.CQRS;
 
 namespace Axis.Identity.Application.Queries.GetRoles;
 
-/// <summary>Lists all roles for the Tenant, including system roles, paginated.</summary>
+/// <summary>Lists all roles for the Workspace, including system roles, paginated.</summary>
 public sealed class GetRolesHandler(IRoleRepository roleRepo)
     : IQueryHandler<GetRolesQuery, PagedResult<RoleDto>>
 {
@@ -14,7 +14,7 @@ public sealed class GetRolesHandler(IRoleRepository roleRepo)
         int effectivePageSize = Math.Min(query.PageSize, 100);
 
         (IReadOnlyList<Role> items, int totalCount) =
-            await roleRepo.GetPagedAsync(query.tenantId, query.Page, effectivePageSize, cancellationToken);
+            await roleRepo.GetPagedAsync(query.workspaceId, query.Page, effectivePageSize, cancellationToken);
 
         IReadOnlyList<RoleDto> dtos = items
             .Select(r => new RoleDto(r.Id, r.Name, r.Description, r.IsSystem, r.Permissions))

@@ -12,7 +12,7 @@ public class InvitationRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifet
     private IdentityDbContext _ctx = null!;
     private InvitationRepository _sut = null!;
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private static readonly Guid RoleId = Guid.NewGuid();
     private static readonly Guid InvitedById = Guid.NewGuid();
 
@@ -26,7 +26,7 @@ public class InvitationRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifet
     public async Task DisposeAsync() => await _ctx.DisposeAsync();
 
     private static Invitation MakeInvitation(string email) =>
-        Invitation.Create(Email.Create(email).Value, TenantId, RoleId, InvitedById);
+        Invitation.Create(Email.Create(email).Value, WorkspaceId, RoleId, InvitedById);
 
     [Fact]
     public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedByToken()
@@ -56,7 +56,7 @@ public class InvitationRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifet
         await _sut.AddAsync(invitation);
         await _ctx.SaveChangesAsync();
         Email email = Email.Create("pending@example.com").Value;
-        Invitation? loaded = await _sut.GetPendingByEmailAsync(email, TenantId);
+        Invitation? loaded = await _sut.GetPendingByEmailAsync(email, WorkspaceId);
 
         loaded.Should().NotBeNull();
         loaded!.Id.Should().Be(invitation.Id);
@@ -72,7 +72,7 @@ public class InvitationRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifet
         invitation.Accept();
         await _ctx.SaveChangesAsync();
         Email email = Email.Create("accepted@example.com").Value;
-        Invitation? result = await _sut.GetPendingByEmailAsync(email, TenantId);
+        Invitation? result = await _sut.GetPendingByEmailAsync(email, WorkspaceId);
         result.Should().BeNull();
     }
 }

@@ -10,21 +10,21 @@ internal sealed class DataModelRepository(DataModelingDbContext context) : IData
     public async Task AddAsync(DataModel model, CancellationToken ct = default)
         => await context.DataModels.AddAsync(model, ct);
 
-    public async Task<DataModel?> GetByIdAsync(Guid id, Guid tenantId, CancellationToken ct = default)
+    public async Task<DataModel?> GetByIdAsync(Guid id, Guid workspaceId, CancellationToken ct = default)
         => await context.DataModels
-            .FirstOrDefaultAsync(m => m.Id == id && m.tenantId == tenantId, ct);
+            .FirstOrDefaultAsync(m => m.Id == id && m.workspaceId == workspaceId, ct);
 
-    public async Task<IReadOnlyList<DataModel>> GetAllAsync(Guid tenantId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<DataModel>> GetAllAsync(Guid workspaceId, CancellationToken ct = default)
         => await context.DataModels
-            .Where(m => m.tenantId == tenantId)
+            .Where(m => m.workspaceId == workspaceId)
             .OrderBy(m => m.Name)
             .ToListAsync(ct);
 
     public async Task<(IReadOnlyList<DataModel> Items, int TotalCount)> GetPagedAsync(
-        Guid tenantId, int page, int pageSize, CancellationToken ct = default)
+        Guid workspaceId, int page, int pageSize, CancellationToken ct = default)
     {
         IQueryable<DataModel> query = context.DataModels
-            .Where(m => m.tenantId == tenantId)
+            .Where(m => m.workspaceId == workspaceId)
             .OrderBy(m => m.Name);
 
         int totalCount = await query.CountAsync(ct);
@@ -36,9 +36,9 @@ internal sealed class DataModelRepository(DataModelingDbContext context) : IData
         return (items, totalCount);
     }
 
-    public async Task<bool> NameExistsAsync(string name, Guid tenantId, Guid? excludeId = null, CancellationToken ct = default)
+    public async Task<bool> NameExistsAsync(string name, Guid workspaceId, Guid? excludeId = null, CancellationToken ct = default)
         => await context.DataModels
-            .AnyAsync(m => m.tenantId == tenantId
+            .AnyAsync(m => m.workspaceId == workspaceId
                 && m.Name.ToLower() == name.ToLower()
                 && (excludeId == null || m.Id != excludeId), ct);
 }

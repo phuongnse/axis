@@ -16,12 +16,12 @@ public class InviteUserHandlerTests
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
     private readonly IInvitationRepository _invitationRepo = Substitute.For<IInvitationRepository>();
-    private readonly ITenantRepository _tenantRepo = Substitute.For<ITenantRepository>();
+    private readonly IWorkspaceRepository _workspaceRepo = Substitute.For<IWorkspaceRepository>();
     private readonly IEmailSender _emailSender = Substitute.For<IEmailSender>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly IPlanLimitService _planLimitService = Substitute.For<IPlanLimitService>();
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private static readonly Guid RoleId = Guid.NewGuid();
     private static readonly Guid InvitedById = Guid.NewGuid();
 
@@ -29,26 +29,26 @@ public class InviteUserHandlerTests
     {
         _planLimitService.EnsureWithinLimitAsync(Arg.Any<Guid>(), Arg.Any<PlanLimitResourceType>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Result.Success());
-        return new(_planLimitService, _userRepo, _roleRepo, _invitationRepo, _tenantRepo, _emailSender, _uow);
+        return new(_planLimitService, _userRepo, _roleRepo, _invitationRepo, _workspaceRepo, _emailSender, _uow);
     }
 
     private InviteUserCommand ValidCommand() =>
-        new(TenantId, "invited@example.com", RoleId, InvitedById);
+        new(WorkspaceId, "invited@example.com", RoleId, InvitedById);
 
     [Fact]
     public async Task InviteUser_WhenRequestIsValid_CreatesInvitationAndSendsEmail()
     {
         Email email = Email.Create("invited@example.com").Value;
-        _userRepo.GetByEmailAsync(Arg.Any<Email>(), TenantId).ReturnsNull();
-        _invitationRepo.GetPendingByEmailAsync(Arg.Any<Email>(), TenantId).ReturnsNull();
-        Role role = Role.Create("Editor", null, TenantId, ["workflow:definition:read"]);
-        _roleRepo.GetByIdAsync(RoleId, TenantId).Returns(role);
-        Tenant Tenant = Tenant.Create(
+        _userRepo.GetByEmailAsync(Arg.Any<Email>(), WorkspaceId).ReturnsNull();
+        _invitationRepo.GetPendingByEmailAsync(Arg.Any<Email>(), WorkspaceId).ReturnsNull();
+        Role role = Role.Create("Editor", null, WorkspaceId, ["workflow:definition:read"]);
+        _roleRepo.GetByIdAsync(RoleId, WorkspaceId).Returns(role);
+        Workspace Workspace = Workspace.Create(
             "Acme",
-            TenantSlug.Create("acme").Value,
+            WorkspaceSlug.Create("acme").Value,
             Email.Create("admin@acme.com").Value,
             Domain.Subscriptions.WellKnownSubscriptionPlans.FreeId);
-        _tenantRepo.GetByIdAsync(TenantId).Returns(Tenant);
+        _workspaceRepo.GetByIdAsync(WorkspaceId).Returns(Workspace);
 
         Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
@@ -63,7 +63,7 @@ public class InviteUserHandlerTests
     public async Task InviteUser_WhenEmailIsExistingMember_ReturnsConflict()
     {
         User existingUser = User.Create("Bob", "Jones", Email.Create("invited@example.com").Value);
-        _userRepo.GetByEmailAsync(Arg.Any<Email>(), TenantId).Returns(existingUser);
+        _userRepo.GetByEmailAsync(Arg.Any<Email>(), WorkspaceId).Returns(existingUser);
 
         Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
@@ -75,10 +75,10 @@ public class InviteUserHandlerTests
     [Fact]
     public async Task InviteUser_WhenPendingInvitationExists_ReturnsConflict()
     {
-        _userRepo.GetByEmailAsync(Arg.Any<Email>(), TenantId).ReturnsNull();
+        _userRepo.GetByEmailAsync(Arg.Any<Email>(), WorkspaceId).ReturnsNull();
         Invitation existing = Invitation.Create(
-            Email.Create("invited@example.com").Value, TenantId, RoleId, InvitedById);
-        _invitationRepo.GetPendingByEmailAsync(Arg.Any<Email>(), TenantId).Returns(existing);
+            Email.Create("invited@example.com").Value, WorkspaceId, RoleId, InvitedById);
+        _invitationRepo.GetPendingByEmailAsync(Arg.Any<Email>(), WorkspaceId).Returns(existing);
 
         Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
@@ -90,12 +90,12 @@ public class InviteUserHandlerTests
     [Fact]
     public async Task InviteUser_WhenInvitingSelf_ReturnsConflict()
     {
-        InviteUserCommand selfCommand = new(TenantId, "invited@example.com", RoleId,
+        InviteUserCommand selfCommand = new(WorkspaceId, "invited@example.com", RoleId,
             InvitedById: InvitedById);
         User inviter = User.Create("Alice", "Smith",
             Email.Create("invited@example.com").Value);
         // Same user Id
-        _userRepo.GetByEmailAsync(Arg.Any<Email>(), TenantId).Returns(inviter);
+        _userRepo.GetByEmailAsync(Arg.Any<Email>(), WorkspaceId).Returns(inviter);
 
         // The handler detects self-invite via the existing member check
         Result result = await CreateHandler().Handle(selfCommand, CancellationToken.None);
@@ -106,9 +106,9 @@ public class InviteUserHandlerTests
     [Fact]
     public async Task InviteUser_WhenRoleNotFound_ReturnsNotFound()
     {
-        _userRepo.GetByEmailAsync(Arg.Any<Email>(), TenantId).ReturnsNull();
-        _invitationRepo.GetPendingByEmailAsync(Arg.Any<Email>(), TenantId).ReturnsNull();
-        _roleRepo.GetByIdAsync(RoleId, TenantId).ReturnsNull();
+        _userRepo.GetByEmailAsync(Arg.Any<Email>(), WorkspaceId).ReturnsNull();
+        _invitationRepo.GetPendingByEmailAsync(Arg.Any<Email>(), WorkspaceId).ReturnsNull();
+        _roleRepo.GetByIdAsync(RoleId, WorkspaceId).ReturnsNull();
 
         Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 

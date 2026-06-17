@@ -7,7 +7,8 @@ namespace Axis.Identity.Application.Queries.GetUserTokenClaims;
 
 public sealed class GetUserTokenClaimsHandler(
     IUserRepository userRepo,
-    ITenantMembershipRepository membershipRepo,
+    IWorkspaceMembershipRepository membershipRepo,
+    IWorkspaceRepository workspaceRepo,
     IRoleRepository roleRepo)
     : IQueryHandler<GetUserTokenClaimsQuery, Result<UserTokenClaimsDto>>
 {
@@ -23,15 +24,15 @@ public sealed class GetUserTokenClaimsHandler(
                 "The account is no longer active.");
         }
 
-        TenantMembership? membership = query.tenantId is Guid tenantId
-            ? await membershipRepo.GetByUserAndTenantAsync(user.Id, tenantId, cancellationToken)
+        WorkspaceMembership? membership = query.workspaceId is Guid workspaceId
+            ? await membershipRepo.GetByUserAndWorkspaceAsync(user.Id, workspaceId, cancellationToken)
             : await membershipRepo.GetFirstActiveByUserIdAsync(user.Id, cancellationToken);
 
-        if (query.tenantId.HasValue && membership is null)
+        if (query.workspaceId.HasValue && membership is null)
         {
             return Result.Failure<UserTokenClaimsDto>(
                 ErrorCodes.BusinessRule,
-                "Invalid Tenant scope for this user.");
+                "Invalid Workspace scope for this user.");
         }
 
         if (membership is null)
@@ -44,9 +45,17 @@ public sealed class GetUserTokenClaimsHandler(
                 []));
         }
 
+        Workspace? workspace = await workspaceRepo.GetByIdAsync(membership.workspaceId, cancellationToken);
+        if (workspace is null || !workspace.AllowsSignIn())
+        {
+            return Result.Failure<UserTokenClaimsDto>(
+                ErrorCodes.BusinessRule,
+                "Workspace is not available for sign-in.");
+        }
+
         IReadOnlyList<Role> roles = await roleRepo.GetByIdsAsync(
             membership.RoleIds,
-            membership.tenantId,
+            membership.workspaceId,
             cancellationToken);
         List<string> permissions = roles
             .SelectMany(r => r.Permissions)
@@ -55,7 +64,7 @@ public sealed class GetUserTokenClaimsHandler(
 
         return Result.Success(new UserTokenClaimsDto(
             user.Id,
-            membership.tenantId,
+            membership.workspaceId,
             user.Email.Value,
             $"{user.FirstName} {user.LastName}",
             permissions));

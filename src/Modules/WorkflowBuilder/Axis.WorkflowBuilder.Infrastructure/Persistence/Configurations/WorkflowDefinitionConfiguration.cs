@@ -60,8 +60,8 @@ internal sealed class WorkflowDefinitionConfiguration : IEntityTypeConfiguration
             .HasMaxLength(20)
             .IsRequired();
 
-        builder.Property(w => w.tenantId)
-            .HasColumnName("tenant_id")
+        builder.Property(w => w.workspaceId)
+            .HasColumnName("workspace_id")
             .IsRequired();
 
         builder.Property(w => w.DeletedAt)
@@ -110,7 +110,7 @@ internal sealed class WorkflowDefinitionConfiguration : IEntityTypeConfiguration
         builder.Ignore(w => w.Transitions);
         builder.Ignore(w => w.Triggers);
 
-        builder.HasIndex(w => new { w.tenantId, w.Name })
+        builder.HasIndex(w => new { w.workspaceId, w.Name })
             .IsUnique()
             .HasFilter("deleted_at IS NULL");
     }

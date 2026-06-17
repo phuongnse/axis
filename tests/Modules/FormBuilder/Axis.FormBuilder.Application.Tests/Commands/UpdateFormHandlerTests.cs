@@ -11,7 +11,7 @@ namespace Axis.FormBuilder.Application.Tests.Commands;
 
 public class UpdateFormHandlerTests
 {
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private readonly IFormRepository _repo = Substitute.For<IFormRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly UpdateFormHandler _handler;
@@ -21,12 +21,12 @@ public class UpdateFormHandlerTests
     [Fact]
     public async Task Handle_WhenFormExistsAndNameUnique_UpdatesAndSaves()
     {
-        FormDefinition form = FormDefinition.Create("Old Name", null, TenantId, "user");
-        _repo.GetByIdAsync(form.Id, TenantId, Arg.Any<CancellationToken>()).Returns(form);
-        _repo.NameExistsAsync("New Name", TenantId, form.Id, Arg.Any<CancellationToken>()).Returns(false);
+        FormDefinition form = FormDefinition.Create("Old Name", null, WorkspaceId, "user");
+        _repo.GetByIdAsync(form.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(form);
+        _repo.NameExistsAsync("New Name", WorkspaceId, form.Id, Arg.Any<CancellationToken>()).Returns(false);
 
         Result result = await _handler.Handle(
-            new UpdateFormCommand(form.Id, TenantId, "New Name", "Updated desc"), CancellationToken.None);
+            new UpdateFormCommand(form.Id, WorkspaceId, "New Name", "Updated desc"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         form.Name.Should().Be("New Name");
@@ -37,25 +37,25 @@ public class UpdateFormHandlerTests
     [Fact]
     public async Task Handle_WhenFormNotFound_ReturnsNotFound()
     {
-        _repo.GetByIdAsync(Arg.Any<Guid>(), TenantId, Arg.Any<CancellationToken>())
+        _repo.GetByIdAsync(Arg.Any<Guid>(), WorkspaceId, Arg.Any<CancellationToken>())
             .Returns((FormDefinition?)null);
 
         Result result = await _handler.Handle(
-            new UpdateFormCommand(Guid.NewGuid(), TenantId, "Name", null), CancellationToken.None);
+            new UpdateFormCommand(Guid.NewGuid(), WorkspaceId, "Name", null), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
     }
 
     [Fact]
-    public async Task Handle_WhenFormBelongsToAnotherTenant_ReturnsNotFound()
+    public async Task Handle_WhenFormBelongsToAnotherWorkspace_ReturnsNotFound()
     {
-        FormDefinition form = FormDefinition.Create("Old Name", null, TenantId, "user");
-        _repo.GetByIdAsync(form.Id, TenantId, Arg.Any<CancellationToken>()).Returns(form);
+        FormDefinition form = FormDefinition.Create("Old Name", null, WorkspaceId, "user");
+        _repo.GetByIdAsync(form.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(form);
 
-        Guid otherTenantId = Guid.NewGuid();
+        Guid otherWorkspaceId = Guid.NewGuid();
         Result result = await _handler.Handle(
-            new UpdateFormCommand(form.Id, otherTenantId, "New Name", null), CancellationToken.None);
+            new UpdateFormCommand(form.Id, otherWorkspaceId, "New Name", null), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
@@ -64,12 +64,12 @@ public class UpdateFormHandlerTests
     [Fact]
     public async Task Handle_WhenNameAlreadyExists_ReturnsConflict()
     {
-        FormDefinition form = FormDefinition.Create("Old Name", null, TenantId, "user");
-        _repo.GetByIdAsync(form.Id, TenantId, Arg.Any<CancellationToken>()).Returns(form);
-        _repo.NameExistsAsync("Taken Name", TenantId, form.Id, Arg.Any<CancellationToken>()).Returns(true);
+        FormDefinition form = FormDefinition.Create("Old Name", null, WorkspaceId, "user");
+        _repo.GetByIdAsync(form.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(form);
+        _repo.NameExistsAsync("Taken Name", WorkspaceId, form.Id, Arg.Any<CancellationToken>()).Returns(true);
 
         Result result = await _handler.Handle(
-            new UpdateFormCommand(form.Id, TenantId, "Taken Name", null), CancellationToken.None);
+            new UpdateFormCommand(form.Id, WorkspaceId, "Taken Name", null), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.Conflict);
@@ -78,14 +78,14 @@ public class UpdateFormHandlerTests
     [Fact]
     public async Task Handle_WhenSaveThrowsUniqueConstraint_ReturnsConflict()
     {
-        FormDefinition form = FormDefinition.Create("Old Name", null, TenantId, "user");
-        _repo.GetByIdAsync(form.Id, TenantId, Arg.Any<CancellationToken>()).Returns(form);
-        _repo.NameExistsAsync("Concurrent Name", TenantId, form.Id, Arg.Any<CancellationToken>()).Returns(false);
+        FormDefinition form = FormDefinition.Create("Old Name", null, WorkspaceId, "user");
+        _repo.GetByIdAsync(form.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(form);
+        _repo.NameExistsAsync("Concurrent Name", WorkspaceId, form.Id, Arg.Any<CancellationToken>()).Returns(false);
         _uow.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns<int>(_ => throw new UniqueConstraintException("unique violation"));
 
         Result result = await _handler.Handle(
-            new UpdateFormCommand(form.Id, TenantId, "Concurrent Name", null), CancellationToken.None);
+            new UpdateFormCommand(form.Id, WorkspaceId, "Concurrent Name", null), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.Conflict);

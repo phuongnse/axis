@@ -54,10 +54,6 @@ namespace Axis.WorkflowBuilder.Infrastructure.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
-                    b.Property<Guid>("tenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -83,9 +79,13 @@ namespace Axis.WorkflowBuilder.Infrastructure.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("triggers");
 
+                    b.Property<Guid>("workspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("tenantId", "Name")
+                    b.HasIndex("workspaceId", "Name")
                         .IsUnique()
                         .HasFilter("deleted_at IS NULL");
 
@@ -110,15 +110,15 @@ namespace Axis.WorkflowBuilder.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_broken");
 
-                    b.Property<Guid>("tenantId")
+                    b.Property<Guid>("workspaceId")
                         .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
+                        .HasColumnName("workspace_id");
 
                     b.HasKey("WorkflowId", "StepId");
 
                     b.HasIndex("FormId");
 
-                    b.HasIndex("tenantId", "FormId");
+                    b.HasIndex("workspaceId", "FormId");
 
                     b.ToTable("workflow_form_references", (string)null);
                 });
@@ -137,15 +137,15 @@ namespace Axis.WorkflowBuilder.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_broken");
 
-                    b.Property<Guid>("tenantId")
+                    b.Property<Guid>("workspaceId")
                         .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
+                        .HasColumnName("workspace_id");
 
                     b.HasKey("WorkflowId", "ModelId");
 
                     b.HasIndex("ModelId");
 
-                    b.HasIndex("tenantId", "ModelId");
+                    b.HasIndex("workspaceId", "ModelId");
 
                     b.ToTable("workflow_model_references", (string)null);
                 });

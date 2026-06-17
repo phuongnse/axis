@@ -15,7 +15,7 @@ public class ReorderFieldsHandlerTests
 {
     private readonly IDataModelRepository _modelRepo = Substitute.For<IDataModelRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     private ReorderFieldsHandler CreateHandler() => new(_modelRepo, _uow);
@@ -23,14 +23,14 @@ public class ReorderFieldsHandlerTests
     [Fact]
     public async Task ReorderFields_WhenValidOrderProvided_ReordersCustomFieldsAndSaves()
     {
-        DataModel model = DataModel.Create("My Model", null, null, null, TenantId, UserId);
+        DataModel model = DataModel.Create("My Model", null, null, null, WorkspaceId, UserId);
         FieldDefinition f1 = model.AddField("alpha", "Alpha", FieldType.Text, false, new TextFieldConfig());
         FieldDefinition f2 = model.AddField("beta", "Beta", FieldType.Text, false, new TextFieldConfig());
-        _modelRepo.GetByIdAsync(model.Id, TenantId).Returns(model);
+        _modelRepo.GetByIdAsync(model.Id, WorkspaceId).Returns(model);
 
         // Reverse order: beta first, alpha second
         Result result = await CreateHandler().Handle(
-            new ReorderFieldsCommand(model.Id, TenantId, [f2.Id, f1.Id]),
+            new ReorderFieldsCommand(model.Id, WorkspaceId, [f2.Id, f1.Id]),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -43,10 +43,10 @@ public class ReorderFieldsHandlerTests
     [Fact]
     public async Task ReorderFields_WhenModelNotFound_ReturnsNotFound()
     {
-        _modelRepo.GetByIdAsync(Arg.Any<Guid>(), TenantId).Returns((DataModel?)null);
+        _modelRepo.GetByIdAsync(Arg.Any<Guid>(), WorkspaceId).Returns((DataModel?)null);
 
         Result result = await CreateHandler().Handle(
-            new ReorderFieldsCommand(Guid.NewGuid(), TenantId, [Guid.NewGuid()]),
+            new ReorderFieldsCommand(Guid.NewGuid(), WorkspaceId, [Guid.NewGuid()]),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -55,15 +55,15 @@ public class ReorderFieldsHandlerTests
     }
 
     [Fact]
-    public async Task ReorderFields_WhenModelBelongsToAnotherTenant_ReturnsNotFound()
+    public async Task ReorderFields_WhenModelBelongsToAnotherWorkspace_ReturnsNotFound()
     {
-        DataModel model = DataModel.Create("My Model", null, null, null, TenantId, UserId);
+        DataModel model = DataModel.Create("My Model", null, null, null, WorkspaceId, UserId);
         FieldDefinition f1 = model.AddField("alpha", "Alpha", FieldType.Text, false, new TextFieldConfig());
-        _modelRepo.GetByIdAsync(model.Id, TenantId).Returns(model);
+        _modelRepo.GetByIdAsync(model.Id, WorkspaceId).Returns(model);
 
-        Guid otherTenantId = Guid.NewGuid();
+        Guid otherWorkspaceId = Guid.NewGuid();
         Result result = await CreateHandler().Handle(
-            new ReorderFieldsCommand(model.Id, otherTenantId, [f1.Id]),
+            new ReorderFieldsCommand(model.Id, otherWorkspaceId, [f1.Id]),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -73,12 +73,12 @@ public class ReorderFieldsHandlerTests
     [Fact]
     public async Task ReorderFields_WhenIdsMismatch_ReturnsBusinessRuleFailure()
     {
-        DataModel model = DataModel.Create("My Model", null, null, null, TenantId, UserId);
+        DataModel model = DataModel.Create("My Model", null, null, null, WorkspaceId, UserId);
         model.AddField("alpha", "Alpha", FieldType.Text, false, new TextFieldConfig());
-        _modelRepo.GetByIdAsync(model.Id, TenantId).Returns(model);
+        _modelRepo.GetByIdAsync(model.Id, WorkspaceId).Returns(model);
 
         Result result = await CreateHandler().Handle(
-            new ReorderFieldsCommand(model.Id, TenantId, [Guid.NewGuid()]),
+            new ReorderFieldsCommand(model.Id, WorkspaceId, [Guid.NewGuid()]),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

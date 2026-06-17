@@ -11,7 +11,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List all data models for the tenant */
+        /** List all data models for the workspace */
         get: operations["GetModels"];
         put?: never;
         /** Create a new data model */
@@ -100,7 +100,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List all data classes for the tenant */
+        /** List all data classes for the workspace */
         get: operations["GetDataClasses"];
         put?: never;
         /** Create a new data class */
@@ -242,7 +242,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List all forms for the tenant (paginated) */
+        /** List all forms for the workspace (paginated) */
         get: operations["GetForms"];
         put?: never;
         /** Create a new form definition */
@@ -442,6 +442,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/switch-workspace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Switch the active workspace for the next PKCE token exchange */
+        post: operations["SwitchWorkspace"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/verify-email": {
         parameters: {
             query?: never;
@@ -466,7 +483,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Poll tenant provisioning progress after email verification */
+        /** Poll workspace provisioning progress after email verification */
         get: operations["GetProvisioningStatus"];
         put?: never;
         post?: never;
@@ -485,8 +502,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Manually re-queue tenant provisioning after automatic retries are exhausted */
-        post: operations["RetryTenantProvisioning"];
+        /** Manually re-queue workspace provisioning after automatic retries are exhausted */
+        post: operations["RetryWorkspaceProvisioning"];
         delete?: never;
         options?: never;
         head?: never;
@@ -544,15 +561,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/tenants/slug-preview": {
+    "/api/workspaces/slug-preview": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Preview tenant URL slug from a proposed name */
-        get: operations["GetTenantSlugPreview"];
+        /** Preview workspace URL slug from a proposed name */
+        get: operations["GetWorkspaceSlugPreview"];
         put?: never;
         post?: never;
         delete?: never;
@@ -561,7 +578,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/tenants": {
+    "/api/workspaces": {
         parameters: {
             query?: never;
             header?: never;
@@ -570,15 +587,15 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register a new tenant contact for verification */
-        post: operations["RegisterTenant"];
+        /** Register a new workspace contact for verification */
+        post: operations["RegisterWorkspace"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/tenants/me/invitations": {
+    "/api/workspaces/me/invitations": {
         parameters: {
             query?: never;
             header?: never;
@@ -587,7 +604,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Invite a user to the tenant by email */
+        /** Invite a user to the workspace by email */
         post: operations["InviteUser"];
         delete?: never;
         options?: never;
@@ -595,15 +612,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/tenants/current/settings": {
+    "/api/workspaces/current/settings": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get tenant settings and usage stats */
-        get: operations["GetTenantSettings"];
+        /** Get workspace settings and usage stats */
+        get: operations["GetWorkspaceSettings"];
         put?: never;
         post?: never;
         delete?: never;
@@ -612,7 +629,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/tenants/current/profile": {
+    "/api/workspaces/current/profile": {
         parameters: {
             query?: never;
             header?: never;
@@ -620,8 +637,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Update tenant profile (name, timezone, language, logo) */
-        put: operations["UpdateTenantProfile"];
+        /** Update workspace profile (name, timezone, language, logo) */
+        put: operations["UpdateWorkspaceProfile"];
         post?: never;
         delete?: never;
         options?: never;
@@ -629,7 +646,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/tenants/current/deletion": {
+    "/api/workspaces/current/deletion": {
         parameters: {
             query?: never;
             header?: never;
@@ -638,10 +655,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Schedule tenant for deletion after a 30-day grace period */
-        post: operations["ScheduleTenantDeletion"];
-        /** Cancel a scheduled tenant deletion */
-        delete: operations["CancelTenantDeletion"];
+        /** Schedule workspace for deletion after a 30-day grace period */
+        post: operations["ScheduleWorkspaceDeletion"];
+        /** Cancel a scheduled workspace deletion */
+        delete: operations["CancelWorkspaceDeletion"];
         options?: never;
         head?: never;
         patch?: never;
@@ -690,7 +707,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register a user account standalone or with a tenant setup token */
+        /** Register a user account standalone or with a workspace setup token */
         post: operations["RegisterUser"];
         delete?: never;
         options?: never;
@@ -809,7 +826,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List all roles for the tenant */
+        /** List all roles for the workspace */
         get: operations["GetRoles"];
         put?: never;
         /** Create a new role */
@@ -854,7 +871,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/platform/tenants/{tenantId}/plan": {
+    "/api/platform/workspaces/{workspaceId}/plan": {
         parameters: {
             query?: never;
             header?: never;
@@ -862,8 +879,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Platform admin: change a tenant's subscription plan */
-        put: operations["ChangeTenantPlan"];
+        /** Platform admin: change a workspace's subscription plan */
+        put: operations["ChangeWorkspacePlan"];
         post?: never;
         delete?: never;
         options?: never;
@@ -878,7 +895,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List workflow definitions for the tenant (paginated) */
+        /** List workflow definitions for the workspace (paginated) */
         get: operations["GetWorkflows"];
         put?: never;
         /** Create a new workflow definition in Draft status */
@@ -1121,7 +1138,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List workflow executions for the tenant (paginated) */
+        /** List workflow executions for the workspace (paginated) */
         get: operations["GetAllExecutions"];
         put?: never;
         post?: never;
@@ -1303,7 +1320,7 @@ export interface components {
             newPassword?: string;
             confirmPassword?: string;
         };
-        ChangeTenantPlanRequest: {
+        ChangeWorkspacePlanRequest: {
             /** Format: uuid */
             planId?: string;
         };
@@ -1350,8 +1367,9 @@ export interface components {
             avatarUrl?: string | null;
             isActive?: boolean;
             /** Format: uuid */
-            tenantId?: string | null;
+            workspaceId?: string | null;
             permissions?: string[];
+            workspaces?: components["schemas"]["UserWorkspaceDto"][];
         };
         DataClassDetailDto: {
             /** Format: uuid */
@@ -1626,8 +1644,8 @@ export interface components {
         };
         ProvisioningStatusDto: {
             /** Format: uuid */
-            tenantId?: string;
-            tenantStatus?: string;
+            workspaceId?: string;
+            workspaceStatus?: string;
             isReady?: boolean;
             modules?: components["schemas"]["ModuleProvisioningStatusDto"][];
         };
@@ -1655,14 +1673,6 @@ export interface components {
             /** Format: int32 */
             totalPages?: number;
         };
-        RegisterTenantRequest: {
-            tenantName?: string;
-            tenantContactEmail?: string;
-            acceptedTermsVersion?: string;
-            acceptedPrivacyVersion?: string;
-            /** Format: uuid */
-            subscriptionPlanId?: string | null;
-        };
         RegisterUserRequest: {
             firstName?: string;
             lastName?: string;
@@ -1671,7 +1681,15 @@ export interface components {
             passwordConfirmation?: string;
             acceptedTermsVersion?: string;
             acceptedPrivacyVersion?: string;
-            tenantSetupToken?: string | null;
+            workspaceSetupToken?: string | null;
+        };
+        RegisterWorkspaceRequest: {
+            workspaceName?: string;
+            workspaceContactEmail?: string;
+            acceptedTermsVersion?: string;
+            acceptedPrivacyVersion?: string;
+            /** Format: uuid */
+            subscriptionPlanId?: string | null;
         };
         RemoveTransitionRequest: {
             /** Format: uuid */
@@ -1709,7 +1727,7 @@ export interface components {
             isSystem?: boolean;
             permissions?: string[];
         };
-        ScheduleTenantDeletionRequest: {
+        ScheduleWorkspaceDeletionRequest: {
             confirmationName?: string;
         };
         StartExecutionRequest: {
@@ -1759,24 +1777,9 @@ export interface components {
             isCurrent?: boolean;
             isAvailableForNewSignups?: boolean;
         };
-        TenantSettingsDto: {
+        SwitchWorkspaceRequest: {
             /** Format: uuid */
-            tenantId?: string;
-            name?: string;
-            slug?: string;
-            logoUrl?: string | null;
-            planName?: string;
-            status?: string;
-            /** Format: date-time */
-            createdAt?: string;
-            timeZoneId?: string | null;
-            defaultLanguage?: string | null;
-            /** Format: date-time */
-            scheduledHardDeleteAt?: string | null;
-            usage?: components["schemas"]["UsageStatsDto"];
-        };
-        TenantSlugPreviewDto: {
-            slug?: string;
+            workspaceId?: string;
         };
         TransitionExportDto: {
             /** Format: uuid */
@@ -1828,16 +1831,16 @@ export interface components {
         UpdateStatusRequest: {
             isActive?: boolean;
         };
-        UpdateTenantProfileRequest: {
+        UpdateWorkflowRequest: {
+            name?: string;
+            description?: string | null;
+        };
+        UpdateWorkspaceProfileRequest: {
             name?: string;
             timeZoneId?: string | null;
             defaultLanguage?: string | null;
             logoBase64?: string | null;
             logoContentType?: string | null;
-        };
-        UpdateWorkflowRequest: {
-            name?: string;
-            description?: string | null;
         };
         UsageStatsDto: {
             /** Format: int32 */
@@ -1862,6 +1865,14 @@ export interface components {
             expiresAt?: string;
             isCurrent?: boolean;
         };
+        UserWorkspaceDto: {
+            /** Format: uuid */
+            id?: string;
+            name?: string;
+            slug?: string;
+            type?: string;
+            isCurrent?: boolean;
+        };
         /** @enum {string} */
         VerifyEmailNextStep: "Dashboard" | "RegisterUser" | "WorkspaceProvisioning";
         VerifyEmailRequest: {
@@ -1870,7 +1881,7 @@ export interface components {
         VerifyEmailSessionEstablishedDto: {
             sessionEstablished?: boolean;
             nextStep?: components["schemas"]["VerifyEmailNextStep"];
-            tenantSetupToken?: string | null;
+            workspaceSetupToken?: string | null;
         };
         WorkflowDetailDto: {
             /** Format: uuid */
@@ -1934,6 +1945,25 @@ export interface components {
                 [key: string]: unknown;
             } | null;
             isBroken?: boolean;
+        };
+        WorkspaceSettingsDto: {
+            /** Format: uuid */
+            workspaceId?: string;
+            name?: string;
+            slug?: string;
+            logoUrl?: string | null;
+            planName?: string;
+            status?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            timeZoneId?: string | null;
+            defaultLanguage?: string | null;
+            /** Format: date-time */
+            scheduledHardDeleteAt?: string | null;
+            usage?: components["schemas"]["UsageStatsDto"];
+        };
+        WorkspaceSlugPreviewDto: {
+            slug?: string;
         };
     };
     responses: never;
@@ -3900,6 +3930,55 @@ export interface operations {
             };
         };
     };
+    SwitchWorkspace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SwitchWorkspaceRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     VerifyEmail: {
         parameters: {
             query?: never;
@@ -3962,7 +4041,7 @@ export interface operations {
             };
         };
     };
-    RetryTenantProvisioning: {
+    RetryWorkspaceProvisioning: {
         parameters: {
             query?: never;
             header?: never;
@@ -4097,10 +4176,10 @@ export interface operations {
             };
         };
     };
-    GetTenantSlugPreview: {
+    GetWorkspaceSlugPreview: {
         parameters: {
             query: {
-                tenantName: string;
+                workspaceName: string;
             };
             header?: never;
             path?: never;
@@ -4114,12 +4193,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TenantSlugPreviewDto"];
+                    "application/json": components["schemas"]["WorkspaceSlugPreviewDto"];
                 };
             };
         };
     };
-    RegisterTenant: {
+    RegisterWorkspace: {
         parameters: {
             query?: never;
             header?: never;
@@ -4128,7 +4207,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RegisterTenantRequest"];
+                "application/json": components["schemas"]["RegisterWorkspaceRequest"];
             };
         };
         responses: {
@@ -4230,7 +4309,7 @@ export interface operations {
             };
         };
     };
-    GetTenantSettings: {
+    GetWorkspaceSettings: {
         parameters: {
             query?: never;
             header?: never;
@@ -4245,7 +4324,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TenantSettingsDto"];
+                    "application/json": components["schemas"]["WorkspaceSettingsDto"];
                 };
             };
             /** @description Unauthorized */
@@ -4277,7 +4356,7 @@ export interface operations {
             };
         };
     };
-    UpdateTenantProfile: {
+    UpdateWorkspaceProfile: {
         parameters: {
             query?: never;
             header?: never;
@@ -4286,7 +4365,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["UpdateTenantProfileRequest"];
+                "application/json": components["schemas"]["UpdateWorkspaceProfileRequest"];
             };
         };
         responses: {
@@ -4335,7 +4414,7 @@ export interface operations {
             };
         };
     };
-    ScheduleTenantDeletion: {
+    ScheduleWorkspaceDeletion: {
         parameters: {
             query?: never;
             header?: never;
@@ -4344,7 +4423,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ScheduleTenantDeletionRequest"];
+                "application/json": components["schemas"]["ScheduleWorkspaceDeletionRequest"];
             };
         };
         responses: {
@@ -4384,7 +4463,7 @@ export interface operations {
             };
         };
     };
-    CancelTenantDeletion: {
+    CancelWorkspaceDeletion: {
         parameters: {
             query?: never;
             header?: never;
@@ -5084,18 +5163,18 @@ export interface operations {
             };
         };
     };
-    ChangeTenantPlan: {
+    ChangeWorkspacePlan: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                tenantId: string;
+                workspaceId: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ChangeTenantPlanRequest"];
+                "application/json": components["schemas"]["ChangeWorkspacePlanRequest"];
             };
         };
         responses: {

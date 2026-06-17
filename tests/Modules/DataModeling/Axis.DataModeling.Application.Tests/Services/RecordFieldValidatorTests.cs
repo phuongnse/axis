@@ -8,12 +8,12 @@ namespace Axis.DataModeling.Application.Tests.Services;
 
 public class RecordFieldValidatorTests
 {
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private const string UserId = "user-1";
 
     private static DataModel ModelWith(Action<DataModel> configure)
     {
-        DataModel model = DataModel.Create("Test", null, null, null, TenantId, UserId);
+        DataModel model = DataModel.Create("Test", null, null, null, WorkspaceId, UserId);
         configure(model);
         return model;
     }
@@ -50,7 +50,7 @@ public class RecordFieldValidatorTests
     public void Validate_WhenOnlySystemFieldsArePresent_ReturnsNoErrors()
     {
         // id, created_at, updated_at are system fields — never validated against required rule
-        DataModel model = DataModel.Create("Test", null, null, null, TenantId, UserId);
+        DataModel model = DataModel.Create("Test", null, null, null, WorkspaceId, UserId);
         Dictionary<string, string[]> errors = RecordFieldValidator.Validate(new Dictionary<string, object?>(), model.Fields);
         errors.Should().BeEmpty();
     }

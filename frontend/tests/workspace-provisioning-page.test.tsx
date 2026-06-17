@@ -10,7 +10,7 @@ describe('WorkspaceProvisioningPage', () => {
     vi.stubGlobal('fetch', vi.fn());
     saveRegistrationContext({
       email: 'alex@example.com',
-      TenantName: 'Acme Corp',
+      WorkspaceName: 'Acme Corp',
     });
   });
 
@@ -27,8 +27,8 @@ describe('WorkspaceProvisioningPage', () => {
       text: () =>
         Promise.resolve(
           JSON.stringify({
-            tenantId: '00000000-0000-0000-0000-000000000001',
-            tenantStatus: 'Provisioning',
+            workspaceId: '00000000-0000-0000-0000-000000000001',
+            workspaceStatus: 'Provisioning',
             isReady: false,
             modules: [
               { module: 'DataModeling', status: 'Pending', attemptCount: 0, lastError: null },
@@ -56,8 +56,8 @@ describe('WorkspaceProvisioningPage', () => {
       text: () =>
         Promise.resolve(
           JSON.stringify({
-            tenantId: '00000000-0000-0000-0000-000000000001',
-            tenantStatus: 'ProvisioningFailed',
+            workspaceId: '00000000-0000-0000-0000-000000000001',
+            workspaceStatus: 'ProvisioningFailed',
             isReady: false,
             modules: [
               { module: 'DataModeling', status: 'Failed', attemptCount: 3, lastError: 'timeout' },

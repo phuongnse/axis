@@ -10,7 +10,7 @@ namespace Axis.Identity.Application.Commands.AcceptInvitation;
 public sealed class AcceptInvitationHandler(
     IInvitationRepository invitationRepo,
     IUserRepository userRepo,
-    ITenantMembershipRepository membershipRepo,
+    IWorkspaceMembershipRepository membershipRepo,
     IRoleRepository roleRepo,
     IPasswordHasher hasher,
     IUnitOfWork uow)
@@ -52,18 +52,18 @@ public sealed class AcceptInvitationHandler(
 
         await userRepo.AddAsync(user, cancellationToken);
 
-        TenantMembership membership = TenantMembership.Create(user.Id, invitation.tenantId);
+        WorkspaceMembership membership = WorkspaceMembership.Create(user.Id, invitation.workspaceId);
         membership.AssignRole(invitation.RoleId);
         await membershipRepo.AddAsync(membership, cancellationToken);
 
         await uow.SaveChangesAsync(cancellationToken);
 
-        IReadOnlyList<Role> roles = await roleRepo.GetByIdsAsync([invitation.RoleId], invitation.tenantId, cancellationToken);
+        IReadOnlyList<Role> roles = await roleRepo.GetByIdsAsync([invitation.RoleId], invitation.workspaceId, cancellationToken);
         List<string> permissions = roles.SelectMany(r => r.Permissions).Distinct().ToList();
 
         return new AcceptInvitationResult(
             user.Id,
-            invitation.tenantId,
+            invitation.workspaceId,
             invitation.Email.Value,
             $"{command.FirstName} {command.LastName}",
             permissions);

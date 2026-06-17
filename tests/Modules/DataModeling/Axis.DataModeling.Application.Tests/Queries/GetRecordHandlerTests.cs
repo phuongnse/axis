@@ -10,7 +10,7 @@ namespace Axis.DataModeling.Application.Tests.Queries;
 
 public class GetRecordHandlerTests
 {
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private static readonly Guid ModelId = Guid.NewGuid();
     private readonly IDataRecordRepository _recordRepo = Substitute.For<IDataRecordRepository>();
 
@@ -21,13 +21,13 @@ public class GetRecordHandlerTests
     {
         DataRecord record = DataRecord.Create(
             ModelId,
-            TenantId,
+            WorkspaceId,
             new Dictionary<string, object?> { ["status"] = "active" },
             "user-123");
-        _recordRepo.GetByIdAsync(record.Id, ModelId, TenantId, Arg.Any<CancellationToken>()).Returns(record);
+        _recordRepo.GetByIdAsync(record.Id, ModelId, WorkspaceId, Arg.Any<CancellationToken>()).Returns(record);
 
         Result<RecordDto> result = await CreateHandler().Handle(
-            new GetRecordQuery(record.Id, ModelId, TenantId),
+            new GetRecordQuery(record.Id, ModelId, WorkspaceId),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -38,11 +38,11 @@ public class GetRecordHandlerTests
     [Fact]
     public async Task Handle_WhenRecordDoesNotExist_ReturnsNotFound()
     {
-        _recordRepo.GetByIdAsync(Arg.Any<Guid>(), ModelId, TenantId, Arg.Any<CancellationToken>())
+        _recordRepo.GetByIdAsync(Arg.Any<Guid>(), ModelId, WorkspaceId, Arg.Any<CancellationToken>())
             .Returns((DataRecord?)null);
 
         Result<RecordDto> result = await CreateHandler().Handle(
-            new GetRecordQuery(Guid.NewGuid(), ModelId, TenantId),
+            new GetRecordQuery(Guid.NewGuid(), ModelId, WorkspaceId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

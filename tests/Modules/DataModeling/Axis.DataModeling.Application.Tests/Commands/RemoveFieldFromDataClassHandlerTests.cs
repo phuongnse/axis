@@ -13,7 +13,7 @@ namespace Axis.DataModeling.Application.Tests.Commands;
 
 public class RemoveFieldFromDataClassHandlerTests
 {
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private readonly IDataClassRepository _dataClassRepo = Substitute.For<IDataClassRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
@@ -22,17 +22,17 @@ public class RemoveFieldFromDataClassHandlerTests
     [Fact]
     public async Task Handle_WhenFieldExists_RemovesFieldAndSaves()
     {
-        DataClass dataClass = DataClass.Create("Address", null, TenantId, "user-123");
+        DataClass dataClass = DataClass.Create("Address", null, WorkspaceId, "user-123");
         FieldDefinition field = dataClass.AddField(
             "street",
             "Street",
             FieldType.Text,
             true,
             new TextFieldConfig());
-        _dataClassRepo.GetByIdAsync(dataClass.Id, TenantId, Arg.Any<CancellationToken>()).Returns(dataClass);
+        _dataClassRepo.GetByIdAsync(dataClass.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(dataClass);
 
         Result result = await CreateHandler().Handle(
-            new RemoveFieldFromDataClassCommand(dataClass.Id, field.Id, TenantId),
+            new RemoveFieldFromDataClassCommand(dataClass.Id, field.Id, WorkspaceId),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -43,11 +43,11 @@ public class RemoveFieldFromDataClassHandlerTests
     [Fact]
     public async Task Handle_WhenDataClassDoesNotExist_ReturnsNotFound()
     {
-        _dataClassRepo.GetByIdAsync(Arg.Any<Guid>(), TenantId, Arg.Any<CancellationToken>())
+        _dataClassRepo.GetByIdAsync(Arg.Any<Guid>(), WorkspaceId, Arg.Any<CancellationToken>())
             .Returns((DataClass?)null);
 
         Result result = await CreateHandler().Handle(
-            new RemoveFieldFromDataClassCommand(Guid.NewGuid(), Guid.NewGuid(), TenantId),
+            new RemoveFieldFromDataClassCommand(Guid.NewGuid(), Guid.NewGuid(), WorkspaceId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

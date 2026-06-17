@@ -8,7 +8,7 @@ Delete a record so that I can remove outdated or incorrect entries.
 
 ## Primary actor
 
-- Tenant Member with `data_modeling:record:delete`
+- Workspace Member with `data_modeling:record:delete`
 
 ## Trigger
 
@@ -17,7 +17,7 @@ Delete a record so that I can remove outdated or incorrect entries.
 ## Main flow
 
 1. Actor starts the — Delete a record flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
@@ -26,7 +26,7 @@ Delete a record so that I can remove outdated or incorrect entries.
 
 ## Context
 
-Users can create, read, update, and delete records against any model. Records are stored as JSONB in the tenant schema.
+Users can create, read, update, and delete records against any model. Records are stored as JSONB in the workspace schema.
 
 ## Acceptance Criteria
 

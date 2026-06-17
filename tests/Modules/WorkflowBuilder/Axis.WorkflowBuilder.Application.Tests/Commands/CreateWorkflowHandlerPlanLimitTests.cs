@@ -15,7 +15,7 @@ public class CreateWorkflowHandlerPlanLimitTests
     private readonly IWorkflowRepository _workflowRepo = Substitute.For<IWorkflowRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
 
     [Fact]
     public async Task CreateWorkflow_WhenWorkflowLimitExceeded_ReturnsPlanLimitFailureWithoutSaving()
@@ -27,11 +27,11 @@ public class CreateWorkflowHandlerPlanLimitTests
             "/pricing",
             "Your plan allows 3 workflows.");
         _planLimitService
-            .EnsureWithinLimitAsync(TenantId, PlanLimitResourceType.Workflows, 1, Arg.Any<CancellationToken>())
+            .EnsureWithinLimitAsync(WorkspaceId, PlanLimitResourceType.Workflows, 1, Arg.Any<CancellationToken>())
             .Returns(Result.PlanLimitFailure(details));
 
         Result<Guid> result = await new CreateWorkflowHandler(_planLimitService, _workflowRepo, _uow).Handle(
-            new CreateWorkflowCommand("New Flow", null, TenantId, "user"),
+            new CreateWorkflowCommand("New Flow", null, WorkspaceId, "user"),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

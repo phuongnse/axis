@@ -6,7 +6,7 @@ internal static class TestRegistrationPayload
 {
     public const string AdminPassword = "maple river sunrise";
 
-    public static string TenantContactEmail(string suffix) =>
+    public static string WorkspaceContactEmail(string suffix) =>
         $"contact{suffix}@test.com";
 
     public static string AdminEmail(string suffix) =>
@@ -14,13 +14,13 @@ internal static class TestRegistrationPayload
 
     public static object Create(string suffix) => new
     {
-        tenantName = $"TestTenant{suffix}",
-        TenantContactEmail = TenantContactEmail(suffix),
+        workspaceName = $"TestWorkspace{suffix}",
+        WorkspaceContactEmail = WorkspaceContactEmail(suffix),
         acceptedTermsVersion = WellKnownLegalDocuments.TermsVersion,
         acceptedPrivacyVersion = WellKnownLegalDocuments.PrivacyVersion,
     };
 
-    public static object CreateUser(string suffix, string? TenantSetupToken = null) => new
+    public static object CreateUser(string suffix, string? WorkspaceSetupToken = null) => new
     {
         firstName = "Test",
         lastName = "Admin",
@@ -29,6 +29,6 @@ internal static class TestRegistrationPayload
         passwordConfirmation = AdminPassword,
         acceptedTermsVersion = WellKnownLegalDocuments.TermsVersion,
         acceptedPrivacyVersion = WellKnownLegalDocuments.PrivacyVersion,
-        TenantSetupToken,
+        WorkspaceSetupToken,
     };
 }

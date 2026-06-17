@@ -15,7 +15,7 @@ internal sealed class WorkflowEngineDbContextFactory : IDesignTimeDbContextFacto
 
         DbContextOptionsBuilder<WorkflowEngineDbContext> builder = new();
         builder.UseNpgsql(connectionString);
-        return new WorkflowEngineDbContext(builder.Options, new DesignTimePublicSchemaTenantContext());
+        return new WorkflowEngineDbContext(builder.Options, new DesignTimePublicSchemaWorkspaceContext());
     }
 
     private static string RequireConnectionString(params string[] envVarNames)

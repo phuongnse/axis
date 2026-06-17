@@ -31,16 +31,16 @@ internal sealed class WorkflowPublishedHandler(
     private async Task UpsertActiveStatusAsync(WorkflowPublishedEvent @event, CancellationToken ct)
     {
         Guid workflowId = @event.WorkflowId();
-        Guid tenantId = @event.tenantId();
+        Guid workspaceId = @event.workspaceId();
 
         WorkflowActiveStatus? existing = await context.WorkflowActiveStatuses
             .FirstOrDefaultAsync(
-                w => w.WorkflowId == workflowId && w.tenantId == tenantId,
+                w => w.WorkflowId == workflowId && w.workspaceId == workspaceId,
                 ct);
 
         if (existing is null)
             context.WorkflowActiveStatuses.Add(
-                WorkflowActiveStatus.Activated(workflowId, tenantId));
+                WorkflowActiveStatus.Activated(workflowId, workspaceId));
         else
             existing.Reactivate();
 
@@ -64,25 +64,25 @@ internal sealed class WorkflowPublishedHandler(
         }
 
         logger.LogInformation(
-            "WorkflowPublishedHandler: active status upserted for workflow {WorkflowId} Tenant {tenantId}",
-            workflowId, tenantId);
+            "WorkflowPublishedHandler: active status upserted for workflow {WorkflowId} Workspace {workspaceId}",
+            workflowId, workspaceId);
     }
 
     private async Task UpsertSnapshotAsync(WorkflowPublishedEvent @event, CancellationToken ct)
     {
         Guid workflowId = @event.WorkflowId();
-        Guid tenantId = @event.tenantId();
+        Guid workspaceId = @event.workspaceId();
         IReadOnlyList<EngineReadModels.StepDefinitionSnapshot> steps = MapSteps(@event.steps);
         IReadOnlyList<EngineReadModels.TransitionSnapshot> transitions = MapTransitions(@event.transitions);
 
         EngineReadModels.WorkflowSnapshot? existing = await context.WorkflowSnapshots
             .FirstOrDefaultAsync(
-                w => w.WorkflowId == workflowId && w.tenantId == tenantId,
+                w => w.WorkflowId == workflowId && w.workspaceId == workspaceId,
                 ct);
 
         if (existing is null)
             context.WorkflowSnapshots.Add(
-                EngineReadModels.WorkflowSnapshot.Create(workflowId, tenantId, steps, transitions));
+                EngineReadModels.WorkflowSnapshot.Create(workflowId, workspaceId, steps, transitions));
         else
             existing.Update(steps, transitions);
 

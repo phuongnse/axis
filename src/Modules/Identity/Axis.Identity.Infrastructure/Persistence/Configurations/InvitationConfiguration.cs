@@ -22,8 +22,8 @@ internal sealed class InvitationConfiguration : IEntityTypeConfiguration<Invitat
                 e => e.Value,
                 s => Email.Create(s).Value!));
 
-        builder.Property(i => i.tenantId)
-            .HasColumnName("tenant_id")
+        builder.Property(i => i.workspaceId)
+            .HasColumnName("workspace_id")
             .IsRequired();
 
         builder.Property(i => i.RoleId)

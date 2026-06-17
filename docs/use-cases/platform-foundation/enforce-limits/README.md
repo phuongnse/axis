@@ -4,11 +4,11 @@
 
 ## Purpose
 
-Enforce subscription plan limits at the API so that Tenants cannot exceed their subscription without upgrading.
+Enforce subscription plan limits at the API so that Workspaces cannot exceed their subscription without upgrading.
 
 ## Primary actor
 
-- Platform (enforcement on behalf of any tenant user action)
+- Platform (enforcement on behalf of any workspace user action)
 
 ## Trigger
 
@@ -16,8 +16,8 @@ Enforce subscription plan limits at the API so that Tenants cannot exceed their 
 
 ## Main flow
 
-1. Tenant user starts an operation that consumes a plan-limited resource, such as creating a workflow, inviting a user, or starting an execution.
-2. API resolves the Tenant's plan and current usage from Redis, falling back to DB-backed counts when Redis is unavailable.
+1. Workspace user starts an operation that consumes a plan-limited resource, such as creating a workflow, inviting a user, or starting an execution.
+2. API resolves the Workspace's plan and current usage from Redis, falling back to DB-backed counts when Redis is unavailable.
 3. System allows the operation when usage is within the plan limit, updates the relevant counter after the mutation, or returns HTTP 402 with limit details when the operation would exceed the plan.
 
 ## Alternate / error flows
@@ -28,7 +28,7 @@ Enforce subscription plan limits at the API so that Tenants cannot exceed their 
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] When a tenant is within limits, all operations proceed normally with no noticeable overhead.
+- [ ] When a workspace is within limits, all operations proceed normally with no noticeable overhead.
 - [ ] Plan limit checks complete in under 10 ms (Redis-cached counters).
 
 *Validation & errors*

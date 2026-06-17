@@ -4,20 +4,20 @@
 
 ## Purpose
 
-See all roles in my Tenant so that I can understand who has what level of access.
+See all roles in my Workspace so that I can understand who has what level of access.
 
 ## Primary actor
 
-- Tenant Admin
+- Workspace Admin
 
 ## Trigger
 
-- User initiates: see all roles in my Tenant
+- User initiates: see all roles in my Workspace
 
 ## Main flow
 
 1. Actor starts the — View and manage roles flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
@@ -26,7 +26,7 @@ See all roles in my Tenant so that I can understand who has what level of access
 
 ## Context
 
-Tenant admins can create custom roles, assign permissions to each role, and assign roles to users. Default system roles (Admin, Editor, Viewer) are provided out-of-the-box and cannot be deleted or modified.
+Workspace admins can create custom roles, assign permissions to each role, and assign roles to users. Default system roles (Admin, Editor, Viewer) are provided out-of-the-box and cannot be deleted or modified.
 
 ## Acceptance Criteria
 
@@ -39,7 +39,7 @@ Tenant admins can create custom roles, assign permissions to each role, and assi
 - [ ] Users without `roles:read` permission who navigate to this URL are redirected to the home page with a permission error.
 
 *Edge cases*
-- [ ] If a tenant has no custom roles yet, the list shows only the 4 default system roles with a prompt to create a custom role.
+- [ ] If a workspace has no custom roles yet, the list shows only the 4 default system roles with a prompt to create a custom role.
 
 *Out of scope*
 - Role hierarchy / role inheritance — flat role model only.

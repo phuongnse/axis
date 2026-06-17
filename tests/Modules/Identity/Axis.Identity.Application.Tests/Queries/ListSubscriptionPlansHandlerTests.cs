@@ -11,10 +11,10 @@ namespace Axis.Identity.Application.Tests.Queries;
 public class ListSubscriptionPlansHandlerTests
 {
     private readonly ISubscriptionPlanRepository _planRepo = Substitute.For<ISubscriptionPlanRepository>();
-    private readonly ITenantRepository _tenantRepo = Substitute.For<ITenantRepository>();
+    private readonly IWorkspaceRepository _workspaceRepo = Substitute.For<IWorkspaceRepository>();
 
     [Fact]
-    public async Task ListSubscriptionPlans_WhenTenantOnRetiredPlan_IncludesCurrentPlanInResults()
+    public async Task ListSubscriptionPlans_WhenWorkspaceOnRetiredPlan_IncludesCurrentPlanInResults()
     {
         SubscriptionPlan free = SubscriptionPlan.Create(
             WellKnownSubscriptionPlans.FreeId, "Free", "free", 0, 3, 1_000, 3, 500, true, true);
@@ -33,16 +33,16 @@ public class ListSubscriptionPlansHandlerTests
         _planRepo.ListAvailableForNewSignupsAsync(Arg.Any<CancellationToken>())
             .Returns(new List<SubscriptionPlan> { free });
 
-        Tenant Tenant = Tenant.Create(
+        Workspace Workspace = Workspace.Create(
             "Acme",
-            TenantSlug.Create("acme").Value!,
+            WorkspaceSlug.Create("acme").Value!,
             Email.Create("a@acme.com").Value!,
             WellKnownSubscriptionPlans.EnterpriseId);
-        _tenantRepo.GetByIdAsync(Tenant.Id).Returns(Tenant);
+        _workspaceRepo.GetByIdAsync(Workspace.Id).Returns(Workspace);
         _planRepo.GetByIdAsync(WellKnownSubscriptionPlans.EnterpriseId).Returns(enterprise);
 
-        IReadOnlyList<SubscriptionPlanDto> result = await new ListSubscriptionPlansHandler(_planRepo, _tenantRepo)
-            .Handle(new ListSubscriptionPlansQuery(Tenant.Id), CancellationToken.None);
+        IReadOnlyList<SubscriptionPlanDto> result = await new ListSubscriptionPlansHandler(_planRepo, _workspaceRepo)
+            .Handle(new ListSubscriptionPlansQuery(Workspace.Id), CancellationToken.None);
 
         result.Should().HaveCount(2);
         result.Should().Contain(p => p.Slug == "enterprise" && p.IsCurrent && !p.IsAvailableForNewSignups);

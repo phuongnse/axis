@@ -12,20 +12,20 @@ namespace axis.datamodeling.events
     public partial class ModelDeletedEvent : global::Avro.Specific.ISpecificRecord
     {
         public static global::Avro.Schema _SCHEMA = global::Avro.Schema.Parse(
-            @"{""type"":""record"",""name"":""ModelDeletedEvent"",""namespace"":""axis.datamodeling.events"",""fields"":[{""name"":""modelId"",""type"":""string""},{""name"":""tenantId"",""type"":""string""}]}");
+            @"{""type"":""record"",""name"":""ModelDeletedEvent"",""namespace"":""axis.datamodeling.events"",""fields"":[{""name"":""modelId"",""type"":""string""},{""name"":""workspaceId"",""type"":""string""}]}");
 
         private string _modelId = string.Empty;
-        private string _tenantId = string.Empty;
+        private string _workspaceId = string.Empty;
 
         public virtual global::Avro.Schema Schema => ModelDeletedEvent._SCHEMA;
 
         public string modelId { get => _modelId; set => _modelId = value; }
-        public string tenantId { get => _tenantId; set => _tenantId = value; }
+        public string workspaceId { get => _workspaceId; set => _workspaceId = value; }
 
         public virtual object Get(int fieldPos) => fieldPos switch
         {
             0 => modelId,
-            1 => tenantId,
+            1 => workspaceId,
             _ => throw new global::Avro.AvroRuntimeException("Bad index " + fieldPos + " in Get()"),
         };
 
@@ -34,7 +34,7 @@ namespace axis.datamodeling.events
             switch (fieldPos)
             {
                 case 0: modelId = (string)fieldValue; break;
-                case 1: tenantId = (string)fieldValue; break;
+                case 1: workspaceId = (string)fieldValue; break;
                 default: throw new global::Avro.AvroRuntimeException("Bad index " + fieldPos + " in Put()");
             }
         }

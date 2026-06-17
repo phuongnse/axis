@@ -54,10 +54,6 @@ namespace Axis.DataModeling.Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
-                    b.Property<Guid>("tenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -67,9 +63,13 @@ namespace Axis.DataModeling.Infrastructure.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("fields");
 
+                    b.Property<Guid>("workspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("tenantId", "Name");
+                    b.HasIndex("workspaceId", "Name");
 
                     b.ToTable("data_classes", (string)null);
                 });
@@ -116,10 +116,6 @@ namespace Axis.DataModeling.Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
-                    b.Property<Guid>("tenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -129,9 +125,13 @@ namespace Axis.DataModeling.Infrastructure.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("fields");
 
+                    b.Property<Guid>("workspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("tenantId", "Name");
+                    b.HasIndex("workspaceId", "Name");
 
                     b.ToTable("data_models", (string)null);
                 });
@@ -161,10 +161,6 @@ namespace Axis.DataModeling.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("model_id");
 
-                    b.Property<Guid>("tenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -174,9 +170,13 @@ namespace Axis.DataModeling.Infrastructure.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("data");
 
+                    b.Property<Guid>("workspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("ModelId", "tenantId");
+                    b.HasIndex("ModelId", "workspaceId");
 
                     b.ToTable("data_records", (string)null);
                 });

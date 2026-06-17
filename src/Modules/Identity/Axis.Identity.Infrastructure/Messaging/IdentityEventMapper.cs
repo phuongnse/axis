@@ -10,30 +10,30 @@ internal static class IdentityEventMapper
     public static object? ToIntegrationEvent(IDomainEvent domainEvent) =>
         domainEvent switch
         {
-            TenantVerified verified => new TenantVerifiedEvent
+            WorkspaceVerified verified => new WorkspaceVerifiedEvent
             {
-                tenantId = verified.tenantId.ToString(),
+                workspaceId = verified.workspaceId.ToString(),
             },
             UserDeactivated deactivated => new UserDeactivatedEvent
             {
                 userId = deactivated.UserId.ToString(),
-                tenantId = deactivated.tenantId.ToString(),
+                workspaceId = deactivated.workspaceId.ToString(),
             },
             UserReactivated reactivated => new UserReactivatedEvent
             {
                 userId = reactivated.UserId.ToString(),
-                tenantId = reactivated.tenantId.ToString(),
+                workspaceId = reactivated.workspaceId.ToString(),
             },
             RoleAssigned assigned => new RoleAssignedEvent
             {
                 userId = assigned.UserId.ToString(),
-                tenantId = assigned.tenantId.ToString(),
+                workspaceId = assigned.workspaceId.ToString(),
                 roleId = assigned.RoleId.ToString(),
             },
             RoleRemoved removed => new RoleRemovedEvent
             {
                 userId = removed.UserId.ToString(),
-                tenantId = removed.tenantId.ToString(),
+                workspaceId = removed.workspaceId.ToString(),
                 roleId = removed.RoleId.ToString(),
             },
             _ => null,

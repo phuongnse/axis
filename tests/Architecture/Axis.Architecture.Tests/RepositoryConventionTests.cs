@@ -9,7 +9,7 @@ namespace Axis.Architecture.Tests;
 /// projects. Repositories are the "anti-corruption layer" between the domain
 /// and EF Core; they must materialize results before returning so callers in
 /// Application can't accidentally extend the query (which would defer execution
-/// across tenant/schema boundaries) or expose <c>IQueryable</c> to UI handlers
+/// across workspace/schema boundaries) or expose <c>IQueryable</c> to UI handlers
 /// (which leaks transport-bound types into pure business code).
 ///
 /// <para>
@@ -62,7 +62,7 @@ public class RepositoryConventionTests
         leakingMethods.Should().BeEmpty(
             $"{repoType.FullName} exposes IQueryable on a public method — repositories must " +
             "materialize (ToList/FirstOrDefault/ProjectTo) before returning. IQueryable leaks " +
-            "deferred-execution semantics into Application/Domain and breaks tenant schema interceptors " +
+            "deferred-execution semantics into Application/Domain and breaks workspace schema interceptors " +
             "(patterns.md § Repository pattern). " +
             $"Methods: {string.Join(", ", leakingMethods.Select(m => m.Name))}");
     }

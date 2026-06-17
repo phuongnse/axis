@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Sign in with my email and password — or with Microsoft, Google, or GitHub — so that I can access my Tenant's workspace.
+Sign in with my email and password — or with Microsoft, Google, or GitHub — so that I can access my Workspace's workspace.
 
 ## Primary actor
 
@@ -20,14 +20,14 @@ Sign in with my email and password — or with Microsoft, Google, or GitHub — 
 2. User enters email/password or chooses a configured external identity provider.
 3. System validates the credential or external provider callback and establishes an Axis session through OpenIddict.
 4. SPA exchanges the authorization code with PKCE and stores the access token in memory.
-5. User is redirected to the workspace dashboard for their active Tenant.
+5. User is redirected to the workspace dashboard for their active Workspace.
 
 ## Alternate / error flows
 
 - Missing email/password: show inline field errors and do not submit.
 - Invalid credential or unknown user: show a generic "Incorrect email or password" message.
 - Unverified account: show the verify-email reminder and resend option.
-- Deactivated account or missing Tenant access: reject sign-in with the documented account-state message.
+- Deactivated account or missing Workspace access: reject sign-in with the documented account-state message.
 - External provider failure or unlinked provider account: return to sign-in with a provider-specific error.
 
 ## Context
@@ -46,14 +46,14 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 - [ ] Invalid credentials: generic message "Incorrect email or password" (no indication of which field is wrong).
 - [ ] After 5 consecutive failed sign-in attempts within 15 minutes, the account is temporarily locked for 15 minutes. Subsequent attempts show "Too many failed attempts. Try again after [time]."
 - [ ] Signing in to an unverified account: "Please verify your email before signing in." with a resend link.
-- [ ] Signing in to a deactivated account: "Your account has been deactivated. Contact your Tenant admin."
+- [ ] Signing in to a deactivated account: "Your account has been deactivated. Contact your Workspace admin."
 - [ ] Server error (5xx): "Something went wrong. Please try again." — the password field is cleared, email retained.
 
 *External identity providers*
 - [ ] Sign-in page offers **Microsoft**, **Google**, and **GitHub** buttons alongside the email/password form ([ADR-027](../../../TECH_STACK.md#adr-027-external-identity-providers-for-user-sign-in-and-registration)).
 - [ ] Selecting a provider runs the OAuth2 Authorization Code + PKCE flow through OpenIddict; on return, Axis mints its own access + refresh tokens (the external token is never exposed to the client).
 - [ ] A provider login whose verified email matches an existing user attaches to that account rather than creating a duplicate (account linking by verified email).
-- [ ] A provider login with no matching account and no pending invitation/setup token is rejected with "No account found. Ask your Tenant admin for an invitation." Provider account setup belongs to a separate provider registration/linking flow.
+- [ ] A provider login with no matching account and no pending invitation/setup token is rejected with "No account found. Ask your Workspace admin for an invitation." Provider account setup belongs to a separate provider registration/linking flow.
 - [ ] If the provider returns no verified email, sign-in is rejected with "Your <provider> account has no verified email; use email and password instead."
 - [ ] A disabled provider (not configured for this deployment) is not shown.
 
@@ -65,7 +65,7 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 
 *Out of scope*
 - 2FA / MFA (TOTP or WebAuthn).
-- Enterprise SSO federation (SAML, SCIM provisioning, per-tenant IdP) — separate initiative, see [ADR-027](../../../TECH_STACK.md#adr-027-external-identity-providers-for-user-sign-in-and-registration).
+- Enterprise SSO federation (SAML, SCIM provisioning, per-workspace IdP) — separate initiative, see [ADR-027](../../../TECH_STACK.md#adr-027-external-identity-providers-for-user-sign-in-and-registration).
 
 > **Implementation status**
 >
@@ -79,7 +79,7 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 >
 > **Gaps vs spec:** Email/password sign-in has login page + PKCE flow + app shell/dashboard scaffold partially implemented. **External identity providers (Microsoft/Google/GitHub, ADR-027) are spec'd but not yet implemented** — no provider registration in OpenIddict, no account-linking handler, no provider buttons on the sign-in page. BroadcastChannel multi-tab refresh, account lockout UI, and unverified-email screen polish also pending.
 >
-> **Deferred follow-ups:** 2FA/MFA (TOTP or WebAuthn); enterprise SAML/SCIM federation and per-tenant IdP (ADR-027 enterprise scope).
+> **Deferred follow-ups:** 2FA/MFA (TOTP or WebAuthn); enterprise SAML/SCIM federation and per-workspace IdP (ADR-027 enterprise scope).
 >
 > **Decisions:**
 > - OpenIddict 5.x serves as the in-process OAuth2/OIDC server. `AuthenticateUserCommand` validates credentials
@@ -127,7 +127,7 @@ sequenceDiagram
     Note over User,DB: Authenticated request
     User->>Web: Navigate / perform action
     Web->>API: GET /resource (Bearer token)
-    API->>API: Validate JWT + set tenant
+    API->>API: Validate JWT + set workspace
     API-->>Web: 200 OK + data
   end
 

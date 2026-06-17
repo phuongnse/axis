@@ -14,7 +14,7 @@ public sealed class RemoveFieldFromDataClassHandler(
 {
     public async Task<Result> Handle(RemoveFieldFromDataClassCommand command, CancellationToken cancellationToken)
     {
-        DataClass? dc = await dataClassRepo.GetByIdAsync(command.DataClassId, command.tenantId, cancellationToken);
+        DataClass? dc = await dataClassRepo.GetByIdAsync(command.DataClassId, command.workspaceId, cancellationToken);
         if (dc is null)
             return Result.Failure(ErrorCodes.NotFound, "Data class not found.");
 

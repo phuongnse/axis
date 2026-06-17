@@ -8,7 +8,7 @@ Undo and redo changes on the canvas so that I can recover from mistakes easily.
 
 ## Primary actor
 
-- Tenant Member
+- Workspace Member
 
 ## Trigger
 
@@ -17,7 +17,7 @@ Undo and redo changes on the canvas so that I can recover from mistakes easily.
 ## Main flow
 
 1. Actor starts the — Undo and redo canvas actions flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows

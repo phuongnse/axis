@@ -9,11 +9,11 @@ namespace Axis.Identity.Application.Queries.GetProvisioningStatus;
 
 public sealed class GetProvisioningStatusHandler(
     IEmailVerificationTokenStore verificationTokenStore,
-    ITenantRegistrationTokenStore TenantTokenStore,
+    IWorkspaceRegistrationTokenStore WorkspaceTokenStore,
     IUserRepository userRepo,
-    ITenantMembershipRepository membershipRepo,
-    ITenantRepository TenantRepo,
-    ITenantModuleProvisioningRepository provisioningRepo)
+    IWorkspaceMembershipRepository membershipRepo,
+    IWorkspaceRepository WorkspaceRepo,
+    IWorkspaceModuleProvisioningRepository provisioningRepo)
     : IQueryHandler<GetProvisioningStatusQuery, ProvisioningStatusDto?>
 {
     public async Task<ProvisioningStatusDto?> Handle(
@@ -24,11 +24,11 @@ public sealed class GetProvisioningStatusHandler(
             return null;
 
         string tokenHash = OpaqueTokenGenerator.Hash(query.Token.Trim());
-        Guid? tenantId = await TenantTokenStore.ResolvetenantIdForProvisioningPollAsync(
+        Guid? workspaceId = await WorkspaceTokenStore.ResolveWorkspaceIdForProvisioningPollAsync(
             tokenHash,
             cancellationToken);
-        if (tenantId is Guid resolvedtenantId)
-            return await BuildStatusAsync(resolvedtenantId, cancellationToken);
+        if (workspaceId is Guid resolvedworkspaceId)
+            return await BuildStatusAsync(resolvedworkspaceId, cancellationToken);
 
         Guid? userId = await verificationTokenStore.ResolveUserIdForProvisioningPollAsync(
             tokenHash,
@@ -40,34 +40,53 @@ public sealed class GetProvisioningStatusHandler(
         if (user is null || !user.IsEmailVerified)
             return null;
 
-        TenantMembership? membership =
-            await membershipRepo.GetFirstActiveByUserIdAsync(user.Id, cancellationToken);
-        if (membership is null)
+        Guid? primaryWorkspaceId = await ResolvePrimaryWorkspaceIdAsync(user.Id, cancellationToken);
+        if (primaryWorkspaceId is null)
             return null;
 
-        return await BuildStatusAsync(membership.tenantId, cancellationToken);
+        return await BuildStatusAsync(primaryWorkspaceId.Value, cancellationToken);
+    }
+
+    private async Task<Guid?> ResolvePrimaryWorkspaceIdAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<WorkspaceMembership> memberships =
+            await membershipRepo.GetByUserIdAsync(userId, cancellationToken);
+
+        List<(WorkspaceMembership Membership, Workspace Workspace)> activeWorkspaces = [];
+        foreach (WorkspaceMembership membership in memberships.Where(m => m.Status == WorkspaceMembershipStatus.Active))
+        {
+            Workspace? workspace = await WorkspaceRepo.GetByIdAsync(membership.workspaceId, cancellationToken);
+            if (workspace is not null)
+                activeWorkspaces.Add((membership, workspace));
+        }
+
+        return activeWorkspaces
+            .OrderBy(item => item.Workspace.Type == WorkspaceType.Team ? 0 : 1)
+            .ThenBy(item => item.Membership.CreatedAt)
+            .Select(item => (Guid?)item.Workspace.Id)
+            .FirstOrDefault();
     }
 
     private async Task<ProvisioningStatusDto?> BuildStatusAsync(
-        Guid tenantId,
+        Guid workspaceId,
         CancellationToken cancellationToken)
     {
-        Tenant? Tenant = await TenantRepo.GetByIdAsync(tenantId, cancellationToken);
-        if (Tenant is null)
+        Workspace? Workspace = await WorkspaceRepo.GetByIdAsync(workspaceId, cancellationToken);
+        if (Workspace is null)
             return null;
 
-        IReadOnlyList<TenantModuleProvisioning> modules =
-            await provisioningRepo.GetAllForTenantAsync(tenantId, cancellationToken);
+        IReadOnlyList<WorkspaceModuleProvisioning> modules =
+            await provisioningRepo.GetAllForWorkspaceAsync(workspaceId, cancellationToken);
 
-        bool isReady = Tenant.Status == TenantStatus.Active
-            && TenantModuleNames.All.All(moduleName =>
+        bool isReady = Workspace.Status == WorkspaceStatus.Active
+            && WorkspaceModuleNames.All.All(moduleName =>
                 modules.Any(m =>
                     m.Module == moduleName
-                    && m.Status == TenantModuleProvisioningStatus.Succeeded));
+                    && m.Status == WorkspaceModuleProvisioningStatus.Succeeded));
 
         return new ProvisioningStatusDto(
-            Tenant.Id,
-            Tenant.Status.ToString(),
+            Workspace.Id,
+            Workspace.Status.ToString(),
             isReady,
             modules.Select(m => new ModuleProvisioningStatusDto(
                 m.Module,

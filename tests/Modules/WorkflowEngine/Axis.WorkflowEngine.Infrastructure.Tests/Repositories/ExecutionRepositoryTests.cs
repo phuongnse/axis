@@ -10,15 +10,15 @@ namespace Axis.WorkflowEngine.Infrastructure.Tests.Repositories;
 [Collection("WorkflowEngineDatabase")]
 public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixture)
 {
-    private static readonly Guid TenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-    private static readonly Guid OtherTenantId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+    private static readonly Guid WorkspaceId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid OtherWorkspaceId = Guid.Parse("00000000-0000-0000-0000-000000000002");
 
     private static WorkflowExecution CreateExecution(
-        Guid? workflowId = null, Guid? tenantId = null,
+        Guid? workflowId = null, Guid? workspaceId = null,
         TriggerType trigger = TriggerType.Manual)
         => WorkflowExecution.Create(
             workflowId ?? Guid.NewGuid(),
-            tenantId ?? TenantId,
+            workspaceId ?? WorkspaceId,
             trigger,
             null,
             new Dictionary<string, object?> { ["key"] = "value" });
@@ -34,7 +34,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new ExecutionRepository(readCtx);
-        WorkflowExecution? loaded = await readRepo.GetByIdAsync(execution.Id, TenantId);
+        WorkflowExecution? loaded = await readRepo.GetByIdAsync(execution.Id, WorkspaceId);
 
         loaded.Should().NotBeNull();
         loaded!.Id.Should().Be(execution.Id);
@@ -43,23 +43,23 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     }
 
     [Fact]
-    public async Task GetByIdAsync_WhenTenantDoesNotMatch_ReturnsNull()
+    public async Task GetByIdAsync_WhenWorkspaceDoesNotMatch_ReturnsNull()
     {
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
         ExecutionRepository repo = new ExecutionRepository(ctx);
-        WorkflowExecution execution = CreateExecution(tenantId: TenantId);
+        WorkflowExecution execution = CreateExecution(workspaceId: WorkspaceId);
         await repo.AddAsync(execution);
         await ctx.SaveChangesAsync();
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new ExecutionRepository(readCtx);
-        WorkflowExecution? result = await readRepo.GetByIdAsync(execution.Id, OtherTenantId);
+        WorkflowExecution? result = await readRepo.GetByIdAsync(execution.Id, OtherWorkspaceId);
 
         result.Should().BeNull();
     }
 
     [Fact]
-    public async Task GetAllAsync_WhenMultipleExecutionsExist_ReturnsOnlyTenantExecutionsOrderedNewestFirst()
+    public async Task GetAllAsync_WhenMultipleExecutionsExist_ReturnsOnlyWorkspaceExecutionsOrderedNewestFirst()
     {
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
         ExecutionRepository repo = new ExecutionRepository(ctx);
@@ -67,7 +67,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
         WorkflowExecution first = CreateExecution(workflowId: wfId);
         await Task.Delay(5); // ensure distinct CreatedAt
         WorkflowExecution second = CreateExecution(workflowId: wfId);
-        WorkflowExecution other = CreateExecution(tenantId: OtherTenantId);
+        WorkflowExecution other = CreateExecution(workspaceId: OtherWorkspaceId);
 
         await repo.AddAsync(first);
         await repo.AddAsync(second);
@@ -76,15 +76,15 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new ExecutionRepository(readCtx);
-        IReadOnlyList<WorkflowExecution> results = await readRepo.GetAllAsync(TenantId);
+        IReadOnlyList<WorkflowExecution> results = await readRepo.GetAllAsync(WorkspaceId);
 
         results.Should().HaveCountGreaterThanOrEqualTo(2);
-        results.Should().OnlyContain(e => e.tenantId == TenantId);
+        results.Should().OnlyContain(e => e.workspaceId == WorkspaceId);
         results.Select(e => e.CreatedAt).Should().BeInDescendingOrder();
     }
 
     [Fact]
-    public async Task GetByWorkflowAsync_WhenFilteredByWorkflowAndTenant_ReturnsMatchingExecutions()
+    public async Task GetByWorkflowAsync_WhenFilteredByWorkflowAndWorkspace_ReturnsMatchingExecutions()
     {
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
         ExecutionRepository repo = new ExecutionRepository(ctx);
@@ -92,16 +92,16 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
         Guid otherWfId = Guid.NewGuid();
         WorkflowExecution match = CreateExecution(workflowId: wfId);
         WorkflowExecution wrongWf = CreateExecution(workflowId: otherWfId);
-        WorkflowExecution wrongTenant = CreateExecution(workflowId: wfId, tenantId: OtherTenantId);
+        WorkflowExecution wrongWorkspace = CreateExecution(workflowId: wfId, workspaceId: OtherWorkspaceId);
 
         await repo.AddAsync(match);
         await repo.AddAsync(wrongWf);
-        await repo.AddAsync(wrongTenant);
+        await repo.AddAsync(wrongWorkspace);
         await ctx.SaveChangesAsync();
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new ExecutionRepository(readCtx);
-        IReadOnlyList<WorkflowExecution> results = await readRepo.GetByWorkflowAsync(wfId, TenantId);
+        IReadOnlyList<WorkflowExecution> results = await readRepo.GetByWorkflowAsync(wfId, WorkspaceId);
 
         results.Should().ContainSingle();
         results[0].Id.Should().Be(match.Id);
@@ -113,7 +113,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
         ExecutionRepository repo = new ExecutionRepository(ctx);
         WorkflowExecution execution = WorkflowExecution.Create(
-                    Guid.NewGuid(), TenantId, TriggerType.Webhook, null,
+                    Guid.NewGuid(), WorkspaceId, TriggerType.Webhook, null,
                     new Dictionary<string, object?> { ["input_name"] = "Alice", ["input_count"] = 42 });
 
         await repo.AddAsync(execution);
@@ -121,7 +121,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new ExecutionRepository(readCtx);
-        WorkflowExecution? loaded = await readRepo.GetByIdAsync(execution.Id, TenantId);
+        WorkflowExecution? loaded = await readRepo.GetByIdAsync(execution.Id, WorkspaceId);
 
         loaded!.Context.Should().ContainKey("input_name");
         loaded.Context.Should().ContainKey("input_count");
@@ -142,7 +142,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new ExecutionRepository(readCtx);
-        WorkflowExecution? loaded = await readRepo.GetByIdAsync(execution.Id, TenantId);
+        WorkflowExecution? loaded = await readRepo.GetByIdAsync(execution.Id, WorkspaceId);
 
         loaded!.Status.Should().Be(ExecutionStatus.Completed);
         loaded.StartedAt.Should().NotBeNull();
@@ -155,10 +155,10 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
         Guid wfId = Guid.NewGuid();
 
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
-        ctx.WorkflowActiveStatuses.Add(WorkflowActiveStatus.Activated(wfId, TenantId));
+        ctx.WorkflowActiveStatuses.Add(WorkflowActiveStatus.Activated(wfId, WorkspaceId));
         await ctx.SaveChangesAsync();
         WorkflowDefinitionReader reader = new WorkflowDefinitionReader(ctx);
-        bool result = await reader.IsActiveAsync(wfId, TenantId);
+        bool result = await reader.IsActiveAsync(wfId, WorkspaceId);
 
         result.Should().BeTrue();
     }
@@ -171,7 +171,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
         // Workflow never published → no row in workflow_active_statuses → false
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
         WorkflowDefinitionReader reader = new WorkflowDefinitionReader(ctx);
-        bool result = await reader.IsActiveAsync(wfId, TenantId);
+        bool result = await reader.IsActiveAsync(wfId, WorkspaceId);
 
         result.Should().BeFalse();
     }
@@ -185,7 +185,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
         ExecutionRepository repo = new(ctx);
 
-        WorkflowExecution execution = WorkflowExecution.Create(wfId, TenantId, TriggerType.Manual, null, new Dictionary<string, object?>());
+        WorkflowExecution execution = WorkflowExecution.Create(wfId, WorkspaceId, TriggerType.Manual, null, new Dictionary<string, object?>());
         execution.AddStep(stepDefId, "Form", StepType.Form, 0);
         execution.AddStep(Guid.NewGuid(), "End", StepType.End, 1);
 
@@ -194,7 +194,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new(readCtx);
-        WorkflowExecution? loaded = await readRepo.GetByIdWithStepsAsync(execution.Id, TenantId);
+        WorkflowExecution? loaded = await readRepo.GetByIdWithStepsAsync(execution.Id, WorkspaceId);
 
         loaded.Should().NotBeNull();
         loaded!.Steps.Should().HaveCount(2);
@@ -202,7 +202,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     }
 
     [Fact]
-    public async Task GetByIdWithStepsAsync_WhenTenantDoesNotMatch_ReturnsNull()
+    public async Task GetByIdWithStepsAsync_WhenWorkspaceDoesNotMatch_ReturnsNull()
     {
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
         ExecutionRepository repo = new(ctx);
@@ -213,7 +213,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         ExecutionRepository readRepo = new(readCtx);
-        WorkflowExecution? result = await readRepo.GetByIdWithStepsAsync(execution.Id, OtherTenantId);
+        WorkflowExecution? result = await readRepo.GetByIdWithStepsAsync(execution.Id, OtherWorkspaceId);
 
         result.Should().BeNull();
     }
@@ -236,12 +236,12 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
         };
 
         await using WorkflowEngineDbContext setupCtx = fixture.CreateContext();
-        setupCtx.WorkflowSnapshots.Add(WorkflowSnapshot.Create(wfId, TenantId, steps, transitions));
+        setupCtx.WorkflowSnapshots.Add(WorkflowSnapshot.Create(wfId, WorkspaceId, steps, transitions));
         await setupCtx.SaveChangesAsync();
 
         await using WorkflowEngineDbContext readCtx = fixture.CreateContext();
         WorkflowDefinitionReader reader = new(readCtx);
-        WorkflowSnapshot? snapshot = await reader.GetSnapshotAsync(wfId, TenantId);
+        WorkflowSnapshot? snapshot = await reader.GetSnapshotAsync(wfId, WorkspaceId);
 
         snapshot.Should().NotBeNull();
         snapshot!.Steps.Should().HaveCount(2);
@@ -254,7 +254,7 @@ public sealed class ExecutionRepositoryTests(WorkflowEngineDatabaseFixture fixtu
     {
         await using WorkflowEngineDbContext ctx = fixture.CreateContext();
         WorkflowDefinitionReader reader = new(ctx);
-        WorkflowSnapshot? result = await reader.GetSnapshotAsync(Guid.NewGuid(), TenantId);
+        WorkflowSnapshot? result = await reader.GetSnapshotAsync(Guid.NewGuid(), WorkspaceId);
 
         result.Should().BeNull();
     }

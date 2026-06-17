@@ -29,7 +29,7 @@ Feature work (frontend feature UIs, page-builder) tracks per-domain **Open work*
 
 ## Shared Kernel ✅ (narrowed per ADR-017)
 
-`Axis.Shared.Domain` and `Axis.Shared.Application` hold abstractions only (primitives, interfaces, Result/Error types, exception types). `Axis.Shared.Infrastructure` now contains only genuinely cross-cutting infrastructure that every module needs identically: `TenantSchemaInterceptor`, `HttpTenantContext`, `HandlerLoggingMiddleware`, and the DI registration extension. The `UnitOfWork` base class and `AxisDbContext` base class were inlined into each module's Infrastructure project per [ADR-017](TECH_STACK.md#adr-017-axisshared-is-abstractions-only-no-shared-implementation) — explicit per-module ownership over magical inheritance.
+`Axis.Shared.Domain` and `Axis.Shared.Application` hold abstractions only (primitives, interfaces, Result/Error types, exception types). `Axis.Shared.Infrastructure` now contains only genuinely cross-cutting infrastructure that every module needs identically: `WorkspaceSchemaInterceptor`, `HttpWorkspaceContext`, `HandlerLoggingMiddleware`, and the DI registration extension. The `UnitOfWork` base class and `AxisDbContext` base class were inlined into each module's Infrastructure project per [ADR-017](TECH_STACK.md#adr-017-axisshared-is-abstractions-only-no-shared-implementation) — explicit per-module ownership over magical inheritance.
 
 ## Identity (`identity-access`)
 
@@ -39,7 +39,7 @@ Full auth, user, role, invitation, and session management. OpenIddict 5.x OIDC s
 
 > ✅ **Frontend preference foundation:** [language](./use-cases/identity-access/language/) and [theme](./use-cases/identity-access/theme/) now cover EN/VI locale switching plus light/dark/system mode for the current SPA shell.
 
-> ✅ **Phase 2 complete:** `Axis.Identity.Contracts` with `IdentityService.GetUserPermissions` gRPC + 5 Avro lifecycle event schemas published via Wolverine outbox → Kafka with CloudEvents envelope (ADR-019). Each of DataModeling/FormBuilder/WorkflowBuilder/WorkflowEngine subscribes to `TenantVerifiedEvent` and provisions its own tenant schema (central `TenantSchemaProvisioner` and `ProvisionTenantMessage` removed — extraction is now a redeploy per ADR-010). Gateway uses `AddGrpcClient<IdentityService.IdentityServiceClient>` with `Modules:Identity:GrpcUrl` config; JWKS-only validation rule documented in [patterns.md § Pattern 3](playbooks/patterns.md#-pattern-3-jwks-only-jwt-validation-in-consuming-modules).
+> ✅ **Phase 2 complete:** `Axis.Identity.Contracts` with `IdentityService.GetUserPermissions` gRPC + 5 Avro lifecycle event schemas published via Wolverine outbox → Kafka with CloudEvents envelope (ADR-019). Each of DataModeling/FormBuilder/WorkflowBuilder/WorkflowEngine subscribes to `WorkspaceVerifiedEvent` and provisions its own workspace schema (central `WorkspaceSchemaProvisioner` and `ProvisionWorkspaceMessage` removed — extraction is now a redeploy per ADR-010). Gateway uses `AddGrpcClient<IdentityService.IdentityServiceClient>` with `Modules:Identity:GrpcUrl` config; JWKS-only validation rule documented in [patterns.md § Pattern 3](playbooks/patterns.md#-pattern-3-jwks-only-jwt-validation-in-consuming-modules).
 
 ## Data Modeling (`data-modeling`)
 
@@ -75,19 +75,19 @@ Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoi
 
 ## Platform Foundation (`platform-foundation`)
 
-**Tenant registration:** ⚠️ backend/API split implemented after process/design split. `register-tenant` owns Tenant contact email verification + tenant provisioning only. Standalone email/password user registration is complete in `identity-access/register-user`; first-user setup-token handoff polish stays with `register-tenant`, and third-party provider registration/linking remains a separate Identity follow-up. Reusable pieces: slug preview, legal versions, confirmation/resend, verify-email states, provisioning status UI. Remaining frontend: dedicated Tenant-contact registration screen/copy and polished setup-token handoff.
+**Workspace registration:** ⚠️ backend/API split implemented after process/design split. `register-workspace` owns Workspace contact email verification + workspace provisioning only. Standalone email/password user registration is complete in `identity-access/register-user`; first-user setup-token handoff polish stays with `register-workspace`, and third-party provider registration/linking remains a separate Identity follow-up. Reusable pieces: slug preview, legal versions, confirmation/resend, verify-email states, provisioning status UI. Remaining frontend: dedicated Workspace-contact registration screen/copy and polished setup-token handoff.
 
 **Subscription plans (backend):** ✅ `GET /api/plans`, platform plan change, 402 limits (workflows / users / executions), Redis counters. Frontend pricing UI ⏳. **Deferred:** atomic execution counter under concurrency; fail-closed when Redis unavailable; bulk multi-workflow import limit AC until bulk endpoint exists.
 
-**Tenant management (backend):** ✅ profile API, settings + usage, scheduled deletion with 30-day hard-delete job. Frontend ⏳.
+**Workspace management (backend):** ✅ profile API, settings + usage, scheduled deletion with 30-day hard-delete job. Frontend ⏳.
 
-**Tenant isolation:** ✅ `TenantSchemaInterceptor`, `TenantAccessMiddleware` (403 for missing/archived/not-ready tenants), cross-tenant API integration tests — see [tenant isolation](./use-cases/platform-foundation/tenant-scope/).
+**Workspace isolation:** ✅ `WorkspaceSchemaInterceptor`, `WorkspaceAccessMiddleware` (403 for missing/archived/not-ready workspaces), cross-workspace API integration tests — see [workspace isolation](./use-cases/platform-foundation/workspace-scope/).
 
 **Agents:** per-use-case truth in **Implementation status** callouts; domain [Open work](./use-cases/platform-foundation/README.md#open-work-agents) lists next backend/frontend items.
 
 ## Registration journey (cross-cutting)
 
-**Register tenant (sign-up → verify → provision):** spec in [register-tenant](./use-cases/platform-foundation/register-tenant/README.md). **Verify → async provision:** `User.VerifyEmail()` sets tenant `Provisioning`, seeds `tenant_module_provisions`, publishes `TenantVerifiedEvent` → each module provisions and reports via `TenantModuleProvisionReportEvent`; Identity coordinator retries (3×, exponential backoff) and logs critical alert on exhaustion; `GET /api/auth/provisioning-status?token=` for polling. **Frontend ⚠️:** `/register/confirmation`, `/auth/verify`, `/provisioning` screens shipped; auto sign-in after verify and manual retry UI **Deferred**.
+**Register workspace (sign-up → verify → provision):** spec in [register-workspace](./use-cases/platform-foundation/register-workspace/README.md). **Verify → async provision:** `User.VerifyEmail()` sets workspace `Provisioning`, seeds `workspace_module_provisions`, publishes `WorkspaceVerifiedEvent` → each module provisions and reports via `WorkspaceModuleProvisionReportEvent`; Identity coordinator retries (3×, exponential backoff) and logs critical alert on exhaustion; `GET /api/auth/provisioning-status?token=` for polling. **Frontend ⚠️:** `/register/confirmation`, `/auth/verify`, `/provisioning` screens shipped; auto sign-in after verify and manual retry UI **Deferred**.
 
 ## Page Builder (`page-builder`)
 

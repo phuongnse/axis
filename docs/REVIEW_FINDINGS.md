@@ -132,7 +132,7 @@ Mechanism tiers, cheapest first: analyzer severity in [`.editorconfig`](../.edit
 | Side effects committed before the DB transaction they depend on | [patterns.md](./playbooks/patterns.md) | Handlers, repositories, jobs, or consumers with side effects | CodeRabbit path instruction + review | Requires data-flow and transaction-boundary judgment | **Review-only** |
 | Test asserts something other than its name claims | [testing.md](./playbooks/testing.md) | Test changes with assertion/name mismatch risk | CodeRabbit path instruction; analyzer pilot only if it recurs | Green-but-wrong tests require assertion semantics | **Review-only** |
 | `Result`/`Result<T>` vs bespoke bool/tuple/throw for business failures | [AGENTS.md](../AGENTS.md) | Business failure modeling in Application/Domain | CodeRabbit path instruction + review | Design judgment; exceptions are valid for infrastructure faults | **Review-only** |
-| One public type per `.cs` file | None | C# file Tenant | None | Intentional groupings are common and valid | **Not a rule** |
+| One public type per `.cs` file | None | C# file Workspace | None | Intentional groupings are common and valid | **Not a rule** |
 | Inline fully-qualified type names instead of `using` directives | [.editorconfig](../.editorconfig) | Style cleanup | IDE suggestions / `dotnet format` cleanup | Low defect value; keep as style guidance unless it becomes recurring review noise | **Guidance** |
 
 ---

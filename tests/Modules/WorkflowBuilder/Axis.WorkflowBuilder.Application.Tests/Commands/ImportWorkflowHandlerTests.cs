@@ -13,7 +13,7 @@ namespace Axis.WorkflowBuilder.Application.Tests;
 
 public class ImportWorkflowHandlerTests
 {
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private readonly IPlanLimitService _planLimitService = Substitute.For<IPlanLimitService>();
     private readonly IWorkflowRepository _repo = Substitute.For<IWorkflowRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
@@ -47,17 +47,17 @@ public class ImportWorkflowHandlerTests
     public async Task Handle_WhenNameIsAvailable_CreatesNewDraftWorkflowAndSaves()
     {
         WorkflowExportDto exportDto = BuildExportDto();
-        _repo.NameExistsAsync(exportDto.Name, TenantId, null, Arg.Any<CancellationToken>()).Returns(false);
+        _repo.NameExistsAsync(exportDto.Name, WorkspaceId, null, Arg.Any<CancellationToken>()).Returns(false);
 
         Result<Guid> result = await _handler.Handle(
-            new ImportWorkflowCommand(TenantId, "user", exportDto), CancellationToken.None);
+            new ImportWorkflowCommand(WorkspaceId, "user", exportDto), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         await _repo.Received(1).AddAsync(
             Arg.Is<WorkflowDefinition>(w =>
                 w.Name == exportDto.Name &&
                 w.Status == WorkflowStatus.Draft &&
-                w.tenantId == TenantId),
+                w.workspaceId == WorkspaceId),
             Arg.Any<CancellationToken>());
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
@@ -66,10 +66,10 @@ public class ImportWorkflowHandlerTests
     public async Task Handle_WhenNameAlreadyExists_ReturnsConflict()
     {
         WorkflowExportDto exportDto = BuildExportDto("Existing Workflow");
-        _repo.NameExistsAsync(exportDto.Name, TenantId, null, Arg.Any<CancellationToken>()).Returns(true);
+        _repo.NameExistsAsync(exportDto.Name, WorkspaceId, null, Arg.Any<CancellationToken>()).Returns(true);
 
         Result<Guid> result = await _handler.Handle(
-            new ImportWorkflowCommand(TenantId, "user", exportDto), CancellationToken.None);
+            new ImportWorkflowCommand(WorkspaceId, "user", exportDto), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be(ErrorCodes.Conflict);
@@ -80,11 +80,11 @@ public class ImportWorkflowHandlerTests
     public async Task Handle_WhenImportHasStepsAndTriggers_ImportsThemCorrectly()
     {
         WorkflowExportDto exportDto = BuildExportDto();
-        _repo.NameExistsAsync(Arg.Any<string>(), TenantId, null, Arg.Any<CancellationToken>()).Returns(false);
+        _repo.NameExistsAsync(Arg.Any<string>(), WorkspaceId, null, Arg.Any<CancellationToken>()).Returns(false);
         WorkflowDefinition? addedWorkflow = null;
         await _repo.AddAsync(Arg.Do<WorkflowDefinition>(w => addedWorkflow = w), Arg.Any<CancellationToken>());
 
-        await _handler.Handle(new ImportWorkflowCommand(TenantId, "user", exportDto), CancellationToken.None);
+        await _handler.Handle(new ImportWorkflowCommand(WorkspaceId, "user", exportDto), CancellationToken.None);
 
         addedWorkflow.Should().NotBeNull();
         addedWorkflow!.Steps.Should().Contain(s => s.Name == "Review" && s.Type == StepType.Form);
@@ -96,14 +96,14 @@ public class ImportWorkflowHandlerTests
     {
         WorkflowExportDto exportDto = BuildExportDto();
         _planLimitService.EnsureWithinLimitAsync(
-                TenantId,
+                WorkspaceId,
                 PlanLimitResourceType.Workflows,
                 1,
                 Arg.Any<CancellationToken>())
             .Returns(Result.Failure(ErrorCodes.PlanLimit, "Workflow limit reached."));
 
         Result<Guid> result = await _handler.Handle(
-            new ImportWorkflowCommand(TenantId, "user", exportDto),
+            new ImportWorkflowCommand(WorkspaceId, "user", exportDto),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

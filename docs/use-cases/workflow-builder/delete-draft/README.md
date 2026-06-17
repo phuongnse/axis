@@ -8,7 +8,7 @@ Delete a Draft workflow so that I can permanently remove workflows I no longer n
 
 ## Primary actor
 
-- Tenant Member with `workflow:definition:write`
+- Workspace Member with `workflow:definition:write`
 
 ## Trigger
 

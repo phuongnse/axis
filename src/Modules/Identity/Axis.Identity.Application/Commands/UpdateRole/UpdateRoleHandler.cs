@@ -14,7 +14,7 @@ public sealed class UpdateRoleHandler(
 {
     public async Task<Result> Handle(UpdateRoleCommand command, CancellationToken cancellationToken)
     {
-        Role? role = await roleRepo.GetByIdAsync(command.RoleId, command.tenantId, cancellationToken);
+        Role? role = await roleRepo.GetByIdAsync(command.RoleId, command.workspaceId, cancellationToken);
         if (role is null)
             return Result.Failure(ErrorCodes.NotFound, "Role not found.");
 
@@ -22,8 +22,8 @@ public sealed class UpdateRoleHandler(
         if (role.IsSystem)
             return Result.Failure(ErrorCodes.BusinessRule, "Cannot modify a system role.");
 
-        // name must be unique within the Tenant (excluding self)
-        if (await roleRepo.NameExistsAsync(command.Name, command.tenantId, role.Id, cancellationToken))
+        // name must be unique within the Workspace (excluding self)
+        if (await roleRepo.NameExistsAsync(command.Name, command.workspaceId, role.Id, cancellationToken))
             return Result.Failure(ErrorCodes.Conflict, "A role with this name already exists.");
 
         role.Update(command.Name, command.Description, command.Permissions);

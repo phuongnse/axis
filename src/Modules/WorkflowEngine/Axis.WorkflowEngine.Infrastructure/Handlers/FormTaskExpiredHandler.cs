@@ -27,10 +27,10 @@ internal sealed class FormTaskExpiredHandler(
     {
         Guid executionId = @event.ExecutionId();
         Guid executionStepId = @event.ExecutionStepId();
-        Guid tenantId = @event.tenantId();
+        Guid workspaceId = @event.workspaceId();
 
         WorkflowExecution? execution = await execRepo.GetByIdWithStepsAsync(
-            executionId, tenantId, ct);
+            executionId, workspaceId, ct);
 
         if (execution is null)
         {
@@ -70,7 +70,7 @@ internal sealed class FormTaskExpiredHandler(
             new StepFailedMessage(
                 executionId,
                 executionStepId,
-                tenantId,
+                workspaceId,
                 errorDetails),
             ct);
     }

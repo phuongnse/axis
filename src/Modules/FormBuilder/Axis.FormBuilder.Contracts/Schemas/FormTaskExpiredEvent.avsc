@@ -5,7 +5,7 @@
   "fields": [
     { "name": "formSubmissionId", "type": "string" },
     { "name": "formDefinitionId", "type": "string" },
-    { "name": "tenantId", "type": "string" },
+    { "name": "workspaceId", "type": "string" },
     { "name": "executionId", "type": "string" },
     { "name": "executionStepId", "type": "string" }
   ]

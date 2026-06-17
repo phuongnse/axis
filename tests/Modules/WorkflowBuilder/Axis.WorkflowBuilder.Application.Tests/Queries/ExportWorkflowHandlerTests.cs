@@ -10,7 +10,7 @@ namespace Axis.WorkflowBuilder.Application.Tests;
 
 public class ExportWorkflowHandlerTests
 {
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private readonly IWorkflowRepository _repo = Substitute.For<IWorkflowRepository>();
     private readonly ExportWorkflowHandler _handler;
 
@@ -19,13 +19,13 @@ public class ExportWorkflowHandlerTests
     [Fact]
     public async Task Handle_WhenWorkflowExists_ReturnsExportDtoWithAllData()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", "desc", TenantId, "user");
+        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", "desc", WorkspaceId, "user");
         wf.AddTrigger(TriggerType.Manual, null);
         WorkflowStep step = wf.AddStep("HTTP Call", StepType.HttpRequest,
             new Dictionary<string, object?> { ["url"] = "https://api.example.com", ["token"] = "secret-value" });
-        _repo.GetByIdAsync(wf.Id, TenantId, Arg.Any<CancellationToken>()).Returns(wf);
+        _repo.GetByIdAsync(wf.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(wf);
 
-        WorkflowExportDto? dto = await _handler.Handle(new ExportWorkflowQuery(wf.Id, TenantId), CancellationToken.None);
+        WorkflowExportDto? dto = await _handler.Handle(new ExportWorkflowQuery(wf.Id, WorkspaceId), CancellationToken.None);
 
         dto.Should().NotBeNull();
         dto!.Name.Should().Be("Invoice Approval");
@@ -36,7 +36,7 @@ public class ExportWorkflowHandlerTests
     [Fact]
     public async Task Handle_WhenWorkflowHasSensitiveConfig_RedactsSensitiveValues()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("API Workflow", null, TenantId, "user");
+        WorkflowDefinition wf = WorkflowDefinition.Create("API Workflow", null, WorkspaceId, "user");
         wf.AddStep("HTTP Call", StepType.HttpRequest,
             new Dictionary<string, object?>
             {
@@ -45,9 +45,9 @@ public class ExportWorkflowHandlerTests
                 ["api_key"] = "sk-1234",
                 ["method"] = "POST"
             });
-        _repo.GetByIdAsync(wf.Id, TenantId, Arg.Any<CancellationToken>()).Returns(wf);
+        _repo.GetByIdAsync(wf.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(wf);
 
-        WorkflowExportDto? dto = await _handler.Handle(new ExportWorkflowQuery(wf.Id, TenantId), CancellationToken.None);
+        WorkflowExportDto? dto = await _handler.Handle(new ExportWorkflowQuery(wf.Id, WorkspaceId), CancellationToken.None);
 
         StepExportDto httpStep = dto!.Steps.Single(s => s.Name == "HTTP Call");
         httpStep.Config!["url"].Should().Be("https://api.example.com");
@@ -59,7 +59,7 @@ public class ExportWorkflowHandlerTests
     [Fact]
     public async Task Handle_WhenConfigHasVariantSensitiveKey_RedactsPatternMatch()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("API Workflow", null, TenantId, "user");
+        WorkflowDefinition wf = WorkflowDefinition.Create("API Workflow", null, WorkspaceId, "user");
         wf.AddStep("HTTP Call", StepType.HttpRequest,
             new Dictionary<string, object?>
             {
@@ -68,9 +68,9 @@ public class ExportWorkflowHandlerTests
                 ["webhook_secret"] = "hmac",
                 ["url"] = "https://example.com"
             });
-        _repo.GetByIdAsync(wf.Id, TenantId, Arg.Any<CancellationToken>()).Returns(wf);
+        _repo.GetByIdAsync(wf.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(wf);
 
-        WorkflowExportDto? dto = await _handler.Handle(new ExportWorkflowQuery(wf.Id, TenantId), CancellationToken.None);
+        WorkflowExportDto? dto = await _handler.Handle(new ExportWorkflowQuery(wf.Id, WorkspaceId), CancellationToken.None);
 
         StepExportDto step = dto!.Steps.Single(s => s.Name == "HTTP Call");
         step.Config!["bearer_token"].Should().Be("[REDACTED]");
@@ -82,16 +82,16 @@ public class ExportWorkflowHandlerTests
     [Fact]
     public async Task Handle_WhenConfigHasNestedDictionary_RecursivelyScrubs()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("API Workflow", null, TenantId, "user");
+        WorkflowDefinition wf = WorkflowDefinition.Create("API Workflow", null, WorkspaceId, "user");
         wf.AddStep("HTTP Call", StepType.HttpRequest,
             new Dictionary<string, object?>
             {
                 ["headers"] = new Dictionary<string, object?> { ["Authorization"] = "Bearer abc", ["Content-Type"] = "application/json" },
                 ["url"] = "https://example.com"
             });
-        _repo.GetByIdAsync(wf.Id, TenantId, Arg.Any<CancellationToken>()).Returns(wf);
+        _repo.GetByIdAsync(wf.Id, WorkspaceId, Arg.Any<CancellationToken>()).Returns(wf);
 
-        WorkflowExportDto? dto = await _handler.Handle(new ExportWorkflowQuery(wf.Id, TenantId), CancellationToken.None);
+        WorkflowExportDto? dto = await _handler.Handle(new ExportWorkflowQuery(wf.Id, WorkspaceId), CancellationToken.None);
 
         StepExportDto step = dto!.Steps.Single(s => s.Name == "HTTP Call");
         IReadOnlyDictionary<string, object?> headers = (IReadOnlyDictionary<string, object?>)step.Config!["headers"]!;
@@ -102,26 +102,26 @@ public class ExportWorkflowHandlerTests
     [Fact]
     public async Task Handle_WhenWorkflowNotFound_ReturnsNull()
     {
-        _repo.GetByIdAsync(Arg.Any<Guid>(), TenantId, Arg.Any<CancellationToken>()).Returns((WorkflowDefinition?)null);
+        _repo.GetByIdAsync(Arg.Any<Guid>(), WorkspaceId, Arg.Any<CancellationToken>()).Returns((WorkflowDefinition?)null);
 
         WorkflowExportDto? dto = await _handler.Handle(
-            new ExportWorkflowQuery(Guid.NewGuid(), TenantId), CancellationToken.None);
+            new ExportWorkflowQuery(Guid.NewGuid(), WorkspaceId), CancellationToken.None);
 
         dto.Should().BeNull();
     }
 
     [Fact]
-    public async Task Handle_WhenWorkflowBelongsToAnotherTenant_ReturnsNull()
+    public async Task Handle_WhenWorkflowBelongsToAnotherWorkspace_ReturnsNull()
     {
-        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, TenantId, "user");
+        WorkflowDefinition wf = WorkflowDefinition.Create("Invoice Approval", null, WorkspaceId, "user");
 
-        Guid otherTenantId = Guid.NewGuid();
-        _repo.GetByIdAsync(wf.Id, otherTenantId, Arg.Any<CancellationToken>())
+        Guid otherWorkspaceId = Guid.NewGuid();
+        _repo.GetByIdAsync(wf.Id, otherWorkspaceId, Arg.Any<CancellationToken>())
             .Returns((WorkflowDefinition?)null);
         WorkflowExportDto? dto = await _handler.Handle(
-            new ExportWorkflowQuery(wf.Id, otherTenantId), CancellationToken.None);
+            new ExportWorkflowQuery(wf.Id, otherWorkspaceId), CancellationToken.None);
 
         dto.Should().BeNull();
-        await _repo.Received(1).GetByIdAsync(wf.Id, otherTenantId, Arg.Any<CancellationToken>());
+        await _repo.Received(1).GetByIdAsync(wf.Id, otherWorkspaceId, Arg.Any<CancellationToken>());
     }
 }

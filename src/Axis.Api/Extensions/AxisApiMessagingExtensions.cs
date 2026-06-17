@@ -39,8 +39,8 @@ internal static class AxisApiMessagingExtensions
         new CrossModuleEventRoute<WorkflowArchivedEvent>(WorkflowBuilderKafkaTopics.WorkflowArchived),
         new CrossModuleEventRoute<WorkflowUnarchivedEvent>(WorkflowBuilderKafkaTopics.WorkflowUnarchived),
 
-        new CrossModuleEventRoute<TenantVerifiedEvent>(IdentityKafkaTopics.TenantVerified),
-        new CrossModuleEventRoute<TenantModuleProvisionReportEvent>(IdentityKafkaTopics.TenantModuleProvisionReport),
+        new CrossModuleEventRoute<WorkspaceVerifiedEvent>(IdentityKafkaTopics.WorkspaceVerified),
+        new CrossModuleEventRoute<WorkspaceModuleProvisionReportEvent>(IdentityKafkaTopics.WorkspaceModuleProvisionReport),
         new CrossModuleEventRoute<UserDeactivatedEvent>(IdentityKafkaTopics.UserDeactivated),
         new CrossModuleEventRoute<UserReactivatedEvent>(IdentityKafkaTopics.UserReactivated),
         new CrossModuleEventRoute<RoleAssignedEvent>(IdentityKafkaTopics.RoleAssigned),

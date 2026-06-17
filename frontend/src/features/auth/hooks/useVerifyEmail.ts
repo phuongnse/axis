@@ -21,10 +21,10 @@ export function useVerifyEmail() {
   const mutation = useMutation({
     mutationFn: verifyEmail,
     onSuccess: async (data, token) => {
-      if (data?.nextStep === 'RegisterUser' && data.tenantSetupToken) {
+      if (data?.nextStep === 'RegisterUser' && data.workspaceSetupToken) {
         void navigate({
           to: '/register',
-          search: { setupToken: data.tenantSetupToken },
+          search: { setupToken: data.workspaceSetupToken },
         });
         return;
       }

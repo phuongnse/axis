@@ -10,5 +10,5 @@ public sealed record RegisterUserCommand(
     string PasswordConfirmation,
     string AcceptedTermsVersion,
     string AcceptedPrivacyVersion,
-    string? TenantSetupToken = null,
+    string? WorkspaceSetupToken = null,
     string? IdempotencyKey = null) : ICommand;

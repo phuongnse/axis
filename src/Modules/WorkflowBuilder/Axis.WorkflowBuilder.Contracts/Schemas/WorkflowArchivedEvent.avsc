@@ -4,6 +4,6 @@
   "name": "WorkflowArchivedEvent",
   "fields": [
     { "name": "workflowId", "type": "string" },
-    { "name": "tenantId", "type": "string" }
+    { "name": "workspaceId", "type": "string" }
   ]
 }

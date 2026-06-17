@@ -41,8 +41,8 @@ internal sealed class FormDefinitionConfiguration : IEntityTypeConfiguration<For
             .HasColumnName("description")
             .HasMaxLength(500);
 
-        builder.Property(f => f.tenantId)
-            .HasColumnName("tenant_id")
+        builder.Property(f => f.workspaceId)
+            .HasColumnName("workspace_id")
             .IsRequired();
 
         builder.Property(f => f.DeletedAt)
@@ -73,7 +73,7 @@ internal sealed class FormDefinitionConfiguration : IEntityTypeConfiguration<For
 
         builder.Ignore(f => f.Fields);
 
-        builder.HasIndex(f => new { f.tenantId, f.Name }).IsUnique()
+        builder.HasIndex(f => new { f.workspaceId, f.Name }).IsUnique()
             .HasFilter("deleted_at IS NULL");
     }
 }

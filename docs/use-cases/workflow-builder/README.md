@@ -116,7 +116,7 @@ See [Workflow model](./create-workflow/README.md#workflow-model) (Mermaid).
 - [ ] All 4 trigger types can be configured and activated.
 - [ ] A workflow with an if/else condition correctly routes to the appropriate branch.
 - [ ] Parallel steps fan out and the workflow waits for all to complete before continuing.
-- [ ] A workflow exported as JSON can be imported into another Tenant and runs correctly.
+- [ ] A workflow exported as JSON can be imported into another Workspace and runs correctly.
 
 ---
 
@@ -132,7 +132,7 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 |---|---|---|
 | Domain | ✅ Done | `WorkflowDefinition`, `Step`, `Trigger` aggregates; all step types and domain events; ConfigureStep method; AddTrigger duplicate-type guard |
 | Application | ✅ Done | All 15 handlers: CreateWorkflow, PublishWorkflow, ArchiveWorkflow, UnarchiveWorkflow, UpdateWorkflow, DuplicateWorkflow, AddStep, RemoveStep, ConfigureStep, AddTransition, RemoveTransition, AddTrigger, RemoveTrigger, ImportWorkflow, BulkExportWorkflows; GetWorkflows, GetWorkflow, ExportWorkflow queries |
-| Infrastructure | ✅ Done | WorkflowBuilderDbContext, EF Core configuration (WorkflowDefinition with steps/transitions/triggers as JSONB), WorkflowRepository, integration tests (Testcontainers). `workflow_form_references` + `workflow_model_references` read models with `IWorkflowReferenceSync`; `ModelDeletedHandler` + `FormDeletedHandler` (Kafka); `WorkflowFormReferenceService` gRPC (server derives `tenant_id` from the caller's JWT `tenant_id` claim). Migration `AddWorkflowReferenceReadModels`. DbContext + UnitOfWork inlined per ADR-017. `TenantVerifiedHandler` provisions tenant schema via `TenantModuleProvisionAttempt` (reports `TenantModuleProvisionReportEvent` to Identity; retries via `RetryTenantModuleProvisionHandler` + shared `TenantSchemaProvisioner`, tenant provisioning use case). Avro lifecycle publish ([ADR-019](../../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). Publish blocked when broken refs; `GetWorkflow` returns `isBroken` on steps/triggers. |
+| Infrastructure | ✅ Done | WorkflowBuilderDbContext, EF Core configuration (WorkflowDefinition with steps/transitions/triggers as JSONB), WorkflowRepository, integration tests (Testcontainers). `workflow_form_references` + `workflow_model_references` read models with `IWorkflowReferenceSync`; `ModelDeletedHandler` + `FormDeletedHandler` (Kafka); `WorkflowFormReferenceService` gRPC (server derives `workspace_id` from the caller's JWT `workspace_id` claim). Migration `AddWorkflowReferenceReadModels`. DbContext + UnitOfWork inlined per ADR-017. `WorkspaceVerifiedHandler` provisions workspace schema via `WorkspaceModuleProvisionAttempt` (reports `WorkspaceModuleProvisionReportEvent` to Identity; retries via `RetryWorkspaceModuleProvisionHandler` + shared `WorkspaceSchemaProvisioner`, workspace provisioning use case). Avro lifecycle publish ([ADR-019](../../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). Publish blocked when broken refs; `GetWorkflow` returns `isBroken` on steps/triggers. |
 | API | ✅ Done | 18 endpoints: workflow CRUD + publish/archive/unarchive/duplicate, step/transition/trigger management, JSON export, JSON import, ZIP bulk export. Create/duplicate/import/add-step return the shared `CreatedResponse` DTO (no anonymous `object`) |
 | Frontend | ⏳ Pending | — |
 
@@ -143,7 +143,7 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 | Area | Status | Detail |
 |------|--------|--------|
 | **Backend** | ⚠️ mostly ✅ | CRUD/publish/import/export ✅; plan limits 402 ✅ (platform-foundation subscription plans). **Engine-owned:** triggers (cron/webhook/event), step execution, parallel/join — tracked in [workflow-engine](../workflow-engine/README.md#open-work-agents). **API polish:** list filters (last execution date), import transactional rollback — [import-json](./import-json/), [export-json](./export-json/). |
-| **Frontend** | ⏳ | Visual canvas, step config panels, trigger UI — every Tenant-management–import-export US. |
+| **Frontend** | ⏳ | Visual canvas, step config panels, trigger UI — every Workspace-management–import-export US. |
 
 Do not re-implement plan limits here; update stale “pending platform-foundation subscription plans” lines if you see them in feature callouts.
 

@@ -13,7 +13,7 @@ internal sealed class DataModelCatalogGrpcService(IDataModelRepository dataModel
         GetModelSummaryRequest request,
         ServerCallContext context)
     {
-        Guid tenantId = ResolveCallertenantId(context);
+        Guid workspaceId = ResolveCallerworkspaceId(context);
 
         if (!Guid.TryParse(request.ModelId, out Guid modelId))
         {
@@ -23,7 +23,7 @@ internal sealed class DataModelCatalogGrpcService(IDataModelRepository dataModel
 
         DataModel? model = await dataModelRepository.GetByIdAsync(
             modelId,
-            tenantId,
+            workspaceId,
             context.CancellationToken);
 
         return new GetModelSummaryResponse
@@ -33,15 +33,15 @@ internal sealed class DataModelCatalogGrpcService(IDataModelRepository dataModel
         };
     }
 
-    private static Guid ResolveCallertenantId(ServerCallContext context)
+    private static Guid ResolveCallerworkspaceId(ServerCallContext context)
     {
-        Claim? claim = context.GetHttpContext().User.FindFirst("tenant_id");
-        if (claim is null || !Guid.TryParse(claim.Value, out Guid tenantId))
+        Claim? claim = context.GetHttpContext().User.FindFirst("workspace_id");
+        if (claim is null || !Guid.TryParse(claim.Value, out Guid workspaceId))
         {
             throw new RpcException(
-                new Status(StatusCode.Unauthenticated, "Caller JWT is missing a valid tenant_id claim."));
+                new Status(StatusCode.Unauthenticated, "Caller JWT is missing a valid workspace_id claim."));
         }
 
-        return tenantId;
+        return workspaceId;
     }
 }

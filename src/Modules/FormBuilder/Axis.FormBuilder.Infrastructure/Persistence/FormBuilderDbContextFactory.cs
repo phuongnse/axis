@@ -15,7 +15,7 @@ internal sealed class FormBuilderDbContextFactory : IDesignTimeDbContextFactory<
 
         DbContextOptionsBuilder<FormBuilderDbContext> builder = new();
         builder.UseNpgsql(connectionString);
-        return new FormBuilderDbContext(builder.Options, new DesignTimePublicSchemaTenantContext());
+        return new FormBuilderDbContext(builder.Options, new DesignTimePublicSchemaWorkspaceContext());
     }
 
     private static string RequireConnectionString(params string[] envVarNames)

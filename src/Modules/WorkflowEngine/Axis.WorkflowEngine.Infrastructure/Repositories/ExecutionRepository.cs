@@ -12,35 +12,35 @@ internal sealed class ExecutionRepository(WorkflowEngineDbContext context) : IEx
     public async Task AddAsync(WorkflowExecution execution, CancellationToken ct = default)
         => await context.WorkflowExecutions.AddAsync(execution, ct);
 
-    public async Task<WorkflowExecution?> GetByIdAsync(Guid id, Guid tenantId, CancellationToken ct = default)
+    public async Task<WorkflowExecution?> GetByIdAsync(Guid id, Guid workspaceId, CancellationToken ct = default)
         => await context.WorkflowExecutions
-            .FirstOrDefaultAsync(e => e.Id == id && e.tenantId == tenantId, ct);
+            .FirstOrDefaultAsync(e => e.Id == id && e.workspaceId == workspaceId, ct);
 
-    public async Task<WorkflowExecution?> GetByIdWithStepsAsync(Guid id, Guid tenantId, CancellationToken ct = default)
+    public async Task<WorkflowExecution?> GetByIdWithStepsAsync(Guid id, Guid workspaceId, CancellationToken ct = default)
         => await context.WorkflowExecutions
             .Include(e => e.Steps)
-            .FirstOrDefaultAsync(e => e.Id == id && e.tenantId == tenantId, ct);
+            .FirstOrDefaultAsync(e => e.Id == id && e.workspaceId == workspaceId, ct);
 
-    public async Task<IReadOnlyList<WorkflowExecution>> GetAllAsync(Guid tenantId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<WorkflowExecution>> GetAllAsync(Guid workspaceId, CancellationToken ct = default)
         => await context.WorkflowExecutions
-            .Where(e => e.tenantId == tenantId)
+            .Where(e => e.workspaceId == workspaceId)
             .OrderByDescending(e => e.CreatedAt)
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<WorkflowExecution>> GetByWorkflowAsync(
-        Guid workflowId, Guid tenantId, CancellationToken ct = default)
+        Guid workflowId, Guid workspaceId, CancellationToken ct = default)
         => await context.WorkflowExecutions
-            .Where(e => e.WorkflowDefinitionId == workflowId && e.tenantId == tenantId)
+            .Where(e => e.WorkflowDefinitionId == workflowId && e.workspaceId == workspaceId)
             .OrderByDescending(e => e.CreatedAt)
             .ToListAsync(ct);
 
     public async Task<ExecutionResponse?> GetWithStepsAsync(
-        Guid executionId, Guid tenantId, CancellationToken ct = default)
+        Guid executionId, Guid workspaceId, CancellationToken ct = default)
     {
         WorkflowExecution? execution = await context.WorkflowExecutions
             .AsNoTracking()
             .Include(e => e.Steps)
-            .FirstOrDefaultAsync(e => e.Id == executionId && e.tenantId == tenantId, ct);
+            .FirstOrDefaultAsync(e => e.Id == executionId && e.workspaceId == workspaceId, ct);
 
         if (execution is null)
             return null;
@@ -78,11 +78,11 @@ internal sealed class ExecutionRepository(WorkflowEngineDbContext context) : IEx
     }
 
     public async Task<(IReadOnlyList<ExecutionSummaryResponse> Items, int TotalCount)> GetPagedAsync(
-        Guid tenantId, int page, int pageSize, ExecutionStatus? status = null, CancellationToken ct = default)
+        Guid workspaceId, int page, int pageSize, ExecutionStatus? status = null, CancellationToken ct = default)
     {
         IQueryable<WorkflowExecution> query = context.WorkflowExecutions
             .AsNoTracking()
-            .Where(e => e.tenantId == tenantId);
+            .Where(e => e.workspaceId == workspaceId);
 
         if (status.HasValue)
             query = query.Where(e => e.Status == status.Value);
@@ -110,11 +110,11 @@ internal sealed class ExecutionRepository(WorkflowEngineDbContext context) : IEx
     }
 
     public async Task<(IReadOnlyList<ExecutionSummaryResponse> Items, int TotalCount)> GetPagedByWorkflowAsync(
-        Guid workflowId, Guid tenantId, int page, int pageSize, ExecutionStatus? status = null, CancellationToken ct = default)
+        Guid workflowId, Guid workspaceId, int page, int pageSize, ExecutionStatus? status = null, CancellationToken ct = default)
     {
         IQueryable<WorkflowExecution> query = context.WorkflowExecutions
             .AsNoTracking()
-            .Where(e => e.WorkflowDefinitionId == workflowId && e.tenantId == tenantId);
+            .Where(e => e.WorkflowDefinitionId == workflowId && e.workspaceId == workspaceId);
 
         if (status.HasValue)
             query = query.Where(e => e.Status == status.Value);
@@ -142,10 +142,10 @@ internal sealed class ExecutionRepository(WorkflowEngineDbContext context) : IEx
     }
 
     public async Task<IReadOnlyList<ExecutionSummaryResponse>> GetRetriesAsync(
-        Guid originalExecutionId, Guid tenantId, CancellationToken ct = default)
+        Guid originalExecutionId, Guid workspaceId, CancellationToken ct = default)
         => await context.WorkflowExecutions
             .AsNoTracking()
-            .Where(e => e.RetryOfExecutionId == originalExecutionId && e.tenantId == tenantId)
+            .Where(e => e.RetryOfExecutionId == originalExecutionId && e.workspaceId == workspaceId)
             .OrderBy(e => e.CreatedAt)
             .Select(e => new ExecutionSummaryResponse(
                 e.Id,
@@ -160,16 +160,16 @@ internal sealed class ExecutionRepository(WorkflowEngineDbContext context) : IEx
                 e.CompletedAt))
             .ToListAsync(ct);
 
-    public Task<int> CountCreatedSinceUtcAsync(Guid tenantId, DateTime sinceUtc, CancellationToken ct = default) =>
+    public Task<int> CountCreatedSinceUtcAsync(Guid workspaceId, DateTime sinceUtc, CancellationToken ct = default) =>
         context.WorkflowExecutions.CountAsync(
-            e => e.tenantId == tenantId && e.CreatedAt >= sinceUtc,
+            e => e.workspaceId == workspaceId && e.CreatedAt >= sinceUtc,
             ct);
 
-    public async Task<IReadOnlyList<WorkflowExecution>> GetCancellableByTenantAsync(
-        Guid tenantId,
+    public async Task<IReadOnlyList<WorkflowExecution>> GetCancellableByWorkspaceAsync(
+        Guid workspaceId,
         CancellationToken ct = default) =>
         await context.WorkflowExecutions
-            .Where(e => e.tenantId == tenantId
+            .Where(e => e.workspaceId == workspaceId
                         && (e.Status == ExecutionStatus.Pending || e.Status == ExecutionStatus.Running))
             .ToListAsync(ct);
 }

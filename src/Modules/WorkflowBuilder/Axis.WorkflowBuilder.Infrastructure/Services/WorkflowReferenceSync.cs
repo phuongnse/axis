@@ -69,7 +69,7 @@ internal sealed class WorkflowReferenceSync(WorkflowBuilderDbContext context) : 
             {
                 context.WorkflowFormReferences.Add(
                     WorkflowFormReference.Create(
-                        workflow.Id, step.Id, formId.Value, workflow.tenantId));
+                        workflow.Id, step.Id, formId.Value, workflow.workspaceId));
             }
             else if (row.FormId != formId.Value)
                 row.Retarget(formId.Value);
@@ -97,7 +97,7 @@ internal sealed class WorkflowReferenceSync(WorkflowBuilderDbContext context) : 
                 continue;
 
             context.WorkflowModelReferences.Add(
-                WorkflowModelReference.Create(workflow.Id, modelId, workflow.tenantId));
+                WorkflowModelReference.Create(workflow.Id, modelId, workflow.workspaceId));
         }
     }
 }

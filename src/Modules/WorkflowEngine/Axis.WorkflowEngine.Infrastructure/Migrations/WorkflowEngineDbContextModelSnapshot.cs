@@ -33,9 +33,9 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
-                    b.Property<Guid>("tenantId")
+                    b.Property<Guid>("workspaceId")
                         .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
+                        .HasColumnName("workspace_id");
 
                     b.HasKey("WorkflowId");
 
@@ -59,9 +59,6 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
 
                     b.Property<string>("ErrorMessage")
                         .HasColumnType("text");
-
-                    b.Property<Guid>("tenantId")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("RetryOfExecutionId")
                         .HasColumnType("uuid");
@@ -88,6 +85,10 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("context");
 
+                    b.Property<Guid>("workspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
                     b.HasKey("Id");
 
                     b.ToTable("workflow_executions", (string)null);
@@ -100,10 +101,6 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("workflow_id");
 
-                    b.Property<Guid>("tenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
                     b.Property<string>("Steps")
                         .IsRequired()
                         .HasColumnType("jsonb")
@@ -113,6 +110,10 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("jsonb")
                         .HasColumnName("transitions");
+
+                    b.Property<Guid>("workspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
 
                     b.HasKey("WorkflowId");
 
@@ -150,9 +151,6 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                                 .HasMaxLength(500)
                                 .HasColumnType("character varying(500)");
 
-                            b1.Property<Guid>("tenantId")
-                                .HasColumnType("uuid");
-
                             b1.Property<string>("OutputSnapshot")
                                 .HasColumnType("jsonb");
 
@@ -170,6 +168,10 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
                                 .IsRequired()
                                 .HasColumnType("text");
 
+                            b1.Property<Guid>("workspaceId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("workspace_id");
+
                             b1.Property<uint>("xmin")
                                 .IsConcurrencyToken()
                                 .ValueGeneratedOnAddOrUpdate()
@@ -178,7 +180,7 @@ namespace Axis.WorkflowEngine.Infrastructure.Migrations
 
                             b1.HasKey("Id");
 
-                            b1.HasIndex("ExecutionId", "tenantId");
+                            b1.HasIndex("ExecutionId", "workspaceId");
 
                             b1.ToTable("execution_steps", (string)null);
 

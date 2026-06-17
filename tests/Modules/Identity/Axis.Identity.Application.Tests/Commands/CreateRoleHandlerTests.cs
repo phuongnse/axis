@@ -13,12 +13,12 @@ public class CreateRoleHandlerTests
     private readonly IRoleRepository _roleRepo = Substitute.For<IRoleRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
 
     private CreateRoleHandler CreateHandler() => new(_roleRepo, _uow);
 
     private static CreateRoleCommand ValidCommand() => new(
-        TenantId,
+        WorkspaceId,
         Name: "Manager",
         Description: "Can manage workflows",
         Permissions: ["workflow:definition:read", "workflow:definition:write"]);
@@ -26,14 +26,14 @@ public class CreateRoleHandlerTests
     [Fact]
     public async Task CreateRole_WhenNameIsUnique_CreatesAndPersistsRole()
     {
-        _roleRepo.NameExistsAsync("Manager", TenantId).Returns(false);
+        _roleRepo.NameExistsAsync("Manager", WorkspaceId).Returns(false);
 
         Result<Guid> result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeEmpty();
         await _roleRepo.Received(1).AddAsync(
-            Arg.Is<Role>(r => r.Name == "Manager" && r.tenantId == TenantId),
+            Arg.Is<Role>(r => r.Name == "Manager" && r.workspaceId == WorkspaceId),
             Arg.Any<CancellationToken>());
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
@@ -41,7 +41,7 @@ public class CreateRoleHandlerTests
     [Fact]
     public async Task CreateRole_WhenNameIsDuplicate_ReturnsConflict()
     {
-        _roleRepo.NameExistsAsync("Manager", TenantId).Returns(true);
+        _roleRepo.NameExistsAsync("Manager", WorkspaceId).Returns(true);
 
         Result<Guid> result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
 
@@ -54,7 +54,7 @@ public class CreateRoleHandlerTests
     public async Task CreateRole_WhenPermissionsAreEmpty_ReturnsBusinessRuleFailure()
     {
         CreateRoleCommand command = ValidCommand() with { Permissions = [] };
-        _roleRepo.NameExistsAsync(Arg.Any<string>(), TenantId).Returns(false);
+        _roleRepo.NameExistsAsync(Arg.Any<string>(), WorkspaceId).Returns(false);
 
         Result<Guid> result = await CreateHandler().Handle(command, CancellationToken.None);
 

@@ -13,7 +13,7 @@ public class CreateFormHandlerTests
     private readonly IFormRepository _formRepo = Substitute.For<IFormRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     private CreateFormHandler CreateHandler() => new(_formRepo, _uow);
@@ -21,10 +21,10 @@ public class CreateFormHandlerTests
     [Fact]
     public async Task CreateForm_WhenNameIsUnique_CreatesFormAndReturnsId()
     {
-        _formRepo.NameExistsAsync("Employee Intake", TenantId).Returns(false);
+        _formRepo.NameExistsAsync("Employee Intake", WorkspaceId).Returns(false);
 
         Result<Guid> result = await CreateHandler().Handle(
-            new CreateFormCommand("Employee Intake", "New hire form", TenantId, UserId),
+            new CreateFormCommand("Employee Intake", "New hire form", WorkspaceId, UserId),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -39,10 +39,10 @@ public class CreateFormHandlerTests
     [Fact]
     public async Task CreateForm_WhenNameIsDuplicate_ReturnsConflict()
     {
-        _formRepo.NameExistsAsync("Employee Intake", TenantId).Returns(true);
+        _formRepo.NameExistsAsync("Employee Intake", WorkspaceId).Returns(true);
 
         Result<Guid> result = await CreateHandler().Handle(
-            new CreateFormCommand("Employee Intake", null, TenantId, UserId),
+            new CreateFormCommand("Employee Intake", null, WorkspaceId, UserId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -53,12 +53,12 @@ public class CreateFormHandlerTests
     [Fact]
     public async Task CreateForm_WhenSaveThrowsUniqueConstraint_ReturnsConflict()
     {
-        _formRepo.NameExistsAsync("Concurrent Form", TenantId).Returns(false);
+        _formRepo.NameExistsAsync("Concurrent Form", WorkspaceId).Returns(false);
         _uow.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns<int>(_ => throw new UniqueConstraintException("unique violation"));
 
         Result<Guid> result = await CreateHandler().Handle(
-            new CreateFormCommand("Concurrent Form", null, TenantId, UserId),
+            new CreateFormCommand("Concurrent Form", null, WorkspaceId, UserId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

@@ -8,7 +8,7 @@ Delete a model so that I can clean up unused data structures.
 
 ## Primary actor
 
-- Tenant Member with `data_modeling:model:delete`
+- Workspace Member with `data_modeling:model:delete`
 
 ## Trigger
 
@@ -17,7 +17,7 @@ Delete a model so that I can clean up unused data structures.
 ## Main flow
 
 1. Actor starts the — Delete a model flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
@@ -26,7 +26,7 @@ Delete a model so that I can clean up unused data structures.
 
 ## Context
 
-Users can create custom data models within their Tenant. A model defines the structure of a type of business object. All model metadata is stored in the tenant schema; actual records use a JSONB-backed storage strategy.
+Users can create custom data models within their Workspace. A model defines the structure of a type of business object. All model metadata is stored in the workspace schema; actual records use a JSONB-backed storage strategy.
 
 ## Acceptance Criteria
 

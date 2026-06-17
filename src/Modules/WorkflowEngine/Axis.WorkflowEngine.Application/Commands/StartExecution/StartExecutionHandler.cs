@@ -24,7 +24,7 @@ public sealed class StartExecutionHandler(
     public async Task<Result<Guid>> Handle(StartExecutionCommand command, CancellationToken cancellationToken)
     {
         Result planCheck = await planLimitService.EnsureWithinLimitAsync(
-            command.tenantId,
+            command.workspaceId,
             PlanLimitResourceType.ExecutionsPerMonth,
             increment: 1,
             cancellationToken);
@@ -36,25 +36,25 @@ public sealed class StartExecutionHandler(
         }
 
         // only Active workflows can be triggered
-        if (!await workflowReader.IsActiveAsync(command.WorkflowDefinitionId, command.tenantId, cancellationToken))
+        if (!await workflowReader.IsActiveAsync(command.WorkflowDefinitionId, command.workspaceId, cancellationToken))
             return Result.Failure<Guid>(ErrorCodes.BusinessRule,
                 "This workflow cannot be triggered. Only active workflows can be executed.");
 
         WorkflowSnapshot? snapshot = await workflowReader.GetSnapshotAsync(
-            command.WorkflowDefinitionId, command.tenantId, cancellationToken);
+            command.WorkflowDefinitionId, command.workspaceId, cancellationToken);
 
         if (snapshot is null)
         {
             logger.LogError(
-                "No workflow snapshot found for workflow {WorkflowId} in Tenant {TenantId}",
-                command.WorkflowDefinitionId, command.tenantId);
+                "No workflow snapshot found for workflow {WorkflowId} in Workspace {WorkspaceId}",
+                command.WorkflowDefinitionId, command.workspaceId);
             return Result.Failure<Guid>(ErrorCodes.BusinessRule,
                 "Workflow definition snapshot not found. Please re-publish the workflow.");
         }
 
         WorkflowExecution execution = WorkflowExecution.Create(
             command.WorkflowDefinitionId,
-            command.tenantId,
+            command.workspaceId,
             command.TriggerType,
             command.TriggeredByUserId,
             command.Input ?? new Dictionary<string, object?>());
@@ -64,14 +64,14 @@ public sealed class StartExecutionHandler(
         await execRepo.AddAsync(execution, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);
         await planLimitService.RecordUsageDeltaAsync(
-            command.tenantId,
+            command.workspaceId,
             PlanLimitResourceType.ExecutionsPerMonth,
             delta: 1,
             cancellationToken);
 
         // Dispatch async — Wolverine picks up execution outside this request/transaction boundary
         await dispatcher.PublishAsync(
-            new ExecuteNextStepMessage(execution.Id, execution.tenantId), cancellationToken);
+            new ExecuteNextStepMessage(execution.Id, execution.workspaceId), cancellationToken);
 
         return execution.Id;
     }

@@ -10,7 +10,7 @@ public sealed class Invitation : AggregateRoot<Guid>
     private const int ExpiryHours = 48;
 
     public Email Email { get; private set; }
-    public Guid tenantId { get; private set; }
+    public Guid workspaceId { get; private set; }
     public Guid RoleId { get; private set; }
     public Guid InvitedByUserId { get; private set; }
     public string Token { get; private set; }
@@ -20,12 +20,12 @@ public sealed class Invitation : AggregateRoot<Guid>
 
     public bool IsExpired => DateTime.UtcNow > ExpiresAt;
 
-    private Invitation(Guid id, Email email, Guid tenantId, Guid roleId,
+    private Invitation(Guid id, Email email, Guid workspaceId, Guid roleId,
         Guid invitedByUserId, string token, DateTime expiresAt, DateTime createdAt)
         : base(id)
     {
         Email = email;
-        this.tenantId = tenantId;
+        this.workspaceId = workspaceId;
         RoleId = roleId;
         InvitedByUserId = invitedByUserId;
         Token = token;
@@ -34,23 +34,23 @@ public sealed class Invitation : AggregateRoot<Guid>
         CreatedAt = createdAt;
     }
 
-    public static Invitation Create(Email email, Guid tenantId, Guid roleId, Guid invitedByUserId)
+    public static Invitation Create(Email email, Guid workspaceId, Guid roleId, Guid invitedByUserId)
     {
         string token = GenerateToken();
         DateTime now = DateTime.UtcNow;
-        Invitation invitation = new Invitation(Guid.NewGuid(), email, tenantId, roleId,
+        Invitation invitation = new Invitation(Guid.NewGuid(), email, workspaceId, roleId,
             invitedByUserId, token, now.AddHours(ExpiryHours), now);
 
-        invitation.RaiseDomainEvent(new InvitationCreated(invitation.Id, tenantId, email.Value, token));
+        invitation.RaiseDomainEvent(new InvitationCreated(invitation.Id, workspaceId, email.Value, token));
         return invitation;
     }
 
     /// <summary>Test helper — creates an already-expired invitation.</summary>
-    internal static Invitation CreateExpired(Email email, Guid tenantId, Guid roleId, Guid invitedByUserId)
+    internal static Invitation CreateExpired(Email email, Guid workspaceId, Guid roleId, Guid invitedByUserId)
     {
         string token = GenerateToken();
         DateTime past = DateTime.UtcNow.AddHours(-1);
-        return new Invitation(Guid.NewGuid(), email, tenantId, roleId,
+        return new Invitation(Guid.NewGuid(), email, workspaceId, roleId,
             invitedByUserId, token, past, past.AddHours(-ExpiryHours));
     }
 
@@ -66,7 +66,7 @@ public sealed class Invitation : AggregateRoot<Guid>
             throw new InvalidOperationException("This invitation has been cancelled.");
 
         Status = InvitationStatus.Accepted;
-        RaiseDomainEvent(new InvitationAccepted(Id, tenantId, Email.Value));
+        RaiseDomainEvent(new InvitationAccepted(Id, workspaceId, Email.Value));
     }
 
     public void Cancel()

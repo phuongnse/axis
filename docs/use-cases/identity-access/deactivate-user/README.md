@@ -8,7 +8,7 @@ Deactivate a user so that they can no longer access the workspace without deleti
 
 ## Primary actor
 
-- Tenant Admin
+- Workspace Admin
 
 ## Trigger
 
@@ -17,7 +17,7 @@ Deactivate a user so that they can no longer access the workspace without deleti
 ## Main flow
 
 1. Actor starts the — Deactivate a user flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
@@ -26,7 +26,7 @@ Deactivate a user so that they can no longer access the workspace without deleti
 
 ## Context
 
-Tenant admins can invite new members, manage their accounts, and deactivate users who should no longer have access.
+Workspace admins can invite new members, manage their accounts, and deactivate users who should no longer have access.
 
 ## Acceptance Criteria
 
@@ -38,12 +38,12 @@ Tenant admins can invite new members, manage their accounts, and deactivate user
 
 *Validation & errors*
 - [ ] An admin cannot deactivate themselves.
-- [ ] Deactivating the last Admin-role user is blocked: "You cannot deactivate the last admin of the Tenant."
+- [ ] Deactivating the last Admin-role user is blocked: "You cannot deactivate the last admin of the Workspace."
 - [ ] A non-admin who calls the deactivate API endpoint receives HTTP 403.
 
 *Edge cases*
 - [ ] Deactivated user's created content (workflows, models, records) is preserved and attributed to them.
-- [ ] A deactivated user who tries to sign in sees: "Your account has been deactivated. Contact your Tenant admin."
+- [ ] A deactivated user who tries to sign in sees: "Your account has been deactivated. Contact your Workspace admin."
 - [ ] A deactivated user with pending form tasks: those tasks are marked "Assignee deactivated" and the admin is notified.
 
 *Out of scope*

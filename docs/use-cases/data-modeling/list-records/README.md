@@ -8,7 +8,7 @@ See all records for a model so that I can browse and find the data I need.
 
 ## Primary actor
 
-- Tenant Member with `data_modeling:record:read`
+- Workspace Member with `data_modeling:record:read`
 
 ## Trigger
 
@@ -17,7 +17,7 @@ See all records for a model so that I can browse and find the data I need.
 ## Main flow
 
 1. Actor starts the — View records list flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
@@ -26,7 +26,7 @@ See all records for a model so that I can browse and find the data I need.
 
 ## Context
 
-Users can create, read, update, and delete records against any model. Records are stored as JSONB in the tenant schema.
+Users can create, read, update, and delete records against any model. Records are stored as JSONB in the workspace schema.
 
 ## Acceptance Criteria
 

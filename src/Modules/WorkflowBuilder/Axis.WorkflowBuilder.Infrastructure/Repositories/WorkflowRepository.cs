@@ -10,21 +10,21 @@ internal sealed class WorkflowRepository(WorkflowBuilderDbContext context) : IWo
     public async Task AddAsync(WorkflowDefinition workflow, CancellationToken ct = default)
         => await context.WorkflowDefinitions.AddAsync(workflow, ct);
 
-    public async Task<WorkflowDefinition?> GetByIdAsync(Guid id, Guid tenantId, CancellationToken ct = default)
+    public async Task<WorkflowDefinition?> GetByIdAsync(Guid id, Guid workspaceId, CancellationToken ct = default)
         => await context.WorkflowDefinitions
-            .FirstOrDefaultAsync(w => w.Id == id && w.tenantId == tenantId, ct);
+            .FirstOrDefaultAsync(w => w.Id == id && w.workspaceId == workspaceId, ct);
 
-    public async Task<IReadOnlyList<WorkflowDefinition>> GetAllAsync(Guid tenantId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<WorkflowDefinition>> GetAllAsync(Guid workspaceId, CancellationToken ct = default)
         => await context.WorkflowDefinitions
-            .Where(w => w.tenantId == tenantId)
+            .Where(w => w.workspaceId == workspaceId)
             .OrderBy(w => w.Name)
             .ToListAsync(ct);
 
     public async Task<(IReadOnlyList<WorkflowDefinition> Items, int TotalCount)> GetPagedAsync(
-        Guid tenantId, int page, int pageSize, CancellationToken ct = default)
+        Guid workspaceId, int page, int pageSize, CancellationToken ct = default)
     {
         IQueryable<WorkflowDefinition> query = context.WorkflowDefinitions
-            .Where(w => w.tenantId == tenantId)
+            .Where(w => w.workspaceId == workspaceId)
             .OrderByDescending(w => w.UpdatedAt);
 
         int totalCount = await query.CountAsync(ct);
@@ -36,12 +36,12 @@ internal sealed class WorkflowRepository(WorkflowBuilderDbContext context) : IWo
         return (items, totalCount);
     }
 
-    public async Task<bool> NameExistsAsync(string name, Guid tenantId, Guid? excludeId = null, CancellationToken ct = default)
+    public async Task<bool> NameExistsAsync(string name, Guid workspaceId, Guid? excludeId = null, CancellationToken ct = default)
         => await context.WorkflowDefinitions
-            .AnyAsync(w => w.tenantId == tenantId
+            .AnyAsync(w => w.workspaceId == workspaceId
                 && w.Name.ToLower() == name.ToLower()
                 && (excludeId == null || w.Id != excludeId), ct);
 
-    public Task<int> CountByTenantAsync(Guid tenantId, CancellationToken ct = default) =>
-        context.WorkflowDefinitions.CountAsync(w => w.tenantId == tenantId, ct);
+    public Task<int> CountByWorkspaceAsync(Guid workspaceId, CancellationToken ct = default) =>
+        context.WorkflowDefinitions.CountAsync(w => w.workspaceId == workspaceId, ct);
 }

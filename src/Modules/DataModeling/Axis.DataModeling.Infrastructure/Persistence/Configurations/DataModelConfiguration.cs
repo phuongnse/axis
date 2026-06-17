@@ -43,8 +43,8 @@ internal sealed class DataModelConfiguration : IEntityTypeConfiguration<DataMode
             .HasColumnName("color")
             .HasMaxLength(50);
 
-        builder.Property(m => m.tenantId)
-            .HasColumnName("tenant_id")
+        builder.Property(m => m.workspaceId)
+            .HasColumnName("workspace_id")
             .IsRequired();
 
         builder.Property(m => m.DeletedAt)
@@ -75,6 +75,6 @@ internal sealed class DataModelConfiguration : IEntityTypeConfiguration<DataMode
 
         builder.Ignore(m => m.Fields);
 
-        builder.HasIndex(m => new { m.tenantId, m.Name });
+        builder.HasIndex(m => new { m.workspaceId, m.Name });
     }
 }

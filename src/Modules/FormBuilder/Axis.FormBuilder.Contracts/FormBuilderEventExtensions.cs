@@ -34,8 +34,8 @@ public static class FormBuilderEventExtensions
     public static Guid FormDefinitionId(this FormTaskSubmittedEvent @event)
         => ParseRequiredGuid(@event.formDefinitionId, nameof(@event.formDefinitionId));
 
-    public static Guid tenantId(this FormTaskSubmittedEvent @event)
-        => ParseRequiredGuid(@event.tenantId, nameof(@event.tenantId));
+    public static Guid workspaceId(this FormTaskSubmittedEvent @event)
+        => ParseRequiredGuid(@event.workspaceId, nameof(@event.workspaceId));
 
     public static Guid ExecutionId(this FormTaskSubmittedEvent @event)
         => ParseRequiredGuid(@event.executionId, nameof(@event.executionId));
@@ -49,8 +49,8 @@ public static class FormBuilderEventExtensions
     public static Guid FormDefinitionId(this FormTaskExpiredEvent @event)
         => ParseRequiredGuid(@event.formDefinitionId, nameof(@event.formDefinitionId));
 
-    public static Guid tenantId(this FormTaskExpiredEvent @event)
-        => ParseRequiredGuid(@event.tenantId, nameof(@event.tenantId));
+    public static Guid workspaceId(this FormTaskExpiredEvent @event)
+        => ParseRequiredGuid(@event.workspaceId, nameof(@event.workspaceId));
 
     public static Guid ExecutionId(this FormTaskExpiredEvent @event)
         => ParseRequiredGuid(@event.executionId, nameof(@event.executionId));
@@ -61,8 +61,8 @@ public static class FormBuilderEventExtensions
     public static Guid FormId(this FormDeletedEvent @event)
         => ParseRequiredGuid(@event.formId, nameof(@event.formId));
 
-    public static Guid tenantId(this FormDeletedEvent @event)
-        => ParseRequiredGuid(@event.tenantId, nameof(@event.tenantId));
+    public static Guid workspaceId(this FormDeletedEvent @event)
+        => ParseRequiredGuid(@event.workspaceId, nameof(@event.workspaceId));
 
     private static Guid ParseRequiredGuid(string value, string fieldName)
         => Guid.TryParse(value, out Guid parsed)

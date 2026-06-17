@@ -38,10 +38,10 @@ Every repository integration test class must cover **all three paths**, not just
 | Path | What to test |
 |---|---|
 | **Happy path** | Entity is created / queried / updated successfully |
-| **Not-found / isolation** | Query with wrong `tenantId` returns `null`; soft-deleted record excluded |
+| **Not-found / isolation** | Query with wrong `workspaceId` returns `null`; soft-deleted record excluded |
 | **Constraint violations** | Duplicate insert (same unique fields) throws `UniqueConstraintException`; wrong FK fails as expected |
 
-When a repository has a unique constraint (e.g. `(tenant_id, name)`), a test **must** attempt to insert a second record with the same unique fields and assert the violation is caught. This prevents the class of bug where the DB index exists but `.IsUnique()` was accidentally omitted.
+When a repository has a unique constraint (e.g. `(workspace_id, name)`), a test **must** attempt to insert a second record with the same unique fields and assert the violation is caught. This prevents the class of bug where the DB index exists but `.IsUnique()` was accidentally omitted.
 
 **Happy-path-only integration tests are not complete** — they must be expanded before the layer is marked ✅.
 
@@ -95,7 +95,7 @@ await using (IdentityDbContext ctx = new(/* UseOpenIddict() */))
     await ctx.Database.MigrateAsync();
 
 await PostgresModuleTestDatabase.MigrateAsync<DataModelingDbContext>(
-    dmConn, opts => new DataModelingDbContext(opts, tenantContext));
+    dmConn, opts => new DataModelingDbContext(opts, workspaceContext));
 ```
 
 **Wolverine:** no separate `axis_wolverine_test` database. Per-module `wolverine` schemas are created by `AddResourceSetupOnStartup()` in each module's database when the test host starts ([ADR-012](../TECH_STACK.md#adr-012-per-module-wolverine-schema-in-the-modules-own-database)).

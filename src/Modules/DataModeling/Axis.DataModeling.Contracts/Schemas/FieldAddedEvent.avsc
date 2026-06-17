@@ -8,7 +8,7 @@
       "type": "string"
     },
     {
-      "name": "tenantId",
+      "name": "workspaceId",
       "type": "string"
     },
     {

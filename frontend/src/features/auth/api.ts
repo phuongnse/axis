@@ -15,17 +15,17 @@ import type {
   LoginCredentials,
   MessageResponse,
   ProvisioningStatusResponse,
-  RegisterTenantRequest,
   RegisterUserRequest,
-  TenantSlugPreviewResponse,
+  RegisterWorkspaceRequest,
   VerifyEmailResponse,
+  WorkspaceSlugPreviewResponse,
 } from './types';
 
 export const authKeys = {
   all: ['auth'] as const,
   provisioningStatus: (token: string) => [...authKeys.all, 'provisioning-status', token] as const,
   legalVersions: ['auth', 'legal-versions'] as const,
-  slugPreview: (tenantName: string) => [...authKeys.all, 'slug-preview', tenantName] as const,
+  slugPreview: (workspaceName: string) => [...authKeys.all, 'slug-preview', workspaceName] as const,
 };
 
 export function createRegisterIdempotencyKey(): string {
@@ -46,11 +46,11 @@ export function toAdminNameParts(fullName: string): { firstName: string; lastNam
   };
 }
 
-export async function registerTenant(
-  payload: RegisterTenantRequest,
+export async function registerWorkspace(
+  payload: RegisterWorkspaceRequest,
   idempotencyKey: string,
 ): Promise<MessageResponse> {
-  return fetchApi<MessageResponse>('/tenants', {
+  return fetchApi<MessageResponse>('/workspaces', {
     method: 'POST',
     headers: {
       'Idempotency-Key': idempotencyKey,
@@ -76,9 +76,11 @@ export async function getLegalVersions(): Promise<LegalVersionsResponse> {
   return fetchApi<LegalVersionsResponse>('/legal/versions');
 }
 
-export async function getTenantSlugPreview(tenantName: string): Promise<TenantSlugPreviewResponse> {
-  const params = new URLSearchParams({ tenantName });
-  return fetchApi<TenantSlugPreviewResponse>(`/tenants/slug-preview?${params.toString()}`);
+export async function getWorkspaceSlugPreview(
+  workspaceName: string,
+): Promise<WorkspaceSlugPreviewResponse> {
+  const params = new URLSearchParams({ workspaceName });
+  return fetchApi<WorkspaceSlugPreviewResponse>(`/workspaces/slug-preview?${params.toString()}`);
 }
 
 export class LoginRequestError extends Error {
@@ -179,6 +181,16 @@ export async function completePostVerifyPkceFlow(verificationToken?: string | nu
   }
   const pkce = createPkceSession();
   const authorizeUrl = await buildAuthorizeUrl(pkce.state, pkce.verifier);
+  window.location.assign(authorizeUrl);
+}
+
+export async function switchWorkspace(workspaceId: string): Promise<void> {
+  const pkce = createPkceSession();
+  const authorizeUrl = await buildAuthorizeUrl(pkce.state, pkce.verifier);
+  await fetchApi<null>('/auth/switch-workspace', {
+    method: 'POST',
+    body: JSON.stringify({ workspaceId }),
+  });
   window.location.assign(authorizeUrl);
 }
 

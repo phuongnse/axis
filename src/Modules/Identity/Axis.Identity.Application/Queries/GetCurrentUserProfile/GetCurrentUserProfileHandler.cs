@@ -4,7 +4,10 @@ using Axis.Shared.Application.CQRS;
 
 namespace Axis.Identity.Application.Queries.GetCurrentUserProfile;
 
-public sealed class GetCurrentUserProfileHandler(IUserRepository userRepository)
+public sealed class GetCurrentUserProfileHandler(
+    IUserRepository userRepository,
+    IWorkspaceMembershipRepository membershipRepository,
+    IWorkspaceRepository workspaceRepository)
     : IQueryHandler<GetCurrentUserProfileQuery, CurrentUserProfileDto?>
 {
     public async Task<CurrentUserProfileDto?> Handle(
@@ -15,6 +18,23 @@ public sealed class GetCurrentUserProfileHandler(IUserRepository userRepository)
         if (user is null)
             return null;
 
+        IReadOnlyList<WorkspaceMembership> memberships =
+            await membershipRepository.GetByUserIdAsync(user.Id, cancellationToken);
+        List<UserWorkspaceDto> workspaces = [];
+        foreach (WorkspaceMembership membership in memberships.Where(m => m.Status == WorkspaceMembershipStatus.Active))
+        {
+            Workspace? workspace = await workspaceRepository.GetByIdAsync(membership.workspaceId, cancellationToken);
+            if (workspace is null || !workspace.AllowsSignIn())
+                continue;
+
+            workspaces.Add(new UserWorkspaceDto(
+                workspace.Id,
+                workspace.Name,
+                workspace.Slug.Value,
+                workspace.Type.ToString(),
+                query.workspaceId == workspace.Id));
+        }
+
         return new CurrentUserProfileDto(
             user.Id,
             user.Email.Value,
@@ -23,7 +43,11 @@ public sealed class GetCurrentUserProfileHandler(IUserRepository userRepository)
             $"{user.FirstName} {user.LastName}",
             user.AvatarUrl,
             user.Status == UserStatus.Active,
-            query.tenantId,
-            query.Permissions);
+            query.workspaceId,
+            query.Permissions,
+            workspaces
+                .OrderBy(workspace => workspace.Type == WorkspaceType.Personal.ToString() ? 0 : 1)
+                .ThenBy(workspace => workspace.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList());
     }
 }

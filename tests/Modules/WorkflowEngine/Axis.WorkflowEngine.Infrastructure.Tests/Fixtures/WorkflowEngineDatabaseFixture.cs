@@ -1,4 +1,4 @@
-using Axis.Shared.Application.Tenancy;
+using Axis.Shared.Application.Workspaces;
 using Axis.Testing;
 using Axis.WorkflowEngine.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -30,17 +30,17 @@ public sealed class WorkflowEngineDatabaseFixture : IAsyncLifetime
         schemaCmd.CommandText = $"""CREATE SCHEMA IF NOT EXISTS "{TestSchema}";""";
         await schemaCmd.ExecuteNonQueryAsync();
 
-        TestTenantContext tenantContext = new(TestSchema);
+        TestWorkspaceContext workspaceContext = new(TestSchema);
         await PostgresModuleTestDatabase.MigrateAsync<WorkflowEngineDbContext>(
             ConnectionString,
-            opts => new WorkflowEngineDbContext(opts, tenantContext));
+            opts => new WorkflowEngineDbContext(opts, workspaceContext));
 
         // Stub table for cross-module WorkflowDefinitionReader queries
         await using NpgsqlCommand wfCmd = conn.CreateCommand();
         wfCmd.CommandText = $"""
             CREATE TABLE IF NOT EXISTS "{TestSchema}".workflow_definitions (
                 id UUID PRIMARY KEY,
-                tenant_id UUID NOT NULL,
+                workspace_id UUID NOT NULL,
                 status TEXT NOT NULL DEFAULT 'Draft'
             );
             """;
@@ -54,12 +54,12 @@ public sealed class WorkflowEngineDatabaseFixture : IAsyncLifetime
         DbContextOptions<WorkflowEngineDbContext> options = new DbContextOptionsBuilder<WorkflowEngineDbContext>()
                     .UseNpgsql(ConnectionString)
                     .Options;
-        return new WorkflowEngineDbContext(options, new TestTenantContext(TestSchema));
+        return new WorkflowEngineDbContext(options, new TestWorkspaceContext(TestSchema));
     }
 }
 
-internal sealed class TestTenantContext(string schemaName) : ITenantContext
+internal sealed class TestWorkspaceContext(string schemaName) : IWorkspaceContext
 {
-    public Guid tenantId => Guid.Parse("00000000-0000-0000-0000-000000000001");
+    public Guid workspaceId => Guid.Parse("00000000-0000-0000-0000-000000000001");
     public string SchemaName => schemaName;
 }

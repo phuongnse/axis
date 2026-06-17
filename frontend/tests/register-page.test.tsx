@@ -138,7 +138,7 @@ describe('RegisterPage', () => {
     );
     const stored = sessionStorage.getItem('axis.registration-context');
     expect(stored).toContain('alex@example.com');
-    expect(stored).not.toContain('TenantName');
+    expect(stored).not.toContain('WorkspaceName');
   });
 
   it('shows a specific error when legal versions are unavailable', async () => {
@@ -170,7 +170,7 @@ describe('RegisterPage', () => {
     expect(registerAttempted).toBe(false);
   });
 
-  it('includes setup token when registering the first Tenant user', async () => {
+  it('includes setup token when registering the first Workspace user', async () => {
     const user = userEvent.setup();
     let registerBody: Record<string, unknown> | undefined;
     vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
@@ -204,7 +204,7 @@ describe('RegisterPage', () => {
     await user.click(screen.getByRole('button', { name: /create account/i }));
 
     await waitFor(() => {
-      expect(registerBody?.tenantSetupToken).toBe('setup-token');
+      expect(registerBody?.workspaceSetupToken).toBe('setup-token');
     });
   });
 

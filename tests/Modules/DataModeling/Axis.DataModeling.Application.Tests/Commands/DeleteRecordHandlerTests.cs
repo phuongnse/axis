@@ -12,7 +12,7 @@ public class DeleteRecordHandlerTests
 {
     private readonly IDataRecordRepository _recordRepo = Substitute.For<IDataRecordRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private static readonly Guid ModelId = Guid.NewGuid();
     private const string UserId = "user-123";
 
@@ -21,11 +21,11 @@ public class DeleteRecordHandlerTests
     [Fact]
     public async Task DeleteRecord_WhenRecordExists_SoftDeletesAndSaves()
     {
-        DataRecord record = DataRecord.Create(ModelId, TenantId, new Dictionary<string, object?> { ["x"] = 1 }, UserId);
-        _recordRepo.GetByIdAsync(record.Id, ModelId, TenantId).Returns(record);
+        DataRecord record = DataRecord.Create(ModelId, WorkspaceId, new Dictionary<string, object?> { ["x"] = 1 }, UserId);
+        _recordRepo.GetByIdAsync(record.Id, ModelId, WorkspaceId).Returns(record);
 
         Result result = await CreateHandler().Handle(
-            new DeleteRecordCommand(record.Id, ModelId, TenantId),
+            new DeleteRecordCommand(record.Id, ModelId, WorkspaceId),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -36,10 +36,10 @@ public class DeleteRecordHandlerTests
     [Fact]
     public async Task DeleteRecord_WhenRecordNotFound_ReturnsNotFound()
     {
-        _recordRepo.GetByIdAsync(Arg.Any<Guid>(), ModelId, TenantId).Returns((DataRecord?)null);
+        _recordRepo.GetByIdAsync(Arg.Any<Guid>(), ModelId, WorkspaceId).Returns((DataRecord?)null);
 
         Result result = await CreateHandler().Handle(
-            new DeleteRecordCommand(Guid.NewGuid(), ModelId, TenantId),
+            new DeleteRecordCommand(Guid.NewGuid(), ModelId, WorkspaceId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -48,14 +48,14 @@ public class DeleteRecordHandlerTests
     }
 
     [Fact]
-    public async Task DeleteRecord_WhenRecordBelongsToAnotherTenant_ReturnsNotFound()
+    public async Task DeleteRecord_WhenRecordBelongsToAnotherWorkspace_ReturnsNotFound()
     {
-        DataRecord record = DataRecord.Create(ModelId, TenantId, new Dictionary<string, object?> { ["x"] = 1 }, UserId);
-        _recordRepo.GetByIdAsync(record.Id, ModelId, TenantId).Returns(record);
+        DataRecord record = DataRecord.Create(ModelId, WorkspaceId, new Dictionary<string, object?> { ["x"] = 1 }, UserId);
+        _recordRepo.GetByIdAsync(record.Id, ModelId, WorkspaceId).Returns(record);
 
-        Guid otherTenantId = Guid.NewGuid();
+        Guid otherWorkspaceId = Guid.NewGuid();
         Result result = await CreateHandler().Handle(
-            new DeleteRecordCommand(record.Id, ModelId, otherTenantId),
+            new DeleteRecordCommand(record.Id, ModelId, otherWorkspaceId),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

@@ -12,23 +12,23 @@ public class UpdateModelHandlerTests
 {
     private readonly IDataModelRepository _modelRepo = Substitute.For<IDataModelRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     private UpdateModelHandler CreateHandler() => new(_modelRepo, _uow);
 
     private static DataModel BuildModel() =>
-        DataModel.Create("Invoice", null, null, null, TenantId, UserId);
+        DataModel.Create("Invoice", null, null, null, WorkspaceId, UserId);
 
     [Fact]
     public async Task UpdateModel_WhenRequestIsValid_UpdatesModelAndSaves()
     {
         DataModel model = BuildModel();
-        _modelRepo.GetByIdAsync(model.Id, TenantId).Returns(model);
-        _modelRepo.NameExistsAsync("Updated Invoice", TenantId, model.Id).Returns(false);
+        _modelRepo.GetByIdAsync(model.Id, WorkspaceId).Returns(model);
+        _modelRepo.NameExistsAsync("Updated Invoice", WorkspaceId, model.Id).Returns(false);
 
         Result result = await CreateHandler().Handle(
-            new UpdateModelCommand(model.Id, TenantId, "Updated Invoice", "desc", null, null),
+            new UpdateModelCommand(model.Id, WorkspaceId, "Updated Invoice", "desc", null, null),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -39,10 +39,10 @@ public class UpdateModelHandlerTests
     [Fact]
     public async Task UpdateModel_WhenModelNotFound_ReturnsNotFound()
     {
-        _modelRepo.GetByIdAsync(Arg.Any<Guid>(), TenantId).Returns((DataModel?)null);
+        _modelRepo.GetByIdAsync(Arg.Any<Guid>(), WorkspaceId).Returns((DataModel?)null);
 
         Result result = await CreateHandler().Handle(
-            new UpdateModelCommand(Guid.NewGuid(), TenantId, "X", null, null, null),
+            new UpdateModelCommand(Guid.NewGuid(), WorkspaceId, "X", null, null, null),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -51,19 +51,19 @@ public class UpdateModelHandlerTests
     }
 
     [Fact]
-    public async Task UpdateModel_WhenModelBelongsToAnotherTenant_ReturnsNotFound()
+    public async Task UpdateModel_WhenModelBelongsToAnotherWorkspace_ReturnsNotFound()
     {
         DataModel model = BuildModel();
-        _modelRepo.GetByIdAsync(model.Id, TenantId).Returns(model);
+        _modelRepo.GetByIdAsync(model.Id, WorkspaceId).Returns(model);
 
-        Guid otherTenantId = Guid.NewGuid();
+        Guid otherWorkspaceId = Guid.NewGuid();
         Result result = await CreateHandler().Handle(
-            new UpdateModelCommand(model.Id, otherTenantId, "Updated Invoice", null, null, null),
+            new UpdateModelCommand(model.Id, otherWorkspaceId, "Updated Invoice", null, null, null),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
-        await _modelRepo.Received(1).GetByIdAsync(model.Id, otherTenantId);
+        await _modelRepo.Received(1).GetByIdAsync(model.Id, otherWorkspaceId);
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
@@ -71,11 +71,11 @@ public class UpdateModelHandlerTests
     public async Task UpdateModel_WhenNameIsDuplicate_ReturnsConflict()
     {
         DataModel model = BuildModel();
-        _modelRepo.GetByIdAsync(model.Id, TenantId).Returns(model);
-        _modelRepo.NameExistsAsync("Other", TenantId, model.Id).Returns(true);
+        _modelRepo.GetByIdAsync(model.Id, WorkspaceId).Returns(model);
+        _modelRepo.NameExistsAsync("Other", WorkspaceId, model.Id).Returns(true);
 
         Result result = await CreateHandler().Handle(
-            new UpdateModelCommand(model.Id, TenantId, "Other", null, null, null),
+            new UpdateModelCommand(model.Id, WorkspaceId, "Other", null, null, null),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

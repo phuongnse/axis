@@ -11,7 +11,7 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     private WorkflowBuilderDbContext _ctx = null!;
     private WorkflowRepository _sut = null!;
 
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private const string UserId = "user-123";
 
     public Task InitializeAsync()
@@ -23,8 +23,8 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
 
     public async Task DisposeAsync() => await _ctx.DisposeAsync();
 
-    private static WorkflowDefinition MakeWorkflow(string name, Guid? tenantId = null)
-        => WorkflowDefinition.Create(name, null, tenantId ?? TenantId, UserId);
+    private static WorkflowDefinition MakeWorkflow(string name, Guid? workspaceId = null)
+        => WorkflowDefinition.Create(name, null, workspaceId ?? WorkspaceId, UserId);
 
     [Fact]
     public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
@@ -32,27 +32,27 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
         WorkflowDefinition wf = MakeWorkflow("Order Approval");
         await _sut.AddAsync(wf);
         await _ctx.SaveChangesAsync();
-        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, TenantId);
+        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, WorkspaceId);
 
         loaded.Should().NotBeNull();
         loaded!.Name.Should().Be("Order Approval");
-        loaded.tenantId.Should().Be(TenantId);
+        loaded.workspaceId.Should().Be(WorkspaceId);
         loaded.Status.Should().Be(WorkflowStatus.Draft);
     }
 
     [Fact]
-    public async Task GetAllAsync_WhenMultipleWorkflowsExist_ReturnsOnlyTenantWorkflows()
+    public async Task GetAllAsync_WhenMultipleWorkflowsExist_ReturnsOnlyWorkspaceWorkflows()
     {
-        Guid TenantId = Guid.NewGuid();
-        WorkflowDefinition w1 = MakeWorkflow("WF-A", TenantId);
-        WorkflowDefinition w2 = MakeWorkflow("WF-B", TenantId);
+        Guid WorkspaceId = Guid.NewGuid();
+        WorkflowDefinition w1 = MakeWorkflow("WF-A", WorkspaceId);
+        WorkflowDefinition w2 = MakeWorkflow("WF-B", WorkspaceId);
         WorkflowDefinition other = MakeWorkflow("WF-Other", Guid.NewGuid());
 
         await _sut.AddAsync(w1);
         await _sut.AddAsync(w2);
         await _sut.AddAsync(other);
         await _ctx.SaveChangesAsync();
-        IReadOnlyList<WorkflowDefinition> result = await _sut.GetAllAsync(TenantId);
+        IReadOnlyList<WorkflowDefinition> result = await _sut.GetAllAsync(WorkspaceId);
 
         result.Should().HaveCount(2);
         result.Select(w => w.Name).Should().BeEquivalentTo(["WF-A", "WF-B"]);
@@ -61,22 +61,22 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     [Fact]
     public async Task NameExistsAsync_WhenNameExists_IsCaseInsensitive()
     {
-        Guid TenantId = Guid.NewGuid();
-        await _sut.AddAsync(MakeWorkflow("Employee Onboarding", TenantId));
+        Guid WorkspaceId = Guid.NewGuid();
+        await _sut.AddAsync(MakeWorkflow("Employee Onboarding", WorkspaceId));
         await _ctx.SaveChangesAsync();
 
-        (await _sut.NameExistsAsync("employee onboarding", TenantId)).Should().BeTrue();
-        (await _sut.NameExistsAsync("EMPLOYEE ONBOARDING", TenantId)).Should().BeTrue();
+        (await _sut.NameExistsAsync("employee onboarding", WorkspaceId)).Should().BeTrue();
+        (await _sut.NameExistsAsync("EMPLOYEE ONBOARDING", WorkspaceId)).Should().BeTrue();
     }
 
     [Fact]
     public async Task NameExistsAsync_WhenExcludeIdProvided_ExcludesThatWorkflowFromCheck()
     {
-        Guid TenantId = Guid.NewGuid();
-        WorkflowDefinition wf = MakeWorkflow("Invoice Review", TenantId);
+        Guid WorkspaceId = Guid.NewGuid();
+        WorkflowDefinition wf = MakeWorkflow("Invoice Review", WorkspaceId);
         await _sut.AddAsync(wf);
         await _ctx.SaveChangesAsync();
-        bool exists = await _sut.NameExistsAsync("Invoice Review", TenantId, excludeId: wf.Id);
+        bool exists = await _sut.NameExistsAsync("Invoice Review", WorkspaceId, excludeId: wf.Id);
 
         exists.Should().BeFalse();
     }
@@ -91,7 +91,7 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
 
         await _sut.AddAsync(wf);
         await _ctx.SaveChangesAsync();
-        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, TenantId);
+        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, WorkspaceId);
 
         loaded!.Steps.Should().HaveCount(3); // Start + Review + End
         loaded.Steps.Should().Contain(s => s.Name == "Review" && s.Type == StepType.Form);
@@ -108,7 +108,7 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
 
         await _sut.AddAsync(wf);
         await _ctx.SaveChangesAsync();
-        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, TenantId);
+        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, WorkspaceId);
 
         loaded!.Triggers.Should().HaveCount(2);
         loaded.Triggers.Should().Contain(t => t.Type == TriggerType.Schedule);
@@ -126,7 +126,7 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
         await _sut.AddAsync(wf);
         await _ctx.SaveChangesAsync();
 
-        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, TenantId);
+        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, WorkspaceId);
 
         loaded!.Status.Should().Be(WorkflowStatus.Active);
     }
@@ -134,30 +134,30 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     [Fact]
     public async Task AddStep_WhenMutatedAfterReload_IsPersisted()
     {
-        Guid TenantId = Guid.NewGuid();
-        WorkflowDefinition wf = MakeWorkflow("Mutation Test", TenantId);
+        Guid WorkspaceId = Guid.NewGuid();
+        WorkflowDefinition wf = MakeWorkflow("Mutation Test", WorkspaceId);
         await _sut.AddAsync(wf);
         await _ctx.SaveChangesAsync();
 
         // Load then mutate in the same tracked context — without a ValueComparer EF Core
         // uses reference equality on the list and silently skips the UPDATE.
-        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, TenantId);
+        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, WorkspaceId);
         loaded!.AddStep("Extra Step", StepType.Notification, null);
         await _ctx.SaveChangesAsync();
 
         // Verify with a fresh context to bypass the first-level cache
         await using WorkflowBuilderDbContext freshCtx = db.CreateContext();
         WorkflowRepository freshRepo = new(freshCtx);
-        WorkflowDefinition? reloaded = await freshRepo.GetByIdAsync(wf.Id, TenantId);
+        WorkflowDefinition? reloaded = await freshRepo.GetByIdAsync(wf.Id, WorkspaceId);
 
         reloaded!.Steps.Should().HaveCount(3, "Start + End + Extra Step must all be persisted");
         reloaded.Steps.Should().Contain(s => s.Name == "Extra Step");
     }
 
     [Fact]
-    public async Task GetByIdAsync_WhenWorkflowBelongsToDifferentTenant_ReturnsNull()
+    public async Task GetByIdAsync_WhenWorkflowBelongsToDifferentWorkspace_ReturnsNull()
     {
-        WorkflowDefinition wf = MakeWorkflow("Cross-Tenant Check");
+        WorkflowDefinition wf = MakeWorkflow("Cross-Workspace Check");
         await _sut.AddAsync(wf);
         await _ctx.SaveChangesAsync();
 
@@ -169,12 +169,12 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     [Fact]
     public async Task GetPagedAsync_WhenWorkflowsExist_ReturnsPagedResult()
     {
-        Guid TenantId = Guid.NewGuid();
-        await _sut.AddAsync(MakeWorkflow($"Paged-WF-A-{Guid.NewGuid():N}", TenantId));
-        await _sut.AddAsync(MakeWorkflow($"Paged-WF-B-{Guid.NewGuid():N}", TenantId));
+        Guid WorkspaceId = Guid.NewGuid();
+        await _sut.AddAsync(MakeWorkflow($"Paged-WF-A-{Guid.NewGuid():N}", WorkspaceId));
+        await _sut.AddAsync(MakeWorkflow($"Paged-WF-B-{Guid.NewGuid():N}", WorkspaceId));
         await _ctx.SaveChangesAsync();
 
-        (IReadOnlyList<WorkflowDefinition> items, int total) = await _sut.GetPagedAsync(TenantId, 1, 20);
+        (IReadOnlyList<WorkflowDefinition> items, int total) = await _sut.GetPagedAsync(WorkspaceId, 1, 20);
 
         items.Should().HaveCount(2);
         total.Should().Be(2);
@@ -183,18 +183,18 @@ public class WorkflowRepositoryTests(WorkflowBuilderDatabaseFixture db) : IAsync
     [Fact]
     public async Task AddTrigger_WhenMutatedAfterReload_IsPersisted()
     {
-        Guid TenantId = Guid.NewGuid();
-        WorkflowDefinition wf = MakeWorkflow("Trigger Mutation Test", TenantId);
+        Guid WorkspaceId = Guid.NewGuid();
+        WorkflowDefinition wf = MakeWorkflow("Trigger Mutation Test", WorkspaceId);
         await _sut.AddAsync(wf);
         await _ctx.SaveChangesAsync();
 
-        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, TenantId);
+        WorkflowDefinition? loaded = await _sut.GetByIdAsync(wf.Id, WorkspaceId);
         loaded!.AddTrigger(TriggerType.Manual, null);
         await _ctx.SaveChangesAsync();
 
         await using WorkflowBuilderDbContext freshCtx = db.CreateContext();
         WorkflowRepository freshRepo = new(freshCtx);
-        WorkflowDefinition? reloaded = await freshRepo.GetByIdAsync(wf.Id, TenantId);
+        WorkflowDefinition? reloaded = await freshRepo.GetByIdAsync(wf.Id, WorkspaceId);
 
         reloaded!.Triggers.Should().HaveCount(1);
         reloaded.Triggers.Should().Contain(t => t.Type == TriggerType.Manual);

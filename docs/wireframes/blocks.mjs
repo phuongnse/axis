@@ -403,9 +403,9 @@ export function authSlugPreviewField(
   prefix, cardX, y, cardW, errorMsg = null, required = false, helpText = null) {
   const x = cardX + AUTH_CARD_PAD_X;
   const innerW = cardW - AUTH_CARD_PAD_X * 2;
-  const slugHelp = helpText ?? 'Unique URL path; auto-generated from Tenant name.';
+  const slugHelp = helpText ?? 'Unique URL path; auto-generated from Workspace name.';
   const { els: labelEls, inputY } = fieldLabelBlock(
-    prefix, x, y, innerW, 'Tenant URL slug', { required, helpText: slugHelp, color: AUTH_MUTED });
+    prefix, x, y, innerW, 'Workspace URL slug', { required, helpText: slugHelp, color: AUTH_MUTED });
   const previewY = inputY + 44;
   const els = [
     ...labelEls,
@@ -503,11 +503,11 @@ export function authCard(screenW, screenH, prefix, { title, subtitle = null, ite
   return { els, files };
 }
 
-/** Default register-tenant entry fields (Tenant onboarding only). */
-export const REGISTER_TENANT_ENTRY_FIELDS = [
+/** Default register-workspace entry fields (Workspace onboarding only). */
+export const REGISTER_WORKSPACE_ENTRY_FIELDS = [
   {
     kind: 'input',
-    label: 'Tenant name',
+    label: 'Workspace name',
     value: 'Acme Corp',
     err: null,
     required: true,
@@ -516,21 +516,21 @@ export const REGISTER_TENANT_ENTRY_FIELDS = [
   { kind: 'slug', err: null },
   {
     kind: 'input',
-    label: 'Tenant contact email',
+    label: 'Workspace contact email',
     value: 'admin@company.com',
     err: null,
     required: true,
-    helpText: 'Use an official Tenant mailbox. User sign-in is set up later.',
+    helpText: 'Use an official Workspace mailbox. User sign-in is set up later.',
   },
 ];
 
-export const REGISTER_tenant_NAME_HELP = '2–100 characters. Shown on invoices and in your workspace.';
+export const REGISTER_workspace_NAME_HELP = '2–100 characters. Shown on invoices and in your workspace.';
 
 /**
- * Paint register-tenant entry fields; returns y after last field block.
- * @param {object[]} fields — like REGISTER_TENANT_ENTRY_FIELDS
+ * Paint register-workspace entry fields; returns y after last field block.
+ * @param {object[]} fields — like REGISTER_WORKSPACE_ENTRY_FIELDS
  */
-export function paintRegisterTenantEntryFields(els, idPrefix, cardX, y, cardW, fields) {
+export function paintRegisterWorkspaceEntryFields(els, idPrefix, cardX, y, cardW, fields) {
   let fy = y;
   fields.forEach((f, i) => {
     if (f.kind === 'slug') {

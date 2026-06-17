@@ -5,6 +5,6 @@ namespace Axis.DataModeling.Application.Commands.UpdateDataClass;
 /// <summary>Update a data class's name and description.</summary>
 public sealed record UpdateDataClassCommand(
     Guid DataClassId,
-    Guid tenantId,
+    Guid workspaceId,
     string Name,
     string? Description) : ICommand;

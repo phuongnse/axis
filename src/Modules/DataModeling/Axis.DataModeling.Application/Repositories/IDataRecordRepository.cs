@@ -6,8 +6,8 @@ namespace Axis.DataModeling.Application.Repositories;
 public interface IDataRecordRepository
 {
     Task AddAsync(DataRecord record, CancellationToken ct = default);
-    Task<DataRecord?> GetByIdAsync(Guid id, Guid modelId, Guid tenantId, CancellationToken ct = default);
-    Task<IReadOnlyList<DataRecord>> GetAllAsync(Guid modelId, Guid tenantId, CancellationToken ct = default);
+    Task<DataRecord?> GetByIdAsync(Guid id, Guid modelId, Guid workspaceId, CancellationToken ct = default);
+    Task<IReadOnlyList<DataRecord>> GetAllAsync(Guid modelId, Guid workspaceId, CancellationToken ct = default);
 
     /// <summary>
     /// Returns a paginated page of records with optional full-text search,
@@ -15,7 +15,7 @@ public interface IDataRecordRepository
     /// </summary>
     Task<(IReadOnlyList<DataRecord> Records, int TotalCount)> GetPagedAsync(
         Guid modelId,
-        Guid tenantId,
+        Guid workspaceId,
         int page,
         int pageSize,
         string? search = null,
@@ -28,13 +28,13 @@ public interface IDataRecordRepository
     Task<int> BulkDeleteAsync(
         IReadOnlyList<Guid> ids,
         Guid modelId,
-        Guid tenantId,
+        Guid workspaceId,
         CancellationToken ct = default);
 
     /// <summary>Streams all matching records for CSV export without loading into memory at once.</summary>
     IAsyncEnumerable<DataRecord> GetAllForExportAsync(
         Guid modelId,
-        Guid tenantId,
+        Guid workspaceId,
         string? search = null,
         IReadOnlyList<RecordFilter>? filters = null,
         string? sortBy = null,

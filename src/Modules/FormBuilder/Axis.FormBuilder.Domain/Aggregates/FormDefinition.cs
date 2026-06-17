@@ -16,7 +16,7 @@ public sealed class FormDefinition : AggregateRoot<Guid>
 
     public string Name { get; private set; }
     public string? Description { get; private set; }
-    public Guid tenantId { get; private set; }
+    public Guid workspaceId { get; private set; }
     public DateTimeOffset? DeletedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -26,25 +26,25 @@ public sealed class FormDefinition : AggregateRoot<Guid>
 
     private FormDefinition() : base(default) { Name = null!; CreatedBy = string.Empty; } // EF Core materialisation
 
-    private FormDefinition(Guid id, string name, string? description, Guid tenantId,
+    private FormDefinition(Guid id, string name, string? description, Guid workspaceId,
         string createdBy, DateTimeOffset createdAt)
         : base(id)
     {
         Name = name;
         Description = description;
-        this.tenantId = tenantId;
+        this.workspaceId = workspaceId;
         CreatedBy = createdBy;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
     }
 
-    public static FormDefinition Create(string name, string? description, Guid tenantId, string createdBy)
+    public static FormDefinition Create(string name, string? description, Guid workspaceId, string createdBy)
     {
         ValidateName(name);
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        FormDefinition form = new(Guid.NewGuid(), name.Trim(), description?.Trim(), tenantId, createdBy, now);
-        form.RaiseDomainEvent(new FormCreated(form.Id, tenantId, form.Name));
+        FormDefinition form = new(Guid.NewGuid(), name.Trim(), description?.Trim(), workspaceId, createdBy, now);
+        form.RaiseDomainEvent(new FormCreated(form.Id, workspaceId, form.Name));
         return form;
     }
 
@@ -99,7 +99,7 @@ public sealed class FormDefinition : AggregateRoot<Guid>
             throw new InvalidOperationException("Form is already deleted.");
 
         DeletedAt = DateTimeOffset.UtcNow;
-        RaiseDomainEvent(new FormDeleted(Id, tenantId));
+        RaiseDomainEvent(new FormDeleted(Id, workspaceId));
     }
 
     // ─── Private helpers ──────────────────────────────────────────────────────

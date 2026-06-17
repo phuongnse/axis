@@ -27,7 +27,7 @@ Complete in order when scaffolding a brand-new module:
 | 2 | Add all three to `Axis.sln` |
 | 3 | Wire project references: `Domain` ← `Application` ← `Infrastructure`; `Axis.Api` references `Infrastructure` (and transitively `Application`) |
 | 4 | Add `GlobalUsings.cs` to each project; add common usings to `Directory.Build.props` if not already present |
-| 5 | Create `AxisDbContext` subclass in Infrastructure with `TenantSchemaInterceptor`; register in DI |
+| 5 | Create `AxisDbContext` subclass in Infrastructure with `WorkspaceSchemaInterceptor`; register in DI |
 | 6 | Create `IEndpointRouteBuilder` extension class in `src/Axis.Api/Endpoints/{Module}Endpoints.cs`; wire it in `Axis.Api/Program.cs` |
 | 7 | Create test projects: `{Module}.Domain.Tests` (unit), `{Module}.Application.Tests` (unit), `{Module}.Infrastructure.Tests` (integration with Testcontainers) |
 | 8 | Add test projects to `Axis.sln` |
@@ -160,5 +160,5 @@ Repeat for every screen / feature area. **Never skip the wireframe step** — it
 - Is the copy user-facing, specific, and free of internal architecture terms?
 - Does the screen lead to a clear next action instead of explaining how the system works?
 - If content was removed, did the layout adapt instead of filling space with decorative or redundant text?
-- Are public/auth screens free of fake workspace data, fake metrics, tenant names, and operational status?
+- Are public/auth screens free of fake workspace data, fake metrics, workspace names, and operational status?
 - Can the primary action be found without reading decorative or explanatory content?

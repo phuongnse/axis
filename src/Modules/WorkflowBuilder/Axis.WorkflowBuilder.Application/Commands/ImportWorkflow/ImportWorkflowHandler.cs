@@ -20,7 +20,7 @@ public sealed class ImportWorkflowHandler(
     public async Task<Result<Guid>> Handle(ImportWorkflowCommand command, CancellationToken cancellationToken)
     {
         Result planCheck = await planLimitService.EnsureWithinLimitAsync(
-            command.tenantId,
+            command.workspaceId,
             PlanLimitResourceType.Workflows,
             increment: 1,
             cancellationToken);
@@ -33,12 +33,12 @@ public sealed class ImportWorkflowHandler(
 
         WorkflowExportDto data = command.ExportData;
 
-        if (await workflowRepo.NameExistsAsync(data.Name, command.tenantId, null, cancellationToken))
+        if (await workflowRepo.NameExistsAsync(data.Name, command.workspaceId, null, cancellationToken))
             return Result.Failure<Guid>(ErrorCodes.Conflict,
                 $"A workflow named '{data.Name}' already exists. Rename the import file and try again.");
 
         WorkflowDefinition workflow = WorkflowDefinition.Create(
-            data.Name, data.Description, command.tenantId, command.CreatedBy);
+            data.Name, data.Description, command.workspaceId, command.CreatedBy);
 
         Dictionary<Guid, Guid> stepIdMap = ImportSteps(workflow, data.Steps);
         ImportTransitions(workflow, data.Transitions, stepIdMap);
@@ -48,7 +48,7 @@ public sealed class ImportWorkflowHandler(
         await referenceSync.SyncAsync(workflow, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);
         await planLimitService.RecordUsageDeltaAsync(
-            command.tenantId,
+            command.workspaceId,
             PlanLimitResourceType.Workflows,
             delta: 1,
             cancellationToken);

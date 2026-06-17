@@ -5,7 +5,7 @@ using Axis.Shared.Application.CQRS;
 
 namespace Axis.DataModeling.Application.Queries.GetDataClasses;
 
-/// <summary>Lists non-deleted data classes for the Tenant, paginated.</summary>
+/// <summary>Lists non-deleted data classes for the Workspace, paginated.</summary>
 public sealed class GetDataClassesHandler(IDataClassRepository dataClassRepo)
     : IQueryHandler<GetDataClassesQuery, PagedResult<DataClassSummaryDto>>
 {
@@ -15,7 +15,7 @@ public sealed class GetDataClassesHandler(IDataClassRepository dataClassRepo)
         int effectivePageSize = Math.Min(query.PageSize, 100);
 
         (IReadOnlyList<DataClass> items, int totalCount) =
-            await dataClassRepo.GetPagedAsync(query.tenantId, query.Page, effectivePageSize, cancellationToken);
+            await dataClassRepo.GetPagedAsync(query.workspaceId, query.Page, effectivePageSize, cancellationToken);
 
         IReadOnlyList<DataClassSummaryDto> dtos = items
             .Select(c => new DataClassSummaryDto(c.Id, c.Name, c.Description, c.Fields.Count, c.CreatedAt))

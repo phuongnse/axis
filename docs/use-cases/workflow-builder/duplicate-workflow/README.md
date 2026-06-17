@@ -8,7 +8,7 @@ Duplicate an existing workflow so that I can use it as a starting point for a si
 
 ## Primary actor
 
-- Tenant Member with `workflow:definition:write`
+- Workspace Member with `workflow:definition:write`
 
 ## Trigger
 
@@ -17,7 +17,7 @@ Duplicate an existing workflow so that I can use it as a starting point for a si
 ## Main flow
 
 1. Actor starts the — Duplicate a workflow flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
@@ -44,7 +44,7 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 - [ ] Webhook URLs are NOT copied; the duplicate generates a new unique webhook URL when published.
 
 *Out of scope*
-- Cross-tenant workflow duplication (copy to another tenant) — handled by Import/Export in import-export.
+- Cross-workspace workflow duplication (copy to another workspace) — handled by Import/Export in import-export.
 
 > **Implementation status**
 >

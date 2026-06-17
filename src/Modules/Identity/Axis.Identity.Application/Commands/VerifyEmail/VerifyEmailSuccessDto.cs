@@ -2,12 +2,12 @@ namespace Axis.Identity.Application.Commands.VerifyEmail;
 
 public sealed record VerifyEmailSuccessDto(
     Guid? UserId,
-    Guid? tenantId,
+    Guid? workspaceId,
     string Email,
     string FullName,
     IReadOnlyList<string> Permissions,
     VerifyEmailNextStep NextStep,
-    string? TenantSetupToken = null)
+    string? WorkspaceSetupToken = null)
 {
     public bool SessionEstablished => UserId.HasValue;
 }

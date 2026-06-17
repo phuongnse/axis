@@ -2,4 +2,4 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Identity.Domain.Events;
 
-public record UserDeactivated(Guid UserId, Guid tenantId) : IDomainEvent;
+public record UserDeactivated(Guid UserId, Guid workspaceId) : IDomainEvent;

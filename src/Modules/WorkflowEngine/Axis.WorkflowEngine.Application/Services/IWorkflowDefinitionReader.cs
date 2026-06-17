@@ -9,11 +9,11 @@ namespace Axis.WorkflowEngine.Application.Services;
 /// </summary>
 public interface IWorkflowDefinitionReader
 {
-    Task<bool> IsActiveAsync(Guid workflowDefinitionId, Guid tenantId, CancellationToken ct = default);
+    Task<bool> IsActiveAsync(Guid workflowDefinitionId, Guid workspaceId, CancellationToken ct = default);
 
     /// <summary>
     /// Returns the workflow step/transition snapshot captured at last publish time,
     /// or null if the workflow has never been published.
     /// </summary>
-    Task<WorkflowSnapshot?> GetSnapshotAsync(Guid workflowDefinitionId, Guid tenantId, CancellationToken ct = default);
+    Task<WorkflowSnapshot?> GetSnapshotAsync(Guid workflowDefinitionId, Guid workspaceId, CancellationToken ct = default);
 }

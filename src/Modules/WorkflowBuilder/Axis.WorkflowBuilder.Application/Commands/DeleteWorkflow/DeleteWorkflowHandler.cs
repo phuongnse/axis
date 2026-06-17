@@ -16,7 +16,7 @@ public sealed class DeleteWorkflowHandler(
     public async Task<Result> Handle(DeleteWorkflowCommand command, CancellationToken cancellationToken)
     {
         WorkflowDefinition? workflow = await workflowRepo.GetByIdAsync(
-            command.WorkflowId, command.tenantId, cancellationToken);
+            command.WorkflowId, command.workspaceId, cancellationToken);
 
         if (workflow is null)
             return Result.Failure(ErrorCodes.NotFound, "Workflow not found.");
@@ -32,7 +32,7 @@ public sealed class DeleteWorkflowHandler(
 
         await uow.SaveChangesAsync(cancellationToken);
         await planLimitService.RecordUsageDeltaAsync(
-            command.tenantId,
+            command.workspaceId,
             PlanLimitResourceType.Workflows,
             delta: -1,
             cancellationToken);

@@ -17,7 +17,7 @@ Update my profile information so that my name and contact details are current.
 ## Main flow
 
 1. Actor starts the — Manage user profile flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
@@ -26,7 +26,7 @@ Update my profile information so that my name and contact details are current.
 
 ## Context
 
-Tenant admins can invite new members, manage their accounts, and deactivate users who should no longer have access.
+Workspace admins can invite new members, manage their accounts, and deactivate users who should no longer have access.
 
 ## Acceptance Criteria
 
@@ -44,7 +44,7 @@ Tenant admins can invite new members, manage their accounts, and deactivate user
 - [ ] If avatar upload fails mid-way, the old avatar remains unchanged and an error is shown.
 
 *Out of scope*
-- Public profile visibility — all profiles are private within the tenant.
+- Public profile visibility — all profiles are private within the workspace.
 
 > **Implementation status**
 >

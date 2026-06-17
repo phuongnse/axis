@@ -8,7 +8,7 @@ Be notified when a workflow execution fails so that I can investigate and take a
 
 ## Primary actor
 
-- Tenant Member
+- Workspace Member
 
 ## Trigger
 
@@ -17,7 +17,7 @@ Be notified when a workflow execution fails so that I can investigate and take a
 ## Main flow
 
 1. Actor starts the — Receive error notification when a workflow fails flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows
@@ -37,7 +37,7 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 
 *Validation & errors*
 - [ ] If the email notification itself fails to deliver, the failure is logged but does not create a cascading error (no retry for notification delivery).
-- [ ] If no notification channels are configured for the workflow, the failure notification is sent to all tenant Admins by default as a safety net.
+- [ ] If no notification channels are configured for the workflow, the failure notification is sent to all workspace Admins by default as a safety net.
 
 *Edge cases*
 - [ ] A workflow with multiple parallel branches: if one branch fails (AND join), a single failure notification is sent for the overall execution, not one per failed branch.

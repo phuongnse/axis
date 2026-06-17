@@ -7,7 +7,7 @@ namespace Axis.Identity.Domain.Tests.Aggregates;
 
 public class InvitationTests
 {
-    private static readonly Guid TenantId = Guid.NewGuid();
+    private static readonly Guid WorkspaceId = Guid.NewGuid();
     private static readonly Guid RoleId = Guid.NewGuid();
     private static readonly Guid InvitedBy = Guid.NewGuid();
     private static Email ValidEmail => Email.Create("invited@example.com").Value;
@@ -15,10 +15,10 @@ public class InvitationTests
     [Fact]
     public void Invitation_WhenCreated_ProducesValidInvitation()
     {
-        Invitation invitation = Invitation.Create(ValidEmail, TenantId, RoleId, InvitedBy);
+        Invitation invitation = Invitation.Create(ValidEmail, WorkspaceId, RoleId, InvitedBy);
 
         invitation.Email.Should().Be(ValidEmail);
-        invitation.tenantId.Should().Be(TenantId);
+        invitation.workspaceId.Should().Be(WorkspaceId);
         invitation.RoleId.Should().Be(RoleId);
         invitation.InvitedByUserId.Should().Be(InvitedBy);
         invitation.Status.Should().Be(InvitationStatus.Pending);
@@ -28,7 +28,7 @@ public class InvitationTests
     [Fact]
     public void Invitation_WhenCreated_GeneratesNonEmptyToken()
     {
-        Invitation invitation = Invitation.Create(ValidEmail, TenantId, RoleId, InvitedBy);
+        Invitation invitation = Invitation.Create(ValidEmail, WorkspaceId, RoleId, InvitedBy);
 
         invitation.Token.Should().NotBeNullOrEmpty();
     }
@@ -36,8 +36,8 @@ public class InvitationTests
     [Fact]
     public void Invitation_WhenTwoCreated_HaveDifferentTokens()
     {
-        Invitation a = Invitation.Create(ValidEmail, TenantId, RoleId, InvitedBy);
-        Invitation b = Invitation.Create(ValidEmail, TenantId, RoleId, InvitedBy);
+        Invitation a = Invitation.Create(ValidEmail, WorkspaceId, RoleId, InvitedBy);
+        Invitation b = Invitation.Create(ValidEmail, WorkspaceId, RoleId, InvitedBy);
 
         a.Token.Should().NotBe(b.Token);
     }
@@ -45,7 +45,7 @@ public class InvitationTests
     [Fact]
     public void Invitation_WhenCreated_RaisesInvitationCreatedEvent()
     {
-        Invitation invitation = Invitation.Create(ValidEmail, TenantId, RoleId, InvitedBy);
+        Invitation invitation = Invitation.Create(ValidEmail, WorkspaceId, RoleId, InvitedBy);
 
         invitation.DomainEvents.Should().ContainSingle()
             .Which.Should().BeOfType<InvitationCreated>();
@@ -54,7 +54,7 @@ public class InvitationTests
     [Fact]
     public void Invitation_WhenAccepted_ChangesStatusToAccepted()
     {
-        Invitation invitation = Invitation.Create(ValidEmail, TenantId, RoleId, InvitedBy);
+        Invitation invitation = Invitation.Create(ValidEmail, WorkspaceId, RoleId, InvitedBy);
         invitation.ClearDomainEvents();
 
         invitation.Accept();
@@ -67,7 +67,7 @@ public class InvitationTests
     [Fact]
     public void Invitation_WhenExpired_AcceptThrows()
     {
-        Invitation invitation = Invitation.CreateExpired(ValidEmail, TenantId, RoleId, InvitedBy);
+        Invitation invitation = Invitation.CreateExpired(ValidEmail, WorkspaceId, RoleId, InvitedBy);
 
         Action act = () => invitation.Accept();
 
@@ -78,7 +78,7 @@ public class InvitationTests
     [Fact]
     public void Invitation_WhenAlreadyAccepted_AcceptThrows()
     {
-        Invitation invitation = Invitation.Create(ValidEmail, TenantId, RoleId, InvitedBy);
+        Invitation invitation = Invitation.Create(ValidEmail, WorkspaceId, RoleId, InvitedBy);
         invitation.Accept();
 
         Action act = () => invitation.Accept();
@@ -90,7 +90,7 @@ public class InvitationTests
     [Fact]
     public void Invitation_WhenCancelled_ChangesStatusToCancelled()
     {
-        Invitation invitation = Invitation.Create(ValidEmail, TenantId, RoleId, InvitedBy);
+        Invitation invitation = Invitation.Create(ValidEmail, WorkspaceId, RoleId, InvitedBy);
 
         invitation.Cancel();
 
@@ -100,7 +100,7 @@ public class InvitationTests
     [Fact]
     public void Invitation_WhenAlreadyAccepted_CancelThrows()
     {
-        Invitation invitation = Invitation.Create(ValidEmail, TenantId, RoleId, InvitedBy);
+        Invitation invitation = Invitation.Create(ValidEmail, WorkspaceId, RoleId, InvitedBy);
         invitation.Accept();
 
         Action act = () => invitation.Cancel();
@@ -112,7 +112,7 @@ public class InvitationTests
     [Fact]
     public void IsExpired_WhenPastExpiry_ReturnsTrue()
     {
-        Invitation invitation = Invitation.CreateExpired(ValidEmail, TenantId, RoleId, InvitedBy);
+        Invitation invitation = Invitation.CreateExpired(ValidEmail, WorkspaceId, RoleId, InvitedBy);
 
         invitation.IsExpired.Should().BeTrue();
     }
@@ -120,7 +120,7 @@ public class InvitationTests
     [Fact]
     public void IsExpired_WhenFreshInvitation_ReturnsFalse()
     {
-        Invitation invitation = Invitation.Create(ValidEmail, TenantId, RoleId, InvitedBy);
+        Invitation invitation = Invitation.Create(ValidEmail, WorkspaceId, RoleId, InvitedBy);
 
         invitation.IsExpired.Should().BeFalse();
     }

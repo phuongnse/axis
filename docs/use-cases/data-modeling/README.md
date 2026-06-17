@@ -23,7 +23,7 @@ Custom data modeling is the core differentiator of Axis. Without it, the platfor
 | [Delete a model](delete-model/) | Delete a model so that I can clean up unused data structures. |
 | [Edit a model](edit-model/) | Edit an existing model so that I can add, remove, or rename fields as requirements evolve. |
 | [Configure field validation rules](field-validation/) | Configure validation rules on a field so that data quality is enforced at input time. |
-| [View all models](list-models/) | See all models in my Tenant so that I can understand the data available to me. |
+| [View all models](list-models/) | See all models in my Workspace so that I can understand the data available to me. |
 | [Reorder fields](reorder-fields/) | Reorder fields in a model so that the display order matches our team's mental model. |
 
 ### Data classes
@@ -68,7 +68,7 @@ A typed attribute on a Model. Each field has a name, type, validation rules, and
 A reusable, structured type composed of multiple fields. Used as a field type within a Model (similar to an embedded object). Example: `Address`, `ContactInfo`.
 
 ### Record
-A concrete instance of a Model. Records are stored in the tenant's schema using a flexible JSONB-backed storage strategy.
+A concrete instance of a Model. Records are stored in the workspace's schema using a flexible JSONB-backed storage strategy.
 
 ---
 
@@ -110,7 +110,7 @@ Repo-wide C# conventions (explicit types, naming, Allman braces) are enforced vi
 |---|---|---|
 | Domain | ✅ Done | `DataModel`, `Field`, `DataRecord` aggregates; all field types and domain events |
 | Application | ✅ Done | All command/query handlers; `RecordFieldValidator`; `BulkDeleteRecordsHandler`; `ExportRecordsCsvHandler` |
-| Infrastructure | ✅ Done | EF Core mappings, repositories, JSONB field converters; `GetPagedAsync` with filter/sort; `BulkDeleteAsync`; `GetAllForExportAsync`. Database `axis_datamodeling` with initial migration `InitialCreate` ([ADR-011](../../TECH_STACK.md#adr-011-per-module-database-with-schema-per-tenant-inside), [ADR-023](../../TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)). DbContext + UnitOfWork inlined per ADR-017. `TenantVerifiedHandler` provisions tenant schema via `TenantModuleProvisionAttempt` (reports `TenantModuleProvisionReportEvent` to Identity; retries via `RetryTenantModuleProvisionHandler` + shared `TenantSchemaProvisioner`, tenant provisioning use case). `Axis.DataModeling.Contracts` + `DataModelingEventMapper` publish 9 Avro lifecycle/field events via Wolverine outbox → Kafka ([ADR-019](../../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope), [ADR-025](../../TECH_STACK.md#adr-025-transport-selection-rule-by-message-name-suffix)). `DataModelCatalogService` gRPC exposes model summary lookup for cross-module consumers (ADR-014 boundary contract); the server derives `tenant_id` from the caller's JWT `tenant_id` claim so tenant isolation is structural rather than caller-trusted. **Done:** `ModelDeletedHandler` in FormBuilder + WorkflowBuilder. **Deferred follow-ups:** Kafka consumer in WorkflowBuilder for field delete refs. |
+| Infrastructure | ✅ Done | EF Core mappings, repositories, JSONB field converters; `GetPagedAsync` with filter/sort; `BulkDeleteAsync`; `GetAllForExportAsync`. Database `axis_datamodeling` with initial migration `InitialCreate` ([ADR-011](../../TECH_STACK.md#adr-011-per-module-database-with-schema-per-workspace-inside), [ADR-023](../../TECH_STACK.md#adr-023-per-module-ef-core-migrations-only)). DbContext + UnitOfWork inlined per ADR-017. `WorkspaceVerifiedHandler` provisions workspace schema via `WorkspaceModuleProvisionAttempt` (reports `WorkspaceModuleProvisionReportEvent` to Identity; retries via `RetryWorkspaceModuleProvisionHandler` + shared `WorkspaceSchemaProvisioner`, workspace provisioning use case). `Axis.DataModeling.Contracts` + `DataModelingEventMapper` publish 9 Avro lifecycle/field events via Wolverine outbox → Kafka ([ADR-019](../../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope), [ADR-025](../../TECH_STACK.md#adr-025-transport-selection-rule-by-message-name-suffix)). `DataModelCatalogService` gRPC exposes model summary lookup for cross-module consumers (ADR-014 boundary contract); the server derives `workspace_id` from the caller's JWT `workspace_id` claim so workspace isolation is structural rather than caller-trusted. **Done:** `ModelDeletedHandler` in FormBuilder + WorkflowBuilder. **Deferred follow-ups:** Kafka consumer in WorkflowBuilder for field delete refs. |
 | API | ✅ Done | 7 record endpoints (CRUD + bulk-delete + CSV export); filter/sort params; HTTP 422 `ValidationProblemDetails` on create/update. Create/field/record endpoints return the shared `CreatedResponse` DTO (no anonymous `object`) |
 | Frontend | ⏳ Pending | — |
 

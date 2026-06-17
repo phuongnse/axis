@@ -8,7 +8,7 @@ Add a field to my form so that I can collect the data I need.
 
 ## Primary actor
 
-- Tenant Member with `form:definition:write`
+- Workspace Member with `form:definition:write`
 
 ## Trigger
 
@@ -17,7 +17,7 @@ Add a field to my form so that I can collect the data I need.
 ## Main flow
 
 1. Actor starts the — Add a field to a form flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows

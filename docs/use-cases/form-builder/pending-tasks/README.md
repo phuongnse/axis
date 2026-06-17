@@ -8,7 +8,7 @@ See a list of all form tasks assigned to me so that I don't miss any pending act
 
 ## Primary actor
 
-- Tenant Member
+- Workspace Member
 
 ## Trigger
 
@@ -17,7 +17,7 @@ See a list of all form tasks assigned to me so that I don't miss any pending act
 ## Main flow
 
 1. Actor starts the — View pending form tasks flow from the relevant Axis screen or API.
-2. System checks tenant access, validates the request, and applies the documented acceptance criteria.
+2. System checks workspace access, validates the request, and applies the documented acceptance criteria.
 3. Actor sees the resulting data, confirmation, or actionable error for the flow.
 
 ## Alternate / error flows

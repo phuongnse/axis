@@ -12,11 +12,11 @@ namespace axis.formbuilder.events
     public partial class FormTaskExpiredEvent : global::Avro.Specific.ISpecificRecord
     {
         public static global::Avro.Schema _SCHEMA = global::Avro.Schema.Parse(
-            @"{""type"":""record"",""name"":""FormTaskExpiredEvent"",""namespace"":""axis.formbuilder.events"",""fields"":[{""name"":""formSubmissionId"",""type"":""string""},{""name"":""formDefinitionId"",""type"":""string""},{""name"":""tenantId"",""type"":""string""},{""name"":""executionId"",""type"":""string""},{""name"":""executionStepId"",""type"":""string""}]}");
+            @"{""type"":""record"",""name"":""FormTaskExpiredEvent"",""namespace"":""axis.formbuilder.events"",""fields"":[{""name"":""formSubmissionId"",""type"":""string""},{""name"":""formDefinitionId"",""type"":""string""},{""name"":""workspaceId"",""type"":""string""},{""name"":""executionId"",""type"":""string""},{""name"":""executionStepId"",""type"":""string""}]}");
 
         private string _formSubmissionId = string.Empty;
         private string _formDefinitionId = string.Empty;
-        private string _tenantId = string.Empty;
+        private string _workspaceId = string.Empty;
         private string _executionId = string.Empty;
         private string _executionStepId = string.Empty;
 
@@ -24,7 +24,7 @@ namespace axis.formbuilder.events
 
         public string formSubmissionId { get => _formSubmissionId; set => _formSubmissionId = value; }
         public string formDefinitionId { get => _formDefinitionId; set => _formDefinitionId = value; }
-        public string tenantId { get => _tenantId; set => _tenantId = value; }
+        public string workspaceId { get => _workspaceId; set => _workspaceId = value; }
         public string executionId { get => _executionId; set => _executionId = value; }
         public string executionStepId { get => _executionStepId; set => _executionStepId = value; }
 
@@ -32,7 +32,7 @@ namespace axis.formbuilder.events
         {
             0 => formSubmissionId,
             1 => formDefinitionId,
-            2 => tenantId,
+            2 => workspaceId,
             3 => executionId,
             4 => executionStepId,
             _ => throw new global::Avro.AvroRuntimeException("Bad index " + fieldPos + " in Get()"),
@@ -44,7 +44,7 @@ namespace axis.formbuilder.events
             {
                 case 0: formSubmissionId = (string)fieldValue; break;
                 case 1: formDefinitionId = (string)fieldValue; break;
-                case 2: tenantId = (string)fieldValue; break;
+                case 2: workspaceId = (string)fieldValue; break;
                 case 3: executionId = (string)fieldValue; break;
                 case 4: executionStepId = (string)fieldValue; break;
                 default: throw new global::Avro.AvroRuntimeException("Bad index " + fieldPos + " in Put()");
