@@ -64,9 +64,6 @@ Allow Workspace admins to manage their Workspace's profile, settings, and basic 
 >
 > **Done:** `Workspace` profile fields + `UpdateWorkspaceProfileCommand`; S3 logo storage; IANA timezone validation.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
 > - N/A
 >

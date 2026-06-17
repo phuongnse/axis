@@ -58,9 +58,6 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 >
 > **Gaps vs spec:** context expression input UI and expression evaluation at execution time pending Frontend + workflow-engine.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
 > - N/A
 >

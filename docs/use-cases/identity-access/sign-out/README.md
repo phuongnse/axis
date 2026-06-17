@@ -16,13 +16,16 @@ Sign out so that my session is terminated and no one else can use my account fro
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. User clicks Sign out from the authenticated app.
+2. Client calls `POST /api/auth/signout` and clears the in-memory access token.
+3. Server revokes the refresh token, blacklists the current access token JTI, clears auth cookies, and client redirects to sign-in.
 
 ## Alternate / error flows
 
-- Validation failures and edge cases in Acceptance Criteria.
+- If the sign-out API call fails, client still clears local auth state and redirects to sign-in.
+- Browser Back cannot restore protected content because routes re-check valid auth state.
+- Old access tokens are rejected after blacklist propagation.
+- Other open tabs clear auth state through BroadcastChannel.
 
 ## Context
 
@@ -58,10 +61,15 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 > | Frontend | ⏳ |
 >
 > **Decisions:** `POST /api/auth/signout` [Authorize] reads the opaque refresh token from the httpOnly cookie, calls `IOpenIddictTokenManager.FindByReferenceIdAsync` + `TryRevokeAsync` to revoke it in DB, blacklists the access token JTI in Redis via `IJtiBlacklist` (TTL = remaining access token lifetime), clears the refresh token cookie and the PKCE session cookie. No Application handler — pure API/Infrastructure concern.
+>
+> **Gaps vs spec:**
+> - N/A
+>
+> **Deferred follow-ups:**
+> - N/A
 
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

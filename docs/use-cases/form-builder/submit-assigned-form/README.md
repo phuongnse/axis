@@ -16,13 +16,16 @@ Open the form link and submit my responses so that the workflow can continue.
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Assignee opens the unique Form Task URL without signing in to Axis.
+2. System loads the standalone form page with workflow context, form fields, and pre-populated values.
+3. Assignee submits valid responses; system records the submission, resumes the workflow, and shows a confirmation page.
 
 ## Alternate / error flows
 
-- Validation failures and edge cases in Acceptance Criteria.
+- Required and field-level validation errors stay inline on the form.
+- Expired or already-submitted Form Tasks show terminal-state messages instead of accepting another response.
+- Network failure preserves entered values and lets the assignee retry.
+- A second browser tab sees the already-submitted state on the next interaction.
 
 ## Context
 
@@ -63,10 +66,15 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 > | Frontend | ⏳ |
 >
 > **Gaps vs spec:** `SubmitFormByTokenCommand` + anonymous `POST /api/form-tasks/{token}/submit` ✅. Standalone form page, field validation UX, pre-signed file upload, and multi-tab deduplication pending Frontend.
+>
+> **Deferred follow-ups:**
+> - N/A
+>
+> **Decisions:**
+> - N/A
 
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

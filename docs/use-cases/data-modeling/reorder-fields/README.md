@@ -59,9 +59,6 @@ Each field in a model has a type that determines what data it stores, how it's v
 >
 > **Done:** `displayOrder` persisted in JSONB field list at Application + Infrastructure.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
 > - N/A
 >

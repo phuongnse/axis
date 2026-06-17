@@ -60,9 +60,6 @@ Each field in a model has a type that determines what data it stores, how it's v
 >
 > **Gaps vs spec:** server-side per-field validation on record create/update is in Application handlers but HTTP 422 structured errors pending.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
 > - N/A
 >

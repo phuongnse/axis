@@ -16,13 +16,16 @@ Start a workflow execution so that the defined process begins running.
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Manual, Schedule, Webhook, or Event trigger requests a workflow execution.
+2. Engine validates workflow status, trigger configuration, and required input, then creates a `PENDING` Execution record.
+3. Engine enqueues asynchronous step execution, returns the execution ID where applicable, and transitions the execution to `RUNNING`.
 
 ## Alternate / error flows
 
-- Validation failures and edge cases in Acceptance Criteria.
+- Draft or archived workflows cannot be triggered and return HTTP 422.
+- Missing trigger configuration or required Manual input returns HTTP 422 with actionable errors.
+- Stale `PENDING` executions are recovered or failed by a recovery job.
+- Rapid repeated triggers create independent executions unless the trigger type defines its own deduplication rule.
 
 ## Context
 
@@ -61,6 +64,9 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 > **Gaps vs spec:** trigger HTTP endpoint, schedule/webhook/event trigger handlers, stale-PENDING recovery job pending API + workflow-engine engine.
 >
 > **Decisions:** `WorkflowExecution.Create` sets status `Pending`; `Start()` transitions to `Running` — engine calls both in sequence.
+>
+> **Deferred follow-ups:**
+> - N/A
 
 ## Wireframes
 

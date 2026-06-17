@@ -16,13 +16,16 @@ My session to stay active while I'm working so that I'm not interrupted by unexp
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Client tracks access token age and schedules refresh at roughly 80% of the token TTL.
+2. One browser tab obtains the refresh lock and calls `POST /connect/token` with the refresh-token cookie.
+3. Server rotates the opaque refresh token, returns a fresh access token, and all tabs continue without user interruption.
 
 ## Alternate / error flows
 
-- Validation failures and edge cases in Acceptance Criteria.
+- Expired or revoked refresh tokens redirect the user to sign-in with a session-expired message.
+- Network failure retries with exponential backoff before redirecting.
+- Replay of an old refresh token is rejected and invalidates user sessions.
+- Multiple tabs coordinate refresh so only one tab spends the one-use refresh token.
 
 ## Context
 
@@ -62,10 +65,12 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 > **Decisions:**
 > - OpenIddict handles token rotation natively. `ExtractRefreshTokenFromCookieHandler` reads the refresh token from the httpOnly cookie into the OpenIddict request. `POST /connect/token` with grant_type=refresh_token validates the opaque reference token, loads fresh user+permissions, rotates the refresh token, returns a new access token in the JSON body and a new refresh token cookie. Replay detection: reference tokens are single-use
 > - replaying revoked token returns `invalid_grant`.
+>
+> **Deferred follow-ups:**
+> - N/A
 
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

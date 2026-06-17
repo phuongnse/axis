@@ -42,13 +42,6 @@ Compare available subscription plans so that I can choose the one that fits my n
 - Monthly vs annual billing toggle — part of the separate billing initiative.
 - Per-seat pricing.
 
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-
-
 > **Implementation status**
 >
 > | Layer | Status |
@@ -63,13 +56,7 @@ Compare available subscription plans so that I can choose the one that fits my n
 >
 > **Decisions:** retired plans hidden on public page; workspaces on retired plans still resolve plan via API when signed in.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
-> - N/A
->
-> **Decisions:**
 > - N/A
 
 ## Wireframes
@@ -77,4 +64,3 @@ Compare available subscription plans so that I can choose the one that fits my n
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | pricing | [source](./pricing.excalidraw) | [preview](./pricing.svg) |
-

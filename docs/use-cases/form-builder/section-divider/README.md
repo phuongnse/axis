@@ -59,13 +59,7 @@ Form fields define what data the form collects. Each field has a type, label, he
 >
 > **Decisions:** sections use `FormFieldType.Section` + `SectionFieldConfig` and flow through the same `AddFieldToFormCommand` as regular fields.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
-> - N/A
->
-> **Decisions:**
 > - N/A
 
 ## Wireframes

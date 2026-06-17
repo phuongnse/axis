@@ -16,13 +16,16 @@ Every API endpoint to enforce the required permission so that unauthorized actio
 
 ## Main flow
 
-1. Actor satisfies the trigger.
-2. System performs the happy-path steps in Acceptance Criteria.
-3. Actor receives the expected outcome.
+1. Authenticated request reaches an API endpoint with a declared permission policy.
+2. API validates the JWT and evaluates required permissions from the request claims.
+3. Authorized requests continue to the endpoint handler; unauthorized requests are rejected without revealing protected resource existence.
 
 ## Alternate / error flows
 
-- Validation failures and edge cases in Acceptance Criteria.
+- Expired or invalid JWTs return HTTP 401 before permission checks run.
+- Missing permissions return HTTP 403 with the required permission payload.
+- Endpoints requiring multiple permissions must satisfy all required checks.
+- Permission changes take effect after token refresh because permissions are claim-backed.
 
 ## Context
 
@@ -62,10 +65,12 @@ A resource-based permission system where each permission grants the ability to p
 > **Decisions:**
 > - permissions are included as a flat array in JWT claims at sign-in time (union of all role permissions)
 > - checked via ASP.NET Core custom policy at API layer.
+>
+> **Deferred follow-ups:**
+> - N/A
 
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

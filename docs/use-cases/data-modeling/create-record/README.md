@@ -69,9 +69,6 @@ Users can create, read, update, and delete records against any model. Records ar
 >
 > **Deferred follow-ups:**
 > - N/A
->
-> **Decisions:**
-> - N/A
 
 ## Wireframes
 

@@ -63,13 +63,7 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 >
 > **Decisions:** `Cancel()` domain guard rejects terminal statuses (`Completed`, `Failed`, `Cancelled`) with `InvalidOperationException`.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
-> - N/A
->
-> **Decisions:**
 > - N/A
 
 ## Wireframes

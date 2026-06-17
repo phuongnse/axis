@@ -62,13 +62,7 @@ Workspace admins can create custom roles, assign permissions to each role, and a
 >
 > **Decisions:** roles stored as `List<Guid>` (`_roleIds`) on `User` aggregate — effective permissions are the union of all assigned roles' permission lists, computed at token issuance time (pending auth layer).
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
-> - N/A
->
-> **Decisions:**
 > - N/A
 
 ## Wireframes

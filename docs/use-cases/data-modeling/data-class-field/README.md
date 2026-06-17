@@ -59,9 +59,6 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 >
 > **Gaps vs spec:** sub-form rendering and record-list summary display pending Frontend layer.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
 > - N/A
 >

@@ -67,9 +67,6 @@ Self-service registration flow where a new workspace signs up and is automatical
 >
 > **Deferred follow-ups:**
 > - N/A
->
-> **Decisions:**
-> - N/A
 
 ## Wireframes
 

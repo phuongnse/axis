@@ -56,9 +56,6 @@ Workspace admins can create custom roles, assign permissions to each role, and a
 >
 > **Gaps vs spec:** member count per role requires a JOIN query — not implemented yet (query projection pending). UI badges and detail view are frontend concerns.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
 > - N/A
 >

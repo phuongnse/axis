@@ -63,13 +63,7 @@ Users can create custom data models within their Workspace. A model defines the 
 >
 > **Decisions:** system fields (id, created_at, updated_at) injected by domain factory; atomicity guaranteed by UnitOfWork.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
-> - N/A
->
-> **Decisions:**
 > - N/A
 
 ## Wireframes

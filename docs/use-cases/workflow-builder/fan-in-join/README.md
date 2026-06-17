@@ -63,14 +63,6 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 >
 > **Decisions:** Initial join semantics stay binary (`all`/`any`) so execution can be made correct before adding quorum joins.
 >
-> **Gaps vs spec:**
-> - N/A
->
-> **Deferred follow-ups:**
-> - N/A
->
-> **Decisions:**
-> - N/A
 
 ## Wireframes
 

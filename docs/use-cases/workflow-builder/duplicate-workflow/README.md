@@ -64,9 +64,6 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 > - Duplicate() deep-copies all steps with new IDs and remaps transitions atomically in domain logic
 > - handler resolves name collisions via "(2)", "(3)"… suffix loop up to 50, then Guid suffix.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
 > - N/A
 

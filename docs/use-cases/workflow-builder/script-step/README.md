@@ -62,9 +62,6 @@ Each step has a type that determines what it does when executed. Users configure
 >
 > **Gaps vs spec:** JS sandbox execution, timeout enforcement, and "Run test" button pending workflow-engine + Frontend.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
 > - N/A
 >

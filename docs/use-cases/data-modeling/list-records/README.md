@@ -65,14 +65,6 @@ Users can create, read, update, and delete records against any model. Records ar
 >
 > **Decisions:** N/A - no implementation-specific decision recorded for this slice.
 >
-> **Gaps vs spec:**
-> - N/A
->
-> **Deferred follow-ups:**
-> - N/A
->
-> **Decisions:**
-> - N/A
 
 ## Wireframes
 

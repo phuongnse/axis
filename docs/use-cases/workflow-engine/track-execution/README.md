@@ -64,13 +64,7 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 >
 > **Decisions:** `GetExecutionHandler` delegates to `IExecutionRepository.GetWithStepsAsync`, which loads execution + steps in two queries (no EF navigation property — `ExecutionStep` is a separate aggregate).
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
-> - N/A
->
-> **Decisions:**
 > - N/A
 
 ## Wireframes

@@ -63,13 +63,7 @@ Form fields define what data the form collects. Each field has a type, label, he
 >
 > **Decisions:** `AddFieldToFormHandler` catches both `ArgumentException` (invalid key format) and `InvalidOperationException` (duplicate key) from the domain and returns `ErrorCodes.BusinessRule`. Field config polymorphism handled by FormFieldConverter using FormFieldType enum as discriminator.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
-> - N/A
->
-> **Decisions:**
 > - N/A
 
 ## Wireframes

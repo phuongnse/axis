@@ -58,9 +58,6 @@ When a workflow execution fails at a step, users can manually retry from the fai
 >
 > **Gaps vs spec:** `GET /api/executions/{id}/retry-history` ✅. Retry history UI and interlinked execution chain navigation pending Frontend.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
 > - N/A
 >

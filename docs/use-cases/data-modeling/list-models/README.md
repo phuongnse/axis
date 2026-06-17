@@ -60,9 +60,6 @@ Users can create custom data models within their Workspace. A model defines the 
 >
 > **Done:** field count is derived from `Fields.Count` at query time.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
 > - N/A
 >

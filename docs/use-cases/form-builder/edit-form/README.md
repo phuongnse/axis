@@ -61,9 +61,6 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 > - `UpdateFormHandler` checks name uniqueness via `NameExistsAsync(name, WorkspaceId, excludeId)` before calling `form.Update()`
 > - TOCTOU race requires a unique DB index on `(name, workspace_id)` at Infrastructure layer.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
 > - N/A
 

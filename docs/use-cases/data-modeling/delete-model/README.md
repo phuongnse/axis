@@ -66,11 +66,6 @@ Users can create custom data models within their Workspace. A model defines the 
 >
 > **Decisions:** Model deletion remains soft-delete first; cross-module broken-reference handling is event-driven through module consumers.
 >
-> **Deferred follow-ups:**
-> - N/A
->
-> **Decisions:**
-> - N/A
 
 ## Wireframes
 

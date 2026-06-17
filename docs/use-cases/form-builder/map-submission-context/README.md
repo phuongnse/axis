@@ -66,8 +66,6 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 >
 > **Decisions:** N/A - no implementation-specific decision recorded for this slice.
 >
-> **Decisions:**
-> - N/A
 
 ## Wireframes
 

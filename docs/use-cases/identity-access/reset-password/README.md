@@ -79,6 +79,9 @@ Allow users to reset forgotten passwords, change their current password, and man
 > - reset token is a cryptographically random 32-byte value
 > - stored as SHA-256 hash in `password_reset_tokens` table
 > - raw token sent by email. New request invalidates all prior tokens for the user. Token lifetime: 1 hour.
+>
+> **Deferred follow-ups:**
+> - N/A
 
 ## Wireframes
 

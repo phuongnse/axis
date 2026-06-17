@@ -88,6 +88,9 @@ Define user-facing localization and visual theme behavior for the SPA so each us
 > **Decisions:**
 > - Theme mode uses class-based strategy (`light` / `dark`) with `system` resolution.
 > - Theme controls must be available in the authenticated shell; public/auth placement is allowed because users may choose a comfortable theme before signing in.
+>
+> **Deferred follow-ups:**
+> - N/A
 
 ## Wireframes
 

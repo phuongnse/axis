@@ -57,9 +57,6 @@ Workflows can take different execution paths based on data values using Conditio
 >
 > **Gaps vs spec:** OR-merge deduplication (execute-once on first arrival) is an execution engine concern — pending workflow-engine.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
 > - N/A
 >

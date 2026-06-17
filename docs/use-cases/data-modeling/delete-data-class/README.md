@@ -64,13 +64,7 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 >
 > **Decisions:** `IsReferencedByAnyModelAsync` uses raw SQL `fields @> {0}::jsonb` to query nested JSON without loading all models into memory.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
-> - N/A
->
-> **Decisions:**
 > - N/A
 
 ## Wireframes

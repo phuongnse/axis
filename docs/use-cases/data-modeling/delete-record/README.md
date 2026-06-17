@@ -58,9 +58,6 @@ Users can create, read, update, and delete records against any model. Records ar
 >
 > **Gaps vs spec:** Relation broken-reference warning pending workflow-builder integration; 30-day purge pending background job scheduler.
 >
-> **Gaps vs spec:**
-> - N/A
->
 > **Deferred follow-ups:**
 > - N/A
 >
