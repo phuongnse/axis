@@ -151,7 +151,7 @@ Sequence/architecture drawings are under [Diagrams](#diagrams).
 
 ### Diagrams (content rules)
 
-- **Mermaid only** in this README (`sequenceDiagram`, `flowchart`, `erDiagram`, …) — one `### <diagram-slug>` section per diagram. First line inside each fence: `MERMAID_INIT` from [`mermaid-theme.mjs`](../diagrams/mermaid-theme.mjs) ([playbook](./mermaid.md)). **Do not** add Excalidraw diagram link tables in this section (pre-Mermaid inventory tables are retired).
+- **Mermaid only** in this README (`sequenceDiagram`, `flowchart`, `erDiagram`, …) — one `### <diagram-slug>` section per diagram. First line inside each fence: `MERMAID_INIT` from [`mermaid_theme.py`](../diagrams/mermaid_theme.py) ([playbook](./mermaid.md)). **Do not** add Excalidraw diagram link tables in this section (pre-Mermaid inventory tables are retired).
 - **Standard set (multi-screen user journeys):**
   - **One** `### <slug>-journey` `sequenceDiagram` — actor happy path from first screen through the use-case outcome (use `rect rgb(22, 35, 58)` phase bands; keep SSO/error branches minimal — details belong in `*-cases`).
   - **Zero or one** `### <slug>-cases` `sequenceDiagram` — dev/QA map of API responses to `*-states` wireframes. Skip when there are few error screens.

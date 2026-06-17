@@ -13,7 +13,8 @@
     "ci": "tsc -b --noEmit && biome ci .",
     "preview": "vite preview",
     "test": "vitest run",
-    "gen:api-types": "openapi-typescript ../openapi.json -o src/lib/api-types.ts"
+    "gen:api-types": "openapi-typescript ../openapi.json -o src/lib/api-types.ts",
+    "export:wireframes": "node scripts/export-wireframes.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
@@ -36,6 +37,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16",
+    "@excalidraw/excalidraw": "^0.18.1",
     "@tanstack/react-query-devtools": "^5.100.14",
     "@tanstack/router-devtools": "^1.167.0",
     "@tanstack/router-plugin": "^1.168.13",

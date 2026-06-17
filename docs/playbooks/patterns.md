@@ -1909,19 +1909,18 @@ npm run test    # vitest run — all tests must pass
 
 Wireframes use Excalidraw (`.excalidraw` JSON). Both files — source and SVG preview — are committed.
 
-**File location:** assets sit **flat** inside each use-case folder. Shared app shell (`app-shell`) stays under top-level `docs/wireframes/`; kit geometry is `.mjs` source in the same folder.
+**File location:** assets sit **flat** inside each use-case folder. Shared app shell (`app-shell`) stays under top-level `docs/wireframes/`.
 
 ```
 docs/
-├── wireframes/                          ← kit source (.mjs) + shared app-shell
-│   ├── components.mjs, blocks.mjs, generate-template.mjs, generate-screens.mjs
-│   ├── app-shell.excalidraw
-│   └── app-shell.svg
-└── use-cases/
-    └── <domain>/<use-case>/
-        ├── README.md
-        ├── <screen>.excalidraw          ← source (JSON, diffable)
-        └── <screen>.svg                 ← preview (vector, renders on GitHub)
+|-- wireframes/
+|   |-- app-shell.excalidraw             # shared source
+|   `-- app-shell.svg                    # shared preview
+`-- use-cases/
+    `-- <domain>/<use-case>/
+        |-- README.md
+        |-- <screen>.excalidraw          # source (JSON, diffable)
+        `-- <screen>.svg                 # preview (vector, renders on GitHub)
 ```
 
 **Naming:** screen slug in kebab-case matching the primary route segment — `login`, `data-models`, `workflow-detail`.
@@ -1938,7 +1937,7 @@ docs/
 | login | [source](./login.excalidraw) | [preview](./login.svg) |
 ```
 
-Reference shared kit screens from `../../../wireframes/` (do not duplicate).
+Reference the shared app shell from `../../../wireframes/` when needed.
 
 **Excalidraw settings** for consistent sketch aesthetic:
 - `roughness: 1` on all shapes
@@ -1946,10 +1945,6 @@ Reference shared kit screens from `../../../wireframes/` (do not duplicate).
 - `fontFamily: 1` (Virgil — hand-drawn feel)
 - `strokeWidth: 2` for card/container outlines, `1` for inputs
 
-**Generate SVG** after every edit: run `docs/scripts/generate-wireframes.ps1` — regenerates all `.svg` files from `.excalidraw` source via Kroki.io. Commit both `.excalidraw` and `.svg` together.
-
-**Deterministic regeneration:** `generate-screens.mjs` must call each screen through `runScreen(screenKey, generator)` so Excalidraw `seed` values do not depend on global generation order. See [`wireframes.md` § Deterministic seed rule](wireframes.md#deterministic-seed-rule-non-negotiable). Before committing generator changes, run the script twice and confirm `git diff` is empty after the second run.
+**Generate SVG** after every edit: run `python scripts/axis.py generate wireframes` to regenerate `.svg` previews from `.excalidraw` source via the official Excalidraw exporter. Commit both `.excalidraw` and `.svg` together.
 
 **Pitfall:** committing only `.excalidraw` without `.svg` means the wireframe is invisible on GitHub without the VS Code extension. Always run the script and commit both.
-
-**Pitfall:** editing `generate-screens.mjs` without per-screen seeds causes dozens of unrelated domain wireframes to change in the same PR — always verify the second-run diff is empty.

@@ -2,8 +2,10 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← agent-checklist.md](./agent-checklist.md) · [← AGENTS.md](../../AGENTS.md)
 
-`scripts/axis.py` is the source of truth for repository maintenance commands.
-Top-level maintenance scripts under `scripts/` should be Python only.
+`scripts/axis.py` is the default source of truth for repository maintenance
+commands. Prefer Python for repo-level policy, docs checks, and orchestration.
+Use ecosystem-native tooling when the underlying tool is native to that
+ecosystem, such as Excalidraw SVG export in `frontend/scripts/`.
 
 ## Commands
 
@@ -17,6 +19,7 @@ python scripts/axis.py check scripts-standard
 python scripts/axis.py check doc-navigation
 python scripts/axis.py test unit
 python scripts/axis.py generate api-contracts
+python scripts/axis.py generate wireframes
 python scripts/axis.py generate buf-yaml
 python scripts/axis.py generate domain-readme-index
 python scripts/axis.py register avro-schemas --dry-run
@@ -24,12 +27,17 @@ python scripts/axis.py register avro-schemas --dry-run
 
 ## Rules
 
-- Keep new top-level maintenance scripts in Python.
-- Add subcommands to `scripts/axis.py` for new workflows.
+- Keep new repo-level maintenance and docs policy scripts in Python.
+- Add subcommands to `scripts/axis.py` for new repo workflows.
 - Put shared repository discovery in `scripts/axis_repo.py` or small Python helpers.
-- Do not add Bash/PowerShell maintenance scripts under `scripts/`.
+- Do not add JavaScript, Bash, PowerShell, `.cmd`, or `.bat` utility scripts under
+  top-level `scripts/`, `docs/scripts/`, `docs/wireframes/`, or `docs/diagrams/`.
+- Native ecosystem tooling belongs beside the owning package, with a package
+  script and, when useful for repo workflows, a `scripts/axis.py` entrypoint.
+- `scripts/hooks/pre-push` has no extension because Git expects that filename, but
+  its entrypoint must be Python and delegate to `scripts/axis.py pre-push`.
 - Use Python JSON/path/process APIs instead of shell string manipulation when parsing
   Markdown, OpenAPI, Avro, YAML-like config, or Git output.
 
-`python scripts/axis.py check scripts-standard` enforces the script-standard rule and is
-included in doc drift.
+`python scripts/axis.py check scripts-standard` enforces the no-ad-hoc-script
+rule and is included in doc drift.

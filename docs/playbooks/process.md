@@ -136,7 +136,7 @@ Repeat for every screen / feature area. **Never skip the wireframe step** — it
 | Step | Action | Output |
 |---|---|---|
 | 1 | Read use-case file ACs in full and define the user goal, required decision, and minimum useful information | UX contract before visual design |
-| 2 | Create Excalidraw wireframe + run `generate-wireframes.ps1` | `docs/use-cases/{domain}/{slug}/{screen}.excalidraw` + `.svg` (shared kit only: `docs/wireframes/`) |
+| 2 | Create Excalidraw wireframe + run `python scripts/axis.py generate wireframes` | `docs/use-cases/{domain}/{slug}/{screen}.excalidraw` + `.svg` (shared app shell: `docs/wireframes/`) |
 | 3 | Add row to the use-case `## Wireframes` table | Wireframe linked from spec |
 | 4 | Define types from backend contract | `features/{name}/types.ts` |
 | 5 | Define API functions + query key factory | `features/{name}/api.ts` |

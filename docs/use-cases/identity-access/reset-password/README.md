@@ -85,7 +85,7 @@ Allow users to reset forgotten passwords, change their current password, and man
 
 ## Wireframes
 
-The reset-password entry screen uses the shared public auth card/page-frame skeleton and field-level help text from `docs/wireframes/blocks.mjs`.
+The reset-password entry screen uses the shared public auth card/page-frame skeleton and field-level help text pattern from [wireframes/README](../../../wireframes/README.md#agent-contract).
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

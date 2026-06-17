@@ -51,7 +51,7 @@
 
 ## Key Diagrams
 
-Platform **architecture** diagrams live here as **Mermaid** (one shared [dark theme](./playbooks/mermaid.md) via `docs/diagrams/mermaid-theme.mjs`). **UI wireframes** stay Excalidraw — see [Wireframes](#wireframes) below.
+Platform **architecture** diagrams live here as **Mermaid** (one shared [dark theme](./playbooks/mermaid.md) via `docs/diagrams/mermaid_theme.py`). **UI wireframes** stay Excalidraw — see [Wireframes](#wireframes) below.
 
 Use-case **sequence / entity** diagrams live in each use-case `README.md` under `## Diagrams` (also Mermaid). Index:
 
@@ -188,7 +188,7 @@ Screen wireframes use Excalidraw (`.excalidraw` + `.svg`). Each use case lists i
 |----------|----------------|
 | [register-workspace § Wireframes](./use-cases/platform-foundation/register-workspace/README.md#wireframes) | Multi-screen Workspace onboarding path, error `*-states`, links to Mermaid diagrams |
 
-Regenerate screen `.svg` after `.excalidraw` changes: `node docs/wireframes/generate-screens.mjs` and Kroki (see [wireframes.md](./playbooks/wireframes.md)).
+Regenerate screen `.svg` after `.excalidraw` changes: `python scripts/axis.py generate wireframes` (see [wireframes.md](./playbooks/wireframes.md)).
 
 ---
 

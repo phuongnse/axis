@@ -1,15 +1,26 @@
-#!/usr/bin/env bash
-# Git hook entrypoint. Python is the source of truth: scripts/axis.py pre-push.
-set -euo pipefail
-ROOT="$(git rev-parse --show-toplevel)"
-if [ -z "${PYTHON:-}" ]; then
-  if command -v python3 >/dev/null 2>&1; then
-    PYTHON=python3
-  elif command -v python >/dev/null 2>&1; then
-    PYTHON=python
-  else
-    echo "Python is required. Set PYTHON or install python/python3 on PATH." >&2
-    exit 1
-  fi
-fi
-exec "${PYTHON}" "${ROOT}/scripts/axis.py" pre-push
+#!/usr/bin/env python3
+"""Git pre-push hook entrypoint."""
+
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+
+def main() -> int:
+    result = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        check=True,
+        capture_output=True,
+        encoding="utf-8",
+        text=True,
+    )
+    root = Path(result.stdout.strip())
+    os.execv(sys.executable, [sys.executable, str(root / "scripts" / "axis.py"), "pre-push"])
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

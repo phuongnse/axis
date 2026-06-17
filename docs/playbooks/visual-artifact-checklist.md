@@ -34,14 +34,14 @@ Use this checklist **before every commit** that changes visual artifacts:
 
 **Wireframes (Excalidraw):**
 
-1. Edit `docs/wireframes/*.mjs` generators or source `.excalidraw` files.
-2. Regenerate related `.svg` previews (`generate-screens.mjs` + Kroki).
+1. Edit source `.excalidraw` files.
+2. Regenerate related `.svg` previews (`python scripts/axis.py generate wireframes`).
 3. Review at 100% zoom with this checklist.
 
 **Diagrams (Mermaid in Markdown):**
 
 1. Edit diagram content in `docs/README.md` or the owning use-case `README.md`.
-2. Theme colors: only in [`docs/diagrams/mermaid-theme.mjs`](../diagrams/mermaid-theme.mjs) — run `node docs/scripts/sync-mermaid-theme.mjs` after changing `MERMAID_INIT`.
+2. Theme colors: only in [`docs/diagrams/mermaid_theme.py`](../diagrams/mermaid_theme.py) — run `python docs/scripts/sync-mermaid-theme.py` after changing `MERMAID_INIT`.
 3. Preview on GitHub or in the IDE; see [mermaid.md](./mermaid.md).
 4. Commit `.md` only — no `.excalidraw` / `.svg` for sequence or entity diagrams.
 
@@ -51,4 +51,3 @@ Use this checklist **before every commit** that changes visual artifacts:
 - [ ] No sequence/entity diagram files (`*-flow`, `*-model`, `*-cases`) in the folder — those belong in `## Diagrams` as **Mermaid** in the README.
 - [ ] `## Diagrams` uses `### <slug>` + fenced `mermaid` blocks; other use cases linked in `**Related:**` prose only.
 - [ ] When >3 screens or branched flow: `## Screen flow` present and **row order** matches wireframes table ([docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--wireframes--implementation-status), example [register-workspace](../use-cases/platform-foundation/register-workspace/README.md)); pattern checklist [wireframes.md § Multi-screen journey](./wireframes.md#multi-screen-journey-pattern).
-
