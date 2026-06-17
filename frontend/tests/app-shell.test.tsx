@@ -6,6 +6,7 @@ import { renderWithRouter } from './render-with-router';
 
 vi.mock('@/features/auth/api', () => ({
   signOut: vi.fn().mockResolvedValue(undefined),
+  switchWorkspace: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe('AppShell', () => {

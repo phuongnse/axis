@@ -13,6 +13,7 @@ service IdentityService {
 
 message GetUserPermissionsRequest {
   reserved 2;
+  reserved "organization_id", "tenant_id";
 
   string user_id = 1;
 }
