@@ -9,6 +9,7 @@ generator is native to that ecosystem.
 from __future__ import annotations
 
 import argparse
+import importlib
 import importlib.util
 import json
 import os
@@ -43,6 +44,10 @@ class CheckError(RuntimeError):
 
 def rel(path: Path) -> str:
     return str(path.relative_to(ROOT)).replace("\\", "/")
+
+
+def rel_from(path: Path, root: Path) -> str:
+    return str(path.relative_to(root)).replace("\\", "/")
 
 
 def exe(name: str) -> str:
@@ -890,6 +895,202 @@ def check_scripts_standard(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
+SKILL_NAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")
+FRONTMATTER_RE = re.compile(r"\A---\n(?P<header>.*?)\n---\n", re.DOTALL)
+SKILL_MAX_LINES = 120
+SKILL_AMBIGUOUS_WORD_RE = re.compile(
+    r"\b(best[- ]effort|if you have time|nice to have|maybe|probably|hopefully)\b",
+    re.IGNORECASE,
+)
+SKILL_REPO_REF_RE = re.compile(
+    r"`(?P<target>(?:AGENTS\.md|\.github/[A-Za-z0-9._/#-]+|docs/[A-Za-z0-9._/#-]+|"
+    r"scripts/[A-Za-z0-9._/#-]+|tests/[A-Za-z0-9._/#-]+|frontend/[A-Za-z0-9._/#-]+))`"
+)
+SKILL_MD_LINK_RE = re.compile(r"\[[^\]]+\]\((?P<target>[^)]+)\)")
+SKILL_REQUIRED_SKILL_REFS = {
+    "axis-api-contract": ("axis-design-gate", "axis-ready-review"),
+    "axis-cross-module-contract": ("axis-design-gate", "axis-ready-review"),
+    "axis-frontend-feature": ("axis-design-gate", "axis-ready-review"),
+    "axis-use-case-implementation": ("axis-design-gate", "axis-ready-review"),
+    "axis-review-feedback": ("axis-ready-review",),
+}
+
+
+def simple_yaml_value(text: str, key: str) -> str:
+    match = re.search(rf"(?m)^\s*{re.escape(key)}:\s*(?P<value>.+?)\s*$", text)
+    if match is None:
+        return ""
+    value = match.group("value").strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        return value[1:-1]
+    return value
+
+
+def markdown_anchor_slug(text: str) -> str:
+    text = re.sub(r"`([^`]*)`", r"\1", text.strip().lower())
+    text = re.sub(r"<[^>]+>", "", text)
+    text = re.sub(r"[^\w\s-]", "", text)
+    text = re.sub(r"\s+", "-", text)
+    return text.strip("-")
+
+
+def markdown_anchor_slugs(path: Path) -> set[str]:
+    slugs: set[str] = set()
+    for line in path.read_text(encoding="utf-8").splitlines():
+        match = re.match(r"^(?P<marks>#{1,6})\s+(?P<title>.+?)\s*#*\s*$", line)
+        if match is not None:
+            slugs.add(markdown_anchor_slug(match.group("title")))
+    return slugs
+
+
+def skill_reference_target(target: str, *, skill_dir: Path, root: Path) -> tuple[Path, str] | None:
+    target = urllib.parse.unquote(target.strip())
+    if not target or target.startswith(("#", "http://", "https://", "mailto:")):
+        return None
+    if any(token in target for token in ("{", "}", "*")):
+        return None
+
+    path_part = target.split("#", 1)[0].split("?", 1)[0]
+    if not path_part:
+        return None
+
+    normalized = path_part.replace("\\", "/")
+    repo_prefixes = ("AGENTS.md", ".github/", "docs/", "scripts/", "tests/", "frontend/")
+    if normalized.startswith(repo_prefixes):
+        return root / normalized, target
+    return skill_dir / normalized, target
+
+
+def codex_skill_reference_issues(skill_md: Path, text: str, *, root: Path) -> list[str]:
+    issues: list[str] = []
+    seen: set[str] = set()
+    skill_dir = skill_md.parent
+    candidates = [match.group("target") for match in SKILL_REPO_REF_RE.finditer(text)]
+    candidates.extend(match.group("target") for match in SKILL_MD_LINK_RE.finditer(text))
+
+    for target in candidates:
+        resolved = skill_reference_target(target, skill_dir=skill_dir, root=root)
+        if resolved is None:
+            continue
+        path, display = resolved
+        key = f"{path}#{display}"
+        if key in seen:
+            continue
+        seen.add(key)
+
+        path_without_anchor = Path(str(path).split("#", 1)[0])
+        if not path_without_anchor.exists():
+            issues.append(
+                f"{rel_from(skill_md, root)}: referenced path `{display.split('#', 1)[0]}` does not exist"
+            )
+            continue
+
+        if "#" in display and path_without_anchor.suffix.lower() == ".md":
+            anchor = display.split("#", 1)[1]
+            if anchor and anchor not in markdown_anchor_slugs(path_without_anchor):
+                issues.append(f"{rel_from(skill_md, root)}: referenced anchor `{display}` does not exist")
+
+    return issues
+
+
+def codex_skill_issues(*, root: Path = ROOT) -> list[str]:
+    skills_root = root / ".agents" / "skills"
+    if not skills_root.exists():
+        return []
+
+    issues: list[str] = []
+    for skill_dir in sorted(skills_root.iterdir()):
+        skill_path = rel_from(skill_dir, root)
+        if not skill_dir.is_dir():
+            issues.append(f"{skill_path}: repo skills must be directories")
+            continue
+
+        skill_name = skill_dir.name
+        if SKILL_NAME_RE.fullmatch(skill_name) is None:
+            issues.append(f"{skill_path}: skill folder name must be lowercase letters, digits, and hyphens")
+
+        skill_md = skill_dir / "SKILL.md"
+        if not skill_md.is_file():
+            issues.append(f"{skill_path}: missing SKILL.md")
+            continue
+
+        text = skill_md.read_text(encoding="utf-8")
+        if "TODO" in text or "[TODO" in text:
+            issues.append(f"{rel_from(skill_md, root)}: remove template TODO text before committing")
+        line_count = len(text.splitlines())
+        if line_count > SKILL_MAX_LINES:
+            issues.append(
+                f"{rel_from(skill_md, root)}: keep SKILL.md concise ({line_count} lines > {SKILL_MAX_LINES})"
+            )
+        for idx, line in enumerate(text.splitlines(), 1):
+            if SKILL_AMBIGUOUS_WORD_RE.search(line):
+                issues.append(
+                    f"{rel_from(skill_md, root)}:{idx}: replace ambiguous best-effort wording with a concrete action"
+                )
+
+        frontmatter = FRONTMATTER_RE.match(text)
+        if frontmatter is None:
+            issues.append(f"{rel_from(skill_md, root)}: missing YAML frontmatter delimited by ---")
+            continue
+
+        header = frontmatter.group("header")
+        declared_name = simple_yaml_value(header, "name")
+        description = simple_yaml_value(header, "description")
+        if declared_name != skill_name:
+            issues.append(
+                f"{rel_from(skill_md, root)}: frontmatter name must match folder name "
+                f"({skill_name})"
+            )
+        if not description:
+            issues.append(f"{rel_from(skill_md, root)}: frontmatter description is required")
+        elif len(description) < 40:
+            issues.append(f"{rel_from(skill_md, root)}: frontmatter description is too vague")
+
+        body = text[frontmatter.end() :]
+        if not re.search(r"(?m)^#\s+\S", body):
+            issues.append(f"{rel_from(skill_md, root)}: body must start with a Markdown H1")
+        for required_skill in SKILL_REQUIRED_SKILL_REFS.get(skill_name, ()):
+            if f"${required_skill}" not in text:
+                issues.append(f"{rel_from(skill_md, root)}: must chain to ${required_skill}")
+        issues.extend(codex_skill_reference_issues(skill_md, text, root=root))
+
+        openai_yaml = skill_dir / "agents" / "openai.yaml"
+        if not openai_yaml.is_file():
+            issues.append(f"{skill_path}: missing agents/openai.yaml UI metadata")
+            continue
+
+        metadata = openai_yaml.read_text(encoding="utf-8")
+        if "TODO" in metadata:
+            issues.append(f"{rel_from(openai_yaml, root)}: remove template TODO text before committing")
+
+        display_name = simple_yaml_value(metadata, "display_name")
+        short_description = simple_yaml_value(metadata, "short_description")
+        default_prompt = simple_yaml_value(metadata, "default_prompt")
+        if not display_name:
+            issues.append(f"{rel_from(openai_yaml, root)}: interface.display_name is required")
+        if not short_description:
+            issues.append(f"{rel_from(openai_yaml, root)}: interface.short_description is required")
+        elif not 25 <= len(short_description) <= 64:
+            issues.append(f"{rel_from(openai_yaml, root)}: interface.short_description must be 25-64 characters")
+        if not default_prompt:
+            issues.append(f"{rel_from(openai_yaml, root)}: interface.default_prompt is required")
+        elif f"${skill_name}" not in default_prompt:
+            issues.append(f"{rel_from(openai_yaml, root)}: default_prompt must mention ${skill_name}")
+
+    return issues
+
+
+def check_codex_skills(_args: argparse.Namespace | None = None) -> int:
+    issues = codex_skill_issues()
+    if issues:
+        print("check-codex-skills FAIL:", file=sys.stderr)
+        for issue in issues:
+            print(f"  - {issue}", file=sys.stderr)
+        return 1
+    print("check-codex-skills: OK")
+    return 0
+
+
 def check_policy_tests(_args: argparse.Namespace | None = None) -> int:
     return run(
         [
@@ -1453,6 +1654,7 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
     checkers = [
         ("check-text-encoding", check_text_encoding),
         ("check-scripts-standard", check_scripts_standard),
+        ("check-codex-skills", check_codex_skills),
         ("check-ef-domain-mapping", check_ef_domain_mapping),
         ("check-frontend-api-contracts", check_frontend_api_contracts),
         ("check-frontend-style", check_frontend_style),
@@ -1703,6 +1905,23 @@ def _command_version(name: str, *version_args: str) -> tuple[str, str]:
     return "OK", f"{version} ({resolved})"
 
 
+def _python_module_version(module_name: str, package_name: str) -> tuple[str, str]:
+    if importlib.util.find_spec(module_name) is None:
+        return (
+            "FAIL",
+            f"{package_name} is not installed for {sys.executable}; install with "
+            f"`{sys.executable} -m pip install {package_name}`",
+        )
+
+    try:
+        module = importlib.import_module(module_name)
+    except Exception as exc:  # pragma: no cover - import side effects are environment-specific
+        return "FAIL", f"{package_name} import failed: {exc}"
+
+    version = getattr(module, "__version__", "available")
+    return "OK", f"{package_name} {version} ({sys.executable})"
+
+
 def _http_ok(url: str, timeout_seconds: float = 1.5) -> bool:
     try:
         with urllib.request.urlopen(url, timeout=timeout_seconds) as response:
@@ -1758,6 +1977,9 @@ def doctor(args: argparse.Namespace) -> int:
         record("OK", "python launcher", python_in_path)
     else:
         record("WARN", "python launcher", "not found in PATH; open a shell where Python 3 resolves before running repo scripts")
+
+    yaml_status, yaml_detail = _python_module_version("yaml", "PyYAML")
+    record(yaml_status, "python package PyYAML", f"{yaml_detail}; required for skill-creator quick_validate.py")
 
     for name, version_args in (
         ("git", ("--version",)),
@@ -1869,6 +2091,7 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("policy-tests").set_defaults(func=check_policy_tests)
     check_sub.add_parser("text-encoding").set_defaults(func=check_text_encoding)
     check_sub.add_parser("scripts-standard").set_defaults(func=check_scripts_standard)
+    check_sub.add_parser("codex-skills").set_defaults(func=check_codex_skills)
     check_sub.add_parser("test-naming").set_defaults(func=check_test_naming)
     check_sub.add_parser("test-project-classification").set_defaults(func=check_test_project_classification)
     check_sub.add_parser("vulnerable-packages").set_defaults(func=check_vulnerable_packages)

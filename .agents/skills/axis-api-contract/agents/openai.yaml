@@ -1,0 +1,4 @@
+interface:
+  display_name: "Axis API Contract"
+  short_description: "Change Axis API contracts safely"
+  default_prompt: "Use $axis-api-contract to change this Axis API contract safely."

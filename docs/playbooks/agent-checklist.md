@@ -2,31 +2,23 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← AGENTS.md](../../AGENTS.md)
 
-**Daily workflow.** Walk the Ready review, Docs review, and Retrospective review while implementing; run the Verification gate before marking a PR ready for review. Reflect outcomes in the [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) checkboxes. **PR description = Summary + Linked spec + Requirements only** — no review/check paste blocks, no commit list, no CI/Doc-drift status (GitHub Checks tab covers that).
+**Daily workflow.** Walk the Ready review, Docs review, and Retrospective review while implementing; run the Verification gate before marking a PR ready for review. Use `$axis-use-case-implementation` for use-case slices and `$axis-ready-review` before PR review. **PR description = Summary + Linked spec + Requirements only** — no review/check paste blocks, no commit list, no CI/Doc-drift status (GitHub Checks tab covers that).
+
+**Skill routing.** API contracts: `$axis-api-contract`; cross-module contracts: `$axis-cross-module-contract`; frontend: `$axis-frontend-feature`; visuals: `$axis-visual-artifact`; review fixes: `$axis-review-feedback`.
 
 **Large use cases:** split into **genuinely isolated PRs** (each branch from `main`, each passing the two-sided isolation test). See [pr-slicing.md](./pr-slicing.md) — never stack slice B on slice A's branch, never claim the Verification gate is green when you did not run it, and assign one owner per shared seam.
-
-The paste-block templates below are for *your own* walk-through (agent reasoning, scratchpad, or PR thread comment if asked) — not for the PR description.
 
 ---
 
 ## Ready Review — before code
 
-- **Design Gate** ([design-gate.md](./design-gate.md)): required review artifact before non-trivial code; re-derive the rules governing the surface you touch and produce the dossier (rules quoted, blast-radius `grep`, contract+casing, gate plan); **high-risk surfaces require user sign-off before code**
+- **Design Gate** ([design-gate.md](./design-gate.md)): use `$axis-design-gate` before non-trivial code; **high-risk surfaces require user sign-off before code**
 - AC map: every row has layer + file/test — **no blank cells**
 - Read: domain README → use-case file → same-module code
 - Skim [`docs/WORKAROUNDS.md`](../WORKAROUNDS.md) for entries touching the same files/modules — known shortcuts may explain surprising code
 - Before API layer: `grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/use-cases/` — fix, defer with reason, or stop
 - If the use case crosses the SPA/API boundary or depends on local-dev services (auth, email, provisioning, storage, Redis, Kafka, RabbitMQ, MailDev), start the Docker local-dev stack from [local-dev.md](./local-dev.md) during Ready review and include a smoke path in the plan. Do not wait until PR wrap-up to discover compose-only failures.
 - End of PR: [process.md § PR wrap-up](process.md) — deferred lines, host wiring, callouts (no user reminder)
-
-```markdown
-## Ready review
-| AC / use case | Layer | File / test |
-|---------|-------|-------------|
-| …       | …     | …           |
-Docs touched: docs/use-cases/…
-```
 
 ### AC coverage — avoid happy-path-only
 
@@ -113,6 +105,7 @@ Use the terms from [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md#enforcement-taxono
 - **Doc navigation** — `python scripts/axis.py check doc-navigation` requires every `docs/**/*.md` file to start with an H1 and a `> **Navigation**:` block so docs never become dead ends.
 - **Code-fence integrity** — `python scripts/axis.py check doc-code-fences` (inside the drift command) flags code-block lines with collapsed indentation (a lone leading space). Catches the bulk-find-replace corruption class that lychee, prettier, and the structural checks all let through.
 - **Use-case docs** — `python scripts/axis.py check use-case-docs` validates use-case file structure (required sections + tables + status callout), flags template placeholders (`_(One sentence...)_`, `_(Actor)_`, `_(What starts...)_`), flags self-links `[name](./README.md)` and truncated summary rows in domain READMEs, and counts use cases still on the stock Main flow.
+- **Codex skill metadata** — `python scripts/axis.py check codex-skills` validates repo-scoped `.agents/skills/*/SKILL.md` frontmatter, concise bodies, doc references, required skill chaining, concrete wording, and UI metadata/default prompts.
 - **Secret scanning** — TruffleHog scans the full PR diff for committed secrets (API keys, passwords, tokens) and verifies each finding against the alleged service before reporting (`--only-verified` cuts false positives).
 - **Vulnerable packages** — `python scripts/axis.py check vulnerable-packages` wraps `dotnet list package --vulnerable --include-transitive` and fails on any known CVE in the dep tree (covers transitive packages too).
 - **Architecture fitness tests** run as part of `dotnet test` — failures there mean a AGENTS.md P0/P1 rule got violated structurally. See [tests README](../../tests/Architecture/Axis.Architecture.Tests/README.md).
@@ -157,64 +150,32 @@ The .NET branch of `python scripts/axis.py verify` also runs the enforced
 | Docs/scripts/layout/policy change | `python scripts/axis.py check policy-tests` then `python scripts/axis.py check doc-drift` |
 | `docker-compose.yml` | Update [local-dev.md](./local-dev.md) in same PR; `python scripts/axis.py check doc-drift` |
 
-```text
-Verification gate self-check:
-- test naming → ran / not triggered (reason)
-- dotnet build → ran / not triggered (reason)
-- vulnerable package scan → ran / not triggered (reason)
-- unit test projects → ran / not triggered (reason)
-- dotnet format --verify-no-changes → ran / not triggered (reason)
-- npm run ci + npm run test → ran / not triggered (reason)
-- docker local-dev smoke → ran / not triggered (reason)
-- policy gate tests → ran / not triggered (reason)
-- python scripts/axis.py check text-encoding → ran / not triggered (reason)
-- python scripts/axis.py check doc-drift → ran / not triggered (reason)
-```
-
-Example (docs-only): every line `not triggered — no src/, tests/, or frontend/ changes`.
+When reporting verification, state each triggered command as `ran`, `not triggered` with reason, or `failed` with the blocker. `$axis-ready-review` provides the repeatable reporting shape.
 
 **Full suite:** integration and API tests run in CI as part of full `dotnet test`; Docker/Testcontainers is required there. Run full local `dotnet test Axis.sln --nologo` when debugging CI, changing Infrastructure/API behavior, or preparing a high-risk backend PR. Use the Docker endpoint available to the shell running the suite when `docker info` works. If it does not and Docker Engine lives inside WSL2, set `DOCKER_HOST` to the exported daemon instead (prefer `tcp://127.0.0.1:2375`).
 
 ### Docs Review
 
-Paste block format: header `Docs review:` then one `-` line per row (Retrospective review uses the same bullet style). Mark pure refactor/style/test-only changes as `not triggered` instead of inventing docs churn.
+Use `$axis-ready-review` for the walkthrough. Mark pure refactor/style/test-only changes as `not triggered` instead of inventing docs churn.
 
-```text
-Docs review:
-- Library → TECH_STACK.md / not triggered
-- New pattern → patterns.md or REVIEW_FINDINGS.md / not triggered
-- Use-case layer callout → docs/use-cases/{domain}/… (layout per [docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--wireframes--implementation-status); multi-screen example [register-workspace](../use-cases/platform-foundation/register-workspace/README.md)) / not triggered
-- Use-case wireframes/diagrams README → Screen flow + full wireframes inventory + Diagrams owned in-folder only ([docs-style](./docs-style.md#use-case-files--wireframes--implementation-status)) / not triggered
-- Domain README + PROGRESS → … / not triggered
-- Architecture rule → AGENTS.md / not triggered
-- process.md workflow → … / not triggered
-- Project structure → AGENTS.md § Solution tree + process.md / not triggered
-- Wireframe/diagram path move → grep docs/ / not triggered
-- Program.cs host → patterns.md host section / not triggered
-- Stale code comment → same file / not triggered
-- Library rename → grep docs/ + src comments / not triggered
-- Deferred follow-up → `**Deferred follow-ups:**` on affected US + PROGRESS if cross-cutting / not triggered
-- Host wiring (`*Endpoints.cs` / `Program.cs`) → `Map*Endpoints` sweep in process.md / not triggered
-- Repo layout (module, event, proto, domain README) → [repo-layout-discovery.md](./repo-layout-discovery.md) checklists A–E / not triggered
-```
+Common owner mapping:
+
+| Trigger | Owner |
+|---|---|
+| Library or stack change | [TECH_STACK.md](../TECH_STACK.md) |
+| New pattern or repeated finding | [patterns.md](./patterns.md) or [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md) |
+| Behavior/spec/status change | Owning use-case callout, domain README, and [PROGRESS.md](../PROGRESS.md) when their summaries change |
+| Repo layout, module, event, proto, API group | [repo-layout-discovery.md](./repo-layout-discovery.md) |
+| Frontend screen or use-case visual | Owning use-case wireframe/diagram section and [visual-artifact-checklist.md](./visual-artifact-checklist.md) |
+| Intentional P0/P1 shortcut | [WORKAROUNDS.md](../WORKAROUNDS.md) plus site reference |
 
 **Deferred follow-ups (mandatory when leaving work open):** do not wait for the user. Any skipped review item, thin-endpoint refactor, or partial layer needs a named `**Deferred follow-ups:**` line — full rules in [process.md § Deferred follow-up](process.md). Remove the line when fixed.
 
 ### Review feedback (CodeRabbit / human)
 
-Apply **before** resolving review threads (no user reminder required). Bots are **signal**, not authority — validate against [patterns.md](./patterns.md) and [AGENTS.md](../../AGENTS.md).
+Use `$axis-review-feedback`. Apply fixes before resolving threads. Bots are **signal**, not authority — validate against [patterns.md](./patterns.md) and [AGENTS.md](../../AGENTS.md).
 
-Do **not** ship the first diff that only makes CI green or closes the thread. For each comment, ask:
-
-1. **Is this already best practice** for this codebase (patterns, layer boundaries, siblings in the same module)?
-2. **Can I improve or enhance** beyond what the reviewer suggested (clearer ownership, fewer round-trips, one transaction boundary, consistent error handling)?
-3. If a better design is feasible but skipped, is that a deliberate **minimal diff** (user asked) or should it be **`**Deferred follow-ups:**`**?
-
-**Default:** prefer the design you would defend in review. **Exception:** user explicitly requests the smallest change — say so in the PR Summary.
-
-**PR Summary (one line when review fixes are non-trivial):** `Review fixes: improved — <what>` or `Review fixes: minimal — <why>`.
-
-**Examples** (illustrative — not an exhaustive list): splitting an invariant across “mutate then query”; external calls with catch-only patches; duplicating logic to silence a linter. In those cases, look for a single owner of the invariant or parity with existing guards/handlers in the repo.
+Classify each comment as fixed, improved beyond suggestion, false positive with evidence, or deferred with owner. Prefer the design you would defend in review; when the user explicitly asks for the smallest change, say `Review fixes: minimal — <why>` in the PR Summary. For non-trivial improvements, say `Review fixes: improved — <what>`.
 
 ### Retrospective Review
 

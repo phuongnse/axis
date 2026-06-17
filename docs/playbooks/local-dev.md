@@ -12,6 +12,17 @@ The full dev stack runs from one `docker compose up -d`: **Postgres**, **Redis**
 
 - **Python 3** - repo maintenance commands run through `python scripts/axis.py ...`.
   If a shell cannot resolve `python`, fix PATH before using repo scripts.
+- **PyYAML** - Python package required by skill-creator `quick_validate.py`
+  when editing repo-scoped Codex skills under `.agents/skills/`. Install it
+  into the same Python that runs repo scripts:
+  `python -m pip install PyYAML`.
+- **.NET SDK 8.x** - required for host-side `dotnet build`, `dotnet test`,
+  `dotnet format`, EF migrations, and API contract generation. The compose API
+  container has its own SDK, but local verification expects `dotnet` on `PATH`.
+- **Node.js + npm** - required for host-side frontend checks (`npm run ci`,
+  `npm run test`), OpenAPI TypeScript generation, and wireframe export. The
+  compose web container has its own Node runtime, but local verification expects
+  `node` and `npm` on `PATH`.
 - **Docker** — Docker Engine + Compose v2.
   - **Linux / macOS:** run commands from the repo root.
   - **Windows:** use the Docker endpoint available to your shell when `docker info` works. If it does not, but Docker Engine lives inside WSL2, run compose commands from WSL (`wsl -- bash -lc "cd /path/to/axis && …"`) or open a WSL shell and `cd` there.
@@ -34,9 +45,9 @@ Run the doctor before debugging local stack issues:
 python scripts/axis.py doctor
 ```
 
-It checks the repo root, Python launcher, Git, .NET SDK, Node, npm, Docker CLI,
-Docker Compose, the active Docker endpoint, WSL Docker, and the common WSL2 TCP
-daemon endpoint at `127.0.0.1:2375`.
+It checks the repo root, Python launcher, PyYAML, Git, .NET SDK, Node, npm,
+Docker CLI, Docker Compose, the active Docker endpoint, WSL Docker, and the
+common WSL2 TCP daemon endpoint at `127.0.0.1:2375`.
 
 Use strict mode when you want the command to fail on blocking local-dev issues:
 

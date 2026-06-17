@@ -1025,6 +1025,160 @@ class TestScriptsStandardGate(unittest.TestCase):
             self.assertEqual(0, axis.check_scripts_standard())
 
 
+class TestCodexSkillsGate(unittest.TestCase):
+    def issues_for_skill(self, files: dict[str, str]) -> list[str]:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for relative, content in files.items():
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+            return axis.codex_skill_issues(root=root)
+
+    def valid_skill_files(self) -> dict[str, str]:
+        return {
+            ".agents/skills/axis-example/SKILL.md": (
+                "---\n"
+                "name: axis-example\n"
+                "description: Use when Codex needs to perform a concrete Axis example workflow with repo-specific checks.\n"
+                "---\n"
+                "\n"
+                "# Axis Example\n"
+                "\n"
+                "Run the example workflow.\n"
+            ),
+            ".agents/skills/axis-example/agents/openai.yaml": (
+                "interface:\n"
+                "  display_name: \"Axis Example\"\n"
+                "  short_description: \"Check example skill metadata\"\n"
+                "  default_prompt: \"Use $axis-example to run the example workflow.\"\n"
+            ),
+        }
+
+    def test_accepts_valid_repo_skill(self) -> None:
+        self.assertEqual([], self.issues_for_skill(self.valid_skill_files()))
+
+    def test_rejects_template_todo_text(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/axis-example/SKILL.md"] += "\nTODO: finish this later.\n"
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn("remove template TODO text", "\n".join(issues))
+
+    def test_rejects_frontmatter_name_mismatch(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/axis-example/SKILL.md"] = files[
+            ".agents/skills/axis-example/SKILL.md"
+        ].replace("name: axis-example", "name: axis-other")
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn("frontmatter name must match folder name", "\n".join(issues))
+
+    def test_rejects_default_prompt_without_skill_invocation(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/axis-example/agents/openai.yaml"] = files[
+            ".agents/skills/axis-example/agents/openai.yaml"
+        ].replace("$axis-example", "$other-skill")
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn("default_prompt must mention $axis-example", "\n".join(issues))
+
+    def test_rejects_missing_skill_doc_reference(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/axis-example/SKILL.md"] += "\nRead `docs/playbooks/missing.md`.\n"
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn("referenced path `docs/playbooks/missing.md` does not exist", "\n".join(issues))
+
+    def test_accepts_existing_skill_doc_reference(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/axis-example/SKILL.md"] += "\nRead `docs/playbooks/frontend.md`.\n"
+        files["docs/playbooks/frontend.md"] = "# Frontend\n"
+
+        self.assertEqual([], self.issues_for_skill(files))
+
+    def test_rejects_missing_markdown_anchor_reference(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/axis-example/SKILL.md"] += "\nRead [Frontend](docs/playbooks/frontend.md#missing).\n"
+        files["docs/playbooks/frontend.md"] = "# Frontend\n"
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn("referenced anchor `docs/playbooks/frontend.md#missing` does not exist", "\n".join(issues))
+
+    def test_rejects_overlong_skill_body(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/axis-example/SKILL.md"] += "\n" + "\n".join("Extra line." for _ in range(130))
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn("keep SKILL.md concise", "\n".join(issues))
+
+    def test_rejects_ambiguous_best_effort_wording(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/axis-example/SKILL.md"] += "\nMaybe run the check if you have time.\n"
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn("replace ambiguous best-effort wording", "\n".join(issues))
+
+    def test_rejects_api_contract_skill_without_required_chaining(self) -> None:
+        files = {
+            ".agents/skills/axis-api-contract/SKILL.md": (
+                "---\n"
+                "name: axis-api-contract\n"
+                "description: Use when Codex changes Axis REST API contracts with generated frontend types.\n"
+                "---\n"
+                "\n"
+                "# Axis API Contract\n"
+                "\n"
+                "Change the API contract.\n"
+            ),
+            ".agents/skills/axis-api-contract/agents/openai.yaml": (
+                "interface:\n"
+                "  display_name: \"Axis API Contract\"\n"
+                "  short_description: \"Change Axis API contracts safely\"\n"
+                "  default_prompt: \"Use $axis-api-contract to change this API contract.\"\n"
+            ),
+        }
+
+        issues = self.issues_for_skill(files)
+
+        joined = "\n".join(issues)
+        self.assertIn("must chain to $axis-design-gate", joined)
+        self.assertIn("must chain to $axis-ready-review", joined)
+
+    def test_current_repository_codex_skills_still_pass(self) -> None:
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(0, axis.check_codex_skills())
+
+
+class TestDoctorPythonPackageChecks(unittest.TestCase):
+    def test_python_module_version_rejects_missing_package(self) -> None:
+        with mock.patch.object(axis.importlib.util, "find_spec", return_value=None):
+            status, detail = axis._python_module_version("yaml", "PyYAML")
+
+        self.assertEqual("FAIL", status)
+        self.assertIn("PyYAML is not installed", detail)
+
+    def test_python_module_version_reports_package_version(self) -> None:
+        class Module:
+            __version__ = "6.0.3"
+
+        with (
+            mock.patch.object(axis.importlib.util, "find_spec", return_value=object()),
+            mock.patch.object(axis.importlib, "import_module", return_value=Module),
+        ):
+            status, detail = axis._python_module_version("yaml", "PyYAML")
+
+        self.assertEqual("OK", status)
+        self.assertIn("PyYAML 6.0.3", detail)
+
+
 class TestHandlerTestRatchet(unittest.TestCase):
     def test_modified_handler_requires_matching_test_file(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

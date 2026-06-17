@@ -1,0 +1,4 @@
+interface:
+  display_name: "Axis Design Gate"
+  short_description: "Prepare Axis pre-code dossier"
+  default_prompt: "Use $axis-design-gate to prepare the Axis Design Gate dossier for this change."

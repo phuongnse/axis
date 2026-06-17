@@ -106,21 +106,13 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 
 ### Design Gate (mandatory before code)
 
-Before a non-trivial change, complete the **Design Gate** ([design-gate.md](docs/playbooks/design-gate.md)): re-derive the rules governing the exact surface you touch and produce the dossier — governing rules quoted with `file:section`, blast-radius `grep` (every caller/consumer/test), request/response shape **and casing** decision, and the full-scope gate plan. Artifacts, not "I thought carefully."
+Before a non-trivial change, complete the **Design Gate** ([design-gate.md](docs/playbooks/design-gate.md)): governing rules quoted with `file:section`, blast-radius search, contract/casing decision, and verification plan. Use `$axis-design-gate` for the repeatable workflow.
 
 Design Gate is a required review artifact, not a machine-enforced CI gate. Reviewers and agents own the evidence; deterministic subsets belong in scripts/tests and then in [REVIEW_FINDINGS.md](docs/REVIEW_FINDINGS.md).
 
 **High-risk surfaces** — new/changed endpoint or contract/required field, migration/schema, cross-module interaction, auth, new library or public API surface — require **user sign-off via plan mode before writing code**.
 
-Response header for multi-file / new-layer tasks:
-
-1. Affected module(s) and layer(s)  
-2. Governing rules (quoted) + docs to read  
-3. Key decisions (2–3) — confirm with user before new API surface or library  
-4. Blast radius + plan  
-5. Risks / ambiguities  
-
-Skip for trivial single-file fixes and doc-only edits.
+Use repo skills for repeatable workflows: `$axis-use-case-implementation`, `$axis-api-contract`, `$axis-cross-module-contract`, `$axis-frontend-feature`, `$axis-visual-artifact`, `$axis-review-feedback`, and `$axis-ready-review`.
 
 ### Reviews And Gates
 
@@ -159,20 +151,13 @@ Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, use-c
 | Hygiene | Prefer `using` over inline FQCN; `dotnet format Axis.sln` before review (CI `--verify-no-changes`) | Biome via `npm run ci` |
 | Scope | Fix violation class in one PR, not one file | Feature folders; no cross-feature imports except `index.ts` |
 
-**Enforced C# rules** live in [`.editorconfig`](.editorconfig) at the repo root (naming, braces, file-scoped namespaces, analyzer severities). Do not restate style here — run `dotnet format` and follow the file. Architecture patterns: [`patterns.md`](docs/playbooks/patterns.md). Frontend: [`frontend.md`](docs/playbooks/frontend.md).
+**Enforced C# rules** live in [`.editorconfig`](.editorconfig) at the repo root. Do not restate style here — run `dotnet format` and follow the file.
 
-**Architecture (.NET) — consult patterns before coding:**
+**Architecture/API contracts:** use `$axis-api-contract` for REST/OpenAPI/API-type work and `$axis-cross-module-contract` for events, protos, Wolverine, Kafka, RabbitMQ, or gRPC. Details live in [`patterns.md`](docs/playbooks/patterns.md) and [`repo-layout-discovery.md`](docs/playbooks/repo-layout-discovery.md).
 
-- Aggregates, `OwnsMany`, JSONB + `HasValueComparer`, Result pattern, response DTOs in Application, pagination `PagedResult`, idempotent commands/migrations.
-- Minimal API: no logic in endpoints — `mediator.Send` + `ToProblemDetails()`.
-- Repositories return materialized types, not `IQueryable`; `SaveChangesAsync` only in `IUnitOfWork`.
-- List endpoints: project with `.Select()` before materialize — no full aggregate loads on lists.
+**Frontend:** use `$axis-frontend-feature`; details live in [`frontend.md`](docs/playbooks/frontend.md).
 
-**Frontend — consult [`frontend.md`](docs/playbooks/frontend.md):**
-
-- TanStack Query = server state; Zustand = client-only; loading/empty/error on fetches; RHF + Zod; lazy routes; no tokens in `localStorage`.
-
-**Wireframes:** use-case assets under `docs/use-cases/{domain}/{use-case}/`; shared shell lives in `docs/wireframes/app-shell.excalidraw`. Regenerate previews with `python scripts/axis.py generate wireframes`. **Agents:** [`wireframes/README.md` § Agent contract](docs/wireframes/README.md#agent-contract), [`wireframes.md`](docs/playbooks/wireframes.md).
+**Visual artifacts:** use `$axis-visual-artifact` for wireframes, generated SVG previews, and diagrams. Source rules live in [`wireframes.md`](docs/playbooks/wireframes.md), [`wireframes/README.md`](docs/wireframes/README.md), and [`visual-artifact-checklist.md`](docs/playbooks/visual-artifact-checklist.md).
 
 **Cross-cutting:** forward `CancellationToken`; audit fields in Application; soft-delete on workspace aggregates; Serilog without PII; rate limit auth endpoints; CORS before auth; `/health` + `/health/ready` anonymous.
 
