@@ -71,7 +71,7 @@ docs/use-cases/
         └── *.svg            # previews for this use case
 ```
 
-Shared wireframe kit (`.mjs` source + `app-shell`): [`../wireframes/`](../wireframes/) — agent spacing/blocks: [Agent contract](../wireframes/README.md#agent-contract). Platform diagrams: [`../diagrams/`](../diagrams/).
+Shared wireframe reference (`app-shell` + Python preview renderer): [`../wireframes/`](../wireframes/) — agent contract: [wireframes/README](../wireframes/README.md#agent-contract). Platform diagrams: [`../diagrams/`](../diagrams/).
 
 ---
 

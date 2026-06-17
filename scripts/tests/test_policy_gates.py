@@ -866,7 +866,10 @@ class TestEnforcementTruthAudit(unittest.TestCase):
     def test_rejects_missing_pre_push_quick_gate_delegate(self) -> None:
         def mutate(files: dict[Path, str]) -> None:
             hook = Path("scripts/hooks/pre-push")
-            files[hook] = files[hook].replace('scripts/axis.py" pre-push', 'scripts/other.py" pre-push')
+            files[hook] = files[hook].replace(
+                'root / "scripts" / "axis.py"), "pre-push"',
+                'root / "scripts" / "other.py"), "pre-push"',
+            )
 
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -943,6 +946,56 @@ class TestTextEncodingGate(unittest.TestCase):
     def test_current_repository_text_encoding_still_passes(self) -> None:
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(0, axis.check_text_encoding())
+
+
+class TestScriptsStandardGate(unittest.TestCase):
+    def issues_for_files(self, files: dict[str, str]) -> list[str]:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for relative, content in files.items():
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+            return axis.non_python_utility_script_issues(root=root)
+
+    def test_rejects_non_python_docs_utility_script(self) -> None:
+        issues = self.issues_for_files({"docs/scripts/render-wireframes.mjs": "console.log('nope');\n"})
+        self.assertIn(
+            "docs/scripts/render-wireframes.mjs: docs-level utility scripts must be Python; "
+            "native tooling belongs beside its owning package",
+            issues,
+        )
+
+    def test_rejects_non_python_docs_utility_script_case_insensitive(self) -> None:
+        issues = self.issues_for_files({"docs/scripts/render-wireframes.MJS": "console.log('nope');\n"})
+        self.assertIn(
+            "docs/scripts/render-wireframes.MJS: docs-level utility scripts must be Python; "
+            "native tooling belongs beside its owning package",
+            issues,
+        )
+
+    def test_accepts_python_docs_utility_native_frontend_tooling_and_wireframe_assets(self) -> None:
+        issues = self.issues_for_files(
+            {
+                "docs/scripts/sync-mermaid-theme.py": "print('ok')\n",
+                "docs/wireframes/app-shell.excalidraw": "{}\n",
+                "docs/wireframes/app-shell.svg": "<svg />\n",
+                "docs/diagrams/mermaid_theme.py": "MERMAID_INIT = ''\n",
+                "frontend/package.json": '{"scripts":{"export:wireframes":"node scripts/export-wireframes.mjs"}}\n',
+                "frontend/scripts/export-wireframes.mjs": "console.log('native package tooling');\n",
+            }
+        )
+        self.assertEqual([], issues)
+
+    def test_rejects_non_python_pre_push_hook(self) -> None:
+        issues = self.issues_for_files(
+            {"scripts/hooks/pre-push": "#!/usr/bin/env bash\npython scripts/axis.py pre-push\n"}
+        )
+        self.assertIn("scripts/hooks/pre-push: pre-push hook must be a Python entrypoint", issues)
+
+    def test_current_repository_scripts_standard_still_passes(self) -> None:
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(0, axis.check_scripts_standard())
 
 
 class TestHandlerTestRatchet(unittest.TestCase):

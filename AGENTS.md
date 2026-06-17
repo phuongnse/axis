@@ -81,7 +81,7 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 - Zero build warnings and zero test failures.
 - Owning docs in the same PR when behavior/spec/status changes; pure refactor/style/test-only changes do not need a token docs edit (see [agent-checklist](docs/playbooks/agent-checklist.md)).
 - No new TODO/FIXME/placeholder/stub code.
-- For **wireframe** changes (`docs/wireframes/`, `docs/use-cases/**` screen `.excalidraw`/`.svg`): run [`docs/playbooks/visual-artifact-checklist.md`](docs/playbooks/visual-artifact-checklist.md) before commit. **Diagrams** are Mermaid in `docs/README.md` and use-case `README.md` — one theme in [`docs/diagrams/mermaid-theme.mjs`](docs/diagrams/mermaid-theme.mjs); run `node docs/scripts/sync-mermaid-theme.mjs` after editing `MERMAID_INIT` ([`docs/playbooks/mermaid.md`](docs/playbooks/mermaid.md)).
+- For **wireframe** changes (`docs/wireframes/`, `docs/use-cases/**` screen `.excalidraw`/`.svg`): run [`docs/playbooks/visual-artifact-checklist.md`](docs/playbooks/visual-artifact-checklist.md) before commit. **Diagrams** are Mermaid in `docs/README.md` and use-case `README.md` — one theme in [`docs/diagrams/mermaid_theme.py`](docs/diagrams/mermaid_theme.py); run `python docs/scripts/sync-mermaid-theme.py` after editing `MERMAID_INIT` ([`docs/playbooks/mermaid.md`](docs/playbooks/mermaid.md)).
 
 **When blocked:** state blocker → cite constraint → 2–3 options → wait. Never self-unblock on P0.
 
@@ -172,7 +172,7 @@ Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, use-c
 
 - TanStack Query = server state; Zustand = client-only; loading/empty/error on fetches; RHF + Zod; lazy routes; no tokens in `localStorage`.
 
-**Wireframes:** use-case assets under `docs/use-cases/{domain}/{use-case}/`; kit source in `docs/wireframes/*.mjs` (shared shell: `app-shell` only). Regenerate with `node docs/wireframes/generate-screens.mjs` + `docs/scripts/generate-wireframes.ps1`. **Agents:** [`wireframes/README.md` § Agent contract](docs/wireframes/README.md#agent-contract), [`wireframes.md`](docs/playbooks/wireframes.md).
+**Wireframes:** use-case assets under `docs/use-cases/{domain}/{use-case}/`; shared shell lives in `docs/wireframes/app-shell.excalidraw`. Regenerate previews with `python scripts/axis.py generate wireframes`. **Agents:** [`wireframes/README.md` § Agent contract](docs/wireframes/README.md#agent-contract), [`wireframes.md`](docs/playbooks/wireframes.md).
 
 **Cross-cutting:** forward `CancellationToken`; audit fields in Application; soft-delete on workspace aggregates; Serilog without PII; rate limit auth endpoints; CORS before auth; `/health` + `/health/ready` anonymous.
 

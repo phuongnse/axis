@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Repository maintenance CLI.
 
-Python is the source of truth for scripts in this repository. Add maintenance
-workflows as subcommands here instead of adding new shell or PowerShell scripts.
+Python is the default entrypoint for repository maintenance. Ecosystem-native
+tools may live beside their owning package when the underlying renderer or
+generator is native to that ecosystem.
 """
 
 from __future__ import annotations
@@ -235,6 +236,7 @@ TEXT_ENCODING_FILENAMES = {
     ".gitignore",
     "Dockerfile",
     "Makefile",
+    "pre-push",
 }
 TEXT_ENCODING_SKIP_PARTS = {".git", "bin", "coverage", "dist", "node_modules", "obj"}
 UTF8_BOM = b"\xef\xbb\xbf"
@@ -830,19 +832,55 @@ def check_buf_breaking_against_base(_args: argparse.Namespace | None = None) -> 
     return 0
 
 
-def check_scripts_standard(_args: argparse.Namespace | None = None) -> int:
+NON_PYTHON_UTILITY_SCRIPT_SUFFIXES = {".mjs", ".js", ".ps1", ".sh", ".cmd", ".bat"}
+DOCS_UTILITY_SCRIPT_ROOTS = (
+    Path("docs/scripts"),
+    Path("docs/wireframes"),
+    Path("docs/diagrams"),
+)
+
+
+def non_python_utility_script_issues(root: Path = ROOT) -> list[str]:
     issues: list[str] = []
-    for path in sorted(SCRIPTS.iterdir()):
+
+    def local_rel(path: Path) -> str:
+        return str(path.relative_to(root)).replace("\\", "/")
+
+    scripts_dir = root / "scripts"
+    for path in sorted(scripts_dir.iterdir()) if scripts_dir.exists() else []:
         if not path.is_file():
             continue
-        if path.suffix == ".py":
+        if path.suffix.lower() == ".py":
             continue
-        issues.append(f"{rel(path)}: top-level scripts must be Python; add a scripts/axis.py subcommand instead")
-    hook = SCRIPTS / "hooks" / "pre-push"
+        issues.append(
+            f"{local_rel(path)}: top-level scripts must be Python entrypoints; "
+            "native tooling belongs beside its owning package"
+        )
+
+    for utility_root in DOCS_UTILITY_SCRIPT_ROOTS:
+        full_root = root / utility_root
+        if not full_root.exists():
+            continue
+        for path in sorted(full_root.rglob("*")):
+            if path.is_file() and path.suffix.lower() in NON_PYTHON_UTILITY_SCRIPT_SUFFIXES:
+                issues.append(
+                    f"{local_rel(path)}: docs-level utility scripts must be Python; "
+                    "native tooling belongs beside its owning package"
+                )
+
+    hook = scripts_dir / "hooks" / "pre-push"
     if hook.is_file():
         text = hook.read_text(encoding="utf-8", errors="ignore")
+        first_line = text.splitlines()[0] if text.splitlines() else ""
+        if "python" not in first_line.lower():
+            issues.append(f"{local_rel(hook)}: pre-push hook must be a Python entrypoint")
         if "axis.py" not in text:
-            issues.append(f"{rel(hook)}: pre-push hook must delegate to scripts/axis.py")
+            issues.append(f"{local_rel(hook)}: pre-push hook must delegate to scripts/axis.py")
+    return issues
+
+
+def check_scripts_standard(_args: argparse.Namespace | None = None) -> int:
+    issues = non_python_utility_script_issues()
     if issues:
         print("check-scripts-standard FAIL:", file=sys.stderr)
         for issue in issues:
@@ -1099,7 +1137,7 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
     (
         Path("scripts/hooks/pre-push"),
         [
-            ('scripts/axis.py" pre-push', "pre-push delegates to scripts/axis.py pre-push"),
+            ('root / "scripts" / "axis.py"), "pre-push"', "pre-push delegates to scripts/axis.py pre-push"),
         ],
     ),
     (
@@ -1587,6 +1625,16 @@ def generate_api_contracts(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
+def generate_wireframes(args: argparse.Namespace) -> int:
+    command = [exe("npm"), "run", "export:wireframes", "--"]
+    if args.filter:
+        command.extend(["--filter", args.filter])
+    if args.changed:
+        command.append("--changed")
+    result = run(command, cwd=ROOT / "frontend", check=False)
+    return result.returncode
+
+
 def register_avro_schemas(args: argparse.Namespace) -> int:
     registry_url = args.schema_registry_url or os.environ.get("SCHEMA_REGISTRY_URL", "http://localhost:8081")
     dry_run = args.dry_run or bool(os.environ.get("DRY_RUN"))
@@ -1864,6 +1912,10 @@ def main(argv: list[str] | None = None) -> int:
     generate = sub.add_parser("generate")
     generate_sub = generate.add_subparsers(dest="generate_command", required=True)
     generate_sub.add_parser("api-contracts").set_defaults(func=generate_api_contracts)
+    wireframes = generate_sub.add_parser("wireframes")
+    wireframes.add_argument("-f", "--filter", default="", help="Render only paths containing this text.")
+    wireframes.add_argument("--changed", action="store_true", help="Render changed wireframes and linked wireframes.")
+    wireframes.set_defaults(func=generate_wireframes)
     write_buf = generate_sub.add_parser("buf-yaml")
     write_buf.set_defaults(func=lambda _args: module_main("sync_buf_yaml.py", ["--write"]))
     write_domain = generate_sub.add_parser("domain-readme-index")
