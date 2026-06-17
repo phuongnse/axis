@@ -1,0 +1,4 @@
+interface:
+  display_name: "Axis Visual Artifact"
+  short_description: "Update Axis wireframes and diagrams"
+  default_prompt: "Use $axis-visual-artifact to update this Axis visual artifact safely."

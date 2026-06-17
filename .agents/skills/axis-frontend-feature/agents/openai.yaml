@@ -1,0 +1,4 @@
+interface:
+  display_name: "Axis Frontend Feature"
+  short_description: "Build Axis frontend feature slices"
+  default_prompt: "Use $axis-frontend-feature to build this Axis frontend slice safely."

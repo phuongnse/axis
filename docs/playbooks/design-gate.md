@@ -2,11 +2,9 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← agent-checklist.md](./agent-checklist.md) · [← AGENTS.md](../../AGENTS.md)
 
-Defects are **born before code is written** — when the agent edits a surface without first re-deriving the rules that govern it (the response is camelCase, the endpoint must go through Application, a required-field change touches every caller, a migration needs a paired Designer). Verification only *catches* what was already written; the Design Gate stops it being written.
+The Design Gate is a required pre-code review artifact for non-trivial changes. It is not a machine-enforced CI gate; it is evidence that the agent re-derived the rules for the exact surface before editing it.
 
-The discipline: **re-derive the governing rules for the exact surface you are about to touch, before touching it** — the rigor an independent reviewer applies, applied up front.
-
-> **This gate fails the same way "Verification gate green" fails** — by being ticked, not done. So it is **artifact-producing**, not a feeling: you quote rules with `file:section`, you paste the blast-radius `grep`, you name the contract. "I thought carefully" is not a Design Gate.
+For repeatable execution, use `$axis-design-gate`.
 
 ---
 
@@ -22,7 +20,7 @@ When unsure which tier, treat it as the higher one.
 
 ---
 
-## The dossier (produce these artifacts, not prose)
+## Dossier
 
 For each surface you touch, before coding:
 
@@ -58,14 +56,8 @@ Present the dossier through **plan mode** and **do not write code until the user
 
 ---
 
-## Close the loop (after implementing)
+## Close The Loop
 
 1. **Self-review the diff against the dossier** — was every governing rule honored, every caller in the blast radius updated, the contract emitted as decided?
 2. **Run the local gate before review** — `python scripts/axis.py verify` runs build, vulnerable package scan, format, unit test projects, frontend checks, policy tests, and doc drift. The pre-push hook is only a quick policy/doc sanity gate for ordinary network pushes. CI/branch protection is the required full gate and runs full `dotnet test` including Testcontainers before merge. "Build passed" ≠ "PR is mergeable" — formatting, integration, and casing only fully surface in the CI gate. See [agent-checklist § Verification Gate](./agent-checklist.md#verification-gate--verify-before-pr-review) and [pr-slicing § Verification Gate Honesty](./pr-slicing.md#verification-gate-honesty).
 3. If you claim the **full suite** ran locally, that means full `dotnet test Axis.sln` ran — including the integration tests. Docker is required for that full local run; if Docker is unavailable, rely on CI for the authoritative full gate instead of presenting a partial run as full.
-
----
-
-## Why this is the root fix
-
-The failures this gate targets were not unknown rules — they were rules **not re-derived at the moment of editing**. CodeRabbit catches them because it re-reads the repo with fresh context every time; the Design Gate moves that same rigor to **before** the code exists, where the fix is free instead of a review round-trip.

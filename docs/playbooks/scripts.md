@@ -13,6 +13,7 @@ ecosystem, such as Excalidraw SVG export in `frontend/scripts/`.
 python scripts/axis.py doctor
 python scripts/axis.py verify
 python scripts/axis.py check policy-tests
+python scripts/axis.py check codex-skills
 python scripts/axis.py check text-encoding
 python scripts/axis.py check doc-drift
 python scripts/axis.py check scripts-standard
@@ -38,6 +39,12 @@ python scripts/axis.py register avro-schemas --dry-run
   its entrypoint must be Python and delegate to `scripts/axis.py pre-push`.
 - Use Python JSON/path/process APIs instead of shell string manipulation when parsing
   Markdown, OpenAPI, Avro, YAML-like config, or Git output.
+- Repo-scoped Codex skills under `.agents/skills/` must have valid `SKILL.md`
+  frontmatter, concise bodies, concrete wording, existing doc references, required
+  skill chaining, matching UI metadata, and a default prompt that invokes the
+  skill by `$skill-name`.
 
 `python scripts/axis.py check scripts-standard` enforces the no-ad-hoc-script
 rule and is included in doc drift.
+`python scripts/axis.py check codex-skills` enforces repo-scoped skill structure
+and is included in doc drift.

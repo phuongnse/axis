@@ -1,0 +1,4 @@
+interface:
+  display_name: "Axis Cross Module Contract"
+  short_description: "Wire Axis cross-module contracts"
+  default_prompt: "Use $axis-cross-module-contract to change this Axis cross-module contract safely."
