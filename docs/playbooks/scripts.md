@@ -7,6 +7,30 @@ commands. Prefer Python for repo-level policy, docs checks, and orchestration.
 Use ecosystem-native tooling when the underlying tool is native to that
 ecosystem, such as Excalidraw SVG export in `frontend/scripts/`.
 
+## Tool Versions
+
+Application/runtime versions live in [TECH_STACK.md](../TECH_STACK.md) and
+manifest files such as [`frontend/.nvmrc`](../../frontend/.nvmrc). This section
+owns repo-maintenance CLI versions that are used by `scripts/axis.py` and CI.
+Local tools must match the documented version instead of adapting config at
+runtime.
+
+| Tool | Required version | Used by | Notes |
+|---|---:|---|---|
+| Lychee | `0.23.0` exactly | `python scripts/axis.py check markdown-links`, CI Markdown link check | `lychee.toml` is written for the 0.23 config schema. `lychee --version` must print `lychee 0.23.0`; newer versions fail fast until this row and config are intentionally upgraded together. |
+| Buf CLI | `1.50.0` | CI protobuf lint/breaking checks; local `python scripts/axis.py check buf-breaking-against-base` | Keep local `buf` aligned with the CI setup action when debugging protobuf failures. |
+
+Install Lychee from the upstream release for `v0.23.0`, or via Cargo if Rust is
+already available:
+
+```bash
+cargo install lychee --version 0.23.0 --locked --force
+lychee --version
+```
+
+If `lychee --version` reports another version, fix `PATH` or reinstall before
+running the markdown link check.
+
 ## Commands
 
 ```bash

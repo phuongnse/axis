@@ -29,6 +29,9 @@ or pattern docs.
   `npm run test`), OpenAPI TypeScript generation, and wireframe export. The
   compose web container has its own Node runtime, but local verification expects
   `node` and `npm` on `PATH`.
+- **Lychee** - required for markdown link verification. Use the exact version in
+  [scripts.md § Tool Versions](./scripts.md#tool-versions); `python scripts/axis.py check markdown-links`
+  fails when `lychee` is missing from `PATH` or reports a different version.
 - **Docker** — Docker Engine + Compose v2.
   Run canonical commands from the repo root. If Docker is not visible from the
   current execution context, use [Environment adapters](#environment-adapters).
@@ -50,7 +53,7 @@ python scripts/axis.py doctor
 ```
 
 It checks the repo root, Python launcher, PyYAML, Git, .NET SDK, Node, npm,
-Docker CLI, Docker Compose, the active Docker endpoint, and known adapter
+Lychee, Docker CLI, Docker Compose, the active Docker endpoint, and known adapter
 probes.
 
 Use strict mode when you want the command to fail on blocking local-dev issues:

@@ -1,5 +1,6 @@
 # Lychee config — shared between local dev and CI so they agree.
-# Run locally:  lychee --config ./lychee.toml './**/*.md'
+# Required version: 0.23.0 (owner: docs/playbooks/scripts.md#tool-versions).
+# Run locally:  python scripts/axis.py check markdown-links
 # Docs:         https://lychee.cli.rs/usage/config/
 
 # Offline: resolve only local files and anchors. External http(s) is checked

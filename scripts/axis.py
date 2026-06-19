@@ -18,7 +18,6 @@ import re
 import shutil
 import subprocess
 import sys
-import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -30,6 +29,7 @@ sys.dont_write_bytecode = True
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
+REQUIRED_LYCHEE_VERSION = "0.23.0"
 
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
@@ -1439,6 +1439,7 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
             ("run: python scripts/axis.py check policy-tests", "policy gate tests run in CI"),
             ("run: python scripts/axis.py check doc-drift", "doc drift runs in CI"),
             ("uses: lycheeverse/lychee-action", "markdown link check runs in CI"),
+            ("lycheeVersion: v0.23.0", "markdown link check pins the documented Lychee version"),
             ("args: --config ./lychee.toml './**/*.md'", "markdown link check uses shared lychee config"),
             ("BASE_BRANCH: main", "doc drift compares against main"),
         ],
@@ -1806,19 +1807,30 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
 
 
 def find_lychee() -> str | None:
-    found = shutil.which("lychee")
-    if found:
-        return found
-
-    executable = "lychee.exe" if os.name == "nt" else "lychee"
-    cargo_bin = Path.home() / ".cargo" / "bin" / executable
-    if cargo_bin.is_file() and os.access(cargo_bin, os.X_OK):
-        return str(cargo_bin)
-    return None
+    return shutil.which("lychee")
 
 
-def run_lychee_markdown_check(lychee: str, config: str) -> subprocess.CompletedProcess[str]:
-    return run([lychee, "--config", config, "./**/*.md"], capture=True, check=False)
+def lychee_version_status(lychee: str) -> tuple[bool, str]:
+    result = run_optional([lychee, "--version"])
+    if result is None:
+        return False, f"{lychee} is not executable"
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()
+        return False, detail or f"{lychee} --version exited with {result.returncode}"
+
+    first_line = (result.stdout or result.stderr or "").strip().splitlines()
+    version_line = first_line[0] if first_line else ""
+    expected = f"lychee {REQUIRED_LYCHEE_VERSION}"
+    if version_line != expected:
+        return (
+            False,
+            f"found `{version_line or 'unknown'}` at {lychee}; expected `{expected}`",
+        )
+    return True, f"{version_line} ({lychee})"
+
+
+def run_lychee_markdown_check(lychee: str) -> subprocess.CompletedProcess[str]:
+    return run([lychee, "--config", "./lychee.toml", "./**/*.md"], capture=True, check=False)
 
 
 def emit_captured_process(result: subprocess.CompletedProcess[str]) -> None:
@@ -1828,28 +1840,25 @@ def emit_captured_process(result: subprocess.CompletedProcess[str]) -> None:
         print(result.stderr, end="", file=sys.stderr)
 
 
-def retry_lychee_with_anchor_only_config(lychee: str) -> subprocess.CompletedProcess[str]:
-    original = (ROOT / "lychee.toml").read_text(encoding="utf-8")
-    adapted = original.replace("include_fragments = true", 'include_fragments = "anchor-only"')
-    with tempfile.TemporaryDirectory(prefix="axis-lychee-") as temp:
-        config = Path(temp) / "lychee.toml"
-        config.write_text(adapted, encoding="utf-8")
-        return run_lychee_markdown_check(lychee, str(config))
-
-
 def check_markdown_links(_args: argparse.Namespace | None = None) -> int:
     lychee = find_lychee()
     if lychee is None:
         print(
-            "check-markdown-links: lychee is required. "
-            "Install lychee, then run `python scripts/axis.py check markdown-links` again.",
+            f"check-markdown-links: Lychee {REQUIRED_LYCHEE_VERSION} is required, "
+            "but `lychee` was not found in PATH. See docs/playbooks/scripts.md#tool-versions.",
             file=sys.stderr,
         )
         return 1
-    result = run_lychee_markdown_check(lychee, "./lychee.toml")
-    output = f"{result.stdout or ''}\n{result.stderr or ''}"
-    if result.returncode == 3 and "include_fragments" in output and "wanted string or table" in output:
-        result = retry_lychee_with_anchor_only_config(lychee)
+    version_ok, version_detail = lychee_version_status(lychee)
+    if not version_ok:
+        print(
+            f"check-markdown-links: Lychee {REQUIRED_LYCHEE_VERSION} is required; {version_detail}. "
+            "Install the documented version or put it earlier in PATH. "
+            "See docs/playbooks/scripts.md#tool-versions.",
+            file=sys.stderr,
+        )
+        return 1
+    result = run_lychee_markdown_check(lychee)
     emit_captured_process(result)
     return result.returncode
 
@@ -2160,6 +2169,18 @@ def doctor(args: argparse.Namespace) -> int:
 
     yaml_status, yaml_detail = _python_module_version("yaml", "PyYAML")
     record(yaml_status, "python package PyYAML", f"{yaml_detail}; required for skill-creator quick_validate.py")
+
+    lychee = find_lychee()
+    if lychee is None:
+        record(
+            "FAIL",
+            "lychee",
+            f"Lychee {REQUIRED_LYCHEE_VERSION} is required for markdown link checks; "
+            "install it on PATH per docs/playbooks/scripts.md#tool-versions",
+        )
+    else:
+        lychee_ok, lychee_detail = lychee_version_status(lychee)
+        record("OK" if lychee_ok else "FAIL", "lychee", lychee_detail)
 
     for name, version_args in (
         ("git", ("--version",)),

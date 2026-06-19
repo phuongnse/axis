@@ -617,20 +617,6 @@ class TestVulnerablePackageGate(unittest.TestCase):
 
 
 class TestMarkdownLinkGate(unittest.TestCase):
-    def test_finds_cargo_installed_lychee(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            home = Path(temp)
-            cargo_lychee = home / ".cargo" / "bin" / "lychee"
-            cargo_lychee.parent.mkdir(parents=True)
-            cargo_lychee.write_text("#!/bin/sh\n", encoding="utf-8")
-            cargo_lychee.chmod(0o755)
-
-            with (
-                mock.patch.object(axis.shutil, "which", return_value=None),
-                mock.patch.object(axis.Path, "home", return_value=home),
-            ):
-                self.assertEqual(str(cargo_lychee), axis.find_lychee())
-
     def test_runs_lychee_with_shared_config(self) -> None:
         calls: list[list[str]] = []
 
@@ -640,38 +626,42 @@ class TestMarkdownLinkGate(unittest.TestCase):
 
         with (
             mock.patch.object(axis, "find_lychee", return_value="/usr/bin/lychee"),
+            mock.patch.object(
+                axis,
+                "run_optional",
+                return_value=axis.subprocess.CompletedProcess(
+                    ["/usr/bin/lychee", "--version"],
+                    0,
+                    stdout="lychee 0.23.0\n",
+                    stderr="",
+                ),
+            ),
             mock.patch.object(axis, "run", side_effect=fake_run),
         ):
             self.assertEqual(0, axis.check_markdown_links())
 
         self.assertEqual([["/usr/bin/lychee", "--config", "./lychee.toml", "./**/*.md"]], calls)
 
-    def test_retries_with_new_fragment_config_for_lychee_024(self) -> None:
-        calls: list[list[str]] = []
-
-        def fake_run(args: list[str], **_kwargs):
-            calls.append(args)
-            if args[2] == "./lychee.toml":
-                return axis.subprocess.CompletedProcess(
-                    args,
-                    3,
-                    stdout="",
-                    stderr="wanted string or table for include_fragments",
-                )
-            adapted_config = Path(args[2]).read_text(encoding="utf-8")
-            self.assertIn('include_fragments = "anchor-only"', adapted_config)
-            return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
-
+    def test_fails_when_lychee_version_is_wrong(self) -> None:
         with (
             mock.patch.object(axis, "find_lychee", return_value="/usr/bin/lychee"),
-            mock.patch.object(axis, "run", side_effect=fake_run),
-            contextlib.redirect_stdout(io.StringIO()),
-            contextlib.redirect_stderr(io.StringIO()),
+            mock.patch.object(
+                axis,
+                "run_optional",
+                return_value=axis.subprocess.CompletedProcess(
+                    ["/usr/bin/lychee", "--version"],
+                    0,
+                    stdout="lychee 0.24.2\n",
+                    stderr="",
+                ),
+            ),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
         ):
-            self.assertEqual(0, axis.check_markdown_links())
+            self.assertEqual(1, axis.check_markdown_links())
 
-        self.assertEqual("./lychee.toml", calls[0][2])
-        self.assertNotEqual("./lychee.toml", calls[1][2])
+        output = stderr.getvalue()
+        self.assertIn("Lychee 0.23.0 is required", output)
+        self.assertIn("found `lychee 0.24.2`", output)
 
     def test_fails_when_lychee_is_missing(self) -> None:
         with (
@@ -680,7 +670,7 @@ class TestMarkdownLinkGate(unittest.TestCase):
         ):
             self.assertEqual(1, axis.check_markdown_links())
 
-        self.assertIn("lychee is required", stderr.getvalue())
+        self.assertIn("Lychee 0.23.0 is required", stderr.getvalue())
 
 
 class TestVerifyGate(unittest.TestCase):

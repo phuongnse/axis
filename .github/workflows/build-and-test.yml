@@ -254,9 +254,11 @@ jobs:
       # Lychee runs in offline mode (configured in lychee.toml): resolves
       # local file paths and #anchors only. External http(s) is intentionally
       # not blocking — third-party rot is real but doesn't belong in PR CI.
+      # Version owner: docs/playbooks/scripts.md#tool-versions.
       - name: Lychee — verify internal links and anchors
         uses: lycheeverse/lychee-action@8646ba30535128ac92d33dfc9133794bfdd9b411 # v2.8.0
         with:
+          lycheeVersion: v0.23.0
           args: --config ./lychee.toml './**/*.md'
           fail: true
 
