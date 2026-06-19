@@ -63,7 +63,7 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 > - `WorkspaceSchemaInterceptorTests` (two schemas, no cross-read). `HttpWorkspaceContext` on `Axis.Api`
 > - `FixedWorkspaceContext` in Wolverine provision handlers.
 > - cross-workspace API integration tests (`WorkspaceIsolationEndpointTests` — DataModeling list/get by id and archived-workspace 403)
-> - connection-pool safety documented in [patterns.md](../../../playbooks/patterns.md) (`search_path` set on every `ConnectionOpened`, including pooled reconnects).
+> - connection-pool safety documented in [persistence patterns](../../../playbooks/persistence-patterns.md#multi-workspace-isolation-pitfalls) (`search_path` set on every `ConnectionOpened`, including pooled reconnects).
 >
 > **Gaps vs spec:** none for backend schema-per-workspace isolation. Workspace-scoped data never lives in `public` by design (module tables only in `workspace_{WorkspaceId:N}`); no separate runtime guard beyond schema isolation.
 >
@@ -78,4 +78,3 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

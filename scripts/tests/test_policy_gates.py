@@ -440,6 +440,43 @@ Ship user value.
         self.assertFalse(changed)
         self.assertIn(["git", "merge-base", "origin/main", "HEAD"], calls)
 
+    def test_changed_paths_against_base_include_working_tree_and_untracked(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            calls: list[list[str]] = []
+            outputs = {
+                ("git", "rev-parse", "--verify", "origin/main"): "",
+                ("git", "diff", "--name-only", "origin/main...HEAD"): "docs/use-cases/a/README.md\n",
+                ("git", "diff", "--name-only", "--cached"): "docs/use-cases/b/README.md\n",
+                ("git", "diff", "--name-only"): "docs/use-cases/c/README.md\n",
+                ("git", "ls-files", "--others", "--exclude-standard"): "docs/use-cases/d/README.md\n",
+            }
+
+            def fake_run(args: list[str], **_kwargs):
+                calls.append(args)
+                stdout = outputs.get(tuple(args), "")
+                return check_use_case_docs.subprocess.CompletedProcess(args, 0, stdout=stdout)
+
+            original_root = check_use_case_docs.ROOT
+            check_use_case_docs.ROOT = Path(temp)
+            try:
+                with mock.patch.object(check_use_case_docs.subprocess, "run", side_effect=fake_run):
+                    paths = check_use_case_docs.changed_paths_against_base()
+            finally:
+                check_use_case_docs.ROOT = original_root
+
+        self.assertEqual(
+            [
+                root / "docs" / "use-cases" / "a" / "README.md",
+                root / "docs" / "use-cases" / "b" / "README.md",
+                root / "docs" / "use-cases" / "c" / "README.md",
+                root / "docs" / "use-cases" / "d" / "README.md",
+            ],
+            paths,
+        )
+        self.assertIn(["git", "diff", "--name-only"], calls)
+        self.assertIn(["git", "ls-files", "--others", "--exclude-standard"], calls)
+
 
 class TestDocDriftRatchets(unittest.TestCase):
     def issue_text(self, rows: list[tuple[str, str]]) -> str:
@@ -470,8 +507,351 @@ class TestDocDriftRatchets(unittest.TestCase):
         self.assertIn("Machine-specific local path introduced", issues)
 
     def test_accepts_placeholder_paths_in_docs(self) -> None:
-        issues = axis.doc_drift_added_line_issues([("docs/playbooks/local-dev.md", "cd /path/to/axis && docker compose up -d")])
+        issues = axis.doc_drift_added_line_issues([("docs/playbooks/local-dev.md", "cd <repo-root> && docker compose up -d")])
         self.assertEqual([], issues)
+
+
+class TestWorkingTreeDiffHelpers(unittest.TestCase):
+    def fake_git_run(self, outputs: dict[tuple[str, ...], str]):
+        def fake_run(args: list[str], **_kwargs):
+            key = tuple(args[1:] if args and args[0] == "git" else args)
+            stdout = outputs.get(key, "")
+            return axis.subprocess.CompletedProcess(args, 0, stdout=stdout, stderr="")
+
+        return fake_run
+
+    def test_changed_paths_include_committed_staged_unstaged_and_untracked(self) -> None:
+        outputs = {
+            ("diff", "--name-only", "base...HEAD"): "docs/committed.md\n",
+            ("diff", "--name-only", "--cached"): "docs/staged.md\n",
+            ("diff", "--name-only"): "docs/unstaged.md\n",
+            ("ls-files", "--others", "--exclude-standard"): "docs/untracked.md\n",
+        }
+
+        with (
+            mock.patch.object(axis, "exe", side_effect=lambda name: name),
+            mock.patch.object(axis, "run", side_effect=self.fake_git_run(outputs)),
+        ):
+            paths = axis.changed_paths("base...HEAD")
+
+        self.assertEqual(
+            ["docs/committed.md", "docs/staged.md", "docs/unstaged.md", "docs/untracked.md"],
+            paths,
+        )
+
+    def test_changed_name_status_marks_untracked_files_added(self) -> None:
+        outputs = {
+            ("diff", "--name-status", "base...HEAD"): "M\tdocs/committed.md\n",
+            ("diff", "--name-status", "--cached"): "A\tdocs/staged.md\n",
+            ("diff", "--name-status"): "M\tdocs/unstaged.md\n",
+            ("ls-files", "--others", "--exclude-standard"): "docs/untracked.md\n",
+        }
+
+        with (
+            mock.patch.object(axis, "exe", side_effect=lambda name: name),
+            mock.patch.object(axis, "run", side_effect=self.fake_git_run(outputs)),
+        ):
+            changes = axis.changed_name_status("base...HEAD")
+
+        self.assertEqual(
+            [
+                ["M", "docs/committed.md"],
+                ["A", "docs/staged.md"],
+                ["M", "docs/unstaged.md"],
+                ["A", "docs/untracked.md"],
+            ],
+            changes,
+        )
+
+    def test_added_lines_include_working_tree_and_untracked_content(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            untracked = root / "docs" / "untracked.md"
+            untracked.parent.mkdir(parents=True)
+            untracked.write_text("untracked line\n", encoding="utf-8")
+
+            outputs = {
+                ("diff", "--unified=0", "base...HEAD"): "+++ b/docs/committed.md\n++++heading\n+committed line\n",
+                ("diff", "--unified=0", "--cached"): "+++ b/docs/staged.md\n+staged line\n",
+                ("diff", "--unified=0"): "+++ b/docs/unstaged.md\n+unstaged line\n",
+                ("ls-files", "--others", "--exclude-standard"): "docs/untracked.md\n",
+            }
+
+            with (
+                mock.patch.object(axis, "ROOT", root),
+                mock.patch.object(axis, "exe", side_effect=lambda name: name),
+                mock.patch.object(axis, "run", side_effect=self.fake_git_run(outputs)),
+            ):
+                rows = list(axis.added_lines("base...HEAD", lambda _path: True))
+
+        self.assertEqual(
+            [
+                ("docs/committed.md", "+++heading"),
+                ("docs/committed.md", "committed line"),
+                ("docs/staged.md", "staged line"),
+                ("docs/unstaged.md", "unstaged line"),
+                ("docs/untracked.md", "untracked line"),
+            ],
+            rows,
+        )
+
+
+class TestVulnerablePackageGate(unittest.TestCase):
+    def test_uses_absolute_solution_path_for_dotnet_list(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(args: list[str], **_kwargs):
+            calls.append(args)
+            return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+        with (
+            mock.patch.object(axis, "check_dotnet_sdk", return_value=0),
+            mock.patch.object(axis, "exe", side_effect=lambda name: name),
+            mock.patch.object(axis, "run", side_effect=fake_run),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.check_vulnerable_packages())
+
+        self.assertEqual("dotnet", calls[0][0])
+        self.assertEqual(str(axis.ROOT / "Axis.sln"), calls[0][2])
+        self.assertTrue(Path(calls[0][2]).is_absolute())
+
+
+class TestToolVersionGates(unittest.TestCase):
+    def test_dotnet_sdk_rejects_global_json_major_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            global_json = Path(temp) / "global.json"
+            global_json.write_text(
+                '{"sdk":{"version":"9.0.100","rollForward":"latestFeature"}}\n',
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(axis, "GLOBAL_JSON_PATH", global_json):
+                ok, detail = axis.dotnet_sdk_status()
+
+        self.assertFalse(ok)
+        self.assertIn("selects .NET SDK 9.x", detail)
+        self.assertIn("expected 8.x", detail)
+
+    def test_dotnet_sdk_rejects_wrong_major(self) -> None:
+        with mock.patch.object(
+            axis,
+            "command_version_line",
+            return_value=(True, "9.0.100", "/usr/bin/dotnet"),
+        ):
+            ok, detail = axis.dotnet_sdk_status()
+
+        self.assertFalse(ok)
+        self.assertIn("expected .NET SDK 8.x", detail)
+        self.assertIn("docs/TECH_STACK.md", detail)
+
+    def test_frontend_toolchain_rejects_wrong_node_major(self) -> None:
+        with (
+            mock.patch.object(axis, "required_node_major", return_value=(True, "22")),
+            mock.patch.object(
+                axis,
+                "command_version_line",
+                return_value=(True, "v24.13.0", "/usr/bin/node"),
+            ),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(1, axis.check_frontend_toolchain())
+
+        self.assertIn("expected Node 22.x", stderr.getvalue())
+        self.assertIn("frontend/.nvmrc", stderr.getvalue())
+
+    def test_buf_cli_rejects_wrong_version(self) -> None:
+        with (
+            mock.patch.object(axis, "find_buf", return_value="/usr/bin/buf"),
+            mock.patch.object(
+                axis,
+                "run_optional",
+                return_value=axis.subprocess.CompletedProcess(
+                    ["/usr/bin/buf", "--version"],
+                    0,
+                    stdout="1.51.0\n",
+                    stderr="",
+                ),
+            ),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(1, axis.check_buf_cli())
+
+        output = stderr.getvalue()
+        self.assertIn("Buf CLI 1.50.0 is required", output)
+        self.assertIn("found `1.51.0`", output)
+
+    def test_buf_lint_runs_through_version_checked_wrapper(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(args: list[str], **_kwargs):
+            calls.append(args)
+            return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+        with (
+            mock.patch.object(axis, "find_buf", return_value="/usr/bin/buf"),
+            mock.patch.object(
+                axis,
+                "run_optional",
+                return_value=axis.subprocess.CompletedProcess(
+                    ["/usr/bin/buf", "--version"],
+                    0,
+                    stdout="1.50.0\n",
+                    stderr="",
+                ),
+            ),
+            mock.patch.object(axis, "run", side_effect=fake_run),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.check_buf_lint())
+
+        self.assertEqual([["/usr/bin/buf", "lint"]], calls)
+
+    def test_buf_breaking_rejects_wrong_version_before_running_buf(self) -> None:
+        with (
+            mock.patch.dict(axis.os.environ, {"BASE_REF": "origin/main"}, clear=False),
+            mock.patch.object(axis, "ref_exists", return_value=True),
+            mock.patch.object(axis, "find_buf", return_value="/usr/bin/buf"),
+            mock.patch.object(
+                axis,
+                "run_optional",
+                return_value=axis.subprocess.CompletedProcess(
+                    ["/usr/bin/buf", "--version"],
+                    0,
+                    stdout="1.51.0\n",
+                    stderr="",
+                ),
+            ),
+            mock.patch.object(axis, "run") as run_mock,
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(1, axis.check_buf_breaking_against_base())
+
+        run_mock.assert_not_called()
+        self.assertIn("Buf CLI 1.50.0 is required", stderr.getvalue())
+
+
+class TestMarkdownLinkGate(unittest.TestCase):
+    def test_runs_lychee_with_shared_config(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(args: list[str], **_kwargs):
+            calls.append(args)
+            return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+        with (
+            mock.patch.object(axis, "find_lychee", return_value="/usr/bin/lychee"),
+            mock.patch.object(
+                axis,
+                "run_optional",
+                return_value=axis.subprocess.CompletedProcess(
+                    ["/usr/bin/lychee", "--version"],
+                    0,
+                    stdout="lychee 0.23.0\n",
+                    stderr="",
+                ),
+            ),
+            mock.patch.object(axis, "run", side_effect=fake_run),
+        ):
+            self.assertEqual(0, axis.check_markdown_links())
+
+        self.assertEqual([["/usr/bin/lychee", "--config", "./lychee.toml", "./**/*.md"]], calls)
+
+    def test_fails_when_lychee_version_is_wrong(self) -> None:
+        with (
+            mock.patch.object(axis, "find_lychee", return_value="/usr/bin/lychee"),
+            mock.patch.object(
+                axis,
+                "run_optional",
+                return_value=axis.subprocess.CompletedProcess(
+                    ["/usr/bin/lychee", "--version"],
+                    0,
+                    stdout="lychee 0.24.2\n",
+                    stderr="",
+                ),
+            ),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(1, axis.check_markdown_links())
+
+        output = stderr.getvalue()
+        self.assertIn("Lychee 0.23.0 is required", output)
+        self.assertIn("found `lychee 0.24.2`", output)
+
+    def test_fails_when_lychee_is_missing(self) -> None:
+        with (
+            mock.patch.object(axis, "find_lychee", return_value=None),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(1, axis.check_markdown_links())
+
+        self.assertIn("Lychee 0.23.0 is required", stderr.getvalue())
+
+
+class TestVerifyGate(unittest.TestCase):
+    def test_runs_markdown_links_for_markdown_changes(self) -> None:
+        calls: list[str] = []
+
+        with (
+            mock.patch.object(axis, "diff_range", return_value="base...HEAD"),
+            mock.patch.object(axis, "changed_paths", return_value=["docs/example.md"]),
+            mock.patch.object(axis, "check_markdown_links", side_effect=lambda: calls.append("markdown-links") or 0),
+            mock.patch.object(axis, "check_policy_tests", side_effect=lambda: calls.append("policy-tests") or 0),
+            mock.patch.object(axis, "check_doc_drift", side_effect=lambda: calls.append("doc-drift") or 0),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.verify(object()))
+
+        self.assertEqual(["markdown-links", "policy-tests", "doc-drift"], calls)
+
+    def test_skips_markdown_links_for_non_markdown_changes(self) -> None:
+        calls: list[str] = []
+
+        with (
+            mock.patch.object(axis, "diff_range", return_value="base...HEAD"),
+            mock.patch.object(axis, "changed_paths", return_value=["scripts/tool.py"]),
+            mock.patch.object(axis, "check_markdown_links", side_effect=lambda: calls.append("markdown-links") or 0),
+            mock.patch.object(axis, "check_policy_tests", side_effect=lambda: calls.append("policy-tests") or 0),
+            mock.patch.object(axis, "check_doc_drift", side_effect=lambda: calls.append("doc-drift") or 0),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.verify(object()))
+
+        self.assertEqual(["policy-tests", "doc-drift"], calls)
+
+    def test_runs_frontend_toolchain_before_frontend_commands(self) -> None:
+        calls: list[str] = []
+
+        def fake_run(args: list[str], **_kwargs):
+            if args[1:3] == ["run", "ci"]:
+                calls.append("npm run ci")
+            elif args[1:3] == ["run", "test"]:
+                calls.append("npm run test")
+            else:
+                calls.append(" ".join(args[:3]))
+            return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+        with (
+            mock.patch.object(axis, "diff_range", return_value="base...HEAD"),
+            mock.patch.object(axis, "changed_paths", return_value=["frontend/src/App.tsx"]),
+            mock.patch.object(axis, "check_frontend_toolchain", side_effect=lambda: calls.append("frontend-toolchain") or 0),
+            mock.patch.object(axis, "run", side_effect=fake_run),
+            mock.patch.object(axis, "check_policy_tests", side_effect=lambda: calls.append("policy-tests") or 0),
+            mock.patch.object(axis, "check_doc_drift", side_effect=lambda: calls.append("doc-drift") or 0),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.verify(object()))
+
+        self.assertEqual(
+            [
+                "frontend-toolchain",
+                "npm run ci",
+                "npm run test",
+                "policy-tests",
+                "doc-drift",
+            ],
+            calls,
+        )
 
 
 class TestFrontendRadiusTokens(unittest.TestCase):
@@ -890,6 +1270,18 @@ class TestEnforcementTruthAudit(unittest.TestCase):
 
         self.assertIn("doc drift runs in CI", "\n".join(issues))
 
+    def test_rejects_local_verify_without_markdown_links(self) -> None:
+        def mutate(files: dict[Path, str]) -> None:
+            script = Path("scripts/axis.py")
+            files[script] = files[script].replace('step("markdown links", lambda: check_markdown_links())\n', "")
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_truth_repo(root, mutate)
+            issues = axis.enforcement_truth_audit_issues(root=root)
+
+        self.assertIn("local verify runs markdown link check", "\n".join(issues))
+
     def test_rejects_missing_pre_push_quick_gate_delegate(self) -> None:
         def mutate(files: dict[Path, str]) -> None:
             hook = Path("scripts/hooks/pre-push")
@@ -973,6 +1365,34 @@ class TestTextEncodingGate(unittest.TestCase):
     def test_current_repository_text_encoding_still_passes(self) -> None:
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(0, axis.check_text_encoding())
+
+
+class TestDocSizeBudgetGate(unittest.TestCase):
+    def issues_for_files(self, files: dict[str, str]) -> list[str]:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for relative, content in files.items():
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+            return axis.doc_size_budget_issues(root=root)
+
+    def test_rejects_overlong_pattern_router(self) -> None:
+        issues = self.issues_for_files(
+            {"docs/playbooks/patterns.md": "\n".join("line" for _ in range(151))}
+        )
+
+        self.assertIn("150-line docs budget", "\n".join(issues))
+
+    def test_rejects_overlong_playbook(self) -> None:
+        issues = self.issues_for_files(
+            {"docs/playbooks/api-patterns.md": "\n".join("line" for _ in range(301))}
+        )
+
+        self.assertIn("300-line docs budget", "\n".join(issues))
+
+    def test_current_repository_doc_size_budgets_still_pass(self) -> None:
+        self.assertEqual([], axis.doc_size_budget_issues())
 
 
 class TestScriptsStandardGate(unittest.TestCase):

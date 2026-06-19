@@ -19,7 +19,7 @@ Change an Axis API surface without drifting from module boundaries, auth default
    - `AGENTS.md`
    - `docs/playbooks/design-gate.md`
    - `docs/playbooks/agent-checklist.md`
-   - `docs/playbooks/patterns.md`
+   - `docs/playbooks/api-patterns.md`
    - `docs/playbooks/repo-layout-discovery.md`
    - `docs/playbooks/frontend.md` when the SPA consumes the contract
    - The owning use-case file when behavior or status changes

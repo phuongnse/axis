@@ -10,9 +10,19 @@ public sealed class ExportWorkflowHandler(IWorkflowRepository workflowRepo)
 {
     private static readonly string[] SensitivePatterns =
     [
-        "token", "api_key", "apikey", "secret", "password", "authorization",
-        "auth_token", "hmac_secret", "client_secret", "private_key", "bearer",
-        "access_token", "refresh_token"
+        "token",
+        "api_key",
+        "apikey",
+        "secret",
+        "password",
+        "authorization",
+        "auth_token",
+        "hmac_secret",
+        "client_secret",
+        "private_key",
+        "bearer",
+        "access_token",
+        "refresh_token"
     ];
 
     public async Task<WorkflowExportDto?> Handle(ExportWorkflowQuery query, CancellationToken cancellationToken)

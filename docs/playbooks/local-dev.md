@@ -6,38 +6,52 @@ The full dev stack runs from one `docker compose up -d`: **Postgres**, **Redis**
 
 **Canonical port list:** [`docker-compose.yml`](../../docker-compose.yml) is the source of truth; this doc explains how to use it. CI runs `python scripts/axis.py check local-dev-docs` to catch drift.
 
+**Environment contract:** Project docs own repo-root commands, compose services,
+ports, and verification commands. Environment adapters below only make that
+baseline reachable from the current execution context; do not add personal
+paths, agent sandbox flags, or environment-specific workarounds to feature specs
+or pattern docs.
+
 ---
 
 ## Prerequisites
 
 - **Python 3** - repo maintenance commands run through `python scripts/axis.py ...`.
-  If a shell cannot resolve `python`, fix PATH before using repo scripts.
+  If `python` cannot resolve, fix `PATH` before using repo scripts.
 - **PyYAML** - Python package required by skill-creator `quick_validate.py`
   when editing repo-scoped Codex skills under `.agents/skills/`. Install it
   into the same Python that runs repo scripts:
   `python -m pip install PyYAML`.
-- **.NET SDK 8.x** - required for host-side `dotnet build`, `dotnet test`,
-  `dotnet format`, EF migrations, and API contract generation. The compose API
-  container has its own SDK, but local verification expects `dotnet` on `PATH`.
-- **Node.js + npm** - required for host-side frontend checks (`npm run ci`,
+- **.NET SDK 8.x** - required for repo verification (`dotnet build`, `dotnet test`,
+  `dotnet format`), EF migrations, and API contract generation. The compose API
+  container has its own SDK, but local verification expects `dotnet` on `PATH`
+  and fails before running .NET commands when [`global.json`](../../global.json)
+  or `dotnet --version` is not 8.x.
+- **Node.js + npm** - required for repo verification (`npm run ci`,
   `npm run test`), OpenAPI TypeScript generation, and wireframe export. The
   compose web container has its own Node runtime, but local verification expects
-  `node` and `npm` on `PATH`.
+  `node` and `npm` on `PATH`. The Node major must match
+  [`frontend/.nvmrc`](../../frontend/.nvmrc).
+- **Buf CLI** - required for protobuf lint/breaking verification. Use the exact
+  version in [scripts.md § Tool Versions](./scripts.md#tool-versions); local
+  protobuf commands fail when `buf` is missing from `PATH` or reports a
+  different version.
+- **Lychee** - required for markdown link verification. Use the exact version in
+  [scripts.md § Tool Versions](./scripts.md#tool-versions); `python scripts/axis.py check markdown-links`
+  fails when `lychee` is missing from `PATH` or reports a different version.
 - **Docker** — Docker Engine + Compose v2.
-  - **Linux / macOS:** run commands from the repo root.
-  - **Windows:** use the Docker endpoint available to your shell when `docker info` works. If it does not, but Docker Engine lives inside WSL2, run compose commands from WSL (`wsl -- bash -lc "cd /path/to/axis && …"`) or open a WSL shell and `cd` there.
-- **Windows PowerShell:** prefer `npm.cmd` over `npm` when execution policy blocks
-  `npm.ps1`.
+  Run canonical commands from the repo root. If Docker is not visible from the
+  current execution context, use [Environment adapters](#environment-adapters).
 - Host ports free (default compose bindings):
 
   `3000`, `5280`, `5432`, `6379`, `1025`, `1080`, `4566`, `29092`, `8081`, `5672`, `15672`, `8200`
 
   Optional observability profile also uses `3001`, `4317`, `4318` — see [Observability (optional)](#observability-optional).
-- The API container writes .NET build artifacts to `/tmp/axis-artifacts`, so host-side `dotnet build` no longer shares `bin/obj` with the container.
+- The API container writes .NET build artifacts to `/tmp/axis-artifacts`, so repo-level `dotnet build` no longer shares `bin/obj` with the container.
 
 ---
 
-## One-time environment doctor
+## Environment doctor
 
 Run the doctor before debugging local stack issues:
 
@@ -45,9 +59,9 @@ Run the doctor before debugging local stack issues:
 python scripts/axis.py doctor
 ```
 
-It checks the repo root, Python launcher, PyYAML, Git, .NET SDK, Node, npm,
-Docker CLI, Docker Compose, the active Docker endpoint, WSL Docker, and the
-common WSL2 TCP daemon endpoint at `127.0.0.1:2375`.
+It checks the repo root, Python launcher, PyYAML, Git, documented .NET SDK
+major, documented Node major, npm, Buf, Lychee, Docker CLI, Docker Compose, the
+active Docker endpoint, and known adapter probes.
 
 Use strict mode when you want the command to fail on blocking local-dev issues:
 
@@ -55,31 +69,43 @@ Use strict mode when you want the command to fail on blocking local-dev issues:
 python scripts/axis.py doctor --strict
 ```
 
-Windows with Docker Engine inside WSL2 usually needs one of these paths:
+## Environment adapters
 
-```powershell
-# Current shell only
-$env:DOCKER_HOST = "tcp://127.0.0.1:2375"
+Use these only when the canonical repo-root commands cannot see the required
+tooling. Keep the canonical command in plans and verification reports; mention
+the adapter only as execution context.
 
-# Persist for future PowerShell sessions
-[Environment]::SetEnvironmentVariable("DOCKER_HOST", "tcp://127.0.0.1:2375", "User")
+### Docker endpoint adapter
+
+Preferred path: run Docker, .NET, npm, and compose commands from the same
+execution environment where `docker info` succeeds.
+
+If Docker is reachable only through an exported endpoint, set `DOCKER_HOST` for
+the current process/session using that environment's standard env-var mechanism:
+
+```text
+DOCKER_HOST=<docker-endpoint>
 ```
 
-Only expose the Docker TCP daemon on `127.0.0.1`; do not bind it to a public
-interface.
+Only expose local Docker TCP endpoints to loopback/private interfaces; do not
+bind them publicly.
 
-If Docker works in WSL but not in PowerShell, run compose through WSL:
+Use the endpoint's `/_ping` URL as the quick daemon probe when the Docker CLI is
+not visible in the current environment.
 
-```powershell
-wsl.exe bash -lc "cd /path/to/axis && docker compose up -d"
-```
+If Docker is available only from another execution environment, run the same
+canonical repo-root command there.
 
-If PowerShell blocks `npm.ps1`, use `npm.cmd`:
+### Package-manager adapter
 
-```powershell
+If a shell wrapper blocks package-manager execution, use the runtime's native
+binary/shim for the same package script. Keep the reported command as the
+package script, not the adapter-specific wrapper:
+
+```bash
 cd frontend
-npm.cmd run ci
-npm.cmd run test
+npm run ci
+npm run test
 ```
 
 ---
@@ -90,12 +116,6 @@ From the repo root:
 
 ```bash
 docker compose up -d
-```
-
-**Windows (WSL)** — same command inside WSL:
-
-```powershell
-wsl -- bash -lc "cd /path/to/axis && docker compose up -d"
 ```
 
 First boot:
@@ -142,7 +162,7 @@ docker compose --profile observability up -d
 | Service | Host access | Notes |
 |---|---|---|
 | Grafana | <http://localhost:3001> | Traces / metrics / logs UI. |
-| OTLP gRPC | `localhost:4317` | Point host-run API at this, or set `OpenTelemetry__Otlp__Endpoint=http://otel-lgtm:4317` when API runs in compose with the profile. |
+| OTLP gRPC | `localhost:4317` | Point an API run outside compose at this, or set `OpenTelemetry__Otlp__Endpoint=http://otel-lgtm:4317` when API runs in compose with the profile. |
 | OTLP HTTP | `localhost:4318` | Alternative OTLP ingress. |
 
 Default compose API has OTLP export off (`OpenTelemetry__Otlp__Endpoint=""`) so the stack starts without LGTM.
@@ -151,7 +171,8 @@ Default compose API has OTLP export off (`OpenTelemetry__Otlp__Endpoint=""`) so 
 
 ## Daily operations
 
-Run from the repo root (or prefix with `wsl -- bash -lc "cd /path/to/axis && …"` on Windows):
+Run from the repo root. Use [Environment adapters](#environment-adapters) only
+when the current execution context cannot reach Docker.
 
 | Goal | Command |
 |---|---|
@@ -174,7 +195,9 @@ Run from the repo root (or prefix with `wsl -- bash -lc "cd /path/to/axis && …
 | Backend (`api`) | Restart `api` after saving `.cs` under `src/`. | Any backend code, `Directory.Packages.props`, or new `<PackageReference>` → `docker compose restart api`. |
 | Frontend (`web`) | Saving under `frontend/src/` — Vite HMR. | `vite.config.ts`, `package.json`, `package-lock.json`, or new npm dep → `docker compose restart web`; the container syncs `npm ci` automatically when the lockfile hash changes. |
 
-Vite polling is enabled (`VITE_USE_POLLING=1`) because inotify from Windows bind mounts through WSL is unreliable. Expect ~200–500 ms between frontend save and reload.
+Vite polling is enabled (`VITE_USE_POLLING=1`) because file-watch events through
+bind mounts are not consistent across container runtimes. Expect ~200–500 ms
+between frontend save and reload.
 
 ---
 
@@ -187,18 +210,15 @@ dotnet build && dotnet test
 cd frontend && npm run ci && npm run test
 ```
 
-When `docker info` works in the shell running .NET, Testcontainers uses that
-Docker endpoint and no extra configuration is needed. If it does not, but Docker
-Engine is running inside WSL2 with its TCP daemon exported, point Testcontainers
-at that daemon:
+When `docker info` works for the process running .NET, Testcontainers uses that
+Docker endpoint and no extra configuration is needed. If it does not, use the
+[Docker endpoint adapter](#docker-endpoint-adapter) instead of
+hardcoding Docker endpoints in test code:
 
-```powershell
-$env:DOCKER_HOST = "tcp://127.0.0.1:2375"
+```text
+DOCKER_HOST=<docker-endpoint>
 dotnet test Axis.sln --nologo
 ```
-
-Use `http://127.0.0.1:2375/_ping` as the quick WSL2 daemon probe when
-`docker.exe` is not available in PowerShell.
 
 ---
 
@@ -207,8 +227,8 @@ Use `http://127.0.0.1:2375/_ping` as the quick WSL2 daemon probe when
 Pre-production: each module keeps migrations generated by EF. Do **not** hand-write migration `.cs` files or patch `.Designer.cs` without re-running the tool.
 
 `dotnet` and `dotnet ef` must resolve from `PATH`. If either command is missing,
-install the .NET SDK / EF tool or fix your shell `PATH` before generating a
-migration; repo scripts should not guess a machine-specific SDK location.
+install the .NET SDK / EF tool or fix `PATH` before generating a migration. Repo
+scripts must use `PATH`, not hardcoded SDK locations.
 
 Connection string env vars (dummy host is fine for `migrations add`; tests use Testcontainers):
 
@@ -258,7 +278,7 @@ docker compose up -d
 ## Gotchas
 
 - **`launchSettings.json` is ignored** in the container. Compose passes `--no-launch-profile` to `dotnet run`; without it, the launch profile's `applicationUrl` can override `ASPNETCORE_URLS` and bind only inside the container — "connection reset" on `:5280` from the host.
-- **Container build artifacts stay outside the bind mount.** The API compose command passes `--artifacts-path /tmp/axis-artifacts` to `dotnet restore` and `dotnet run`, so Linux `bin/obj` outputs do not overwrite host-side Windows/Rider assets.
+- **Container build artifacts stay outside the bind mount.** The API compose command passes `--artifacts-path /tmp/axis-artifacts` to `dotnet restore` and `dotnet run`, so container-generated `bin/obj` outputs do not overwrite repo-level IDE or developer-tool artifacts.
 - **MailDev health** — compose disables MailDev's baked-in healthcheck (`healthcheck: disable: true`); nothing waits on it.
 - **API startup order** — Kafka + Schema Registry + RabbitMQ must be healthy before the API starts; first boot can take ~60s on the API healthcheck `start_period`.
 - **Module vs workspace migrations** — API startup migrates each module's public schema in Development; workspace schemas migrate on first workspace provisioning.
@@ -270,7 +290,7 @@ docker compose up -d
 | File | Role |
 |---|---|
 | [`docker-compose.yml`](../../docker-compose.yml) | Service graph, env vars, volumes, healthchecks — **port source of truth** |
-| `python scripts/axis.py doctor` | Local environment diagnostics for PATH, Docker, WSL, and npm shell issues |
+| `python scripts/axis.py doctor` | Local environment diagnostics for PATH, Docker, package-manager, and adapter visibility |
 | `python scripts/axis.py check local-dev-docs` | CI/doc drift: verifies this file matches compose |
 | [`Dockerfile`](../../Dockerfile) | Production API image (not used by default compose dev) |
 | [`frontend/Dockerfile.dev`](../../frontend/Dockerfile.dev) | Node + Vite dev image |

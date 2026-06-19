@@ -20,7 +20,7 @@ Do not edit implementation files before this dossier is complete. For high-risk 
 
 2. Read the governing docs for the exact surface.
    - Always read `AGENTS.md`, `docs/playbooks/design-gate.md`, and `docs/playbooks/agent-checklist.md`.
-   - Read only the relevant surface docs: `process.md`, `patterns.md`, `frontend.md`, `testing.md`, `repo-layout-discovery.md`, `WORKAROUNDS.md`, or the owning use-case file.
+   - Read only the relevant surface docs: `process.md`, `patterns-index.md`, the focused pattern owner, `frontend.md`, `testing.md`, `repo-layout-discovery.md`, `WORKAROUNDS.md`, or the owning use-case file.
 
 3. Quote governing rules.
    - Use `file:section` references.

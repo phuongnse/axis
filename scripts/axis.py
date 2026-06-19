@@ -29,6 +29,13 @@ sys.dont_write_bytecode = True
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
+REQUIRED_DOTNET_SDK_MAJOR = "8"
+REQUIRED_BUF_VERSION = "1.50.0"
+REQUIRED_LYCHEE_VERSION = "0.23.0"
+TOOL_VERSIONS_DOC = "docs/playbooks/scripts.md#tool-versions"
+TECH_STACK_DOC = "docs/TECH_STACK.md"
+GLOBAL_JSON_PATH = ROOT / "global.json"
+NVMRC_PATH = ROOT / "frontend" / ".nvmrc"
 
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
@@ -44,6 +51,13 @@ class CheckError(RuntimeError):
 
 def rel(path: Path) -> str:
     return str(path.relative_to(ROOT)).replace("\\", "/")
+
+
+def path_label(path: Path) -> str:
+    try:
+        return rel(path)
+    except ValueError:
+        return str(path)
 
 
 def rel_from(path: Path, root: Path) -> str:
@@ -125,22 +139,64 @@ def diff_range() -> str:
     raise CheckError(f"diff_range: cannot determine diff base (tried {tried}); set BASE_REF or fetch the base branch")
 
 
-def changed_paths(range_spec: str | None = None) -> list[str]:
-    range_spec = range_spec or diff_range()
-    result = run([exe("git"), "diff", "--name-only", range_spec], capture=True, check=False)
+def git_lines(args: list[str], *, label: str) -> list[str]:
+    result = run([exe("git"), *args], capture=True, check=False)
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "").strip()
-        raise CheckError(f"changed_paths: git diff failed for {range_spec}: {detail}")
+        raise CheckError(f"{label}: git {' '.join(args)} failed: {detail}")
     return [line.strip().replace("\\", "/") for line in result.stdout.splitlines() if line.strip()]
+
+
+def unique_paths(paths: Iterable[str]) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for path in paths:
+        normalized = path.replace("\\", "/")
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        ordered.append(normalized)
+    return ordered
+
+
+def working_tree_paths() -> list[str]:
+    return unique_paths(
+        [
+            *git_lines(["diff", "--name-only", "--cached"], label="working_tree_paths staged"),
+            *git_lines(["diff", "--name-only"], label="working_tree_paths unstaged"),
+            *git_lines(["ls-files", "--others", "--exclude-standard"], label="working_tree_paths untracked"),
+        ]
+    )
+
+
+def changed_paths(range_spec: str | None = None) -> list[str]:
+    range_spec = range_spec or diff_range()
+    return unique_paths(
+        [
+            *git_lines(["diff", "--name-only", range_spec], label=f"changed_paths {range_spec}"),
+            *working_tree_paths(),
+        ]
+    )
 
 
 def changed_name_status(range_spec: str | None = None) -> list[list[str]]:
     range_spec = range_spec or diff_range()
-    result = run([exe("git"), "diff", "--name-status", range_spec], capture=True, check=False)
-    if result.returncode != 0:
-        detail = (result.stderr or result.stdout or "").strip()
-        raise CheckError(f"changed_name_status: git diff failed for {range_spec}: {detail}")
-    return [line.split("\t") for line in result.stdout.splitlines() if line.strip()]
+    rows: list[list[str]] = []
+    for args, label in (
+        (["diff", "--name-status", range_spec], f"changed_name_status {range_spec}"),
+        (["diff", "--name-status", "--cached"], "changed_name_status staged"),
+        (["diff", "--name-status"], "changed_name_status unstaged"),
+    ):
+        rows.extend(line.split("\t") for line in git_lines(args, label=label))
+    rows.extend(["A", path] for path in git_lines(["ls-files", "--others", "--exclude-standard"], label="changed_name_status untracked"))
+
+    deduped: dict[str, list[str]] = {}
+    for row in rows:
+        if not row:
+            continue
+        key = row[-1].replace("\\", "/")
+        deduped[key] = [part.replace("\\", "/") for part in row]
+    return list(deduped.values())
 
 
 def module_main(script_name: str, args: list[str], *, stdin_text: str | None = None) -> int:
@@ -404,6 +460,9 @@ def check_test_project_classification(_args: argparse.Namespace | None = None) -
 
 
 def test_unit(args: argparse.Namespace) -> int:
+    rc = check_dotnet_sdk()
+    if rc != 0:
+        return rc
     rc = check_test_project_classification()
     if rc != 0:
         return rc
@@ -425,8 +484,12 @@ def test_unit(args: argparse.Namespace) -> int:
 
 
 def check_vulnerable_packages(_args: argparse.Namespace | None = None) -> int:
+    rc = check_dotnet_sdk()
+    if rc != 0:
+        return rc
+    solution_path = ROOT / "Axis.sln"
     result = run(
-        [exe("dotnet"), "list", "Axis.sln", "package", "--vulnerable", "--include-transitive"],
+        [exe("dotnet"), "list", str(solution_path), "package", "--vulnerable", "--include-transitive"],
         capture=True,
         check=False,
     )
@@ -491,7 +554,7 @@ def check_ef_domain_mapping(_args: argparse.Namespace | None = None) -> int:
     if issues:
         for issue in issues:
             print(f"check-ef-domain-mapping FAIL: {issue}", file=sys.stderr)
-        print("\nSee docs/playbooks/patterns.md#ef-core-aggregate-mapping-patterns", file=sys.stderr)
+        print("\nSee docs/playbooks/persistence-patterns.md#ef-core-aggregate-mapping-patterns", file=sys.stderr)
         return 1
     print("check-ef-domain-mapping: OK")
     return 0
@@ -802,20 +865,89 @@ def check_doc_navigation(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
+PLAYBOOK_DEFAULT_MAX_LINES = 300
+PATTERN_ROUTER_MAX_LINES = 150
+DOC_SIZE_BUDGETS = {
+    "docs/playbooks/patterns.md": PATTERN_ROUTER_MAX_LINES,
+    "docs/playbooks/patterns-index.md": PATTERN_ROUTER_MAX_LINES,
+}
+
+
+def doc_size_budget_issues(*, root: Path = ROOT) -> list[str]:
+    candidates = [root / "AGENTS.md", root / "docs" / "ARCHITECTURE.md"]
+    playbooks = sorted((root / "docs" / "playbooks").glob("*.md"))
+    candidates.extend(playbooks)
+
+    issues: list[str] = []
+    for path in candidates:
+        if not path.is_file():
+            continue
+        normalized = rel_from(path, root)
+        limit = DOC_SIZE_BUDGETS.get(normalized, PLAYBOOK_DEFAULT_MAX_LINES)
+        line_count = len(path.read_text(encoding="utf-8").splitlines())
+        if line_count > limit:
+            issues.append(
+                f"{normalized}: {line_count} lines exceeds {limit}-line docs budget; "
+                "split by topic or route through patterns-index.md"
+            )
+    return issues
+
+
+def check_doc_size_budgets(_args: argparse.Namespace | None = None) -> int:
+    issues = doc_size_budget_issues()
+    if issues:
+        print("check-doc-size-budgets FAIL:", file=sys.stderr)
+        for issue in issues:
+            print(f"  - {issue}", file=sys.stderr)
+        return 1
+    print("check-doc-size-budgets: OK")
+    return 0
+
+
 def check_buf_modules(_args: argparse.Namespace | None = None) -> int:
     return sync_buf_yaml.main_with_args(["--check"]) if hasattr(sync_buf_yaml, "main_with_args") else module_main("sync_buf_yaml.py", ["--check"])
 
 
-def check_buf_breaking_against_base(_args: argparse.Namespace | None = None) -> int:
+def buf_breaking_base_ref() -> str | None:
     base_ref = os.environ.get("BASE_REF")
+    if base_ref:
+        return base_ref
+
+    base = os.environ.get("BASE_BRANCH", "main")
+    for candidate in (f"origin/{base}", base):
+        if ref_exists(candidate):
+            return candidate
+    return None
+
+
+def check_buf_breaking_against_base(_args: argparse.Namespace | None = None) -> int:
+    base_ref = buf_breaking_base_ref()
     if not base_ref:
-        print("buf-breaking-against-base FAIL: Set BASE_REF (e.g. origin/main)", file=sys.stderr)
+        base = os.environ.get("BASE_BRANCH", "main")
+        print(
+            f"buf-breaking-against-base FAIL: cannot determine base ref; set BASE_REF "
+            f"or fetch origin/{base}",
+            file=sys.stderr,
+        )
         return 1
     if not ref_exists(base_ref):
         print(f"buf-breaking-against-base FAIL: missing {base_ref}", file=sys.stderr)
         return 1
-    if shutil.which("buf") is None:
-        print("buf-breaking-against-base FAIL: buf CLI not on PATH", file=sys.stderr)
+    buf = find_buf()
+    if buf is None:
+        print(
+            f"buf-breaking-against-base FAIL: Buf CLI {REQUIRED_BUF_VERSION} is required, "
+            f"but `buf` was not found in PATH. See {TOOL_VERSIONS_DOC}.",
+            file=sys.stderr,
+        )
+        return 1
+    buf_ok, buf_detail = buf_version_status(buf)
+    if not buf_ok:
+        print(
+            f"buf-breaking-against-base FAIL: Buf CLI {REQUIRED_BUF_VERSION} is required; {buf_detail}. "
+            f"Install the documented version or put it earlier in PATH. See {TOOL_VERSIONS_DOC}.",
+            file=sys.stderr,
+        )
         return 1
     if not (ROOT / "buf.yaml").is_file():
         print("buf-breaking-against-base: no buf.yaml - skip")
@@ -828,7 +960,7 @@ def check_buf_breaking_against_base(_args: argparse.Namespace | None = None) -> 
         existing = run([exe("git"), "ls-tree", "-r", "--name-only", base_ref, path], capture=True, check=False)
         if existing.returncode == 0 and re.search(r"[.]proto$", existing.stdout, re.MULTILINE):
             print(f"buf breaking {path} (vs {base_ref})")
-            result = run(["buf", "breaking", path, "--against", f".git#ref={base_ref},subdir={path}"], check=False)
+            result = run([buf, "breaking", path, "--against", f".git#ref={base_ref},subdir={path}"], check=False)
             if result.returncode != 0:
                 return result.returncode
         else:
@@ -1107,21 +1239,55 @@ def check_policy_tests(_args: argparse.Namespace | None = None) -> int:
     ).returncode
 
 
-def added_lines(range_spec: str, include: callable[[str], bool]) -> Iterable[tuple[str, str]]:
-    result = run([exe("git"), "diff", "--unified=0", range_spec], capture=True, check=False)
-    if result.returncode != 0:
-        detail = (result.stderr or result.stdout or "").strip()
-        raise CheckError(f"added_lines: git diff failed for {range_spec}: {detail}")
+def parse_added_lines(diff_text: str, include: callable[[str], bool]) -> list[tuple[str, str]]:
     current = ""
     rows: list[tuple[str, str]] = []
-    for line in result.stdout.splitlines():
+    for line in diff_text.splitlines():
         if line.startswith("+++ b/"):
             current = line[6:].replace("\\", "/")
             continue
         if not current or not include(current):
             continue
-        if line.startswith("+") and not line.startswith("+++"):
+        if line.startswith("+") and not line.startswith("+++ "):
             rows.append((current, line[1:]))
+    return rows
+
+
+def untracked_added_lines(include: callable[[str], bool]) -> list[tuple[str, str]]:
+    rows: list[tuple[str, str]] = []
+    for path in git_lines(["ls-files", "--others", "--exclude-standard"], label="untracked_added_lines"):
+        if not include(path):
+            continue
+        full_path = ROOT / path
+        if not full_path.is_file():
+            continue
+        try:
+            lines = full_path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            continue
+        rows.extend((path, line) for line in lines)
+    return rows
+
+
+def added_lines(range_spec: str, include: callable[[str], bool]) -> Iterable[tuple[str, str]]:
+    rows: list[tuple[str, str]] = []
+    result = run([exe("git"), "diff", "--unified=0", range_spec], capture=True, check=False)
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()
+        raise CheckError(f"added_lines: git diff failed for {range_spec}: {detail}")
+    rows.extend(parse_added_lines(result.stdout, include))
+
+    for args, label in (
+        (["diff", "--unified=0", "--cached"], "added_lines staged"),
+        (["diff", "--unified=0"], "added_lines unstaged"),
+    ):
+        local_result = run([exe("git"), *args], capture=True, check=False)
+        if local_result.returncode != 0:
+            detail = (local_result.stderr or local_result.stdout or "").strip()
+            raise CheckError(f"{label}: git {' '.join(args)} failed: {detail}")
+        rows.extend(parse_added_lines(local_result.stdout, include))
+
+    rows.extend(untracked_added_lines(include))
     return rows
 
 
@@ -1145,7 +1311,7 @@ DOC_DRIFT_ADDED_LINE_RULES = [
         lambda p: (p.startswith("docs/") or p.startswith("scripts/"))
         and not p.startswith("scripts/tests/")
         and p.endswith((".md", ".py", ".ps1", ".sh", ".yml", ".yaml")),
-        "Machine-specific local path introduced - use a placeholder such as /path/to/axis",
+        "Machine-specific local path introduced - use <repo-root> or state 'from the repo root'",
     ),
     (
         r"GetAwaiter[(][)][.]GetResult[(][)]",
@@ -1284,6 +1450,7 @@ GOVERNANCE_ENTRY_DOCS = [
 GOVERNANCE_COMMANDS_OWNED_BY_AGENT_CHECKLIST = [
     "python scripts/axis.py check policy-tests",
     "python scripts/axis.py check doc-drift",
+    "python scripts/axis.py check markdown-links",
 ]
 
 REVIEW_FINDINGS_LEDGER_HEADER = [
@@ -1311,28 +1478,48 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
             ("run: python scripts/axis.py check pr", "PR metadata guard runs in CI"),
             ("run: python scripts/axis.py check vulnerable-packages", "vulnerable package gate runs in CI"),
             ("run: python scripts/axis.py check test-naming", ".NET test naming gate runs in CI"),
+            ("dotnet-version: 8.0.x", ".NET CI setup uses the documented SDK major"),
             ("run: dotnet build --no-restore", ".NET build runs in CI"),
             ("run: dotnet format Axis.sln --verify-no-changes --no-restore", ".NET format gate runs in CI"),
             ("dotnet test --no-build", "full .NET test suite runs in CI"),
+            ("node-version-file: frontend/.nvmrc", "frontend CI setup uses the documented Node source"),
             ("npm run gen:api-types", "frontend API type generation runs in CI"),
             ("git diff --exit-code -- src/lib/api-types.ts", "frontend API type diff fails stale generated types"),
             ("run: npm run ci", "frontend typecheck/lint runs in CI"),
             ("run: npm run test", "frontend tests run in CI"),
+            ('version: "1.50.0"', "protobuf CI setup pins the documented Buf CLI version"),
+            ("run: python scripts/axis.py check buf-lint", "protobuf CI lint uses the version-checking local wrapper"),
+            ("run: python scripts/axis.py check buf-breaking-against-base", "protobuf CI breaking check uses the version-checking local wrapper"),
             ("run: python scripts/axis.py check policy-tests", "policy gate tests run in CI"),
             ("run: python scripts/axis.py check doc-drift", "doc drift runs in CI"),
+            ("uses: lycheeverse/lychee-action", "markdown link check runs in CI"),
+            ("lycheeVersion: v0.23.0", "markdown link check pins the documented Lychee version"),
+            ("args: --config ./lychee.toml './**/*.md'", "markdown link check uses shared lychee config"),
             ("BASE_BRANCH: main", "doc drift compares against main"),
         ],
     ),
     (
         Path("scripts/axis.py"),
         [
+            ('step(".NET SDK", lambda: check_dotnet_sdk())', "local verify checks the documented .NET SDK before dotnet commands"),
+            ('step("frontend toolchain", lambda: check_frontend_toolchain())', "local verify checks the documented Node source before npm commands"),
+            ('step("buf lint", lambda: check_buf_lint())', "local verify runs Buf lint through the version-checking wrapper"),
+            ('step("buf breaking", lambda: check_buf_breaking_against_base())', "local verify runs Buf breaking through the version-checking wrapper"),
             ('step("policy gate tests", lambda: check_policy_tests())', "local verify runs policy gate tests"),
             ('step("doc drift", lambda: check_doc_drift())', "local verify runs doc drift"),
+            ('step("markdown links", lambda: check_markdown_links())', "local verify runs markdown link check"),
             ('def pre_push(args: argparse.Namespace) -> int:', "pre-push quick gate is implemented in Python"),
             ('return verify(args)', "pre-push can opt into full verify with AXIS_PRE_PUSH_FULL"),
             ("for issue in governance_owner_boundary_issues():", "doc drift checks governance owner boundaries"),
             ("for issue in review_findings_registry_issues():", "doc drift checks review findings registry rows"),
             ("for issue in enforcement_truth_audit_issues():", "doc drift checks enforcement truth wiring"),
+        ],
+    ),
+    (
+        Path("global.json"),
+        [
+            ('"version": "8.0.100"', "global.json selects the documented .NET SDK major"),
+            ('"rollForward": "latestFeature"', "global.json allows latest installed .NET 8 feature band without selecting newer majors"),
         ],
     ),
     (
@@ -1663,6 +1850,7 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         ("check-use-case-docs.py", lambda _=None: run_module_check("check-use-case-docs.py", ["--check"])),
         ("check-doc-link-targets.py", lambda _=None: run_module_check("check-doc-link-targets.py", ["--check"])),
         ("check-doc-navigation", check_doc_navigation),
+        ("check-doc-size-budgets", check_doc_size_budgets),
         ("check-doc-code-fences.py", lambda _=None: run_module_check("check-doc-code-fences.py", ["--check"])),
         ("check-local-dev-docs.py", lambda _=None: run_module_check("check-local-dev-docs.py", ["--check"])),
         ("sync_buf_yaml.py", lambda _=None: module_main("sync_buf_yaml.py", ["--check"])),
@@ -1683,15 +1871,258 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
+def command_version_line(name: str, *version_args: str) -> tuple[bool, str, str]:
+    command = exe(name)
+    resolved = shutil.which(command) or shutil.which(name)
+    if resolved is None:
+        return False, f"{name} not found in PATH", command
+
+    result = run_optional([command, *version_args])
+    if result is None:
+        return False, f"{name} not executable from PATH", resolved
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()
+        return False, detail or f"{name} exited with {result.returncode}", resolved
+
+    first_line = (result.stdout or result.stderr or "").strip().splitlines()
+    return True, first_line[0] if first_line else "available", resolved
+
+
+def version_major(version_line: str) -> str | None:
+    match = re.search(r"\b[vV]?([0-9]+)(?:[.][0-9]+)*\b", version_line)
+    return match.group(1) if match else None
+
+
+def required_node_major() -> tuple[bool, str]:
+    if not NVMRC_PATH.is_file():
+        return False, f"missing {rel(NVMRC_PATH)}"
+    text = NVMRC_PATH.read_text(encoding="utf-8").strip()
+    match = re.fullmatch(r"v?([0-9]+)(?:[.][0-9]+)*", text)
+    if match is None:
+        return False, f"{rel(NVMRC_PATH)} must contain a Node major or semver version"
+    return True, match.group(1)
+
+
+def global_json_sdk_major() -> tuple[bool, str]:
+    if not GLOBAL_JSON_PATH.is_file():
+        return False, f"missing {path_label(GLOBAL_JSON_PATH)}"
+    try:
+        data = json.loads(GLOBAL_JSON_PATH.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return False, f"{path_label(GLOBAL_JSON_PATH)} is invalid JSON: {exc}"
+
+    sdk = data.get("sdk")
+    if not isinstance(sdk, dict):
+        return False, f"{path_label(GLOBAL_JSON_PATH)} must contain an sdk object"
+    version = sdk.get("version")
+    if not isinstance(version, str) or not version.strip():
+        return False, f"{path_label(GLOBAL_JSON_PATH)} must contain sdk.version"
+
+    major = version_major(version)
+    if major is None:
+        return False, f"{path_label(GLOBAL_JSON_PATH)} sdk.version `{version}` is not a semver version"
+    return True, major
+
+
+def dotnet_sdk_status() -> tuple[bool, str]:
+    source_ok, source_major_or_error = global_json_sdk_major()
+    if not source_ok:
+        return False, f"{source_major_or_error}; .NET SDK {REQUIRED_DOTNET_SDK_MAJOR}.x is required per {TECH_STACK_DOC}"
+    if source_major_or_error != REQUIRED_DOTNET_SDK_MAJOR:
+        return (
+            False,
+            f"{path_label(GLOBAL_JSON_PATH)} selects .NET SDK {source_major_or_error}.x; "
+            f"expected {REQUIRED_DOTNET_SDK_MAJOR}.x per {TECH_STACK_DOC}",
+        )
+
+    ok, version_line, resolved = command_version_line("dotnet", "--version")
+    if not ok:
+        return (
+            False,
+            f"{version_line}; .NET SDK {REQUIRED_DOTNET_SDK_MAJOR}.x is required per "
+            f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}",
+        )
+
+    major = version_major(version_line)
+    if major != REQUIRED_DOTNET_SDK_MAJOR:
+        return (
+            False,
+            f"found `{version_line or 'unknown'}` at {resolved}; "
+            f"expected .NET SDK {REQUIRED_DOTNET_SDK_MAJOR}.x per "
+            f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}",
+        )
+    return True, f"{version_line} ({resolved}); expected major {REQUIRED_DOTNET_SDK_MAJOR} from {path_label(GLOBAL_JSON_PATH)}"
+
+
+def check_dotnet_sdk(_args: argparse.Namespace | None = None) -> int:
+    ok, detail = dotnet_sdk_status()
+    if not ok:
+        print(f"dotnet-sdk: FAIL - {detail}", file=sys.stderr)
+        return 1
+    print(f"dotnet-sdk: OK ({detail})")
+    return 0
+
+
+def node_version_status() -> tuple[bool, str]:
+    expected_ok, expected_or_error = required_node_major()
+    if not expected_ok:
+        return False, f"{expected_or_error}; fix the documented Node source before running frontend commands"
+    expected = expected_or_error
+
+    ok, version_line, resolved = command_version_line("node", "--version")
+    if not ok:
+        return False, f"{version_line}; Node {expected}.x is required per {rel(NVMRC_PATH)}"
+
+    major = version_major(version_line)
+    if major != expected:
+        return (
+            False,
+            f"found `{version_line or 'unknown'}` at {resolved}; "
+            f"expected Node {expected}.x from {rel(NVMRC_PATH)}",
+        )
+    return True, f"{version_line} ({resolved}); expected major {expected} from {rel(NVMRC_PATH)}"
+
+
+def check_frontend_toolchain(_args: argparse.Namespace | None = None) -> int:
+    node_ok, node_detail = node_version_status()
+    if not node_ok:
+        print(f"frontend-toolchain: FAIL - {node_detail}", file=sys.stderr)
+        return 1
+
+    npm_status, npm_detail = _command_version("npm", "--version")
+    if npm_status != "OK":
+        print(f"frontend-toolchain: FAIL - {npm_detail}; npm must resolve beside Node from PATH", file=sys.stderr)
+        return 1
+
+    print(f"frontend-toolchain: OK ({node_detail}; npm {npm_detail})")
+    return 0
+
+
+def find_buf() -> str | None:
+    return shutil.which(exe("buf")) or shutil.which("buf")
+
+
+def buf_version_status(buf: str) -> tuple[bool, str]:
+    result = run_optional([buf, "--version"])
+    if result is None:
+        return False, f"{buf} is not executable"
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()
+        return False, detail or f"{buf} --version exited with {result.returncode}"
+
+    first_line = (result.stdout or result.stderr or "").strip().splitlines()
+    version_line = first_line[0] if first_line else ""
+    if version_line != REQUIRED_BUF_VERSION:
+        return (
+            False,
+            f"found `{version_line or 'unknown'}` at {buf}; expected `{REQUIRED_BUF_VERSION}`",
+        )
+    return True, f"{version_line} ({buf})"
+
+
+def check_buf_cli(_args: argparse.Namespace | None = None) -> int:
+    buf = find_buf()
+    if buf is None:
+        print(
+            f"buf-cli: FAIL - Buf CLI {REQUIRED_BUF_VERSION} is required, "
+            f"but `buf` was not found in PATH. See {TOOL_VERSIONS_DOC}.",
+            file=sys.stderr,
+        )
+        return 1
+
+    ok, detail = buf_version_status(buf)
+    if not ok:
+        print(
+            f"buf-cli: FAIL - Buf CLI {REQUIRED_BUF_VERSION} is required; {detail}. "
+            f"Install the documented version or put it earlier in PATH. See {TOOL_VERSIONS_DOC}.",
+            file=sys.stderr,
+        )
+        return 1
+
+    print(f"buf-cli: OK ({detail})")
+    return 0
+
+
+def check_buf_lint(_args: argparse.Namespace | None = None) -> int:
+    rc = check_buf_cli()
+    if rc != 0:
+        return rc
+    buf = find_buf()
+    if buf is None:
+        return 1
+    return run([buf, "lint"], check=False).returncode
+
+
+def find_lychee() -> str | None:
+    return shutil.which("lychee")
+
+
+def lychee_version_status(lychee: str) -> tuple[bool, str]:
+    result = run_optional([lychee, "--version"])
+    if result is None:
+        return False, f"{lychee} is not executable"
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()
+        return False, detail or f"{lychee} --version exited with {result.returncode}"
+
+    first_line = (result.stdout or result.stderr or "").strip().splitlines()
+    version_line = first_line[0] if first_line else ""
+    expected = f"lychee {REQUIRED_LYCHEE_VERSION}"
+    if version_line != expected:
+        return (
+            False,
+            f"found `{version_line or 'unknown'}` at {lychee}; expected `{expected}`",
+        )
+    return True, f"{version_line} ({lychee})"
+
+
+def run_lychee_markdown_check(lychee: str) -> subprocess.CompletedProcess[str]:
+    return run([lychee, "--config", "./lychee.toml", "./**/*.md"], capture=True, check=False)
+
+
+def emit_captured_process(result: subprocess.CompletedProcess[str]) -> None:
+    if result.stdout:
+        print(result.stdout, end="")
+    if result.stderr:
+        print(result.stderr, end="", file=sys.stderr)
+
+
+def check_markdown_links(_args: argparse.Namespace | None = None) -> int:
+    lychee = find_lychee()
+    if lychee is None:
+        print(
+            f"check-markdown-links: Lychee {REQUIRED_LYCHEE_VERSION} is required, "
+            "but `lychee` was not found in PATH. See docs/playbooks/scripts.md#tool-versions.",
+            file=sys.stderr,
+        )
+        return 1
+    version_ok, version_detail = lychee_version_status(lychee)
+    if not version_ok:
+        print(
+            f"check-markdown-links: Lychee {REQUIRED_LYCHEE_VERSION} is required; {version_detail}. "
+            "Install the documented version or put it earlier in PATH. "
+            "See docs/playbooks/scripts.md#tool-versions.",
+            file=sys.stderr,
+        )
+        return 1
+    result = run_lychee_markdown_check(lychee)
+    emit_captured_process(result)
+    return result.returncode
+
+
 def verify(args: argparse.Namespace) -> int:
     range_spec = diff_range()
     paths = changed_paths(range_spec)
 
     dotnet = False
     frontend = False
+    protobuf = False
+    markdown_links = False
     if not paths:
         dotnet = True
         frontend = True
+        protobuf = True
+        markdown_links = True
     else:
         dotnet = any(
             re.search(r"^(src/|tests/|Directory[.]|Axis[.]sln$|global[.]json$|[.]editorconfig$|openapi[.]json$|[.]github/workflows/build-and-test[.]yml$)", p)
@@ -1701,11 +2132,19 @@ def verify(args: argparse.Namespace) -> int:
             re.search(r"^(frontend/|[.]editorconfig$|openapi[.]json$|[.]github/workflows/build-and-test[.]yml$)", p)
             for p in paths
         )
+        protobuf = any(
+            re.search(r"(^|/)[^/]+[.]proto$|^buf[.]yaml$|^[.]github/workflows/build-and-test[.]yml$", p)
+            for p in paths
+        )
+        markdown_links = any(
+            re.search(r"(^|/)[^/]+[.]md$|^lychee[.]toml$|^[.]github/workflows/build-and-test[.]yml$", p)
+            for p in paths
+        )
 
     api_surface_drift = any_changed(paths, r"^src/Axis[.]Api/Endpoints/") and not any_changed(paths, r"^openapi[.]json$")
     failed: list[str] = []
 
-    def step(name: str, fn: callable[[], int]) -> None:
+    def step(name: str, fn: callable[[], int]) -> int:
         print()
         print(f"> {name}")
         try:
@@ -1718,19 +2157,29 @@ def verify(args: argparse.Namespace) -> int:
         else:
             print(f"FAIL {name}")
             failed.append(name)
+        return rc
 
-    print(f"verify - .NET={dotnet} frontend={frontend}")
+    print(f"verify - .NET={dotnet} frontend={frontend} protobuf={protobuf} markdown-links={markdown_links}")
 
     if dotnet:
-        step(".NET test naming", lambda: check_test_naming())
-        step(".NET build", lambda: run([exe("dotnet"), "build", "Axis.sln", "--nologo"], check=False).returncode)
-        step(".NET vulnerable packages", lambda: check_vulnerable_packages())
-        step(".NET format", lambda: run([exe("dotnet"), "format", "Axis.sln", "--verify-no-changes"], check=False).returncode)
-        step(".NET test (unit projects)", lambda: test_unit(argparse.Namespace(dotnet_args=[])))
+        if step(".NET SDK", lambda: check_dotnet_sdk()) == 0:
+            step(".NET test naming", lambda: check_test_naming())
+            step(".NET build", lambda: run([exe("dotnet"), "build", "Axis.sln", "--nologo"], check=False).returncode)
+            step(".NET vulnerable packages", lambda: check_vulnerable_packages())
+            step(".NET format", lambda: run([exe("dotnet"), "format", "Axis.sln", "--verify-no-changes"], check=False).returncode)
+            step(".NET test (unit projects)", lambda: test_unit(argparse.Namespace(dotnet_args=[])))
 
     if frontend:
-        step("frontend ci (tsc + biome)", lambda: run([exe("npm"), "run", "ci"], cwd=ROOT / "frontend", check=False).returncode)
-        step("frontend test", lambda: run([exe("npm"), "run", "test"], cwd=ROOT / "frontend", check=False).returncode)
+        if step("frontend toolchain", lambda: check_frontend_toolchain()) == 0:
+            step("frontend ci (tsc + biome)", lambda: run([exe("npm"), "run", "ci"], cwd=ROOT / "frontend", check=False).returncode)
+            step("frontend test", lambda: run([exe("npm"), "run", "test"], cwd=ROOT / "frontend", check=False).returncode)
+
+    if protobuf:
+        if step("buf lint", lambda: check_buf_lint()) == 0:
+            step("buf breaking", lambda: check_buf_breaking_against_base())
+
+    if markdown_links:
+        step("markdown links", lambda: check_markdown_links())
 
     step("policy gate tests", lambda: check_policy_tests())
     step("doc drift", lambda: check_doc_drift())
@@ -1801,6 +2250,10 @@ def pre_push(args: argparse.Namespace) -> int:
 
 
 def generate_api_contracts(_args: argparse.Namespace | None = None) -> int:
+    for checker in (check_dotnet_sdk, check_frontend_toolchain):
+        rc = checker()
+        if rc != 0:
+            return rc
     commands = [
         ([exe("dotnet"), "build", "src/Axis.Api/Axis.Api.csproj", "--nologo"], ROOT, None),
         (
@@ -1828,6 +2281,9 @@ def generate_api_contracts(_args: argparse.Namespace | None = None) -> int:
 
 
 def generate_wireframes(args: argparse.Namespace) -> int:
+    rc = check_frontend_toolchain()
+    if rc != 0:
+        return rc
     command = [exe("npm"), "run", "export:wireframes", "--"]
     if args.filter:
         command.extend(["--filter", args.filter])
@@ -1888,20 +2344,9 @@ def install_hooks(_args: argparse.Namespace | None = None) -> int:
 
 
 def _command_version(name: str, *version_args: str) -> tuple[str, str]:
-    command = exe(name)
-    resolved = shutil.which(command) or command
-    if shutil.which(command) is None and shutil.which(name) is None:
-        return "FAIL", f"{name} not found in PATH"
-
-    result = run_optional([command, *version_args])
-    if result is None:
-        return "FAIL", f"{name} not executable from PATH"
-    if result.returncode != 0:
-        detail = (result.stderr or result.stdout or "").strip()
-        return "FAIL", detail or f"{name} exited with {result.returncode}"
-
-    first_line = (result.stdout or result.stderr or "").strip().splitlines()
-    version = first_line[0] if first_line else "available"
+    ok, version, resolved = command_version_line(name, *version_args)
+    if not ok:
+        return "FAIL", version
     return "OK", f"{version} ({resolved})"
 
 
@@ -1981,10 +2426,38 @@ def doctor(args: argparse.Namespace) -> int:
     yaml_status, yaml_detail = _python_module_version("yaml", "PyYAML")
     record(yaml_status, "python package PyYAML", f"{yaml_detail}; required for skill-creator quick_validate.py")
 
+    lychee = find_lychee()
+    if lychee is None:
+        record(
+            "FAIL",
+            "lychee",
+            f"Lychee {REQUIRED_LYCHEE_VERSION} is required for markdown link checks; "
+            "install it on PATH per docs/playbooks/scripts.md#tool-versions",
+        )
+    else:
+        lychee_ok, lychee_detail = lychee_version_status(lychee)
+        record("OK" if lychee_ok else "FAIL", "lychee", lychee_detail)
+
+    buf = find_buf()
+    if buf is None:
+        record(
+            "FAIL",
+            "buf",
+            f"Buf CLI {REQUIRED_BUF_VERSION} is required for protobuf checks; "
+            f"install it on PATH per {TOOL_VERSIONS_DOC}",
+        )
+    else:
+        buf_ok, buf_detail = buf_version_status(buf)
+        record("OK" if buf_ok else "FAIL", "buf", buf_detail)
+
+    dotnet_ok, dotnet_detail = dotnet_sdk_status()
+    record("OK" if dotnet_ok else "FAIL", ".NET SDK", dotnet_detail)
+
+    node_ok, node_detail = node_version_status()
+    record("OK" if node_ok else "FAIL", "node", node_detail)
+
     for name, version_args in (
         ("git", ("--version",)),
-        ("dotnet", ("--version",)),
-        ("node", ("--version",)),
         ("npm", ("--version",)),
     ):
         status, detail = _command_version(name, *version_args)
@@ -1992,7 +2465,11 @@ def doctor(args: argparse.Namespace) -> int:
 
     docker_status, docker_detail = _command_version("docker", "--version")
     if docker_status == "FAIL":
-        record("WARN", "docker cli", f"{docker_detail}; compose can still run through WSL if Docker lives there")
+        record(
+            "WARN",
+            "docker cli",
+            f"{docker_detail}; use an environment adapter if Docker is available from another execution context",
+        )
     else:
         record(docker_status, "docker cli", docker_detail)
 
@@ -2012,28 +2489,36 @@ def doctor(args: argparse.Namespace) -> int:
         record(
             "WARN",
             "docker endpoint",
-            'TCP daemon responds at 127.0.0.1:2375; set DOCKER_HOST="tcp://127.0.0.1:2375" in this shell',
+            "an exported Docker endpoint responds; set DOCKER_HOST to that endpoint for the current process/session",
         )
     elif wsl_docker:
-        record("WARN", "docker endpoint", "Docker works inside WSL; run compose through wsl.exe or expose a local TCP endpoint")
+        record(
+            "WARN",
+            "docker endpoint",
+            "Docker works from another detected execution context; run the canonical repo-root command there or expose a local Docker endpoint",
+        )
     else:
-        record("FAIL", "docker endpoint", "docker info failed; no WSL Docker or 127.0.0.1:2375 TCP daemon detected")
+        record("FAIL", "docker endpoint", "docker info failed; no reachable Docker endpoint detected")
 
     if _docker_compose_ok():
         record("OK", "docker compose", "docker compose version works")
     elif wsl_docker:
-        record("WARN", "docker compose", 'use WSL: wsl.exe bash -lc "cd /path/to/axis && docker compose up -d"')
+        record(
+            "WARN",
+            "docker compose",
+            "Docker Compose is available from another detected execution context; run the canonical repo-root command there",
+        )
     else:
-        record("FAIL", "docker compose", "Docker Compose v2 not available from this shell")
+        record("FAIL", "docker compose", "Docker Compose v2 not available from this execution context")
 
     if os.name == "nt":
         npm_cmd = shutil.which("npm.cmd")
         npm_ps1 = shutil.which("npm.ps1")
         if npm_cmd:
-            detail = f"use npm.cmd in PowerShell ({npm_cmd})"
+            detail = f"native npm shim available ({npm_cmd})"
             if npm_ps1:
-                detail += f"; npm.ps1 also exists ({npm_ps1}) and may be blocked by execution policy"
-            record("OK", "windows npm", detail)
+                detail += f"; alternate npm launcher also detected ({npm_ps1})"
+            record("OK", "npm adapter", detail)
 
     print("axis doctor")
     for status, label, detail in rows:
@@ -2094,12 +2579,16 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("codex-skills").set_defaults(func=check_codex_skills)
     check_sub.add_parser("test-naming").set_defaults(func=check_test_naming)
     check_sub.add_parser("test-project-classification").set_defaults(func=check_test_project_classification)
+    check_sub.add_parser("dotnet-sdk").set_defaults(func=check_dotnet_sdk)
+    check_sub.add_parser("frontend-toolchain").set_defaults(func=check_frontend_toolchain)
     check_sub.add_parser("vulnerable-packages").set_defaults(func=check_vulnerable_packages)
     check_sub.add_parser("ef-domain-mapping").set_defaults(func=check_ef_domain_mapping)
     check_sub.add_parser("frontend-api-contracts").set_defaults(func=check_frontend_api_contracts)
     check_sub.add_parser("frontend-style").set_defaults(func=check_frontend_style)
     check_sub.add_parser("frontend-component-composition").set_defaults(func=check_frontend_component_composition)
     check_sub.add_parser("frontend-quality").set_defaults(func=check_frontend_quality)
+    check_sub.add_parser("buf-cli").set_defaults(func=check_buf_cli)
+    check_sub.add_parser("buf-lint").set_defaults(func=check_buf_lint)
     check_sub.add_parser("buf-modules").set_defaults(func=check_buf_modules)
     check_sub.add_parser("buf-breaking-against-base").set_defaults(func=check_buf_breaking_against_base)
     check_sub.add_parser("local-dev-docs").set_defaults(
@@ -2108,7 +2597,9 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("doc-link-targets").set_defaults(
         func=lambda _args: run_module_check("check-doc-link-targets.py", ["--check"])
     )
+    check_sub.add_parser("markdown-links").set_defaults(func=check_markdown_links)
     check_sub.add_parser("doc-navigation").set_defaults(func=check_doc_navigation)
+    check_sub.add_parser("doc-size-budgets").set_defaults(func=check_doc_size_budgets)
     check_sub.add_parser("doc-code-fences").set_defaults(
         func=lambda _args: run_module_check("check-doc-code-fences.py", ["--check"])
     )

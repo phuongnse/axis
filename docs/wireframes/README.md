@@ -68,6 +68,6 @@ After changing any `.excalidraw`, regenerate the matching `.svg`, then review th
 
 ### Must Not
 
-- Add ad hoc JavaScript, PowerShell, shell, or external-service scripts for docs/wireframe generation.
+- Add ad hoc utility scripts or external-service dependencies for docs/wireframe generation.
 - Add sequence/entity diagram files beside use cases; those belong as Mermaid blocks in the use-case README.
 - Add visual polish that implies final frontend styling.

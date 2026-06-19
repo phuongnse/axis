@@ -13,7 +13,7 @@ Foundation phases (engineering rollout labels — not a product scope cut; each 
 
 | Phase | Status | Deliverable |
 |---|---|---|
-| **Phase 0 — Foundation decisions** | ✅ done | Rewrote ADR-001/002/009; added ADR-010..023; updated `ARCHITECTURE.md` + `AGENTS.md` + `patterns.md`. |
+| **Phase 0 — Foundation decisions** | ✅ done | Rewrote ADR-001/002/009; added ADR-010..023; updated `ARCHITECTURE.md` + `AGENTS.md` + pattern playbooks. |
 | **Phase 1 — Infrastructure foundation** | ✅ done | Kafka/RabbitMQ (ADR-017), per-module DBs (ADR-011), Wolverine enroll (ADR-012), migrations (ADR-023), OpenTelemetry (ADR-018), **Avro + Schema Registry + CloudEvents** for WorkflowBuilder lifecycle events (ADR-019). |
 | **Phase 2 — Per-module HTTP/gRPC boundary** | ✅ done | All core modules have `Axis.{Module}.Contracts` + Kafka Avro events. Identity (`IdentityService`), FormBuilder (`FormModelReferenceService`), WorkflowBuilder (`WorkflowFormReferenceService`), and DataModeling (`DataModelCatalogService`) gRPC services are wired behind module boundaries. |
 | **Phase 3 — Per-module EF migrations** | ⚠️ in progress | Identity, DataModeling, FormBuilder, WorkflowBuilder, WorkflowEngine have migrations; tests use `MigrateAsync`. PageBuilder pending (module not started). |
@@ -39,7 +39,7 @@ Full auth, user, role, invitation, and session management. OpenIddict 5.x OIDC s
 
 > ✅ **Frontend preference foundation:** [language](./use-cases/identity-access/language/) and [theme](./use-cases/identity-access/theme/) now cover EN/VI locale switching plus light/dark/system mode for the current SPA shell.
 
-> ✅ **Phase 2 complete:** `Axis.Identity.Contracts` with `IdentityService.GetUserPermissions` gRPC + 5 Avro lifecycle event schemas published via Wolverine outbox → Kafka with CloudEvents envelope (ADR-019). Each of DataModeling/FormBuilder/WorkflowBuilder/WorkflowEngine subscribes to `WorkspaceVerifiedEvent` and provisions its own workspace schema (central `WorkspaceSchemaProvisioner` and `ProvisionWorkspaceMessage` removed — extraction is now a redeploy per ADR-010). Gateway uses `AddGrpcClient<IdentityService.IdentityServiceClient>` with `Modules:Identity:GrpcUrl` config; JWKS-only validation rule documented in [patterns.md § Pattern 3](playbooks/patterns.md#-pattern-3-jwks-only-jwt-validation-in-consuming-modules).
+> ✅ **Phase 2 complete:** `Axis.Identity.Contracts` with `IdentityService.GetUserPermissions` gRPC + 5 Avro lifecycle event schemas published via Wolverine outbox → Kafka with CloudEvents envelope (ADR-019). Each of DataModeling/FormBuilder/WorkflowBuilder/WorkflowEngine subscribes to `WorkspaceVerifiedEvent` and provisions its own workspace schema (central `WorkspaceSchemaProvisioner` and `ProvisionWorkspaceMessage` removed — extraction is now a redeploy per ADR-010). Gateway uses `AddGrpcClient<IdentityService.IdentityServiceClient>` with `Modules:Identity:GrpcUrl` config; JWKS-only validation rule documented in [gRPC patterns](playbooks/grpc-patterns.md#jwks-only-jwt-validation-in-consuming-modules).
 
 ## Data Modeling (`data-modeling`)
 

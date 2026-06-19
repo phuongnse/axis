@@ -63,7 +63,7 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 > - `workspace_id` claim issued at login (`ConnectEndpoints`)
 > - handlers use `IWorkspaceContext` / `ICurrentUser` — schema `workspace_{WorkspaceId:N}` derived in `HttpWorkspaceContext` (no separate DB lookup; Redis cache N/A — deterministic derivation satisfies the under-5 ms AC).
 > - `WorkspaceAccessMiddleware` returns HTTP 403 for missing, archived/deleted, or not-ready workspaces on workspace module routes (`/api/models`, workflows, forms, etc.).
-> - background jobs use `FixedWorkspaceContext` in provision/cancel handlers (see [patterns.md](../../../playbooks/patterns.md)).
+> - background jobs use `FixedWorkspaceContext` in provision/cancel handlers (see [runtime patterns](../../../playbooks/runtime-patterns.md) and [Wolverine patterns](../../../playbooks/wolverine-patterns.md)).
 >
 > **Gaps vs spec:** none for backend cross-workspace access prevention.
 >
@@ -78,4 +78,3 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
 | N/A | N/A | N/A |
-

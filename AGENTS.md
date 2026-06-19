@@ -47,7 +47,7 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 - **MediatR is intra-module only.** Cross-module dispatch always goes through Wolverine: commands/jobs/saga steps via RabbitMQ, events via Kafka (suffix convention in ADR-025).
 - **Auth checks read JWT claims locally.** Never `IdentityDbContext.Users.Find(...)` from outside Identity — call Identity's gRPC `IdentityService` or rely on JWT claims.
 
-**Cross-module data:** local read model synced by Kafka events — see [`patterns.md` § Cross-module communication](docs/playbooks/patterns.md). Saga orchestration ([ADR-020](docs/TECH_STACK.md#adr-020-saga-orchestration-for-cross-module-workflows)) for workflows that need transactional-looking semantics across modules.
+**Cross-module data:** local read model synced by Kafka events — see [`cross-module-patterns.md`](docs/playbooks/cross-module-patterns.md). Saga orchestration ([ADR-020](docs/TECH_STACK.md#adr-020-saga-orchestration-for-cross-module-workflows)) for workflows that need transactional-looking semantics across modules.
 
 **Layer dependency (per module):** Contracts (pure schema) ← Domain (pure C#) ← Application ← Infrastructure ← module API entrypoint. `frontend/` calls only `Axis.Api` (REST). `Axis.Api` calls module Application directly (modulith mode) or module gRPC (extracted mode).
 
@@ -102,7 +102,7 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 1. [`agent-checklist.md`](docs/playbooks/agent-checklist.md) — AC map, gates/checkpoints, domain map. New module/event/proto → [`repo-layout-discovery.md`](docs/playbooks/repo-layout-discovery.md).
 2. `docs/use-cases/{domain}/README.md` + `docs/use-cases/{domain}/*.md` for the use case.
 3. [`docs/PROGRESS.md`](docs/PROGRESS.md) for layer status.
-4. Open [`process.md`](docs/playbooks/process.md) / [`patterns.md`](docs/playbooks/patterns.md) only when the checklist says so.
+4. Open [`process.md`](docs/playbooks/process.md) / [`patterns-index.md`](docs/playbooks/patterns-index.md) only when the checklist says so.
 
 ### Design Gate (mandatory before code)
 
@@ -153,7 +153,7 @@ Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, use-c
 
 **Enforced C# rules** live in [`.editorconfig`](.editorconfig) at the repo root. Do not restate style here — run `dotnet format` and follow the file.
 
-**Architecture/API contracts:** use `$axis-api-contract` for REST/OpenAPI/API-type work and `$axis-cross-module-contract` for events, protos, Wolverine, Kafka, RabbitMQ, or gRPC. Details live in [`patterns.md`](docs/playbooks/patterns.md) and [`repo-layout-discovery.md`](docs/playbooks/repo-layout-discovery.md).
+**Architecture/API contracts:** use `$axis-api-contract` for REST/OpenAPI/API-type work and `$axis-cross-module-contract` for events, protos, Wolverine, Kafka, RabbitMQ, or gRPC. Details live in [`api-patterns.md`](docs/playbooks/api-patterns.md), [`cross-module-patterns.md`](docs/playbooks/cross-module-patterns.md), [`wolverine-patterns.md`](docs/playbooks/wolverine-patterns.md), [`grpc-patterns.md`](docs/playbooks/grpc-patterns.md), and [`repo-layout-discovery.md`](docs/playbooks/repo-layout-discovery.md).
 
 **Frontend:** use `$axis-frontend-feature`; details live in [`frontend.md`](docs/playbooks/frontend.md).
 
@@ -183,8 +183,8 @@ Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` chan
 | [repo-layout-discovery.md](docs/playbooks/repo-layout-discovery.md) | **Agents —** module/event/proto → docs/config checklists + CI discovery rules |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Branches, PRs, drift script |
 | [process.md](docs/playbooks/process.md) | Layer workflow; deferred follow-ups; PR wrap-up |
-| [patterns-index.md](docs/playbooks/patterns-index.md) | Jump table into patterns |
-| [patterns.md](docs/playbooks/patterns.md) | Implementation detail |
+| [patterns-index.md](docs/playbooks/patterns-index.md) | Jump table into focused implementation-pattern playbooks |
+| [patterns.md](docs/playbooks/patterns.md) | Compatibility router for legacy pattern anchors |
 | [testing.md](docs/playbooks/testing.md) | Test patterns |
 | [frontend.md](docs/playbooks/frontend.md) | SPA rules |
 | [docs-style.md](docs/playbooks/docs-style.md) | Doc anti-patterns + single-owner rule (read before adding a `.md`) |

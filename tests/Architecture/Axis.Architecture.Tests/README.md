@@ -18,7 +18,7 @@ Tests in this project run under `dotnet test` like any other and enforce **AGENT
 
 ### Convention rules
 
-These rules don't enforce a P0/P1 from AGENTS.md directly — they encode the implementation conventions in `docs/playbooks/patterns.md` so a new agent writing a handler/repo/aggregate is forced into the same shape as existing code.
+These rules don't enforce a P0/P1 from AGENTS.md directly — they encode implementation conventions from the focused pattern playbooks under `docs/playbooks/` so a new agent writing a handler/repo/aggregate is forced into the same shape as existing code.
 
 | Test file | Convention enforced |
 |---|---|

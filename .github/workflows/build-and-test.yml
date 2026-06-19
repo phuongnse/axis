@@ -102,6 +102,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
         with:
+          # Version owner: docs/TECH_STACK.md (.NET 8.x); global.json selects it.
           dotnet-version: 8.0.x
           cache: true
           cache-dependency-path: '**/*.csproj'
@@ -227,11 +228,12 @@ jobs:
       - name: Setup Buf CLI
         uses: bufbuild/buf-setup-action@a47c93e0b1648d5651a065437926377d060baa99 # v1.50.0
         with:
+          # Version owner: docs/playbooks/scripts.md#tool-versions.
           version: "1.50.0"
           github_token: ${{ github.token }}
 
       - name: buf lint
-        run: buf lint
+        run: python scripts/axis.py check buf-lint
 
       # Do not git fetch here: checkout@v6 with fetch-depth: 0 already provides
       # origin/<base> for pull_request events. persist-credentials: false blocks fetch.
@@ -254,9 +256,11 @@ jobs:
       # Lychee runs in offline mode (configured in lychee.toml): resolves
       # local file paths and #anchors only. External http(s) is intentionally
       # not blocking — third-party rot is real but doesn't belong in PR CI.
+      # Version owner: docs/playbooks/scripts.md#tool-versions.
       - name: Lychee — verify internal links and anchors
         uses: lycheeverse/lychee-action@8646ba30535128ac92d33dfc9133794bfdd9b411 # v2.8.0
         with:
+          lycheeVersion: v0.23.0
           args: --config ./lychee.toml './**/*.md'
           fail: true
 
