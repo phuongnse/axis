@@ -132,7 +132,7 @@ public sealed class WorkflowExecution : AggregateRoot<Guid>
 **Consequences of correct modeling:**
 - Domain events are raised by the aggregate root, ensuring they are dispatched within its transaction boundary
 - Owned entities do NOT need `DeletedAt` — they are deleted when the root is deleted (EF Cascade)
-- EF Core: use `OwnsMany` with a separate table (see [OwnsMany pattern](#ef-core-ownsmany-pattern)) instead of a standalone `DbSet<ChildEntity>`
+- EF Core: use `OwnsMany` with a separate table (see [OwnsMany pattern](./persistence-patterns.md#ef-core-ownsmany-pattern)) instead of a standalone `DbSet<ChildEntity>`
 - Child entities are always accessed through the root — no standalone repository for them
 
 **Correct boundary (keep as separate AggregateRoot) when:**

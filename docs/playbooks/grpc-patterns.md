@@ -40,7 +40,7 @@ message GetUserPermissionsResponse {
 2. Add the `Protos` directory to `modules:` in [`buf.yaml`](../../buf.yaml) at the repo root (copy an existing line).
 3. Keep `Grpc.Tools` `<Protobuf Include=...>` in the `.csproj` — Buf does not replace codegen.
 4. Run `buf lint` locally (`buf` CLI) and `python scripts/axis.py check buf-modules` (also runs in CI **Doc drift**).
-5. **Changing `buf.yaml` breaking policy or removing a field?** Read [Buf breaking rules — what's actually configured (and the gotcha)](#buf-breaking-rules--whats-actually-configured-and-the-gotcha) first. The v2 category model splits deletion rules in a way that's easy to misread, and "buf passes locally" can mean "no rule fires" rather than "the relaxed rule passed".
+5. **Changing `buf.yaml` breaking policy or removing a field?** Read [Buf breaking rules](#buf-breaking-rules) first. The v2 category model splits deletion rules in a way that's easy to misread, and "buf passes locally" can mean "no rule fires" rather than "the relaxed rule passed".
 
 CI runs `buf lint` and `buf breaking` against `main` when `.proto` or `buf.yaml` changes.
 
