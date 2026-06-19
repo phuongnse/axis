@@ -21,16 +21,29 @@ function normalizeRepoPath(filePath) {
   return normalized.startsWith('./') ? normalized.slice(2) : normalized;
 }
 
-function gitOutput(args) {
+function gitOutput(args, label, options = {}) {
   try {
     return execFileSync('git', ['-C', repoRoot, ...args], { encoding: 'utf8' });
-  } catch {
-    return '';
+  } catch (error) {
+    if (options.allowFailure === true) {
+      return '';
+    }
+    const stderr =
+      error && typeof error === 'object' && 'stderr' in error && error.stderr
+        ? String(error.stderr).trim()
+        : '';
+    const message = error instanceof Error ? error.message : String(error);
+    const detail = stderr || message;
+    throw new Error(`${label}: git ${args.join(' ')} failed: ${detail}`);
   }
 }
 
 function gitRefExists(ref) {
-  return gitOutput(['rev-parse', '--verify', ref]).trim().length > 0;
+  return (
+    gitOutput(['rev-parse', '--verify', ref], `gitRefExists ${ref}`, {
+      allowFailure: true,
+    }).trim().length > 0
+  );
 }
 
 function diffRange() {
@@ -40,7 +53,10 @@ function diffRange() {
     if (!gitRefExists(candidate)) {
       continue;
     }
-    const mergeBase = gitOutput(['merge-base', candidate, 'HEAD']).trim();
+    const mergeBase = gitOutput(
+      ['merge-base', candidate, 'HEAD'],
+      `diffRange merge-base ${candidate}`,
+    ).trim();
     if (mergeBase) {
       return `${mergeBase}...HEAD`;
     }
@@ -86,11 +102,26 @@ function changedRepoPaths() {
   const paths = new Set();
   const range = diffRange();
   if (range) {
-    appendPathLines(paths, gitOutput(['diff', '--name-only', range, '--', 'docs']));
+    appendPathLines(
+      paths,
+      gitOutput(['diff', '--name-only', range, '--', 'docs'], 'changedRepoPaths range'),
+    );
   }
-  appendPathLines(paths, gitOutput(['diff', '--name-only', '--cached', '--', 'docs']));
-  appendPathLines(paths, gitOutput(['diff', '--name-only', '--', 'docs']));
-  appendPathLines(paths, gitOutput(['ls-files', '--others', '--exclude-standard', '--', 'docs']));
+  appendPathLines(
+    paths,
+    gitOutput(['diff', '--name-only', '--cached', '--', 'docs'], 'changedRepoPaths staged'),
+  );
+  appendPathLines(
+    paths,
+    gitOutput(['diff', '--name-only', '--', 'docs'], 'changedRepoPaths unstaged'),
+  );
+  appendPathLines(
+    paths,
+    gitOutput(
+      ['ls-files', '--others', '--exclude-standard', '--', 'docs'],
+      'changedRepoPaths untracked',
+    ),
+  );
   return [...paths];
 }
 

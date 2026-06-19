@@ -1198,7 +1198,7 @@ def parse_added_lines(diff_text: str, include: callable[[str], bool]) -> list[tu
             continue
         if not current or not include(current):
             continue
-        if line.startswith("+") and not line.startswith("+++"):
+        if line.startswith("+") and not line.startswith("+++ "):
             rows.append((current, line[1:]))
     return rows
 

@@ -76,7 +76,7 @@ The restructured version hides what type is being worked with, discards future f
 
 ### 3. Verify `!` is actually needed before adding it
 
-Before using the null-fworkspaceiving operator `!` to suppress a nullable annotation, check whether the assignment compiles without it. If the existing codebase already uses the same API without `!`, adding it is a workaround — not a fix.
+Before using the null-forgiving operator `!` to suppress a nullable annotation, check whether the assignment compiles without it. If the existing codebase already uses the same API without `!`, adding it is a workaround — not a fix.
 
 **Wrong** — `!` added without verifying it is necessary:
 ```csharp

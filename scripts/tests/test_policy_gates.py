@@ -571,7 +571,7 @@ class TestWorkingTreeDiffHelpers(unittest.TestCase):
             untracked.write_text("untracked line\n", encoding="utf-8")
 
             outputs = {
-                ("diff", "--unified=0", "base...HEAD"): "+++ b/docs/committed.md\n+committed line\n",
+                ("diff", "--unified=0", "base...HEAD"): "+++ b/docs/committed.md\n++++heading\n+committed line\n",
                 ("diff", "--unified=0", "--cached"): "+++ b/docs/staged.md\n+staged line\n",
                 ("diff", "--unified=0"): "+++ b/docs/unstaged.md\n+unstaged line\n",
                 ("ls-files", "--others", "--exclude-standard"): "docs/untracked.md\n",
@@ -586,6 +586,7 @@ class TestWorkingTreeDiffHelpers(unittest.TestCase):
 
         self.assertEqual(
             [
+                ("docs/committed.md", "+++heading"),
                 ("docs/committed.md", "committed line"),
                 ("docs/staged.md", "staged line"),
                 ("docs/unstaged.md", "unstaged line"),
