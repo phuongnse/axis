@@ -18,7 +18,9 @@ Add or change cross-module communication without introducing in-process coupling
 2. Read the owning rules.
    - `AGENTS.md`
    - `docs/TECH_STACK.md` ADRs for event sourcing, Avro, RabbitMQ/Wolverine, and routing suffixes
-   - `docs/playbooks/patterns.md`
+   - `docs/playbooks/cross-module-patterns.md`
+   - `docs/playbooks/wolverine-patterns.md`
+   - `docs/playbooks/grpc-patterns.md` when sync RPC or proto changes
    - `docs/playbooks/repo-layout-discovery.md`
    - `docs/playbooks/agent-checklist.md`
    - The owning use-case file when behavior changes

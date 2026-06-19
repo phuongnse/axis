@@ -251,23 +251,36 @@ def diff_range_against_base() -> str:
 
 
 def changed_paths_against_base() -> list[Path]:
-    """Return changed paths for PR-style ratchets; fail closed without diff context."""
+    """Return PR-range and working-tree paths for local and CI ratchets."""
     range_spec = diff_range_against_base()
-    result = subprocess.run(
-        ["git", "diff", "--name-only", range_spec],
-        cwd=ROOT,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        check=False,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"check-use-case-docs: failed to diff {range_spec}")
 
     paths: list[Path] = []
-    for line in result.stdout.splitlines():
-        if line.strip():
-            paths.append((ROOT / line.strip()).resolve())
+    seen: set[Path] = set()
+
+    def collect(args: list[str], label: str) -> None:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"check-use-case-docs: failed to diff {label}")
+        for line in result.stdout.splitlines():
+            if not line.strip():
+                continue
+            path = (ROOT / line.strip()).resolve()
+            if path in seen:
+                continue
+            seen.add(path)
+            paths.append(path)
+
+    collect(["diff", "--name-only", range_spec], range_spec)
+    collect(["diff", "--name-only", "--cached"], "staged changes")
+    collect(["diff", "--name-only"], "unstaged changes")
+    collect(["ls-files", "--others", "--exclude-standard"], "untracked files")
     return paths
 
 

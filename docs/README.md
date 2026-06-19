@@ -19,12 +19,21 @@
 
 | Playbook | Description |
 |---|---|
-| [Local dev](./playbooks/local-dev.md) | Run the full stack with `docker compose up` — URLs, ports, hot reload, reset commands |
+| [Local dev](./playbooks/local-dev.md) | Run the full stack with `docker compose up` — baseline commands, URLs, ports, environment adapters |
 | [Process](./playbooks/process.md) | Step-by-step implementation workflow — backend and frontend; deferred follow-ups and PR wrap-up checklist |
 | [Design Gate](./playbooks/design-gate.md) | **Agents:** mandatory pre-code reasoning — re-derive the rules for the surface you touch, produce the dossier, sign-off on high-risk before coding |
 | [PR slicing](./playbooks/pr-slicing.md) | **Agents:** split large use cases into genuinely isolated, mergeable PRs — two-sided isolation test, shared-seam ownership, merge/rebase cadence |
 | [Repo layout discovery](./playbooks/repo-layout-discovery.md) | **Agents:** auto vs manual CI maps (module → docs, Kafka, buf, indexes) + checklists before review |
-| [Patterns](./playbooks/patterns.md) | Technical patterns, pitfalls, and code examples |
+| [Patterns index](./playbooks/patterns-index.md) | Router to the focused technical-pattern owner docs |
+| [Domain/Application patterns](./playbooks/domain-application-patterns.md) | Domain behavior, `Result`, aggregate boundaries, application idempotency |
+| [Dependency patterns](./playbooks/dependency-patterns.md) | NuGet/CPM and dependency-injection pitfalls |
+| [Persistence patterns](./playbooks/persistence-patterns.md) | EF Core, repositories, workspace schema, migrations |
+| [API patterns](./playbooks/api-patterns.md) | Minimal API, DTOs, OpenAPI, pagination, HTTP mapping |
+| [Runtime patterns](./playbooks/runtime-patterns.md) | Async, cancellation, background work, OpenTelemetry |
+| [Wolverine patterns](./playbooks/wolverine-patterns.md) | Wolverine host setup, handlers, jobs, idempotency, logging |
+| [Cross-module patterns](./playbooks/cross-module-patterns.md) | Cross-module data sovereignty, Kafka/local read models, violation sweeps |
+| [gRPC patterns](./playbooks/grpc-patterns.md) | gRPC escape hatch, proto/Buf compatibility, grpcurl, JWKS validation |
+| [Code hygiene patterns](./playbooks/code-hygiene-patterns.md) | Pre-commit hygiene and policy regex constraints |
 | [Testing](./playbooks/testing.md) | Test isolation, naming, file layout, mocking rules — .NET and frontend |
 | [Frontend](./playbooks/frontend.md) | UX-first UI rules, TanStack Query patterns, TypeScript discipline, routing, component design |
 | [Wireframe kit](./playbooks/wireframes.md) | Screen generators, kit sections; **agents:** [spacing & blocks contract](./wireframes/README.md#agent-contract) |
@@ -197,6 +206,6 @@ When two docs disagree, the **owner** wins. Update the owner first; everything e
 | Per-use-case ACs and current gaps | `docs/use-cases/{domain}/{short-slug}/README.md` |
 | Module-wide layer status | [PROGRESS.md](./PROGRESS.md) |
 | Daily agent workflow + gates | [playbooks/agent-checklist.md](./playbooks/agent-checklist.md) |
-| Local dev (compose, ports, URLs) | [playbooks/local-dev.md](./playbooks/local-dev.md) + [`docker-compose.yml`](../docker-compose.yml) |
-| Implementation patterns and pitfalls | [playbooks/patterns.md](./playbooks/patterns.md) (start at [patterns-index.md](./playbooks/patterns-index.md)) |
+| Local dev (compose, ports, URLs, environment adapters) | [playbooks/local-dev.md](./playbooks/local-dev.md) + [`docker-compose.yml`](../docker-compose.yml) |
+| Implementation patterns and pitfalls | [playbooks/patterns-index.md](./playbooks/patterns-index.md) routes to the focused owner docs; [playbooks/patterns.md](./playbooks/patterns.md) is a compatibility router only |
 | UI wireframes (per screen / use case) | `docs/use-cases/{domain}/{use-case}/README.md` → `## Wireframes` ([hub § Wireframes](./README.md#wireframes) for navigation only) |

@@ -23,7 +23,7 @@ Every `[Fact]` and `[Theory]` name is mechanically checked by
 
 ### Test isolation
 
-Each integration test class implements `IAsyncLifetime` (one Testcontainer per class). Each test method calls `ResetAsync()` at its start to truncate relevant tables. See `docs/playbooks/patterns.md` for the full `IAsyncLifetime` pattern.
+Each integration test class implements `IAsyncLifetime` (one Testcontainer per class). Each test method calls `ResetAsync()` at its start to truncate relevant tables. See [Additional .NET test patterns](#additional-net-test-patterns) for the full `IAsyncLifetime` pattern.
 
 ### Database rules
 
@@ -56,6 +56,69 @@ Testing playbook responsibility here is implementation technique:
 - keep path assertions deterministic (no timing-race assertions),
 - keep behavior assertions explicit enough to map back to the AC row.
 
+### Additional .NET test patterns
+
+- Never run `dotnet test --no-build` after editing test code — always let it recompile.
+- **Never hardcode environment configurations**: connection strings, API URLs, Docker endpoints, secret keys must use environment variables, `appsettings.json`, or `.testcontainers.properties`.
+- **Pre-push / CI**: local pre-push runs a quick policy/doc sanity gate (`python scripts/axis.py pre-push`) so ordinary pushes stay fast. Before requesting review, run the ready-PR gate (`python scripts/axis.py verify`), including unit test projects via `python scripts/axis.py test unit`. CI runs full `dotnet test Axis.sln`, including Testcontainers integration and API tests.
+
+#### Pattern — keep API isolation tests deterministic, test async provisioning separately
+
+Workspace data-isolation API tests and workspace-provisioning event-pipeline tests have different failure modes and should not share the same precondition mechanism.
+
+- **API isolation tests** (e.g., cross-workspace 404/403 behavior) should use deterministic setup: create/verify workspace schema readiness in fixture code and verify required tables exist before requests.
+- **Async provisioning tests** (Kafka/Wolverine coordinator paths) should validate retry/backoff/exhaustion/completion logic in dedicated messaging/infrastructure tests.
+- Avoid helper-level long polling for eventual consistency in shared auth/setup helpers; a single timing hiccup can fan out into dozens of unrelated API test failures and CI timeout/cancel behavior.
+
+Use this split whenever a feature combines "eventually consistent provisioning" with "synchronous API authorization/isolation checks."
+
+**Test isolation pattern** — two levels of isolation to understand:
+
+**Level 1 — between test classes (container-per-class):** Each test class gets its own Testcontainers instance via `IAsyncLifetime`. This guarantees no cross-class pollution.
+
+**Level 2 — between tests within the same class:** A fresh container starts empty, so the first test is clean by default. But subsequent tests in the same class accumulate data from previous ones. Handle this with a `ResetAsync()` helper that truncates relevant tables at the start of each test:
+
+```csharp
+public class CreateWorkflowTests : IAsyncLifetime
+{
+    private PostgreSqlContainer _postgres = null!;
+    private WorkflowBuilderDbContext _context = null!;
+
+    public async Task InitializeAsync()
+    {
+        _postgres = new PostgreSqlBuilder().Build();
+        await _postgres.StartAsync();
+        _context = DbContextFactory.Create(_postgres.GetConnectionString());
+        await _context.Database.MigrateAsync();
+    }
+
+    public async Task DisposeAsync()
+    {
+        await _context.DisposeAsync();
+        await _postgres.DisposeAsync();
+    }
+
+    // Call at the start of each test method that needs a clean slate
+    private async Task ResetAsync()
+    {
+        await _context.Database.ExecuteSqlRawAsync(
+            "TRUNCATE TABLE workflow_definitions CASCADE");
+    }
+
+    [Fact]
+    public async Task CreateWorkflow_WhenNameIsUnique_Succeeds()
+    {
+        await ResetAsync();
+        // ... arrange, act, assert
+    }
+}
+```
+
+**Rules:**
+- Never assume a test runs first — always call `ResetAsync()` at the start of any test that requires a clean state.
+- Never rely on data created by a sibling test — each test must arrange its own prerequisites.
+- Use `AsNoTracking()` for all read queries in tests to avoid EF Core change tracker interference between assertions.
+
 ### Ready-PR gate
 
 See [agent-checklist.md § Verification Gate](./agent-checklist.md#verification-gate--verify-before-pr-review) and AGENTS.md. When `src/` or `tests/` change:
@@ -69,11 +132,10 @@ dotnet format --verify-no-changes
 
 `python scripts/axis.py test unit` discovers committed `*.Domain.Tests` and `*.Application.Tests` projects from `git ls-files`; it does not use a static solution filter. Run `python scripts/axis.py check test-project-classification` when adding a test project; CI fails if a committed `*.Tests.csproj` is not classified. Full `dotnet test Axis.sln --nologo` runs Domain, Application, Infrastructure with Testcontainers, and API tests; Docker must be available for that full local run and CI always runs it before merge.
 
-Use the Docker endpoint already available to the shell running .NET when
-`docker info` works. Only set `DOCKER_HOST=tcp://127.0.0.1:2375` when that
-shell cannot see Docker but Docker Engine is running inside WSL2 with its TCP
-daemon exported; probe that fallback with
-`Invoke-WebRequest http://127.0.0.1:2375/_ping`.
+Full local `dotnet test` requires Docker to be visible to the process running
+.NET. Use `docker info` as the check. If Docker is not visible from that process,
+use the [local-dev Docker endpoint adapter](./local-dev.md#docker-endpoint-adapter);
+do not hardcode Docker endpoints in test code or fixtures.
 
 ### Integration test maintenance
 
@@ -110,7 +172,7 @@ Do not couple request-path / synchronous tests to the timing of an asynchronous,
 - **Async-workflow tests** (retry scheduling, exhaustion/alert behavior, completion transitions) belong in a **separate suite** that targets the coordinator/handler directly — not as an implicit precondition of every request-path test.
 - **Shared helpers** (e.g. an auth/setup helper used by many suites) must never poll an eventually-consistent pipeline in a long loop. One slow or flaky pipeline then fails or times out every suite that touches the helper, hiding the real failure.
 
-When a suite in this class flakes, fix setup determinism first (is the precondition actually present before the call?), then verify the pipeline behavior in its dedicated suite. See [patterns.md § Testing rules](./patterns.md#testing-rules) for the technique.
+When a suite in this class flakes, fix setup determinism first (is the precondition actually present before the call?), then verify the pipeline behavior in its dedicated suite. See [Additional .NET test patterns](#additional-net-test-patterns) for the technique.
 
 ---
 

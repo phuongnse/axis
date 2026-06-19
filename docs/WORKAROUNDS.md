@@ -34,7 +34,7 @@ When the cleanup trigger fires and you remove the workaround:
 1. **Delete the entry** from **Active workarounds**. Git history is the audit trail — `git log -p docs/WORKAROUNDS.md` shows when and why each entry was removed; no need for an in-file archive.
 2. Remove the `// WORKAROUND:` code comment at the violation site.
 3. Remove the test allow-list entry (the test will catch this for you — it fails with "stale entries: …" pointing at the exact line to delete).
-4. **If the resolution taught a durable lesson** (e.g. "centralised X in the gateway breaks ADR-Y"), capture it in `docs/playbooks/patterns.md` as a pattern or anti-pattern, or amend the relevant ADR. The lesson belongs where future readers will find it; WORKAROUNDS.md is for *current* debt, not history.
+4. **If the resolution taught a durable lesson** (e.g. "centralised X in the gateway breaks ADR-Y"), capture it in the focused pattern owner from `docs/playbooks/patterns-index.md`, or amend the relevant ADR. The lesson belongs where future readers will find it; WORKAROUNDS.md is for *current* debt, not history.
 5. If the workaround has lived longer than 6 months without its trigger firing, the entry should be **revisited** during the next architecture audit — either the trigger needs to be re-stated, or the workaround needs to be promoted into the design (ADR amendment).
 
 ### Reviewing

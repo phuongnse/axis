@@ -89,11 +89,11 @@ Also check cross-module Application dependencies: list every query or command th
 
 Run the following and inspect every result:
 
-```powershell
+```bash
 grep -rn "SqlQueryRaw\|ExecuteSqlRaw\|FromSqlRaw\|ExecuteSqlInterpolated" src/Modules/ --include="*.cs"
 ```
 
-For every match: confirm the SQL only references tables owned by that match's own module. Any reference to another module's table is a P0 violation — fix it using the event-driven local denormalization pattern in `patterns.md § Cross-module data pattern` before continuing.
+For every match: confirm the SQL only references tables owned by that match's own module. Any reference to another module's table is a P0 violation — fix it using the event-driven local denormalization pattern in [cross-module patterns](./cross-module-patterns.md) before continuing.
 
 **Do not start Step 5 until every ⚠️ is resolved or explicitly documented as deferred with a reason.**
 
@@ -111,7 +111,7 @@ For every match: confirm the SQL only references tables owned by that match's ow
 - Update use-case file `> **Implementation status**` callout for this US
 - If all USes in the feature are complete for a layer: update Domain README status table
 - If the full layer is done for the module: update `docs/PROGRESS.md`
-- If a new pattern was established: add to `docs/playbooks/patterns.md`
+- If a new pattern was established: add it to the focused owner doc from `docs/playbooks/patterns-index.md`
 - If a library was added or changed: update `docs/TECH_STACK.md`
 
 ---
@@ -151,7 +151,7 @@ Repeat for every screen / feature area. **Never skip the wireframe step** — it
 - Update use-case file `> **Implementation status**` callout for this US
 - If all USes in the feature are complete for Frontend: update Domain README status table
 - If the full Frontend layer is done for the module: update `docs/PROGRESS.md`
-- If a new frontend pattern was established: add to `docs/playbooks/patterns.md`
+- If a new frontend pattern was established: add it to `docs/playbooks/frontend.md` and update `patterns-index.md` only if routing changes
 - If a library was added or changed: update `docs/TECH_STACK.md`
 
 **UX review before implementation and before PR:**

@@ -115,6 +115,6 @@ python scripts/axis.py check domain-readme-index
 |-----|--------|
 | [agent-checklist.md](./agent-checklist.md) | Verification gate, review checks, domain layout summary |
 | [process.md](./process.md) | Layer order, host wiring, deferred follow-ups |
-| [patterns.md § gRPC](./patterns.md) | Buf, proto layout |
+| [grpc-patterns.md](./grpc-patterns.md) | Buf, proto layout |
 | [Architecture tests README](../../tests/Architecture/Axis.Architecture.Tests/README.md) | Fitness tests + new module |
 | [CONTRIBUTING.md](../../CONTRIBUTING.md) | Short pre-push pointer |

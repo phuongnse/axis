@@ -63,7 +63,7 @@ public class RepositoryConventionTests
             $"{repoType.FullName} exposes IQueryable on a public method — repositories must " +
             "materialize (ToList/FirstOrDefault/ProjectTo) before returning. IQueryable leaks " +
             "deferred-execution semantics into Application/Domain and breaks workspace schema interceptors " +
-            "(patterns.md § Repository pattern). " +
+            "(persistence-patterns.md § EF Core common pitfalls). " +
             $"Methods: {string.Join(", ", leakingMethods.Select(m => m.Name))}");
     }
 
@@ -87,7 +87,7 @@ public class RepositoryConventionTests
 
         suspectMethods.Should().BeEmpty(
             $"{repoType.FullName} exposes a commit-style method — persistence belongs in " +
-            "IUnitOfWork.SaveChangesAsync (patterns.md § Unit of Work). " +
+            "IUnitOfWork.SaveChangesAsync (persistence-patterns.md § EF Core common pitfalls). " +
             $"Methods: {string.Join(", ", suspectMethods.Select(m => m.Name))}");
     }
 

@@ -440,6 +440,43 @@ Ship user value.
         self.assertFalse(changed)
         self.assertIn(["git", "merge-base", "origin/main", "HEAD"], calls)
 
+    def test_changed_paths_against_base_include_working_tree_and_untracked(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            calls: list[list[str]] = []
+            outputs = {
+                ("git", "rev-parse", "--verify", "origin/main"): "",
+                ("git", "diff", "--name-only", "origin/main...HEAD"): "docs/use-cases/a/README.md\n",
+                ("git", "diff", "--name-only", "--cached"): "docs/use-cases/b/README.md\n",
+                ("git", "diff", "--name-only"): "docs/use-cases/c/README.md\n",
+                ("git", "ls-files", "--others", "--exclude-standard"): "docs/use-cases/d/README.md\n",
+            }
+
+            def fake_run(args: list[str], **_kwargs):
+                calls.append(args)
+                stdout = outputs.get(tuple(args), "")
+                return check_use_case_docs.subprocess.CompletedProcess(args, 0, stdout=stdout)
+
+            original_root = check_use_case_docs.ROOT
+            check_use_case_docs.ROOT = Path(temp)
+            try:
+                with mock.patch.object(check_use_case_docs.subprocess, "run", side_effect=fake_run):
+                    paths = check_use_case_docs.changed_paths_against_base()
+            finally:
+                check_use_case_docs.ROOT = original_root
+
+        self.assertEqual(
+            [
+                root / "docs" / "use-cases" / "a" / "README.md",
+                root / "docs" / "use-cases" / "b" / "README.md",
+                root / "docs" / "use-cases" / "c" / "README.md",
+                root / "docs" / "use-cases" / "d" / "README.md",
+            ],
+            paths,
+        )
+        self.assertIn(["git", "diff", "--name-only"], calls)
+        self.assertIn(["git", "ls-files", "--others", "--exclude-standard"], calls)
+
 
 class TestDocDriftRatchets(unittest.TestCase):
     def issue_text(self, rows: list[tuple[str, str]]) -> str:
@@ -470,8 +507,112 @@ class TestDocDriftRatchets(unittest.TestCase):
         self.assertIn("Machine-specific local path introduced", issues)
 
     def test_accepts_placeholder_paths_in_docs(self) -> None:
-        issues = axis.doc_drift_added_line_issues([("docs/playbooks/local-dev.md", "cd /path/to/axis && docker compose up -d")])
+        issues = axis.doc_drift_added_line_issues([("docs/playbooks/local-dev.md", "cd <repo-root> && docker compose up -d")])
         self.assertEqual([], issues)
+
+
+class TestWorkingTreeDiffHelpers(unittest.TestCase):
+    def fake_git_run(self, outputs: dict[tuple[str, ...], str]):
+        def fake_run(args: list[str], **_kwargs):
+            key = tuple(args[1:] if args and args[0] == "git" else args)
+            stdout = outputs.get(key, "")
+            return axis.subprocess.CompletedProcess(args, 0, stdout=stdout, stderr="")
+
+        return fake_run
+
+    def test_changed_paths_include_committed_staged_unstaged_and_untracked(self) -> None:
+        outputs = {
+            ("diff", "--name-only", "base...HEAD"): "docs/committed.md\n",
+            ("diff", "--name-only", "--cached"): "docs/staged.md\n",
+            ("diff", "--name-only"): "docs/unstaged.md\n",
+            ("ls-files", "--others", "--exclude-standard"): "docs/untracked.md\n",
+        }
+
+        with (
+            mock.patch.object(axis, "exe", side_effect=lambda name: name),
+            mock.patch.object(axis, "run", side_effect=self.fake_git_run(outputs)),
+        ):
+            paths = axis.changed_paths("base...HEAD")
+
+        self.assertEqual(
+            ["docs/committed.md", "docs/staged.md", "docs/unstaged.md", "docs/untracked.md"],
+            paths,
+        )
+
+    def test_changed_name_status_marks_untracked_files_added(self) -> None:
+        outputs = {
+            ("diff", "--name-status", "base...HEAD"): "M\tdocs/committed.md\n",
+            ("diff", "--name-status", "--cached"): "A\tdocs/staged.md\n",
+            ("diff", "--name-status"): "M\tdocs/unstaged.md\n",
+            ("ls-files", "--others", "--exclude-standard"): "docs/untracked.md\n",
+        }
+
+        with (
+            mock.patch.object(axis, "exe", side_effect=lambda name: name),
+            mock.patch.object(axis, "run", side_effect=self.fake_git_run(outputs)),
+        ):
+            changes = axis.changed_name_status("base...HEAD")
+
+        self.assertEqual(
+            [
+                ["M", "docs/committed.md"],
+                ["A", "docs/staged.md"],
+                ["M", "docs/unstaged.md"],
+                ["A", "docs/untracked.md"],
+            ],
+            changes,
+        )
+
+    def test_added_lines_include_working_tree_and_untracked_content(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            untracked = root / "docs" / "untracked.md"
+            untracked.parent.mkdir(parents=True)
+            untracked.write_text("untracked line\n", encoding="utf-8")
+
+            outputs = {
+                ("diff", "--unified=0", "base...HEAD"): "+++ b/docs/committed.md\n+committed line\n",
+                ("diff", "--unified=0", "--cached"): "+++ b/docs/staged.md\n+staged line\n",
+                ("diff", "--unified=0"): "+++ b/docs/unstaged.md\n+unstaged line\n",
+                ("ls-files", "--others", "--exclude-standard"): "docs/untracked.md\n",
+            }
+
+            with (
+                mock.patch.object(axis, "ROOT", root),
+                mock.patch.object(axis, "exe", side_effect=lambda name: name),
+                mock.patch.object(axis, "run", side_effect=self.fake_git_run(outputs)),
+            ):
+                rows = list(axis.added_lines("base...HEAD", lambda _path: True))
+
+        self.assertEqual(
+            [
+                ("docs/committed.md", "committed line"),
+                ("docs/staged.md", "staged line"),
+                ("docs/unstaged.md", "unstaged line"),
+                ("docs/untracked.md", "untracked line"),
+            ],
+            rows,
+        )
+
+
+class TestVulnerablePackageGate(unittest.TestCase):
+    def test_uses_absolute_solution_path_for_dotnet_list(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(args: list[str], **_kwargs):
+            calls.append(args)
+            return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+        with (
+            mock.patch.object(axis, "exe", side_effect=lambda name: name),
+            mock.patch.object(axis, "run", side_effect=fake_run),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.check_vulnerable_packages())
+
+        self.assertEqual("dotnet", calls[0][0])
+        self.assertEqual(str(axis.ROOT / "Axis.sln"), calls[0][2])
+        self.assertTrue(Path(calls[0][2]).is_absolute())
 
 
 class TestFrontendRadiusTokens(unittest.TestCase):
@@ -973,6 +1114,34 @@ class TestTextEncodingGate(unittest.TestCase):
     def test_current_repository_text_encoding_still_passes(self) -> None:
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(0, axis.check_text_encoding())
+
+
+class TestDocSizeBudgetGate(unittest.TestCase):
+    def issues_for_files(self, files: dict[str, str]) -> list[str]:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for relative, content in files.items():
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+            return axis.doc_size_budget_issues(root=root)
+
+    def test_rejects_overlong_pattern_router(self) -> None:
+        issues = self.issues_for_files(
+            {"docs/playbooks/patterns.md": "\n".join("line" for _ in range(151))}
+        )
+
+        self.assertIn("150-line docs budget", "\n".join(issues))
+
+    def test_rejects_overlong_playbook(self) -> None:
+        issues = self.issues_for_files(
+            {"docs/playbooks/api-patterns.md": "\n".join("line" for _ in range(301))}
+        )
+
+        self.assertIn("300-line docs budget", "\n".join(issues))
+
+    def test_current_repository_doc_size_budgets_still_pass(self) -> None:
+        self.assertEqual([], axis.doc_size_budget_issues())
 
 
 class TestScriptsStandardGate(unittest.TestCase):

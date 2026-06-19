@@ -359,6 +359,13 @@ dotnet_diagnostic.CA2016.severity = warning
 dotnet_diagnostic.VSTHRD200.severity = none
 dotnet_diagnostic.VSTHRD111.severity = none
 
+# Avro/protobuf-generated contract files are not edited by hand. Mark them as
+# generated for Roslyn-compatible IDEs and suppress the avrogen switch terminator
+# warning that Rider surfaces as "Code is unreachable".
+[src/**/Generated/**/*.cs]
+generated_code = true
+dotnet_diagnostic.CS0162.severity = none
+
 # xUnit / test harness — allow test-only patterns without warning noise
 [tests/**.cs]
 dotnet_diagnostic.xUnit1004.severity = none

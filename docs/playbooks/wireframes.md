@@ -94,4 +94,4 @@ Split `*-states` by trigger: interactions on the same screen go on one board; a 
 
 ## Script Policy
 
-Repo-level docs and wireframe utility scripts are Python-first. Native renderer tooling may live beside the owning package, such as `frontend/scripts/export-wireframes.mjs` for Excalidraw. Do not add ad hoc `.mjs`, `.js`, `.ps1`, `.sh`, `.cmd`, or `.bat` scripts under `docs/`, `docs/scripts/`, `docs/wireframes/`, or `docs/diagrams/`.
+Repo-level docs and wireframe utility scripts are Python-first. Native renderer tooling may live beside the owning package, such as `frontend/scripts/export-wireframes.mjs` for Excalidraw. Do not add ad hoc utility scripts under `docs/`, `docs/scripts/`, `docs/wireframes/`, or `docs/diagrams/`.

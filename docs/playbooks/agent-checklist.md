@@ -71,6 +71,7 @@ Use the terms from [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md#enforcement-taxono
 - **Doc drift** — runs deterministic docs/policy/layout checks: text encoding, module/API discovery, governance registry/owner-boundary/truth wiring, handler/test ratchets, endpoint DTO ratchets, workaround sync, doc hygiene, script standards, and layout checks (`buf`, Kafka wiring, domain README index). [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md) owns finding-class status; script output owns the exact failing guard.
 - **Markdown link check** — `lychee` verifies internal links and `#anchors`. **Relative file/image targets** (`![alt](./asset.svg)`, `[text](./file.md)`) are double-checked by `python scripts/axis.py check doc-link-targets` inside the drift command — catches the broken-image class lychee misses.
 - **Doc navigation** — `python scripts/axis.py check doc-navigation` requires every `docs/**/*.md` file to start with an H1 and a `> **Navigation**:` block so docs never become dead ends.
+- **Doc size budgets** — `python scripts/axis.py check doc-size-budgets` keeps reference docs/playbooks within the budgets in [docs-style.md](./docs-style.md#size-budgets), including the tighter pattern-router budget.
 - **Code-fence integrity** — `python scripts/axis.py check doc-code-fences` (inside the drift command) flags code-block lines with collapsed indentation (a lone leading space). Catches the bulk-find-replace corruption class that lychee, prettier, and the structural checks all let through.
 - **Use-case docs** — `python scripts/axis.py check use-case-docs` validates use-case file structure (required sections + tables + status callout), flags template placeholders (`_(One sentence...)_`, `_(Actor)_`, `_(What starts...)_`), flags self-links `[name](./README.md)` and truncated summary rows in domain READMEs, and counts use cases still on the stock Main flow.
 - **Codex skill metadata** — `python scripts/axis.py check codex-skills` validates repo-scoped `.agents/skills/*/SKILL.md` frontmatter, concise bodies, doc references, required skill chaining, concrete wording, and UI metadata/default prompts.
@@ -79,7 +80,7 @@ Use the terms from [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md#enforcement-taxono
 - **Architecture fitness tests** run as part of `dotnet test` — failures there mean a AGENTS.md P0/P1 rule got violated structurally. See [tests README](../../tests/Architecture/Axis.Architecture.Tests/README.md).
 - **EF migrations** — drift verifies each migration `.cs` has its `.Designer.cs`. The command used to create the migration remains review-owned. See [local-dev.md § EF Core migrations](./local-dev.md#ef-core-migrations-dotnet-ef).
 - **Local dev docs** — [`docker-compose.yml`](../../docker-compose.yml) changes require [`docs/playbooks/local-dev.md`](./local-dev.md) in the same PR; CI runs `python scripts/axis.py check local-dev-docs`.
-- **Async-safety analyzers** (`Microsoft.VisualStudio.Threading.Analyzers`) — type-aware checks at build time for sync-over-async (VSTHRD002), async-void (VSTHRD100), unobserved async results (VSTHRD110). Rule selection rationale in [patterns.md § Async patterns](./patterns.md#async-patterns).
+- **Async-safety analyzers** (`Microsoft.VisualStudio.Threading.Analyzers`) — type-aware checks at build time for sync-over-async (VSTHRD002), async-void (VSTHRD100), unobserved async results (VSTHRD110). Rule selection rationale in [runtime patterns § Async patterns](./runtime-patterns.md#async-patterns).
 - **Coverage report** uploaded as artifact (`dotnet-coverage`). No threshold yet — see [CONTRIBUTING.md § Coverage](../../CONTRIBUTING.md#coverage).
 
 **Adding new CI checks — verify GitHub plan support first.** Some GitHub-native security workflows require **GitHub Advanced Security (GHAS)** on private repos (a paid add-on). On `phuong-labs/axis` this includes `actions/dependency-review-action` and CodeQL code-scanning *upload* (analysis runs, only the SARIF upload fails). Verify GHAS provisioning before adding such checks; otherwise the PR will fail and need a follow-up to disable. Dependabot security updates work on any plan and cover the same threat model with a publish-time delay — use it as the baseline. The disabled-job comment in [`.github/workflows/build-and-test.yml`](../../.github/workflows/build-and-test.yml) lists the specific jobs to restore when GHAS is provisioned.
@@ -120,7 +121,7 @@ The .NET branch of `python scripts/axis.py verify` also runs the enforced
 
 When reporting verification, state each triggered command as `ran`, `not triggered` with reason, or `failed` with the blocker. `$axis-ready-review` provides the repeatable reporting shape.
 
-**Full suite:** integration and API tests run in CI as part of full `dotnet test`; Docker/Testcontainers is required there. Run full local `dotnet test Axis.sln --nologo` when debugging CI, changing Infrastructure/API behavior, or preparing a high-risk backend PR. Use the Docker endpoint available to the shell running the suite when `docker info` works. If it does not and Docker Engine lives inside WSL2, set `DOCKER_HOST` to the exported daemon instead (prefer `tcp://127.0.0.1:2375`).
+**Full suite:** integration and API tests run in CI as part of full `dotnet test`; Docker/Testcontainers is required there. Run full local `dotnet test Axis.sln --nologo` when debugging CI, changing Infrastructure/API behavior, or preparing a high-risk backend PR. If Docker is not visible to the process running .NET, use the [local-dev Docker endpoint adapter](./local-dev.md#docker-endpoint-adapter) and report the execution context instead of rewriting verification commands.
 
 ### Docs Review
 
@@ -131,7 +132,7 @@ Common owner mapping:
 | Trigger | Owner |
 |---|---|
 | Library or stack change | [TECH_STACK.md](../TECH_STACK.md) |
-| New pattern or repeated finding | [patterns.md](./patterns.md) or [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md) |
+| New pattern or repeated finding | Focused owner from [patterns-index.md](./patterns-index.md) or [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md) |
 | Behavior/spec/status change | Owning use-case callout, domain README, and [PROGRESS.md](../PROGRESS.md) when their summaries change |
 | Repo layout, module, event, proto, API group | [repo-layout-discovery.md](./repo-layout-discovery.md) |
 | Frontend screen or use-case visual | Owning use-case wireframe/diagram section and [visual-artifact-checklist.md](./visual-artifact-checklist.md) |
@@ -141,7 +142,7 @@ Common owner mapping:
 
 ### Review feedback (CodeRabbit / human)
 
-Use `$axis-review-feedback`. Apply fixes before resolving threads. Bots are **signal**, not authority — validate against [patterns.md](./patterns.md) and [AGENTS.md](../../AGENTS.md).
+Use `$axis-review-feedback`. Apply fixes before resolving threads. Bots are **signal**, not authority — validate against the focused owner from [patterns-index.md](./patterns-index.md) and [AGENTS.md](../../AGENTS.md).
 
 Classify each comment as fixed, improved beyond suggestion, false positive with evidence, or deferred with owner. Prefer the design you would defend in review; when the user explicitly asks for the smallest change, say `Review fixes: minimal — <why>` in the PR Summary. For non-trivial improvements, say `Review fixes: improved — <what>`.
 
@@ -220,7 +221,7 @@ These expectations still matter, but do not call them CI gates unless [REVIEW_FI
 | Layer order, TDD, gap sweep, deferred docs, PR wrap-up | [process.md](./process.md) |
 | New module / event / proto / domain README — what to update & how CI checks | [repo-layout-discovery.md](./repo-layout-discovery.md) |
 | Find the right patterns section | [patterns-index.md](./patterns-index.md) |
-| EF, API, Wolverine, workspace isolation | [patterns.md](./patterns.md) |
+| EF, API, Wolverine, workspace isolation | [patterns-index.md](./patterns-index.md) routes to the focused owner doc |
 | React, Query, a11y | [frontend.md](./frontend.md) |
 | Tests, Testcontainers | [testing.md](./testing.md) |
 | Wireframe kit | [wireframes.md](./wireframes.md) · **Agent contract:** [wireframes/README § Agent contract](../wireframes/README.md#agent-contract) |

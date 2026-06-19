@@ -21,6 +21,42 @@ function normalizeRepoPath(filePath) {
   return normalized.startsWith('./') ? normalized.slice(2) : normalized;
 }
 
+function gitOutput(args) {
+  try {
+    return execFileSync('git', ['-C', repoRoot, ...args], { encoding: 'utf8' });
+  } catch {
+    return '';
+  }
+}
+
+function gitRefExists(ref) {
+  return gitOutput(['rev-parse', '--verify', ref]).trim().length > 0;
+}
+
+function diffRange() {
+  const base = process.env.BASE_BRANCH || 'main';
+  const candidates = [process.env.BASE_REF, `origin/${base}`, base].filter(Boolean);
+  for (const candidate of candidates) {
+    if (!gitRefExists(candidate)) {
+      continue;
+    }
+    const mergeBase = gitOutput(['merge-base', candidate, 'HEAD']).trim();
+    if (mergeBase) {
+      return `${mergeBase}...HEAD`;
+    }
+  }
+  return gitRefExists('HEAD~1') ? 'HEAD~1...HEAD' : '';
+}
+
+function appendPathLines(paths, output) {
+  for (const line of output.split(/\r?\n/)) {
+    const value = line.trim();
+    if (value) {
+      paths.add(normalizeRepoPath(value));
+    }
+  }
+}
+
 function readDirRecursive(root, extension) {
   const files = [];
   if (!fs.existsSync(root)) {
@@ -47,17 +83,15 @@ function wireframeFiles() {
 }
 
 function changedRepoPaths() {
-  const output = execFileSync('git', ['-C', repoRoot, 'status', '--porcelain', '--', 'docs'], {
-    encoding: 'utf8',
-  });
-  return output
-    .split(/\r?\n/)
-    .map((line) => line.trimEnd())
-    .filter(Boolean)
-    .map((line) => {
-      const filePath = line.slice(3);
-      return normalizeRepoPath(filePath.includes(' -> ') ? filePath.split(' -> ').pop() : filePath);
-    });
+  const paths = new Set();
+  const range = diffRange();
+  if (range) {
+    appendPathLines(paths, gitOutput(['diff', '--name-only', range, '--', 'docs']));
+  }
+  appendPathLines(paths, gitOutput(['diff', '--name-only', '--cached', '--', 'docs']));
+  appendPathLines(paths, gitOutput(['diff', '--name-only', '--', 'docs']));
+  appendPathLines(paths, gitOutput(['ls-files', '--others', '--exclude-standard', '--', 'docs']));
+  return [...paths];
 }
 
 function linkedWireframePaths(markdownRepoPath) {

@@ -73,7 +73,7 @@ Each module *is* a service contract — modulith mode collocates them as in-proc
 
 Per-message transport selection follows the suffix convention in [ADR-025](./TECH_STACK.md#adr-025-transport-selection-rule-by-message-name-suffix): `*Command`/`*Job`/`*SagaStep` → RabbitMQ, `*Event`/`*Snapshot` → Kafka.
 
-Forbidden: shared `DbContext`, direct C# method calls into another module's Application services, cross-module SQL, in-process `IMediator` for cross-module dispatch. Architecture tests and CI enforce the structural subset; cross-module raw SQL and runtime DI gaps remain review-owned. See [AGENTS.md § Service boundaries](../AGENTS.md), [REVIEW_FINDINGS.md](./REVIEW_FINDINGS.md), and [playbooks/patterns.md § Cross-module communication](./playbooks/patterns.md#cross-module-communication-pattern).
+Forbidden: shared `DbContext`, direct C# method calls into another module's Application services, cross-module SQL, in-process `IMediator` for cross-module dispatch. Architecture tests and CI enforce the structural subset; cross-module raw SQL and runtime DI gaps remain review-owned. See [AGENTS.md § Service boundaries](../AGENTS.md), [REVIEW_FINDINGS.md](./REVIEW_FINDINGS.md), and [cross-module patterns](./playbooks/cross-module-patterns.md#cross-module-communication-pattern).
 
 ---
 
@@ -98,7 +98,7 @@ axis_pagebuilder DB               ← same shape (when PageBuilder module ships)
 
 **Workspace resolution:** every external request carries a JWT with an `workspace_id` claim. The gateway extracts it and propagates via gRPC metadata (sync calls) and CloudEvents `workspaceid` extension (events). Each module restores it into a scoped `IWorkspaceContext`. EF Core sets the per-connection `search_path` to the workspace schema via `WorkspaceSchemaInterceptor`.
 
-Implementation details and pitfalls: [playbooks/patterns.md § Multi-workspace isolation](./playbooks/patterns.md#multi-workspace isolation-pitfalls).
+Implementation details and pitfalls: [persistence patterns § Multi-workspace isolation](./playbooks/persistence-patterns.md#multi-workspace-isolation-pitfalls).
 
 ---
 

@@ -26,7 +26,7 @@ Resolve review feedback by improving the codebase, not merely silencing a thread
 3. Re-read the governing source.
    - `AGENTS.md`
    - `docs/playbooks/agent-checklist.md`
-   - `docs/playbooks/patterns.md` or `docs/playbooks/frontend.md` for implementation patterns
+   - `docs/playbooks/patterns-index.md` plus the focused pattern owner, or `docs/playbooks/frontend.md` for frontend implementation patterns
    - The owning use-case and tests when behavior is involved
    - `docs/REVIEW_FINDINGS.md` when the issue looks repeatable
 

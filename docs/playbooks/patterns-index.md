@@ -1,82 +1,57 @@
 # Patterns index
 
-> **Navigation**: [← docs/README.md](../README.md) · [← patterns.md](./patterns.md) · [← AGENTS.md](../../AGENTS.md)
+> **Navigation**: [← docs/README.md](../README.md) · [← technical patterns](./patterns.md) · [← AGENTS.md](../../AGENTS.md)
 
-One-page map into [`patterns.md`](./patterns.md). Open only the section you need — do not read the full playbook.
+Open the owner doc for the surface you are changing. `patterns.md` is a compatibility router, not the implementation-pattern owner.
 
 ---
 
 ## By task
 
-| You are… | Open section |
-|----------|----------------|
-| Adding a NuGet package | [NuGet / packaging rules](./patterns.md#nuget--packaging-rules) |
-| Mapping JSONB `List<T>` | [EF Core JSONB collection change tracking](./patterns.md#ef-core-jsonb-collection-change-tracking) |
-| Fixing EF tracking / migrations | [EF Core common pitfalls](./patterns.md#ef-core-common-pitfalls) |
-| Modeling aggregates / owned entities | [DDD pitfalls](./patterns.md#ddd--aggregate-design-pitfalls) · [OwnsMany](./patterns.md#ef-core-ownsmany-pattern) |
-| Wiring DI / scoped services | [Dependency Injection pitfalls](./patterns.md#dependency-injection-pitfalls) |
-| Workspace schema / raw SQL | [Multi-workspace isolation pitfalls](./patterns.md#multi-workspace isolation-pitfalls) |
-| `Task.Run` / fire-and-forget | [Async fire-and-forget pitfalls](./patterns.md#async-fire-and-forget-pitfalls) |
-| New `IEntityTypeConfiguration` | [EF aggregate mapping patterns](./patterns.md#ef-core-aggregate-mapping-patterns) |
-| Writing unit tests | [Testing rules](./patterns.md#testing-rules) · [testing.md](./testing.md) |
-| `CancellationToken` / async handlers | [Async patterns](./patterns.md#async-patterns) |
-| List endpoint / N+1 | [Query & N+1](./patterns.md#query--n1-patterns) · [Pagination](./patterns.md#pagination-pattern) |
-| API response shape | [Response DTO convention](./patterns.md#response-dto-convention) |
-| New Minimal API endpoint | [Minimal API wiring](./patterns.md#minimal-api-endpoint-wiring) · [OpenAPI annotation](./patterns.md#openapi-annotation-reference) |
-| `Result` → HTTP status | [Result → HTTP mapping](./patterns.md#result--http-status-code-mapping) |
-| Scalar / Swagger setup | [OpenAPI / Scalar setup](./patterns.md#openapi--scalar-setup) |
-| Domain events / Wolverine handlers | [Wolverine patterns](./patterns.md#wolverine-patterns) |
-| Traces / metrics / structured logs | [OpenTelemetry observability](./patterns.md#opentelemetry-observability) |
-| Data owned by another module | [Cross-module data pattern](./patterns.md#cross-module-communication-pattern) · [gRPC dev (grpcurl)](./patterns.md#dev--verify-getuserpermissions-with-grpcurl) |
-| Editing `buf.yaml` / removing a proto field | [Buf breaking rules — what's actually configured (and the gotcha)](./patterns.md#buf-breaking-rules--whats-actually-configured-and-the-gotcha) |
-| Idempotent command / migration | [Command idempotency](./patterns.md#command-idempotency-pattern) |
-| Pre-commit hygiene grep | [Code hygiene checklist](./patterns.md#code-hygiene-checklist) |
+| You are… | Open |
+|----------|------|
+| Adding a NuGet package | [Dependency patterns](./dependency-patterns.md#nuget--packaging-rules) |
+| Wiring DI / scoped services | [Dependency patterns](./dependency-patterns.md#dependency-injection-pitfalls) |
+| Modeling aggregates / business failures | [Domain/Application patterns](./domain-application-patterns.md) |
+| Making a command idempotent | [Domain/Application patterns](./domain-application-patterns.md#command-idempotency-pattern) |
+| Mapping EF JSONB / owned entities / repositories | [Persistence patterns](./persistence-patterns.md) |
+| Working with workspace schema or raw SQL | [Persistence patterns](./persistence-patterns.md#multi-workspace-isolation-pitfalls) |
+| Writing or maintaining tests | [Testing playbook](./testing.md) |
+| Handling `Task.Run`, cancellation, or async analyzers | [Runtime patterns](./runtime-patterns.md) |
+| Adding list/query endpoints or pagination | [API patterns](./api-patterns.md#query--n1-patterns) |
+| Defining API DTOs, OpenAPI metadata, or status mapping | [API patterns](./api-patterns.md) |
+| Wiring Wolverine handlers/jobs or recurring work | [Wolverine patterns](./wolverine-patterns.md) |
+| Syncing data from another module by event | [Cross-module patterns](./cross-module-patterns.md) |
+| Adding gRPC/proto/Buf/JWKS behavior | [gRPC patterns](./grpc-patterns.md) |
+| Adding traces, metrics, or structured runtime behavior | [Runtime patterns](./runtime-patterns.md#opentelemetry-observability) |
+| Running pre-commit hygiene checks | [Code hygiene patterns](./code-hygiene-patterns.md) |
+| React / TanStack Query screen | [Frontend playbook](./frontend.md) |
+| Wireframe or visual docs | [Wireframe kit](./wireframes.md) · [Visual artifact checklist](./visual-artifact-checklist.md) |
 | New module / Kafka / proto / domain README index | [Repo layout discovery](./repo-layout-discovery.md) |
-| React / TanStack Query screen | [frontend.md](./frontend.md) · [Frontend pointers](./patterns.md#frontend-patterns) |
-| Wireframe or visual docs | [wireframes.md](./wireframes.md) · [Wireframe pointers](./patterns.md#wireframe-convention) |
-| Where logic belongs (handler vs aggregate) | [Axis layering](./patterns.md#axis-layering-srp-at-a-glance) · [Key patterns](./patterns.md#key-patterns) |
-| Business failure vs exception | [Result vs exceptions](./patterns.md#result-pattern-vs-exceptions--when-to-use-what) |
 
 ---
 
-## All sections (anchor list)
+## Owner docs
 
-| # | Section |
-|---|---------|
-| 1 | [Key patterns](./patterns.md#key-patterns) |
-| 2 | [Result vs exceptions](./patterns.md#result-pattern-vs-exceptions--when-to-use-what) |
-| 3 | [NuGet / packaging](./patterns.md#nuget--packaging-rules) |
-| 4 | [EF JSONB collections](./patterns.md#ef-core-jsonb-collection-change-tracking) |
-| 5 | [EF common pitfalls](./patterns.md#ef-core-common-pitfalls) |
-| 6 | [DDD / aggregate pitfalls](./patterns.md#ddd--aggregate-design-pitfalls) |
-| 7 | [EF OwnsMany](./patterns.md#ef-core-ownsmany-pattern) |
-| 8 | [DI pitfalls](./patterns.md#dependency-injection-pitfalls) |
-| 9 | [Multi-workspace isolation](./patterns.md#multi-workspace isolation-pitfalls) |
-| 10 | [Async fire-and-forget](./patterns.md#async-fire-and-forget-pitfalls) |
-| 11 | [EF aggregate mapping](./patterns.md#ef-core-aggregate-mapping-patterns) |
-| 12 | [Testing rules](./patterns.md#testing-rules) |
-| 13 | [Async patterns](./patterns.md#async-patterns) |
-| 14 | [Query & N+1](./patterns.md#query--n1-patterns) |
-| 15 | [Response DTOs](./patterns.md#response-dto-convention) |
-| 16 | [Pagination](./patterns.md#pagination-pattern) |
-| 17 | [Minimal API](./patterns.md#minimal-api-endpoint-wiring) |
-| 18 | [Axis layering](./patterns.md#axis-layering-srp-at-a-glance) |
-| 19 | [OpenAPI annotations](./patterns.md#openapi-annotation-reference) |
-| 20 | [Result → HTTP](./patterns.md#result--http-status-code-mapping) |
-| 21 | [OpenAPI / Scalar](./patterns.md#openapi--scalar-setup) |
-| 22 | [Wolverine](./patterns.md#wolverine-patterns) |
-| 23 | [OpenTelemetry](./patterns.md#opentelemetry-observability) |
-| 24 | [Cross-module data](./patterns.md#cross-module-communication-pattern) |
-| 24a | [Buf breaking rules + counterexample lesson](./patterns.md#buf-breaking-rules--whats-actually-configured-and-the-gotcha) |
-| 25 | [Command idempotency](./patterns.md#command-idempotency-pattern) |
-| 26 | [Code hygiene](./patterns.md#code-hygiene-checklist) |
-| 27 | [Frontend pointers](./patterns.md#frontend-patterns) |
-| 28 | [Wireframe pointers](./patterns.md#wireframe-convention) |
+| Owner | Scope |
+|---|---|
+| [domain-application-patterns.md](./domain-application-patterns.md) | Domain behavior, `Result`, aggregate boundaries, application idempotency |
+| [dependency-patterns.md](./dependency-patterns.md) | NuGet/CPM and DI pitfalls |
+| [persistence-patterns.md](./persistence-patterns.md) | EF Core, repositories, workspace schema, migrations |
+| [api-patterns.md](./api-patterns.md) | Minimal API, DTOs, OpenAPI, pagination, HTTP mapping |
+| [runtime-patterns.md](./runtime-patterns.md) | Async, cancellation, background work, OpenTelemetry |
+| [wolverine-patterns.md](./wolverine-patterns.md) | Wolverine host setup, handlers, jobs, idempotency, logging |
+| [cross-module-patterns.md](./cross-module-patterns.md) | Cross-module data sovereignty, Kafka/local read models, violation sweep |
+| [grpc-patterns.md](./grpc-patterns.md) | gRPC escape hatch, proto/Buf, grpcurl, JWKS validation |
+| [testing.md](./testing.md) | Test naming, isolation, Testcontainers, deterministic API tests |
+| [code-hygiene-patterns.md](./code-hygiene-patterns.md) | Pre-commit code hygiene and policy regex constraints |
+| [frontend.md](./frontend.md) | SPA architecture, state, forms, components, accessibility |
+| [wireframes.md](./wireframes.md) | Wireframe source, generation, visual-doc workflow |
 
 ---
 
 ## Contributing a new pattern
 
-1. Check whether an existing section can absorb the rule.
-2. Write the **principle** (WHY), then one **Axis-specific** example.
-3. Add a row to the tables above and to the Contents list in `patterns.md`.
+1. Pick the owner doc above; do not add broad guidance to `patterns.md`.
+2. Write the principle first, then one Axis-specific example.
+3. Add or update a row in this index when the task routing changes.

@@ -125,22 +125,64 @@ def diff_range() -> str:
     raise CheckError(f"diff_range: cannot determine diff base (tried {tried}); set BASE_REF or fetch the base branch")
 
 
-def changed_paths(range_spec: str | None = None) -> list[str]:
-    range_spec = range_spec or diff_range()
-    result = run([exe("git"), "diff", "--name-only", range_spec], capture=True, check=False)
+def git_lines(args: list[str], *, label: str) -> list[str]:
+    result = run([exe("git"), *args], capture=True, check=False)
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "").strip()
-        raise CheckError(f"changed_paths: git diff failed for {range_spec}: {detail}")
+        raise CheckError(f"{label}: git {' '.join(args)} failed: {detail}")
     return [line.strip().replace("\\", "/") for line in result.stdout.splitlines() if line.strip()]
+
+
+def unique_paths(paths: Iterable[str]) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for path in paths:
+        normalized = path.replace("\\", "/")
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        ordered.append(normalized)
+    return ordered
+
+
+def working_tree_paths() -> list[str]:
+    return unique_paths(
+        [
+            *git_lines(["diff", "--name-only", "--cached"], label="working_tree_paths staged"),
+            *git_lines(["diff", "--name-only"], label="working_tree_paths unstaged"),
+            *git_lines(["ls-files", "--others", "--exclude-standard"], label="working_tree_paths untracked"),
+        ]
+    )
+
+
+def changed_paths(range_spec: str | None = None) -> list[str]:
+    range_spec = range_spec or diff_range()
+    return unique_paths(
+        [
+            *git_lines(["diff", "--name-only", range_spec], label=f"changed_paths {range_spec}"),
+            *working_tree_paths(),
+        ]
+    )
 
 
 def changed_name_status(range_spec: str | None = None) -> list[list[str]]:
     range_spec = range_spec or diff_range()
-    result = run([exe("git"), "diff", "--name-status", range_spec], capture=True, check=False)
-    if result.returncode != 0:
-        detail = (result.stderr or result.stdout or "").strip()
-        raise CheckError(f"changed_name_status: git diff failed for {range_spec}: {detail}")
-    return [line.split("\t") for line in result.stdout.splitlines() if line.strip()]
+    rows: list[list[str]] = []
+    for args, label in (
+        (["diff", "--name-status", range_spec], f"changed_name_status {range_spec}"),
+        (["diff", "--name-status", "--cached"], "changed_name_status staged"),
+        (["diff", "--name-status"], "changed_name_status unstaged"),
+    ):
+        rows.extend(line.split("\t") for line in git_lines(args, label=label))
+    rows.extend(["A", path] for path in git_lines(["ls-files", "--others", "--exclude-standard"], label="changed_name_status untracked"))
+
+    deduped: dict[str, list[str]] = {}
+    for row in rows:
+        if not row:
+            continue
+        key = row[-1].replace("\\", "/")
+        deduped[key] = [part.replace("\\", "/") for part in row]
+    return list(deduped.values())
 
 
 def module_main(script_name: str, args: list[str], *, stdin_text: str | None = None) -> int:
@@ -425,8 +467,9 @@ def test_unit(args: argparse.Namespace) -> int:
 
 
 def check_vulnerable_packages(_args: argparse.Namespace | None = None) -> int:
+    solution_path = ROOT / "Axis.sln"
     result = run(
-        [exe("dotnet"), "list", "Axis.sln", "package", "--vulnerable", "--include-transitive"],
+        [exe("dotnet"), "list", str(solution_path), "package", "--vulnerable", "--include-transitive"],
         capture=True,
         check=False,
     )
@@ -491,7 +534,7 @@ def check_ef_domain_mapping(_args: argparse.Namespace | None = None) -> int:
     if issues:
         for issue in issues:
             print(f"check-ef-domain-mapping FAIL: {issue}", file=sys.stderr)
-        print("\nSee docs/playbooks/patterns.md#ef-core-aggregate-mapping-patterns", file=sys.stderr)
+        print("\nSee docs/playbooks/persistence-patterns.md#ef-core-aggregate-mapping-patterns", file=sys.stderr)
         return 1
     print("check-ef-domain-mapping: OK")
     return 0
@@ -802,6 +845,45 @@ def check_doc_navigation(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
+PLAYBOOK_DEFAULT_MAX_LINES = 300
+PATTERN_ROUTER_MAX_LINES = 150
+DOC_SIZE_BUDGETS = {
+    "docs/playbooks/patterns.md": PATTERN_ROUTER_MAX_LINES,
+    "docs/playbooks/patterns-index.md": PATTERN_ROUTER_MAX_LINES,
+}
+
+
+def doc_size_budget_issues(*, root: Path = ROOT) -> list[str]:
+    candidates = [root / "AGENTS.md", root / "docs" / "ARCHITECTURE.md"]
+    playbooks = sorted((root / "docs" / "playbooks").glob("*.md"))
+    candidates.extend(playbooks)
+
+    issues: list[str] = []
+    for path in candidates:
+        if not path.is_file():
+            continue
+        normalized = rel_from(path, root)
+        limit = DOC_SIZE_BUDGETS.get(normalized, PLAYBOOK_DEFAULT_MAX_LINES)
+        line_count = len(path.read_text(encoding="utf-8").splitlines())
+        if line_count > limit:
+            issues.append(
+                f"{normalized}: {line_count} lines exceeds {limit}-line docs budget; "
+                "split by topic or route through patterns-index.md"
+            )
+    return issues
+
+
+def check_doc_size_budgets(_args: argparse.Namespace | None = None) -> int:
+    issues = doc_size_budget_issues()
+    if issues:
+        print("check-doc-size-budgets FAIL:", file=sys.stderr)
+        for issue in issues:
+            print(f"  - {issue}", file=sys.stderr)
+        return 1
+    print("check-doc-size-budgets: OK")
+    return 0
+
+
 def check_buf_modules(_args: argparse.Namespace | None = None) -> int:
     return sync_buf_yaml.main_with_args(["--check"]) if hasattr(sync_buf_yaml, "main_with_args") else module_main("sync_buf_yaml.py", ["--check"])
 
@@ -1107,14 +1189,10 @@ def check_policy_tests(_args: argparse.Namespace | None = None) -> int:
     ).returncode
 
 
-def added_lines(range_spec: str, include: callable[[str], bool]) -> Iterable[tuple[str, str]]:
-    result = run([exe("git"), "diff", "--unified=0", range_spec], capture=True, check=False)
-    if result.returncode != 0:
-        detail = (result.stderr or result.stdout or "").strip()
-        raise CheckError(f"added_lines: git diff failed for {range_spec}: {detail}")
+def parse_added_lines(diff_text: str, include: callable[[str], bool]) -> list[tuple[str, str]]:
     current = ""
     rows: list[tuple[str, str]] = []
-    for line in result.stdout.splitlines():
+    for line in diff_text.splitlines():
         if line.startswith("+++ b/"):
             current = line[6:].replace("\\", "/")
             continue
@@ -1122,6 +1200,44 @@ def added_lines(range_spec: str, include: callable[[str], bool]) -> Iterable[tup
             continue
         if line.startswith("+") and not line.startswith("+++"):
             rows.append((current, line[1:]))
+    return rows
+
+
+def untracked_added_lines(include: callable[[str], bool]) -> list[tuple[str, str]]:
+    rows: list[tuple[str, str]] = []
+    for path in git_lines(["ls-files", "--others", "--exclude-standard"], label="untracked_added_lines"):
+        if not include(path):
+            continue
+        full_path = ROOT / path
+        if not full_path.is_file():
+            continue
+        try:
+            lines = full_path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            continue
+        rows.extend((path, line) for line in lines)
+    return rows
+
+
+def added_lines(range_spec: str, include: callable[[str], bool]) -> Iterable[tuple[str, str]]:
+    rows: list[tuple[str, str]] = []
+    result = run([exe("git"), "diff", "--unified=0", range_spec], capture=True, check=False)
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()
+        raise CheckError(f"added_lines: git diff failed for {range_spec}: {detail}")
+    rows.extend(parse_added_lines(result.stdout, include))
+
+    for args, label in (
+        (["diff", "--unified=0", "--cached"], "added_lines staged"),
+        (["diff", "--unified=0"], "added_lines unstaged"),
+    ):
+        local_result = run([exe("git"), *args], capture=True, check=False)
+        if local_result.returncode != 0:
+            detail = (local_result.stderr or local_result.stdout or "").strip()
+            raise CheckError(f"{label}: git {' '.join(args)} failed: {detail}")
+        rows.extend(parse_added_lines(local_result.stdout, include))
+
+    rows.extend(untracked_added_lines(include))
     return rows
 
 
@@ -1145,7 +1261,7 @@ DOC_DRIFT_ADDED_LINE_RULES = [
         lambda p: (p.startswith("docs/") or p.startswith("scripts/"))
         and not p.startswith("scripts/tests/")
         and p.endswith((".md", ".py", ".ps1", ".sh", ".yml", ".yaml")),
-        "Machine-specific local path introduced - use a placeholder such as /path/to/axis",
+        "Machine-specific local path introduced - use <repo-root> or state 'from the repo root'",
     ),
     (
         r"GetAwaiter[(][)][.]GetResult[(][)]",
@@ -1663,6 +1779,7 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         ("check-use-case-docs.py", lambda _=None: run_module_check("check-use-case-docs.py", ["--check"])),
         ("check-doc-link-targets.py", lambda _=None: run_module_check("check-doc-link-targets.py", ["--check"])),
         ("check-doc-navigation", check_doc_navigation),
+        ("check-doc-size-budgets", check_doc_size_budgets),
         ("check-doc-code-fences.py", lambda _=None: run_module_check("check-doc-code-fences.py", ["--check"])),
         ("check-local-dev-docs.py", lambda _=None: run_module_check("check-local-dev-docs.py", ["--check"])),
         ("sync_buf_yaml.py", lambda _=None: module_main("sync_buf_yaml.py", ["--check"])),
@@ -1992,7 +2109,11 @@ def doctor(args: argparse.Namespace) -> int:
 
     docker_status, docker_detail = _command_version("docker", "--version")
     if docker_status == "FAIL":
-        record("WARN", "docker cli", f"{docker_detail}; compose can still run through WSL if Docker lives there")
+        record(
+            "WARN",
+            "docker cli",
+            f"{docker_detail}; use an environment adapter if Docker is available from another execution context",
+        )
     else:
         record(docker_status, "docker cli", docker_detail)
 
@@ -2012,28 +2133,36 @@ def doctor(args: argparse.Namespace) -> int:
         record(
             "WARN",
             "docker endpoint",
-            'TCP daemon responds at 127.0.0.1:2375; set DOCKER_HOST="tcp://127.0.0.1:2375" in this shell',
+            "an exported Docker endpoint responds; set DOCKER_HOST to that endpoint for the current process/session",
         )
     elif wsl_docker:
-        record("WARN", "docker endpoint", "Docker works inside WSL; run compose through wsl.exe or expose a local TCP endpoint")
+        record(
+            "WARN",
+            "docker endpoint",
+            "Docker works from another detected execution context; run the canonical repo-root command there or expose a local Docker endpoint",
+        )
     else:
-        record("FAIL", "docker endpoint", "docker info failed; no WSL Docker or 127.0.0.1:2375 TCP daemon detected")
+        record("FAIL", "docker endpoint", "docker info failed; no reachable Docker endpoint detected")
 
     if _docker_compose_ok():
         record("OK", "docker compose", "docker compose version works")
     elif wsl_docker:
-        record("WARN", "docker compose", 'use WSL: wsl.exe bash -lc "cd /path/to/axis && docker compose up -d"')
+        record(
+            "WARN",
+            "docker compose",
+            "Docker Compose is available from another detected execution context; run the canonical repo-root command there",
+        )
     else:
-        record("FAIL", "docker compose", "Docker Compose v2 not available from this shell")
+        record("FAIL", "docker compose", "Docker Compose v2 not available from this execution context")
 
     if os.name == "nt":
         npm_cmd = shutil.which("npm.cmd")
         npm_ps1 = shutil.which("npm.ps1")
         if npm_cmd:
-            detail = f"use npm.cmd in PowerShell ({npm_cmd})"
+            detail = f"native npm shim available ({npm_cmd})"
             if npm_ps1:
-                detail += f"; npm.ps1 also exists ({npm_ps1}) and may be blocked by execution policy"
-            record("OK", "windows npm", detail)
+                detail += f"; alternate npm launcher also detected ({npm_ps1})"
+            record("OK", "npm adapter", detail)
 
     print("axis doctor")
     for status, label, detail in rows:
@@ -2109,6 +2238,7 @@ def main(argv: list[str] | None = None) -> int:
         func=lambda _args: run_module_check("check-doc-link-targets.py", ["--check"])
     )
     check_sub.add_parser("doc-navigation").set_defaults(func=check_doc_navigation)
+    check_sub.add_parser("doc-size-budgets").set_defaults(func=check_doc_size_budgets)
     check_sub.add_parser("doc-code-fences").set_defaults(
         func=lambda _args: run_module_check("check-doc-code-fences.py", ["--check"])
     )

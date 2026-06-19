@@ -39,9 +39,10 @@ Reference and practice docs are **scanned, not read**. Optimize for a reader who
 | **Dead-end docs without navigation** | Readers cannot climb back to the owning index; agents miss related guidance | Every `docs/**/*.md` file starts with an H1 followed by `> **Navigation**:` links to the relevant index |
 | **Duplicating versions / paths / commands** across docs | Both copies drift; readers don't know which is canonical | Link to the owner doc (see ownership table) |
 | **Duplicating compose ports / service URLs** | Playbooks drift from `docker-compose.yml` | Owner: [local-dev.md](./local-dev.md) + compose file; enforced by `python scripts/axis.py check local-dev-docs` |
+| **Environment-specific command fixes** | A local workaround reads like a project rule and misleads future readers | State the project-owned baseline first: repo root, committed scripts, compose services, CI command. Put execution adapters in [local-dev.md](./local-dev.md), never in feature specs or pattern rules. |
 | **Aspirational metrics** in engineering docs (e.g. "50 customers in 6 months") | Nobody measures or tests against them; they age into embarrassment | Keep in pitch deck / `PRODUCT_VISION.md` if anywhere; do not pollute technical reference |
 | **Empty "TODO: fill later" sections** | Look authoritative, contain nothing, lie to readers | Delete the section. Add it when there's content to add. |
-| **Accidental encoding rewrites** | Review diffs become unreadable; PowerShell/default tool output can turn Unicode into mojibake | Tracked text files must be UTF-8 without BOM and LF line endings. `python scripts/axis.py check text-encoding` enforces this and still allows real Unicode such as Vietnamese, arrows, and status icons. |
+| **Accidental encoding rewrites** | Review diffs become unreadable; non-UTF-8 tool output can turn Unicode into mojibake | Tracked text files must be UTF-8 without BOM and LF line endings. `python scripts/axis.py check text-encoding` enforces this and still allows real Unicode such as Vietnamese, arrows, and status icons. |
 | **"Process about process"** docs > 100 lines | Nobody reads them; the rules don't get followed | If deterministic, embed the rule into a tested gate or template. If not, keep it short and label it review-only guidance. |
 | **New file for content that fits in an existing file** | Doc graph fragments; agents have to read more files to get less | Absorb into the closest existing file. New file only when topic is genuinely separate **and** ≥ ~50 lines worth. |
 | **Incident / lesson detail baked into a general rule** | Reads as universal guidance but only fits the one case it came from; ages into noise and is hard to apply elsewhere | State the **general principle** in the playbook; keep the instance specifics in the use-case file / `PROGRESS.md` / PR retro. See § Keep practice docs general. |
@@ -53,11 +54,11 @@ Reference and practice docs are **scanned, not read**. Optimize for a reader who
 | File class | Budget | Action when exceeded |
 |---|---|---|
 | Reference docs (`AGENTS.md`, `ARCHITECTURE.md`, playbooks) | 300 lines | Split by topic, extract a sub-playbook, or move detail into an index + section pattern |
-| `patterns.md` | temporary outlier | Use [`patterns-index.md`](./patterns-index.md) as the entry point; split or link out duplicated owner sections |
+| Pattern router docs (`patterns.md`, `patterns-index.md`) | 150 lines | Keep them as navigation only; implementation rules live in focused owner playbooks |
 | Domain README | 200 lines | Move detail into per-use-case files |
 | Use-case file | no hard cap | Already scoped by AC list |
 
-`patterns.md` is the only tolerated outlier while older patterns are being split or linked out. Do not add broad new sections there when a focused owner doc already exists.
+Do not add broad implementation guidance to `patterns.md`; pick the focused owner doc from [`patterns-index.md`](./patterns-index.md).
 
 ---
 
