@@ -618,6 +618,21 @@ class TestVulnerablePackageGate(unittest.TestCase):
 
 
 class TestToolVersionGates(unittest.TestCase):
+    def test_dotnet_sdk_rejects_global_json_major_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            global_json = Path(temp) / "global.json"
+            global_json.write_text(
+                '{"sdk":{"version":"9.0.100","rollForward":"latestFeature"}}\n',
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(axis, "GLOBAL_JSON_PATH", global_json):
+                ok, detail = axis.dotnet_sdk_status()
+
+        self.assertFalse(ok)
+        self.assertIn("selects .NET SDK 9.x", detail)
+        self.assertIn("expected 8.x", detail)
+
     def test_dotnet_sdk_rejects_wrong_major(self) -> None:
         with mock.patch.object(
             axis,

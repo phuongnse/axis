@@ -25,7 +25,8 @@ or pattern docs.
 - **.NET SDK 8.x** - required for repo verification (`dotnet build`, `dotnet test`,
   `dotnet format`), EF migrations, and API contract generation. The compose API
   container has its own SDK, but local verification expects `dotnet` on `PATH`
-  and fails before running .NET commands when `dotnet --version` is not 8.x.
+  and fails before running .NET commands when [`global.json`](../../global.json)
+  or `dotnet --version` is not 8.x.
 - **Node.js + npm** - required for repo verification (`npm run ci`,
   `npm run test`), OpenAPI TypeScript generation, and wireframe export. The
   compose web container has its own Node runtime, but local verification expects

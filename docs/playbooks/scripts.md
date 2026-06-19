@@ -17,7 +17,7 @@ runtime.
 
 | Tool | Required version source | Used by | Local enforcement |
 |---|---:|---|---|
-| .NET SDK | `8.x` in [TECH_STACK.md](../TECH_STACK.md) | `python scripts/axis.py verify`, `test unit`, package scans, API contract generation | `dotnet --version` major must be `8`; another major fails before any `dotnet` command runs. |
+| .NET SDK | `8.x` in [TECH_STACK.md](../TECH_STACK.md), selected by [`global.json`](../../global.json) | `python scripts/axis.py verify`, `test unit`, package scans, API contract generation | `global.json` must select major `8`; `dotnet --version` major must be `8`; another major fails before any `dotnet` command runs. |
 | Node.js | [`frontend/.nvmrc`](../../frontend/.nvmrc) | `python scripts/axis.py verify`, frontend checks/tests, API type generation, wireframe export | `node --version` major must match `.nvmrc`; `npm` must resolve from `PATH`. |
 | Lychee | `0.23.0` exactly in this table | `python scripts/axis.py check markdown-links`, CI Markdown link check | `lychee.toml` is written for the 0.23 config schema. `lychee --version` must print `lychee 0.23.0`; newer versions fail fast until this row and config are intentionally upgraded together. |
 | Buf CLI | `1.50.0` exactly in this table | `python scripts/axis.py check buf-lint`, `python scripts/axis.py check buf-breaking-against-base`, CI protobuf checks | `buf --version` must print `1.50.0`; local protobuf commands must go through `scripts/axis.py` wrappers, not raw `buf`, so the version check always runs first. |

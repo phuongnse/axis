@@ -34,6 +34,7 @@ REQUIRED_BUF_VERSION = "1.50.0"
 REQUIRED_LYCHEE_VERSION = "0.23.0"
 TOOL_VERSIONS_DOC = "docs/playbooks/scripts.md#tool-versions"
 TECH_STACK_DOC = "docs/TECH_STACK.md"
+GLOBAL_JSON_PATH = ROOT / "global.json"
 NVMRC_PATH = ROOT / "frontend" / ".nvmrc"
 
 if str(SCRIPTS) not in sys.path:
@@ -50,6 +51,13 @@ class CheckError(RuntimeError):
 
 def rel(path: Path) -> str:
     return str(path.relative_to(ROOT)).replace("\\", "/")
+
+
+def path_label(path: Path) -> str:
+    try:
+        return rel(path)
+    except ValueError:
+        return str(path)
 
 
 def rel_from(path: Path, root: Path) -> str:
@@ -1508,6 +1516,13 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
         ],
     ),
     (
+        Path("global.json"),
+        [
+            ('"version": "8.0.100"', "global.json selects the documented .NET SDK major"),
+            ('"rollForward": "latestFeature"', "global.json allows latest installed .NET 8 feature band without selecting newer majors"),
+        ],
+    ),
+    (
         Path("scripts/hooks/pre-push"),
         [
             ('root / "scripts" / "axis.py"), "pre-push"', "pre-push delegates to scripts/axis.py pre-push"),
@@ -1888,19 +1903,55 @@ def required_node_major() -> tuple[bool, str]:
     return True, match.group(1)
 
 
+def global_json_sdk_major() -> tuple[bool, str]:
+    if not GLOBAL_JSON_PATH.is_file():
+        return False, f"missing {path_label(GLOBAL_JSON_PATH)}"
+    try:
+        data = json.loads(GLOBAL_JSON_PATH.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return False, f"{path_label(GLOBAL_JSON_PATH)} is invalid JSON: {exc}"
+
+    sdk = data.get("sdk")
+    if not isinstance(sdk, dict):
+        return False, f"{path_label(GLOBAL_JSON_PATH)} must contain an sdk object"
+    version = sdk.get("version")
+    if not isinstance(version, str) or not version.strip():
+        return False, f"{path_label(GLOBAL_JSON_PATH)} must contain sdk.version"
+
+    major = version_major(version)
+    if major is None:
+        return False, f"{path_label(GLOBAL_JSON_PATH)} sdk.version `{version}` is not a semver version"
+    return True, major
+
+
 def dotnet_sdk_status() -> tuple[bool, str]:
+    source_ok, source_major_or_error = global_json_sdk_major()
+    if not source_ok:
+        return False, f"{source_major_or_error}; .NET SDK {REQUIRED_DOTNET_SDK_MAJOR}.x is required per {TECH_STACK_DOC}"
+    if source_major_or_error != REQUIRED_DOTNET_SDK_MAJOR:
+        return (
+            False,
+            f"{path_label(GLOBAL_JSON_PATH)} selects .NET SDK {source_major_or_error}.x; "
+            f"expected {REQUIRED_DOTNET_SDK_MAJOR}.x per {TECH_STACK_DOC}",
+        )
+
     ok, version_line, resolved = command_version_line("dotnet", "--version")
     if not ok:
-        return False, f"{version_line}; .NET SDK {REQUIRED_DOTNET_SDK_MAJOR}.x is required per {TECH_STACK_DOC}"
+        return (
+            False,
+            f"{version_line}; .NET SDK {REQUIRED_DOTNET_SDK_MAJOR}.x is required per "
+            f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}",
+        )
 
     major = version_major(version_line)
     if major != REQUIRED_DOTNET_SDK_MAJOR:
         return (
             False,
             f"found `{version_line or 'unknown'}` at {resolved}; "
-            f"expected .NET SDK {REQUIRED_DOTNET_SDK_MAJOR}.x per {TECH_STACK_DOC}",
+            f"expected .NET SDK {REQUIRED_DOTNET_SDK_MAJOR}.x per "
+            f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}",
         )
-    return True, f"{version_line} ({resolved}); expected major {REQUIRED_DOTNET_SDK_MAJOR}"
+    return True, f"{version_line} ({resolved}); expected major {REQUIRED_DOTNET_SDK_MAJOR} from {path_label(GLOBAL_JSON_PATH)}"
 
 
 def check_dotnet_sdk(_args: argparse.Namespace | None = None) -> int:
