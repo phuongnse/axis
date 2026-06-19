@@ -39,6 +39,7 @@ Use the matching repo skill for surface-specific checklist detail:
 
 | Surface | Skill |
 |---|---|
+| Missing or incomplete use-case spec | `$axis-use-case-spec` |
 | Use-case slice | `$axis-use-case-implementation` |
 | REST/OpenAPI/API type change | `$axis-api-contract` |
 | Event, proto, Wolverine, Kafka, RabbitMQ, or gRPC | `$axis-cross-module-contract` |

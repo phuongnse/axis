@@ -2,9 +2,9 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← AGENTS.md](../../AGENTS.md)
 
-**Daily workflow.** Walk the Ready review, Docs review, and Retrospective review while implementing; run the Verification gate before marking a PR ready for review. Use `$axis-use-case-implementation` for use-case slices and `$axis-ready-review` before PR review. **PR description = Summary + Linked spec + Requirements only** — no review/check paste blocks, no commit list, no CI/Doc-drift status (GitHub Checks tab covers that).
+**Daily workflow.** Walk the Ready review, Docs review, and Retrospective review while implementing; run the Verification gate before marking a PR ready for review. Use `$axis-use-case-spec` when a use case lacks an owning spec, `$axis-use-case-implementation` for implementation slices, and `$axis-ready-review` before PR review. **PR description = Summary + Linked spec + Requirements only** — no review/check paste blocks, no commit list, no CI/Doc-drift status (GitHub Checks tab covers that).
 
-**Skill routing.** API contracts: `$axis-api-contract`; cross-module contracts: `$axis-cross-module-contract`; frontend: `$axis-frontend-feature`; visuals: `$axis-visual-artifact`; review fixes: `$axis-review-feedback`.
+**Skill routing.** Use-case specs: `$axis-use-case-spec`; API contracts: `$axis-api-contract`; cross-module contracts: `$axis-cross-module-contract`; frontend: `$axis-frontend-feature`; visuals: `$axis-visual-artifact`; review fixes: `$axis-review-feedback`.
 
 **Large use cases:** split into **genuinely isolated PRs** (each branch from `main`, each passing the two-sided isolation test). See [pr-slicing.md](./pr-slicing.md) — never stack slice B on slice A's branch, never claim the Verification gate is green when you did not run it, and assign one owner per shared seam.
 

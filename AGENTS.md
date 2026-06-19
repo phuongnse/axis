@@ -112,7 +112,7 @@ Design Gate is a required review artifact, not a machine-enforced CI gate. Revie
 
 **High-risk surfaces** — new/changed endpoint or contract/required field, migration/schema, cross-module interaction, auth, new library or public API surface — require **user sign-off via plan mode before writing code**.
 
-Use repo skills for repeatable workflows: `$axis-use-case-implementation`, `$axis-api-contract`, `$axis-cross-module-contract`, `$axis-frontend-feature`, `$axis-visual-artifact`, `$axis-review-feedback`, and `$axis-ready-review`.
+Use repo skills for repeatable workflows: `$axis-use-case-spec`, `$axis-use-case-implementation`, `$axis-api-contract`, `$axis-cross-module-contract`, `$axis-frontend-feature`, `$axis-visual-artifact`, `$axis-review-feedback`, and `$axis-ready-review`.
 
 ### Reviews And Gates
 
