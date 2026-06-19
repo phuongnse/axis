@@ -39,10 +39,10 @@ message GetUserPermissionsResponse {
 1. Place files under `src/Modules/{Module}/Axis.{Module}.Contracts/Protos/axis/{module}/v{n}/` with `package axis.{module}.v{n};` matching the directory (`PACKAGE_DIRECTORY_MATCH`).
 2. Add the `Protos` directory to `modules:` in [`buf.yaml`](../../buf.yaml) at the repo root (copy an existing line).
 3. Keep `Grpc.Tools` `<Protobuf Include=...>` in the `.csproj` — Buf does not replace codegen.
-4. Run `buf lint` locally (`buf` CLI) and `python scripts/axis.py check buf-modules` (also runs in CI **Doc drift**).
+4. Run `python scripts/axis.py check buf-lint` and `python scripts/axis.py check buf-modules` (also runs in CI **Doc drift**). The Buf CLI version is owned by [scripts.md § Tool Versions](./scripts.md#tool-versions).
 5. **Changing `buf.yaml` breaking policy or removing a field?** Read [Buf breaking rules](#buf-breaking-rules) first. The v2 category model splits deletion rules in a way that's easy to misread, and "buf passes locally" can mean "no rule fires" rather than "the relaxed rule passed".
 
-CI runs `buf lint` and `buf breaking` against `main` when `.proto` or `buf.yaml` changes.
+CI runs `python scripts/axis.py check buf-lint` and `python scripts/axis.py check buf-breaking-against-base` when `.proto` or `buf.yaml` changes.
 
 ## Buf breaking rules
 
@@ -75,7 +75,7 @@ Result: a field may be removed **iff** the proto has `reserved <number>;` AND `r
 When changing `buf.yaml` to allow a previously-forbidden change:
 
 1. **Run `buf config ls-breaking-rules --version=v2`** to see exactly which rules a category contains. Don't infer from category names — `PACKAGE` does *not* relax `FIELD_NO_DELETE`; the relaxed variant lives in `WIRE_JSON`/`WIRE` and is OFF by default.
-2. **Test the negative case before declaring the fix works.** Delete a `reserved` line locally, run `buf breaking`, and confirm it now fails. If it passes, you didn't fix it — you disabled enforcement. *"Buf passes" ≠ "rule fires correctly"*. A common bad fix is switching to `use: PACKAGE` or `FILE except FIELD_NO_DELETE` alone; both can pass local buf while enforcing nothing.
+2. **Test the negative case before declaring the fix works.** Delete a `reserved` line locally, run `python scripts/axis.py check buf-breaking-against-base`, and confirm it now fails. If it passes, you didn't fix it — you disabled enforcement. *"Buf passes" ≠ "rule fires correctly"*. A common bad fix is switching to `use: PACKAGE` or `FILE except FIELD_NO_DELETE` alone; both can pass raw local Buf while enforcing nothing.
 3. **Reserved fields alone are hygiene only.** Without an enforced rule, `reserved` is documentation — it tells humans not to reuse the number, but buf won't fail anyone who forgets.
 
 The shortcut "if CI is green, the rule is doing its job" fails here because the absence of an error proves the absence of a check, not the presence of a working check. Always force the rule to fire on a counterexample before trusting it.

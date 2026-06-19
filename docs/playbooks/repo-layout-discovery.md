@@ -13,7 +13,7 @@
 | `src/Modules/{Module}/` | Folder name → `docs/use-cases/{slug}/` ([`doc_drift_domains.py`](../../scripts/doc_drift_domains.py)) | Add or map the domain folder when adding a module |
 | `src/Axis.Api/Endpoints/*Endpoints.cs` | `using Axis.{Module}.Application` → same domain as module | Ensure the endpoint group maps to an existing domain; update behavior docs via Docs review when behavior changes |
 | `*Event.avsc` under `Contracts/Schemas/` | `python scripts/axis.py register avro-schemas --dry-run` globs `*Event.avsc` | No script edit; optional local: `python scripts/axis.py register avro-schemas` |
-| `Contracts/Protos/*.proto` | `python scripts/axis.py check buf-modules` vs `buf.yaml` | `python scripts/axis.py generate buf-yaml` then `buf lint` |
+| `Contracts/Protos/*.proto` | `python scripts/axis.py check buf-modules` vs `buf.yaml` | `python scripts/axis.py generate buf-yaml` then `python scripts/axis.py check buf-lint` |
 | `*KafkaTopics.cs` constants | `python scripts/axis.py check kafka-wiring` vs `Program.cs` | Add `PublishAndListenWithAvro` + `PublishLocally` for new `{Class}.{Const}` |
 | Use-case `## Purpose` / new folder under domain | `python scripts/axis.py check domain-readme-index` | `python scripts/axis.py generate domain-readme-index` |
 | `docker-compose.yml` services / ports | `python scripts/axis.py check local-dev-docs` | Update [local-dev.md](./local-dev.md) |
@@ -64,7 +64,7 @@ python scripts/axis.py check domain-readme-index
 - [ ] Add use-case folder(s) under that domain as specs are written.
 - [ ] If workspace provisioning: add `WorkspaceVerifiedHandler` + update `WorkspaceModuleNames` in Identity.Contracts.
 - [ ] If Kafka events: add `*Event.avsc`, `*KafkaTopics.cs` const, wire `Program.cs` (kafka check).
-- [ ] If gRPC: add `Contracts/Protos/*.proto`, run `python scripts/axis.py generate buf-yaml`, `buf lint`.
+- [ ] If gRPC: add `Contracts/Protos/*.proto`, run `python scripts/axis.py generate buf-yaml`, `python scripts/axis.py check buf-lint`.
 - [ ] Reference module projects in `tests/Architecture/Axis.Architecture.Tests/Axis.Architecture.Tests.csproj` when fitness tests should load them.
 - [ ] Run `python scripts/axis.py check doc-drift` and full `dotnet test` on `Axis.sln`.
 

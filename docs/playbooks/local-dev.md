@@ -24,11 +24,17 @@ or pattern docs.
   `python -m pip install PyYAML`.
 - **.NET SDK 8.x** - required for repo verification (`dotnet build`, `dotnet test`,
   `dotnet format`), EF migrations, and API contract generation. The compose API
-  container has its own SDK, but local verification expects `dotnet` on `PATH`.
+  container has its own SDK, but local verification expects `dotnet` on `PATH`
+  and fails before running .NET commands when `dotnet --version` is not 8.x.
 - **Node.js + npm** - required for repo verification (`npm run ci`,
   `npm run test`), OpenAPI TypeScript generation, and wireframe export. The
   compose web container has its own Node runtime, but local verification expects
-  `node` and `npm` on `PATH`.
+  `node` and `npm` on `PATH`. The Node major must match
+  [`frontend/.nvmrc`](../../frontend/.nvmrc).
+- **Buf CLI** - required for protobuf lint/breaking verification. Use the exact
+  version in [scripts.md § Tool Versions](./scripts.md#tool-versions); local
+  protobuf commands fail when `buf` is missing from `PATH` or reports a
+  different version.
 - **Lychee** - required for markdown link verification. Use the exact version in
   [scripts.md § Tool Versions](./scripts.md#tool-versions); `python scripts/axis.py check markdown-links`
   fails when `lychee` is missing from `PATH` or reports a different version.
@@ -52,9 +58,9 @@ Run the doctor before debugging local stack issues:
 python scripts/axis.py doctor
 ```
 
-It checks the repo root, Python launcher, PyYAML, Git, .NET SDK, Node, npm,
-Lychee, Docker CLI, Docker Compose, the active Docker endpoint, and known adapter
-probes.
+It checks the repo root, Python launcher, PyYAML, Git, documented .NET SDK
+major, documented Node major, npm, Buf, Lychee, Docker CLI, Docker Compose, the
+active Docker endpoint, and known adapter probes.
 
 Use strict mode when you want the command to fail on blocking local-dev issues:
 

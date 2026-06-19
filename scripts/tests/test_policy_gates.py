@@ -605,6 +605,7 @@ class TestVulnerablePackageGate(unittest.TestCase):
             return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
 
         with (
+            mock.patch.object(axis, "check_dotnet_sdk", return_value=0),
             mock.patch.object(axis, "exe", side_effect=lambda name: name),
             mock.patch.object(axis, "run", side_effect=fake_run),
             contextlib.redirect_stdout(io.StringIO()),
@@ -614,6 +615,105 @@ class TestVulnerablePackageGate(unittest.TestCase):
         self.assertEqual("dotnet", calls[0][0])
         self.assertEqual(str(axis.ROOT / "Axis.sln"), calls[0][2])
         self.assertTrue(Path(calls[0][2]).is_absolute())
+
+
+class TestToolVersionGates(unittest.TestCase):
+    def test_dotnet_sdk_rejects_wrong_major(self) -> None:
+        with mock.patch.object(
+            axis,
+            "command_version_line",
+            return_value=(True, "9.0.100", "/usr/bin/dotnet"),
+        ):
+            ok, detail = axis.dotnet_sdk_status()
+
+        self.assertFalse(ok)
+        self.assertIn("expected .NET SDK 8.x", detail)
+        self.assertIn("docs/TECH_STACK.md", detail)
+
+    def test_frontend_toolchain_rejects_wrong_node_major(self) -> None:
+        with (
+            mock.patch.object(axis, "required_node_major", return_value=(True, "22")),
+            mock.patch.object(
+                axis,
+                "command_version_line",
+                return_value=(True, "v24.13.0", "/usr/bin/node"),
+            ),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(1, axis.check_frontend_toolchain())
+
+        self.assertIn("expected Node 22.x", stderr.getvalue())
+        self.assertIn("frontend/.nvmrc", stderr.getvalue())
+
+    def test_buf_cli_rejects_wrong_version(self) -> None:
+        with (
+            mock.patch.object(axis, "find_buf", return_value="/usr/bin/buf"),
+            mock.patch.object(
+                axis,
+                "run_optional",
+                return_value=axis.subprocess.CompletedProcess(
+                    ["/usr/bin/buf", "--version"],
+                    0,
+                    stdout="1.51.0\n",
+                    stderr="",
+                ),
+            ),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(1, axis.check_buf_cli())
+
+        output = stderr.getvalue()
+        self.assertIn("Buf CLI 1.50.0 is required", output)
+        self.assertIn("found `1.51.0`", output)
+
+    def test_buf_lint_runs_through_version_checked_wrapper(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(args: list[str], **_kwargs):
+            calls.append(args)
+            return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+        with (
+            mock.patch.object(axis, "find_buf", return_value="/usr/bin/buf"),
+            mock.patch.object(
+                axis,
+                "run_optional",
+                return_value=axis.subprocess.CompletedProcess(
+                    ["/usr/bin/buf", "--version"],
+                    0,
+                    stdout="1.50.0\n",
+                    stderr="",
+                ),
+            ),
+            mock.patch.object(axis, "run", side_effect=fake_run),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.check_buf_lint())
+
+        self.assertEqual([["/usr/bin/buf", "lint"]], calls)
+
+    def test_buf_breaking_rejects_wrong_version_before_running_buf(self) -> None:
+        with (
+            mock.patch.dict(axis.os.environ, {"BASE_REF": "origin/main"}, clear=False),
+            mock.patch.object(axis, "ref_exists", return_value=True),
+            mock.patch.object(axis, "find_buf", return_value="/usr/bin/buf"),
+            mock.patch.object(
+                axis,
+                "run_optional",
+                return_value=axis.subprocess.CompletedProcess(
+                    ["/usr/bin/buf", "--version"],
+                    0,
+                    stdout="1.51.0\n",
+                    stderr="",
+                ),
+            ),
+            mock.patch.object(axis, "run") as run_mock,
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(1, axis.check_buf_breaking_against_base())
+
+        run_mock.assert_not_called()
+        self.assertIn("Buf CLI 1.50.0 is required", stderr.getvalue())
 
 
 class TestMarkdownLinkGate(unittest.TestCase):
@@ -703,6 +803,40 @@ class TestVerifyGate(unittest.TestCase):
             self.assertEqual(0, axis.verify(object()))
 
         self.assertEqual(["policy-tests", "doc-drift"], calls)
+
+    def test_runs_frontend_toolchain_before_frontend_commands(self) -> None:
+        calls: list[str] = []
+
+        def fake_run(args: list[str], **_kwargs):
+            if args[1:3] == ["run", "ci"]:
+                calls.append("npm run ci")
+            elif args[1:3] == ["run", "test"]:
+                calls.append("npm run test")
+            else:
+                calls.append(" ".join(args[:3]))
+            return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+        with (
+            mock.patch.object(axis, "diff_range", return_value="base...HEAD"),
+            mock.patch.object(axis, "changed_paths", return_value=["frontend/src/App.tsx"]),
+            mock.patch.object(axis, "check_frontend_toolchain", side_effect=lambda: calls.append("frontend-toolchain") or 0),
+            mock.patch.object(axis, "run", side_effect=fake_run),
+            mock.patch.object(axis, "check_policy_tests", side_effect=lambda: calls.append("policy-tests") or 0),
+            mock.patch.object(axis, "check_doc_drift", side_effect=lambda: calls.append("doc-drift") or 0),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.verify(object()))
+
+        self.assertEqual(
+            [
+                "frontend-toolchain",
+                "npm run ci",
+                "npm run test",
+                "policy-tests",
+                "doc-drift",
+            ],
+            calls,
+        )
 
 
 class TestFrontendRadiusTokens(unittest.TestCase):

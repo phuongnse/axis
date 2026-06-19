@@ -11,14 +11,16 @@ ecosystem, such as Excalidraw SVG export in `frontend/scripts/`.
 
 Application/runtime versions live in [TECH_STACK.md](../TECH_STACK.md) and
 manifest files such as [`frontend/.nvmrc`](../../frontend/.nvmrc). This section
-owns repo-maintenance CLI versions that are used by `scripts/axis.py` and CI.
-Local tools must match the documented version instead of adapting config at
+owns repo-maintenance CLI versions and records which source each local gate uses.
+Local tools must match the documented source instead of adapting config at
 runtime.
 
-| Tool | Required version | Used by | Notes |
+| Tool | Required version source | Used by | Local enforcement |
 |---|---:|---|---|
-| Lychee | `0.23.0` exactly | `python scripts/axis.py check markdown-links`, CI Markdown link check | `lychee.toml` is written for the 0.23 config schema. `lychee --version` must print `lychee 0.23.0`; newer versions fail fast until this row and config are intentionally upgraded together. |
-| Buf CLI | `1.50.0` | CI protobuf lint/breaking checks; local `python scripts/axis.py check buf-breaking-against-base` | Keep local `buf` aligned with the CI setup action when debugging protobuf failures. |
+| .NET SDK | `8.x` in [TECH_STACK.md](../TECH_STACK.md) | `python scripts/axis.py verify`, `test unit`, package scans, API contract generation | `dotnet --version` major must be `8`; another major fails before any `dotnet` command runs. |
+| Node.js | [`frontend/.nvmrc`](../../frontend/.nvmrc) | `python scripts/axis.py verify`, frontend checks/tests, API type generation, wireframe export | `node --version` major must match `.nvmrc`; `npm` must resolve from `PATH`. |
+| Lychee | `0.23.0` exactly in this table | `python scripts/axis.py check markdown-links`, CI Markdown link check | `lychee.toml` is written for the 0.23 config schema. `lychee --version` must print `lychee 0.23.0`; newer versions fail fast until this row and config are intentionally upgraded together. |
+| Buf CLI | `1.50.0` exactly in this table | `python scripts/axis.py check buf-lint`, `python scripts/axis.py check buf-breaking-against-base`, CI protobuf checks | `buf --version` must print `1.50.0`; local protobuf commands must go through `scripts/axis.py` wrappers, not raw `buf`, so the version check always runs first. |
 
 Install Lychee from the upstream release for `v0.23.0`, or via Cargo if Rust is
 already available:
@@ -31,6 +33,15 @@ lychee --version
 If `lychee --version` reports another version, fix `PATH` or reinstall before
 running the markdown link check.
 
+Install Buf CLI from the upstream release for `v1.50.0`, then verify:
+
+```bash
+buf --version
+```
+
+If `buf --version` reports another version, fix `PATH` or reinstall before
+running protobuf checks.
+
 ## Commands
 
 ```bash
@@ -39,8 +50,12 @@ python scripts/axis.py verify
 python scripts/axis.py check policy-tests
 python scripts/axis.py check codex-skills
 python scripts/axis.py check text-encoding
+python scripts/axis.py check dotnet-sdk
+python scripts/axis.py check frontend-toolchain
 python scripts/axis.py check doc-drift
 python scripts/axis.py check markdown-links
+python scripts/axis.py check buf-cli
+python scripts/axis.py check buf-lint
 python scripts/axis.py check scripts-standard
 python scripts/axis.py check doc-navigation
 python scripts/axis.py check doc-size-budgets

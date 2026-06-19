@@ -89,7 +89,7 @@ Use the terms from [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md#enforcement-taxono
 
 ### Verification Gate — verify before PR review
 
-**One command:** `python scripts/axis.py verify` runs the local ready-PR gate — build + vulnerable package scan + `dotnet format --verify` + **unit test projects only** + frontend `ci`/test + markdown link check when markdown changed + drift. It only runs the layers whose files changed (so doc-only and frontend-only work stays quick).
+**One command:** `python scripts/axis.py verify` runs the local ready-PR gate — documented toolchain version checks + build + vulnerable package scan + `dotnet format --verify` + **unit test projects only** + frontend `ci`/test + protobuf lint/breaking when proto config changed + markdown link check when markdown changed + drift. It only runs the layers whose files changed (so doc-only and frontend-only work stays quick).
 
 Run `python scripts/axis.py bootstrap` once to install the committed **pre-push hook** explicitly (`core.hooksPath = scripts/hooks`); build commands must not mutate Git config. The hook runs `python scripts/axis.py pre-push`, a quick policy/doc sanity gate for ordinary network pushes. It intentionally does not run the full local Verification gate on every push. Set `AXIS_PRE_PUSH_FULL=1` when you explicitly want the hook to run `python scripts/axis.py verify` before pushing.
 
@@ -104,17 +104,18 @@ The .NET branch of `python scripts/axis.py verify` also runs the enforced
 |--------------------|--------|
 | Process/docs change | `python scripts/axis.py check doc-drift`; for Markdown links/anchors also run `python scripts/axis.py check markdown-links` |
 | Test change | `python scripts/axis.py check test-naming`; for project changes also run `python scripts/axis.py check test-project-classification` and `python scripts/axis.py test unit` |
-| Frontend change | `npm run ci` and/or `npm run test` |
-| Backend compile-sensitive change | `dotnet build` or the directly affected test project |
+| Frontend change | `python scripts/axis.py check frontend-toolchain`, then `npm run ci` and/or `npm run test` |
+| Backend compile-sensitive change | `python scripts/axis.py check dotnet-sdk`, then `dotnet build` or the directly affected test project |
 | Review fix touching a rule/guard | The specific guard for that rule, then run `python scripts/axis.py verify` before requesting review |
 
 | Changed | Commands (all must pass when triggered) |
 |---------|----------------------------------------|
 | `tests/` | `python scripts/axis.py check test-naming` |
-| `src/` or `tests/` | `dotnet build` then `python scripts/axis.py test unit` (auto-discovers `*.Domain.Tests` and `*.Application.Tests`) |
+| `src/` or `tests/` | `python scripts/axis.py check dotnet-sdk`, then `dotnet build` and `python scripts/axis.py test unit` (auto-discovers `*.Domain.Tests` and `*.Application.Tests`) |
 | `src/`, `tests/`, dependency props, or API contract | `python scripts/axis.py check vulnerable-packages` |
 | `src/` or `tests/` | `dotnet format --verify-no-changes` |
-| `frontend/` | `npm run ci` then `npm run test` |
+| `frontend/` | `python scripts/axis.py check frontend-toolchain`, then `npm run ci` and `npm run test` |
+| `.proto` or `buf.yaml` | `python scripts/axis.py check buf-lint` then `python scripts/axis.py check buf-breaking-against-base` |
 | `src/Axis.Api/Endpoints/` or API contract | Update + run `tests/Api/Axis.Api.Tests/` |
 | Docs/scripts/layout/policy change | `python scripts/axis.py check policy-tests` then `python scripts/axis.py check doc-drift`; for Markdown/`lychee.toml` changes also run `python scripts/axis.py check markdown-links` |
 | `docker-compose.yml` | Update [local-dev.md](./local-dev.md) in same PR; `python scripts/axis.py check doc-drift` |
