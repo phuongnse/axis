@@ -1,6 +1,6 @@
 ---
 name: axis-use-case-implementation
-description: Implement Axis use-case slices from specs through tests, code, documentation status, and verification. Use when adding or fixing behavior for a use case in docs/use-cases, touching module Domain/Application/Infrastructure/API/Frontend layers, or closing implementation-status gaps.
+description: Implement Axis use-case slices from specs through tests, code, documentation status, and verification. Use when adding or fixing behavior for a documented use case in docs/use-cases, touching module Domain/Application/Infrastructure/API/Frontend layers, or closing implementation-status gaps. If the requested use case has no owning README or acceptance criteria, first use axis-use-case-spec.
 ---
 
 # Axis Use Case Implementation
@@ -14,6 +14,7 @@ Ship one reviewable Axis use-case slice without losing acceptance criteria, laye
 1. Locate the owning spec.
    - Read `docs/use-cases/README.md`, the domain `README.md`, and the use-case file.
    - If the use case is unclear, search with `rg -n "<feature words>" docs/use-cases src tests frontend`.
+   - If no owning use-case README or AC block exists, stop implementation and use `$axis-use-case-spec` first.
    - Read `docs/WORKAROUNDS.md` for entries touching the same module or files.
 
 2. Run `$axis-design-gate` for non-trivial work.
