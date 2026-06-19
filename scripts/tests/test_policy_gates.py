@@ -616,6 +616,105 @@ class TestVulnerablePackageGate(unittest.TestCase):
         self.assertTrue(Path(calls[0][2]).is_absolute())
 
 
+class TestMarkdownLinkGate(unittest.TestCase):
+    def test_finds_cargo_installed_lychee(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            cargo_lychee = home / ".cargo" / "bin" / "lychee"
+            cargo_lychee.parent.mkdir(parents=True)
+            cargo_lychee.write_text("#!/bin/sh\n", encoding="utf-8")
+            cargo_lychee.chmod(0o755)
+
+            with (
+                mock.patch.object(axis.shutil, "which", return_value=None),
+                mock.patch.object(axis.Path, "home", return_value=home),
+            ):
+                self.assertEqual(str(cargo_lychee), axis.find_lychee())
+
+    def test_runs_lychee_with_shared_config(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(args: list[str], **_kwargs):
+            calls.append(args)
+            return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+        with (
+            mock.patch.object(axis, "find_lychee", return_value="/usr/bin/lychee"),
+            mock.patch.object(axis, "run", side_effect=fake_run),
+        ):
+            self.assertEqual(0, axis.check_markdown_links())
+
+        self.assertEqual([["/usr/bin/lychee", "--config", "./lychee.toml", "./**/*.md"]], calls)
+
+    def test_retries_with_new_fragment_config_for_lychee_024(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(args: list[str], **_kwargs):
+            calls.append(args)
+            if args[2] == "./lychee.toml":
+                return axis.subprocess.CompletedProcess(
+                    args,
+                    3,
+                    stdout="",
+                    stderr="wanted string or table for include_fragments",
+                )
+            adapted_config = Path(args[2]).read_text(encoding="utf-8")
+            self.assertIn('include_fragments = "anchor-only"', adapted_config)
+            return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+        with (
+            mock.patch.object(axis, "find_lychee", return_value="/usr/bin/lychee"),
+            mock.patch.object(axis, "run", side_effect=fake_run),
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.check_markdown_links())
+
+        self.assertEqual("./lychee.toml", calls[0][2])
+        self.assertNotEqual("./lychee.toml", calls[1][2])
+
+    def test_fails_when_lychee_is_missing(self) -> None:
+        with (
+            mock.patch.object(axis, "find_lychee", return_value=None),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(1, axis.check_markdown_links())
+
+        self.assertIn("lychee is required", stderr.getvalue())
+
+
+class TestVerifyGate(unittest.TestCase):
+    def test_runs_markdown_links_for_markdown_changes(self) -> None:
+        calls: list[str] = []
+
+        with (
+            mock.patch.object(axis, "diff_range", return_value="base...HEAD"),
+            mock.patch.object(axis, "changed_paths", return_value=["docs/example.md"]),
+            mock.patch.object(axis, "check_markdown_links", side_effect=lambda: calls.append("markdown-links") or 0),
+            mock.patch.object(axis, "check_policy_tests", side_effect=lambda: calls.append("policy-tests") or 0),
+            mock.patch.object(axis, "check_doc_drift", side_effect=lambda: calls.append("doc-drift") or 0),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.verify(object()))
+
+        self.assertEqual(["markdown-links", "policy-tests", "doc-drift"], calls)
+
+    def test_skips_markdown_links_for_non_markdown_changes(self) -> None:
+        calls: list[str] = []
+
+        with (
+            mock.patch.object(axis, "diff_range", return_value="base...HEAD"),
+            mock.patch.object(axis, "changed_paths", return_value=["scripts/tool.py"]),
+            mock.patch.object(axis, "check_markdown_links", side_effect=lambda: calls.append("markdown-links") or 0),
+            mock.patch.object(axis, "check_policy_tests", side_effect=lambda: calls.append("policy-tests") or 0),
+            mock.patch.object(axis, "check_doc_drift", side_effect=lambda: calls.append("doc-drift") or 0),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.verify(object()))
+
+        self.assertEqual(["policy-tests", "doc-drift"], calls)
+
+
 class TestFrontendRadiusTokens(unittest.TestCase):
     def issues_for_frontend(self, component_source: str, css_radius: str = "0.5rem") -> list[str]:
         with tempfile.TemporaryDirectory() as temp:
@@ -1031,6 +1130,18 @@ class TestEnforcementTruthAudit(unittest.TestCase):
             issues = axis.enforcement_truth_audit_issues(root=root)
 
         self.assertIn("doc drift runs in CI", "\n".join(issues))
+
+    def test_rejects_local_verify_without_markdown_links(self) -> None:
+        def mutate(files: dict[Path, str]) -> None:
+            script = Path("scripts/axis.py")
+            files[script] = files[script].replace('step("markdown links", lambda: check_markdown_links())\n', "")
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_truth_repo(root, mutate)
+            issues = axis.enforcement_truth_audit_issues(root=root)
+
+        self.assertIn("local verify runs markdown link check", "\n".join(issues))
 
     def test_rejects_missing_pre_push_quick_gate_delegate(self) -> None:
         def mutate(files: dict[Path, str]) -> None:

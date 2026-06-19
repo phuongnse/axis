@@ -69,7 +69,7 @@ Use the terms from [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md#enforcement-taxono
 - **PR guard** — [`scripts/check-pr.py`](../../scripts/check-pr.py) validates PR metadata shape and checkbox self-attestation. It cannot prove that review-only checkpoints happened.
 - **Policy gate tests** — `python scripts/axis.py check policy-tests` runs counterexample tests for custom Python gates so a regex/path change cannot silently disable enforcement.
 - **Doc drift** — runs deterministic docs/policy/layout checks: text encoding, module/API discovery, governance registry/owner-boundary/truth wiring, handler/test ratchets, endpoint DTO ratchets, workaround sync, doc hygiene, script standards, and layout checks (`buf`, Kafka wiring, domain README index). [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md) owns finding-class status; script output owns the exact failing guard.
-- **Markdown link check** — `lychee` verifies internal links and `#anchors`. **Relative file/image targets** (`![alt](./asset.svg)`, `[text](./file.md)`) are double-checked by `python scripts/axis.py check doc-link-targets` inside the drift command — catches the broken-image class lychee misses.
+- **Markdown link check** — `lychee` verifies internal links and `#anchors`; run it locally with `python scripts/axis.py check markdown-links`. **Relative file/image targets** (`![alt](./asset.svg)`, `[text](./file.md)`) are double-checked by `python scripts/axis.py check doc-link-targets` inside the drift command — catches the broken-image class lychee misses.
 - **Doc navigation** — `python scripts/axis.py check doc-navigation` requires every `docs/**/*.md` file to start with an H1 and a `> **Navigation**:` block so docs never become dead ends.
 - **Doc size budgets** — `python scripts/axis.py check doc-size-budgets` keeps reference docs/playbooks within the budgets in [docs-style.md](./docs-style.md#size-budgets), including the tighter pattern-router budget.
 - **Code-fence integrity** — `python scripts/axis.py check doc-code-fences` (inside the drift command) flags code-block lines with collapsed indentation (a lone leading space). Catches the bulk-find-replace corruption class that lychee, prettier, and the structural checks all let through.
@@ -89,7 +89,7 @@ Use the terms from [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md#enforcement-taxono
 
 ### Verification Gate — verify before PR review
 
-**One command:** `python scripts/axis.py verify` runs the local ready-PR gate — build + vulnerable package scan + `dotnet format --verify` + **unit test projects only** + frontend `ci`/test + drift. It only runs the layers whose files changed (so doc-only and frontend-only work stays quick).
+**One command:** `python scripts/axis.py verify` runs the local ready-PR gate — build + vulnerable package scan + `dotnet format --verify` + **unit test projects only** + frontend `ci`/test + markdown link check when markdown changed + drift. It only runs the layers whose files changed (so doc-only and frontend-only work stays quick).
 
 Run `python scripts/axis.py bootstrap` once to install the committed **pre-push hook** explicitly (`core.hooksPath = scripts/hooks`); build commands must not mutate Git config. The hook runs `python scripts/axis.py pre-push`, a quick policy/doc sanity gate for ordinary network pushes. It intentionally does not run the full local Verification gate on every push. Set `AXIS_PRE_PUSH_FULL=1` when you explicitly want the hook to run `python scripts/axis.py verify` before pushing.
 
@@ -102,7 +102,7 @@ The .NET branch of `python scripts/axis.py verify` also runs the enforced
 
 | During development | Prefer |
 |--------------------|--------|
-| Process/docs change | `python scripts/axis.py check doc-drift` or the specific doc guard named in its output |
+| Process/docs change | `python scripts/axis.py check doc-drift`; for Markdown links/anchors also run `python scripts/axis.py check markdown-links` |
 | Test change | `python scripts/axis.py check test-naming`; for project changes also run `python scripts/axis.py check test-project-classification` and `python scripts/axis.py test unit` |
 | Frontend change | `npm run ci` and/or `npm run test` |
 | Backend compile-sensitive change | `dotnet build` or the directly affected test project |
@@ -116,7 +116,7 @@ The .NET branch of `python scripts/axis.py verify` also runs the enforced
 | `src/` or `tests/` | `dotnet format --verify-no-changes` |
 | `frontend/` | `npm run ci` then `npm run test` |
 | `src/Axis.Api/Endpoints/` or API contract | Update + run `tests/Api/Axis.Api.Tests/` |
-| Docs/scripts/layout/policy change | `python scripts/axis.py check policy-tests` then `python scripts/axis.py check doc-drift` |
+| Docs/scripts/layout/policy change | `python scripts/axis.py check policy-tests` then `python scripts/axis.py check doc-drift`; for Markdown/`lychee.toml` changes also run `python scripts/axis.py check markdown-links` |
 | `docker-compose.yml` | Update [local-dev.md](./local-dev.md) in same PR; `python scripts/axis.py check doc-drift` |
 
 When reporting verification, state each triggered command as `ran`, `not triggered` with reason, or `failed` with the blocker. `$axis-ready-review` provides the repeatable reporting shape.

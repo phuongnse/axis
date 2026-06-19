@@ -18,6 +18,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -1400,6 +1401,7 @@ GOVERNANCE_ENTRY_DOCS = [
 GOVERNANCE_COMMANDS_OWNED_BY_AGENT_CHECKLIST = [
     "python scripts/axis.py check policy-tests",
     "python scripts/axis.py check doc-drift",
+    "python scripts/axis.py check markdown-links",
 ]
 
 REVIEW_FINDINGS_LEDGER_HEADER = [
@@ -1436,6 +1438,8 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
             ("run: npm run test", "frontend tests run in CI"),
             ("run: python scripts/axis.py check policy-tests", "policy gate tests run in CI"),
             ("run: python scripts/axis.py check doc-drift", "doc drift runs in CI"),
+            ("uses: lycheeverse/lychee-action", "markdown link check runs in CI"),
+            ("args: --config ./lychee.toml './**/*.md'", "markdown link check uses shared lychee config"),
             ("BASE_BRANCH: main", "doc drift compares against main"),
         ],
     ),
@@ -1444,6 +1448,7 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
         [
             ('step("policy gate tests", lambda: check_policy_tests())', "local verify runs policy gate tests"),
             ('step("doc drift", lambda: check_doc_drift())', "local verify runs doc drift"),
+            ('step("markdown links", lambda: check_markdown_links())', "local verify runs markdown link check"),
             ('def pre_push(args: argparse.Namespace) -> int:', "pre-push quick gate is implemented in Python"),
             ('return verify(args)', "pre-push can opt into full verify with AXIS_PRE_PUSH_FULL"),
             ("for issue in governance_owner_boundary_issues():", "doc drift checks governance owner boundaries"),
@@ -1800,15 +1805,66 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
+def find_lychee() -> str | None:
+    found = shutil.which("lychee")
+    if found:
+        return found
+
+    executable = "lychee.exe" if os.name == "nt" else "lychee"
+    cargo_bin = Path.home() / ".cargo" / "bin" / executable
+    if cargo_bin.is_file() and os.access(cargo_bin, os.X_OK):
+        return str(cargo_bin)
+    return None
+
+
+def run_lychee_markdown_check(lychee: str, config: str) -> subprocess.CompletedProcess[str]:
+    return run([lychee, "--config", config, "./**/*.md"], capture=True, check=False)
+
+
+def emit_captured_process(result: subprocess.CompletedProcess[str]) -> None:
+    if result.stdout:
+        print(result.stdout, end="")
+    if result.stderr:
+        print(result.stderr, end="", file=sys.stderr)
+
+
+def retry_lychee_with_anchor_only_config(lychee: str) -> subprocess.CompletedProcess[str]:
+    original = (ROOT / "lychee.toml").read_text(encoding="utf-8")
+    adapted = original.replace("include_fragments = true", 'include_fragments = "anchor-only"')
+    with tempfile.TemporaryDirectory(prefix="axis-lychee-") as temp:
+        config = Path(temp) / "lychee.toml"
+        config.write_text(adapted, encoding="utf-8")
+        return run_lychee_markdown_check(lychee, str(config))
+
+
+def check_markdown_links(_args: argparse.Namespace | None = None) -> int:
+    lychee = find_lychee()
+    if lychee is None:
+        print(
+            "check-markdown-links: lychee is required. "
+            "Install lychee, then run `python scripts/axis.py check markdown-links` again.",
+            file=sys.stderr,
+        )
+        return 1
+    result = run_lychee_markdown_check(lychee, "./lychee.toml")
+    output = f"{result.stdout or ''}\n{result.stderr or ''}"
+    if result.returncode == 3 and "include_fragments" in output and "wanted string or table" in output:
+        result = retry_lychee_with_anchor_only_config(lychee)
+    emit_captured_process(result)
+    return result.returncode
+
+
 def verify(args: argparse.Namespace) -> int:
     range_spec = diff_range()
     paths = changed_paths(range_spec)
 
     dotnet = False
     frontend = False
+    markdown_links = False
     if not paths:
         dotnet = True
         frontend = True
+        markdown_links = True
     else:
         dotnet = any(
             re.search(r"^(src/|tests/|Directory[.]|Axis[.]sln$|global[.]json$|[.]editorconfig$|openapi[.]json$|[.]github/workflows/build-and-test[.]yml$)", p)
@@ -1816,6 +1872,10 @@ def verify(args: argparse.Namespace) -> int:
         )
         frontend = any(
             re.search(r"^(frontend/|[.]editorconfig$|openapi[.]json$|[.]github/workflows/build-and-test[.]yml$)", p)
+            for p in paths
+        )
+        markdown_links = any(
+            re.search(r"(^|/)[^/]+[.]md$|^lychee[.]toml$|^[.]github/workflows/build-and-test[.]yml$", p)
             for p in paths
         )
 
@@ -1836,7 +1896,7 @@ def verify(args: argparse.Namespace) -> int:
             print(f"FAIL {name}")
             failed.append(name)
 
-    print(f"verify - .NET={dotnet} frontend={frontend}")
+    print(f"verify - .NET={dotnet} frontend={frontend} markdown-links={markdown_links}")
 
     if dotnet:
         step(".NET test naming", lambda: check_test_naming())
@@ -1848,6 +1908,9 @@ def verify(args: argparse.Namespace) -> int:
     if frontend:
         step("frontend ci (tsc + biome)", lambda: run([exe("npm"), "run", "ci"], cwd=ROOT / "frontend", check=False).returncode)
         step("frontend test", lambda: run([exe("npm"), "run", "test"], cwd=ROOT / "frontend", check=False).returncode)
+
+    if markdown_links:
+        step("markdown links", lambda: check_markdown_links())
 
     step("policy gate tests", lambda: check_policy_tests())
     step("doc drift", lambda: check_doc_drift())
@@ -2237,6 +2300,7 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("doc-link-targets").set_defaults(
         func=lambda _args: run_module_check("check-doc-link-targets.py", ["--check"])
     )
+    check_sub.add_parser("markdown-links").set_defaults(func=check_markdown_links)
     check_sub.add_parser("doc-navigation").set_defaults(func=check_doc_navigation)
     check_sub.add_parser("doc-size-budgets").set_defaults(func=check_doc_size_budgets)
     check_sub.add_parser("doc-code-fences").set_defaults(

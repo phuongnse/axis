@@ -16,6 +16,7 @@ python scripts/axis.py check policy-tests
 python scripts/axis.py check codex-skills
 python scripts/axis.py check text-encoding
 python scripts/axis.py check doc-drift
+python scripts/axis.py check markdown-links
 python scripts/axis.py check scripts-standard
 python scripts/axis.py check doc-navigation
 python scripts/axis.py check doc-size-budgets
