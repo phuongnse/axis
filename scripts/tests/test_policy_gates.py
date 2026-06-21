@@ -1673,13 +1673,29 @@ class TestDocSizeBudgetGate(unittest.TestCase):
 
 class TestScriptsStandardGate(unittest.TestCase):
     def issues_for_files(self, files: dict[str, str]) -> list[str]:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(dir=ROOT) as temp:
             root = Path(temp)
             for relative, content in files.items():
                 path = root / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content, encoding="utf-8")
             return axis.non_python_utility_script_issues(root=root)
+
+    def test_rejects_executable_top_level_python_script(self) -> None:
+        with tempfile.TemporaryDirectory(dir=ROOT) as temp:
+            root = Path(temp)
+            script = root / "scripts" / "check-local-dev-docs.py"
+            script.parent.mkdir(parents=True, exist_ok=True)
+            script.write_text("#!/usr/bin/env python3\nprint('ok')\n", encoding="utf-8")
+            script.chmod(0o755)
+
+            issues = axis.non_python_utility_script_issues(root=root)
+
+        self.assertIn(
+            "scripts/check-local-dev-docs.py: top-level Python scripts must not be executable; "
+            "run them through scripts/axis.py",
+            issues,
+        )
 
     def test_rejects_non_python_docs_utility_script(self) -> None:
         issues = self.issues_for_files({"docs/scripts/render-wireframes.mjs": "console.log('nope');\n"})
@@ -1715,6 +1731,15 @@ class TestScriptsStandardGate(unittest.TestCase):
             {"scripts/hooks/pre-push": "#!/usr/bin/env bash\npython scripts/axis.py pre-push\n"}
         )
         self.assertIn("scripts/hooks/pre-push: pre-push hook must be a Python entrypoint", issues)
+
+    def test_rejects_non_executable_pre_push_hook(self) -> None:
+        issues = self.issues_for_files(
+            {
+                "scripts/hooks/pre-push": "#!/usr/bin/env python3\n"
+                'os.execv(sys.executable, [sys.executable, str(root / "scripts" / "axis.py"), "pre-push"])\n'
+            }
+        )
+        self.assertIn("scripts/hooks/pre-push: pre-push hook must be executable", issues)
 
     def test_current_repository_scripts_standard_still_passes(self) -> None:
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):

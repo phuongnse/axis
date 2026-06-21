@@ -76,8 +76,10 @@ python scripts/axis.py register avro-schemas --dry-run
   `docs/scripts/`, `docs/wireframes/`, or `docs/diagrams/`.
 - Native ecosystem tooling belongs beside the owning package, with a package
   script and, when useful for repo workflows, a `scripts/axis.py` entrypoint.
+- Top-level `scripts/*.py` files are run through `python scripts/axis.py` or
+  explicit `python ...` commands and should stay non-executable.
 - `scripts/hooks/pre-push` has no extension because Git expects that filename, but
-  its entrypoint must be Python and delegate to `scripts/axis.py pre-push`.
+  its entrypoint must be executable Python and delegate to `scripts/axis.py pre-push`.
 - Use Python JSON/path/process APIs instead of shell string manipulation when parsing
   Markdown, OpenAPI, Avro, YAML-like config, or Git output.
 - Diff-aware local checks must include the PR range plus staged, unstaged, and

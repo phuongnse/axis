@@ -989,6 +989,11 @@ def non_python_utility_script_issues(root: Path = ROOT) -> list[str]:
         if not path.is_file():
             continue
         if path.suffix.lower() == ".py":
+            if os.name != "nt" and path.stat().st_mode & 0o111:
+                issues.append(
+                    f"{local_rel(path)}: top-level Python scripts must not be executable; "
+                    "run them through scripts/axis.py"
+                )
             continue
         issues.append(
             f"{local_rel(path)}: top-level scripts must be Python entrypoints; "
@@ -1014,6 +1019,8 @@ def non_python_utility_script_issues(root: Path = ROOT) -> list[str]:
             issues.append(f"{local_rel(hook)}: pre-push hook must be a Python entrypoint")
         if "axis.py" not in text:
             issues.append(f"{local_rel(hook)}: pre-push hook must delegate to scripts/axis.py")
+        if os.name != "nt" and (hook.stat().st_mode & 0o111) == 0:
+            issues.append(f"{local_rel(hook)}: pre-push hook must be executable")
     return issues
 
 
