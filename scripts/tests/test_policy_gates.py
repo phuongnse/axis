@@ -1828,6 +1828,64 @@ class TestScriptsStandardGate(unittest.TestCase):
             self.assertEqual(0, axis.check_scripts_standard())
 
 
+class TestInstallHooks(unittest.TestCase):
+    def test_refuses_to_overwrite_custom_core_hooks_path(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(args: list[str], **_kwargs):
+            calls.append(args)
+            if args[1:] == ["config", "--get", "core.hooksPath"]:
+                return axis.subprocess.CompletedProcess(args, 0, stdout="custom/hooks\n", stderr="")
+            raise AssertionError(f"unexpected command: {args}")
+
+        with (
+            mock.patch.object(axis, "run", side_effect=fake_run),
+            mock.patch.object(axis, "exe", side_effect=lambda name: name),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(1, axis.install_hooks())
+
+        self.assertIn("refusing to overwrite existing core.hooksPath", stderr.getvalue())
+        self.assertEqual([["git", "config", "--get", "core.hooksPath"]], calls)
+
+    def test_replaces_legacy_core_hooks_path_with_git_hook_copy(self) -> None:
+        with tempfile.TemporaryDirectory(dir=ROOT) as temp:
+            temp_root = Path(temp)
+            source = temp_root / "scripts" / "hooks" / "pre-push"
+            target = temp_root / ".git" / "hooks" / "pre-push"
+            source.parent.mkdir(parents=True)
+            source.write_text("#!/usr/bin/env python3\nprint('pre-push')\n", encoding="utf-8")
+
+            calls: list[list[str]] = []
+
+            def fake_run(args: list[str], **_kwargs):
+                calls.append(args)
+                if args[1:] == ["config", "--get", "core.hooksPath"]:
+                    return axis.subprocess.CompletedProcess(args, 0, stdout="scripts/hooks\n", stderr="")
+                if args[1:] == ["config", "--unset-all", "core.hooksPath"]:
+                    return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+                if args[1:] == ["rev-parse", "--git-path", "hooks/pre-push"]:
+                    return axis.subprocess.CompletedProcess(args, 0, stdout=f"{target}\n", stderr="")
+                raise AssertionError(f"unexpected command: {args}")
+
+            original_root = axis.ROOT
+            axis.ROOT = temp_root
+            try:
+                with (
+                    mock.patch.object(axis, "run", side_effect=fake_run),
+                    mock.patch.object(axis, "exe", side_effect=lambda name: name),
+                    contextlib.redirect_stdout(io.StringIO()),
+                ):
+                    self.assertEqual(0, axis.install_hooks())
+            finally:
+                axis.ROOT = original_root
+
+            self.assertEqual(source.read_text(encoding="utf-8"), target.read_text(encoding="utf-8"))
+            if axis.os.name != "nt":
+                self.assertNotEqual(0, target.stat().st_mode & 0o111)
+            self.assertIn(["git", "config", "--unset-all", "core.hooksPath"], calls)
+
+
 class TestCodexSkillsGate(unittest.TestCase):
     def issues_for_skill(self, files: dict[str, str]) -> list[str]:
         with tempfile.TemporaryDirectory() as temp:

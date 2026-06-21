@@ -28,7 +28,16 @@ Use-case files group ACs under **Happy path**, **Validation & errors**, **Edge c
 
 **AC map:** before code, copy each `- [ ]` AC bullet into a row, tag it `happy` / `validation` / `edge` / `out-of-scope`, and name the proving test or handler. Mark cross-layer bullets explicitly (`N/A this PR — Frontend` / `N/A this PR — API`). No blank in-scope file/test cells.
 
-**Use-case acceptance test matrix:** when implementing, closing, or materially refreshing a use case, add local AC IDs (`AC-001`, `AC-002`, ...) and an `## Acceptance Test Matrix` with AT IDs (`AT-001`, `AT-002`, ...). Do this for the use case being touched; do not bulk-retrofit unrelated use cases. Every in-scope AC must appear in at least one required AT row before a layer or use case is marked done. Keep the matrix high-level: no `Evidence source` column, test file paths, class names, or commands. `Automated by` names the runner/tool, not a file path: `Playwright`, `Vitest`, `xUnit API`, or another concrete runner. Required AT expected behavior must still cite a spec section, AC ID, or flow step in the implementation/verification report; if no citation exists, stop and tighten the spec before coding. Use Playwright for the browser-level happy path when the use case has a user-facing UI, Vitest for focused UI states/validation, and xUnit API/Application/Infrastructure tests for backend contracts, side effects, and business rules. If the named runner is not installed yet, treat adding it as a new-library Design Gate decision and get required sign-off before code.
+**Use-case acceptance test matrix:** when implementing, closing, or materially refreshing a use case:
+
+- Add local AC IDs (`AC-001`, `AC-002`, ...) and an `## Acceptance Test Matrix` with AT IDs (`AT-001`, `AT-002`, ...).
+- Update only the touched use case; do not bulk-retrofit unrelated use cases.
+- Cover every in-scope AC in at least one required AT row before marking a layer or use case done.
+- Keep the matrix high-level: no `Evidence source` column, test file paths, class names, or commands.
+- Use `Automated by` for runner/tool names only: `Playwright`, `Vitest`, `xUnit API`, or another concrete runner.
+- Cite a spec section, AC ID, or flow step for each required AT expected behavior in the implementation/verification report; if no citation exists, stop and tighten the spec before coding.
+- Choose Playwright for browser-level happy paths, Vitest for focused UI states/validation, and xUnit API/Application/Infrastructure tests for backend contracts, side effects, and business rules.
+- Treat a missing runner as a new-library Design Gate decision and get required sign-off before code.
 
 **Path coverage matrix template** (fill once per touched implementation surface):
 

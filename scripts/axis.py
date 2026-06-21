@@ -2344,9 +2344,31 @@ def register_avro_schemas(args: argparse.Namespace) -> int:
 
 
 def install_hooks(_args: argparse.Namespace | None = None) -> int:
-    unset_result = run([exe("git"), "config", "--unset-all", "core.hooksPath"], check=False)
-    if unset_result.returncode not in (0, 5):
-        return unset_result.returncode
+    current_hooks = run([exe("git"), "config", "--get", "core.hooksPath"], capture=True, check=False)
+    if current_hooks.returncode not in (0, 1, 5):
+        return current_hooks.returncode
+
+    hooks_value = current_hooks.stdout.strip() if current_hooks.returncode == 0 else ""
+    if hooks_value:
+        legacy_hooks_path = (ROOT / "scripts" / "hooks").resolve()
+        hooks_path = Path(hooks_value)
+        resolved_hooks_path = hooks_path if hooks_path.is_absolute() else (ROOT / hooks_path)
+        normalized_hooks_value = hooks_value.replace("\\", "/").rstrip("/")
+        is_legacy_hooks_path = (
+            normalized_hooks_value in {"scripts/hooks", "./scripts/hooks"}
+            or resolved_hooks_path.resolve() == legacy_hooks_path
+        )
+        if not is_legacy_hooks_path:
+            print(
+                "install-hooks: refusing to overwrite existing core.hooksPath "
+                f"({hooks_value}). Clear it explicitly or move the hook manually.",
+                file=sys.stderr,
+            )
+            return 1
+
+        unset_result = run([exe("git"), "config", "--unset-all", "core.hooksPath"], check=False)
+        if unset_result.returncode not in (0, 5):
+            return unset_result.returncode
 
     hook_path_result = run([exe("git"), "rev-parse", "--git-path", "hooks/pre-push"], capture=True, check=False)
     if hook_path_result.returncode != 0:
