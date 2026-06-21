@@ -93,7 +93,7 @@ Use the terms from [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md#enforcement-taxono
 
 **One command:** `python scripts/axis.py verify` runs the local ready-PR gate — documented toolchain version checks + build + vulnerable package scan + `dotnet format --verify` + **unit test projects only** + frontend `ci`/test + protobuf lint/breaking when proto config changed + markdown link check when markdown changed + drift. It only runs the layers whose files changed (so doc-only and frontend-only work stays quick).
 
-Run `python scripts/axis.py bootstrap` once to install the committed **pre-push hook** explicitly (`core.hooksPath = scripts/hooks`); build commands must not mutate Git config. The hook runs `python scripts/axis.py pre-push`, a quick policy/doc sanity gate for ordinary network pushes. It intentionally does not run the full local Verification gate on every push. Set `AXIS_PRE_PUSH_FULL=1` when you explicitly want the hook to run `python scripts/axis.py verify` before pushing.
+Run `python scripts/axis.py bootstrap` once to install the local **pre-push hook** under `.git/hooks/pre-push`; build commands must not mutate Git config. The hook runs `python scripts/axis.py pre-push`, a quick policy/doc sanity gate for ordinary network pushes. It intentionally does not run the full local Verification gate on every push. Set `AXIS_PRE_PUSH_FULL=1` when you explicitly want the hook to run `python scripts/axis.py verify` before pushing.
 
 CI/branch protection remains the authoritative full gate and runs full `dotnet test` including Testcontainers before merge.
 

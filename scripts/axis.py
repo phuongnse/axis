@@ -1019,8 +1019,11 @@ def non_python_utility_script_issues(root: Path = ROOT) -> list[str]:
             issues.append(f"{local_rel(hook)}: pre-push hook must be a Python entrypoint")
         if "axis.py" not in text:
             issues.append(f"{local_rel(hook)}: pre-push hook must delegate to scripts/axis.py")
-        if os.name != "nt" and (hook.stat().st_mode & 0o111) == 0:
-            issues.append(f"{local_rel(hook)}: pre-push hook must be executable")
+        if os.name != "nt" and hook.stat().st_mode & 0o111:
+            issues.append(
+                f"{local_rel(hook)}: committed hook source must not be executable; "
+                "install-hooks writes the executable copy under .git/hooks"
+            )
     return issues
 
 
@@ -2341,13 +2344,24 @@ def register_avro_schemas(args: argparse.Namespace) -> int:
 
 
 def install_hooks(_args: argparse.Namespace | None = None) -> int:
-    result = run([exe("git"), "config", "core.hooksPath", "scripts/hooks"], check=False)
-    if result.returncode != 0:
-        return result.returncode
-    hook = ROOT / "scripts" / "hooks" / "pre-push"
-    if os.name != "nt" and hook.exists():
-        hook.chmod(hook.stat().st_mode | 0o111)
-    print("Installed: core.hooksPath = scripts/hooks (pre-push runs python scripts/axis.py pre-push).")
+    unset_result = run([exe("git"), "config", "--unset-all", "core.hooksPath"], check=False)
+    if unset_result.returncode not in (0, 5):
+        return unset_result.returncode
+
+    hook_path_result = run([exe("git"), "rev-parse", "--git-path", "hooks/pre-push"], capture=True, check=False)
+    if hook_path_result.returncode != 0:
+        return hook_path_result.returncode
+
+    source = ROOT / "scripts" / "hooks" / "pre-push"
+    target = Path(hook_path_result.stdout.strip())
+    if not target.is_absolute():
+        target = ROOT / target
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source, target)
+    if os.name != "nt":
+        target.chmod(target.stat().st_mode | 0o111)
+
+    print(f"Installed: {target} (pre-push runs python scripts/axis.py pre-push).")
     return 0
 
 

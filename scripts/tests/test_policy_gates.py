@@ -1732,14 +1732,25 @@ class TestScriptsStandardGate(unittest.TestCase):
         )
         self.assertIn("scripts/hooks/pre-push: pre-push hook must be a Python entrypoint", issues)
 
-    def test_rejects_non_executable_pre_push_hook(self) -> None:
-        issues = self.issues_for_files(
-            {
-                "scripts/hooks/pre-push": "#!/usr/bin/env python3\n"
-                'os.execv(sys.executable, [sys.executable, str(root / "scripts" / "axis.py"), "pre-push"])\n'
-            }
+    def test_rejects_executable_pre_push_hook_source(self) -> None:
+        with tempfile.TemporaryDirectory(dir=ROOT) as temp:
+            root = Path(temp)
+            hook = root / "scripts" / "hooks" / "pre-push"
+            hook.parent.mkdir(parents=True, exist_ok=True)
+            hook.write_text(
+                "#!/usr/bin/env python3\n"
+                'os.execv(sys.executable, [sys.executable, str(root / "scripts" / "axis.py"), "pre-push"])\n',
+                encoding="utf-8",
+            )
+            hook.chmod(0o755)
+
+            issues = axis.non_python_utility_script_issues(root=root)
+
+        self.assertIn(
+            "scripts/hooks/pre-push: committed hook source must not be executable; "
+            "install-hooks writes the executable copy under .git/hooks",
+            issues,
         )
-        self.assertIn("scripts/hooks/pre-push: pre-push hook must be executable", issues)
 
     def test_current_repository_scripts_standard_still_passes(self) -> None:
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
