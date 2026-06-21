@@ -55,7 +55,7 @@ internal static class AxisApiServiceExtensions
         builder.Services.AddAxisAuthorization();
         builder.Services.AddAxisForwardedHeaders();
         builder.Services.AddAxisRateLimiting(builder.Configuration, builder.Environment);
-        builder.Services.AddAxisModules(builder.Configuration);
+        builder.Services.AddAxisModules(builder.Configuration, builder.Environment);
         builder.Services.AddAxisGrpcClients(builder.Configuration, builder.Environment);
         builder.Services.AddAxisRedis(builder.Configuration);
         builder.Services.AddAxisRequestContext();
@@ -234,9 +234,10 @@ internal static class AxisApiServiceExtensions
 
     private static void AddAxisModules(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
-        services.AddIdentityInfrastructure(configuration);
+        services.AddIdentityInfrastructure(configuration, environment);
         services.AddDataModelingInfrastructure(configuration);
         services.AddWorkflowBuilderInfrastructure(configuration);
         services.AddFormBuilderInfrastructure(configuration);
@@ -252,7 +253,7 @@ internal static class AxisApiServiceExtensions
         string identityGrpcUrl = !string.IsNullOrWhiteSpace(configuredUrl)
             ? configuredUrl
             : environment.IsDevelopmentOrTesting()
-                ? "http://localhost:5280"
+                ? "https://localhost:7275"
                 : throw new InvalidOperationException("Modules:Identity:GrpcUrl is required");
 
         if (!Uri.TryCreate(identityGrpcUrl, UriKind.Absolute, out Uri? identityUri))

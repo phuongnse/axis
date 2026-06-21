@@ -12,13 +12,23 @@ import os
 import re
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 USE_CASES = ROOT / "docs" / "use-cases"
 SKIP_DIRS = set()
 
-REQUIRED_HEADINGS = ["## Wireframes"]
+REQUIRED_SECTIONS = (
+    "Purpose",
+    "Primary actor",
+    "Trigger",
+    "Main flow",
+    "Alternate / error flows",
+    "Acceptance Criteria",
+    "Acceptance Test Matrix",
+    "Wireframes",
+)
 IMPLEMENTATION_STATUS_HEADING = "> **Implementation status**"
 IMPLEMENTATION_STATUS_REQUIRED_MARKERS = (
     ("> **Gaps vs spec:**", "gaps vs spec"),
@@ -33,6 +43,45 @@ GENERIC_STATUS_PROSE = (
 )
 
 LEGACY_DIAGRAM_TABLE_HEADER = "| Diagram | Source | Preview |"
+AC_ID_RE = re.compile(r"\bAC-\d{3}\b")
+AT_ID_RE = re.compile(r"^[A-Z][A-Z0-9]{1,11}-\d{3}$")
+CHECKBOX_AC_RE = re.compile(r"^\s*-\s+\[[ xX]\]\s+(?P<body>.+)$", re.MULTILINE)
+H2_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+IMPLEMENTATION_DETAIL_MATRIX_RE = re.compile(
+    r"(?:`?(?:frontend|src|tests|scripts|[.]agents)/[^`|\s]+`?)|"
+    r"(?:\bAxis[.][A-Za-z0-9_.]*Tests\b)|"
+    r"(?:\b[A-Za-z0-9_.]+[.](?:cs|tsx?|jsx?|mjs|py)\b)|"
+    r"(?:`?(?:dotnet|npm|npx|pnpm|yarn|python|docker(?:\s+compose)?)\b[^`|]*)"
+)
+ACCEPTANCE_MATRIX_COLUMNS = [
+    "ID",
+    "Level",
+    "Scenario",
+    "Covers AC",
+    "Automated by",
+    "Required to close",
+]
+ACCEPTANCE_MATRIX_LEVELS = {
+    "E2E",
+    "API",
+    "Application",
+    "Infrastructure",
+    "Domain",
+    "Component",
+    "UI",
+}
+AUTOMATED_BY_VALUES = {
+    "Playwright",
+    "Vitest",
+    "xUnit",
+    "xUnit API",
+    "xUnit Application",
+    "xUnit Infrastructure",
+    "xUnit Domain",
+    "xUnit Architecture",
+}
+IMPLEMENTATION_STATUS_COLUMNS = ["Layer", "Status"]
+WIREFRAME_REQUIRED_COLUMNS = {"Screen", "Excalidraw", "Preview"}
 
 # Placeholder markers from USE_CASE_TEMPLATE.md that must be replaced before a
 # use case can be considered written. Listed individually so the validator can
@@ -56,6 +105,125 @@ TEMPLATE_MAIN_FLOW = (
     "2. System performs the happy-path steps in Acceptance Criteria.\n"
     "3. Actor receives the expected outcome."
 )
+
+
+@dataclass(frozen=True)
+class MarkdownTable:
+    headers: list[str]
+    rows: list[list[str]]
+    start_line: int
+
+
+@dataclass(frozen=True)
+class UseCaseDocument:
+    path: Path
+    root: Path
+    text: str
+    sections: dict[str, str]
+    h2_headings: list[str]
+
+    @property
+    def rel(self) -> Path:
+        return self.path.relative_to(self.root)
+
+    def section(self, heading: str) -> str:
+        return self.sections.get(heading, "")
+
+
+def split_h2_sections(text: str) -> tuple[list[str], dict[str, str]]:
+    matches = list(H2_RE.finditer(text))
+    headings: list[str] = [match.group(1).strip() for match in matches]
+    sections: dict[str, str] = {}
+    for idx, match in enumerate(matches):
+        start = match.end()
+        end = matches[idx + 1].start() if idx + 1 < len(matches) else len(text)
+        sections.setdefault(match.group(1).strip(), text[start:end].strip("\n"))
+    return headings, sections
+
+
+def use_case_document(path: Path) -> UseCaseDocument:
+    text = path.read_text(encoding="utf-8")
+    headings, sections = split_h2_sections(text)
+    return UseCaseDocument(path=path, root=ROOT, text=text, sections=sections, h2_headings=headings)
+
+
+def parse_table_row(line: str) -> list[str] | None:
+    stripped = line.strip()
+    if not stripped.startswith("|") or not stripped.endswith("|"):
+        return None
+    return [cell.strip() for cell in stripped.strip("|").split("|")]
+
+
+def is_table_separator(cells: list[str]) -> bool:
+    return bool(cells) and all(re.fullmatch(r":?-{3,}:?", cell.replace(" ", "")) for cell in cells)
+
+
+def first_markdown_table(section: str) -> MarkdownTable | None:
+    lines = section.splitlines()
+    for idx in range(len(lines) - 1):
+        headers = parse_table_row(lines[idx])
+        separator = parse_table_row(lines[idx + 1])
+        if headers is None or separator is None or not is_table_separator(separator):
+            continue
+
+        rows: list[list[str]] = []
+        for row_line in lines[idx + 2 :]:
+            parsed = parse_table_row(row_line)
+            if parsed is None:
+                break
+            rows.append(parsed)
+        return MarkdownTable(headers=headers, rows=rows, start_line=idx + 1)
+    return None
+
+
+def validate_table_shape(
+    table: MarkdownTable | None,
+    *,
+    rel: Path,
+    label: str,
+    exact_columns: list[str] | None = None,
+    required_columns: set[str] | None = None,
+) -> list[str]:
+    if table is None:
+        return [f"{rel}: {label} must contain a markdown table"]
+
+    issues: list[str] = []
+    if len(set(table.headers)) != len(table.headers):
+        issues.append(f"{rel}: {label} table has duplicate columns")
+    if exact_columns is not None and table.headers != exact_columns:
+        issues.append(
+            f"{rel}: {label} table columns must be exactly `{' | '.join(exact_columns)}`",
+        )
+    if required_columns is not None:
+        missing = sorted(required_columns.difference(table.headers))
+        if missing:
+            issues.append(f"{rel}: {label} table missing required columns: {', '.join(missing)}")
+    for idx, row in enumerate(table.rows, start=1):
+        if len(row) != len(table.headers):
+            issues.append(
+                f"{rel}: {label} table row {idx} has {len(row)} cells but header has {len(table.headers)}",
+            )
+    if not table.rows:
+        issues.append(f"{rel}: {label} table must have at least one row")
+    return issues
+
+
+def record_for_row(table: MarkdownTable, row: list[str]) -> dict[str, str]:
+    return {header: row[idx] if idx < len(row) else "" for idx, header in enumerate(table.headers)}
+
+
+def acceptance_criteria_ids(section: str) -> tuple[set[str], list[str], list[str]]:
+    ids: list[str] = []
+    missing_id_bullets: list[str] = []
+    for match in CHECKBOX_AC_RE.finditer(section):
+        body = match.group("body").strip()
+        found = AC_ID_RE.search(body)
+        if found:
+            ids.append(found.group(0))
+        else:
+            missing_id_bullets.append(body)
+    duplicate_ids = sorted({ac_id for ac_id in ids if ids.count(ac_id) > 1})
+    return set(ids), duplicate_ids, missing_id_bullets
 
 
 def implementation_status_callout(text: str) -> str:
@@ -112,69 +280,196 @@ def iter_use_case_files() -> list[Path]:
     return files
 
 
-def check_file(path: Path, *, strict_status: bool = True) -> list[str]:
+def validate_sections(doc: UseCaseDocument) -> list[str]:
     issues: list[str] = []
-    text = path.read_text(encoding="utf-8")
-    rel = path.relative_to(ROOT)
+    rel = doc.rel
 
-    if re.search(r"^#\s*F\d+\s*[—-]\s*", text, re.MULTILINE):
+    if re.search(r"^#\s*F\d+\s*[—-]\s*", doc.text, re.MULTILINE):
         issues.append(f"{rel}: legacy Fxx title found")
 
-    for heading in REQUIRED_HEADINGS:
-        if heading not in text:
-            issues.append(f"{rel}: missing required heading `{heading}`")
+    duplicates = sorted({heading for heading in doc.h2_headings if doc.h2_headings.count(heading) > 1})
+    for heading in duplicates:
+        issues.append(f"{rel}: duplicate `## {heading}` section")
 
-    if LEGACY_DEFERRED_INLINE_RE.search(text):
-        issues.append(f"{rel}: legacy Deferred status heading found - use `Deferred follow-ups`")
+    for heading in REQUIRED_SECTIONS:
+        if heading == "Acceptance Test Matrix":
+            continue
+        if heading not in doc.sections:
+            issues.append(f"{rel}: missing {heading.lower()} section")
 
-    has_purpose = "## Purpose" in text
-    has_actor = "## Primary actor" in text
-    has_trigger = "## Trigger" in text
-    has_main_flow = "## Main flow" in text
-    has_alt_flow = "## Alternate / error flows" in text
-    has_ac = "## Acceptance Criteria" in text
+    for placeholder in PURPOSE_PLACEHOLDERS:
+        if placeholder in doc.text:
+            issues.append(f"{rel}: Purpose still has placeholder `{placeholder}`")
+    for placeholder in ACTOR_PLACEHOLDERS:
+        if placeholder in doc.text:
+            issues.append(f"{rel}: Primary actor still has placeholder `{placeholder.strip()}`")
+    for placeholder in TRIGGER_PLACEHOLDERS:
+        if placeholder in doc.text:
+            issues.append(f"{rel}: Trigger still has placeholder `{placeholder.strip()}`")
 
-    if not has_purpose:
-        issues.append(f"{rel}: missing purpose section")
-    if not has_actor:
-        issues.append(f"{rel}: missing actor section")
-    if not has_trigger:
-        issues.append(f"{rel}: missing trigger section")
-    if not has_main_flow:
-        issues.append(f"{rel}: missing main flow section")
-    if not has_alt_flow:
-        issues.append(f"{rel}: missing alternate/error flows section")
-    if not has_ac:
-        issues.append(f"{rel}: missing acceptance criteria section")
+    return issues
 
-    wireframes_section = ""
-    if "## Wireframes" in text:
-        wireframes_section = text.split("## Wireframes", 1)[1].split("\n## ", 1)[0]
-    if not (
-        "| Screen |" in wireframes_section
-        and "| Excalidraw |" in wireframes_section
-        and "| Preview |" in wireframes_section
-    ):
-        issues.append(f"{rel}: missing wireframes table (need Screen, Excalidraw, Preview columns)")
 
-    if LEGACY_DIAGRAM_TABLE_HEADER in text:
+def validate_acceptance_contract(doc: UseCaseDocument, *, require_matrix: bool) -> list[str]:
+    issues: list[str] = []
+    rel = doc.rel
+    ac_section = doc.section("Acceptance Criteria")
+    ac_ids, duplicate_ac_ids, missing_id_bullets = acceptance_criteria_ids(ac_section)
+    for ac_id in duplicate_ac_ids:
+        issues.append(f"{rel}: duplicate acceptance criterion ID `{ac_id}`")
+
+    if "Acceptance Test Matrix" not in doc.sections:
+        if require_matrix:
+            issues.append(f"{rel}: missing acceptance test matrix section")
+        return issues
+
+    matrix_section = doc.section("Acceptance Test Matrix")
+    if not matrix_section.strip():
+        issues.append(f"{rel}: Acceptance Test Matrix section is empty")
+        return issues
+
+    for bullet in missing_id_bullets:
+        issues.append(
+            f"{rel}: Acceptance Criteria bullet lacks an AC ID while an Acceptance Test Matrix exists: {bullet}",
+        )
+    if not ac_ids:
+        issues.append(f"{rel}: Acceptance Test Matrix exists but no AC IDs were found")
+
+    table = first_markdown_table(matrix_section)
+    issues.extend(
+        validate_table_shape(
+            table,
+            rel=rel,
+            label="Acceptance Test Matrix",
+            exact_columns=ACCEPTANCE_MATRIX_COLUMNS,
+        )
+    )
+    if table is None:
+        return issues
+    if "Evidence source" in table.headers:
+        issues.append(
+            f"{rel}: Acceptance Test Matrix must not include an `Evidence source` column; "
+            "put spec citations in the implementation/verification report",
+        )
+
+    seen_at_ids: set[str] = set()
+    id_prefixes: set[str] = set()
+    required_coverage: set[str] = set()
+    for idx, row in enumerate(table.rows, start=1):
+        record = record_for_row(table, row)
+        row_label = record.get("ID") or f"row {idx}"
+        for cell in row:
+            if IMPLEMENTATION_DETAIL_MATRIX_RE.search(cell):
+                issues.append(
+                    f"{rel}: Acceptance Test Matrix {row_label} contains implementation details; "
+                    "use runner/tool names only, not file paths, class names, or commands",
+                )
+
+        at_id = record.get("ID", "")
+        if not AT_ID_RE.fullmatch(at_id):
+            issues.append(f"{rel}: Acceptance Test Matrix row {idx} has invalid ID `{at_id}`")
+        elif at_id in seen_at_ids:
+            issues.append(f"{rel}: duplicate Acceptance Test Matrix ID `{at_id}`")
+        elif "-" in at_id:
+            seen_at_ids.add(at_id)
+            id_prefixes.add(at_id.split("-", 1)[0])
+
+        level = record.get("Level", "")
+        level_parts = [part.strip() for part in level.split("/") if part.strip()]
+        if not level_parts or any(part not in ACCEPTANCE_MATRIX_LEVELS for part in level_parts):
+            issues.append(
+                f"{rel}: Acceptance Test Matrix {row_label} has invalid Level `{level}`",
+            )
+
+        automated_by = record.get("Automated by", "")
+        automation_parts = [part.strip() for part in automated_by.split("+") if part.strip()]
+        if not automation_parts or any(part not in AUTOMATED_BY_VALUES for part in automation_parts):
+            issues.append(
+                f"{rel}: Acceptance Test Matrix {row_label} has invalid Automated by `{automated_by}`",
+            )
+
+        required = record.get("Required to close", "")
+        if required not in {"Yes", "No"}:
+            issues.append(
+                f"{rel}: Acceptance Test Matrix {row_label} Required to close must be `Yes` or `No`",
+            )
+
+        covers = set(AC_ID_RE.findall(record.get("Covers AC", "")))
+        if not covers:
+            issues.append(f"{rel}: Acceptance Test Matrix {row_label} must cover at least one AC ID")
+        unknown = sorted(covers.difference(ac_ids))
+        if unknown:
+            issues.append(
+                f"{rel}: Acceptance Test Matrix {row_label} references unknown AC IDs: {', '.join(unknown)}",
+            )
+        if required == "Yes":
+            required_coverage.update(covers)
+
+    if len(id_prefixes) > 1:
+        issues.append(
+            f"{rel}: Acceptance Test Matrix IDs must use one local prefix, found: {', '.join(sorted(id_prefixes))}",
+        )
+    missing_required_coverage = sorted(ac_ids.difference(required_coverage))
+    if missing_required_coverage:
+        issues.append(
+            f"{rel}: Acceptance Test Matrix required rows do not cover AC IDs: {', '.join(missing_required_coverage)}",
+        )
+
+    return issues
+
+
+def validate_wireframes(doc: UseCaseDocument) -> list[str]:
+    table = first_markdown_table(doc.section("Wireframes"))
+    return validate_table_shape(
+        table,
+        rel=doc.rel,
+        label="Wireframes",
+        required_columns=WIREFRAME_REQUIRED_COLUMNS,
+    )
+
+
+def validate_diagrams(doc: UseCaseDocument) -> list[str]:
+    issues: list[str] = []
+    rel = doc.rel
+    if LEGACY_DIAGRAM_TABLE_HEADER in doc.text:
         issues.append(
             f"{rel}: legacy Excalidraw diagrams table — use Mermaid under ## Diagrams "
             "(docs-style) or omit ## Diagrams when there is no local diagram",
         )
-    elif "## Diagrams" in text:
-        diagrams_section = text.split("## Diagrams", 1)[1].split("\n## ", 1)[0]
-        if "```mermaid" not in diagrams_section:
-            issues.append(
-                f"{rel}: ## Diagrams must contain at least one ```mermaid block "
-                "(or omit ## Diagrams when there is no local diagram)",
-            )
+    diagrams_section = doc.section("Diagrams")
+    if diagrams_section and "```mermaid" not in diagrams_section:
+        issues.append(
+            f"{rel}: ## Diagrams must contain at least one ```mermaid block "
+            "(or omit ## Diagrams when there is no local diagram)",
+        )
+    return issues
 
-    callout = implementation_status_callout(text)
+
+def validate_implementation_status(doc: UseCaseDocument, *, strict_status: bool) -> list[str]:
+    issues: list[str] = []
+    rel = doc.rel
+
+    if LEGACY_DEFERRED_INLINE_RE.search(doc.text):
+        issues.append(f"{rel}: legacy Deferred status heading found - use `Deferred follow-ups`")
+
+    callout = implementation_status_callout(doc.text)
     if not callout:
         issues.append(f"{rel}: missing implementation status callout")
+        return issues
 
-    if callout and strict_status:
+    status_table = first_markdown_table(
+        "\n".join(line.removeprefix(">").strip() for line in callout.splitlines())
+    )
+    issues.extend(
+        validate_table_shape(
+            status_table,
+            rel=rel,
+            label="Implementation status",
+            exact_columns=IMPLEMENTATION_STATUS_COLUMNS,
+        )
+    )
+
+    if strict_status:
         for marker, label in IMPLEMENTATION_STATUS_REQUIRED_MARKERS:
             if marker not in callout:
                 issues.append(f"{rel}: missing implementation status {label} section")
@@ -195,16 +490,22 @@ def check_file(path: Path, *, strict_status: bool = True) -> list[str]:
             ):
                 issues.append(f"{rel}: pending layer cannot use `Gaps vs spec: none`")
 
-    for placeholder in PURPOSE_PLACEHOLDERS:
-        if placeholder in text:
-            issues.append(f"{rel}: Purpose still has placeholder `{placeholder}`")
-    for placeholder in ACTOR_PLACEHOLDERS:
-        if placeholder in text:
-            issues.append(f"{rel}: Primary actor still has placeholder `{placeholder.strip()}`")
-    for placeholder in TRIGGER_PLACEHOLDERS:
-        if placeholder in text:
-            issues.append(f"{rel}: Trigger still has placeholder `{placeholder.strip()}`")
+    return issues
 
+
+def check_file(
+    path: Path,
+    *,
+    strict_status: bool = True,
+    require_acceptance_matrix: bool = True,
+) -> list[str]:
+    doc = use_case_document(path)
+    issues: list[str] = []
+    issues.extend(validate_sections(doc))
+    issues.extend(validate_acceptance_contract(doc, require_matrix=require_acceptance_matrix))
+    issues.extend(validate_wireframes(doc))
+    issues.extend(validate_diagrams(doc))
+    issues.extend(validate_implementation_status(doc, strict_status=strict_status))
     return issues
 
 
@@ -430,8 +731,24 @@ def main() -> int:
         changed_paths = set(changed_paths_against_base())
     except RuntimeError as exc:
         issues.append(str(exc))
+    range_spec: str | None = None
+    try:
+        range_spec = diff_range_against_base()
+    except RuntimeError as exc:
+        issues.append(str(exc))
+
     for path in files:
-        issues.extend(check_file(path, strict_status=path.resolve() in changed_paths))
+        changed = path.resolve() in changed_paths
+        requires_matrix = False
+        if changed and range_spec is not None:
+            requires_matrix = changed_use_case_content_outside_status(path, range_spec)
+        issues.extend(
+            check_file(
+                path,
+                strict_status=changed,
+                require_acceptance_matrix=requires_matrix,
+            )
+        )
     try:
         issues.extend(check_changed_stock_main_flow(files))
     except RuntimeError as exc:

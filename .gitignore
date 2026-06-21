@@ -19,11 +19,14 @@ TestResults/
 node_modules/
 dist/
 .next/
+frontend/playwright-report/
+frontend/test-results/
 
 # Environment
 .env
 .env.*
 !.env.example
+.dev-certs/
 
 # Logs
 *.log

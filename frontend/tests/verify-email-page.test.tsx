@@ -1,4 +1,5 @@
 import { screen, waitFor } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { completePostVerifyPkceFlow } from '@/features/auth/api';
@@ -57,6 +58,32 @@ describe('VerifyEmailPage', () => {
     expect(navigateMock).not.toHaveBeenCalled();
   });
 
+  it('submits a verification token only once under React StrictMode', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            sessionEstablished: true,
+            nextStep: 'Dashboard',
+          }),
+        ),
+    } as unknown as Response);
+
+    await renderWithRouter(
+      <StrictMode>
+        <VerifyEmailPage />
+      </StrictMode>,
+      { path: '/auth/verify?token=strict-token' },
+    );
+
+    await waitFor(() => {
+      expect(completePostVerifyPkceFlow).toHaveBeenCalledWith(null);
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it('navigates to user registration when Workspace contact is verified', async () => {
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,
@@ -101,5 +128,50 @@ describe('VerifyEmailPage', () => {
     expect(
       screen.getByText('Use the email that received the verification link.'),
     ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /resend verification email/i })).toBeInTheDocument();
+  });
+
+  it('shows invalid message when verification token is missing', async () => {
+    await renderWithRouter(<VerifyEmailPage />, { path: '/auth/verify' });
+
+    expect(
+      await screen.findByRole('heading', { name: /invalid verification link/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /back to registration/i })).toBeInTheDocument();
+  });
+
+  it('shows already-used message when verification token was consumed', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 422,
+      statusText: 'Unprocessable Entity',
+      json: () =>
+        Promise.resolve({
+          detail: 'This link has already been used. Please sign in.',
+        }),
+    } as unknown as Response);
+
+    await renderWithRouter(<VerifyEmailPage />, { path: '/auth/verify?token=used-token' });
+
+    expect(await screen.findByRole('heading', { name: /already verified/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /go to sign in/i })).toBeInTheDocument();
+  });
+
+  it('shows rate-limited message when verification retries are throttled', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      statusText: 'Too Many Requests',
+      json: () =>
+        Promise.resolve({
+          detail: 'Please wait before trying again.',
+        }),
+    } as unknown as Response);
+
+    await renderWithRouter(<VerifyEmailPage />, { path: '/auth/verify?token=limited-token' });
+
+    expect(await screen.findByRole('heading', { name: /please wait/i })).toBeInTheDocument();
+    expect(screen.getByLabelText('Email address')).toBeDisabled();
+    expect(screen.getByRole('button', { name: /resend verification email/i })).toBeDisabled();
   });
 });

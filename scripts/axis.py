@@ -206,6 +206,7 @@ def module_main(script_name: str, args: list[str], *, stdin_text: str | None = N
     if spec is None or spec.loader is None:
         raise CheckError(f"Cannot load {script_name}")
     module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
 
     old_argv = sys.argv
     old_stdin = sys.stdin
@@ -988,6 +989,11 @@ def non_python_utility_script_issues(root: Path = ROOT) -> list[str]:
         if not path.is_file():
             continue
         if path.suffix.lower() == ".py":
+            if os.name != "nt" and path.stat().st_mode & 0o111:
+                issues.append(
+                    f"{local_rel(path)}: top-level Python scripts must not be executable; "
+                    "run them through scripts/axis.py"
+                )
             continue
         issues.append(
             f"{local_rel(path)}: top-level scripts must be Python entrypoints; "
@@ -1013,6 +1019,11 @@ def non_python_utility_script_issues(root: Path = ROOT) -> list[str]:
             issues.append(f"{local_rel(hook)}: pre-push hook must be a Python entrypoint")
         if "axis.py" not in text:
             issues.append(f"{local_rel(hook)}: pre-push hook must delegate to scripts/axis.py")
+        if os.name != "nt" and hook.stat().st_mode & 0o111:
+            issues.append(
+                f"{local_rel(hook)}: committed hook source must not be executable; "
+                "install-hooks writes the executable copy under .git/hooks"
+            )
     return issues
 
 
@@ -2333,13 +2344,46 @@ def register_avro_schemas(args: argparse.Namespace) -> int:
 
 
 def install_hooks(_args: argparse.Namespace | None = None) -> int:
-    result = run([exe("git"), "config", "core.hooksPath", "scripts/hooks"], check=False)
-    if result.returncode != 0:
-        return result.returncode
-    hook = ROOT / "scripts" / "hooks" / "pre-push"
-    if os.name != "nt" and hook.exists():
-        hook.chmod(hook.stat().st_mode | 0o111)
-    print("Installed: core.hooksPath = scripts/hooks (pre-push runs python scripts/axis.py pre-push).")
+    current_hooks = run([exe("git"), "config", "--get", "core.hooksPath"], capture=True, check=False)
+    if current_hooks.returncode not in (0, 1, 5):
+        return current_hooks.returncode
+
+    hooks_value = current_hooks.stdout.strip() if current_hooks.returncode == 0 else ""
+    if hooks_value:
+        legacy_hooks_path = (ROOT / "scripts" / "hooks").resolve()
+        hooks_path = Path(hooks_value)
+        resolved_hooks_path = hooks_path if hooks_path.is_absolute() else (ROOT / hooks_path)
+        normalized_hooks_value = hooks_value.replace("\\", "/").rstrip("/")
+        is_legacy_hooks_path = (
+            normalized_hooks_value in {"scripts/hooks", "./scripts/hooks"}
+            or resolved_hooks_path.resolve() == legacy_hooks_path
+        )
+        if not is_legacy_hooks_path:
+            print(
+                "install-hooks: refusing to overwrite existing core.hooksPath "
+                f"({hooks_value}). Clear it explicitly or move the hook manually.",
+                file=sys.stderr,
+            )
+            return 1
+
+        unset_result = run([exe("git"), "config", "--unset-all", "core.hooksPath"], check=False)
+        if unset_result.returncode not in (0, 5):
+            return unset_result.returncode
+
+    hook_path_result = run([exe("git"), "rev-parse", "--git-path", "hooks/pre-push"], capture=True, check=False)
+    if hook_path_result.returncode != 0:
+        return hook_path_result.returncode
+
+    source = ROOT / "scripts" / "hooks" / "pre-push"
+    target = Path(hook_path_result.stdout.strip())
+    if not target.is_absolute():
+        target = ROOT / target
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source, target)
+    if os.name != "nt":
+        target.chmod(target.stat().st_mode | 0o111)
+
+    print(f"Installed: {target} (pre-push runs python scripts/axis.py pre-push).")
     return 0
 
 

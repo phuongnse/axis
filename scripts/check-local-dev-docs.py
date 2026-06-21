@@ -25,7 +25,7 @@ SERVICE_BLOCK = re.compile(
     r"^  ([a-z0-9_-]+):\n((?:    .*\n)*)",
     re.MULTILINE,
 )
-PORT_MAPPING = re.compile(r'^\s+-\s+"(\d+):\d+"', re.MULTILINE)
+PORT_MAPPING = re.compile(r'^\s+-\s+"(?:127[.]0[.]0[.]1:)?(\d+):\d+"', re.MULTILINE)
 PROFILE_LINE = re.compile(r'^\s+profiles:\s*\[(.+)\]', re.MULTILINE)
 
 STALE_MARKERS = [

@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import { createRegisterIdempotencyKey, registerUser, toAdminNameParts } from '@/features/auth/api';
 import { useLegalVersions } from '@/features/auth/hooks/useLegalVersions';
+import { getProblemDetail } from '@/features/auth/problem-details';
 import { saveRegistrationContext } from '@/features/auth/registration-context';
 import {
   createRegisterSchema,
@@ -147,6 +148,14 @@ export function useRegister() {
       void navigate({ to: '/register/confirmation' });
     },
     onError: (error: unknown) => {
+      if (error instanceof ApiError && error.status === 409) {
+        form.setError('email', {
+          type: 'server',
+          message: getProblemDetail(error),
+        });
+        return;
+      }
+
       if (error instanceof ApiError && error.status < 500) {
         const errorData = error.data as RegisterValidationErrorData;
         const hasMappedFieldError = applyRegisterValidationErrors(form, errorData);

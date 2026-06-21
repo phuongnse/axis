@@ -28,16 +28,28 @@ One sentence about user value.
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] ...
+- [ ] AC-001 ...
 
 *Validation & errors*
-- [ ] ...
+- [ ] AC-002 ...
 
 *Edge cases*
-- [ ] ...
+- [ ] AC-003 ...
 
 *Out of scope*
 - ...
+
+## Acceptance Test Matrix
+
+Add this section when implementing, closing, or materially refreshing this use case. Keep IDs local to this README. Do not bulk-retrofit unrelated use cases.
+
+| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+|----|-------|----------|-----------|--------------|-------------------|
+| AT-001 | E2E | `<happy-path journey>` | AC-001 | Playwright | Yes |
+| AT-002 | API | `<backend contract or side effect>` | AC-001, AC-002 | xUnit API | Yes |
+| AT-003 | UI | `<focused UI state or validation>` | AC-002 | Vitest | Yes |
+
+Use the lowest reliable level for each AC. Playwright covers browser-level journeys; Vitest covers focused UI behavior; xUnit API/Application/Infrastructure tests cover backend contracts, side effects, and business rules. Keep implementation details out of this matrix: do not include test file paths, class names, commands, or implementation-evidence columns. Required AT expected behavior must cite the spec section, AC ID, or flow step in the implementation/verification report; if no citation exists, tighten the spec before implementation.
 
 ## Screen flow
 

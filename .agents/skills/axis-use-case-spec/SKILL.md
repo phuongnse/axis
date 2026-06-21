@@ -22,11 +22,20 @@ Create or tighten the owning use-case spec so implementation can follow spec -> 
    - Use the source priority from `AGENTS.md`: use-case ACs, then AGENTS, then playbooks, then same-module code.
    - Ask the user for blocking decisions such as permission model, billing behavior, data ownership, API exposure, cross-module effects, or UI journey.
    - Do not invent IDs, events, endpoints, table names, roles, plans, or copy that changes product meaning.
+   - Treat the spec as ready only when each in-scope required-to-close AC has a cited actor, entry point, precondition, observable outcome, business side effect, failure/validation behavior, and testable expected result.
+   - Cite readiness evidence by spec section, AC ID, or flow step. If an expected behavior cannot be cited from the spec, record it under Open decisions instead of turning it into a test expectation.
 
-3. Write acceptance criteria for implementation.
+3. Write acceptance criteria and acceptance tests for implementation.
    - Group ACs under `Happy path`, `Validation & errors`, `Edge cases`, and `Out of scope`.
+   - When implementing, closing, or materially refreshing this use case, give in-scope AC bullets local IDs (`AC-001`, `AC-002`, ...). Do not bulk-retrofit unrelated use cases.
    - Keep checkboxes unchecked because use-case checkboxes are spec-only.
    - Include enough validation, isolation, permission, dependency-failure, rollback, and empty-state ACs for the layer that will be implemented.
+   - Add an `## Acceptance Test Matrix` with local AT IDs (`AT-001`, `AT-002`, ...). Every in-scope AC must appear in at least one required AT row before the use case can be closed.
+   - Keep the matrix high-level: do not add `Evidence source`, test file paths, class names, or commands to use-case specs.
+   - Before making a row required, confirm its expected result can cite the spec section, AC ID, or flow step. That citation belongs in the readiness/verification report, not in the use-case matrix.
+   - Use `Automated by` values that name runners/tools, not file paths: `Playwright`, `Vitest`, `xUnit API`, `xUnit Application`, `xUnit Infrastructure`, etc.
+   - Choose the lowest reliable level: Playwright for browser-level journeys, Vitest for focused UI states/validation, and xUnit for backend contracts, side effects, and business rules.
+   - If the selected runner is not installed yet, record that adding the harness is a new-library Design Gate decision before implementation.
    - Split oversized work into isolated slices and record the slice boundary in `Decisions` or `Deferred follow-ups`.
 
 4. Define visuals and diagrams.
@@ -38,6 +47,7 @@ Create or tighten the owning use-case spec so implementation can follow spec -> 
 5. Mark implementation status honestly.
    - Add the `> **Implementation status**` callout after Out of scope using the template layer table.
    - Set unimplemented layers to `⏳`, non-applicable layers to `N/A`, and partial existing work to `⚠️` with `Gaps vs spec`.
+   - Do not mark a layer or use case done if an in-scope AC lacks a required AT row or required automated evidence is missing.
    - Name exact deferred AC bullets under `Deferred follow-ups`, or write `N/A`.
    - Update the domain README Open work only when the new spec changes prioritized work.
 

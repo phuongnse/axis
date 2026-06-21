@@ -4,6 +4,7 @@ import {
   buildAuthorizeUrl,
   CLIENT_ID,
   clearPkceSession,
+  connectEndpoint,
   createPkceSession,
   loadPkceSession,
   REDIRECT_URI,
@@ -33,6 +34,21 @@ export function createRegisterIdempotencyKey(): string {
     return crypto.randomUUID();
   }
   return `register-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+const verifyEmailSuccessCache = new Map<
+  string,
+  { response: VerifyEmailResponse; expiresAt: number }
+>();
+const verifyEmailInFlight = new Map<string, Promise<VerifyEmailResponse>>();
+const verifyEmailSuccessCacheTtlMs = 60_000;
+
+function pruneVerifyEmailSuccessCache(now: number): void {
+  for (const [token, entry] of verifyEmailSuccessCache.entries()) {
+    if (entry.expiresAt <= now) {
+      verifyEmailSuccessCache.delete(token);
+    }
+  }
 }
 
 export function toAdminNameParts(fullName: string): { firstName: string; lastName: string } {
@@ -103,10 +119,10 @@ export async function loginWithPassword(
   const body = new URLSearchParams({
     email: credentials.email.trim(),
     password: credentials.password,
-    return_url: `${window.location.origin}${authorizeUrl}`,
+    return_url: authorizeUrl,
   });
 
-  const response = await fetch('/connect/login', {
+  const response = await fetch(connectEndpoint('/connect/login'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
@@ -146,7 +162,7 @@ export async function exchangeAuthorizationCode(code: string): Promise<string> {
     code_verifier: pkce.verifier,
   });
 
-  const response = await fetch('/connect/token', {
+  const response = await fetch(connectEndpoint('/connect/token'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
@@ -165,10 +181,36 @@ export async function exchangeAuthorizationCode(code: string): Promise<string> {
 }
 
 export async function verifyEmail(token: string): Promise<VerifyEmailResponse> {
-  return fetchApi<VerifyEmailResponse>('/auth/verify-email', {
+  const now = Date.now();
+  pruneVerifyEmailSuccessCache(now);
+
+  const cached = verifyEmailSuccessCache.get(token);
+  if (cached) {
+    return cached.response;
+  }
+
+  const inFlight = verifyEmailInFlight.get(token);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const request = fetchApi<VerifyEmailResponse>('/auth/verify-email', {
     method: 'POST',
     body: JSON.stringify({ token }),
-  });
+  })
+    .then((response) => {
+      verifyEmailSuccessCache.set(token, {
+        response,
+        expiresAt: Date.now() + verifyEmailSuccessCacheTtlMs,
+      });
+      return response;
+    })
+    .finally(() => {
+      verifyEmailInFlight.delete(token);
+    });
+
+  verifyEmailInFlight.set(token, request);
+  return request;
 }
 
 /**

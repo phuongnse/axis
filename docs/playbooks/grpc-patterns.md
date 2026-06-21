@@ -104,7 +104,7 @@ public sealed class PermissionGate(
 }
 ```
 
-The gRPC channel is configured via `Modules:Identity:GrpcUrl` in `src/Axis.Api/appsettings.json` (see [ADR-016](../TECH_STACK.md#adr-016-service-discovery-via-config-in-modulith-mode-and-k8s-dns-in-production)) — `http://localhost:5280` on the modulith host in development, module service DNS in production when extracted.
+The gRPC channel is configured via `Modules:Identity:GrpcUrl` in `src/Axis.Api/appsettings.json` (see [ADR-016](../TECH_STACK.md#adr-016-service-discovery-via-config-in-modulith-mode-and-k8s-dns-in-production)) — HTTPS localhost in development, module service DNS in production when extracted.
 
 **Step 3 — Server side: derive workspace from JWT, not the request payload**
 
@@ -151,17 +151,17 @@ Identity gRPC is mapped on the same Kestrel host as REST (`MapIdentityGrpc()`). 
 Prerequisites:
 
 - [`grpcurl`](https://github.com/fullstorydev/grpcurl) installed locally.
-- `Axis.Api` running (e.g. `dotnet run --project src/Axis.Api` — default dev URL `http://localhost:5280`).
+- `Axis.Api` running from the compose local-dev stack — default dev URL `https://localhost:5281`.
 - A Bearer access token from an authenticated session (PKCE login via the SPA, or the integration-test helpers in `tests/Api/Axis.Api.Tests/Helpers/AuthHelper.cs`).
 
 ```bash
 # Optional: list services exposed on the host
-grpcurl -plaintext localhost:5280 list
+grpcurl -cacert .dev-certs/rootCA.pem localhost:5281 list
 
-grpcurl -plaintext \
+grpcurl -cacert .dev-certs/rootCA.pem \
   -H "authorization: Bearer <access_token>" \
   -d '{"user_id":"<user-guid>"}' \
-  localhost:5280 axis.identity.v1.IdentityService/GetUserPermissions
+  localhost:5281 axis.identity.v1.IdentityService/GetUserPermissions
 ```
 
 Replace `<access_token>` and `<user-guid>` with values from your workspace — the server reads the workspace from the JWT's `workspace_id` claim, so no `workspace_id` is sent in the payload. `Unauthenticated` / `PermissionDenied` means the token is missing, expired, or invalid — obtain a fresh token from `POST /connect/token` after PKCE login.

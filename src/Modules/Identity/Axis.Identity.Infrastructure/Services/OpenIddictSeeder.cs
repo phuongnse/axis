@@ -9,7 +9,8 @@ namespace Axis.Identity.Infrastructure.Services;
 /// Seeds the two built-in OAuth2 clients on startup:
 /// axis_spa — Authorization Code + PKCE (for the React SPA)
 /// axis_m2m — Client Credentials (for external system integrations)
-/// Idempotent: skips creation if the client already exists.
+/// Idempotent: creates the built-in clients and updates the SPA client so local
+/// redirect URI changes are applied without wiping the development database.
 /// </summary>
 public sealed class OpenIddictSeeder(IServiceProvider services) : IHostedService
 {
@@ -47,10 +48,8 @@ public sealed class OpenIddictSeeder(IServiceProvider services) : IHostedService
     private static async Task SeedSpaClientAsync(
         IOpenIddictApplicationManager appManager, CancellationToken ct)
     {
-        if (await appManager.FindByClientIdAsync("axis_spa", ct) is not null)
-            return;
-
-        await appManager.CreateAsync(new OpenIddictApplicationDescriptor
+        object? application = await appManager.FindByClientIdAsync("axis_spa", ct);
+        OpenIddictApplicationDescriptor descriptor = new()
         {
             ClientId = "axis_spa",
             // Public client — no client secret (PKCE provides security instead)
@@ -73,19 +72,24 @@ public sealed class OpenIddictSeeder(IServiceProvider services) : IHostedService
             // Allowed redirect URIs — front-end dev server + placeholder for production
             RedirectUris =
             {
-                new Uri("http://localhost:3000/callback"),
-                new Uri("http://localhost:5173/callback"),
+                new Uri("https://localhost:3000/callback"),
+                new Uri("https://localhost:5173/callback"),
             },
             PostLogoutRedirectUris =
             {
-                new Uri("http://localhost:3000"),
-                new Uri("http://localhost:5173"),
+                new Uri("https://localhost:3000"),
+                new Uri("https://localhost:5173"),
             },
             Requirements =
             {
                 Requirements.Features.ProofKeyForCodeExchange,
             },
-        }, ct);
+        };
+
+        if (application is null)
+            await appManager.CreateAsync(descriptor, ct);
+        else
+            await appManager.UpdateAsync(application, descriptor, ct);
     }
 
     private static async Task SeedM2MClientAsync(

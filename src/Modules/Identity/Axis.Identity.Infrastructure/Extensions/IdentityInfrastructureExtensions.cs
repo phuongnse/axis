@@ -13,14 +13,18 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Axis.Identity.Infrastructure.Extensions;
 
 public static class IdentityInfrastructureExtensions
 {
+    private const string TestingEnvironmentName = "Testing";
+
     public static IServiceCollection AddIdentityInfrastructure(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
         services.AddDbContext<IdentityDbContext>(opts =>
             opts.UseNpgsql(configuration.GetConnectionString("Identity"))
@@ -63,7 +67,8 @@ public static class IdentityInfrastructureExtensions
 
         services.AddGrpc();
 
-        services.AddHostedService<OpenIddictSeeder>();
+        if (environment.IsDevelopment() || environment.IsEnvironment(TestingEnvironmentName))
+            services.AddHostedService<OpenIddictSeeder>();
         services.AddHostedService<SubscriptionPlanSeeder>();
         services.AddHostedService<WorkspaceSettingsPermissionSeeder>();
 

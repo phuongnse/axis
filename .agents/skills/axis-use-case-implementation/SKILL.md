@@ -17,40 +17,53 @@ Ship one reviewable Axis use-case slice without losing acceptance criteria, laye
    - If no owning use-case README or AC block exists, stop implementation and use `$axis-use-case-spec` first.
    - Read `docs/WORKAROUNDS.md` for entries touching the same module or files.
 
-2. Run `$axis-design-gate` for non-trivial work.
+2. Prove spec readiness before code.
+   - Record `Spec Readiness Verdict: Ready` only when each required-to-close AC and AT expected result can cite the owning spec section, AC ID, or flow step.
+   - Mark the verdict `Blocked` and use `$axis-use-case-spec` when any required AC lacks a cited actor, entry point, precondition, observable outcome, business side effect, failure/validation behavior, or testable expected result.
+   - Do not infer product behavior from existing code, screenshots, or agent judgment and then make it a required test expectation.
+
+3. Run `$axis-design-gate` for non-trivial work.
    - Stop for high-risk sign-off before code.
    - Carry the dossier decisions into the implementation.
 
-3. Build the AC map.
+4. Build the AC map.
+   - If the use case you are implementing or closing lacks local AC IDs or an `## Acceptance Test Matrix`, update the spec first with `$axis-use-case-spec`.
    - Copy each in-scope `- [ ]` acceptance criterion into a row.
+   - Use the matrix as the acceptance contract: every in-scope AC must be covered by at least one required AT row before any layer or use case is marked done.
+   - Keep implementation details out of the use-case matrix: do not add `Evidence source`, test file paths, class names, or commands.
+   - For each required AT row, record in the implementation/verification report which spec section, AC ID, or flow step defines the expected behavior. If any expected behavior cannot be cited from the spec, stop and use `$axis-use-case-spec`.
    - Include out-of-scope bullets as `N/A this PR`.
-   - Give every in-scope row a proving file or test name before coding.
+   - Give every in-scope row a proving automated test before coding. Use the AT ID in the test title, xUnit trait, or nearby metadata when practical.
+   - Choose the lowest reliable runner: Playwright for browser-level journeys, Vitest for focused UI states/validation, and xUnit API/Application/Infrastructure for backend contracts, side effects, and business rules.
+   - If a required runner is missing, treat installing the harness as a new-library Design Gate decision and get required sign-off before code.
    - Do not mark a layer complete when validation, edge, isolation, or rollback ACs remain open.
 
-4. Work in layer order.
+5. Work in layer order.
    - Domain, then Application, then Infrastructure, then API, then Frontend.
    - Before API work, search open lower-layer gaps in `docs/use-cases`.
    - Cross-module work must use Kafka events, RabbitMQ commands/jobs/saga steps, or gRPC contracts. Do not add in-process calls across modules.
 
-5. Use TDD where behavior changes.
+6. Use TDD where behavior changes.
    - Add or update the proving test first when practical.
    - Use .NET test names shaped as `{Subject}_{Condition}_{ExpectedOutcome}`.
    - Do not add skips, weaken assertions, or mock away the behavior under test.
 
-6. Implement narrowly.
+7. Implement narrowly.
    - Follow same-module patterns before inventing abstractions.
    - Use `Result` / `Result<T>` for business failures.
    - Keep endpoint logic thin: route binding, `mediator.Send`, and problem-details mapping.
    - Keep frontend server state in TanStack Query and forms in RHF + Zod.
 
-7. Update status docs when behavior/status changes.
+8. Update status docs when behavior/status changes.
    - Update the use-case `Implementation status` callout.
    - Update the domain README and `docs/PROGRESS.md` only when their summarized status changes.
    - Name exact deferred AC bullets under `Deferred follow-ups`; use `N/A` when none.
    - Add or update `docs/WORKAROUNDS.md` only for intentional P0/P1 workarounds.
 
-8. Verify honestly.
+9. Verify honestly.
    - During development, run the narrow checks for the touched surface.
+   - Run every required AT row's runner or targeted test before claiming the use case/layer is complete.
+   - Report acceptance evidence by AT ID (`AT-001 Playwright passed`, `AT-002 xUnit API passed`, etc.).
    - Before review, run `python scripts/axis.py verify` when triggered.
    - Use `$axis-ready-review` before asking for review.
    - Do not claim the full suite unless full `dotnet test Axis.sln --nologo` ran.
@@ -65,6 +78,9 @@ Implemented:
 
 Tests / checks:
 - command -> pass/fail/not run with reason
+
+Acceptance evidence:
+- AT-... -> pass/fail/not run with reason
 
 Docs:
 - updated / not triggered with reason

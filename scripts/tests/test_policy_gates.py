@@ -29,6 +29,7 @@ def load_python_file(path: Path):
     if spec is None or spec.loader is None:
         raise AssertionError(f"Cannot load {path}")
     module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -132,13 +133,33 @@ docs/use-cases/example/README.md
 
 
 class TestUseCaseDocsGate(unittest.TestCase):
-    def issues_for_use_case(self, callout: str) -> list[str]:
+    def issues_for_document(self, content: str) -> list[str]:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             path = root / "docs" / "use-cases" / "example" / "sample" / "README.md"
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(
-                """# Sample use case
+            path.write_text(content, encoding="utf-8")
+            original_root = check_use_case_docs.ROOT
+            check_use_case_docs.ROOT = root
+            try:
+                return check_use_case_docs.check_file(path)
+            finally:
+                check_use_case_docs.ROOT = original_root
+
+    def issues_for_use_case(self, callout: str) -> list[str]:
+        matrix = (
+            ""
+            if "## Acceptance Test Matrix" in callout
+            else """## Acceptance Test Matrix
+
+| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+|---|---|---|---|---|---|
+| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
+
+"""
+        )
+        return self.issues_for_document(
+            """# Sample use case
 
 ## Purpose
 
@@ -165,8 +186,11 @@ Ship user value.
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] Works.
+- [ ] AC-001 Works.
 
+"""
+            + matrix
+            + """
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
@@ -174,15 +198,8 @@ Ship user value.
 | N/A | N/A | N/A |
 
 """
-                + callout,
-                encoding="utf-8",
-            )
-            original_root = check_use_case_docs.ROOT
-            check_use_case_docs.ROOT = root
-            try:
-                return check_use_case_docs.check_file(path)
-            finally:
-                check_use_case_docs.ROOT = original_root
+            + callout
+        )
 
     def test_rejects_missing_deferred_followups(self) -> None:
         issues = self.issues_for_use_case(
@@ -374,6 +391,316 @@ Ship user value.
 
         self.assertEqual([], issues)
 
+    def test_rejects_evidence_source_column_in_acceptance_test_matrix(self) -> None:
+        issues = self.issues_for_use_case(
+            """## Acceptance Test Matrix
+
+| ID | Level | Scenario | Covers AC | Evidence source | Automated by | Required to close |
+|---|---|---|---|---|---|---|
+| AT-001 | E2E | User completes flow | AC-001 | Main flow | Playwright | Yes |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertIn("must not include an `Evidence source` column", "\n".join(issues))
+
+    def test_rejects_missing_acceptance_test_matrix_when_required(self) -> None:
+        issues = self.issues_for_document(
+            """# Sample use case
+
+## Purpose
+
+Ship user value.
+
+## Primary actor
+
+- User
+
+## Trigger
+
+- User starts the flow.
+
+## Main flow
+
+1. User starts.
+2. System responds.
+3. User completes the flow.
+
+## Alternate / error flows
+
+- None.
+
+## Acceptance Criteria
+
+*Happy path*
+- [ ] AC-001 Works.
+
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| N/A | N/A | N/A |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertIn("missing acceptance test matrix section", "\n".join(issues))
+
+    def test_rejects_file_paths_in_acceptance_test_matrix(self) -> None:
+        issues = self.issues_for_use_case(
+            """## Acceptance Test Matrix
+
+| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+|---|---|---|---|---|---|
+| AT-001 | E2E | User completes flow | AC-001 | `frontend/e2e/sample.pw.ts` | Yes |
+| AT-002 | API | Backend side effect | AC-001 | Axis.Api.Tests | Yes |
+| AT-003 | UI | UI validation | AC-001 | npm run test | Yes |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("contains implementation details", joined)
+
+    def test_accepts_high_level_acceptance_test_matrix(self) -> None:
+        issues = self.issues_for_use_case(
+            """## Acceptance Test Matrix
+
+| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+|---|---|---|---|---|---|
+| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
+| AT-002 | API | Backend side effect | AC-001 | xUnit API | Yes |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertEqual([], issues)
+
+    def test_rejects_acceptance_matrix_unknown_and_uncovered_ac_ids(self) -> None:
+        issues = self.issues_for_use_case(
+            """## Acceptance Test Matrix
+
+| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+|---|---|---|---|---|---|
+| AT-001 | E2E | User completes flow | AC-999 | Playwright | No |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("references unknown AC IDs: AC-999", joined)
+        self.assertIn("required rows do not cover AC IDs: AC-001", joined)
+
+    def test_rejects_acceptance_matrix_invalid_enum_values(self) -> None:
+        issues = self.issues_for_use_case(
+            """## Acceptance Test Matrix
+
+| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+|---|---|---|---|---|---|
+| AT-001 | Smoke | User completes flow | AC-001 | Jest | Required |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("invalid Level `Smoke`", joined)
+        self.assertIn("invalid Automated by `Jest`", joined)
+        self.assertIn("Required to close must be `Yes` or `No`", joined)
+
+    def test_rejects_acceptance_matrix_mixed_id_prefixes(self) -> None:
+        issues = self.issues_for_use_case(
+            """## Acceptance Test Matrix
+
+| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+|---|---|---|---|---|---|
+| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
+| REG-002 | API | Backend side effect | AC-001 | xUnit API | Yes |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertIn("IDs must use one local prefix", "\n".join(issues))
+
+    def test_rejects_wireframes_table_schema_drift(self) -> None:
+        issues = self.issues_for_document(
+            """# Sample use case
+
+## Purpose
+
+Ship user value.
+
+## Primary actor
+
+- User
+
+## Trigger
+
+- User starts the flow.
+
+## Main flow
+
+1. User starts.
+2. System responds.
+3. User completes the flow.
+
+## Alternate / error flows
+
+- None.
+
+## Acceptance Criteria
+
+*Happy path*
+- [ ] AC-001 Works.
+
+## Wireframes
+
+| Screen | Preview |
+|--------|---------|
+| N/A | N/A |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertIn("Wireframes table missing required columns: Excalidraw", "\n".join(issues))
+
+    def test_rejects_implementation_status_table_schema_drift(self) -> None:
+        issues = self.issues_for_use_case(
+            """> **Implementation status**
+>
+> | Area | State |
+> |------|-------|
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertIn("Implementation status table columns must be exactly", "\n".join(issues))
+
     def test_strips_implementation_status_for_stock_flow_ratchet(self) -> None:
         before = """# Sample
 
@@ -512,6 +839,26 @@ class TestDocDriftRatchets(unittest.TestCase):
 
 
 class TestWorkingTreeDiffHelpers(unittest.TestCase):
+    def test_module_main_supports_dataclass_scripts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            scripts_dir = Path(temp)
+            (scripts_dir / "example-check.py").write_text(
+                """
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class Example:
+    value: str
+
+def main() -> int:
+    return 0 if Example("ok").value == "ok" else 1
+""",
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(axis, "SCRIPTS", scripts_dir):
+                self.assertEqual(0, axis.module_main("example-check.py", []))
+
     def fake_git_run(self, outputs: dict[tuple[str, ...], str]):
         def fake_run(args: list[str], **_kwargs):
             key = tuple(args[1:] if args and args[0] == "git" else args)
@@ -1397,13 +1744,29 @@ class TestDocSizeBudgetGate(unittest.TestCase):
 
 class TestScriptsStandardGate(unittest.TestCase):
     def issues_for_files(self, files: dict[str, str]) -> list[str]:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(dir=ROOT) as temp:
             root = Path(temp)
             for relative, content in files.items():
                 path = root / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content, encoding="utf-8")
             return axis.non_python_utility_script_issues(root=root)
+
+    def test_rejects_executable_top_level_python_script(self) -> None:
+        with tempfile.TemporaryDirectory(dir=ROOT) as temp:
+            root = Path(temp)
+            script = root / "scripts" / "check-local-dev-docs.py"
+            script.parent.mkdir(parents=True, exist_ok=True)
+            script.write_text("#!/usr/bin/env python3\nprint('ok')\n", encoding="utf-8")
+            script.chmod(0o755)
+
+            issues = axis.non_python_utility_script_issues(root=root)
+
+        self.assertIn(
+            "scripts/check-local-dev-docs.py: top-level Python scripts must not be executable; "
+            "run them through scripts/axis.py",
+            issues,
+        )
 
     def test_rejects_non_python_docs_utility_script(self) -> None:
         issues = self.issues_for_files({"docs/scripts/render-wireframes.mjs": "console.log('nope');\n"})
@@ -1440,9 +1803,87 @@ class TestScriptsStandardGate(unittest.TestCase):
         )
         self.assertIn("scripts/hooks/pre-push: pre-push hook must be a Python entrypoint", issues)
 
+    def test_rejects_executable_pre_push_hook_source(self) -> None:
+        with tempfile.TemporaryDirectory(dir=ROOT) as temp:
+            root = Path(temp)
+            hook = root / "scripts" / "hooks" / "pre-push"
+            hook.parent.mkdir(parents=True, exist_ok=True)
+            hook.write_text(
+                "#!/usr/bin/env python3\n"
+                'os.execv(sys.executable, [sys.executable, str(root / "scripts" / "axis.py"), "pre-push"])\n',
+                encoding="utf-8",
+            )
+            hook.chmod(0o755)
+
+            issues = axis.non_python_utility_script_issues(root=root)
+
+        self.assertIn(
+            "scripts/hooks/pre-push: committed hook source must not be executable; "
+            "install-hooks writes the executable copy under .git/hooks",
+            issues,
+        )
+
     def test_current_repository_scripts_standard_still_passes(self) -> None:
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(0, axis.check_scripts_standard())
+
+
+class TestInstallHooks(unittest.TestCase):
+    def test_refuses_to_overwrite_custom_core_hooks_path(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(args: list[str], **_kwargs):
+            calls.append(args)
+            if args[1:] == ["config", "--get", "core.hooksPath"]:
+                return axis.subprocess.CompletedProcess(args, 0, stdout="custom/hooks\n", stderr="")
+            raise AssertionError(f"unexpected command: {args}")
+
+        with (
+            mock.patch.object(axis, "run", side_effect=fake_run),
+            mock.patch.object(axis, "exe", side_effect=lambda name: name),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(1, axis.install_hooks())
+
+        self.assertIn("refusing to overwrite existing core.hooksPath", stderr.getvalue())
+        self.assertEqual([["git", "config", "--get", "core.hooksPath"]], calls)
+
+    def test_replaces_legacy_core_hooks_path_with_git_hook_copy(self) -> None:
+        with tempfile.TemporaryDirectory(dir=ROOT) as temp:
+            temp_root = Path(temp)
+            source = temp_root / "scripts" / "hooks" / "pre-push"
+            target = temp_root / ".git" / "hooks" / "pre-push"
+            source.parent.mkdir(parents=True)
+            source.write_text("#!/usr/bin/env python3\nprint('pre-push')\n", encoding="utf-8")
+
+            calls: list[list[str]] = []
+
+            def fake_run(args: list[str], **_kwargs):
+                calls.append(args)
+                if args[1:] == ["config", "--get", "core.hooksPath"]:
+                    return axis.subprocess.CompletedProcess(args, 0, stdout="scripts/hooks\n", stderr="")
+                if args[1:] == ["config", "--unset-all", "core.hooksPath"]:
+                    return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+                if args[1:] == ["rev-parse", "--git-path", "hooks/pre-push"]:
+                    return axis.subprocess.CompletedProcess(args, 0, stdout=f"{target}\n", stderr="")
+                raise AssertionError(f"unexpected command: {args}")
+
+            original_root = axis.ROOT
+            axis.ROOT = temp_root
+            try:
+                with (
+                    mock.patch.object(axis, "run", side_effect=fake_run),
+                    mock.patch.object(axis, "exe", side_effect=lambda name: name),
+                    contextlib.redirect_stdout(io.StringIO()),
+                ):
+                    self.assertEqual(0, axis.install_hooks())
+            finally:
+                axis.ROOT = original_root
+
+            self.assertEqual(source.read_text(encoding="utf-8"), target.read_text(encoding="utf-8"))
+            if axis.os.name != "nt":
+                self.assertNotEqual(0, target.stat().st_mode & 0o111)
+            self.assertIn(["git", "config", "--unset-all", "core.hooksPath"], calls)
 
 
 class TestCodexSkillsGate(unittest.TestCase):

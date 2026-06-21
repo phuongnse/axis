@@ -1,4 +1,7 @@
 const CLIENT_ID = 'axis_spa';
+const CONNECT_BASE_URL = (
+  import.meta.env.VITE_CONNECT_URL || (import.meta.env.DEV ? 'https://localhost:7275' : '')
+).replace(/\/+$/, '');
 const REDIRECT_URI = `${window.location.origin}/callback`;
 const SCOPES = 'openid email profile offline_access permissions';
 
@@ -57,7 +60,11 @@ export async function buildAuthorizeUrl(state: string, verifier: string): Promis
     scope: SCOPES,
     state,
   });
-  return `/connect/authorize?${params.toString()}`;
+  return `${CONNECT_BASE_URL}/connect/authorize?${params.toString()}`;
+}
+
+export function connectEndpoint(path: string): string {
+  return `${CONNECT_BASE_URL}${path}`;
 }
 
 export { CLIENT_ID, REDIRECT_URI };

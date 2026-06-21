@@ -201,6 +201,14 @@ When a suite in this class flakes, fix setup determinism first (is the precondit
 - Test behaviour, not implementation — assert what users see and interact with, not internal state or component structure.
 - If a refactor breaks a test without changing visible behaviour, the test was wrong.
 
+### Browser E2E
+
+- Playwright owns browser-level acceptance paths and local-dev smoke tests. Put these specs under `frontend/e2e/`, name them `*.pw.ts`, and run them with `npm run test:e2e`.
+- Keep Vitest for focused component, hook, and UI-state coverage. Do not duplicate a full browser journey in Vitest when a Playwright AT row already owns that path.
+- Run browser E2E through Docker: `docker compose --profile e2e build e2e && docker compose --profile e2e run --rm --no-deps e2e`. It runs inside the project E2E image based on the official Playwright image, bakes frontend dependencies at image build time, trusts `.dev-certs/rootCA.pem` through Node and Chromium NSS, and writes reports to the container-local E2E output directory.
+- Browser E2E uses HTTPS (`https://localhost:3000` and `https://localhost:5281`) in the canonical compose path. Do not set Playwright `ignoreHTTPSErrors`; fix or trust the local CA instead.
+- Host-only Playwright runs are a developer convenience, not the canonical path. Use Docker evidence when closing an E2E AT row.
+
 ### Interactions
 
 Use `@testing-library/user-event` for all interactions — not `fireEvent`. `userEvent` simulates real browser event sequences (focus, input, click) more accurately.

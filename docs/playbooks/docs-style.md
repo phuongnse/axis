@@ -217,9 +217,10 @@ Use case files should be self-contained and user-facing:
 2. Main flow
 3. Alternate/error flows
 4. Acceptance criteria
-5. Wireframes table (mapped to this use case)
-6. Diagrams table (mapped to this use case; explicit N/A if not needed yet)
-7. Implementation status callout
+5. Acceptance test matrix when implementing, closing, or materially refreshing the use case; keep it high-level and put spec citations / test file paths in implementation or verification reports, not in the use-case README
+6. Wireframes table (mapped to this use case)
+7. Diagrams table (mapped to this use case; explicit N/A if not needed yet)
+8. Implementation status callout
 
 Avoid writing engineering process constraints as end-user use cases. Keep those in shared playbooks and gates (for example `frontend.md`, `agent-checklist.md`, `AGENTS.md`).
 

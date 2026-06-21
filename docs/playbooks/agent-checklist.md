@@ -17,7 +17,7 @@
 - Read: domain README → use-case file → same-module code
 - Skim [`docs/WORKAROUNDS.md`](../WORKAROUNDS.md) for entries touching the same files/modules — known shortcuts may explain surprising code
 - Before API layer: `grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/use-cases/` — fix, defer with reason, or stop
-- If the use case crosses the SPA/API boundary or depends on local-dev services (auth, email, provisioning, storage, Redis, Kafka, RabbitMQ, MailDev), start the Docker local-dev stack from [local-dev.md](./local-dev.md) during Ready review and include a smoke path in the plan. Do not wait until PR wrap-up to discover compose-only failures.
+- If the use case crosses the SPA/API boundary or depends on local-dev services (auth, email, provisioning, storage, Redis, Kafka, RabbitMQ, MailDev), start the Docker local-dev stack from [local-dev.md](./local-dev.md) during Ready review and include a smoke path in the plan. After the smoke path or E2E evidence is captured, run `docker compose down --remove-orphans` unless the user explicitly asks to keep the stack running for hands-on dev.
 - End of PR: [process.md § PR wrap-up](process.md) — deferred lines, host wiring, callouts (no user reminder)
 
 ### AC coverage — avoid happy-path-only
@@ -27,6 +27,17 @@ Use-case files group ACs under **Happy path**, **Validation & errors**, **Edge c
 **Ownership note (single source):** This file is the source of truth for AC/path coverage expectations. Other playbooks should link here instead of re-stating these rules.
 
 **AC map:** before code, copy each `- [ ]` AC bullet into a row, tag it `happy` / `validation` / `edge` / `out-of-scope`, and name the proving test or handler. Mark cross-layer bullets explicitly (`N/A this PR — Frontend` / `N/A this PR — API`). No blank in-scope file/test cells.
+
+**Use-case acceptance test matrix:** when implementing, closing, or materially refreshing a use case:
+
+- Add local AC IDs (`AC-001`, `AC-002`, ...) and an `## Acceptance Test Matrix` with AT IDs (`AT-001`, `AT-002`, ...).
+- Update only the touched use case; do not bulk-retrofit unrelated use cases.
+- Cover every in-scope AC in at least one required AT row before marking a layer or use case done.
+- Keep the matrix high-level: no `Evidence source` column, test file paths, class names, or commands.
+- Use `Automated by` for runner/tool names only: `Playwright`, `Vitest`, `xUnit API`, or another concrete runner.
+- Cite a spec section, AC ID, or flow step for each required AT expected behavior in the implementation/verification report; if no citation exists, stop and tighten the spec before coding.
+- Choose Playwright for browser-level happy paths, Vitest for focused UI states/validation, and xUnit API/Application/Infrastructure tests for backend contracts, side effects, and business rules.
+- Treat a missing runner as a new-library Design Gate decision and get required sign-off before code.
 
 **Path coverage matrix template** (fill once per touched implementation surface):
 
@@ -38,7 +49,7 @@ Use-case files group ACs under **Happy path**, **Validation & errors**, **Edge c
 
 - [process.md § Per use case workflow](./process.md#per-use-case-workflow): Domain → Application → Infrastructure → API; tests green per layer before the next.
 - [testing.md § Required test coverage](./testing.md#required-test-coverage-for-integration-tests): integration tests need happy path **and** not-found/isolation **and** constraint violations where applicable — not one happy test per handler.
-- **Docker local-dev smoke:** when triggered by the Ready-review rule above, run compose early enough to influence implementation. Minimum evidence: `/health`, `/health/ready`, the route/endpoint under test, and the observable dependency effect.
+- **Docker local-dev smoke:** when triggered by the Ready-review rule above, run compose early enough to influence implementation. Minimum evidence: `/health`, `/health/ready`, the route/endpoint under test, and the observable dependency effect. Treat compose as a scoped resource: capture evidence, then `docker compose down --remove-orphans` unless the user wants the stack left up.
 
 | Check | Action |
 |-------|--------|
@@ -73,7 +84,7 @@ Use the terms from [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md#enforcement-taxono
 - **Doc navigation** — `python scripts/axis.py check doc-navigation` requires every `docs/**/*.md` file to start with an H1 and a `> **Navigation**:` block so docs never become dead ends.
 - **Doc size budgets** — `python scripts/axis.py check doc-size-budgets` keeps reference docs/playbooks within the budgets in [docs-style.md](./docs-style.md#size-budgets), including the tighter pattern-router budget.
 - **Code-fence integrity** — `python scripts/axis.py check doc-code-fences` (inside the drift command) flags code-block lines with collapsed indentation (a lone leading space). Catches the bulk-find-replace corruption class that lychee, prettier, and the structural checks all let through.
-- **Use-case docs** — `python scripts/axis.py check use-case-docs` validates use-case file structure (required sections + tables + status callout), flags template placeholders (`_(One sentence...)_`, `_(Actor)_`, `_(What starts...)_`), flags self-links `[name](./README.md)` and truncated summary rows in domain READMEs, and counts use cases still on the stock Main flow.
+- **Use-case docs** — `python scripts/axis.py check use-case-docs` validates the use-case document contract: required sections, table schemas, Acceptance Test Matrix AC coverage/runner values, high-level matrix cells, wireframe/status table shape, Mermaid-only diagrams, template placeholders, self-links, and truncated domain README rows. It also counts use cases still on the stock Main flow.
 - **Codex skill metadata** — `python scripts/axis.py check codex-skills` validates repo-scoped `.agents/skills/*/SKILL.md` frontmatter, concise bodies, doc references, required skill chaining, concrete wording, and UI metadata/default prompts.
 - **Secret scanning** — TruffleHog scans the full PR diff for committed secrets (API keys, passwords, tokens) and verifies each finding against the alleged service before reporting (`--only-verified` cuts false positives).
 - **Vulnerable packages** — `python scripts/axis.py check vulnerable-packages` wraps `dotnet list package --vulnerable --include-transitive` and fails on any known CVE in the dep tree (covers transitive packages too).
@@ -91,7 +102,7 @@ Use the terms from [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md#enforcement-taxono
 
 **One command:** `python scripts/axis.py verify` runs the local ready-PR gate — documented toolchain version checks + build + vulnerable package scan + `dotnet format --verify` + **unit test projects only** + frontend `ci`/test + protobuf lint/breaking when proto config changed + markdown link check when markdown changed + drift. It only runs the layers whose files changed (so doc-only and frontend-only work stays quick).
 
-Run `python scripts/axis.py bootstrap` once to install the committed **pre-push hook** explicitly (`core.hooksPath = scripts/hooks`); build commands must not mutate Git config. The hook runs `python scripts/axis.py pre-push`, a quick policy/doc sanity gate for ordinary network pushes. It intentionally does not run the full local Verification gate on every push. Set `AXIS_PRE_PUSH_FULL=1` when you explicitly want the hook to run `python scripts/axis.py verify` before pushing.
+Run `python scripts/axis.py bootstrap` once to install the local **pre-push hook** under `.git/hooks/pre-push`; build commands must not mutate Git config. The hook runs `python scripts/axis.py pre-push`, a quick policy/doc sanity gate for ordinary network pushes. It intentionally does not run the full local Verification gate on every push. Set `AXIS_PRE_PUSH_FULL=1` when you explicitly want the hook to run `python scripts/axis.py verify` before pushing.
 
 CI/branch protection remains the authoritative full gate and runs full `dotnet test` including Testcontainers before merge.
 
