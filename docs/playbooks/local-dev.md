@@ -166,7 +166,8 @@ when the current execution context cannot reach Docker.
 
 | Goal | Command |
 |---|---|
-| Stop everything (keep data) | `docker compose stop` |
+| Pause everything (keep containers + data) | `docker compose stop` |
+| Stop and remove containers after smoke/E2E (keep data) | `docker compose down --remove-orphans` |
 | Start again | `docker compose start` or `docker compose up -d` |
 | Tail logs (all services) | `docker compose logs -f` |
 | Tail one service | `docker compose logs -f api` |

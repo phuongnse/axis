@@ -17,7 +17,7 @@
 - Read: domain README → use-case file → same-module code
 - Skim [`docs/WORKAROUNDS.md`](../WORKAROUNDS.md) for entries touching the same files/modules — known shortcuts may explain surprising code
 - Before API layer: `grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/use-cases/` — fix, defer with reason, or stop
-- If the use case crosses the SPA/API boundary or depends on local-dev services (auth, email, provisioning, storage, Redis, Kafka, RabbitMQ, MailDev), start the Docker local-dev stack from [local-dev.md](./local-dev.md) during Ready review and include a smoke path in the plan. Do not wait until PR wrap-up to discover compose-only failures.
+- If the use case crosses the SPA/API boundary or depends on local-dev services (auth, email, provisioning, storage, Redis, Kafka, RabbitMQ, MailDev), start the Docker local-dev stack from [local-dev.md](./local-dev.md) during Ready review and include a smoke path in the plan. After the smoke path or E2E evidence is captured, run `docker compose down --remove-orphans` unless the user explicitly asks to keep the stack running for hands-on dev.
 - End of PR: [process.md § PR wrap-up](process.md) — deferred lines, host wiring, callouts (no user reminder)
 
 ### AC coverage — avoid happy-path-only
@@ -40,7 +40,7 @@ Use-case files group ACs under **Happy path**, **Validation & errors**, **Edge c
 
 - [process.md § Per use case workflow](./process.md#per-use-case-workflow): Domain → Application → Infrastructure → API; tests green per layer before the next.
 - [testing.md § Required test coverage](./testing.md#required-test-coverage-for-integration-tests): integration tests need happy path **and** not-found/isolation **and** constraint violations where applicable — not one happy test per handler.
-- **Docker local-dev smoke:** when triggered by the Ready-review rule above, run compose early enough to influence implementation. Minimum evidence: `/health`, `/health/ready`, the route/endpoint under test, and the observable dependency effect.
+- **Docker local-dev smoke:** when triggered by the Ready-review rule above, run compose early enough to influence implementation. Minimum evidence: `/health`, `/health/ready`, the route/endpoint under test, and the observable dependency effect. Treat compose as a scoped resource: capture evidence, then `docker compose down --remove-orphans` unless the user wants the stack left up.
 
 | Check | Action |
 |-------|--------|
