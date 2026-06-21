@@ -3,6 +3,8 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Axis.Api.Tests.Helpers;
 using Axis.Identity.Application.Services;
+using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Domain.ValueObjects;
 using Axis.Identity.Infrastructure.Persistence;
 using Axis.Identity.Infrastructure.Persistence.Entities;
 using FluentAssertions;
@@ -58,6 +60,7 @@ public class AuthEndpointTests(ApiTestFixture fixture)
             Json);
 
         registerResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        await AssertStandaloneUserRegistrationPersistedAsync(email);
 
         string verifyToken = fixture.EmailCapture.GetVerificationToken(email)
             ?? throw new InvalidOperationException($"No verification token captured for {email}.");
@@ -74,6 +77,46 @@ public class AuthEndpointTests(ApiTestFixture fixture)
 
         string accessToken = await AuthHelper.CompletePkceFlowWithSessionAsync(client);
         accessToken.Should().NotBeNullOrEmpty();
+    }
+
+    private async Task AssertStandaloneUserRegistrationPersistedAsync(string emailAddress)
+    {
+        using IServiceScope scope = fixture.CreateScope();
+        IdentityDbContext ctx = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        Email email = Email.Create(emailAddress).Value!;
+
+        User user = await ctx.Users.SingleAsync(u => u.Email == email);
+        user.IsEmailVerified.Should().BeFalse();
+
+        Workspace personalWorkspace = await (
+            from membership in ctx.WorkspaceMemberships
+            join workspace in ctx.Workspaces on membership.workspaceId equals workspace.Id
+            where membership.UserId == user.Id && workspace.Type == WorkspaceType.Personal
+            select workspace)
+            .SingleAsync();
+
+        personalWorkspace.OwnerUserId.Should().Be(user.Id);
+        personalWorkspace.OwnerEmail.Should().Be(email);
+        personalWorkspace.Status.Should().Be(WorkspaceStatus.PendingVerification);
+
+        WorkspaceMembership personalMembership = await ctx.WorkspaceMemberships
+            .Include(m => m.Roles)
+            .SingleAsync(m => m.UserId == user.Id && m.workspaceId == personalWorkspace.Id);
+        personalMembership.Status.Should().Be(WorkspaceMembershipStatus.Active);
+        personalMembership.RoleIds.Should().ContainSingle();
+
+        int teamMembershipCount = await (
+            from membership in ctx.WorkspaceMemberships
+            join workspace in ctx.Workspaces on membership.workspaceId equals workspace.Id
+            where membership.UserId == user.Id && workspace.Type == WorkspaceType.Team
+            select membership.Id)
+            .CountAsync();
+        teamMembershipCount.Should().Be(0);
+
+        EmailVerificationToken token = await ctx.EmailVerificationTokens
+            .SingleAsync(t => t.UserId == user.Id);
+        token.UsedAt.Should().BeNull();
+        token.ExpiresAt.Should().BeAfter(DateTime.UtcNow);
     }
 
     [Fact]

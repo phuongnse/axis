@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: axis_dev_pass
       POSTGRES_DB: axis
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -20,7 +20,7 @@ services:
     image: redis:7-alpine
     container_name: axis_redis
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -33,8 +33,8 @@ services:
     image: maildev/maildev:2.1.0
     container_name: axis_maildev
     ports:
-      - "1025:1025"  # SMTP
-      - "1080:1080"  # Web UI — open http://localhost:1080 to read outbound mail
+      - "127.0.0.1:1025:1025"  # SMTP
+      - "127.0.0.1:1080:1080"  # Web UI — open http://localhost:1080 to read outbound mail
     healthcheck:
       disable: true
 
@@ -45,7 +45,7 @@ services:
       SERVICES: s3
       DEBUG: 0
     ports:
-      - "4566:4566"
+      - "127.0.0.1:4566:4566"
     volumes:
       - localstack_data:/var/lib/localstack
     healthcheck:
@@ -94,7 +94,7 @@ services:
       # (PLAINTEXT on :9092) stays reachable inside the Compose network as
       # `kafka:9092` and is intentionally not exposed — its advertised
       # address would mis-resolve from the host.
-      - "29092:29092"    # host PLAINTEXT — connect from local processes here
+      - "127.0.0.1:29092:29092" # host PLAINTEXT — connect from local processes here
     volumes:
       - kafka_data:/var/lib/kafka/data
     healthcheck:
@@ -118,7 +118,7 @@ services:
       # ship a breaking schema change without explicit override.
       SCHEMA_REGISTRY_SCHEMA_COMPATIBILITY_LEVEL: "BACKWARD"
     ports:
-      - "8081:8081"
+      - "127.0.0.1:8081:8081"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8081/subjects >/dev/null || exit 1"]
       interval: 10s
@@ -135,8 +135,8 @@ services:
       RABBITMQ_DEFAULT_USER: axis
       RABBITMQ_DEFAULT_PASS: axis_dev_pass
     ports:
-      - "5672:5672"     # AMQP
-      - "15672:15672"   # Management UI — http://localhost:15672 (axis / axis_dev_pass)
+      - "127.0.0.1:5672:5672" # AMQP
+      - "127.0.0.1:15672:15672" # Management UI — http://localhost:15672 (axis / axis_dev_pass)
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
@@ -153,9 +153,9 @@ services:
     image: grafana/otel-lgtm:0.11.8
     container_name: axis_otel_lgtm
     ports:
-      - "3001:3000"   # Grafana UI — http://localhost:3001
-      - "4317:4317"   # OTLP/gRPC (traces, metrics, logs)
-      - "4318:4318"   # OTLP/HTTP
+      - "127.0.0.1:3001:3000" # Grafana UI — http://localhost:3001
+      - "127.0.0.1:4317:4317" # OTLP/gRPC (traces, metrics, logs)
+      - "127.0.0.1:4318:4318" # OTLP/HTTP
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
       interval: 10s
@@ -175,7 +175,7 @@ services:
       VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
       VAULT_ADDR: "http://0.0.0.0:8200"
     ports:
-      - "8200:8200"
+      - "127.0.0.1:8200:8200"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8200/v1/sys/health | grep -q '\"initialized\":true' || exit 1"]
       interval: 10s
@@ -189,7 +189,7 @@ services:
     command:
       - bash
       - -lc
-      - "dotnet restore src/Axis.Api/Axis.Api.csproj --artifacts-path /tmp/axis-artifacts && dotnet run --project src/Axis.Api/Axis.Api.csproj --no-launch-profile --artifacts-path /tmp/axis-artifacts"
+      - "dotnet restore src/Axis.Api/Axis.Api.csproj --artifacts-path /tmp/axis-artifacts && dotnet build src/Axis.Api/Axis.Api.csproj --no-restore --artifacts-path /tmp/axis-artifacts && cd /tmp/axis-artifacts/bin/Axis.Api/debug && dotnet Axis.Api.dll"
     depends_on:
       postgres:
         condition: service_healthy
@@ -207,7 +207,9 @@ services:
         condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_URLS: https://+:8443
+      Kestrel__Certificates__Default__Path: "/https/localhost.pem"
+      Kestrel__Certificates__Default__KeyPath: "/https/localhost-key.pem"
       ConnectionStrings__Identity: "Host=postgres;Port=5432;Database=axis_identity;Username=axis;Password=axis_dev_pass"
       ConnectionStrings__DataModeling: "Host=postgres;Port=5432;Database=axis_datamodeling;Username=axis;Password=axis_dev_pass"
       ConnectionStrings__WorkflowBuilder: "Host=postgres;Port=5432;Database=axis_workflowbuilder;Username=axis;Password=axis_dev_pass"
@@ -220,23 +222,29 @@ services:
       Email__Host: maildev
       Email__Port: "1025"
       Aws__ServiceURL: "http://localstack:4566"
-      Cors__AllowedOrigins__0: "http://localhost:3000"
+      Modules__Identity__GrpcUrl: "https://localhost:8443"
+      Modules__FormBuilder__GrpcUrl: "https://localhost:8443"
+      Modules__WorkflowBuilder__GrpcUrl: "https://localhost:8443"
+      Cors__AllowedOrigins__0: "https://localhost:3000"
       # OTLP export is off in the default compose API container (no LGTM dependency).
       # For traces in Grafana: `docker compose --profile observability up -d otel-lgtm`
       # then `dotnet run` on the host (appsettings.json → localhost:4317) or set
       # OpenTelemetry__Otlp__Endpoint=http://otel-lgtm:4317 when running API in compose with the profile.
       OpenTelemetry__Otlp__Endpoint: ""
     ports:
-      - "5280:8080"
+      - "127.0.0.1:5281:8443"
     volumes:
       - ./src:/src/src
       - ./Axis.sln:/src/Axis.sln:ro
       - ./.editorconfig:/src/.editorconfig:ro
       - ./Directory.Build.props:/src/Directory.Build.props:ro
       - ./Directory.Packages.props:/src/Directory.Packages.props:ro
+      - ./.dev-certs/rootCA.pem:/https/rootCA.pem:ro
+      - ./.dev-certs/localhost.pem:/https/localhost.pem:ro
+      - ./.dev-certs/localhost-key.pem:/https/localhost-key.pem:ro
       - nuget_packages:/root/.nuget/packages
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health || exit 1"]
+      test: ["CMD-SHELL", "curl --cacert /https/rootCA.pem -fsS https://localhost:8443/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 30
@@ -250,21 +258,65 @@ services:
     depends_on:
       - api
     environment:
-      VITE_API_PROXY_TARGET: "http://api:8080"
+      NODE_EXTRA_CA_CERTS: "/https/rootCA.pem"
+      VITE_API_PROXY_TARGET: "https://api:8443"
+      VITE_API_URL: "https://localhost:5281/api"
+      VITE_CONNECT_URL: "https://localhost:5281"
+      VITE_ALLOWED_HOSTS: "localhost,127.0.0.1,web"
+      VITE_DEV_HTTPS_CERT: "/https/localhost.pem"
+      VITE_DEV_HTTPS_KEY: "/https/localhost-key.pem"
       # Vite chokidar polling — needed for file change events through WSL bind mounts.
       VITE_USE_POLLING: "1"
     command: ["sh", "./scripts/docker-dev-entrypoint.sh"]
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - ./frontend:/app
+      - ./.dev-certs/rootCA.pem:/https/rootCA.pem:ro
+      - ./.dev-certs/localhost.pem:/https/localhost.pem:ro
+      - ./.dev-certs/localhost-key.pem:/https/localhost-key.pem:ro
       - web_node_modules:/app/node_modules
+
+  e2e:
+    profiles: ["e2e"]
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.e2e
+    container_name: axis_e2e
+    user: root
+    working_dir: /work/frontend
+    network_mode: host
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_started
+    environment:
+      CI: "1"
+      NODE_EXTRA_CA_CERTS: "/https/rootCA.pem"
+      E2E_BASE_URL: "https://localhost:3000"
+      E2E_API_URL: "https://localhost:5281"
+      E2E_MAILDEV_URL: "http://localhost:1080"
+      E2E_SKIP_WEB_SERVER: "1"
+      PLAYWRIGHT_BROWSERS_PATH: "/ms-playwright"
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+    command:
+      - sh
+      - -lc
+      - "cp /https/rootCA.pem /usr/local/share/ca-certificates/axis-local-root.crt && update-ca-certificates && mkdir -p /root/.pki/nssdb && if [ ! -f /root/.pki/nssdb/cert9.db ]; then certutil -d sql:/root/.pki/nssdb -N --empty-password; fi && certutil -d sql:/root/.pki/nssdb -D -n axis-local-root >/dev/null 2>&1 || true && certutil -d sql:/root/.pki/nssdb -A -t 'C,,' -n axis-local-root -i /https/rootCA.pem && npm ci && node ./scripts/wait-for-e2e-targets.mjs && npm run test:e2e"
+    volumes:
+      - ./frontend:/work/frontend
+      - ./.dev-certs/rootCA.pem:/https/rootCA.pem:ro
+      - e2e_node_modules:/work/frontend/node_modules
+      - e2e_npm_cache:/root/.npm
 
 volumes:
   postgres_data:
   redis_data:
   localstack_data:
   web_node_modules:
+  e2e_node_modules:
+  e2e_npm_cache:
   nuget_packages:
   kafka_data:
   rabbitmq_data:

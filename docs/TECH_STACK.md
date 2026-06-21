@@ -57,6 +57,7 @@
 | **Biome** | 2.x | Linter + formatter | Replaces ESLint + Prettier. Single tool for linting, formatting, and import sorting. See ADR-008. |
 | **Vitest** | 3.x | Frontend test runner | Fast Vite-native test runner; v3 deduplicates cleanly with vite 6 (v4 installs a nested vite 8, breaking `npm ci`). |
 | **@testing-library/react** | 16.x | Component testing | Behaviour-driven component tests; always paired with Vitest |
+| **Playwright** | 1.x | Browser E2E test runner | Browser-level acceptance and local-dev smoke tests; the Docker e2e profile builds from the official browser image pinned to the package version and adds local-CA tooling. |
 
 ---
 

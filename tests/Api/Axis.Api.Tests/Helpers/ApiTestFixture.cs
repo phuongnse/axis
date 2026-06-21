@@ -24,7 +24,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using OpenIddict.Abstractions;
-using OpenIddict.Server.AspNetCore;
 using StackExchange.Redis;
 using Testcontainers.Kafka;
 using Testcontainers.PostgreSql;
@@ -150,7 +149,6 @@ public sealed class ApiTestFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("Kafka__Brokers", _kafka.GetBootstrapAddress());
         Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", _rabbitMq.GetConnectionString());
 
-        AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
         _dataProtectionKeysDirectory.Create();
 
         WebApplicationFactory<Program> factory = null!;
@@ -171,9 +169,9 @@ public sealed class ApiTestFixture : IAsyncLifetime
                     ["ConnectionStrings:FormBuilder"] = _formBuilderConnectionString,
                     ["ConnectionStrings:WorkflowEngine"] = _workflowEngineConnectionString,
                     ["Redis:ConnectionString"] = _redis.GetConnectionString(),
-                    ["Modules:DataModeling:GrpcUrl"] = "http://localhost",
-                    ["Modules:FormBuilder:GrpcUrl"] = "http://localhost",
-                    ["Modules:WorkflowBuilder:GrpcUrl"] = "http://localhost",
+                    ["Modules:DataModeling:GrpcUrl"] = "https://localhost",
+                    ["Modules:FormBuilder:GrpcUrl"] = "https://localhost",
+                    ["Modules:WorkflowBuilder:GrpcUrl"] = "https://localhost",
                 });
             });
 
@@ -186,19 +184,19 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.RemoveAll<FormModelReferenceService.FormModelReferenceServiceClient>();
                 services.AddGrpcClient<FormModelReferenceService.FormModelReferenceServiceClient>(options =>
                 {
-                    options.Address = new Uri("http://localhost");
+                    options.Address = new Uri("https://localhost");
                 })
                 .ConfigurePrimaryHttpMessageHandler(() => grpcTestServerHandler.Value);
                 services.RemoveAll<DataModelCatalogService.DataModelCatalogServiceClient>();
                 services.AddGrpcClient<DataModelCatalogService.DataModelCatalogServiceClient>(options =>
                 {
-                    options.Address = new Uri("http://localhost");
+                    options.Address = new Uri("https://localhost");
                 })
                 .ConfigurePrimaryHttpMessageHandler(() => grpcTestServerHandler.Value);
                 services.RemoveAll<WorkflowFormReferenceService.WorkflowFormReferenceServiceClient>();
                 services.AddGrpcClient<WorkflowFormReferenceService.WorkflowFormReferenceServiceClient>(options =>
                 {
-                    options.Address = new Uri("http://localhost");
+                    options.Address = new Uri("https://localhost");
                 })
                 .ConfigurePrimaryHttpMessageHandler(() => grpcTestServerHandler.Value);
                 services.RemoveAll<DbContextOptions<IdentityDbContext>>();
@@ -235,9 +233,6 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.AddScoped<IFormBuilderUnitOfWork>(sp =>
                     new NullFormBuilderUnitOfWork(sp.GetRequiredService<FormBuilderDbContext>()));
 
-                services.PostConfigure<OpenIddictServerAspNetCoreOptions>(opts =>
-                    opts.DisableTransportSecurityRequirement = true);
-
                 ServiceDescriptor? openIddictSeederDescriptor = services.FirstOrDefault(
                     d => d.ImplementationType == typeof(OpenIddictSeeder));
                 if (openIddictSeederDescriptor is not null)
@@ -254,6 +249,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
         Client = _factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false,
+            BaseAddress = new Uri("https://localhost"),
         });
     }
 
@@ -288,6 +284,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
     public HttpClient CreateNewClient() => _factory.CreateClient(new WebApplicationFactoryClientOptions
     {
         AllowAutoRedirect = false,
+        BaseAddress = new Uri("https://localhost"),
     });
 
     public async Task EnsureWorkspaceProvisionedAsync(string adminEmail)
@@ -428,8 +425,8 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 },
                 RedirectUris =
                 {
-                    new Uri("http://localhost:3000/callback"),
-                    new Uri("http://localhost/callback"),
+                    new Uri("https://localhost:3000/callback"),
+                    new Uri("https://localhost/callback"),
                 },
                 Requirements =
                 {

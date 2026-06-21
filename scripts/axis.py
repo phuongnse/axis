@@ -206,6 +206,7 @@ def module_main(script_name: str, args: list[str], *, stdin_text: str | None = N
     if spec is None or spec.loader is None:
         raise CheckError(f"Cannot load {script_name}")
     module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
 
     old_argv = sys.argv
     old_stdin = sys.stdin

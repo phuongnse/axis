@@ -7,7 +7,14 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!**/routeTree.gen.ts", "!**/api-types.ts", "!eslint.config.js"]
+    "includes": [
+      "**",
+      "!**/routeTree.gen.ts",
+      "!**/api-types.ts",
+      "!eslint.config.js",
+      "!playwright-report",
+      "!test-results"
+    ]
   },
   "formatter": {
     "enabled": true,

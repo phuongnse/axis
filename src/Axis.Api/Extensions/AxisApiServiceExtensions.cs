@@ -252,7 +252,7 @@ internal static class AxisApiServiceExtensions
         string identityGrpcUrl = !string.IsNullOrWhiteSpace(configuredUrl)
             ? configuredUrl
             : environment.IsDevelopmentOrTesting()
-                ? "http://localhost:5280"
+                ? "https://localhost:7275"
                 : throw new InvalidOperationException("Modules:Identity:GrpcUrl is required");
 
         if (!Uri.TryCreate(identityGrpcUrl, UriKind.Absolute, out Uri? identityUri))

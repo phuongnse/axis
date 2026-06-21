@@ -17,7 +17,7 @@ public static class AuthHelper
     private static readonly JsonSerializerOptions Json = ApiTestFixture.JsonOptions;
 
     // Test redirect URI - must match a registered RedirectUri in the SPA client seed
-    private const string RedirectUri = "http://localhost/callback";
+    private const string RedirectUri = "https://localhost/callback";
     private const string ClientId = "axis_spa";
 
     /// <summary>

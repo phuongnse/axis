@@ -40,25 +40,38 @@ Third-party identity providers authenticate an individual user and can be linked
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] User registration can be started without any team/setup context.
-- [ ] User can register with email/password.
-- [ ] A standalone registration creates a `User` with a personal workspace membership and without requiring a team workspace membership.
-- [ ] Registration sends an email verification link.
-- [ ] After successful email verification, the user is signed in through Axis/OpenIddict and redirected to the dashboard.
+- [x] **AC-001** User registration can be started without any team/setup context.
+- [x] **AC-002** User can register with full name, email/password, password confirmation, and current user-level legal acceptance.
+- [x] **AC-003** A standalone registration creates a `User` with a personal workspace membership and without requiring or creating a team workspace membership.
+- [x] **AC-004** Registration sends an email verification link.
+- [x] **AC-005** After successful email verification, the user is signed in through Axis/OpenIddict and redirected to the dashboard.
 
 *Validation & errors*
-- [ ] Email: required, valid email format, unique across Axis users.
-- [ ] Password path: password is required, minimum 15 characters, max 128 characters, and common or predictable passwords are rejected.
-- [ ] Password confirmation must match password exactly.
-- [ ] Missing team/setup context is accepted for standalone registration.
-- [ ] All field-level errors are shown inline, not as a global toast.
-- [ ] If the API returns a server error (5xx), the form shows a generic "Something went wrong, please try again" message and the submit button re-enables.
-- [ ] Expired, invalid, rate-limited, and already-used verification links show clear user-facing states.
+- [x] **AC-006** Email is required, must be a valid email format, and must be unique across Axis users.
+- [x] **AC-007** Password is required, must be 15-128 characters, and common or predictable passwords are rejected.
+- [x] **AC-008** Password confirmation must match password exactly.
+- [x] **AC-009** Missing team/setup context is accepted for standalone registration.
+- [x] **AC-010** All field-level errors are shown inline, not as a global toast.
+- [x] **AC-011** If the API returns a server error (5xx), the form shows a generic "Something went wrong, please try again" message and the submit button re-enables.
+- [x] **AC-012** Expired, invalid, rate-limited, and already-used verification links show clear user-facing states.
 
 *Edge cases*
-- [ ] Multiple rapid submissions are deduplicated with an idempotency key.
-- [ ] Pasting a password with leading/trailing spaces is accepted as-is.
-- [ ] A standalone user can later create or join a team workspace without re-registering.
+- [x] **AC-013** Multiple rapid submissions are deduplicated with an idempotency key.
+- [x] **AC-014** Pasting a password with leading/trailing spaces is accepted as-is.
+- [x] **AC-015** Standalone registration leaves the account independent of team/setup context so later team create/join flows can attach without re-registration.
+
+## Acceptance Test Matrix
+
+| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+|---|---|---|---|---|---|
+| REG-001 | E2E | User registers, opens verification email, completes PKCE, and reaches dashboard | AC-001, AC-002, AC-004, AC-005, AC-009 | Playwright | Yes |
+| REG-002 | E2E | Duplicate email shows the exact inline email-field error | AC-006, AC-010 | Playwright | Yes |
+| REG-003 | API | Registration creates user, personal workspace membership, verification token, and no team membership | AC-003, AC-004, AC-009, AC-015 | xUnit API | Yes |
+| REG-004 | Component | Empty form, invalid email, password confirmation, and backend field errors render inline | AC-006, AC-008, AC-010 | Vitest | Yes |
+| REG-005 | Component | Password policy rejects short/common passwords and accepts leading/trailing spaces as entered | AC-007, AC-014 | Vitest | Yes |
+| REG-006 | Component | 5xx submission failure shows generic retry text and re-enables submit | AC-011 | Vitest | Yes |
+| REG-007 | Component/API | Expired, invalid, rate-limited, and already-used verification links show clear states; resend remains available where allowed | AC-012 | Vitest + xUnit API | Yes |
+| REG-008 | Application | Completed or in-progress idempotency key deduplicates repeated registration attempts | AC-013 | xUnit Application | Yes |
 
 *Out of scope*
 - Creating a new team workspace; see [register-workspace](../../platform-foundation/register-workspace/).
@@ -113,7 +126,7 @@ sequenceDiagram
 >
 > **Implemented:** Email/password standalone registration is implemented at `POST /api/users/register`, including idempotency, current legal-version acceptance, personal workspace creation, email verification, post-verification PKCE session establishment, confirmation/resend states, and dashboard routing. Personal workspace provisioning may run in the background, but the standalone user path never routes to the provisioning page.
 >
-> **Gaps vs spec:** none for standalone email/password registration.
+> **Gaps vs spec:** none for standalone email/password registration. Later team create/join behavior is covered by separate workspace and invitation use cases; this use case verifies that standalone registration does not create or require team membership.
 >
 > **Deferred follow-ups:**
 > - Microsoft / Google / GitHub providers are a separate provider registration/linking use case.

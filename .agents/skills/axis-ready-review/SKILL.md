@@ -23,6 +23,12 @@ Decide whether the branch is ready for review using Axis enforced checks plus re
 
 3. Audit use-case and docs status.
    - For behavior/spec/status changes, verify the owning use-case callout, domain README, and `docs/PROGRESS.md` when triggered.
+   - For use cases being implemented, closed, or materially refreshed, verify local AC IDs and the `## Acceptance Test Matrix` exist.
+   - Confirm every in-scope AC appears in at least one required AT row and every required AT row names an automated runner/tool.
+   - Confirm the use-case matrix stays high-level: no test file paths, class names, commands, or `Evidence source` implementation-detail column.
+   - Confirm the implementation/verification report cites the spec section, AC ID, or flow step behind each required AT expected behavior.
+   - Confirm the implementation report includes `Spec Readiness Verdict: Ready`; if any required expectation cannot be cited from the spec, mark the branch Not ready.
+   - Confirm the verification report includes pass/fail evidence by AT ID.
    - Verify `Deferred follow-ups` names exact AC bullets or says `N/A`.
    - Check `docs/WORKAROUNDS.md` when an intentional P0/P1 workaround ships.
 
@@ -36,6 +42,8 @@ Decide whether the branch is ready for review using Axis enforced checks plus re
 
 5. Keep review-only items honest.
    - AC map has no blank in-scope rows.
+   - Acceptance Test Matrix has no uncovered in-scope ACs and no required AT row without an automated runner.
+   - Required AT expectations have spec citations in the implementation/verification report.
    - Docs review lines are `updated`, `not triggered`, or a named deferral.
    - Retrospective review answers each line, especially repeat findings and new enforceable rules.
 
@@ -60,6 +68,7 @@ Verification:
 Review-only audits:
 - Design Gate: ...
 - AC map: ...
+- Acceptance Test Matrix: ...
 - Docs review: ...
 - Retrospective review: ...
 

@@ -16,7 +16,8 @@ It provides the core building blocks: custom data models, workflows, forms, and 
 
 ## Quick start (local dev)
 
-Prerequisite: Docker + Compose v2.
+Prerequisite: Docker + Compose v2 and the local HTTPS files from
+[docs/playbooks/local-https.md](./docs/playbooks/local-https.md).
 
 From repo root:
 
@@ -26,9 +27,9 @@ docker compose up -d
 
 Then open:
 
-- Web app: <http://localhost:3000>
-- API: <http://localhost:5280>
-- API health: <http://localhost:5280/health>
+- Web app: <https://localhost:3000>
+- API: <https://localhost:5281>
+- API health: <https://localhost:5281/health>
 
 For full local-dev operations, ports, troubleshooting, and observability profile, see:
 [docs/playbooks/local-dev.md](./docs/playbooks/local-dev.md)

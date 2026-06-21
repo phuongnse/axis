@@ -29,6 +29,7 @@ def load_python_file(path: Path):
     if spec is None or spec.loader is None:
         raise AssertionError(f"Cannot load {path}")
     module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -132,13 +133,22 @@ docs/use-cases/example/README.md
 
 
 class TestUseCaseDocsGate(unittest.TestCase):
-    def issues_for_use_case(self, callout: str) -> list[str]:
+    def issues_for_document(self, content: str) -> list[str]:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             path = root / "docs" / "use-cases" / "example" / "sample" / "README.md"
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(
-                """# Sample use case
+            path.write_text(content, encoding="utf-8")
+            original_root = check_use_case_docs.ROOT
+            check_use_case_docs.ROOT = root
+            try:
+                return check_use_case_docs.check_file(path)
+            finally:
+                check_use_case_docs.ROOT = original_root
+
+    def issues_for_use_case(self, callout: str) -> list[str]:
+        return self.issues_for_document(
+            """# Sample use case
 
 ## Purpose
 
@@ -165,7 +175,7 @@ Ship user value.
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] Works.
+- [ ] AC-001 Works.
 
 ## Wireframes
 
@@ -174,15 +184,8 @@ Ship user value.
 | N/A | N/A | N/A |
 
 """
-                + callout,
-                encoding="utf-8",
-            )
-            original_root = check_use_case_docs.ROOT
-            check_use_case_docs.ROOT = root
-            try:
-                return check_use_case_docs.check_file(path)
-            finally:
-                check_use_case_docs.ROOT = original_root
+            + callout
+        )
 
     def test_rejects_missing_deferred_followups(self) -> None:
         issues = self.issues_for_use_case(
@@ -374,6 +377,259 @@ Ship user value.
 
         self.assertEqual([], issues)
 
+    def test_rejects_evidence_source_column_in_acceptance_test_matrix(self) -> None:
+        issues = self.issues_for_use_case(
+            """## Acceptance Test Matrix
+
+| ID | Level | Scenario | Covers AC | Evidence source | Automated by | Required to close |
+|---|---|---|---|---|---|---|
+| AT-001 | E2E | User completes flow | AC-001 | Main flow | Playwright | Yes |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertIn("must not include an `Evidence source` column", "\n".join(issues))
+
+    def test_rejects_file_paths_in_acceptance_test_matrix(self) -> None:
+        issues = self.issues_for_use_case(
+            """## Acceptance Test Matrix
+
+| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+|---|---|---|---|---|---|
+| AT-001 | E2E | User completes flow | AC-001 | `frontend/e2e/sample.pw.ts` | Yes |
+| AT-002 | API | Backend side effect | AC-001 | Axis.Api.Tests | Yes |
+| AT-003 | UI | UI validation | AC-001 | npm run test | Yes |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("contains implementation details", joined)
+
+    def test_accepts_high_level_acceptance_test_matrix(self) -> None:
+        issues = self.issues_for_use_case(
+            """## Acceptance Test Matrix
+
+| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+|---|---|---|---|---|---|
+| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
+| AT-002 | API | Backend side effect | AC-001 | xUnit API | Yes |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertEqual([], issues)
+
+    def test_rejects_acceptance_matrix_unknown_and_uncovered_ac_ids(self) -> None:
+        issues = self.issues_for_use_case(
+            """## Acceptance Test Matrix
+
+| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+|---|---|---|---|---|---|
+| AT-001 | E2E | User completes flow | AC-999 | Playwright | No |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("references unknown AC IDs: AC-999", joined)
+        self.assertIn("required rows do not cover AC IDs: AC-001", joined)
+
+    def test_rejects_acceptance_matrix_invalid_enum_values(self) -> None:
+        issues = self.issues_for_use_case(
+            """## Acceptance Test Matrix
+
+| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+|---|---|---|---|---|---|
+| AT-001 | Smoke | User completes flow | AC-001 | Jest | Required |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("invalid Level `Smoke`", joined)
+        self.assertIn("invalid Automated by `Jest`", joined)
+        self.assertIn("Required to close must be `Yes` or `No`", joined)
+
+    def test_rejects_acceptance_matrix_mixed_id_prefixes(self) -> None:
+        issues = self.issues_for_use_case(
+            """## Acceptance Test Matrix
+
+| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+|---|---|---|---|---|---|
+| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
+| REG-002 | API | Backend side effect | AC-001 | xUnit API | Yes |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertIn("IDs must use one local prefix", "\n".join(issues))
+
+    def test_rejects_wireframes_table_schema_drift(self) -> None:
+        issues = self.issues_for_document(
+            """# Sample use case
+
+## Purpose
+
+Ship user value.
+
+## Primary actor
+
+- User
+
+## Trigger
+
+- User starts the flow.
+
+## Main flow
+
+1. User starts.
+2. System responds.
+3. User completes the flow.
+
+## Alternate / error flows
+
+- None.
+
+## Acceptance Criteria
+
+*Happy path*
+- [ ] AC-001 Works.
+
+## Wireframes
+
+| Screen | Preview |
+|--------|---------|
+| N/A | N/A |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertIn("Wireframes table missing required columns: Excalidraw", "\n".join(issues))
+
+    def test_rejects_implementation_status_table_schema_drift(self) -> None:
+        issues = self.issues_for_use_case(
+            """> **Implementation status**
+>
+> | Area | State |
+> |------|-------|
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertIn("Implementation status table columns must be exactly", "\n".join(issues))
+
     def test_strips_implementation_status_for_stock_flow_ratchet(self) -> None:
         before = """# Sample
 
@@ -512,6 +768,26 @@ class TestDocDriftRatchets(unittest.TestCase):
 
 
 class TestWorkingTreeDiffHelpers(unittest.TestCase):
+    def test_module_main_supports_dataclass_scripts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            scripts_dir = Path(temp)
+            (scripts_dir / "example-check.py").write_text(
+                """
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class Example:
+    value: str
+
+def main() -> int:
+    return 0 if Example("ok").value == "ok" else 1
+""",
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(axis, "SCRIPTS", scripts_dir):
+                self.assertEqual(0, axis.module_main("example-check.py", []))
+
     def fake_git_run(self, outputs: dict[tuple[str, ...], str]):
         def fake_run(args: list[str], **_kwargs):
             key = tuple(args[1:] if args and args[0] == "git" else args)

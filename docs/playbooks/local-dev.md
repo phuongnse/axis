@@ -2,9 +2,9 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← AGENTS.md](../../AGENTS.md)
 
-The full dev stack runs from one `docker compose up -d`: **Postgres**, **Redis**, **MailDev**, **LocalStack**, **Kafka** (KRaft), **Schema Registry**, **RabbitMQ**, **Vault** (dev mode), the **.NET API**, and the **Vite SPA**. The API runs in Docker via `dotnet run`; restart the `api` service after backend changes. Frontend hot-reloads via Vite. Source is bind-mounted — edit on the host, containers pick up changes.
+The full dev stack runs from one `docker compose up -d`: **Postgres**, **Redis**, **MailDev**, **LocalStack**, **Kafka** (KRaft), **Schema Registry**, **RabbitMQ**, **Vault** (dev mode), the **.NET API**, and the **Vite SPA**. Browser-facing local services run on HTTPS by default: Web at `https://localhost:3000` and API at `https://localhost:5281`. The API runs in Docker via `dotnet run`; restart the `api` service after backend changes. Frontend hot-reloads via Vite. Source is bind-mounted — edit on the host, containers pick up changes.
 
-**Canonical port list:** [`docker-compose.yml`](../../docker-compose.yml) is the source of truth; this doc explains how to use it. CI runs `python scripts/axis.py check local-dev-docs` to catch drift.
+**Canonical port list:** [`docker-compose.yml`](../../docker-compose.yml) is the source of truth; this doc explains how to use it. Published ports bind to `127.0.0.1` only. CI runs `python scripts/axis.py check local-dev-docs` to catch drift.
 
 **Environment contract:** Project docs own repo-root commands, compose services,
 ports, and verification commands. Environment adapters below only make that
@@ -16,35 +16,17 @@ or pattern docs.
 
 ## Prerequisites
 
-- **Python 3** - repo maintenance commands run through `python scripts/axis.py ...`.
-  If `python` cannot resolve, fix `PATH` before using repo scripts.
-- **PyYAML** - Python package required by skill-creator `quick_validate.py`
-  when editing repo-scoped Codex skills under `.agents/skills/`. Install it
-  into the same Python that runs repo scripts:
+- **Python 3 + PyYAML** - repo maintenance commands run through
+  `python scripts/axis.py ...`; install PyYAML into that Python with
   `python -m pip install PyYAML`.
-- **.NET SDK 8.x** - required for repo verification (`dotnet build`, `dotnet test`,
-  `dotnet format`), EF migrations, and API contract generation. The compose API
-  container has its own SDK, but local verification expects `dotnet` on `PATH`
-  and fails before running .NET commands when [`global.json`](../../global.json)
-  or `dotnet --version` is not 8.x.
-- **Node.js + npm** - required for repo verification (`npm run ci`,
-  `npm run test`), OpenAPI TypeScript generation, and wireframe export. The
-  compose web container has its own Node runtime, but local verification expects
-  `node` and `npm` on `PATH`. The Node major must match
-  [`frontend/.nvmrc`](../../frontend/.nvmrc).
-- **Buf CLI** - required for protobuf lint/breaking verification. Use the exact
-  version in [scripts.md § Tool Versions](./scripts.md#tool-versions); local
-  protobuf commands fail when `buf` is missing from `PATH` or reports a
-  different version.
-- **Lychee** - required for markdown link verification. Use the exact version in
-  [scripts.md § Tool Versions](./scripts.md#tool-versions); `python scripts/axis.py check markdown-links`
-  fails when `lychee` is missing from `PATH` or reports a different version.
-- **Docker** — Docker Engine + Compose v2.
-  Run canonical commands from the repo root. If Docker is not visible from the
-  current execution context, use [Environment adapters](#environment-adapters).
+- **.NET SDK 8.x** - local verification, EF migrations, and API contract generation; version must match [`global.json`](../../global.json).
+- **Node.js + npm** - frontend verification, OpenAPI TypeScript generation, and wireframe export; major must match [`frontend/.nvmrc`](../../frontend/.nvmrc).
+- **Buf CLI + Lychee** - protobuf and markdown-link verification; use versions in [scripts.md § Tool Versions](./scripts.md#tool-versions).
+- **Docker** - Docker Engine + Compose v2. Run canonical commands from the repo root; if Docker is not visible, use [Environment adapters](#environment-adapters).
+- **OpenSSL** - local development CA and localhost certificate generation; see [Local HTTPS](./local-https.md).
 - Host ports free (default compose bindings):
 
-  `3000`, `5280`, `5432`, `6379`, `1025`, `1080`, `4566`, `29092`, `8081`, `5672`, `15672`, `8200`
+  `3000`, `5281`, `5432`, `6379`, `1025`, `1080`, `4566`, `29092`, `8081`, `5672`, `15672`, `8200`
 
   Optional observability profile also uses `3001`, `4317`, `4318` — see [Observability (optional)](#observability-optional).
 - The API container writes .NET build artifacts to `/tmp/axis-artifacts`, so repo-level `dotnet build` no longer shares `bin/obj` with the container.
@@ -68,6 +50,14 @@ Use strict mode when you want the command to fail on blocking local-dev issues:
 ```bash
 python scripts/axis.py doctor --strict
 ```
+
+## Local HTTPS
+
+Compose requires `.dev-certs/rootCA.pem`, `.dev-certs/rootCA.cer`,
+`.dev-certs/localhost.pem`, and `.dev-certs/localhost-key.pem`. Generate and
+trust them with [local-https.md](./local-https.md) before running the stack.
+Services fail fast when the files are missing; browser and Playwright E2E trust
+the local CA instead of disabling HTTPS validation.
 
 ## Environment adapters
 
@@ -99,14 +89,8 @@ canonical repo-root command there.
 ### Package-manager adapter
 
 If a shell wrapper blocks package-manager execution, use the runtime's native
-binary/shim for the same package script. Keep the reported command as the
-package script, not the adapter-specific wrapper:
-
-```bash
-cd frontend
-npm run ci
-npm run test
-```
+binary/shim for the same package script. Keep reported commands as package
+scripts, e.g. `cd frontend && npm run ci && npm run test`.
 
 ---
 
@@ -118,13 +102,19 @@ From the repo root:
 docker compose up -d
 ```
 
+If the cert files above are missing, `api`, `web`, and `e2e` fail fast instead
+of silently falling back to HTTP.
+
 First boot:
 
 - Infrastructure images pull (Postgres, Redis, Kafka, RabbitMQ, … — several hundred MB total).
 - **API** waits for Postgres, Redis, LocalStack, Kafka, Schema Registry, and RabbitMQ to be healthy, then runs `dotnet restore` and `dotnet run` with container artifacts under `/tmp/axis-artifacts` — first restore ~1–2 min; NuGet cache lives in the `nuget_packages` volume.
 - **Web** syncs `npm ci` when `package-lock.json` changes, then starts Vite — first install ~1 min; `node_modules` cache lives in `web_node_modules`.
 
-Add `--build` only after changing [`frontend/Dockerfile.dev`](../../frontend/Dockerfile.dev) or the root [`Dockerfile`](../../Dockerfile) (production image).
+Add `--build` only after changing [`frontend/Dockerfile.dev`](../../frontend/Dockerfile.dev), [`frontend/Dockerfile.e2e`](../../frontend/Dockerfile.e2e), or the root [`Dockerfile`](../../Dockerfile) (production image).
+
+Optional browser smoke uses `docker compose --profile e2e run --rm e2e`; see
+[testing.md § Browser E2E](./testing.md#browser-e2e).
 
 ---
 
@@ -132,11 +122,11 @@ Add `--build` only after changing [`frontend/Dockerfile.dev`](../../frontend/Doc
 
 | Service | Host access | Notes |
 |---|---|---|
-| Web (SPA) | <http://localhost:3000> | Vite dev server. `/api/*` and `/connect/*` proxy to the API container. |
-| API | <http://localhost:5280> | Container listens on `8080`; mapped to host `5280`. |
-| API health | <http://localhost:5280/health> | Anonymous; compose healthcheck target. |
-| API ready | <http://localhost:5280/health/ready> | Includes Postgres + Redis probes. |
-| Scalar / Swagger | <http://localhost:5280/scalar/v1> | OpenAPI explorer (Development / Staging only). |
+| Web (SPA) | <https://localhost:3000> | Vite dev server with the local HTTPS certificate. Browser API calls use `https://localhost:5281/api`. |
+| API | <https://localhost:5281> | Container listens on HTTPS `8443`; mapped to host `5281`. |
+| API health | <https://localhost:5281/health> | Anonymous; compose healthcheck target using `.dev-certs/rootCA.pem`. |
+| API ready | <https://localhost:5281/health/ready> | Includes Postgres + Redis probes. |
+| Scalar / Swagger | <https://localhost:5281/scalar/v1> | OpenAPI explorer (Development / Staging only). |
 | MailDev UI | <http://localhost:1080> | Outbound email (SMTP `:1025`) lands here. |
 | Postgres | `localhost:5432` | User `axis` / password `axis_dev_pass`. API startup creates and migrates active module DBs in Development: `axis_identity`, `axis_datamodeling`, `axis_workflowbuilder`, `axis_formbuilder`, `axis_workflowengine`. |
 | Redis | `localhost:6379` | No auth. |
@@ -183,6 +173,7 @@ when the current execution context cannot reach Docker.
 | Service status | `docker compose ps` |
 | Restart one service | `docker compose restart api` |
 | Force recreate (env change) | `docker compose up -d --force-recreate api` |
+| Run browser smoke | `docker compose --profile e2e run --rm e2e` |
 | Shell in API container | `docker compose exec api bash` |
 | `psql` | `docker compose exec postgres psql -U axis -d axis` |
 
@@ -277,7 +268,8 @@ docker compose up -d
 
 ## Gotchas
 
-- **`launchSettings.json` is ignored** in the container. Compose passes `--no-launch-profile` to `dotnet run`; without it, the launch profile's `applicationUrl` can override `ASPNETCORE_URLS` and bind only inside the container — "connection reset" on `:5280` from the host.
+- **`launchSettings.json` is ignored** in the container. Compose passes `--no-launch-profile` to `dotnet run`; without it, the launch profile's `applicationUrl` can override `ASPNETCORE_URLS` and bind only inside the container — "connection reset" on `:5281` from the host.
+- **Host browser trust is separate from container trust.** Docker services mount the required files from `.dev-certs/`; Windows, macOS, or Linux browsers need the root CA trusted in that host OS before `https://localhost:3000` is clean.
 - **Container build artifacts stay outside the bind mount.** The API compose command passes `--artifacts-path /tmp/axis-artifacts` to `dotnet restore` and `dotnet run`, so container-generated `bin/obj` outputs do not overwrite repo-level IDE or developer-tool artifacts.
 - **MailDev health** — compose disables MailDev's baked-in healthcheck (`healthcheck: disable: true`); nothing waits on it.
 - **API startup order** — Kafka + Schema Registry + RabbitMQ must be healthy before the API starts; first boot can take ~60s on the API healthcheck `start_period`.
@@ -290,9 +282,11 @@ docker compose up -d
 | File | Role |
 |---|---|
 | [`docker-compose.yml`](../../docker-compose.yml) | Service graph, env vars, volumes, healthchecks — **port source of truth** |
+| `.dev-certs/` | Ignored local CA and HTTPS leaf certificate used by compose |
 | `python scripts/axis.py doctor` | Local environment diagnostics for PATH, Docker, package-manager, and adapter visibility |
 | `python scripts/axis.py check local-dev-docs` | CI/doc drift: verifies this file matches compose |
 | [`Dockerfile`](../../Dockerfile) | Production API image (not used by default compose dev) |
 | [`frontend/Dockerfile.dev`](../../frontend/Dockerfile.dev) | Node + Vite dev image |
-| [`frontend/vite.config.ts`](../../frontend/vite.config.ts) | `VITE_API_PROXY_TARGET`, `VITE_USE_POLLING` |
+| [`frontend/Dockerfile.e2e`](../../frontend/Dockerfile.e2e) | Playwright E2E image with NSS certificate tooling |
+| [`frontend/vite.config.ts`](../../frontend/vite.config.ts) | `VITE_API_PROXY_TARGET`, `VITE_DEV_HTTPS_CERT`, `VITE_DEV_HTTPS_KEY`, `VITE_USE_POLLING` |
 | [`src/Axis.Api/Program.cs`](../../src/Axis.Api/Program.cs) | Dev Identity `MigrateAsync`, Wolverine AutoProvision, Scalar |
