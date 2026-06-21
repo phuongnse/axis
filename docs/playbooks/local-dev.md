@@ -2,7 +2,7 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← AGENTS.md](../../AGENTS.md)
 
-The full dev stack runs from one `docker compose up -d`: **Postgres**, **Redis**, **MailDev**, **LocalStack**, **Kafka** (KRaft), **Schema Registry**, **RabbitMQ**, **Vault** (dev mode), the **.NET API**, and the **Vite SPA**. Browser-facing local services run on HTTPS by default: Web at `https://localhost:3000` and API at `https://localhost:5281`. The API runs in Docker via `dotnet run`; restart the `api` service after backend changes. Frontend hot-reloads via Vite. Source is bind-mounted — edit on the host, containers pick up changes.
+The full dev stack runs from one `docker compose up -d`: **Postgres**, **Redis**, **MailDev**, **LocalStack**, **Kafka** (KRaft), **Schema Registry**, **RabbitMQ**, **Vault** (dev mode), the **.NET API**, and the **Vite SPA**. Browser-facing local services run on HTTPS by default: Web at `https://localhost:3000` and API at `https://localhost:5281`. The API runs in Docker by restoring, building, then executing `dotnet Axis.Api.dll`; restart the `api` service after backend changes. Frontend hot-reloads via Vite. Source is bind-mounted — edit on the host, containers pick up changes.
 
 **Canonical port list:** [`docker-compose.yml`](../../docker-compose.yml) is the source of truth; this doc explains how to use it. Published ports bind to `127.0.0.1` only. CI runs `python scripts/axis.py check local-dev-docs` to catch drift.
 
@@ -108,12 +108,12 @@ of silently falling back to HTTP.
 First boot:
 
 - Infrastructure images pull (Postgres, Redis, Kafka, RabbitMQ, … — several hundred MB total).
-- **API** waits for Postgres, Redis, LocalStack, Kafka, Schema Registry, and RabbitMQ to be healthy, then runs `dotnet restore` and `dotnet run` with container artifacts under `/tmp/axis-artifacts` — first restore ~1–2 min; NuGet cache lives in the `nuget_packages` volume.
+- **API** waits for Postgres, Redis, LocalStack, Kafka, Schema Registry, and RabbitMQ to be healthy, then runs `dotnet restore`, `dotnet build`, and `dotnet Axis.Api.dll` with artifacts under `/tmp/axis-artifacts` — first restore ~1–2 min; NuGet cache lives in the `nuget_packages` volume.
 - **Web** syncs `npm ci` when `package-lock.json` changes, then starts Vite — first install ~1 min; `node_modules` cache lives in `web_node_modules`.
 
-Add `--build` only after changing [`frontend/Dockerfile.dev`](../../frontend/Dockerfile.dev), [`frontend/Dockerfile.e2e`](../../frontend/Dockerfile.e2e), or the root [`Dockerfile`](../../Dockerfile) (production image).
+Add `--build` only after changing [`frontend/Dockerfile.dev`](../../frontend/Dockerfile.dev) or the root [`Dockerfile`](../../Dockerfile) (production image). Browser smoke builds only the E2E image because it bakes in the current frontend source and dependencies.
 
-Optional browser smoke uses `docker compose --profile e2e run --rm e2e`; see
+Optional browser smoke uses `docker compose --profile e2e build e2e && docker compose --profile e2e run --rm --no-deps e2e`; see
 [testing.md § Browser E2E](./testing.md#browser-e2e).
 
 ---
@@ -173,7 +173,7 @@ when the current execution context cannot reach Docker.
 | Service status | `docker compose ps` |
 | Restart one service | `docker compose restart api` |
 | Force recreate (env change) | `docker compose up -d --force-recreate api` |
-| Run browser smoke | `docker compose --profile e2e run --rm e2e` |
+| Run browser smoke | `docker compose --profile e2e build e2e && docker compose --profile e2e run --rm --no-deps e2e` |
 | Shell in API container | `docker compose exec api bash` |
 | `psql` | `docker compose exec postgres psql -U axis -d axis` |
 
@@ -268,9 +268,9 @@ docker compose up -d
 
 ## Gotchas
 
-- **`launchSettings.json` is ignored** in the container. Compose passes `--no-launch-profile` to `dotnet run`; without it, the launch profile's `applicationUrl` can override `ASPNETCORE_URLS` and bind only inside the container — "connection reset" on `:5281` from the host.
+- **`launchSettings.json` is ignored** in the container because compose starts the compiled DLL directly (`dotnet Axis.Api.dll`), not `dotnet run`; launch profile `applicationUrl` does not apply to that path.
 - **Host browser trust is separate from container trust.** Docker services mount the required files from `.dev-certs/`; Windows, macOS, or Linux browsers need the root CA trusted in that host OS before `https://localhost:3000` is clean.
-- **Container build artifacts stay outside the bind mount.** The API compose command passes `--artifacts-path /tmp/axis-artifacts` to `dotnet restore` and `dotnet run`, so container-generated `bin/obj` outputs do not overwrite repo-level IDE or developer-tool artifacts.
+- **Container build artifacts stay outside the bind mount.** The API compose command passes `--artifacts-path /tmp/axis-artifacts` to `dotnet restore` and `dotnet build`, so container-generated `bin/obj` outputs do not overwrite repo-level IDE or developer-tool artifacts.
 - **MailDev health** — compose disables MailDev's baked-in healthcheck (`healthcheck: disable: true`); nothing waits on it.
 - **API startup order** — Kafka + Schema Registry + RabbitMQ must be healthy before the API starts; first boot can take ~60s on the API healthcheck `start_period`.
 - **Module vs workspace migrations** — API startup migrates each module's public schema in Development; workspace schemas migrate on first workspace provisioning.

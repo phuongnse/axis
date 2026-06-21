@@ -3,4 +3,6 @@ dist
 .vite
 .cache
 coverage
+playwright-report
+test-results
 .git

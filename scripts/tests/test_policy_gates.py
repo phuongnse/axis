@@ -147,6 +147,17 @@ class TestUseCaseDocsGate(unittest.TestCase):
                 check_use_case_docs.ROOT = original_root
 
     def issues_for_use_case(self, callout: str) -> list[str]:
+        matrix = (
+            ""
+            if "## Acceptance Test Matrix" in callout
+            else """## Acceptance Test Matrix
+
+| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+|---|---|---|---|---|---|
+| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
+
+"""
+        )
         return self.issues_for_document(
             """# Sample use case
 
@@ -177,6 +188,9 @@ Ship user value.
 *Happy path*
 - [ ] AC-001 Works.
 
+"""
+            + matrix
+            + """
 ## Wireframes
 
 | Screen | Excalidraw | Preview |
@@ -404,6 +418,63 @@ Ship user value.
         )
 
         self.assertIn("must not include an `Evidence source` column", "\n".join(issues))
+
+    def test_rejects_missing_acceptance_test_matrix_when_required(self) -> None:
+        issues = self.issues_for_document(
+            """# Sample use case
+
+## Purpose
+
+Ship user value.
+
+## Primary actor
+
+- User
+
+## Trigger
+
+- User starts the flow.
+
+## Main flow
+
+1. User starts.
+2. System responds.
+3. User completes the flow.
+
+## Alternate / error flows
+
+- None.
+
+## Acceptance Criteria
+
+*Happy path*
+- [ ] AC-001 Works.
+
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| N/A | N/A | N/A |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertIn("missing acceptance test matrix section", "\n".join(issues))
 
     def test_rejects_file_paths_in_acceptance_test_matrix(self) -> None:
         issues = self.issues_for_use_case(

@@ -104,7 +104,6 @@ async function fillRegisterForm(page: Page, email: string): Promise<void> {
 
 test.describe('register user', () => {
   test.skip(!apiURL, 'Set E2E_API_URL to run register-user API setup.');
-  test.skip(!maildevURL, 'Set E2E_MAILDEV_URL to run register-user email verification.');
 
   test.beforeEach(async ({ request }) => {
     await clearMaildev(request);
@@ -114,6 +113,8 @@ test.describe('register user', () => {
     page,
     request,
   }) => {
+    test.skip(!maildevURL, 'Set E2E_MAILDEV_URL to run register-user email verification.');
+
     const email = uniqueEmail('reg001');
 
     await page.goto('/register');

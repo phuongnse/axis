@@ -26,6 +26,7 @@ REQUIRED_SECTIONS = (
     "Main flow",
     "Alternate / error flows",
     "Acceptance Criteria",
+    "Acceptance Test Matrix",
     "Wireframes",
 )
 IMPLEMENTATION_STATUS_HEADING = "> **Implementation status**"
@@ -291,6 +292,8 @@ def validate_sections(doc: UseCaseDocument) -> list[str]:
         issues.append(f"{rel}: duplicate `## {heading}` section")
 
     for heading in REQUIRED_SECTIONS:
+        if heading == "Acceptance Test Matrix":
+            continue
         if heading not in doc.sections:
             issues.append(f"{rel}: missing {heading.lower()} section")
 
@@ -307,7 +310,7 @@ def validate_sections(doc: UseCaseDocument) -> list[str]:
     return issues
 
 
-def validate_acceptance_contract(doc: UseCaseDocument) -> list[str]:
+def validate_acceptance_contract(doc: UseCaseDocument, *, require_matrix: bool) -> list[str]:
     issues: list[str] = []
     rel = doc.rel
     ac_section = doc.section("Acceptance Criteria")
@@ -315,8 +318,14 @@ def validate_acceptance_contract(doc: UseCaseDocument) -> list[str]:
     for ac_id in duplicate_ac_ids:
         issues.append(f"{rel}: duplicate acceptance criterion ID `{ac_id}`")
 
+    if "Acceptance Test Matrix" not in doc.sections:
+        if require_matrix:
+            issues.append(f"{rel}: missing acceptance test matrix section")
+        return issues
+
     matrix_section = doc.section("Acceptance Test Matrix")
-    if not matrix_section:
+    if not matrix_section.strip():
+        issues.append(f"{rel}: Acceptance Test Matrix section is empty")
         return issues
 
     for bullet in missing_id_bullets:
@@ -484,11 +493,16 @@ def validate_implementation_status(doc: UseCaseDocument, *, strict_status: bool)
     return issues
 
 
-def check_file(path: Path, *, strict_status: bool = True) -> list[str]:
+def check_file(
+    path: Path,
+    *,
+    strict_status: bool = True,
+    require_acceptance_matrix: bool = True,
+) -> list[str]:
     doc = use_case_document(path)
     issues: list[str] = []
     issues.extend(validate_sections(doc))
-    issues.extend(validate_acceptance_contract(doc))
+    issues.extend(validate_acceptance_contract(doc, require_matrix=require_acceptance_matrix))
     issues.extend(validate_wireframes(doc))
     issues.extend(validate_diagrams(doc))
     issues.extend(validate_implementation_status(doc, strict_status=strict_status))
@@ -717,8 +731,24 @@ def main() -> int:
         changed_paths = set(changed_paths_against_base())
     except RuntimeError as exc:
         issues.append(str(exc))
+    range_spec: str | None = None
+    try:
+        range_spec = diff_range_against_base()
+    except RuntimeError as exc:
+        issues.append(str(exc))
+
     for path in files:
-        issues.extend(check_file(path, strict_status=path.resolve() in changed_paths))
+        changed = path.resolve() in changed_paths
+        requires_matrix = False
+        if changed and range_spec is not None:
+            requires_matrix = changed_use_case_content_outside_status(path, range_spec)
+        issues.extend(
+            check_file(
+                path,
+                strict_status=changed,
+                require_acceptance_matrix=requires_matrix,
+            )
+        )
     try:
         issues.extend(check_changed_stock_main_flow(files))
     except RuntimeError as exc:

@@ -68,6 +68,6 @@ browser, import `.dev-certs/rootCA.cer` into **Current User -> Trusted Root
 Certification Authorities** in Windows. Trusting only inside WSL is not enough
 for a Windows browser.
 
-Docker Playwright E2E installs `.dev-certs/rootCA.pem` into the test container
-OS trust store and Chromium NSS database before running browsers, so E2E tests
-do not use `ignoreHTTPSErrors`.
+Docker Playwright E2E passes `.dev-certs/rootCA.pem` to Node and imports it
+into Chromium's NSS database before running browsers, so E2E tests do not use
+`ignoreHTTPSErrors`.

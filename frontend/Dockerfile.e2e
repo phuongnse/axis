@@ -1,6 +1,17 @@
 # syntax=docker/dockerfile:1.7
 FROM mcr.microsoft.com/playwright:v1.61.0-noble
 
+WORKDIR /work/frontend
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libnss3-tools \
+    && mkdir -p /work/frontend/node_modules /home/pwuser/.npm /home/pwuser/.pki/nssdb \
+    && chown -R pwuser:pwuser /work /home/pwuser \
     && rm -rf /var/lib/apt/lists/*
+
+USER pwuser
+
+COPY --chown=pwuser:pwuser package.json package-lock.json ./
+RUN --mount=type=cache,target=/home/pwuser/.npm,uid=1001,gid=1001 npm ci
+
+COPY --chown=pwuser:pwuser . .

@@ -283,7 +283,6 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.e2e
     container_name: axis_e2e
-    user: root
     working_dir: /work/frontend
     network_mode: host
     depends_on:
@@ -298,25 +297,23 @@ services:
       E2E_API_URL: "https://localhost:5281"
       E2E_MAILDEV_URL: "http://localhost:1080"
       E2E_SKIP_WEB_SERVER: "1"
+      E2E_OUTPUT_DIR: "/tmp/axis-e2e/test-results"
+      E2E_REPORT_DIR: "/tmp/axis-e2e/playwright-report"
+      HOME: "/home/pwuser"
       PLAYWRIGHT_BROWSERS_PATH: "/ms-playwright"
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
     command:
       - sh
       - -lc
-      - "cp /https/rootCA.pem /usr/local/share/ca-certificates/axis-local-root.crt && update-ca-certificates && mkdir -p /root/.pki/nssdb && if [ ! -f /root/.pki/nssdb/cert9.db ]; then certutil -d sql:/root/.pki/nssdb -N --empty-password; fi && certutil -d sql:/root/.pki/nssdb -D -n axis-local-root >/dev/null 2>&1 || true && certutil -d sql:/root/.pki/nssdb -A -t 'C,,' -n axis-local-root -i /https/rootCA.pem && npm ci && node ./scripts/wait-for-e2e-targets.mjs && npm run test:e2e"
+      - "mkdir -p /home/pwuser/.pki/nssdb /tmp/axis-e2e/test-results /tmp/axis-e2e/playwright-report && if [ ! -f /home/pwuser/.pki/nssdb/cert9.db ]; then certutil -d sql:/home/pwuser/.pki/nssdb -N --empty-password; fi && certutil -d sql:/home/pwuser/.pki/nssdb -D -n axis-local-root >/dev/null 2>&1 || true && certutil -d sql:/home/pwuser/.pki/nssdb -A -t 'C,,' -n axis-local-root -i /https/rootCA.pem && node ./scripts/wait-for-e2e-targets.mjs && npm run test:e2e"
     volumes:
-      - ./frontend:/work/frontend
       - ./.dev-certs/rootCA.pem:/https/rootCA.pem:ro
-      - e2e_node_modules:/work/frontend/node_modules
-      - e2e_npm_cache:/root/.npm
 
 volumes:
   postgres_data:
   redis_data:
   localstack_data:
   web_node_modules:
-  e2e_node_modules:
-  e2e_npm_cache:
   nuget_packages:
   kafka_data:
   rabbitmq_data:

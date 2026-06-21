@@ -5,6 +5,7 @@ const targets = [
 
 const timeoutMs = Number(process.env.E2E_TARGET_TIMEOUT_MS ?? 120_000);
 const intervalMs = 1_000;
+const requestTimeoutMs = 2_000;
 const deadline = Date.now() + timeoutMs;
 
 function sleep(ms) {
@@ -16,8 +17,11 @@ function sleep(ms) {
 async function waitForTarget(name, url) {
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(url, { redirect: 'manual' });
-      if (response.status < 500) {
+      const response = await fetch(url, {
+        redirect: 'manual',
+        signal: AbortSignal.timeout(requestTimeoutMs),
+      });
+      if (response.ok) {
         console.log(`e2e target ready: ${name} (${url})`);
         return;
       }
