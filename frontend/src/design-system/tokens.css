@@ -1,0 +1,70 @@
+@layer base {
+  :root {
+    /* Axis control plane */
+    --background: 154 19% 96%;
+    --foreground: 202 17% 14%;
+    --card: 0 0% 100%;
+    --card-foreground: 202 17% 14%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 202 17% 14%;
+    --primary: 168 48% 24%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 194 22% 91%;
+    --secondary-foreground: 202 17% 14%;
+    --muted: 158 15% 91%;
+    --muted-foreground: 204 9% 43%;
+    --accent: 32 62% 48%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 5 56% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 194 14% 78%;
+    --input: 194 14% 78%;
+    --ring: 182 54% 33%;
+    --chart-1: 172 54% 34%;
+    --chart-2: 202 53% 43%;
+    --chart-3: 32 62% 48%;
+    --chart-4: 5 56% 45%;
+    --chart-5: 262 31% 45%;
+    --action-accent-border: 32 62% 40%;
+    --action-accent-shadow: 32 62% 32%;
+    --action-primary-shadow: 168 48% 16%;
+    --action-inverse-foreground: 174 25% 12%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 198 19% 9%;
+    --foreground: 0 0% 98%;
+    --card: 195 18% 12%;
+    --card-foreground: 0 0% 98%;
+    --popover: 195 18% 12%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 168 36% 54%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 195 13% 19%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 195 13% 19%;
+    --muted-foreground: 200 7% 64%;
+    --accent: 32 62% 51%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 5 60% 48%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 195 12% 24%;
+    --input: 195 12% 24%;
+    --ring: 168 36% 54%;
+    --chart-1: 168 36% 54%;
+    --chart-2: 202 53% 58%;
+    --chart-3: 32 62% 51%;
+    --chart-4: 5 60% 58%;
+    --chart-5: 262 36% 62%;
+    --action-accent-border: 32 62% 51%;
+    --action-accent-shadow: 32 62% 31%;
+    --action-primary-shadow: 168 36% 31%;
+    --action-inverse-foreground: 174 25% 12%;
+  }
+
+  .theme {
+    --font-heading: var(--font-sans);
+    --font-sans: "Geist Variable", sans-serif;
+  }
+}

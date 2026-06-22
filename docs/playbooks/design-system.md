@@ -52,6 +52,26 @@ Tokens are named by intent, not by current color or one screen. Raw values belon
 
 Token changes are design-system changes. They should not be bundled with unrelated feature behavior.
 
+## Token Export/Import Convention
+
+Penpot owns the approved design token decisions. Frontend code owns the executable token contract that components can consume.
+
+| File | Owns |
+|---|---|
+| `frontend/src/design-system/tokens.css` | Raw CSS variable values for light and dark themes |
+| `frontend/src/design-system/tokens.ts` | Typed token registry used by tests and future design-system tooling |
+| `frontend/tailwind.config.js` | Tailwind names that map to semantic CSS variables |
+
+When importing token updates from Penpot:
+
+1. Translate approved Penpot token names into the semantic CSS variable names in `tokens.css`.
+2. Update `tokens.ts` in the same change so tests know the complete token contract.
+3. Map only semantic color and radius tokens in `tailwind.config.js`; components should consume Tailwind token classes such as `bg-primary`, `text-muted-foreground`, `border-border`, and `rounded-md`.
+4. Use token-backed arbitrary values only when Tailwind has no first-class utility for the property, for example a shadow color sourced from `hsl(var(--action-primary-shadow))`.
+5. Keep raw hex, raw HSL, and one-off numeric values out of component files when a semantic token exists.
+
+Do not generate frontend tokens from unapproved design files. If a Penpot export changes a visual decision, treat that as design-system work and include the registry/test update in the same PR.
+
 ## Component Inventory
 
 Build the design system from primitives upward. A feature screen can use only components that exist in this inventory or are added to it in the same PR.

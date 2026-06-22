@@ -1268,7 +1268,7 @@ class TestFrontendRadiusTokens(unittest.TestCase):
     def issues_for_frontend(self, component_source: str, css_radius: str = "0.5rem") -> list[str]:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            css = root / "frontend" / "src" / "index.css"
+            css = root / "frontend" / "src" / "design-system" / "tokens.css"
             component = root / "frontend" / "src" / "components" / "Example.tsx"
             css.parent.mkdir(parents=True, exist_ok=True)
             component.parent.mkdir(parents=True, exist_ok=True)

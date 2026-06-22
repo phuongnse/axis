@@ -593,13 +593,15 @@ def check_frontend_api_contracts(_args: argparse.Namespace | None = None) -> int
 
 def frontend_radius_token_issues(root: Path = ROOT) -> list[str]:
     issues: list[str] = []
-    index_css = root / "frontend" / "src" / "index.css"
-    if not index_css.is_file():
-        return [f"{rel(index_css) if root == ROOT else index_css}: missing radius token source"]
+    token_css = root / "frontend" / "src" / "design-system" / "tokens.css"
+    if not token_css.is_file():
+        return [f"{rel(token_css) if root == ROOT else token_css}: missing radius token source"]
 
-    css = index_css.read_text(encoding="utf-8")
+    css = token_css.read_text(encoding="utf-8")
     if "--radius: 0.5rem;" not in css:
-        issues.append("frontend/src/index.css: --radius must stay 0.5rem (8px panel token)")
+        issues.append(
+            "frontend/src/design-system/tokens.css: --radius must stay 0.5rem (8px panel token)"
+        )
 
     src_root = root / "frontend" / "src"
     if not src_root.exists():
