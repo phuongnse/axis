@@ -36,6 +36,7 @@
 | [Code hygiene patterns](./playbooks/code-hygiene-patterns.md) | Pre-commit hygiene and policy regex constraints |
 | [Testing](./playbooks/testing.md) | Test isolation, naming, file layout, mocking rules — .NET and frontend |
 | [Frontend](./playbooks/frontend.md) | UX-first UI rules, TanStack Query patterns, TypeScript discipline, routing, component design |
+| [Design system](./playbooks/design-system.md) | Tokens, reusable components, pixel-perfect definition, and visual QA workflow |
 | [Wireframe kit](./playbooks/wireframes.md) | Screen generators, kit sections; **agents:** [spacing & blocks contract](./wireframes/README.md#agent-contract) |
 | [Visual artifact checklist](./playbooks/visual-artifact-checklist.md) | Required review checklist for diagrams/wireframes/use-case visuals before commit |
 | [Mermaid theme](./playbooks/mermaid.md) | One `%%{init}%%` for every diagram in `docs/` |
@@ -208,4 +209,5 @@ When two docs disagree, the **owner** wins. Update the owner first; everything e
 | Daily agent workflow + gates | [playbooks/agent-checklist.md](./playbooks/agent-checklist.md) |
 | Local dev (compose, ports, URLs, environment adapters) | [playbooks/local-dev.md](./playbooks/local-dev.md) + [`docker-compose.yml`](../docker-compose.yml) |
 | Implementation patterns and pitfalls | [playbooks/patterns-index.md](./playbooks/patterns-index.md) routes to the focused owner docs; [playbooks/patterns.md](./playbooks/patterns.md) is a compatibility router only |
+| Design-system tokens, component inventory, and pixel-perfect workflow | [playbooks/design-system.md](./playbooks/design-system.md) |
 | UI wireframes (per screen / use case) | `docs/use-cases/{domain}/{use-case}/README.md` → `## Wireframes` ([hub § Wireframes](./README.md#wireframes) for navigation only) |
