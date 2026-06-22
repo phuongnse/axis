@@ -854,7 +854,9 @@ def frontend_design_token_usage_issues(root: Path = ROOT) -> list[str]:
         r"\b(?:bg|text|border|from|via|to|ring|divide|placeholder|decoration|outline)-"
         r"(?:white|black|slate|gray|zinc|neutral|stone)(?:-\d{2,3})?(?:/[A-Za-z0-9.[\\]-]+)?\b"
     )
-    raw_shadow = re.compile(r"\b(?:shadow-(?:sm|md|lg|xl|2xl)|shadow-\[[^\]]+\])")
+    raw_shadow = re.compile(
+        r"(?<![-\w])(?:shadow(?![-\w])|shadow-(?:sm|md|lg|xl|2xl|inner|none|\[[^\]]+\]))"
+    )
     arbitrary_color = re.compile(
         r"\b(?:bg|text|border|from|via|to|ring|divide|placeholder|decoration|outline)-"
         r"\[(?:linear-gradient|radial-gradient|hsl|rgb|#)[^\]]+\]"

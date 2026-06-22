@@ -1567,6 +1567,11 @@ class TestFrontendDesignTokenUsage(unittest.TestCase):
 
         self.assertIn("use named shadow tokens", "\n".join(issues))
 
+    def test_rejects_bare_shadow_utility(self) -> None:
+        issues = self.issues_for_frontend("export const bad = 'shadow';\n")
+
+        self.assertIn("use named shadow tokens", "\n".join(issues))
+
     def test_rejects_arbitrary_color_and_gradient_values(self) -> None:
         issues = self.issues_for_frontend(
             "export const bad = 'bg-[linear-gradient(red,blue)] border-[hsl(var(--border))]';\n"
@@ -1576,7 +1581,14 @@ class TestFrontendDesignTokenUsage(unittest.TestCase):
 
     def test_accepts_semantic_token_utilities(self) -> None:
         issues = self.issues_for_frontend(
-            "export const ok = 'bg-card text-card-foreground border-border shadow-surface bg-gradient-inverse-panel';\n"
+            "export const ok = 'bg-card text-card-foreground border-border shadow-surface shadow-control shadow-accent-control shadow-panel shadow-feature-panel bg-gradient-inverse-panel';\n"
+        )
+
+        self.assertEqual([], issues)
+
+    def test_accepts_shadow_token_variable_names(self) -> None:
+        issues = self.issues_for_frontend(
+            "export const tokens = ['--action-accent-shadow', '--shadow-surface'];\n"
         )
 
         self.assertEqual([], issues)
