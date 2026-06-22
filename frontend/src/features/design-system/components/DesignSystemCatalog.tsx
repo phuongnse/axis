@@ -3,7 +3,9 @@ import {
   Check,
   CheckCircle2,
   ExternalLink,
+  Eye,
   LoaderCircle,
+  MoreHorizontal,
   Palette,
   Save,
   Search,
@@ -17,9 +19,12 @@ import { ActionLink } from '@/components/ui/action-link';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CheckboxField } from '@/components/ui/checkbox-field';
+import { FormField } from '@/components/ui/form-field';
+import { IconButton } from '@/components/ui/icon-button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 interface Swatch {
   label: string;
@@ -118,6 +123,10 @@ function ButtonMatrix() {
           <Trash2 className="size-4" aria-hidden />
           Remove
         </Button>
+        <Button type="button" variant="cta" isLoading loadingLabel="Saving">
+          <Save className="size-4" aria-hidden />
+          Saving
+        </Button>
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <Button type="button" size="xs" variant="outline">
@@ -137,6 +146,31 @@ function ButtonMatrix() {
           Disabled
         </Button>
       </div>
+    </div>
+  );
+}
+
+function IconButtonMatrix() {
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <IconButton type="button" icon={Search} label="Search catalog" />
+      <IconButton type="button" icon={Settings2} label="Configure catalog" variant="secondary" />
+      <IconButton type="button" icon={MoreHorizontal} label="More catalog actions" size="icon-sm" />
+      <IconButton
+        type="button"
+        icon={Trash2}
+        label="Remove item"
+        variant="destructive"
+        size="icon-lg"
+      />
+      <IconButton
+        type="button"
+        icon={Eye}
+        label="Preview catalog"
+        isLoading
+        loadingLabel="Loading preview"
+      />
+      <IconButton type="button" icon={ShieldAlert} label="Disabled attention state" disabled />
     </div>
   );
 }
@@ -179,42 +213,61 @@ function FormMatrix() {
   return (
     <div className="grid gap-5 lg:grid-cols-2">
       <div className="space-y-4 rounded-lg border border-border bg-card p-4">
-        <div className="space-y-2">
-          <Label htmlFor="catalog-name">Name</Label>
-          <Input id="catalog-name" defaultValue="Workflow designer" />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="catalog-search">Search</Label>
-          <div className="relative">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-              aria-hidden
+        <FormField id="catalog-name" label="Name" helpText="Use the short component name.">
+          {({ describedBy }) => (
+            <Input
+              id="catalog-name"
+              defaultValue="Workflow designer"
+              aria-describedby={describedBy}
             />
-            <Input id="catalog-search" className="pl-9" defaultValue="Button" />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="catalog-state">State</Label>
-          <Select id="catalog-state" defaultValue="ready">
-            <option value="ready">Ready</option>
-            <option value="loading">Loading</option>
-            <option value="error">Error</option>
-          </Select>
-        </div>
+          )}
+        </FormField>
+        <FormField id="catalog-search" label="Search">
+          {({ describedBy }) => (
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden
+              />
+              <Input
+                id="catalog-search"
+                className="pl-9"
+                defaultValue="Button"
+                aria-describedby={describedBy}
+              />
+            </div>
+          )}
+        </FormField>
+        <FormField id="catalog-state" label="State">
+          {({ describedBy }) => (
+            <Select id="catalog-state" defaultValue="ready" aria-describedby={describedBy}>
+              <option value="ready">Ready</option>
+              <option value="loading">Loading</option>
+              <option value="error">Error</option>
+            </Select>
+          )}
+        </FormField>
       </div>
       <div className="space-y-4 rounded-lg border border-border bg-card p-4">
-        <div className="space-y-2">
-          <Label htmlFor="catalog-invalid">Invalid field</Label>
-          <Input
-            id="catalog-invalid"
-            aria-invalid
-            defaultValue="missing-domain"
-            aria-describedby="catalog-invalid-error"
-          />
-          <p id="catalog-invalid-error" className="text-xs text-destructive">
-            Use a complete email address.
-          </p>
-        </div>
+        <FormField id="catalog-invalid" label="Invalid field" error="Use a complete email address.">
+          {({ describedBy }) => (
+            <Input
+              id="catalog-invalid"
+              aria-invalid
+              defaultValue="missing-domain"
+              aria-describedby={describedBy}
+            />
+          )}
+        </FormField>
+        <FormField id="catalog-notes" label="Notes" helpText="Long copy wraps inside the field.">
+          {({ describedBy }) => (
+            <Textarea
+              id="catalog-notes"
+              defaultValue="A reusable primitive should preserve height, focus, and readable line length across dense layouts."
+              aria-describedby={describedBy}
+            />
+          )}
+        </FormField>
         <CheckboxField id="catalog-terms" defaultChecked>
           Accept required terms
         </CheckboxField>
@@ -298,6 +351,10 @@ export function DesignSystemCatalog() {
 
         <CatalogSection title="Button" eyebrow="primitive-button">
           <ButtonMatrix />
+        </CatalogSection>
+
+        <CatalogSection title="Icon button" eyebrow="primitive-icon-button">
+          <IconButtonMatrix />
         </CatalogSection>
 
         <CatalogSection title="Action links" eyebrow="primitive-action-link">
