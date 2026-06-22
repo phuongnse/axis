@@ -9,8 +9,8 @@ interface HeaderRuleProps {
 
 const toneClass: Record<HeaderRuleTone, string> = {
   default: 'from-transparent via-border to-transparent',
-  inverted: 'from-white/0 via-white/15 to-white/0',
-  adaptive: 'from-transparent via-border to-transparent dark:via-white/15',
+  inverted: 'from-transparent via-inverse-border to-transparent',
+  adaptive: 'from-transparent via-border to-transparent dark:via-inverse-border',
 };
 
 export function HeaderRule({ tone = 'default', className }: HeaderRuleProps) {

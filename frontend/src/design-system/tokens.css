@@ -25,11 +25,53 @@
     --chart-3: 32 62% 48%;
     --chart-4: 5 56% 45%;
     --chart-5: 262 31% 45%;
+    --state-info: 202 53% 43%;
+    --state-info-foreground: 202 66% 20%;
+    --state-info-background: 202 53% 43% / 0.08;
+    --state-info-border: 202 53% 43% / 0.26;
+    --state-success: 154 50% 34%;
+    --state-success-foreground: 154 61% 21%;
+    --state-success-background: 154 50% 34% / 0.09;
+    --state-success-border: 154 50% 34% / 0.26;
+    --state-warning: 32 62% 48%;
+    --state-warning-foreground: 27 64% 24%;
+    --state-warning-background: 32 62% 48% / 0.1;
+    --state-warning-border: 32 62% 48% / 0.28;
     --action-accent-border: 32 62% 40%;
     --action-accent-shadow: 32 62% 32%;
     --action-primary-shadow: 168 48% 16%;
     --action-inverse-foreground: 174 25% 12%;
+    --inverse: 174 25% 12%;
+    --inverse-foreground: 0 0% 100%;
+    --inverse-muted: 0 0% 100% / 0.06;
+    --inverse-border: 0 0% 100% / 0.14;
+    --sidebar: 174 25% 12%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-muted: 0 0% 100% / 0.48;
+    --sidebar-border: 0 0% 100% / 0.1;
+    --sidebar-accent: 0 0% 100% / 0.1;
+    --sidebar-accent-foreground: 0 0% 100%;
     --radius: 0.5rem;
+    --space-form-gap: 1rem;
+    --space-section-gap: 1.5rem;
+    --space-page-padding: 2rem;
+    --size-control-xs: 1.5rem;
+    --size-control-sm: 1.75rem;
+    --size-control-md: 2rem;
+    --size-control-lg: 2.25rem;
+    --size-icon-sm: 0.875rem;
+    --size-icon-md: 1rem;
+    --size-icon-lg: 1.25rem;
+    --size-sidebar: 16rem;
+    --shadow-control: 0 1px 0 hsl(var(--action-primary-shadow));
+    --shadow-panel: 0 18px 55px hsl(198 24% 5% / 0.16);
+    --shadow-feature-panel: 0 22px 70px hsl(198 24% 5% / 0.14);
+    --motion-duration-fast: 150ms;
+    --motion-duration-standard: 200ms;
+    --motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+    --breakpoint-mobile: 360px;
+    --breakpoint-tablet: 768px;
+    --breakpoint-desktop: 1280px;
   }
 
   .dark {
@@ -57,14 +99,41 @@
     --chart-3: 32 62% 51%;
     --chart-4: 5 60% 58%;
     --chart-5: 262 36% 62%;
+    --state-info: 202 53% 58%;
+    --state-info-foreground: 202 78% 78%;
+    --state-info-background: 202 53% 58% / 0.13;
+    --state-info-border: 202 53% 58% / 0.3;
+    --state-success: 154 44% 56%;
+    --state-success-foreground: 154 63% 76%;
+    --state-success-background: 154 44% 56% / 0.13;
+    --state-success-border: 154 44% 56% / 0.3;
+    --state-warning: 32 62% 56%;
+    --state-warning-foreground: 32 78% 76%;
+    --state-warning-background: 32 62% 56% / 0.14;
+    --state-warning-border: 32 62% 56% / 0.32;
     --action-accent-border: 32 62% 51%;
     --action-accent-shadow: 32 62% 31%;
     --action-primary-shadow: 168 36% 31%;
     --action-inverse-foreground: 174 25% 12%;
+    --inverse: 174 25% 12%;
+    --inverse-foreground: 0 0% 100%;
+    --inverse-muted: 0 0% 100% / 0.06;
+    --inverse-border: 0 0% 100% / 0.14;
+    --sidebar: 174 25% 12%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-muted: 0 0% 100% / 0.48;
+    --sidebar-border: 0 0% 100% / 0.1;
+    --sidebar-accent: 0 0% 100% / 0.1;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --shadow-panel: 0 18px 55px hsl(198 35% 4% / 0.2);
+    --shadow-feature-panel: 0 22px 70px hsl(198 35% 5% / 0.24);
   }
 
   .theme {
     --font-heading: var(--font-sans);
     --font-sans: "Geist Variable", sans-serif;
+    --type-body-sm: 0.875rem / 1.5 var(--font-sans);
+    --type-label-xs: 0.75rem / 1.25 var(--font-sans);
+    --type-heading-md: 1.5rem / 1.2 var(--font-heading);
   }
 }

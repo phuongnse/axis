@@ -27,16 +27,7 @@ function LandingHeroPanel() {
   const { t } = useTranslation();
 
   return (
-    <section className="relative overflow-hidden rounded-lg border border-border/70 bg-card/95 text-foreground shadow-[0_22px_70px_hsl(198_24%_5%/0.14)] backdrop-blur dark:border-[hsl(174_18%_18%)] dark:bg-[linear-gradient(145deg,hsl(174_25%_12%),hsl(174_23%_9%))] dark:text-white dark:shadow-[0_22px_70px_hsl(198_35%_5%/0.24)]">
-      <div
-        className="absolute -left-20 top-10 size-64 rounded-full bg-primary/15 blur-3xl dark:bg-primary/10"
-        aria-hidden
-      />
-      <div
-        className="absolute -bottom-24 right-8 size-72 rounded-full bg-accent/10 blur-3xl"
-        aria-hidden
-      />
-
+    <section className="relative overflow-hidden rounded-lg border border-border/70 bg-card/95 text-foreground shadow-[var(--shadow-feature-panel)] backdrop-blur dark:border-inverse-border dark:bg-[linear-gradient(145deg,hsl(var(--inverse)),hsl(var(--background)))] dark:text-inverse-foreground">
       <div className="relative grid min-h-[460px] gap-8 p-7 sm:p-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center lg:p-10">
         <div className="max-w-xl space-y-10">
           <BrandHeader label={t('landing.accessLabel')} tone="adaptive" />
@@ -45,7 +36,7 @@ function LandingHeroPanel() {
             <h1 className="max-w-xl text-2xl font-semibold leading-[1.12] tracking-tight sm:text-3xl lg:text-[2.5rem] lg:leading-[1.08]">
               {t('landing.heroTitle')}
             </h1>
-            <p className="max-w-md text-sm leading-6 text-muted-foreground dark:text-white/60">
+            <p className="max-w-md text-sm leading-6 text-muted-foreground dark:text-inverse-muted">
               {t('landing.heroBody')}
             </p>
           </div>
@@ -53,7 +44,7 @@ function LandingHeroPanel() {
           <LandingActions />
         </div>
 
-        <div className="border-t border-border/70 pt-7 dark:border-white/10 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
+        <div className="border-t border-border/70 pt-7 dark:border-inverse-border lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
           <GatewayPreview />
         </div>
       </div>
@@ -67,7 +58,7 @@ function GatewayPreview() {
   return (
     <div className="relative w-full">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground dark:text-white/45">
+        <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground dark:text-inverse-muted">
           {t('landing.accessPath')}
         </p>
         <LockKeyhole className="size-4 text-primary" aria-hidden />

@@ -49,6 +49,40 @@ export default {
           4: 'hsl(var(--chart-4))',
           5: 'hsl(var(--chart-5))',
         },
+        state: {
+          info: {
+            DEFAULT: 'hsl(var(--state-info))',
+            foreground: 'hsl(var(--state-info-foreground))',
+            background: 'hsl(var(--state-info-background))',
+            border: 'hsl(var(--state-info-border))',
+          },
+          success: {
+            DEFAULT: 'hsl(var(--state-success))',
+            foreground: 'hsl(var(--state-success-foreground))',
+            background: 'hsl(var(--state-success-background))',
+            border: 'hsl(var(--state-success-border))',
+          },
+          warning: {
+            DEFAULT: 'hsl(var(--state-warning))',
+            foreground: 'hsl(var(--state-warning-foreground))',
+            background: 'hsl(var(--state-warning-background))',
+            border: 'hsl(var(--state-warning-border))',
+          },
+        },
+        inverse: {
+          DEFAULT: 'hsl(var(--inverse))',
+          foreground: 'hsl(var(--inverse-foreground))',
+          muted: 'hsl(var(--inverse-muted))',
+          border: 'hsl(var(--inverse-border))',
+        },
+        sidebar: {
+          DEFAULT: 'hsl(var(--sidebar))',
+          foreground: 'hsl(var(--sidebar-foreground))',
+          muted: 'hsl(var(--sidebar-muted))',
+          border: 'hsl(var(--sidebar-border))',
+          accent: 'hsl(var(--sidebar-accent))',
+          'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
+        },
       },
       borderRadius: {
         lg: 'var(--radius)',

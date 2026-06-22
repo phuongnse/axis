@@ -25,14 +25,16 @@ const actionLinkClass: Record<ActionLinkSurface, Record<ActionLinkVariant, strin
       'border-border bg-background text-foreground hover:bg-muted hover:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50',
   },
   inverted: {
-    primary: 'border-white bg-white text-[hsl(var(--action-inverse-foreground))] hover:bg-white/90',
-    secondary: 'border-white/20 bg-white/[0.06] text-white hover:bg-white/10',
+    primary:
+      'border-inverse-foreground bg-inverse-foreground text-inverse hover:bg-inverse-foreground/90',
+    secondary:
+      'border-inverse-border bg-inverse-muted text-inverse-foreground hover:bg-inverse-muted',
   },
   adaptive: {
     primary:
-      'border-[hsl(var(--action-accent-border))] bg-accent text-accent-foreground shadow-[0_1px_0_hsl(var(--action-accent-shadow))] hover:bg-accent/90 dark:border-white dark:bg-white dark:text-[hsl(var(--action-inverse-foreground))] dark:hover:bg-white/90',
+      'border-[hsl(var(--action-accent-border))] bg-accent text-accent-foreground shadow-[0_1px_0_hsl(var(--action-accent-shadow))] hover:bg-accent/90 dark:border-inverse-foreground dark:bg-inverse-foreground dark:text-inverse dark:hover:bg-inverse-foreground/90',
     secondary:
-      'border-border bg-background text-foreground hover:bg-muted hover:text-foreground dark:border-white/20 dark:bg-white/[0.06] dark:text-white dark:hover:bg-white/10',
+      'border-border bg-background text-foreground hover:bg-muted hover:text-foreground dark:border-inverse-border dark:bg-inverse-muted dark:text-inverse-foreground dark:hover:bg-inverse-muted',
   },
 };
 

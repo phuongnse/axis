@@ -3,8 +3,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  axisBreakpointTokens,
+  axisMotionTokens,
   axisRadiusTokens,
   axisSemanticColorTokens,
+  axisShadowTokens,
+  axisSizingTokens,
+  axisSpacingTokens,
   axisTailwindColorTokens,
   axisTailwindRadiusTokens,
   axisTypographyTokens,
@@ -93,7 +98,14 @@ describe('Axis design tokens', () => {
     const lightTokens = cssBlock(':root');
     const themeTokens = cssBlock('.theme');
 
-    for (const token of axisRadiusTokens) {
+    for (const token of [
+      ...axisRadiusTokens,
+      ...axisSpacingTokens,
+      ...axisSizingTokens,
+      ...axisShadowTokens,
+      ...axisMotionTokens,
+      ...axisBreakpointTokens,
+    ]) {
       expect(lightTokens).toContain(`${token}:`);
     }
 

@@ -16,6 +16,7 @@ import { useVerifyEmail } from '@/features/auth/hooks/useVerifyEmail';
 import { loadRegistrationContext } from '@/features/auth/registration-context';
 import type { VerifyEmailErrorKind } from '@/features/auth/types';
 import { useQueryParam } from '@/features/auth/use-query-param';
+import { cn } from '@/lib/utils';
 
 function createResendSchema(t: TFunction) {
   return z.object({
@@ -54,7 +55,7 @@ function VerifyEmailOutcome({
       icon: Clock,
       title: t('verifyEmail.expiredTitle'),
       body: t('verifyEmail.expiredBody'),
-      iconClass: 'text-amber-600 bg-amber-500/10',
+      iconClass: 'bg-state-warning-background text-state-warning-foreground',
     },
     already_used: {
       icon: CheckCircle2,
@@ -72,7 +73,7 @@ function VerifyEmailOutcome({
       icon: Clock,
       title: t('verifyEmail.rateLimitedTitle'),
       body: t('verifyEmail.rateLimitedBody'),
-      iconClass: 'text-amber-600 bg-amber-500/10',
+      iconClass: 'bg-state-warning-background text-state-warning-foreground',
     },
   }[kind];
 
@@ -99,7 +100,10 @@ function VerifyEmailOutcome({
       <div className="space-y-4">
         <div className="flex items-start gap-3">
           <div
-            className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${config.iconClass}`}
+            className={cn(
+              'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
+              config.iconClass,
+            )}
           >
             <Icon className="h-4 w-4" aria-hidden />
           </div>

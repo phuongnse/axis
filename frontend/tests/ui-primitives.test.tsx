@@ -1,9 +1,13 @@
 import { render, screen } from '@testing-library/react';
-import { Search } from 'lucide-react';
+import { Inbox, Search } from 'lucide-react';
 import { describe, expect, it } from 'vitest';
 
+import { Badge } from '../src/components/ui/badge';
 import { CheckboxField } from '../src/components/ui/checkbox-field';
+import { EmptyState } from '../src/components/ui/empty-state';
 import { IconButton } from '../src/components/ui/icon-button';
+import { Notice } from '../src/components/ui/notice';
+import { Progress } from '../src/components/ui/progress';
 import { Textarea } from '../src/components/ui/textarea';
 
 describe('IconButton', () => {
@@ -51,5 +55,62 @@ describe('CheckboxField', () => {
     const checkbox = screen.getByLabelText('Terms');
     expect(checkbox).toHaveAttribute('aria-invalid', 'true');
     expect(checkbox).toHaveAccessibleDescription('Accept terms before continuing.');
+  });
+});
+
+describe('Notice', () => {
+  it('uses alert semantics for warning and error feedback', () => {
+    render(
+      <Notice variant="warning" title="Needs review">
+        Check the required fields.
+      </Notice>,
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Needs review');
+  });
+
+  it('uses status semantics for informational feedback', () => {
+    render(
+      <Notice variant="success" title="Ready">
+        Workspace is active.
+      </Notice>,
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent('Workspace is active.');
+  });
+});
+
+describe('Badge', () => {
+  it('renders compact status text', () => {
+    render(<Badge variant="success">Stable</Badge>);
+
+    expect(screen.getByText('Stable')).toBeInTheDocument();
+  });
+});
+
+describe('Progress', () => {
+  it('keeps a determinate value accessible', () => {
+    render(<Progress value={42} aria-label="Storage used" />);
+
+    const progress = screen.getByLabelText('Storage used');
+    expect(progress).toHaveAttribute('value', '42');
+    expect(progress).toHaveAttribute('max', '100');
+  });
+});
+
+describe('EmptyState', () => {
+  it('renders a user-actionable empty state', () => {
+    render(
+      <EmptyState
+        icon={Inbox}
+        title="No records yet"
+        description="Create the first record when the model is ready."
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'No records yet' })).toBeInTheDocument();
+    expect(
+      screen.getByText('Create the first record when the model is ready.'),
+    ).toBeInTheDocument();
   });
 });

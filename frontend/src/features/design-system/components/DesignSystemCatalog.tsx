@@ -1,9 +1,12 @@
 import {
+  AlertTriangle,
   ArrowRight,
   Check,
   CheckCircle2,
   ExternalLink,
   Eye,
+  Inbox,
+  Layers3,
   LoaderCircle,
   MoreHorizontal,
   Palette,
@@ -16,15 +19,25 @@ import {
 import type { ReactNode } from 'react';
 
 import { ActionLink } from '@/components/ui/action-link';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CheckboxField } from '@/components/ui/checkbox-field';
+import { ContentGrid } from '@/components/ui/content-grid';
+import { EmptyState } from '@/components/ui/empty-state';
 import { FormField } from '@/components/ui/form-field';
 import { IconButton } from '@/components/ui/icon-button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Notice } from '@/components/ui/notice';
+import { PageHeader } from '@/components/ui/page-header';
+import { Panel } from '@/components/ui/panel';
+import { Progress } from '@/components/ui/progress';
 import { Select } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
+import { Toolbar } from '@/components/ui/toolbar';
 
 interface Swatch {
   label: string;
@@ -53,6 +66,40 @@ const chartSwatches: Swatch[] = [
   { label: 'Chart 3', className: 'bg-chart-3', textClassName: 'text-white' },
   { label: 'Chart 4', className: 'bg-chart-4', textClassName: 'text-white' },
   { label: 'Chart 5', className: 'bg-chart-5', textClassName: 'text-white' },
+];
+
+const stateSwatches: Swatch[] = [
+  {
+    label: 'Info',
+    className: 'bg-state-info-background',
+    textClassName: 'text-state-info-foreground',
+  },
+  {
+    label: 'Success',
+    className: 'bg-state-success-background',
+    textClassName: 'text-state-success-foreground',
+  },
+  {
+    label: 'Warning',
+    className: 'bg-state-warning-background',
+    textClassName: 'text-state-warning-foreground',
+  },
+  {
+    label: 'Danger',
+    className: 'bg-destructive/10',
+    textClassName: 'text-destructive',
+  },
+];
+
+const surfaceSwatches: Swatch[] = [
+  { label: 'Inverse', className: 'bg-inverse', textClassName: 'text-inverse-foreground' },
+  { label: 'Sidebar', className: 'bg-sidebar', textClassName: 'text-sidebar-foreground' },
+  {
+    label: 'Sidebar Accent',
+    className: 'bg-sidebar-accent',
+    textClassName: 'text-sidebar-foreground',
+  },
+  { label: 'Inverse Muted', className: 'bg-inverse-muted', textClassName: 'text-foreground' },
 ];
 
 function CatalogSection({
@@ -187,8 +234,8 @@ function ActionLinkMatrix() {
           Secondary link
         </ActionLink>
       </div>
-      <div className="space-y-3 rounded-lg border border-border bg-[hsl(var(--action-inverse-foreground))] p-4">
-        <p className="text-sm font-medium text-white">Inverted surface</p>
+      <div className="space-y-3 rounded-lg border border-inverse-border bg-inverse p-4">
+        <p className="text-sm font-medium text-inverse-foreground">Inverted surface</p>
         <ActionLink to="/" icon={ArrowRight} surface="inverted">
           Start flow
         </ActionLink>
@@ -196,8 +243,10 @@ function ActionLinkMatrix() {
           Learn more
         </ActionLink>
       </div>
-      <div className="space-y-3 rounded-lg border border-border bg-card p-4 dark:bg-[hsl(var(--action-inverse-foreground))]">
-        <p className="text-sm font-medium text-foreground dark:text-white">Adaptive surface</p>
+      <div className="space-y-3 rounded-lg border border-border bg-card p-4 dark:border-inverse-border dark:bg-inverse">
+        <p className="text-sm font-medium text-foreground dark:text-inverse-foreground">
+          Adaptive surface
+        </p>
         <ActionLink to="/" icon={ArrowRight} surface="adaptive">
           Primary action
         </ActionLink>
@@ -318,6 +367,128 @@ function ThemePreview() {
   );
 }
 
+function FeedbackMatrix() {
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-3 lg:grid-cols-2">
+        <Notice variant="info" title="Information">
+          Connection settings were saved and are ready for the next run.
+        </Notice>
+        <Notice variant="success" title="Ready">
+          The workspace profile is active and available.
+        </Notice>
+        <Notice variant="warning" title="Needs review">
+          Check the required fields before publishing this workflow.
+        </Notice>
+        <Notice variant="error" title="Unable to load">
+          Retry after the service is reachable again.
+        </Notice>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Badge variant="primary">Primary</Badge>
+        <Badge variant="accent">Accent</Badge>
+        <Badge variant="info">Info</Badge>
+        <Badge variant="success">Success</Badge>
+        <Badge variant="warning">Warning</Badge>
+        <Badge variant="destructive">Danger</Badge>
+        <Badge variant="outline">Outline</Badge>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Panel className="space-y-3">
+          <p className="text-sm font-medium text-foreground">Progress</p>
+          <Progress value={62} aria-label="Catalog progress example" />
+          <Progress value={100} isIndeterminate aria-label="Catalog indeterminate example" />
+        </Panel>
+        <Panel className="space-y-3">
+          <p className="text-sm font-medium text-foreground">Skeleton</p>
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-4 w-2/3" />
+        </Panel>
+      </div>
+    </div>
+  );
+}
+
+function StructureMatrix() {
+  return (
+    <div className="grid gap-4 lg:grid-cols-3">
+      <Card>
+        <CardHeader>
+          <CardTitle>Card title</CardTitle>
+          <CardDescription>Reusable card anatomy for compact work surfaces.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Badge variant="success">Stable</Badge>
+        </CardContent>
+      </Card>
+      <Panel variant="muted" className="space-y-3">
+        <Layers3 className="size-5 text-primary" aria-hidden />
+        <p className="text-sm font-medium text-foreground">Muted panel</p>
+        <p className="text-sm leading-6 text-muted-foreground">
+          Panels frame operational state without page-local geometry.
+        </p>
+      </Panel>
+      <EmptyState
+        icon={Inbox}
+        title="No records yet"
+        description="Create the first item when the owning workflow is ready."
+        action={
+          <Button type="button" variant="outline" size="sm">
+            <ArrowRight className="size-3.5" aria-hidden />
+            Open
+          </Button>
+        }
+      />
+    </div>
+  );
+}
+
+function LayoutMatrix() {
+  return (
+    <div className="space-y-4">
+      <PageHeader
+        eyebrow="Workspace"
+        title="Operations overview"
+        description="A compact header keeps the title, supporting state, and actions aligned."
+        actions={
+          <Button type="button" variant="outline" size="sm">
+            <Settings2 className="size-3.5" aria-hidden />
+            Configure
+          </Button>
+        }
+      />
+      <Toolbar>
+        <Button type="button" variant="ghost" size="sm">
+          <Search className="size-3.5" aria-hidden />
+          Search
+        </Button>
+        <Button type="button" variant="ghost" size="sm">
+          <AlertTriangle className="size-3.5" aria-hidden />
+          Filter
+        </Button>
+        <IconButton
+          type="button"
+          icon={MoreHorizontal}
+          label="More layout actions"
+          size="icon-sm"
+        />
+      </Toolbar>
+      <ContentGrid>
+        <Panel variant="inset" className="p-4">
+          <p className="text-sm font-medium text-foreground">First panel</p>
+        </Panel>
+        <Panel variant="inset" className="p-4">
+          <p className="text-sm font-medium text-foreground">Second panel</p>
+        </Panel>
+        <Panel variant="inset" className="p-4">
+          <p className="text-sm font-medium text-foreground">Third panel</p>
+        </Panel>
+      </ContentGrid>
+    </div>
+  );
+}
+
 export function DesignSystemCatalog() {
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -346,6 +517,8 @@ export function DesignSystemCatalog() {
           <div className="space-y-4">
             <SwatchGrid swatches={semanticSwatches} />
             <SwatchGrid swatches={chartSwatches} />
+            <SwatchGrid swatches={stateSwatches} />
+            <SwatchGrid swatches={surfaceSwatches} />
           </div>
         </CatalogSection>
 
@@ -367,6 +540,18 @@ export function DesignSystemCatalog() {
 
         <CatalogSection title="Theme coverage" eyebrow="theme-coverage">
           <ThemePreview />
+        </CatalogSection>
+
+        <CatalogSection title="Feedback" eyebrow="feedback">
+          <FeedbackMatrix />
+        </CatalogSection>
+
+        <CatalogSection title="Structure and data" eyebrow="structure-data">
+          <StructureMatrix />
+        </CatalogSection>
+
+        <CatalogSection title="Layout" eyebrow="layout">
+          <LayoutMatrix />
         </CatalogSection>
 
         <CatalogSection title="State language" eyebrow="state-language">

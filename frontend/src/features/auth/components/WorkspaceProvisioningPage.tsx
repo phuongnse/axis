@@ -3,7 +3,9 @@ import type { TFunction } from 'i18next';
 import { AlertCircle, Database, Loader2, RefreshCw, ShieldCheck, Workflow } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Panel } from '@/components/ui/panel';
 import { FlowTrace, type FlowTraceState, type FlowTraceStep } from '@/components/visual/FlowTrace';
 import { AuthCard } from '@/features/auth/components/AuthCard';
 import { useProvisioningStatus } from '@/features/auth/hooks/useProvisioningStatus';
@@ -151,16 +153,9 @@ export function WorkspaceProvisioningPage() {
               </p>
               <p className="mt-1 text-sm font-medium text-foreground">{WorkspaceName}</p>
             </div>
-            <span
-              className={cn(
-                'border px-2 py-1 text-xs font-medium',
-                failed
-                  ? 'border-destructive/25 bg-destructive/10 text-destructive'
-                  : 'border-primary/20 bg-primary/10 text-primary',
-              )}
-            >
+            <Badge variant={failed ? 'destructive' : 'primary'}>
               {failed ? t('provisioning.blocked') : t('provisioning.running')}
-            </span>
+            </Badge>
           </div>
 
           <FlowTrace steps={trace} />
@@ -172,7 +167,7 @@ export function WorkspaceProvisioningPage() {
           ) : null}
 
           {failed ? (
-            <div className="space-y-3 rounded-md border border-destructive/20 bg-destructive/5 p-4 text-sm">
+            <Panel variant="attention" className="space-y-3 rounded-md p-4 text-sm">
               <p className="text-muted-foreground">{t('provisioning.exhausted')}</p>
               <Button
                 type="button"
@@ -197,7 +192,7 @@ export function WorkspaceProvisioningPage() {
                   {t('provisioning.contactSupport')}
                 </a>
               </p>
-            </div>
+            </Panel>
           ) : null}
         </div>
       </section>
