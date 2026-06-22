@@ -42,4 +42,17 @@ describe('Button', () => {
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute('aria-label', 'test-label');
   });
+
+  it('should expose loading state as disabled busy feedback', () => {
+    render(
+      <Button data-testid="btn" isLoading loadingLabel="Saving">
+        Save changes
+      </Button>,
+    );
+
+    const button = screen.getByTestId('btn');
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    expect(button).toHaveTextContent('Saving');
+  });
 });

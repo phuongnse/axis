@@ -105,6 +105,19 @@ Every component entry should document:
 
 If a variant is not documented, do not infer it from a one-off screen.
 
+## Primitive Contracts
+
+The first shared primitive contract covers the controls already proven in the catalog. Keep this table updated before using a new primitive broadly in migrated screens.
+
+| Component | Purpose | Variants and states | Accessibility | Token map | Visual QA targets |
+|---|---|---|---|---|---|
+| `Button` | Visible command with required icon support | `cta`, `default`, `outline`, `secondary`, `ghost`, `destructive`, `link`; `xs`, `sm`, `default`, `lg`, icon sizes; disabled, loading, invalid, focus-visible | Native button semantics through Base UI; loading sets `aria-busy` and disables interaction | `bg-primary`, `bg-accent`, `bg-secondary`, `bg-destructive`, `border-border`, `ring-ring`, `rounded-md` | `primitive-button` desktop screenshot |
+| `IconButton` | Icon-only command for dense tool surfaces | Shared button variants; icon sizes; disabled and loading | Requires `label`; label becomes the accessible name; loading label replaces the action label while busy | Same button tokens; icon size utilities only | `primitive-icon-button` smoke target |
+| `ActionLink` | Navigation CTA on public/auth surfaces | `primary`, `secondary`; `default`, `inverted`, `adaptive` surfaces | Renders TanStack Router `Link`; icon is decorative and text remains the accessible name | `bg-accent`, `text-accent-foreground`, `border-border`, inverse action tokens | `primitive-action-link` smoke target |
+| `Input`, `Textarea`, `Select` | Text, long text, and option input | Default, disabled, invalid, focus-visible, long-copy wrapping | Requires `Label` or `aria-label`; invalid state uses `aria-invalid`; descriptions flow through `FormField` | `bg-background`, `border-input`, `ring-ring`, `text-foreground`, `text-muted-foreground`, `rounded-md` | `primitive-form` desktop and mobile screenshots |
+| `Checkbox`, `CheckboxField` | Binary choice with optional validation | Checked, unchecked, disabled, invalid | `CheckboxField` links label and error copy through `aria-describedby` | `accent-primary`, `border-input`, `ring-ring`, `text-destructive`, `rounded-sm` | `primitive-form` desktop and mobile screenshots |
+| `FormField` | Label, help text, description IDs, and error copy wrapper | Help text, error, externally supplied description IDs | Provides deterministic `aria-describedby` IDs to child controls | `text-muted-foreground`, `text-primary`, `text-destructive` | `primitive-form` desktop and mobile screenshots |
+
 ## Component Catalog
 
 Use the frontend catalog route as the first visual QA harness:
