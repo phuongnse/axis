@@ -105,6 +105,21 @@ Every component entry should document:
 
 If a variant is not documented, do not infer it from a one-off screen.
 
+## Component Catalog
+
+Use the frontend catalog route as the first visual QA harness:
+
+| Decision | Rule |
+|---|---|
+| Route | `frontend/src/routes/design-system.lazy.tsx` exposes `/design-system` |
+| Catalog owner | `frontend/src/features/design-system/` |
+| Storybook | Deferred until the route catalog cannot cover an expected component-review workflow |
+| Visual targets | Catalog sections include stable `data-visual-target` values for Playwright smoke checks and future screenshot baselines |
+| Navigation | Keep the catalog hidden from product navigation until there is an explicit internal-tools shell |
+
+The catalog route is an implementation and verification surface, not a product workflow. Use it to prove token, theme, state, and primitive-component coverage before migrating legacy screens.
+Run `npm run test:e2e -- design-system-catalog.pw.ts` from `frontend/` for local smoke coverage after installing Playwright browsers and native dependencies with `npx playwright install chromium` and `npx playwright install-deps chromium`.
+
 ## Implementation Rules
 
 - Add or update tokens before component styles that need those values.
