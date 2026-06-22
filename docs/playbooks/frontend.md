@@ -145,6 +145,7 @@ export const workflowKeys = {
 - **Tailwind only** — no inline `style` prop.
 - **`cn()` for conditional classes** — never string concatenation.
 - Do not mix Tailwind utility classes and custom CSS on the same element.
+- Consume design tokens through Tailwind classes wired in `frontend/tailwind.config.js`; for token ownership and update workflow, follow [design-system.md](./design-system.md#token-exportimport-convention).
 - Use Tailwind opacity modifiers from the standard scale only: `/0`, `/5`, `/10`, ..., `/100` and `opacity-0`, `opacity-5`, ..., `opacity-100`. If a non-scale value is truly needed, use bracket syntax such as `/[0.28]`; bare values like `/28` or `opacity-58` can compile to no CSS and hide UI.
 - `python scripts/axis.py check frontend-style` is the shared style gate. It currently enforces radius tokens and Tailwind opacity modifier syntax; add future objective style checks there instead of creating narrowly named gates.
 
