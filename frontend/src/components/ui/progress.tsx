@@ -23,7 +23,7 @@ function Progress({
         isIndeterminate && 'opacity-40',
         className,
       )}
-      value={isIndeterminate ? max : value}
+      value={isIndeterminate ? undefined : value}
       max={max}
       {...props}
     />

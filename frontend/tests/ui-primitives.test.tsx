@@ -96,6 +96,14 @@ describe('Progress', () => {
     expect(progress).toHaveAttribute('value', '42');
     expect(progress).toHaveAttribute('max', '100');
   });
+
+  it('omits value for indeterminate progress semantics', () => {
+    render(<Progress isIndeterminate value={42} aria-label="Syncing workspace" />);
+
+    const progress = screen.getByLabelText('Syncing workspace');
+    expect(progress).not.toHaveAttribute('value');
+    expect(progress).toHaveAttribute('max', '100');
+  });
 });
 
 describe('EmptyState', () => {
