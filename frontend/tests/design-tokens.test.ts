@@ -4,20 +4,25 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   axisBreakpointTokens,
+  axisGradientTokens,
   axisMotionTokens,
   axisRadiusTokens,
   axisSemanticColorTokens,
   axisShadowTokens,
   axisSizingTokens,
   axisSpacingTokens,
+  axisTailwindBackgroundImageTokens,
   axisTailwindColorTokens,
   axisTailwindRadiusTokens,
+  axisTailwindShadowTokens,
   axisTypographyTokens,
 } from '../src/design-system/tokens';
 import tailwindConfig from '../tailwind.config.js';
 
 type TokenTree = string | { readonly [key: string]: TokenTree };
 type TailwindExtend = {
+  backgroundImage?: unknown;
+  boxShadow?: unknown;
   colors?: unknown;
   borderRadius?: unknown;
 };
@@ -103,6 +108,7 @@ describe('Axis design tokens', () => {
       ...axisSpacingTokens,
       ...axisSizingTokens,
       ...axisShadowTokens,
+      ...axisGradientTokens,
       ...axisMotionTokens,
       ...axisBreakpointTokens,
     ]) {
@@ -123,6 +129,18 @@ describe('Axis design tokens', () => {
   it('maps Tailwind radius names to the shared radius token', () => {
     for (const [radiusName, tokenValue] of Object.entries(axisTailwindRadiusTokens)) {
       expect(readPath(tailwindExtend.borderRadius, [radiusName])).toBe(tokenValue);
+    }
+  });
+
+  it('maps Tailwind shadow names to shadow tokens', () => {
+    for (const [shadowName, tokenValue] of Object.entries(axisTailwindShadowTokens)) {
+      expect(readPath(tailwindExtend.boxShadow, [shadowName])).toBe(tokenValue);
+    }
+  });
+
+  it('maps Tailwind background image names to gradient tokens', () => {
+    for (const [backgroundName, tokenValue] of Object.entries(axisTailwindBackgroundImageTokens)) {
+      expect(readPath(tailwindExtend.backgroundImage, [backgroundName])).toBe(tokenValue);
     }
   });
 });

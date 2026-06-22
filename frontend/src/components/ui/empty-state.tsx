@@ -14,7 +14,10 @@ interface EmptyStateProps {
 function EmptyState({ icon: Icon, title, description, action, className }: EmptyStateProps) {
   return (
     <div
-      className={cn('rounded-lg border border-border bg-card p-6 text-center shadow-sm', className)}
+      className={cn(
+        'rounded-lg border border-border bg-card p-6 text-center shadow-surface',
+        className,
+      )}
     >
       <span className="mx-auto inline-flex size-10 items-center justify-center rounded-md border border-border bg-muted text-muted-foreground">
         <Icon className="size-5" aria-hidden />

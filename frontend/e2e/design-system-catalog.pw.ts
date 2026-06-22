@@ -24,6 +24,14 @@ test.describe('design system catalog', () => {
       'primitive-button-desktop.png',
       screenshotOptions,
     );
+    await expect(page.locator('[data-visual-target="primitive-icon-button"]')).toHaveScreenshot(
+      'primitive-icon-button-desktop.png',
+      screenshotOptions,
+    );
+    await expect(page.locator('[data-visual-target="primitive-action-link"]')).toHaveScreenshot(
+      'primitive-action-link-desktop.png',
+      screenshotOptions,
+    );
     await expect(page.locator('[data-visual-target="primitive-form"]')).toHaveScreenshot(
       'primitive-form-desktop.png',
       screenshotOptions,

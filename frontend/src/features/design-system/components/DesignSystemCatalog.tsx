@@ -61,11 +61,11 @@ const semanticSwatches: Swatch[] = [
 ];
 
 const chartSwatches: Swatch[] = [
-  { label: 'Chart 1', className: 'bg-chart-1', textClassName: 'text-white' },
-  { label: 'Chart 2', className: 'bg-chart-2', textClassName: 'text-white' },
-  { label: 'Chart 3', className: 'bg-chart-3', textClassName: 'text-white' },
-  { label: 'Chart 4', className: 'bg-chart-4', textClassName: 'text-white' },
-  { label: 'Chart 5', className: 'bg-chart-5', textClassName: 'text-white' },
+  { label: 'Chart 1', className: 'bg-chart-1', textClassName: 'text-chart-foreground' },
+  { label: 'Chart 2', className: 'bg-chart-2', textClassName: 'text-chart-foreground' },
+  { label: 'Chart 3', className: 'bg-chart-3', textClassName: 'text-chart-foreground' },
+  { label: 'Chart 4', className: 'bg-chart-4', textClassName: 'text-chart-foreground' },
+  { label: 'Chart 5', className: 'bg-chart-5', textClassName: 'text-chart-foreground' },
 ];
 
 const stateSwatches: Swatch[] = [
@@ -132,7 +132,7 @@ function SwatchGrid({ swatches }: { swatches: Swatch[] }) {
       {swatches.map((swatch) => (
         <div
           key={swatch.label}
-          className="overflow-hidden rounded-lg border border-border bg-card shadow-sm"
+          className="overflow-hidden rounded-lg border border-border bg-card shadow-surface"
         >
           <div className={`flex h-24 items-end p-3 ${swatch.className} ${swatch.textClassName}`}>
             <span className="text-sm font-medium">{swatch.label}</span>

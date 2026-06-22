@@ -1407,11 +1407,71 @@ class TestFrontendComponentComposition(unittest.TestCase):
                     "export function CustomControl() {\n"
                     "  return <button type=\"button\"><input /></button>;\n"
                     "}\n"
-                )
+                ),
+                "frontend/src/design-system/primitive-contracts.ts": (
+                    "export const axisPrimitiveContracts = [{\n"
+                    "  component: 'CustomControl',\n"
+                    "  file: 'frontend/src/components/ui/custom-control.tsx',\n"
+                    "  catalogTargets: ['primitive-custom-control'],\n"
+                    "  visualTargets: ['primitive-custom-control'],\n"
+                    "  testFiles: ['frontend/tests/custom-control.test.tsx'],\n"
+                    "}];\n"
+                ),
+                "frontend/src/features/design-system/components/DesignSystemCatalog.tsx": (
+                    "export const target = 'primitive-custom-control';\n"
+                ),
+                "frontend/e2e/design-system-catalog.pw.ts": (
+                    "await expect(page.locator('[data-visual-target=\"primitive-custom-control\"]'))"
+                    ".toHaveScreenshot('primitive-custom-control-desktop.png');\n"
+                ),
+                "frontend/tests/custom-control.test.tsx": "export {};\n",
             }
         )
 
         self.assertEqual([], issues)
+
+    def test_rejects_ui_primitive_without_contract(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/components/ui/custom-control.tsx": (
+                    "export function CustomControl() {\n"
+                    "  return <button type=\"button\" />;\n"
+                    "}\n"
+                ),
+                "frontend/src/design-system/primitive-contracts.ts": (
+                    "export const axisPrimitiveContracts = [];\n"
+                ),
+            }
+        )
+
+        self.assertIn("UI primitive must be listed", "\n".join(issues))
+
+    def test_rejects_primitive_contract_without_visual_screenshot(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/components/ui/custom-control.tsx": (
+                    "export function CustomControl() {\n"
+                    "  return <button type=\"button\" />;\n"
+                    "}\n"
+                ),
+                "frontend/src/design-system/primitive-contracts.ts": (
+                    "export const axisPrimitiveContracts = [{\n"
+                    "  component: 'CustomControl',\n"
+                    "  file: 'frontend/src/components/ui/custom-control.tsx',\n"
+                    "  catalogTargets: ['primitive-custom-control'],\n"
+                    "  visualTargets: ['primitive-custom-control'],\n"
+                    "  testFiles: ['frontend/tests/custom-control.test.tsx'],\n"
+                    "}];\n"
+                ),
+                "frontend/src/features/design-system/components/DesignSystemCatalog.tsx": (
+                    "export const target = 'primitive-custom-control';\n"
+                ),
+                "frontend/e2e/design-system-catalog.pw.ts": "export {};\n",
+                "frontend/tests/custom-control.test.tsx": "export {};\n",
+            }
+        )
+
+        self.assertIn("needs a desktop Playwright screenshot", "\n".join(issues))
 
     def test_rejects_text_button_without_icon(self) -> None:
         issues = self.issues_for_frontend(
@@ -1482,6 +1542,42 @@ class TestFrontendTailwindOpacity(unittest.TestCase):
 
     def test_accepts_bracket_opacity_syntax(self) -> None:
         issues = self.issues_for_frontend("export const ok = 'bg-white/[0.28] text-white/[0.52]';\n")
+
+        self.assertEqual([], issues)
+
+
+class TestFrontendDesignTokenUsage(unittest.TestCase):
+    def issues_for_frontend(self, component_source: str) -> list[str]:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            component = root / "frontend" / "src" / "components" / "Example.tsx"
+            component.parent.mkdir(parents=True, exist_ok=True)
+            component.write_text(component_source, encoding="utf-8")
+            return axis.frontend_design_token_usage_issues(root=root)
+
+    def test_rejects_raw_neutral_color_utilities(self) -> None:
+        issues = self.issues_for_frontend(
+            "export const bad = 'bg-white text-slate-700 border-zinc-200';\n"
+        )
+
+        self.assertIn("use semantic color tokens", "\n".join(issues))
+
+    def test_rejects_raw_shadow_utilities(self) -> None:
+        issues = self.issues_for_frontend("export const bad = 'shadow-sm shadow-[0_1px_2px_red]';\n")
+
+        self.assertIn("use named shadow tokens", "\n".join(issues))
+
+    def test_rejects_arbitrary_color_and_gradient_values(self) -> None:
+        issues = self.issues_for_frontend(
+            "export const bad = 'bg-[linear-gradient(red,blue)] border-[hsl(var(--border))]';\n"
+        )
+
+        self.assertIn("move arbitrary color or gradient values into design-system tokens", "\n".join(issues))
+
+    def test_accepts_semantic_token_utilities(self) -> None:
+        issues = self.issues_for_frontend(
+            "export const ok = 'bg-card text-card-foreground border-border shadow-surface bg-gradient-inverse-panel';\n"
+        )
 
         self.assertEqual([], issues)
 

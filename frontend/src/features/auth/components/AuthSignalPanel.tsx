@@ -7,7 +7,7 @@ export function AuthSignalPanel() {
   const { t } = useTranslation();
 
   return (
-    <section className="relative hidden min-h-[420px] overflow-hidden rounded-lg border border-inverse-border bg-[linear-gradient(145deg,hsl(var(--inverse)),hsl(var(--background)))] p-7 text-inverse-foreground shadow-[var(--shadow-panel)] lg:flex lg:flex-col lg:justify-start">
+    <section className="relative hidden min-h-[420px] overflow-hidden rounded-lg border border-inverse-border bg-gradient-inverse-panel p-7 text-inverse-foreground shadow-panel lg:flex lg:flex-col lg:justify-start">
       <div className="relative flex flex-col gap-8">
         <BrandHeader label={t('common.controlPlane')} tone="inverted" />
 

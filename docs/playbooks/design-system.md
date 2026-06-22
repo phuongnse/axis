@@ -60,15 +60,16 @@ Penpot owns the approved design token decisions. Frontend code owns the executab
 |---|---|
 | `frontend/src/design-system/tokens.css` | Raw CSS variable values for light and dark themes |
 | `frontend/src/design-system/tokens.ts` | Typed token registry used by tests and future design-system tooling |
+| `frontend/src/design-system/primitive-contracts.ts` | UI primitive registry: file ownership, catalog target, visual target, and test coverage |
 | `frontend/tailwind.config.js` | Tailwind names that map to semantic CSS variables |
 
 When importing token updates from Penpot:
 
 1. Translate approved Penpot token names into the semantic CSS variable names in `tokens.css`.
 2. Update `tokens.ts` in the same change so tests know the complete token contract.
-3. Map only semantic color and radius tokens in `tailwind.config.js`; components should consume Tailwind token classes such as `bg-primary`, `text-muted-foreground`, `border-border`, and `rounded-md`.
-4. Use token-backed arbitrary values only when Tailwind has no first-class utility for the property, for example a shadow color sourced from `hsl(var(--action-primary-shadow))`.
-5. Keep raw hex, raw HSL, and one-off numeric values out of component files when a semantic token exists.
+3. Map semantic tokens in `tailwind.config.js`; components should consume Tailwind token classes such as `bg-primary`, `text-muted-foreground`, `border-border`, and `rounded-md`.
+4. Map shadows and reusable gradients as named Tailwind tokens such as `shadow-surface`, `shadow-panel`, and `bg-gradient-inverse-panel`.
+5. Keep raw hex, raw HSL, raw neutral colors, raw shadows, and one-off visual values out of component files when a semantic token exists.
 
 Do not generate frontend tokens from unapproved design files. If a Penpot export changes a visual decision, treat that as design-system work and include the registry/test update in the same PR.
 
@@ -138,10 +139,24 @@ Use the frontend catalog route as the first visual QA harness:
 The catalog route is an implementation and verification surface, not a product workflow. Use it to prove token, theme, state, and primitive-component coverage before migrating legacy screens.
 Run `npm run test:e2e -- design-system-catalog.pw.ts` from `frontend/` for local smoke coverage after installing Playwright browsers and native dependencies with `npx playwright install chromium` and `npx playwright install-deps chromium`.
 
+## Enforceable Contract
+
+Design-system rules should fail deterministically when they can be checked without intent.
+
+| Rule | Mechanism |
+|---|---|
+| UI primitive files must have a registry contract | `python scripts/axis.py check frontend-component-composition` compares `frontend/src/components/ui/*.tsx` to `primitive-contracts.ts` |
+| Primitive contracts must name catalog, visual, and test coverage | Same check verifies catalog target strings, desktop Playwright screenshot targets, and test file paths |
+| Component code must use semantic color and shadow tokens | `python scripts/axis.py check frontend-style` rejects raw neutral color utilities, raw shadow utilities, and arbitrary color/gradient classes in TS/TSX |
+| Token registry must match executable Tailwind mapping | `frontend/tests/design-tokens.test.ts` checks CSS variables, color, radius, shadow, and background-image mappings |
+
+Do not add per-file allowlists for design-system violations. If a component needs a new visual value, add the token and Tailwind mapping first, then consume the named class from component code.
+
 ## Implementation Rules
 
 - Add or update tokens before component styles that need those values.
 - Add or update shared components before feature screens that need those components.
+- Add or update `primitive-contracts.ts` before broad use of a new UI primitive.
 - Keep route files and feature pages thin; visual geometry belongs in shared components or feature-owned pattern components.
 - Do not write raw hex, HSL, arbitrary spacing, arbitrary radius, or page-local component clones when a token or shared component exists.
 - Do not add visual polish to wireframes to compensate for missing design-system decisions.

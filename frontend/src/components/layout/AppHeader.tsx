@@ -26,7 +26,7 @@ export function AppHeader({ onSignOut }: AppHeaderProps) {
         <div className="mx-auto hidden max-w-lg flex-1 justify-center md:flex">
           <search
             aria-label={t('shell.searchLabel')}
-            className="flex h-8 w-full items-center gap-2 rounded-md border border-input bg-card px-3 text-muted-foreground shadow-sm"
+            className="flex h-8 w-full items-center gap-2 rounded-md border border-input bg-card px-3 text-muted-foreground shadow-surface"
           >
             <Search className="size-4 shrink-0" aria-hidden />
             <span className="flex-1 text-left text-xs">{t('shell.searchPlaceholder')}</span>
