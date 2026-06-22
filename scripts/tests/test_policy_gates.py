@@ -681,7 +681,70 @@ Ship user value.
 """
         )
 
-        self.assertIn("Wireframes table missing required columns: Excalidraw", "\n".join(issues))
+        self.assertIn("Wireframes table missing required columns: Source", "\n".join(issues))
+
+    def test_accepts_wireframes_table_with_source_column(self) -> None:
+        issues = self.issues_for_document(
+            """# Sample use case
+
+## Purpose
+
+Ship user value.
+
+## Primary actor
+
+- User
+
+## Trigger
+
+- User starts the flow.
+
+## Main flow
+
+1. User starts.
+2. System responds.
+3. User completes the flow.
+
+## Alternate / error flows
+
+- None.
+
+## Acceptance Criteria
+
+*Happy path*
+- [ ] AC-001 Works.
+
+## Acceptance Test Matrix
+
+| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+|---|---|---|---|---|---|
+| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
+
+## Wireframes
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertEqual([], issues)
 
     def test_rejects_implementation_status_table_schema_drift(self) -> None:
         issues = self.issues_for_use_case(

@@ -44,7 +44,7 @@ Use the matching repo skill for surface-specific checklist detail:
 | REST/OpenAPI/API type change | `$axis-api-contract` |
 | Event, proto, Wolverine, Kafka, RabbitMQ, or gRPC | `$axis-cross-module-contract` |
 | Frontend feature or SPA caller | `$axis-frontend-feature` |
-| Wireframe, Mermaid, generated visual artifact | `$axis-visual-artifact` |
+| Penpot source link, wireframe, Mermaid, generated visual artifact | `$axis-visual-artifact` |
 | Review feedback | `$axis-review-feedback` |
 
 If no skill fits, quote the owner doc directly and keep the same dossier shape.

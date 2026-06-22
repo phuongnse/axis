@@ -81,7 +81,7 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 - Zero build warnings and zero test failures.
 - Owning docs in the same PR when behavior/spec/status changes; pure refactor/style/test-only changes do not need a token docs edit (see [agent-checklist](docs/playbooks/agent-checklist.md)).
 - No new TODO/FIXME/placeholder/stub code.
-- For **wireframe** changes (`docs/wireframes/`, `docs/use-cases/**` screen `.excalidraw`/`.svg`): run [`docs/playbooks/visual-artifact-checklist.md`](docs/playbooks/visual-artifact-checklist.md) before commit. **Diagrams** are Mermaid in `docs/README.md` and use-case `README.md` — one theme in [`docs/diagrams/mermaid_theme.py`](docs/diagrams/mermaid_theme.py); run `python docs/scripts/sync-mermaid-theme.py` after editing `MERMAID_INIT` ([`docs/playbooks/mermaid.md`](docs/playbooks/mermaid.md)).
+- For **wireframe/design-source** changes (`docs/wireframes/`, `docs/use-cases/**` screen source/preview rows, committed previews, or legacy `.excalidraw`/`.svg`): run [`docs/playbooks/visual-artifact-checklist.md`](docs/playbooks/visual-artifact-checklist.md) before commit. **Diagrams** are Mermaid in `docs/README.md` and use-case `README.md` — one theme in [`docs/diagrams/mermaid_theme.py`](docs/diagrams/mermaid_theme.py); run `python docs/scripts/sync-mermaid-theme.py` after editing `MERMAID_INIT` ([`docs/playbooks/mermaid.md`](docs/playbooks/mermaid.md)).
 
 **When blocked:** state blocker → cite constraint → 2–3 options → wait. Never self-unblock on P0.
 
@@ -157,7 +157,7 @@ Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, use-c
 
 **Frontend:** use `$axis-frontend-feature`; details live in [`frontend.md`](docs/playbooks/frontend.md).
 
-**Visual artifacts:** use `$axis-visual-artifact` for wireframes, generated SVG previews, and diagrams. Source rules live in [`wireframes.md`](docs/playbooks/wireframes.md), [`wireframes/README.md`](docs/wireframes/README.md), and [`visual-artifact-checklist.md`](docs/playbooks/visual-artifact-checklist.md).
+**Visual artifacts:** use `$axis-visual-artifact` for Penpot design-source links, wireframes, committed previews, legacy Excalidraw assets, and diagrams. Source rules live in [`design-source.md`](docs/playbooks/design-source.md), [`wireframes.md`](docs/playbooks/wireframes.md), [`wireframes/README.md`](docs/wireframes/README.md), and [`visual-artifact-checklist.md`](docs/playbooks/visual-artifact-checklist.md).
 
 **Cross-cutting:** forward `CancellationToken`; audit fields in Application; soft-delete on workspace aggregates; Serilog without PII; rate limit auth endpoints; CORS before auth; `/health` + `/health/ready` anonymous.
 
@@ -171,7 +171,7 @@ Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, use-c
 
 **Per PR before merge:** PR description = Summary + Linked spec + Requirements only (no CI status, no commit list — Checks tab covers that). Run the triggered Verification gate commands from [agent-checklist.md](docs/playbooks/agent-checklist.md#verification-gate--verify-before-pr-review); CI/Doc drift enforcement status is tracked in [REVIEW_FINDINGS.md](docs/REVIEW_FINDINGS.md).
 
-Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` changes. Agents must pass [`docs/playbooks/visual-artifact-checklist.md`](docs/playbooks/visual-artifact-checklist.md) before commit.
+Diagrams/wireframes: update design-source links and committed preview links together; regenerate `.svg` in the same PR when touching legacy `.excalidraw`. Agents must pass [`docs/playbooks/visual-artifact-checklist.md`](docs/playbooks/visual-artifact-checklist.md) before commit.
 
 ---
 
@@ -187,6 +187,7 @@ Diagrams/wireframes: regenerate `.svg` in same PR when source `.excalidraw` chan
 | [patterns.md](docs/playbooks/patterns.md) | Compatibility router for legacy pattern anchors |
 | [testing.md](docs/playbooks/testing.md) | Test patterns |
 | [frontend.md](docs/playbooks/frontend.md) | SPA rules |
+| [design-source.md](docs/playbooks/design-source.md) | Penpot design source, MCP workflow, source/preview link rules |
 | [docs-style.md](docs/playbooks/docs-style.md) | Doc anti-patterns + single-owner rule (read before adding a `.md`) |
 | [TECH_STACK.md](docs/TECH_STACK.md) | Libraries + ADRs |
 | [PROGRESS.md](docs/PROGRESS.md) | Module layer status |

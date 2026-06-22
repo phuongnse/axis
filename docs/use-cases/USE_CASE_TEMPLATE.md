@@ -83,21 +83,21 @@ If `## Screen flow` exists, use the full table and inventory note from [register
 
 All UI assets in this folder (<N> screens). Row order matches [Screen flow](#screen-flow) above. Sequence/architecture drawings are under [Diagrams](#diagrams).
 
-| # | Screen | Role | Excalidraw | Preview |
-|---|--------|------|------------|---------|
-| 1 | `<screen-slug>` | Happy path — … | `/<screen-slug>.excalidraw` | `/<screen-slug>.svg` |
+| # | Screen | Role | Source | Preview |
+|---|--------|------|--------|---------|
+| 1 | `<screen-slug>` | Happy path — … | `[source](https://design.example/penpot-frame)` | `[preview](./<screen-slug>.svg)` |
 
-Replace path placeholders with real `[source](./…)` / `[preview](./…)` links when implementing (see [register-workspace](./platform-foundation/register-workspace/README.md#wireframes) for a filled-in table including error rows).
+Replace placeholders with real Penpot `[source](…)` links and optional `[preview](./…)` links when implementing (see [register-workspace](./platform-foundation/register-workspace/README.md#wireframes) for a filled-in table including error rows).
 
 Minimal (delete `#` / `Role` columns and the inventory note when Screen flow is omitted):
 
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| `<screen-slug>` | `/<screen-slug>.excalidraw` | `/<screen-slug>.svg` |
+| Screen | Source | Preview |
+|--------|--------|---------|
+| `<screen-slug>` | `[source](https://design.example/penpot-frame)` | `[preview](./<screen-slug>.svg)` |
 
-Use real `[source](./…)` / `[preview](./…)` links in implemented use cases — not angle-bracket placeholders.
+Use real `[source](…)` / `[preview](./…)` links in implemented use cases — not angle-bracket placeholders.
 
-Assets live **flat** inside this use-case folder. Reference shared kit screens from `../../../wireframes/` when needed. Use a single `N/A` row when no wireframe applies.
+Committed previews live **flat** inside this use-case folder. Reference shared kit screens from Penpot or `../../../wireframes/` legacy assets when needed. Use a single `N/A` row when no wireframe applies.
 
 ## Diagrams
 

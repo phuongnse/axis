@@ -1,12 +1,14 @@
 # Visual artifact checklist (agents)
 
-> **Navigation**: [← docs/README.md](../README.md) · [← AGENTS.md](../../AGENTS.md)
+> **Navigation**: [← docs/README.md](../README.md) · [← design-source.md](./design-source.md) · [← AGENTS.md](../../AGENTS.md)
 
 Use this checklist **before every commit** that changes visual artifacts:
 
-- `docs/wireframes/**/*.excalidraw` and `docs/wireframes/**/*.svg`
-- `docs/use-cases/**/*.excalidraw` and `docs/use-cases/**/*.svg` (**wireframe screens only** — not Mermaid in README)
-- `docs/README.md` and use-case `README.md` **Mermaid** blocks under `## Diagrams` or [Key Diagrams](../README.md#key-diagrams)
+- `docs/wireframes/**`
+- `docs/use-cases/**` `## Wireframes` source/preview rows
+- committed wireframe preview assets
+- legacy `docs/**/*.excalidraw` and `docs/**/*.svg` wireframe assets
+- `docs/README.md` and use-case `README.md` **Mermaid** blocks under `## Diagrams`, `## Screen flow`, or [Key Diagrams](../README.md#key-diagrams)
 
 ## 1) Semantic checks
 
@@ -14,6 +16,7 @@ Use this checklist **before every commit** that changes visual artifacts:
 - [ ] One visual meaning = one style (consistent connector color/line style/arrowhead usage).
 - [ ] Legend (if present) matches actual styles used in the file.
 - [ ] Detail level matches artifact scope (system-context vs container vs module vs screen/wireframe).
+- [ ] Screen source is traceable to a use-case AC, screen-flow step, or documented state.
 
 ## 2) Geometry checks
 
@@ -32,7 +35,14 @@ Use this checklist **before every commit** that changes visual artifacts:
 
 ## 4) Update flow (required)
 
-**Wireframes (Excalidraw):**
+**Wireframes / design source:**
+
+1. Edit the source of truth in Penpot.
+2. Update the owning use-case `## Wireframes` source link.
+3. Export and commit preview assets only when a stable preview is needed or an existing preview row changes.
+4. Review committed previews at 100% zoom with this checklist.
+
+**Legacy Excalidraw wireframes:**
 
 1. Edit source `.excalidraw` files.
 2. Regenerate related `.svg` previews (`python scripts/axis.py generate wireframes`).
@@ -47,7 +57,8 @@ Use this checklist **before every commit** that changes visual artifacts:
 
 ## 5) Use-case `README.md` sync (when `docs/use-cases/**` changes)
 
-- [ ] Every **screen** `.excalidraw` in the use-case folder has a row in `## Wireframes` (error `*-states` included).
+- [ ] Every documented **screen** has a row in `## Wireframes` (error `*-states` included).
+- [ ] New/updated rows use `Source` + `Preview`; legacy rows with `Excalidraw` are accepted only until that use case is refreshed.
 - [ ] No sequence/entity diagram files (`*-flow`, `*-model`, `*-cases`) in the folder — those belong in `## Diagrams` as **Mermaid** in the README.
 - [ ] `## Diagrams` uses `### <slug>` + fenced `mermaid` blocks; other use cases linked in `**Related:**` prose only.
 - [ ] When >3 screens or branched flow: `## Screen flow` present and **row order** matches wireframes table ([docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--wireframes--implementation-status), example [register-workspace](../use-cases/platform-foundation/register-workspace/README.md)); pattern checklist [wireframes.md § Multi-screen journey](./wireframes.md#multi-screen-journey-pattern).

@@ -19,6 +19,7 @@
 | Testing | [testing.md](./testing.md) |
 | Code hygiene/policy regexes | [code-hygiene-patterns.md](./code-hygiene-patterns.md) |
 | Frontend | [frontend.md](./frontend.md) |
+| Design source | [design-source.md](./design-source.md) |
 | Wireframes/visual docs | [wireframes.md](./wireframes.md) |
 
 ## Compatibility Anchors

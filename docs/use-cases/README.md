@@ -67,11 +67,10 @@ docs/use-cases/
     ├── README.md            # domain index + grouped use-case links
     └── <short-slug>/        # one folder per use case (short, readable name)
         ├── README.md        # spec (flow, AC, implementation status)
-        ├── *.excalidraw     # wireframe/diagram sources for this use case
-        └── *.svg            # previews for this use case
+        └── *.svg            # optional committed previews for this use case
 ```
 
-Shared wireframe reference (`app-shell` + Python preview renderer): [`../wireframes/`](../wireframes/) — agent contract: [wireframes/README](../wireframes/README.md#agent-contract). Platform diagrams: [`../diagrams/`](../diagrams/).
+Penpot design sources are linked from each use-case `## Wireframes` table; setup lives in [design-source.md](../playbooks/design-source.md). Legacy shared wireframe references live in [`../wireframes/`](../wireframes/) — agent contract: [wireframes/README](../wireframes/README.md#agent-contract). Platform diagrams: [`../diagrams/`](../diagrams/).
 
 ---
 

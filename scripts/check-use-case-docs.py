@@ -81,7 +81,8 @@ AUTOMATED_BY_VALUES = {
     "xUnit Architecture",
 }
 IMPLEMENTATION_STATUS_COLUMNS = ["Layer", "Status"]
-WIREFRAME_REQUIRED_COLUMNS = {"Screen", "Excalidraw", "Preview"}
+WIREFRAME_REQUIRED_COLUMNS = {"Screen", "Preview"}
+WIREFRAME_SOURCE_COLUMNS = {"Source", "Excalidraw"}
 
 # Placeholder markers from USE_CASE_TEMPLATE.md that must be replaced before a
 # use case can be considered written. Listed individually so the validator can
@@ -420,12 +421,18 @@ def validate_acceptance_contract(doc: UseCaseDocument, *, require_matrix: bool) 
 
 def validate_wireframes(doc: UseCaseDocument) -> list[str]:
     table = first_markdown_table(doc.section("Wireframes"))
-    return validate_table_shape(
+    issues = validate_table_shape(
         table,
         rel=doc.rel,
         label="Wireframes",
         required_columns=WIREFRAME_REQUIRED_COLUMNS,
     )
+    if table is not None and WIREFRAME_SOURCE_COLUMNS.isdisjoint(table.headers):
+        issues.append(
+            f"{doc.rel}: Wireframes table missing required columns: Source "
+            "(legacy Excalidraw accepted until the use case is refreshed)",
+        )
+    return issues
 
 
 def validate_diagrams(doc: UseCaseDocument) -> list[str]:
