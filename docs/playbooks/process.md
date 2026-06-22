@@ -118,6 +118,10 @@ For every match: confirm the SQL only references tables owned by that match's ow
 
 ## Frontend Process
 
+### Phase 0 — Design system foundation
+
+Before broad UI polish or new visual patterns, follow [design-system.md](./design-system.md). Design-system PRs establish tokens, reusable components, visual QA, and migration rules; they do not migrate unrelated legacy screens.
+
 ### Phase 1 — Foundation (one-time)
 
 Complete in order before building any feature screen. Do not skip or reorder.

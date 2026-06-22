@@ -22,6 +22,8 @@ UI exists to help users complete work. Visual style matters, but it is secondary
 - Public/auth screens should focus on access and trust. Authenticated workspace screens can show workspace data, operational status, and metrics.
 - UI polish follows UX: spacing, color, icons, and motion should make the workflow easier to understand, not make the screen feel more complex.
 
+Design-system rules live in [design-system.md](./design-system.md). Use that owner for tokens, component inventory, pixel-perfect criteria, and visual QA. This playbook owns frontend implementation patterns.
+
 ---
 
 ## Mobile-first layout and radius
@@ -120,6 +122,7 @@ export const workflowKeys = {
 ## Component design
 
 - **Component-first design is non-negotiable**: every visible UI pattern starts as the smallest reusable component, then larger components compose those pieces. Do not copy visual geometry between screens.
+- New visual rules start in the design system. Feature screens should consume existing tokens and shared components, or add the missing token/component before using the pattern.
 - Route files are routing boundaries only. They import and render page components; they must not contain styled layout markup, Tailwind-heavy JSX, or screen design details.
 - Shared patterns such as timelines, flow traces, panels, fields, buttons, badges, and status markers live in shared or feature components. If two screens need the same visual behaviour, extract the component before the second implementation lands.
 - Standard controls must come from the shadcn/ui primitive layer in `frontend/src/components/ui/`. Feature code must not render native `<button>`, `<input>`, `<label>`, `<select>`, or `<textarea>` directly. If a needed primitive does not exist, add or adapt it in `src/components/ui/` first, then compose it from feature components.
