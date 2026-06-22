@@ -39,7 +39,7 @@ Create or tighten the owning use-case spec so implementation can follow spec -> 
    - Split oversized work into isolated slices and record the slice boundary in `Decisions` or `Deferred follow-ups`.
 
 4. Define visuals and diagrams.
-   - For user-facing screens, use `$axis-visual-artifact` to create or update Excalidraw sources, generated SVG previews, and the `## Wireframes` table.
+   - For user-facing screens, use `$axis-visual-artifact` to create or update Penpot design-source links, optional previews, and the `## Wireframes` table.
    - Add `## Screen flow` when the journey has more than three screens, branched happy paths, or non-obvious error screens.
    - Add Mermaid diagrams for non-trivial workflow, sequence, or cross-module behavior; keep local diagrams in the owning README.
    - Use a single `N/A` row when no wireframe or local diagram applies.
@@ -61,7 +61,8 @@ Create or tighten the owning use-case spec so implementation can follow spec -> 
    - Run `python scripts/axis.py check use-case-docs`.
    - Run `python scripts/axis.py check doc-navigation`.
    - Run `python scripts/axis.py check markdown-links` when Markdown links or anchors changed.
-   - Run `python scripts/axis.py generate wireframes` and the visual artifact checklist when Excalidraw or SVG previews changed.
+   - Run the visual artifact checklist when design-source links, previews, Mermaid diagrams, or legacy visual assets changed.
+   - Run `python scripts/axis.py generate wireframes` only when legacy Excalidraw sources or SVG previews changed.
 
 ## Output
 

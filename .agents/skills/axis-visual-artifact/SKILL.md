@@ -1,24 +1,26 @@
 ---
 name: axis-visual-artifact
-description: Update Axis wireframes and diagrams safely. Use when changing docs wireframes, use-case Excalidraw files, generated SVG previews, Mermaid diagrams, diagram theme configuration, or visual artifacts referenced from use-case docs.
+description: Update Axis wireframes and diagrams safely. Use when changing docs wireframes, Penpot design-source links or previews, legacy Excalidraw assets, Mermaid diagrams, diagram theme configuration, or visual artifacts referenced from use-case docs.
 ---
 
 # Axis Visual Artifact
 
 ## Goal
 
-Keep Axis visual docs source-controlled, regenerated, linked, and visually checked instead of editing previews by hand.
+Keep Axis visual docs linked, source-first, regenerated where needed, and visually checked instead of letting design evidence drift from the spec.
 
 ## Workflow
 
 1. Identify the artifact type.
-   - Wireframe source: `.excalidraw`.
-   - Generated preview: `.svg` next to the source.
+   - Design source: Penpot file/page/frame link in a use-case `## Wireframes` row.
+   - Preview: committed image/export or `N/A` while no stable preview exists.
+   - Legacy wireframe source: `.excalidraw` with generated `.svg`.
    - Mermaid diagram: Markdown diagram using the shared theme.
-   - Use-case visual index: tables in the owning use-case or domain README.
+   - Visual index: tables in the owning use-case or domain README.
 
 2. Read the owning rules.
    - `AGENTS.md`
+   - `docs/playbooks/design-source.md`
    - `docs/playbooks/visual-artifact-checklist.md`
    - `docs/playbooks/wireframes.md`
    - `docs/wireframes/README.md`
@@ -26,15 +28,16 @@ Keep Axis visual docs source-controlled, regenerated, linked, and visually check
    - The owning use-case file when a screen or flow changes
 
 3. Edit the source of truth.
-   - Edit `.excalidraw` for wireframes, not only the generated `.svg`.
+   - Edit the Penpot design source for new/updated wireframes, not only the committed preview.
+   - Edit legacy `.excalidraw` only when maintaining an existing legacy asset.
    - Edit Mermaid source in Markdown, not rendered output.
-   - Keep shared app shell assets under `docs/wireframes/`.
-   - Keep use-case-specific assets under `docs/use-cases/{domain}/{use-case}/`.
+   - Keep shared app shell references under the shared Penpot file or `docs/wireframes/` legacy assets.
+   - Keep use-case-specific previews under `docs/use-cases/{domain}/{use-case}/`.
 
-4. Regenerate derived files.
-   - Wireframes: `python scripts/axis.py generate wireframes`.
-   - Mermaid theme changes: `python docs/scripts/sync-mermaid-theme.py`.
-   - Include regenerated `.svg` files in the same change when `.excalidraw` changes.
+4. Refresh derived files.
+   - Penpot: export/commit previews only when the use-case table has a preview row or review needs a stable snapshot.
+   - Legacy Excalidraw: run `python scripts/axis.py generate wireframes` and include regenerated `.svg`.
+   - Mermaid theme changes: run `python docs/scripts/sync-mermaid-theme.py`.
 
 5. Check links and visual quality.
    - Run the visual artifact checklist before commit.
@@ -44,8 +47,9 @@ Keep Axis visual docs source-controlled, regenerated, linked, and visually check
 6. Verify.
    - Docs/scripts/policy changes: `python scripts/axis.py check policy-tests`.
    - Docs drift: `python scripts/axis.py check doc-drift`.
+   - Markdown links: `python scripts/axis.py check markdown-links` when links or anchors changed.
    - Ready review: `$axis-ready-review`.
 
 ## Output
 
-Report source files edited, generated files refreshed, checklist result, and doc checks.
+Report design sources edited, previews refreshed or intentionally `N/A`, checklist result, and doc checks.

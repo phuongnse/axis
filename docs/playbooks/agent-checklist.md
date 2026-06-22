@@ -211,8 +211,8 @@ These expectations still matter, but do not call them CI gates unless [REVIEW_FI
 - No cross-module SQL / shared `DbContext` / `IMediator` for domain events. Structural subsets are enforced; semantic SQL and runtime DI remain review-only.
 - Changed `*Handler.cs` → matching `*HandlerTests.cs`. The diff ratchet enforces changed Application handlers; untouched legacy files are not swept.
 - Behavior/spec/status changes → update the owning docs in the same PR. Pure refactor, style, dependency, and test-only changes do not need a token docs edit.
-- Frontend screen → wireframe row in the owning use-case `## Wireframes` table when the screen changes.
-- Use-case diagram → row only if the `.excalidraw` lives **in that use-case folder**; link other use cases in `**Related:**` prose, not in `## Diagrams` table.
+- Frontend screen → source/preview row in the owning use-case `## Wireframes` table when the screen changes.
+- Use-case diagram → Mermaid in that use-case README; link other use cases in `**Related:**` prose, not in `## Diagrams` table.
 - No test `Skip = ...`, weakened tests, or completed layer status when ACs are open. New test skips are enforced; weakened assertions/status honesty remain review-only.
 - **Full suite honesty:** local `python scripts/axis.py verify` uses the ready-PR Verification gate command matrix; CI/branch protection runs full `dotnet test Axis.sln`. If you claim the full suite ran locally, it must be full `Axis.sln` with integration/API tests, not a solution filter or unit-only run.
 

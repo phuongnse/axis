@@ -20,7 +20,7 @@ or pattern docs.
   `python scripts/axis.py ...`; install PyYAML into that Python with
   `python -m pip install PyYAML`.
 - **.NET SDK 8.x** - local verification, EF migrations, and API contract generation; version must match [`global.json`](../../global.json).
-- **Node.js + npm** - frontend verification, OpenAPI TypeScript generation, and wireframe export; major must match [`frontend/.nvmrc`](../../frontend/.nvmrc).
+- **Node.js + npm** - frontend verification, OpenAPI TypeScript generation, and legacy wireframe export; major must match [`frontend/.nvmrc`](../../frontend/.nvmrc).
 - **Buf CLI + Lychee** - protobuf and markdown-link verification; use versions in [scripts.md § Tool Versions](./scripts.md#tool-versions).
 - **Docker** - Docker Engine + Compose v2. Run canonical commands from the repo root; if Docker is not visible, use [Environment adapters](#environment-adapters).
 - **OpenSSL** - local development CA and localhost certificate generation; see [Local HTTPS](./local-https.md).

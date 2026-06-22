@@ -61,6 +61,15 @@
 
 ---
 
+## Design Tooling
+
+| Technology | Version | Role | Rationale |
+|---|---|---|---|
+| **Penpot** | Self-hosted | Product design source | Open design tool for design-system files, app-shell references, and per-use-case screen sources. Setup and source-link rules live in [design-source.md](./playbooks/design-source.md). |
+| **Penpot MCP** | Remote MCP or `@penpot/mcp@stable` | AI design-agent bridge | Allows trusted MCP clients to inspect and edit Penpot files. It is design infrastructure, not an Axis frontend dependency. |
+
+---
+
 ## Infrastructure & Data
 
 | Technology | Role | Rationale |

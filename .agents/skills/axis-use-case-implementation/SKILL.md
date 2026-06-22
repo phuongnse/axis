@@ -56,6 +56,7 @@ Ship one reviewable Axis use-case slice without losing acceptance criteria, laye
 
 8. Update status docs when behavior/status changes.
    - Update the use-case `Implementation status` callout.
+   - Use `$axis-visual-artifact` when frontend screen shape, design-source links, previews, or diagrams changed.
    - Update the domain README and `docs/PROGRESS.md` only when their summarized status changes.
    - Name exact deferred AC bullets under `Deferred follow-ups`; use `N/A` when none.
    - Add or update `docs/WORKAROUNDS.md` only for intentional P0/P1 workarounds.

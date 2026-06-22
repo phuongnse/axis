@@ -1,6 +1,6 @@
 # Design System
 
-> **Navigation**: [<- docs/README.md](../README.md) | [Frontend playbook](./frontend.md) | [Wireframe playbook](./wireframes.md) | [AGENTS.md](../../AGENTS.md)
+> **Navigation**: [← docs/README.md](../README.md) · [← Design source](./design-source.md) · [← Frontend playbook](./frontend.md) · [← Wireframe playbook](./wireframes.md) · [← AGENTS.md](../../AGENTS.md)
 
 This playbook owns the Axis design-system workflow: tokens, reusable UI components, implementation rules, and visual QA. It is separate from use-case wireframes. Wireframes describe low-fidelity flow and screen intent; the design system defines final UI decisions.
 
@@ -14,7 +14,7 @@ This playbook owns the Axis design-system workflow: tokens, reusable UI componen
 | Frontend code | Executable components, accessibility behavior, responsive implementation | New visual rules not represented in the design system |
 | Visual QA | Evidence that implementation matches the approved design-system target | Product acceptance by itself |
 
-Design-system work must not use Excalidraw files as the final visual source. Excalidraw wireframes remain low-fidelity artifacts until the design-source workflow is replaced or migrated in a dedicated PR.
+Design-system work must not use Excalidraw files as the final visual source. Use Penpot design sources per [design-source.md](./design-source.md); legacy Excalidraw wireframes remain low-fidelity artifacts until migrated.
 
 ## Pixel-Perfect Definition
 

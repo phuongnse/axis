@@ -113,16 +113,17 @@ Skip `## Screen flow` when there are **zero or one** local screen wireframes (a 
 3. **Error / reference** table (separate): screens that are **not** sequential steps — when to open each (validation, 5xx, provider errors).
 4. Optional **mermaid** `flowchart` — solid edges = happy path, dotted = error/reference (keep labels = screen slugs).
 
-Do **not** duplicate Excalidraw links here; links live only in `## Wireframes`.
+Do **not** duplicate design-source or preview links here; links live only in `## Wireframes`.
 
 ### Wireframes (content rules)
 
-- Assets live **flat** in the use-case folder (`<screen>.excalidraw` + `.svg` next to `README.md`).
-- Reference **shared kit** screens from `../../../wireframes/` (e.g. `app-shell`) — do not copy files into the use-case folder.
+- Design sources live in Penpot and are linked from `## Wireframes`; setup and MCP rules live in [design-source.md](./design-source.md).
+- Committed previews live **flat** in the use-case folder when they exist.
+- Reference **shared kit** screens from the shared Penpot file or `../../../wireframes/` legacy assets (e.g. `app-shell`) — do not copy files into the use-case folder.
 - One table per README — no blockquote wireframe stacks.
 - Opening line (when `## Screen flow` exists): state how many screens, that order matches Screen flow, and that **sequence/architecture** drawings are under `## Diagrams`.
-- **Inventory:** every `*.excalidraw` **UI screen** in this folder must have a row. Include error/reference variants (`*-states`). Use `N/A` only when the use case truly has no wireframes.
-- **Columns:** minimum `| Screen | Excalidraw | Preview |`. When `## Screen flow` exists, use `| # | Screen | Role | Excalidraw | Preview |` — `#` matches flow steps (`1`, `2a`, `—` for non-step error screens); `Role` = short happy-path / error label.
+- **Inventory:** every documented **UI screen** for this use case must have a row. Include error/reference variants (`*-states`). Use `N/A` only when the use case truly has no design source or preview yet.
+- **Columns:** minimum `| Screen | Source | Preview |`. When `## Screen flow` exists, use `| # | Screen | Role | Source | Preview |` — `#` matches flow steps (`1`, `2a`, `—` for non-step error screens); `Role` = short happy-path / error label. Legacy tables with `Excalidraw` remain accepted until the owning use case is refreshed.
 - **Row order:** happy-path screens first (same order as Screen flow), then error/reference screens (same order as the error table in Screen flow).
 - **Do not** list diagrams here (e.g. `*-flow`, `workspace-provisioning`, entity models) — those are not UI screens; sequence/architecture diagrams belong under `## Diagrams` as Mermaid, not in this table.
 
@@ -131,9 +132,9 @@ Minimal table (few screens, no Screen flow):
 ```markdown
 ## Wireframes
 
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| login | [source](./login.excalidraw) | [preview](./login.svg) |
+| Screen | Source | Preview |
+|--------|--------|---------|
+| login | [source](https://design.example/penpot-frame) | [preview](./login.svg) |
 ```
 
 Full table (see [register-workspace](../use-cases/platform-foundation/register-workspace/README.md#wireframes)):
@@ -144,15 +145,15 @@ Full table (see [register-workspace](../use-cases/platform-foundation/register-w
 All UI assets in this folder (N screens). Row order matches [Screen flow](#screen-flow) above.
 Sequence/architecture drawings are under [Diagrams](#diagrams).
 
-| # | Screen | Role | Excalidraw | Preview |
-|---|--------|------|------------|---------|
-| 1 | … | Happy path — … | [source](./….excalidraw) | [preview](./….svg) |
-| — | …-states | Error — … | [source](./….excalidraw) | [preview](./….svg) |
+| # | Screen | Role | Source | Preview |
+|---|--------|------|--------|---------|
+| 1 | … | Happy path — … | [source](https://design.example/penpot-frame) | [preview](./….svg) |
+| — | …-states | Error — … | [source](https://design.example/penpot-states-frame) | [preview](./….svg) |
 ```
 
 ### Diagrams (content rules)
 
-- **Mermaid only** in this README (`sequenceDiagram`, `flowchart`, `erDiagram`, …) — one `### <diagram-slug>` section per diagram. First line inside each fence: `MERMAID_INIT` from [`mermaid_theme.py`](../diagrams/mermaid_theme.py) ([playbook](./mermaid.md)). **Do not** add Excalidraw diagram link tables in this section (pre-Mermaid inventory tables are retired).
+- **Mermaid only** in this README (`sequenceDiagram`, `flowchart`, `erDiagram`, …) — one `### <diagram-slug>` section per diagram. First line inside each fence: `MERMAID_INIT` from [`mermaid_theme.py`](../diagrams/mermaid_theme.py) ([playbook](./mermaid.md)). **Do not** add image/source diagram link tables in this section (pre-Mermaid inventory tables are retired).
 - **Standard set (multi-screen user journeys):**
   - **One** `### <slug>-journey` `sequenceDiagram` — actor happy path from first screen through the use-case outcome (use `rect rgb(22, 35, 58)` phase bands; keep SSO/error branches minimal — details belong in `*-cases`).
   - **Zero or one** `### <slug>-cases` `sequenceDiagram` — dev/QA map of API responses to `*-states` wireframes. Skip when there are few error screens.
@@ -166,11 +167,11 @@ Sequence/architecture drawings are under [Diagrams](#diagrams).
 
 When touching an older use case that only has a flat wireframes table:
 
-1. Count `*.excalidraw` in the folder — **screens only** (UI wireframes). Sequence/entity content belongs in `## Diagrams` as Mermaid, not as `.excalidraw` files.
+1. Count documented UI/state screens for the use case. Legacy `*.excalidraw` files count only when they are UI wireframes; sequence/entity content belongs in `## Diagrams` as Mermaid, not as image/source files.
 2. Add or refresh `## Screen flow` if the when-to-add rules apply.
-3. Expand `## Wireframes` so **every screen file** has a row; add `#` / `Role` if helpful.
+3. Expand `## Wireframes` so **every screen** has a row; add `#` / `Role` if helpful.
 4. Move cross-use-case diagram references into `**Related:**` prose (link to the other README’s `###` anchor).
-5. Regenerate `.svg` if **wireframe** `.excalidraw` changed; run [`visual-artifact-checklist.md`](./visual-artifact-checklist.md). Preview Mermaid after diagram edits.
+5. Refresh committed previews when a design source changed; regenerate `.svg` if legacy **wireframe** `.excalidraw` changed; run [`visual-artifact-checklist.md`](./visual-artifact-checklist.md). Preview Mermaid after diagram edits.
 
 No need to bulk-edit all use cases in one PR — update the use case you are already changing, and align siblings in the same domain when obvious.
 
