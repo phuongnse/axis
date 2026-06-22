@@ -54,13 +54,13 @@ export function AccessPathTrace({
         size={size}
         iconMode="provided"
         className={className}
-        markerClassName="border-white/15 bg-white/[0.06]"
-        connectorClassName="bg-white/30"
-        titleClassName="text-white"
-        metaClassName="mt-1 leading-5 text-white/50"
+        markerClassName="border-inverse-border bg-inverse-muted"
+        connectorClassName="bg-inverse-border"
+        titleClassName="text-inverse-foreground"
+        metaClassName="mt-1 leading-5 text-inverse-muted"
         stateClassName={{
           active: 'border-accent bg-accent text-accent-foreground',
-          pending: 'border-white/15 bg-white/[0.06] text-white/55',
+          pending: 'border-inverse-border bg-inverse-muted text-inverse-muted',
         }}
       />
     );
@@ -73,14 +73,14 @@ export function AccessPathTrace({
         size={size}
         iconMode="provided"
         className={className}
-        markerClassName="border-border bg-background/70 dark:border-white/15 dark:bg-white/[0.06]"
-        connectorClassName="bg-border dark:bg-white/30"
-        titleClassName="text-foreground dark:text-white"
-        metaClassName="mt-1 leading-5 text-muted-foreground dark:text-white/50"
+        markerClassName="border-border bg-background/70 dark:border-inverse-border dark:bg-inverse-muted"
+        connectorClassName="bg-border dark:bg-inverse-border"
+        titleClassName="text-foreground dark:text-inverse-foreground"
+        metaClassName="mt-1 leading-5 text-muted-foreground dark:text-inverse-muted"
         stateClassName={{
           active: 'border-accent bg-accent text-accent-foreground',
           pending:
-            'border-border bg-background/70 text-muted-foreground dark:border-white/15 dark:bg-white/[0.06] dark:text-white/55',
+            'border-border bg-background/70 text-muted-foreground dark:border-inverse-border dark:bg-inverse-muted dark:text-inverse-muted',
         }}
       />
     );

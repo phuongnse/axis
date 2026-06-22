@@ -11,9 +11,12 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Panel } from '@/components/ui/panel';
+import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
 import { type UsageStats, useWorkspaceStart, type WorkspaceSettings } from '@/features/workspace';
-import { cn } from '@/lib/utils';
 
 interface UsageCardProps {
   label: string;
@@ -74,7 +77,7 @@ function UsageCard({ label, value, limit, percent, icon: Icon }: UsageCardProps)
   const { t } = useTranslation();
 
   return (
-    <div className="rounded-lg border border-border bg-background/80 p-4 shadow-sm">
+    <Panel variant="inset" className="p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-medium text-foreground">{t(label)}</p>
         <span className="inline-flex size-8 items-center justify-center rounded-md border border-primary/20 bg-primary/10 text-primary">
@@ -83,16 +86,13 @@ function UsageCard({ label, value, limit, percent, icon: Icon }: UsageCardProps)
       </div>
       <p className="mt-4 text-2xl font-semibold text-foreground">{value}</p>
       <p className="mt-1 text-xs text-muted-foreground">{t('dashboard.usage.limit', { limit })}</p>
-      <progress
-        className={cn(
-          'mt-4 h-1.5 w-full overflow-hidden rounded-full bg-muted accent-primary [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-primary [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary',
-          percent === null && 'opacity-40',
-        )}
+      <Progress
+        className="mt-4"
         value={percent ?? 100}
-        max={100}
+        isIndeterminate={percent === null}
         aria-label={t('dashboard.usage.progress', { label: t(label) })}
       />
-    </div>
+    </Panel>
   );
 }
 
@@ -132,7 +132,7 @@ function WorkspaceSummary({
   ];
 
   return (
-    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+    <Panel>
       <h2 className="text-sm font-semibold text-foreground">{t('dashboard.summary.title')}</h2>
       <div className="mt-4 space-y-3">
         {rows.map((row) => {
@@ -150,23 +150,23 @@ function WorkspaceSummary({
           );
         })}
       </div>
-    </section>
+    </Panel>
   );
 }
 
 function LoadingDashboard() {
   return (
     <div className="max-w-6xl space-y-6">
-      <div className="rounded-lg border border-border bg-card p-6 shadow-sm sm:p-8">
-        <div className="h-4 w-32 animate-pulse rounded bg-muted" />
-        <div className="mt-8 h-9 w-80 max-w-full animate-pulse rounded bg-muted" />
-        <div className="mt-4 h-4 w-[28rem] max-w-full animate-pulse rounded bg-muted" />
+      <Panel className="p-6 sm:p-8">
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="mt-8 h-9 w-80 max-w-full" />
+        <Skeleton className="mt-4 h-4 w-[28rem] max-w-full" />
         <div className="mt-8 grid gap-3 sm:grid-cols-3">
-          <div className="h-36 animate-pulse rounded-lg bg-muted" />
-          <div className="h-36 animate-pulse rounded-lg bg-muted" />
-          <div className="h-36 animate-pulse rounded-lg bg-muted" />
+          <Skeleton className="h-36 rounded-lg" />
+          <Skeleton className="h-36 rounded-lg" />
+          <Skeleton className="h-36 rounded-lg" />
         </div>
-      </div>
+      </Panel>
     </div>
   );
 }
@@ -175,7 +175,7 @@ function ErrorDashboard({ onRetry }: { onRetry: () => void }) {
   const { t } = useTranslation();
 
   return (
-    <div className="max-w-3xl rounded-lg border border-destructive/30 bg-card p-6 shadow-sm">
+    <Panel variant="attention" className="max-w-3xl p-6">
       <div className="flex items-start gap-3">
         <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-destructive/25 bg-destructive/10 text-destructive">
           <AlertCircle className="size-4" aria-hidden />
@@ -189,7 +189,7 @@ function ErrorDashboard({ onRetry }: { onRetry: () => void }) {
           </Button>
         </div>
       </div>
-    </div>
+    </Panel>
   );
 }
 
@@ -218,18 +218,14 @@ export function DashboardOverview() {
 
   return (
     <div className="max-w-6xl space-y-6">
-      <section className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+      <Panel className="overflow-hidden p-0">
         <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_22rem]">
           <div className="p-6 sm:p-8">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-md border border-primary/20 bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+              <Badge variant="primary">
                 {hasWorkspace ? t('dashboard.workspaceLinked') : t('dashboard.accountReady')}
-              </span>
-              {settings?.planName ? (
-                <span className="rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">
-                  {settings.planName}
-                </span>
-              ) : null}
+              </Badge>
+              {settings?.planName ? <Badge>{settings.planName}</Badge> : null}
             </div>
 
             <div className="mt-8 max-w-3xl space-y-3">
@@ -269,10 +265,10 @@ export function DashboardOverview() {
             </div>
           </div>
         </div>
-      </section>
+      </Panel>
 
       {workspaceSettingsQuery.isError ? (
-        <section className="rounded-lg border border-destructive/30 bg-card p-5 shadow-sm">
+        <Panel variant="attention">
           <div className="flex items-start gap-3">
             <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
             <div>
@@ -294,7 +290,7 @@ export function DashboardOverview() {
               </Button>
             </div>
           </div>
-        </section>
+        </Panel>
       ) : null}
 
       {showUsage ? (

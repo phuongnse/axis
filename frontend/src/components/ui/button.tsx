@@ -11,7 +11,7 @@ const buttonVariants = cva(
       variant: {
         cta: 'border-[hsl(var(--action-accent-border))] bg-accent text-accent-foreground shadow-[0_1px_0_hsl(var(--action-accent-shadow))] hover:bg-accent/90 focus-visible:ring-accent/30',
         default:
-          'bg-primary text-primary-foreground shadow-[0_1px_0_hsl(var(--action-primary-shadow))] hover:bg-primary/85',
+          'bg-primary text-primary-foreground shadow-[var(--shadow-control)] hover:bg-primary/85',
         outline:
           'border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50',
         secondary:

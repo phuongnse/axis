@@ -16,6 +16,9 @@ test.describe('design system catalog', () => {
     await expect(page.locator('[data-visual-target="primitive-action-link"]')).toBeVisible();
     await expect(page.locator('[data-visual-target="primitive-form"]')).toBeVisible();
     await expect(page.locator('[data-visual-target="theme-coverage"]')).toBeVisible();
+    await expect(page.locator('[data-visual-target="feedback"]')).toBeVisible();
+    await expect(page.locator('[data-visual-target="structure-data"]')).toBeVisible();
+    await expect(page.locator('[data-visual-target="layout"]')).toBeVisible();
 
     await expect(page.locator('[data-visual-target="primitive-button"]')).toHaveScreenshot(
       'primitive-button-desktop.png',
@@ -23,6 +26,18 @@ test.describe('design system catalog', () => {
     );
     await expect(page.locator('[data-visual-target="primitive-form"]')).toHaveScreenshot(
       'primitive-form-desktop.png',
+      screenshotOptions,
+    );
+    await expect(page.locator('[data-visual-target="feedback"]')).toHaveScreenshot(
+      'feedback-desktop.png',
+      screenshotOptions,
+    );
+    await expect(page.locator('[data-visual-target="structure-data"]')).toHaveScreenshot(
+      'structure-data-desktop.png',
+      screenshotOptions,
+    );
+    await expect(page.locator('[data-visual-target="layout"]')).toHaveScreenshot(
+      'layout-desktop.png',
       screenshotOptions,
     );
   });
@@ -34,10 +49,15 @@ test.describe('design system catalog', () => {
     await expect(page.getByRole('heading', { name: 'Axis design system' })).toBeVisible();
     await expect(page.locator('[data-visual-target="catalog-header"]')).toBeVisible();
     await expect(page.locator('[data-visual-target="primitive-form"]')).toBeVisible();
+    await expect(page.locator('[data-visual-target="feedback"]')).toBeVisible();
     await expect(page.locator('[data-visual-target="state-language"]')).toBeVisible();
 
     await expect(page.locator('[data-visual-target="primitive-form"]')).toHaveScreenshot(
       'primitive-form-mobile.png',
+      screenshotOptions,
+    );
+    await expect(page.locator('[data-visual-target="feedback"]')).toHaveScreenshot(
+      'feedback-mobile.png',
       screenshotOptions,
     );
   });

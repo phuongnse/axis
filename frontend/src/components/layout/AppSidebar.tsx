@@ -23,11 +23,11 @@ export function AppSidebar() {
   const selectedWorkspaceId = profile?.workspaceId ?? '';
 
   return (
-    <aside className="hidden min-h-screen w-64 shrink-0 flex-col border-r border-[hsl(174_18%_18%)] bg-[hsl(174_25%_12%)] text-white lg:flex">
-      <div className="space-y-4 border-b border-white/10 px-5 py-5">
+    <aside className="hidden min-h-screen w-[var(--size-sidebar)] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex">
+      <div className="space-y-4 border-b border-sidebar-border px-5 py-5">
         <div className="flex items-center gap-2">
           <img src={axisLogo} alt="Axis" className="size-8 shrink-0" width={32} height={32} />
-          <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-sidebar-muted">
             {t('common.controlPlane')}
           </p>
         </div>
@@ -43,13 +43,13 @@ export function AppSidebar() {
                   switchWorkspaceMutation.mutate(workspaceId);
                 }
               }}
-              className="h-10 w-full appearance-none rounded-md border border-white/10 bg-white/[0.06] px-3 pr-9 text-left text-sm text-white outline-none transition-colors hover:bg-white/[0.08] focus:border-white/30 disabled:cursor-wait disabled:opacity-70"
+              className="h-10 w-full appearance-none rounded-md border border-sidebar-border bg-inverse-muted px-3 pr-9 text-left text-sm text-sidebar-foreground outline-none transition-colors hover:bg-sidebar-accent focus:border-inverse-border disabled:cursor-wait disabled:opacity-70"
             >
               {workspaces.map((workspace) => (
                 <option
                   key={workspace.id}
                   value={workspace.id}
-                  className="bg-[hsl(174_25%_12%)] text-white"
+                  className="bg-sidebar text-sidebar-foreground"
                 >
                   {workspace.name} (
                   {workspace.type === 'Personal'
@@ -59,18 +59,18 @@ export function AppSidebar() {
                 </option>
               ))}
             </Select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-3 size-4 text-white/45" />
+            <ChevronDown className="pointer-events-none absolute right-3 top-3 size-4 text-sidebar-muted" />
           </div>
         ) : (
           <Button
             type="button"
             variant="outline"
-            className="w-full justify-start border-white/10 bg-white/[0.06] px-3 text-left text-sm text-white hover:bg-white/[0.08] hover:text-white"
+            className="w-full justify-start border-sidebar-border bg-inverse-muted px-3 text-left text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             disabled
             aria-label={t('shell.workspaceLabel')}
           >
             <span className="truncate">{t('shell.workspaceFallback')}</span>
-            <ChevronDown className="ml-auto size-4 shrink-0 text-white/45" />
+            <ChevronDown className="ml-auto size-4 shrink-0 text-sidebar-muted" />
           </Button>
         )}
       </div>
@@ -81,9 +81,12 @@ export function AppSidebar() {
           const active = item.to !== undefined && pathname.startsWith(item.to);
           const baseClass = cn(
             'flex items-center gap-3 rounded-md border border-transparent px-3 py-2 text-[13px] transition-colors',
-            active && 'border-white/10 bg-white/10 text-white font-medium',
-            !active && !item.disabled && 'text-white/70 hover:bg-white/[0.07] hover:text-white',
-            item.disabled && 'text-white/35 cursor-not-allowed',
+            active &&
+              'border-sidebar-border bg-sidebar-accent font-medium text-sidebar-accent-foreground',
+            !active &&
+              !item.disabled &&
+              'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+            item.disabled && 'cursor-not-allowed text-sidebar-muted',
           );
 
           if (item.disabled || !item.to) {
@@ -104,19 +107,21 @@ export function AppSidebar() {
         })}
       </nav>
 
-      <div className="mt-auto border-t border-white/10 px-4 py-4">
+      <div className="mt-auto border-t border-sidebar-border px-4 py-4">
         <div className="flex items-center gap-3">
           <div
-            className="flex size-8 shrink-0 items-center justify-center rounded-md border border-white/15 bg-white/10 text-xs font-medium text-white"
+            className="flex size-8 shrink-0 items-center justify-center rounded-md border border-inverse-border bg-sidebar-accent text-xs font-medium text-sidebar-accent-foreground"
             aria-hidden
           >
             {userInitials ?? '?'}
           </div>
           <div className="min-w-0">
-            <span className="block truncate text-xs font-medium text-white">
+            <span className="block truncate text-xs font-medium text-sidebar-foreground">
               {userLabel ?? t('shell.userFallback')}
             </span>
-            <span className="block text-[11px] text-white/45">{t('shell.workspaceAdmin')}</span>
+            <span className="block text-[11px] text-sidebar-muted">
+              {t('shell.workspaceAdmin')}
+            </span>
           </div>
         </div>
       </div>

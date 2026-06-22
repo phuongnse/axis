@@ -14,8 +14,12 @@ describe('DesignSystemCatalog', () => {
     expect(screen.getByRole('heading', { name: 'Icon button' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Action links' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Form controls' })).toBeInTheDocument();
-    expect(screen.getByText('Primary')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Feedback' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Structure and data' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Layout' })).toBeInTheDocument();
+    expect(screen.getAllByText('Primary').length).toBeGreaterThan(0);
     expect(screen.getByText('Chart 1')).toBeInTheDocument();
+    expect(screen.getByText('Sidebar')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /saving/i })).toHaveAttribute('aria-busy', 'true');
     expect(screen.getByRole('button', { name: 'Search catalog' })).toBeInTheDocument();
@@ -25,5 +29,8 @@ describe('DesignSystemCatalog', () => {
       'A reusable primitive should preserve height, focus, and readable line length across dense layouts.',
     );
     expect(screen.getByLabelText('Accept required terms')).toBeChecked();
+    expect(screen.getByText('Needs review')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'No records yet' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'More layout actions' })).toBeInTheDocument();
   });
 });
