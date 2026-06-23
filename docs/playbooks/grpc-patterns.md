@@ -48,7 +48,7 @@ CI runs `python scripts/axis.py check buf-lint` and `python scripts/axis.py chec
 
 Field-deletion enforcement in `buf.yaml` is **non-obvious** because the buf v2 category model splits deletion rules across categories in a way that's easy to misread. Dropping `FIELD_NO_DELETE` alone leaves *zero* enforcement on field removal — the "reserved variant" is not implicit in FILE/PACKAGE.
 
-Rule map (verify with `buf config ls-breaking-rules --version=v2`):
+Rule map (verify with `python scripts/axis.py buf list-breaking-rules`):
 
 | Rule | Categories | Default | What it does |
 |---|---|---|---|
@@ -74,7 +74,7 @@ Result: a field may be removed **iff** the proto has `reserved <number>;` AND `r
 
 When changing `buf.yaml` to allow a previously-forbidden change:
 
-1. **Run `buf config ls-breaking-rules --version=v2`** to see exactly which rules a category contains. Don't infer from category names — `PACKAGE` does *not* relax `FIELD_NO_DELETE`; the relaxed variant lives in `WIRE_JSON`/`WIRE` and is OFF by default.
+1. **Run `python scripts/axis.py buf list-breaking-rules`** to see exactly which rules a category contains. Don't infer from category names — `PACKAGE` does *not* relax `FIELD_NO_DELETE`; the relaxed variant lives in `WIRE_JSON`/`WIRE` and is OFF by default.
 2. **Test the negative case before declaring the fix works.** Delete a `reserved` line locally, run `python scripts/axis.py check buf-breaking-against-base`, and confirm it now fails. If it passes, you didn't fix it — you disabled enforcement. *"Buf passes" ≠ "rule fires correctly"*. A common bad fix is switching to `use: PACKAGE` or `FILE except FIELD_NO_DELETE` alone; both can pass raw local Buf while enforcing nothing.
 3. **Reserved fields alone are hygiene only.** Without an enforced rule, `reserved` is documentation — it tells humans not to reuse the number, but buf won't fail anyone who forgets.
 
@@ -144,24 +144,23 @@ internal sealed class DataModelCatalogGrpcService(IDataModelRepository repo)
 
 The server is mapped with `.RequireAuthorization()` so JwtBearer middleware runs first; the call reaches this method only when the JWT is valid. Caller-side gRPC clients (`FormModelDeletionGuard`, `FormWorkflowDeletionGuard`) forward the inbound `authorization` header via `Metadata` so the JWT travels with every cross-module call.
 
-## Dev — verify GetUserPermissions with grpcurl
+## Dev — verify GetUserPermissions
 
 Identity gRPC is mapped on the same Kestrel host as REST (`MapIdentityGrpc()`). The RPC requires a valid JWT (`RequireAuthorization`) and shares the `auth` rate limiter with login endpoints.
 
 Prerequisites:
 
-- [`grpcurl`](https://github.com/fullstorydev/grpcurl) installed locally.
+- [grpcurl](https://github.com/fullstorydev/grpcurl) installed locally; Axis wraps the command so docs and verification reports stay consistent.
 - `Axis.Api` running from the compose local-dev stack — default dev URL `https://localhost:5281`.
 - A Bearer access token from an authenticated session (PKCE login via the SPA, or the integration-test helpers in `tests/Api/Axis.Api.Tests/Helpers/AuthHelper.cs`).
 
 ```bash
 # Optional: list services exposed on the host
-grpcurl -cacert .dev-certs/rootCA.pem localhost:5281 list
+python scripts/axis.py grpc list
 
-grpcurl -cacert .dev-certs/rootCA.pem \
-  -H "authorization: Bearer <access_token>" \
-  -d '{"user_id":"<user-guid>"}' \
-  localhost:5281 axis.identity.v1.IdentityService/GetUserPermissions
+python scripts/axis.py grpc call axis.identity.v1.IdentityService/GetUserPermissions \
+  --authorization "Bearer <access_token>" \
+  --data '{"user_id":"<user-guid>"}'
 ```
 
 Replace `<access_token>` and `<user-guid>` with values from your workspace — the server reads the workspace from the JWT's `workspace_id` claim, so no `workspace_id` is sent in the payload. `Unauthenticated` / `PermissionDenied` means the token is missing, expired, or invalid — obtain a fresh token from `POST /connect/token` after PKCE login.

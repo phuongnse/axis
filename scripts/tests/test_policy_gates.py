@@ -904,6 +904,65 @@ class TestDocDriftRatchets(unittest.TestCase):
         issues = self.issue_text([("docs/playbooks/local-dev.md", "docker compose up -d")])
         self.assertIn("Raw Docker Compose command introduced in docs", issues)
 
+    def documented_issue_text(self, files: dict[str, str]) -> str:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for relative, content in files.items():
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+            return "\n".join(axis.documented_raw_command_issues(files.keys(), root=root))
+
+    def test_rejects_raw_repo_commands_in_documented_workflows(self) -> None:
+        issues = self.documented_issue_text(
+            {
+                "docs/playbooks/example.md": "\n".join(
+                    [
+                        "# Example",
+                        "",
+                        "```bash",
+                        "dotnet build",
+                        "npm run test",
+                        "npx -y @penpot/mcp@stable",
+                        "openssl genrsa -out key.pem 2048",
+                        "grpcurl -cacert .dev-certs/rootCA.pem localhost:5281 list",
+                        "python docs/scripts/sync-mermaid-theme.py",
+                        "buf config ls-breaking-rules --version=v2",
+                        "```",
+                    ]
+                ),
+            }
+        )
+
+        self.assertIn("use `python scripts/axis.py dotnet ...`", issues)
+        self.assertIn("use `python scripts/axis.py frontend ...`", issues)
+        self.assertIn("use `python scripts/axis.py design-source penpot mcp`", issues)
+        self.assertIn("use `python scripts/axis.py local-dev certs`", issues)
+        self.assertIn("use `python scripts/axis.py grpc ...`", issues)
+        self.assertIn("use `python scripts/axis.py docs ...`", issues)
+        self.assertIn("use `python scripts/axis.py buf list-breaking-rules`", issues)
+
+    def test_accepts_axis_wrapped_documented_commands(self) -> None:
+        issues = self.documented_issue_text(
+            {
+                "docs/playbooks/example.md": "\n".join(
+                    [
+                        "# Example",
+                        "",
+                        "```bash",
+                        "python scripts/axis.py dotnet build",
+                        "python scripts/axis.py frontend test",
+                        "python scripts/axis.py local-dev certs",
+                        "python scripts/axis.py grpc list",
+                        "python scripts/axis.py docs sync-mermaid-theme",
+                        "```",
+                    ]
+                ),
+            }
+        )
+
+        self.assertEqual("", issues)
+
 
 class TestWorkingTreeDiffHelpers(unittest.TestCase):
     def test_module_main_supports_dataclass_scripts(self) -> None:
@@ -1259,7 +1318,9 @@ class TestVerifyGate(unittest.TestCase):
         self.assertEqual(
             [
                 "frontend-toolchain",
+                "frontend-toolchain",
                 "npm run ci",
+                "frontend-toolchain",
                 "npm run test",
                 "policy-tests",
                 "doc-drift",
@@ -2547,6 +2608,135 @@ class TestLocalDevCli(unittest.TestCase):
         self.assertEqual(["compose", "-p", "axis", "-f", str(axis.LOCAL_DEV_COMPOSE_FILE), "down"], calls[0][1:])
         self.assertEqual(["volume", "rm", "axis_postgres_data"], calls[1][1:])
         self.assertEqual(["compose", "-p", "axis", "-f", str(axis.LOCAL_DEV_COMPOSE_FILE), "up", "-d"], calls[2][1:])
+
+
+class TestAxisCommandWrappers(unittest.TestCase):
+    def run_with_fake_process(self, func, args: axis.argparse.Namespace) -> list[list[str]]:
+        calls: list[list[str]] = []
+
+        def fake_run(command: list[str], **_kwargs):
+            calls.append(command)
+            return axis.subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        with (
+            mock.patch.object(axis, "check_dotnet_sdk", return_value=0),
+            mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+            mock.patch.object(axis, "check_buf_cli", return_value=0),
+            mock.patch.object(axis, "find_buf", return_value="buf"),
+            mock.patch.object(axis, "run", side_effect=fake_run),
+            mock.patch.object(axis, "exe", side_effect=lambda name: name),
+            mock.patch.object(axis.shutil, "which", return_value="/usr/bin/tool"),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, func(args))
+
+        return calls
+
+    def test_dotnet_build_uses_solution_wrapper(self) -> None:
+        calls = self.run_with_fake_process(
+            axis.dotnet_command,
+            axis.argparse.Namespace(dotnet_command="build", dotnet_args=["--no-restore"]),
+        )
+
+        self.assertEqual(["dotnet", "build", "Axis.sln", "--nologo", "--no-restore"], calls[0])
+
+    def test_dotnet_format_check_uses_verify_no_changes(self) -> None:
+        calls = self.run_with_fake_process(
+            axis.dotnet_command,
+            axis.argparse.Namespace(dotnet_command="format", check=True, dotnet_args=[]),
+        )
+
+        self.assertEqual(["dotnet", "format", "Axis.sln", "--verify-no-changes"], calls[0])
+
+    def test_frontend_gen_api_types_check_diffs_generated_file(self) -> None:
+        calls = self.run_with_fake_process(
+            axis.frontend_command,
+            axis.argparse.Namespace(frontend_command="gen-api-types", check=True),
+        )
+
+        self.assertEqual(["npm", "run", "gen:api-types"], calls[0])
+        self.assertEqual(["git", "diff", "--exit-code", "--", "frontend/src/lib/api-types.ts"], calls[1])
+
+    def test_docs_sync_mermaid_theme_runs_from_axis(self) -> None:
+        calls = self.run_with_fake_process(
+            axis.docs_command,
+            axis.argparse.Namespace(docs_command="sync-mermaid-theme"),
+        )
+
+        self.assertEqual([axis.sys.executable, str(ROOT / "docs" / "scripts" / "sync-mermaid-theme.py")], calls[0])
+
+    def test_buf_list_breaking_rules_uses_version_checked_wrapper(self) -> None:
+        calls = self.run_with_fake_process(
+            axis.buf_command,
+            axis.argparse.Namespace(buf_command="list-breaking-rules"),
+        )
+
+        self.assertEqual(["buf", "config", "ls-breaking-rules", "--version=v2"], calls[0])
+
+    def test_grpc_call_uses_grpcurl_with_default_local_target(self) -> None:
+        calls = self.run_with_fake_process(
+            axis.grpc_command,
+            axis.argparse.Namespace(
+                grpc_command="call",
+                cacert=".dev-certs/rootCA.pem",
+                authorization="Bearer token",
+                data='{"user_id":"user"}',
+                target="localhost:5281",
+                method="axis.identity.v1.IdentityService/GetUserPermissions",
+            ),
+        )
+
+        self.assertEqual(
+            [
+                "grpcurl",
+                "-cacert",
+                ".dev-certs/rootCA.pem",
+                "-H",
+                "authorization: Bearer token",
+                "-d",
+                '{"user_id":"user"}',
+                "localhost:5281",
+                "axis.identity.v1.IdentityService/GetUserPermissions",
+            ],
+            calls[0],
+        )
+
+    def test_penpot_mcp_runs_through_axis_wrapper(self) -> None:
+        calls = self.run_with_fake_process(
+            axis.design_source_penpot,
+            axis.argparse.Namespace(penpot_command="mcp"),
+        )
+
+        self.assertEqual(["npx", "-y", "@penpot/mcp@stable"], calls[0])
+
+    def test_local_dev_certs_writes_extension_and_runs_openssl(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            cert_dir = Path(temp) / ".dev-certs"
+            calls: list[list[str]] = []
+
+            def fake_run(command: list[str], **_kwargs):
+                calls.append(command)
+                return axis.subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+            with (
+                mock.patch.object(axis, "LOCAL_CERT_DIR", cert_dir),
+                mock.patch.object(axis, "LOCAL_ROOT_CA_KEY", cert_dir / "rootCA-key.pem"),
+                mock.patch.object(axis, "LOCAL_ROOT_CA_PEM", cert_dir / "rootCA.pem"),
+                mock.patch.object(axis, "LOCAL_ROOT_CA_CER", cert_dir / "rootCA.cer"),
+                mock.patch.object(axis, "LOCALHOST_KEY", cert_dir / "localhost-key.pem"),
+                mock.patch.object(axis, "LOCALHOST_CSR", cert_dir / "localhost.csr"),
+                mock.patch.object(axis, "LOCALHOST_EXT", cert_dir / "localhost.ext"),
+                mock.patch.object(axis, "LOCALHOST_CERT", cert_dir / "localhost.pem"),
+                mock.patch.object(axis, "run", side_effect=fake_run),
+                mock.patch.object(axis, "exe", side_effect=lambda name: name),
+                mock.patch.object(axis.shutil, "which", return_value="/usr/bin/openssl"),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                self.assertEqual(0, axis.local_dev_certs())
+
+            self.assertTrue((cert_dir / "localhost.ext").is_file())
+            self.assertIn("subjectAltName=@alt_names", (cert_dir / "localhost.ext").read_text(encoding="utf-8"))
+            self.assertEqual("openssl", calls[0][0])
 
 
 class TestInstallHooks(unittest.TestCase):

@@ -117,7 +117,7 @@ https://{your-penpot-domain}/mcp/stream?userToken={secret-token}
 Use this when you need local resources or the remote MCP endpoint is unavailable:
 
 ```bash
-npx -y @penpot/mcp@stable
+python scripts/axis.py design-source penpot mcp
 ```
 
 Then in Penpot:

@@ -2,10 +2,10 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← agent-checklist.md](./agent-checklist.md) · [← AGENTS.md](../../AGENTS.md)
 
-`scripts/axis.py` is the default source of truth for repository maintenance
-commands. Prefer Python for repo-level policy, docs checks, and orchestration.
-Use ecosystem-native tooling when the underlying tool is native to that
-ecosystem, such as legacy Excalidraw SVG export in `frontend/scripts/`.
+`scripts/axis.py` is the source of truth for repository maintenance commands.
+Documented repo workflows and CI `run:` steps go through Axis wrappers. Native
+tools such as Docker, .NET, npm, Buf, Lychee, OpenSSL, and grpcurl stay behind
+the wrapper as implementation details.
 
 ## Tool Versions
 
@@ -17,44 +17,47 @@ runtime.
 
 | Tool | Required version source | Used by | Local enforcement |
 |---|---:|---|---|
-| .NET SDK | `8.x` in [TECH_STACK.md](../TECH_STACK.md), selected by [`global.json`](../../global.json) | `python scripts/axis.py verify`, `test unit`, package scans, API contract generation | `global.json` must select major `8`; `dotnet --version` major must be `8`; another major fails before any `dotnet` command runs. |
-| Node.js | [`frontend/.nvmrc`](../../frontend/.nvmrc) | `python scripts/axis.py verify`, frontend checks/tests, API type generation, legacy wireframe export | `node --version` major must match `.nvmrc`; `npm` must resolve from `PATH`. |
-| Lychee | `0.23.0` exactly in this table | `python scripts/axis.py check markdown-links`, CI Markdown link check | `lychee.toml` is written for the 0.23 config schema. `lychee --version` must print `lychee 0.23.0`; newer versions fail fast until this row and config are intentionally upgraded together. |
-| Buf CLI | `1.50.0` exactly in this table | `python scripts/axis.py check buf-lint`, `python scripts/axis.py check buf-breaking-against-base`, CI protobuf checks | `buf --version` must print `1.50.0`; local protobuf commands must go through `scripts/axis.py` wrappers, not raw `buf`, so the version check always runs first. |
+| .NET SDK | `8.x` in [TECH_STACK.md](../TECH_STACK.md), selected by [`global.json`](../../global.json) | `python scripts/axis.py verify`, `python scripts/axis.py dotnet ...`, `test unit`, package scans, API contract generation | `global.json` must select major `8`; Axis checks the resolved SDK major before any wrapped .NET workflow runs. |
+| Node.js | [`frontend/.nvmrc`](../../frontend/.nvmrc) | `python scripts/axis.py verify`, `python scripts/axis.py frontend ...`, API type generation, legacy wireframe export, Penpot MCP | Axis checks the resolved Node major and package-manager availability before wrapped frontend workflows run. |
+| Lychee | `0.23.0` exactly in this table | `python scripts/axis.py check markdown-links`, CI Markdown link check | `lychee.toml` is written for the 0.23 config schema; Axis fails fast when another version resolves. |
+| Buf CLI | `1.50.0` exactly in this table | `python scripts/axis.py check buf-lint`, `python scripts/axis.py check buf-breaking-against-base`, CI protobuf checks | Axis checks the resolved Buf version before wrapped protobuf workflows run. |
 
-Install Lychee from the upstream release for `v0.23.0`, or via Cargo if Rust is
-already available:
-
-```bash
-cargo install lychee --version 0.23.0 --locked --force
-lychee --version
-```
-
-If `lychee --version` reports another version, fix `PATH` or reinstall before
-running the markdown link check.
-
-Install Buf CLI from the upstream release for `v1.50.0`, then verify:
-
-```bash
-buf --version
-```
-
-If `buf --version` reports another version, fix `PATH` or reinstall before
-running protobuf checks.
+Install Lychee and Buf from their upstream releases at the documented versions,
+then verify the active toolchain with `python scripts/axis.py doctor` or the
+specific Axis checks below. Do not document raw installer/version commands as a
+repo workflow.
 
 ## Commands
 
 ```bash
 python scripts/axis.py doctor
 python scripts/axis.py verify
+python scripts/axis.py dotnet restore
+python scripts/axis.py dotnet build
+python scripts/axis.py dotnet test
+python scripts/axis.py dotnet format --check
+python scripts/axis.py dotnet run-api
+python scripts/axis.py dotnet ef migrations add <Name> ...
+python scripts/axis.py frontend install
+python scripts/axis.py frontend ci
+python scripts/axis.py frontend test
+python scripts/axis.py frontend gen-api-types --check
+python scripts/axis.py docs sync-mermaid-theme
+python scripts/axis.py docs mermaid-init
+python scripts/axis.py buf list-breaking-rules
+python scripts/axis.py grpc list
+python scripts/axis.py grpc call <method> --data '{"example":"value"}'
+python scripts/axis.py local-dev certs
 python scripts/axis.py local-dev up
 python scripts/axis.py local-dev status
 python scripts/axis.py local-dev e2e
 python scripts/axis.py design-source penpot up
 python scripts/axis.py design-source penpot status
+python scripts/axis.py design-source penpot mcp
 python scripts/axis.py check policy-tests
 python scripts/axis.py check codex-skills
 python scripts/axis.py check text-encoding
+python scripts/axis.py check docker
 python scripts/axis.py check dotnet-sdk
 python scripts/axis.py check frontend-toolchain
 python scripts/axis.py check doc-drift
@@ -76,15 +79,15 @@ python scripts/axis.py register avro-schemas --dry-run
 
 - Keep new repo-level maintenance and docs policy scripts in Python.
 - Add subcommands to `scripts/axis.py` for new repo workflows.
-- Document repo-owned orchestration through `scripts/axis.py`; raw underlying
-  commands belong inside the wrapper, not as the default docs path.
+- Document repo-owned workflows through `scripts/axis.py`; raw underlying
+  commands belong inside the wrapper, not in docs or CI `run:` steps.
 - Put shared repository discovery in `scripts/axis_repo.py` or small Python helpers.
 - Do not add ad hoc utility scripts in any runtime under top-level `scripts/`,
   `docs/scripts/`, `docs/wireframes/`, or `docs/diagrams/`.
 - Native ecosystem tooling belongs beside the owning package, with a package
-  script and, when useful for repo workflows, a `scripts/axis.py` entrypoint.
-- Top-level `scripts/*.py` files are run through `python scripts/axis.py` or
-  explicit `python ...` commands and should stay non-executable.
+  script and a `scripts/axis.py` entrypoint for any repo workflow.
+- Top-level `scripts/*.py` files are run through `python scripts/axis.py` and
+  should stay non-executable.
 - `scripts/hooks/pre-push` is the committed source for the local Git hook. Keep
   it non-executable in the worktree; `python scripts/axis.py install-hooks`
   writes the executable copy to `.git/hooks/pre-push`.
@@ -101,5 +104,7 @@ python scripts/axis.py register avro-schemas --dry-run
 rule and is included in doc drift.
 `python scripts/axis.py check codex-skills` enforces repo-scoped skill structure
 and is included in doc drift.
+`python scripts/axis.py check doc-drift` enforces documented repo workflows
+through Axis wrappers and rejects raw workflow commands in docs.
 `python scripts/axis.py check doc-size-budgets` enforces reference/playbook size
 budgets and is included in doc drift.

@@ -106,7 +106,7 @@ export const workflowKeys = {
 - **Entity IDs are `string`**: backend uses Guid serialised as string. Never type an entity ID as `number`.
 - **No transformation in components**: if a different shape is needed, derive it in the hook or a selector — not inline in JSX.
 - **Type co-location**: small prop interfaces and local type aliases may be co-located with the component that owns them. Shared types belong in a `types.ts` file within the feature folder.
-- **Biome** is the single tool for linting and formatting (`frontend/biome.json`). Run `npm run lint:fix` to auto-fix, `npm run format` to format only.
+- **Biome** is the single tool for linting and formatting (`frontend/biome.json`). Run `python scripts/axis.py frontend script lint:fix` to auto-fix, `python scripts/axis.py frontend script format` to format only.
 
 ---
 

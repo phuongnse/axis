@@ -61,4 +61,4 @@ High-risk surfaces require user sign-off before code. For standard-tier work, th
 
 1. Self-review the diff against the dossier.
 2. Run the triggered checks from [agent-checklist § Verification Gate](./agent-checklist.md#verification-gate--verify-before-pr-review).
-3. If you claim the full suite ran locally, it must mean full `dotnet test Axis.sln` ran, including integration tests.
+3. If you claim the full suite ran locally, it must mean full `python scripts/axis.py dotnet test` ran, including integration tests.

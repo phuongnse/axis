@@ -29,7 +29,7 @@ or pattern docs.
   `3000`, `5281`, `5432`, `6379`, `1025`, `1080`, `4566`, `29092`, `8081`, `5672`, `15672`, `8200`
 
   Optional observability profile also uses `3001`, `4317`, `4318` — see [Observability (optional)](#observability-optional).
-- The API container writes .NET build artifacts to `/tmp/axis-artifacts`, so repo-level `dotnet build` no longer shares `bin/obj` with the container.
+- The API container writes .NET build artifacts to `/tmp/axis-artifacts`, so repo-level Axis .NET builds no longer share `bin/obj` with the container.
 
 ---
 
@@ -67,8 +67,8 @@ the adapter only as execution context.
 
 ### Docker endpoint adapter
 
-Preferred path: run Docker, .NET, npm, and Axis CLI commands from the same
-execution environment where `docker info` succeeds.
+Preferred path: run Docker, .NET, frontend, and Axis CLI commands from the same
+execution environment where `python scripts/axis.py check docker` succeeds.
 
 If Docker is reachable only through an exported endpoint, set `DOCKER_HOST` for
 the current process/session using that environment's standard env-var mechanism:
@@ -88,9 +88,10 @@ canonical Axis CLI repo-root command there.
 
 ### Package-manager adapter
 
-If a shell wrapper blocks package-manager execution, use the runtime's native
-binary/shim for the same package script. Keep reported commands as package
-scripts, e.g. `cd frontend && npm run ci && npm run test`.
+If a shell wrapper blocks package-manager execution, fix that environment or use
+the runtime's native binary/shim only as the implementation path behind the
+matching Axis frontend wrapper. Keep reported commands as Axis commands, e.g.
+`python scripts/axis.py frontend ci` and `python scripts/axis.py frontend test`.
 
 ---
 
@@ -108,8 +109,8 @@ of silently falling back to HTTP.
 First boot:
 
 - Infrastructure images pull (Postgres, Redis, Kafka, RabbitMQ, … — several hundred MB total).
-- **API** waits for Postgres, Redis, LocalStack, Kafka, Schema Registry, and RabbitMQ to be healthy, then runs `dotnet restore`, `dotnet build`, and `dotnet Axis.Api.dll` with artifacts under `/tmp/axis-artifacts` — first restore ~1–2 min; NuGet cache lives in the `nuget_packages` volume.
-- **Web** syncs `npm ci` when `package-lock.json` changes, then starts Vite — first install ~1 min; `node_modules` cache lives in `web_node_modules`.
+- **API** waits for Postgres, Redis, LocalStack, Kafka, Schema Registry, and RabbitMQ to be healthy, then restores, builds, and executes the API DLL with artifacts under `/tmp/axis-artifacts` — first restore ~1–2 min; NuGet cache lives in the `nuget_packages` volume.
+- **Web** syncs package-lock dependencies when `package-lock.json` changes, then starts Vite — first install ~1 min; `node_modules` cache lives in `web_node_modules`.
 
 Add `--build` only after changing [`frontend/Dockerfile.dev`](../../frontend/Dockerfile.dev) or the root [`Dockerfile`](../../Dockerfile) (production image). Browser smoke builds only the E2E image because it bakes in the current frontend source and dependencies.
 
@@ -131,7 +132,7 @@ Optional browser smoke uses `python scripts/axis.py local-dev e2e`; see
 | Postgres | `localhost:5432` | User `axis` / password `axis_dev_pass`. API startup creates and migrates active module DBs in Development: `axis_identity`, `axis_datamodeling`, `axis_workflowbuilder`, `axis_formbuilder`, `axis_workflowengine`. |
 | Redis | `localhost:6379` | No auth. |
 | LocalStack | <http://localhost:4566> | S3 only (avatars). |
-| Kafka (KRaft) | `localhost:29092` | Host listener for local `dotnet run`. Containers use `kafka:9092` on the compose network (not host-published). Carries `*Event` / `*Snapshot` ([ADR-025](../TECH_STACK.md#adr-025-transport-selection-rule-by-message-name-suffix)). |
+| Kafka (KRaft) | `localhost:29092` | Host listener for local API runs through `python scripts/axis.py dotnet run-api`. Containers use `kafka:9092` on the compose network (not host-published). Carries `*Event` / `*Snapshot` ([ADR-025](../TECH_STACK.md#adr-025-transport-selection-rule-by-message-name-suffix)). |
 | Schema Registry | <http://localhost:8081> | `BACKWARD`-only compatibility ([ADR-019](../TECH_STACK.md#adr-019-avro-and-schema-registry-for-event-payloads-with-cloudevents-envelope)). |
 | RabbitMQ | `localhost:5672` (AMQP) | Credentials `axis` / `axis_dev_pass`. |
 | RabbitMQ UI | <http://localhost:15672> | Management UI. Carries `*Command` / `*Job` / `*SagaStep` ([ADR-024](../TECH_STACK.md#adr-024-rabbitmq-for-commands-background-jobs-and-saga-orchestration)). |
@@ -185,7 +186,7 @@ when the current execution context cannot reach Docker.
 | Stack | Triggers reload | Needs container restart |
 |---|---|---|
 | Backend (`api`) | Restart `api` after saving `.cs` under `src/`. | Any backend code, `Directory.Packages.props`, or new `<PackageReference>` → `python scripts/axis.py local-dev restart api`. |
-| Frontend (`web`) | Saving under `frontend/src/` — Vite HMR. | `vite.config.ts`, `package.json`, `package-lock.json`, or new npm dep → `python scripts/axis.py local-dev restart web`; the container syncs `npm ci` automatically when the lockfile hash changes. |
+| Frontend (`web`) | Saving under `frontend/src/` — Vite HMR. | `vite.config.ts`, `package.json`, `package-lock.json`, or new npm dep → `python scripts/axis.py local-dev restart web`; the container syncs package-lock dependencies automatically when the lockfile hash changes. |
 
 Vite polling is enabled (`VITE_USE_POLLING=1`) because file-watch events through
 bind mounts are not consistent across container runtimes. Expect ~200–500 ms
@@ -198,29 +199,32 @@ between frontend save and reload.
 Backend integration tests use **Testcontainers** — no compose stack required for CI-style verification:
 
 ```bash
-dotnet build && dotnet test
-cd frontend && npm run ci && npm run test
+python scripts/axis.py dotnet build
+python scripts/axis.py dotnet test
+python scripts/axis.py frontend ci
+python scripts/axis.py frontend test
 ```
 
-When `docker info` works for the process running .NET, Testcontainers uses that
-Docker endpoint and no extra configuration is needed. If it does not, use the
+When `python scripts/axis.py check docker` works for the process running .NET,
+Testcontainers uses that Docker endpoint and no extra configuration is needed. If it does not, use the
 [Docker endpoint adapter](#docker-endpoint-adapter) instead of
 hardcoding Docker endpoints in test code:
 
 ```text
 DOCKER_HOST=<docker-endpoint>
-dotnet test Axis.sln --nologo
+python scripts/axis.py dotnet test
 ```
 
 ---
 
-## EF Core migrations (`dotnet ef`)
+## EF Core migrations
 
 Pre-production: each module keeps migrations generated by EF. Do **not** hand-write migration `.cs` files or patch `.Designer.cs` without re-running the tool.
 
-`dotnet` and `dotnet ef` must resolve from `PATH`. If either command is missing,
-install the .NET SDK / EF tool or fix `PATH` before generating a migration. Repo
-scripts must use `PATH`, not hardcoded SDK locations.
+Generate migrations through `python scripts/axis.py dotnet ef ...`; the wrapper
+checks the documented .NET SDK before invoking the EF tool. If the EF tool is
+missing, install it for the active SDK or fix `PATH` before generating a
+migration. Repo scripts must use `PATH`, not hardcoded SDK locations.
 
 Connection string env vars (dummy host is fine for `migrations add`; tests use Testcontainers):
 
@@ -235,7 +239,7 @@ Connection string env vars (dummy host is fine for `migrations add`; tests use T
 Regenerate from repo root (Identity example):
 
 ```bash
-dotnet ef migrations add InitialCreate \
+python scripts/axis.py dotnet ef migrations add InitialCreate \
   --project src/Modules/Identity/Axis.Identity.Infrastructure/Axis.Identity.Infrastructure.csproj \
   --startup-project src/Modules/Identity/Axis.Identity.Infrastructure/Axis.Identity.Infrastructure.csproj
 ```
@@ -266,9 +270,9 @@ python scripts/axis.py local-dev reset-db
 
 ## Gotchas
 
-- **`launchSettings.json` is ignored** in the container because compose starts the compiled DLL directly (`dotnet Axis.Api.dll`), not `dotnet run`; launch profile `applicationUrl` does not apply to that path.
+- **`launchSettings.json` is ignored** in the container because compose starts the compiled DLL directly, not the SDK launch-profile path; launch profile `applicationUrl` does not apply there.
 - **Host browser trust is separate from container trust.** Docker services mount the required files from `.dev-certs/`; Windows, macOS, or Linux browsers need the root CA trusted in that host OS before `https://localhost:3000` is clean.
-- **Container build artifacts stay outside the bind mount.** The API compose command passes `--artifacts-path /tmp/axis-artifacts` to `dotnet restore` and `dotnet build`, so container-generated `bin/obj` outputs do not overwrite repo-level IDE or developer-tool artifacts.
+- **Container build artifacts stay outside the bind mount.** The API compose command passes an artifacts path for restore/build, so container-generated `bin/obj` outputs do not overwrite repo-level IDE or developer-tool artifacts.
 - **MailDev health** — compose disables MailDev's baked-in healthcheck (`healthcheck: disable: true`); nothing waits on it.
 - **API startup order** — Kafka + Schema Registry + RabbitMQ must be healthy before the API starts; first boot can take ~60s on the API healthcheck `start_period`.
 - **Module vs workspace migrations** — API startup migrates each module's public schema in Development; workspace schemas migrate on first workspace provisioning.

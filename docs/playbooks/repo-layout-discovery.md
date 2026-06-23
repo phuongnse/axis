@@ -48,7 +48,7 @@ That runs (among others): module/API layout discovery, changed-handler test ratc
 When only validating discovery (no PR diff yet):
 
 ```bash
-python scripts/doc_drift_domains.py --list    # debug: module/API → docs mapping
+python scripts/axis.py check doc-drift       # includes module/API → docs mapping
 python scripts/axis.py check buf-modules
 python scripts/axis.py check kafka-wiring
 python scripts/axis.py check domain-readme-index
@@ -66,7 +66,7 @@ python scripts/axis.py check domain-readme-index
 - [ ] If Kafka events: add `*Event.avsc`, `*KafkaTopics.cs` const, wire `Program.cs` (kafka check).
 - [ ] If gRPC: add `Contracts/Protos/*.proto`, run `python scripts/axis.py generate buf-yaml`, `python scripts/axis.py check buf-lint`.
 - [ ] Reference module projects in `tests/Architecture/Axis.Architecture.Tests/Axis.Architecture.Tests.csproj` when fitness tests should load them.
-- [ ] Run `python scripts/axis.py check doc-drift` and full `dotnet test` on `Axis.sln`.
+- [ ] Run `python scripts/axis.py check doc-drift` and full `python scripts/axis.py dotnet test`.
 
 ### B — New use case (folder under `docs/use-cases/{domain}/{slug}/`)
 

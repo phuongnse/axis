@@ -51,7 +51,7 @@ Use this checklist **before every commit** that changes visual artifacts:
 **Diagrams (Mermaid in Markdown):**
 
 1. Edit diagram content in `docs/README.md` or the owning use-case `README.md`.
-2. Theme colors: only in [`docs/diagrams/mermaid_theme.py`](../diagrams/mermaid_theme.py) — run `python docs/scripts/sync-mermaid-theme.py` after changing `MERMAID_INIT`.
+2. Theme colors: only in [`docs/diagrams/mermaid_theme.py`](../diagrams/mermaid_theme.py) — run `python scripts/axis.py docs sync-mermaid-theme` after changing `MERMAID_INIT`.
 3. Preview on GitHub or in the IDE; see [mermaid.md](./mermaid.md).
 4. Commit `.md` only — no `.excalidraw` / `.svg` for sequence or entity diagrams.
 

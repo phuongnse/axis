@@ -14,7 +14,7 @@ A slice is isolated only if **both** sides hold. Verify both before marking the 
 
 | Side | Definition | How to verify |
 |------|------------|---------------|
-| **A — Stands alone** | A fresh checkout of the branch compiles, the local Verification gate is green, CI is expected to run the full suite, and every route / endpoint / contract / symbol the slice *references* already exists on its merge target. | Switch to the branch on a clean tree → run `python scripts/axis.py verify`; rely on CI/branch protection for full `dotnet test Axis.sln`. |
+| **A — Stands alone** | A fresh checkout of the branch compiles, the local Verification gate is green, CI is expected to run the full suite, and every route / endpoint / contract / symbol the slice *references* already exists on its merge target. | Switch to the branch on a clean tree → run `python scripts/axis.py verify`; rely on CI/branch protection for full `python scripts/axis.py dotnet test`. |
 | **B — Integrates** | After **rebasing onto current `main`**, it still compiles and is green, and merging it requires **no unmerged sibling**. | Rebase onto `origin/main`, re-run `python scripts/axis.py verify`; CI must rerun on the rebased branch before merge. |
 
 If a slice references something an **unmerged sibling owns** (a route it navigates to, an endpoint it calls, a symbol it imports, a constant it reads), it fails side A — it is stacked in disguise, not isolated. Either pull that dependency into this slice, or ship a fallback that compiles and degrades gracefully on the current `main`.
@@ -62,7 +62,7 @@ Common seam categories:
 
 "Verification gate green" in a PR body is a factual claim that you ran the local Verification gate on this branch: `python scripts/axis.py verify` with the command matrix in [agent-checklist § Verification Gate](./agent-checklist.md#verification-gate--verify-before-pr-review). Do not present unit-only output, a one-file test, or a partial command as the Verification gate.
 
-The full suite is a separate claim: full local verification means full `dotnet test Axis.sln --nologo` plus the applicable frontend and drift checks. CI/branch protection is the authoritative full gate before merge.
+The full suite is a separate claim: full local verification means full `python scripts/axis.py dotnet test` plus the applicable frontend and drift checks. CI/branch protection is the authoritative full gate before merge.
 
 If you cannot run a piece (e.g. an integration suite needs infra you do not have), **say so explicitly** in your own walk-through. Never tick a green box you did not verify — the cost of a false green lands on review, not on you.
 

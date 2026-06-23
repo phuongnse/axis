@@ -81,7 +81,7 @@ Stack, versions, and ADRs are owned by [`docs/TECH_STACK.md`](docs/TECH_STACK.md
 - Zero build warnings and zero test failures.
 - Owning docs in the same PR when behavior/spec/status changes; pure refactor/style/test-only changes do not need a token docs edit (see [agent-checklist](docs/playbooks/agent-checklist.md)).
 - No new TODO/FIXME/placeholder/stub code.
-- For **wireframe/design-source** changes (`docs/wireframes/`, `docs/use-cases/**` screen source/preview rows, committed previews, or legacy `.excalidraw`/`.svg`): run [`docs/playbooks/visual-artifact-checklist.md`](docs/playbooks/visual-artifact-checklist.md) before commit. **Diagrams** are Mermaid in `docs/README.md` and use-case `README.md` — one theme in [`docs/diagrams/mermaid_theme.py`](docs/diagrams/mermaid_theme.py); run `python docs/scripts/sync-mermaid-theme.py` after editing `MERMAID_INIT` ([`docs/playbooks/mermaid.md`](docs/playbooks/mermaid.md)).
+- For **wireframe/design-source** changes (`docs/wireframes/`, `docs/use-cases/**` screen source/preview rows, committed previews, or legacy `.excalidraw`/`.svg`): run [`docs/playbooks/visual-artifact-checklist.md`](docs/playbooks/visual-artifact-checklist.md) before commit. **Diagrams** are Mermaid in `docs/README.md` and use-case `README.md` — one theme in [`docs/diagrams/mermaid_theme.py`](docs/diagrams/mermaid_theme.py); run `python scripts/axis.py docs sync-mermaid-theme` after editing `MERMAID_INIT` ([`docs/playbooks/mermaid.md`](docs/playbooks/mermaid.md)).
 
 **When blocked:** state blocker → cite constraint → 2–3 options → wait. Never self-unblock on P0.
 
@@ -148,10 +148,10 @@ Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, use-c
 | | .NET | Frontend |
 |---|------|----------|
 | Types | No `var` for locals (see `.editorconfig`); explicit types; keep files focused | `const`/`let`, no `var`; strict TS, no `any` |
-| Hygiene | Prefer `using` over inline FQCN; `dotnet format Axis.sln` before review (CI `--verify-no-changes`) | Biome via `npm run ci` |
+| Hygiene | Prefer `using` over inline FQCN; `python scripts/axis.py dotnet format --check` before review | Biome via `python scripts/axis.py frontend ci` |
 | Scope | Fix violation class in one PR, not one file | Feature folders; no cross-feature imports except `index.ts` |
 
-**Enforced C# rules** live in [`.editorconfig`](.editorconfig) at the repo root. Do not restate style here — run `dotnet format` and follow the file.
+**Enforced C# rules** live in [`.editorconfig`](.editorconfig) at the repo root. Do not restate style here — run `python scripts/axis.py dotnet format --check` and follow the file.
 
 **Architecture/API contracts:** use `$axis-api-contract` for REST/OpenAPI/API-type work and `$axis-cross-module-contract` for events, protos, Wolverine, Kafka, RabbitMQ, or gRPC. Details live in [`api-patterns.md`](docs/playbooks/api-patterns.md), [`cross-module-patterns.md`](docs/playbooks/cross-module-patterns.md), [`wolverine-patterns.md`](docs/playbooks/wolverine-patterns.md), [`grpc-patterns.md`](docs/playbooks/grpc-patterns.md), and [`repo-layout-discovery.md`](docs/playbooks/repo-layout-discovery.md).
 

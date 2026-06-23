@@ -150,7 +150,7 @@ Use the frontend catalog route as the first visual QA harness:
 | Navigation | Keep the catalog hidden from product navigation until there is an explicit internal-tools shell |
 
 The catalog route is an implementation and verification surface, not a product workflow. Use it to prove token, theme, state, and primitive-component coverage before migrating legacy screens.
-Run `npm run test:e2e -- design-system-catalog.pw.ts` from `frontend/` for local smoke coverage after installing Playwright browsers and native dependencies with `npx playwright install chromium` and `npx playwright install-deps chromium`.
+Run `python scripts/axis.py local-dev e2e` for canonical local smoke coverage. Host-only Playwright checks are developer convenience paths and should be exposed through an Axis frontend wrapper before becoming documented workflow commands.
 
 ## Enforceable Contract
 

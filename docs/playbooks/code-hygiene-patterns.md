@@ -136,14 +136,9 @@ foreach (WorkflowExportDto dto in workflows)
 
 Every change — including one-line fixes — goes through a branch + PR. Steps:
 
-```bash
-git checkout -b chore/my-fix   # branch off current HEAD
-# make changes
-git add <files>
-git commit -m "chore: ..."
-git push -u origin chore/my-fix
-gh pr create …
-```
+Use the normal Git/GitHub client for source-control actions, keep the branch off
+the current review base, commit with a Conventional Commit subject, push the
+branch, and open a PR. Do not push directly to `main`.
 
 ---
 

@@ -8,9 +8,9 @@ Rules for NuGet package changes and dependency-injection lifetimes.
 
 ## NuGet / packaging rules
 
-- **Never use `dotnet add package`** — it corrupts `Directory.Packages.props` (CPM project). Always edit `Directory.Packages.props` directly.
-- **Search NuGet before assuming a package ID** — NuGet IDs often differ from project names. Run `dotnet package search "<name>"` when unsure of the correct ID.
-- **Check transitive dependency versions** after adding any new infrastructure package — run `dotnet build` immediately to catch conflicts introduced by the new dependency.
+- **Never use the SDK package-add command** — it corrupts `Directory.Packages.props` (CPM project). Always edit `Directory.Packages.props` directly.
+- **Search NuGet before assuming a package ID** — NuGet IDs often differ from project names. Use the package registry search before editing the central package file.
+- **Check transitive dependency versions** after adding any new infrastructure package — run `python scripts/axis.py dotnet build` immediately to catch conflicts introduced by the new dependency.
 - **Non-web test projects needing ASP.NET Core types** — use `<FrameworkReference Include="Microsoft.AspNetCore.App" />`, never `<PackageReference Include="Microsoft.AspNetCore.Http" />`.
 
 ## Dependency Injection pitfalls

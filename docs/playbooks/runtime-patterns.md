@@ -113,7 +113,7 @@ Implementation lives in `Axis.Shared.Infrastructure/Observability/OpenTelemetryS
 
 ```bash
 python scripts/axis.py local-dev observability up
-dotnet run --project src/Axis.Api/Axis.Api.csproj
+python scripts/axis.py dotnet run-api
 ```
 
 Grafana UI: `http://localhost:3001`. OTLP endpoint for an API run outside compose: `http://localhost:4317` (default in `appsettings.json`).
