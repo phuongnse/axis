@@ -51,6 +51,12 @@ Workspace admins can invite new members, manage their accounts, and deactivate u
 *Out of scope*
 - Bulk invitation via CSV upload.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -69,9 +75,3 @@ Workspace admins can invite new members, manage their accounts, and deactivate u
 >
 > **Decisions:** existing-member and pending-invitation checks throw `ValidationException` with specific messages matching AC wording.
 >
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |

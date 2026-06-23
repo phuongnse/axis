@@ -42,6 +42,12 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 - Hard delete / permanent purge.
 - Bulk delete.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -58,9 +64,3 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 >
 > **Decisions:** Draft deletion remains a soft-delete operation; no restore UI is exposed for deleted drafts.
 >
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |

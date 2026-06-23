@@ -193,8 +193,8 @@ Ship user value.
             + """
 ## Design Sources
 
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
+| Screen | Source | Preview |
+|--------|--------|---------|
 | N/A | N/A | N/A |
 
 """
@@ -279,8 +279,8 @@ Ship user value.
 
 ## Design Sources
 
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
+| Screen | Source | Preview |
+|--------|--------|---------|
 | N/A | N/A | N/A |
 
 > **Implementation status**
@@ -452,8 +452,8 @@ Ship user value.
 
 ## Design Sources
 
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
+| Screen | Source | Preview |
+|--------|--------|---------|
 | N/A | N/A | N/A |
 
 > **Implementation status**
@@ -809,6 +809,132 @@ Ship user value.
 
         self.assertEqual([], issues)
 
+    def test_rejects_implementation_status_before_design_sources(self) -> None:
+        issues = self.issues_for_document(
+            """# Sample use case
+
+## Purpose
+
+Ship user value.
+
+## Primary actor
+
+- User
+
+## Trigger
+
+- User starts the flow.
+
+## Main flow
+
+1. User starts.
+2. System responds.
+3. User completes the flow.
+
+## Alternate / error flows
+
+- None.
+
+## Acceptance Criteria
+
+*Happy path*
+- [ ] AC-001 Works.
+
+## Acceptance Test Matrix
+
+| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+|---|---|---|---|---|---|
+| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+"""
+        )
+
+        self.assertIn("section order must be", "\n".join(issues))
+
+    def test_rejects_tool_specific_design_source_header(self) -> None:
+        issues = self.issues_for_document(
+            """# Sample use case
+
+## Purpose
+
+Ship user value.
+
+## Primary actor
+
+- User
+
+## Trigger
+
+- User starts the flow.
+
+## Main flow
+
+1. User starts.
+2. System responds.
+3. User completes the flow.
+
+## Alternate / error flows
+
+- None.
+
+## Acceptance Criteria
+
+*Happy path*
+- [ ] AC-001 Works.
+
+## Acceptance Test Matrix
+
+| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+|---|---|---|---|---|---|
+| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
+
+## Design Sources
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| register | [source](./register.excalidraw) | [preview](./register.svg) |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertIn("must use `Source`, not tool-specific `Excalidraw`", "\n".join(issues))
+
     def test_rejects_design_source_pointing_to_preview_asset(self) -> None:
         issues = self.issues_for_document(
             """# Sample use case
@@ -933,9 +1059,9 @@ Ship user value.
 """
         )
 
-        self.assertIn("has a preview but no editable Source/Excalidraw", "\n".join(issues))
+        self.assertIn("has a preview but no editable Source", "\n".join(issues))
 
-    def test_accepts_legacy_excalidraw_source_with_preview(self) -> None:
+    def test_accepts_legacy_excalidraw_asset_under_source_with_preview(self) -> None:
         issues = self.issues_for_document(
             """# Sample use case
 
@@ -1047,14 +1173,76 @@ Canonical order. The wireframes table below uses the same row order.
 
 ## Wireframes
 
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| login | [source](https://design.example/frame) | N/A |
+"""
+        after = (
+            before.replace("wireframes table", "design sources table")
+            .replace("## Wireframes", "## Design Sources")
+            .replace("| Screen | Excalidraw | Preview |", "| Screen | Source | Preview |")
+            .replace("|--------|------------|---------|", "|--------|--------|---------|")
+        )
+
+        self.assertEqual(
+            check_use_case_docs.material_change_snapshot(before),
+            check_use_case_docs.material_change_snapshot(after),
+        )
+
+    def test_design_source_status_reorder_is_not_material_use_case_refresh(self) -> None:
+        before = """# Sample
+
+*Out of scope*
+- None.
+
+> **Implementation status**
+>
+> **Gaps vs spec:** old.
+
+## Wireframes
+
+| Screen | Excalidraw | Preview |
+|--------|------------|---------|
+| login | [source](https://design.example/frame) | N/A |
+"""
+        after = """# Sample
+
+*Out of scope*
+- None.
+
+## Design Sources
+
 | Screen | Source | Preview |
 |--------|--------|---------|
 | login | [source](https://design.example/frame) | N/A |
+
+> **Implementation status**
+>
+> **Gaps vs spec:** old.
 """
-        after = before.replace("wireframes table", "design sources table").replace(
-            "## Wireframes",
-            "## Design Sources",
+
+        self.assertEqual(
+            check_use_case_docs.material_change_snapshot(before),
+            check_use_case_docs.material_change_snapshot(after),
         )
+
+    def test_design_source_prose_taxonomy_cleanup_is_not_material_use_case_refresh(self) -> None:
+        before = """# Sample
+
+## Wireframes
+
+Current public sign-in wireframes show the implemented email/password path only.
+No new wireframe artifact is required.
+The screen uses a shared pattern from [wireframes/README](../../../wireframes/README.md#agent-contract).
+"""
+        after = """# Sample
+
+## Design Sources
+
+Current public sign-in design sources show the implemented email/password path only.
+No new design-source artifact is required.
+The screen uses a shared pattern.
+"""
 
         self.assertEqual(
             check_use_case_docs.material_change_snapshot(before),

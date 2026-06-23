@@ -46,6 +46,12 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 *Out of scope*
 - Saving form submission data directly to a Data Model record automatically — a subsequent Script or HTTP step can do this.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -66,9 +72,3 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 >
 > **Decisions:** N/A - no implementation-specific decision recorded for this slice.
 >
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |

@@ -48,6 +48,12 @@ Workspace admins can invite new members, manage their accounts, and deactivate u
 *Out of scope*
 - Inviting users who already have accounts on other workspaces to join a second workspace simultaneously — each user belongs to one workspace.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| accept-invitation | [source](./accept-invitation.excalidraw) | [preview](./accept-invitation.svg) |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -64,10 +70,3 @@ Workspace admins can invite new members, manage their accounts, and deactivate u
 >
 > **Deferred follow-ups:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| accept-invitation | [source](./accept-invitation.excalidraw) | [preview](./accept-invitation.svg) |
-

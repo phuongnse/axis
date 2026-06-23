@@ -123,7 +123,7 @@ Do **not** duplicate design-source or preview links here; links live only in `##
 - One table per README — no blockquote design-source stacks.
 - Opening line (when `## Screen flow` exists): state how many screens, that order matches Screen flow, and that **sequence/architecture** drawings are under `## Diagrams`.
 - **Inventory:** every documented **UI screen** for this use case must have a row. Include error/reference variants (`*-states`). Use `N/A` only when the use case truly has no design source or preview yet.
-- **Columns:** minimum `| Screen | Source | Preview |`. When `## Screen flow` exists, use `| # | Screen | Role | Source | Preview |` — `#` matches flow steps (`1`, `2a`, `—` for non-step error screens); `Role` = short happy-path / error label. Legacy tables with `Excalidraw` remain accepted until the owning use case is refreshed.
+- **Columns:** minimum `| Screen | Source | Preview |`. When `## Screen flow` exists, use `| # | Screen | Role | Source | Preview |` — `#` matches flow steps (`1`, `2a`, `—` for non-step error screens); `Role` = short happy-path / error label. The `Source` cell may link to Penpot or a legacy `.excalidraw` file, but the column name stays generic.
 - **Row order:** happy-path screens first (same order as Screen flow), then error/reference screens (same order as the error table in Screen flow).
 - **Do not** list diagrams here (e.g. `*-flow`, `workspace-provisioning`, entity models) — those are not UI screens; sequence/architecture diagrams belong under `## Diagrams` as Mermaid, not in this table.
 

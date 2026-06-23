@@ -48,6 +48,12 @@ Each field in a model has a type that determines what data it stores, how it's v
 *Out of scope*
 - Cross-field validation (e.g., "end_date must be after start_date").
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -65,10 +71,3 @@ Each field in a model has a type that determines what data it stores, how it's v
 >
 > **Decisions:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

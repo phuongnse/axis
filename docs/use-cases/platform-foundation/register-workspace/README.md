@@ -77,30 +77,6 @@ Axis supports standalone user accounts. Registering a workspace is required only
 - Automatic re-send of verification email after X minutes.
 - Custom schema naming chosen by the user; schema names are auto-generated.
 
-> **Implementation status**
->
-> | Layer | Status |
-> |-------|--------|
-> | Domain | ✅ |
-> | Application | ✅ |
-> | Infrastructure | ✅ |
-> | API | ✅ |
-> | Frontend | ⚠️ |
->
-> **Gaps vs spec:** Backend/API now split workspace onboarding from standalone user registration.
-> `POST /api/workspaces` records workspace facts + legal versions and sends workspace-contact verification; it only creates the pending workspace record.
-> The workspace-email verification step starts provisioning and issues a short-lived setup token for the `/register` first-owner handoff. Remaining work is the dedicated register-workspace frontend copy/validation and polished setup-token handoff UI.
->
-> **Deferred follow-ups:**
-> - Dedicated register-workspace frontend copy/validation.
-> - Polished first-owner setup-token handoff UI.
->
-> **Decisions:**
-> - `register-workspace` owns workspace facts only: workspace name, workspace contact email, legal acceptance, slug, verification, and workspace provisioning.
-> - Microsoft / Google / GitHub authenticate users, not workspaces. Generic OAuth provider claims must not be used as proof that someone controls a workspace.
-> - First owner/admin identity creation is a follow-up setup-token step after workspace verification.
-> - Workspace onboarding is optional from the product perspective: a user can register and use Axis without creating or joining a workspace.
->
 ## Screen flow
 
 Canonical order for this use case. Screens owned by another use case are linked inline.
@@ -143,8 +119,8 @@ flowchart TD
 
 UI assets in this folder cover workspace-owned screens. Standalone user registration is owned by [register-user](../../identity-access/register-user/); external-provider/user-identity screens are not owned by this folder.
 
-| # | Screen | Role | Excalidraw | Preview |
-|---|--------|------|------------|---------|
+| # | Screen | Role | Source | Preview |
+|---|--------|------|--------|---------|
 | 1 | register-workspace | Happy path — workspace registration form | [source](./register-workspace.excalidraw) | [preview](./register-workspace.svg) |
 | 2 | email-confirmation | Happy path — workspace email confirmation | [source](./email-confirmation.excalidraw) | [preview](./email-confirmation.svg) |
 | 4 | workspace-provisioning | Workspace setup progress / failure reference | [source](./workspace-provisioning.excalidraw) | [preview](./workspace-provisioning.svg) |
@@ -207,3 +183,28 @@ sequenceDiagram
 ```
 
 **Related:** [register-user](../../identity-access/register-user/) owns standalone user registration. First owner/admin setup-token polish remains part of this workspace onboarding journey; third-party identity providers belong to user identity sign-in/provider-linking flows.
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⚠️ |
+>
+> **Gaps vs spec:** Backend/API now split workspace onboarding from standalone user registration.
+> `POST /api/workspaces` records workspace facts + legal versions and sends workspace-contact verification; it only creates the pending workspace record.
+> The workspace-email verification step starts provisioning and issues a short-lived setup token for the `/register` first-owner handoff. Remaining work is the dedicated register-workspace frontend copy/validation and polished setup-token handoff UI.
+>
+> **Deferred follow-ups:**
+> - Dedicated register-workspace frontend copy/validation.
+> - Polished first-owner setup-token handoff UI.
+>
+> **Decisions:**
+> - `register-workspace` owns workspace facts only: workspace name, workspace contact email, legal acceptance, slug, verification, and workspace provisioning.
+> - Microsoft / Google / GitHub authenticate users, not workspaces. Generic OAuth provider claims must not be used as proof that someone controls a workspace.
+> - First owner/admin identity creation is a follow-up setup-token step after workspace verification.
+> - Workspace onboarding is optional from the product perspective: a user can register and use Axis without creating or joining a workspace.
+>

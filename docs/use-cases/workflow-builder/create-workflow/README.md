@@ -45,31 +45,10 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 *Out of scope*
 - Workflow templates / starter library.
 
-> **Implementation status**
->
-> | Layer | Status |
-> |-------|--------|
-> | Domain | ✅ |
-> | Application | ✅ |
-> | Infrastructure | ✅ |
-> | API | ✅ |
-> | Frontend | ⏳ |
->
-> **Gaps vs spec:** canvas/list UI only (backend).
->
-> **Deferred follow-ups:** Workflow templates / starter library.
->
-> **Done:** HTTP 402 on create when workflow plan limit reached (`CreateWorkflowHandler` + platform-foundation subscription plans).
->
-> **Decisions:**
-> - new workflow initialised with Start + End nodes by domain factory
-> - all data stored in single `workflow_definitions` table.
->
-
 ## Design Sources
 
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
+| Screen | Source | Preview |
+|--------|--------|---------|
 | N/A | N/A | N/A |
 
 ## Diagrams
@@ -106,3 +85,24 @@ erDiagram
     string condition
   }
 ```
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** canvas/list UI only (backend).
+>
+> **Deferred follow-ups:** Workflow templates / starter library.
+>
+> **Done:** HTTP 402 on create when workflow plan limit reached (`CreateWorkflowHandler` + platform-foundation subscription plans).
+>
+> **Decisions:**
+> - new workflow initialised with Start + End nodes by domain factory
+> - all data stored in single `workflow_definitions` table.
+>

@@ -47,6 +47,12 @@ A workflow must have at least one trigger before it can be published. Triggers d
 *Out of scope*
 - Triggering with pre-filled input from a page button (Page Builder) — covered in page-builder.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -65,10 +71,3 @@ A workflow must have at least one trigger before it can be published. Triggers d
 >
 > **Deferred follow-ups:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

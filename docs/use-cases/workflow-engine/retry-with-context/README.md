@@ -47,6 +47,12 @@ When a workflow execution fails at a step, users can manually retry from the fai
 *Out of scope*
 - Structured field-by-field editing of context (showing fields by step/variable name) — raw JSON editor only.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -63,10 +69,3 @@ When a workflow execution fails at a step, users can manually retry from the fai
 >
 > **Deferred follow-ups:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

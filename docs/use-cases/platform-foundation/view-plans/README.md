@@ -58,23 +58,6 @@ The page does not collect payment, change an existing workspace plan, or manage 
 - Credit card collection and payment processing.
 - Self-service upgrade/downgrade from this page; admin override is covered by [change workspace plan](../admin-change-plan/).
 
-> **Implementation status**
->
-> | Layer | Status |
-> |-------|--------|
-> | Domain | ✅ |
-> | Application | ✅ |
-> | Infrastructure | ✅ |
-> | API | ✅ |
-> | Frontend | ⏳ |
->
-> **Gaps vs spec:** public pricing page UI, responsive comparison layout, signup plan-selection handoff, static fallback state, and current-plan badge.
->
-> **Decisions:** pricing owns comparison and signup handoff only; billing, payment collection, and plan changes are separate flows. Retired plans are hidden for prospects but remain visible as current-plan context for existing workspaces.
->
-> **Deferred follow-ups:**
-> - N/A
-
 ## Screen flow
 
 | Step | Screen / state | When |
@@ -102,6 +85,23 @@ flowchart TD
 
 ## Design Sources
 
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
+| Screen | Source | Preview |
+|--------|--------|---------|
 | pricing | [source](./pricing.excalidraw) | [preview](./pricing.svg) |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** public pricing page UI, responsive comparison layout, signup plan-selection handoff, static fallback state, and current-plan badge.
+>
+> **Decisions:** pricing owns comparison and signup handoff only; billing, payment collection, and plan changes are separate flows. Retired plans are hidden for prospects but remain visible as current-plan context for existing workspaces.
+>
+> **Deferred follow-ups:**
+> - N/A

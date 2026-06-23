@@ -46,6 +46,12 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 *Out of scope*
 - PagerDuty / OpsGenie / Slack integration for error notifications.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -66,10 +72,3 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 >
 > **Decisions:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

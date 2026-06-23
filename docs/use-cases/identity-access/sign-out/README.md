@@ -50,6 +50,12 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 *Out of scope*
 - "Sign out of all devices" from this flow — covered in [[password-security](./README.md) Password & Security](./password-security.md).
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -67,9 +73,3 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 >
 > **Deferred follow-ups:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |

@@ -85,8 +85,8 @@ Third-party identity providers authenticate an individual user and can be linked
 
 User registration reuses the auth card system with email/password setup and field-level help text. Team/setup context is not shown as a required field on the standalone registration screen.
 
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
+| Screen | Source | Preview |
+|--------|--------|---------|
 | register-user | [source](./register-user.excalidraw) | [preview](./register-user.svg) |
 
 ## Diagrams

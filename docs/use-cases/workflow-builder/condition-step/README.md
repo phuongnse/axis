@@ -48,6 +48,12 @@ Each step has a type that determines what it does when executed. Users configure
 *Out of scope*
 - Raw expression editing (writing code directly) — the visual builder is the only interface.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -64,9 +70,3 @@ Each step has a type that determines what it does when executed. Users configure
 >
 > **Decisions:** Condition branches are stored in step config JSONB until the visual branch editor needs a dedicated persistence model.
 >
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |

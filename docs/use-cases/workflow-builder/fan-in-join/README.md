@@ -47,6 +47,12 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 *Out of scope*
 - "Wait for N of M" join type (e.g., wait for 2 out of 3 branches).
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -63,9 +69,3 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 >
 > **Decisions:** Initial join semantics stay binary (`all`/`any`) so execution can be made correct before adding quorum joins.
 >
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |

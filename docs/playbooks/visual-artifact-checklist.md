@@ -58,7 +58,7 @@ Use this checklist **before every commit** that changes visual artifacts:
 ## 5) Use-case `README.md` sync (when `docs/use-cases/**` changes)
 
 - [ ] Every documented **screen** has a row in `## Design Sources` (error `*-states` included).
-- [ ] New/updated rows use `Source` + `Preview`; legacy rows with `Excalidraw` are accepted only until that use case is refreshed.
+- [ ] Rows use `Source` + `Preview`; the `Source` cell may link to Penpot or a legacy `.excalidraw` file.
 - [ ] No sequence/entity diagram files (`*-flow`, `*-model`, `*-cases`) in the folder — those belong in `## Diagrams` as **Mermaid** in the README.
 - [ ] `## Diagrams` uses `### <slug>` + fenced `mermaid` blocks; other use cases linked in `**Related:**` prose only.
 - [ ] When >3 screens or branched flow: `## Screen flow` present and **row order** matches design sources table ([docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--design-sources--implementation-status), example [register-workspace](../use-cases/platform-foundation/register-workspace/README.md)); pattern checklist [wireframes.md § Multi-screen journey](./wireframes.md#multi-screen-journey-pattern).

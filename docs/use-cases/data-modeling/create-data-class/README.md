@@ -45,6 +45,12 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 *Out of scope*
 - Nested data classes (data class within a data class) — depth limited to 1.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -64,10 +70,3 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 >
 > **Deferred follow-ups:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

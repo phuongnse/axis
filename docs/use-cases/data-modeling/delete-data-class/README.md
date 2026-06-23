@@ -46,6 +46,12 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 *Out of scope*
 - Merging two data classes into one.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -66,10 +72,3 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 >
 > **Deferred follow-ups:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

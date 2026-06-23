@@ -44,6 +44,14 @@ Allow Workspace admins to manage their workspace's profile, settings, and basic 
 *Out of scope*
 - Editing all settings inline on this page — this page is read-only for stats; editing is in sub-sections.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| settings-workspace-usage-error | [source](./settings-workspace-usage-error.excalidraw) | [preview](./settings-workspace-usage-error.svg) |
+| settings-workspace-free-plan | [source](./settings-workspace-free-plan.excalidraw) | [preview](./settings-workspace-free-plan.svg) |
+| settings-workspace-access-denied | [source](./settings-workspace-access-denied.excalidraw) | [preview](./settings-workspace-access-denied.svg) |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -65,11 +73,3 @@ Allow Workspace admins to manage their workspace's profile, settings, and basic 
 >
 > **Decisions:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| settings-workspace-usage-error | [source](./settings-workspace-usage-error.excalidraw) | [preview](./settings-workspace-usage-error.svg) |
-| settings-workspace-free-plan | [source](./settings-workspace-free-plan.excalidraw) | [preview](./settings-workspace-free-plan.svg) |
-| settings-workspace-access-denied | [source](./settings-workspace-access-denied.excalidraw) | [preview](./settings-workspace-access-denied.svg) |

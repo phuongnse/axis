@@ -44,6 +44,12 @@ Workflow definitions can be exported as portable JSON files and imported into an
 *Out of scope*
 - Scheduled automatic backups.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -63,10 +69,3 @@ Workflow definitions can be exported as portable JSON files and imported into an
 >
 > **Decisions:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

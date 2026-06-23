@@ -51,6 +51,13 @@ Allow Workspace admins to manage their Workspace's profile, settings, and basic 
 - Data export before deletion — available separately as a future feature.
 - Immediate hard delete without grace period — the 30-day window is non-negotiable.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| settings-workspace-delete-modal | [source](./settings-workspace-delete-modal.excalidraw) | [preview](./settings-workspace-delete-modal.svg) |
+| settings-workspace-delete-states | [source](./settings-workspace-delete-states.excalidraw) | [preview](./settings-workspace-delete-states.svg) |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -75,10 +82,3 @@ Allow Workspace admins to manage their Workspace's profile, settings, and basic 
 >
 > **Decisions:** Hard delete uses in-process modulith cancellers until modules are extracted; cross-module RabbitMQ hard-delete commands are deferred to the extraction boundary.
 >
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| settings-workspace-delete-modal | [source](./settings-workspace-delete-modal.excalidraw) | [preview](./settings-workspace-delete-modal.svg) |
-| settings-workspace-delete-states | [source](./settings-workspace-delete-states.excalidraw) | [preview](./settings-workspace-delete-states.svg) |

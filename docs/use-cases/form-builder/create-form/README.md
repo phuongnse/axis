@@ -44,27 +44,10 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 *Out of scope*
 - Form templates / starter library.
 
-> **Implementation status**
->
-> | Layer | Status |
-> |-------|--------|
-> | Domain | ✅ |
-> | Application | ✅ |
-> | Infrastructure | ✅ |
-> | API | ✅ |
-> | Frontend | ⏳ |
->
-> **Gaps vs spec:** live preview panel and form editor pending Frontend.
->
-> **Decisions:** all form fields stored as JSONB via custom FormFieldConverter using FormFieldType as polymorphic discriminator.
->
-> **Deferred follow-ups:**
-> - N/A
-
 ## Design Sources
 
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
+| Screen | Source | Preview |
+|--------|--------|---------|
 | N/A | N/A | N/A |
 
 ## Diagrams
@@ -98,3 +81,20 @@ erDiagram
     jsonb submittedData
   }
 ```
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** live preview panel and form editor pending Frontend.
+>
+> **Decisions:** all form fields stored as JSONB via custom FormFieldConverter using FormFieldType as polymorphic discriminator.
+>
+> **Deferred follow-ups:**
+> - N/A

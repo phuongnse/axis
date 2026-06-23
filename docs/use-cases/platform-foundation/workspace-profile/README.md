@@ -50,6 +50,12 @@ Allow Workspace admins to manage their Workspace's profile, settings, and basic 
 - Custom domain / vanity URL.
 - White-label theming (custom colors, fonts).
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| settings-workspace-profile-states | [source](./settings-workspace-profile-states.excalidraw) | [preview](./settings-workspace-profile-states.svg) |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -69,10 +75,3 @@ Allow Workspace admins to manage their Workspace's profile, settings, and basic 
 >
 > **Decisions:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| settings-workspace-profile-states | [source](./settings-workspace-profile-states.excalidraw) | [preview](./settings-workspace-profile-states.svg) |
-

@@ -46,6 +46,12 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 *Out of scope*
 - Cross-workspace workflow duplication (copy to another workspace) — handled by Import/Export in import-export.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -66,10 +72,3 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 >
 > **Deferred follow-ups:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

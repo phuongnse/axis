@@ -49,6 +49,12 @@ A workflow must have at least one trigger before it can be published. Triggers d
 - GET webhook triggers — POST only.
 - Event-type filtering on a single webhook URL (multiple workflows sharing one URL).
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -66,10 +72,3 @@ A workflow must have at least one trigger before it can be published. Triggers d
 >
 > **Decisions:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

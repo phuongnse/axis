@@ -45,6 +45,12 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 *Out of scope*
 - Automatic archiving after N days of inactivity.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -64,10 +70,3 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 >
 > **Decisions:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

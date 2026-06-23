@@ -49,6 +49,12 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 *Out of scope*
 - API key authentication (alternative to JWT).
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -72,9 +78,3 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 >
 > **Decisions:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |

@@ -49,6 +49,12 @@ Form fields define what data the form collects. Each field has a type, label, he
 *Out of scope*
 - Conditional field visibility (show field only if another field has a certain value).
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -65,10 +71,3 @@ Form fields define what data the form collects. Each field has a type, label, he
 >
 > **Deferred follow-ups:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

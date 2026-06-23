@@ -46,6 +46,12 @@ Enforce subscription plan limits at the API so that Workspaces cannot exceed the
 *Out of scope*
 - Soft limits with grace period (allowing some overage before blocking).
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -64,9 +70,3 @@ Enforce subscription plan limits at the API so that Workspaces cannot exceed the
 >
 > **Decisions:** Redis failure currently falls back to DB count + warning instead of failing closed; this keeps local/dev availability while the fail-closed production policy is unresolved.
 >
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |

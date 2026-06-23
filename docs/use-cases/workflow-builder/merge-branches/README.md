@@ -45,6 +45,12 @@ Workflows can take different execution paths based on data values using Conditio
 *Out of scope*
 - Explicit merge/join nodes on the canvas — merging is implicit (any step with multiple incoming edges acts as a merge point). An explicit Join node is used only in Parallel Groups ([parallel execution](./README.md)).
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -62,10 +68,3 @@ Workflows can take different execution paths based on data values using Conditio
 >
 > **Decisions:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

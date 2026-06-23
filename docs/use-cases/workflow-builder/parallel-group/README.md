@@ -48,6 +48,12 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 *Out of scope*
 - Dynamic parallelism (creating N parallel branches based on a list of records at runtime).
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -67,10 +73,3 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 >
 > **Decisions:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

@@ -45,6 +45,12 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 *Out of scope*
 - Form versioning (publishing a new "version" of a form) — edits are live immediately.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -63,10 +69,3 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 >
 > **Deferred follow-ups:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

@@ -51,6 +51,12 @@ Allow users to reset forgotten passwords, change their current password, and man
 *Out of scope*
 - Password history check (cannot reuse last N passwords).
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| change-password | [source](./change-password.excalidraw) | [preview](./change-password.svg) |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -67,9 +73,3 @@ Allow users to reset forgotten passwords, change their current password, and man
 >
 > **Deferred follow-ups:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| change-password | [source](./change-password.excalidraw) | [preview](./change-password.svg) |

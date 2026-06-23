@@ -46,6 +46,12 @@ Workflows can take different execution paths based on data values using Conditio
 *Out of scope*
 - Loop-back branching (sending execution back to an earlier step) — cycles are blocked.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -62,10 +68,3 @@ Workflows can take different execution paths based on data values using Conditio
 >
 > **Deferred follow-ups:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

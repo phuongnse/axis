@@ -47,6 +47,12 @@ Self-service registration flow where a new workspace signs up and is automatical
 - Credit card collection and payment processing — part of the separate billing initiative.
 - Plan upgrade/downgrade self-service — covered in subscription-plans.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -67,9 +73,3 @@ Self-service registration flow where a new workspace signs up and is automatical
 >
 > **Deferred follow-ups:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |

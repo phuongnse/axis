@@ -47,6 +47,12 @@ Workspace admins can create custom roles, assign permissions to each role, and a
 *Out of scope*
 - Permission change notifications to affected users.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -66,10 +72,3 @@ Workspace admins can create custom roles, assign permissions to each role, and a
 >
 > **Decisions:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

@@ -66,6 +66,12 @@ Define user-facing localization and visual theme behavior for the SPA so each us
 *Out of scope*
 - Custom theme palette editor.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -91,9 +97,3 @@ Define user-facing localization and visual theme behavior for the SPA so each us
 >
 > **Deferred follow-ups:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |

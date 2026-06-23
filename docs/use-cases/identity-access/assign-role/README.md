@@ -46,6 +46,12 @@ Workspace admins can create custom roles, assign permissions to each role, and a
 *Out of scope*
 - Time-limited role assignments (e.g., "grant admin for 24 hours").
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -64,10 +70,3 @@ Workspace admins can create custom roles, assign permissions to each role, and a
 >
 > **Deferred follow-ups:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

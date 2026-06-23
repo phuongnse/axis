@@ -48,6 +48,12 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 *Out of scope*
 - Real-time execution graph overlay on the workflow canvas — timeline list only.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -66,10 +72,3 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 >
 > **Deferred follow-ups:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

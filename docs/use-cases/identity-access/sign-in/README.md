@@ -67,33 +67,12 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 - 2FA / MFA (TOTP or WebAuthn).
 - Enterprise SSO federation (SAML, SCIM provisioning, per-workspace IdP) — separate initiative, see [ADR-027](../../../TECH_STACK.md#adr-027-external-identity-providers-for-user-sign-in-and-registration).
 
-> **Implementation status**
->
-> | Layer | Status |
-> |-------|--------|
-> | Domain | ✅ |
-> | Application | ⚠️ |
-> | Infrastructure | ⚠️ |
-> | API | ⚠️ |
-> | Frontend | ⚠️ |
->
-> **Gaps vs spec:** Email/password sign-in has login page + PKCE flow + app shell/dashboard scaffold partially implemented. **External identity providers (Microsoft/Google/GitHub, ADR-027) are spec'd but not yet implemented** — no provider registration in OpenIddict, no account-linking handler, no provider buttons on the sign-in page. BroadcastChannel multi-tab refresh, account lockout UI, and unverified-email screen polish also pending.
->
-> **Deferred follow-ups:** 2FA/MFA (TOTP or WebAuthn); enterprise SAML/SCIM federation and per-workspace IdP (ADR-027 enterprise scope).
->
-> **Decisions:**
-> - OpenIddict 5.x serves as the in-process OAuth2/OIDC server. `AuthenticateUserCommand` validates credentials
-> - `/connect/login` sets a 5-min httpOnly session cookie
-> - `/connect/authorize` issues the authorization code
-> - `/connect/token` exchanges it for access + refresh tokens. Refresh token stored as an opaque reference in DB (OpenIddict `OpenIddictTokens` table) and delivered as an httpOnly `Secure SameSite=Strict` cookie at `/connect` path via `ApplyRefreshTokenCookieHandler`.
->
-
 ## Design Sources
 
-Current public sign-in wireframes show the implemented email/password path only. External identity providers remain documented in the use-case spec, but provider buttons should not appear here until ADR-027 is implemented for sign-in.
+Current public sign-in design sources show the implemented email/password path only. External identity providers remain documented in the use-case spec, but provider buttons should not appear here until ADR-027 is implemented for sign-in.
 
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
+| Screen | Source | Preview |
+|--------|--------|---------|
 | login | [source](./login.excalidraw) | [preview](./login.svg) |
 | login-unverified | [source](./login-unverified.excalidraw) | [preview](./login-unverified.svg) |
 
@@ -142,3 +121,24 @@ sequenceDiagram
     API-->>Web: 200 OK
   end
 ```
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ⚠️ |
+> | Infrastructure | ⚠️ |
+> | API | ⚠️ |
+> | Frontend | ⚠️ |
+>
+> **Gaps vs spec:** Email/password sign-in has login page + PKCE flow + app shell/dashboard scaffold partially implemented. **External identity providers (Microsoft/Google/GitHub, ADR-027) are spec'd but not yet implemented** — no provider registration in OpenIddict, no account-linking handler, no provider buttons on the sign-in page. BroadcastChannel multi-tab refresh, account lockout UI, and unverified-email screen polish also pending.
+>
+> **Deferred follow-ups:** 2FA/MFA (TOTP or WebAuthn); enterprise SAML/SCIM federation and per-workspace IdP (ADR-027 enterprise scope).
+>
+> **Decisions:**
+> - OpenIddict 5.x serves as the in-process OAuth2/OIDC server. `AuthenticateUserCommand` validates credentials
+> - `/connect/login` sets a 5-min httpOnly session cookie
+> - `/connect/authorize` issues the authorization code
+> - `/connect/token` exchanges it for access + refresh tokens. Refresh token stored as an opaque reference in DB (OpenIddict `OpenIddictTokens` table) and delivered as an httpOnly `Secure SameSite=Strict` cookie at `/connect` path via `ApplyRefreshTokenCookieHandler`.
+>

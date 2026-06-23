@@ -50,6 +50,12 @@ Each step has a type that determines what it does when executed. Users configure
 - GraphQL or gRPC step types.
 - Response streaming.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -69,10 +75,3 @@ Each step has a type that determines what it does when executed. Users configure
 >
 > **Decisions:**
 > - N/A
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-
