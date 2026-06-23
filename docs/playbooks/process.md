@@ -120,7 +120,8 @@ For every match: confirm the SQL only references tables owned by that match's ow
 
 ### Phase 0 — Design system foundation
 
-Before broad UI polish or new visual patterns, follow [design-system.md](./design-system.md). Design-system PRs establish tokens, reusable components, visual QA, and migration rules; they do not migrate unrelated legacy screens.
+Before broad UI polish or new visual patterns, follow [design-system.md](./design-system.md). Design-system PRs establish tokens, reusable components, component contract checks, and migration rules; they do not migrate unrelated legacy screens.
+When a foundation PR proposes new automation, use the design-system automation boundary first: prefer Penpot-backed tokens/contracts and keep case-specific visual checks review-only unless they have a reusable source-of-truth contract.
 
 ### Phase 1 — Foundation (one-time)
 

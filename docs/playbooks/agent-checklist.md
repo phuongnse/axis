@@ -2,9 +2,9 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← AGENTS.md](../../AGENTS.md)
 
-**Daily workflow.** Walk the Ready review, Docs review, and Retrospective review while implementing; run the Verification gate before marking a PR ready for review. Use `$axis-use-case-spec` when a use case lacks an owning spec, `$axis-use-case-implementation` for implementation slices, and `$axis-ready-review` before PR review. **PR description = Summary + Linked spec + Requirements only** — no review/check paste blocks, no commit list, no CI/Doc-drift status (GitHub Checks tab covers that).
+**Daily workflow.** Walk the Ready review, Docs review, and Retrospective review while implementing; run the Verification gate before marking a PR ready for review. Use `$axis-use-case-spec` when a use case lacks an owning spec, `$axis-use-case-implementation` for implementation slices, `$axis-ready-review` before review, and `$axis-pull-request` before opening, updating, or marking a PR ready. **PR title = Conventional Commit; PR description = Summary + Linked spec + Requirements only** — no review/check paste blocks, no commit list, no CI/Doc-drift status (GitHub Checks tab covers that).
 
-**Skill routing.** Use-case specs: `$axis-use-case-spec`; API contracts: `$axis-api-contract`; cross-module contracts: `$axis-cross-module-contract`; frontend: `$axis-frontend-feature`; design system: `$axis-design-system`; visuals: `$axis-visual-artifact`; review fixes: `$axis-review-feedback`.
+**Skill routing.** Use-case specs: `$axis-use-case-spec`; API contracts: `$axis-api-contract`; cross-module contracts: `$axis-cross-module-contract`; frontend: `$axis-frontend-feature`; design system: `$axis-design-system`; visuals: `$axis-visual-artifact`; review fixes: `$axis-review-feedback`; PR publish/update: `$axis-pull-request`.
 
 **Large use cases:** split into **genuinely isolated PRs** (each branch from `main`, each passing the two-sided isolation test). See [pr-slicing.md](./pr-slicing.md) — never stack slice B on slice A's branch, never claim the Verification gate is green when you did not run it, and assign one owner per shared seam.
 

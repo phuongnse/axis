@@ -2,7 +2,7 @@
 
 > **Navigation**: [← Wireframe playbook](../playbooks/wireframes.md) · [← Design source](../playbooks/design-source.md) · [← docs/README.md](../README.md)
 
-Wireframes are low-fidelity skeletons. They document layout, user flow, content intent, form/help/error states, and action hierarchy. They do **not** document product theme, dark/light styling, decorative backdrops, semantic color styling, final colors, shadows, or exact visual polish. Those belong to the design system, frontend components, screenshots, and visual QA.
+Wireframes are low-fidelity skeletons. They document layout, user flow, content intent, form/help/error states, and action hierarchy. They do **not** document product theme, dark/light styling, decorative backdrops, semantic color styling, final colors, shadows, or exact visual polish. Those belong to the design system, frontend components, and component verification.
 
 ## What Lives Here
 
@@ -37,7 +37,7 @@ When touching legacy `.excalidraw`, regenerate the matching `.svg`, then review 
 - State meaning must come from labels, copy, icons, and placement, not color styling.
 - Show decorative/background systems only as neutral placeholders when they affect layout.
 - Do not encode real product palette, dark/light mode, final radius, shadow, texture, or decorative motif in wireframes.
-- If a visual decision needs enforcement, put it in design-system/frontend component rules and tests, not wireframe screenshots.
+- If a visual decision needs enforcement, put it in design-system/frontend component rules and tests, not wireframe previews.
 
 ### Layout
 

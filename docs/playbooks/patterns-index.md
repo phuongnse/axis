@@ -48,7 +48,7 @@ Open the owner doc for the surface you are changing. `patterns.md` is a compatib
 | [testing.md](./testing.md) | Test naming, isolation, Testcontainers, deterministic API tests |
 | [code-hygiene-patterns.md](./code-hygiene-patterns.md) | Pre-commit code hygiene and policy regex constraints |
 | [frontend.md](./frontend.md) | SPA architecture, state, forms, components, accessibility |
-| [design-system.md](./design-system.md) | Tokens, reusable components, pixel-perfect workflow, visual QA |
+| [design-system.md](./design-system.md) | Tokens, reusable components, pixel-perfect workflow, component contract checks |
 | [design-source.md](./design-source.md) | Penpot source-of-truth workflow, MCP usage, source/preview link rules |
 | [wireframes.md](./wireframes.md) | Low-fidelity screen intent and legacy wireframe workflow |
 

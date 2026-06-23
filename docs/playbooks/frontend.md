@@ -22,7 +22,7 @@ UI exists to help users complete work. Visual style matters, but it is secondary
 - Public/auth screens should focus on access and trust. Authenticated workspace screens can show workspace data, operational status, and metrics.
 - UI polish follows UX: spacing, color, icons, and motion should make the workflow easier to understand, not make the screen feel more complex.
 
-Design-system rules live in [design-system.md](./design-system.md). Use that owner for tokens, component inventory, pixel-perfect criteria, and visual QA. This playbook owns frontend implementation patterns.
+Design-system rules live in [design-system.md](./design-system.md). Use that owner for tokens, component inventory, pixel-perfect criteria, and component contract checks. This playbook owns frontend implementation patterns.
 
 ---
 
@@ -131,8 +131,8 @@ export const workflowKeys = {
 - Never rebuild connector/timeline geometry inline. Use `FlowTrace` for vertical flow/timeline displays so marker, connector spacing, state colour, and accessibility remain consistent.
 - The public/auth access path pattern uses `AccessPathTrace`; do not redefine its step list, icons, or labels in page-specific components.
 - Navigation CTAs on public/auth surfaces use `ActionLink`. Do not hand-code `Link` buttons with Tailwind classes; the shared component keeps icon presence, spacing, height, hover states, and accessible icon treatment consistent. Plain inline text links are still fine for secondary footer/help copy.
-- `python scripts/axis.py check frontend-component-composition` enforces route composition, shared shadcn/ui primitive usage for standard controls, text-button icon consistency, detects duplicated flow/timeline geometry outside `FlowTrace`, and rejects duplicated access-path trace definitions outside `AccessPathTrace`.
-- High-level visual consistency is not a single regex rule. Enforce concrete, repeatable pieces through shared components and gates; handle broader judgement with mobile/desktop visual review.
+- `python scripts/axis.py check frontend-component-composition` enforces route composition, primitive-layer ownership for native standard controls/headless UI imports, primitive registry coverage, and route-bound consumer contracts.
+- High-level visual consistency is not a single regex rule. Enforce concrete, repeatable pieces through shared components and contract checks; handle broader judgement with mobile/desktop visual review.
 - **Single-purpose**: if a component both fetches server data AND contains complex conditional rendering, extract the data-fetching into a custom hook.
 - **Composition over prop drilling**: use compound components or context for UI that shares state across more than two levels. Avoid prop chains longer than 2 hops.
 - When props exceed 5 with no clear grouping, reconsider whether the component is doing too much — it likely needs to be split.

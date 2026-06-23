@@ -36,7 +36,7 @@
 | [Code hygiene patterns](./playbooks/code-hygiene-patterns.md) | Pre-commit hygiene and policy regex constraints |
 | [Testing](./playbooks/testing.md) | Test isolation, naming, file layout, mocking rules — .NET and frontend |
 | [Frontend](./playbooks/frontend.md) | UX-first UI rules, TanStack Query patterns, TypeScript discipline, routing, component design |
-| [Design system](./playbooks/design-system.md) | Tokens, reusable components, pixel-perfect definition, and visual QA workflow |
+| [Design system](./playbooks/design-system.md) | Tokens, reusable components, pixel-perfect definition, and contract workflow |
 | [Design source](./playbooks/design-source.md) | Penpot source-of-truth workflow, MCP usage, source/preview link rules |
 | [Wireframe kit](./playbooks/wireframes.md) | Low-fidelity screen intent and use-case visual inventory; **agents:** [wireframe contract](./wireframes/README.md#agent-contract) |
 | [Visual artifact checklist](./playbooks/visual-artifact-checklist.md) | Required review checklist for diagrams, design sources, and use-case visuals before commit |
@@ -211,6 +211,6 @@ When two docs disagree, the **owner** wins. Update the owner first; everything e
 | Daily agent workflow + gates | [playbooks/agent-checklist.md](./playbooks/agent-checklist.md) |
 | Local dev (Axis CLI, compose graph, ports, URLs, environment adapters) | [playbooks/local-dev.md](./playbooks/local-dev.md) + [`docker-compose.yml`](../docker-compose.yml) |
 | Implementation patterns and pitfalls | [playbooks/patterns-index.md](./playbooks/patterns-index.md) routes to the focused owner docs; [playbooks/patterns.md](./playbooks/patterns.md) is a compatibility router only |
-| Design-system tokens, component inventory, and pixel-perfect workflow | [playbooks/design-system.md](./playbooks/design-system.md) |
+| Design-system tokens, component inventory, and component contract workflow | [playbooks/design-system.md](./playbooks/design-system.md) |
 | Product design source, Penpot, and MCP workflow | [playbooks/design-source.md](./playbooks/design-source.md) |
 | UI design sources and preview rows (per screen / use case) | `docs/use-cases/{domain}/{use-case}/README.md` → `## Design Sources` ([hub § Design Sources](./README.md#design-sources) for navigation only) |
