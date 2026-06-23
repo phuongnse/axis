@@ -1592,6 +1592,198 @@ class TestFrontendComponentComposition(unittest.TestCase):
 
         self.assertIn("unknown tokenFamilies values: `raw-shadow`", "\n".join(issues))
 
+    def test_rejects_route_bound_consumer_without_contract_registry(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/routes/index.lazy.tsx": (
+                    "import { LandingPage } from '@/features/landing/components/LandingPage';\n"
+                    "export const route = '/';\n"
+                ),
+                "frontend/src/features/landing/components/LandingPage.tsx": (
+                    "export function LandingPage() { return null; }\n"
+                ),
+            }
+        )
+
+        self.assertIn("missing consumer contract registry", "\n".join(issues))
+
+    def test_accepts_route_bound_consumer_contract(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/routes/index.lazy.tsx": (
+                    "import { LandingPage } from '@/features/landing/components/LandingPage';\n"
+                    "export const route = '/';\n"
+                ),
+                "frontend/src/features/landing/components/LandingPage.tsx": (
+                    "export function LandingPage() { return null; }\n"
+                ),
+                "frontend/src/design-system/consumer-contracts.ts": (
+                    "export const axisConsumerContracts = [{\n"
+                    "  surface: 'Public landing',\n"
+                    "  kind: 'public',\n"
+                    "  route: '/',\n"
+                    "  component: 'LandingPage',\n"
+                    "  file: 'frontend/src/features/landing/components/LandingPage.tsx',\n"
+                    "  owner: 'landing',\n"
+                    "  readiness: 'ready',\n"
+                    "  primitives: ['ActionLink'],\n"
+                    "  states: ['default'],\n"
+                    "  evidence: ['e2e-smoke'],\n"
+                    "  testFiles: ['frontend/e2e/local-dev-smoke.pw.ts'],\n"
+                    "}];\n"
+                ),
+                "frontend/src/features/design-system/components/DesignSystemCatalog.tsx": (
+                    "import { axisConsumerContracts } from '@/design-system/consumer-contracts';\n"
+                    "export const target = 'consumer-readiness';\n"
+                    "export const contracts = axisConsumerContracts;\n"
+                ),
+                "frontend/e2e/design-system-catalog.pw.ts": (
+                    "await expect(page.locator('[data-visual-target=\"consumer-readiness\"]'))"
+                    ".toHaveScreenshot('consumer-readiness-desktop.png');\n"
+                ),
+                "frontend/e2e/local-dev-smoke.pw.ts": "export {};\n",
+            }
+        )
+
+        self.assertEqual([], issues)
+
+    def test_rejects_route_bound_consumer_missing_from_contract(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/routes/index.lazy.tsx": (
+                    "import { LandingPage } from '@/features/landing/components/LandingPage';\n"
+                    "export const route = '/';\n"
+                ),
+                "frontend/src/features/landing/components/LandingPage.tsx": (
+                    "export function LandingPage() { return null; }\n"
+                ),
+                "frontend/src/design-system/consumer-contracts.ts": (
+                    "export const axisConsumerContracts = [];\n"
+                ),
+            }
+        )
+
+        self.assertIn("route-bound UI consumer must be listed", "\n".join(issues))
+
+    def test_rejects_consumer_contract_without_readiness_matrix(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/routes/index.lazy.tsx": (
+                    "import { LandingPage } from '@/features/landing/components/LandingPage';\n"
+                    "export const route = '/';\n"
+                ),
+                "frontend/src/features/landing/components/LandingPage.tsx": (
+                    "export function LandingPage() { return null; }\n"
+                ),
+                "frontend/src/design-system/consumer-contracts.ts": (
+                    "export const axisConsumerContracts = [{\n"
+                    "  surface: 'Public landing',\n"
+                    "  kind: 'public',\n"
+                    "  route: '/',\n"
+                    "  component: 'LandingPage',\n"
+                    "  file: 'frontend/src/features/landing/components/LandingPage.tsx',\n"
+                    "  owner: 'landing',\n"
+                    "  readiness: 'ready',\n"
+                    "  primitives: ['ActionLink'],\n"
+                    "  states: ['default'],\n"
+                    "  evidence: ['e2e-smoke'],\n"
+                    "  testFiles: ['frontend/e2e/local-dev-smoke.pw.ts'],\n"
+                    "}];\n"
+                ),
+                "frontend/src/features/design-system/components/DesignSystemCatalog.tsx": (
+                    "export const target = 'consumer';\n"
+                ),
+                "frontend/e2e/design-system-catalog.pw.ts": (
+                    "await expect(page.locator('[data-visual-target=\"consumer-readiness\"]'))"
+                    ".toHaveScreenshot('consumer-readiness-desktop.png');\n"
+                ),
+                "frontend/e2e/local-dev-smoke.pw.ts": "export {};\n",
+            }
+        )
+
+        self.assertIn("missing consumer readiness matrix", "\n".join(issues))
+
+    def test_rejects_consumer_contract_without_snapshot(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/routes/index.lazy.tsx": (
+                    "import { LandingPage } from '@/features/landing/components/LandingPage';\n"
+                    "export const route = '/';\n"
+                ),
+                "frontend/src/features/landing/components/LandingPage.tsx": (
+                    "export function LandingPage() { return null; }\n"
+                ),
+                "frontend/src/design-system/consumer-contracts.ts": (
+                    "export const axisConsumerContracts = [{\n"
+                    "  surface: 'Public landing',\n"
+                    "  kind: 'public',\n"
+                    "  route: '/',\n"
+                    "  component: 'LandingPage',\n"
+                    "  file: 'frontend/src/features/landing/components/LandingPage.tsx',\n"
+                    "  owner: 'landing',\n"
+                    "  readiness: 'ready',\n"
+                    "  primitives: ['ActionLink'],\n"
+                    "  states: ['default'],\n"
+                    "  evidence: ['e2e-smoke'],\n"
+                    "  testFiles: ['frontend/e2e/local-dev-smoke.pw.ts'],\n"
+                    "}];\n"
+                ),
+                "frontend/src/features/design-system/components/DesignSystemCatalog.tsx": (
+                    "import { axisConsumerContracts } from '@/design-system/consumer-contracts';\n"
+                    "export const target = 'consumer-readiness';\n"
+                    "export const contracts = axisConsumerContracts;\n"
+                ),
+                "frontend/e2e/design-system-catalog.pw.ts": "export {};\n",
+                "frontend/e2e/local-dev-smoke.pw.ts": "export {};\n",
+            }
+        )
+
+        self.assertIn("consumer readiness matrix needs a desktop Playwright screenshot", "\n".join(issues))
+
+    def test_rejects_consumer_contract_without_required_metadata(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/routes/index.lazy.tsx": (
+                    "import { LandingPage } from '@/features/landing/components/LandingPage';\n"
+                    "export const route = '/';\n"
+                ),
+                "frontend/src/features/landing/components/LandingPage.tsx": (
+                    "export function LandingPage() { return null; }\n"
+                ),
+                "frontend/src/design-system/consumer-contracts.ts": (
+                    "export const axisConsumerContracts = [{\n"
+                    "  surface: 'Public landing',\n"
+                    "  kind: 'public',\n"
+                    "  route: '/',\n"
+                    "  component: 'LandingPage',\n"
+                    "  file: 'frontend/src/features/landing/components/LandingPage.tsx',\n"
+                    "  owner: 'landing',\n"
+                    "  readiness: 'unknown',\n"
+                    "  primitives: [],\n"
+                    "  states: [],\n"
+                    "  evidence: ['manual'],\n"
+                    "  testFiles: ['frontend/e2e/missing.pw.ts'],\n"
+                    "}];\n"
+                ),
+                "frontend/src/features/design-system/components/DesignSystemCatalog.tsx": (
+                    "import { axisConsumerContracts } from '@/design-system/consumer-contracts';\n"
+                    "export const target = 'consumer-readiness';\n"
+                    "export const contracts = axisConsumerContracts;\n"
+                ),
+                "frontend/e2e/design-system-catalog.pw.ts": (
+                    "await expect(page.locator('[data-visual-target=\"consumer-readiness\"]'))"
+                    ".toHaveScreenshot('consumer-readiness-desktop.png');\n"
+                ),
+            }
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("contract readiness must be `ready` or `candidate`", joined)
+        self.assertIn("contract must list at least one primitives value", joined)
+        self.assertIn("contract must list at least one states value", joined)
+        self.assertIn("unknown evidence values: `manual`", joined)
+        self.assertIn("test file `frontend/e2e/missing.pw.ts` does not exist", joined)
+
     def test_rejects_text_button_without_icon(self) -> None:
         issues = self.issues_for_frontend(
             {

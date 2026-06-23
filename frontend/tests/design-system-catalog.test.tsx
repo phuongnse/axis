@@ -11,6 +11,7 @@ describe('DesignSystemCatalog', () => {
     expect(screen.getByRole('heading', { name: 'Axis design system' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Semantic color tokens' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Primitive readiness' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Consumer contracts' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Button' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Icon button' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Action links' })).toBeInTheDocument();
@@ -21,8 +22,12 @@ describe('DesignSystemCatalog', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Layout' })).toBeInTheDocument();
     expect(screen.getAllByText('Primary').length).toBeGreaterThan(0);
-    expect(screen.getByText('ActionLink')).toBeInTheDocument();
-    expect(screen.getByText('IconButton')).toBeInTheDocument();
+    expect(screen.getAllByText('ActionLink').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('IconButton').length).toBeGreaterThan(0);
+    expect(screen.getByText('LandingPage')).toBeInTheDocument();
+    expect(screen.getByText('RegisterPage')).toBeInTheDocument();
+    expect(screen.getByText('AppShell')).toBeInTheDocument();
+    expect(screen.getAllByText('e2e smoke').length).toBeGreaterThan(0);
     expect(screen.getAllByText('aria busy loading').length).toBeGreaterThan(0);
     expect(screen.getByText('Chart 1')).toBeInTheDocument();
     expect(screen.getByText('Sidebar')).toBeInTheDocument();

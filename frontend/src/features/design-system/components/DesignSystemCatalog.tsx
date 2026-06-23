@@ -39,6 +39,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Toolbar } from '@/components/ui/toolbar';
 import {
+  type AxisConsumerContract,
+  axisConsumerContracts,
+} from '@/design-system/consumer-contracts';
+import {
   type AxisPrimitiveContract,
   axisPrimitiveContracts,
 } from '@/design-system/primitive-contracts';
@@ -128,7 +132,11 @@ function ReadinessGroup({ label, values }: { label: string; values: readonly str
   );
 }
 
-function ReadinessBadge({ readiness }: { readiness: AxisPrimitiveContract['readiness'] }) {
+function ReadinessBadge({
+  readiness,
+}: {
+  readiness: AxisPrimitiveContract['readiness'] | AxisConsumerContract['readiness'];
+}) {
   return (
     <Badge variant={readiness === 'ready' ? 'success' : 'warning'}>
       {formatContractLabel(readiness)}
@@ -157,6 +165,35 @@ function PrimitiveReadinessMatrix() {
             <ReadinessGroup label="States" values={contract.states} />
             <ReadinessGroup label="Accessibility" values={contract.accessibility} />
             <ReadinessGroup label="Tokens" values={contract.tokenFamilies} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ConsumerReadinessMatrix() {
+  return (
+    <div className="grid gap-3">
+      {axisConsumerContracts.map((contract) => (
+        <div
+          key={contract.component}
+          className="grid gap-4 rounded-lg border border-border bg-card p-4 shadow-surface lg:grid-cols-[12rem_minmax(0,1fr)]"
+          data-consumer-contract={contract.component}
+        >
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-semibold text-foreground">{contract.component}</h3>
+              <ReadinessBadge readiness={contract.readiness} />
+            </div>
+            <p className="text-xs font-medium text-muted-foreground">{contract.surface}</p>
+            <p className="break-all text-xs leading-5 text-muted-foreground">{contract.file}</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <ReadinessGroup label="Primitives" values={contract.primitives} />
+            <ReadinessGroup label="States" values={contract.states} />
+            <ReadinessGroup label="Evidence" values={contract.evidence} />
+            <ReadinessGroup label="Tests" values={contract.testFiles} />
           </div>
         </div>
       ))}
@@ -586,6 +623,10 @@ export function DesignSystemCatalog() {
 
         <CatalogSection title="Primitive readiness" eyebrow="primitive-readiness">
           <PrimitiveReadinessMatrix />
+        </CatalogSection>
+
+        <CatalogSection title="Consumer contracts" eyebrow="consumer-readiness">
+          <ConsumerReadinessMatrix />
         </CatalogSection>
 
         <CatalogSection title="Button" eyebrow="primitive-button">

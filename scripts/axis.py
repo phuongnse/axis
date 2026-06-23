@@ -721,6 +721,162 @@ def frontend_primitive_contract_issues(root: Path = ROOT) -> list[str]:
     return issues
 
 
+def parse_frontend_consumer_contracts(contract_text: str) -> list[dict[str, object]]:
+    block_pattern = re.compile(
+        r"\{\s*"
+        r"surface:\s*'(?P<surface>[^']+)'\s*,\s*"
+        r"kind:\s*'(?P<kind>[^']+)'\s*,\s*"
+        r"route:\s*'(?P<route>[^']+)'\s*,\s*"
+        r"component:\s*'(?P<component>[^']+)'\s*,\s*"
+        r"file:\s*'(?P<file>[^']+)'\s*,\s*"
+        r"owner:\s*'(?P<owner>[^']+)'\s*,\s*"
+        r"readiness:\s*'(?P<readiness>[^']+)'\s*,\s*"
+        r"primitives:\s*\[(?P<primitives>[^\]]*)\]\s*,\s*"
+        r"states:\s*\[(?P<states>[^\]]*)\]\s*,\s*"
+        r"evidence:\s*\[(?P<evidence>[^\]]*)\]\s*,\s*"
+        r"testFiles:\s*\[(?P<tests>[^\]]*)\]\s*,?\s*"
+        r"\}",
+        re.DOTALL,
+    )
+    value_pattern = re.compile(r"'([^']+)'")
+    contracts: list[dict[str, object]] = []
+
+    for match in block_pattern.finditer(contract_text):
+        contracts.append(
+            {
+                "surface": match.group("surface"),
+                "kind": match.group("kind"),
+                "route": match.group("route"),
+                "component": match.group("component"),
+                "file": match.group("file"),
+                "owner": match.group("owner"),
+                "readiness": match.group("readiness"),
+                "primitives": value_pattern.findall(match.group("primitives")),
+                "states": value_pattern.findall(match.group("states")),
+                "evidence": value_pattern.findall(match.group("evidence")),
+                "testFiles": value_pattern.findall(match.group("tests")),
+            }
+        )
+
+    return contracts
+
+
+def frontend_route_consumer_files(root: Path = ROOT) -> list[str]:
+    route_root = root / "frontend" / "src" / "routes"
+    if not route_root.exists():
+        return []
+
+    import_pattern = re.compile(
+        r"import\s+(?:\{[^}]+\}|[A-Za-z_][A-Za-z0-9_]*)\s+from\s+['\"]@/"
+        r"(?P<source>(?:features/[^'\"]+/components/[^'\"]+|components/layout/[^'\"]+))['\"]"
+    )
+    consumer_files: set[str] = set()
+    for path in iter_files(route_root, (".tsx",)):
+        normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
+        if normalized.endswith("routeTree.gen.ts") or normalized.endswith("design-system.lazy.tsx"):
+            continue
+
+        text = path.read_text(encoding="utf-8")
+        for match in import_pattern.finditer(text):
+            source = match.group("source")
+            if source.startswith("features/design-system/"):
+                continue
+            candidate = root / "frontend" / "src" / f"{source}.tsx"
+            if candidate.is_file():
+                consumer_files.add(str(candidate.relative_to(root)).replace("\\", "/"))
+
+    return sorted(consumer_files)
+
+
+def frontend_consumer_contract_issues(root: Path = ROOT) -> list[str]:
+    issues: list[str] = []
+    consumer_files = frontend_route_consumer_files(root)
+    if not consumer_files:
+        return issues
+
+    contract_path = root / "frontend" / "src" / "design-system" / "consumer-contracts.ts"
+    if not contract_path.is_file():
+        return [f"{path_label(contract_path)}: missing consumer contract registry"]
+
+    allowed_kinds = {"public", "auth", "authenticated"}
+    allowed_evidence = {
+        "api-state",
+        "auth-state",
+        "e2e-smoke",
+        "form-state",
+        "i18n",
+        "layout-state",
+        "route-state",
+        "unit-test",
+    }
+    contracts = parse_frontend_consumer_contracts(contract_path.read_text(encoding="utf-8"))
+    contracted_files = sorted(str(contract["file"]) for contract in contracts)
+
+    missing_contracts = sorted(set(consumer_files) - set(contracted_files))
+    stale_contracts = sorted(set(contracted_files) - set(consumer_files))
+    for file_path in missing_contracts:
+        issues.append(
+            f"{file_path}: route-bound UI consumer must be listed in frontend/src/design-system/consumer-contracts.ts"
+        )
+    for file_path in stale_contracts:
+        issues.append(
+            f"frontend/src/design-system/consumer-contracts.ts: stale consumer contract for missing route-bound file {file_path}"
+        )
+
+    route_text = ""
+    route_root = root / "frontend" / "src" / "routes"
+    if route_root.exists():
+        route_text = "\n".join(path.read_text(encoding="utf-8") for path in iter_files(route_root, (".tsx",)))
+
+    catalog_path = root / "frontend" / "src" / "features" / "design-system" / "components" / "DesignSystemCatalog.tsx"
+    e2e_path = root / "frontend" / "e2e" / "design-system-catalog.pw.ts"
+    catalog_text = catalog_path.read_text(encoding="utf-8") if catalog_path.is_file() else ""
+    e2e_text = e2e_path.read_text(encoding="utf-8") if e2e_path.is_file() else ""
+    if contracts and ("consumer-readiness" not in catalog_text or "axisConsumerContracts" not in catalog_text):
+        issues.append(
+            "frontend/src/features/design-system/components/DesignSystemCatalog.tsx: "
+            "missing consumer readiness matrix rendered from axisConsumerContracts"
+        )
+    if contracts and ("consumer-readiness" not in catalog_text or "consumer-readiness-desktop.png" not in e2e_text):
+        issues.append(
+            "frontend/src/features/design-system/components/DesignSystemCatalog.tsx: "
+            "consumer readiness matrix needs a desktop Playwright screenshot"
+        )
+
+    for contract in contracts:
+        component = str(contract["component"])
+        file_path = str(contract["file"])
+        kind = str(contract["kind"])
+        route = str(contract["route"])
+        owner = str(contract["owner"])
+        readiness = str(contract["readiness"])
+        evidence = list(contract["evidence"])
+        test_files = list(contract["testFiles"])
+
+        if kind not in allowed_kinds:
+            issues.append(f"{file_path}: {component} contract kind must be public, auth, or authenticated")
+        if readiness not in {"ready", "candidate"}:
+            issues.append(f"{file_path}: {component} contract readiness must be `ready` or `candidate`")
+        if route not in route_text:
+            issues.append(f"{file_path}: {component} contract route `{route}` is not declared in frontend routes")
+        if not owner:
+            issues.append(f"{file_path}: {component} contract must name an owner")
+        for field_name in ("primitives", "states", "evidence", "testFiles"):
+            if not list(contract[field_name]):
+                issues.append(f"{file_path}: {component} contract must list at least one {field_name} value")
+
+        unknown_evidence = sorted(set(evidence) - allowed_evidence)
+        if unknown_evidence:
+            joined_values = ", ".join(f"`{value}`" for value in unknown_evidence)
+            issues.append(f"{file_path}: {component} contract has unknown evidence values: {joined_values}")
+
+        for test_file in test_files:
+            if not (root / test_file).is_file():
+                issues.append(f"{file_path}: test file `{test_file}` does not exist")
+
+    return issues
+
+
 def frontend_radius_token_issues(root: Path = ROOT) -> list[str]:
     issues: list[str] = []
     token_css = root / "frontend" / "src" / "design-system" / "tokens.css"
@@ -752,7 +908,10 @@ def frontend_radius_token_issues(root: Path = ROOT) -> list[str]:
 
 
 def frontend_component_composition_issues(root: Path = ROOT) -> list[str]:
-    issues: list[str] = [*frontend_primitive_contract_issues(root)]
+    issues: list[str] = [
+        *frontend_primitive_contract_issues(root),
+        *frontend_consumer_contract_issues(root),
+    ]
     src_root = root / "frontend" / "src"
     route_root = src_root / "routes"
     ui_root = src_root / "components" / "ui"
