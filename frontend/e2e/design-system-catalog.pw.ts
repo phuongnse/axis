@@ -6,12 +6,19 @@ const screenshotOptions = {
 } as const;
 
 test.describe('design system catalog', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      window.__AXIS_DISABLE_DEVTOOLS__ = true;
+    });
+  });
+
   test('DSCAT-001 catalog route exposes stable visual QA targets', async ({ page }) => {
     await page.goto('/design-system');
 
     await expect(page.getByRole('heading', { name: 'Axis design system' })).toBeVisible();
     await expect(page.locator('[data-visual-target="tokens"]')).toBeVisible();
     await expect(page.locator('[data-visual-target="primitive-readiness"]')).toBeVisible();
+    await expect(page.locator('[data-visual-target="consumer-readiness"]')).toBeVisible();
     await expect(page.locator('[data-visual-target="primitive-button"]')).toBeVisible();
     await expect(page.locator('[data-visual-target="primitive-icon-button"]')).toBeVisible();
     await expect(page.locator('[data-visual-target="primitive-action-link"]')).toBeVisible();
@@ -27,6 +34,10 @@ test.describe('design system catalog', () => {
     );
     await expect(page.locator('[data-visual-target="primitive-readiness"]')).toHaveScreenshot(
       'primitive-readiness-desktop.png',
+      screenshotOptions,
+    );
+    await expect(page.locator('[data-visual-target="consumer-readiness"]')).toHaveScreenshot(
+      'consumer-readiness-desktop.png',
       screenshotOptions,
     );
     await expect(page.locator('[data-visual-target="primitive-icon-button"]')).toHaveScreenshot(

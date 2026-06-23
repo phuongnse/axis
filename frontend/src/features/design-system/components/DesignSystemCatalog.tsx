@@ -39,6 +39,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Toolbar } from '@/components/ui/toolbar';
 import {
+  type AxisConsumerContract,
+  axisConsumerContracts,
+} from '@/design-system/consumer-contracts';
+import {
   type AxisPrimitiveContract,
   axisPrimitiveContracts,
 } from '@/design-system/primitive-contracts';
@@ -128,11 +132,73 @@ function ReadinessGroup({ label, values }: { label: string; values: readonly str
   );
 }
 
-function ReadinessBadge({ readiness }: { readiness: AxisPrimitiveContract['readiness'] }) {
+function ReadinessBadge({
+  readiness,
+}: {
+  readiness: AxisPrimitiveContract['readiness'] | AxisConsumerContract['readiness'];
+}) {
   return (
     <Badge variant={readiness === 'ready' ? 'success' : 'warning'}>
       {formatContractLabel(readiness)}
     </Badge>
+  );
+}
+
+function pluralize(count: number, singular: string) {
+  return `${count} ${singular}${count === 1 ? '' : 's'}`;
+}
+
+function ContractReferences({
+  sourceFile,
+  testFiles,
+  visualTargets = [],
+}: {
+  sourceFile: string;
+  testFiles: readonly string[];
+  visualTargets?: readonly string[];
+}) {
+  const summary = [
+    'source',
+    pluralize(testFiles.length, 'test'),
+    visualTargets.length > 0 ? pluralize(visualTargets.length, 'visual target') : null,
+  ]
+    .filter(Boolean)
+    .join(' + ');
+
+  return (
+    <details className="pt-1 text-xs text-muted-foreground">
+      <summary className="cursor-pointer font-medium text-muted-foreground hover:text-foreground">
+        References ({summary})
+      </summary>
+      <div className="mt-3 space-y-3 border-l border-border pl-3">
+        <div>
+          <p className="font-medium uppercase text-muted-foreground">Source</p>
+          <code className="mt-1 block break-all text-muted-foreground">{sourceFile}</code>
+        </div>
+        <div>
+          <p className="font-medium uppercase text-muted-foreground">Tests</p>
+          <div className="mt-1 space-y-1">
+            {testFiles.map((testFile) => (
+              <code key={testFile} className="block break-all text-muted-foreground">
+                {testFile}
+              </code>
+            ))}
+          </div>
+        </div>
+        {visualTargets.length > 0 ? (
+          <div>
+            <p className="font-medium uppercase text-muted-foreground">Visual targets</p>
+            <div className="mt-1 space-y-1">
+              {visualTargets.map((target) => (
+                <code key={target} className="block break-all text-muted-foreground">
+                  {target}
+                </code>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </details>
   );
 }
 
@@ -150,13 +216,69 @@ function PrimitiveReadinessMatrix() {
               <h3 className="text-sm font-semibold text-foreground">{contract.component}</h3>
               <ReadinessBadge readiness={contract.readiness} />
             </div>
-            <p className="break-all text-xs leading-5 text-muted-foreground">{contract.file}</p>
+            <p className="text-xs font-medium text-muted-foreground">Primitive contract</p>
+            <div className="flex flex-wrap gap-1.5">
+              <span className="rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">
+                {pluralize(contract.testFiles.length, 'test')}
+              </span>
+              <span className="rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">
+                {pluralize(contract.visualTargets.length, 'visual target')}
+              </span>
+            </div>
+            <ContractReferences
+              sourceFile={contract.file}
+              testFiles={contract.testFiles}
+              visualTargets={contract.visualTargets}
+            />
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <ReadinessGroup label="Variants" values={contract.variants} />
             <ReadinessGroup label="States" values={contract.states} />
             <ReadinessGroup label="Accessibility" values={contract.accessibility} />
             <ReadinessGroup label="Tokens" values={contract.tokenFamilies} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ConsumerReadinessMatrix() {
+  return (
+    <div className="grid gap-3">
+      {axisConsumerContracts.map((contract) => (
+        <div
+          key={contract.component}
+          className="grid gap-4 rounded-lg border border-border bg-card p-4 shadow-surface lg:grid-cols-[12rem_minmax(0,1fr)]"
+          data-consumer-contract={contract.component}
+        >
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-semibold text-foreground">{contract.component}</h3>
+              <ReadinessBadge readiness={contract.readiness} />
+            </div>
+            <p className="text-xs font-medium text-muted-foreground">{contract.surface}</p>
+            <div className="flex flex-wrap gap-1.5">
+              <span className="rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">
+                {contract.route}
+              </span>
+              <span className="rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">
+                {formatContractLabel(contract.owner)}
+              </span>
+              <span className="rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">
+                {formatContractLabel(contract.kind)}
+              </span>
+            </div>
+            <ContractReferences sourceFile={contract.file} testFiles={contract.testFiles} />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <ReadinessGroup label="Primitives" values={contract.primitives} />
+            <ReadinessGroup label="States" values={contract.states} />
+            <ReadinessGroup label="Evidence" values={contract.evidence} />
+            <ReadinessGroup
+              label="Coverage"
+              values={[pluralize(contract.testFiles.length, 'test file')]}
+            />
           </div>
         </div>
       ))}
@@ -586,6 +708,10 @@ export function DesignSystemCatalog() {
 
         <CatalogSection title="Primitive readiness" eyebrow="primitive-readiness">
           <PrimitiveReadinessMatrix />
+        </CatalogSection>
+
+        <CatalogSection title="Consumer contracts" eyebrow="consumer-readiness">
+          <ConsumerReadinessMatrix />
         </CatalogSection>
 
         <CatalogSection title="Button" eyebrow="primitive-button">

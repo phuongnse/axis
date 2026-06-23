@@ -63,6 +63,7 @@ Penpot owns the approved design token decisions. Frontend code owns the executab
 | `frontend/src/design-system/tokens.css` | Raw CSS variable values for light and dark themes |
 | `frontend/src/design-system/tokens.ts` | Typed token registry used by tests and future design-system tooling |
 | `frontend/src/design-system/primitive-contracts.ts` | UI primitive registry: file ownership, catalog target, visual target, readiness status, variant/state/accessibility matrix, token families, and test coverage |
+| `frontend/src/design-system/consumer-contracts.ts` | Route-bound UI consumer registry: product surface, route, owner, readiness, primitive usage, state coverage, evidence, and tests |
 | `frontend/tailwind.config.js` | Tailwind names that map to semantic CSS variables |
 
 When importing token updates from Penpot:
@@ -128,6 +129,14 @@ The table below is the human summary of the current executable contract:
 | `Skeleton`, `Progress`, `EmptyState` | Loading, quantitative progress, and empty-state feedback | Fixed skeleton blocks; determinate/indeterminate progress; empty state title/description/action | Progress requires an accessible label; empty-state icon is decorative | `bg-muted`, `accent-primary`, `rounded-md`, `rounded-full` for progress track | `feedback`, `structure-data` screenshots |
 | `PageHeader`, `Toolbar`, `ContentGrid` | Shared page-level layout rhythm | Header with eyebrow/title/description/actions; compact toolbar; responsive 1/2/3-column grid | Keeps heading/action order stable across viewports | `text-foreground`, `text-muted-foreground`, `border-border`, `bg-card`, shared spacing scale | `layout` desktop screenshot |
 
+## Consumer Contracts
+
+The executable consumer contract lives in `frontend/src/design-system/consumer-contracts.ts`. It covers route-bound product UI surfaces: public pages, auth pages, authenticated shell layout, and routed workspace views. The design-system catalog renders its readiness matrix from that file so reviewers can inspect which screens consume which primitives, which states are covered, and which tests prove the contract.
+
+Every routed product surface must have exactly one consumer contract entry before the route is introduced or changed. Mark the surface `candidate` when the current implementation is intentionally transitional, but still list the primitives, states, evidence, and test files that exist today. Do not skip a surface because the UI is small; small surfaces are where drift starts cheapest.
+
+Consumer contracts are not a substitute for use-case acceptance criteria. They prove design-system consumption and screen-state evidence only; product behavior still belongs to the owning use-case docs and tests.
+
 ## Component Catalog
 
 Use the frontend catalog route as the first visual QA harness:
@@ -151,6 +160,7 @@ Design-system rules should fail deterministically when they can be checked witho
 |---|---|
 | UI primitive files must have a registry contract | `python scripts/axis.py check frontend-component-composition` compares `frontend/src/components/ui/*.tsx` to `primitive-contracts.ts` |
 | Primitive contracts must name catalog, visual, readiness, and test coverage | Same check verifies catalog target strings, readiness matrix fields, desktop Playwright screenshot targets, and test file paths |
+| Route-bound product UI surfaces must have a consumer contract | Same check compares frontend route imports to `consumer-contracts.ts` and verifies owner, readiness, primitive/state/evidence metadata, catalog matrix, desktop screenshot target, and test files |
 | Component code must use semantic color and shadow tokens | `python scripts/axis.py check frontend-style` rejects raw neutral color utilities, raw shadow utilities, and arbitrary color/gradient classes in TS/TSX |
 | Token registry must match executable Tailwind mapping | `frontend/tests/design-tokens.test.ts` checks CSS variables, color, radius, shadow, and background-image mappings |
 
@@ -161,6 +171,7 @@ Do not add per-file allowlists for design-system violations. If a component need
 - Add or update tokens before component styles that need those values.
 - Add or update shared components before feature screens that need those components.
 - Add or update `primitive-contracts.ts` before broad use of a new UI primitive.
+- Add or update `consumer-contracts.ts` before exposing or changing a route-bound product UI surface.
 - Keep route files and feature pages thin; visual geometry belongs in shared components or feature-owned pattern components.
 - Do not write raw hex, HSL, arbitrary spacing, arbitrary radius, or page-local component clones when a token or shared component exists.
 - Do not add visual polish to wireframes to compensate for missing design-system decisions.
